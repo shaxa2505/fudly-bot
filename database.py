@@ -797,10 +797,53 @@ class Database:
     def approve_store(self, store_id: int):
         conn = self.get_connection()
         cursor = conn.cursor()
+        
+        # Получаем данные магазина и проверяем владельца
+        cursor.execute('''
+            SELECT s.owner_id, u.user_id, s.status, s.name 
+            FROM stores s
+            LEFT JOIN users u ON s.owner_id = u.user_id
+            WHERE s.store_id = ?
+        ''', (store_id,))
+        
+        result = cursor.fetchone()
+        if not result:
+            conn.close()
+            logger.error(f"Store {store_id} not found")
+            return False
+            
+        owner_id, user_exists, current_status, store_name = result
+        
+        # Проверяем что владелец существует
+        if not user_exists:
+            conn.close()
+            logger.error(f"Owner {owner_id} for store {store_id} ({store_name}) not found")
+            return False
+        
+        # Проверяем что магазин еще не одобрен
+        if current_status != 'pending':
+            conn.close()
+            logger.warning(f"Store {store_id} already has status: {current_status}")
+            return False
+        
+        # Обновляем статус магазина
         cursor.execute('UPDATE stores SET status = ? WHERE store_id = ?', ('approved', store_id))
-        cursor.execute('UPDATE users SET role = ? WHERE user_id = (SELECT owner_id FROM stores WHERE store_id = ?)', ('seller', store_id))
+        
+        # Обновляем роль владельца
+        cursor.execute('UPDATE users SET role = ? WHERE user_id = ?', ('seller', owner_id))
+        
         conn.commit()
         conn.close()
+        
+        # Инвалидируем кэш
+        try:
+            cache.delete(f'store:{store_id}')
+            cache.delete(f'user:{owner_id}')
+        except:
+            pass
+        
+        logger.info(f"Store {store_id} ({store_name}) approved, owner {owner_id} promoted to seller")
+        return True
     
     def reject_store(self, store_id: int, reason: str):
         conn = self.get_connection()

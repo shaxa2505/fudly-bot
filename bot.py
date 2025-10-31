@@ -1862,14 +1862,20 @@ async def approve_store(callback: types.CallbackQuery):
         return
     
     store_id = int(callback.data.split("_")[2])
-    db.approve_store(store_id)
     
-    # Получаем владельца магазина
+    # Получаем данные магазина до одобрения
     store = db.get_store(store_id)
-    if store:
-        owner_id = store[1]
-        db.update_user_role(owner_id, "seller")
-        
+    if not store:
+        await callback.answer("❌ Магазин не найден", show_alert=True)
+        return
+    
+    owner_id = store[1]
+    store_name = store[2]
+    
+    # Одобряем магазин (включает обновление роли владельца)
+    success = db.approve_store(store_id)
+    
+    if success:
         # Уведомляем владельца
         try:
             owner_lang = db.get_user_language(owner_id)
@@ -1879,14 +1885,17 @@ async def approve_store(callback: types.CallbackQuery):
                 parse_mode="HTML",
                 reply_markup=main_menu_seller(owner_lang)
             )
-        except:
-            pass
-    
-    await callback.message.edit_text(
-        callback.message.text + "\n\n✅ <b>ОДОБРЕНО</b>",
-        parse_mode="HTML"
-    )
-    await callback.answer(get_text(lang, 'store_approved_admin'))
+        except Exception as e:
+            logger.error(f"Failed to notify store owner {owner_id}: {e}")
+        
+        # Обновляем сообщение
+        await callback.message.edit_text(
+            callback.message.text + "\n\n✅ <b>ОДОБРЕНО</b>",
+            parse_mode="HTML"
+        )
+        await callback.answer(f"✅ Магазин '{store_name}' одобрен!")
+    else:
+        await callback.answer("❌ Ошибка при одобрении магазина", show_alert=True)
 
 @dp.callback_query(F.data.startswith("reject_"))
 async def reject_store(callback: types.CallbackQuery):
