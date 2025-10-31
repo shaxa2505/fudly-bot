@@ -403,17 +403,79 @@ class Database:
 
         return stores
     
+    def _format_datetime_field(self, time_input: str) -> str:
+        """
+        Преобразует различные форматы времени в стандартный формат YYYY-MM-DD HH:MM
+        """
+        from datetime import datetime, timedelta
+        
+        if not time_input:
+            return ""
+            
+        time_input = time_input.strip()
+        
+        # Если уже в правильном формате - возвращаем как есть
+        try:
+            datetime.strptime(time_input, '%Y-%m-%d %H:%M')
+            return time_input
+        except ValueError:
+            pass
+        
+        current_date = datetime.now()
+        
+        # Обрабатываем формат HH:MM (например "21:00")
+        try:
+            time_obj = datetime.strptime(time_input, '%H:%M')
+            # Добавляем сегодняшнюю дату
+            result_dt = current_date.replace(
+                hour=time_obj.hour, 
+                minute=time_obj.minute, 
+                second=0, 
+                microsecond=0
+            )
+            # Если время уже прошло сегодня, переносим на завтра
+            if result_dt <= current_date:
+                result_dt += timedelta(days=1)
+            return result_dt.strftime('%Y-%m-%d %H:%M')
+        except ValueError:
+            pass
+        
+        # Обрабатываем формат HH (например "21")
+        try:
+            hour = int(time_input)
+            if 0 <= hour <= 23:
+                result_dt = current_date.replace(
+                    hour=hour, 
+                    minute=0, 
+                    second=0, 
+                    microsecond=0
+                )
+                # Если время уже прошло сегодня, переносим на завтра
+                if result_dt <= current_date:
+                    result_dt += timedelta(days=1)
+                return result_dt.strftime('%Y-%m-%d %H:%M')
+        except ValueError:
+            pass
+        
+        # Если ничего не подходит, возвращаем исходное значение
+        return time_input
+
     # Методы для предложений
     def add_offer(self, store_id: int, title: str, description: str, original_price: float, 
                   discount_price: float, quantity: int, available_from: str, available_until: str, 
                   photo: str = None, expiry_date: str = None) -> int:
+        
+        # Приводим время к стандартному формату
+        formatted_from = self._format_datetime_field(available_from)
+        formatted_until = self._format_datetime_field(available_until)
+        
         conn = self.get_connection()
         cursor = conn.cursor()
         cursor.execute('''
             INSERT INTO offers (store_id, title, description, original_price, discount_price, 
                               quantity, available_from, available_until, expiry_date, status, photo)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'active', ?)
-        ''', (store_id, title, description, original_price, discount_price, quantity, available_from, available_until, expiry_date, photo))
+        ''', (store_id, title, description, original_price, discount_price, quantity, formatted_from, formatted_until, expiry_date, photo))
         offer_id = cursor.lastrowid
         conn.commit()
         try:
@@ -567,15 +629,36 @@ class Database:
         
         # Получаем текущую дату и время
         now = datetime.now()
+        current_time_str = now.strftime('%Y-%m-%d %H:%M')
         
-        # Деактивируем истекшие предложения
-        # available_until хранится как строка в формате "YYYY-MM-DD HH:MM"
+        # Сначала нормализуем все записи с неправильным форматом времени
+        cursor.execute('SELECT offer_id, available_until FROM offers WHERE status = "active"')
+        offers_to_fix = cursor.fetchall()
+        
+        for offer_id, available_until in offers_to_fix:
+            if available_until:
+                # Приводим к правильному формату если нужно
+                normalized_time = self._format_datetime_field(available_until)
+                if normalized_time != available_until:
+                    cursor.execute(
+                        'UPDATE offers SET available_until = ? WHERE offer_id = ?', 
+                        (normalized_time, offer_id)
+                    )
+        
+        conn.commit()
+        
+        # Теперь деактивируем истекшие предложения
         cursor.execute('''
             UPDATE offers 
             SET status = 'inactive' 
             WHERE status = 'active' 
-            AND datetime(available_until) < datetime(?)
-        ''', (now.strftime('%Y-%m-%d %H:%M'),))
+            AND available_until != ''
+            AND available_until IS NOT NULL
+            AND (
+                datetime(available_until) < datetime(?)
+                OR available_until NOT LIKE '%-%-%'
+            )
+        ''', (current_time_str,))
         
         deleted_count = cursor.rowcount
         conn.commit()
