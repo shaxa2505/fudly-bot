@@ -1,6 +1,7 @@
+# type: ignore
 import sqlite3
 import os
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import List, Optional, Tuple
 
 # pooling, caching and structured logging
@@ -244,7 +245,7 @@ class Database:
                 pass
     
     # Методы для пользователей
-    def add_user(self, user_id: int, username: str = None, first_name: str = None, role: str = 'customer', city: str = 'Ташкент'):
+    def add_user(self, user_id: int, username: Optional[str] = None, first_name: Optional[str] = None, role: str = 'customer', city: str = 'Ташкент'):
         conn = self.get_connection()
         cursor = conn.cursor()
         cursor.execute('''
@@ -308,7 +309,7 @@ class Database:
         return result[0] if result else 'ru'
     
     # Методы для магазинов
-    def add_store(self, owner_id: int, name: str, city: str, address: str = None, description: str = None, category: str = 'Ресторан', phone: str = None) -> int:
+    def add_store(self, owner_id: int, name: str, city: str, address: Optional[str] = None, description: Optional[str] = None, category: str = 'Ресторан', phone: Optional[str] = None) -> int:
         conn = self.get_connection()
         cursor = conn.cursor()
         cursor.execute('''
@@ -1245,4 +1246,68 @@ class Database:
         
         conn.commit()
         conn.close()
+
+    @staticmethod
+    def get_time_remaining(available_until: str) -> str:
+        """
+        Возвращает строку с оставшимся временем до окончания акции
+        Формат: '🕐 Осталось: 2 часа 15 минут ⏳' или '⏰ Акция закончилась'
+        """
+        if not available_until:
+            return ""
+            
+        try:
+            # Парсим время окончания
+            end_time = datetime.strptime(available_until, '%Y-%m-%d %H:%M')
+            current_time = datetime.now()
+            
+            # Если акция уже закончилась
+            if end_time <= current_time:
+                return "⏰ Акция закончилась"
+                
+            # Вычисляем разницу
+            time_diff = end_time - current_time
+            
+            # Получаем дни, часы и минуты
+            days = time_diff.days
+            hours, remainder = divmod(time_diff.seconds, 3600)
+            minutes, _ = divmod(remainder, 60)
+            
+            # Формируем строку
+            time_parts = []
+            
+            if days > 0:
+                if days == 1:
+                    time_parts.append("1 день")
+                elif days < 5:
+                    time_parts.append(f"{days} дня")
+                else:
+                    time_parts.append(f"{days} дней")
+                    
+            if hours > 0:
+                if hours == 1:
+                    time_parts.append("1 час")
+                elif hours < 5:
+                    time_parts.append(f"{hours} часа")
+                else:
+                    time_parts.append(f"{hours} часов")
+                    
+            if minutes > 0:
+                if minutes == 1:
+                    time_parts.append("1 минута")
+                elif minutes < 5:
+                    time_parts.append(f"{minutes} минуты")
+                else:
+                    time_parts.append(f"{minutes} минут")
+            
+            # Если осталось меньше минуты
+            if not time_parts:
+                return "🕐 Осталось: меньше минуты ⏳"
+                
+            time_str = " ".join(time_parts)
+            return f"🕐 Осталось: {time_str} ⏳"
+            
+        except ValueError:
+            # Если формат времени некорректный
+            return ""
 

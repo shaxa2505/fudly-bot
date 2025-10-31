@@ -121,14 +121,28 @@ rate_limiter = RateLimiter()
 
 def secure_user_input(func):
     """Decorator to sanitize user input for bot handlers."""
-    def wrapper(*args, **kwargs):
+    import asyncio
+    import functools
+    import inspect
+    
+    @functools.wraps(func)
+    async def wrapper(*args, **kwargs):
         try:
             # Log the function call for security monitoring
             logger.info(f"Handler called: {func.__name__}")
-            return func(*args, **kwargs)
+            
+            # Если функция асинхронная - вызываем напрямую
+            if inspect.iscoroutinefunction(func):
+                return await func(*args, **kwargs)
+            else:
+                # Если синхронная - оборачиваем в executor
+                loop = asyncio.get_event_loop()
+                return await loop.run_in_executor(None, lambda: func(*args, **kwargs))
+                
         except Exception as e:
             logger.error(f"Handler {func.__name__} failed: {str(e)}")
             raise
+    
     return wrapper
 
 

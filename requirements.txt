@@ -1,22 +1,26 @@
-# Fudly Telegram Bot - Production Dependencies
+# Fudly Telegram Bot - Core Dependencies
 
-# Telegram Bot Framework
+# Telegram Bot Framework (REQUIRED)
 aiogram>=3.0.0
 
-# Environment variables
+# Environment variables (REQUIRED)
 python-dotenv>=0.19.0
 
-# Production optimizations
-redis>=4.5.0                   # Caching (optional, falls back to in-memory)
-python-json-logger>=2.0.0      # Structured logging (optional, falls back to basic)
-Pillow>=10.0.0                 # Image processing and optimization
+# Web server for Render deployment (REQUIRED for Render)
+aiohttp>=3.8.0
+flask>=2.3.0
 
-# Development and testing
-pytest>=7.0.0                  # Testing framework
-pytest-asyncio>=0.21.0         # Async testing support
+# Optional dependencies (remove if not needed)
+# redis>=4.5.0                   # For Redis caching (optional, fallback to in-memory)
+# python-json-logger>=2.0.0      # For JSON logging (optional, fallback to basic logging)
+# Pillow>=10.0.0                 # For image processing (optional)
 
-# Security & Input Validation
-bleach>=6.0.0
+# Development and testing (optional)
+# pytest>=7.0.0                  # Testing framework  
+# pytest-asyncio>=0.21.0         # Async testing support
+
+# Security & Input Validation (recommended)
+# bleach>=6.0.0                   # HTML sanitization
 
 # HTTP client for health checks
 requests>=2.28.0

@@ -2,7 +2,7 @@ import logging
 import os
 
 try:
-    from pythonjsonlogger import jsonlogger
+    from pythonjsonlogger import jsonlogger  # pylint: disable=import-error
     HAS_JSON_LOGGER = True
 except ImportError:
     HAS_JSON_LOGGER = False

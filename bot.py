@@ -1,3 +1,4 @@
+# type: ignore
 from aiogram import Bot, Dispatcher, types, F
 from aiogram.filters import Command
 from aiogram.fsm.context import FSMContext
@@ -418,25 +419,35 @@ async def available_offers(message: types.Message):
         text += f"📦 {get_text(lang, 'available')}: {offer[6]} шт.\n"
         text += f"🕐 {get_text(lang, 'time')}: {offer[7]} - {offer[8]}\n"
         
+        # Показываем оставшееся время до конца акции
+        time_remaining = db.get_time_remaining(offer[8])
+        if time_remaining:
+            text += f"{time_remaining}\n"
+        
         # Показываем срок годности если он есть
-        if len(offer) > 10 and offer[9]:  # expiry_date - индекс 9
+        if len(offer) > 9 and offer[9]:  # expiry_date - индекс 9
             text += f"📅 Годен до: {offer[9]}\n"
         
-        text += f"📍 {offer[12]}, {offer[13]}"
+        # Добавляем информацию о магазине (индексы: 13-store_name, 15-city)
+        if len(offer) > 15:
+            text += f"📍 {offer[15]}, {offer[13]}"  # city, store_name
         
-        # Если есть фото
-        if offer[14]:  # photo field
+        # Если есть фото (индекс 11 - поле photo из таблицы offers)
+        if len(offer) > 11 and offer[11] and offer[11].strip():
             try:
                 await message.answer_photo(
-                    photo=offer[14],
+                    photo=offer[11],
                     caption=text,
                     parse_mode="HTML",
                     reply_markup=offer_keyboard(offer[0], lang)
                 )
-            except:
-                await message.answer(text, parse_mode="HTML", reply_markup=offer_keyboard(offer[0], lang))
-        else:
-            await message.answer(text, parse_mode="HTML", reply_markup=offer_keyboard(offer[0], lang))
+                continue  # Фото отправлено успешно, переходим к следующему
+            except Exception as e:
+                logger.error(f"Error sending photo {offer[11]}: {e}")
+                # Если фото не отправилось, отправляем без фото ниже
+        
+        # Отправляем без фото
+        await message.answer(text, parse_mode="HTML", reply_markup=offer_keyboard(offer[0], lang))
 
 # ============== БРОНИРОВАНИЕ ==============
 
@@ -530,6 +541,85 @@ async def book_offer_quantity(message: types.Message, state: FSMContext):
         
     except ValueError:
         await message.answer("❌ Введите число!")
+
+# ============== ПОДРОБНОСТИ ПРЕДЛОЖЕНИЯ ==============
+
+@dp.callback_query(F.data.startswith("details_"))
+async def offer_details(callback: types.CallbackQuery):
+    """Показывает подробную информацию о предложении"""
+    lang = db.get_user_language(callback.from_user.id)
+    offer_id = int(callback.data.split("_")[1])
+    
+    # Получаем полную информацию о предложении
+    conn = db.get_connection()
+    cursor = conn.cursor()
+    cursor.execute('''
+        SELECT o.*, s.name as store_name, s.address, s.city, s.phone, s.description as store_desc
+        FROM offers o 
+        JOIN stores s ON o.store_id = s.store_id 
+        WHERE o.offer_id = ?
+    ''', (offer_id,))
+    
+    offer_data = cursor.fetchone()
+    conn.close()
+    
+    if not offer_data:
+        await callback.answer("❌ Предложение не найдено", show_alert=True)
+        return
+    
+    # Формируем детальную информацию
+    discount_percent = int((1 - offer_data[5] / offer_data[4]) * 100)
+    
+    text = f"🍽 <b>{offer_data[2]}</b>\n\n"
+    text += f"📝 <b>Описание:</b> {offer_data[3]}\n\n"
+    text += f"💰 <b>Цена:</b> {int(offer_data[4]):,} ➜ <b>{int(offer_data[5]):,} сум</b> (-{discount_percent}%)\n"
+    text += f"📦 <b>Доступно:</b> {offer_data[6]} шт.\n"
+    text += f"🕐 <b>Время забора:</b> {offer_data[7]} - {offer_data[8]}\n"
+    
+    # Показываем оставшееся время до конца акции
+    time_remaining = db.get_time_remaining(offer_data[8])
+    if time_remaining:
+        text += f"{time_remaining}\n"
+    
+    # Показываем срок годности если есть
+    if offer_data[9]:  # expiry_date
+        text += f"📅 <b>Годен до:</b> {offer_data[9]}\n"
+    
+    # Индексы: 13-store_name, 14-address, 15-city, 16-phone, 17-store_desc
+    text += f"\n🏪 <b>Магазин:</b> {offer_data[13]}\n"
+    text += f"📍 <b>Адрес:</b> {offer_data[14]}, {offer_data[15]}\n"
+    
+    if offer_data[16]:  # phone
+        text += f"📞 <b>Телефон:</b> {offer_data[16]}\n"
+    
+    if offer_data[17]:  # store description
+        text += f"ℹ️ <b>О магазине:</b> {offer_data[17]}\n"
+    
+    # Если есть фото предложения (индекс 11 - поле photo)
+    if offer_data[11] and offer_data[11].strip():  # photo field
+        try:
+            await callback.message.edit_media(
+                media=types.InputMediaPhoto(
+                    media=offer_data[11],
+                    caption=text,
+                    parse_mode="HTML"
+                ),
+                reply_markup=offer_keyboard(offer_id, lang)
+            )
+        except:
+            await callback.message.edit_text(
+                text, 
+                parse_mode="HTML",
+                reply_markup=offer_keyboard(offer_id, lang)
+            )
+    else:
+        await callback.message.edit_text(
+            text, 
+            parse_mode="HTML",
+            reply_markup=offer_keyboard(offer_id, lang)
+        )
+    
+    await callback.answer()
 
 # ============== МОИ БРОНИРОВАНИЯ ==============
 
@@ -1113,7 +1203,12 @@ async def my_offers(message: types.Message):
         text = f"{'✅' if offer[9] == 'active' else '❌'} <b>{offer[2]}</b>\n"
         text += f"💰 {int(offer[4]):,} ➜ {int(offer[5]):,} сум\n"
         text += f"📦 Осталось: {offer[6]} шт.\n"
-        text += f"🕐 {offer[7]} - {offer[8]}"
+        text += f"🕐 {offer[7]} - {offer[8]}\n"
+        
+        # Показываем оставшееся время до конца акции
+        time_remaining = db.get_time_remaining(offer[8])
+        if time_remaining:
+            text += f"{time_remaining}"
         
         if offer[10]:  # photo (индекс 10, а не 14!)
             try:

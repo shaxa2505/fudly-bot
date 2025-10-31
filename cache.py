@@ -4,13 +4,15 @@ import pickle
 import threading
 
 try:
-    import redis
+    import redis  # pylint: disable=import-error
 except Exception:
     redis = None
 
 
 class RedisCache:
     def __init__(self, url: str):
+        if redis is None:
+            raise ImportError("Redis library not installed")
         self.client = redis.from_url(url)
 
     def get(self, key: str):
