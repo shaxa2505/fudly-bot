@@ -1,0 +1,31 @@
+# Fudly Telegram Bot - Production Dependencies
+
+# Telegram Bot Framework
+aiogram>=3.0.0
+
+# Environment variables
+python-dotenv>=0.19.0
+
+# Production optimizations
+redis>=4.5.0                   # Caching (optional, falls back to in-memory)
+python-json-logger>=2.0.0      # Structured logging (optional, falls back to basic)
+Pillow>=10.0.0                 # Image processing and optimization
+
+# Development and testing
+pytest>=7.0.0                  # Testing framework
+pytest-asyncio>=0.21.0         # Async testing support
+
+# Security & Input Validation
+bleach>=6.0.0
+
+# HTTP client for health checks
+requests>=2.28.0
+
+# Database connection pooling (alternative to our custom pool)
+# sqlalchemy>=2.0.0  # uncomment if switching to SQLAlchemy
+
+# База данных (встроена в Python, но указываем для информации)
+# sqlite3 - встроен в Python
+
+# Асинхронность (встроена в Python 3.8+)
+# asyncio - встроен в Python
