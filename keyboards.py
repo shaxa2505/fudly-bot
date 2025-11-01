@@ -169,7 +169,7 @@ def settings_keyboard(notifications_enabled: bool, lang: str = 'ru'):
     notif_text = "🔔 Откл. уведомления" if notifications_enabled else "🔕 Вкл. уведомления"
     builder = InlineKeyboardBuilder()
     builder.button(text=notif_text, callback_data="toggle_notifications")
-    builder.button(text=f"🌍 {get_text(lang, 'change_language')}", callback_data="change_language")
+    builder.button(text=get_text(lang, 'change_language'), callback_data="change_language")
     builder.button(text="🗑 Удалить аккаунт", callback_data="delete_account")
     builder.adjust(1)
     return builder.as_markup()

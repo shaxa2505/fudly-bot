@@ -738,38 +738,53 @@ async def my_bookings(message: types.Message):
         await message.answer(get_text(lang, 'my_bookings_empty'))
         return
     
-    await message.answer(get_text(lang, 'active_bookings', count=len(bookings)), parse_mode="HTML")
+    # Разделим бронирования по статусам
+    active_bookings = [b for b in bookings if b[3] in ['pending', 'confirmed']]
+    completed_bookings = [b for b in bookings if b[3] == 'completed']
+    cancelled_bookings = [b for b in bookings if b[3] == 'cancelled']
     
-    # SQL: b.* (8 полей: 0-7), o.title (8), o.discount_price (9), o.available_until (10), s.name (11), s.address (12), s.city (13)
-    # b.* = booking_id[0], offer_id[1], user_id[2], status[3], booking_code[4], pickup_time[5], quantity[6], created_at[7]
-    for booking in bookings:
-        if booking[3] == "pending":
-            try:
-                quantity = 1
-                # Пытаемся получить quantity из разных позиций
-                for i in [6, 7, 8]:
-                    if len(booking) > i and booking[i] and str(booking[i]).isdigit():
-                        quantity = int(booking[i])
-                        break
-            except:
-                quantity = 1
+    total_text = f"📋 <b>Мои бронирования</b>\n\n"
+    total_text += f"🟢 Активные: {len(active_bookings)}\n"
+    total_text += f"✅ Завершенные: {len(completed_bookings)}\n"
+    total_text += f"❌ Отмененные: {len(cancelled_bookings)}"
+    
+    await message.answer(total_text, parse_mode="HTML")
+    
+    # Показываем активные бронирования
+    for booking in active_bookings:
+        try:
+            quantity = booking[6] if len(booking) > 6 and booking[6] else 1
+            discount_price = float(booking[9]) if len(booking) > 9 else 0
+            total_price = int(discount_price * quantity)
             
-            try:
-                discount_price = float(booking[9]) if len(booking) > 9 else 0
-            except:
-                discount_price = 0
-            total_price = int(discount_price * quantity)  # discount_price * quantity
+            # Определяем статус
+            status_emoji = {"pending": "⏳", "confirmed": "✅", "completed": "🎉", "cancelled": "❌"}
+            status_text = {"pending": "Ожидает", "confirmed": "Подтвержден", "completed": "Завершен", "cancelled": "Отменен"}
             
-            text = f"🎫 <b>#{booking[0]}</b>\n"
+            text = f"🎫 <b>#{booking[0]}</b> {status_emoji.get(booking[3], '📋')} {status_text.get(booking[3], booking[3])}\n"
             text += f"🍽 {booking[8]}\n"  # title
             text += f"🏪 {booking[11]}\n"  # store_name
-            text += f"� Количество: {quantity} шт\n"
+            text += f"📦 Количество: {quantity} шт\n"
             text += f"💰 {total_price:,} сум\n"
             text += f"📍 {booking[13]}, {booking[12]}\n"  # city, address
             text += f"🕐 {booking[10]}\n\n"  # available_until
             text += f"🎫 Код: <code>{booking[4]}</code>"  # booking_code
             
-            await message.answer(text, parse_mode="HTML", reply_markup=booking_keyboard(booking[0], lang))
+            # Создаем клавиатуру в зависимости от статуса
+            keyboard = InlineKeyboardBuilder()
+            if booking[3] == 'pending':
+                keyboard.button(text="❌ Отменить", callback_data=f"cancel_booking_{booking[0]}")
+                keyboard.button(text="✅ Завершить", callback_data=f"complete_booking_{booking[0]}")
+                keyboard.adjust(2)
+            elif booking[3] == 'confirmed':
+                keyboard.button(text="✅ Завершить", callback_data=f"complete_booking_{booking[0]}")
+                keyboard.button(text="⭐ Оценить", callback_data=f"rate_booking_{booking[0]}")
+                keyboard.adjust(2)
+            
+            await message.answer(text, parse_mode="HTML", reply_markup=keyboard.as_markup())
+        except Exception as e:
+            logger.error(f"Error displaying booking {booking[0]}: {e}")
+            continue
 
 @dp.callback_query(F.data.startswith("cancel_booking_"))
 async def cancel_booking(callback: types.CallbackQuery):
@@ -777,7 +792,7 @@ async def cancel_booking(callback: types.CallbackQuery):
     booking_id = int(callback.data.split("_")[2])
     
     booking = db.get_booking(booking_id)
-    if booking and booking[3] == 'pending':  # Только если статус pending
+    if booking and booking[3] in ['pending', 'confirmed']:  # Можно отменить pending и confirmed
         offer = db.get_offer(booking[1])
         if offer:
             db.cancel_booking(booking_id)
@@ -787,6 +802,82 @@ async def cancel_booking(callback: types.CallbackQuery):
         await callback.message.edit_text(
             callback.message.text + f"\n\n❌ {get_text(lang, 'booking_cancelled')}"
         )
+    await callback.answer()
+
+@dp.callback_query(F.data.startswith("complete_booking_"))
+async def complete_booking(callback: types.CallbackQuery):
+    """Завершает бронирование"""
+    lang = db.get_user_language(callback.from_user.id)
+    booking_id = int(callback.data.split("_")[2])
+    
+    booking = db.get_booking(booking_id)
+    if booking and booking[3] in ['pending', 'confirmed']:
+        # Обновляем статус на completed
+        conn = db.get_connection()
+        cursor = conn.cursor()
+        cursor.execute('UPDATE bookings SET status = ? WHERE booking_id = ?', ('completed', booking_id))
+        conn.commit()
+        conn.close()
+        
+        await callback.message.edit_text(
+            callback.message.text + f"\n\n✅ Заказ завершен! Спасибо за покупку!"
+        )
+    await callback.answer()
+
+@dp.callback_query(F.data.startswith("rate_booking_"))
+async def rate_booking(callback: types.CallbackQuery):
+    """Оценить магазин после завершения заказа"""
+    lang = db.get_user_language(callback.from_user.id)
+    booking_id = int(callback.data.split("_")[2])
+    
+    booking = db.get_booking(booking_id)
+    if not booking:
+        await callback.answer("❌ Бронирование не найдено", show_alert=True)
+        return
+    
+    # Получаем информацию о магазине через предложение
+    offer = db.get_offer(booking[1])
+    if not offer:
+        await callback.answer("❌ Предложение не найдено", show_alert=True)
+        return
+    
+    store_id = offer[1]
+    store = db.get_store(store_id)
+    
+    # Создаем клавиатуру с рейтингами
+    keyboard = InlineKeyboardBuilder()
+    for rating in range(1, 6):
+        keyboard.button(text=f"{'⭐' * rating}", callback_data=f"booking_rate_{booking_id}_{rating}")
+    keyboard.adjust(5)
+    
+    text = f"⭐ <b>Оцените ваш заказ</b>\n\n🎫 #{booking_id}\n🏪 {store[2]}\n\nВыберите оценку:"
+    await callback.message.edit_text(text, parse_mode="HTML", reply_markup=keyboard.as_markup())
+    await callback.answer()
+
+@dp.callback_query(F.data.startswith("booking_rate_"))
+async def save_booking_rating(callback: types.CallbackQuery):
+    """Сохраняет оценку заказа"""
+    lang = db.get_user_language(callback.from_user.id)
+    parts = callback.data.split("_")
+    booking_id = int(parts[2])
+    rating = int(parts[3])
+    
+    # Получаем информацию о бронировании и магазине
+    booking = db.get_booking(booking_id)
+    offer = db.get_offer(booking[1])
+    store_id = offer[1]
+    
+    # Сохраняем рейтинг
+    conn = db.get_connection()
+    cursor = conn.cursor()
+    cursor.execute('INSERT OR REPLACE INTO ratings (booking_id, user_id, store_id, rating) VALUES (?, ?, ?, ?)', 
+                  (booking_id, callback.from_user.id, store_id, rating))
+    conn.commit()
+    conn.close()
+    
+    await callback.message.edit_text(
+        f"✅ Спасибо за оценку: {'⭐' * rating}\n\nВаш отзыв поможет другим покупателям!"
+    )
     await callback.answer()
 
 # ============== СТАТЬ ПАРТНЁРОМ ==============

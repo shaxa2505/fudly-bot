@@ -1,1 +1,2 @@
-web: python render_app.py
+worker: python bot.py
+
