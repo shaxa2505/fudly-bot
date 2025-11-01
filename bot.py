@@ -16,6 +16,7 @@ from datetime import datetime
 from dotenv import load_dotenv
 from database import Database
 from keyboards import *
+from keyboards import units_keyboard, product_categories_keyboard
 from localization import get_text, get_cities, get_categories
 
 # Production optimizations (optional imports with fallbacks)
@@ -118,6 +119,8 @@ class CreateOffer(StatesGroup):
     original_price = State()
     discount_price = State()
     quantity = State()
+    unit = State()  # Единицы измерения
+    category = State()  # Категория товара
     available_from = State()
     expiry_date = State()  # Новое поле для срока годности (дата)
     available_until = State()  # Остается для времени забора
@@ -416,7 +419,10 @@ async def available_offers(message: types.Message):
         text = f"🍽 <b>{offer[2]}</b>\n"
         text += f"📝 {offer[3]}\n\n"
         text += f"💰 {int(offer[4]):,} ➜ <b>{int(offer[5]):,} сум</b> (-{discount_percent}%)\n"
-        text += f"📦 {get_text(lang, 'available')}: {offer[6]} шт.\n"
+        
+        # Показываем количество с правильными единицами измерения
+        unit = offer[13] if len(offer) > 13 and offer[13] else 'шт'  # unit field index 13
+        text += f"📦 {get_text(lang, 'available')}: {offer[6]} {unit}\n"
         text += f"🕐 {get_text(lang, 'time')}: {offer[7]} - {offer[8]}\n"
         
         # Показываем оставшееся время до конца акции
@@ -425,18 +431,19 @@ async def available_offers(message: types.Message):
             text += f"{time_remaining}\n"
         
         # Показываем срок годности если он есть
-        if len(offer) > 9 and offer[9]:  # expiry_date - индекс 9
-            text += f"📅 Годен до: {offer[9]}\n"
+        if len(offer) > 12 and offer[12]:  # expiry_date - индекс 12
+            text += f"📅 Годен до: {offer[12]}\n"
         
-        # Добавляем информацию о магазине (индексы: 13-store_name, 15-city)
-        if len(offer) > 15:
-            text += f"📍 {offer[15]}, {offer[13]}"  # city, store_name
+        # Добавляем информацию о магазине (правильные индексы для JOIN)
+        # Структура: offers(0-14) + stores(15-19): store_name[15], address[16], city[17], category[18]
+        if len(offer) > 17:
+            text += f"📍 {offer[17]}, {offer[15]}"  # city, store_name - правильный порядок
         
-        # Если есть фото (индекс 11 - поле photo из таблицы offers)
-        if len(offer) > 11 and offer[11] and offer[11].strip():
+        # Если есть фото (индекс 10 - поле photo из таблицы offers)
+        if len(offer) > 10 and offer[10] and offer[10].strip():
             try:
                 await message.answer_photo(
-                    photo=offer[11],
+                    photo=offer[10],
                     caption=text,
                     parse_mode="HTML",
                     reply_markup=offer_keyboard(offer[0], lang)
@@ -568,12 +575,18 @@ async def offer_details(callback: types.CallbackQuery):
         return
     
     # Формируем детальную информацию
+    # offers: [0]offer_id, [1]store_id, [2]title, [3]description, [4]original_price, [5]discount_price,
+    # [6]quantity, [7]available_from, [8]available_until, [9]status, [10]photo, [11]created_at, 
+    # [12]expiry_date, [13]unit, [14]category
+    # stores: [15]store_name, [16]address, [17]city, [18]phone, [19]store_desc
+    
     discount_percent = int((1 - offer_data[5] / offer_data[4]) * 100)
+    unit = offer_data[13] if offer_data[13] else 'шт'
     
     text = f"🍽 <b>{offer_data[2]}</b>\n\n"
     text += f"📝 <b>Описание:</b> {offer_data[3]}\n\n"
     text += f"💰 <b>Цена:</b> {int(offer_data[4]):,} ➜ <b>{int(offer_data[5]):,} сум</b> (-{discount_percent}%)\n"
-    text += f"📦 <b>Доступно:</b> {offer_data[6]} шт.\n"
+    text += f"📦 <b>Доступно:</b> {offer_data[6]} {unit}\n"
     text += f"🕐 <b>Время забора:</b> {offer_data[7]} - {offer_data[8]}\n"
     
     # Показываем оставшееся время до конца акции
@@ -582,43 +595,136 @@ async def offer_details(callback: types.CallbackQuery):
         text += f"{time_remaining}\n"
     
     # Показываем срок годности если есть
-    if offer_data[9]:  # expiry_date
-        text += f"📅 <b>Годен до:</b> {offer_data[9]}\n"
+    if offer_data[12]:  # expiry_date - правильный индекс
+        text += f"📅 <b>Годен до:</b> {offer_data[12]}\n"
     
-    # Индексы: 13-store_name, 14-address, 15-city, 16-phone, 17-store_desc
-    text += f"\n🏪 <b>Магазин:</b> {offer_data[13]}\n"
-    text += f"📍 <b>Адрес:</b> {offer_data[14]}, {offer_data[15]}\n"
+    # Правильные индексы: 15-store_name, 16-address, 17-city, 18-phone, 19-store_desc
+    text += f"\n🏪 <b>Магазин:</b> {offer_data[15]}\n"
+    text += f"📍 <b>Адрес:</b> {offer_data[16]}, {offer_data[17]}\n"
     
-    if offer_data[16]:  # phone
-        text += f"📞 <b>Телефон:</b> {offer_data[16]}\n"
+    if offer_data[18]:  # phone
+        text += f"📞 <b>Телефон:</b> {offer_data[18]}\n"
     
-    if offer_data[17]:  # store description
-        text += f"ℹ️ <b>О магазине:</b> {offer_data[17]}\n"
+    if offer_data[19]:  # store description - правильный индекс
+        text += f"ℹ️ <b>О магазине:</b> {offer_data[19]}\n"
     
-    # Если есть фото предложения (индекс 11 - поле photo)
-    if offer_data[11] and offer_data[11].strip():  # photo field
+    # Создаем клавиатуру только с кнопкой бронирования
+    keyboard = InlineKeyboardBuilder()
+    keyboard.button(text="🛒 Забронировать", callback_data=f"book_{offer_id}")
+    keyboard.adjust(1)
+    
+    # Если есть фото предложения (индекс 10 - поле photo)
+    if offer_data[10] and offer_data[10].strip():  # photo field - правильный индекс
         try:
             await callback.message.edit_media(
                 media=types.InputMediaPhoto(
-                    media=offer_data[11],
+                    media=offer_data[10],
                     caption=text,
                     parse_mode="HTML"
                 ),
-                reply_markup=offer_keyboard(offer_id, lang)
+                reply_markup=keyboard.as_markup()
             )
-        except:
+        except Exception as e:
+            logger.error(f"Error editing photo: {e}")
             await callback.message.edit_text(
                 text, 
                 parse_mode="HTML",
-                reply_markup=offer_keyboard(offer_id, lang)
+                reply_markup=keyboard.as_markup()
             )
     else:
         await callback.message.edit_text(
             text, 
             parse_mode="HTML",
-            reply_markup=offer_keyboard(offer_id, lang)
+            reply_markup=keyboard.as_markup()
         )
     
+    await callback.answer()
+
+# ============== ТОВАРЫ МАГАЗИНА ==============
+
+@dp.callback_query(F.data.startswith("store_offers_"))
+async def show_store_offers(callback: types.CallbackQuery):
+    """Показывает товары конкретного магазина"""
+    lang = db.get_user_language(callback.from_user.id)
+    store_id = int(callback.data.split("_")[2])
+    
+    # Получаем информацию о магазине
+    store = db.get_store(store_id)
+    if not store:
+        await callback.answer("❌ Магазин не найден", show_alert=True)
+        return
+    
+    # Получаем товары магазина
+    offers = db.get_active_offers(store_id=store_id)
+    
+    if not offers:
+        text = f"🏪 <b>{store[2]}</b>\n\n😔 В этом магазине пока нет активных предложений"
+        await callback.message.edit_text(text, parse_mode="HTML")
+        await callback.answer()
+        return
+    
+    # Показываем заголовок
+    text = f"🏪 <b>{store[2]}</b>\n📍 {store[4]}\n\n🛍 <b>Доступные товары ({len(offers)}):</b>\n\n"
+    
+    # Добавляем первые 5 товаров в текст
+    for i, offer in enumerate(offers[:5]):
+        discount_percent = int((1 - offer[5] / offer[4]) * 100)
+        unit = offer[13] if len(offer) > 13 and offer[13] else 'шт'
+        
+        text += f"{i+1}. <b>{offer[2]}</b>\n"
+        text += f"   💰 {int(offer[4]):,} ➜ {int(offer[5]):,} сум (-{discount_percent}%)\n"
+        text += f"   📦 {offer[6]} {unit}\n"
+        if len(offer) > 12 and offer[12]:
+            text += f"   📅 До: {offer[12]}\n"
+        text += "\n"
+    
+    if len(offers) > 5:
+        text += f"... и еще {len(offers) - 5} товаров"
+    
+    # Создаем кнопки для каждого товара
+    keyboard = InlineKeyboardBuilder()
+    for i, offer in enumerate(offers[:6]):  # Показываем кнопки для первых 6 товаров
+        keyboard.button(text=f"📦 {offer[2][:20]}...", callback_data=f"details_{offer[0]}")
+    keyboard.adjust(2)
+    
+    await callback.message.edit_text(text, parse_mode="HTML", reply_markup=keyboard.as_markup())
+    await callback.answer()
+
+@dp.callback_query(F.data.regex(r"^store_\d+$"))
+async def show_store_info(callback: types.CallbackQuery):
+    """Показывает информацию о магазине и его товары"""
+    lang = db.get_user_language(callback.from_user.id)
+    store_id = int(callback.data.split("_")[1])
+    
+    # Получаем информацию о магазине
+    store = db.get_store(store_id)
+    if not store:
+        await callback.answer("❌ Магазин не найден", show_alert=True)
+        return
+    
+    # Получаем товары магазина
+    offers = db.get_active_offers(store_id=store_id)
+    avg_rating = db.get_store_average_rating(store_id)
+    ratings = db.get_store_ratings(store_id)
+    
+    text = f"🏪 <b>{store[2]}</b>\n\n"
+    text += f"🏷 <b>Категория:</b> {store[6]}\n"
+    text += f"📍 <b>Адрес:</b> {store[4]}\n"
+    text += f"📝 <b>Описание:</b> {store[5]}\n"
+    text += f"⭐ <b>Рейтинг:</b> {avg_rating:.1f}/5 ({len(ratings)} отзывов)\n"
+    text += f"🛍 <b>Активных товаров:</b> {len(offers)}\n"
+    
+    if store[7]:  # phone
+        text += f"📞 <b>Телефон:</b> {store[7]}\n"
+    
+    # Добавляем кнопки
+    keyboard = InlineKeyboardBuilder()
+    if offers:
+        keyboard.button(text="🛍 Смотреть товары", callback_data=f"store_offers_{store_id}")
+    keyboard.button(text="⭐ Оставить отзыв", callback_data=f"rate_store_{store_id}")
+    keyboard.adjust(2)
+    
+    await callback.message.edit_text(text, parse_mode="HTML", reply_markup=keyboard.as_markup())
     await callback.answer()
 
 # ============== МОИ БРОНИРОВАНИЯ ==============
@@ -929,10 +1035,34 @@ async def create_offer_quantity(message: types.Message, state: FSMContext):
     try:
         qty = int(message.text)
         await state.update_data(quantity=qty)
-        await message.answer(get_text(lang, 'time_from'))
-        await state.set_state(CreateOffer.available_from)
+        await message.answer("📏 Выберите единицы измерения:", reply_markup=units_keyboard(lang))
+        await state.set_state(CreateOffer.unit)
     except:
         await message.answer(get_text(lang, 'error_invalid_number'))
+
+@dp.message(CreateOffer.unit)
+async def create_offer_unit(message: types.Message, state: FSMContext):
+    lang = db.get_user_language(message.from_user.id)
+    await state.update_data(unit=message.text)
+    await message.answer("🏷 Выберите категорию товара:", reply_markup=product_categories_keyboard(lang))
+    await state.set_state(CreateOffer.category)
+
+@dp.message(CreateOffer.category)
+async def create_offer_category(message: types.Message, state: FSMContext):
+    lang = db.get_user_language(message.from_user.id)
+    # Извлекаем английское название категории из эмодзи текста
+    category_map = {
+        '🍞 Хлеб и выпечка': 'bakery', '🥛 Молочные продукты': 'dairy', '🥩 Мясо и птица': 'meat',
+        '🐟 Рыба и морепродукты': 'fish', '🥬 Овощи': 'vegetables', '🍎 Фрукты и ягоды': 'fruits',
+        '🧀 Сыры': 'cheese', '🥚 Яйца': 'eggs', '🍚 Крупы и макароны': 'grains',
+        '🥫 Консервы': 'canned', '🍫 Кондитерские изделия': 'sweets', '🍪 Печенье и снэки': 'snacks',
+        '☕ Чай и кофе': 'drinks_hot', '🥤 Напитки': 'drinks', '🧴 Бытовая химия': 'household',
+        '🧼 Гигиена': 'hygiene', '🏠 Для дома': 'home', '🎯 Другое': 'other'
+    }
+    category = category_map.get(message.text, 'other')
+    await state.update_data(category=category)
+    await message.answer(get_text(lang, 'time_from'), reply_markup=types.ReplyKeyboardRemove())
+    await state.set_state(CreateOffer.available_from)
 
 @dp.message(CreateOffer.available_from)
 async def create_offer_time_from(message: types.Message, state: FSMContext):
@@ -967,25 +1097,38 @@ async def create_offer_time_until(message: types.Message, state: FSMContext):
         data['available_from'],  # Время начала (например "18:00")
         message.text,  # Время окончания (например "21:00")
         data.get('photo'),
-        data.get('expiry_date')  # Срок годности (например "31.12.2025")
+        data.get('expiry_date'),  # Срок годности (например "31.12.2025")
+        data.get('unit', 'шт'),   # Единицы измерения
+        data.get('category', 'other')  # Категория товара
     )
     
     await state.clear()
     
     discount = int((1 - data['discount_price'] / data['original_price']) * 100)
+    unit = data.get('unit', 'шт')
     text = get_text(lang, 'offer_created',
                    title=data['title'],
                    description=data['description'],
                    original_price=f"{int(data['original_price']):,}",
                    discount_price=f"{int(data['discount_price']):,}",
                    discount=discount,
-                   quantity=data['quantity'],
+                   quantity=f"{data['quantity']} {unit}",
                    time_from=data['available_from'],
                    time_until=message.text)
     
-    # Добавляем информацию о сроке годности отдельно
+    # Добавляем информацию о сроке годности и категории
     if data.get('expiry_date'):
         text += f"\n\n📅 Срок годности: {data['expiry_date']}"
+    if data.get('category') and data['category'] != 'other':
+        category_names = {
+            'bakery': 'Хлеб и выпечка', 'dairy': 'Молочные продукты', 'meat': 'Мясо и птица',
+            'fish': 'Рыба и морепродукты', 'vegetables': 'Овощи', 'fruits': 'Фрукты и ягоды',
+            'cheese': 'Сыры', 'eggs': 'Яйца', 'grains': 'Крупы и макароны', 'canned': 'Консервы',
+            'sweets': 'Кондитерские изделия', 'snacks': 'Печенье и снэки', 'drinks_hot': 'Чай и кофе',
+            'drinks': 'Напитки', 'household': 'Бытовая химия', 'hygiene': 'Гигиена', 'home': 'Для дома'
+        }
+        category_name = category_names.get(data['category'], data['category'])
+        text += f"\n🏷 Категория: {category_name}"
     text += f"\n🕐 Время забора: {data['available_from']} - {message.text}"
     
     if data.get('photo'):
@@ -1196,14 +1339,21 @@ async def my_offers(message: types.Message):
     
     await message.answer(get_text(lang, 'your_offers', count=len(all_offers)), parse_mode="HTML")
     
-    # offers: SELECT * FROM offers (11 полей)
+    # offers: SELECT * FROM offers (теперь с новыми полями)
     # [0]offer_id, [1]store_id, [2]title, [3]description, [4]original_price, [5]discount_price,
-    # [6]quantity, [7]available_from, [8]available_until, [9]status, [10]photo, [11]created_at
+    # [6]quantity, [7]available_from, [8]available_until, [9]status, [10]photo, [11]created_at, [12]expiry_date, [13]unit, [14]category
     for offer in all_offers[:15]:
         text = f"{'✅' if offer[9] == 'active' else '❌'} <b>{offer[2]}</b>\n"
         text += f"💰 {int(offer[4]):,} ➜ {int(offer[5]):,} сум\n"
-        text += f"📦 Осталось: {offer[6]} шт.\n"
+        
+        # Показываем количество с правильными единицами измерения
+        unit = offer[13] if len(offer) > 13 and offer[13] else 'шт'
+        text += f"📦 Осталось: {offer[6]} {unit}\n"
         text += f"🕐 {offer[7]} - {offer[8]}\n"
+        
+        # Показываем срок годности вместо времени акции
+        if len(offer) > 12 and offer[12]:
+            text += f"📅 Годен до: {offer[12]}\n"
         
         # Показываем оставшееся время до конца акции
         time_remaining = db.get_time_remaining(offer[8])
@@ -1326,6 +1476,59 @@ async def rate_store(callback: types.CallbackQuery):
     )
     await callback.answer()
 
+@dp.callback_query(F.data.startswith("rate_store_"))
+async def rate_store_direct(callback: types.CallbackQuery):
+    """Оценить магазин напрямую"""
+    lang = db.get_user_language(callback.from_user.id)
+    store_id = int(callback.data.split("_")[2])
+    
+    # Получаем информацию о магазине
+    store = db.get_store(store_id)
+    if not store:
+        await callback.answer("❌ Магазин не найден", show_alert=True)
+        return
+    
+    # Создаем клавиатуру с рейтингами
+    keyboard = InlineKeyboardBuilder()
+    for rating in range(1, 6):
+        keyboard.button(text=f"{'⭐' * rating}", callback_data=f"store_rating_{store_id}_{rating}")
+    keyboard.adjust(5)
+    
+    text = f"⭐ <b>Оцените магазин</b>\n\n🏪 {store[2]}\n📍 {store[4]}\n\nВыберите оценку:"
+    await callback.message.edit_text(text, parse_mode="HTML", reply_markup=keyboard.as_markup())
+    await callback.answer()
+
+@dp.callback_query(F.data.startswith("store_rating_"))
+async def save_store_rating(callback: types.CallbackQuery):
+    """Сохраняет оценку магазина"""
+    lang = db.get_user_language(callback.from_user.id)
+    parts = callback.data.split("_")
+    store_id = int(parts[2])
+    rating = int(parts[3])
+    
+    # Проверяем, не оценивал ли уже пользователь этот магазин
+    conn = db.get_connection()
+    cursor = conn.cursor()
+    cursor.execute('SELECT COUNT(*) FROM ratings WHERE store_id = ? AND user_id = ?', (store_id, callback.from_user.id))
+    already_rated = cursor.fetchone()[0] > 0
+    
+    if already_rated:
+        # Обновляем существующую оценку
+        cursor.execute('UPDATE ratings SET rating = ? WHERE store_id = ? AND user_id = ?', 
+                      (rating, store_id, callback.from_user.id))
+        message_text = f"✅ Оценка обновлена: {'⭐' * rating}"
+    else:
+        # Добавляем новую оценку
+        cursor.execute('INSERT INTO ratings (store_id, user_id, rating) VALUES (?, ?, ?)', 
+                      (store_id, callback.from_user.id, rating))
+        message_text = f"✅ Спасибо за оценку: {'⭐' * rating}"
+    
+    conn.commit()
+    conn.close()
+    
+    await callback.message.edit_text(message_text, parse_mode="HTML")
+    await callback.answer()
+
 # ============== МОИ МАГАЗИНЫ ==============
 
 @dp.message(F.text.contains("Магазины") | F.text.contains("Dokonlar"))
@@ -1357,7 +1560,13 @@ async def all_stores(message: types.Message):
 📝 {store[5]}
 ⭐ Рейтинг: {avg_rating:.1f}/5 ({len(ratings)} отзывов)"""
         
-        await message.answer(text, parse_mode="HTML")
+        # Добавляем кнопку для просмотра товаров магазина
+        keyboard = InlineKeyboardBuilder()
+        keyboard.button(text="🛍 Товары магазина", callback_data=f"store_offers_{store[0]}")
+        keyboard.button(text="⭐ Оставить отзыв", callback_data=f"rate_store_{store[0]}")
+        keyboard.adjust(2)
+        
+        await message.answer(text, parse_mode="HTML", reply_markup=keyboard.as_markup())
 
 @dp.message(F.text.contains("Мои магазины") | F.text.contains("Mening dokonlarim"))
 async def my_stores(message: types.Message):
@@ -1935,8 +2144,33 @@ async def admin_all_offers(message: types.Message):
         return
     
     offers = db.get_active_offers()
-    text = f"📋 <b>Все предложения</b>\n\n"
-    text += f"Активных: {len(offers)}"
+    if not offers:
+        await message.answer("📋 <b>Все предложения</b>\n\nНет активных предложений", parse_mode="HTML")
+        return
+    
+    text = f"📋 <b>Все предложения ({len(offers)})</b>\n\n"
+    
+    for i, offer in enumerate(offers[:10]):  # Показываем первые 10
+        discount_percent = int((1 - offer[5] / offer[4]) * 100) if offer[4] > 0 else 0
+        
+        # Получаем единицы измерения
+        unit = offer[13] if len(offer) > 13 and offer[13] else 'шт'
+        
+        text += f"{i+1}. <b>{offer[2]}</b>\n"
+        text += f"   💰 {int(offer[4]):,} ➜ {int(offer[5]):,} сум (-{discount_percent}%)\n"
+        text += f"   📦 {offer[6]} {unit}\n"
+        
+        # Показываем срок годности
+        if len(offer) > 12 and offer[12]:
+            text += f"   📅 До: {offer[12]}\n"
+        
+        # Показываем магазин (индексы для JOIN: 15-store_name, 17-city)
+        if len(offer) > 17:
+            text += f"   🏪 {offer[15]} ({offer[17]})\n"
+        text += "\n"
+    
+    if len(offers) > 10:
+        text += f"... и еще {len(offers) - 10} предложений"
     
     await message.answer(text, parse_mode="HTML")
 

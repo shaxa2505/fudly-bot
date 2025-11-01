@@ -181,3 +181,44 @@ def store_keyboard(store_id: int):
     builder.button(text="📋 Предложения", callback_data=f"store_offers_{store_id}")
     builder.adjust(2)
     return builder.as_markup()
+
+# ============== ЕДИНИЦЫ ИЗМЕРЕНИЯ ==============
+
+def units_keyboard(lang: str = 'ru'):
+    """Клавиатура выбора единиц измерения"""
+    builder = ReplyKeyboardBuilder()
+    units = ['шт', 'кг', 'г', 'л', 'мл', 'упак', 'м', 'см']
+    for unit in units:
+        builder.button(text=unit)
+    builder.adjust(4, 4)  # 4 кнопки в первом ряду, 4 во втором
+    return builder.as_markup(resize_keyboard=True)
+
+# ============== КАТЕГОРИИ ТОВАРОВ ==============
+
+def product_categories_keyboard(lang: str = 'ru'):
+    """Клавиатура выбора категорий товаров для супермаркетов"""
+    builder = ReplyKeyboardBuilder()
+    
+    categories_ru = [
+        '🍞 Хлеб и выпечка', '🥛 Молочные продукты', '🥩 Мясо и птица', 
+        '🐟 Рыба и морепродукты', '🥬 Овощи', '🍎 Фрукты и ягоды',
+        '🧀 Сыры', '🥚 Яйца', '🍚 Крупы и макароны', '🥫 Консервы',
+        '🍫 Кондитерские изделия', '🍪 Печенье и снэки', '☕ Чай и кофе', 
+        '🥤 Напитки', '🧴 Бытовая химия', '🧼 Гигиена', '🏠 Для дома', '🎯 Другое'
+    ]
+    
+    categories_uz = [
+        '🍞 Non va pishiriq', '🥛 Sut mahsulotlari', '🥩 Go\'sht va parrandalar', 
+        '🐟 Baliq va dengiz mahsulotlari', '🥬 Sabzavotlar', '🍎 Mevalar va rezavorlar',
+        '🧀 Pishloqlar', '🥚 Tuxum', '🍚 Yorma va makaron', '🥫 Konservalar',
+        '🍫 Qandolat mahsulotlari', '🍪 Pechene va sneklar', '☕ Choy va qahva', 
+        '🥤 Ichimliklar', '🧴 Maishiy kimyo', '🧼 Gigiyena', '🏠 Uy uchun', '🎯 Boshqa'
+    ]
+    
+    categories = categories_uz if lang == 'uz' else categories_ru
+    
+    for category in categories:
+        builder.button(text=category)
+    
+    builder.adjust(2, 2, 2, 2, 2, 2, 2, 2, 2)  # По 2 кнопки в ряду
+    return builder.as_markup(resize_keyboard=True)

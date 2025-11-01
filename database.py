@@ -464,7 +464,7 @@ class Database:
     # Методы для предложений
     def add_offer(self, store_id: int, title: str, description: str, original_price: float, 
                   discount_price: float, quantity: int, available_from: str, available_until: str, 
-                  photo: str = None, expiry_date: str = None) -> int:
+                  photo: str = None, expiry_date: str = None, unit: str = 'шт', category: str = 'other') -> int:
         
         # Приводим время к стандартному формату
         formatted_from = self._format_datetime_field(available_from)
@@ -474,9 +474,9 @@ class Database:
         cursor = conn.cursor()
         cursor.execute('''
             INSERT INTO offers (store_id, title, description, original_price, discount_price, 
-                              quantity, available_from, available_until, expiry_date, status, photo)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'active', ?)
-        ''', (store_id, title, description, original_price, discount_price, quantity, formatted_from, formatted_until, expiry_date, photo))
+                              quantity, available_from, available_until, expiry_date, status, photo, unit, category)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'active', ?, ?, ?)
+        ''', (store_id, title, description, original_price, discount_price, quantity, formatted_from, formatted_until, expiry_date, photo, unit, category))
         offer_id = cursor.lastrowid
         conn.commit()
         try:
