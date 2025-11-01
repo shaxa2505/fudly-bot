@@ -17,7 +17,7 @@ from dotenv import load_dotenv
 from database import Database
 from keyboards import *
 from keyboards import units_keyboard, product_categories_keyboard
-from localization import get_text, get_cities, get_categories
+from localization import get_text, get_cities, get_categories, normalize_category
 
 # Production optimizations (optional imports with fallbacks)
 try:
@@ -61,6 +61,10 @@ except ImportError as e:
 load_dotenv()
 TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 ADMIN_ID = int(os.getenv("ADMIN_ID", 0))
+WEBHOOK_URL = os.getenv("WEBHOOK_URL", "")  # Для Railway: https://yourapp.railway.app
+WEBHOOK_PATH = os.getenv("WEBHOOK_PATH", "/webhook")
+PORT = int(os.getenv("PORT", 8000))
+USE_WEBHOOK = os.getenv("USE_WEBHOOK", "false").lower() == "true"
 
 # Словарь для преобразования узбекских названий городов в русские
 CITY_UZ_TO_RU = {
@@ -404,59 +408,172 @@ async def process_city(message: types.Message, state: FSMContext):
 async def available_offers(message: types.Message):
     lang = db.get_user_language(message.from_user.id)
     
-    # Показываем ВСЕ предложения независимо от города и языка
-    offers = db.get_active_offers()
+    await message.answer(
+        get_text(lang, 'choose_category'),
+        reply_markup=store_category_selection(lang)
+    )
+
+# ============== БРОНИРОВАНИЕ ==============
+
+@dp.callback_query(F.data.startswith("cat_"))
+async def select_category(callback: types.CallbackQuery):
+    """Выбор категории заведения"""
+    print("Handler select_category called")  # Debug
+    await callback.answer()  # Подтверждаем callback
+    try:
+        lang = db.get_user_language(callback.from_user.id)
+        categories = get_categories(lang)
+        cat_index = int(callback.data.split("_")[1])
+        category = categories[cat_index]
+        category = normalize_category(category)
+        
+        logger.info(f"Selected category: {category}, lang: {lang}")  # Debug
+        
+        # Получаем магазины этой категории
+        stores = db.get_stores_by_category(category)
+        
+        logger.info(f"Found stores: {len(stores)}")  # Debug
+        
+        if not stores:
+            await callback.answer(get_text(lang, 'no_offers'), show_alert=True)
+            return
+        
+        await callback.message.edit_text(
+            get_text(lang, 'choose_store'),
+            reply_markup=store_selection(stores, lang)
+        )
+        await callback.answer()
+    except Exception as e:
+        print(f"ERROR in select_category: {e}")
+        await callback.answer("Ошибка", show_alert=True)
+
+@dp.callback_query(F.data == "back_to_categories")
+async def back_to_categories(callback: types.CallbackQuery):
+    """Возврат к выбору категорий"""
+    lang = db.get_user_language(callback.from_user.id)
     
-    if not offers:
-        await message.answer(get_text(lang, 'no_offers'))
-        return
+    await callback.message.edit_text(
+        get_text(lang, 'choose_category'),
+        reply_markup=store_category_selection(lang)
+    )
+    await callback.answer()
+
+@dp.callback_query(F.data.startswith("store_"))
+async def select_store(callback: types.CallbackQuery):
+    """Выбор магазина"""
+    try:
+        lang = db.get_user_language(callback.from_user.id)
+        store_id = int(callback.data.split("_")[1])
+        
+        logger.info(f"Selected store_id: {store_id}")  # Debug
+        
+        # Получаем предложения этого магазина
+        offers = db.get_offers_by_store(store_id)
+        
+        print(f"DEBUG: Found offers: {len(offers)}")  # Debug
+        
+        if not offers:
+            await callback.answer(get_text(lang, 'no_offers'), show_alert=True)
+            return
+        
+        await callback.message.edit_text(
+            get_text(lang, 'choose_offer'),
+            reply_markup=offer_selection(offers, lang)
+        )
+        await callback.answer()
+    except Exception as e:
+        print(f"ERROR in select_store: {e}")
+        await callback.answer("Ошибка", show_alert=True)
+
+@dp.callback_query(F.data == "back_to_stores")
+async def back_to_stores(callback: types.CallbackQuery):
+    """Возврат к выбору магазинов"""
+    # Для простоты вернём к категориям
+    lang = db.get_user_language(callback.from_user.id)
     
-    await message.answer(get_text(lang, 'offers_found', count=len(offers)), parse_mode="HTML")
-    
-    for offer in offers[:20]:
-        discount_percent = int((1 - offer[5] / offer[4]) * 100)
+    await callback.message.edit_text(
+        get_text(lang, 'choose_category'),
+        reply_markup=store_category_selection(lang)
+    )
+    await callback.answer()
+
+@dp.callback_query(F.data.startswith("back_to_offers_"))
+async def back_to_offers(callback: types.CallbackQuery):
+    """Возврат к списку предложений магазина"""
+    try:
+        lang = db.get_user_language(callback.from_user.id)
+        store_id = int(callback.data.split("_")[-1])
+        
+        # Получаем предложения этого магазина
+        offers = db.get_offers_by_store(store_id)
+        
+        if not offers:
+            await callback.answer(get_text(lang, 'no_offers'), show_alert=True)
+            return
+        
+        await callback.message.edit_text(
+            get_text(lang, 'choose_offer'),
+            reply_markup=offer_selection(offers, lang)
+        )
+        await callback.answer()
+    except Exception as e:
+        print(f"ERROR in back_to_offers: {e}")
+        await callback.answer("Ошибка", show_alert=True)
+
+@dp.callback_query(F.data.startswith("offer_"))
+async def select_offer(callback: types.CallbackQuery):
+    """Показ деталей предложения"""
+    try:
+        lang = db.get_user_language(callback.from_user.id)
+        offer_id = int(callback.data.split("_")[1])
+        
+        print(f"DEBUG: Selected offer_id: {offer_id}")  # Debug
+        
+        offer = db.get_offer(offer_id)
+        if not offer:
+            await callback.answer(get_text(lang, 'no_offers'), show_alert=True)
+            return
+        
+        # Показываем детали как в старом коде
+        discount_percent = int((1 - offer[5] / offer[4]) * 100) if offer[4] > 0 else 0
         
         text = f"🍽 <b>{offer[2]}</b>\n"
         text += f"📝 {offer[3]}\n\n"
-        text += f"💰 {int(offer[4]):,} ➜ <b>{int(offer[5]):,} сум</b> (-{discount_percent}%)\n"
+        text += f"💰 {int(offer[4]):,} ➜ <b>{int(offer[5]):,} {get_text(lang, 'currency')}</b> (-{discount_percent}%)\n"
         
-        # Показываем количество с правильными единицами измерения
-        unit = offer[13] if len(offer) > 13 and offer[13] else 'шт'  # unit field index 13
+        unit = offer[13] if len(offer) > 13 and offer[13] else get_text(lang, 'unit')
         text += f"📦 {get_text(lang, 'available')}: {offer[6]} {unit}\n"
         text += f"🕐 {get_text(lang, 'time')}: {offer[7]} - {offer[8]}\n"
         
-        # Показываем оставшееся время до конца акции
-        time_remaining = db.get_time_remaining(offer[8])
-        if time_remaining:
-            text += f"{time_remaining}\n"
+        # Таймер срока годности
+        if len(offer) > 12 and offer[12]:  # expiry_date на позиции 12
+            time_remaining = db.get_time_remaining(offer[12])
+            if time_remaining:
+                text += f"{time_remaining}\n"
+            text += f"📅 {get_text(lang, 'expires_on')}: {offer[12]}\n"
         
-        # Показываем срок годности если он есть
-        if len(offer) > 12 and offer[12]:  # expiry_date - индекс 12
-            text += f"📅 Годен до: {offer[12]}\n"
-        
-        # Добавляем информацию о магазине (правильные индексы для JOIN)
-        # Структура: offers(0-14) + stores(15-19): store_name[15], address[16], city[17], category[18]
         if len(offer) > 17:
-            text += f"📍 {offer[17]}, {offer[15]}"  # city, store_name - правильный порядок
+            text += f"📍 {offer[17]}, {offer[15]}"
         
-        # Если есть фото (индекс 10 - поле photo из таблицы offers)
-        if len(offer) > 10 and offer[10] and offer[10].strip():
-            try:
-                await message.answer_photo(
-                    photo=offer[10],
-                    caption=text,
-                    parse_mode="HTML",
-                    reply_markup=offer_keyboard(offer[0], lang)
-                )
-                continue  # Фото отправлено успешно, переходим к следующему
-            except Exception as e:
-                logger.error(f"Error sending photo {offer[11]}: {e}")
-                # Если фото не отправилось, отправляем без фото ниже
+        # Получаем store_id для кнопки "Назад"
+        store_id = offer[1]  # store_id на позиции 1
         
-        # Отправляем без фото
-        await message.answer(text, parse_mode="HTML", reply_markup=offer_keyboard(offer[0], lang))
-
-# ============== БРОНИРОВАНИЕ ==============
+        # Создаем клавиатуру с кнопкой "Назад"
+        keyboard = InlineKeyboardBuilder()
+        keyboard.button(text=get_text(lang, 'book'), callback_data=f"book_{offer[0]}")
+        keyboard.button(text=get_text(lang, 'back'), callback_data=f"back_to_offers_{store_id}")
+        keyboard.adjust(1)
+        
+        # Удаляем клавиатуру и показываем детали с кнопкой бронирования
+        await callback.message.edit_text(
+            text,
+            parse_mode="HTML",
+            reply_markup=keyboard.as_markup()
+        )
+        await callback.answer()
+    except Exception as e:
+        print(f"ERROR in select_offer: {e}")
+        await callback.answer("Ошибка", show_alert=True)
 
 @dp.callback_query(F.data.startswith("book_"))
 async def book_offer_start(callback: types.CallbackQuery, state: FSMContext):
@@ -530,12 +647,14 @@ async def book_offer_quantity(message: types.Message, state: FSMContext):
                 pass
         
         total_price = int(offer[5] * quantity)
+        # ИСПРАВЛЕНО: Правильные индексы после JOIN
+        # offer: [0-12] поля offers, [13] store_name, [14] address, [15] city, [16] category
         text = get_text(lang, 'booking_success',
-                       store_name=offer[12],
+                       store_name=offer[13],  # store_name из JOIN
                        offer_name=offer[2],
                        price=f"{total_price:,}",
-                       city=offer[14],
-                       address=offer[13],
+                       city=offer[15],  # city из JOIN
+                       address=offer[14],  # address из JOIN
                        time=offer[8],
                        code=code)
         text += f"\n📦 Количество: {quantity} шт."
@@ -548,6 +667,10 @@ async def book_offer_quantity(message: types.Message, state: FSMContext):
         
     except ValueError:
         await message.answer("❌ Введите число!")
+    except Exception as e:
+        logger.error(f"Error in book_offer_quantity: {e}")
+        await message.answer("❌ Произошла ошибка при бронировании. Попробуйте снова.")
+        await state.clear()
 
 # ============== ПОДРОБНОСТИ ПРЕДЛОЖЕНИЯ ==============
 
@@ -642,7 +765,7 @@ async def offer_details(callback: types.CallbackQuery):
 
 # ============== ТОВАРЫ МАГАЗИНА ==============
 
-@dp.callback_query(F.data.startswith("store_offers_"))
+@dp.callback_query(F.data.startswith("show_offers_"))
 async def show_store_offers(callback: types.CallbackQuery):
     """Показывает товары конкретного магазина"""
     lang = db.get_user_language(callback.from_user.id)
@@ -720,7 +843,7 @@ async def show_store_info(callback: types.CallbackQuery):
     # Добавляем кнопки
     keyboard = InlineKeyboardBuilder()
     if offers:
-        keyboard.button(text="🛍 Смотреть товары", callback_data=f"store_offers_{store_id}")
+        keyboard.button(text="🛍 Смотреть товары", callback_data=f"show_offers_{store_id}")
     keyboard.button(text="⭐ Оставить отзыв", callback_data=f"rate_store_{store_id}")
     keyboard.adjust(2)
     
@@ -1077,9 +1200,16 @@ async def create_offer_title(message: types.Message, state: FSMContext):
 async def create_offer_description(message: types.Message, state: FSMContext):
     lang = db.get_user_language(message.from_user.id)
     await state.update_data(description=message.text)
+    
+    # Клавиатура для фото
+    builder = InlineKeyboardBuilder()
+    builder.button(text=get_text(lang, 'skip'), callback_data="skip_photo")
+    builder.button(text=get_text(lang, 'cancel'), callback_data="cancel_offer")
+    builder.adjust(2)
+    
     await message.answer(
         get_text(lang, 'send_photo'),
-        reply_markup=cancel_keyboard(lang)
+        reply_markup=builder.as_markup()
     )
     await state.set_state(CreateOffer.photo)
 
@@ -1098,38 +1228,82 @@ async def create_offer_no_photo(message: types.Message, state: FSMContext):
     await message.answer(get_text(lang, 'original_price'))
     await state.set_state(CreateOffer.original_price)
 
+@dp.callback_query(F.data == "skip_photo")
+async def skip_photo(callback: types.CallbackQuery, state: FSMContext):
+    lang = db.get_user_language(callback.from_user.id)
+    await state.update_data(photo=None)
+    await callback.message.edit_text(get_text(lang, 'original_price'))
+    await state.set_state(CreateOffer.original_price)
+    await callback.answer()
+
 @dp.message(CreateOffer.original_price)
 async def create_offer_original_price(message: types.Message, state: FSMContext):
     lang = db.get_user_language(message.from_user.id)
     try:
         price = float(message.text)
+        if price <= 0:
+            await message.answer("❌ Цена должна быть больше 0")
+            return
+        if price > 100000000:  # 100 миллионов - разумный лимит
+            await message.answer("❌ Слишком большая цена")
+            return
         await state.update_data(original_price=price)
         await message.answer(get_text(lang, 'discount_price'))
         await state.set_state(CreateOffer.discount_price)
-    except:
+    except ValueError:
         await message.answer(get_text(lang, 'error_invalid_number'))
+    except Exception as e:
+        logger.error(f"Error in create_offer_original_price: {e}")
+        await message.answer("❌ Ошибка обработки. Попробуйте снова.")
 
 @dp.message(CreateOffer.discount_price)
 async def create_offer_discount_price(message: types.Message, state: FSMContext):
     lang = db.get_user_language(message.from_user.id)
     try:
         price = float(message.text)
+        if price <= 0:
+            await message.answer("❌ Цена должна быть больше 0")
+            return
+        
+        data = await state.get_data()
+        original_price = data.get('original_price', 0)
+        
+        if price >= original_price:
+            await message.answer("❌ Цена со скидкой должна быть меньше обычной цены")
+            return
+        
+        discount_percent = int((1 - price / original_price) * 100)
+        if discount_percent < 10:
+            await message.answer("⚠️ Внимание: скидка меньше 10%. Рекомендуем делать скидку от 30% для привлечения клиентов.")
+        
         await state.update_data(discount_price=price)
         await message.answer(get_text(lang, 'quantity'))
         await state.set_state(CreateOffer.quantity)
-    except:
+    except ValueError:
         await message.answer(get_text(lang, 'error_invalid_number'))
+    except Exception as e:
+        logger.error(f"Error in create_offer_discount_price: {e}")
+        await message.answer("❌ Ошибка обработки. Попробуйте снова.")
 
 @dp.message(CreateOffer.quantity)
 async def create_offer_quantity(message: types.Message, state: FSMContext):
     lang = db.get_user_language(message.from_user.id)
     try:
         qty = int(message.text)
+        if qty <= 0:
+            await message.answer("❌ Количество должно быть больше 0")
+            return
+        if qty > 10000:
+            await message.answer("❌ Слишком большое количество (максимум 10000)")
+            return
         await state.update_data(quantity=qty)
         await message.answer("📏 Выберите единицы измерения:", reply_markup=units_keyboard(lang))
         await state.set_state(CreateOffer.unit)
-    except:
+    except ValueError:
         await message.answer(get_text(lang, 'error_invalid_number'))
+    except Exception as e:
+        logger.error(f"Error in create_offer_quantity: {e}")
+        await message.answer("❌ Ошибка обработки. Попробуйте снова.")
 
 @dp.message(CreateOffer.unit)
 async def create_offer_unit(message: types.Message, state: FSMContext):
@@ -1159,13 +1333,36 @@ async def create_offer_category(message: types.Message, state: FSMContext):
 async def create_offer_time_from(message: types.Message, state: FSMContext):
     lang = db.get_user_language(message.from_user.id)
     await state.update_data(available_from=message.text)
-    await message.answer(get_text(lang, 'expiry_date'))
+    
+    # Клавиатура для срока годности
+    builder = InlineKeyboardBuilder()
+    from datetime import datetime, timedelta
+    today = datetime.now()
+    builder.button(text=f"Сегодня ({today.strftime('%d.%m.%Y')})", callback_data=f"expiry_{today.strftime('%d.%m.%Y')}")
+    builder.button(text=f"Завтра ({(today + timedelta(days=1)).strftime('%d.%m.%Y')})", callback_data=f"expiry_{(today + timedelta(days=1)).strftime('%d.%m.%Y')}")
+    builder.button(text=f"Неделя ({(today + timedelta(days=7)).strftime('%d.%m.%Y')})", callback_data=f"expiry_{(today + timedelta(days=7)).strftime('%d.%m.%Y')}")
+    builder.button(text="Ввести вручную", callback_data="expiry_manual")
+    builder.adjust(1)
+    
+    await message.answer(get_text(lang, 'expiry_date'), reply_markup=builder.as_markup())
     await state.set_state(CreateOffer.expiry_date)
 
 @dp.message(CreateOffer.expiry_date)
 async def create_offer_expiry_date(message: types.Message, state: FSMContext):
     lang = db.get_user_language(message.from_user.id)
-    await state.update_data(expiry_date=message.text)
+    
+    # Конвертируем дату из dd.mm.yyyy в yyyy-mm-dd
+    date_str = message.text.strip()
+    try:
+        if '.' in date_str:
+            day, month, year = date_str.split('.')
+            formatted_date = f"{year}-{month.zfill(2)}-{day.zfill(2)}"
+        else:
+            formatted_date = date_str  # Если уже в правильном формате
+        await state.update_data(expiry_date=formatted_date)
+    except:
+        await state.update_data(expiry_date=date_str)  # Сохраняем как есть, если не удалось
+    
     await message.answer(get_text(lang, 'time_until'))
     await state.set_state(CreateOffer.available_until)
 
@@ -1231,6 +1428,128 @@ async def create_offer_time_until(message: types.Message, state: FSMContext):
         )
     else:
         await message.answer(text, parse_mode="HTML", reply_markup=main_menu_seller(lang))
+
+@dp.callback_query(F.data.startswith("expiry_"))
+async def select_expiry_date(callback: types.CallbackQuery, state: FSMContext):
+    lang = db.get_user_language(callback.from_user.id)
+    if callback.data == "expiry_manual":
+        await callback.message.edit_text("Введите срок годности в формате дд.мм.гггг:")
+        return
+    
+    date_str = callback.data.split("_", 1)[1]  # expiry_dd.mm.yyyy
+    # Конвертируем
+    try:
+        day, month, year = date_str.split('.')
+        formatted_date = f"{year}-{month.zfill(2)}-{day.zfill(2)}"
+        await state.update_data(expiry_date=formatted_date)
+    except:
+        await state.update_data(expiry_date=date_str)
+    
+    # Клавиатура для времени окончания
+    builder = InlineKeyboardBuilder()
+    builder.button(text="18:00", callback_data="time_18:00")
+    builder.button(text="20:00", callback_data="time_20:00")
+    builder.button(text="22:00", callback_data="time_22:00")
+    builder.button(text="Ввести вручную", callback_data="time_manual")
+    builder.adjust(2)
+    
+    await callback.message.edit_text(get_text(lang, 'time_until'), reply_markup=builder.as_markup())
+    await state.set_state(CreateOffer.available_until)
+    await callback.answer()
+
+@dp.callback_query(F.data.startswith("time_"))
+async def select_time_until(callback: types.CallbackQuery, state: FSMContext):
+    lang = db.get_user_language(callback.from_user.id)
+    if callback.data == "time_manual":
+        await callback.message.edit_text("Введите время окончания в формате чч:мм:")
+        return
+    
+    time_str = callback.data.split("_", 1)[1]
+    await state.update_data(available_until=time_str)
+    
+    # Теперь создаем предложение
+    data = await state.get_data()
+    
+    # Проверяем наличие всех необходимых данных
+    if not all(key in data for key in ['store_id', 'title', 'description', 'original_price', 'discount_price', 'quantity', 'available_from']):
+        await callback.answer("Ошибка: данные потеряны. Начните добавление товара заново.", show_alert=True)
+        await state.clear()
+        return
+    
+    offer_id = db.add_offer(
+        data['store_id'],
+        data['title'],
+        data['description'],
+        data['original_price'],
+        data['discount_price'],
+        data['quantity'],
+        data['available_from'],
+        time_str,
+        data.get('photo'),
+        data.get('expiry_date'),
+        data.get('unit', 'шт'),
+        data.get('category', 'other')
+    )
+    
+    await state.clear()
+    
+    discount = int((1 - data['discount_price'] / data['original_price']) * 100)
+    unit = data.get('unit', 'шт')
+    text = get_text(lang, 'offer_created',
+                   title=data['title'],
+                   description=data['description'],
+                   original_price=f"{int(data['original_price']):,} {get_text(lang, 'currency')}",
+                   discount_price=f"{int(data['discount_price']):,} {get_text(lang, 'currency')}",
+                   discount=discount,
+                   quantity=f"{data['quantity']} {unit}",
+                   time_from=data['available_from'],
+                   time_until=time_str)
+    
+    if data.get('expiry_date'):
+        text += f"\n\n📅 {get_text(lang, 'expires_on')}: {data['expiry_date']}"
+    if data.get('category') and data['category'] != 'other':
+        category_names = {
+            'bakery': 'Хлеб и выпечка', 'dairy': 'Молочные продукты', 'meat': 'Мясо и птица',
+            'fish': 'Рыба и морепродукты', 'vegetables': 'Овощи', 'fruits': 'Фрукты и ягоды',
+            'cheese': 'Сыры', 'eggs': 'Яйца', 'grains': 'Крупы и макароны', 'canned': 'Консервы',
+            'sweets': 'Кондитерские изделия', 'snacks': 'Печенье и снэки', 'drinks_hot': 'Чай и кофе',
+            'drinks': 'Напитки', 'household': 'Бытовая химия', 'hygiene': 'Гигиена', 'home': 'Для дома'
+        }
+        text += f"\n🏷 Категория: {category_names.get(data['category'], data['category'])}"
+    
+    # ИСПРАВЛЕНИЕ: Отправляем новое сообщение вместо edit_text
+    try:
+        if data.get('photo'):
+            await bot.send_photo(
+                chat_id=callback.message.chat.id,
+                photo=data['photo'],
+                caption=text,
+                parse_mode="HTML",
+                reply_markup=main_menu_seller(lang)
+            )
+        else:
+            await bot.send_message(
+                chat_id=callback.message.chat.id,
+                text=text,
+                parse_mode="HTML",
+                reply_markup=main_menu_seller(lang)
+            )
+        # Удаляем старое сообщение с кнопками
+        await callback.message.delete()
+    except Exception as e:
+        # Если не удалось отправить с фото, отправляем текст
+        await bot.send_message(
+            chat_id=callback.message.chat.id,
+            text=text,
+            parse_mode="HTML",
+            reply_markup=main_menu_seller(lang)
+        )
+        try:
+            await callback.message.delete()
+        except:
+            pass
+    
+    await callback.answer()
 
 # ============== МАССОВОЕ СОЗДАНИЕ ==============
 
@@ -1442,7 +1761,7 @@ async def my_offers(message: types.Message):
         text += f"📦 Осталось: {offer[6]} {unit}\n"
         text += f"🕐 {offer[7]} - {offer[8]}\n"
         
-        # Показываем срок годности вместо времени акции
+        # Показываем срок годности
         if len(offer) > 12 and offer[12]:
             text += f"📅 Годен до: {offer[12]}\n"
         
@@ -1544,29 +1863,6 @@ async def confirm_delivery_process(message: types.Message, state: FSMContext):
 
 # ============== РЕЙТИНГ ==============
 
-@dp.callback_query(F.data.startswith("rate_"))
-async def rate_store(callback: types.CallbackQuery):
-    lang = db.get_user_language(callback.from_user.id)
-    parts = callback.data.split("_")
-    booking_id = int(parts[1])
-    rating = int(parts[2])
-    
-    if db.has_rated_booking(booking_id):
-        await callback.answer(get_text(lang, 'already_rated'), show_alert=True)
-        return
-    
-    booking = db.get_booking(booking_id)
-    offer = db.get_offer(booking[1])
-    store_id = offer[1]
-    
-    db.add_rating(booking_id, callback.from_user.id, store_id, rating)
-    
-    await callback.message.edit_text(
-        callback.message.text + f"\n\n{'⭐' * rating}\n{get_text(lang, 'rating_saved')}",
-        parse_mode="HTML"
-    )
-    await callback.answer()
-
 @dp.callback_query(F.data.startswith("rate_store_"))
 async def rate_store_direct(callback: types.CallbackQuery):
     """Оценить магазин напрямую"""
@@ -1587,6 +1883,30 @@ async def rate_store_direct(callback: types.CallbackQuery):
     
     text = f"⭐ <b>Оцените магазин</b>\n\n🏪 {store[2]}\n📍 {store[4]}\n\nВыберите оценку:"
     await callback.message.edit_text(text, parse_mode="HTML", reply_markup=keyboard.as_markup())
+    await callback.answer()
+
+@dp.callback_query(F.data.startswith("rate_"))
+async def rate_booking(callback: types.CallbackQuery):
+    """Оценить бронирование (НЕ магазин напрямую)"""
+    lang = db.get_user_language(callback.from_user.id)
+    parts = callback.data.split("_")
+    booking_id = int(parts[1])
+    rating = int(parts[2])
+    
+    if db.has_rated_booking(booking_id):
+        await callback.answer(get_text(lang, 'already_rated'), show_alert=True)
+        return
+    
+    booking = db.get_booking(booking_id)
+    offer = db.get_offer(booking[1])
+    store_id = offer[1]
+    
+    db.add_rating(booking_id, callback.from_user.id, store_id, rating)
+    
+    await callback.message.edit_text(
+        callback.message.text + f"\n\n{'⭐' * rating}\n{get_text(lang, 'rating_saved')}",
+        parse_mode="HTML"
+    )
     await callback.answer()
 
 @dp.callback_query(F.data.startswith("store_rating_"))
@@ -1629,7 +1949,7 @@ async def all_stores(message: types.Message):
     user = db.get_user(message.from_user.id)
     city = user[4]  # город пользователя (исправлено: было [3], должно быть [4])
     
-    # Преобразуем узбекское название города в русское для поиска в БД
+    # Преобразуем узбекское название города в русский для поиска в БД
     search_city = normalize_city(city)
     
     # Получаем все одобренные магазины в городе
@@ -1651,13 +1971,21 @@ async def all_stores(message: types.Message):
 📝 {store[5]}
 ⭐ Рейтинг: {avg_rating:.1f}/5 ({len(ratings)} отзывов)"""
         
-        # Добавляем кнопку для просмотра товаров магазина
+        # Добавляем кнопки для просмотра товаров магазина
         keyboard = InlineKeyboardBuilder()
-        keyboard.button(text="🛍 Товары магазина", callback_data=f"store_offers_{store[0]}")
+        keyboard.button(text="🛍 Товары магазина", callback_data=f"show_offers_{store[0]}")
         keyboard.button(text="⭐ Оставить отзыв", callback_data=f"rate_store_{store[0]}")
-        keyboard.adjust(2)
+        
+        # Проверяем, в избранном ли магазин
+        is_fav = db.is_favorite(message.from_user.id, store[0])
+        fav_text = "💔 Убрать из избранного" if is_fav else "❤️ Добавить в избранное"
+        fav_callback = f"unfavorite_{store[0]}" if is_fav else f"favorite_{store[0]}"
+        keyboard.button(text=fav_text, callback_data=fav_callback)
+        
+        keyboard.adjust(2, 1)
         
         await message.answer(text, parse_mode="HTML", reply_markup=keyboard.as_markup())
+
 
 @dp.message(F.text.contains("Мои магазины") | F.text.contains("Mening dokonlarim"))
 async def my_stores(message: types.Message):
@@ -1672,7 +2000,9 @@ async def my_stores(message: types.Message):
     
     for store in stores:
         stats = db.get_store_sales_stats(store[0])
+       
         avg_rating = db.get_store_average_rating(store[0])
+
         ratings = db.get_store_ratings(store[0])
         
         text = get_text(lang, 'store_stats',
@@ -1733,7 +2063,7 @@ async def store_bookings(message: types.Message):
         text += f"👤 {booking[9]}"  # customer name
         if booking[10]:
             text += f" (@{booking[10]})"
-        text += f"\n🎫 Код: <code>{booking[4]}</code>\n"  # booking code
+        text += f"\n🎫 Код: <code>{booking[4]}</code>"  # booking code
         text += f"📅 {booking[7]}"  # created_at
         
         await message.answer(text, parse_mode="HTML")
@@ -1765,6 +2095,138 @@ async def change_city_process(message: types.Message, state: FSMContext):
             get_text(lang, 'city_changed', city=city_text),
             reply_markup=menu
         )
+
+# ============== ИЗБРАННОЕ ==============
+
+@dp.message(F.text.contains("Избранное") | F.text.contains("Sevimlilar"))
+async def show_favorites(message: types.Message):
+    """Показать избранные магазины"""
+    lang = db.get_user_language(message.from_user.id)
+    user_id = message.from_user.id
+    
+    # Получаем избранные магазины
+    favorites = db.get_favorites(user_id)
+    
+    if not favorites:
+        await message.answer(get_text(lang, 'no_favorites'))
+        return
+    
+    await message.answer(f"❤️ <b>Ваши избранные магазины ({len(favorites)})</b>", parse_mode="HTML")
+    
+    for store in favorites:
+        store_id = store[0]
+        avg_rating = db.get_store_average_rating(store_id)
+        ratings = db.get_store_ratings(store_id)
+        
+        text = f"""🏪 <b>{store[2]}</b>
+🏷 {store[6]}
+📍 {store[4]}
+📝 {store[5]}
+⭐ Рейтинг: {avg_rating:.1f}/5 ({len(ratings)} отзывов)"""
+        
+        keyboard = InlineKeyboardBuilder()
+        keyboard.button(text="🛍 Товары магазина", callback_data=f"show_offers_{store_id}")
+        keyboard.button(text="💔 Удалить из избранного", callback_data=f"unfavorite_{store_id}")
+        keyboard.adjust(1)
+        
+        await message.answer(text, parse_mode="HTML", reply_markup=keyboard.as_markup())
+
+@dp.callback_query(F.data.startswith("favorite_"))
+async def toggle_favorite(callback: types.CallbackQuery):
+    """Добавить магазин в избранное"""
+    store_id = int(callback.data.split("_")[1])
+    user_id = callback.from_user.id
+    lang = db.get_user_language(user_id)
+    
+    # Проверяем, уже в избранном или нет
+    if db.is_favorite(user_id, store_id):
+        await callback.answer(get_text(lang, 'already_in_favorites'), show_alert=True)
+    else:
+        db.add_favorite(user_id, store_id)
+        await callback.answer(get_text(lang, 'added_to_favorites'), show_alert=True)
+
+@dp.callback_query(F.data.startswith("unfavorite_"))
+async def remove_favorite(callback: types.CallbackQuery):
+    """Удалить магазин из избранного"""
+    store_id = int(callback.data.split("_")[1])
+    user_id = callback.from_user.id
+    lang = db.get_user_language(user_id)
+    
+    db.remove_favorite(user_id, store_id)
+    await callback.message.delete()
+    await callback.answer(get_text(lang, 'removed_from_favorites'), show_alert=True)
+
+# ============== АНАЛИТИКА ДЛЯ ПАРТНЕРОВ ==============
+
+@dp.message(F.text.contains("Аналитика") | F.text.contains("Analitika"))
+async def show_analytics(message: types.Message):
+    """Показать аналитику для партнера"""
+    lang = db.get_user_language(message.from_user.id)
+    user = db.get_user(message.from_user.id)
+    
+    if user[5] != 'seller':
+        await message.answer(get_text(lang, 'not_seller'))
+        return
+    
+    # Получаем магазины партнера
+    stores = db.get_user_stores(message.from_user.id)
+    
+    if not stores:
+        await message.answer(get_text(lang, 'no_stores'))
+        return
+    
+    # Даем выбрать магазин для аналитики
+    keyboard = InlineKeyboardBuilder()
+    for store in stores:
+        keyboard.button(text=f"📊 {store[2]}", callback_data=f"analytics_{store[0]}")
+    keyboard.adjust(1)
+    
+    await message.answer(
+        get_text(lang, 'select_store_for_analytics'),
+        reply_markup=keyboard.as_markup()
+    )
+
+@dp.callback_query(F.data.startswith("analytics_"))
+async def show_store_analytics(callback: types.CallbackQuery):
+    """Показать подробную аналитику магазина"""
+    store_id = int(callback.data.split("_")[1])
+    lang = db.get_user_language(callback.from_user.id)
+    
+    # Получаем аналитику
+    analytics = db.get_store_analytics(store_id)
+    store = db.get_store(store_id)
+    
+    text = f"📊 <b>Аналитика магазина {store[2]}</b>\n\n"
+    
+    # Общая статистика
+    text += f"📈 <b>ОБЩАЯ СТАТИСТИКА</b>\n"
+    text += f"📦 Всего бронирований: {analytics['total_bookings']}\n"
+    text += f"✅ Выдано: {analytics['completed_bookings']}\n"
+    text += f"❌ Отменено: {analytics['cancelled_bookings']}\n"
+    text += f"💰 Конверсия: {analytics['conversion_rate']:.1f}%\n\n"
+    
+    # По дням недели
+    if analytics['bookings_by_day']:
+        text += f"📅 <b>ПО ДНЯМ НЕДЕЛИ</b>\n"
+        days_ru = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс']
+        for day, count in analytics['bookings_by_day'].items():
+            text += f"{days_ru[day]}: {count} бронирований\n"
+        text += "\n"
+    
+    # Популярные категории
+    if analytics['popular_categories']:
+        text += f"🏷 <b>ПОПУЛЯРНЫЕ КАТЕГОРИИ</b>\n"
+        for cat, count in analytics['popular_categories'][:5]:
+            text += f"{cat}: {count} бронирований\n"
+        text += "\n"
+    
+    # Средний рейтинг
+    if analytics['avg_rating']:
+        text += f"⭐ <b>СРЕДНИЙ РЕЙТИНГ</b>\n"
+        text += f"{analytics['avg_rating']:.1f}/5 ({analytics['total_ratings']} отзывов)\n"
+    
+    await callback.message.answer(text, parse_mode="HTML")
+    await callback.answer()
 
 # ============== ПРОФИЛЬ ==============
 
@@ -1998,7 +2460,7 @@ async def admin_full_stats(message: types.Message):
     
     text += "👥 <b>ПОЛЬЗОВАТЕЛИ</b>\n"
     text += f"Всего: {total_users}\n"
-    text += f"🏪 Партнёров: {sellers}\n"
+    text += f"🏪 Партнеров: {sellers}\n"
     text += f"🛍 Покупателей: {customers}\n\n"
     
     text += "🏪 <b>МАГАЗИНЫ</b>\n"
@@ -2028,8 +2490,8 @@ async def admin_full_stats(message: types.Message):
     text += "📋 <b>БРОНИРОВАНИЯ</b>\n"
     text += f"Всего: {total_bookings}\n"
     text += f"✅ Активных: {active_bookings}\n"
-    text += f"✔️ Завершено: {completed_bookings}\n"
-    text += f"❌ Отменено: {cancelled_bookings}\n"
+    text += f"✔️ Завершен: {completed_bookings}\n"
+    text += f"❌ Отменен: {cancelled_bookings}\n"
     text += f"📦 Товаров забронировано: {total_quantity} шт\n"
     text += f"💰 Экономия покупателей: {int(total_savings):,} сум\n\n"
     
@@ -2227,7 +2689,7 @@ async def reject_store(callback: types.CallbackQuery):
     )
     await callback.answer(get_text(lang, 'store_rejected_admin'))
 
-@dp.message(F.text == " Все предложения")
+@dp.message(F.text == "📋 Все предложения")
 async def admin_all_offers(message: types.Message):
     lang = 'ru'
     if not db.is_admin(message.from_user.id):
@@ -2236,10 +2698,10 @@ async def admin_all_offers(message: types.Message):
     
     offers = db.get_active_offers()
     if not offers:
-        await message.answer("📋 <b>Все предложения</b>\n\nНет активных предложений", parse_mode="HTML")
+        await message.answer(f"📋 <b>{get_text(lang, 'all_offers')}</b>\n\n{get_text(lang, 'no_active_offers')}", parse_mode="HTML")
         return
     
-    text = f"📋 <b>Все предложения ({len(offers)})</b>\n\n"
+    text = f"📋 <b>{get_text(lang, 'all_offers')} ({len(offers)})</b>\n\n"
     
     for i, offer in enumerate(offers[:10]):  # Показываем первые 10
         discount_percent = int((1 - offer[5] / offer[4]) * 100) if offer[4] > 0 else 0
@@ -2306,23 +2768,23 @@ async def admin_all_stores(message: types.Message):
         await asyncio.sleep(0.2)
 
 @dp.callback_query(F.data.startswith("delete_store_"))
-async def delete_store_callback(callback: types.CallbackQuery):
+async def delete_store_callback(request: types.CallbackQuery):
     lang = 'ru'
-    if not db.is_admin(callback.from_user.id):
-        await callback.answer(get_text(lang, 'access_denied'), show_alert=True)
+    if not db.is_admin(request.from_user.id):
+        await request.answer(get_text(lang, 'access_denied'), show_alert=True)
         return
     
-    store_id = int(callback.data.split("_")[2])
+    store_id = int(request.data.split("_")[2])
     
     try:
         db.delete_store(store_id)
-        await callback.message.edit_text(
-            callback.message.text + "\n\n🗑 <b>УДАЛЕНО</b>",
+        await request.message.edit_text(
+            request.message.text + "\n\n🗑 <b>УДАЛЕНО</b>",
             parse_mode="HTML"
         )
-        await callback.answer("✅ Магазин удалён!")
+        await request.answer("✅ Магазин удалён!")
     except Exception as e:
-        await callback.answer(f"❌ Ошибка: {str(e)}", show_alert=True)
+        await request.answer(f"❌ Ошибка: {str(e)}", show_alert=True)
 
 @dp.message(F.text == "📢 Рассылка")
 async def admin_broadcast(message: types.Message):
@@ -2372,37 +2834,104 @@ async def cleanup_expired_offers():
 # ЗАПУСК БОТА
 # ============================================
 
+async def on_startup():
+    """Действия при запуске бота"""
+    if USE_WEBHOOK:
+        # Устанавливаем webhook
+        webhook_url = f"{WEBHOOK_URL}{WEBHOOK_PATH}"
+        await bot.set_webhook(
+            url=webhook_url,
+            drop_pending_updates=True,
+            allowed_updates=dp.resolve_used_update_types()
+        )
+        print(f"✅ Webhook установлен: {webhook_url}")
+    else:
+        # Удаляем webhook если используем polling
+        await bot.delete_webhook(drop_pending_updates=True)
+        print("✅ Polling режим активирован")
+
+async def on_shutdown():
+    """Действия при остановке бота"""
+    await bot.session.close()
+    print("👋 Бот остановлен")
+
 async def main():
     print("✅ Бот успешно запущен!")
+    print(f"🔄 Режим: {'Webhook' if USE_WEBHOOK else 'Polling'}")
     print("⚠️ Нажмите Ctrl+C для остановки")
     print("=" * 50)
     
     # Запускаем фоновую задачу очистки
     cleanup_task = asyncio.create_task(cleanup_expired_offers())
     
-    try:
-        # Запускаем polling с правильными параметрами
-        await dp.start_polling(
+    if USE_WEBHOOK:
+        # Webhook режим (для production на Railway)
+        from aiohttp import web
+        
+        await on_startup()
+        
+        app = web.Application()
+        
+        # Webhook endpoint
+        async def webhook_handler(request):
+            try:
+                update = await request.json()
+                telegram_update = types.Update(**update)
+                await dp.feed_update(bot, telegram_update)
+                return web.Response(status=200)
+            except Exception as e:
+                logger.error(f"Webhook error: {e}")
+                return web.Response(status=500)
+        
+        # Health check endpoint
+        async def health_check(request):
+            return web.json_response({"status": "ok", "bot": "Fudly"})
+        
+        app.router.add_post(WEBHOOK_PATH, webhook_handler)
+        app.router.add_get("/health", health_check)
+        app.router.add_get("/", health_check)  # Railway health check
+        
+        runner = web.AppRunner(app)
+        await runner.setup()
+        site = web.TCPSite(runner, '0.0.0.0', PORT)
+        await site.start()
+        
+        print(f"🌐 Webhook сервер запущен на порту {PORT}")
+        
+        try:
+            await shutdown_event.wait()
+        finally:
+            cleanup_task.cancel()
+            await runner.cleanup()
+            await on_shutdown()
+    else:
+        # Polling режим (для локальной разработки)
+        await on_startup()
+        
+        # Создаём задачу для polling
+        polling_task = asyncio.create_task(dp.start_polling(
             bot,
             allowed_updates=dp.resolve_used_update_types(),
-            drop_pending_updates=True  # Игнорируем старые обновления
-        )
-    except asyncio.CancelledError:
-        print("\n⏸ Получен сигнал отмены...")
-    except KeyboardInterrupt:
-        print("\n⛔ Бот остановлен пользователем")
-    except Exception as e:
-        print(f"\n❌ Критическая ошибка: {type(e).__name__}: {e}")
-    finally:
-        # Отменяем фоновую задачу
-        cleanup_task.cancel()
+            drop_pending_updates=True
+        ))
+        
         try:
-            await cleanup_task
-        except asyncio.CancelledError:
-            pass
-        print("\n🔄 Завершение работы бота...")
-        await bot.session.close()
-        print("✅ Бот остановлен корректно")
+            await shutdown_event.wait()
+            print("\n🛑 Завершение по сигналу...")
+            polling_task.cancel()
+            try:
+                await polling_task
+            except asyncio.CancelledError:
+                pass
+        except Exception as e:
+            print(f"\n❌ Критическая ошибка: {type(e).__name__}: {e}")
+        finally:
+            cleanup_task.cancel()
+            try:
+                await cleanup_task
+            except asyncio.CancelledError:
+                pass
+            await on_shutdown()
 
 # ============================================
 # ЗАЩИТА ОТ МНОЖЕСТВЕННОГО ЗАПУСКА

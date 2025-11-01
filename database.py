@@ -232,9 +232,16 @@ class Database:
             cursor.execute('CREATE INDEX IF NOT EXISTS idx_stores_city_status ON stores(city, status)')
             cursor.execute('CREATE INDEX IF NOT EXISTS idx_offers_store_status ON offers(store_id, status)')
             cursor.execute('CREATE INDEX IF NOT EXISTS idx_offers_created ON offers(created_at)')
+            cursor.execute('CREATE INDEX IF NOT EXISTS idx_offers_expiry ON offers(expiry_date)')
+            cursor.execute('CREATE INDEX IF NOT EXISTS idx_offers_quantity ON offers(quantity)')
+            cursor.execute('CREATE INDEX IF NOT EXISTS idx_offers_status_quantity_expiry ON offers(status, quantity, expiry_date)')
             cursor.execute('CREATE INDEX IF NOT EXISTS idx_bookings_user ON bookings(user_id)')
             cursor.execute('CREATE INDEX IF NOT EXISTS idx_bookings_offer ON bookings(offer_id)')
+            cursor.execute('CREATE INDEX IF NOT EXISTS idx_bookings_status ON bookings(status)')
             cursor.execute('CREATE INDEX IF NOT EXISTS idx_users_role ON users(role)')
+            cursor.execute('CREATE INDEX IF NOT EXISTS idx_ratings_store ON ratings(store_id)')
+            cursor.execute('CREATE INDEX IF NOT EXISTS idx_ratings_user ON ratings(user_id)')
+            cursor.execute('CREATE INDEX IF NOT EXISTS idx_favorites_user_store ON favorites(user_id, store_id)')
             conn.commit()
         except Exception:
             pass
@@ -516,6 +523,7 @@ class Database:
                 FROM offers o
                 JOIN stores s ON o.store_id = s.store_id
                 WHERE o.status = 'active' AND o.quantity > 0 AND s.store_id = ? AND s.status = 'approved'
+                    AND date(o.expiry_date) >= date('now')
                 ORDER BY o.created_at DESC
             ''', (store_id,))
         elif city:
@@ -525,6 +533,7 @@ class Database:
                 FROM offers o
                 JOIN stores s ON o.store_id = s.store_id
                 WHERE o.status = 'active' AND o.quantity > 0 AND s.city = ? AND s.status = 'approved'
+                    AND date(o.expiry_date) >= date('now')
                 ORDER BY o.created_at DESC
             ''', (city,))
         else:
@@ -534,6 +543,7 @@ class Database:
                 FROM offers o
                 JOIN stores s ON o.store_id = s.store_id
                 WHERE o.status = 'active' AND o.quantity > 0 AND s.status = 'approved'
+                    AND date(o.expiry_date) >= date('now')
                 ORDER BY o.created_at DESC
             ''')
         
@@ -1291,66 +1301,218 @@ class Database:
         conn.close()
 
     @staticmethod
-    def get_time_remaining(available_until: str) -> str:
+    def get_time_remaining(expiry_date: str) -> str:
         """
-        Возвращает строку с оставшимся временем до окончания акции
-        Формат: '🕐 Осталось: 2 часа 15 минут ⏳' или '⏰ Акция закончилась'
+        Возвращает строку с оставшимся временем до истечения срока годности
+        Формат: '🕐 Годен: 2 дня' или '⏰ Срок годности истек'
         """
-        if not available_until:
+        if not expiry_date:
             return ""
             
         try:
-            # Парсим время окончания
-            end_time = datetime.strptime(available_until, '%Y-%m-%d %H:%M')
+            # Парсим дату истечения срока годности (формат: YYYY-MM-DD)
+            if isinstance(expiry_date, str):
+                if ' ' in expiry_date:
+                    # Если есть время, парсим с временем
+                    end_date = datetime.strptime(expiry_date, '%Y-%m-%d %H:%M:%S')
+                elif '-' in expiry_date:
+                    # Если только дата в формате YYYY-MM-DD
+                    end_date = datetime.strptime(expiry_date, '%Y-%m-%d')
+                elif '.' in expiry_date:
+                    # Если дата в формате DD.MM.YYYY
+                    end_date = datetime.strptime(expiry_date, '%d.%m.%Y')
+                else:
+                    return ""
+            else:
+                return ""
+            
             current_time = datetime.now()
             
-            # Если акция уже закончилась
-            if end_time <= current_time:
-                return "⏰ Акция закончилась"
+            # Если срок уже истек
+            if end_date <= current_time:
+                return "⏰ Срок годности истек"
                 
             # Вычисляем разницу
-            time_diff = end_time - current_time
+            time_diff = end_date - current_time
             
-            # Получаем дни, часы и минуты
+            # Получаем дни
             days = time_diff.days
             hours, remainder = divmod(time_diff.seconds, 3600)
-            minutes, _ = divmod(remainder, 60)
             
             # Формируем строку
-            time_parts = []
-            
             if days > 0:
                 if days == 1:
-                    time_parts.append("1 день")
+                    return "🕐 Годен: 1 день"
                 elif days < 5:
-                    time_parts.append(f"{days} дня")
+                    return f"🕐 Годен: {days} дня"
                 else:
-                    time_parts.append(f"{days} дней")
-                    
-            if hours > 0:
+                    return f"🕐 Годен: {days} дней"
+            elif hours > 0:
                 if hours == 1:
-                    time_parts.append("1 час")
+                    return "🕐 Годен: 1 час"
                 elif hours < 5:
-                    time_parts.append(f"{hours} часа")
+                    return f"🕐 Годен: {hours} часа"
                 else:
-                    time_parts.append(f"{hours} часов")
-                    
-            if minutes > 0:
-                if minutes == 1:
-                    time_parts.append("1 минута")
-                elif minutes < 5:
-                    time_parts.append(f"{minutes} минуты")
-                else:
-                    time_parts.append(f"{minutes} минут")
-            
-            # Если осталось меньше минуты
-            if not time_parts:
-                return "🕐 Осталось: меньше минуты ⏳"
+                    return f"🕐 Годен: {hours} часов"
+            else:
+                return "🕐 Годен: менее часа"
                 
-            time_str = " ".join(time_parts)
-            return f"🕐 Осталось: {time_str} ⏳"
-            
-        except ValueError:
-            # Если формат времени некорректный
+        except (ValueError, TypeError) as e:
+            print(f"Error parsing expiry_date: {expiry_date}, error: {e}")
             return ""
+    
+    def get_stores_by_category(self, category: str) -> List[Tuple]:
+        """Получить магазины по категории"""
+        conn = self.get_connection()
+        cursor = conn.cursor()
+        try:
+            cursor.execute('''
+                SELECT store_id, name, address, category, city 
+                FROM stores 
+                WHERE category = ? AND status = 'approved'
+                ORDER BY name
+            ''', (category,))
+            return cursor.fetchall()
+        finally:
+            conn.close()
+    
+    def get_offers_by_store(self, store_id: int) -> List[Tuple]:
+        """Получить активные предложения магазина"""
+        conn = self.get_connection()
+        cursor = conn.cursor()
+        try:
+            cursor.execute('''
+                SELECT o.*, s.name, s.address, s.city, s.category
+                FROM offers o
+                JOIN stores s ON o.store_id = s.store_id
+                WHERE o.store_id = ? AND o.quantity > 0 AND date(o.expiry_date) >= date('now')
+                ORDER BY o.created_at DESC
+            ''', (store_id,))
+            return cursor.fetchall()
+        finally:
+            conn.close()
 
+    # ============== ИЗБРАННОЕ ==============
+    
+    def add_favorite(self, user_id: int, store_id: int):
+        """Добавить магазин в избранное"""
+        conn = self.get_connection()
+        cursor = conn.cursor()
+        try:
+            cursor.execute('INSERT OR IGNORE INTO favorites (user_id, store_id) VALUES (?, ?)', 
+                          (user_id, store_id))
+            conn.commit()
+            return True
+        except Exception as e:
+            print(f"Error adding favorite: {e}")
+            return False
+        finally:
+            conn.close()
+    
+    def remove_favorite(self, user_id: int, store_id: int):
+        """Удалить магазин из избранного"""
+        conn = self.get_connection()
+        cursor = conn.cursor()
+        try:
+            cursor.execute('DELETE FROM favorites WHERE user_id = ? AND store_id = ?', 
+                          (user_id, store_id))
+            conn.commit()
+            return True
+        except Exception as e:
+            print(f"Error removing favorite: {e}")
+            return False
+        finally:
+            conn.close()
+    
+    def is_favorite(self, user_id: int, store_id: int) -> bool:
+        """Проверить, в избранном ли магазин"""
+        conn = self.get_connection()
+        cursor = conn.cursor()
+        try:
+            cursor.execute('SELECT COUNT(*) FROM favorites WHERE user_id = ? AND store_id = ?', 
+                          (user_id, store_id))
+            return cursor.fetchone()[0] > 0
+        finally:
+            conn.close()
+    
+    def get_favorites(self, user_id: int) -> List[Tuple]:
+        """Получить избранные магазины пользователя"""
+        conn = self.get_connection()
+        cursor = conn.cursor()
+        try:
+            cursor.execute('''
+                SELECT s.* FROM stores s
+                JOIN favorites f ON s.store_id = f.store_id
+                WHERE f.user_id = ? AND s.status = 'approved'
+                ORDER BY f.created_at DESC
+            ''', (user_id,))
+            return cursor.fetchall()
+        finally:
+            conn.close()
+
+    # ============== АНАЛИТИКА ==============
+    
+    def get_store_analytics(self, store_id: int) -> dict:
+        """Получить аналитику магазина"""
+        conn = self.get_connection()
+        cursor = conn.cursor()
+        
+        try:
+            # Общая статистика
+            cursor.execute('''
+                SELECT 
+                    COUNT(*) as total_bookings,
+                    SUM(CASE WHEN status = 'completed' THEN 1 ELSE 0 END) as completed,
+                    SUM(CASE WHEN status = 'cancelled' THEN 1 ELSE 0 END) as cancelled
+                FROM bookings b
+                JOIN offers o ON b.offer_id = o.offer_id
+                WHERE o.store_id = ?
+            ''', (store_id,))
+            stats = cursor.fetchone()
+            
+            # Продажи по дням недели
+            cursor.execute('''
+                SELECT 
+                    CAST(strftime('%w', b.created_at) AS INTEGER) as day_of_week,
+                    COUNT(*) as count
+                FROM bookings b
+                JOIN offers o ON b.offer_id = o.offer_id
+                WHERE o.store_id = ? AND b.status = 'completed'
+                GROUP BY day_of_week
+            ''', (store_id,))
+            days = cursor.fetchall()
+            
+            # Популярные категории
+            cursor.execute('''
+                SELECT 
+                    o.category,
+                    COUNT(*) as count
+                FROM bookings b
+                JOIN offers o ON b.offer_id = o.offer_id
+                WHERE o.store_id = ? AND b.status = 'completed'
+                GROUP BY o.category
+                ORDER BY count DESC
+                LIMIT 5
+            ''', (store_id,))
+            categories = cursor.fetchall()
+            
+            # Средний рейтинг
+            cursor.execute('''
+                SELECT AVG(rating) as avg_rating, COUNT(*) as rating_count
+                FROM ratings
+                WHERE store_id = ?
+            ''', (store_id,))
+            rating = cursor.fetchone()
+            
+            return {
+                'total_bookings': stats[0] or 0,
+                'completed': stats[1] or 0,
+                'cancelled': stats[2] or 0,
+                'conversion_rate': (stats[1] / stats[0] * 100) if stats[0] > 0 else 0,
+                'days_of_week': dict(days) if days else {},
+                'popular_categories': categories or [],
+                'avg_rating': rating[0] or 0,
+                'rating_count': rating[1] or 0
+            }
+        finally:
+            conn.close()

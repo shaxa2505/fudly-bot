@@ -35,11 +35,12 @@ def main_menu_customer(lang: str = 'ru'):
     builder = ReplyKeyboardBuilder()
     builder.button(text=get_text(lang, 'available_offers'))
     builder.button(text=get_text(lang, 'stores'))
+    builder.button(text=get_text(lang, 'favorites'))
     builder.button(text=get_text(lang, 'my_city'))
     builder.button(text=get_text(lang, 'my_bookings'))
     builder.button(text=get_text(lang, 'profile'))
     builder.button(text=get_text(lang, 'become_partner'))
-    builder.adjust(1, 2, 2, 1)
+    builder.adjust(2, 2, 2, 1)
     return builder.as_markup(resize_keyboard=True)
 
 def main_menu_seller(lang: str = 'ru'):
@@ -49,11 +50,12 @@ def main_menu_seller(lang: str = 'ru'):
     builder.button(text=get_text(lang, 'bulk_create'))
     builder.button(text=get_text(lang, 'my_stores'))
     builder.button(text=get_text(lang, 'my_offers'))
+    builder.button(text=get_text(lang, 'analytics'))
     builder.button(text=get_text(lang, 'store_bookings'))
     builder.button(text=get_text(lang, 'confirm_delivery'))
     builder.button(text=get_text(lang, 'profile'))
     builder.button(text=get_text(lang, 'back_to_customer'))
-    builder.adjust(2, 2, 2, 2)
+    builder.adjust(2, 2, 1, 2, 2)
     return builder.as_markup(resize_keyboard=True)
 
 # ============== ВЫБОР ГОРОДА И КАТЕГОРИИ ==============
@@ -178,7 +180,7 @@ def store_keyboard(store_id: int):
     """Кнопки управления магазином"""
     builder = InlineKeyboardBuilder()
     builder.button(text="📊 Статистика", callback_data=f"store_stats_{store_id}")
-    builder.button(text="📋 Предложения", callback_data=f"store_offers_{store_id}")
+    builder.button(text="📋 Предложения", callback_data=f"show_offers_{store_id}")
     builder.adjust(2)
     return builder.as_markup()
 
@@ -222,3 +224,39 @@ def product_categories_keyboard(lang: str = 'ru'):
     
     builder.adjust(2, 2, 2, 2, 2, 2, 2, 2, 2)  # По 2 кнопки в ряду
     return builder.as_markup(resize_keyboard=True)
+
+def store_category_selection(lang: str = 'ru'):
+    """Inline клавиатура для выбора категории заведения"""
+    builder = InlineKeyboardBuilder()
+    
+    categories = get_categories(lang)
+    
+    for i, category in enumerate(categories):
+        builder.button(text=category, callback_data=f"cat_{i}")
+    
+    builder.adjust(2)  # 2 кнопки в ряду
+    return builder.as_markup()
+
+def store_selection(stores, lang: str = 'ru'):
+    """Inline клавиатура для выбора магазина"""
+    builder = InlineKeyboardBuilder()
+    
+    for store in stores[:10]:  # Ограничим 10
+        builder.button(text=f"{store[1]} ({store[3]})", callback_data=f"store_{store[0]}")
+    
+    builder.button(text=get_text(lang, 'back'), callback_data="back_to_categories")
+    builder.adjust(1)
+    return builder.as_markup()
+
+def offer_selection(offers, lang: str = 'ru'):
+    """Inline клавиатура для выбора предложения"""
+    builder = InlineKeyboardBuilder()
+    
+    for offer in offers[:10]:
+        discount_percent = int((1 - offer[5] / offer[4]) * 100) if offer[4] > 0 else 0
+        text = f"{offer[2]} (-{discount_percent}%)"
+        builder.button(text=text, callback_data=f"offer_{offer[0]}")
+    
+    builder.button(text=get_text(lang, 'back'), callback_data="back_to_stores")
+    builder.adjust(1)
+    return builder.as_markup()

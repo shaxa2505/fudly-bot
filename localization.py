@@ -36,9 +36,11 @@ Fudly помогает спасать еду от выбрасывания и э
         'available_offers': '🍽 Доступные предложения',
         'my_bookings': '📋 Мои бронирования',
         'stores': '🏪 Магазины',
+        'favorites': '❤️ Избранное',
         'my_city': '🌆 Мой город',
         'profile': '👤 Профиль',
         'become_partner': '🏪 Стать партнером',
+        'analytics': '📊 Аналитика',
         'back_to_customer': '🔙 Режим покупателя',
         'add_offer': '➕ Добавить предложение',
         'bulk_create': '📦 Массовое создание',
@@ -69,12 +71,21 @@ Fudly помогает спасать еду от выбрасывания и э
         'no_offers': '😔 Пока нет доступных предложений в вашем городе',
         'offers_in_city': '🍽 <b>Доступные предложения в городе {city}</b>\n\nВсего: {count}',
         'offers_found': '🍽 <b>Доступные предложения</b>\n\nНайдено: {count}',
+        'all_offers': 'Все предложения',
+        'no_active_offers': 'Нет активных предложений',
+        'choose_category': '🏪 Выберите категорию заведения:',
+        'choose_store': '🏪 Выберите магазин:',
+        'choose_offer': '🍽 Выберите предложение:',
+        'back': '🔙 Назад',
         'book': '✅ Забронировать',
         'details': 'ℹ️ Подробнее',
         'discount': 'Скидка',
         'available': 'Доступно',
         'time': 'Время',
         'address': 'Адрес',
+        'currency': 'сум',
+        'unit': 'шт',
+        'expires_on': 'Годен до',
         
         # Бронирование
         'booking_success': '''✅ <b>Бронирование успешно!</b>
@@ -249,6 +260,17 @@ Fudly помогает спасать еду от выбрасывания и э
         'store_approved_admin': '✅ Магазин одобрен!',
         'store_rejected_admin': '✅ Магазин отклонён!',
         
+        # Избранное
+        'no_favorites': '😔 У вас пока нет избранных магазинов\n\nДобавьте магазины в избранное, чтобы быстро находить их!',
+        'already_in_favorites': '❤️ Уже в избранном!',
+        'added_to_favorites': '✅ Добавлено в избранное!',
+        'removed_from_favorites': '💔 Удалено из избранного',
+        
+        # Аналитика
+        'not_seller': '❌ Эта функция доступна только партнёрам',
+        'no_stores': '😔 У вас пока нет магазинов',
+        'select_store_for_analytics': '📊 Выберите магазин для просмотра аналитики:',
+        
         # Прочее
         'duplicate': '📋 Дублировать',
         'delete': '❌ Удалить',
@@ -305,9 +327,11 @@ Harakatni tanlang:''',
         'available_offers': '🍽 Mavjud takliflar',
         'my_bookings': '📋 Mening buyurtmalarim',
         'stores': '🏪 Dokonlar',
+        'favorites': '❤️ Sevimlilar',
         'my_city': '🌆 Mening shahrim',
         'profile': '👤 Profil',
         'become_partner': '🏪 Hamkor bolish',
+        'analytics': '📊 Analitika',
         'back_to_customer': '🔙 Xaridor rejimi',
         'add_offer': '➕ Taklif qoshish',
         'bulk_create': '📦 Ommaviy yaratish',
@@ -338,28 +362,37 @@ Harakatni tanlang:''',
         'no_offers': '😔 Hozircha sizning shahringizda takliflar yo\'q',
         'offers_in_city': '🍽 <b>{city} shahridagi mavjud takliflar</b>\n\nJami: {count}',
         'offers_found': '🍽 <b>Mavjud takliflar</b>\n\nTopildi: {count}',
+        'all_offers': 'Barcha takliflar',
+        'no_active_offers': 'Faol takliflar yo\'q',
+        'choose_category': '🏪 Kategoriyani tanlang:',
+        'choose_store': '🏪 Dokonni tanlang:',
+        'choose_offer': '🍽 Taklifni tanlang:',
+        'back': '🔙 Orqaga',
         'book': '✅ Buyurtma qilish',
         'details': 'ℹ️ Batafsil',
         'discount': 'Chegirma',
         'available': 'Mavjud',
         'time': 'Vaqt',
         'address': 'Manzil',
+        'currency': 'so\'m',
+        'unit': 'dona',
+        'expires_on': 'Yaroqlilik muddati',
         
         # Buyurtma
         'booking_success': '''✅ <b>Buyurtma muvaffaqiyatli!</b>
 
 🏪 {store_name}
 🍽 {offer_name}
-💰 To\'lov: {price} so\'m
+💰 To'lash kerak: {price} so'm
 
 📍 Manzil: {city}, {address}
 🕐 Olish vaqti: {time}
 
 🎫 Buyurtma kodi: <code>{code}</code>
 
-⚠️ Buyurtmani olishda bu kodni ko\'rsating!''',
+⚠️ Buyurtmani olishda bu kodni ko'rsating!''',
         
-        'my_bookings_empty': '📋 Sizda hali buyurtmalar yo\'q.\n\nRo\'yxatdan taklif tanlang! 🍽',
+        'my_bookings_empty': '📋 Sizda hali buyurtmalar yo\'q.\n\nTakliflar ro\'yxatidan tanlang! 🍽',
         'active_bookings': '📋 <b>Sizning faol buyurtmalaringiz:</b>\n\nJami: {count}',
         'cancel_booking': '❌ Buyurtmani bekor qilish',
         'booking_cancelled': '✅ Buyurtma bekor qilindi',
@@ -423,7 +456,7 @@ Afsuski, arizangiz tasdiqlanmadi.
 
 Tuzatilgan ma'lumotlar bilan yangi ariza topshirishingiz mumkin.''',
         
-        # Taklif yaratish
+        # Takлиф yaratиш
         'choose_store': 'Do\'konni tanlang:',
         'offer_title': 'Taklif nomini kiriting:',
         'offer_description': '📝 Taklif ta\'rifini kiriting:',
@@ -516,6 +549,17 @@ Mijoz do'koningizni baholash uchun xabar oladi.''',
         'no_pending_stores': '✅ Moderatsiyada arizalar yoq',
         'pending_stores_count': '⏳ Moderatsiyadagi arizalar: {count}',
         
+        # Sevimlilar
+        'no_favorites': '😔 Sizda hali sevimli dokonlar yoq\n\nDokonlarni sevimlilarga qo\'shing, tez topish uchun!',
+        'already_in_favorites': '❤️ Allaqachon sevimlilarda!',
+        'added_to_favorites': '✅ Sevimlilarga qo\'shildi!',
+        'removed_from_favorites': '💔 Sevimlilardan o\'chirildi',
+        
+        # Analitika
+        'not_seller': '❌ Bu funksiya faqat hamkorlar uchun',
+        'no_stores': '😔 Sizda hali dokonlar yoq',
+        'select_store_for_analytics': '📊 Analitika uchun dokonni tanlang:',
+        
         # Boshqa
         'duplicate': '📋 Nusxalash',
         'delete': '❌ O\'chirish',
@@ -573,3 +617,15 @@ def get_categories(lang: str) -> list:
         return ["Ресторан", "Кафе", "Пекарня", "Супермаркет", "Кондитерская", "Фастфуд"]
     else:
         return ["Restoran", "Kafe", "Nonvoyxona", "Supermarket", "Qandolatxona", "Fastfud"]
+
+def normalize_category(category: str) -> str:
+    """Нормализовать категорию к русскому для БД"""
+    mapping = {
+        'Restoran': 'Ресторан',
+        'Kafe': 'Кафе',
+        'Nonvoyxona': 'Пекарня',
+        'Supermarket': 'Супермаркет',
+        'Qandolatxona': 'Кондитерская',
+        'Fastfud': 'Фастфуд'
+    }
+    return mapping.get(category, category)
