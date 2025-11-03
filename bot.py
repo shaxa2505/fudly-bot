@@ -68,6 +68,7 @@ WEBHOOK_URL = os.getenv("WEBHOOK_URL", "")  # Для Railway: https://yourapp.ra
 WEBHOOK_PATH = os.getenv("WEBHOOK_PATH", "/webhook")
 PORT = int(os.getenv("PORT", 8000))
 USE_WEBHOOK = os.getenv("USE_WEBHOOK", "false").lower() == "true"
+SECRET_TOKEN = os.getenv("TELEGRAM_SECRET_TOKEN", None)  # Опциональный токен для безопасности webhook
     # ...existing code...
 
 # Simple in-process metrics (no external deps)
@@ -2378,29 +2379,23 @@ async def create_offer_prices_and_quantity(message: types.Message, state: FSMCon
             description=data.get('title', 'Описание не указано')  # используем название как описание
         )
         
-        # ШАГ 3: Время и категория
-        from datetime import datetime, timedelta
-        today = datetime.now()
-        tomorrow = today + timedelta(days=1)
-        
+        # ШАГ 3: Категория товара (сначала выбираем категорию)
         builder = InlineKeyboardBuilder()
-        # Категории популярные
+        # Только категории, без срока годности
         builder.button(text="🍞 Выпечка", callback_data="prodcat_bakery")
         builder.button(text="🥛 Молочка", callback_data="prodcat_dairy")
         builder.button(text="🥩 Мясо", callback_data="prodcat_meat")
         builder.button(text="🍎 Фрукты", callback_data="prodcat_fruits")
         builder.button(text="🥬 Овощи", callback_data="prodcat_vegetables")
         builder.button(text="🎯 Другое", callback_data="prodcat_other")
-        # Срок годности
-        builder.button(text=f"Сегодня {today.strftime('%d.%m')}", callback_data=f"exp_today")
-        builder.button(text=f"Завтра {tomorrow.strftime('%d.%m')}", callback_data=f"exp_tomorrow")
-        builder.button(text="Неделя", callback_data="exp_week")
-        builder.adjust(3, 3, 3)
+        builder.adjust(3, 3)  # 2 ряда по 3 кнопки
+        
+        uz_note = "(Kategoriyani tanlagandan keyin yaroqlilik muddatini ko'rsatasiz)"
         
         await message.answer(
-            f"<b>{'ШАГ 3 из 3: КАТЕГОРИЯ И СРОК' if lang == 'ru' else '3-QADAM 3 tadan: KATEGORIYA VA MUDDAT'}</b>\n\n"
-            f"{'Выберите категорию и срок годности:' if lang == 'ru' else 'Kategoriya va yaroqlilik muddatini tanlang:'}\n\n"
-            f"{'Время забора по умолчанию: 18:00-21:00' if lang == 'ru' else 'Olish vaqti standart: 18:00-21:00'}",
+            f"<b>{'ШАГ 3 из 3: КАТЕГОРИЯ' if lang == 'ru' else '3-QADAM 3 tadan: KATEGORIYA'}</b>\n\n"
+            f"{'Выберите категорию товара:' if lang == 'ru' else 'Mahsulot kategoriyasini tanlang:'}\n\n"
+            f"{'(После выбора категории укажете срок годности)' if lang == 'ru' else uz_note}",
             parse_mode="HTML",
             reply_markup=builder.as_markup()
         )
@@ -2418,33 +2413,37 @@ async def create_offer_prices_and_quantity(message: types.Message, state: FSMCon
 # Обработчики выбора категории и срока
 @dp.callback_query(F.data.startswith("prodcat_"), CreateOffer.category)
 async def select_category_simple(callback: types.CallbackQuery, state: FSMContext):
-    """Выбор категории товара"""
+    """Выбор категории товара - ОБЯЗАТЕЛЬНО сначала категория"""
     lang = db.get_user_language(callback.from_user.id)
     category_key = callback.data.split("_")[1]
     
     await state.update_data(category=category_key)
     
-    # Обновляем сообщение - показываем выбранную категорию
+    # После выбора категории показываем ТОЛЬКО кнопки срока годности
     from datetime import datetime, timedelta
     today = datetime.now()
     tomorrow = today + timedelta(days=1)
     
     builder = InlineKeyboardBuilder()
-    builder.button(text="🍞 Выпечка" + (" ✓" if category_key == "bakery" else ""), callback_data="prodcat_bakery")
-    builder.button(text="🥛 Молочка" + (" ✓" if category_key == "dairy" else ""), callback_data="prodcat_dairy")
-    builder.button(text="🥩 Мясо" + (" ✓" if category_key == "meat" else ""), callback_data="prodcat_meat")
-    builder.button(text="🍎 Фрукты" + (" ✓" if category_key == "fruits" else ""), callback_data="prodcat_fruits")
-    builder.button(text="🥬 Овощи" + (" ✓" if category_key == "vegetables" else ""), callback_data="prodcat_vegetables")
-    builder.button(text="🎯 Другое" + (" ✓" if category_key == "other" else ""), callback_data="prodcat_other")
     builder.button(text=f"Сегодня {today.strftime('%d.%m')}", callback_data=f"exp_today")
     builder.button(text=f"Завтра {tomorrow.strftime('%d.%m')}", callback_data=f"exp_tomorrow")
     builder.button(text="Неделя", callback_data="exp_week")
-    builder.adjust(3, 3, 3)
+    builder.adjust(3)
+    
+    # Показываем название выбранной категории
+    category_names = {
+        'bakery': '🍞 Выпечка',
+        'dairy': '� Молочка',
+        'meat': '🥩 Мясо',
+        'fruits': '� Фрукты',
+        'vegetables': '🥬 Овощи',
+        'other': '🎯 Другое'
+    }
     
     await callback.message.edit_text(
-        f"<b>{'ШАГ 3 из 3: КАТЕГОРИЯ И СРОК' if lang == 'ru' else '3-QADAM 3 tadan: KATEGORIYA VA MUDDAT'}</b>\n\n"
-        f"✅ {'Категория выбрана!' if lang == 'ru' else 'Kategoriya tanlandi!'}\n"
-        f"{'Теперь выберите срок годности:' if lang == 'ru' else 'Endi yaroqlilik muddatini tanlang:'}",
+        f"<b>{'ШАГ 3 из 3: СРОК ГОДНОСТИ' if lang == 'ru' else '3-QADAM 3 tadan: YAROQLILIK MUDDATI'}</b>\n\n"
+        f"✅ {'Категория:' if lang == 'ru' else 'Kategoriya:'} {category_names.get(category_key, '🎯 Другое')}\n\n"
+        f"{'Выберите срок годности:' if lang == 'ru' else 'Yaroqlilik muddatini tanlang:'}",
         parse_mode="HTML",
         reply_markup=builder.as_markup()
     )
@@ -2470,6 +2469,11 @@ async def select_expiry_simple(callback: types.CallbackQuery, state: FSMContext)
     
     data = await state.get_data()
     
+    # Проверяем что категория выбрана
+    if 'category' not in data:
+        await callback.answer("❌ Ошибка: категория не выбрана", show_alert=True)
+        return
+    
     # Создаём предложение
     logger.info(f"Creating offer: store_id={data.get('store_id')}, title={data.get('title')}, category={data.get('category')}")
     
@@ -2494,9 +2498,21 @@ async def select_expiry_simple(callback: types.CallbackQuery, state: FSMContext)
     
     discount_percent = int((1 - data['discount_price'] / data['original_price']) * 100)
     
+    # Название категории для отображения
+    category_names = {
+        'bakery': '🍞 Выпечка',
+        'dairy': '🥛 Молочка',
+        'meat': '🥩 Мясо',
+        'fruits': '🍎 Фрукты',
+        'vegetables': '🥬 Овощи',
+        'other': '🎯 Другое'
+    }
+    category_display = category_names.get(data.get('category', 'other'), '🎯 Другое')
+    
     await callback.message.edit_text(
         f"✅ <b>{'ТОВАР СОЗДАН!' if lang == 'ru' else 'MAHSULOT YARATILDI!'}</b>\n\n"
         f"📦 {data['title']}\n"
+        f"🏷️ {category_display}\n"
         f"💰 {int(data['original_price'])} ➜ {int(data['discount_price'])} сум (-{discount_percent}%)\n"
         f"📊 {data['quantity']} шт\n"
         f"📅 До: {expiry_date}\n"
@@ -5817,21 +5833,30 @@ async def main():
         # Webhook endpoint
         async def webhook_handler(request):
             try:
+                logger.info(f"Webhook request received from {request.remote}")
+                
                 # Проверяем секретный токен Telegram при наличии
                 if SECRET_TOKEN:
                     hdr = request.headers.get("X-Telegram-Bot-Api-Secret-Token")
                     if hdr != SECRET_TOKEN:
-                        from aiohttp import web
+                        logger.warning(f"Invalid secret token from {request.remote}")
                         return web.Response(status=403, text="Forbidden")
+                
                 # Основная обработка запроса
-                update = await request.json()
-                telegram_update = types.Update.model_validate(update)
+                update_data = await request.json()
+                logger.debug(f"Update data: {update_data}")
+                
+                telegram_update = types.Update.model_validate(update_data)
                 await dp.feed_update(bot, telegram_update)
-                from aiohttp import web
-                return web.Response(status=200)
+                
+                METRICS["updates_received"] = METRICS.get("updates_received", 0) + 1
+                logger.info("Update processed successfully")
+                return web.Response(status=200, text="OK")
             except Exception as e:
-                from aiohttp import web
-                return web.Response(status=500, text=str(e))
+                logger.error(f"Webhook error: {e}", exc_info=True)
+                METRICS["updates_errors"] = METRICS.get("updates_errors", 0) + 1
+                # Возвращаем 200 чтобы Telegram не повторял запрос
+                return web.Response(status=200, text="OK")
         
         # Health check endpoint
         async def health_check(request):
