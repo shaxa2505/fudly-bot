@@ -2012,7 +2012,9 @@ async def register_store_city(message: types.Message, state: FSMContext):
     city_text = message.text.replace("📍 ", "").strip()
     
     if city_text in cities:
-        await state.update_data(city=city_text)
+        # КРИТИЧЕСКИ ВАЖНО: Нормализуем город в русское название для единообразия в БД!
+        normalized_city = normalize_city(city_text)
+        await state.update_data(city=normalized_city)
         await message.answer(
             get_text(lang, 'store_category'),
             reply_markup=category_keyboard(lang)
@@ -2026,7 +2028,9 @@ async def register_store_category(message: types.Message, state: FSMContext):
     cat_text = message.text.replace("🏷 ", "").strip()
     
     if cat_text in categories:
-        await state.update_data(category=cat_text)
+        # КРИТИЧЕСКИ ВАЖНО: Нормализуем категорию в русское название для единообразия в БД!
+        normalized_category = normalize_category(cat_text)
+        await state.update_data(category=normalized_category)
         await message.answer(get_text(lang, 'store_name'), reply_markup=cancel_keyboard(lang))
         await state.set_state(RegisterStore.name)
 
