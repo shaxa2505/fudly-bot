@@ -149,7 +149,9 @@ def get_uzb_time():
 def has_approved_store(user_id: int) -> bool:
     """Проверяет, есть ли у пользователя одобренный магазин"""
     stores = db.get_user_stores(user_id)
-    return any(store[4] == "active" for store in stores)
+    # stores: [0]store_id, [1]owner_id, [2]name, [3]city, [4]address, [5]description, 
+    #         [6]category, [7]phone, [8]status, [9]rejection_reason, [10]created_at
+    return any(store[8] == "active" for store in stores if len(store) > 8)
 
 def get_appropriate_menu(user_id: int, lang: str):
     """Возвращает подходящее меню для пользователя с проверкой статуса магазина"""
@@ -868,9 +870,8 @@ async def cancel_action(message: types.Message, state: FSMContext):
     
     # ВАЖНО: Проверяем наличие одобренного магазина для партнёров
     if role == "seller":
-        stores = db.get_user_stores(message.from_user.id)
-        approved_stores = [s for s in stores if s[4] == "active"]
-        if not approved_stores:
+        # Используем готовую функцию has_approved_store для проверки
+        if not has_approved_store(message.from_user.id):
             # Нет одобренного магазина — показываем меню покупателя
             role = "customer"
             preferred_menu = "customer"
