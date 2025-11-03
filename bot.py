@@ -962,9 +962,10 @@ async def available_offers(message: types.Message):
         return
     
     city = user[4]  # город пользователя
+    search_city = normalize_city(city)  # Нормализуем для поиска в БД
     
     # Получаем топ 10 предложений с самыми большими скидками
-    offers = db.get_top_offers_by_city(city, limit=10)
+    offers = db.get_top_offers_by_city(search_city, limit=10)
     
     if not offers:
         await message.answer(
@@ -1950,9 +1951,8 @@ async def become_partner(message: types.Message, state: FSMContext):
     # Проверяем: если уже партнер И есть магазин - просто переключаем режим
     # user: [0]user_id, [1]username, [2]first_name, [3]phone, [4]city, [5]language, [6]role, [7]is_admin, [8]notifications
     if user[6] == 'seller':
-        # Проверяем, есть ли у партнера хоть один магазин
-        stores = db.get_user_stores(message.from_user.id)
-        if stores:
+        # Проверяем, есть ли у партнера ОДОБРЕННЫЙ магазин
+        if has_approved_store(message.from_user.id):
             # Remember seller view preference
             user_view_mode[message.from_user.id] = 'seller'
             await message.answer(
@@ -1961,8 +1961,29 @@ async def become_partner(message: types.Message, state: FSMContext):
             )
             return
         else:
-            # Если магазина нет - меняем роль на customer и начинаем регистрацию
-            db.update_user_role(message.from_user.id, 'customer')
+            # Если нет одобренного магазина - показываем статус
+            stores = db.get_user_stores(message.from_user.id)
+            if stores:
+                # Есть магазин(ы), но не одобрены
+                status = stores[0][8] if len(stores[0]) > 8 else 'pending'
+                if status == 'pending':
+                    await message.answer(
+                        get_text(lang, 'no_approved_stores'),
+                        reply_markup=main_menu_customer(lang)
+                    )
+                elif status == 'rejected':
+                    # Можно подать заявку заново
+                    await message.answer(
+                        get_text(lang, 'store_rejected') + "\n\nПодайте заявку заново:",
+                        reply_markup=main_menu_customer(lang)
+                    )
+                    # Продолжаем регистрацию новой заявки
+                else:
+                    await message.answer(
+                        get_text(lang, 'no_approved_stores'),
+                        reply_markup=main_menu_customer(lang)
+                    )
+                return
     
     # Если не партнер или нет магазина - начинаем регистрацию
     await message.answer(
@@ -2495,8 +2516,15 @@ async def select_expiry_simple(callback: types.CallbackQuery, state: FSMContext)
 @dp.message(CreateOffer.photo)
 async def create_offer_photo(message: types.Message, state: FSMContext):
     lang = db.get_user_language(message.from_user.id)
-    photo_id = message.photo[-1].file_id
-    await state.update_data(photo=photo_id)
+    
+    # Проверяем есть ли фото или пользователь пропустил
+    if message.photo:
+        photo_id = message.photo[-1].file_id
+        await state.update_data(photo=photo_id)
+    else:
+        # Пользователь написал "пропустить" или отправил текст
+        await state.update_data(photo=None)
+    
     await message.answer(get_text(lang, 'original_price'))
     await state.set_state(CreateOffer.original_price)
 
@@ -3594,9 +3622,9 @@ async def save_store_rating(callback: types.CallbackQuery):
 
 # ============== МАГАЗИНЫ ==============
 
-@dp.message(F.text.contains("Магазины") | F.text.contains("Dokonlar"))
+@dp.message(F.text.contains("Все магазины") | F.text.contains("Barcha dokonlar"))
 async def all_stores(message: types.Message):
-    """Выбор категории магазинов с количеством"""
+    """Выбор категории магазинов с количеством (для клиентов)"""
     lang = db.get_user_language(message.from_user.id)
     user = db.get_user(message.from_user.id)
     
