@@ -105,9 +105,23 @@ CITY_UZ_TO_RU = {
     "Nukus": "Нукус"
 }
 
+# Словарь для преобразования категорий заведений в русский формат
+STORE_CATEGORY_UZ_TO_RU = {
+    "Restoran": "Ресторан",
+    "Kafe": "Кафе",
+    "Nonvoyxona": "Пекарня",
+    "Supermarket": "Супермаркет",
+    "Qandolatxona": "Кондитерская",
+    "Fastfud": "Фастфуд"
+}
+
 def normalize_city(city: str) -> str:
     """Преобразует название города в русский формат для поиска в БД"""
     return CITY_UZ_TO_RU.get(city, city)
+
+def normalize_store_category(category: str) -> str:
+    """Преобразует категорию заведения в русский формат для поиска в БД"""
+    return STORE_CATEGORY_UZ_TO_RU.get(category, category)
 
 def normalize_category(category: str) -> str:
     """Преобразует отображаемое название категории в английский ключ для БД"""
@@ -1212,7 +1226,7 @@ async def select_category(callback: types.CallbackQuery):
         categories = get_categories(lang)
         cat_index = int(callback.data.split("_")[1])
         category = categories[cat_index]
-        category = normalize_category(category)
+        category = normalize_store_category(category)  # Используем normalize_store_category для категорий заведений!
         
         
         # Получаем магазины этой категории в городе пользователя
@@ -1266,7 +1280,7 @@ async def stores_pagination(callback: types.CallbackQuery):
             await callback.answer("Ошибка", show_alert=True)
             return
         category_label = categories[cat_index]
-        category = normalize_category(category_label)
+        category = normalize_store_category(category_label)  # Используем normalize_store_category для категорий заведений!
         stores = db.get_stores_by_category(category, search_city)
 
         # Обновляем только клавиатуру
@@ -2028,8 +2042,8 @@ async def register_store_category(message: types.Message, state: FSMContext):
     cat_text = message.text.replace("🏷 ", "").strip()
     
     if cat_text in categories:
-        # КРИТИЧЕСКИ ВАЖНО: Нормализуем категорию в русское название для единообразия в БД!
-        normalized_category = normalize_category(cat_text)
+        # КРИТИЧЕСКИ ВАЖНО: Нормализуем категорию заведения в русское название для единообразия в БД!
+        normalized_category = normalize_store_category(cat_text)
         await state.update_data(category=normalized_category)
         await message.answer(get_text(lang, 'store_name'), reply_markup=cancel_keyboard(lang))
         await state.set_state(RegisterStore.name)
@@ -3753,7 +3767,7 @@ async def show_stores_by_category(callback: types.CallbackQuery):
         return
     
     category = categories[cat_index]
-    category_normalized = normalize_category(category)
+    category_normalized = normalize_store_category(category)  # Используем normalize_store_category для категорий заведений!
     
     # Получаем магазины этой категории в городе пользователя
     stores = db.get_stores_by_category(category_normalized, search_city)
