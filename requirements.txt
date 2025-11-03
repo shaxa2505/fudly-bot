@@ -12,6 +12,11 @@ aiohttp>=3.9.0
 # HTTP client
 requests>=2.31.0
 
+# Testing
+pytest>=7.4.0
+pytest-cov>=4.1.0
+pytest-asyncio>=0.21.0
+
 # Production Features (optional - graceful fallback if not installed)
 # Uncomment if needed:
 # redis>=4.5.0                   # For Redis caching

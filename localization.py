@@ -30,6 +30,11 @@ Fudly помогает спасать еду от выбрасывания и э
 
 Выберите действие:''',
 
+        'registration_required': '''❌ <b>Требуется регистрация</b>
+
+Для использования бота необходимо поделиться номером телефона.
+Нажмите /start для регистрации.''',
+
         # Кнопки
         'share_phone': 'Поделиться номером',
         'cancel': 'Отмена',
@@ -40,14 +45,18 @@ Fudly помогает спасать еду от выбрасывания и э
         'my_city': '🌆 Мой город',
         'profile': '👤 Профиль',
         'become_partner': '🏪 Стать партнером',
-        'analytics': '📊 Аналитика',
-        'back_to_customer': '🔙 Режим покупателя',
-        'add_offer': '➕ Добавить предложение',
-        'bulk_create': '📦 Массовое создание',
-        'my_offers': '📊 Мои предложения',
-        'my_stores': '🏪 Мои магазины',
-        'store_bookings': '📋 Бронирования магазина',
-        'confirm_delivery': '✅ Подтвердить выдачу',
+        
+        # Партнёр - новые короткие названия
+        'add_item': '➕ Добавить',
+        'my_items': '📦 Мои товары',
+        'orders': '🎫 Заказы',
+        'today_stats': '📊 Сегодня',
+        'back_to_customer': '🔄 Режим покупателя',
+        
+        # Старые ключи (для совместимости)
+        'add_offer': '➕ Добавить',
+        'my_offers': '📋 Мои товары',
+        'store_bookings': '🎫 Заказы',
         'notifications': '🔔 Уведомления',
         'settings': '⚙️ Настройки',
         
@@ -64,11 +73,13 @@ Fudly помогает спасать еду от выбрасывания и э
         'switched_to_seller': '🔄 Переключено в режим партнёра',
         
         # Города
+        'your_city': '📍 Ваш город',
         'choose_city': '🌆 <b>Выберите ваш город:</b>',
         'city_changed': '✅ Город изменён на {city}',
         
         # Предложения
         'no_offers': '😔 Пока нет доступных предложений в вашем городе',
+        'no_offers_in_store': '😔 В этом магазине пока нет предложений',
         'offers_in_city': '🍽 <b>Доступные предложения в городе {city}</b>\n\nВсего: {count}',
         'offers_found': '🍽 <b>Доступные предложения</b>\n\nНайдено: {count}',
         'all_offers': 'Все предложения',
@@ -105,6 +116,13 @@ Fudly помогает спасать еду от выбрасывания и э
         'active_bookings': '📋 <b>Ваши активные бронирования:</b>\n\nВсего: {count}',
         'cancel_booking': '❌ Отменить бронь',
         'booking_cancelled': '✅ Бронирование отменено',
+        'insufficient_stock': '❌ К сожалению, выбранное количество уже недоступно. Обновите список предложений.',
+        'error_qty_gt_zero': '❌ Количество должно быть больше 0',
+        'error_price_gt_zero': '❌ Цена должна быть больше 0',
+        'error_price_too_high': '❌ Слишком большая цена',
+        'error_discount_less_than_original': '❌ Цена со скидкой должна быть меньше обычной цены',
+        'warn_discount_low': '⚠️ Внимание: скидка меньше 10%. Рекомендуем делать скидку от 30% для привлечения клиентов.',
+        'booking_how_many': 'Сколько вы хотите забронировать? (1-{max_qty})',
         
         # Партнёр
         'become_partner_text': '''🏪 <b>Стать партнёром Fudly</b>
@@ -167,6 +185,8 @@ Fudly помогает спасать еду от выбрасывания и э
         
         # Создание предложения
         'choose_store': 'Выберите магазин:',
+        'choose_product_category': '🏷 Выберите категорию продукта:',
+        'choose_unit': '📏 Выберите единицу измерения:',
         'offer_title': 'Введите название предложения:',
         'offer_description': '📝 Введите описание предложения:',
         'original_price': '💰 Введите обычную цену (в сумах):',
@@ -277,6 +297,7 @@ Fudly помогает спасать еду от выбрасывания и э
         'duplicated': '✅ Предложение продублировано!',
         'deleted': '✅ Предложение удалено',
         'change_language': '🌍 Изменить язык',
+        'delete_account': '🗑 Удалить аккаунт',
         
         # Настройки
         'notifications_enabled': '✅ Уведомления включены',
@@ -295,6 +316,11 @@ Fudly помогает спасать еду от выбрасывания и э
         'account_deleted': '✅ Ваш аккаунт успешно удалён',
         'yes_delete': '✅ Да, удалить',
         'no_cancel': '❌ Нет, отменить',
+        'store_deleted': '✅ Магазин успешно удалён',
+        'error_general': '❌ Произошла ошибка. Попробуйте позже.',
+                # Валидация/лимиты
+                'invalid_city': 'Пожалуйста, выберите город из списка.',
+                'rate_limit_exceeded': 'Слишком много запросов. Попробуйте позже.',
     },
     
     'uz': {
@@ -321,6 +347,11 @@ Salom, {name}! 👋
 
 Harakatni tanlang:''',
 
+        'registration_required': '''❌ <b>Ro'yxatdan o'tish talab qilinadi</b>
+
+Botdan foydalanish uchun telefon raqamingiz bilan bo'lishingiz kerak.
+Ro'yxatdan o'tish uchun /start bosing.''',
+
         # Tugmalar
         'share_phone': 'Raqamni ulashish',
         'cancel': 'Bekor qilish',
@@ -331,18 +362,24 @@ Harakatni tanlang:''',
         'my_city': '🌆 Mening shahrim',
         'profile': '👤 Profil',
         'become_partner': '🏪 Hamkor bolish',
-        'analytics': '📊 Analitika',
-        'back_to_customer': '🔙 Xaridor rejimi',
-        'add_offer': '➕ Taklif qoshish',
-        'bulk_create': '📦 Ommaviy yaratish',
-        'my_offers': '📊 Mening takliflarim',
-        'my_stores': '🏪 Mening dokonlarim',
-        'store_bookings': '📋 Dokon buyurtmalari',
-        'confirm_delivery': '✅ Berishni tasdiqlash',
+        
+        # Hamkor - yangi qisqa nomlar
+        'add_item': '➕ Qo\'shish',
+        'my_items': '📦 Mening mahsulotlarim',
+        'orders': '🎫 Buyurtmalar',
+        'today_stats': '📊 Bugun',
+        'back_to_customer': '� Xaridor rejimi',
+        
+        # Eski kalitlar (muvofiqligi uchun)
+        'add_offer': '➕ Qo\'shish',
+        'my_offers': '📦 Mening mahsulotlarim',
+        'store_bookings': '🎫 Buyurtmalar',
         'notifications': '🔔 Bildirishnomalar',
         'settings': '⚙️ Sozlamalar',
         
         # Profil
+         'choose_unit': '📏 O‘lchov birliklarini tanlang:',
+         'choose_product_category': '🏷 Mahsulot kategoriyasini tanlang:',
         'your_profile': '👤 <b>Sizning profilingiz</b>',
         'name': '📝 Ism',
         'phone': '📱 Telefon',
@@ -355,11 +392,13 @@ Harakatni tanlang:''',
         'switched_to_seller': '🔄 Hamkor rejimiga ogirildi',
         
         # Shaharlar
+        'your_city': '📍 Sizning shahringiz',
         'choose_city': '🌆 <b>Shahringizni tanlang:</b>',
         'city_changed': '✅ Shahar {city}ga o\'zgartirildi',
         
         # Takliflar
         'no_offers': '😔 Hozircha sizning shahringizda takliflar yo\'q',
+        'no_offers_in_store': '😔 Bu dokonda hali takliflar yo\'q',
         'offers_in_city': '🍽 <b>{city} shahridagi mavjud takliflar</b>\n\nJami: {count}',
         'offers_found': '🍽 <b>Mavjud takliflar</b>\n\nTopildi: {count}',
         'all_offers': 'Barcha takliflar',
@@ -396,6 +435,13 @@ Harakatni tanlang:''',
         'active_bookings': '📋 <b>Sizning faol buyurtmalaringiz:</b>\n\nJami: {count}',
         'cancel_booking': '❌ Buyurtmani bekor qilish',
         'booking_cancelled': '✅ Buyurtma bekor qilindi',
+        'insufficient_stock': '❌ Afsuski, tanlangan miqdor endi mavjud emas. Takliflar ro‘yxatini yangilang.',
+        'error_qty_gt_zero': '❌ Miqdor 0 dan katta bo‘lishi kerak',
+        'error_price_gt_zero': '❌ Narx 0 dan katta bo‘lishi kerak',
+        'error_price_too_high': '❌ Juda katta narx',
+        'error_discount_less_than_original': '❌ Chegirma narxi oddiy narxdan kichik bo‘lishi kerak',
+        'warn_discount_low': '⚠️ Diqqat: chegirma 10% dan kichik. Mijozlarni jalb qilish uchun 30% va undan yuqori tavsiya etamiz.',
+        'booking_how_many': 'Nechta buyurtma qilmoqchisiz? (1-{max_qty})',
         
         # Hamkor
         'become_partner_text': '''🏪 <b>Fudly hamkori bo\'ling</b>
@@ -548,6 +594,8 @@ Mijoz do'koningizni baholash uchun xabar oladi.''',
         'access_denied': '❌ Kirish taqiqlangan',
         'no_pending_stores': '✅ Moderatsiyada arizalar yoq',
         'pending_stores_count': '⏳ Moderatsiyadagi arizalar: {count}',
+        'store_approved_admin': '✅ Dokon tasdiqlandi!',
+        'store_rejected_admin': '✅ Dokon rad etildi!',
         
         # Sevimlilar
         'no_favorites': '😔 Sizda hali sevimli dokonlar yoq\n\nDokonlarni sevimlilarga qo\'shing, tez topish uchun!',
@@ -566,6 +614,7 @@ Mijoz do'koningizni baholash uchun xabar oladi.''',
         'duplicated': '✅ Taklif nusxalandi!',
         'deleted': '✅ Taklif o\'chirildi',
         'change_language': '🌍 Tilni o\'zgartirish',
+        'delete_account': '🗑 Akkauntni o\'chirish',
         
         # Sozlamalar
         'notifications_enabled': '✅ Bildirishnomalar yoqildi',
@@ -584,15 +633,48 @@ Bu harakatni qaytarib bo\'lmaydi!''',
         'account_deleted': '✅ Akkauntingiz muvaffaqiyatli o\'chirildi',
         'yes_delete': '✅ Ha, o\'chirish',
         'no_cancel': '❌ Yo\'q, bekor qilish',
+        'store_deleted': '✅ Dokon muvaffaqiyatli o\'chirildi',
+        'error_general': '❌ Xatolik yuz berdi. Keyinroq urinib ko\'ring.',
+                # Tekshiruv/cheklovlar
+                'invalid_city': 'Iltimos, shaharni ro\'yxatdan tanlang.',
+                'rate_limit_exceeded': 'Juda ko\'p so\'rov. Keyinroq urinib ko\'ring.',
     }
 }
 
 def get_text(lang: str, key: str, **kwargs) -> str:
-    """Получить текст на нужном языке с форматированием"""
-    text = TEXTS.get(lang, TEXTS['ru']).get(key, TEXTS['ru'].get(key, key))
-    if kwargs:
-        return text.format(**kwargs)
-    return text
+    """Получить текст на нужном языке с форматированием
+    
+    Args:
+        lang: Код языка ('ru' или 'uz')
+        key: Ключ текста из TEXTS
+        **kwargs: Параметры для форматирования строки
+        
+    Returns:
+        Отформатированная строка текста или сам ключ, если текст не найден
+    """
+    try:
+        texts = TEXTS.get(lang, TEXTS.get('ru', {}))
+        text = texts.get(key, key)
+        
+        # Если текст не найден, пробуем русский
+        if text == key and lang != 'ru':
+            text = TEXTS.get('ru', {}).get(key, key)
+        
+        # Форматируем, если есть параметры и текст содержит плейсхолдеры
+        if kwargs and text != key:
+            try:
+                return text.format(**kwargs)
+            except (KeyError, ValueError) as e:
+                # Если форматирование не удалось, возвращаем текст без форматирования
+                import logging
+                logging.warning(f"Format error in get_text: {e}, key={key}, lang={lang}")
+                return text
+        
+        return text
+    except Exception as e:
+        import logging
+        logging.error(f"Error in get_text: {e}, key={key}, lang={lang}")
+        return key
 
 def get_language_name(lang: str) -> str:
     """Получить название языка"""

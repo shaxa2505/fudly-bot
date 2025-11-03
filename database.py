@@ -11,7 +11,7 @@ from logging_config import logger
 
 # Module-level pool (configurable via env vars)
 DB_PATH = os.environ.get('DATABASE_PATH', 'fudly.db')
-POOL = SQLitePool(DB_PATH, maxsize=int(os.environ.get('DB_POOL_SIZE', 5)), timeout=int(os.environ.get('DB_TIMEOUT', 5)))
+POOL = SQLitePool(DB_PATH, pool_size=int(os.environ.get('DB_POOL_SIZE', 5)))
 
 class Database:
     def __init__(self, db_name: str = "fudly.db"):
@@ -120,7 +120,21 @@ class Database:
         try:
             cursor.execute('ALTER TABLE offers ADD COLUMN expiry_date TEXT')
             conn.commit()
-        except:
+        except Exception:
+            pass  # Поле уже существует
+        
+        # Добавляем поле unit если его нет (для старых БД)
+        try:
+            cursor.execute("ALTER TABLE offers ADD COLUMN unit TEXT DEFAULT 'шт'")
+            conn.commit()
+        except Exception:
+            pass  # Поле уже существует
+        
+        # Добавляем поле category если его нет (для старых БД)
+        try:
+            cursor.execute("ALTER TABLE offers ADD COLUMN category TEXT DEFAULT 'other'")
+            conn.commit()
+        except Exception:
             pass  # Поле уже существует
         
         # Таблица уведомлений
@@ -252,7 +266,7 @@ class Database:
                 pass
     
     # Методы для пользователей
-    def add_user(self, user_id: int, username: Optional[str] = None, first_name: Optional[str] = None, role: str = 'customer', city: str = 'Ташкент'):
+    def add_user(self, user_id: int, username: Optional[str] = None, first_name: Optional[str] = None, role: str = 'customer', city: str = None):
         conn = self.get_connection()
         cursor = conn.cursor()
         cursor.execute('''
@@ -271,32 +285,52 @@ class Database:
     
     def get_user(self, user_id: int) -> Optional[Tuple]:
         conn = self.get_connection()
-        cursor = conn.cursor()
-        cursor.execute('SELECT * FROM users WHERE user_id = ?', (user_id,))
-        user = cursor.fetchone()
-        conn.close()
-        return user
+        try:
+            cursor = conn.cursor()
+            cursor.execute('SELECT * FROM users WHERE user_id = ?', (user_id,))
+            user = cursor.fetchone()
+            return user
+        finally:
+            try:
+                conn.close()
+            except Exception:
+                pass
     
     def update_user_city(self, user_id: int, city: str):
         conn = self.get_connection()
-        cursor = conn.cursor()
-        cursor.execute('UPDATE users SET city = ? WHERE user_id = ?', (city, user_id))
-        conn.commit()
-        conn.close()
+        try:
+            cursor = conn.cursor()
+            cursor.execute('UPDATE users SET city = ? WHERE user_id = ?', (city, user_id))
+            conn.commit()
+        finally:
+            try:
+                conn.close()
+            except Exception:
+                pass
     
     def update_user_role(self, user_id: int, role: str):
         conn = self.get_connection()
-        cursor = conn.cursor()
-        cursor.execute('UPDATE users SET role = ? WHERE user_id = ?', (role, user_id))
-        conn.commit()
-        conn.close()
+        try:
+            cursor = conn.cursor()
+            cursor.execute('UPDATE users SET role = ? WHERE user_id = ?', (role, user_id))
+            conn.commit()
+        finally:
+            try:
+                conn.close()
+            except Exception:
+                pass
     
     def update_user_phone(self, user_id: int, phone: str):
         conn = self.get_connection()
-        cursor = conn.cursor()
-        cursor.execute('UPDATE users SET phone = ? WHERE user_id = ?', (phone, user_id))
-        conn.commit()
-        conn.close()
+        try:
+            cursor = conn.cursor()
+            cursor.execute('UPDATE users SET phone = ? WHERE user_id = ?', (phone, user_id))
+            conn.commit()
+        finally:
+            try:
+                conn.close()
+            except Exception:
+                pass
     
     def update_user_language(self, user_id: int, language: str):
         """Обновить язык пользователя"""
@@ -353,13 +387,18 @@ class Database:
         return stores
     
     def get_approved_stores(self, owner_id: int) -> List[Tuple]:
-        """Получить только ОДОБРЕННЫЕ магазины пользователя"""
+        """Получить только ОДОБРЕННЫЕ магазина пользователя"""
         conn = self.get_connection()
-        cursor = conn.cursor()
-        cursor.execute('SELECT * FROM stores WHERE owner_id = ? AND status = "approved"', (owner_id,))
-        stores = cursor.fetchall()
-        conn.close()
-        return stores
+        try:
+            cursor = conn.cursor()
+            cursor.execute('SELECT * FROM stores WHERE owner_id = ? AND status = "active"', (owner_id,))
+            stores = cursor.fetchall()
+            return stores
+        finally:
+            try:
+                conn.close()
+            except Exception:
+                pass
     
     def get_store(self, store_id: int) -> Optional[Tuple]:
         key = f'store:{store_id}'
@@ -397,7 +436,7 @@ class Database:
 
         conn = self.get_connection()
         cursor = conn.cursor()
-        cursor.execute('SELECT * FROM stores WHERE city = ? AND status = "approved"', (city,))
+        cursor.execute('SELECT * FROM stores WHERE city = ? AND status = "active"', (city,))
         stores = cursor.fetchall()
         try:
             conn.close()
@@ -522,7 +561,7 @@ class Database:
                 SELECT o.*, s.name as store_name, s.address, s.city, s.category
                 FROM offers o
                 JOIN stores s ON o.store_id = s.store_id
-                WHERE o.status = 'active' AND o.quantity > 0 AND s.store_id = ? AND s.status = 'approved'
+                WHERE o.status = 'active' AND o.quantity > 0 AND s.store_id = ? AND s.status = 'active'
                     AND date(o.expiry_date) >= date('now')
                 ORDER BY o.created_at DESC
             ''', (store_id,))
@@ -532,7 +571,7 @@ class Database:
                 SELECT o.*, s.name as store_name, s.address, s.city, s.category
                 FROM offers o
                 JOIN stores s ON o.store_id = s.store_id
-                WHERE o.status = 'active' AND o.quantity > 0 AND s.city = ? AND s.status = 'approved'
+                WHERE o.status = 'active' AND o.quantity > 0 AND s.city = ? AND s.status = 'active'
                     AND date(o.expiry_date) >= date('now')
                 ORDER BY o.created_at DESC
             ''', (city,))
@@ -542,7 +581,7 @@ class Database:
                 SELECT o.*, s.name as store_name, s.address, s.city, s.category
                 FROM offers o
                 JOIN stores s ON o.store_id = s.store_id
-                WHERE o.status = 'active' AND o.quantity > 0 AND s.status = 'approved'
+                WHERE o.status = 'active' AND o.quantity > 0 AND s.status = 'active'
                     AND date(o.expiry_date) >= date('now')
                 ORDER BY o.created_at DESC
             ''')
@@ -583,25 +622,63 @@ class Database:
         return valid_offers
     
     def get_offer(self, offer_id: int) -> Optional[Tuple]:
+        """Получить предложение с информацией о магазине.
+        
+        Returns tuple structure:
+        [0] offer_id
+        [1] store_id
+        [2] title
+        [3] description
+        [4] original_price
+        [5] discount_price
+        [6] quantity
+        [7] available_from
+        [8] available_until
+        [9] expiry_date
+        [10] status
+        [11] photo
+        [12] created_at
+        [13] unit (добавлено через ALTER TABLE, может быть None для старых записей)
+        [14] category (добавлено через ALTER TABLE, может быть None для старых записей)
+        После JOIN добавляются:
+        [15] store_name (from stores)
+        [16] address (from stores)
+        [17] city (from stores)
+        [18] category (from stores - category магазина)
+        """
         conn = self.get_connection()
-        cursor = conn.cursor()
-        cursor.execute('''
-            SELECT o.*, s.name as store_name, s.address, s.city, s.category
-            FROM offers o
-            JOIN stores s ON o.store_id = s.store_id
-            WHERE o.offer_id = ?
-        ''', (offer_id,))
-        offer = cursor.fetchone()
-        conn.close()
-        return offer
+        try:
+            cursor = conn.cursor()
+            cursor.execute('''
+                SELECT o.*, s.name as store_name, s.address, s.city, s.category
+                FROM offers o
+                JOIN stores s ON o.store_id = s.store_id
+                WHERE o.offer_id = ?
+            ''', (offer_id,))
+            offer = cursor.fetchone()
+            return offer
+        finally:
+            try:
+                conn.close()
+            except Exception:
+                pass
     
     def get_store_offers(self, store_id: int) -> List[Tuple]:
+        """Получить товары магазина (исключая удаленные)"""
         conn = self.get_connection()
-        cursor = conn.cursor()
-        cursor.execute('SELECT * FROM offers WHERE store_id = ? ORDER BY created_at DESC', (store_id,))
-        offers = cursor.fetchall()
-        conn.close()
-        return offers
+        try:
+            cursor = conn.cursor()
+            cursor.execute(
+                'SELECT * FROM offers WHERE store_id = ? AND status != "deleted" ORDER BY created_at DESC',
+                (store_id,)
+            )
+            offers = cursor.fetchall()
+            return offers
+        finally:
+            try:
+                conn.close()
+            except Exception:
+                pass
     
     def update_offer_quantity(self, offer_id: int, new_quantity: int):
         """Обновить количество товара и автоматически управлять статусом"""
@@ -618,6 +695,24 @@ class Database:
         conn.commit()
         conn.close()
     
+    def increment_offer_quantity(self, offer_id: int, amount: int = 1):
+        """Увеличить количество товара (при отмене бронирования)"""
+        conn = self.get_connection()
+        try:
+            cursor = conn.cursor()
+            # Получаем текущее количество
+            cursor.execute('SELECT quantity FROM offers WHERE offer_id = ?', (offer_id,))
+            row = cursor.fetchone()
+            if row:
+                current_qty = row[0] if row[0] is not None else 0
+                new_qty = current_qty + amount
+                self.update_offer_quantity(offer_id, new_qty)
+        finally:
+            try:
+                conn.close()
+            except Exception:
+                pass
+    
     def deactivate_offer(self, offer_id: int):
         conn = self.get_connection()
         cursor = conn.cursor()
@@ -631,6 +726,52 @@ class Database:
             cache.delete('offers:all')
         except Exception:
             pass
+    
+    def activate_offer(self, offer_id: int):
+        """Активировать товар"""
+        conn = self.get_connection()
+        cursor = conn.cursor()
+        cursor.execute('UPDATE offers SET status = ? WHERE offer_id = ?', ('active', offer_id))
+        conn.commit()
+        try:
+            conn.close()
+        except Exception:
+            pass
+        try:
+            cache.delete('offers:all')
+        except Exception:
+            pass
+    
+    def update_offer_expiry(self, offer_id: int, new_expiry: str):
+        """Обновить срок годности товара"""
+        conn = self.get_connection()
+        cursor = conn.cursor()
+        cursor.execute('UPDATE offers SET expiry_date = ? WHERE offer_id = ?', (new_expiry, offer_id))
+        conn.commit()
+        try:
+            conn.close()
+        except Exception:
+            pass
+        try:
+            cache.delete('offers:all')
+        except Exception:
+            pass
+    
+    def delete_offer(self, offer_id: int) -> bool:
+        """Удалить товар (установить статус deleted)"""
+        conn = self.get_connection()
+        cursor = conn.cursor()
+        cursor.execute('UPDATE offers SET status = "deleted" WHERE offer_id = ?', (offer_id,))
+        conn.commit()
+        try:
+            conn.close()
+        except Exception:
+            pass
+        try:
+            cache.delete('offers:all')
+        except Exception:
+            pass
+        return True
     
     def delete_expired_offers(self):
         """Удаляет предложения с истёкшим сроком действия"""
@@ -685,61 +826,181 @@ class Database:
         return deleted_count
     
     # Методы для бронирований
-    def create_booking(self, offer_id: int, user_id: int, booking_code: str) -> int:
+    def create_booking(self, offer_id: int, user_id: int, booking_code: str, quantity: int = 1) -> int:
+        """Создать бронирование (не атомарное - используйте create_booking_atomic для предотвращения race conditions)"""
         conn = self.get_connection()
-        cursor = conn.cursor()
-        cursor.execute('''
-            INSERT INTO bookings (offer_id, user_id, booking_code, status)
-            VALUES (?, ?, ?, 'pending')
-        ''', (offer_id, user_id, booking_code))
-        booking_id = cursor.lastrowid
-        conn.commit()
-        conn.close()
-        return booking_id
+        try:
+            cursor = conn.cursor()
+            cursor.execute('''
+                INSERT INTO bookings (offer_id, user_id, booking_code, status, quantity)
+                VALUES (?, ?, ?, 'pending', ?)
+            ''', (offer_id, user_id, booking_code, quantity))
+            booking_id = cursor.lastrowid
+            conn.commit()
+            return booking_id
+        finally:
+            try:
+                conn.close()
+            except Exception:
+                pass
+    
+    def create_booking_atomic(self, offer_id: int, user_id: int, quantity: int = 1) -> Tuple[bool, Optional[int], Optional[str]]:
+        """Атомарно резервирует товар и создает бронирование внутри одной транзакции.
+        
+        Args:
+            offer_id (int): ID предложения для бронирования
+            user_id (int): ID пользователя
+            quantity (int, optional): Количество единиц товара. По умолчанию 1.
+            
+        Returns:
+            Tuple[bool, Optional[int], Optional[str]]: 
+            - ok: True если бронирование создано успешно
+            - booking_id: ID созданного бронирования или None при ошибке
+            - booking_code: Код бронирования или None при ошибке
+            
+        Note:
+            Использует транзакцию SQLite с IMMEDIATE для предотвращения race conditions.
+            Уменьшает quantity предложения атомарно перед созданием бронирования.
+        """
+        import random
+        import string
+        conn = None
+        try:
+            conn = self.get_connection()
+            cursor = conn.cursor()
+            
+            # Начинаем транзакцию IMMEDIATE для предотвращения race conditions
+            cursor.execute('BEGIN IMMEDIATE')
+            
+            # Проверяем и резервируем товар атомарно
+            cursor.execute('''
+                SELECT quantity, status FROM offers 
+                WHERE offer_id = ? AND status = 'active'
+            ''', (offer_id,))
+            offer = cursor.fetchone()
+            
+            if not offer or offer[0] is None or offer[0] < quantity or offer[1] != 'active':
+                conn.rollback()
+                return (False, None, None)
+            
+            current_quantity = offer[0]
+            new_quantity = current_quantity - quantity
+            
+            # Обновляем quantity атомарно
+            cursor.execute('''
+                UPDATE offers 
+                SET quantity = ?, status = CASE WHEN ? <= 0 THEN 'inactive' ELSE 'active' END
+                WHERE offer_id = ? AND quantity = ?
+            ''', (new_quantity, new_quantity, offer_id, current_quantity))
+            
+            if cursor.rowcount == 0:
+                # Кто-то другой уже забронировал
+                conn.rollback()
+                return (False, None, None)
+            
+            # Генерируем уникальный код бронирования
+            booking_code = ''.join(random.choices(string.ascii_uppercase + string.digits, k=6))
+            
+            # Создаем бронирование
+            cursor.execute('''
+                INSERT INTO bookings (offer_id, user_id, booking_code, status, quantity)
+                VALUES (?, ?, ?, 'pending', ?)
+            ''', (offer_id, user_id, booking_code, quantity))
+            booking_id = cursor.lastrowid
+            
+            # Коммитим транзакцию
+            conn.commit()
+            return (True, booking_id, booking_code)
+            
+        except Exception as e:
+            if conn:
+                try:
+                    conn.rollback()
+                except Exception:
+                    pass
+            logger.error(f"Error in create_booking_atomic: {e}", exc_info=True)
+            return (False, None, None)
+        finally:
+            if conn:
+                try:
+                    conn.close()
+                except Exception:
+                    pass
     
     def get_user_bookings(self, user_id: int) -> List[Tuple]:
         conn = self.get_connection()
-        cursor = conn.cursor()
-        cursor.execute('''
-            SELECT b.*, o.title, o.discount_price, o.available_until, s.name, s.address, s.city
-            FROM bookings b
-            JOIN offers o ON b.offer_id = o.offer_id
-            JOIN stores s ON o.store_id = s.store_id
-            WHERE b.user_id = ?
-            ORDER BY b.created_at DESC
-        ''', (user_id,))
-        bookings = cursor.fetchall()
-        conn.close()
-        return bookings
+        try:
+            cursor = conn.cursor()
+            cursor.execute('''
+                SELECT b.booking_id, b.offer_id, b.user_id, b.status, b.booking_code,
+                       b.pickup_time, COALESCE(b.quantity, 1) as quantity, b.created_at,
+                       o.title, o.discount_price, o.available_until, s.name, s.address, s.city
+                FROM bookings b
+                JOIN offers o ON b.offer_id = o.offer_id
+                JOIN stores s ON o.store_id = s.store_id
+                WHERE b.user_id = ?
+                ORDER BY b.created_at DESC
+            ''', (user_id,))
+            bookings = cursor.fetchall()
+            return bookings
+        finally:
+            try:
+                conn.close()
+            except Exception:
+                pass
     
     def get_booking(self, booking_id: int) -> Optional[Tuple]:
         conn = self.get_connection()
-        cursor = conn.cursor()
-        cursor.execute('SELECT * FROM bookings WHERE booking_id = ?', (booking_id,))
-        booking = cursor.fetchone()
-        conn.close()
-        return booking
+        try:
+            cursor = conn.cursor()
+            # Explicit column order to match expected structure:
+            # 0:booking_id, 1:offer_id, 2:user_id, 3:status, 4:booking_code, 5:pickup_time, 6:quantity, 7:created_at
+            cursor.execute('''
+                SELECT booking_id, offer_id, user_id, status, booking_code, 
+                       pickup_time, COALESCE(quantity, 1) as quantity, created_at 
+                FROM bookings 
+                WHERE booking_id = ?
+            ''', (booking_id,))
+            booking = cursor.fetchone()
+            return booking
+        finally:
+            try:
+                conn.close()
+            except Exception:
+                pass
     
     def get_booking_by_code(self, booking_code: str) -> Optional[Tuple]:
         """Получить бронирование по коду"""
         conn = self.get_connection()
-        cursor = conn.cursor()
-        cursor.execute('''
-            SELECT b.*, u.first_name, u.username
-            FROM bookings b
-            JOIN users u ON b.user_id = u.user_id
-            WHERE b.booking_code = ? AND b.status = 'pending'
-        ''', (booking_code,))
-        booking = cursor.fetchone()
-        conn.close()
-        return booking
+        try:
+            cursor = conn.cursor()
+            cursor.execute('''
+                SELECT b.booking_id, b.offer_id, b.user_id, b.status, b.booking_code,
+                       b.pickup_time, COALESCE(b.quantity, 1) as quantity, b.created_at,
+                       u.first_name, u.username
+                FROM bookings b
+                JOIN users u ON b.user_id = u.user_id
+                WHERE b.booking_code = ? AND b.status = 'pending'
+            ''', (booking_code,))
+            booking = cursor.fetchone()
+            return booking
+        finally:
+            try:
+                conn.close()
+            except Exception:
+                pass
     
     def update_booking_status(self, booking_id: int, status: str):
         conn = self.get_connection()
-        cursor = conn.cursor()
-        cursor.execute('UPDATE bookings SET status = ? WHERE booking_id = ?', (status, booking_id))
-        conn.commit()
-        conn.close()
+        try:
+            cursor = conn.cursor()
+            cursor.execute('UPDATE bookings SET status = ? WHERE booking_id = ?', (status, booking_id))
+            conn.commit()
+        finally:
+            try:
+                conn.close()
+            except Exception:
+                pass
     
     def complete_booking(self, booking_id: int):
         """Завершить бронирование"""
@@ -752,18 +1013,23 @@ class Database:
     def get_store_bookings(self, store_id: int) -> List[Tuple]:
         """Получить все бронирования для магазина"""
         conn = self.get_connection()
-        cursor = conn.cursor()
-        cursor.execute('''
-            SELECT b.*, o.title, u.first_name, u.username
-            FROM bookings b
-            JOIN offers o ON b.offer_id = o.offer_id
-            JOIN users u ON b.user_id = u.user_id
-            WHERE o.store_id = ?
-            ORDER BY b.created_at DESC
-        ''', (store_id,))
-        bookings = cursor.fetchall()
-        conn.close()
-        return bookings
+        try:
+            cursor = conn.cursor()
+            cursor.execute('''
+                SELECT b.*, o.title, u.first_name, u.username, u.phone
+                FROM bookings b
+                JOIN offers o ON b.offer_id = o.offer_id
+                JOIN users u ON b.user_id = u.user_id
+                WHERE o.store_id = ?
+                ORDER BY b.created_at DESC
+            ''', (store_id,))
+            bookings = cursor.fetchall()
+            return bookings
+        finally:
+            try:
+                conn.close()
+            except Exception:
+                pass
     
     # Методы для админа
     def set_admin(self, user_id: int):
@@ -837,7 +1103,7 @@ class Database:
             return False
         
         # Обновляем статус магазина
-        cursor.execute('UPDATE stores SET status = ? WHERE store_id = ?', ('approved', store_id))
+        cursor.execute('UPDATE stores SET status = ? WHERE store_id = ?', ('active', store_id))
         
         # Обновляем роль владельца
         cursor.execute('UPDATE users SET role = ? WHERE user_id = ?', ('seller', owner_id))
@@ -890,7 +1156,7 @@ class Database:
         cursor.execute('SELECT COUNT(*) FROM stores')
         stats['stores'] = cursor.fetchone()[0]
         
-        cursor.execute('SELECT COUNT(*) FROM stores WHERE status = ?', ('approved',))
+        cursor.execute('SELECT COUNT(*) FROM stores WHERE status = ?', ('active',))
         stats['approved_stores'] = cursor.fetchone()[0]
         
         cursor.execute('SELECT COUNT(*) FROM stores WHERE status = ?', ('pending',))
@@ -1152,7 +1418,9 @@ class Database:
         cursor = conn.cursor()
         if status:
             cursor.execute('''
-                SELECT b.*, o.title, o.discount_price, o.original_price, s.name, s.address, s.city
+                SELECT b.booking_id, b.offer_id, b.user_id, b.status, b.booking_code,
+                       b.pickup_time, COALESCE(b.quantity, 1) as quantity, b.created_at,
+                       o.title, o.discount_price, o.original_price, s.name, s.address, s.city
                 FROM bookings b
                 JOIN offers o ON b.offer_id = o.offer_id
                 JOIN stores s ON o.store_id = s.store_id
@@ -1161,7 +1429,9 @@ class Database:
             ''', (user_id, status))
         else:
             cursor.execute('''
-                SELECT b.*, o.title, o.discount_price, o.original_price, s.name, s.address, s.city
+                SELECT b.booking_id, b.offer_id, b.user_id, b.status, b.booking_code,
+                       b.pickup_time, COALESCE(b.quantity, 1) as quantity, b.created_at,
+                       o.title, o.discount_price, o.original_price, s.name, s.address, s.city
                 FROM bookings b
                 JOIN offers o ON b.offer_id = o.offer_id
                 JOIN stores s ON o.store_id = s.store_id
@@ -1189,61 +1459,85 @@ class Database:
     # Промокоды
     def create_promo(self, code: str, discount_percent: int = 0, discount_amount: float = 0, max_uses: int = 1, valid_until: str = None):
         conn = self.get_connection()
-        cursor = conn.cursor()
-        cursor.execute('''
-            INSERT INTO promocodes (code, discount_percent, discount_amount, max_uses, valid_until)
-            VALUES (?, ?, ?, ?, ?)
-        ''', (code, discount_percent, discount_amount, max_uses, valid_until))
-        conn.commit()
-        conn.close()
+        try:
+            cursor = conn.cursor()
+            cursor.execute('''
+                INSERT INTO promocodes (code, discount_percent, discount_amount, max_uses, valid_until)
+                VALUES (?, ?, ?, ?, ?)
+            ''', (code, discount_percent, discount_amount, max_uses, valid_until))
+            conn.commit()
+        finally:
+            try:
+                conn.close()
+            except Exception:
+                pass
     
     def get_promo(self, code: str) -> Optional[Tuple]:
         conn = self.get_connection()
-        cursor = conn.cursor()
-        cursor.execute('SELECT * FROM promocodes WHERE code = ?', (code,))
-        promo = cursor.fetchone()
-        conn.close()
-        return promo
+        try:
+            cursor = conn.cursor()
+            cursor.execute('SELECT * FROM promocodes WHERE code = ?', (code,))
+            promo = cursor.fetchone()
+            return promo
+        finally:
+            try:
+                conn.close()
+            except Exception:
+                pass
     
     def use_promo(self, user_id: int, promo_id: int, booking_id: int, discount_applied: float):
         conn = self.get_connection()
-        cursor = conn.cursor()
-        cursor.execute('''
-            INSERT INTO promo_usage (user_id, promo_id, booking_id, discount_applied)
-            VALUES (?, ?, ?, ?)
-        ''', (user_id, promo_id, booking_id, discount_applied))
-        cursor.execute('UPDATE promocodes SET current_uses = current_uses + 1 WHERE promo_id = ?', (promo_id,))
-        conn.commit()
-        conn.close()
+        try:
+            cursor = conn.cursor()
+            cursor.execute('''
+                INSERT INTO promo_usage (user_id, promo_id, booking_id, discount_applied)
+                VALUES (?, ?, ?, ?)
+            ''', (user_id, promo_id, booking_id, discount_applied))
+            cursor.execute('UPDATE promocodes SET current_uses = current_uses + 1 WHERE promo_id = ?', (promo_id,))
+            conn.commit()
+        finally:
+            try:
+                conn.close()
+            except Exception:
+                pass
     
     # Реферальная система
     def generate_referral_code(self, user_id: int) -> str:
         import random, string
         code = ''.join(random.choices(string.ascii_uppercase + string.digits, k=8))
         conn = self.get_connection()
-        cursor = conn.cursor()
-        cursor.execute('UPDATE users SET referral_code = ? WHERE user_id = ?', (code, user_id))
-        conn.commit()
-        conn.close()
-        return code
+        try:
+            cursor = conn.cursor()
+            cursor.execute('UPDATE users SET referral_code = ? WHERE user_id = ?', (code, user_id))
+            conn.commit()
+            return code
+        finally:
+            try:
+                conn.close()
+            except Exception:
+                pass
     
     def use_referral(self, referrer_code: str, referred_id: int) -> bool:
         conn = self.get_connection()
-        cursor = conn.cursor()
-        cursor.execute('SELECT user_id FROM users WHERE referral_code = ?', (referrer_code,))
-        referrer = cursor.fetchone()
-        if referrer:
-            cursor.execute('''
-                INSERT INTO referrals (referrer_id, referred_id, bonus_given)
-                VALUES (?, ?, 1)
-            ''', (referrer[0], referred_id))
-            cursor.execute('UPDATE users SET bonus_balance = bonus_balance + 5000 WHERE user_id = ?', (referrer[0],))
-            cursor.execute('UPDATE users SET bonus_balance = bonus_balance + 3000 WHERE user_id = ?', (referred_id,))
-            conn.commit()
-            conn.close()
-            return True
-        conn.close()
-        return False
+        try:
+            cursor = conn.cursor()
+            cursor.execute('SELECT user_id FROM users WHERE referral_code = ?', (referrer_code,))
+            referrer = cursor.fetchone()
+            if referrer:
+                cursor.execute('''
+                    INSERT INTO referrals (referrer_id, referred_id, bonus_given)
+                    VALUES (?, ?, 1)
+                ''', (referrer[0], referred_id))
+                cursor.execute('UPDATE users SET bonus_balance = bonus_balance + 5000 WHERE user_id = ?', (referrer[0],))
+                cursor.execute('UPDATE users SET bonus_balance = bonus_balance + 3000 WHERE user_id = ?', (referred_id,))
+                conn.commit()
+                return True
+            return False
+        finally:
+            try:
+                conn.close()
+            except Exception:
+                pass
     
     # Логирование ошибок
     def log_error(self, error_message: str, user_id: int = None):
@@ -1263,42 +1557,46 @@ class Database:
     def delete_store(self, store_id: int):
         """Полное удаление магазина и всех связанных данных"""
         conn = self.get_connection()
-        cursor = conn.cursor()
-        
-        # Получаем user_id владельца магазина
-        cursor.execute('SELECT user_id FROM stores WHERE store_id = ?', (store_id,))
-        result = cursor.fetchone()
-        if not result:
-            conn.close()
-            return
-        
-        user_id = result[0]
-        
-        # Удаляем рейтинги магазина
-        cursor.execute('DELETE FROM ratings WHERE store_id = ?', (store_id,))
-        
-        # Удаляем бронирования на предложения этого магазина
-        cursor.execute('''
-            DELETE FROM bookings 
-            WHERE offer_id IN (SELECT offer_id FROM offers WHERE store_id = ?)
-        ''', (store_id,))
-        
-        # Удаляем предложения магазина
-        cursor.execute('DELETE FROM offers WHERE store_id = ?', (store_id,))
-        
-        # Удаляем сам магазин
-        cursor.execute('DELETE FROM stores WHERE store_id = ?', (store_id,))
-        
-        # Проверяем, остались ли у пользователя другие магазины
-        cursor.execute('SELECT COUNT(*) FROM stores WHERE user_id = ?', (user_id,))
-        remaining_stores = cursor.fetchone()[0]
-        
-        # Если магазинов не осталось - меняем роль на customer
-        if remaining_stores == 0:
-            cursor.execute('UPDATE users SET role = "customer" WHERE user_id = ?', (user_id,))
-        
-        conn.commit()
-        conn.close()
+        try:
+            cursor = conn.cursor()
+            
+            # Получаем user_id владельца магазина
+            cursor.execute('SELECT owner_id FROM stores WHERE store_id = ?', (store_id,))
+            result = cursor.fetchone()
+            if not result:
+                return
+            
+            user_id = result[0]
+            
+            # Удаляем рейтинги магазина
+            cursor.execute('DELETE FROM ratings WHERE store_id = ?', (store_id,))
+            
+            # Удаляем бронирования на предложения этого магазина
+            cursor.execute('''
+                DELETE FROM bookings 
+                WHERE offer_id IN (SELECT offer_id FROM offers WHERE store_id = ?)
+            ''', (store_id,))
+            
+            # Удаляем предложения магазина
+            cursor.execute('DELETE FROM offers WHERE store_id = ?', (store_id,))
+            
+            # Удаляем сам магазин
+            cursor.execute('DELETE FROM stores WHERE store_id = ?', (store_id,))
+            
+            # Проверяем, остались ли у пользователя другие магазины
+            cursor.execute('SELECT COUNT(*) FROM stores WHERE owner_id = ?', (user_id,))
+            remaining_stores = cursor.fetchone()[0]
+            
+            # Если магазинов не осталось - меняем роль на customer
+            if remaining_stores == 0:
+                cursor.execute('UPDATE users SET role = "customer" WHERE user_id = ?', (user_id,))
+            
+            conn.commit()
+        finally:
+            try:
+                conn.close()
+            except Exception:
+                pass
 
     @staticmethod
     def get_time_remaining(expiry_date: str) -> str:
@@ -1313,8 +1611,14 @@ class Database:
             # Парсим дату истечения срока годности (формат: YYYY-MM-DD)
             if isinstance(expiry_date, str):
                 if ' ' in expiry_date:
-                    # Если есть время, парсим с временем
-                    end_date = datetime.strptime(expiry_date, '%Y-%m-%d %H:%M:%S')
+                    # Если есть время, пробуем разные форматы
+                    try:
+                        end_date = datetime.strptime(expiry_date, '%Y-%m-%d %H:%M:%S')
+                    except ValueError:
+                        try:
+                            end_date = datetime.strptime(expiry_date, '%Y-%m-%d %H:%M')
+                        except ValueError:
+                            return ""
                 elif '-' in expiry_date:
                     # Если только дата в формате YYYY-MM-DD
                     end_date = datetime.strptime(expiry_date, '%Y-%m-%d')
@@ -1361,17 +1665,25 @@ class Database:
             print(f"Error parsing expiry_date: {expiry_date}, error: {e}")
             return ""
     
-    def get_stores_by_category(self, category: str) -> List[Tuple]:
-        """Получить магазины по категории"""
+    def get_stores_by_category(self, category: str, city: str = None) -> List[Tuple]:
+        """Получить магазины по категории и опционально по городу"""
         conn = self.get_connection()
         cursor = conn.cursor()
         try:
-            cursor.execute('''
-                SELECT store_id, name, address, category, city 
-                FROM stores 
-                WHERE category = ? AND status = 'approved'
-                ORDER BY name
-            ''', (category,))
+            if city:
+                cursor.execute('''
+                    SELECT * 
+                    FROM stores 
+                    WHERE category = ? AND city = ? AND status = 'active'
+                    ORDER BY name
+                ''', (category, city))
+            else:
+                cursor.execute('''
+                    SELECT * 
+                    FROM stores 
+                    WHERE category = ? AND status = 'active'
+                    ORDER BY name
+                ''', (category,))
             return cursor.fetchall()
         finally:
             conn.close()
@@ -1388,6 +1700,83 @@ class Database:
                 WHERE o.store_id = ? AND o.quantity > 0 AND date(o.expiry_date) >= date('now')
                 ORDER BY o.created_at DESC
             ''', (store_id,))
+            return cursor.fetchall()
+        finally:
+            conn.close()
+    
+    def get_top_offers_by_city(self, city: str, limit: int = 10) -> List[Tuple]:
+        """Получить топ предложения в городе (по размеру скидки)"""
+        conn = self.get_connection()
+        cursor = conn.cursor()
+        try:
+            cursor.execute('''
+                SELECT o.*, s.name, s.address, s.city, s.category,
+                       CAST((o.original_price - o.discount_price) AS REAL) / o.original_price * 100 as discount_percent
+                FROM offers o
+                JOIN stores s ON o.store_id = s.store_id
+                WHERE s.city = ? AND s.status = 'active' 
+                      AND o.status = 'active' AND o.quantity > 0 
+                      AND date(o.expiry_date) >= date('now')
+                ORDER BY discount_percent DESC, o.created_at DESC
+                LIMIT ?
+            ''', (city, limit))
+            return cursor.fetchall()
+        finally:
+            conn.close()
+    
+    def get_offers_by_city_and_category(self, city: str, category: str, limit: int = 20) -> List[Tuple]:
+        """Получить предложения в городе по категории магазина"""
+        conn = self.get_connection()
+        cursor = conn.cursor()
+        try:
+            cursor.execute('''
+                SELECT o.*, s.name, s.address, s.city, s.category,
+                       CAST((o.original_price - o.discount_price) AS REAL) / o.original_price * 100 as discount_percent
+                FROM offers o
+                JOIN stores s ON o.store_id = s.store_id
+                WHERE s.city = ? AND s.category = ? AND s.status = 'active'
+                      AND o.status = 'active' AND o.quantity > 0 
+                      AND date(o.expiry_date) >= date('now')
+                ORDER BY discount_percent DESC, o.created_at DESC
+                LIMIT ?
+            ''', (city, category, limit))
+            return cursor.fetchall()
+        finally:
+            conn.close()
+    
+    def get_stores_count_by_category(self, city: str) -> dict:
+        """Получить количество магазинов по каждой категории в городе"""
+        conn = self.get_connection()
+        cursor = conn.cursor()
+        try:
+            cursor.execute('''
+                SELECT category, COUNT(*) as count
+                FROM stores
+                WHERE city = ? AND status = 'active'
+                GROUP BY category
+            ''', (city,))
+            results = cursor.fetchall()
+            # Возвращаем словарь {категория: количество}
+            return {row[0]: row[1] for row in results}
+        finally:
+            conn.close()
+    
+    def get_top_stores_by_city(self, city: str, limit: int = 10) -> List[Tuple]:
+        """Получить топ магазины по рейтингу в городе"""
+        conn = self.get_connection()
+        cursor = conn.cursor()
+        try:
+            cursor.execute('''
+                SELECT s.*, 
+                       COALESCE(AVG(r.rating), 0) as avg_rating,
+                       COUNT(r.rating_id) as ratings_count
+                FROM stores s
+                LEFT JOIN ratings r ON s.store_id = r.store_id
+                WHERE s.city = ? AND s.status = 'active'
+                GROUP BY s.store_id
+                ORDER BY avg_rating DESC, ratings_count DESC
+                LIMIT ?
+            ''', (city, limit))
             return cursor.fetchall()
         finally:
             conn.close()
@@ -1443,7 +1832,7 @@ class Database:
             cursor.execute('''
                 SELECT s.* FROM stores s
                 JOIN favorites f ON s.store_id = f.store_id
-                WHERE f.user_id = ? AND s.status = 'approved'
+                WHERE f.user_id = ? AND s.status = 'active'
                 ORDER BY f.created_at DESC
             ''', (user_id,))
             return cursor.fetchall()
