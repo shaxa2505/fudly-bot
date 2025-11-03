@@ -4,35 +4,43 @@ import os
 from datetime import datetime, timedelta
 from typing import List, Optional, Tuple
 
-# pooling, caching and structured logging
-from db_pool import SQLitePool
-from cache import cache
-from logging_config import logger
+# Простое логирование (fallback если нет logging_config)
+try:
+    from logging_config import logger
+except ImportError:
+    import logging
+    logger = logging.getLogger(__name__)
 
-# Module-level pool (configurable via env vars)
+# Простой кэш-заглушка (для совместимости)
+class SimpleCache:
+    """Простая заглушка кэша без зависимостей"""
+    def get(self, key):
+        return None
+    
+    def set(self, key, value, ex=None):
+        pass
+    
+    def delete(self, key):
+        pass
+
+cache = SimpleCache()
+
+# Module-level settings
 DB_PATH = os.environ.get('DATABASE_PATH', 'fudly.db')
-POOL = SQLitePool(DB_PATH, pool_size=int(os.environ.get('DB_POOL_SIZE', 5)))
 
 class Database:
     def __init__(self, db_name: str = "fudly.db"):
-        # Backwards-compatible: allow passing explicit db_name (tests). Otherwise use DB_PATH.
         self.db_name = db_name or DB_PATH
         self.init_db()
     
     def get_connection(self):
-        """Return a pooled connection. The returned object supports .cursor(), .commit(), and .close().
-        Calling .close() will return the underlying connection to the pool.
-        """
+        """Возвращает подключение к базе данных"""
+        conn = sqlite3.connect(self.db_name, timeout=int(os.environ.get('DB_TIMEOUT', 30)))
         try:
-            return POOL.getconn()
+            conn.execute('PRAGMA journal_mode=WAL')
         except Exception:
-            # fallback to direct connection
-            conn = sqlite3.connect(self.db_name, timeout=int(os.environ.get('DB_TIMEOUT', 5)))
-            try:
-                conn.execute('PRAGMA journal_mode=WAL')
-            except Exception:
-                pass
-            return conn
+            pass
+        return conn
     
     def init_db(self):
         """Инициализация базы данных"""
