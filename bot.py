@@ -868,6 +868,16 @@ async def cancel_action(message: types.Message, state: FSMContext):
     user = db.get_user(message.from_user.id)
     role = user[6] if user and len(user) > 6 else "customer"
     
+    # КРИТИЧНО: При отмене RegisterStore ВСЕГДА возвращаем на меню клиента
+    # потому что у пользователя ещё НЕТ одобренного магазина
+    if current_state and str(current_state).startswith("RegisterStore"):
+        # Отменяем регистрацию магазина - возвращаем на клиентское меню
+        await message.answer(
+            get_text(lang, 'operation_cancelled'),
+            reply_markup=main_menu_customer(lang)
+        )
+        return
+    
     # ВАЖНО: Проверяем наличие одобренного магазина для партнёров
     if role == "seller":
         # Используем готовую функцию has_approved_store для проверки
