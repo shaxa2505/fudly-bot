@@ -2469,11 +2469,16 @@ async def select_expiry_simple(callback: types.CallbackQuery, state: FSMContext)
     from datetime import datetime, timedelta
     today = datetime.now()
     
+    # ВАЖНО: Устанавливаем срок годности на КОНЕЦ дня (23:59:59)
+    # чтобы товары не удалялись в середине дня
     if exp_key == "today":
+        # Сегодня до конца дня
         expiry_date = today.strftime('%Y-%m-%d')
     elif exp_key == "tomorrow":
+        # Завтра до конца дня
         expiry_date = (today + timedelta(days=1)).strftime('%Y-%m-%d')
     elif exp_key == "week":
+        # Через неделю
         expiry_date = (today + timedelta(days=7)).strftime('%Y-%m-%d')
     else:
         expiry_date = today.strftime('%Y-%m-%d')

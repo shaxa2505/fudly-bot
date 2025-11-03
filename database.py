@@ -782,55 +782,34 @@ class Database:
         return True
     
     def delete_expired_offers(self):
-        """Удаляет предложения с истёкшим сроком действия"""
+        """Удаляет предложения с истёкшим сроком годности"""
         from datetime import datetime
         conn = self.get_connection()
         cursor = conn.cursor()
         
-        # Получаем текущую дату и время
-        now = datetime.now()
-        current_time_str = now.strftime('%Y-%m-%d %H:%M')
-        
-        # Сначала нормализуем все записи с неправильным форматом времени
-        cursor.execute('SELECT offer_id, available_until FROM offers WHERE status = "active"')
-        offers_to_fix = cursor.fetchall()
-        
-        for offer_id, available_until in offers_to_fix:
-            if available_until:
-                # Приводим к правильному формату если нужно
-                normalized_time = self._format_datetime_field(available_until)
-                if normalized_time != available_until:
-                    cursor.execute(
-                        'UPDATE offers SET available_until = ? WHERE offer_id = ?', 
-                        (normalized_time, offer_id)
-                    )
-        
-        conn.commit()
-        
-        # Теперь деактивируем истекшие предложения
+        # Деактивируем товары с истёкшим сроком годности
         cursor.execute('''
             UPDATE offers 
             SET status = 'inactive' 
             WHERE status = 'active' 
-            AND available_until != ''
-            AND available_until IS NOT NULL
-            AND (
-                datetime(available_until) < datetime(?)
-                OR available_until NOT LIKE '%-%-%'
-            )
-        ''', (current_time_str,))
+            AND expiry_date IS NOT NULL
+            AND date(expiry_date) < date('now')
+        ''')
         
         deleted_count = cursor.rowcount
         conn.commit()
+        
         try:
             conn.close()
         except Exception:
             pass
+            
         # Invalidate offers cache when expiry cleanups happen
         try:
             cache.delete('offers:all')
         except Exception:
             pass
+            
         return deleted_count
     
     # Методы для бронирований
