@@ -236,6 +236,12 @@ class BulkCreate(StatesGroup):
 class ChangeCity(StatesGroup):
     city = State()
 
+class EditOffer(StatesGroup):
+    """Состояния для редактирования товара"""
+    offer_id = State()
+    available_from = State()
+    available_until = State()
+
 class ConfirmOrder(StatesGroup):
     booking_code = State()
 
@@ -3441,7 +3447,8 @@ async def edit_offer(callback: types.CallbackQuery):
     kb = InlineKeyboardBuilder()
     kb.button(text="💰 Изменить цену" if lang == 'ru' else "💰 Narxni o'zgartirish", callback_data=f"edit_price_{offer_id}")
     kb.button(text="📦 Изменить количество" if lang == 'ru' else "📦 Sonini o'zgartirish", callback_data=f"edit_quantity_{offer_id}")
-    kb.button(text="📝 Изменить описание" if lang == 'ru' else "📝 Tavsifni o'zgartirish", callback_data=f"edit_description_{offer_id}")
+    kb.button(text="� Изменить время" if lang == 'ru' else "🕐 Vaqtni o'zgartirish", callback_data=f"edit_time_{offer_id}")
+    kb.button(text="�📝 Изменить описание" if lang == 'ru' else "📝 Tavsifni o'zgartirish", callback_data=f"edit_description_{offer_id}")
     kb.button(text="🔙 Назад" if lang == 'ru' else "🔙 Orqaga", callback_data=f"back_to_offer_{offer_id}")
     kb.adjust(1)
     
@@ -3451,6 +3458,71 @@ async def edit_offer(callback: types.CallbackQuery):
         await callback.answer("📝 Редактирование товара временно недоступно", show_alert=True)
     
     await callback.answer()
+
+@dp.callback_query(F.data.startswith("edit_time_"))
+async def edit_time_start(callback: types.CallbackQuery, state: FSMContext):
+    """Начать редактирование времени забора"""
+    lang = db.get_user_language(callback.from_user.id)
+    offer_id = int(callback.data.split("_")[2])
+    
+    offer = db.get_offer(offer_id)
+    if not offer:
+        await callback.answer("❌ Товар не найден", show_alert=True)
+        return
+    
+    # Проверка владельца
+    user_stores = db.get_user_stores(callback.from_user.id)
+    if not any(store[0] == offer[1] for store in user_stores):
+        await callback.answer("❌ Это не ваш товар", show_alert=True)
+        return
+    
+    await state.update_data(offer_id=offer_id)
+    await state.set_state(EditOffer.available_from)
+    
+    await callback.message.answer(
+        f"🕐 <b>Изменение времени забора</b>\n\n"
+        f"Текущее время: {offer[7]} - {offer[8]}\n\n"
+        f"{'Введите новое время начала (например: 18:00):' if lang == 'ru' else 'Yangi boshlanish vaqtini kiriting (masalan: 18:00):'}",
+        parse_mode="HTML"
+    )
+    await callback.answer()
+
+@dp.message(EditOffer.available_from)
+async def edit_time_from(message: types.Message, state: FSMContext):
+    """Обработка времени начала"""
+    lang = db.get_user_language(message.from_user.id)
+    await state.update_data(available_from=message.text)
+    await message.answer(
+        f"{'Введите время окончания (например: 21:00):' if lang == 'ru' else 'Tugash vaqtini kiriting (masalan: 21:00):'}",
+        reply_markup=types.ReplyKeyboardRemove()
+    )
+    await state.set_state(EditOffer.available_until)
+
+@dp.message(EditOffer.available_until)
+async def edit_time_until(message: types.Message, state: FSMContext):
+    """Завершение редактирования времени"""
+    lang = db.get_user_language(message.from_user.id)
+    data = await state.get_data()
+    offer_id = data['offer_id']
+    available_from = data['available_from']
+    available_until = message.text
+    
+    # Обновление в БД
+    conn = db.get_connection()
+    cursor = conn.cursor()
+    cursor.execute(
+        'UPDATE offers SET available_from = ?, available_until = ? WHERE offer_id = ?',
+        (available_from, available_until, offer_id)
+    )
+    conn.commit()
+    conn.close()
+    
+    await message.answer(
+        f"✅ {'Время забора обновлено!' if lang == 'ru' else 'Olib ketish vaqti yangilandi!'}\n\n"
+        f"🕐 {available_from} - {available_until}",
+        reply_markup=main_menu_seller(lang)
+    )
+    await state.clear()
 
 async def update_offer_message(callback: types.CallbackQuery, offer_id: int, lang: str):
     """Обновить сообщение с товаром"""
