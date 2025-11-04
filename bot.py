@@ -1266,7 +1266,7 @@ async def stores_pagination(callback: types.CallbackQuery):
             await callback.answer("Ошибка", show_alert=True)
             return
         category_label = categories[cat_index]
-        category = normalize_category(category_label)
+        category = normalize_store_category(category_label)  # ИСПРАВЛЕНО: было normalize_category
         stores = db.get_stores_by_category(category, search_city)
 
         # Обновляем только клавиатуру
@@ -3753,7 +3753,7 @@ async def show_stores_by_category(callback: types.CallbackQuery):
         return
     
     category = categories[cat_index]
-    category_normalized = normalize_category(category)
+    category_normalized = normalize_store_category(category)  # ИСПРАВЛЕНО: было normalize_category
     
     # Получаем магазины этой категории в городе пользователя
     stores = db.get_stores_by_category(category_normalized, search_city)
