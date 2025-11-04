@@ -1006,7 +1006,7 @@ async def send_offer_card(message: types.Message, offer: tuple, lang: str):
     # Распаковываем данные предложения
     # offer структура: [0]=offer_id, [1]=store_id, [2]=title, [3]=description,
     # [4]=original_price, [5]=discount_price, [6]=quantity, [7]=available_from,
-    # [8]=available_until, [9]=status, [10]=photo, [11]=created_at, [12]=expiry_date,
+    # [8]=available_until, [9]=expiry_date, [10]=status, [11]=photo, [12]=created_at,
     # [13]=unit, [14]=category, [15]=store_name, [16]=store_address, [17]=store_city,
     # [18]=store_category, [19]=discount_percent
     
@@ -1016,7 +1016,7 @@ async def send_offer_card(message: types.Message, offer: tuple, lang: str):
     original_price = offer[4]
     discount_price = offer[5]
     quantity = offer[6]
-    expiry_date = offer[12]
+    expiry_date = offer[9]  # ПРАВИЛЬНЫЙ индекс для expiry_date
     store_name = offer[15] if len(offer) > 15 else "Магазин"
     store_address = offer[16] if len(offer) > 16 else ""
     store_category = offer[18] if len(offer) > 18 else ""
@@ -1609,14 +1609,12 @@ async def offer_details(callback: types.CallbackQuery):
     text += f"📦 <b>Доступно:</b> {offer_data[6]} {unit}\n"
     text += f"🕐 <b>Время забора:</b> {offer_data[7]} - {offer_data[8]}\n"
     
-    # Показываем оставшееся время до конца акции (по сроку годности)
-    time_remaining = db.get_time_remaining(offer_data[9]) if len(offer_data) > 9 else ""
-    if time_remaining:
-        text += f"{time_remaining}\n"
-    
     # Показываем срок годности если есть (expiry_date на позиции 9)
-    if len(offer_data) > 9 and offer_data[9]:
-        text += f"📅 <b>Годен до:</b> {offer_data[9]}\n"
+    # Только если товар активен (status на позиции 10)
+    if len(offer_data) > 10 and offer_data[10] == 'active' and offer_data[9]:
+        time_remaining = db.get_time_remaining(offer_data[9])
+        if time_remaining:
+            text += f"{time_remaining}\n"
     
     # Правильные индексы: 15-store_name, 16-address, 17-city, 18-phone, 19-store_desc
     text += f"\n🏪 <b>Магазин:</b> {offer_data[15]}\n"
@@ -1822,7 +1820,7 @@ async def cancel_booking(callback: types.CallbackQuery):
             
             from aiogram.utils.keyboard import InlineKeyboardBuilder
             customer_kb = InlineKeyboardBuilder()
-            customer_kb.button(text="🔍 Найти похожее", callback_data="browse_offers")
+            customer_kb.button(text="🏠 Главное меню", callback_data="main_menu")
             
             try:
                 await bot.send_message(
@@ -1838,6 +1836,24 @@ async def cancel_booking(callback: types.CallbackQuery):
             except Exception as e:
                 logger.error(f"Failed to notify customer {customer_id}: {e}")
         
+    await callback.answer()
+
+@dp.callback_query(F.data == "main_menu")
+async def handle_main_menu(callback: types.CallbackQuery):
+    """Обработчик кнопки возврата в главное меню"""
+    user = db.get_user(callback.from_user.id)
+    if not user:
+        await callback.answer("Ошибка: пользователь не найден")
+        return
+    
+    lang = db.get_user_language(callback.from_user.id)
+    menu = main_menu_seller(lang) if user[6] == "seller" else main_menu_customer(lang)
+    
+    await callback.message.answer(
+        get_text(lang, 'welcome_back', name=callback.from_user.first_name, city=user[4]),
+        parse_mode="HTML",
+        reply_markup=menu
+    )
     await callback.answer()
 
 @dp.callback_query(F.data.startswith("complete_booking_"))
@@ -2135,10 +2151,9 @@ async def add_offer_start(message: types.Message, state: FSMContext):
         
         step1_text = (
             f"🏪 <b>{stores[0][2]}</b>\n\n"
-            f"<b>{'ШАГ 1 из 3' if lang == 'ru' else '1-QADAM 3 tadan'}</b>\n\n"
-            f"📝 {'Введите название товара' if lang == 'ru' else 'Mahsulot nomini kiriting'}\n"
-            f"📸 Затем отправьте фото (или нажмите кнопку 'Без фото')" if lang == 'ru'
-            else f"📸 Keyin rasmni yuboring (yoki 'Fotosiz' tugmasini bosing)"
+            f"<b>{'ШАГ 1 из 3: НАЗВАНИЕ И ФОТО' if lang == 'ru' else '1-QADAM 3 tadan: NOM VA RASM'}</b>\n\n"
+            f"📝 {'Введите название товара' if lang == 'ru' else 'Mahsulot nomini kiriting'}\n\n"
+            f"� {'Можете сразу отправить фото с названием в подписи или нажать кнопку' if lang == 'ru' else 'Rasmni nom bilan yuboring yoki tugmani bosing'}"
         )
         
         await message.answer(
@@ -2214,11 +2229,11 @@ async def create_offer_title_with_photo(message: types.Message, state: FSMContex
     
     await message.answer(
         f"<b>{'ШАГ 2 из 3: ЦЕНЫ И КОЛИЧЕСТВО' if lang == 'ru' else '2-QADAM 3 tadan: NARXLAR VA MIQDOR'}</b>\n\n"
-        f"{'Введите в формате' if lang == 'ru' else 'Formatda kiriting'}:\n"
-        f"<code>{'обычная_цена скидка количество' if lang == 'ru' else 'oddiy_narx chegirma miqdor'}</code>\n\n"
-        f"{'Пример' if lang == 'ru' else 'Misol'}: <code>1000 40% 50</code>\n"
-        f"{'(цена 1000, скидка 40%, количество 50 шт)' if lang == 'ru' else '(narx 1000, chegirma 40%, miqdor 50 dona)'}\n\n"
-        f"{'Или просто введите обычную цену и выберите % скидки:' if lang == 'ru' else 'Yoki oddiy narxni kiriting va chegirma % tanlang:'}",
+        f"💡 {'Быстрый формат' if lang == 'ru' else 'Tez format'}:\n"
+        f"<code>{'обычная_цена скидка% количество' if lang == 'ru' else 'oddiy_narx chegirma% miqdor'}</code>\n\n"
+        f"📝 {'Пример' if lang == 'ru' else 'Misol'}: <code>1000 40% 50</code>\n"
+        f"   {'(обычная цена 1000, скидка 40%, количество 50)' if lang == 'ru' else '(oddiy narx 1000, chegirma 40%, miqdor 50)'}\n\n"
+        f"{'Или введите только обычную цену и выберите % скидки кнопкой ⬇️' if lang == 'ru' else 'Yoki faqat oddiy narxni kiriting va tugma bilan % chegirmani tanlang ⬇️'}",
         parse_mode="HTML",
         reply_markup=builder.as_markup()
     )
@@ -2229,22 +2244,27 @@ async def create_offer_title(message: types.Message, state: FSMContext):
     lang = db.get_user_language(message.from_user.id)
     await state.update_data(title=message.text, photo=None)
     
-    # Напоминаем отправить фото
+    # Сразу переходим к ценам, без повторного запроса фото
+    # ШАГ 2: Цены и количество
     builder = InlineKeyboardBuilder()
-    builder.button(text="Пропустить фото ➡️" if lang == 'ru' else "Rasmni o'tkazib yuborish ➡️", 
-                   callback_data="create_skip_photo")
-    builder.adjust(1)
-    
-    photo_text = (
-        "📸 Отправьте фото товара или нажмите кнопку для пропуска" if lang == 'ru'
-        else "📸 Mahsulot rasmini yuboring yoki o'tkazish tugmasini bosing"
-    )
+    # Популярные варианты скидок
+    builder.button(text="30%", callback_data="discount_30")
+    builder.button(text="40%", callback_data="discount_40")
+    builder.button(text="50%", callback_data="discount_50")
+    builder.button(text="60%", callback_data="discount_60")
+    builder.adjust(4)
     
     await message.answer(
-        photo_text,
+        f"<b>{'ШАГ 2 из 3: ЦЕНЫ И КОЛИЧЕСТВО' if lang == 'ru' else '2-QADAM 3 tadan: NARXLAR VA MIQDOR'}</b>\n\n"
+        f"� {'Быстрый формат' if lang == 'ru' else 'Tez format'}:\n"
+        f"<code>{'обычная_цена скидка% количество' if lang == 'ru' else 'oddiy_narx chegirma% miqdor'}</code>\n\n"
+        f"📝 {'Пример' if lang == 'ru' else 'Misol'}: <code>1000 40% 50</code>\n"
+        f"   {'(обычная цена 1000, скидка 40%, количество 50)' if lang == 'ru' else '(oddiy narx 1000, chegirma 40%, miqdor 50)'}\n\n"
+        f"{'Или введите только обычную цену и выберите % скидки кнопкой ⬇️' if lang == 'ru' else 'Yoki faqat oddiy narxni kiriting va tugma bilan % chegirmani tanlang ⬇️'}",
+        parse_mode="HTML",
         reply_markup=builder.as_markup()
     )
-    await state.set_state(CreateOffer.photo)
+    await state.set_state(CreateOffer.original_price)
 
 @dp.callback_query(F.data == "create_no_photo")
 async def offer_without_photo(callback: types.CallbackQuery, state: FSMContext):
@@ -3161,13 +3181,13 @@ async def my_offers(message: types.Message):
         text += f"💰 {original_price:,} ➜ <b>{discount_price:,}</b> сум (-{discount_percent}%)\n"
         text += f"📦 {'Осталось' if lang == 'ru' else 'Qoldi'}: <b>{quantity}</b> {unit}\n"
         
-        # Срок годности
-        if len(offer) > 12 and offer[12]:
-            expiry_info = db.get_time_remaining(offer[12])
+        # Срок годности (expiry_date на позиции 9)
+        if len(offer) > 9 and offer[9]:
+            expiry_info = db.get_time_remaining(offer[9])
             if expiry_info:
                 text += f"{expiry_info}\n"
             else:
-                text += f"📅 До: {offer[12]}\n"
+                text += f"📅 До: {offer[9]}\n"
         
         # Время забора
         text += f"🕐 {offer[7]} - {offer[8]}"
@@ -4177,7 +4197,6 @@ async def profile(message: types.Message):
         return
     
     # user: [0]user_id, [1]username, [2]first_name, [3]phone, [4]city, [5]language, [6]role, [7]is_admin, [8]notifications
-    role_text = get_text(lang, 'role_seller') if user[6] == 'seller' else get_text(lang, 'role_customer')
     lang_text = 'Русский' if lang == 'ru' else 'Ozbekcha'
     
     text = f"{get_text(lang, 'your_profile')}\n\n"
@@ -4185,7 +4204,6 @@ async def profile(message: types.Message):
     text += f"{get_text(lang, 'phone')}: {user[3]}\n"
     text += f"{get_text(lang, 'city')}: {user[4]}\n"
     text += f"{get_text(lang, 'language')}: {lang_text}\n"
-    text += f"{get_text(lang, 'role')}: {role_text}"
     
     await message.answer(
         text,
