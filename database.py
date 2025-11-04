@@ -624,18 +624,26 @@ class Database:
         from datetime import datetime
         valid_offers = []
         for offer in offers:
-            # Проверяем срок годности если он указан (индекс 9 - expiry_date)
-            if len(offer) > 9 and offer[9]:
+            # Проверяем срок годности если он указан (индекс 12 - expiry_date после ALTER TABLE)
+            if len(offer) > 12 and offer[12]:
                 try:
-                    # Преобразуем дату из формата DD.MM.YYYY
-                    expiry_parts = offer[9].split('.')
-                    if len(expiry_parts) == 3:
-                        expiry_date = datetime(int(expiry_parts[2]), int(expiry_parts[1]), int(expiry_parts[0]))
-                        # Если срок годности не истёк
-                        if expiry_date >= datetime.now():
+                    # Преобразуем дату из формата DD.MM.YYYY или YYYY-MM-DD
+                    expiry_str = str(offer[12])
+                    if '.' in expiry_str:
+                        expiry_parts = expiry_str.split('.')
+                        if len(expiry_parts) == 3:
+                            expiry_date = datetime(int(expiry_parts[2]), int(expiry_parts[1]), int(expiry_parts[0]))
+                        else:
                             valid_offers.append(offer)
+                            continue
+                    elif '-' in expiry_str:
+                        expiry_date = datetime.strptime(expiry_str, '%Y-%m-%d')
                     else:
-                        valid_offers.append(offer)  # Неверный формат - показываем
+                        valid_offers.append(offer)
+                        continue
+                    # Если срок годности не истёк
+                    if expiry_date >= datetime.now():
+                        valid_offers.append(offer)
                 except:
                     valid_offers.append(offer)  # Ошибка парсинга - показываем
             else:
@@ -652,7 +660,7 @@ class Database:
     def get_offer(self, offer_id: int) -> Optional[Tuple]:
         """Получить предложение с информацией о магазине.
         
-        Returns tuple structure:
+        Returns tuple structure (АКТУАЛЬНАЯ структура после ALTER TABLE):
         [0] offer_id
         [1] store_id
         [2] title
@@ -662,12 +670,12 @@ class Database:
         [6] quantity
         [7] available_from
         [8] available_until
-        [9] expiry_date
-        [10] status
-        [11] photo
-        [12] created_at
-        [13] unit (добавлено через ALTER TABLE, может быть None для старых записей)
-        [14] category (добавлено через ALTER TABLE, может быть None для старых записей)
+        [9] status
+        [10] photo
+        [11] created_at
+        [12] expiry_date
+        [13] unit
+        [14] category
         После JOIN добавляются:
         [15] store_name (from stores)
         [16] address (from stores)
@@ -692,14 +700,17 @@ class Database:
                 pass
     
     def get_store_offers(self, store_id: int) -> List[Tuple]:
-        """Получить товары магазина (исключая удаленные)"""
+        """Получить товары магазина с информацией о магазине (оптимизировано с JOIN)"""
         conn = self.get_connection()
         try:
             cursor = conn.cursor()
-            cursor.execute(
-                'SELECT * FROM offers WHERE store_id = ? AND status != "deleted" ORDER BY created_at DESC',
-                (store_id,)
-            )
+            cursor.execute('''
+                SELECT o.*, s.name as store_name, s.address, s.city, s.category as store_category
+                FROM offers o
+                JOIN stores s ON o.store_id = s.store_id
+                WHERE o.store_id = ? AND o.status != "deleted"
+                ORDER BY o.created_at DESC
+            ''', (store_id,))
             offers = cursor.fetchall()
             return offers
         finally:

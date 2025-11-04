@@ -1044,11 +1044,13 @@ async def available_offers(message: types.Message):
 async def send_offer_card(message: types.Message, offer: tuple, lang: str):
     """Отправить карточку предложения"""
     # Распаковываем данные предложения
-    # offer структура: [0]=offer_id, [1]=store_id, [2]=title, [3]=description,
+    # АКТУАЛЬНАЯ структура (после ALTER TABLE):
+    # [0]=offer_id, [1]=store_id, [2]=title, [3]=description,
     # [4]=original_price, [5]=discount_price, [6]=quantity, [7]=available_from,
-    # [8]=available_until, [9]=expiry_date, [10]=status, [11]=photo, [12]=created_at,
-    # [13]=unit, [14]=category, [15]=store_name, [16]=store_address, [17]=store_city,
-    # [18]=store_category, [19]=discount_percent
+    # [8]=available_until, [9]=status, [10]=photo, [11]=created_at,
+    # [12]=expiry_date, [13]=unit, [14]=category
+    # После JOIN с stores: [15]=store_name, [16]=store_address, [17]=store_city,
+    # [18]=store_category, [19]=discount_percent (если добавлено в запросе)
     
     offer_id = offer[0]
     store_id = offer[1]
@@ -1056,7 +1058,7 @@ async def send_offer_card(message: types.Message, offer: tuple, lang: str):
     original_price = offer[4]
     discount_price = offer[5]
     quantity = offer[6]
-    expiry_date = offer[9]  # ПРАВИЛЬНЫЙ индекс для expiry_date
+    expiry_date = offer[12]  # ПРАВИЛЬНЫЙ индекс для expiry_date (после ALTER TABLE)
     store_name = offer[15] if len(offer) > 15 else "Магазин"
     store_address = offer[16] if len(offer) > 16 else ""
     store_category = offer[18] if len(offer) > 18 else ""
@@ -1430,16 +1432,13 @@ async def select_offer(callback: types.CallbackQuery):
         text += f"📦 {get_text(lang, 'available')}: {offer[6]} {unit}\n"
         text += f"🕐 {get_text(lang, 'time')}: {offer[7]} - {offer[8]}\n"
         
-        # Таймер срока годности (expiry_date на позиции 8 в o.*)
-        # Структура offers: [0]offer_id, [1]store_id, [2]title, [3]description, [4]original_price, 
-        # [5]discount_price, [6]quantity, [7]available_from, [8]available_until, [9]expiry_date, 
-        # [10]status, [11]photo, [12]created_at
-        # После JOIN добавляются: [13]store_name, [14]address, [15]city, [16]category
-        if len(offer) > 9 and offer[9]:
-            time_remaining = db.get_time_remaining(offer[9])
+        # Таймер срока годности
+        # АКТУАЛЬНАЯ структура: [12]=expiry_date, [9]=status, [10]=photo, [11]=created_at
+        if len(offer) > 12 and offer[12]:
+            time_remaining = db.get_time_remaining(offer[12])
             if time_remaining:
                 text += f"{time_remaining}\n"
-            text += f"📅 {get_text(lang, 'expires_on')}: {offer[9]}\n"
+            text += f"📅 {get_text(lang, 'expires_on')}: {offer[12]}\n"
         
         if len(offer) > 16:
             # Магазин и адрес (после JOIN)
@@ -1635,10 +1634,11 @@ async def offer_details(callback: types.CallbackQuery):
         return
     
     # Формируем детальную информацию
-    # offers: [0]offer_id, [1]store_id, [2]title, [3]description, [4]original_price, [5]discount_price,
-    # [6]quantity, [7]available_from, [8]available_until, [9]expiry_date, [10]status, [11]photo, [12]created_at,
-    # [13]unit, [14]category
-    # stores: [15]store_name, [16]address, [17]city, [18]phone, [19]store_desc
+    # АКТУАЛЬНАЯ структура после ALTER TABLE:
+    # [0]offer_id, [1]store_id, [2]title, [3]description, [4]original_price, [5]discount_price,
+    # [6]quantity, [7]available_from, [8]available_until, [9]status, [10]photo, [11]created_at,
+    # [12]expiry_date, [13]unit, [14]category
+    # После JOIN со stores: [15]store_name, [16]address, [17]city, [18]phone, [19]store_desc
     
     discount_percent = int((1 - offer_data[5] / offer_data[4]) * 100)
     unit = offer_data[13] if len(offer_data) > 13 and offer_data[13] else 'шт'
@@ -1649,10 +1649,9 @@ async def offer_details(callback: types.CallbackQuery):
     text += f"📦 <b>Доступно:</b> {offer_data[6]} {unit}\n"
     text += f"🕐 <b>Время забора:</b> {offer_data[7]} - {offer_data[8]}\n"
     
-    # Показываем срок годности если есть (expiry_date на позиции 9)
-    # Только если товар активен (status на позиции 10)
-    if len(offer_data) > 10 and offer_data[10] == 'active' and offer_data[9]:
-        time_remaining = db.get_time_remaining(offer_data[9])
+    # Показываем срок годности если есть (expiry_date на позиции 12, status на позиции 9)
+    if len(offer_data) > 12 and offer_data[9] == 'active' and offer_data[12]:
+        time_remaining = db.get_time_remaining(offer_data[12])
         if time_remaining:
             text += f"{time_remaining}\n"
     
@@ -1671,12 +1670,12 @@ async def offer_details(callback: types.CallbackQuery):
     keyboard.button(text="🛒 Забронировать", callback_data=f"book_{offer_id}")
     keyboard.adjust(1)
     
-    # Если есть фото предложения (индекс 11 - поле photo)
-    if len(offer_data) > 11 and offer_data[11] and str(offer_data[11]).strip():
+    # Если есть фото предложения (индекс 10 - поле photo)
+    if len(offer_data) > 10 and offer_data[10] and str(offer_data[10]).strip():
         try:
             await callback.message.edit_media(
                 media=types.InputMediaPhoto(
-                    media=offer_data[11],
+                    media=offer_data[10],
                     caption=text,
                     parse_mode="HTML"
                 ),
@@ -2600,23 +2599,6 @@ async def select_expiry_simple(callback: types.CallbackQuery, state: FSMContext)
     
     await callback.answer("✅ Готово!" if lang == 'ru' else "✅ Tayyor!")
 
-# СТАРЫЕ ОБРАБОТЧИКИ (оставляем для совместимости, но они не будут вызываться)
-
-@dp.message(CreateOffer.photo)
-async def create_offer_photo(message: types.Message, state: FSMContext):
-    lang = db.get_user_language(message.from_user.id)
-    
-    # Проверяем есть ли фото или пользователь пропустил
-    if message.photo:
-        photo_id = message.photo[-1].file_id
-        await state.update_data(photo=photo_id)
-    else:
-        # Пользователь написал "пропустить" или отправил текст
-        await state.update_data(photo=None)
-    
-    await message.answer(get_text(lang, 'original_price'))
-    await state.set_state(CreateOffer.original_price)
-
 # СТАРЫЕ ОБРАБОТЧИКИ (закомментированы, так как используется упрощённый flow)
 # Оставлены для справки и возможного восстановления
 
@@ -2766,9 +2748,8 @@ async def create_offer_time_from(message: types.Message, state: FSMContext):
     import re
     time_pattern = r'^([0-1]?[0-9]|2[0-3]):([0-5][0-9])$'
     if not re.match(time_pattern, message.text.strip()):
-        await message.answer(
-            f"❌ {'Неверный формат времени! Введите в формате ЧЧ:ММ (например: 18:00)' if lang == 'ru' else 'Noto\\'g\\'ri vaqt formati! ЧЧ:ММ formatida kiriting (masalan: 18:00)'}"
-        )
+        error_msg = "❌ Неверный формат времени! Введите в формате ЧЧ:ММ (например: 18:00)" if lang == 'ru' else "❌ Noto'g'ri vaqt formati! ЧЧ:ММ formatida kiriting (masalan: 18:00)"
+        await message.answer(error_msg)
         return
     
     await state.update_data(available_from=message.text.strip())
@@ -2813,9 +2794,8 @@ async def create_offer_time_until(message: types.Message, state: FSMContext):
     import re
     time_pattern = r'^([0-1]?[0-9]|2[0-3]):([0-5][0-9])$'
     if not re.match(time_pattern, message.text.strip()):
-        await message.answer(
-            f"❌ {'Неверный формат времени! Введите в формате ЧЧ:ММ (например: 21:00)' if lang == 'ru' else 'Noto\\'g\\'ri vaqt formati! ЧЧ:ММ formatida kiriting (masalan: 21:00)'}"
-        )
+        error_msg = "❌ Неверный формат времени! Введите в формате ЧЧ:ММ (например: 21:00)" if lang == 'ru' else "❌ Noto'g'ri vaqt formati! ЧЧ:ММ formatida kiriting (masalan: 21:00)"
+        await message.answer(error_msg)
         return
     
     data = await state.get_data()
@@ -3543,9 +3523,8 @@ async def edit_time_from(message: types.Message, state: FSMContext):
     import re
     time_pattern = r'^([0-1]?[0-9]|2[0-3]):([0-5][0-9])$'
     if not re.match(time_pattern, message.text.strip()):
-        await message.answer(
-            f"❌ {'Неверный формат! Введите время в формате ЧЧ:ММ (например: 18:00)' if lang == 'ru' else 'Noto\\'g\\'ri format! ЧЧ:ММ formatida vaqt kiriting (masalan: 18:00)'}"
-        )
+        error_msg = "❌ Неверный формат! Введите время в формате ЧЧ:ММ (например: 18:00)" if lang == 'ru' else "❌ Noto'g'ri format! ЧЧ:ММ formatida vaqt kiriting (masalan: 18:00)"
+        await message.answer(error_msg)
         return
     
     await state.update_data(available_from=message.text.strip())
@@ -3564,9 +3543,8 @@ async def edit_time_until(message: types.Message, state: FSMContext):
     import re
     time_pattern = r'^([0-1]?[0-9]|2[0-3]):([0-5][0-9])$'
     if not re.match(time_pattern, message.text.strip()):
-        await message.answer(
-            f"❌ {'Неверный формат! Введите время в формате ЧЧ:ММ (например: 21:00)' if lang == 'ru' else 'Noto\\'g\\'ri format! ЧЧ:ММ formatida vaqt kiriting (masalan: 21:00)'}"
-        )
+        error_msg = "❌ Неверный формат! Введите время в формате ЧЧ:ММ (например: 21:00)" if lang == 'ru' else "❌ Noto'g'ri format! ЧЧ:ММ formatida vaqt kiriting (masalan: 21:00)"
+        await message.answer(error_msg)
         return
     
     data = await state.get_data()
