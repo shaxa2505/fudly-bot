@@ -3190,13 +3190,12 @@ async def my_offers(message: types.Message):
         builder = InlineKeyboardBuilder()
         
         if status == 'active':
-            # Кнопки для активного товара
+            # Кнопки для активного товара - упрощённый набор
             builder.button(text="➕ +1", callback_data=f"qty_add_{offer_id}")
             builder.button(text="➖ -1", callback_data=f"qty_sub_{offer_id}")
             builder.button(text="📝 Изменить" if lang == 'ru' else "📝 Tahrirlash", callback_data=f"edit_offer_{offer_id}")
-            builder.button(text="🔄 Продлить" if lang == 'ru' else "🔄 Uzaytirish", callback_data=f"extend_offer_{offer_id}")
-            builder.button(text="❌ Снять" if lang == 'ru' else "❌ O'chirish", callback_data=f"deactivate_offer_{offer_id}")
-            builder.adjust(2, 2, 1)
+            builder.button(text="⏸ Снять с продажи" if lang == 'ru' else "⏸ Sotuvdan olish", callback_data=f"confirm_deactivate_{offer_id}")
+            builder.adjust(2, 1, 1)
         else:
             # Кнопки для неактивного товара
             builder.button(text="✅ Активировать" if lang == 'ru' else "✅ Faollashtirish", callback_data=f"activate_offer_{offer_id}")
@@ -3340,6 +3339,34 @@ async def cancel_extend(callback: types.CallbackQuery):
     await callback.answer("❌ Отменено")
     # Просто закрываем меню
     await callback.message.edit_reply_markup(reply_markup=None)
+
+@dp.callback_query(F.data.startswith("confirm_deactivate_"))
+async def confirm_deactivate_offer(callback: types.CallbackQuery):
+    """Подтверждение снятия товара с продажи"""
+    lang = db.get_user_language(callback.from_user.id)
+    offer_id = int(callback.data.split("_")[2])
+    
+    # Создаём кнопки подтверждения
+    builder = InlineKeyboardBuilder()
+    builder.button(
+        text="✅ Да, снять" if lang == 'ru' else "✅ Ha, olib tashlash",
+        callback_data=f"deactivate_offer_{offer_id}"
+    )
+    builder.button(
+        text="❌ Отмена" if lang == 'ru' else "❌ Bekor qilish",
+        callback_data="cancel_action"
+    )
+    builder.adjust(1)
+    
+    await callback.answer(
+        "⚠️ Товар будет снят с продажи" if lang == 'ru' else "⚠️ Mahsulot sotuvdan olinadi",
+        show_alert=True
+    )
+    
+    try:
+        await callback.message.edit_reply_markup(reply_markup=builder.as_markup())
+    except Exception:
+        pass
 
 @dp.callback_query(F.data.startswith("deactivate_offer_"))
 async def deactivate_offer(callback: types.CallbackQuery):
@@ -3490,9 +3517,8 @@ async def update_offer_message(callback: types.CallbackQuery, offer_id: int, lan
         builder.button(text="➕ +1", callback_data=f"qty_add_{offer_id}")
         builder.button(text="➖ -1", callback_data=f"qty_sub_{offer_id}")
         builder.button(text="📝 Изменить" if lang == 'ru' else "📝 Tahrirlash", callback_data=f"edit_offer_{offer_id}")
-        builder.button(text="🔄 Продлить" if lang == 'ru' else "🔄 Uzaytirish", callback_data=f"extend_offer_{offer_id}")
-        builder.button(text="❌ Снять" if lang == 'ru' else "❌ O'chirish", callback_data=f"deactivate_offer_{offer_id}")
-        builder.adjust(2, 2, 1)
+        builder.button(text="⏸ Снять с продажи" if lang == 'ru' else "⏸ Sotuvdan olish", callback_data=f"confirm_deactivate_{offer_id}")
+        builder.adjust(2, 1, 1)
     else:
         builder.button(text="✅ Активировать" if lang == 'ru' else "✅ Faollashtirish", callback_data=f"activate_offer_{offer_id}")
         builder.button(text="🗑 Удалить" if lang == 'ru' else "🗑 O'chirish", callback_data=f"delete_offer_{offer_id}")
