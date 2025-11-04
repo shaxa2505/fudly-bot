@@ -11,19 +11,23 @@ except ImportError:
     import logging
     logger = logging.getLogger(__name__)
 
-# Простой кэш-заглушка (для совместимости)
-class SimpleCache:
-    """Простая заглушка кэша без зависимостей"""
-    def get(self, key):
-        return None
+# Импорт кэша
+try:
+    from cache import cache
+except ImportError:
+    # Простой кэш-заглушка (для совместимости)
+    class SimpleCache:
+        """Простая заглушка кэша без зависимостей"""
+        def get(self, key):
+            return None
+        
+        def set(self, key, value, ex=None):
+            pass
+        
+        def delete(self, key):
+            pass
     
-    def set(self, key, value, ex=None):
-        pass
-    
-    def delete(self, key):
-        pass
-
-cache = SimpleCache()
+    cache = SimpleCache()
 
 # Module-level settings
 DB_PATH = os.environ.get('DATABASE_PATH', 'fudly.db')

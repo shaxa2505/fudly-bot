@@ -967,6 +967,40 @@ async def process_city(message: types.Message, state: FSMContext):
             reply_markup=main_menu_customer(lang)
         )
 
+
+# ============== PAGINATION HELPERS ==============
+
+ITEMS_PER_PAGE = 10
+
+def get_pagination_keyboard(lang: str, current_page: int, total_pages: int, callback_prefix: str):
+    """Создать клавиатуру для пагинации"""
+    from aiogram.utils.keyboard import InlineKeyboardBuilder
+    
+    builder = InlineKeyboardBuilder()
+    
+    # Кнопки навигации
+    buttons = []
+    
+    if current_page > 0:
+        buttons.append(("◀️ Назад" if lang == 'ru' else "◀️ Orqaga", f"{callback_prefix}_page_{current_page - 1}"))
+    
+    # Показываем текущую страницу
+    buttons.append((f"📄 {current_page + 1}/{total_pages}", "noop"))
+    
+    if current_page < total_pages - 1:
+        buttons.append(("Вперёд ▶️" if lang == 'ru' else "Oldinga ▶️", f"{callback_prefix}_page_{current_page + 1}"))
+    
+    for text, callback in buttons:
+        builder.button(text=text, callback_data=callback)
+    
+    builder.adjust(len(buttons))
+    return builder.as_markup()
+
+@dp.callback_query(F.data == "noop")
+async def noop_callback(callback: types.CallbackQuery):
+    """Заглушка для кнопки с номером страницы"""
+    await callback.answer()
+
 # ============== ДОСТУПНЫЕ ПРЕДЛОЖЕНИЯ ==============
 
 @dp.message(F.text.contains("Доступные предложения") | F.text.contains("Mavjud takliflar"))
@@ -2727,7 +2761,17 @@ async def create_offer_category(message: types.Message, state: FSMContext):
 @dp.message(CreateOffer.available_from)
 async def create_offer_time_from(message: types.Message, state: FSMContext):
     lang = db.get_user_language(message.from_user.id)
-    await state.update_data(available_from=message.text)
+    
+    # Валидация формата времени HH:MM
+    import re
+    time_pattern = r'^([0-1]?[0-9]|2[0-3]):([0-5][0-9])$'
+    if not re.match(time_pattern, message.text.strip()):
+        await message.answer(
+            f"❌ {'Неверный формат времени! Введите в формате ЧЧ:ММ (например: 18:00)' if lang == 'ru' else 'Noto\\'g\\'ri vaqt formati! ЧЧ:ММ formatida kiriting (masalan: 18:00)'}"
+        )
+        return
+    
+    await state.update_data(available_from=message.text.strip())
     
     # Клавиатура для срока годности
     builder = InlineKeyboardBuilder()
@@ -2764,6 +2808,16 @@ async def create_offer_expiry_date(message: types.Message, state: FSMContext):
 @dp.message(CreateOffer.available_until)
 async def create_offer_time_until(message: types.Message, state: FSMContext):
     lang = db.get_user_language(message.from_user.id)
+    
+    # Валидация формата времени HH:MM
+    import re
+    time_pattern = r'^([0-1]?[0-9]|2[0-3]):([0-5][0-9])$'
+    if not re.match(time_pattern, message.text.strip()):
+        await message.answer(
+            f"❌ {'Неверный формат времени! Введите в формате ЧЧ:ММ (например: 21:00)' if lang == 'ru' else 'Noto\\'g\\'ri vaqt formati! ЧЧ:ММ formatida kiriting (masalan: 21:00)'}"
+        )
+        return
+    
     data = await state.get_data()
     
     # Теперь expiry_date и available_until - это отдельные поля
@@ -3484,7 +3538,17 @@ async def edit_time_start(callback: types.CallbackQuery, state: FSMContext):
 async def edit_time_from(message: types.Message, state: FSMContext):
     """Обработка времени начала"""
     lang = db.get_user_language(message.from_user.id)
-    await state.update_data(available_from=message.text)
+    
+    # Валидация формата времени
+    import re
+    time_pattern = r'^([0-1]?[0-9]|2[0-3]):([0-5][0-9])$'
+    if not re.match(time_pattern, message.text.strip()):
+        await message.answer(
+            f"❌ {'Неверный формат! Введите время в формате ЧЧ:ММ (например: 18:00)' if lang == 'ru' else 'Noto\\'g\\'ri format! ЧЧ:ММ formatida vaqt kiriting (masalan: 18:00)'}"
+        )
+        return
+    
+    await state.update_data(available_from=message.text.strip())
     await message.answer(
         f"{'Введите время окончания (например: 21:00):' if lang == 'ru' else 'Tugash vaqtini kiriting (masalan: 21:00):'}",
         reply_markup=types.ReplyKeyboardRemove()
@@ -3495,10 +3559,20 @@ async def edit_time_from(message: types.Message, state: FSMContext):
 async def edit_time_until(message: types.Message, state: FSMContext):
     """Завершение редактирования времени"""
     lang = db.get_user_language(message.from_user.id)
+    
+    # Валидация формата времени
+    import re
+    time_pattern = r'^([0-1]?[0-9]|2[0-3]):([0-5][0-9])$'
+    if not re.match(time_pattern, message.text.strip()):
+        await message.answer(
+            f"❌ {'Неверный формат! Введите время в формате ЧЧ:ММ (например: 21:00)' if lang == 'ru' else 'Noto\\'g\\'ri format! ЧЧ:ММ formatida vaqt kiriting (masalan: 21:00)'}"
+        )
+        return
+    
     data = await state.get_data()
     offer_id = data['offer_id']
     available_from = data['available_from']
-    available_until = message.text
+    available_until = message.text.strip()
     
     # Обновление в БД
     conn = db.get_connection()
