@@ -4191,7 +4191,6 @@ async def profile(message: types.Message):
         return
     
     # user: [0]user_id, [1]username, [2]first_name, [3]phone, [4]city, [5]language, [6]role, [7]is_admin, [8]notifications
-    role_text = get_text(lang, 'role_seller') if user[6] == 'seller' else get_text(lang, 'role_customer')
     lang_text = 'Русский' if lang == 'ru' else 'Ozbekcha'
     
     text = f"{get_text(lang, 'your_profile')}\n\n"
@@ -4199,7 +4198,6 @@ async def profile(message: types.Message):
     text += f"{get_text(lang, 'phone')}: {user[3]}\n"
     text += f"{get_text(lang, 'city')}: {user[4]}\n"
     text += f"{get_text(lang, 'language')}: {lang_text}\n"
-    text += f"{get_text(lang, 'role')}: {role_text}"
     
     await message.answer(
         text,
@@ -4224,17 +4222,6 @@ async def profile_change_city(callback: types.CallbackQuery, state: FSMContext):
             reply_markup=city_keyboard(lang)
         )
     await state.set_state(ChangeCity.city)
-    await callback.answer()
-
-@dp.callback_query(F.data == "switch_to_customer")
-async def switch_to_customer_cb(callback: types.CallbackQuery):
-    """Переключиться в режим покупателя из профиля"""
-    lang = db.get_user_language(callback.from_user.id)
-    user_view_mode[callback.from_user.id] = 'customer'
-    try:
-        await callback.message.edit_text(get_text(lang, 'switched_to_customer'), reply_markup=main_menu_customer(lang))
-    except Exception:
-        await callback.message.answer(get_text(lang, 'switched_to_customer'), reply_markup=main_menu_customer(lang))
     await callback.answer()
 
 @dp.callback_query(F.data == "become_partner_cb")
@@ -4392,18 +4379,6 @@ async def confirm_delete_no(callback: types.CallbackQuery):
         await callback.message.answer(get_text(lang, 'operation_cancelled'), reply_markup=settings_keyboard(user[8], lang, role=user[6]))
 
     await callback.answer()
-
-# ============== РЕЖИМ ПОКУПАТЕЛЯ ==============
-
-@dp.message(F.text.contains("Режим покупателя") | F.text.contains("Xaridor rejimi"))
-async def switch_to_customer(message: types.Message):
-    lang = db.get_user_language(message.from_user.id)
-    # Remember that the user prefers customer view until changed
-    user_view_mode[message.from_user.id] = 'customer'
-    await message.answer(
-        get_text(lang, 'switched_to_customer'),
-        reply_markup=main_menu_customer(lang)
-    )
 
 # ============== СТАТИСТИКА ПАРТНЁРА "СЕГОДНЯ" ==============
 
