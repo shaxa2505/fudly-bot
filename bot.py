@@ -1,4 +1,13 @@
 # type: ignore
+"""
+Fudly Telegram Bot - Main Module
+
+This file is being refactored to use modular handlers from the handlers/ package.
+See handlers/README.md for details on the refactoring structure.
+
+Current status: Foundation laid with handlers/common.py, handlers/registration.py,
+handlers/user_commands.py, and handlers/admin.py created. Full integration pending.
+"""
 from aiogram import Bot, Dispatcher, types, F
 from aiogram.filters import Command
 from aiogram.fsm.context import FSMContext
@@ -177,8 +186,19 @@ storage = MemoryStorage()
 dp = Dispatcher(storage=storage)
 db = Database()
 
-# Регистрируем middleware для проверки регистрации
-# (будет добавлен после определения класса RegistrationCheckMiddleware)
+# Import state classes and utilities from handlers package
+from handlers.common import (
+    Registration, RegisterStore, CreateOffer, BulkCreate,
+    ChangeCity, EditOffer, ConfirmOrder, BookOffer,
+    RegistrationCheckMiddleware, user_view_mode as handler_user_view_mode,
+    has_approved_store as handler_has_approved_store,
+    get_appropriate_menu as handler_get_appropriate_menu
+)
+
+# Use imported utilities (override local definitions)
+user_view_mode = handler_user_view_mode
+has_approved_store = lambda user_id: handler_has_approved_store(user_id, db)
+get_appropriate_menu = lambda user_id, lang: handler_get_appropriate_menu(user_id, lang, db, main_menu_seller, main_menu_customer)
 
 # Устанавливаем первого админа при старте
 if ADMIN_ID > 0:
@@ -194,389 +214,311 @@ if ADMIN_ID > 0:
     except Exception as e:
         print(f"⚠️ Ошибка при установке админа: {e}")
 
-# FSM States
-class Registration(StatesGroup):
-    phone = State()
-    city = State()
+# Register modular handlers from handlers package
+from handlers import registration, user_commands, admin
 
-class RegisterStore(StatesGroup):
-    city = State()
-    category = State()
-    name = State()
-    address = State()
-    description = State()
-    phone = State()
+# Setup registration handlers
+registration.setup(dp, db, get_text, get_cities, city_keyboard, main_menu_customer,
+                  validator, rate_limiter, logger, secure_user_input)
 
-class CreateOffer(StatesGroup):
-    store_id = State()
-    title = State()
-    description = State()
-    photo = State()
-    original_price = State()
-    discount_price = State()
-    quantity = State()
-    unit = State()  # Единицы измерения
-    category = State()  # Категория товара
-    available_from = State()
-    expiry_date = State()  # Новое поле для срока годности (дата)
-    available_until = State()  # Остается для времени забора
+# Setup user command handlers
+user_commands.setup(dp, db, get_text, get_cities, city_keyboard, language_keyboard,
+                   phone_request_keyboard, main_menu_seller, main_menu_customer)
 
-class BulkCreate(StatesGroup):
-    store_id = State()
-    title = State()
-    description = State()
-    photo = State()
-    original_price = State()
-    discount_price = State()
-    quantity = State()
-    available_from = State()
-    available_until = State()
-    count = State()
+# Setup admin handlers
+admin.setup(dp, db, get_text, admin_menu)
 
-class ChangeCity(StatesGroup):
-    city = State()
+# Register middleware for registration check
+dp.update.middleware(RegistrationCheckMiddleware(db, get_text, phone_request_keyboard))
 
-class EditOffer(StatesGroup):
-    """Состояния для редактирования товара"""
-    offer_id = State()
-    available_from = State()
-    available_until = State()
+# ============== REMAINING HANDLERS (TO BE MIGRATED) ==============
+# Note: The handlers below will be gradually moved to the handlers/ package
+# Handlers already migrated: registration, user_commands (start, language, cancel), admin (main panel)
 
-class ConfirmOrder(StatesGroup):
-    booking_code = State()
-
-class BookOffer(StatesGroup):
-    offer_id = State()
-    quantity = State()
-
-# ============== MIDDLEWARE: ПРОВЕРКА РЕГИСТРАЦИИ ==============
+# Skip duplicate handlers that are now in handler modules
+# - Removed: Registration handlers (process_phone, process_city) - now in handlers/registration.py
+# - Removed: User commands (cmd_start, choose_language, cancel_action, etc.) - now in handlers/user_commands.py
+# - Removed: Admin commands (cmd_admin, admin_dashboard, admin_exit) - now in handlers/admin.py
 
 from aiogram.types import Update
 from aiogram import BaseMiddleware
 from typing import Callable, Dict, Any, Awaitable
 
-class RegistrationCheckMiddleware(BaseMiddleware):
-    """Проверяет, что пользователь зарегистрирован (есть номер телефона) перед любым действием"""
-    
-    async def __call__(
-        self,
-        handler: Callable[[Update, Dict[str, Any]], Awaitable[Any]],
-        event: Update,
-        data: Dict[str, Any]
-    ) -> Any:
-        # Определяем user_id из разных типов событий
-        user_id = None
-        if event.message:
-            user_id = event.message.from_user.id
-        elif event.callback_query:
-            user_id = event.callback_query.from_user.id
-        
-        if not user_id:
-            return await handler(event, data)
-        
-        # Команды, которые всегда разрешены (для процесса регистрации)
-        allowed_commands = ['/start', '/help']
-        allowed_callbacks = ['lang_ru', 'lang_uz']  # Выбор языка при регистрации
-        
-        # Проверяем, является ли это разрешённой командой
-        if event.message and event.message.text:
-            if any(event.message.text.startswith(cmd) for cmd in allowed_commands):
-                return await handler(event, data)
-            # Разрешаем отправку контакта (номера телефона)
-            if event.message.contact:
-                return await handler(event, data)
-        
-        # Разрешаем колбэки выбора языка
-        if event.callback_query and event.callback_query.data in allowed_callbacks:
-            return await handler(event, data)
-        
-        # Проверяем FSM состояние — если пользователь в процессе регистрации, пропускаем
-        state = data.get('state')
-        if state:
-            current_state = await state.get_state()
-            if current_state and current_state.startswith('Registration:'):
-                # Пользователь в процессе регистрации — разрешаем
-                return await handler(event, data)
-        
-        # Проверяем регистрацию пользователя
-        user = db.get_user(user_id)
-        if not user or not user[3]:  # user[3] — это phone
-            lang = db.get_user_language(user_id) if user else 'ru'
-            
-            # Если это сообщение
-            if event.message:
-                await event.message.answer(
-                    get_text(lang, 'registration_required'),
-                    parse_mode="HTML",
-                    reply_markup=phone_request_keyboard(lang)
-                )
-            # Если это callback
-            elif event.callback_query:
-                await event.callback_query.answer(
-                    get_text(lang, 'registration_required'),
-                    show_alert=True
-                )
-            return  # Блокируем дальнейшую обработку
-        
-        # Пользователь зарегистрирован — продолжаем
-        return await handler(event, data)
+# Middleware class is now imported from handlers.common, but keeping the old code commented for reference
+# class RegistrationCheckMiddleware(BaseMiddleware):
+#     """Проверяет, что пользователь зарегистрирован (есть номер телефона) перед любым действием"""
+# (Implementation removed - now in handlers/common.py)
 
-# Регистрируем middleware для всех обновлений
-dp.update.middleware(RegistrationCheckMiddleware())
+# Old middleware registration removed - now registered above with imported class
 
-# ============== КОМАНДА /START ==============
-@dp.message(F.text == "Мой город")
-async def my_city(message: types.Message, state: FSMContext = None):
-    user_id = message.from_user.id
-    lang = db.get_user_language(user_id)
-    user = db.get_user(user_id)
-    current_city = user[4] if user and len(user) > 4 else None
-    if not current_city:
-        current_city = get_cities(lang)[0]
-    
-    # Получаем статистику по городу
-    stats_text = ""
-    try:
-        stores_count = len(db.get_stores_by_city(current_city))
-        offers_count = len(db.get_active_offers(city=current_city))
-        stats_text = f"\n\n📊 В вашем городе:\n🏪 Магазинов: {stores_count}\n🍽 Предложений: {offers_count}"
-    except:
-        pass
-    
-    # Создаём inline-клавиатуру с кнопками
-    builder = InlineKeyboardBuilder()
-    builder.button(
-        text="✏️ Изменить город" if lang == 'ru' else "✏️ Shaharni o'zgartirish",
-        callback_data="change_city"
-    )
-    builder.button(
-        text="◀️ Назад" if lang == 'ru' else "◀️ Orqaga",
-        callback_data="back_to_menu"
-    )
-    builder.adjust(1)
-    
-    await message.answer(
-        f"{get_text(lang, 'your_city')}: {current_city}{stats_text}",
-        reply_markup=builder.as_markup(),
-        parse_mode="HTML"
-    )
+# ============== HANDLERS BELOW WILL BE GRADUALLY MIGRATED ==============
+# The following handlers remain in bot.py and can be moved to handler modules incrementally:
+# - Store registration and management
+# - Offer creation and management
+# - Booking operations
+# - Callback handlers (pagination, filters, etc.)
+# - Additional admin handlers (moderation, detailed stats, etc.)
 
-@dp.callback_query(F.data == "change_city")
-async def show_city_selection(callback: types.CallbackQuery, state: FSMContext):
-    """Показать список городов для выбора"""
-    lang = db.get_user_language(callback.from_user.id)
-    await callback.message.edit_text(
-        get_text(lang, 'choose_city'),
-        reply_markup=city_keyboard(lang)
-    )
-    await callback.answer()
+# ============== MY CITY HANDLER (TODO: Already in user_commands.py, remove after testing) ==============
+# DUPLICATE HANDLER - Moved to handlers/ package
+# @dp.message(F.text == "Мой город")
+# async def my_city(message: types.Message, state: FSMContext = None):
+#     user_id = message.from_user.id
+#     lang = db.get_user_language(user_id)
+#     user = db.get_user(user_id)
+#     current_city = user[4] if user and len(user) > 4 else None
+#     if not current_city:
+#         current_city = get_cities(lang)[0]
+    
+#     # Получаем статистику по городу
+#     stats_text = ""
+#     try:
+#         stores_count = len(db.get_stores_by_city(current_city))
+#         offers_count = len(db.get_active_offers(city=current_city))
+#         stats_text = f"\n\n📊 В вашем городе:\n🏪 Магазинов: {stores_count}\n🍽 Предложений: {offers_count}"
+#     except:
+#         pass
+    
+#     # Создаём inline-клавиатуру с кнопками
+#     builder = InlineKeyboardBuilder()
+#     builder.button(
+#         text="✏️ Изменить город" if lang == 'ru' else "✏️ Shaharni o'zgartirish",
+#         callback_data="change_city"
+#     )
+#     builder.button(
+#         text="◀️ Назад" if lang == 'ru' else "◀️ Orqaga",
+#         callback_data="back_to_menu"
+#     )
+#     builder.adjust(1)
+    
+#     await message.answer(
+#         f"{get_text(lang, 'your_city')}: {current_city}{stats_text}",
+#         reply_markup=builder.as_markup(),
+#         parse_mode="HTML"
+#     )
 
-@dp.callback_query(F.data == "back_to_menu")
-async def back_to_main_menu(callback: types.CallbackQuery):
-    """Вернуться в главное меню"""
-    lang = db.get_user_language(callback.from_user.id)
-    user = db.get_user(callback.from_user.id)
-    menu = main_menu_seller(lang) if user and user[6] == "seller" else main_menu_customer(lang)
-    
-    await callback.message.delete()
-    await callback.message.answer(
-        get_text(lang, 'main_menu') if 'main_menu' in dir() else "Главное меню",
-        reply_markup=menu
-    )
-    await callback.answer()
+# DUPLICATE HANDLER - Moved to handlers/ package
+# @dp.callback_query(F.data == "change_city")
+# async def show_city_selection(callback: types.CallbackQuery, state: FSMContext):
+#     """Показать список городов для выбора"""
+#     lang = db.get_user_language(callback.from_user.id)
+#     await callback.message.edit_text(
+#         get_text(lang, 'choose_city'),
+#         reply_markup=city_keyboard(lang)
+#     )
+#     await callback.answer()
 
-@dp.message(F.text.in_(get_cities('ru') + get_cities('uz')))
-async def change_city(message: types.Message, state: FSMContext = None):
-    """Обработчик быстрой смены города (без FSM состояния)"""
-    user_id = message.from_user.id
-    lang = db.get_user_language(user_id)
-    user = db.get_user(user_id)
+# DUPLICATE HANDLER - Moved to handlers/ package
+# @dp.callback_query(F.data == "back_to_menu")
+# async def back_to_main_menu(callback: types.CallbackQuery):
+#     """Вернуться в главное меню"""
+#     lang = db.get_user_language(callback.from_user.id)
+#     user = db.get_user(callback.from_user.id)
+#     menu = main_menu_seller(lang) if user and user[6] == "seller" else main_menu_customer(lang)
     
-    # ВАЖНО: Проверяем текущее состояние FSM
-    # Если пользователь в процессе регистрации (магазина или самого себя), пропускаем
-    if state:
-        current_state = await state.get_state()
-        if current_state and (current_state.startswith('RegisterStore:') or current_state.startswith('Registration:')):
-            # Пользователь в процессе регистрации — не трогаем, пусть обработает соответствующий обработчик
-            return
-    
-    new_city = message.text
-    
-    # Сохраняем новый город
-    db.update_user_city(user_id, new_city)
-    
-    # Получаем обновлённое главное меню
-    menu = main_menu_seller(lang) if user and user[6] == "seller" else main_menu_customer(lang)
-    
-    await message.answer(
-        f"✅ {get_text(lang, 'city_changed', city=new_city)}\n\n"
-        f"Теперь вы будете видеть предложения из города {new_city}",
-        reply_markup=menu,
-        parse_mode="HTML"
-    )
+#     await callback.message.delete()
+#     await callback.message.answer(
+#         get_text(lang, 'main_menu') if 'main_menu' in dir() else "Главное меню",
+#         reply_markup=menu
+#     )
+#     await callback.answer()
 
-@dp.message(Command("start"))
-async def cmd_start(message: types.Message, state: FSMContext):
-    user = db.get_user(message.from_user.id)
+# DUPLICATE HANDLER - Moved to handlers/ package
+# @dp.message(F.text.in_(get_cities('ru') + get_cities('uz')))
+# async def change_city(message: types.Message, state: FSMContext = None):
+#     """Обработчик быстрой смены города (без FSM состояния)"""
+#     user_id = message.from_user.id
+#     lang = db.get_user_language(user_id)
+#     user = db.get_user(user_id)
     
-    if not user:
-        # Новый пользователь - показываем выбор языка
-        # НЕ создаём пользователя до получения номера телефона!
-        await message.answer(
-            get_text('ru', 'choose_language'),
-            reply_markup=language_keyboard()
-        )
-        return
+#     # ВАЖНО: Проверяем текущее состояние FSM
+#     # Если пользователь в процессе регистрации (магазина или самого себя), пропускаем
+#     if state:
+#         current_state = await state.get_state()
+#         if current_state and (current_state.startswith('RegisterStore:') or current_state.startswith('Registration:')):
+#             # Пользователь в процессе регистрации — не трогаем, пусть обработает соответствующий обработчик
+#             return
     
-    lang = db.get_user_language(message.from_user.id)
+#     new_city = message.text
     
-    # Проверка телефона
-    if not user[3]:
-        await message.answer(
-            get_text(lang, 'welcome', name=message.from_user.first_name),
-            parse_mode="HTML",
-            reply_markup=phone_request_keyboard(lang)
-        )
-        await state.set_state(Registration.phone)
-        return
+#     # Сохраняем новый город
+#     db.update_user_city(user_id, new_city)
     
-    # Проверка города
-    if not user[4]:
-        await message.answer(
-            get_text(lang, 'choose_city'),
-            parse_mode="HTML",
-            reply_markup=city_keyboard(lang, allow_cancel=False)
-        )
-        await state.set_state(Registration.city)
-        return
+#     # Получаем обновлённое главное меню
+#     menu = main_menu_seller(lang) if user and user[6] == "seller" else main_menu_customer(lang)
     
-    # Приветствие
-    menu = main_menu_seller(lang) if user[6] == "seller" else main_menu_customer(lang)
-    await message.answer(
-        get_text(lang, 'welcome_back', name=message.from_user.first_name, city=user[4]),
-        parse_mode="HTML",
-        reply_markup=menu
-    )
+#     await message.answer(
+#         f"✅ {get_text(lang, 'city_changed', city=new_city)}\n\n"
+#         f"Теперь вы будете видеть предложения из города {new_city}",
+#         reply_markup=menu,
+#         parse_mode="HTML"
+#     )
 
-# ============== АДМИН ПАНЕЛЬ ==============
+# DUPLICATE HANDLER - Moved to handlers/ package
+# @dp.message(Command("start"))
+# async def cmd_start(message: types.Message, state: FSMContext):
+#     user = db.get_user(message.from_user.id)
+    
+#     if not user:
+#         # Новый пользователь - показываем выбор языка
+#         # НЕ создаём пользователя до получения номера телефона!
+#         await message.answer(
+#             get_text('ru', 'choose_language'),
+#             reply_markup=language_keyboard()
+#         )
+#         return
+    
+#     lang = db.get_user_language(message.from_user.id)
+    
+#     # Проверка телефона
+#     if not user[3]:
+#         await message.answer(
+#             get_text(lang, 'welcome', name=message.from_user.first_name),
+#             parse_mode="HTML",
+#             reply_markup=phone_request_keyboard(lang)
+#         )
+#         await state.set_state(Registration.phone)
+#         return
+    
+#     # Проверка города
+#     if not user[4]:
+#         await message.answer(
+#             get_text(lang, 'choose_city'),
+#             parse_mode="HTML",
+#             reply_markup=city_keyboard(lang, allow_cancel=False)
+#         )
+#         await state.set_state(Registration.city)
+#         return
+    
+#     # Приветствие
+#     menu = main_menu_seller(lang) if user[6] == "seller" else main_menu_customer(lang)
+#     await message.answer(
+#         get_text(lang, 'welcome_back', name=message.from_user.first_name, city=user[4]),
+#         parse_mode="HTML",
+#         reply_markup=menu
+#     )
 
-@dp.message(Command("admin"))
-async def cmd_admin(message: types.Message):
-    lang = db.get_user_language(message.from_user.id)
-    
-    if not db.is_admin(message.from_user.id):
-        await message.answer(get_text(lang, 'no_admin_access'))
-        return
-    
-    await message.answer(
-        "👑 <b>Админ-панель Fudly</b>\n\n"
-        "Добро пожаловать! Выберите раздел:",
-        parse_mode="HTML",
-        reply_markup=admin_menu()
-    )
+# # ============== АДМИН ПАНЕЛЬ ==============
 
-# ============== АДМИН ПАНЕЛЬ - DASHBOARD ==============
+# DUPLICATE HANDLER - Moved to handlers/ package
+# @dp.message(Command("admin"))
+# async def cmd_admin(message: types.Message):
+#     lang = db.get_user_language(message.from_user.id)
+    
+#     if not db.is_admin(message.from_user.id):
+#         await message.answer(get_text(lang, 'no_admin_access'))
+#         return
+    
+#     await message.answer(
+#         "👑 <b>Админ-панель Fudly</b>\n\n"
+#         "Добро пожаловать! Выберите раздел:",
+#         parse_mode="HTML",
+#         reply_markup=admin_menu()
+#     )
 
-@dp.message(F.text == "📊 Dashboard")
-async def admin_dashboard(message: types.Message):
-    """Главная панель с общей статистикой и быстрыми действиями"""
-    if not db.is_admin(message.from_user.id):
-        return
-    
-    conn = db.get_connection()
-    cursor = conn.cursor()
-    
-    # Общая статистика
-    cursor.execute('SELECT COUNT(*) FROM users')
-    total_users = cursor.fetchone()[0]
-    
-    cursor.execute('SELECT COUNT(*) FROM users WHERE role = "seller"')
-    sellers = cursor.fetchone()[0]
-    
-    cursor.execute('SELECT COUNT(*) FROM users WHERE role = "customer"')
-    customers = cursor.fetchone()[0]
-    
-    # Магазины
-    cursor.execute('SELECT COUNT(*) FROM stores WHERE status = "active"')
-    active_stores = cursor.fetchone()[0]
-    
-    cursor.execute('SELECT COUNT(*) FROM stores WHERE status = "pending"')
-    pending_stores = cursor.fetchone()[0]
-    
-    # Товары
-    cursor.execute('SELECT COUNT(*) FROM offers WHERE status = "active"')
-    active_offers = cursor.fetchone()[0]
-    
-    cursor.execute('SELECT COUNT(*) FROM offers WHERE status = "inactive"')
-    inactive_offers = cursor.fetchone()[0]
-    
-    # Бронирования
-    cursor.execute('SELECT COUNT(*) FROM bookings')
-    total_bookings = cursor.fetchone()[0]
-    
-    cursor.execute('SELECT COUNT(*) FROM bookings WHERE status = "pending"')
-    pending_bookings = cursor.fetchone()[0]
-    
-    # Статистика за сегодня (узбекское время)
-    today = get_uzb_time().strftime('%Y-%m-%d')
-    
-    cursor.execute('SELECT COUNT(*) FROM bookings WHERE DATE(created_at) = ?', (today,))
-    today_bookings = cursor.fetchone()[0]
-    
-    cursor.execute('''
-        SELECT SUM(o.discount_price * b.quantity)
-        FROM bookings b
-        JOIN offers o ON b.offer_id = o.offer_id
-        WHERE DATE(b.created_at) = ? AND b.status != 'cancelled'
-    ''', (today,))
-    today_revenue = cursor.fetchone()[0] or 0
-    
-    # Новые пользователи за сегодня
-    cursor.execute('''
-        SELECT COUNT(*) FROM users 
-        WHERE DATE(created_at) = ?
-    ''', (today,))
-    today_users = cursor.fetchone()[0]
-    
-    conn.close()
-    
-    # Формируем сообщение
-    text = "📊 <b>Dashboard - Общая статистика</b>\n\n"
-    
-    text += "👥 <b>Пользователи:</b>\n"
-    text += f"├ Всего: {total_users} (+{today_users} сегодня)\n"
-    text += f"├ 🏪 Партнёры: {sellers}\n"
-    text += f"└ 🛍 Покупатели: {customers}\n\n"
-    
-    text += "🏪 <b>Магазины:</b>\n"
-    text += f"├ ✅ Активные: {active_stores}\n"
-    text += f"└ ⏳ На модерации: {pending_stores}\n\n"
-    
-    text += "📦 <b>Товары:</b>\n"
-    text += f"├ ✅ Активные: {active_offers}\n"
-    text += f"└ ❌ Неактивные: {inactive_offers}\n\n"
-    
-    text += "🎫 <b>Бронирования:</b>\n"
-    text += f"├ Всего: {total_bookings}\n"
-    text += f"├ ⏳ Активные: {pending_bookings}\n"
-    text += f"└ 📅 Сегодня: {today_bookings}\n\n"
-    
-    text += f"💰 <b>Выручка сегодня:</b> {int(today_revenue):,} сум"
-    
-    # Inline-кнопки для быстрых действий
-    from aiogram.utils.keyboard import InlineKeyboardBuilder
-    kb = InlineKeyboardBuilder()
-    
-    if pending_stores > 0:
-        kb.button(text=f"⏳ Модерация ({pending_stores})", callback_data="admin_moderation")
-    
-    kb.button(text="📊 Детальная статистика", callback_data="admin_detailed_stats")
-    kb.button(text="🔄 Обновить", callback_data="admin_refresh_dashboard")
-    kb.adjust(1)
-    
-    await message.answer(text, parse_mode="HTML", reply_markup=kb.as_markup())
+# # ============== АДМИН ПАНЕЛЬ - DASHBOARD ==============
 
-# ============== АДМИН ПАНЕЛЬ - ОБРАБОТЧИКИ ==============
+# DUPLICATE HANDLER - Moved to handlers/ package
+# @dp.message(F.text == "📊 Dashboard")
+# async def admin_dashboard(message: types.Message):
+#     """Главная панель с общей статистикой и быстрыми действиями"""
+#     if not db.is_admin(message.from_user.id):
+#         return
+    
+#     conn = db.get_connection()
+#     cursor = conn.cursor()
+    
+#     # Общая статистика
+#     cursor.execute('SELECT COUNT(*) FROM users')
+#     total_users = cursor.fetchone()[0]
+    
+#     cursor.execute('SELECT COUNT(*) FROM users WHERE role = "seller"')
+#     sellers = cursor.fetchone()[0]
+    
+#     cursor.execute('SELECT COUNT(*) FROM users WHERE role = "customer"')
+#     customers = cursor.fetchone()[0]
+    
+#     # Магазины
+#     cursor.execute('SELECT COUNT(*) FROM stores WHERE status = "active"')
+#     active_stores = cursor.fetchone()[0]
+    
+#     cursor.execute('SELECT COUNT(*) FROM stores WHERE status = "pending"')
+#     pending_stores = cursor.fetchone()[0]
+    
+#     # Товары
+#     cursor.execute('SELECT COUNT(*) FROM offers WHERE status = "active"')
+#     active_offers = cursor.fetchone()[0]
+    
+#     cursor.execute('SELECT COUNT(*) FROM offers WHERE status = "inactive"')
+#     inactive_offers = cursor.fetchone()[0]
+    
+#     # Бронирования
+#     cursor.execute('SELECT COUNT(*) FROM bookings')
+#     total_bookings = cursor.fetchone()[0]
+    
+#     cursor.execute('SELECT COUNT(*) FROM bookings WHERE status = "pending"')
+#     pending_bookings = cursor.fetchone()[0]
+    
+#     # Статистика за сегодня (узбекское время)
+#     today = get_uzb_time().strftime('%Y-%m-%d')
+    
+#     cursor.execute('SELECT COUNT(*) FROM bookings WHERE DATE(created_at) = ?', (today,))
+#     today_bookings = cursor.fetchone()[0]
+    
+#     cursor.execute('''
+#         SELECT SUM(o.discount_price * b.quantity)
+#         FROM bookings b
+#         JOIN offers o ON b.offer_id = o.offer_id
+#         WHERE DATE(b.created_at) = ? AND b.status != 'cancelled'
+#     ''', (today,))
+#     today_revenue = cursor.fetchone()[0] or 0
+    
+#     # Новые пользователи за сегодня
+#     cursor.execute('''
+#         SELECT COUNT(*) FROM users 
+#         WHERE DATE(created_at) = ?
+#     ''', (today,))
+#     today_users = cursor.fetchone()[0]
+    
+#     conn.close()
+    
+#     # Формируем сообщение
+#     text = "📊 <b>Dashboard - Общая статистика</b>\n\n"
+    
+#     text += "👥 <b>Пользователи:</b>\n"
+#     text += f"├ Всего: {total_users} (+{today_users} сегодня)\n"
+#     text += f"├ 🏪 Партнёры: {sellers}\n"
+#     text += f"└ 🛍 Покупатели: {customers}\n\n"
+    
+#     text += "🏪 <b>Магазины:</b>\n"
+#     text += f"├ ✅ Активные: {active_stores}\n"
+#     text += f"└ ⏳ На модерации: {pending_stores}\n\n"
+    
+#     text += "📦 <b>Товары:</b>\n"
+#     text += f"├ ✅ Активные: {active_offers}\n"
+#     text += f"└ ❌ Неактивные: {inactive_offers}\n\n"
+    
+#     text += "🎫 <b>Бронирования:</b>\n"
+#     text += f"├ Всего: {total_bookings}\n"
+#     text += f"├ ⏳ Активные: {pending_bookings}\n"
+#     text += f"└ 📅 Сегодня: {today_bookings}\n\n"
+    
+#     text += f"💰 <b>Выручка сегодня:</b> {int(today_revenue):,} сум"
+    
+#     # Inline-кнопки для быстрых действий
+#     from aiogram.utils.keyboard import InlineKeyboardBuilder
+#     kb = InlineKeyboardBuilder()
+    
+#     if pending_stores > 0:
+#         kb.button(text=f"⏳ Модерация ({pending_stores})", callback_data="admin_moderation")
+    
+#     kb.button(text="📊 Детальная статистика", callback_data="admin_detailed_stats")
+#     kb.button(text="🔄 Обновить", callback_data="admin_refresh_dashboard")
+#     kb.adjust(1)
+    
+#     await message.answer(text, parse_mode="HTML", reply_markup=kb.as_markup())
+
+# # ============== АДМИН ПАНЕЛЬ - ОБРАБОТЧИКИ ==============
 
 @dp.message(F.text == "👥 Пользователи")
 async def admin_users(message: types.Message):
@@ -768,209 +710,215 @@ async def admin_bookings(message: types.Message):
     
     await message.answer(text, parse_mode="HTML", reply_markup=kb.as_markup())
 
-@dp.message(F.text == "🔙 Выход")
-async def admin_exit(message: types.Message):
-    """Выход из админ-панели"""
-    lang = db.get_user_language(message.from_user.id)
-    user = db.get_user(message.from_user.id)
-    menu = main_menu_seller(lang) if user and user[6] == "seller" else main_menu_customer(lang)
-    await message.answer(
-        "👋 Выход из админ-панели",
-        reply_markup=menu
-    )
+# DUPLICATE HANDLER - Moved to handlers/ package
+# @dp.message(F.text == "🔙 Выход")
+# async def admin_exit(message: types.Message):
+#     """Выход из админ-панели"""
+#     lang = db.get_user_language(message.from_user.id)
+#     user = db.get_user(message.from_user.id)
+#     menu = main_menu_seller(lang) if user and user[6] == "seller" else main_menu_customer(lang)
+#     await message.answer(
+#         "👋 Выход из админ-панели",
+#         reply_markup=menu
+#     )
 
-# ============== ВЫБОР ЯЗЫКА ==============
+# # ============== ВЫБОР ЯЗЫКА ==============
 
-@dp.callback_query(F.data.startswith("lang_"))
-async def choose_language(callback: types.CallbackQuery, state: FSMContext):
-    lang = callback.data.split("_")[1]
+# DUPLICATE HANDLER - Moved to handlers/ package
+# @dp.callback_query(F.data.startswith("lang_"))
+# async def choose_language(callback: types.CallbackQuery, state: FSMContext):
+#     lang = callback.data.split("_")[1]
     
-    # Показываем меню после выбора языка
-    user = db.get_user(callback.from_user.id)
+#     # Показываем меню после выбора языка
+#     user = db.get_user(callback.from_user.id)
     
-    # ПРОВЕРКА: если пользователя нет в БД (новый пользователь)
-    if not user:
-        # Создаём нового пользователя С выбранным языком
-        db.add_user(callback.from_user.id, callback.from_user.username, callback.from_user.first_name)
-        db.update_user_language(callback.from_user.id, lang)
-        await callback.message.edit_text(get_text(lang, 'language_changed'))
-        await callback.message.answer(
-            get_text(lang, 'welcome', name=callback.from_user.first_name),
-            parse_mode="HTML",
-            reply_markup=phone_request_keyboard(lang)
-        )
-        await state.set_state(Registration.phone)
-        return
+#     # ПРОВЕРКА: если пользователя нет в БД (новый пользователь)
+#     if not user:
+#         # Создаём нового пользователя С выбранным языком
+#         db.add_user(callback.from_user.id, callback.from_user.username, callback.from_user.first_name)
+#         db.update_user_language(callback.from_user.id, lang)
+#         await callback.message.edit_text(get_text(lang, 'language_changed'))
+#         await callback.message.answer(
+#             get_text(lang, 'welcome', name=callback.from_user.first_name),
+#             parse_mode="HTML",
+#             reply_markup=phone_request_keyboard(lang)
+#         )
+#         await state.set_state(Registration.phone)
+#         return
     
-    # Если пользователь уже есть — просто обновляем язык
-    db.update_user_language(callback.from_user.id, lang)
-    await callback.message.edit_text(get_text(lang, 'language_changed'))
+#     # Если пользователь уже есть — просто обновляем язык
+#     db.update_user_language(callback.from_user.id, lang)
+#     await callback.message.edit_text(get_text(lang, 'language_changed'))
     
-    # Если нет телефона - запрашиваем
-    if not user[3]:
-        await callback.message.answer(
-            get_text(lang, 'welcome', name=callback.from_user.first_name),
-            parse_mode="HTML",
-            reply_markup=phone_request_keyboard(lang)
-        )
-        await state.set_state(Registration.phone)
-        return
+#     # Если нет телефона - запрашиваем
+#     if not user[3]:
+#         await callback.message.answer(
+#             get_text(lang, 'welcome', name=callback.from_user.first_name),
+#             parse_mode="HTML",
+#             reply_markup=phone_request_keyboard(lang)
+#         )
+#         await state.set_state(Registration.phone)
+#         return
     
-    # Если нет города - запрашиваем
-    if not user[4]:
-        await callback.message.answer(
-            get_text(lang, 'choose_city'),
-            parse_mode="HTML",
-            reply_markup=city_keyboard(lang, allow_cancel=False)
-        )
-        await state.set_state(Registration.city)
-        return
+#     # Если нет города - запрашиваем
+#     if not user[4]:
+#         await callback.message.answer(
+#             get_text(lang, 'choose_city'),
+#             parse_mode="HTML",
+#             reply_markup=city_keyboard(lang, allow_cancel=False)
+#         )
+#         await state.set_state(Registration.city)
+#         return
     
-    # Показываем главное меню
-    menu = main_menu_seller(lang) if user[6] == "seller" else main_menu_customer(lang)
-    await callback.message.answer(
-        get_text(lang, 'welcome_back', name=callback.from_user.first_name, city=user[4]),
-        parse_mode="HTML",
-        reply_markup=menu
-    )
+#     # Показываем главное меню
+#     menu = main_menu_seller(lang) if user[6] == "seller" else main_menu_customer(lang)
+#     await callback.message.answer(
+#         get_text(lang, 'welcome_back', name=callback.from_user.first_name, city=user[4]),
+#         parse_mode="HTML",
+#         reply_markup=menu
+#     )
 
-# ============== ОТМЕНА ДЕЙСТВИЙ ==============
+# # ============== ОТМЕНА ДЕЙСТВИЙ ==============
 
-@dp.message(F.text.contains("Отмена") | F.text.contains("Bekor qilish"))
-async def cancel_action(message: types.Message, state: FSMContext):
-    lang = db.get_user_language(message.from_user.id)
-    current_state = await state.get_state()
+# DUPLICATE HANDLER - Moved to handlers/ package
+# @dp.message(F.text.contains("Отмена") | F.text.contains("Bekor qilish"))
+# async def cancel_action(message: types.Message, state: FSMContext):
+#     lang = db.get_user_language(message.from_user.id)
+#     current_state = await state.get_state()
     
-    # БЛОКИРУЕМ отмену обязательной регистрации
-    if current_state in ['Registration:phone', 'Registration:city']:
-        user = db.get_user(message.from_user.id)
-        # Если нет номера телефона — регистрация обязательна, отмена запрещена
-        if not user or not user[3]:
-            await message.answer(
-                "❌ Регистрация обязательна для использования бота.\n\n"
-                "📱 Пожалуйста, поделитесь номером телефона.",
-                reply_markup=phone_request_keyboard(lang)
-            )
-            return
+#     # БЛОКИРУЕМ отмену обязательной регистрации
+#     if current_state in ['Registration:phone', 'Registration:city']:
+#         user = db.get_user(message.from_user.id)
+#         # Если нет номера телефона — регистрация обязательна, отмена запрещена
+#         if not user or not user[3]:
+#             await message.answer(
+#                 "❌ Регистрация обязательна для использования бота.\n\n"
+#                 "📱 Пожалуйста, поделитесь номером телефона.",
+#                 reply_markup=phone_request_keyboard(lang)
+#             )
+#             return
     
-    # Для всех остальных состояний — разрешаем отмену
-    await state.clear()
+#     # Для всех остальных состояний — разрешаем отмену
+#     await state.clear()
 
-    # Map state group to preferred menu context
-    seller_groups = {"RegisterStore", "CreateOffer", "BulkCreate", "ConfirmOrder"}
-    customer_groups = {"Registration", "BookOffer", "ChangeCity"}
+#     # Map state group to preferred menu context
+#     seller_groups = {"RegisterStore", "CreateOffer", "BulkCreate", "ConfirmOrder"}
+#     customer_groups = {"Registration", "BookOffer", "ChangeCity"}
 
-    preferred_menu = None
-    if current_state:
-        try:
-            state_group = str(current_state).split(":", 1)[0]
-            if state_group in seller_groups:
-                preferred_menu = "seller"
-            elif state_group in customer_groups:
-                preferred_menu = "customer"
-        except Exception:
-            preferred_menu = None
+#     preferred_menu = None
+#     if current_state:
+#         try:
+#             state_group = str(current_state).split(":", 1)[0]
+#             if state_group in seller_groups:
+#                 preferred_menu = "seller"
+#             elif state_group in customer_groups:
+#                 preferred_menu = "customer"
+#         except Exception:
+#             preferred_menu = None
 
-    user = db.get_user(message.from_user.id)
-    role = user[6] if user and len(user) > 6 else "customer"
+#     user = db.get_user(message.from_user.id)
+#     role = user[6] if user and len(user) > 6 else "customer"
     
-    # КРИТИЧНО: При отмене RegisterStore ВСЕГДА возвращаем на меню клиента
-    # потому что у пользователя ещё НЕТ одобренного магазина
-    if current_state and str(current_state).startswith("RegisterStore"):
-        # Отменяем регистрацию магазина - возвращаем на клиентское меню
-        await message.answer(
-            get_text(lang, 'operation_cancelled'),
-            reply_markup=main_menu_customer(lang)
-        )
-        return
+#     # КРИТИЧНО: При отмене RegisterStore ВСЕГДА возвращаем на меню клиента
+#     # потому что у пользователя ещё НЕТ одобренного магазина
+#     if current_state and str(current_state).startswith("RegisterStore"):
+#         # Отменяем регистрацию магазина - возвращаем на клиентское меню
+#         await message.answer(
+#             get_text(lang, 'operation_cancelled'),
+#             reply_markup=main_menu_customer(lang)
+#         )
+#         return
     
-    # ВАЖНО: Проверяем наличие одобренного магазина для партнёров
-    if role == "seller":
-        # Используем готовую функцию has_approved_store для проверки
-        if not has_approved_store(message.from_user.id):
-            # Нет одобренного магазина — показываем меню покупателя
-            role = "customer"
-            preferred_menu = "customer"
+#     # ВАЖНО: Проверяем наличие одобренного магазина для партнёров
+#     if role == "seller":
+#         # Используем готовую функцию has_approved_store для проверки
+#         if not has_approved_store(message.from_user.id):
+#             # Нет одобренного магазина — показываем меню покупателя
+#             role = "customer"
+#             preferred_menu = "customer"
     
-    # View mode override has priority if set
-    view_override = user_view_mode.get(message.from_user.id)
-    target = preferred_menu or view_override or ("seller" if role == "seller" else "customer")
-    menu = main_menu_seller(lang) if target == "seller" else main_menu_customer(lang)
+#     # View mode override has priority if set
+#     view_override = user_view_mode.get(message.from_user.id)
+#     target = preferred_menu or view_override or ("seller" if role == "seller" else "customer")
+#     menu = main_menu_seller(lang) if target == "seller" else main_menu_customer(lang)
 
-    await message.answer(
-        get_text(lang, 'operation_cancelled'),
-        reply_markup=menu
-    )
+#     await message.answer(
+#         get_text(lang, 'operation_cancelled'),
+#         reply_markup=menu
+#     )
 
-@dp.callback_query(F.data == "cancel_offer")
-async def cancel_offer_callback(callback: types.CallbackQuery, state: FSMContext):
-    """Обработчик кнопки отмены создания товара"""
-    lang = db.get_user_language(callback.from_user.id)
-    await state.clear()
+# DUPLICATE HANDLER - Moved to handlers/ package
+# @dp.callback_query(F.data == "cancel_offer")
+# async def cancel_offer_callback(callback: types.CallbackQuery, state: FSMContext):
+#     """Обработчик кнопки отмены создания товара"""
+#     lang = db.get_user_language(callback.from_user.id)
+#     await state.clear()
     
-    await callback.message.edit_text(
-        f"❌ {'Создание товара отменено' if lang == 'ru' else 'Mahsulot yaratish bekor qilindi'}",
-        parse_mode="HTML"
-    )
+#     await callback.message.edit_text(
+#         f"❌ {'Создание товара отменено' if lang == 'ru' else 'Mahsulot yaratish bekor qilindi'}",
+#         parse_mode="HTML"
+#     )
     
-    await callback.message.answer(
-        get_text(lang, 'operation_cancelled'),
-        reply_markup=main_menu_seller(lang)
-    )
+#     await callback.message.answer(
+#         get_text(lang, 'operation_cancelled'),
+#         reply_markup=main_menu_seller(lang)
+#     )
     
-    await callback.answer()
+#     await callback.answer()
 
-# ============== РЕГИСТРАЦИЯ ==============
+# # ============== РЕГИСТРАЦИЯ ==============
 
-@dp.message(Registration.phone, F.contact)
-async def process_phone(message: types.Message, state: FSMContext):
-    # Пользователь должен быть создан при выборе языка
-    lang = db.get_user_language(message.from_user.id)
-    phone = message.contact.phone_number
+# DUPLICATE HANDLER - Moved to handlers/ package
+# @dp.message(Registration.phone, F.contact)
+# async def process_phone(message: types.Message, state: FSMContext):
+#     # Пользователь должен быть создан при выборе языка
+#     lang = db.get_user_language(message.from_user.id)
+#     phone = message.contact.phone_number
     
-    # Обновляем номер телефона
-    db.update_user_phone(message.from_user.id, phone)
+#     # Обновляем номер телефона
+#     db.update_user_phone(message.from_user.id, phone)
     
-    await message.answer(
-        get_text(lang, 'choose_city'),
-        parse_mode="HTML",
-        reply_markup=city_keyboard(lang, allow_cancel=False)
-    )
-    await state.set_state(Registration.city)
+#     await message.answer(
+#         get_text(lang, 'choose_city'),
+#         parse_mode="HTML",
+#         reply_markup=city_keyboard(lang, allow_cancel=False)
+#     )
+#     await state.set_state(Registration.city)
 
-@dp.message(Registration.city)
-@secure_user_input
-async def process_city(message: types.Message, state: FSMContext):
-    lang = db.get_user_language(message.from_user.id)
+# DUPLICATE HANDLER - Moved to handlers/ package
+# @dp.message(Registration.city)
+# @secure_user_input
+# async def process_city(message: types.Message, state: FSMContext):
+#     lang = db.get_user_language(message.from_user.id)
     
-    # Rate limiting check
-    try:
-        if not rate_limiter.is_allowed(message.from_user.id, 'city_selection', max_requests=5, window_seconds=60):
-            await message.answer(get_text(lang, 'rate_limit_exceeded'))
-            return
-    except Exception as e:
-        logger.warning(f"Rate limiter error: {e}")
+#     # Rate limiting check
+#     try:
+#         if not rate_limiter.is_allowed(message.from_user.id, 'city_selection', max_requests=5, window_seconds=60):
+#             await message.answer(get_text(lang, 'rate_limit_exceeded'))
+#             return
+#     except Exception as e:
+#         logger.warning(f"Rate limiter error: {e}")
     
-    cities = get_cities(lang)
-    city_text = validator.sanitize_text(message.text.replace("📍 ", "").strip())
+#     cities = get_cities(lang)
+#     city_text = validator.sanitize_text(message.text.replace("📍 ", "").strip())
     
-    # Validate city input
-    if not validator.validate_city(city_text):
-        await message.answer(get_text(lang, 'invalid_city'))
-        return
+#     # Validate city input
+#     if not validator.validate_city(city_text):
+#         await message.answer(get_text(lang, 'invalid_city'))
+#         return
     
-    if city_text in cities:
-        db.update_user_city(message.from_user.id, city_text)
-        await state.clear()
-        await message.answer(
-            get_text(lang, 'city_changed', city=city_text),
-            reply_markup=main_menu_customer(lang)
-        )
+#     if city_text in cities:
+#         db.update_user_city(message.from_user.id, city_text)
+#         await state.clear()
+#         await message.answer(
+#             get_text(lang, 'city_changed', city=city_text),
+#             reply_markup=main_menu_customer(lang)
+#         )
 
 
-# ============== PAGINATION HELPERS ==============
+# # ============== PAGINATION HELPERS ==============
 
-ITEMS_PER_PAGE = 10
+# ITEMS_PER_PAGE = 10
 
 def get_pagination_keyboard(lang: str, current_page: int, total_pages: int, callback_prefix: str):
     """Создать клавиатуру для пагинации"""
