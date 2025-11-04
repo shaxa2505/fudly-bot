@@ -105,23 +105,9 @@ CITY_UZ_TO_RU = {
     "Nukus": "Нукус"
 }
 
-# Словарь для преобразования категорий заведений в русский формат
-STORE_CATEGORY_UZ_TO_RU = {
-    "Restoran": "Ресторан",
-    "Kafe": "Кафе",
-    "Nonvoyxona": "Пекарня",
-    "Supermarket": "Супермаркет",
-    "Qandolatxona": "Кондитерская",
-    "Fastfud": "Фастфуд"
-}
-
 def normalize_city(city: str) -> str:
     """Преобразует название города в русский формат для поиска в БД"""
     return CITY_UZ_TO_RU.get(city, city)
-
-def normalize_store_category(category: str) -> str:
-    """Преобразует категорию заведения в русский формат для поиска в БД"""
-    return STORE_CATEGORY_UZ_TO_RU.get(category, category)
 
 def normalize_category(category: str) -> str:
     """Преобразует отображаемое название категории в английский ключ для БД"""
@@ -1018,9 +1004,10 @@ async def available_offers(message: types.Message):
 async def send_offer_card(message: types.Message, offer: tuple, lang: str):
     """Отправить карточку предложения"""
     # Распаковываем данные предложения
-    # offer структура: [0]=offer_id, [1]=store_id, [2]=title, [3]=description,
+    # offer структура из SELECT o.*, s.name, s.address, s.city, s.category, discount_percent:
+    # [0]=offer_id, [1]=store_id, [2]=title, [3]=description,
     # [4]=original_price, [5]=discount_price, [6]=quantity, [7]=available_from,
-    # [8]=available_until, [9]=status, [10]=photo, [11]=created_at, [12]=expiry_date,
+    # [8]=available_until, [9]=expiry_date, [10]=status, [11]=photo, [12]=created_at,
     # [13]=unit, [14]=category, [15]=store_name, [16]=store_address, [17]=store_city,
     # [18]=store_category, [19]=discount_percent
     
@@ -1030,7 +1017,8 @@ async def send_offer_card(message: types.Message, offer: tuple, lang: str):
     original_price = offer[4]
     discount_price = offer[5]
     quantity = offer[6]
-    expiry_date = offer[12]
+    expiry_date = offer[9]  # ИСПРАВЛЕНО: было [12], теперь [9]
+    unit = offer[13] if len(offer) > 13 and offer[13] else "шт"
     store_name = offer[15] if len(offer) > 15 else "Магазин"
     store_address = offer[16] if len(offer) > 16 else ""
     store_category = offer[18] if len(offer) > 18 else ""
@@ -1045,8 +1033,8 @@ async def send_offer_card(message: types.Message, offer: tuple, lang: str):
     text += f"🏷 {store_category}\n"
     if store_address:
         text += f"📍 {store_address}\n"
-    text += f"📦 Осталось: {quantity} шт\n"
-    text += f"⏰ До: {expiry_date[:10]}"
+    text += f"📦 Осталось: {quantity} {unit}\n"
+    text += f"⏰ До: {expiry_date[:10] if expiry_date else 'не указан'}"
     
     # Кнопки
     builder = InlineKeyboardBuilder()
@@ -1226,7 +1214,7 @@ async def select_category(callback: types.CallbackQuery):
         categories = get_categories(lang)
         cat_index = int(callback.data.split("_")[1])
         category = categories[cat_index]
-        category = normalize_store_category(category)  # Используем normalize_store_category для категорий заведений!
+        category = normalize_category(category)
         
         
         # Получаем магазины этой категории в городе пользователя
@@ -1280,7 +1268,7 @@ async def stores_pagination(callback: types.CallbackQuery):
             await callback.answer("Ошибка", show_alert=True)
             return
         category_label = categories[cat_index]
-        category = normalize_store_category(category_label)  # Используем normalize_store_category для категорий заведений!
+        category = normalize_category(category_label)
         stores = db.get_stores_by_category(category, search_city)
 
         # Обновляем только клавиатуру
@@ -1717,8 +1705,8 @@ async def show_store_offers(callback: types.CallbackQuery):
         text += f"{i+1}. <b>{offer[2]}</b>\n"
         text += f"   💰 {int(offer[4]):,} ➜ {int(offer[5]):,} сум (-{discount_percent}%)\n"
         text += f"   📦 {offer[6]} {unit}\n"
-        if len(offer) > 12 and offer[12]:
-            text += f"   📅 До: {offer[12]}\n"
+        if len(offer) > 9 and offer[9]:
+            text += f"   📅 До: {offer[9]}\n"
         text += "\n"
     
     if len(offers) > 5:
@@ -2042,8 +2030,8 @@ async def register_store_category(message: types.Message, state: FSMContext):
     cat_text = message.text.replace("🏷 ", "").strip()
     
     if cat_text in categories:
-        # КРИТИЧЕСКИ ВАЖНО: Нормализуем категорию заведения в русское название для единообразия в БД!
-        normalized_category = normalize_store_category(cat_text)
+        # КРИТИЧЕСКИ ВАЖНО: Нормализуем категорию в русское название для единообразия в БД!
+        normalized_category = normalize_category(cat_text)
         await state.update_data(category=normalized_category)
         await message.answer(get_text(lang, 'store_name'), reply_markup=cancel_keyboard(lang))
         await state.set_state(RegisterStore.name)
@@ -3176,12 +3164,12 @@ async def my_offers(message: types.Message):
         text += f"📦 {'Осталось' if lang == 'ru' else 'Qoldi'}: <b>{quantity}</b> {unit}\n"
         
         # Срок годности
-        if len(offer) > 12 and offer[12]:
-            expiry_info = db.get_time_remaining(offer[12])
+        if len(offer) > 9 and offer[9]:
+            expiry_info = db.get_time_remaining(offer[9])
             if expiry_info:
                 text += f"{expiry_info}\n"
             else:
-                text += f"📅 До: {offer[12]}\n"
+                text += f"📅 До: {offer[9]}\n"
         
         # Время забора
         text += f"🕐 {offer[7]} - {offer[8]}"
@@ -3190,12 +3178,13 @@ async def my_offers(message: types.Message):
         builder = InlineKeyboardBuilder()
         
         if status == 'active':
-            # Кнопки для активного товара - упрощённый набор
+            # Кнопки для активного товара
             builder.button(text="➕ +1", callback_data=f"qty_add_{offer_id}")
             builder.button(text="➖ -1", callback_data=f"qty_sub_{offer_id}")
             builder.button(text="📝 Изменить" if lang == 'ru' else "📝 Tahrirlash", callback_data=f"edit_offer_{offer_id}")
-            builder.button(text="⏸ Снять с продажи" if lang == 'ru' else "⏸ Sotuvdan olish", callback_data=f"confirm_deactivate_{offer_id}")
-            builder.adjust(2, 1, 1)
+            builder.button(text="🔄 Продлить" if lang == 'ru' else "🔄 Uzaytirish", callback_data=f"extend_offer_{offer_id}")
+            builder.button(text="❌ Снять" if lang == 'ru' else "❌ O'chirish", callback_data=f"deactivate_offer_{offer_id}")
+            builder.adjust(2, 2, 1)
         else:
             # Кнопки для неактивного товара
             builder.button(text="✅ Активировать" if lang == 'ru' else "✅ Faollashtirish", callback_data=f"activate_offer_{offer_id}")
@@ -3340,34 +3329,6 @@ async def cancel_extend(callback: types.CallbackQuery):
     # Просто закрываем меню
     await callback.message.edit_reply_markup(reply_markup=None)
 
-@dp.callback_query(F.data.startswith("confirm_deactivate_"))
-async def confirm_deactivate_offer(callback: types.CallbackQuery):
-    """Подтверждение снятия товара с продажи"""
-    lang = db.get_user_language(callback.from_user.id)
-    offer_id = int(callback.data.split("_")[2])
-    
-    # Создаём кнопки подтверждения
-    builder = InlineKeyboardBuilder()
-    builder.button(
-        text="✅ Да, снять" if lang == 'ru' else "✅ Ha, olib tashlash",
-        callback_data=f"deactivate_offer_{offer_id}"
-    )
-    builder.button(
-        text="❌ Отмена" if lang == 'ru' else "❌ Bekor qilish",
-        callback_data="cancel_action"
-    )
-    builder.adjust(1)
-    
-    await callback.answer(
-        "⚠️ Товар будет снят с продажи" if lang == 'ru' else "⚠️ Mahsulot sotuvdan olinadi",
-        show_alert=True
-    )
-    
-    try:
-        await callback.message.edit_reply_markup(reply_markup=builder.as_markup())
-    except Exception:
-        pass
-
 @dp.callback_query(F.data.startswith("deactivate_offer_"))
 async def deactivate_offer(callback: types.CallbackQuery):
     """Снять товар с продажи"""
@@ -3500,12 +3461,12 @@ async def update_offer_message(callback: types.CallbackQuery, offer_id: int, lan
     text += f"📦 {'Осталось' if lang == 'ru' else 'Qoldi'}: <b>{quantity}</b> {unit}\n"
     
     # Срок годности
-    if len(offer) > 12 and offer[12]:
-        expiry_info = db.get_time_remaining(offer[12])
+    if len(offer) > 9 and offer[9]:
+        expiry_info = db.get_time_remaining(offer[9])
         if expiry_info:
             text += f"{expiry_info}\n"
         else:
-            text += f"📅 До: {offer[12]}\n"
+            text += f"📅 До: {offer[9]}\n"
     
     # Время
     text += f"🕐 {offer[7]} - {offer[8]}"
@@ -3517,8 +3478,9 @@ async def update_offer_message(callback: types.CallbackQuery, offer_id: int, lan
         builder.button(text="➕ +1", callback_data=f"qty_add_{offer_id}")
         builder.button(text="➖ -1", callback_data=f"qty_sub_{offer_id}")
         builder.button(text="📝 Изменить" if lang == 'ru' else "📝 Tahrirlash", callback_data=f"edit_offer_{offer_id}")
-        builder.button(text="⏸ Снять с продажи" if lang == 'ru' else "⏸ Sotuvdan olish", callback_data=f"confirm_deactivate_{offer_id}")
-        builder.adjust(2, 1, 1)
+        builder.button(text="🔄 Продлить" if lang == 'ru' else "🔄 Uzaytirish", callback_data=f"extend_offer_{offer_id}")
+        builder.button(text="❌ Снять" if lang == 'ru' else "❌ O'chirish", callback_data=f"deactivate_offer_{offer_id}")
+        builder.adjust(2, 2, 1)
     else:
         builder.button(text="✅ Активировать" if lang == 'ru' else "✅ Faollashtirish", callback_data=f"activate_offer_{offer_id}")
         builder.button(text="🗑 Удалить" if lang == 'ru' else "🗑 O'chirish", callback_data=f"delete_offer_{offer_id}")
@@ -3793,7 +3755,7 @@ async def show_stores_by_category(callback: types.CallbackQuery):
         return
     
     category = categories[cat_index]
-    category_normalized = normalize_store_category(category)  # Используем normalize_store_category для категорий заведений!
+    category_normalized = normalize_category(category)
     
     # Получаем магазины этой категории в городе пользователя
     stores = db.get_stores_by_category(category_normalized, search_city)
@@ -4217,6 +4179,7 @@ async def profile(message: types.Message):
         return
     
     # user: [0]user_id, [1]username, [2]first_name, [3]phone, [4]city, [5]language, [6]role, [7]is_admin, [8]notifications
+    role_text = get_text(lang, 'role_seller') if user[6] == 'seller' else get_text(lang, 'role_customer')
     lang_text = 'Русский' if lang == 'ru' else 'Ozbekcha'
     
     text = f"{get_text(lang, 'your_profile')}\n\n"
@@ -4224,6 +4187,7 @@ async def profile(message: types.Message):
     text += f"{get_text(lang, 'phone')}: {user[3]}\n"
     text += f"{get_text(lang, 'city')}: {user[4]}\n"
     text += f"{get_text(lang, 'language')}: {lang_text}\n"
+    text += f"{get_text(lang, 'role')}: {role_text}"
     
     await message.answer(
         text,
@@ -4248,6 +4212,17 @@ async def profile_change_city(callback: types.CallbackQuery, state: FSMContext):
             reply_markup=city_keyboard(lang)
         )
     await state.set_state(ChangeCity.city)
+    await callback.answer()
+
+@dp.callback_query(F.data == "switch_to_customer")
+async def switch_to_customer_cb(callback: types.CallbackQuery):
+    """Переключиться в режим покупателя из профиля"""
+    lang = db.get_user_language(callback.from_user.id)
+    user_view_mode[callback.from_user.id] = 'customer'
+    try:
+        await callback.message.edit_text(get_text(lang, 'switched_to_customer'), reply_markup=main_menu_customer(lang))
+    except Exception:
+        await callback.message.answer(get_text(lang, 'switched_to_customer'), reply_markup=main_menu_customer(lang))
     await callback.answer()
 
 @dp.callback_query(F.data == "become_partner_cb")
@@ -4405,6 +4380,18 @@ async def confirm_delete_no(callback: types.CallbackQuery):
         await callback.message.answer(get_text(lang, 'operation_cancelled'), reply_markup=settings_keyboard(user[8], lang, role=user[6]))
 
     await callback.answer()
+
+# ============== РЕЖИМ ПОКУПАТЕЛЯ ==============
+
+@dp.message(F.text.contains("Режим покупателя") | F.text.contains("Xaridor rejimi"))
+async def switch_to_customer(message: types.Message):
+    lang = db.get_user_language(message.from_user.id)
+    # Remember that the user prefers customer view until changed
+    user_view_mode[message.from_user.id] = 'customer'
+    await message.answer(
+        get_text(lang, 'switched_to_customer'),
+        reply_markup=main_menu_customer(lang)
+    )
 
 # ============== СТАТИСТИКА ПАРТНЁРА "СЕГОДНЯ" ==============
 
@@ -5673,8 +5660,8 @@ async def admin_all_offers(message: types.Message):
         text += f"   📦 {offer[6]} {unit}\n"
         
         # Показываем срок годности
-        if len(offer) > 12 and offer[12]:
-            text += f"   📅 До: {offer[12]}\n"
+        if len(offer) > 9 and offer[9]:
+            text += f"   📅 До: {offer[9]}\n"
         
         # Показываем магазин (индексы для JOIN: 15-store_name, 17-city)
         if len(offer) > 17:
