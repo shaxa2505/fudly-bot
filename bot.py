@@ -5,6 +5,7 @@ from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.fsm.storage.memory import MemoryStorage
 from aiogram.types import FSInputFile
+from aiogram.utils.keyboard import InlineKeyboardBuilder
 import asyncio
 import os
 import random
@@ -63,6 +64,15 @@ except ImportError as e:
 # Load environment variables
 load_dotenv()
 TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
+
+# Validate TOKEN before proceeding
+if not TOKEN:
+    error_msg = "❌ ERROR: TELEGRAM_BOT_TOKEN environment variable is not set!"
+    print(error_msg)
+    if PRODUCTION_FEATURES:
+        logger.error(error_msg)
+    sys.exit(1)
+
 ADMIN_ID = int(os.getenv("ADMIN_ID", 0))
 WEBHOOK_URL = os.getenv("WEBHOOK_URL", "")  # Для Railway: https://yourapp.railway.app
 WEBHOOK_PATH = os.getenv("WEBHOOK_PATH", "/webhook")
@@ -138,6 +148,14 @@ def normalize_category(category: str) -> str:
     # Если в тексте есть эмодзи в начале, возвращаем маппинг
     result = category_map.get(cleaned, cleaned.lower())
     return result if result in category_map.values() else 'other'
+
+def normalize_store_category(category: str) -> str:
+    """
+    Alias for normalize_category - преобразует название категории магазина в английский ключ.
+    Используется для нормализации категорий магазинов (поддерживает рус/узб/без эмодзи).
+    Пример: normalize_store_category('🍞 Хлеб и выпечка') -> 'bakery'
+    """
+    return normalize_category(category)
 
 # Узбекская временная зона (UTC+5)
 UZB_TZ = timezone(timedelta(hours=5))
@@ -274,20 +292,20 @@ class RegistrationCheckMiddleware(BaseMiddleware):
         if not user_id:
             return await handler(event, data)
         
+        # Разрешаем отправку контакта (номера телефона) в первую очередь
+        if event.message and event.message.contact:
+            return await handler(event, data)
+        
         # Команды, которые всегда разрешены (для процесса регистрации)
         allowed_commands = ['/start', '/help']
-        allowed_callbacks = ['lang_ru', 'lang_uz']  # Выбор языка при регистрации
         
         # Проверяем, является ли это разрешённой командой
         if event.message and event.message.text:
             if any(event.message.text.startswith(cmd) for cmd in allowed_commands):
                 return await handler(event, data)
-            # Разрешаем отправку контакта (номера телефона)
-            if event.message.contact:
-                return await handler(event, data)
         
-        # Разрешаем колбэки выбора языка
-        if event.callback_query and event.callback_query.data in allowed_callbacks:
+        # Разрешаем колбэки выбора языка (любые, начинающиеся с 'lang_')
+        if event.callback_query and event.callback_query.data and event.callback_query.data.startswith('lang_'):
             return await handler(event, data)
         
         # Проверяем FSM состояние — если пользователь в процессе регистрации, пропускаем
@@ -564,7 +582,6 @@ async def admin_dashboard(message: types.Message):
     text += f"💰 <b>Выручка сегодня:</b> {int(today_revenue):,} сум"
     
     # Inline-кнопки для быстрых действий
-    from aiogram.utils.keyboard import InlineKeyboardBuilder
     kb = InlineKeyboardBuilder()
     
     if pending_stores > 0:
@@ -618,7 +635,6 @@ async def admin_users(message: types.Message):
     text += f"📅 За неделю: +{week_users}\n"
     text += f"📅 Сегодня: +{today_users}"
     
-    from aiogram.utils.keyboard import InlineKeyboardBuilder
     kb = InlineKeyboardBuilder()
     kb.button(text="📋 Список партнёров", callback_data="admin_list_sellers")
     kb.button(text="🔍 Поиск пользователя", callback_data="admin_search_user")
@@ -651,7 +667,6 @@ async def admin_stores(message: types.Message):
     text += f"⏳ На модерации: {pending}\n"
     text += f"❌ Отклонённые: {rejected}"
     
-    from aiogram.utils.keyboard import InlineKeyboardBuilder
     kb = InlineKeyboardBuilder()
     
     if pending > 0:
@@ -705,7 +720,6 @@ async def admin_offers(message: types.Message):
         for cat, cnt in top_categories:
             text += f"├ {cat}: {cnt}\n"
     
-    from aiogram.utils.keyboard import InlineKeyboardBuilder
     kb = InlineKeyboardBuilder()
     kb.button(text="📋 Все активные", callback_data="admin_all_offers")
     kb.button(text="🗑 Очистить старые", callback_data="admin_cleanup_offers")
@@ -759,7 +773,6 @@ async def admin_bookings(message: types.Message):
     text += f"📅 Сегодня: {today_bookings}\n"
     text += f"� Выручка: {int(today_revenue):,} сум"
     
-    from aiogram.utils.keyboard import InlineKeyboardBuilder
     kb = InlineKeyboardBuilder()
     kb.button(text="⏳ Активные", callback_data="admin_pending_bookings")
     kb.button(text="✅ Завершённые", callback_data="admin_completed_bookings")
@@ -974,7 +987,6 @@ ITEMS_PER_PAGE = 10
 
 def get_pagination_keyboard(lang: str, current_page: int, total_pages: int, callback_prefix: str):
     """Создать клавиатуру для пагинации"""
-    from aiogram.utils.keyboard import InlineKeyboardBuilder
     
     builder = InlineKeyboardBuilder()
     
@@ -1539,7 +1551,6 @@ async def book_offer_quantity(message: types.Message, state: FSMContext):
             customer_phone = customer[3] if customer and customer[3] else "Не указан"
             
             # Создаём inline-клавиатуру для быстрых действий
-            from aiogram.utils.keyboard import InlineKeyboardBuilder
             notification_kb = InlineKeyboardBuilder()
             notification_kb.button(text="✅ Выдано", callback_data=f"complete_booking_{booking_id}")
             notification_kb.button(text="❌ Отменить", callback_data=f"cancel_booking_{booking_id}")
@@ -1857,7 +1868,6 @@ async def cancel_booking(callback: types.CallbackQuery):
         if offer:
             store = db.get_store(offer[1])
             
-            from aiogram.utils.keyboard import InlineKeyboardBuilder
             customer_kb = InlineKeyboardBuilder()
             customer_kb.button(text="🏠 Главное меню", callback_data="main_menu")
             
@@ -1880,12 +1890,12 @@ async def cancel_booking(callback: types.CallbackQuery):
 @dp.callback_query(F.data == "main_menu")
 async def handle_main_menu(callback: types.CallbackQuery):
     """Обработчик кнопки возврата в главное меню"""
+    lang = db.get_user_language(callback.from_user.id)
     user = db.get_user(callback.from_user.id)
     if not user:
         await callback.answer(get_text(lang, "user_not_found"))
         return
     
-    lang = db.get_user_language(callback.from_user.id)
     menu = main_menu_seller(lang) if user[6] == "seller" else main_menu_customer(lang)
     
     await callback.message.answer(
@@ -1924,7 +1934,6 @@ async def complete_booking(callback: types.CallbackQuery):
         if offer:
             store = db.get_store(offer[1])
             
-            from aiogram.utils.keyboard import InlineKeyboardBuilder
             customer_kb = InlineKeyboardBuilder()
             customer_kb.button(text="⭐ Оценить магазин", callback_data=f"rate_booking_{booking_id}")
             
@@ -3470,7 +3479,6 @@ async def edit_offer(callback: types.CallbackQuery):
         return
     
     # Меню редактирования
-    from aiogram.utils.keyboard import InlineKeyboardBuilder
     kb = InlineKeyboardBuilder()
     kb.button(text="💰 Изменить цену" if lang == 'ru' else "💰 Narxni o'zgartirish", callback_data=f"edit_price_{offer_id}")
     kb.button(text="📦 Изменить количество" if lang == 'ru' else "📦 Sonini o'zgartirish", callback_data=f"edit_quantity_{offer_id}")
@@ -4017,7 +4025,6 @@ async def store_bookings(message: types.Message, state: FSMContext):
     cancelled_count = len([b for b in all_bookings if b[3] == 'cancelled'])
     
     # Показываем статистику и фильтры
-    from aiogram.utils.keyboard import InlineKeyboardBuilder
     filter_kb = InlineKeyboardBuilder()
     filter_kb.button(text=f"⏳ Ожидают ({pending_count})", callback_data="bookings_filter_pending")
     filter_kb.button(text=f"✅ Завершённые ({completed_count})", callback_data="bookings_filter_completed")
@@ -4081,7 +4088,6 @@ async def filter_bookings(callback: types.CallbackQuery):
     # Показываем каждое бронирование
     # SQL из get_store_bookings: b.* (8 полей: 0-7), o.title (8), u.first_name (9), u.username (10), u.phone (11)
     # b.* = booking_id[0], offer_id[1], user_id[2], status[3], booking_code[4], pickup_time[5], quantity[6], created_at[7]
-    from aiogram.utils.keyboard import InlineKeyboardBuilder
     
     for booking in filtered_bookings[:15]:  # Показываем до 15 бронирований
         # Безопасная конвертация quantity с проверкой типа
@@ -4685,7 +4691,6 @@ async def refresh_dashboard(callback: types.CallbackQuery):
     text += f"└ 📅 Сегодня: {today_bookings}\n\n"
     text += f"💰 <b>Выручка сегодня:</b> {int(today_revenue):,} сум"
     
-    from aiogram.utils.keyboard import InlineKeyboardBuilder
     kb = InlineKeyboardBuilder()
     if pending_stores > 0:
         kb.button(text=f"⏳ Модерация ({pending_stores})", callback_data="admin_moderation")
@@ -4904,7 +4909,6 @@ async def admin_list_sellers_callback(callback: types.CallbackQuery):
     
     text = f"👥 <b>Список партнёров ({len(sellers)}):</b>\n\n"
     
-    from aiogram.utils.keyboard import InlineKeyboardBuilder
     kb = InlineKeyboardBuilder()
     
     for user_id, username, first_name, city, created_at, stores_count, active_stores, offers_count in sellers[:20]:
@@ -4962,7 +4966,6 @@ async def admin_delete_user_stores_callback(callback: types.CallbackQuery):
         return
     
     # Подтверждение удаления
-    from aiogram.utils.keyboard import InlineKeyboardBuilder
     kb = InlineKeyboardBuilder()
     kb.button(text="✅ Да, удалить все", callback_data=f"admin_confirm_delete_stores_{user_id}")
     kb.button(text="❌ Отмена", callback_data="admin_cancel_action")
@@ -5069,7 +5072,6 @@ async def admin_approved_stores_callback(callback: types.CallbackQuery):
     
     text = f"🏪 <b>Одобренные магазины ({len(stores)}):</b>\n\n"
     
-    from aiogram.utils.keyboard import InlineKeyboardBuilder
     kb = InlineKeyboardBuilder()
     
     for store_id, name, city, category, owner_name, username, created_at, offers_count in stores[:15]:
@@ -5850,7 +5852,6 @@ async def admin_all_stores(message: types.Message):
         text += f"Статус: {store[8]}"
         
         # Создаем inline кнопку для удаления
-        from aiogram.utils.keyboard import InlineKeyboardBuilder
         builder = InlineKeyboardBuilder()
         builder.button(text="🗑 Удалить магазин", callback_data=f"delete_store_{store[0]}")
         
