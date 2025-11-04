@@ -1,4 +1,13 @@
 # type: ignore
+"""
+Fudly Telegram Bot - Main Module
+
+This file is being refactored to use modular handlers from the handlers/ package.
+See handlers/README.md for details on the refactoring structure.
+
+Current status: Foundation laid with handlers/common.py, handlers/registration.py,
+handlers/user_commands.py, and handlers/admin.py created. Full integration pending.
+"""
 from aiogram import Bot, Dispatcher, types, F
 from aiogram.filters import Command
 from aiogram.fsm.context import FSMContext
