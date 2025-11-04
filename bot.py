@@ -1637,12 +1637,12 @@ async def offer_details(callback: types.CallbackQuery):
     keyboard.button(text="🛒 Забронировать", callback_data=f"book_{offer_id}")
     keyboard.adjust(1)
     
-    # Если есть фото предложения (индекс 10 - поле photo)
-    if offer_data[10] and offer_data[10].strip():  # photo field - правильный индекс
+    # Если есть фото предложения (индекс 11 - поле photo)
+    if len(offer_data) > 11 and offer_data[11] and str(offer_data[11]).strip():
         try:
             await callback.message.edit_media(
                 media=types.InputMediaPhoto(
-                    media=offer_data[10],
+                    media=offer_data[11],
                     caption=text,
                     parse_mode="HTML"
                 ),
@@ -1849,7 +1849,7 @@ async def handle_main_menu(callback: types.CallbackQuery):
     """Обработчик кнопки возврата в главное меню"""
     user = db.get_user(callback.from_user.id)
     if not user:
-        await callback.answer("Ошибка: пользователь не найден")
+        await callback.answer(get_text(lang, "user_not_found"))
         return
     
     lang = db.get_user_language(callback.from_user.id)
@@ -2248,30 +2248,20 @@ async def create_offer_title_with_photo(message: types.Message, state: FSMContex
 @dp.message(CreateOffer.title)
 async def create_offer_title(message: types.Message, state: FSMContext):
     lang = db.get_user_language(message.from_user.id)
-    await state.update_data(title=message.text, photo=None)
+    await state.update_data(title=message.text)
     
-    # Сразу переходим к ценам, без повторного запроса фото
-    # ШАГ 2: Цены и количество
+    # Теперь спрашиваем про фото
     builder = InlineKeyboardBuilder()
-    # Популярные варианты скидок
-    builder.button(text="30%", callback_data="discount_30")
-    builder.button(text="40%", callback_data="discount_40")
-    builder.button(text="50%", callback_data="discount_50")
-    builder.button(text="60%", callback_data="discount_60")
-    builder.adjust(4)
+    builder.button(text="📝 Без фото" if lang == 'ru' else "📝 Fotosiz", callback_data="create_skip_photo")
+    builder.adjust(1)
     
     await message.answer(
-        f"<b>{'ШАГ 2 из 3: ЦЕНЫ И КОЛИЧЕСТВО' if lang == 'ru' else '2-QADAM 3 tadan: NARXLAR VA MIQDOR'}</b>\n\n"
-        f"� {'Быстрый формат' if lang == 'ru' else 'Tez format'}:\n"
-        f"<code>{'обычная_цена скидка% количество' if lang == 'ru' else 'oddiy_narx chegirma% miqdor'}</code>\n\n"
-        f"📝 {'Пример' if lang == 'ru' else 'Misol'}: <code>1000 40% 50</code>\n"
-        f"   {'(обычная цена 1000, скидка 40%, количество 50)' if lang == 'ru' else '(oddiy narx 1000, chegirma 40%, miqdor 50)'}\n\n"
-        f"{'Или введите только обычную цену и выберите % скидки кнопкой ⬇️' if lang == 'ru' else 'Yoki faqat oddiy narxni kiriting va tugma bilan % chegirmani tanlang ⬇️'}",
+        f"✅ {'Название' if lang == 'ru' else 'Nom'}: <b>{message.text}</b>\n\n"
+        f"📸 {'Теперь отправьте фото товара или нажмите кнопку' if lang == 'ru' else 'Endi mahsulot rasmini yuboring yoki tugmani bosing'}",
         parse_mode="HTML",
         reply_markup=builder.as_markup()
     )
-    await state.set_state(CreateOffer.original_price)
-
+    await state.set_state(CreateOffer.photo)
 @dp.callback_query(F.data == "create_no_photo")
 async def offer_without_photo(callback: types.CallbackQuery, state: FSMContext):
     """Создание без фото сразу после начала"""
@@ -2287,6 +2277,9 @@ async def offer_without_photo(callback: types.CallbackQuery, state: FSMContext):
 async def skip_photo_goto_step2(callback: types.CallbackQuery, state: FSMContext):
     """Пропустить фото и перейти к шагу 2"""
     lang = db.get_user_language(callback.from_user.id)
+    
+    # Сохраняем что фото нет
+    await state.update_data(photo=None)
     
     # ШАГ 2: Цены и количество
     builder = InlineKeyboardBuilder()
@@ -3247,13 +3240,13 @@ async def quantity_add(callback: types.CallbackQuery):
     
     offer = db.get_offer(offer_id)
     if not offer:
-        await callback.answer("❌ Товар не найден", show_alert=True)
+        await callback.answer(get_text(lang, "offer_not_found"), show_alert=True)
         return
     
     # Проверка владельца
     user_stores = db.get_user_stores(callback.from_user.id)
     if not any(store[0] == offer[1] for store in user_stores):
-        await callback.answer("❌ Это не ваш товар", show_alert=True)
+        await callback.answer(get_text(lang, "not_your_offer"), show_alert=True)
         return
     
     # Увеличиваем количество
@@ -3272,13 +3265,13 @@ async def quantity_subtract(callback: types.CallbackQuery):
     
     offer = db.get_offer(offer_id)
     if not offer:
-        await callback.answer("❌ Товар не найден", show_alert=True)
+        await callback.answer(get_text(lang, "offer_not_found"), show_alert=True)
         return
     
     # Проверка владельца
     user_stores = db.get_user_stores(callback.from_user.id)
     if not any(store[0] == offer[1] for store in user_stores):
-        await callback.answer("❌ Это не ваш товар", show_alert=True)
+        await callback.answer(get_text(lang, "not_your_offer"), show_alert=True)
         return
     
     # Уменьшаем количество (минимум 0)
@@ -3301,13 +3294,13 @@ async def extend_offer(callback: types.CallbackQuery):
     
     offer = db.get_offer(offer_id)
     if not offer:
-        await callback.answer("❌ Товар не найден", show_alert=True)
+        await callback.answer(get_text(lang, "offer_not_found"), show_alert=True)
         return
     
     # Проверка владельца
     user_stores = db.get_user_stores(callback.from_user.id)
     if not any(store[0] == offer[1] for store in user_stores):
-        await callback.answer("❌ Это не ваш товар", show_alert=True)
+        await callback.answer(get_text(lang, "not_your_offer"), show_alert=True)
         return
     
     # Показываем кнопки для выбора нового срока
@@ -3361,13 +3354,13 @@ async def deactivate_offer(callback: types.CallbackQuery):
     
     offer = db.get_offer(offer_id)
     if not offer:
-        await callback.answer("❌ Товар не найден", show_alert=True)
+        await callback.answer(get_text(lang, "offer_not_found"), show_alert=True)
         return
     
     # Проверка владельца
     user_stores = db.get_user_stores(callback.from_user.id)
     if not any(store[0] == offer[1] for store in user_stores):
-        await callback.answer("❌ Это не ваш товар", show_alert=True)
+        await callback.answer(get_text(lang, "not_your_offer"), show_alert=True)
         return
     
     # Деактивируем
@@ -3385,13 +3378,13 @@ async def activate_offer(callback: types.CallbackQuery):
     
     offer = db.get_offer(offer_id)
     if not offer:
-        await callback.answer("❌ Товар не найден", show_alert=True)
+        await callback.answer(get_text(lang, "offer_not_found"), show_alert=True)
         return
     
     # Проверка владельца
     user_stores = db.get_user_stores(callback.from_user.id)
     if not any(store[0] == offer[1] for store in user_stores):
-        await callback.answer("❌ Это не ваш товар", show_alert=True)
+        await callback.answer(get_text(lang, "not_your_offer"), show_alert=True)
         return
     
     # Активируем
@@ -3409,13 +3402,13 @@ async def delete_offer(callback: types.CallbackQuery):
     
     offer = db.get_offer(offer_id)
     if not offer:
-        await callback.answer("❌ Товар не найден", show_alert=True)
+        await callback.answer(get_text(lang, "offer_not_found"), show_alert=True)
         return
     
     # Проверка владельца
     user_stores = db.get_user_stores(callback.from_user.id)
     if not any(store[0] == offer[1] for store in user_stores):
-        await callback.answer("❌ Это не ваш товар", show_alert=True)
+        await callback.answer(get_text(lang, "not_your_offer"), show_alert=True)
         return
     
     # Удаляем
@@ -3433,13 +3426,13 @@ async def edit_offer(callback: types.CallbackQuery):
     
     offer = db.get_offer(offer_id)
     if not offer:
-        await callback.answer("❌ Товар не найден", show_alert=True)
+        await callback.answer(get_text(lang, "offer_not_found"), show_alert=True)
         return
     
     # Проверка владельца
     user_stores = db.get_user_stores(callback.from_user.id)
     if not any(store[0] == offer[1] for store in user_stores):
-        await callback.answer("❌ Это не ваш товар", show_alert=True)
+        await callback.answer(get_text(lang, "not_your_offer"), show_alert=True)
         return
     
     # Меню редактирования
@@ -3455,7 +3448,7 @@ async def edit_offer(callback: types.CallbackQuery):
     try:
         await callback.message.edit_reply_markup(reply_markup=kb.as_markup())
     except Exception:
-        await callback.answer("📝 Редактирование товара временно недоступно", show_alert=True)
+        await callback.answer(get_text(lang, "edit_unavailable"), show_alert=True)
     
     await callback.answer()
 
@@ -3467,13 +3460,13 @@ async def edit_time_start(callback: types.CallbackQuery, state: FSMContext):
     
     offer = db.get_offer(offer_id)
     if not offer:
-        await callback.answer("❌ Товар не найден", show_alert=True)
+        await callback.answer(get_text(lang, "offer_not_found"), show_alert=True)
         return
     
     # Проверка владельца
     user_stores = db.get_user_stores(callback.from_user.id)
     if not any(store[0] == offer[1] for store in user_stores):
-        await callback.answer("❌ Это не ваш товар", show_alert=True)
+        await callback.answer(get_text(lang, "not_your_offer"), show_alert=True)
         return
     
     await state.update_data(offer_id=offer_id)

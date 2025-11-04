@@ -145,6 +145,22 @@ class Database:
         except Exception:
             pass  # Поле уже существует
         
+        # ==================== СОЗДАНИЕ ИНДЕКСОВ ДЛЯ ОПТИМИЗАЦИИ ====================
+        # Индексы для быстрого поиска по часто используемым полям
+        try:
+            cursor.execute('CREATE INDEX IF NOT EXISTS idx_offers_status ON offers(status)')
+            cursor.execute('CREATE INDEX IF NOT EXISTS idx_offers_expiry ON offers(expiry_date)')
+            cursor.execute('CREATE INDEX IF NOT EXISTS idx_offers_store ON offers(store_id)')
+            cursor.execute('CREATE INDEX IF NOT EXISTS idx_offers_category ON offers(category)')
+            cursor.execute('CREATE INDEX IF NOT EXISTS idx_bookings_user ON bookings(user_id)')
+            cursor.execute('CREATE INDEX IF NOT EXISTS idx_bookings_offer ON bookings(offer_id)')
+            cursor.execute('CREATE INDEX IF NOT EXISTS idx_bookings_status ON bookings(status)')
+            cursor.execute('CREATE INDEX IF NOT EXISTS idx_stores_owner ON stores(owner_id)')
+            cursor.execute('CREATE INDEX IF NOT EXISTS idx_stores_status ON stores(status)')
+            conn.commit()
+        except Exception as e:
+            pass  # Индексы уже существуют
+        
         # Таблица уведомлений
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS notifications (

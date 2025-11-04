@@ -318,9 +318,24 @@ Fudly помогает спасать еду от выбрасывания и э
         'no_cancel': '❌ Нет, отменить',
         'store_deleted': '✅ Магазин успешно удалён',
         'error_general': '❌ Произошла ошибка. Попробуйте позже.',
-                # Валидация/лимиты
-                'invalid_city': 'Пожалуйста, выберите город из списка.',
-                'rate_limit_exceeded': 'Слишком много запросов. Попробуйте позже.',
+        
+        # Хардкод-тексты которые нужно было перевести
+        'offer_not_found': '❌ Товар не найден',
+        'not_your_offer': '❌ Это не ваш товар',
+        'edit_unavailable': '📝 Редактирование товара временно недоступно',
+        'main_menu': '🏠 Главное меню',
+        'time_edit_title': '🕐 Изменение времени забора',
+        'time_edit_prompt': 'Введите новое время начала (например: 18:00):',
+        'time_end_prompt': 'Введите время окончания (например: 21:00):',
+        'time_updated': '✅ Время забора обновлено!',
+        'title_saved': '✅ Название сохранено',
+        'send_photo_now': '📸 Теперь отправьте фото товара или нажмите кнопку',
+        'without_photo': '📝 Без фото',
+        'user_not_found': 'Ошибка: пользователь не найден',
+        
+        # Валидация/лимиты
+        'invalid_city': 'Пожалуйста, выберите город из списка.',
+        'rate_limit_exceeded': 'Слишком много запросов. Попробуйте позже.',
     },
     
     'uz': {
@@ -635,9 +650,24 @@ Bu harakatni qaytarib bo\'lmaydi!''',
         'no_cancel': '❌ Yo\'q, bekor qilish',
         'store_deleted': '✅ Dokon muvaffaqiyatli o\'chirildi',
         'error_general': '❌ Xatolik yuz berdi. Keyinroq urinib ko\'ring.',
-                # Tekshiruv/cheklovlar
-                'invalid_city': 'Iltimos, shaharni ro\'yxatdan tanlang.',
-                'rate_limit_exceeded': 'Juda ko\'p so\'rov. Keyinroq urinib ko\'ring.',
+        
+        # Qo'shimcha tarjimalar (xardkod-tekstlar)
+        'offer_not_found': '❌ Mahsulot topilmadi',
+        'not_your_offer': '❌ Bu sizning mahsulotingiz emas',
+        'edit_unavailable': '📝 Mahsulotni tahrirlash vaqtincha mavjud emas',
+        'main_menu': '🏠 Asosiy menyu',
+        'time_edit_title': '🕐 Olib ketish vaqtini o\'zgartirish',
+        'time_edit_prompt': 'Yangi boshlanish vaqtini kiriting (masalan: 18:00):',
+        'time_end_prompt': 'Tugash vaqtini kiriting (masalan: 21:00):',
+        'time_updated': '✅ Olib ketish vaqti yangilandi!',
+        'title_saved': '✅ Nom saqlandi',
+        'send_photo_now': '📸 Endi mahsulot rasmini yuboring yoki tugmani bosing',
+        'without_photo': '📝 Fotosiz',
+        'user_not_found': 'Xato: foydalanuvchi topilmadi',
+        
+        # Validatsiya/limitlar
+        'invalid_city': 'Iltimos, ro\'yxatdan shaharni tanlang.',
+        'rate_limit_exceeded': 'Juda ko\'p so\'rovlar. Keyinroq urinib ko\'ring.',
     }
 }
 
