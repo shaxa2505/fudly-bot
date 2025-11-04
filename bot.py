@@ -1004,10 +1004,9 @@ async def available_offers(message: types.Message):
 async def send_offer_card(message: types.Message, offer: tuple, lang: str):
     """Отправить карточку предложения"""
     # Распаковываем данные предложения
-    # offer структура из SELECT o.*, s.name, s.address, s.city, s.category, discount_percent:
-    # [0]=offer_id, [1]=store_id, [2]=title, [3]=description,
+    # offer структура: [0]=offer_id, [1]=store_id, [2]=title, [3]=description,
     # [4]=original_price, [5]=discount_price, [6]=quantity, [7]=available_from,
-    # [8]=available_until, [9]=expiry_date, [10]=status, [11]=photo, [12]=created_at,
+    # [8]=available_until, [9]=status, [10]=photo, [11]=created_at, [12]=expiry_date,
     # [13]=unit, [14]=category, [15]=store_name, [16]=store_address, [17]=store_city,
     # [18]=store_category, [19]=discount_percent
     
@@ -1017,8 +1016,7 @@ async def send_offer_card(message: types.Message, offer: tuple, lang: str):
     original_price = offer[4]
     discount_price = offer[5]
     quantity = offer[6]
-    expiry_date = offer[9]  # ИСПРАВЛЕНО: было [12], теперь [9]
-    unit = offer[13] if len(offer) > 13 and offer[13] else "шт"
+    expiry_date = offer[12]
     store_name = offer[15] if len(offer) > 15 else "Магазин"
     store_address = offer[16] if len(offer) > 16 else ""
     store_category = offer[18] if len(offer) > 18 else ""
@@ -1033,8 +1031,8 @@ async def send_offer_card(message: types.Message, offer: tuple, lang: str):
     text += f"🏷 {store_category}\n"
     if store_address:
         text += f"📍 {store_address}\n"
-    text += f"📦 Осталось: {quantity} {unit}\n"
-    text += f"⏰ До: {expiry_date[:10] if expiry_date else 'не указан'}"
+    text += f"📦 Осталось: {quantity} шт\n"
+    text += f"⏰ До: {expiry_date[:10]}"
     
     # Кнопки
     builder = InlineKeyboardBuilder()
@@ -1705,8 +1703,8 @@ async def show_store_offers(callback: types.CallbackQuery):
         text += f"{i+1}. <b>{offer[2]}</b>\n"
         text += f"   💰 {int(offer[4]):,} ➜ {int(offer[5]):,} сум (-{discount_percent}%)\n"
         text += f"   📦 {offer[6]} {unit}\n"
-        if len(offer) > 9 and offer[9]:
-            text += f"   📅 До: {offer[9]}\n"
+        if len(offer) > 12 and offer[12]:
+            text += f"   📅 До: {offer[12]}\n"
         text += "\n"
     
     if len(offers) > 5:
@@ -3164,12 +3162,12 @@ async def my_offers(message: types.Message):
         text += f"📦 {'Осталось' if lang == 'ru' else 'Qoldi'}: <b>{quantity}</b> {unit}\n"
         
         # Срок годности
-        if len(offer) > 9 and offer[9]:
-            expiry_info = db.get_time_remaining(offer[9])
+        if len(offer) > 12 and offer[12]:
+            expiry_info = db.get_time_remaining(offer[12])
             if expiry_info:
                 text += f"{expiry_info}\n"
             else:
-                text += f"📅 До: {offer[9]}\n"
+                text += f"📅 До: {offer[12]}\n"
         
         # Время забора
         text += f"🕐 {offer[7]} - {offer[8]}"
@@ -3461,12 +3459,12 @@ async def update_offer_message(callback: types.CallbackQuery, offer_id: int, lan
     text += f"📦 {'Осталось' if lang == 'ru' else 'Qoldi'}: <b>{quantity}</b> {unit}\n"
     
     # Срок годности
-    if len(offer) > 9 and offer[9]:
-        expiry_info = db.get_time_remaining(offer[9])
+    if len(offer) > 12 and offer[12]:
+        expiry_info = db.get_time_remaining(offer[12])
         if expiry_info:
             text += f"{expiry_info}\n"
         else:
-            text += f"📅 До: {offer[9]}\n"
+            text += f"📅 До: {offer[12]}\n"
     
     # Время
     text += f"🕐 {offer[7]} - {offer[8]}"
@@ -5660,8 +5658,8 @@ async def admin_all_offers(message: types.Message):
         text += f"   📦 {offer[6]} {unit}\n"
         
         # Показываем срок годности
-        if len(offer) > 9 and offer[9]:
-            text += f"   📅 До: {offer[9]}\n"
+        if len(offer) > 12 and offer[12]:
+            text += f"   📅 До: {offer[12]}\n"
         
         # Показываем магазин (индексы для JOIN: 15-store_name, 17-city)
         if len(offer) > 17:

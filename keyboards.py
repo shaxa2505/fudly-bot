@@ -223,6 +223,13 @@ def settings_keyboard(notifications_enabled: bool, lang: str = 'ru', role: str |
 
     builder = InlineKeyboardBuilder()
     
+    # Для партнёра показываем переключение в режим покупателя
+    if role == 'seller':
+        builder.button(text="🔄 Режим покупателя" if lang == 'ru' else "🔄 Xaridor rejimi", callback_data="switch_to_customer")
+    else:
+        # Для покупателя показываем "Стать партнёром"
+        builder.button(text=get_text(lang, 'become_partner'), callback_data="become_partner_cb")
+    
     # Уведомления
     notif_text = get_text(lang, 'notifications_enabled') if notifications_enabled else get_text(lang, 'notifications_disabled')
     builder.button(text=notif_text, callback_data="toggle_notifications")
@@ -236,7 +243,7 @@ def settings_keyboard(notifications_enabled: bool, lang: str = 'ru', role: str |
     # Удаление аккаунта
     builder.button(text=get_text(lang, 'delete_account'), callback_data="delete_account")
     
-    builder.adjust(1, 1, 1, 1)  # Все кнопки в столбик
+    builder.adjust(1, 1, 1, 1, 1)  # Все кнопки в столбик
     return builder.as_markup()
 
 def store_keyboard(store_id: int):
