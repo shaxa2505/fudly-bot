@@ -1746,7 +1746,7 @@ async def show_store_offers(callback: types.CallbackQuery, state: FSMContext):
     
     # Добавляем пагинацию если товаров больше 20
     builder = InlineKeyboardBuilder()
-    if len(all_offers) > 20:
+    if len(offers) > 20:
         builder.button(
             text="➡️ " + ("Показать ещё 20" if lang == 'ru' else "Yana 20 ta"),
             callback_data=f"store_offers_next_{store_id}_20"
