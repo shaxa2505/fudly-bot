@@ -7560,6 +7560,55 @@ async def cmd_migrate_db(message: types.Message):
     except Exception as e:
         await message.answer(f"❌ Ошибка миграции: {e}")
 
+@dp.message(Command("enable_delivery"))
+async def cmd_enable_delivery(message: types.Message):
+    """Команда для включения доставки для всех магазинов (только для админа)"""
+    if message.from_user.id != ADMIN_ID:
+        await message.answer("❌ Доступ запрещён")
+        return
+    
+    try:
+        await message.answer("🔄 Включаю доставку для всех магазинов...")
+        
+        conn = sqlite3.connect(db.db_name)
+        cursor = conn.cursor()
+        
+        # Проверяем наличие таблицы stores и полей доставки
+        cursor.execute("PRAGMA table_info(stores)")
+        columns = [col[1] for col in cursor.fetchall()]
+        
+        if 'delivery_enabled' not in columns:
+            await message.answer("❌ Таблица stores не имеет полей доставки. Запустите /migrate_db")
+            conn.close()
+            return
+        
+        # Включаем доставку
+        cursor.execute('''
+            UPDATE stores 
+            SET delivery_enabled = 1,
+                delivery_price = 15000,
+                min_order_amount = 30000
+            WHERE delivery_enabled = 0
+        ''')
+        updated = cursor.rowcount
+        conn.commit()
+        
+        # Проверяем результат
+        cursor.execute('SELECT store_id, name, delivery_enabled FROM stores')
+        stores = cursor.fetchall()
+        conn.close()
+        
+        result = f"✅ Доставка включена для {updated} магазина(ов)\n\n"
+        result += "📊 Статус магазинов:\n"
+        for store in stores:
+            status = "✅" if store[2] else "❌"
+            result += f"{status} {store[1]} (ID: {store[0]})\n"
+        
+        await message.answer(result)
+        
+    except Exception as e:
+        await message.answer(f"❌ Ошибка: {e}")
+
 async def main():
     print("✅ Бот успешно запущен!")
     print(f"🔄 Режим: {'Webhook' if USE_WEBHOOK else 'Polling'}")
