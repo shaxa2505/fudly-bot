@@ -7589,6 +7589,52 @@ async def main():
             if updated > 0:
                 print(f"✅ Доставка включена для {updated} магазина(ов)")
         
+        # СОЗДАЕМ ТЕСТОВЫЕ ДАННЫЕ ДЛЯ RAILWAY (если БД пустая)
+        cursor.execute('SELECT COUNT(*) FROM stores WHERE status = "active"')
+        stores_count = cursor.fetchone()[0]
+        
+        if stores_count == 0 and USE_WEBHOOK:
+            print("⚠️ База данных пустая! Создаю тестовые данные...")
+            
+            # Создаем тестового пользователя (админ)
+            cursor.execute('SELECT COUNT(*) FROM users WHERE user_id = ?', (ADMIN_ID,))
+            if cursor.fetchone()[0] == 0:
+                cursor.execute('''
+                    INSERT INTO users (user_id, username, first_name, phone, city, language, role)
+                    VALUES (?, ?, ?, ?, ?, ?, ?)
+                ''', (ADMIN_ID, 'admin', 'Admin', '+998901234567', 'Ташкент', 'ru', 'seller'))
+            
+            # Создаем тестовый магазин
+            cursor.execute('''
+                INSERT INTO stores (owner_id, name, city, address, description, category, phone, status, business_type, delivery_enabled, delivery_price, min_order_amount)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ''', (ADMIN_ID, 'Demo Market', 'Ташкент', 'пр. Амира Темура, 1', 'Тестовый магазин с горячими предложениями', 'Супермаркет', '+998901234567', 'active', 'supermarket', 1, 15000, 30000))
+            store_id = cursor.lastrowid
+            
+            # Создаем тестовые товары с большими скидками
+            from datetime import datetime, timedelta
+            now = datetime.now()
+            tomorrow = now + timedelta(days=1)
+            
+            test_products = [
+                ('Хлеб свежий', 'Свежеиспеченный хлеб', 8000, 3000, 50, tomorrow.strftime('%Y-%m-%d %H:%M:%S'), 'bakery', 'шт'),
+                ('Молоко 1л', 'Свежее молоко', 12000, 5000, 30, tomorrow.strftime('%Y-%m-%d %H:%M:%S'), 'dairy', 'л'),
+                ('Яблоки 1кг', 'Свежие яблоки', 20000, 8000, 100, tomorrow.strftime('%Y-%m-%d %H:%M:%S'), 'fruits', 'кг'),
+                ('Курица 1кг', 'Охлажденная курица', 35000, 18000, 25, tomorrow.strftime('%Y-%m-%d %H:%M:%S'), 'meat', 'кг'),
+                ('Торт праздничный', 'Вкусный торт', 80000, 40000, 10, tomorrow.strftime('%Y-%m-%d %H:%M:%S'), 'ready_food', 'шт'),
+            ]
+            
+            for title, desc, orig_price, disc_price, qty, exp, cat, unit in test_products:
+                cursor.execute('''
+                    INSERT INTO offers (store_id, title, description, original_price, discount_price, quantity, available_from, available_until, expiry_date, status, unit, category)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'active', ?, ?)
+                ''', (store_id, title, desc, orig_price, disc_price, qty, now.strftime('%Y-%m-%d %H:%M:%S'), tomorrow.strftime('%Y-%m-%d %H:%M:%S'), exp, unit, cat))
+            
+            conn.commit()
+            print(f"✅ Создан тестовый магазин с {len(test_products)} товарами!")
+        elif stores_count > 0:
+            print(f"✅ В БД есть {stores_count} активных магазинов")
+        
         conn.close()
     except Exception as e:
         print(f"⚠️ Ошибка миграции: {e}")
