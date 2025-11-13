@@ -1,0 +1,62 @@
+# .gitignore для Fudly Bot
+
+# ВАЖНО: Переменные окружения (ТОКЕНЫ И ПАРОЛИ!)
+.env
+
+# База данных (локальная)
+*.db
+*.sqlite
+*.sqlite3
+fudly.db
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+.venv/
+ENV/
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Временные скрипты
+fix_*.py
+check_*.py
+analyze_*.py
+cleanup_*.py
+verify_*.py
+test_*.py
+
+# Backup папки
+бекап/
+backup*/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Логи
+*.log
+
+# OS
+.DS_Store
+Thumbs.db
