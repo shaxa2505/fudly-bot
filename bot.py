@@ -2911,7 +2911,10 @@ async def my_bookings(message: types.Message):
     
     # Получаем бронирования и заказы
     bookings = db.get_user_bookings(message.from_user.id)
-    orders = db.get_user_orders(message.from_user.id)
+    try:
+        orders = db.get_user_orders(message.from_user.id)
+    except Exception:
+        orders = []  # Таблица orders ещё не создана
     
     if not bookings and not orders:
         empty_text = "Корзина пуста" if lang == 'ru' else "Savat bo'sh"
@@ -5821,7 +5824,10 @@ async def profile(message: types.Message):
     # Добавляем статистику покупок для покупателей
     if user[6] == 'customer' or user_view_mode.get(message.from_user.id) == 'customer':
         bookings = db.get_user_bookings(message.from_user.id)
-        orders = db.get_user_orders(message.from_user.id)
+        try:
+            orders = db.get_user_orders(message.from_user.id)
+        except Exception:
+            orders = []  # Таблица orders ещё не создана
         
         active_bookings = len([b for b in bookings if b[3] in ['pending', 'confirmed']])
         completed_bookings = len([b for b in bookings if b[3] == 'completed'])
