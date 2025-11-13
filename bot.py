@@ -7696,6 +7696,30 @@ if __name__ == "__main__":
         print("❌ Завершение работы дубликата...")
         sys.exit(1)
     
+    # Автоматически включаем доставку для всех магазинов (для Railway)
+    try:
+        conn = sqlite3.connect(db.db_name)
+        cursor = conn.cursor()
+        cursor.execute('SELECT COUNT(*) FROM stores WHERE delivery_enabled = 1')
+        enabled_count = cursor.fetchone()[0]
+        cursor.execute('SELECT COUNT(*) FROM stores')
+        total_count = cursor.fetchone()[0]
+        
+        if total_count > 0 and enabled_count == 0:
+            print("🚚 Включаю доставку для всех магазинов...")
+            cursor.execute('''
+                UPDATE stores 
+                SET delivery_enabled = 1,
+                    delivery_price = 15000,
+                    min_order_amount = 30000
+                WHERE delivery_enabled = 0
+            ''')
+            conn.commit()
+            print(f"✅ Доставка включена для {total_count} магазина(ов)")
+        conn.close()
+    except Exception as e:
+        print(f"⚠️ Ошибка при включении доставки: {e}")
+    
     print("=" * 50)
     print("🚀 Запуск бота Fudly (Production Optimized)...")
     print("=" * 50)
