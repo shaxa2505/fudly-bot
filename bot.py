@@ -3651,11 +3651,12 @@ async def register_store_description(message: types.Message, state: FSMContext):
                 f"🔔 <b>Новая заявка на партнерство!</b>\n\n"
                 f"От: {message.from_user.full_name} (@{message.from_user.username or 'нет'})\n"
                 f"ID: <code>{message.from_user.id}</code>\n\n"
-                f"🏪 {data['name']}\n"
-                f"📍 {data['city']}, {data['address']}\n"
-                f"🏷 {data['category']}\n"
-                f"📝 {data['description']}\n"
-                f"📱 {message.text}\n\n"
+                f"🏪 Название: {data['name']}\n"
+                f"📍 Город: {data['city']}\n"
+                f"🏠 Адрес: {data['address']}\n"
+                f"🏷 Категория: {data['category']}\n"
+                f"📝 Описание: {data['description']}\n"
+                f"📱 Телефон: {owner_phone or '—'}\n\n"
                 f"Перейдите в админ панель для модерации."
             )
             await bot.send_message(admin[0], admin_text, parse_mode="HTML")
