@@ -2681,9 +2681,13 @@ async def order_payment_proof(message: types.Message, state: FSMContext):
     notification_kb.button(text="❌ " + ("Отклонить" if lang == 'ru' else "Rad etish"), callback_data=f"reject_payment_{order_id}")
     notification_kb.adjust(2)
     
+    owner_id = store[1]
+    print(f"[DEBUG] Sending order notification to owner {owner_id} for order {order_id}")
+    logger.info(f"📤 Sending order notification to store owner {owner_id}")
+    
     try:
         await bot.send_photo(
-            chat_id=store[1],
+            chat_id=owner_id,
             photo=photo_id,
             caption=f"🔔 <b>{'Новый заказ с доставкой!' if lang == 'ru' else 'Yangi buyurtma yetkazib berish bilan!'}</b>\n\n"
                     f"🏪 {store[2]}\n"
@@ -2698,8 +2702,11 @@ async def order_payment_proof(message: types.Message, state: FSMContext):
             parse_mode="HTML",
             reply_markup=notification_kb.as_markup()
         )
+        logger.info(f"✅ Order notification sent successfully to {owner_id}")
+        print(f"[DEBUG] ✅ Notification sent to owner {owner_id}")
     except Exception as e:
-        logger.error(f"Error sending order notification: {e}")
+        logger.error(f"❌ Error sending order notification to {owner_id}: {e}")
+        print(f"[DEBUG] ❌ Failed to send notification: {e}")
     
     # Подтверждение клиенту
     total_amount = (offer[5] * quantity) + delivery_price
