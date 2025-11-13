@@ -2242,11 +2242,11 @@ class Database:
             conn.close()
     
     def get_platform_payment_card(self) -> Optional[Tuple]:
-        """Получить активную карту платформы для оплаты"""
+        """Получить карту платформы для оплаты"""
         conn = self.get_connection()
         cursor = conn.cursor()
         try:
-            cursor.execute('SELECT * FROM payment_settings WHERE is_active = 1 LIMIT 1')
+            cursor.execute('SELECT * FROM payment_settings LIMIT 1')
             return cursor.fetchone()
         finally:
             conn.close()
