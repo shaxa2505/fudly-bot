@@ -977,6 +977,7 @@ async def hot_offers_handler(message: types.Message, state: FSMContext):
     total_count = len(all_offers)
     
     logger.info(f"🔥 Found {len(offers)} hot offers (total: {total_count})")
+    print(f"[DEBUG] Hot offers: city={city}, search_city={search_city}, found={len(offers)}, total={total_count}")
     
     if not offers:
         no_offers_msg = "Мы уведомим вас, когда появятся новые предложения!" if lang == 'ru' else "Yangi takliflar paydo bo'lganda xabar beramiz!"
@@ -1154,6 +1155,9 @@ async def business_type_selected(callback: types.CallbackQuery, state: FSMContex
     
     # Получаем магазины этого типа с количеством активных товаров
     stores = db.get_stores_by_business_type(db_type, search_city)
+    
+    print(f"[DEBUG] Biztype selected: type={business_type}, db_type={db_type}, city={city}, search_city={search_city}, stores_found={len(stores)}")
+    logger.info(f"🏪 Business type '{db_type}' in '{search_city}': found {len(stores)} stores")
     
     if not stores:
         type_names = {
@@ -7558,6 +7562,36 @@ async def main():
     print(f"🔄 Режим: {'Webhook' if USE_WEBHOOK else 'Polling'}")
     print("⚠️ Нажмите Ctrl+C для остановки")
     print("=" * 50)
+    
+    # ПРИНУДИТЕЛЬНАЯ МИГРАЦИЯ БД ДЛЯ RAILWAY
+    try:
+        print("🔄 Проверка структуры базы данных...")
+        conn = sqlite3.connect(db.db_name)
+        cursor = conn.cursor()
+        
+        # Проверяем наличие полей доставки
+        cursor.execute('PRAGMA table_info(stores)')
+        columns = [col[1] for col in cursor.fetchall()]
+        
+        if 'delivery_enabled' not in columns:
+            print("⚠️ Поля доставки отсутствуют! Добавляем...")
+            cursor.execute('ALTER TABLE stores ADD COLUMN delivery_enabled INTEGER DEFAULT 1')
+            cursor.execute('ALTER TABLE stores ADD COLUMN delivery_price INTEGER DEFAULT 15000')
+            cursor.execute('ALTER TABLE stores ADD COLUMN min_order_amount INTEGER DEFAULT 30000')
+            conn.commit()
+            print("✅ Поля доставки добавлены!")
+        else:
+            print("✅ Поля доставки уже существуют")
+            # ВКЛЮЧАЕМ доставку для всех магазинов автоматически
+            cursor.execute('UPDATE stores SET delivery_enabled = 1 WHERE delivery_enabled = 0 OR delivery_enabled IS NULL')
+            updated = cursor.rowcount
+            conn.commit()
+            if updated > 0:
+                print(f"✅ Доставка включена для {updated} магазина(ов)")
+        
+        conn.close()
+    except Exception as e:
+        print(f"⚠️ Ошибка миграции: {e}")
     
     # Запускаем фоновую задачу очистки
     cleanup_task = asyncio.create_task(cleanup_expired_offers())
