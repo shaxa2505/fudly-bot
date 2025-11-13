@@ -7451,6 +7451,84 @@ async def admin_settings(message: types.Message):
     
     await message.answer("⚙️ Настройки админа в разработке")
 
+# ============== АДМИНСКИЕ КОМАНДЫ ДЛЯ МИГРАЦИИ ==============
+
+@dp.message(Command("migrate_db"))
+async def cmd_migrate_db(message: types.Message):
+    """Команда для ручного запуска миграции БД (только для админа)"""
+    if message.from_user.id != ADMIN_ID:
+        await message.answer("❌ Доступ запрещён")
+        return
+    
+    try:
+        await message.answer("🔄 Запуск миграции базы данных...")
+        
+        # Пересоздаём объект базы данных для вызова init_db
+        temp_db = Database(db.db_name)
+        
+        await message.answer("✅ Миграция завершена!\n\nПроверьте наличие таблиц:")
+        
+        conn = sqlite3.connect(db.db_name)
+        cursor = conn.cursor()
+        cursor.execute("SELECT name FROM sqlite_master WHERE type='table'")
+        tables = cursor.fetchall()
+        conn.close()
+        
+        tables_text = "\n".join([f"✅ {t[0]}" for t in tables])
+        await message.answer(f"📊 Таблицы в БД:\n{tables_text}")
+        
+    except Exception as e:
+        await message.answer(f"❌ Ошибка миграции: {e}")
+
+@dp.message(Command("enable_delivery"))
+async def cmd_enable_delivery(message: types.Message):
+    """Команда для включения доставки для всех магазинов (только для админа)"""
+    if message.from_user.id != ADMIN_ID:
+        await message.answer("❌ Доступ запрещён")
+        return
+    
+    try:
+        await message.answer("🔄 Включаю доставку для всех магазинов...")
+        
+        conn = sqlite3.connect(db.db_name)
+        cursor = conn.cursor()
+        
+        # Проверяем наличие таблицы stores и полей доставки
+        cursor.execute("PRAGMA table_info(stores)")
+        columns = [col[1] for col in cursor.fetchall()]
+        
+        if 'delivery_enabled' not in columns:
+            await message.answer("❌ Таблица stores не имеет полей доставки. Запустите /migrate_db")
+            conn.close()
+            return
+        
+        # Включаем доставку
+        cursor.execute('''
+            UPDATE stores 
+            SET delivery_enabled = 1,
+                delivery_price = 15000,
+                min_order_amount = 30000
+            WHERE delivery_enabled = 0
+        ''')
+        updated = cursor.rowcount
+        conn.commit()
+        
+        # Проверяем результат
+        cursor.execute('SELECT store_id, name, delivery_enabled FROM stores')
+        stores = cursor.fetchall()
+        conn.close()
+        
+        result = f"✅ Доставка включена для {updated} магазина(ов)\n\n"
+        result += "📊 Статус магазинов:\n"
+        for store in stores:
+            status = "✅" if store[2] else "❌"
+            result += f"{status} {store[1]} (ID: {store[0]})\n"
+        
+        await message.answer(result)
+        
+    except Exception as e:
+        await message.answer(f"❌ Ошибка: {e}")
+
 # ============== ОТЛАДКА - НЕИЗВЕСТНЫЕ СООБЩЕНИЯ ==============
 
 @dp.message(F.text)
@@ -7533,81 +7611,7 @@ async def catch_all_callbacks(callback: types.CallbackQuery):
     except Exception:
         pass
 
-@dp.message(Command("migrate_db"))
-async def cmd_migrate_db(message: types.Message):
-    """Команда для ручного запуска миграции БД (только для админа)"""
-    if message.from_user.id != ADMIN_ID:
-        await message.answer("❌ Доступ запрещён")
-        return
-    
-    try:
-        await message.answer("🔄 Запуск миграции базы данных...")
-        
-        # Пересоздаём объект базы данных для вызова init_db
-        temp_db = Database(db.db_name)
-        
-        await message.answer("✅ Миграция завершена!\n\nПроверьте наличие таблиц:")
-        
-        conn = sqlite3.connect(db.db_name)
-        cursor = conn.cursor()
-        cursor.execute("SELECT name FROM sqlite_master WHERE type='table'")
-        tables = cursor.fetchall()
-        conn.close()
-        
-        tables_text = "\n".join([f"✅ {t[0]}" for t in tables])
-        await message.answer(f"📊 Таблицы в БД:\n{tables_text}")
-        
-    except Exception as e:
-        await message.answer(f"❌ Ошибка миграции: {e}")
-
-@dp.message(Command("enable_delivery"))
-async def cmd_enable_delivery(message: types.Message):
-    """Команда для включения доставки для всех магазинов (только для админа)"""
-    if message.from_user.id != ADMIN_ID:
-        await message.answer("❌ Доступ запрещён")
-        return
-    
-    try:
-        await message.answer("🔄 Включаю доставку для всех магазинов...")
-        
-        conn = sqlite3.connect(db.db_name)
-        cursor = conn.cursor()
-        
-        # Проверяем наличие таблицы stores и полей доставки
-        cursor.execute("PRAGMA table_info(stores)")
-        columns = [col[1] for col in cursor.fetchall()]
-        
-        if 'delivery_enabled' not in columns:
-            await message.answer("❌ Таблица stores не имеет полей доставки. Запустите /migrate_db")
-            conn.close()
-            return
-        
-        # Включаем доставку
-        cursor.execute('''
-            UPDATE stores 
-            SET delivery_enabled = 1,
-                delivery_price = 15000,
-                min_order_amount = 30000
-            WHERE delivery_enabled = 0
-        ''')
-        updated = cursor.rowcount
-        conn.commit()
-        
-        # Проверяем результат
-        cursor.execute('SELECT store_id, name, delivery_enabled FROM stores')
-        stores = cursor.fetchall()
-        conn.close()
-        
-        result = f"✅ Доставка включена для {updated} магазина(ов)\n\n"
-        result += "📊 Статус магазинов:\n"
-        for store in stores:
-            status = "✅" if store[2] else "❌"
-            result += f"{status} {store[1]} (ID: {store[0]})\n"
-        
-        await message.answer(result)
-        
-    except Exception as e:
-        await message.answer(f"❌ Ошибка: {e}")
+# ============== ЗАПУСК БОТА ==============
 
 async def main():
     print("✅ Бот успешно запущен!")
