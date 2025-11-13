@@ -259,7 +259,7 @@ def store_keyboard(store_id: int):
     """Кнопки управления магазином"""
     builder = InlineKeyboardBuilder()
     builder.button(text="📊 Статистика", callback_data=f"store_stats_{store_id}")
-    builder.button(text="📋 Предложения", callback_data=f"show_offers_{store_id}")
+    builder.button(text="📋 Предложения", callback_data=f"store_offers_{store_id}")
     builder.adjust(2)
     return builder.as_markup()
 

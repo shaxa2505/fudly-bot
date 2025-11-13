@@ -260,8 +260,8 @@ from typing import Callable, Dict, Any, Awaitable
 # - Callback handlers (pagination, filters, etc.)
 # - Additional admin handlers (moderation, detailed stats, etc.)
 
-# ============== MY CITY HANDLER (TODO: Already in user_commands.py, remove after testing) ==============
-# DUPLICATE HANDLER - Moved to handlers/ package
+# ============== АДМИН ПАНЕЛЬ - ОБРАБОТЧИКИ ==============
+
 # @dp.message(F.text == "Мой город")
 # async def my_city(message: types.Message, state: FSMContext = None):
 #     user_id = message.from_user.id
@@ -1730,6 +1730,7 @@ async def show_store_offers(callback: types.CallbackQuery, state: FSMContext):
     text = f"🛍 <b>{store_name}</b>\n"
     text += f"{'Все товары' if lang == 'ru' else 'Barcha mahsulotlar'}\n\n"
     
+    total_offers = len(offers)  # Сохраняем общее количество
     for idx, offer in enumerate(offers[:20], 1):  # Показываем первые 20
         product_name = offer[2]
         original_price = offer[4]
@@ -1746,7 +1747,7 @@ async def show_store_offers(callback: types.CallbackQuery, state: FSMContext):
     
     # Добавляем пагинацию если товаров больше 20
     builder = InlineKeyboardBuilder()
-    if len(offers) > 20:
+    if total_offers > 20:
         builder.button(
             text="➡️ " + ("Показать ещё 20" if lang == 'ru' else "Yana 20 ta"),
             callback_data=f"store_offers_next_{store_id}_20"
@@ -2841,67 +2842,6 @@ async def offer_details(callback: types.CallbackQuery):
             )
     
     await callback.answer()
-
-# ============== ТОВАРЫ МАГАЗИНА ==============
-
-@dp.callback_query(F.data.startswith("show_offers_"))
-async def show_store_offers(callback: types.CallbackQuery):
-    """Показывает товары конкретного магазина"""
-    lang = db.get_user_language(callback.from_user.id)
-    store_id = int(callback.data.split("_")[2])
-    
-    # Получаем информацию о магазине
-    store = db.get_store(store_id)
-    if not store:
-        await callback.answer("❌ Магазин не найден", show_alert=True)
-        return
-    
-    # Получаем товары магазина
-    offers = db.get_active_offers(store_id=store_id)
-    print(f"show_store_offers: offers count = {len(offers)}")
-    
-    if not offers:
-        text = f"🏪 <b>{store[2]}</b>\n\n😔 В этом магазине пока нет активных предложений"
-        await callback.message.edit_text(text, parse_mode="HTML")
-        await callback.answer()
-        return
-    
-    # Показываем заголовок
-    text = f"🏪 <b>{store[2]}</b>\n📍 {store[4]}\n\n🛍 <b>Доступные товары ({len(offers)}):</b>\n\n"
-    
-    # Добавляем первые 5 товаров в текст
-    for i, offer in enumerate(offers[:5]):
-        discount_percent = int((1 - offer[5] / offer[4]) * 100)
-        # unit находится в [13] если есть, иначе используем по умолчанию
-        # После JOIN структура: [0-12] offers базовые, [13]unit (если есть), [14]category (если есть)
-        # [15] или [13]store_name, [16] или [14]address, [17] или [15]city
-        if len(offer) >= 19:
-            # Новая структура с unit/category
-            unit = offer[13] if offer[13] else 'шт'
-        else:
-            # Старая структура без unit/category
-            unit = 'шт'
-        
-        text += f"{i+1}. <b>{offer[2]}</b>\n"
-        text += f"   💰 {int(offer[4]):,} ➜ {int(offer[5]):,} сум (-{discount_percent}%)\n"
-        text += f"   📦 {offer[6]} {unit}\n"
-        if len(offer) > 12 and offer[12]:
-            text += f"   📅 До: {offer[12]}\n"
-        text += "\n"
-    
-    if len(offers) > 5:
-        text += f"... и еще {len(offers) - 5} товаров"
-    
-    # Создаем кнопки для каждого товара
-    keyboard = InlineKeyboardBuilder()
-    for i, offer in enumerate(offers[:6]):  # Показываем кнопки для первых 6 товаров
-        keyboard.button(text=f"📦 {offer[2][:20]}...", callback_data=f"details_{offer[0]}")
-    keyboard.adjust(2)
-    
-    await callback.message.edit_text(text, parse_mode="HTML", reply_markup=keyboard.as_markup())
-    await callback.answer()
-
-# Удалён дубль обработчика store_*, чтобы избежать конфликта с select_store
 
 # ============== МОИ БРОНИРОВАНИЯ ==============
 
@@ -5447,7 +5387,7 @@ async def send_store_card(message: types.Message, store: tuple, lang: str, from_
     # Кнопки
     builder = InlineKeyboardBuilder()
     builder.button(text="🛍 Товары магазина" if lang == 'ru' else "🛍 Dokon mahsulotlari", 
-                   callback_data=f"show_offers_{store_id}")
+                   callback_data=f"store_offers_{store_id}")
     builder.button(text="⭐ Оставить отзыв" if lang == 'ru' else "⭐ Sharh qoldirish", 
                    callback_data=f"rate_store_{store_id}")
     builder.adjust(1)
@@ -5694,7 +5634,7 @@ async def show_favorites(message: types.Message):
 ⭐ Рейтинг: {avg_rating:.1f}/5 ({len(ratings)} отзывов)"""
         
         keyboard = InlineKeyboardBuilder()
-        keyboard.button(text="🛍 Товары магазина", callback_data=f"show_offers_{store_id}")
+        keyboard.button(text="🛍 Товары магазина", callback_data=f"store_offers_{store_id}")
         keyboard.button(text="💔 Удалить из избранного", callback_data=f"unfavorite_{store_id}")
         keyboard.adjust(1)
         
