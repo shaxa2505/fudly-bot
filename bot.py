@@ -7729,17 +7729,14 @@ if __name__ == "__main__":
         print("❌ Завершение работы дубликата...")
         sys.exit(1)
     
-    # Проверяем и создаём таблицы для доставки если их нет (для Railway)
+    # ПРИНУДИТЕЛЬНО создаём таблицы для доставки (для Railway)
     try:
         conn = sqlite3.connect(db.db_name)
         cursor = conn.cursor()
         
-        # Проверяем наличие таблицы orders
-        cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='orders'")
-        if not cursor.fetchone():
-            print("🔄 Создаю таблицы для доставки...")
-            
-            # Создаём таблицу orders
+        print("🔄 Проверяю и создаю таблицы для доставки...")
+        
+        # Создаём таблицу orders
             cursor.execute('''
                 CREATE TABLE IF NOT EXISTS orders (
                     order_id INTEGER PRIMARY KEY AUTOINCREMENT,
