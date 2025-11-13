@@ -7589,12 +7589,12 @@ async def main():
             if updated > 0:
                 print(f"✅ Доставка включена для {updated} магазина(ов)")
         
-        # СОЗДАЕМ ТЕСТОВЫЕ ДАННЫЕ ДЛЯ RAILWAY (если БД пустая)
-        cursor.execute('SELECT COUNT(*) FROM stores WHERE status = "active"')
-        stores_count = cursor.fetchone()[0]
+        # СОЗДАЕМ ТЕСТОВЫЕ ДАННЫЕ ДЛЯ RAILWAY (если нет активных товаров)
+        cursor.execute('SELECT COUNT(*) FROM offers WHERE status = "active"')
+        offers_count = cursor.fetchone()[0]
         
-        if stores_count == 0 and USE_WEBHOOK:
-            print("⚠️ База данных пустая! Создаю тестовые данные...")
+        if offers_count == 0:
+            print("⚠️ Нет активных товаров! Создаю тестовые данные...")
             
             # Создаем тестового пользователя (админ)
             cursor.execute('SELECT COUNT(*) FROM users WHERE user_id = ?', (ADMIN_ID,))
@@ -7632,8 +7632,10 @@ async def main():
             
             conn.commit()
             print(f"✅ Создан тестовый магазин с {len(test_products)} товарами!")
-        elif stores_count > 0:
-            print(f"✅ В БД есть {stores_count} активных магазинов")
+        else:
+            cursor.execute('SELECT COUNT(*) FROM stores WHERE status = "active"')
+            stores_count = cursor.fetchone()[0]
+            print(f"✅ В БД есть {stores_count} активных магазинов и {offers_count} активных товаров")
         
         conn.close()
     except Exception as e:
