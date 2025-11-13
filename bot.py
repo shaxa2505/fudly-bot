@@ -7532,6 +7532,33 @@ async def catch_all_callbacks(callback: types.CallbackQuery):
     except Exception:
         pass
 
+@dp.message(Command("migrate_db"))
+async def cmd_migrate_db(message: types.Message):
+    """Команда для ручного запуска миграции БД (только для админа)"""
+    if message.from_user.id != ADMIN_ID:
+        await message.answer("❌ Доступ запрещён")
+        return
+    
+    try:
+        await message.answer("🔄 Запуск миграции базы данных...")
+        
+        # Пересоздаём объект базы данных для вызова init_db
+        temp_db = Database(db.db_name)
+        
+        await message.answer("✅ Миграция завершена!\n\nПроверьте наличие таблиц:")
+        
+        conn = sqlite3.connect(db.db_name)
+        cursor = conn.cursor()
+        cursor.execute("SELECT name FROM sqlite_master WHERE type='table'")
+        tables = cursor.fetchall()
+        conn.close()
+        
+        tables_text = "\n".join([f"✅ {t[0]}" for t in tables])
+        await message.answer(f"📊 Таблицы в БД:\n{tables_text}")
+        
+    except Exception as e:
+        await message.answer(f"❌ Ошибка миграции: {e}")
+
 async def main():
     print("✅ Бот успешно запущен!")
     print(f"🔄 Режим: {'Webhook' if USE_WEBHOOK else 'Polling'}")
