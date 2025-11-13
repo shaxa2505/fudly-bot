@@ -269,6 +269,76 @@ class Database:
         except:
             pass
         
+        # ==================== ТАБЛИЦЫ ДЛЯ ДОСТАВКИ ====================
+        
+        # Таблица заказов доставки
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS orders (
+                order_id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER NOT NULL,
+                store_id INTEGER NOT NULL,
+                offer_id INTEGER NOT NULL,
+                quantity INTEGER NOT NULL,
+                total_amount REAL NOT NULL,
+                delivery_price REAL NOT NULL,
+                delivery_address TEXT NOT NULL,
+                payment_method TEXT NOT NULL,
+                payment_proof TEXT,
+                status TEXT DEFAULT 'pending',
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (user_id) REFERENCES users(user_id),
+                FOREIGN KEY (store_id) REFERENCES stores(store_id),
+                FOREIGN KEY (offer_id) REFERENCES offers(offer_id)
+            )
+        ''')
+        
+        # Таблица настроек платежей
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS payment_settings (
+                setting_id INTEGER PRIMARY KEY AUTOINCREMENT,
+                card_number TEXT NOT NULL,
+                card_holder TEXT NOT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        ''')
+        
+        # Добавляем дефолтную карту если её нет
+        cursor.execute('SELECT COUNT(*) FROM payment_settings')
+        if cursor.fetchone()[0] == 0:
+            cursor.execute('''
+                INSERT INTO payment_settings (card_number, card_holder)
+                VALUES (?, ?)
+            ''', ('8600 0000 0000 0000', 'FUDLY PLATFORM'))
+            conn.commit()
+        
+        # Добавляем поля доставки в stores если их нет
+        try:
+            cursor.execute('ALTER TABLE stores ADD COLUMN delivery_enabled INTEGER DEFAULT 0')
+            conn.commit()
+        except:
+            pass
+        
+        try:
+            cursor.execute('ALTER TABLE stores ADD COLUMN delivery_price INTEGER DEFAULT 10000')
+            conn.commit()
+        except:
+            pass
+        
+        try:
+            cursor.execute('ALTER TABLE stores ADD COLUMN min_order_amount INTEGER DEFAULT 20000')
+            conn.commit()
+        except:
+            pass
+        
+        # Создаём индексы для таблицы orders
+        try:
+            cursor.execute('CREATE INDEX IF NOT EXISTS idx_orders_user ON orders(user_id)')
+            cursor.execute('CREATE INDEX IF NOT EXISTS idx_orders_store ON orders(store_id)')
+            cursor.execute('CREATE INDEX IF NOT EXISTS idx_orders_status ON orders(status)')
+            conn.commit()
+        except:
+            pass
+        
         try:
             conn.close()
         except Exception:

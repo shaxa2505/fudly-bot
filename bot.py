@@ -7696,25 +7696,6 @@ if __name__ == "__main__":
         print("❌ Завершение работы дубликата...")
         sys.exit(1)
     
-    # Автоматическая миграция при старте (для Railway)
-    try:
-        conn = sqlite3.connect(db.db_name)
-        cursor = conn.cursor()
-        # Проверяем наличие таблицы orders
-        cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='orders'")
-        if not cursor.fetchone():
-            print("🔄 Запуск миграции БД...")
-            import subprocess
-            result = subprocess.run([sys.executable, "migrate_add_delivery.py"], 
-                                  capture_output=True, text=True, timeout=30)
-            if result.returncode == 0:
-                print("✅ Миграция выполнена успешно")
-            else:
-                print(f"⚠️ Миграция завершилась с кодом {result.returncode}")
-        conn.close()
-    except Exception as e:
-        print(f"⚠️ Ошибка проверки миграции: {e}")
-    
     print("=" * 50)
     print("🚀 Запуск бота Fudly (Production Optimized)...")
     print("=" * 50)
