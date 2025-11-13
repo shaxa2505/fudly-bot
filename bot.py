@@ -7729,10 +7729,78 @@ if __name__ == "__main__":
         print("❌ Завершение работы дубликата...")
         sys.exit(1)
     
-    # Автоматически включаем доставку для всех магазинов (для Railway)
+    # Проверяем и создаём таблицы для доставки если их нет (для Railway)
     try:
         conn = sqlite3.connect(db.db_name)
         cursor = conn.cursor()
+        
+        # Проверяем наличие таблицы orders
+        cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='orders'")
+        if not cursor.fetchone():
+            print("🔄 Создаю таблицы для доставки...")
+            
+            # Создаём таблицу orders
+            cursor.execute('''
+                CREATE TABLE IF NOT EXISTS orders (
+                    order_id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    user_id INTEGER NOT NULL,
+                    store_id INTEGER NOT NULL,
+                    offer_id INTEGER NOT NULL,
+                    quantity INTEGER NOT NULL,
+                    total_amount REAL NOT NULL,
+                    delivery_price REAL NOT NULL,
+                    delivery_address TEXT NOT NULL,
+                    payment_method TEXT NOT NULL,
+                    payment_proof TEXT,
+                    status TEXT DEFAULT 'pending',
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    FOREIGN KEY (user_id) REFERENCES users(user_id),
+                    FOREIGN KEY (store_id) REFERENCES stores(store_id),
+                    FOREIGN KEY (offer_id) REFERENCES offers(offer_id)
+                )
+            ''')
+            
+            # Создаём таблицу payment_settings
+            cursor.execute('''
+                CREATE TABLE IF NOT EXISTS payment_settings (
+                    setting_id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    card_number TEXT NOT NULL,
+                    card_holder TEXT NOT NULL,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            ''')
+            
+            # Добавляем дефолтную карту
+            cursor.execute('SELECT COUNT(*) FROM payment_settings')
+            if cursor.fetchone()[0] == 0:
+                cursor.execute('''
+                    INSERT INTO payment_settings (card_number, card_holder)
+                    VALUES (?, ?)
+                ''', ('8600 0000 0000 0000', 'FUDLY PLATFORM'))
+            
+            # Добавляем поля доставки в stores
+            try:
+                cursor.execute('ALTER TABLE stores ADD COLUMN delivery_enabled INTEGER DEFAULT 0')
+            except:
+                pass
+            try:
+                cursor.execute('ALTER TABLE stores ADD COLUMN delivery_price INTEGER DEFAULT 10000')
+            except:
+                pass
+            try:
+                cursor.execute('ALTER TABLE stores ADD COLUMN min_order_amount INTEGER DEFAULT 20000')
+            except:
+                pass
+            
+            # Создаём индексы
+            cursor.execute('CREATE INDEX IF NOT EXISTS idx_orders_user ON orders(user_id)')
+            cursor.execute('CREATE INDEX IF NOT EXISTS idx_orders_store ON orders(store_id)')
+            cursor.execute('CREATE INDEX IF NOT EXISTS idx_orders_status ON orders(status)')
+            
+            conn.commit()
+            print("✅ Таблицы для доставки созданы")
+        
+        # Автоматически включаем доставку для всех магазинов
         cursor.execute('SELECT COUNT(*) FROM stores WHERE delivery_enabled = 1')
         enabled_count = cursor.fetchone()[0]
         cursor.execute('SELECT COUNT(*) FROM stores')
@@ -7749,9 +7817,10 @@ if __name__ == "__main__":
             ''')
             conn.commit()
             print(f"✅ Доставка включена для {total_count} магазина(ов)")
+        
         conn.close()
     except Exception as e:
-        print(f"⚠️ Ошибка при включении доставки: {e}")
+        print(f"⚠️ Ошибка при настройке доставки: {e}")
     
     print("=" * 50)
     print("🚀 Запуск бота Fudly (Production Optimized)...")
