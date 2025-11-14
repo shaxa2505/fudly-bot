@@ -33,6 +33,33 @@ DATABASE_URL = os.environ.get('DATABASE_URL', '')
 MIN_CONNECTIONS = int(os.environ.get('DB_MIN_CONN', '1'))
 MAX_CONNECTIONS = int(os.environ.get('DB_MAX_CONN', '10'))
 
+def fix_railway_database_url(url: str) -> str:
+    """
+    Fix Railway internal hostname to use public URL
+    Railway sometimes provides internal hostnames that don't work across services
+    """
+    if not url:
+        return url
+    
+    # Replace .railway.internal with public hostname components
+    if '.railway.internal' in url:
+        # Try to use individual PostgreSQL variables if available
+        pghost = os.environ.get('PGHOST', '')
+        pgport = os.environ.get('PGPORT', '5432')
+        pgdatabase = os.environ.get('PGDATABASE', 'railway')
+        pguser = os.environ.get('PGUSER', 'postgres')
+        pgpassword = os.environ.get('PGPASSWORD', '')
+        
+        if pghost and pgpassword and not '.railway.internal' in pghost:
+            # Build URL from components
+            rebuilt_url = f"postgresql://{pguser}:{pgpassword}@{pghost}:{pgport}/{pgdatabase}"
+            logger.info(f"🔧 Rebuilt DATABASE_URL from PGHOST components")
+            return rebuilt_url
+        else:
+            logger.warning(f"⚠️ DATABASE_URL contains .railway.internal but no valid PGHOST found")
+    
+    return url
+
 class Database:
     def __init__(self, database_url: str = None):
         """
@@ -41,11 +68,16 @@ class Database:
         Args:
             database_url: PostgreSQL connection string (postgresql://user:pass@host:port/dbname)
         """
-        self.database_url = database_url or DATABASE_URL
+        raw_url = database_url or DATABASE_URL
+        self.database_url = fix_railway_database_url(raw_url)
         self.db_name = "PostgreSQL"  # For compatibility with SQLite code
         
         if not self.database_url:
             raise ValueError("DATABASE_URL environment variable is required for PostgreSQL")
+        
+        # Log connection attempt (hide password)
+        safe_url = self.database_url.split('@')[1] if '@' in self.database_url else self.database_url
+        logger.info(f"🔌 Attempting to connect to: ...@{safe_url}")
         
         # Initialize connection pool
         try:
