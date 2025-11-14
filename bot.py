@@ -183,7 +183,30 @@ def get_appropriate_menu(user_id: int, lang: str):
 
 # Initialize bot, dispatcher and database
 bot = Bot(token=TOKEN)
-storage = MemoryStorage()
+
+# Try to use Redis for FSM storage (Railway), fallback to MemoryStorage
+try:
+    from aiogram.fsm.storage.redis import RedisStorage, DefaultKeyBuilder
+    import redis.asyncio as redis_async
+    
+    # Get Redis URL from environment (Railway provides REDIS_URL)
+    REDIS_URL = os.getenv("REDIS_URL")
+    
+    if REDIS_URL:
+        # Parse Redis URL
+        redis_client = redis_async.from_url(REDIS_URL)
+        storage = RedisStorage(redis_client, key_builder=DefaultKeyBuilder(with_destiny=True))
+        print("✅ Using Redis for FSM storage (persistent)")
+        logger.info("✅ Redis FSM storage initialized")
+    else:
+        storage = MemoryStorage()
+        print("⚠️ Redis URL not found, using MemoryStorage (states lost on restart)")
+        logger.warning("⚠️ Using MemoryStorage - FSM states will be lost on restart")
+except ImportError:
+    storage = MemoryStorage()
+    print("⚠️ Redis not available, using MemoryStorage")
+    logger.warning("⚠️ Redis module not found, using MemoryStorage")
+
 dp = Dispatcher(storage=storage)
 db = Database()
 
