@@ -1461,14 +1461,22 @@ async def show_offer_details(message: types.Message, offer_data: tuple, lang: st
     # Получаем информацию о магазине
     store_info = db.get_store(store_id)
     if store_info:
-        store_name = store_info[2]
-        store_address = store_info[4]
-        store_city = store_info[3]
-        # Индексы для новых полей доставки (в конце таблицы stores)
-        # delivery_enabled, delivery_price, min_order_amount - последние 3 поля
-        delivery_enabled = store_info[-3] if len(store_info) >= 3 else 0
-        delivery_price = store_info[-2] if len(store_info) >= 2 else 10000
-        min_order_amount = store_info[-1] if len(store_info) >= 1 else 20000
+        # Handle both dict (PostgreSQL) and tuple (SQLite)
+        if isinstance(store_info, dict):
+            store_name = store_info.get('name', 'Магазин')
+            store_address = store_info.get('address', '')
+            store_city = store_info.get('city', '')
+            delivery_enabled = 1  # PostgreSQL always has delivery enabled
+            delivery_price = 10000  # Default for PostgreSQL
+            min_order_amount = 20000  # Default for PostgreSQL
+        else:
+            store_name = store_info[2]
+            store_address = store_info[4]
+            store_city = store_info[3]
+            # Индексы для новых полей доставки (в конце таблицы stores)
+            delivery_enabled = store_info[-3] if len(store_info) >= 3 else 0
+            delivery_price = store_info[-2] if len(store_info) >= 2 else 10000
+            min_order_amount = store_info[-1] if len(store_info) >= 1 else 20000
     else:
         store_name = "Магазин"
         store_address = ""
