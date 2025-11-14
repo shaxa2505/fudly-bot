@@ -47,6 +47,9 @@ SECRET_TOKEN = os.getenv("SECRET_TOKEN", "")
 METRICS = {
     "updates_received": 0,
     "updates_errors": 0,
+    "webhook_json_errors": 0,
+    "webhook_validation_errors": 0,
+    "webhook_unexpected_errors": 0,
     "bookings_created": 0,
     "bookings_cancelled": 0
 }
@@ -7482,30 +7485,50 @@ async def main():
         
         # Webhook endpoint
         async def webhook_handler(request):
+            start_ts = datetime.now()
+            # Разрешаем только POST запросы Telegram
+            if request.method != 'POST':
+                return web.Response(status=405, text='Method Not Allowed')
             try:
                 logger.info(f"Webhook request received from {request.remote}")
-                
-                # Проверяем секретный токен Telegram при наличии
+
+                # Проверяем секретный токен (если настроен)
                 if SECRET_TOKEN:
                     hdr = request.headers.get("X-Telegram-Bot-Api-Secret-Token")
                     if hdr != SECRET_TOKEN:
-                        logger.warning(f"Invalid secret token from {request.remote}")
+                        logger.warning("Invalid secret token")
+                        METRICS["updates_errors"] += 1
                         return web.Response(status=403, text="Forbidden")
-                
-                # Основная обработка запроса
-                update_data = await request.json()
-                logger.debug(f"Update data: {update_data}")
-                
-                telegram_update = types.Update.model_validate(update_data)
+
+                # Парсинг JSON
+                try:
+                    update_data = await request.json()
+                except Exception as json_e:
+                    logger.error(f"Webhook JSON parse error: {repr(json_e)}")
+                    METRICS["webhook_json_errors"] += 1
+                    # Возвращаем 200 чтобы Telegram не ретраил бесконечно
+                    return web.Response(status=200, text="OK")
+
+                logger.debug(f"Raw update: {update_data}")
+
+                # Валидация структуры Update
+                try:
+                    telegram_update = types.Update.model_validate(update_data)
+                except Exception as validate_e:
+                    logger.error(f"Webhook validation error: {repr(validate_e)}")
+                    METRICS["webhook_validation_errors"] += 1
+                    return web.Response(status=200, text="OK")
+
+                # Обработка апдейта
                 await dp.feed_update(bot, telegram_update)
-                
-                METRICS["updates_received"] = METRICS.get("updates_received", 0) + 1
-                logger.info("Update processed successfully")
+                METRICS["updates_received"] += 1
+                proc_ms = int((datetime.now() - start_ts).total_seconds() * 1000)
+                logger.info(f"Update processed successfully ({proc_ms}ms)")
                 return web.Response(status=200, text="OK")
             except Exception as e:
-                logger.error(f"Webhook error: {e}", exc_info=True)
-                METRICS["updates_errors"] = METRICS.get("updates_errors", 0) + 1
-                # Возвращаем 200 чтобы Telegram не повторял запрос
+                logger.error(f"Webhook unexpected error: {repr(e)}", exc_info=True)
+                METRICS["webhook_unexpected_errors"] += 1
+                METRICS["updates_errors"] += 1
                 return web.Response(status=200, text="OK")
         
         # Health check endpoint
