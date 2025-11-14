@@ -2748,8 +2748,8 @@ async def cancel_booking(callback: types.CallbackQuery):
                     parse_mode="HTML",
                     reply_markup=customer_kb.as_markup()
                 )
-            except Exception as e:
-                logger.error(f"Failed to notify customer {customer_id}: {e}")
+        except Exception as e:
+            logger.error(f"Failed to notify customer {customer_id}: {e}")
         
     await callback.answer()
 
