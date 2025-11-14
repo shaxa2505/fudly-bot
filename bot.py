@@ -43,6 +43,14 @@ WEBHOOK_PATH = os.getenv("WEBHOOK_PATH", "/webhook")
 PORT = int(os.getenv("PORT", "8080"))
 SECRET_TOKEN = os.getenv("SECRET_TOKEN", "")
 
+# Initialize metrics dictionary
+METRICS = {
+    "updates_received": 0,
+    "updates_errors": 0,
+    "bookings_created": 0,
+    "bookings_cancelled": 0
+}
+
 # Helper function for safe user data access (dict from PostgreSQL, tuple from SQLite)
 def get_user_field(user, field_name: str, default=None):
     """Safely extract field from user (dict or tuple)"""
