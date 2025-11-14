@@ -39,6 +39,8 @@ ADMIN_ID = int(os.getenv("ADMIN_ID", "0"))
 # Get webhook settings
 USE_WEBHOOK = os.getenv("USE_WEBHOOK", "false").lower() in ("true", "1", "yes")
 WEBHOOK_URL = os.getenv("WEBHOOK_URL", "")
+WEBHOOK_PATH = os.getenv("WEBHOOK_PATH", "/webhook")
+PORT = int(os.getenv("PORT", "8080"))
 
 # Helper function for safe user data access (dict from PostgreSQL, tuple from SQLite)
 def get_user_field(user, field_name: str, default=None):
