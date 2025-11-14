@@ -7578,6 +7578,39 @@ async def cmd_enable_delivery(message: types.Message):
 
 # ============== ОТЛАДКА - НЕИЗВЕСТНЫЕ СООБЩЕНИЯ ==============
 
+@dp.message(F.photo)
+async def unexpected_photo_handler(message: types.Message, state: FSMContext):
+    """Обработчик для фото без активного состояния (например после перезапуска Railway)"""
+    lang = db.get_user_language(message.from_user.id)
+    current_state = await state.get_state()
+    
+    logger.warning(f"⚠️ User {message.from_user.id} sent photo without FSM state (current: {current_state})")
+    print(f"[DEBUG] ⚠️ Unexpected photo from {message.from_user.id}, state: {current_state}")
+    
+    # Объясняем что произошло и как исправить
+    await message.answer(
+        "⚠️ " + (
+            "Произошла ошибка: данные заказа потеряны.\n\n"
+            "Это может произойти если:\n"
+            "• Прошло много времени между шагами\n"
+            "• Сервер был перезапущен\n\n"
+            "Пожалуйста, начните оформление заказа заново:\n"
+            "1. Откройте 🔥 Горячее или 📍 Места\n"
+            "2. Выберите товар\n"
+            "3. Нажмите 🚚 Заказать с доставкой"
+            if lang == 'ru' else
+            "⚠️ Xatolik: buyurtma ma'lumotlari yo'qoldi.\n\n"
+            "Bu quyidagi hollarda sodir bo'lishi mumkin:\n"
+            "• Qadamlar orasida ko'p vaqt o'tdi\n"
+            "• Server qayta ishga tushirildi\n\n"
+            "Iltimos, buyurtmani qaytadan boshlang:\n"
+            "1. 🔥 Issiq yoki 📍 Joylar ni oching\n"
+            "2. Mahsulotni tanlang\n"
+            "3. 🚚 Yetkazib berish bilan tugmasini bosing"
+        ),
+        reply_markup=get_appropriate_menu(message.from_user.id, lang)
+    )
+
 @dp.message(F.text)
 async def unknown_message_debug(message: types.Message, state: FSMContext):
     """Отладочный обработчик для неизвестных текстовых сообщений"""
