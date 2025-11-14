@@ -80,8 +80,6 @@ except ImportError as e:
             return True
     
     validator = FallbackValidator()
-        except Exception:
-            return True
 
 # Словарь для преобразования узбекских названий городов в русские
 CITY_UZ_TO_RU = {
