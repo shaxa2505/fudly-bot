@@ -7485,7 +7485,8 @@ async def main():
         
         # Webhook endpoint
         async def webhook_handler(request):
-            start_ts = datetime.now()
+            import time
+            start_ts = time.time()
             # Разрешаем только POST запросы Telegram
             if request.method != 'POST':
                 return web.Response(status=405, text='Method Not Allowed')
@@ -7522,7 +7523,7 @@ async def main():
                 # Обработка апдейта
                 await dp.feed_update(bot, telegram_update)
                 METRICS["updates_received"] += 1
-                proc_ms = int((datetime.now() - start_ts).total_seconds() * 1000)
+                proc_ms = int((time.time() - start_ts) * 1000)
                 logger.info(f"Update processed successfully ({proc_ms}ms)")
                 return web.Response(status=200, text="OK")
             except Exception as e:
