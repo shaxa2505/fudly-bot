@@ -534,9 +534,8 @@ async def hot_offers_handler(message: types.Message, state: FSMContext):
     # Получаем топ-20 горячих предложений (начиная с offset=0)
     offers = db.get_hot_offers(search_city, limit=20, offset=0)
     
-    # Получаем общее количество для проверки пагинации
-    all_offers = db.get_hot_offers(search_city, limit=1000)
-    total_count = len(all_offers)
+    # Оптимизированный подсчёт без загрузки всех записей (БЫСТРО!)
+    total_count = db.count_hot_offers(search_city)
     
     logger.info(f"🔥 Found {len(offers)} hot offers (total: {total_count})")
     print(f"[DEBUG] Hot offers: city={city}, search_city={search_city}, found={len(offers)}, total={total_count}")
@@ -614,8 +613,8 @@ async def hot_offers_pagination(callback: types.CallbackQuery, state: FSMContext
         
         # Получаем следующие 20 предложений
         offers = db.get_hot_offers(search_city, limit=20, offset=offset)
-        all_offers = db.get_hot_offers(search_city, limit=1000)
-        total_count = len(all_offers)
+        # Оптимизированный подсчёт без загрузки всех записей
+        total_count = db.count_hot_offers(search_city)
         
         logger.info(f"🔥 Pagination: offset={offset}, found {len(offers)} offers (total: {total_count})")
         
@@ -1292,8 +1291,8 @@ async def back_to_hot_offers(callback: types.CallbackQuery, state: FSMContext):
     
     # Получаем топ-20 горячих предложений
     offers = db.get_hot_offers(search_city, limit=20, offset=0)
-    all_offers = db.get_hot_offers(search_city, limit=1000)
-    total_count = len(all_offers)
+    # Оптимизированный подсчёт без загрузки всех записей
+    total_count = db.count_hot_offers(search_city)
     
     if not offers:
         await callback.answer(

@@ -719,6 +719,33 @@ class Database:
             cursor.execute(query, params)
             return [dict(row) for row in cursor.fetchall()]
     
+    def count_hot_offers(self, city: str = None, business_type: str = None) -> int:
+        """Подсчёт горячих предложений без загрузки данных (быстрая операция)"""
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            
+            query = '''
+                SELECT COUNT(*)
+                FROM offers o
+                JOIN stores s ON o.store_id = s.store_id
+                WHERE o.status = 'active'
+                  AND o.quantity > 0
+                  AND s.status = 'active'
+                  AND (o.available_until IS NULL OR o.available_until >= NOW())
+            '''
+            params = []
+            
+            if city:
+                query += ' AND s.city = %s'
+                params.append(city)
+            
+            if business_type:
+                query += ' AND s.business_type = %s'
+                params.append(business_type)
+            
+            cursor.execute(query, params)
+            return cursor.fetchone()[0]
+    
     def update_offer_quantity(self, offer_id: int, quantity: int):
         """Update offer quantity"""
         with self.get_connection() as conn:

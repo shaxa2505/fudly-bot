@@ -830,6 +830,47 @@ class Database:
         
         return offers
     
+    def count_hot_offers(self, city: str = None, business_type: str = None) -> int:
+        """Подсчёт горячих предложений без загрузки данных (быстрая операция)
+        
+        Args:
+            city: Город для фильтрации
+            business_type: Тип заведения
+            
+        Returns: Количество горячих предложений
+        """
+        conn = self.get_connection()
+        cursor = conn.cursor()
+        
+        query = '''
+            SELECT COUNT(*)
+            FROM offers o
+            JOIN stores s ON o.store_id = s.store_id
+            WHERE o.status = "active"
+              AND o.quantity > 0
+              AND s.status = "active"
+              AND (o.available_until IS NULL OR datetime(o.available_until) >= datetime('now'))
+        '''
+        params = []
+        
+        if city:
+            query += ' AND s.city = ?'
+            params.append(city)
+        
+        if business_type:
+            query += ' AND s.business_type = ?'
+            params.append(business_type)
+        
+        cursor.execute(query, params)
+        count = cursor.fetchone()[0]
+        
+        try:
+            conn.close()
+        except Exception:
+            pass
+        
+        return count
+    
     def get_offer(self, offer_id: int) -> Optional[Tuple]:
         """Получить предложение с информацией о магазине.
         
