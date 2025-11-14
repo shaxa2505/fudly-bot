@@ -491,7 +491,7 @@ class Database:
             cursor = conn.cursor(cursor_factory=RealDictCursor)
             
             query = '''
-                SELECT o.*, s.name as store_name, s.address, s.city, s.business_type,
+                SELECT o.*, s.name as store_name, s.address, s.city, s.category,
                        CAST((1.0 - o.discount_price::float / o.original_price::float) * 100 AS INTEGER) as discount_percent
                 FROM offers o
                 JOIN stores s ON o.store_id = s.store_id
@@ -506,7 +506,7 @@ class Database:
                 params.append(f'%{city}%')
             
             if business_type:
-                query += ' AND s.business_type = %s'
+                query += ' AND s.category = %s'
                 params.append(business_type)
             
             query += '''
@@ -792,6 +792,36 @@ class Database:
         with self.get_connection() as conn:
             cursor = conn.cursor(cursor_factory=RealDictCursor)
             cursor.execute('SELECT * FROM stores WHERE city = %s AND status = %s', (city, 'active'))
+            return [dict(row) for row in cursor.fetchall()]
+    
+    def get_stores_by_business_type(self, business_type: str, city: str = None):
+        """Get stores by business type (using category field) with active offers count"""
+        with self.get_connection() as conn:
+            cursor = conn.cursor(cursor_factory=RealDictCursor)
+            
+            query = '''
+                SELECT s.*, 
+                       COUNT(o.offer_id) as offers_count
+                FROM stores s
+                LEFT JOIN offers o ON s.store_id = o.store_id 
+                    AND o.status = 'active' 
+                    AND o.quantity > 0
+                WHERE (s.status = 'active' OR s.status = 'approved')
+                AND s.category = %s
+            '''
+            params = [business_type]
+            
+            if city:
+                query += ' AND s.city ILIKE %s'
+                params.append(f'%{city}%')
+            
+            query += '''
+                GROUP BY s.store_id
+                HAVING COUNT(o.offer_id) > 0
+                ORDER BY COUNT(o.offer_id) DESC, s.name
+            '''
+            
+            cursor.execute(query, params)
             return [dict(row) for row in cursor.fetchall()]
     
     def get_all_users(self):
