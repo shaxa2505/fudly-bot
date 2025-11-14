@@ -2621,6 +2621,12 @@ async def order_payment_proof(message: types.Message, state: FSMContext):
     print(f"[DEBUG] 📸 Payment proof received from user {message.from_user.id}")
     logger.info(f"📸 Payment screenshot received from user {message.from_user.id}")
     
+    # Проверяем состояние
+    current_state = await state.get_state()
+    data = await state.get_data()
+    print(f"[DEBUG] Current state: {current_state}, Data keys: {list(data.keys())}")
+    logger.info(f"State: {current_state}, Data: {list(data.keys())}")
+    
     lang = db.get_user_language(message.from_user.id)
     
     # Rate limit
@@ -2629,6 +2635,21 @@ async def order_payment_proof(message: types.Message, state: FSMContext):
         return
     
     data = await state.get_data()
+    
+    # Проверяем что все данные на месте
+    required_keys = ['offer_id', 'store_id', 'quantity', 'address']
+    missing_keys = [key for key in required_keys if key not in data]
+    
+    if missing_keys:
+        logger.error(f"❌ Missing data for user {message.from_user.id}: {missing_keys}")
+        print(f"[DEBUG] ❌ Missing keys: {missing_keys}, available: {list(data.keys())}")
+        await message.answer(
+            "❌ " + ("Данные заказа потеряны. Пожалуйста, начните оформление заново из каталога." if lang == 'ru' else "Buyurtma ma'lumotlari yo'qoldi. Iltimos, katalogdan qayta boshlang."),
+            reply_markup=get_appropriate_menu(message.from_user.id, lang)
+        )
+        await state.clear()
+        return
+    
     offer_id = data['offer_id']
     store_id = data['store_id']
     quantity = data['quantity']
