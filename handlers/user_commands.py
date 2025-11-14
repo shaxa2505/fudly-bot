@@ -123,8 +123,18 @@ def setup(dp_or_router: Any, db: Any, get_text: Callable, get_cities: Callable, 
         
         lang = db.get_user_language(message.from_user.id)
         
+        # Handle both dict (PostgreSQL) and tuple (SQLite)
+        if isinstance(user, dict):
+            user_phone = user.get('phone')
+            user_city = user.get('city')
+            user_role = user.get('role', 'customer')
+        else:
+            user_phone = user[3]
+            user_city = user[4]
+            user_role = user[6] if len(user) > 6 else 'customer'
+        
         # Check phone
-        if not user[3]:
+        if not user_phone:
             await message.answer(
                 get_text(lang, 'welcome_phone_step'),
                 parse_mode="HTML",
@@ -134,7 +144,7 @@ def setup(dp_or_router: Any, db: Any, get_text: Callable, get_cities: Callable, 
             return
         
         # Check city
-        if not user[4]:
+        if not user_city:
             await message.answer(
                 get_text(lang, 'welcome_city_step'),
                 parse_mode="HTML",
@@ -144,9 +154,9 @@ def setup(dp_or_router: Any, db: Any, get_text: Callable, get_cities: Callable, 
             return
         
         # Welcome message
-        menu = main_menu_seller(lang) if user[6] == "seller" else main_menu_customer(lang)
+        menu = main_menu_seller(lang) if user_role == "seller" else main_menu_customer(lang)
         await message.answer(
-            get_text(lang, 'welcome_back', name=message.from_user.first_name, city=user[4]),
+            get_text(lang, 'welcome_back', name=message.from_user.first_name, city=user_city),
             parse_mode="HTML",
             reply_markup=menu
         )
