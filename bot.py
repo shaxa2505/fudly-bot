@@ -2471,6 +2471,8 @@ async def order_payment_card(callback: types.CallbackQuery, state: FSMContext):
     # Сохраняем способ оплаты
     await state.update_data(payment_method='card')
     await state.set_state(OrderDelivery.payment_proof)
+    print(f"[DEBUG] 💳 Set state to payment_proof for user {callback.from_user.id}")
+    logger.info(f"💳 Waiting for payment screenshot from user {callback.from_user.id}")
     
     # Получаем реквизиты платформенной карты
     payment_card = db.get_platform_payment_card()
@@ -2616,6 +2618,9 @@ async def order_payment_cash(callback: types.CallbackQuery, state: FSMContext):
 @dp.message(OrderDelivery.payment_proof, F.photo)
 async def order_payment_proof(message: types.Message, state: FSMContext):
     """Обработка скриншота оплаты и создание заказа"""
+    print(f"[DEBUG] 📸 Payment proof received from user {message.from_user.id}")
+    logger.info(f"📸 Payment screenshot received from user {message.from_user.id}")
+    
     lang = db.get_user_language(message.from_user.id)
     
     # Rate limit
@@ -2735,6 +2740,18 @@ async def order_payment_proof(message: types.Message, state: FSMContext):
         parse_mode="HTML"
     )
     await message.answer("✅ " + ("Готово!" if lang == 'ru' else "Tayyor!"), reply_markup=menu)
+
+@dp.message(OrderDelivery.payment_proof)
+async def order_payment_proof_invalid(message: types.Message, state: FSMContext):
+    """Если пользователь отправил не фото"""
+    lang = db.get_user_language(message.from_user.id)
+    print(f"[DEBUG] ❌ User {message.from_user.id} sent non-photo message in payment_proof state")
+    logger.warning(f"❌ User {message.from_user.id} sent {message.content_type} instead of photo")
+    
+    await message.answer(
+        "❌ " + ("Пожалуйста, отправьте скриншот чека (фото)" if lang == 'ru' else "Iltimos, chek skrinshotini (rasm) yuboring"),
+        reply_markup=cancel_keyboard(lang)
+    )
 
 # ============== ПОДРОБНОСТИ ПРЕДЛОЖЕНИЯ ==============
 
