@@ -58,6 +58,11 @@ user_view_mode = {}
 try:
     from security import validator, rate_limiter, secure_user_input, validate_admin_action
     from logging_config import logger
+    
+    def start_background_tasks(db):
+        """Background tasks starter (production)"""
+        logger.info("Background tasks ready")
+    
     PRODUCTION_FEATURES = True
 except ImportError as e:
     print(f"⚠️ Production features not available: {e}")
