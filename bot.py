@@ -2754,7 +2754,7 @@ async def filter_bookings(callback: types.CallbackQuery):
         if not selected_bookings and not selected_orders:
             await callback.answer("Нет заказов" if lang == 'ru' else "Buyurtmalar yo'q", show_alert=True)
             return
-    
+        
         await callback.message.edit_text(
             f"{label}: {len(selected_bookings) + len(selected_orders)}",
             reply_markup=booking_filters_keyboard(lang, len(active_bookings), len(completed_bookings), len(cancelled_bookings)),
@@ -2765,126 +2765,126 @@ async def filter_bookings(callback: types.CallbackQuery):
         if selected_bookings:
             header_text = "📦 Бронирования (самовывоз)" if lang == 'ru' else "📦 Bronlar (olib ketish)"
             await callback.message.answer(f"<b>{header_text}</b>", parse_mode="HTML")
+        
+        for booking in selected_bookings:
+            try:
+                quantity = int(booking[6]) if len(booking) > 6 and booking[6] is not None else 1
+                discount_price = float(booking[9]) if len(booking) > 9 and booking[9] is not None else 0.0
+                total_price = int(discount_price * quantity)
+                status_emoji = {"pending": "⏳", "confirmed": "✅", "completed": "🎉", "cancelled": "❌"}
+                status_text = {"pending": "Ожидает", "confirmed": "Подтвержден", "completed": "Завершен", "cancelled": "Отменен"}
+                text = f"🎫 <b>#{booking[0]}</b> {status_emoji.get(booking[3], '📋')} {status_text.get(booking[3], booking[3])}\n"
+                text += f"🍽 {booking[8]}\n"  # title
+                text += f"🏪 {booking[11]}\n"  # store_name
+                text += f"📦 Количество: {quantity} шт\n"
+                text += f"💰 {total_price:,} сум\n"
+                text += f"📍 {booking[13]}, {booking[12]}\n"  # city, address
+                text += f"🕐 {booking[10]}\n\n"  # available_until
+                text += f"🎫 Код: <code>{booking[4]}</code>"
+                keyboard = InlineKeyboardBuilder()
+                if booking[3] == 'pending':
+                    keyboard.button(text="❌ Отменить", callback_data=f"cancel_booking_{booking[0]}")
+                    keyboard.button(text="✅ Завершить", callback_data=f"complete_booking_{booking[0]}")
+                    keyboard.adjust(2)
+                elif booking[3] == 'confirmed':
+                    keyboard.button(text="✅ Завершить", callback_data=f"complete_booking_{booking[0]}")
+                    keyboard.button(text="⭐ Оценить", callback_data=f"rate_booking_{booking[0]}")
+                    keyboard.adjust(2)
+                await callback.message.answer(text, parse_mode="HTML", reply_markup=keyboard.as_markup())
+            except Exception as e:
+                logger.error(f"Error displaying booking {booking[0]}: {e}")
+                continue
     
-    for booking in selected_bookings:
-        try:
-            quantity = int(booking[6]) if len(booking) > 6 and booking[6] is not None else 1
-            discount_price = float(booking[9]) if len(booking) > 9 and booking[9] is not None else 0.0
-            total_price = int(discount_price * quantity)
-            status_emoji = {"pending": "⏳", "confirmed": "✅", "completed": "🎉", "cancelled": "❌"}
-            status_text = {"pending": "Ожидает", "confirmed": "Подтвержден", "completed": "Завершен", "cancelled": "Отменен"}
-            text = f"🎫 <b>#{booking[0]}</b> {status_emoji.get(booking[3], '📋')} {status_text.get(booking[3], booking[3])}\n"
-            text += f"🍽 {booking[8]}\n"  # title
-            text += f"🏪 {booking[11]}\n"  # store_name
-            text += f"📦 Количество: {quantity} шт\n"
-            text += f"💰 {total_price:,} сум\n"
-            text += f"📍 {booking[13]}, {booking[12]}\n"  # city, address
-            text += f"🕐 {booking[10]}\n\n"  # available_until
-            text += f"🎫 Код: <code>{booking[4]}</code>"
-            keyboard = InlineKeyboardBuilder()
-            if booking[3] == 'pending':
-                keyboard.button(text="❌ Отменить", callback_data=f"cancel_booking_{booking[0]}")
-                keyboard.button(text="✅ Завершить", callback_data=f"complete_booking_{booking[0]}")
-                keyboard.adjust(2)
-            elif booking[3] == 'confirmed':
-                keyboard.button(text="✅ Завершить", callback_data=f"complete_booking_{booking[0]}")
-                keyboard.button(text="⭐ Оценить", callback_data=f"rate_booking_{booking[0]}")
-                keyboard.adjust(2)
-            await callback.message.answer(text, parse_mode="HTML", reply_markup=keyboard.as_markup())
-        except Exception as e:
-            logger.error(f"Error displaying booking {booking[0]}: {e}")
-            continue
-    
-    # Показываем заказы с доставкой
-    if selected_orders:
-        header_text = "🚚 Заказы с доставкой" if lang == 'ru' else "🚚 Yetkazib berish buyurtmalari"
-        await callback.message.answer(f"<b>{header_text}</b>", parse_mode="HTML")
-    
-    for order in selected_orders:
-        try:
-            # Структура order после JOIN: order_id, user_id, store_id, offer_id, quantity, 
-            # order_type, delivery_address, delivery_price, payment_method, payment_status,
-            # order_status, total_amount, created_at, offer_title, store_name
-            order_id = order[0]
-            quantity = order[4]
-            order_type = order[5]
-            delivery_address = order[6] if order[6] else ""
-            delivery_price = order[7]
-            payment_method = order[8]
-            payment_status = order[9]
-            order_status = order[10]
-            total_amount = order[11]
-            offer_title = order[13] if len(order) > 13 else "Товар"
-            store_name = order[14] if len(order) > 14 else "Магазин"
-            
-            status_emoji = {
-                "pending": "⏳",
-                "confirmed": "✅",
-                "preparing": "👨‍🍳",
-                "delivering": "🚚",
-                "completed": "🎉",
-                "cancelled": "❌"
-            }
-            status_text_ru = {
-                "pending": "Ожидает",
-                "confirmed": "Подтверждён",
-                "preparing": "Готовится",
-                "delivering": "В пути",
-                "completed": "Завершён",
-                "cancelled": "Отменён"
-            }
-            status_text_uz = {
-                "pending": "Kutilmoqda",
-                "confirmed": "Tasdiqlangan",
-                "preparing": "Tayyorlanmoqda",
-                "delivering": "Yo'lda",
-                "completed": "Yakunlangan",
-                "cancelled": "Bekor qilingan"
-            }
-            
-            payment_text_ru = {"card": "Перевод на карту", "cash": "Наличными"}
-            payment_text_uz = {"card": "Kartaga o'tkazma", "cash": "Naqd"}
-            
-            status_name = status_text_ru.get(order_status, order_status) if lang == 'ru' else status_text_uz.get(order_status, order_status)
-            payment_name = payment_text_ru.get(payment_method, payment_method) if lang == 'ru' else payment_text_uz.get(payment_method, payment_method)
-            
-            text = f"📦 <b>{'Заказ' if lang == 'ru' else 'Buyurtma'} #{order_id}</b> {status_emoji.get(order_status, '📋')} {status_name}\n"
-            text += f"🍽 {offer_title}\n"
-            text += f"🏪 {store_name}\n"
-            text += f"📦 {'Количество' if lang == 'ru' else 'Miqdor'}: {quantity} {'шт' if lang == 'ru' else 'dona'}\n"
-            
-            if delivery_address:
-                text += f"📍 {delivery_address}\n"
-            
-            payment_ru = 'Оплата'
-            payment_uz = "To'lov"
-            text += f"💰 {payment_ru if lang == 'ru' else payment_uz}: {payment_name}\n"
-            
-            if payment_method == 'card':
-                pending_text = '⏳ Ожидает подтверждения' if lang == 'ru' else '⏳ Tasdiq kutilmoqda'
-                paid_text = '✅ Оплачено' if lang == 'ru' else "✅ To'langan"
-                confirmed_text = '✅ Подтверждено' if lang == 'ru' else '✅ Tasdiqlangan'
-                payment_status_text = {
-                    'pending': pending_text,
-                    'paid': paid_text,
-                    'confirmed': confirmed_text
+        # Показываем заказы с доставкой
+        if selected_orders:
+            header_text = "🚚 Заказы с доставкой" if lang == 'ru' else "🚚 Yetkazib berish buyurtmalari"
+            await callback.message.answer(f"<b>{header_text}</b>", parse_mode="HTML")
+        
+        for order in selected_orders:
+            try:
+                # Структура order после JOIN: order_id, user_id, store_id, offer_id, quantity, 
+                # order_type, delivery_address, delivery_price, payment_method, payment_status,
+                # order_status, total_amount, created_at, offer_title, store_name
+                order_id = order[0]
+                quantity = order[4]
+                order_type = order[5]
+                delivery_address = order[6] if order[6] else ""
+                delivery_price = order[7]
+                payment_method = order[8]
+                payment_status = order[9]
+                order_status = order[10]
+                total_amount = order[11]
+                offer_title = order[13] if len(order) > 13 else "Товар"
+                store_name = order[14] if len(order) > 14 else "Магазин"
+                
+                status_emoji = {
+                    "pending": "⏳",
+                    "confirmed": "✅",
+                    "preparing": "👨‍🍳",
+                    "delivering": "🚚",
+                    "completed": "🎉",
+                    "cancelled": "❌"
                 }
-                text += f"💳 {payment_status_text.get(payment_status, payment_status)}\n"
-            
-            currency_ru = 'сум'
-            currency_uz = "so'm"
-            text += f"💵 {'Итого' if lang == 'ru' else 'Jami'}: <b>{total_amount:,} {currency_ru if lang == 'ru' else currency_uz}</b>"
-            
-            keyboard = InlineKeyboardBuilder()
-            if order_status in ['pending', 'confirmed']:
-                keyboard.button(text="❌ " + ("Отменить" if lang == 'ru' else "Bekor qilish"), callback_data=f"cancel_order_customer_{order_id}")
-            
-            await callback.message.answer(text, parse_mode="HTML", reply_markup=keyboard.as_markup() if keyboard.export() else None)
-        except Exception as e:
-            logger.error(f"Error displaying order {order[0] if order else 'unknown'}: {e}")
-            continue
-    
-    await callback.answer()
+                status_text_ru = {
+                    "pending": "Ожидает",
+                    "confirmed": "Подтверждён",
+                    "preparing": "Готовится",
+                    "delivering": "В пути",
+                    "completed": "Завершён",
+                    "cancelled": "Отменён"
+                }
+                status_text_uz = {
+                    "pending": "Kutilmoqda",
+                    "confirmed": "Tasdiqlangan",
+                    "preparing": "Tayyorlanmoqda",
+                    "delivering": "Yo'lda",
+                    "completed": "Yakunlangan",
+                    "cancelled": "Bekor qilingan"
+                }
+                
+                payment_text_ru = {"card": "Перевод на карту", "cash": "Наличными"}
+                payment_text_uz = {"card": "Kartaga o'tkazma", "cash": "Naqd"}
+                
+                status_name = status_text_ru.get(order_status, order_status) if lang == 'ru' else status_text_uz.get(order_status, order_status)
+                payment_name = payment_text_ru.get(payment_method, payment_method) if lang == 'ru' else payment_text_uz.get(payment_method, payment_method)
+                
+                text = f"📦 <b>{'Заказ' if lang == 'ru' else 'Buyurtma'} #{order_id}</b> {status_emoji.get(order_status, '📋')} {status_name}\n"
+                text += f"🍽 {offer_title}\n"
+                text += f"🏪 {store_name}\n"
+                text += f"📦 {'Количество' if lang == 'ru' else 'Miqdor'}: {quantity} {'шт' if lang == 'ru' else 'dona'}\n"
+                
+                if delivery_address:
+                    text += f"📍 {delivery_address}\n"
+                
+                payment_ru = 'Оплата'
+                payment_uz = "To'lov"
+                text += f"💰 {payment_ru if lang == 'ru' else payment_uz}: {payment_name}\n"
+                
+                if payment_method == 'card':
+                    pending_text = '⏳ Ожидает подтверждения' if lang == 'ru' else '⏳ Tasdiq kutilmoqda'
+                    paid_text = '✅ Оплачено' if lang == 'ru' else "✅ To'langan"
+                    confirmed_text = '✅ Подтверждено' if lang == 'ru' else '✅ Tasdiqlangan'
+                    payment_status_text = {
+                        'pending': pending_text,
+                        'paid': paid_text,
+                        'confirmed': confirmed_text
+                    }
+                    text += f"💳 {payment_status_text.get(payment_status, payment_status)}\n"
+                
+                currency_ru = 'сум'
+                currency_uz = "so'm"
+                text += f"💵 {'Итого' if lang == 'ru' else 'Jami'}: <b>{total_amount:,} {currency_ru if lang == 'ru' else currency_uz}</b>"
+                
+                keyboard = InlineKeyboardBuilder()
+                if order_status in ['pending', 'confirmed']:
+                    keyboard.button(text="❌ " + ("Отменить" if lang == 'ru' else "Bekor qilish"), callback_data=f"cancel_order_customer_{order_id}")
+                
+                await callback.message.answer(text, parse_mode="HTML", reply_markup=keyboard.as_markup() if keyboard.export() else None)
+            except Exception as e:
+                logger.error(f"Error displaying order {order[0] if order else 'unknown'}: {e}")
+                continue
+        
+        await callback.answer()
     except Exception as e:
         logger.error(f"Error in filter_bookings: {e}")
         await callback.answer("Ошибка", show_alert=True)
