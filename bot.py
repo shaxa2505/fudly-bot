@@ -2733,11 +2733,11 @@ async def cancel_booking(callback: types.CallbackQuery):
     lang = db.get_user_language(callback.from_user.id)
     booking_id = int(callback.data.split("_")[2])
     
-            from aiogram.utils.keyboard import InlineKeyboardBuilder
-            customer_kb = InlineKeyboardBuilder()
-            customer_kb.button(text="🏠 Главное меню", callback_data="main_menu")
-            
-            try:
+    from aiogram.utils.keyboard import InlineKeyboardBuilder
+    customer_kb = InlineKeyboardBuilder()
+    customer_kb.button(text="🏠 Главное меню", callback_data="main_menu")
+    
+    try:
                 await bot.send_message(
                     customer_id,
                     f"❌ <b>Бронирование отменено</b>\n\n"
