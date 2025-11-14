@@ -36,6 +36,10 @@ if not TOKEN:
 # Get admin ID from environment
 ADMIN_ID = int(os.getenv("ADMIN_ID", "0"))
 
+# Get webhook settings
+USE_WEBHOOK = os.getenv("USE_WEBHOOK", "false").lower() in ("true", "1", "yes")
+WEBHOOK_URL = os.getenv("WEBHOOK_URL", "")
+
 # Helper function for safe user data access (dict from PostgreSQL, tuple from SQLite)
 def get_user_field(user, field_name: str, default=None):
     """Safely extract field from user (dict or tuple)"""
