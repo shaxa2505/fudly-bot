@@ -678,7 +678,7 @@ class Database:
             
             query += '''
                 ORDER BY discount_percent DESC, 
-                         COALESCE(o.expiry_date::text, '9999-12-31') ASC,
+                         COALESCE(o.expiry_date, '9999-12-31') ASC,
                          o.created_at DESC
                 LIMIT %s OFFSET %s
             '''
