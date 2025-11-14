@@ -779,6 +779,156 @@ class Database:
             cursor.execute('UPDATE offers SET status = %s WHERE offer_id = %s', 
                          ('inactive', offer_id))
     
+    def get_store_owner(self, store_id: int):
+        """Get store owner ID"""
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute('SELECT owner_id FROM stores WHERE store_id = %s', (store_id,))
+            result = cursor.fetchone()
+            return result[0] if result else None
+    
+    def get_stores_by_city(self, city: str):
+        """Get all active stores in city"""
+        with self.get_connection() as conn:
+            cursor = conn.cursor(cursor_factory=RealDictCursor)
+            cursor.execute('SELECT * FROM stores WHERE city = %s AND status = %s', (city, 'active'))
+            return [dict(row) for row in cursor.fetchall()]
+    
+    def get_all_users(self):
+        """Get all users with notifications enabled"""
+        with self.get_connection() as conn:
+            cursor = conn.cursor(cursor_factory=RealDictCursor)
+            cursor.execute('SELECT * FROM users WHERE notifications_enabled = TRUE')
+            return [dict(row) for row in cursor.fetchall()]
+    
+    def get_all_admins(self):
+        """Get all admins"""
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute('SELECT user_id FROM users WHERE is_admin = TRUE')
+            return [row[0] for row in cursor.fetchall()]
+    
+    def toggle_notifications(self, user_id: int):
+        """Toggle notifications for user"""
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute('SELECT notifications_enabled FROM users WHERE user_id = %s', (user_id,))
+            result = cursor.fetchone()
+            if result:
+                new_value = not result[0]
+                cursor.execute('UPDATE users SET notifications_enabled = %s WHERE user_id = %s', 
+                             (new_value, user_id))
+                return new_value
+            return None
+    
+    def get_platform_payment_card(self):
+        """Get platform payment card"""
+        with self.get_connection() as conn:
+            cursor = conn.cursor(cursor_factory=RealDictCursor)
+            cursor.execute('SELECT * FROM payment_settings LIMIT 1')
+            result = cursor.fetchone()
+            return dict(result) if result else None
+    
+    def update_user_role(self, user_id: int, role: str):
+        """Update user role"""
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute('UPDATE users SET role = %s WHERE user_id = %s', (role, user_id))
+    
+    def delete_user(self, user_id: int):
+        """Delete user"""
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute('DELETE FROM users WHERE user_id = %s', (user_id,))
+    
+    def delete_store(self, store_id: int):
+        """Delete store"""
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute('DELETE FROM stores WHERE store_id = %s', (store_id,))
+    
+    def activate_offer(self, offer_id: int):
+        """Activate offer"""
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute('UPDATE offers SET status = %s WHERE offer_id = %s', ('active', offer_id))
+    
+    def deactivate_offer(self, offer_id: int):
+        """Deactivate offer"""
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute('UPDATE offers SET status = %s WHERE offer_id = %s', ('inactive', offer_id))
+    
+    def get_booking_history(self, user_id: int):
+        """Get user booking history"""
+        with self.get_connection() as conn:
+            cursor = conn.cursor(cursor_factory=RealDictCursor)
+            cursor.execute('''
+                SELECT b.*, o.title, s.name as store_name
+                FROM bookings b
+                JOIN offers o ON b.offer_id = o.offer_id
+                JOIN stores s ON o.store_id = s.store_id
+                WHERE b.user_id = %s
+                ORDER BY b.created_at DESC
+            ''', (user_id,))
+            return [dict(row) for row in cursor.fetchall()]
+    
+    def add_to_favorites(self, user_id: int, offer_id: int):
+        """Add offer to favorites"""
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute('''
+                INSERT INTO favorites (user_id, offer_id) 
+                VALUES (%s, %s) 
+                ON CONFLICT DO NOTHING
+            ''', (user_id, offer_id))
+    
+    def remove_from_favorites(self, user_id: int, offer_id: int):
+        """Remove offer from favorites"""
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute('DELETE FROM favorites WHERE user_id = %s AND offer_id = %s', 
+                         (user_id, offer_id))
+    
+    def get_statistics(self):
+        """Get platform statistics"""
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            
+            stats = {}
+            
+            cursor.execute('SELECT COUNT(*) FROM users')
+            stats['users'] = cursor.fetchone()[0]
+            
+            cursor.execute('SELECT COUNT(*) FROM users WHERE role = %s', ('customer',))
+            stats['customers'] = cursor.fetchone()[0]
+            
+            cursor.execute('SELECT COUNT(*) FROM users WHERE role = %s', ('seller',))
+            stats['sellers'] = cursor.fetchone()[0]
+            
+            cursor.execute('SELECT COUNT(*) FROM stores')
+            stats['stores'] = cursor.fetchone()[0]
+            
+            cursor.execute('SELECT COUNT(*) FROM stores WHERE status = %s', ('active',))
+            stats['approved_stores'] = cursor.fetchone()[0]
+            
+            cursor.execute('SELECT COUNT(*) FROM stores WHERE status = %s', ('pending',))
+            stats['pending_stores'] = cursor.fetchone()[0]
+            
+            cursor.execute('SELECT COUNT(*) FROM offers')
+            stats['offers'] = cursor.fetchone()[0]
+            
+            cursor.execute('SELECT COUNT(*) FROM offers WHERE status = %s', ('active',))
+            stats['active_offers'] = cursor.fetchone()[0]
+            
+            cursor.execute('SELECT COUNT(*) FROM bookings')
+            stats['bookings'] = cursor.fetchone()[0]
+            
+            cursor.execute('SELECT COUNT(*) FROM bookings WHERE status = %s', ('completed',))
+            stats['completed_bookings'] = cursor.fetchone()[0]
+            
+            return stats
+    
     # Order management methods
     def create_order(self, user_id: int, store_id: int, offer_id: int, quantity: int,
                      order_type: str, delivery_address: str = None, delivery_price: int = 0,
