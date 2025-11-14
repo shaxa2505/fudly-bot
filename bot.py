@@ -2738,18 +2738,18 @@ async def cancel_booking(callback: types.CallbackQuery):
     customer_kb.button(text="🏠 Главное меню", callback_data="main_menu")
     
     try:
-                await bot.send_message(
-                    customer_id,
-                    f"❌ <b>Бронирование отменено</b>\n\n"
-                    f"🎫 Бронь #{booking_id}\n"
-                    f"🏪 {store[2] if store else 'Магазин'}\n"
-                    f"🍽 {offer[2]}\n\n"
-                    f"Извините за неудобства. Товар снова доступен для бронирования.",
-                    parse_mode="HTML",
-                    reply_markup=customer_kb.as_markup()
-                )
-        except Exception as e:
-            logger.error(f"Failed to notify customer {customer_id}: {e}")
+        await bot.send_message(
+            customer_id,
+            f"❌ <b>Бронирование отменено</b>\n\n"
+            f"🎫 Бронь #{booking_id}\n"
+            f"🏪 {store[2] if store else 'Магазин'}\n"
+            f"🍽 {offer[2]}\n\n"
+            f"Извините за неудобства. Товар снова доступен для бронирования.",
+            parse_mode="HTML",
+            reply_markup=customer_kb.as_markup()
+        )
+    except Exception as e:
+        logger.error(f"Failed to notify customer {customer_id}: {e}")
         
     await callback.answer()
 
