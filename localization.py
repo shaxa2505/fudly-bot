@@ -10,17 +10,42 @@ TEXTS = {
         # Приветствие
         'choose_language': '🌍 Выберите язык / Tilni tanlang',
         'language_changed': '✅ Язык изменён на Русский',
-        'welcome': '''🍽 <b>Добро пожаловать в Fudly!</b>
+        'welcome': '''👋 <b>Привет! Я Fudly Bot!</b>
 
-Привет, {name}! 👋
+🔥 Получай горячие предложения с большими скидками
+💰 Экономь до 70% на продуктах
+🚚 Доставка или самовывоз
 
-Fudly помогает спасать еду от выбрасывания и экономить ваши деньги!
+<b>Давайте начнём! Это займёт 1 минуту ⏱</b>''',
+        
+        'welcome_phone_step': '''Шаг 1/3 ━━━━━━○○○○
 
-🛍 Покупайте качественную еду со скидкой до 70%
-🏪 Помогайте бизнесу снижать потери
-🌍 Заботьтесь об окружающей среде
+📱 <b>Ваш номер телефона</b>
 
-Для продолжения поделитесь своим номером телефона 📱''',
+<b>Нужен для:</b>
+✓ Связи с магазином при бронировании
+✓ Уведомлений о статусе заказа
+✓ Безопасности вашего аккаунта
+
+🔒 <i>Ваши данные защищены</i>''',
+        
+        'welcome_city_step': '''Шаг 2/3 ━━━━━━━━○○
+
+📍 <b>Выберите ваш город</b>
+
+Мы покажем предложения рядом с вами''',
+        
+        'registration_complete': '''Шаг 3/3 ━━━━━━━━━━ ✅
+
+🎉 <b>Регистрация завершена!</b>
+
+<b>Что попробовать:</b>
+🔥 <b>Горячее</b> - товары с лучшими скидками
+🏪 <b>Места</b> - магазины рядом с вами
+🛒 <b>Корзина</b> - ваши бронирования
+
+💡 <b>Совет:</b> Проверяйте "Горячее" каждый день! 
+Новые предложения добавляются утром 🌅''',
         
         'welcome_back': '''🍽 <b>С возвращением в Fudly!</b>
 
@@ -354,17 +379,42 @@ Fudly помогает спасать еду от выбрасывания и э
         # Salomlashish
         'choose_language': '🌍 Выберите язык / Tilni tanlang',
         'language_changed': '✅ Til O\'zbekchaga o\'zgartirildi',
-        'welcome': '''🍽 <b>Fudly ga xush kelibsiz!</b>
+        'welcome': '''👋 <b>Salom! Men Fudly Bot!</b>
 
-Salom, {name}! 👋
+🔥 Katta chegirmalar bilan issiq takliflarni oling
+💰 Mahsulotlarga 70% gacha tejang
+🚚 Yetkazib berish yoki olib ketish
 
-Fudly oziq-ovqatni isrof bo'lishdan saqlash va pulingizni tejashga yordam beradi!
+<b>Keling boshlaylik! Bu 1 daqiqa oladi ⏱</b>''',
+        
+        'welcome_phone_step': '''Qadam 1/3 ━━━━━━○○○○
 
-🛍 Sifatli taomlarni 70% gacha chegirmada sotib oling
-🏪 Biznesga yo'qotishlarni kamaytirishda yordam bering
-🌍 Atrof-muhitni muhofaza qiling
+📱 <b>Telefon raqamingiz</b>
 
-Davom etish uchun telefon raqamingiz bilan bo'lishing 📱''',
+<b>Kerak:</b>
+✓ Bron qilganda do'kon bilan aloqa uchun
+✓ Buyurtma holati haqida xabarnomalar
+✓ Hisobingiz xavfsizligi uchun
+
+🔒 <i>Ma'lumotlaringiz himoyalangan</i>''',
+        
+        'welcome_city_step': '''Qadam 2/3 ━━━━━━━━○○
+
+📍 <b>Shahringizni tanlang</b>
+
+Yaqiningizdagi takliflarni ko'rsatamiz''',
+        
+        'registration_complete': '''Qadam 3/3 ━━━━━━━━━━ ✅
+
+🎉 <b>Ro'yxatdan o'tish tugallandi!</b>
+
+<b>Nimani sinab ko'rish:</b>
+🔥 <b>Issiq</b> - eng yaxshi chegirmalar
+🏪 <b>Joylar</b> - yaqin do'konlar
+🛒 <b>Savat</b> - buyurtmalaringiz
+
+💡 <b>Maslahat:</b> Har kuni "Issiq"ni tekshiring! 
+Ertalab yangi takliflar qo'shiladi 🌅''',
         
         'welcome_back': '''🍽 <b>Fudly ga qaytganingizdan xursandmiz!</b>
 
@@ -695,7 +745,7 @@ Bu harakatni qaytarib bo\'lmaydi!''',
     }
 }
 
-def get_text(lang: str, key: str, **kwargs) -> str:
+def get_text(lang: str, key: str, **kwargs: str) -> str:
     """Получить текст на нужном языке с форматированием
     
     Args:
@@ -734,7 +784,7 @@ def get_language_name(lang: str) -> str:
     """Получить название языка"""
     return LANGUAGES.get(lang, LANGUAGES['ru'])
 
-def get_cities(lang: str) -> list:
+def get_cities(lang: str) -> list[str]:
     """Получить список городов на нужном языке"""
     return [
         "Ташкент" if lang == 'ru' else "Toshkent",
@@ -747,8 +797,8 @@ def get_cities(lang: str) -> list:
         "Нукус" if lang == 'ru' else "Nukus"
     ]
 
-def get_categories(lang: str) -> list:
-    """Получить список категорий на нужном языке"""
+def get_categories(lang: str) -> list[str]:
+    """Получить список категорий бизнеса на нужном языке"""
     if lang == 'ru':
         return ["Ресторан", "Кафе", "Пекарня", "Супермаркет", "Кондитерская", "Фастфуд"]
     else:

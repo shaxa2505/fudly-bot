@@ -23,7 +23,7 @@ def setup(dp_or_router, db, get_text, get_cities, city_keyboard, main_menu_custo
         db.update_user_phone(message.from_user.id, phone)
         
         await message.answer(
-            get_text(lang, 'choose_city'),
+            get_text(lang, 'welcome_city_step'),
             parse_mode="HTML",
             reply_markup=city_keyboard(lang, allow_cancel=False)
         )
@@ -54,6 +54,7 @@ def setup(dp_or_router, db, get_text, get_cities, city_keyboard, main_menu_custo
             db.update_user_city(message.from_user.id, city_text)
             await state.clear()
             await message.answer(
-                get_text(lang, 'city_changed', city=city_text),
+                get_text(lang, 'registration_complete'),
+                parse_mode="HTML",
                 reply_markup=main_menu_customer(lang)
             )

@@ -5612,7 +5612,8 @@ async def change_city_process(message: types.Message, state: FSMContext):
         # Показываем соответствующее меню через get_appropriate_menu
         menu = get_appropriate_menu(message.from_user.id, lang)
         await message.answer(
-            get_text(lang, 'city_changed', city=city_text),
+            get_text(lang, 'registration_complete'),
+            parse_mode="HTML",
             reply_markup=menu
         )
 

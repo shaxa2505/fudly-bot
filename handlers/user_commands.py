@@ -1,7 +1,8 @@
 """
 User command handlers (start, language selection, city selection, cancel actions)
 """
-from aiogram import Router, types, F
+from typing import Optional, Any, Callable
+from aiogram import types, Router, F
 from aiogram.filters import Command
 from aiogram.fsm.context import FSMContext
 from aiogram.utils.keyboard import InlineKeyboardBuilder
@@ -9,8 +10,8 @@ from aiogram.utils.keyboard import InlineKeyboardBuilder
 router = Router()
 
 
-def setup(dp_or_router, db, get_text, get_cities, city_keyboard, language_keyboard,
-          phone_request_keyboard, main_menu_seller, main_menu_customer):
+def setup(dp_or_router: Any, db: Any, get_text: Callable, get_cities: Callable, city_keyboard: Callable, language_keyboard: Callable,
+          phone_request_keyboard: Callable, main_menu_seller: Callable, main_menu_customer: Callable) -> None:
     """Setup user command handlers with dependencies"""
     from handlers.common import Registration, user_view_mode, has_approved_store
     
@@ -109,8 +110,11 @@ def setup(dp_or_router, db, get_text, get_cities, city_keyboard, language_keyboa
         user = db.get_user(message.from_user.id)
         
         if not user:
-            # New user - show language selection
-            # DO NOT create user until we get phone number!
+            # New user - show welcome message + language selection
+            await message.answer(
+                get_text('ru', 'welcome'),
+                parse_mode="HTML"
+            )
             await message.answer(
                 get_text('ru', 'choose_language'),
                 reply_markup=language_keyboard()
@@ -122,7 +126,7 @@ def setup(dp_or_router, db, get_text, get_cities, city_keyboard, language_keyboa
         # Check phone
         if not user[3]:
             await message.answer(
-                get_text(lang, 'welcome', name=message.from_user.first_name),
+                get_text(lang, 'welcome_phone_step'),
                 parse_mode="HTML",
                 reply_markup=phone_request_keyboard(lang)
             )
@@ -132,7 +136,7 @@ def setup(dp_or_router, db, get_text, get_cities, city_keyboard, language_keyboa
         # Check city
         if not user[4]:
             await message.answer(
-                get_text(lang, 'choose_city'),
+                get_text(lang, 'welcome_city_step'),
                 parse_mode="HTML",
                 reply_markup=city_keyboard(lang, allow_cancel=False)
             )
@@ -161,7 +165,7 @@ def setup(dp_or_router, db, get_text, get_cities, city_keyboard, language_keyboa
             db.update_user_language(callback.from_user.id, lang)
             await callback.message.edit_text(get_text(lang, 'language_changed'))
             await callback.message.answer(
-                get_text(lang, 'welcome', name=callback.from_user.first_name),
+                get_text(lang, 'welcome_phone_step'),
                 parse_mode="HTML",
                 reply_markup=phone_request_keyboard(lang)
             )
@@ -175,7 +179,7 @@ def setup(dp_or_router, db, get_text, get_cities, city_keyboard, language_keyboa
         # If no phone - request it
         if not user[3]:
             await callback.message.answer(
-                get_text(lang, 'welcome', name=callback.from_user.first_name),
+                get_text(lang, 'welcome_phone_step'),
                 parse_mode="HTML",
                 reply_markup=phone_request_keyboard(lang)
             )

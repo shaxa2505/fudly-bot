@@ -36,7 +36,7 @@ def get_uzb_time():
     return datetime.now(UZB_TZ)
 
 
-def has_approved_store(user_id: int, db) -> bool:
+def has_approved_store(user_id: int, db: Any) -> bool:
     """Check if user has an approved store"""
     stores = db.get_user_stores(user_id)
     # stores: [0]store_id, [1]owner_id, [2]name, [3]city, [4]address, [5]description, 
@@ -44,7 +44,7 @@ def has_approved_store(user_id: int, db) -> bool:
     return any(store[8] == "active" for store in stores if len(store) > 8)
 
 
-def get_appropriate_menu(user_id: int, lang: str, db, main_menu_seller, main_menu_customer):
+def get_appropriate_menu(user_id: int, lang: str, db: Any, main_menu_seller: Callable, main_menu_customer: Callable) -> Any:
     """Return appropriate menu for user based on their store approval status"""
     user = db.get_user(user_id)
     if not user:
@@ -147,7 +147,7 @@ class OrderDelivery(StatesGroup):
 class RegistrationCheckMiddleware(BaseMiddleware):
     """Check that user is registered (has phone number) before any action"""
     
-    def __init__(self, db, get_text_func, phone_request_keyboard_func):
+    def __init__(self, db: Any, get_text_func: Callable, phone_request_keyboard_func: Callable):
         self.db = db
         self.get_text = get_text_func
         self.phone_request_keyboard = phone_request_keyboard_func
