@@ -1698,13 +1698,70 @@ async def show_store_info(callback: types.CallbackQuery):
     text += f"⭐ Рейтинг: {avg_rating:.1f}/5 ({ratings_count} отзывов)"
     
     builder = InlineKeyboardBuilder()
-    builder.button(text="🛍 Все товары магазина" if lang == 'ru' else "🛍 Barcha mahsulotlar", 
-                   callback_data=f"store_{store_id}")
-    builder.button(text="◀️ Назад" if lang == 'ru' else "◀️ Orqaga", 
-                   callback_data="offers_all")
+    builder.button(text="🛍 " + ("Все товары магазина" if lang == 'ru' else "Barcha mahsulotlar"), 
+                   callback_data=f"store_offers_{store_id}")
+    builder.button(text="◀️ " + ("Назад" if lang == 'ru' else "Orqaga"), 
+                   callback_data="back_to_hot")
     builder.adjust(1)
     
     await callback.message.answer(text, parse_mode="HTML", reply_markup=builder.as_markup())
+    await callback.answer()
+
+@dp.callback_query(F.data == "back_to_hot")
+async def back_to_hot_offers(callback: types.CallbackQuery, state: FSMContext):
+    """Вернуться к списку горячих предложений"""
+    lang = db.get_user_language(callback.from_user.id)
+    user = db.get_user(callback.from_user.id)
+    
+    if not user:
+        await callback.answer(get_text(lang, 'error'), show_alert=True)
+        return
+    
+    city = user[4]
+    search_city = normalize_city(city)
+    
+    # Получаем топ-20 горячих предложений
+    offers = db.get_hot_offers(search_city, limit=20, offset=0)
+    all_offers = db.get_hot_offers(search_city, limit=1000)
+    total_count = len(all_offers)
+    
+    if not offers:
+        await callback.answer(
+            "😔 " + ("В вашем городе пока нет горячих предложений" if lang == 'ru' else "Sizning shahringizda hozircha issiq takliflar yo'q"),
+            show_alert=True
+        )
+        return
+    
+    # Сохраняем список в FSM для выбора по номеру
+    await state.set_state(BrowseOffers.offer_list)
+    await state.update_data(offer_list=[offer[0] for offer in offers])
+    
+    text = f"🔥 <b>{'Горячее' if lang == 'ru' else 'Issiq'}</b>\n"
+    text += f"{'Лучшие предложения дня!' if lang == 'ru' else 'Kunning eng yaxshi takliflari!'}\n\n"
+    
+    for idx, offer in enumerate(offers, 1):
+        store_name = offer[18] if len(offer) > 18 else "Магазин"
+        product_name = offer[2]
+        original_price = offer[4]
+        discount_price = offer[5]
+        discount_percent = round(((original_price - discount_price) / original_price) * 100) if original_price > 0 else 0
+        
+        if len(product_name) > 30:
+            product_name = product_name[:27] + "..."
+        
+        text += f"{idx}. <b>{product_name}</b>\n"
+        text += f"   🏪 {store_name}\n"
+        text += f"   💰 <s>{original_price:,.0f}</s> → <b>{discount_price:,.0f} сум</b> (-{discount_percent:.0f}%)\n\n"
+    
+    text += f"\n💬 {'Введите номер товара для просмотра' if lang == 'ru' else 'Mahsulot raqamini kiriting'}"
+    
+    builder = InlineKeyboardBuilder()
+    if len(offers) < total_count:
+        next_text = "➡️ " + ("Показать ещё 20" if lang == 'ru' else "Yana 20 ta ko'rsatish")
+        builder.button(text=next_text, callback_data="hot_offers_next_20")
+    builder.adjust(1)
+    
+    await callback.message.edit_text(text, parse_mode="HTML", reply_markup=builder.as_markup() if builder.export() else None)
     await callback.answer()
 
 @dp.callback_query(F.data.startswith("store_offers_"))
