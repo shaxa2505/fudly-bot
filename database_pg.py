@@ -709,7 +709,8 @@ class Database:
                 WHERE o.status = 'active' 
                 AND o.quantity > 0
                 AND (s.status = 'approved' OR s.status = 'active')
-                AND (o.available_until IS NULL OR o.available_until::timestamp >= NOW())
+                AND (o.available_until IS NULL OR LENGTH(o.available_until) < 6 OR 
+                     (LENGTH(o.available_until) > 10 AND o.available_until::timestamp >= NOW()))
             '''
             
             params = []
@@ -744,7 +745,8 @@ class Database:
                 WHERE o.status = 'active'
                   AND o.quantity > 0
                   AND s.status = 'active'
-                  AND (o.available_until IS NULL OR o.available_until::timestamp >= NOW())
+                  AND (o.available_until IS NULL OR LENGTH(o.available_until) < 6 OR 
+                       (LENGTH(o.available_until) > 10 AND o.available_until::timestamp >= NOW()))
             '''
             params = []
             
