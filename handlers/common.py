@@ -6,6 +6,9 @@ from aiogram import BaseMiddleware
 from aiogram.types import Update
 from typing import Callable, Dict, Any, Awaitable
 from datetime import timezone, timedelta, datetime
+import logging
+
+logger = logging.getLogger('fudly')
 
 # In-memory per-session view mode override: {'seller'|'customer'}
 user_view_mode = {}
@@ -169,28 +172,42 @@ class RegistrationCheckMiddleware(BaseMiddleware):
         if not user_id:
             return await handler(event, data)
         
+        # Log middleware check
+        content_type = None
+        if event.message:
+            if event.message.photo:
+                content_type = "photo"
+            elif event.message.text:
+                content_type = f"text: {event.message.text[:30]}"
+            elif event.message.contact:
+                content_type = "contact"
+        logger.debug(f"[Middleware] User {user_id}, type: {content_type}")
+        
         # Commands that are always allowed (for registration process)
         allowed_commands = ['/start', '/help']
         allowed_callbacks = ['lang_ru', 'lang_uz']  # Language selection during registration
         
         # Check if this is an allowed command
-        if event.message and event.message.text:
-            if any(event.message.text.startswith(cmd) for cmd in allowed_commands):
+        if event.message:
+            if event.message.text and any(event.message.text.startswith(cmd) for cmd in allowed_commands):
                 return await handler(event, data)
             # Allow sending contact (phone number)
             if event.message.contact:
+                return await handler(event, data)
+            # Allow sending photos (for payment proofs, offers, etc)
+            if event.message.photo:
                 return await handler(event, data)
         
         # Allow language selection callbacks
         if event.callback_query and event.callback_query.data in allowed_callbacks:
             return await handler(event, data)
         
-        # Check FSM state — if user is in registration process, allow
+        # Check FSM state — if user is in ANY FSM process, allow
         state = data.get('state')
         if state:
             current_state = await state.get_state()
-            if current_state and current_state.startswith('Registration:'):
-                # User is in registration process — allow
+            if current_state:
+                # User is in FSM process (registration, ordering, etc) — allow
                 return await handler(event, data)
         
         # Check user registration
