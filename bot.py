@@ -24,7 +24,15 @@ import signal
 import sqlite3
 from datetime import datetime, timedelta, timezone
 from dotenv import load_dotenv
-from database import Database
+
+# Use PostgreSQL if DATABASE_URL is set, otherwise fallback to SQLite
+if os.getenv('DATABASE_URL'):
+    from database_pg import Database
+    print("🐘 Using PostgreSQL database")
+else:
+    from database import Database
+    print("📁 Using SQLite database (local development)")
+
 from keyboards import *
 from keyboards import units_keyboard, product_categories_keyboard, offers_category_filter, stores_category_selection, booking_filters_keyboard
 from localization import get_text, get_cities, get_categories, normalize_category
@@ -184,44 +192,51 @@ def get_appropriate_menu(user_id: int, lang: str):
 # Initialize bot, dispatcher and database
 bot = Bot(token=TOKEN)
 
-# Try to use Redis for FSM storage (Railway), fallback to MemoryStorage
+# Initialize FSM storage based on DATABASE_URL
 storage = None
-REDIS_URL = os.getenv("REDIS_URL")
+DATABASE_URL = os.getenv("DATABASE_URL")
 
-if REDIS_URL and REDIS_URL.strip():
+if DATABASE_URL and DATABASE_URL.strip():
     try:
-        from aiogram.fsm.storage.redis import RedisStorage, DefaultKeyBuilder
-        import redis.asyncio as redis_async
+        from aiogram_storages_psql import PgStorage
         
-        # Parse Redis URL and create client
-        redis_client = redis_async.from_url(
-            REDIS_URL,
-            encoding="utf-8",
-            decode_responses=True
+        # Use PostgreSQL for FSM storage (persistent across restarts)
+        storage = PgStorage(
+            connection_string=DATABASE_URL,
+            table_name='fsm_states'
         )
-        storage = RedisStorage(redis_client, key_builder=DefaultKeyBuilder(with_destiny=True))
-        print(f"✅ Using Redis for FSM storage (persistent): {REDIS_URL.split('@')[0]}@...")
-        logger.info(f"✅ Redis FSM storage initialized: {REDIS_URL[:20]}...")
+        print(f"✅ Using PostgreSQL for FSM storage (persistent): {DATABASE_URL.split('@')[0]}@...")
+        logger.info(f"✅ PostgreSQL FSM storage initialized")
     except ImportError as e:
-        print(f"⚠️ Redis module not available: {e}")
-        logger.warning(f"⚠️ Redis import failed: {e}")
+        print(f"⚠️ aiogram-storages-psql not available: {e}")
+        logger.warning(f"⚠️ PostgreSQL FSM storage import failed: {e}")
         storage = None
     except Exception as e:
-        print(f"⚠️ Redis connection failed: {e}")
-        logger.warning(f"⚠️ Redis initialization failed: {e}")
+        print(f"⚠️ PostgreSQL FSM storage connection failed: {e}")
+        logger.warning(f"⚠️ PostgreSQL FSM storage initialization failed: {e}")
         storage = None
 else:
-    print("⚠️ REDIS_URL not set")
-    logger.warning("⚠️ REDIS_URL environment variable not found")
+    print("⚠️ DATABASE_URL not set - using SQLite with MemoryStorage")
+    logger.warning("⚠️ DATABASE_URL not found - FSM states will be lost on restart")
 
-# Fallback to MemoryStorage if Redis failed
+# Fallback to MemoryStorage if PostgreSQL FSM failed
 if storage is None:
     storage = MemoryStorage()
     print("⚠️ Using MemoryStorage (FSM states will be lost on restart)")
     logger.warning("⚠️ Using MemoryStorage - FSM states will be lost on container restart")
 
 dp = Dispatcher(storage=storage)
-db = Database()
+
+# Initialize database (PostgreSQL or SQLite based on DATABASE_URL)
+try:
+    if DATABASE_URL:
+        db = Database(database_url=DATABASE_URL)
+    else:
+        db = Database()
+    logger.info("✅ Database initialized successfully")
+except Exception as e:
+    logger.error(f"❌ Database initialization failed: {e}")
+    raise
 
 # Import state classes and utilities from handlers package
 from handlers.common import (
