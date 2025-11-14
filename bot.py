@@ -7320,76 +7320,74 @@ async def main():
     print("⚠️ Нажмите Ctrl+C для остановки")
     print("=" * 50)
     
-    # ПРИНУДИТЕЛЬНАЯ МИГРАЦИЯ БД ДЛЯ RAILWAY
-    try:
-        if DATABASE_URL:
-            print("✅ PostgreSQL - миграция не требуется")
-        else:
+    # ПРИНУДИТЕЛЬНАЯ МИГРАЦИЯ БД (только для SQLite)
+    if not DATABASE_URL:
+        try:
             print("🔄 Проверка структуры базы данных...")
             conn = sqlite3.connect(db.db_name)
-        cursor = conn.cursor()
-        
-        # Проверяем наличие полей доставки
-        cursor.execute('PRAGMA table_info(stores)')
-        columns = [col[1] for col in cursor.fetchall()]
-        
-        if 'delivery_enabled' not in columns:
-            print("⚠️ Поля доставки отсутствуют! Добавляем...")
-            cursor.execute('ALTER TABLE stores ADD COLUMN delivery_enabled INTEGER DEFAULT 1')
-            cursor.execute('ALTER TABLE stores ADD COLUMN delivery_price INTEGER DEFAULT 15000')
-            cursor.execute('ALTER TABLE stores ADD COLUMN min_order_amount INTEGER DEFAULT 30000')
-            conn.commit()
-            print("✅ Поля доставки добавлены!")
-        else:
-            print("✅ Поля доставки уже существуют")
-            # ВКЛЮЧАЕМ доставку для всех магазинов автоматически
-            cursor.execute('UPDATE stores SET delivery_enabled = 1 WHERE delivery_enabled = 0 OR delivery_enabled IS NULL')
-            updated = cursor.rowcount
-            conn.commit()
-            if updated > 0:
-                print(f"✅ Доставка включена для {updated} магазина(ов)")
-        
-        # СОЗДАЕМ ТЕСТОВЫЕ ДАННЫЕ ДЛЯ RAILWAY (если нет активных товаров)
-        cursor.execute('SELECT COUNT(*) FROM offers WHERE status = "active"')
-        offers_count = cursor.fetchone()[0]
-        
-        if offers_count == 0:
-            print("⚠️ Нет активных товаров! Создаю тестовые данные...")
+            cursor = conn.cursor()
             
-            # Создаем тестового пользователя (админ)
-            cursor.execute('SELECT COUNT(*) FROM users WHERE user_id = ?', (ADMIN_ID,))
-            if cursor.fetchone()[0] == 0:
+            # Проверяем наличие полей доставки
+            cursor.execute('PRAGMA table_info(stores)')
+            columns = [col[1] for col in cursor.fetchall()]
+            
+            if 'delivery_enabled' not in columns:
+                print("⚠️ Поля доставки отсутствуют! Добавляем...")
+                cursor.execute('ALTER TABLE stores ADD COLUMN delivery_enabled INTEGER DEFAULT 1')
+                cursor.execute('ALTER TABLE stores ADD COLUMN delivery_price INTEGER DEFAULT 15000')
+                cursor.execute('ALTER TABLE stores ADD COLUMN min_order_amount INTEGER DEFAULT 30000')
+                conn.commit()
+                print("✅ Поля доставки добавлены!")
+            else:
+                print("✅ Поля доставки уже существуют")
+                # ВКЛЮЧАЕМ доставку для всех магазинов автоматически
+                cursor.execute('UPDATE stores SET delivery_enabled = 1 WHERE delivery_enabled = 0 OR delivery_enabled IS NULL')
+                updated = cursor.rowcount
+                conn.commit()
+                if updated > 0:
+                    print(f"✅ Доставка включена для {updated} магазина(ов)")
+            
+            # СОЗДАЕМ ТЕСТОВЫЕ ДАННЫЕ (если нет активных товаров)
+            cursor.execute('SELECT COUNT(*) FROM offers WHERE status = "active"')
+            offers_count = cursor.fetchone()[0]
+            
+            if offers_count == 0:
+                print("⚠️ Нет активных товаров! Создаю тестовые данные...")
+                
+                # Создаем тестового пользователя (админ)
+                cursor.execute('SELECT COUNT(*) FROM users WHERE user_id = ?', (ADMIN_ID,))
+                if cursor.fetchone()[0] == 0:
+                    cursor.execute('''
+                        INSERT INTO users (user_id, username, first_name, phone, city, language, role)
+                        VALUES (?, ?, ?, ?, ?, ?, ?)
+                    ''', (ADMIN_ID, 'admin', 'Admin', '+998901234567', 'Ташкент', 'ru', 'seller'))
+                
+                # Создаем тестовый магазин
                 cursor.execute('''
-                    INSERT INTO users (user_id, username, first_name, phone, city, language, role)
-                    VALUES (?, ?, ?, ?, ?, ?, ?)
-                ''', (ADMIN_ID, 'admin', 'Admin', '+998901234567', 'Ташкент', 'ru', 'seller'))
-            
-            # Создаем тестовый магазин
-            cursor.execute('''
-                INSERT INTO stores (owner_id, name, city, address, description, category, phone, status, business_type, delivery_enabled, delivery_price, min_order_amount)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            ''', (ADMIN_ID, 'Demo Market', 'Ташкент', 'пр. Амира Темура, 1', 'Тестовый магазин с горячими предложениями', 'Супермаркет', '+998901234567', 'active', 'supermarket', 1, 15000, 30000))
-            store_id = cursor.lastrowid
-            
-            # Создаем тестовые товары с большими скидками
-            from datetime import datetime, timedelta
-            now = datetime.now()
-            tomorrow = now + timedelta(days=1)
-            
-            test_products = [
-                ('Хлеб свежий', 'Свежеиспеченный хлеб', 8000, 3000, 50, tomorrow.strftime('%Y-%m-%d %H:%M:%S'), 'bakery', 'шт'),
-                ('Молоко 1л', 'Свежее молоко', 12000, 5000, 30, tomorrow.strftime('%Y-%m-%d %H:%M:%S'), 'dairy', 'л'),
-                ('Яблоки 1кг', 'Свежие яблоки', 20000, 8000, 100, tomorrow.strftime('%Y-%m-%d %H:%M:%S'), 'fruits', 'кг'),
-                ('Курица 1кг', 'Охлажденная курица', 35000, 18000, 25, tomorrow.strftime('%Y-%m-%d %H:%M:%S'), 'meat', 'кг'),
-                ('Торт праздничный', 'Вкусный торт', 80000, 40000, 10, tomorrow.strftime('%Y-%m-%d %H:%M:%S'), 'ready_food', 'шт'),
-            ]
-            
-            for title, desc, orig_price, disc_price, qty, exp, cat, unit in test_products:
-                cursor.execute('''
-                    INSERT INTO offers (store_id, title, description, original_price, discount_price, quantity, available_from, available_until, expiry_date, status, unit, category)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'active', ?, ?)
-                ''', (store_id, title, desc, orig_price, disc_price, qty, now.strftime('%Y-%m-%d %H:%M:%S'), tomorrow.strftime('%Y-%m-%d %H:%M:%S'), exp, unit, cat))
-            
+                    INSERT INTO stores (owner_id, name, city, address, description, category, phone, status, business_type, delivery_enabled, delivery_price, min_order_amount)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ''', (ADMIN_ID, 'Demo Market', 'Ташкент', 'пр. Амира Темура, 1', 'Тестовый магазин с горячими предложениями', 'Супермаркет', '+998901234567', 'active', 'supermarket', 1, 15000, 30000))
+                store_id = cursor.lastrowid
+                
+                # Создаем тестовые товары с большими скидками
+                from datetime import datetime, timedelta
+                now = datetime.now()
+                tomorrow = now + timedelta(days=1)
+                
+                test_products = [
+                    ('Хлеб свежий', 'Свежеиспеченный хлеб', 8000, 3000, 50, tomorrow.strftime('%Y-%m-%d %H:%M:%S'), 'bakery', 'шт'),
+                    ('Молоко 1л', 'Свежее молоко', 12000, 5000, 30, tomorrow.strftime('%Y-%m-%d %H:%M:%S'), 'dairy', 'л'),
+                    ('Яблоки 1кг', 'Свежие яблоки', 20000, 8000, 100, tomorrow.strftime('%Y-%m-%d %H:%M:%S'), 'fruits', 'кг'),
+                    ('Курица 1кг', 'Охлажденная курица', 35000, 18000, 25, tomorrow.strftime('%Y-%m-%d %H:%M:%S'), 'meat', 'кг'),
+                    ('Торт праздничный', 'Вкусный торт', 80000, 40000, 10, tomorrow.strftime('%Y-%m-%d %H:%M:%S'), 'ready_food', 'шт'),
+                ]
+                
+                for title, desc, orig_price, disc_price, qty, exp, cat, unit in test_products:
+                    cursor.execute('''
+                        INSERT INTO offers (store_id, title, description, original_price, discount_price, quantity, available_from, available_until, expiry_date, status, unit, category)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'active', ?, ?)
+                    ''', (store_id, title, desc, orig_price, disc_price, qty, now.strftime('%Y-%m-%d %H:%M:%S'), tomorrow.strftime('%Y-%m-%d %H:%M:%S'), exp, unit, cat))
+                
                 conn.commit()
                 print(f"✅ Создан тестовый магазин с {len(test_products)} товарами!")
             else:
@@ -7398,8 +7396,10 @@ async def main():
                 print(f"✅ В БД есть {stores_count} активных магазинов и {offers_count} активных товаров")
             
             conn.close()
-    except Exception as e:
-        print(f"⚠️ Ошибка миграции: {e}")
+        except Exception as e:
+            print(f"⚠️ Ошибка миграции: {e}")
+    else:
+        print("✅ PostgreSQL - миграция не требуется")
     
     # Запускаем фоновую задачу очистки
     cleanup_task = asyncio.create_task(cleanup_expired_offers())
@@ -7565,14 +7565,15 @@ if __name__ == "__main__":
         print("❌ Завершение работы дубликата...")
         sys.exit(1)
     
-    # ПРИНУДИТЕЛЬНО создаём таблицы для доставки (для Railway)
-    try:
-        conn = sqlite3.connect(db.db_name)
-        cursor = conn.cursor()
-        
-        print("🔄 Проверяю и создаю таблицы для доставки...")
-        
-        # Создаём таблицу orders
+    # ПРИНУДИТЕЛЬНО создаём таблицы для доставки (только для SQLite)
+    if not DATABASE_URL:
+        try:
+            conn = sqlite3.connect(db.db_name)
+            cursor = conn.cursor()
+            
+            print("🔄 Проверяю и создаю таблицы для доставки...")
+            
+            # Создаём таблицу orders
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS orders (
                     order_id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -7651,9 +7652,9 @@ if __name__ == "__main__":
             conn.commit()
             print(f"✅ Доставка включена для {total_count} магазина(ов)")
         
-        conn.close()
-    except Exception as e:
-        print(f"⚠️ Ошибка при настройке доставки: {e}")
+            conn.close()
+        except Exception as e:
+            print(f"⚠️ Ошибка при настройке доставки: {e}")
     
     print("=" * 50)
     print("🚀 Запуск бота Fudly (Production Optimized)...")
