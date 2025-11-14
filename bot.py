@@ -5799,40 +5799,6 @@ async def refresh_dashboard(callback: types.CallbackQuery):
     cursor.execute('SELECT COUNT(*) FROM users WHERE DATE(created_at) = ?', (today,))
     today_users = cursor.fetchone()[0]
     
-    conn.close()
-    
-        cursor.execute('SELECT COUNT(*) FROM stores WHERE status = "pending"')
-        pending_stores = cursor.fetchone()[0]
-        
-        cursor.execute('SELECT COUNT(*) FROM offers WHERE status = "active"')
-        active_offers = cursor.fetchone()[0]
-        
-        cursor.execute('SELECT COUNT(*) FROM offers WHERE status = "inactive"')
-        inactive_offers = cursor.fetchone()[0]
-        
-        cursor.execute('SELECT COUNT(*) FROM bookings')
-        total_bookings = cursor.fetchone()[0]
-        
-        cursor.execute('SELECT COUNT(*) FROM bookings WHERE status = "pending"')
-        pending_bookings = cursor.fetchone()[0]
-        
-        from datetime import datetime
-        today = datetime.now().strftime('%Y-%m-%d')
-        
-        cursor.execute('SELECT COUNT(*) FROM bookings WHERE DATE(created_at) = ?', (today,))
-        today_bookings = cursor.fetchone()[0]
-        
-        cursor.execute('''
-            SELECT SUM(o.discount_price * b.quantity)
-            FROM bookings b
-            JOIN offers o ON b.offer_id = o.offer_id
-            WHERE DATE(b.created_at) = ? AND b.status != 'cancelled'
-        ''', (today,))
-        today_revenue = cursor.fetchone()[0] or 0
-        
-        cursor.execute('SELECT COUNT(*) FROM users WHERE DATE(created_at) = ?', (today,))
-        today_users = cursor.fetchone()[0]
-    
     text = "📊 <b>Dashboard - Общая статистика</b>\n\n"
     text += "👥 <b>Пользователи:</b>\n"
     text += f"├ Всего: {total_users} (+{today_users} сегодня)\n"
@@ -6110,17 +6076,12 @@ async def admin_delete_user_stores_callback(callback: types.CallbackQuery):
         
         # Удаляем все товары магазинов
         for (store_id,) in stores:
-    """Удаление всех магазинов пользователя"""
-    if not db.is_admin(callback.from_user.id):
-        await callback.answer("❌ Доступ запрещён", show_alert=True)
-        return
-    
-    user_id = int(callback.data.split("_")[-1])
-    
-    with db.get_connection() as conn:
-        cursor = conn.cursor()
+            cursor.execute('DELETE FROM offers WHERE store_id = ?', (store_id,))
         
-        # Получаем информацию о пользователе и его магазинах
+        # Удаляем все магазины
+        cursor.execute('DELETE FROM stores WHERE user_id = ?', (user_id,))
+        
+        # Получаем информацию о пользователе
         cursor.execute('SELECT first_name, username FROM users WHERE user_id = ?', (user_id,))
         user_info = cursor.fetchone()
         
@@ -6527,6 +6488,9 @@ async def admin_completed_bookings_callback(callback: types.CallbackQuery):
 
 @dp.callback_query(F.data == "admin_bookings_stats")
 async def admin_bookings_stats_callback(callback: types.CallbackQuery):
+    """Детальная статистика бронирований"""
+    if not db.is_admin(callback.from_user.id):
+        await callback.answer("❌ Доступ запрещён", show_alert=True)
         return
     
     await callback.answer()
@@ -6548,14 +6512,8 @@ async def admin_bookings_stats_callback(callback: types.CallbackQuery):
             SELECT SUM((o.original_price - o.discount_price) * b.quantity)
             FROM bookings b
             JOIN offers o ON b.offer_id = o.offer_id
-    """Детальная статистика бронирований"""
-    if not db.is_admin(callback.from_user.id):
-        await callback.answer("❌ Доступ запрещён", show_alert=True)
-        return
-    
-    await callback.answer()
-    conn = db.get_connection()
-    cursor = conn.cursor()
+        ''')
+        total_savings = cursor.fetchone()[0] or 0
     
     # Общая статистика
     cursor.execute('SELECT COUNT(*) FROM bookings')
@@ -7734,3 +7692,4 @@ if __name__ == "__main__":
         print(f"\n❌ Ошибка: {e}")
     finally:
         logger.info("Bot shutdown complete")
+
