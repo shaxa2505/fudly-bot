@@ -80,54 +80,6 @@ except ImportError as e:
             return True
     
     validator = FallbackValidator()
-    rate_limiter = FallbackRateLimiter()
-    
-    def secure_user_input(func):
-        return func
-    
-    def validate_admin_action(user_id, db):
-        return db.is_admin(user_id)
-    
-    import logging
-    logger = logging.getLogger('fudly')
-    
-    def start_background_tasks(db):
-        print("Background tasks disabled (dependencies not available)")
-    
-    PRODUCTION_FEATURES = False
-
-# Load environment variables
-load_dotenv(override=True)
-TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
-if not TOKEN:
-    raise ValueError("TELEGRAM_BOT_TOKEN environment variable is required")
-ADMIN_ID = int(os.getenv("ADMIN_ID", 0))
-WEBHOOK_URL = os.getenv("WEBHOOK_URL", "")  # Для Railway: https://yourapp.railway.app
-WEBHOOK_PATH = os.getenv("WEBHOOK_PATH", "/webhook")
-PORT = int(os.getenv("PORT", 8000))
-USE_WEBHOOK = os.getenv("USE_WEBHOOK", "false").lower() == "true"
-SECRET_TOKEN = os.getenv("TELEGRAM_SECRET_TOKEN", None)  # Опциональный токен для безопасности webhook
-    # ...existing code...
-
-# Simple in-process metrics (no external deps)
-METRICS = {
-    "updates_received": 0,
-    "updates_errors": 0,
-    "bookings_created": 0,
-    "bookings_cancelled": 0,
-}
-
-# Basic rate-limit config
-RL_MAX = int(os.getenv("MAX_REQUESTS_PER_MINUTE", 30))
-RL_WINDOW = int(os.getenv("RATE_LIMIT_WINDOW", 60))
-
-def can_proceed(user_id: int, action: str) -> bool:
-    """Wrapper around rate_limiter if available. Fallback always allows."""
-    try:
-        return rate_limiter.is_allowed(user_id=user_id, action=action, max_requests=RL_MAX, window_seconds=RL_WINDOW)
-    except Exception:
-        try:
-            return rate_limiter.is_allowed(user_id, action)
         except Exception:
             return True
 
@@ -325,14 +277,14 @@ async def admin_users(message: types.Message):
     if not db.is_admin(message.from_user.id):
         return
     
-    conn = db.get_connection()
-    cursor = conn.cursor()
-    
-    cursor.execute('SELECT COUNT(*) FROM users')
-    total = cursor.fetchone()[0]
-    
-    cursor.execute('SELECT COUNT(*) FROM users WHERE role = "seller"')
-    sellers = cursor.fetchone()[0]
+    with db.get_connection() as conn:
+        cursor = conn.cursor()
+        
+        cursor.execute('SELECT COUNT(*) FROM users')
+        total = cursor.fetchone()[0]
+        
+        cursor.execute('SELECT COUNT(*) FROM users WHERE role = "seller"')
+        sellers = cursor.fetchone()[0]
     
     cursor.execute('SELECT COUNT(*) FROM users WHERE role = "customer"')
     customers = cursor.fetchone()[0]
@@ -409,14 +361,14 @@ async def admin_offers(message: types.Message):
     if not db.is_admin(message.from_user.id):
         return
     
-    conn = db.get_connection()
-    cursor = conn.cursor()
-    
-    cursor.execute('SELECT COUNT(*) FROM offers WHERE status = "active"')
-    active = cursor.fetchone()[0]
-    
-    cursor.execute('SELECT COUNT(*) FROM offers WHERE status = "inactive"')
-    inactive = cursor.fetchone()[0]
+    with db.get_connection() as conn:
+        cursor = conn.cursor()
+        
+        cursor.execute('SELECT COUNT(*) FROM offers WHERE status = "active"')
+        active = cursor.fetchone()[0]
+        
+        cursor.execute('SELECT COUNT(*) FROM offers WHERE status = "inactive"')
+        inactive = cursor.fetchone()[0]
     
     cursor.execute('SELECT COUNT(*) FROM offers WHERE status = "deleted"')
     deleted = cursor.fetchone()[0]
@@ -458,16 +410,16 @@ async def admin_bookings(message: types.Message):
     if not db.is_admin(message.from_user.id):
         return
     
-    conn = db.get_connection()
-    cursor = conn.cursor()
-    
-    cursor.execute('SELECT COUNT(*) FROM bookings')
-    total = cursor.fetchone()[0]
-    
-    cursor.execute('SELECT COUNT(*) FROM bookings WHERE status = "pending"')
-    pending = cursor.fetchone()[0]
-    
-    cursor.execute('SELECT COUNT(*) FROM bookings WHERE status = "completed"')
+    with db.get_connection() as conn:
+        cursor = conn.cursor()
+        
+        cursor.execute('SELECT COUNT(*) FROM bookings')
+        total = cursor.fetchone()[0]
+        
+        cursor.execute('SELECT COUNT(*) FROM bookings WHERE status = "pending"')
+        pending = cursor.fetchone()[0]
+        
+        cursor.execute('SELECT COUNT(*) FROM bookings WHERE status = "completed"')
     completed = cursor.fetchone()[0]
     
     cursor.execute('SELECT COUNT(*) FROM bookings WHERE status = "cancelled"')
@@ -2470,14 +2422,14 @@ async def offer_details(callback: types.CallbackQuery):
     offer_id = int(callback.data.split("_")[1])
     
     # Получаем полную информацию о предложении
-    conn = db.get_connection()
-    cursor = conn.cursor()
-    cursor.execute('''
-        SELECT o.*, s.name as store_name, s.address, s.city, s.phone, s.description as store_desc
-        FROM offers o 
-        JOIN stores s ON o.store_id = s.store_id 
-        WHERE o.offer_id = ?
-    ''', (offer_id,))
+    with db.get_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute('''
+            SELECT o.*, s.name as store_name, s.address, s.city, s.phone, s.description as store_desc
+            FROM offers o 
+            JOIN stores s ON o.store_id = s.store_id 
+            WHERE o.offer_id = ?
+        ''', (offer_id,))
     
     offer_data = cursor.fetchone()
     conn.close()
@@ -2783,31 +2735,6 @@ async def cancel_booking(callback: types.CallbackQuery):
     lang = db.get_user_language(callback.from_user.id)
     booking_id = int(callback.data.split("_")[2])
     
-    booking = db.get_booking(booking_id)
-    if booking and booking[3] in ['pending', 'confirmed']:  # Можно отменить pending и confirmed
-        offer = db.get_offer(booking[1])
-        if offer:
-            db.cancel_booking(booking_id)
-            # Возвращаем забронированное количество в остаток
-            qty = int(booking[6]) if len(booking) > 6 and booking[6] is not None else 1
-            db.increment_offer_quantity(booking[1], qty)
-            try:
-                METRICS["bookings_cancelled"] += 1
-            except Exception:
-                pass
-        
-        # Обновляем сообщение
-        await callback.message.edit_text(
-            callback.message.text + f"\n\n❌ {get_text(lang, 'booking_cancelled')}"
-        )
-        
-        # Отправляем уведомление покупателю
-        customer_id = booking[2]  # user_id из booking
-        customer_lang = db.get_user_language(customer_id)
-        
-        if offer:
-            store = db.get_store(offer[1])
-            
             from aiogram.utils.keyboard import InlineKeyboardBuilder
             customer_kb = InlineKeyboardBuilder()
             customer_kb.button(text="🏠 Главное меню", callback_data="main_menu")
@@ -2855,11 +2782,9 @@ async def complete_booking(callback: types.CallbackQuery):
     booking = db.get_booking(booking_id)
     if booking and booking[3] in ['pending', 'confirmed']:
         # Обновляем статус на completed
-        conn = db.get_connection()
-        cursor = conn.cursor()
-        cursor.execute('UPDATE bookings SET status = ? WHERE booking_id = ?', ('completed', booking_id))
-        conn.commit()
-        conn.close()
+        with db.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute('UPDATE bookings SET status = ? WHERE booking_id = ?', ('completed', booking_id))
         
         # Обновляем сообщение партнёра
         await callback.message.edit_text(
@@ -2992,12 +2917,10 @@ async def save_booking_rating(callback: types.CallbackQuery):
     store_id = offer[1]
     
     # Сохраняем рейтинг
-    conn = db.get_connection()
-    cursor = conn.cursor()
-    cursor.execute('INSERT OR REPLACE INTO ratings (booking_id, user_id, store_id, rating) VALUES (?, ?, ?, ?)', 
-                  (booking_id, callback.from_user.id, store_id, rating))
-    conn.commit()
-    conn.close()
+    with db.get_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute('INSERT OR REPLACE INTO ratings (booking_id, user_id, store_id, rating) VALUES (?, ?, ?, ?)', 
+                      (booking_id, callback.from_user.id, store_id, rating))
     
     await callback.message.edit_text(
         f"✅ Спасибо за оценку: {'⭐' * rating}\n\nВаш отзыв поможет другим покупателям!"
@@ -4714,14 +4637,12 @@ async def edit_time_until(message: types.Message, state: FSMContext):
     available_until = message.text.strip()
     
     # Обновление в БД
-    conn = db.get_connection()
-    cursor = conn.cursor()
-    cursor.execute(
-        'UPDATE offers SET available_from = ?, available_until = ? WHERE offer_id = ?',
-        (available_from, available_until, offer_id)
-    )
-    conn.commit()
-    conn.close()
+    with db.get_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute(
+            'UPDATE offers SET available_from = ?, available_until = ? WHERE offer_id = ?',
+            (available_from, available_until, offer_id)
+        )
     
     await message.answer(
         f"✅ {'Время забора обновлено!' if lang == 'ru' else 'Olib ketish vaqti yangilandi!'}\n\n"
@@ -4932,24 +4853,21 @@ async def save_store_rating(callback: types.CallbackQuery):
     rating = int(parts[3])
     
     # Проверяем, не оценивал ли уже пользователь этот магазин
-    conn = db.get_connection()
-    cursor = conn.cursor()
-    cursor.execute('SELECT COUNT(*) FROM ratings WHERE store_id = ? AND user_id = ?', (store_id, callback.from_user.id))
-    already_rated = cursor.fetchone()[0] > 0
-    
-    if already_rated:
-        # Обновляем существующую оценку
-        cursor.execute('UPDATE ratings SET rating = ? WHERE store_id = ? AND user_id = ?', 
-                      (rating, store_id, callback.from_user.id))
-        message_text = f"✅ Оценка обновлена: {'⭐' * rating}"
-    else:
-        # Добавляем новую оценку
-        cursor.execute('INSERT INTO ratings (store_id, user_id, rating) VALUES (?, ?, ?)', 
-                      (store_id, callback.from_user.id, rating))
-        message_text = f"✅ Спасибо за оценку: {'⭐' * rating}"
-    
-    conn.commit()
-    conn.close()
+    with db.get_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute('SELECT COUNT(*) FROM ratings WHERE store_id = ? AND user_id = ?', (store_id, callback.from_user.id))
+        already_rated = cursor.fetchone()[0] > 0
+        
+        if already_rated:
+            # Обновляем существующую оценку
+            cursor.execute('UPDATE ratings SET rating = ? WHERE store_id = ? AND user_id = ?', 
+                          (rating, store_id, callback.from_user.id))
+            message_text = f"✅ Оценка обновлена: {'⭐' * rating}"
+        else:
+            # Добавляем новую оценку
+            cursor.execute('INSERT INTO ratings (store_id, user_id, rating) VALUES (?, ?, ?)', 
+                          (store_id, callback.from_user.id, rating))
+            message_text = f"✅ Спасибо за оценку: {'⭐' * rating}"
     
     await callback.message.edit_text(message_text, parse_mode="HTML")
     await callback.answer()
@@ -5761,47 +5679,47 @@ async def partner_today_stats(message: types.Message):
         await message.answer(get_text(lang, 'no_stores'))
         return
     
-    conn = db.get_connection()
-    cursor = conn.cursor()
-    
-    # Собираем ID всех магазинов партнёра
-    store_ids = [store[0] for store in stores]
-    placeholders = ','.join('?' * len(store_ids))
-    
-    # Статистика за сегодня
-    today = datetime.now().strftime('%Y-%m-%d')
-    
-    # Заказы за сегодня
-    cursor.execute(f'''
-        SELECT COUNT(*), SUM(b.quantity), SUM(o.discount_price * b.quantity)
-        FROM bookings b
-        JOIN offers o ON b.offer_id = o.offer_id
-        WHERE o.store_id IN ({placeholders})
-        AND DATE(b.created_at) = ?
-        AND b.status != 'cancelled'
-    ''', (*store_ids, today))
-    
-    orders_count, items_sold, revenue = cursor.fetchone()
-    orders_count = orders_count or 0
-    items_sold = int(items_sold or 0)
-    revenue = int(revenue or 0)
-    
-    # Активные товары
-    cursor.execute(f'''
-        SELECT COUNT(*)
-        FROM offers
-        WHERE store_id IN ({placeholders})
-        AND status = 'active'
-    ''', store_ids)
-    active_offers = cursor.fetchone()[0]
-    
-    # ТОП товар
-    cursor.execute(f'''
-        SELECT o.title, COUNT(*) as cnt
-        FROM bookings b
-        JOIN offers o ON b.offer_id = o.offer_id
-        WHERE o.store_id IN ({placeholders})
-        AND DATE(b.created_at) = ?
+    with db.get_connection() as conn:
+        cursor = conn.cursor()
+        
+        # Собираем ID всех магазинов партнёра
+        store_ids = [store[0] for store in stores]
+        placeholders = ','.join('?' * len(store_ids))
+        
+        # Статистика за сегодня
+        today = datetime.now().strftime('%Y-%m-%d')
+        
+        # Заказы за сегодня
+        cursor.execute(f'''
+            SELECT COUNT(*), SUM(b.quantity), SUM(o.discount_price * b.quantity)
+            FROM bookings b
+            JOIN offers o ON b.offer_id = o.offer_id
+            WHERE o.store_id IN ({placeholders})
+            AND DATE(b.created_at) = ?
+            AND b.status != 'cancelled'
+        ''', (*store_ids, today))
+        
+        orders_count, items_sold, revenue = cursor.fetchone()
+        orders_count = orders_count or 0
+        items_sold = int(items_sold or 0)
+        revenue = int(revenue or 0)
+        
+        # Активные товары
+        cursor.execute(f'''
+            SELECT COUNT(*)
+            FROM offers
+            WHERE store_id IN ({placeholders})
+            AND status = 'active'
+        ''', store_ids)
+        active_offers = cursor.fetchone()[0]
+        
+        # ТОП товар
+        cursor.execute(f'''
+            SELECT o.title, COUNT(*) as cnt
+            FROM bookings b
+            JOIN offers o ON b.offer_id = o.offer_id
+            WHERE o.store_id IN ({placeholders})
+            AND DATE(b.created_at) = ?
         AND b.status != 'cancelled'
         GROUP BY o.title
         ORDER BY cnt DESC
@@ -5835,24 +5753,24 @@ async def refresh_dashboard(callback: types.CallbackQuery):
         return
     
     # Используем тот же код что и в admin_dashboard
-    conn = db.get_connection()
-    cursor = conn.cursor()
-    
-    # [Копируем весь код из admin_dashboard для получения статистики]
-    cursor.execute('SELECT COUNT(*) FROM users')
-    total_users = cursor.fetchone()[0]
-    
-    cursor.execute('SELECT COUNT(*) FROM users WHERE role = "seller"')
-    sellers = cursor.fetchone()[0]
-    
-    cursor.execute('SELECT COUNT(*) FROM users WHERE role = "customer"')
-    customers = cursor.fetchone()[0]
-    
-    cursor.execute('SELECT COUNT(*) FROM stores WHERE status = "active"')
-    active_stores = cursor.fetchone()[0]
-    
-    cursor.execute('SELECT COUNT(*) FROM stores WHERE status = "pending"')
-    pending_stores = cursor.fetchone()[0]
+    with db.get_connection() as conn:
+        cursor = conn.cursor()
+        
+        # [Копируем весь код из admin_dashboard для получения статистики]
+        cursor.execute('SELECT COUNT(*) FROM users')
+        total_users = cursor.fetchone()[0]
+        
+        cursor.execute('SELECT COUNT(*) FROM users WHERE role = "seller"')
+        sellers = cursor.fetchone()[0]
+        
+        cursor.execute('SELECT COUNT(*) FROM users WHERE role = "customer"')
+        customers = cursor.fetchone()[0]
+        
+        cursor.execute('SELECT COUNT(*) FROM stores WHERE status = "active"')
+        active_stores = cursor.fetchone()[0]
+        
+        cursor.execute('SELECT COUNT(*) FROM stores WHERE status = "pending"')
+        pending_stores = cursor.fetchone()[0]
     
     cursor.execute('SELECT COUNT(*) FROM offers WHERE status = "active"')
     active_offers = cursor.fetchone()[0]
@@ -5884,6 +5802,38 @@ async def refresh_dashboard(callback: types.CallbackQuery):
     today_users = cursor.fetchone()[0]
     
     conn.close()
+    
+        cursor.execute('SELECT COUNT(*) FROM stores WHERE status = "pending"')
+        pending_stores = cursor.fetchone()[0]
+        
+        cursor.execute('SELECT COUNT(*) FROM offers WHERE status = "active"')
+        active_offers = cursor.fetchone()[0]
+        
+        cursor.execute('SELECT COUNT(*) FROM offers WHERE status = "inactive"')
+        inactive_offers = cursor.fetchone()[0]
+        
+        cursor.execute('SELECT COUNT(*) FROM bookings')
+        total_bookings = cursor.fetchone()[0]
+        
+        cursor.execute('SELECT COUNT(*) FROM bookings WHERE status = "pending"')
+        pending_bookings = cursor.fetchone()[0]
+        
+        from datetime import datetime
+        today = datetime.now().strftime('%Y-%m-%d')
+        
+        cursor.execute('SELECT COUNT(*) FROM bookings WHERE DATE(created_at) = ?', (today,))
+        today_bookings = cursor.fetchone()[0]
+        
+        cursor.execute('''
+            SELECT SUM(o.discount_price * b.quantity)
+            FROM bookings b
+            JOIN offers o ON b.offer_id = o.offer_id
+            WHERE DATE(b.created_at) = ? AND b.status != 'cancelled'
+        ''', (today,))
+        today_revenue = cursor.fetchone()[0] or 0
+        
+        cursor.execute('SELECT COUNT(*) FROM users WHERE DATE(created_at) = ?', (today,))
+        today_users = cursor.fetchone()[0]
     
     text = "📊 <b>Dashboard - Общая статистика</b>\n\n"
     text += "👥 <b>Пользователи:</b>\n"
@@ -5965,24 +5915,24 @@ async def admin_detailed_stats_callback(callback: types.CallbackQuery):
     lang = 'ru'
     await bot.send_message(callback.message.chat.id, "⏳ Собираю статистику...")
     
-    conn = db.get_connection()
-    cursor = conn.cursor()
-    
-    # Статистика по пользователям
-    cursor.execute('SELECT COUNT(*) FROM users')
-    total_users = cursor.fetchone()[0]
-    cursor.execute('SELECT COUNT(*) FROM users WHERE role = "seller"')
-    sellers = cursor.fetchone()[0]
-    cursor.execute('SELECT COUNT(*) FROM users WHERE role = "customer"')
-    customers = cursor.fetchone()[0]
-    
-    # Статистика по магазинам
-    cursor.execute('SELECT COUNT(*) FROM stores')
-    total_stores = cursor.fetchone()[0]
-    cursor.execute('SELECT COUNT(*) FROM stores WHERE status = "active"')
-    approved_stores = cursor.fetchone()[0]
-    cursor.execute('SELECT COUNT(*) FROM stores WHERE status = "pending"')
-    pending_stores = cursor.fetchone()[0]
+    with db.get_connection() as conn:
+        cursor = conn.cursor()
+        
+        # Статистика по пользователям
+        cursor.execute('SELECT COUNT(*) FROM users')
+        total_users = cursor.fetchone()[0]
+        cursor.execute('SELECT COUNT(*) FROM users WHERE role = "seller"')
+        sellers = cursor.fetchone()[0]
+        cursor.execute('SELECT COUNT(*) FROM users WHERE role = "customer"')
+        customers = cursor.fetchone()[0]
+        
+        # Статистика по магазинам
+        cursor.execute('SELECT COUNT(*) FROM stores')
+        total_stores = cursor.fetchone()[0]
+        cursor.execute('SELECT COUNT(*) FROM stores WHERE status = "active"')
+        approved_stores = cursor.fetchone()[0]
+        cursor.execute('SELECT COUNT(*) FROM stores WHERE status = "pending"')
+        pending_stores = cursor.fetchone()[0]
     cursor.execute('SELECT COUNT(*) FROM stores WHERE status = "rejected"')
     rejected_stores = cursor.fetchone()[0]
     
@@ -6096,24 +6046,23 @@ async def admin_list_sellers_callback(callback: types.CallbackQuery):
         return
     
     await callback.answer()
-    conn = db.get_connection()
-    cursor = conn.cursor()
-    
-    # Получаем всех продавцов с дополнительной информацией
-    cursor.execute('''
-        SELECT u.user_id, u.username, u.first_name, u.city, u.created_at,
-               COUNT(DISTINCT s.store_id) as stores_count,
-               COUNT(DISTINCT CASE WHEN s.status = 'active' THEN s.store_id END) as active_stores,
-               COUNT(DISTINCT o.offer_id) as offers_count
-        FROM users u
-        LEFT JOIN stores s ON u.user_id = s.owner_id
-        LEFT JOIN offers o ON s.store_id = o.store_id AND o.status = 'active'
-        WHERE u.role = 'seller'
-        GROUP BY u.user_id
-        ORDER BY active_stores DESC, offers_count DESC
-    ''')
-    sellers = cursor.fetchall()
-    conn.close()
+    with db.get_connection() as conn:
+        cursor = conn.cursor()
+        
+        # Получаем всех продавцов с дополнительной информацией
+        cursor.execute('''
+            SELECT u.user_id, u.username, u.first_name, u.city, u.created_at,
+                   COUNT(DISTINCT s.store_id) as stores_count,
+                   COUNT(DISTINCT CASE WHEN s.status = 'active' THEN s.store_id END) as active_stores,
+                   COUNT(DISTINCT o.offer_id) as offers_count
+            FROM users u
+            LEFT JOIN stores s ON u.user_id = s.owner_id
+            LEFT JOIN offers o ON s.store_id = o.store_id AND o.status = 'active'
+            WHERE u.role = 'seller'
+            GROUP BY u.user_id
+            ORDER BY active_stores DESC, offers_count DESC
+        ''')
+        sellers = cursor.fetchall()
     
     if not sellers:
         await bot.send_message(callback.message.chat.id, "👥 Продавцов нет")
@@ -6148,6 +6097,21 @@ async def admin_list_sellers_callback(callback: types.CallbackQuery):
 
 @dp.callback_query(F.data.startswith("admin_delete_user_stores_"))
 async def admin_delete_user_stores_callback(callback: types.CallbackQuery):
+    user_id = int(callback.data.split("_")[-1])
+    
+    with db.get_connection() as conn:
+        cursor = conn.cursor()
+        
+        # Получаем магазины
+        cursor.execute('SELECT store_id FROM stores WHERE owner_id = ?', (user_id,))
+        stores = cursor.fetchall()
+        
+        if not stores:
+            await callback.answer("❌ Магазины не найдены", show_alert=True)
+            return
+        
+        # Удаляем все товары магазинов
+        for (store_id,) in stores:
     """Удаление всех магазинов пользователя"""
     if not db.is_admin(callback.from_user.id):
         await callback.answer("❌ Доступ запрещён", show_alert=True)
@@ -6155,23 +6119,22 @@ async def admin_delete_user_stores_callback(callback: types.CallbackQuery):
     
     user_id = int(callback.data.split("_")[-1])
     
-    conn = db.get_connection()
-    cursor = conn.cursor()
-    
-    # Получаем информацию о пользователе и его магазинах
-    cursor.execute('SELECT first_name, username FROM users WHERE user_id = ?', (user_id,))
-    user_info = cursor.fetchone()
-    
-    if not user_info:
-        await callback.answer("❌ Пользователь не найден", show_alert=True)
-        conn.close()
-        return
-    
-    first_name, username = user_info
-    
-    # Получаем список магазинов
-    cursor.execute('SELECT store_id, name, status FROM stores WHERE owner_id = ?', (user_id,))
-    stores = cursor.fetchall()
+    with db.get_connection() as conn:
+        cursor = conn.cursor()
+        
+        # Получаем информацию о пользователе и его магазинах
+        cursor.execute('SELECT first_name, username FROM users WHERE user_id = ?', (user_id,))
+        user_info = cursor.fetchone()
+        
+        if not user_info:
+            await callback.answer("❌ Пользователь не найден", show_alert=True)
+            return
+        
+        first_name, username = user_info
+        
+        # Получаем список магазинов
+        cursor.execute('SELECT store_id, name, status FROM stores WHERE owner_id = ?', (user_id,))
+        stores = cursor.fetchall()
     
     if not stores:
         await callback.answer("❌ У пользователя нет магазинов", show_alert=True)
@@ -6264,21 +6227,20 @@ async def admin_approved_stores_callback(callback: types.CallbackQuery):
         return
     
     await callback.answer()
-    conn = db.get_connection()
-    cursor = conn.cursor()
-    
-    cursor.execute('''
-        SELECT s.store_id, s.name, s.city, s.category, u.first_name, u.username,
-               s.created_at, COUNT(o.offer_id) as offers_count
-        FROM stores s
-        JOIN users u ON s.owner_id = u.user_id
-        LEFT JOIN offers o ON s.store_id = o.store_id AND o.status = 'active'
-        WHERE s.status = 'active'
-        GROUP BY s.store_id
-        ORDER BY s.created_at DESC
-    ''')
-    stores = cursor.fetchall()
-    conn.close()
+    with db.get_connection() as conn:
+        cursor = conn.cursor()
+        
+        cursor.execute('''
+            SELECT s.store_id, s.name, s.city, s.category, u.first_name, u.username,
+                   s.created_at, COUNT(o.offer_id) as offers_count
+            FROM stores s
+            JOIN users u ON s.owner_id = u.user_id
+            LEFT JOIN offers o ON s.store_id = o.store_id AND o.status = 'active'
+            WHERE s.status = 'active'
+            GROUP BY s.store_id
+            ORDER BY s.created_at DESC
+        ''')
+        stores = cursor.fetchall()
     
     if not stores:
         await bot.send_message(callback.message.chat.id, "🏪 Одобренных магазинов нет")
@@ -6318,25 +6280,21 @@ async def admin_block_store_callback(callback: types.CallbackQuery):
     
     store_id = int(callback.data.split("_")[-1])
     
-    conn = db.get_connection()
-    cursor = conn.cursor()
-    
-    cursor.execute('SELECT name FROM stores WHERE store_id = ?', (store_id,))
-    store = cursor.fetchone()
-    
-    if not store:
-        await callback.answer("❌ Магазин не найден", show_alert=True)
-        conn.close()
-        return
-    
-    # Блокируем магазин
-    cursor.execute('UPDATE stores SET status = "rejected" WHERE store_id = ?', (store_id,))
-    
-    # Деактивируем все товары
-    cursor.execute('UPDATE offers SET status = "inactive" WHERE store_id = ?', (store_id,))
-    
-    conn.commit()
-    conn.close()
+    with db.get_connection() as conn:
+        cursor = conn.cursor()
+        
+        cursor.execute('SELECT name FROM stores WHERE store_id = ?', (store_id,))
+        store = cursor.fetchone()
+        
+        if not store:
+            await callback.answer("❌ Магазин не найден", show_alert=True)
+            return
+        
+        # Блокируем магазин
+        cursor.execute('UPDATE stores SET status = "rejected" WHERE store_id = ?', (store_id,))
+        
+        # Деактивируем все товары
+        cursor.execute('UPDATE offers SET status = "inactive" WHERE store_id = ?', (store_id,))
     
     await callback.message.edit_text(
         f"🚫 <b>Магазин заблокирован</b>\n\n"
@@ -6355,19 +6313,18 @@ async def admin_rejected_stores_callback(callback: types.CallbackQuery):
         return
     
     await callback.answer()
-    conn = db.get_connection()
-    cursor = conn.cursor()
-    
-    cursor.execute('''
-        SELECT s.store_id, s.name, s.city, u.first_name, u.username, s.created_at
-        FROM stores s
-        JOIN users u ON s.owner_id = u.user_id
-        WHERE s.status = 'rejected'
-        ORDER BY s.created_at DESC
-        LIMIT 10
-    ''')
-    stores = cursor.fetchall()
-    conn.close()
+    with db.get_connection() as conn:
+        cursor = conn.cursor()
+        
+        cursor.execute('''
+            SELECT s.store_id, s.name, s.city, u.first_name, u.username, s.created_at
+            FROM stores s
+            JOIN users u ON s.owner_id = u.user_id
+            WHERE s.status = 'rejected'
+            ORDER BY s.created_at DESC
+            LIMIT 10
+        ''')
+        stores = cursor.fetchall()
     
     if not stores:
         await bot.send_message(callback.message.chat.id, "🏪 Отклонённых магазинов нет")
@@ -6398,27 +6355,25 @@ async def admin_all_offers_callback(callback: types.CallbackQuery):
         return
     
     await callback.answer()
-    conn = db.get_connection()
-    cursor = conn.cursor()
-    
-    cursor.execute('''
-        SELECT o.offer_id, o.title, o.original_price, o.discount_price, o.quantity,
-               s.name as store_name, o.status, o.created_at
-        FROM offers o
-        JOIN stores s ON o.store_id = s.store_id
-        ORDER BY o.created_at DESC
-        LIMIT 20
-    ''')
-    offers = cursor.fetchall()
-    
-    cursor.execute('SELECT COUNT(*) FROM offers')
-    total = cursor.fetchone()[0]
-    cursor.execute('SELECT COUNT(*) FROM offers WHERE status = "active"')
-    active = cursor.fetchone()[0]
-    cursor.execute('SELECT COUNT(*) FROM offers WHERE status = "deleted"')
-    deleted = cursor.fetchone()[0]
-    
-    conn.close()
+    with db.get_connection() as conn:
+        cursor = conn.cursor()
+        
+        cursor.execute('''
+            SELECT o.offer_id, o.title, o.original_price, o.discount_price, o.quantity,
+                   s.name as store_name, o.status, o.created_at
+            FROM offers o
+            JOIN stores s ON o.store_id = s.store_id
+            ORDER BY o.created_at DESC
+            LIMIT 20
+        ''')
+        offers = cursor.fetchall()
+        
+        cursor.execute('SELECT COUNT(*) FROM offers')
+        total = cursor.fetchone()[0]
+        cursor.execute('SELECT COUNT(*) FROM offers WHERE status = "active"')
+        active = cursor.fetchone()[0]
+        cursor.execute('SELECT COUNT(*) FROM offers WHERE status = "deleted"')
+        deleted = cursor.fetchone()[0]
     
     text = f"📦 <b>Все товары</b>\n\n"
     text += f"📊 Статистика:\n"
@@ -6449,18 +6404,16 @@ async def admin_cleanup_offers_callback(callback: types.CallbackQuery):
         return
     
     await callback.answer()
-    conn = db.get_connection()
-    cursor = conn.cursor()
-    
-    # Подсчёт истекших товаров
-    today = get_uzb_time().strftime('%Y-%m-%d')
-    cursor.execute('SELECT COUNT(*) FROM offers WHERE expiry_date < ? AND status = "active"', (today,))
-    expired = cursor.fetchone()[0]
-    
-    cursor.execute('SELECT COUNT(*) FROM offers WHERE status = "deleted"')
-    deleted = cursor.fetchone()[0]
-    
-    conn.close()
+    with db.get_connection() as conn:
+        cursor = conn.cursor()
+        
+        # Подсчёт истекших товаров
+        today = get_uzb_time().strftime('%Y-%m-%d')
+        cursor.execute('SELECT COUNT(*) FROM offers WHERE expiry_date < ? AND status = "active"', (today,))
+        expired = cursor.fetchone()[0]
+        
+        cursor.execute('SELECT COUNT(*) FROM offers WHERE status = "deleted"')
+        deleted = cursor.fetchone()[0]
     
     text = f"🗑 <b>Очистка товаров</b>\n\n"
     text += f"📊 Найдено:\n"
@@ -6482,29 +6435,27 @@ async def admin_pending_bookings_callback(callback: types.CallbackQuery):
         return
     
     await callback.answer()
-    conn = db.get_connection()
-    cursor = conn.cursor()
-    
-    cursor.execute('''
-        SELECT b.booking_id, o.title, b.quantity, u.first_name, s.name,
-               b.created_at, (o.original_price - o.discount_price) * b.quantity as savings
-        FROM bookings b
-        JOIN offers o ON b.offer_id = o.offer_id
-        JOIN users u ON b.user_id = u.user_id
-        JOIN stores s ON o.store_id = s.store_id
-        WHERE b.status = 'active'
-        ORDER BY b.created_at DESC
-        LIMIT 15
-    ''')
-    bookings = cursor.fetchall()
-    
-    cursor.execute('SELECT COUNT(*) FROM bookings WHERE status = "active"')
-    total = cursor.fetchone()[0]
-    
-    cursor.execute('SELECT SUM(quantity) FROM bookings WHERE status = "active"')
-    total_qty = cursor.fetchone()[0] or 0
-    
-    conn.close()
+    with db.get_connection() as conn:
+        cursor = conn.cursor()
+        
+        cursor.execute('''
+            SELECT b.booking_id, o.title, b.quantity, u.first_name, s.name,
+                   b.created_at, (o.original_price - o.discount_price) * b.quantity as savings
+            FROM bookings b
+            JOIN offers o ON b.offer_id = o.offer_id
+            JOIN users u ON b.user_id = u.user_id
+            JOIN stores s ON o.store_id = s.store_id
+            WHERE b.status = 'active'
+            ORDER BY b.created_at DESC
+            LIMIT 15
+        ''')
+        bookings = cursor.fetchall()
+        
+        cursor.execute('SELECT COUNT(*) FROM bookings WHERE status = "active"')
+        total = cursor.fetchone()[0]
+        
+        cursor.execute('SELECT SUM(quantity) FROM bookings WHERE status = "active"')
+        total_qty = cursor.fetchone()[0] or 0
     
     text = f"📋 <b>Активные бронирования</b>\n\n"
     text += f"📊 Всего: {total} ({total_qty} шт.)\n\n"
@@ -6532,34 +6483,32 @@ async def admin_completed_bookings_callback(callback: types.CallbackQuery):
         return
     
     await callback.answer()
-    conn = db.get_connection()
-    cursor = conn.cursor()
-    
-    cursor.execute('''
-        SELECT b.booking_id, o.title, b.quantity, u.first_name, s.name,
-               b.created_at, (o.original_price - o.discount_price) * b.quantity as savings
-        FROM bookings b
-        JOIN offers o ON b.offer_id = o.offer_id
-        JOIN users u ON b.user_id = u.user_id
-        JOIN stores s ON o.store_id = s.store_id
-        WHERE b.status = 'completed'
-        ORDER BY b.created_at DESC
-        LIMIT 10
-    ''')
-    bookings = cursor.fetchall()
-    
-    cursor.execute('SELECT COUNT(*) FROM bookings WHERE status = "completed"')
-    total = cursor.fetchone()[0]
-    
-    cursor.execute('''
-        SELECT SUM((o.original_price - o.discount_price) * b.quantity)
-        FROM bookings b
-        JOIN offers o ON b.offer_id = o.offer_id
-        WHERE b.status = 'completed'
-    ''')
-    total_savings = cursor.fetchone()[0] or 0
-    
-    conn.close()
+    with db.get_connection() as conn:
+        cursor = conn.cursor()
+        
+        cursor.execute('''
+            SELECT b.booking_id, o.title, b.quantity, u.first_name, s.name,
+                   b.created_at, (o.original_price - o.discount_price) * b.quantity as savings
+            FROM bookings b
+            JOIN offers o ON b.offer_id = o.offer_id
+            JOIN users u ON b.user_id = u.user_id
+            JOIN stores s ON o.store_id = s.store_id
+            WHERE b.status = 'completed'
+            ORDER BY b.created_at DESC
+            LIMIT 10
+        ''')
+        bookings = cursor.fetchall()
+        
+        cursor.execute('SELECT COUNT(*) FROM bookings WHERE status = "completed"')
+        total = cursor.fetchone()[0]
+        
+        cursor.execute('''
+            SELECT SUM((o.original_price - o.discount_price) * b.quantity)
+            FROM bookings b
+            JOIN offers o ON b.offer_id = o.offer_id
+            WHERE b.status = 'completed'
+        ''')
+        total_savings = cursor.fetchone()[0] or 0
     
     text = f"✅ <b>Завершённые бронирования</b>\n\n"
     text += f"📊 Всего: {total}\n"
@@ -6580,6 +6529,27 @@ async def admin_completed_bookings_callback(callback: types.CallbackQuery):
 
 @dp.callback_query(F.data == "admin_bookings_stats")
 async def admin_bookings_stats_callback(callback: types.CallbackQuery):
+        return
+    
+    await callback.answer()
+    with db.get_connection() as conn:
+        cursor = conn.cursor()
+        
+        # Общая статистика
+        cursor.execute('SELECT COUNT(*) FROM bookings')
+        total = cursor.fetchone()[0]
+        cursor.execute('SELECT COUNT(*) FROM bookings WHERE status = "active"')
+        active = cursor.fetchone()[0]
+        cursor.execute('SELECT COUNT(*) FROM bookings WHERE status = "completed"')
+        completed = cursor.fetchone()[0]
+        cursor.execute('SELECT COUNT(*) FROM bookings WHERE status = "cancelled"')
+        cancelled = cursor.fetchone()[0]
+        
+        # Экономия
+        cursor.execute('''
+            SELECT SUM((o.original_price - o.discount_price) * b.quantity)
+            FROM bookings b
+            JOIN offers o ON b.offer_id = o.offer_id
     """Детальная статистика бронирований"""
     if not db.is_admin(callback.from_user.id):
         await callback.answer("❌ Доступ запрещён", show_alert=True)
@@ -6660,6 +6630,82 @@ async def admin_bookings_stats_callback(callback: types.CallbackQuery):
 
 @dp.message(F.text == "📈 Аналитика")
 async def admin_analytics(message: types.Message):
+    await message.answer("⏳ Собираю статистику...")
+    
+    with db.get_connection() as conn:
+        cursor = conn.cursor()
+        
+        # Статистика по пользователям
+        cursor.execute('SELECT COUNT(*) FROM users')
+        total_users = cursor.fetchone()[0]
+        cursor.execute('SELECT COUNT(*) FROM users WHERE role = "seller"')
+        sellers = cursor.fetchone()[0]
+        cursor.execute('SELECT COUNT(*) FROM users WHERE role = "customer"')
+        customers = cursor.fetchone()[0]
+        
+        # Статистика по магазинам
+        cursor.execute('SELECT COUNT(*) FROM stores')
+        total_stores = cursor.fetchone()[0]
+        cursor.execute('SELECT COUNT(*) FROM stores WHERE status = "active"')
+        approved_stores = cursor.fetchone()[0]
+        cursor.execute('SELECT COUNT(*) FROM stores WHERE status = "pending"')
+        pending_stores = cursor.fetchone()[0]
+        cursor.execute('SELECT COUNT(*) FROM stores WHERE status = "rejected"')
+        rejected_stores = cursor.fetchone()[0]
+        
+        # Статистика по городам
+        cursor.execute('SELECT city, COUNT(*) FROM stores GROUP BY city ORDER BY COUNT(*) DESC LIMIT 5')
+        top_cities = cursor.fetchall()
+        
+        # Статистика по категориям
+        cursor.execute('SELECT category, COUNT(*) FROM stores GROUP BY category ORDER BY COUNT(*) DESC LIMIT 5')
+        top_categories = cursor.fetchall()
+        
+        # Статистика по предложениям
+        cursor.execute('SELECT COUNT(*) FROM offers')
+        total_offers = cursor.fetchone()[0]
+        cursor.execute('SELECT COUNT(*) FROM offers WHERE status = "active"')
+        active_offers = cursor.fetchone()[0]
+        cursor.execute('SELECT SUM(original_price) FROM offers WHERE status = "active"')
+        total_original_price = cursor.fetchone()[0] or 0
+        cursor.execute('SELECT SUM(discount_price) FROM offers WHERE status = "active"')
+        total_discounted_price = cursor.fetchone()[0] or 0
+        
+        # Статистика по бронированиям
+        cursor.execute('SELECT COUNT(*) FROM bookings')
+        total_bookings = cursor.fetchone()[0]
+        cursor.execute('SELECT COUNT(*) FROM bookings WHERE status = "active"')
+        active_bookings = cursor.fetchone()[0]
+        cursor.execute('SELECT COUNT(*) FROM bookings WHERE status = "completed"')
+        completed_bookings = cursor.fetchone()[0]
+        cursor.execute('SELECT COUNT(*) FROM bookings WHERE status = "cancelled"')
+        cancelled_bookings = cursor.fetchone()[0]
+        cursor.execute('SELECT SUM(quantity) FROM bookings WHERE status IN ("active", "completed")')
+        total_quantity = cursor.fetchone()[0] or 0
+        
+        # Доход (экономия покупателей)
+        cursor.execute('''
+            SELECT SUM((o.original_price - o.discount_price) * b.quantity)
+            FROM bookings b
+            JOIN offers o ON b.offer_id = o.offer_id
+            WHERE b.status IN ("active", "completed")
+        ''')
+        total_savings = cursor.fetchone()[0] or 0
+        
+        # Самые активные магазины
+        cursor.execute('''
+            SELECT s.name, COUNT(b.booking_id) as bookings_count
+            FROM stores s
+            LEFT JOIN offers o ON s.store_id = o.store_id
+            LEFT JOIN bookings b ON o.offer_id = b.offer_id
+            WHERE b.status IN ("active", "completed")
+            GROUP BY s.store_id
+            ORDER BY bookings_count DESC
+            LIMIT 5
+        ''')
+        top_stores = cursor.fetchall()
+    
+    # Формируем текстовый отчёт
     """Детальная аналитика системы"""
     lang = 'ru'
     if not db.is_admin(message.from_user.id):
@@ -6668,26 +6714,26 @@ async def admin_analytics(message: types.Message):
     
     await message.answer("⏳ Собираю статистику...")
     
-    conn = db.get_connection()
-    cursor = conn.cursor()
-    
-    # Статистика по пользователям
-    cursor.execute('SELECT COUNT(*) FROM users')
-    total_users = cursor.fetchone()[0]
-    cursor.execute('SELECT COUNT(*) FROM users WHERE role = "seller"')
-    sellers = cursor.fetchone()[0]
-    cursor.execute('SELECT COUNT(*) FROM users WHERE role = "customer"')
-    customers = cursor.fetchone()[0]
-    
-    # Статистика по магазинам
-    cursor.execute('SELECT COUNT(*) FROM stores')
-    total_stores = cursor.fetchone()[0]
-    cursor.execute('SELECT COUNT(*) FROM stores WHERE status = "active"')
-    approved_stores = cursor.fetchone()[0]
-    cursor.execute('SELECT COUNT(*) FROM stores WHERE status = "pending"')
-    pending_stores = cursor.fetchone()[0]
-    cursor.execute('SELECT COUNT(*) FROM stores WHERE status = "rejected"')
-    rejected_stores = cursor.fetchone()[0]
+    with db.get_connection() as conn:
+        cursor = conn.cursor()
+        
+        # Статистика по пользователям
+        cursor.execute('SELECT COUNT(*) FROM users')
+        total_users = cursor.fetchone()[0]
+        cursor.execute('SELECT COUNT(*) FROM users WHERE role = "seller"')
+        sellers = cursor.fetchone()[0]
+        cursor.execute('SELECT COUNT(*) FROM users WHERE role = "customer"')
+        customers = cursor.fetchone()[0]
+        
+        # Статистика по магазинам
+        cursor.execute('SELECT COUNT(*) FROM stores')
+        total_stores = cursor.fetchone()[0]
+        cursor.execute('SELECT COUNT(*) FROM stores WHERE status = "active"')
+        approved_stores = cursor.fetchone()[0]
+        cursor.execute('SELECT COUNT(*) FROM stores WHERE status = "pending"')
+        pending_stores = cursor.fetchone()[0]
+        cursor.execute('SELECT COUNT(*) FROM stores WHERE status = "rejected"')
+        rejected_stores = cursor.fetchone()[0]
     
     # Статистика по городам
     cursor.execute('SELECT city, COUNT(*) FROM stores GROUP BY city ORDER BY COUNT(*) DESC LIMIT 5')
@@ -7040,11 +7086,10 @@ async def admin_all_stores(message: types.Message):
         await message.answer(get_text(lang, 'access_denied'))
         return
     
-    conn = db.get_connection()
-    cursor = conn.cursor()
-    cursor.execute('SELECT * FROM stores ORDER BY created_at DESC')
-    stores = cursor.fetchall()
-    conn.close()
+    with db.get_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute('SELECT * FROM stores ORDER BY created_at DESC')
+        stores = cursor.fetchall()
     
     if not stores:
         await message.answer("Магазинов нет")
