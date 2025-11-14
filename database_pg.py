@@ -967,8 +967,7 @@ class Database:
     
     def increment_offer_quantity(self, offer_id: int, amount: int = 1):
         """Увеличить количество товара (при отмене бронирования)"""
-        conn = self.pool.getconn()
-        try:
+        with self.get_connection() as conn:
             cursor = conn.cursor(cursor_factory=RealDictCursor)
             # Получаем текущее количество
             cursor.execute('SELECT quantity FROM offers WHERE offer_id = %s', (offer_id,))
@@ -977,23 +976,16 @@ class Database:
                 current_qty = row['quantity'] if row['quantity'] is not None else 0
                 new_qty = current_qty + amount
                 self.update_offer_quantity(offer_id, new_qty)
-        finally:
-            self.pool.putconn(conn)
     
     def update_offer_expiry(self, offer_id: int, new_expiry: str):
         """Обновить срок годности товара"""
-        conn = self.pool.getconn()
-        try:
+        with self.get_connection() as conn:
             cursor = conn.cursor()
             cursor.execute('UPDATE offers SET expiry_date = %s WHERE offer_id = %s', (new_expiry, offer_id))
-            conn.commit()
-        finally:
-            self.pool.putconn(conn)
     
     def delete_expired_offers(self):
         """Удаляет предложения с истёкшим сроком годности"""
-        conn = self.pool.getconn()
-        try:
+        with self.get_connection() as conn:
             cursor = conn.cursor()
             # Деактивируем товары с истёкшим сроком годности
             cursor.execute('''
@@ -1003,29 +995,21 @@ class Database:
                 AND expiry_date IS NOT NULL
                 AND expiry_date::date < CURRENT_DATE
             ''')
-            conn.commit()
-        finally:
-            self.pool.putconn(conn)
     
     # ============== RATING METHODS ==============
     
     def add_rating(self, booking_id: int, user_id: int, store_id: int, rating: int, comment: str = None):
         """Добавить рейтинг"""
-        conn = self.pool.getconn()
-        try:
+        with self.get_connection() as conn:
             cursor = conn.cursor()
             cursor.execute('''
                 INSERT INTO ratings (booking_id, user_id, store_id, rating, comment)
                 VALUES (%s, %s, %s, %s, %s)
             ''', (booking_id, user_id, store_id, rating, comment))
-            conn.commit()
-        finally:
-            self.pool.putconn(conn)
     
     def get_store_ratings(self, store_id: int) -> List[dict]:
         """Получить все рейтинги магазина"""
-        conn = self.pool.getconn()
-        try:
+        with self.get_connection() as conn:
             cursor = conn.cursor(cursor_factory=RealDictCursor)
             cursor.execute('''
                 SELECT r.*, u.first_name, u.username
@@ -1035,37 +1019,28 @@ class Database:
                 ORDER BY r.created_at DESC
             ''', (store_id,))
             return cursor.fetchall()
-        finally:
-            self.pool.putconn(conn)
     
     def get_store_average_rating(self, store_id: int) -> float:
         """Получить средний рейтинг магазина"""
-        conn = self.pool.getconn()
-        try:
+        with self.get_connection() as conn:
             cursor = conn.cursor()
             cursor.execute('SELECT AVG(rating) FROM ratings WHERE store_id = %s', (store_id,))
             result = cursor.fetchone()
             return round(result[0], 1) if result and result[0] else 0.0
-        finally:
-            self.pool.putconn(conn)
     
     def has_rated_booking(self, booking_id: int) -> bool:
         """Проверить, оценил ли пользователь бронирование"""
-        conn = self.pool.getconn()
-        try:
+        with self.get_connection() as conn:
             cursor = conn.cursor()
             cursor.execute('SELECT COUNT(*) FROM ratings WHERE booking_id = %s', (booking_id,))
             count = cursor.fetchone()[0]
             return count > 0
-        finally:
-            self.pool.putconn(conn)
     
     # ============== STORE SALES STATISTICS ==============
     
     def get_store_sales_stats(self, store_id: int) -> dict:
         """Получить статистику продаж магазина"""
-        conn = self.pool.getconn()
-        try:
+        with self.get_connection() as conn:
             cursor = conn.cursor()
             
             stats = {}
@@ -1091,15 +1066,12 @@ class Database:
             stats['pending_bookings'] = cursor.fetchone()[0]
             
             return stats
-        finally:
-            self.pool.putconn(conn)
     
     # ============== STORE FILTERING METHODS ==============
     
     def get_stores_by_category(self, category: str, city: str = None) -> List[dict]:
         """Получить магазины по категории и опционально по городу"""
-        conn = self.pool.getconn()
-        try:
+        with self.get_connection() as conn:
             cursor = conn.cursor(cursor_factory=RealDictCursor)
             if city:
                 cursor.execute('''
@@ -1116,13 +1088,10 @@ class Database:
                     ORDER BY name
                 ''', (category,))
             return cursor.fetchall()
-        finally:
-            self.pool.putconn(conn)
     
     def get_offers_by_city_and_category(self, city: str, category: str, limit: int = 20) -> List[dict]:
         """Получить предложения в городе по категории магазина"""
-        conn = self.pool.getconn()
-        try:
+        with self.get_connection() as conn:
             cursor = conn.cursor(cursor_factory=RealDictCursor)
             cursor.execute('''
                 SELECT o.*, s.name as store_name, s.address, s.city, s.category,
@@ -1136,13 +1105,10 @@ class Database:
                 LIMIT %s
             ''', (city, category, limit))
             return cursor.fetchall()
-        finally:
-            self.pool.putconn(conn)
     
     def get_stores_count_by_category(self, city: str) -> dict:
         """Получить количество магазинов по каждой категории в городе"""
-        conn = self.pool.getconn()
-        try:
+        with self.get_connection() as conn:
             cursor = conn.cursor()
             cursor.execute('''
                 SELECT category, COUNT(*) as count
@@ -1153,13 +1119,10 @@ class Database:
             results = cursor.fetchall()
             # Возвращаем словарь {категория: количество}
             return {row[0]: row[1] for row in results}
-        finally:
-            self.pool.putconn(conn)
     
     def get_top_stores_by_city(self, city: str, limit: int = 10) -> List[dict]:
         """Получить топ магазины по рейтингу в городе"""
-        conn = self.pool.getconn()
-        try:
+        with self.get_connection() as conn:
             cursor = conn.cursor(cursor_factory=RealDictCursor)
             cursor.execute('''
                 SELECT s.*, 
@@ -1173,15 +1136,12 @@ class Database:
                 LIMIT %s
             ''', (city, limit))
             return cursor.fetchall()
-        finally:
-            self.pool.putconn(conn)
     
     # ============== FAVORITES & ANALYTICS ==============
     
     def get_favorites(self, user_id: int) -> List[dict]:
         """Получить избранные магазины пользователя"""
-        conn = self.pool.getconn()
-        try:
+        with self.get_connection() as conn:
             cursor = conn.cursor(cursor_factory=RealDictCursor)
             cursor.execute('''
                 SELECT s.* FROM stores s
@@ -1190,13 +1150,10 @@ class Database:
                 ORDER BY f.created_at DESC
             ''', (user_id,))
             return cursor.fetchall()
-        finally:
-            self.pool.putconn(conn)
     
     def get_store_analytics(self, store_id: int) -> dict:
         """Получить аналитику магазина"""
-        conn = self.pool.getconn()
-        try:
+        with self.get_connection() as conn:
             cursor = conn.cursor()
             
             # Общая статистика
@@ -1255,8 +1212,6 @@ class Database:
                 'avg_rating': rating[0] or 0,
                 'rating_count': rating[1] or 0
             }
-        finally:
-            self.pool.putconn(conn)
     
     # ============== UTILITY METHODS ==============
     
