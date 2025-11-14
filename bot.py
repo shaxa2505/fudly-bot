@@ -84,15 +84,21 @@ user_view_mode = {}
 try:
     from security import validator, rate_limiter, secure_user_input, validate_admin_action
     from logging_config import logger
-    
+
     def start_background_tasks(db):
         """Background tasks starter (production)"""
         logger.info("Background tasks ready")
-    
+
     PRODUCTION_FEATURES = True
 except ImportError as e:
     print(f"⚠️ Production features not available: {e}")
-    # Create fallback implementations
+    # Fallback logger
+    import logging
+    logger = logging.getLogger("fudly")
+    if not logger.handlers:
+        logging.basicConfig(level=logging.INFO)
+
+    # Create fallback implementations matching security module API
     class FallbackValidator:
         @staticmethod
         def sanitize_text(text, max_length=1000):
@@ -100,12 +106,22 @@ except ImportError as e:
         @staticmethod
         def validate_city(city):
             return bool(city and len(city) < 50)
-    
+
     class FallbackRateLimiter:
         def is_allowed(self, *args, **kwargs):
             return True
-    
+
+    def secure_user_input(func):
+        async def wrapper(*args, **kwargs):
+            return await func(*args, **kwargs)
+        return wrapper
+
+    def validate_admin_action(user_id: int, db):
+        return db.is_admin(user_id)
+
     validator = FallbackValidator()
+    rate_limiter = FallbackRateLimiter()
+    PRODUCTION_FEATURES = False
 
 # Словарь для преобразования узбекских названий городов в русские
 CITY_UZ_TO_RU = {
@@ -315,50 +331,58 @@ from typing import Callable, Dict, Any, Awaitable
 
 @dp.message(F.text == "👥 Пользователи")
 async def admin_users(message: types.Message):
-    """Статистика пользователей с inline-меню"""
+    """Статистика пользователей с inline-меню (SQLite/PostgreSQL совместимо)"""
     if not db.is_admin(message.from_user.id):
         return
-    
-    with db.get_connection() as conn:
-        cursor = conn.cursor()
-        
-        cursor.execute('SELECT COUNT(*) FROM users')
-        total = cursor.fetchone()[0]
-        
-        cursor.execute('SELECT COUNT(*) FROM users WHERE role = "seller"')
-        sellers = cursor.fetchone()[0]
-    
-    cursor.execute('SELECT COUNT(*) FROM users WHERE role = "customer"')
-    customers = cursor.fetchone()[0]
-    
-    # За последние 7 дней
-    cursor.execute('''
-        SELECT COUNT(*) FROM users 
-        WHERE DATE(created_at) >= DATE('now', '-7 days')
-    ''')
-    week_users = cursor.fetchone()[0]
-    
-    # За сегодня
-    from datetime import datetime
-    today = datetime.now().strftime('%Y-%m-%d')
-    cursor.execute('SELECT COUNT(*) FROM users WHERE DATE(created_at) = ?', (today,))
-    today_users = cursor.fetchone()[0]
-    
-    conn.close()
-    
+
+    # Собираем статистику внутри одного контекста подключения
+    try:
+        from datetime import datetime
+        today = datetime.now().strftime('%Y-%m-%d')
+        with db.get_connection() as conn:
+            cursor = conn.cursor()
+
+            cursor.execute('SELECT COUNT(*) FROM users')
+            total = cursor.fetchone()[0]
+
+            cursor.execute("SELECT COUNT(*) FROM users WHERE role = 'seller'")
+            sellers = cursor.fetchone()[0]
+
+            cursor.execute("SELECT COUNT(*) FROM users WHERE role = 'customer'")
+            customers = cursor.fetchone()[0]
+
+            if DATABASE_URL:
+                # PostgreSQL syntax
+                cursor.execute("SELECT COUNT(*) FROM users WHERE created_at >= CURRENT_DATE - INTERVAL '7 days'")
+                week_users = cursor.fetchone()[0]
+                cursor.execute('SELECT COUNT(*) FROM users WHERE DATE(created_at) = %s', (today,))
+                today_users = cursor.fetchone()[0]
+            else:
+                # SQLite syntax
+                cursor.execute("""
+                    SELECT COUNT(*) FROM users 
+                    WHERE DATE(created_at) >= DATE('now', '-7 days')
+                """)
+                week_users = cursor.fetchone()[0]
+                cursor.execute('SELECT COUNT(*) FROM users WHERE DATE(created_at) = ?', (today,))
+                today_users = cursor.fetchone()[0]
+    except Exception as e:
+        logger.error(f"Admin users stats error: {e}")
+        return
+
     text = "👥 <b>Пользователи</b>\n\n"
     text += f"📊 Всего: {total}\n"
     text += f"├ 🏪 Партнёры: {sellers}\n"
     text += f"└ 🛍 Покупатели: {customers}\n\n"
     text += f"📅 За неделю: +{week_users}\n"
     text += f"📅 Сегодня: +{today_users}"
-    
+
     from aiogram.utils.keyboard import InlineKeyboardBuilder
     kb = InlineKeyboardBuilder()
     kb.button(text="📋 Список партнёров", callback_data="admin_list_sellers")
     kb.button(text="🔍 Поиск пользователя", callback_data="admin_search_user")
     kb.adjust(1)
-    
+
     await message.answer(text, parse_mode="HTML", reply_markup=kb.as_markup())
 
 @dp.message(F.text == "🏪 Магазины")

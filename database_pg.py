@@ -1670,43 +1670,12 @@ class Database:
                          (notification_id,))
     
     # Favorites methods
-    def add_favorite(self, user_id: int, offer_id: int):
-        """Add offer to favorites"""
-        try:
-            with self.get_connection() as conn:
-                cursor = conn.cursor()
-                cursor.execute('''
-                    INSERT INTO favorites (user_id, offer_id)
-                    VALUES (%s, %s)
-                ''', (user_id, offer_id))
-                return True
-        except:
-            return False
-    
-    def remove_favorite(self, user_id: int, offer_id: int):
-        """Remove offer from favorites"""
+    # Deprecated offer-based favorites removed; using store-based favorites API (add_to_favorites/remove_from_favorites/get_favorites)
+    def is_favorite(self, user_id: int, store_id: int) -> bool:
+        """Check if store is in user's favorites (store-based)."""
         with self.get_connection() as conn:
             cursor = conn.cursor()
-            cursor.execute('DELETE FROM favorites WHERE user_id = %s AND offer_id = %s', 
-                         (user_id, offer_id))
-    
-    def get_user_favorites(self, user_id: int):
-        """Get user favorites"""
-        with self.get_connection() as conn:
-            cursor = conn.cursor(cursor_factory=RealDictCursor)
-            cursor.execute('''
-                SELECT o.* FROM offers o
-                JOIN favorites f ON o.offer_id = f.offer_id
-                WHERE f.user_id = %s AND o.status = %s
-            ''', (user_id, 'active'))
-            return [dict(row) for row in cursor.fetchall()]
-    
-    def is_favorite(self, user_id: int, offer_id: int) -> bool:
-        """Check if offer is in favorites"""
-        with self.get_connection() as conn:
-            cursor = conn.cursor()
-            cursor.execute('SELECT 1 FROM favorites WHERE user_id = %s AND offer_id = %s', 
-                         (user_id, offer_id))
+            cursor.execute('SELECT 1 FROM favorites WHERE user_id = %s AND store_id = %s', (user_id, store_id))
             return cursor.fetchone() is not None
     
     # Statistics methods
