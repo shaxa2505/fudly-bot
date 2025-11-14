@@ -35,62 +35,60 @@ def setup(dp_or_router, db, get_text, admin_menu):
         if not db.is_admin(message.from_user.id):
             return
         
-        conn = db.get_connection()
-        cursor = conn.cursor()
-        
-        # General statistics
-        cursor.execute('SELECT COUNT(*) FROM users')
-        total_users = cursor.fetchone()[0]
-        
-        cursor.execute('SELECT COUNT(*) FROM users WHERE role = "seller"')
-        sellers = cursor.fetchone()[0]
-        
-        cursor.execute('SELECT COUNT(*) FROM users WHERE role = "customer"')
-        customers = cursor.fetchone()[0]
-        
-        # Stores
-        cursor.execute('SELECT COUNT(*) FROM stores WHERE status = "active"')
-        active_stores = cursor.fetchone()[0]
-        
-        cursor.execute('SELECT COUNT(*) FROM stores WHERE status = "pending"')
-        pending_stores = cursor.fetchone()[0]
-        
-        # Offers
-        cursor.execute('SELECT COUNT(*) FROM offers WHERE status = "active"')
-        active_offers = cursor.fetchone()[0]
-        
-        cursor.execute('SELECT COUNT(*) FROM offers WHERE status = "inactive"')
-        inactive_offers = cursor.fetchone()[0]
-        
-        # Bookings
-        cursor.execute('SELECT COUNT(*) FROM bookings')
-        total_bookings = cursor.fetchone()[0]
-        
-        cursor.execute('SELECT COUNT(*) FROM bookings WHERE status = "pending"')
-        pending_bookings = cursor.fetchone()[0]
-        
-        # Today's statistics (Uzbek time)
-        today = get_uzb_time().strftime('%Y-%m-%d')
-        
-        cursor.execute('SELECT COUNT(*) FROM bookings WHERE DATE(created_at) = ?', (today,))
-        today_bookings = cursor.fetchone()[0]
-        
-        cursor.execute('''
-            SELECT SUM(o.discount_price * b.quantity)
-            FROM bookings b
-            JOIN offers o ON b.offer_id = o.offer_id
-            WHERE DATE(b.created_at) = ? AND b.status != 'cancelled'
-        ''', (today,))
-        today_revenue = cursor.fetchone()[0] or 0
-        
-        # New users today
-        cursor.execute('''
-            SELECT COUNT(*) FROM users 
-            WHERE DATE(created_at) = ?
-        ''', (today,))
-        today_users = cursor.fetchone()[0]
-        
-        conn.close()
+        with db.get_connection() as conn:
+            cursor = conn.cursor()
+            
+            # General statistics
+            cursor.execute('SELECT COUNT(*) FROM users')
+            total_users = cursor.fetchone()[0]
+            
+            cursor.execute("SELECT COUNT(*) FROM users WHERE role = 'seller'")
+            sellers = cursor.fetchone()[0]
+            
+            cursor.execute("SELECT COUNT(*) FROM users WHERE role = 'customer'")
+            customers = cursor.fetchone()[0]
+            
+            # Stores
+            cursor.execute("SELECT COUNT(*) FROM stores WHERE status = 'active'")
+            active_stores = cursor.fetchone()[0]
+            
+            cursor.execute("SELECT COUNT(*) FROM stores WHERE status = 'pending'")
+            pending_stores = cursor.fetchone()[0]
+            
+            # Offers
+            cursor.execute("SELECT COUNT(*) FROM offers WHERE status = 'active'")
+            active_offers = cursor.fetchone()[0]
+            
+            cursor.execute("SELECT COUNT(*) FROM offers WHERE status = 'inactive'")
+            inactive_offers = cursor.fetchone()[0]
+            
+            # Bookings
+            cursor.execute('SELECT COUNT(*) FROM bookings')
+            total_bookings = cursor.fetchone()[0]
+            
+            cursor.execute("SELECT COUNT(*) FROM bookings WHERE status = 'pending'")
+            pending_bookings = cursor.fetchone()[0]
+            
+            # Today's statistics (Uzbek time)
+            today = get_uzb_time().strftime('%Y-%m-%d')
+            
+            cursor.execute('SELECT COUNT(*) FROM bookings WHERE DATE(created_at) = %s', (today,))
+            today_bookings = cursor.fetchone()[0]
+            
+            cursor.execute('''
+                SELECT SUM(o.discount_price * b.quantity)
+                FROM bookings b
+                JOIN offers o ON b.offer_id = o.offer_id
+                WHERE DATE(b.created_at) = %s AND b.status != 'cancelled'
+            ''', (today,))
+            today_revenue = cursor.fetchone()[0] or 0
+            
+            # New users today
+            cursor.execute('''
+                SELECT COUNT(*) FROM users 
+                WHERE DATE(created_at) = %s
+            ''', (today,))
+            today_users = cursor.fetchone()[0]
         
         # Format message
         text = "📊 <b>Dashboard - Общая статистика</b>\n\n"

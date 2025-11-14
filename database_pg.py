@@ -164,6 +164,8 @@ class Database:
                     offer_id INTEGER,
                     store_id INTEGER,
                     quantity INTEGER DEFAULT 1,
+                    booking_code TEXT,
+                    pickup_time TEXT,
                     status TEXT DEFAULT 'active',
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                     FOREIGN KEY (user_id) REFERENCES users(user_id),
@@ -203,12 +205,14 @@ class Database:
             cursor.execute('''
                 CREATE TABLE IF NOT EXISTS ratings (
                     rating_id SERIAL PRIMARY KEY,
+                    booking_id INTEGER,
                     user_id BIGINT,
                     store_id INTEGER,
                     order_id INTEGER,
                     rating INTEGER CHECK (rating >= 1 AND rating <= 5),
                     comment TEXT,
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    FOREIGN KEY (booking_id) REFERENCES bookings(booking_id),
                     FOREIGN KEY (user_id) REFERENCES users(user_id),
                     FOREIGN KEY (store_id) REFERENCES stores(store_id),
                     FOREIGN KEY (order_id) REFERENCES orders(order_id)
@@ -828,14 +832,14 @@ class Database:
         """Get all users with notifications enabled"""
         with self.get_connection() as conn:
             cursor = conn.cursor(cursor_factory=RealDictCursor)
-            cursor.execute('SELECT * FROM users WHERE notifications_enabled = TRUE')
+            cursor.execute('SELECT * FROM users WHERE notifications_enabled = 1')
             return [dict(row) for row in cursor.fetchall()]
     
     def get_all_admins(self):
         """Get all admins"""
         with self.get_connection() as conn:
             cursor = conn.cursor()
-            cursor.execute('SELECT user_id FROM users WHERE is_admin = TRUE')
+            cursor.execute('SELECT user_id FROM users WHERE is_admin = 1')
             return [row[0] for row in cursor.fetchall()]
     
     def toggle_notifications(self, user_id: int):
