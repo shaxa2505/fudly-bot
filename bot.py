@@ -87,6 +87,28 @@ user_view_mode = {}
 user_cache = {}  # {user_id: {'lang': str, 'role': str, 'ts': float}}
 CACHE_TTL = 300  # 5 minutes
 
+def get_cached_user_data(user_id: int) -> dict:
+    """Get cached user data or fetch from DB"""
+    import time
+    now = time.time()
+    cached = user_cache.get(user_id)
+    if cached and (now - cached['ts']) < CACHE_TTL:
+        return cached
+    # Fetch from DB
+    user = db.get_user(user_id)
+    if user:
+        user_cache[user_id] = {
+            'lang': user.get('language', 'ru'),
+            'role': user.get('role', 'customer'),
+            'ts': now
+        }
+        return user_cache[user_id]
+    return {'lang': 'ru', 'role': 'customer', 'ts': now}
+
+def get_user_language_cached(user_id: int) -> str:
+    """Cached version of get_user_language"""
+    return get_cached_user_data(user_id)['lang']
+
 # Production optimizations (optional imports with fallbacks)
 try:
     from security import validator, rate_limiter, secure_user_input, validate_admin_action
@@ -214,9 +236,10 @@ def get_uzb_time():
 def has_approved_store(user_id: int) -> bool:
     """Проверяет, есть ли у пользователя одобренный магазин"""
     stores = db.get_user_stores(user_id)
-    # stores: [0]store_id, [1]owner_id, [2]name, [3]city, [4]address, [5]description, 
-    #         [6]category, [7]phone, [8]status, [9]rejection_reason, [10]created_at
-    return any(store[8] == "active" for store in stores if len(store) > 8)
+    if not stores:
+        return False
+    # Работает с dict (PostgreSQL) и tuple (SQLite)
+    return any(get_store_field(store, 'status') == "active" for store in stores)
 
 def get_appropriate_menu(user_id: int, lang: str):
     """Возвращает подходящее меню для пользователя с проверкой статуса магазина"""
@@ -3353,7 +3376,9 @@ async def add_offer_start(message: types.Message, state: FSMContext):
     
     if len(stores) == 1:
         # Один магазин - сразу начинаем создание
-        await state.update_data(store_id=stores[0][0])
+        store_id = get_store_field(stores[0], 'store_id')
+        store_name = get_store_field(stores[0], 'name', 'Магазин')
+        await state.update_data(store_id=store_id)
         
         # Клавиатура с кнопкой "Без фото"
         builder = InlineKeyboardBuilder()
@@ -3361,7 +3386,7 @@ async def add_offer_start(message: types.Message, state: FSMContext):
         builder.adjust(1)
         
         step1_text = (
-            f"🏪 <b>{stores[0][2]}</b>\n\n"
+            f"🏪 <b>{store_name}</b>\n\n"
             f"<b>{'ШАГ 1 из 3: НАЗВАНИЕ И ФОТО' if lang == 'ru' else '1-QADAM 3 tadan: NOM VA RASM'}</b>\n\n"
             f"📝 {'Введите название товара' if lang == 'ru' else 'Mahsulot nomini kiriting'}\n\n"
             f"� {'Можете сразу отправить фото с названием в подписи или нажать кнопку' if lang == 'ru' else 'Rasmni nom bilan yuboring yoki tugmani bosing'}"
@@ -3381,7 +3406,9 @@ async def add_offer_start(message: types.Message, state: FSMContext):
         )
         text = ""
         for i, store in enumerate(stores, 1):
-            text += f"{i}. 🏪 {store[2]} - 📍 {store[3]}\n"
+            store_name = get_store_field(store, 'name', 'Магазин')
+            store_city = get_store_field(store, 'city', '')
+            text += f"{i}. 🏪 {store_name} - 📍 {store_city}\n"
         await message.answer(text)
         await state.set_state(CreateOffer.store)
 
@@ -3394,7 +3421,9 @@ async def create_offer_store_selected(message: types.Message, state: FSMContext)
         store_num = int(message.text)
         if 1 <= store_num <= len(stores):
             selected_store = stores[store_num - 1]
-            await state.update_data(store_id=selected_store[0])
+            store_id = get_store_field(selected_store, 'store_id')
+            store_name = get_store_field(selected_store, 'name', 'Магазин')
+            await state.update_data(store_id=store_id)
             
             # Клавиатура с кнопкой "Без фото"
             builder = InlineKeyboardBuilder()
@@ -3402,7 +3431,7 @@ async def create_offer_store_selected(message: types.Message, state: FSMContext)
             builder.adjust(1)
             
             step1_text = (
-                f"🏪 <b>{selected_store[2]}</b>\n\n"
+                f"🏪 <b>{store_name}</b>\n\n"
                 f"<b>{'ШАГ 1 из 3' if lang == 'ru' else '1-QADAM 3 tadan'}</b>\n\n"
                 f"📝 {'Введите название товара' if lang == 'ru' else 'Mahsulot nomini kiriting'}\n"
                 f"📸 Затем отправьте фото (или нажмите кнопку 'Без фото')" if lang == 'ru'
@@ -4335,8 +4364,10 @@ async def my_offers(message: types.Message):
     
     all_offers = []
     for store in stores:
-        offers = db.get_store_offers(store[0])
-        logger.info(f"Store {store[0]} ({store[2]}), offers count: {len(offers)}")
+        store_id = get_store_field(store, 'store_id')
+        store_name = get_store_field(store, 'name', 'Магазин')
+        offers = db.get_store_offers(store_id)
+        logger.info(f"Store {store_id} ({store_name}), offers count: {len(offers)}")
         all_offers.extend(offers)
     
     logger.info(f"Total offers: {len(all_offers)}")
@@ -5158,7 +5189,8 @@ async def store_bookings(message: types.Message, state: FSMContext):
     
     all_bookings = []
     for store in stores:
-        bookings = db.get_store_bookings(store[0])
+        store_id = get_store_field(store, 'store_id')
+        bookings = db.get_store_bookings(store_id)
         all_bookings.extend(bookings)
     
     if not all_bookings:
@@ -5759,7 +5791,7 @@ async def partner_today_stats(message: types.Message):
         cursor = conn.cursor()
         
         # Собираем ID всех магазинов партнёра
-        store_ids = [store[0] for store in stores]
+        store_ids = [get_store_field(store, 'store_id') for store in stores]
         placeholders = ','.join('?' * len(store_ids))
         
         # Статистика за сегодня
