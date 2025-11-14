@@ -33,6 +33,9 @@ TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 if not TOKEN:
     raise ValueError("TELEGRAM_BOT_TOKEN environment variable is not set")
 
+# Get admin ID from environment
+ADMIN_ID = int(os.getenv("ADMIN_ID", "0"))
+
 # Helper function for safe user data access (dict from PostgreSQL, tuple from SQLite)
 def get_user_field(user, field_name: str, default=None):
     """Safely extract field from user (dict or tuple)"""
