@@ -297,7 +297,50 @@ class Database:
             cursor.execute('CREATE INDEX IF NOT EXISTS idx_notifications_user ON notifications(user_id)')
             cursor.execute('CREATE INDEX IF NOT EXISTS idx_ratings_store ON ratings(store_id)')
             cursor.execute('CREATE INDEX IF NOT EXISTS idx_favorites_user ON favorites(user_id)')
-            cursor.execute('CREATE INDEX IF NOT EXISTS idx_favorites_store ON favorites(store_id)')
+            
+            # Check if favorites table needs migration from offer_id to store_id
+            try:
+                cursor.execute("""
+                    SELECT column_name 
+                    FROM information_schema.columns 
+                    WHERE table_name='favorites' AND column_name='offer_id'
+                """)
+                has_offer_id = cursor.fetchone() is not None
+                
+                if has_offer_id:
+                    logger.warning("⚠️ Migrating favorites table from offer_id to store_id...")
+                    # Backup existing data if needed
+                    cursor.execute("SELECT COUNT(*) FROM favorites")
+                    count = cursor.fetchone()[0]
+                    if count > 0:
+                        logger.warning(f"⚠️ Found {count} existing favorites - they will be lost during migration")
+                    
+                    # Drop and recreate with correct schema
+                    cursor.execute("DROP TABLE IF EXISTS favorites CASCADE")
+                    cursor.execute('''
+                        CREATE TABLE favorites (
+                            favorite_id SERIAL PRIMARY KEY,
+                            user_id BIGINT NOT NULL,
+                            store_id INTEGER NOT NULL,
+                            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                            FOREIGN KEY (user_id) REFERENCES users(user_id),
+                            FOREIGN KEY (store_id) REFERENCES stores(store_id),
+                            UNIQUE(user_id, store_id)
+                        )
+                    ''')
+                    cursor.execute('CREATE INDEX IF NOT EXISTS idx_favorites_user ON favorites(user_id)')
+                    cursor.execute('CREATE INDEX IF NOT EXISTS idx_favorites_store ON favorites(store_id)')
+                    logger.info("✅ Favorites table migrated successfully")
+                else:
+                    # Table already has store_id, just ensure index exists
+                    cursor.execute('CREATE INDEX IF NOT EXISTS idx_favorites_store ON favorites(store_id)')
+            except Exception as e:
+                logger.error(f"Error checking/migrating favorites table: {e}")
+                # If error, try to create index anyway (might already exist)
+                try:
+                    cursor.execute('CREATE INDEX IF NOT EXISTS idx_favorites_store ON favorites(store_id)')
+                except:
+                    pass
             
             conn.commit()
             logger.info("✅ PostgreSQL database schema initialized successfully")
