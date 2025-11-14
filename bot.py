@@ -58,7 +58,7 @@ user_view_mode = {}
 try:
     from security import validator, rate_limiter, secure_user_input, validate_admin_action
     from logging_config import logger
-        PRODUCTION_FEATURES = True
+    PRODUCTION_FEATURES = True
 except ImportError as e:
     print(f"⚠️ Production features not available: {e}")
     # Create fallback implementations
