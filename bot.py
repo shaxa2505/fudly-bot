@@ -3310,7 +3310,7 @@ async def add_offer_start(message: types.Message, state: FSMContext):
     lang = db.get_user_language(message.from_user.id)
     
     # ВАЖНО: Берём только ОДОБРЕННЫЕ магазины!
-    stores = db.get_approved_stores(message.from_user.id)
+    stores = [s for s in db.get_user_stores(message.from_user.id) if get_store_field(s, 'status') == 'active']
     
     if not stores:
         await message.answer(get_text(lang, 'no_approved_stores'))
@@ -3353,7 +3353,7 @@ async def add_offer_start(message: types.Message, state: FSMContext):
 @dp.message(CreateOffer.store)
 async def create_offer_store_selected(message: types.Message, state: FSMContext):
     lang = db.get_user_language(message.from_user.id)
-    stores = db.get_approved_stores(message.from_user.id)
+    stores = [s for s in db.get_user_stores(message.from_user.id) if get_store_field(s, 'status') == 'active']
     
     try:
         store_num = int(message.text)
@@ -4114,7 +4114,7 @@ async def select_time_until(callback: types.CallbackQuery, state: FSMContext):
 @dp.message(F.text.contains("Массовое создание") | F.text.contains("Ommaviy yaratish"))
 async def bulk_create_start(message: types.Message, state: FSMContext):
     lang = db.get_user_language(message.from_user.id)
-    stores = db.get_approved_stores(message.from_user.id)
+    stores = [s for s in db.get_user_stores(message.from_user.id) if get_store_field(s, 'status') == 'active']
     
     if not stores:
         await message.answer(get_text(lang, 'no_approved_stores'))
@@ -4144,7 +4144,7 @@ async def bulk_create_start(message: types.Message, state: FSMContext):
 @dp.message(BulkCreate.store)
 async def bulk_create_store_selected(message: types.Message, state: FSMContext):
     lang = db.get_user_language(message.from_user.id)
-    stores = db.get_approved_stores(message.from_user.id)
+    stores = [s for s in db.get_user_stores(message.from_user.id) if get_store_field(s, 'status') == 'active']
     
     try:
         store_num = int(message.text)
@@ -5115,7 +5115,7 @@ async def store_bookings(message: types.Message, state: FSMContext):
     lang = db.get_user_language(message.from_user.id)
     
     # Получаем все магазины партнера
-    stores = db.get_approved_stores(message.from_user.id)
+    stores = [s for s in db.get_user_stores(message.from_user.id) if get_store_field(s, 'status') == 'active']
     
     if not stores:
         await message.answer(get_text(lang, 'no_approved_stores'))
@@ -5164,7 +5164,7 @@ async def filter_bookings(callback: types.CallbackQuery):
     filter_type = callback.data.split("_")[2]  # pending, completed, cancelled, all
     
     # Получаем все магазины партнера
-    stores = db.get_approved_stores(callback.from_user.id)
+    stores = [s for s in db.get_user_stores(callback.from_user.id) if get_store_field(s, 'status') == 'active']
     
     if not stores:
         await callback.answer(get_text(lang, 'no_approved_stores'), show_alert=True)
