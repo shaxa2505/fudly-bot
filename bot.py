@@ -25,6 +25,14 @@ import sqlite3
 from datetime import datetime, timedelta, timezone
 from dotenv import load_dotenv
 
+# Load environment variables
+load_dotenv()
+
+# Get bot token from environment
+TOKEN = os.getenv("BOT_TOKEN")
+if not TOKEN:
+    raise ValueError("BOT_TOKEN environment variable is not set")
+
 # Helper function for safe user data access (dict from PostgreSQL, tuple from SQLite)
 def get_user_field(user, field_name: str, default=None):
     """Safely extract field from user (dict or tuple)"""
