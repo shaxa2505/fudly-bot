@@ -17,9 +17,8 @@ pytest>=7.4.0
 pytest-cov>=4.1.0
 pytest-asyncio>=0.21.0
 
-# PostgreSQL database and FSM storage (Railway)
+# PostgreSQL database (Railway)
 psycopg2-binary>=2.9.9
-aiogram-storages-psql>=0.1.0
 
 # Production Features (optional - graceful fallback if not installed)
 # Uncomment if needed:
