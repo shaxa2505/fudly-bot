@@ -511,7 +511,7 @@ class Database:
             
             query += '''
                 ORDER BY discount_percent DESC, 
-                         COALESCE(o.expiry_date, '9999-12-31'::timestamp) ASC,
+                         COALESCE(o.expiry_date::text, '9999-12-31') ASC,
                          o.created_at DESC
                 LIMIT %s OFFSET %s
             '''
@@ -548,7 +548,7 @@ class Database:
                 SELECT o.*, s.name, s.address, s.city, s.category
                 FROM offers o
                 JOIN stores s ON o.store_id = s.store_id
-                WHERE o.store_id = %s AND o.quantity > 0 AND o.expiry_date >= CURRENT_DATE
+                WHERE o.store_id = %s AND o.quantity > 0 AND o.expiry_date::date >= CURRENT_DATE
                 ORDER BY o.created_at DESC
             ''', (store_id,))
             return [dict(row) for row in cursor.fetchall()]
@@ -564,7 +564,7 @@ class Database:
                 JOIN stores s ON o.store_id = s.store_id
                 WHERE s.city = %s AND s.status = 'active' 
                       AND o.status = 'active' AND o.quantity > 0 
-                      AND o.expiry_date >= CURRENT_DATE
+                      AND o.expiry_date::date >= CURRENT_DATE
                 ORDER BY discount_percent DESC, o.created_at DESC
                 LIMIT %s
             ''', (city, limit))
