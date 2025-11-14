@@ -84,11 +84,11 @@ from localization import get_text, get_cities, get_categories, normalize_categor
 user_view_mode = {}
 
 # Simple in-memory cache for user data (reduces DB calls)
-user_cache = {}  # {user_id: {'lang': str, 'role': str, 'ts': float}}
-CACHE_TTL = 300  # 5 minutes
+user_cache = {}  # {user_id: {'lang': str, 'role': str, 'city': str, 'user': tuple/dict, 'ts': float}}
+CACHE_TTL = 180  # 3 minutes - shorter for better consistency
 
 def get_cached_user_data(user_id: int) -> dict:
-    """Get cached user data or fetch from DB"""
+    """Get cached user data or fetch from DB - returns full user object"""
     import time
     now = time.time()
     cached = user_cache.get(user_id)
@@ -98,12 +98,19 @@ def get_cached_user_data(user_id: int) -> dict:
     user = db.get_user(user_id)
     if user:
         user_cache[user_id] = {
-            'lang': user.get('language', 'ru'),
-            'role': user.get('role', 'customer'),
+            'lang': get_user_field(user, 'language', 'ru'),
+            'role': get_user_field(user, 'role', 'customer'),
+            'city': get_user_field(user, 'city', 'Ташкент'),
+            'user': user,  # Store full user object
             'ts': now
         }
         return user_cache[user_id]
-    return {'lang': 'ru', 'role': 'customer', 'ts': now}
+    return {'lang': 'ru', 'role': 'customer', 'city': 'Ташкент', 'user': None, 'ts': now}
+
+def invalidate_user_cache(user_id: int):
+    """Invalidate user cache after updates"""
+    if user_id in user_cache:
+        del user_cache[user_id]
 
 def get_user_language_cached(user_id: int) -> str:
     """Cached version of get_user_language"""
@@ -1332,9 +1339,13 @@ async def filter_offers_by_store(callback: types.CallbackQuery):
 @dp.callback_query(F.data == "filter_all")
 async def show_all_offers_filter(callback: types.CallbackQuery):
     """Показать все предложения (альтернативный обработчик для filter_all)"""
-    # Переадресуем на offers_all
-    callback.data = "offers_all"
-    await show_all_offers(callback)
+    try:
+        # Переадресуем на offers_all
+        callback.data = "offers_all"
+        await show_all_offers(callback)
+    except Exception as e:
+        logger.error(f"Error in show_all_offers_filter: {e}")
+        await callback.answer("Ошибка", show_alert=True)
 
 @dp.callback_query(F.data.startswith("store_info_"))
 async def show_store_info(callback: types.CallbackQuery):
@@ -1623,21 +1634,24 @@ async def back_to_store_card(callback: types.CallbackQuery):
 @dp.callback_query(F.data == "back_to_places")
 async def back_to_places_menu(callback: types.CallbackQuery):
     """Вернуться к меню выбора типа заведения"""
-    lang = db.get_user_language(callback.from_user.id)
-    
-    await callback.message.answer(
-        get_text(lang, 'browse_by_business_type'),
-        parse_mode="HTML",
-        reply_markup=business_type_keyboard(lang)
-    )
-    await callback.answer()
+    try:
+        lang = db.get_user_language(callback.from_user.id)
+        
+        await callback.message.answer(
+            get_text(lang, 'browse_by_business_type'),
+            parse_mode="HTML",
+            reply_markup=business_type_keyboard(lang)
+        )
+        await callback.answer()
+    except Exception as e:
+        logger.error(f"Error in back_to_places_menu: {e}")
+        await callback.answer("Ошибка", show_alert=True)
 
 # ============== БРОНИРОВАНИЕ ==============
 
 @dp.callback_query(F.data.startswith("cat_"))
 async def select_category(callback: types.CallbackQuery):
     """Выбор категории заведения"""
-    await callback.answer()  # Подтверждаем callback
     try:
         lang = db.get_user_language(callback.from_user.id)
         user = db.get_user(callback.from_user.id)
@@ -1669,18 +1683,23 @@ async def select_category(callback: types.CallbackQuery):
         )
         await callback.answer()
     except Exception as e:
+        logger.error(f"Error in select_category: {e}")
         await callback.answer("Ошибка", show_alert=True)
 
 @dp.callback_query(F.data == "back_to_categories")
 async def back_to_categories(callback: types.CallbackQuery):
     """Возврат к выбору категорий"""
-    lang = db.get_user_language(callback.from_user.id)
-    
-    await callback.message.edit_text(
-        get_text(lang, 'choose_category'),
-        reply_markup=store_category_selection(lang)
-    )
-    await callback.answer()
+    try:
+        lang = db.get_user_language(callback.from_user.id)
+        
+        await callback.message.edit_text(
+            get_text(lang, 'choose_category'),
+            reply_markup=store_category_selection(lang)
+        )
+        await callback.answer()
+    except Exception as e:
+        logger.error(f"Error in back_to_categories: {e}")
+        await callback.answer("Ошибка", show_alert=True)
 
 @dp.callback_query(F.data.regex(r"^stores_(next|prev)_\d+_\d+$"))
 async def stores_pagination(callback: types.CallbackQuery):
@@ -1748,14 +1767,18 @@ async def select_store(callback: types.CallbackQuery):
 @dp.callback_query(F.data == "back_to_stores")
 async def back_to_stores(callback: types.CallbackQuery):
     """Возврат к выбору магазинов"""
-    # Для простоты вернём к категориям
-    lang = db.get_user_language(callback.from_user.id)
-    
-    await callback.message.edit_text(
-        get_text(lang, 'choose_category'),
-        reply_markup=store_category_selection(lang)
-    )
-    await callback.answer()
+    try:
+        # Для простоты вернём к категориям
+        lang = db.get_user_language(callback.from_user.id)
+        
+        await callback.message.edit_text(
+            get_text(lang, 'choose_category'),
+            reply_markup=store_category_selection(lang)
+        )
+        await callback.answer()
+    except Exception as e:
+        logger.error(f"Error in back_to_stores: {e}")
+        await callback.answer("Ошибка", show_alert=True)
 
 @dp.callback_query(F.data.startswith("back_to_offers_"))
 async def back_to_offers(callback: types.CallbackQuery):
@@ -1775,7 +1798,9 @@ async def back_to_offers(callback: types.CallbackQuery):
             get_text(lang, 'choose_offer'),
             reply_markup=offer_selection(offers, lang, store_id=store_id, offset=0)
         )
+        await callback.answer()
     except Exception as e:
+        logger.error(f"Error in back_to_offers: {e}")
         await callback.answer("Ошибка", show_alert=True)
 
 @dp.callback_query(F.data.regex(r"^offers_(next|prev)_\d+_\d+$"))
@@ -2703,42 +2728,43 @@ async def my_bookings(message: types.Message):
 
 @dp.callback_query(lambda c: c.data in ["bookings_active", "bookings_completed", "bookings_cancelled"])
 async def filter_bookings(callback: types.CallbackQuery):
-    lang = db.get_user_language(callback.from_user.id)
+    try:
+        lang = db.get_user_language(callback.from_user.id)
+        
+        # Получаем и бронирования, и заказы
+        bookings = db.get_user_bookings(callback.from_user.id)
+        orders = db.get_user_orders(callback.from_user.id)
+        
+        active_bookings = [b for b in bookings if b[3] in ['pending', 'confirmed']]
+        completed_bookings = [b for b in bookings if b[3] == 'completed']
+        cancelled_bookings = [b for b in bookings if b[3] == 'cancelled']
+        
+        active_orders = [o for o in orders if o[10] in ['pending', 'confirmed', 'preparing', 'delivering']]
+        completed_orders = [o for o in orders if o[10] == 'completed']
+        cancelled_orders = [o for o in orders if o[10] == 'cancelled']
+        
+        status_map = {
+            "bookings_active": (active_bookings, active_orders, "🟢 Активные" if lang == 'ru' else "🟢 Faol"),
+            "bookings_completed": (completed_bookings, completed_orders, "✅ Завершенные" if lang == 'ru' else "✅ Yakunlangan"),
+            "bookings_cancelled": (cancelled_bookings, cancelled_orders, "❌ Отмененные" if lang == 'ru' else "❌ Bekor qilingan")
+        }
+        
+        selected_bookings, selected_orders, label = status_map.get(callback.data, ([], [], ""))
+        
+        if not selected_bookings and not selected_orders:
+            await callback.answer("Нет заказов" if lang == 'ru' else "Buyurtmalar yo'q", show_alert=True)
+            return
     
-    # Получаем и бронирования, и заказы
-    bookings = db.get_user_bookings(callback.from_user.id)
-    orders = db.get_user_orders(callback.from_user.id)
-    
-    active_bookings = [b for b in bookings if b[3] in ['pending', 'confirmed']]
-    completed_bookings = [b for b in bookings if b[3] == 'completed']
-    cancelled_bookings = [b for b in bookings if b[3] == 'cancelled']
-    
-    active_orders = [o for o in orders if o[10] in ['pending', 'confirmed', 'preparing', 'delivering']]
-    completed_orders = [o for o in orders if o[10] == 'completed']
-    cancelled_orders = [o for o in orders if o[10] == 'cancelled']
-    
-    status_map = {
-        "bookings_active": (active_bookings, active_orders, "🟢 Активные" if lang == 'ru' else "🟢 Faol"),
-        "bookings_completed": (completed_bookings, completed_orders, "✅ Завершенные" if lang == 'ru' else "✅ Yakunlangan"),
-        "bookings_cancelled": (cancelled_bookings, cancelled_orders, "❌ Отмененные" if lang == 'ru' else "❌ Bekor qilingan")
-    }
-    
-    selected_bookings, selected_orders, label = status_map.get(callback.data, ([], [], ""))
-    
-    if not selected_bookings and not selected_orders:
-        await callback.answer("Нет заказов" if lang == 'ru' else "Buyurtmalar yo'q", show_alert=True)
-        return
-    
-    await callback.message.edit_text(
-        f"{label}: {len(selected_bookings) + len(selected_orders)}",
-        reply_markup=booking_filters_keyboard(lang, len(active_bookings), len(completed_bookings), len(cancelled_bookings)),
-        parse_mode="HTML"
-    )
-    
-    # Показываем бронирования (самовывоз)
-    if selected_bookings:
-        header_text = "📦 Бронирования (самовывоз)" if lang == 'ru' else "📦 Bronlar (olib ketish)"
-        await callback.message.answer(f"<b>{header_text}</b>", parse_mode="HTML")
+        await callback.message.edit_text(
+            f"{label}: {len(selected_bookings) + len(selected_orders)}",
+            reply_markup=booking_filters_keyboard(lang, len(active_bookings), len(completed_bookings), len(cancelled_bookings)),
+            parse_mode="HTML"
+        )
+        
+        # Показываем бронирования (самовывоз)
+        if selected_bookings:
+            header_text = "📦 Бронирования (самовывоз)" if lang == 'ru' else "📦 Bronlar (olib ketish)"
+            await callback.message.answer(f"<b>{header_text}</b>", parse_mode="HTML")
     
     for booking in selected_bookings:
         try:
@@ -2857,6 +2883,11 @@ async def filter_bookings(callback: types.CallbackQuery):
         except Exception as e:
             logger.error(f"Error displaying order {order[0] if order else 'unknown'}: {e}")
             continue
+    
+    await callback.answer()
+    except Exception as e:
+        logger.error(f"Error in filter_bookings: {e}")
+        await callback.answer("Ошибка", show_alert=True)
 
 @dp.callback_query(F.data.startswith("cancel_booking_"))
 async def cancel_booking(callback: types.CallbackQuery):
@@ -2886,20 +2917,24 @@ async def cancel_booking(callback: types.CallbackQuery):
 @dp.callback_query(F.data == "main_menu")
 async def handle_main_menu(callback: types.CallbackQuery):
     """Обработчик кнопки возврата в главное меню"""
-    user = db.get_user(callback.from_user.id)
-    if not user:
-        await callback.answer(get_text(lang, "user_not_found"))
-        return
-    
-    lang = db.get_user_language(callback.from_user.id)
-    menu = main_menu_seller(lang) if (get_user_field(user, 'role', 'customer') == 'seller') else main_menu_customer(lang)
-    
-    await callback.message.answer(
-        get_text(lang, 'welcome_back', name=callback.from_user.first_name, city=get_user_field(user, 'city')),
-        parse_mode="HTML",
-        reply_markup=menu
-    )
-    await callback.answer()
+    try:
+        lang = db.get_user_language(callback.from_user.id)
+        user = db.get_user(callback.from_user.id)
+        if not user:
+            await callback.answer(get_text(lang, "user_not_found"), show_alert=True)
+            return
+        
+        menu = main_menu_seller(lang) if (get_user_field(user, 'role', 'customer') == 'seller') else main_menu_customer(lang)
+        
+        await callback.message.answer(
+            get_text(lang, 'welcome_back', name=callback.from_user.first_name, city=get_user_field(user, 'city')),
+            parse_mode="HTML",
+            reply_markup=menu
+        )
+        await callback.answer()
+    except Exception as e:
+        logger.error(f"Error in handle_main_menu: {e}")
+        await callback.answer("Ошибка", show_alert=True)
 
 @dp.callback_query(F.data.startswith("complete_booking_"))
 async def complete_booking(callback: types.CallbackQuery):
