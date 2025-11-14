@@ -475,6 +475,51 @@ class Database:
                 ''', ('active', 'approved'))
             return [dict(row) for row in cursor.fetchall()]
     
+    def get_hot_offers(self, city: str = None, limit: int = 20, offset: int = 0, business_type: str = None):
+        """Get hot offers (top by discount and expiry date)
+        
+        Args:
+            city: City filter
+            limit: Maximum number of offers
+            offset: Offset for pagination
+            business_type: Business type filter (supermarket, restaurant, bakery, cafe, pharmacy)
+        
+        Returns: List of dicts with offer data + store info
+        Sorted by: discount_percent DESC, expiry_date ASC
+        """
+        with self.get_connection() as conn:
+            cursor = conn.cursor(cursor_factory=RealDictCursor)
+            
+            query = '''
+                SELECT o.*, s.name as store_name, s.address, s.city, s.business_type,
+                       CAST((1.0 - o.discount_price::float / o.original_price::float) * 100 AS INTEGER) as discount_percent
+                FROM offers o
+                JOIN stores s ON o.store_id = s.store_id
+                WHERE o.status = 'active' 
+                AND o.quantity > 0
+                AND (s.status = 'approved' OR s.status = 'active')
+            '''
+            
+            params = []
+            if city:
+                query += ' AND s.city ILIKE %s'
+                params.append(f'%{city}%')
+            
+            if business_type:
+                query += ' AND s.business_type = %s'
+                params.append(business_type)
+            
+            query += '''
+                ORDER BY discount_percent DESC, 
+                         COALESCE(o.expiry_date, '9999-12-31'::timestamp) ASC,
+                         o.created_at DESC
+                LIMIT %s OFFSET %s
+            '''
+            params.extend([limit, offset])
+            
+            cursor.execute(query, params)
+            return [dict(row) for row in cursor.fetchall()]
+    
     def update_offer_quantity(self, offer_id: int, quantity: int):
         """Update offer quantity"""
         with self.get_connection() as conn:
