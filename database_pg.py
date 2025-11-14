@@ -527,6 +527,251 @@ class Database:
             cursor.execute('UPDATE offers SET quantity = %s WHERE offer_id = %s', 
                          (quantity, offer_id))
     
+    def get_user_stores(self, owner_id: int):
+        """Get ALL stores for user (any status)"""
+        with self.get_connection() as conn:
+            cursor = conn.cursor(cursor_factory=RealDictCursor)
+            cursor.execute('''
+                SELECT s.*, u.first_name, u.username 
+                FROM stores s
+                LEFT JOIN users u ON s.owner_id = u.user_id
+                WHERE s.owner_id = %s
+                ORDER BY s.created_at DESC
+            ''', (owner_id,))
+            return [dict(row) for row in cursor.fetchall()]
+    
+    def get_offers_by_store(self, store_id: int):
+        """Get active offers for store"""
+        with self.get_connection() as conn:
+            cursor = conn.cursor(cursor_factory=RealDictCursor)
+            cursor.execute('''
+                SELECT o.*, s.name, s.address, s.city, s.category
+                FROM offers o
+                JOIN stores s ON o.store_id = s.store_id
+                WHERE o.store_id = %s AND o.quantity > 0 AND o.expiry_date >= CURRENT_DATE
+                ORDER BY o.created_at DESC
+            ''', (store_id,))
+            return [dict(row) for row in cursor.fetchall()]
+    
+    def get_top_offers_by_city(self, city: str, limit: int = 10):
+        """Get top offers in city (by discount)"""
+        with self.get_connection() as conn:
+            cursor = conn.cursor(cursor_factory=RealDictCursor)
+            cursor.execute('''
+                SELECT o.*, s.name, s.address, s.city, s.category,
+                       CAST((o.original_price - o.discount_price)::float / o.original_price * 100 AS INTEGER) as discount_percent
+                FROM offers o
+                JOIN stores s ON o.store_id = s.store_id
+                WHERE s.city = %s AND s.status = 'active' 
+                      AND o.status = 'active' AND o.quantity > 0 
+                      AND o.expiry_date >= CURRENT_DATE
+                ORDER BY discount_percent DESC, o.created_at DESC
+                LIMIT %s
+            ''', (city, limit))
+            return [dict(row) for row in cursor.fetchall()]
+    
+    def create_booking_atomic(self, offer_id: int, user_id: int, quantity: int = 1):
+        """Atomically reserve product and create booking in one transaction
+        
+        Returns: Tuple[bool, Optional[int], Optional[str]]
+            - ok: True if booking created successfully
+            - booking_id: ID of created booking or None on error
+            - booking_code: Booking code or None on error
+        """
+        import random
+        import string
+        
+        conn = None
+        try:
+            conn = self.pool.getconn()
+            conn.autocommit = False  # Start transaction
+            cursor = conn.cursor()
+            
+            # Check and reserve product atomically
+            cursor.execute('''
+                SELECT quantity, status FROM offers 
+                WHERE offer_id = %s AND status = 'active'
+                FOR UPDATE
+            ''', (offer_id,))
+            offer = cursor.fetchone()
+            
+            if not offer or offer[0] is None or offer[0] < quantity or offer[1] != 'active':
+                conn.rollback()
+                return (False, None, None)
+            
+            current_quantity = offer[0]
+            new_quantity = current_quantity - quantity
+            
+            # Update quantity atomically
+            cursor.execute('''
+                UPDATE offers 
+                SET quantity = %s, 
+                    status = CASE WHEN %s <= 0 THEN 'inactive' ELSE 'active' END
+                WHERE offer_id = %s AND quantity = %s
+            ''', (new_quantity, new_quantity, offer_id, current_quantity))
+            
+            if cursor.rowcount == 0:
+                conn.rollback()
+                return (False, None, None)
+            
+            # Generate unique booking code
+            booking_code = ''.join(random.choices(string.ascii_uppercase + string.digits, k=6))
+            
+            # Create booking
+            cursor.execute('''
+                INSERT INTO bookings (offer_id, user_id, booking_code, status, quantity)
+                VALUES (%s, %s, %s, 'pending', %s)
+                RETURNING booking_id
+            ''', (offer_id, user_id, booking_code, quantity))
+            booking_id = cursor.fetchone()[0]
+            
+            conn.commit()
+            return (True, booking_id, booking_code)
+            
+        except Exception as e:
+            if conn:
+                try:
+                    conn.rollback()
+                except Exception:
+                    pass
+            logger.error(f"Error creating booking atomically: {e}")
+            return (False, None, None)
+        finally:
+            if conn:
+                conn.autocommit = True
+                self.pool.putconn(conn)
+    
+    def get_booking(self, booking_id: int):
+        """Get booking by ID"""
+        with self.get_connection() as conn:
+            cursor = conn.cursor(cursor_factory=RealDictCursor)
+            cursor.execute('''
+                SELECT booking_id, offer_id, user_id, status, booking_code, 
+                       pickup_time, COALESCE(quantity, 1) as quantity, created_at 
+                FROM bookings 
+                WHERE booking_id = %s
+            ''', (booking_id,))
+            result = cursor.fetchone()
+            return dict(result) if result else None
+    
+    def get_booking_by_code(self, booking_code: str):
+        """Get booking by code"""
+        with self.get_connection() as conn:
+            cursor = conn.cursor(cursor_factory=RealDictCursor)
+            cursor.execute('''
+                SELECT b.booking_id, b.offer_id, b.user_id, b.status, b.booking_code,
+                       b.pickup_time, COALESCE(b.quantity, 1) as quantity, b.created_at,
+                       u.first_name, u.username
+                FROM bookings b
+                JOIN users u ON b.user_id = u.user_id
+                WHERE b.booking_code = %s AND b.status = 'pending'
+            ''', (booking_code,))
+            result = cursor.fetchone()
+            return dict(result) if result else None
+    
+    def get_store_bookings(self, store_id: int):
+        """Get all bookings for store"""
+        with self.get_connection() as conn:
+            cursor = conn.cursor(cursor_factory=RealDictCursor)
+            cursor.execute('''
+                SELECT b.*, o.title, u.first_name, u.username, u.phone
+                FROM bookings b
+                JOIN offers o ON b.offer_id = o.offer_id
+                JOIN users u ON b.user_id = u.user_id
+                WHERE o.store_id = %s
+                ORDER BY b.created_at DESC
+            ''', (store_id,))
+            return [dict(row) for row in cursor.fetchall()]
+    
+    def update_booking_status(self, booking_id: int, status: str):
+        """Update booking status"""
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute('UPDATE bookings SET status = %s WHERE booking_id = %s', 
+                         (status, booking_id))
+    
+    def complete_booking(self, booking_id: int):
+        """Complete booking"""
+        self.update_booking_status(booking_id, 'completed')
+    
+    def cancel_booking(self, booking_id: int):
+        """Cancel booking"""
+        self.update_booking_status(booking_id, 'cancelled')
+    
+    def approve_store(self, store_id: int):
+        """Approve store and promote owner to seller"""
+        conn = None
+        try:
+            conn = self.pool.getconn()
+            conn.autocommit = False
+            cursor = conn.cursor()
+            
+            # Get store data
+            cursor.execute('''
+                SELECT s.owner_id, u.user_id, s.status, s.name 
+                FROM stores s
+                LEFT JOIN users u ON s.owner_id = u.user_id
+                WHERE s.store_id = %s
+            ''', (store_id,))
+            
+            result = cursor.fetchone()
+            if not result:
+                conn.rollback()
+                logger.error(f"Store {store_id} not found")
+                return False
+                
+            owner_id, user_exists, current_status, store_name = result
+            
+            if not user_exists:
+                conn.rollback()
+                logger.error(f"Owner {owner_id} for store {store_id} ({store_name}) not found")
+                return False
+            
+            if current_status != 'pending':
+                conn.rollback()
+                logger.warning(f"Store {store_id} already has status: {current_status}")
+                return False
+            
+            # Update store status
+            cursor.execute('UPDATE stores SET status = %s WHERE store_id = %s', ('active', store_id))
+            
+            # Update owner role
+            cursor.execute('UPDATE users SET role = %s WHERE user_id = %s', ('seller', owner_id))
+            
+            conn.commit()
+            logger.info(f"Store {store_id} ({store_name}) approved, owner {owner_id} promoted to seller")
+            return True
+            
+        except Exception as e:
+            if conn:
+                conn.rollback()
+            logger.error(f"Error approving store: {e}")
+            return False
+        finally:
+            if conn:
+                conn.autocommit = True
+                self.pool.putconn(conn)
+    
+    def reject_store(self, store_id: int, reason: str):
+        """Reject store with reason"""
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute('UPDATE stores SET status = %s, rejection_reason = %s WHERE store_id = %s', 
+                         ('rejected', reason, store_id))
+    
+    def get_pending_stores(self):
+        """Get all pending stores"""
+        with self.get_connection() as conn:
+            cursor = conn.cursor(cursor_factory=RealDictCursor)
+            cursor.execute('''
+                SELECT s.*, u.first_name, u.username
+                FROM stores s
+                JOIN users u ON s.owner_id = u.user_id
+                WHERE s.status = 'pending'
+                ORDER BY s.created_at DESC
+            ''')
+            return [dict(row) for row in cursor.fetchall()]
+    
     def delete_offer(self, offer_id: int):
         """Soft delete offer (set status to inactive)"""
         with self.get_connection() as conn:
