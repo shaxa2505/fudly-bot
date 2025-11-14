@@ -19,6 +19,14 @@ def setup(dp_or_router, db, get_text, get_cities, city_keyboard, main_menu_custo
         lang = db.get_user_language(message.from_user.id)
         phone = message.contact.phone_number
         
+        # Validate phone format
+        if not validator.validate_phone(phone):
+            await message.answer(
+                "❌ Неверный формат номера телефона. Пожалуйста, используйте кнопку ниже.",
+                reply_markup=phone_request_keyboard(lang)
+            )
+            return
+        
         # Update phone number
         db.update_user_phone(message.from_user.id, phone)
         

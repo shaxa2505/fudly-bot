@@ -2,6 +2,7 @@
 User command handlers (start, language selection, city selection, cancel actions)
 """
 from typing import Optional, Any, Callable
+from database_protocol import DatabaseProtocol
 from aiogram import types, Router, F
 from aiogram.filters import Command
 from aiogram.fsm.context import FSMContext
@@ -10,20 +11,28 @@ from aiogram.utils.keyboard import InlineKeyboardBuilder
 router = Router()
 
 
-def setup(dp_or_router: Any, db: Any, get_text: Callable, get_cities: Callable, city_keyboard: Callable, language_keyboard: Callable,
-          phone_request_keyboard: Callable, main_menu_seller: Callable, main_menu_customer: Callable) -> None:
+def setup(
+    dp_or_router: Any,
+    db: DatabaseProtocol,
+    get_text: Callable[..., str],
+    get_cities: Callable[[str], Any],
+    city_keyboard: Callable[[str], Any],
+    language_keyboard: Callable[[], Any],
+    phone_request_keyboard: Callable[[str], Any],
+    main_menu_seller: Callable[[str], Any],
+    main_menu_customer: Callable[[str], Any]
+) -> None:
     """Setup user command handlers with dependencies"""
     from handlers.common import Registration, user_view_mode, has_approved_store
     
     @dp_or_router.message(F.text == "Мой город")
-    async def my_city(message: types.Message, state: FSMContext = None):
-        user_id = message.from_user.id
+    async def change_city(message: types.Message, state: Optional[FSMContext] = None):
+        user_id = message.from_user.id  # type: ignore[union-attr]  # type: ignore[union-attr]
         lang = db.get_user_language(user_id)
         user = db.get_user(user_id)
-        if isinstance(user, dict):
-            current_city = user.get('city') or get_cities(lang)[0]
-        else:
-            current_city = user[4] if user and len(user) > 4 else get_cities(lang)[0]
+        current_city = user.get('city') if user else get_cities(lang)[0]
+        if not current_city:
+            current_city = get_cities(lang)[0]
         
         # Get city statistics
         stats_text = ""
@@ -56,29 +65,27 @@ def setup(dp_or_router: Any, db: Any, get_text: Callable, get_cities: Callable, 
     async def show_city_selection(callback: types.CallbackQuery, state: FSMContext):
         """Show list of cities for selection"""
         lang = db.get_user_language(callback.from_user.id)
-        await callback.message.edit_text(
+        await callback.message.edit_text(  # type: ignore[union-attr]
             get_text(lang, 'choose_city'),
             reply_markup=city_keyboard(lang)
         )
-        await callback.answer()
-
     @dp_or_router.callback_query(F.data == "back_to_menu")
     async def back_to_main_menu(callback: types.CallbackQuery):
         """Return to main menu"""
         lang = db.get_user_language(callback.from_user.id)
         user = db.get_user(callback.from_user.id)
-        user_role = user.get('role', 'customer') if isinstance(user, dict) else (user[6] if user and len(user) > 6 else 'customer')
+        user_role = user.get('role', 'customer') if user else 'customer'
         menu = main_menu_seller(lang) if user_role == "seller" else main_menu_customer(lang)
         
-        await callback.message.delete()
-        await callback.message.answer(
+        await callback.message.delete()  # type: ignore[union-attr]
+        await callback.message.answer(  # type: ignore[union-attr]
             get_text(lang, 'main_menu') if 'main_menu' in dir() else "Главное меню",
             reply_markup=menu
         )
         await callback.answer()
 
     @dp_or_router.message(F.text.in_(get_cities('ru') + get_cities('uz')))
-    async def change_city(message: types.Message, state: FSMContext = None):
+    async def change_city(message: types.Message, state: Optional[FSMContext] = None):
         """Quick city change handler (without FSM state)"""
         user_id = message.from_user.id
         lang = db.get_user_language(user_id)
@@ -98,7 +105,7 @@ def setup(dp_or_router: Any, db: Any, get_text: Callable, get_cities: Callable, 
         db.update_user_city(user_id, new_city)
         
         # Get updated main menu
-        user_role = user.get('role', 'customer') if isinstance(user, dict) else (user[6] if user and len(user) > 6 else 'customer')
+        user_role = user.get('role', 'customer') if user else 'customer'
         menu = main_menu_seller(lang) if user_role == "seller" else main_menu_customer(lang)
         
         await message.answer(
@@ -110,7 +117,7 @@ def setup(dp_or_router: Any, db: Any, get_text: Callable, get_cities: Callable, 
 
     @dp_or_router.message(Command("start"))
     async def cmd_start(message: types.Message, state: FSMContext):
-        user = db.get_user(message.from_user.id)
+        user = db.get_user(message.from_user.id)  # type: ignore[union-attr]
         
         if not user:
             # New user - show welcome message + language selection
@@ -126,15 +133,10 @@ def setup(dp_or_router: Any, db: Any, get_text: Callable, get_cities: Callable, 
         
         lang = db.get_user_language(message.from_user.id)
         
-        # Handle both dict (PostgreSQL) and tuple (SQLite)
-        if isinstance(user, dict):
-            user_phone = user.get('phone')
-            user_city = user.get('city')
-            user_role = user.get('role', 'customer')
-        else:
-            user_phone = user[3]
-            user_city = user[4]
-            user_role = user[6] if len(user) > 6 else 'customer'
+        # Both backends now return dict
+        user_phone = user.get('phone')
+        user_city = user.get('city')
+        user_role = user.get('role', 'customer')
         
         # Check phone
         if not user_phone:
@@ -159,14 +161,14 @@ def setup(dp_or_router: Any, db: Any, get_text: Callable, get_cities: Callable, 
         # Welcome message
         menu = main_menu_seller(lang) if user_role == "seller" else main_menu_customer(lang)
         await message.answer(
-            get_text(lang, 'welcome_back', name=message.from_user.first_name, city=user_city),
+            get_text(lang, 'welcome_back', name=message.from_user.first_name, city=user_city),  # type: ignore[union-attr]
             parse_mode="HTML",
             reply_markup=menu
         )
 
     @dp_or_router.callback_query(F.data.startswith("lang_"))
     async def choose_language(callback: types.CallbackQuery, state: FSMContext):
-        lang = callback.data.split("_")[1]
+        lang = callback.data.split("_")[1]  # type: ignore[union-attr]
         
         # Show menu after language selection
         user = db.get_user(callback.from_user.id)
@@ -176,8 +178,8 @@ def setup(dp_or_router: Any, db: Any, get_text: Callable, get_cities: Callable, 
             # Create new user WITH selected language
             db.add_user(callback.from_user.id, callback.from_user.username, callback.from_user.first_name)
             db.update_user_language(callback.from_user.id, lang)
-            await callback.message.edit_text(get_text(lang, 'language_changed'))
-            await callback.message.answer(
+            await callback.message.edit_text(get_text(lang, 'language_changed'))  # type: ignore[union-attr]
+            await callback.message.answer(  # type: ignore[union-attr]
                 get_text(lang, 'welcome_phone_step'),
                 parse_mode="HTML",
                 reply_markup=phone_request_keyboard(lang)
@@ -190,8 +192,8 @@ def setup(dp_or_router: Any, db: Any, get_text: Callable, get_cities: Callable, 
         await callback.message.edit_text(get_text(lang, 'language_changed'))
         
         # Extract user data
-        user_phone = user.get('phone') if isinstance(user, dict) else (user[3] if len(user) > 3 else None)
-        user_city = user.get('city') if isinstance(user, dict) else (user[4] if len(user) > 4 else None)
+        user_phone = user.get('phone')
+        user_city = user.get('city')
         
         # If no phone - request it
         if not user_phone:
@@ -214,7 +216,7 @@ def setup(dp_or_router: Any, db: Any, get_text: Callable, get_cities: Callable, 
             return
         
         # Show main menu
-        user_role = user.get('role', 'customer') if isinstance(user, dict) else (user[6] if len(user) > 6 else 'customer')
+        user_role = user.get('role', 'customer') if user else 'customer'
         menu = main_menu_seller(lang) if user_role == "seller" else main_menu_customer(lang)
         await callback.message.answer(
             get_text(lang, 'welcome_back', name=callback.from_user.first_name, city=user_city),
@@ -229,9 +231,9 @@ def setup(dp_or_router: Any, db: Any, get_text: Callable, get_cities: Callable, 
         
         # BLOCK cancellation of mandatory registration
         if current_state in ['Registration:phone', 'Registration:city']:
-            user = db.get_user(message.from_user.id)
+            user = db.get_user(message.from_user.id)  # type: ignore[union-attr]
             # If no phone number — registration is mandatory, cancellation prohibited
-            user_phone = user.get('phone') if isinstance(user, dict) else (user[3] if user and len(user) > 3 else None)
+            user_phone = user.get('phone') if user else None
             if not user or not user_phone:
                 await message.answer(
                     "❌ Регистрация обязательна для использования бота.\n\n"
@@ -259,7 +261,7 @@ def setup(dp_or_router: Any, db: Any, get_text: Callable, get_cities: Callable, 
                 preferred_menu = None
 
         user = db.get_user(message.from_user.id)
-        role = user.get('role', 'customer') if isinstance(user, dict) else (user[6] if user and len(user) > 6 else 'customer')
+        role = user.get('role', 'customer') if user else 'customer'
         
         # CRITICAL: When cancelling RegisterStore ALWAYS return to customer menu
         # because user does NOT YET have an approved store

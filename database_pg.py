@@ -219,16 +219,16 @@ class Database:
                 )
             ''')
             
-            # Favorites table
+            # Favorites table (store favorites – align with SQLite schema)
             cursor.execute('''
                 CREATE TABLE IF NOT EXISTS favorites (
                     favorite_id SERIAL PRIMARY KEY,
                     user_id BIGINT,
-                    offer_id INTEGER,
+                    store_id INTEGER,
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                     FOREIGN KEY (user_id) REFERENCES users(user_id),
-                    FOREIGN KEY (offer_id) REFERENCES offers(offer_id),
-                    UNIQUE(user_id, offer_id)
+                    FOREIGN KEY (store_id) REFERENCES stores(store_id),
+                    UNIQUE(user_id, store_id)
                 )
             ''')
             
@@ -297,6 +297,7 @@ class Database:
             cursor.execute('CREATE INDEX IF NOT EXISTS idx_notifications_user ON notifications(user_id)')
             cursor.execute('CREATE INDEX IF NOT EXISTS idx_ratings_store ON ratings(store_id)')
             cursor.execute('CREATE INDEX IF NOT EXISTS idx_favorites_user ON favorites(user_id)')
+            cursor.execute('CREATE INDEX IF NOT EXISTS idx_favorites_store ON favorites(store_id)')
             
             conn.commit()
             logger.info("✅ PostgreSQL database schema initialized successfully")
@@ -354,6 +355,132 @@ class Database:
         """Get user language"""
         user = self.get_user(user_id)
         return user['language'] if user else 'ru'
+
+    # ===================== ADDITIONAL / PORTED METHODS (from SQLite) =====================
+    def get_user_stores(self, owner_id: int):
+        """Return all stores belonging to an owner"""
+        with self.get_connection() as conn:
+            cursor = conn.cursor(cursor_factory=RealDictCursor)
+            cursor.execute('SELECT * FROM stores WHERE owner_id = %s ORDER BY created_at DESC', (owner_id,))
+            return list(cursor.fetchall())
+
+    def get_stores_by_city(self, city: str):
+        """Return active stores for a given city (compact projection)"""
+        with self.get_connection() as conn:
+            cursor = conn.cursor(cursor_factory=RealDictCursor)
+            cursor.execute("""
+                SELECT store_id, name, address, category, city
+                FROM stores
+                WHERE city = %s AND status = 'active'
+                ORDER BY created_at DESC
+            """, (city,))
+            return list(cursor.fetchall())
+
+    def get_active_offers(self, city: str = None, store_id: int = None):
+        """Return active offers, optionally filtered by city or store.
+        Matches the flexible signature used in handlers.
+        """
+        with self.get_connection() as conn:
+            cursor = conn.cursor(cursor_factory=RealDictCursor)
+            base = ["SELECT o.*, s.city FROM offers o JOIN stores s ON o.store_id = s.store_id WHERE o.status = 'active'"]
+            params = []
+            if city:
+                base.append('AND s.city = %s')
+                params.append(city)
+            if store_id:
+                base.append('AND o.store_id = %s')
+                params.append(store_id)
+            base.append('ORDER BY o.created_at DESC')
+            query = ' '.join(base)
+            cursor.execute(query, tuple(params))
+            return list(cursor.fetchall())
+
+    def toggle_notifications(self, user_id: int) -> bool:
+        """Toggle notifications_enabled flag; return new state"""
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute('''
+                UPDATE users
+                SET notifications_enabled = CASE WHEN notifications_enabled = 1 THEN 0 ELSE 1 END
+                WHERE user_id = %s
+                RETURNING notifications_enabled
+            ''', (user_id,))
+            new_val = cursor.fetchone()[0]
+            return new_val == 1
+
+    def update_user_role(self, user_id: int, role: str):
+        """Update user role"""
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute('UPDATE users SET role = %s WHERE user_id = %s', (role, user_id))
+
+    def get_all_admins(self):
+        """Return list of admin user_ids"""
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute('SELECT user_id FROM users WHERE is_admin = 1')
+            return [row[0] for row in cursor.fetchall()]
+
+    def add_to_favorites(self, user_id: int, store_id: int):
+        """Add store to user's favorites"""
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute('''
+                INSERT INTO favorites (user_id, store_id)
+                VALUES (%s, %s)
+                ON CONFLICT (user_id, store_id) DO NOTHING
+            ''', (user_id, store_id))
+
+    def remove_from_favorites(self, user_id: int, store_id: int):
+        """Remove store from user's favorites"""
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute('DELETE FROM favorites WHERE user_id = %s AND store_id = %s', (user_id, store_id))
+
+    def get_favorites(self, user_id: int):
+        """Return list of favorite stores for user"""
+        with self.get_connection() as conn:
+            cursor = conn.cursor(cursor_factory=RealDictCursor)
+            cursor.execute('''
+                SELECT f.store_id, s.name, s.city, s.category, s.address
+                FROM favorites f
+                JOIN stores s ON f.store_id = s.store_id
+                WHERE f.user_id = %s AND s.status = 'active'
+                ORDER BY f.created_at DESC
+            ''', (user_id,))
+            return list(cursor.fetchall())
+
+    def activate_offer(self, offer_id: int):
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("UPDATE offers SET status = 'active' WHERE offer_id = %s", (offer_id,))
+
+    def deactivate_offer(self, offer_id: int):
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("UPDATE offers SET status = 'inactive' WHERE offer_id = %s", (offer_id,))
+
+    def get_booking_history(self, user_id: int, limit: int = 50):
+        """Return recent bookings for user"""
+        with self.get_connection() as conn:
+            cursor = conn.cursor(cursor_factory=RealDictCursor)
+            cursor.execute('''
+                SELECT b.*, o.title, o.discount_price
+                FROM bookings b
+                JOIN offers o ON b.offer_id = o.offer_id
+                WHERE b.user_id = %s
+                ORDER BY b.created_at DESC
+                LIMIT %s
+            ''', (user_id, limit))
+            return list(cursor.fetchall())
+
+    def get_platform_payment_card(self):
+        """Return generic platform payment card (first settings row)"""
+        with self.get_connection() as conn:
+            cursor = conn.cursor(cursor_factory=RealDictCursor)
+            cursor.execute('SELECT card_number, card_holder FROM payment_settings ORDER BY created_at ASC LIMIT 1')
+            row = cursor.fetchone()
+            return dict(row) if row else None
     
     def set_admin(self, user_id: int):
         """Set user as admin"""

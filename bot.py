@@ -99,6 +99,8 @@ except ImportError as e:
 # Load environment variables
 load_dotenv(override=True)
 TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
+if not TOKEN:
+    raise ValueError("TELEGRAM_BOT_TOKEN environment variable is required")
 ADMIN_ID = int(os.getenv("ADMIN_ID", 0))
 WEBHOOK_URL = os.getenv("WEBHOOK_URL", "")  # Для Railway: https://yourapp.railway.app
 WEBHOOK_PATH = os.getenv("WEBHOOK_PATH", "/webhook")

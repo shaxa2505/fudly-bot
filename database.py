@@ -388,12 +388,21 @@ class Database:
         except Exception:
             pass
     
-    def get_user(self, user_id: int) -> Optional[Tuple]:
+    def get_user(self, user_id: int) -> Optional[dict]:
+        """Return user as dict (unified with PostgreSQL)."""
         conn = self.get_connection()
         try:
             cursor = conn.cursor()
             cursor.execute('SELECT * FROM users WHERE user_id = ?', (user_id,))
-            user = cursor.fetchone()
+            row = cursor.fetchone()
+            if not row:
+                return None
+            # Convert tuple to dict for consistency
+            columns = ['user_id', 'username', 'first_name', 'phone', 'city', 'language', 'role', 'is_admin', 'notifications_enabled', 'created_at']
+            # Handle optional fields (bonus_balance, referral_code)
+            if len(row) > 10:
+                columns.extend(['bonus_balance', 'referral_code'])
+            user = dict(zip(columns[:len(row)], row))
             return user
         finally:
             try:
@@ -476,28 +485,30 @@ class Database:
             pass
         return store_id
     
-    def get_user_stores(self, owner_id: int) -> List[Tuple]:
-        """Получить ВСЕ магазины пользователя (любой статус)"""
+    def get_user_stores(self, owner_id: int) -> List[dict]:
+        """Return all user stores as list of dicts (unified with PostgreSQL)."""
         conn = self.get_connection()
         cursor = conn.cursor()
-        cursor.execute('''
-            SELECT s.*, u.first_name, u.username 
-            FROM stores s
-            LEFT JOIN users u ON s.owner_id = u.user_id
-            WHERE s.owner_id = ?
-            ORDER BY s.created_at DESC
-        ''', (owner_id,))
-        stores = cursor.fetchall()
+        cursor.execute('SELECT * FROM stores WHERE owner_id = ? ORDER BY created_at DESC', (owner_id,))
+        rows = cursor.fetchall()
         conn.close()
-        return stores
+        columns = ['store_id', 'owner_id', 'name', 'city', 'address', 'description', 'category', 'phone', 'status', 'rejection_reason', 'created_at']
+        # Handle optional field business_type
+        if rows and len(rows[0]) > 11:
+            columns.extend(['business_type', 'delivery_enabled', 'delivery_price', 'min_order_amount'])
+        return [dict(zip(columns[:len(row)], row)) for row in rows]
     
-    def get_approved_stores(self, owner_id: int) -> List[Tuple]:
-        """Получить только ОДОБРЕННЫЕ магазина пользователя"""
+    def get_approved_stores(self, owner_id: int) -> List[dict]:
+        """Return only approved stores as list of dicts."""
         conn = self.get_connection()
         try:
             cursor = conn.cursor()
             cursor.execute('SELECT * FROM stores WHERE owner_id = ? AND status = "active"', (owner_id,))
-            stores = cursor.fetchall()
+            rows = cursor.fetchall()
+            columns = ['store_id', 'owner_id', 'name', 'city', 'address', 'description', 'category', 'phone', 'status', 'rejection_reason', 'created_at']
+            if rows and len(rows[0]) > 11:
+                columns.extend(['business_type', 'delivery_enabled', 'delivery_price', 'min_order_amount'])
+            stores = [dict(zip(columns[:len(row)], row)) for row in rows]
             return stores
         finally:
             try:
@@ -505,7 +516,7 @@ class Database:
             except Exception:
                 pass
     
-    def get_store(self, store_id: int) -> Optional[Tuple]:
+    def get_store(self, store_id: int) -> Optional[dict]:
         key = f'store:{store_id}'
         try:
             cached = cache.get(key)
@@ -517,11 +528,19 @@ class Database:
         conn = self.get_connection()
         cursor = conn.cursor()
         cursor.execute('SELECT * FROM stores WHERE store_id = ?', (store_id,))
-        store = cursor.fetchone()
+        row = cursor.fetchone()
         try:
             conn.close()
         except Exception:
             pass
+        
+        if not row:
+            return None
+        
+        columns = ['store_id', 'owner_id', 'name', 'city', 'address', 'description', 'category', 'phone', 'status', 'rejection_reason', 'created_at']
+        if len(row) > 11:
+            columns.extend(['business_type', 'delivery_enabled', 'delivery_price', 'min_order_amount'])
+        store = dict(zip(columns[:len(row)], row))
 
         try:
             cache.set(key, store, ex=int(os.environ.get('CACHE_TTL_SECONDS', 300)))
@@ -530,7 +549,7 @@ class Database:
 
         return store
     
-    def get_stores_by_city(self, city: str) -> List[Tuple]:
+    def get_stores_by_city(self, city: str) -> List[dict]:
         key = f'stores:city:{city}'
         try:
             cached = cache.get(key)
@@ -542,11 +561,16 @@ class Database:
         conn = self.get_connection()
         cursor = conn.cursor()
         cursor.execute('SELECT * FROM stores WHERE city = ? AND status = "active"', (city,))
-        stores = cursor.fetchall()
+        rows = cursor.fetchall()
         try:
             conn.close()
         except Exception:
             pass
+        
+        columns = ['store_id', 'owner_id', 'name', 'city', 'address', 'description', 'category', 'phone', 'status', 'rejection_reason', 'created_at']
+        if rows and len(rows[0]) > 11:
+            columns.extend(['business_type', 'delivery_enabled', 'delivery_price', 'min_order_amount'])
+        stores = [dict(zip(columns[:len(row)], row)) for row in rows]
 
         try:
             cache.set(key, stores, ex=int(os.environ.get('CACHE_TTL_SECONDS', 300)))
@@ -643,7 +667,7 @@ class Database:
             pass
         return offer_id
     
-    def get_active_offers(self, city: str = None, store_id: int = None) -> List[Tuple]:
+    def get_active_offers(self, city: str = None, store_id: int = None) -> List[dict]:
         # Cache keys: offers:all, offers:city:<city>, offers:store:<id>
         cache_key = 'offers:all'
         if store_id:
@@ -660,10 +684,21 @@ class Database:
         conn = self.get_connection()
         cursor = conn.cursor()
         
+        # Определяем колонки для маппинга
+        # Колонки из offers: offer_id, store_id, title, description, original_price, discount_price, 
+        #                    quantity, available_from, available_until, expiry_date, status, photo, created_at
+        # Колонки из JOIN: store_name, address, city, category
+        offer_columns = ['offer_id', 'store_id', 'title', 'description', 'original_price', 'discount_price',
+                        'quantity', 'available_from', 'available_until', 'expiry_date', 'status', 'photo', 'created_at']
+        store_columns = ['store_name', 'address', 'city', 'category']
+        all_columns = offer_columns + store_columns
+        
         if store_id:
             # Фильтр по конкретному магазину
             cursor.execute('''
-                SELECT o.*, s.name as store_name, s.address, s.city, s.category
+                SELECT o.offer_id, o.store_id, o.title, o.description, o.original_price, o.discount_price,
+                       o.quantity, o.available_from, o.available_until, o.expiry_date, o.status, o.photo, o.created_at,
+                       s.name as store_name, s.address, s.city, s.category
                 FROM offers o
                 JOIN stores s ON o.store_id = s.store_id
                 WHERE o.status = 'active' AND o.quantity > 0 AND s.store_id = ? AND s.status = 'active'
@@ -673,7 +708,9 @@ class Database:
         elif city:
             # Фильтр по городу
             cursor.execute('''
-                SELECT o.*, s.name as store_name, s.address, s.city, s.category
+                SELECT o.offer_id, o.store_id, o.title, o.description, o.original_price, o.discount_price,
+                       o.quantity, o.available_from, o.available_until, o.expiry_date, o.status, o.photo, o.created_at,
+                       s.name as store_name, s.address, s.city, s.category
                 FROM offers o
                 JOIN stores s ON o.store_id = s.store_id
                 WHERE o.status = 'active' AND o.quantity > 0 AND s.city = ? AND s.status = 'active'
@@ -683,7 +720,9 @@ class Database:
         else:
             # Все предложения
             cursor.execute('''
-                SELECT o.*, s.name as store_name, s.address, s.city, s.category
+                SELECT o.offer_id, o.store_id, o.title, o.description, o.original_price, o.discount_price,
+                       o.quantity, o.available_from, o.available_until, o.expiry_date, o.status, o.photo, o.created_at,
+                       s.name as store_name, s.address, s.city, s.category
                 FROM offers o
                 JOIN stores s ON o.store_id = s.store_id
                 WHERE o.status = 'active' AND o.quantity > 0 AND s.status = 'active'
@@ -697,34 +736,36 @@ class Database:
         except Exception:
             pass
         
-        # Фильтруем товары с истёкшим сроком годности
+        # Преобразуем в список словарей и фильтруем по сроку годности
         from datetime import datetime
         valid_offers = []
         for offer in offers:
-            # Проверяем срок годности если он указан (индекс 12 - expiry_date после ALTER TABLE)
-            if len(offer) > 12 and offer[12]:
+            offer_dict = dict(zip(all_columns, offer))
+            
+            # Проверяем срок годности если он указан
+            if offer_dict.get('expiry_date'):
                 try:
                     # Преобразуем дату из формата DD.MM.YYYY или YYYY-MM-DD
-                    expiry_str = str(offer[12])
+                    expiry_str = str(offer_dict['expiry_date'])
                     if '.' in expiry_str:
                         expiry_parts = expiry_str.split('.')
                         if len(expiry_parts) == 3:
                             expiry_date = datetime(int(expiry_parts[2]), int(expiry_parts[1]), int(expiry_parts[0]))
                         else:
-                            valid_offers.append(offer)
+                            valid_offers.append(offer_dict)
                             continue
                     elif '-' in expiry_str:
                         expiry_date = datetime.strptime(expiry_str, '%Y-%m-%d')
                     else:
-                        valid_offers.append(offer)
+                        valid_offers.append(offer_dict)
                         continue
                     # Если срок годности не истёк
                     if expiry_date >= datetime.now():
-                        valid_offers.append(offer)
+                        valid_offers.append(offer_dict)
                 except:
-                    valid_offers.append(offer)  # Ошибка парсинга - показываем
+                    valid_offers.append(offer_dict)  # Ошибка парсинга - показываем
             else:
-                valid_offers.append(offer)  # Нет срока годности - показываем
+                valid_offers.append(offer_dict)  # Нет срока годности - показываем
         
         # cache result
         try:

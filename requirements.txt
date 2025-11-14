@@ -23,6 +23,6 @@ psycopg2-binary>=2.9.9
 # Production Features (optional - graceful fallback if not installed)
 # Uncomment if needed:
 # redis>=4.5.0                   # For Redis caching
-# python-json-logger>=2.0.0      # For structured logging
+python-json-logger>=2.0.0        # For structured logging (enabled)
 # Pillow>=10.0.0                 # For image processing
 # sentry-sdk>=1.40.0             # For error tracking

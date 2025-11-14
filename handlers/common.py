@@ -3,8 +3,8 @@ Common utilities, state classes, and middleware
 """
 from aiogram.fsm.state import State, StatesGroup
 from aiogram import BaseMiddleware
-from aiogram.types import Update
 from typing import Callable, Dict, Any, Awaitable
+from database_protocol import DatabaseProtocol
 from datetime import timezone, timedelta, datetime
 import logging
 
@@ -39,24 +39,27 @@ def get_uzb_time():
     return datetime.now(UZB_TZ)
 
 
-def has_approved_store(user_id: int, db: Any) -> bool:
+def has_approved_store(user_id: int, db: DatabaseProtocol) -> bool:
     """Check if user has an approved store"""
     stores = db.get_user_stores(user_id)
-    # stores: [0]store_id, [1]owner_id, [2]name, [3]city, [4]address, [5]description, 
-    #         [6]category, [7]phone, [8]status, [9]rejection_reason, [10]created_at
-    return any(store[8] == "active" for store in stores if len(store) > 8)
+    # stores: now unified dict format
+    return any(store.get('status') == "active" for store in stores)
 
 
-def get_appropriate_menu(user_id: int, lang: str, db: Any, main_menu_seller: Callable, main_menu_customer: Callable) -> Any:
+def get_appropriate_menu(
+    user_id: int,
+    lang: str,
+    db: DatabaseProtocol,
+    main_menu_seller: Callable[[str], Any],
+    main_menu_customer: Callable[[str], Any]
+) -> Any:
     """Return appropriate menu for user based on their store approval status"""
     user = db.get_user(user_id)
     if not user:
         return main_menu_customer(lang)
     
-    if isinstance(user, dict):
-        role = user.get('role', 'customer')
-    else:
-        role = user[6] if len(user) > 6 else "customer"
+    # Both backends now return dict
+    role = user.get('role', 'customer')
     
     # If partner - check for approved store
     if role == "seller":
@@ -153,7 +156,12 @@ class OrderDelivery(StatesGroup):
 class RegistrationCheckMiddleware(BaseMiddleware):
     """Check that user is registered (has phone number) before any action"""
     
-    def __init__(self, db: Any, get_text_func: Callable, phone_request_keyboard_func: Callable):
+    def __init__(
+        self,
+        db: DatabaseProtocol,
+        get_text_func: Callable[[str, str], str] | Callable[..., str],
+        phone_request_keyboard_func: Callable[[str], Any]
+    ):
         self.db = db
         self.get_text = get_text_func
         self.phone_request_keyboard = phone_request_keyboard_func
@@ -161,78 +169,68 @@ class RegistrationCheckMiddleware(BaseMiddleware):
     
     async def __call__(
         self,
-        handler: Callable[[Update, Dict[str, Any]], Awaitable[Any]],
-        event: Update,
+        handler: Callable[[Any, Dict[str, Any]], Awaitable[Any]],
+        event: Any,
         data: Dict[str, Any]
     ) -> Any:
-        # Determine user_id from different event types
+        # Robust attribute access (aiogram runtime object shape)
+        msg = getattr(event, 'message', None)
+        cb = getattr(event, 'callback_query', None)
         user_id = None
-        if event.message:
-            user_id = event.message.from_user.id
-        elif event.callback_query:
-            user_id = event.callback_query.from_user.id
-        
+        if msg and getattr(msg, 'from_user', None):
+            user_id = msg.from_user.id
+        elif cb and getattr(cb, 'from_user', None):
+            user_id = cb.from_user.id
+
         if not user_id:
             return await handler(event, data)
-        
-        # Log middleware check
+
         content_type = None
-        if event.message:
-            if event.message.photo:
+        if msg:
+            if msg.photo:
                 content_type = "photo"
-            elif event.message.text:
-                content_type = f"text: {event.message.text[:30]}"
-            elif event.message.contact:
+            elif msg.text:
+                content_type = f"text: {msg.text[:30]}"
+            elif msg.contact:
                 content_type = "contact"
         logger.debug(f"[Middleware] User {user_id}, type: {content_type}")
-        
-        # Commands that are always allowed (for registration process)
+
         allowed_commands = ['/start', '/help']
-        allowed_callbacks = ['lang_ru', 'lang_uz']  # Language selection during registration
-        
-        # Check if this is an allowed command
-        if event.message:
-            if event.message.text and any(event.message.text.startswith(cmd) for cmd in allowed_commands):
+        allowed_callbacks = ['lang_ru', 'lang_uz']
+
+        if msg:
+            if msg.text and any(msg.text.startswith(cmd) for cmd in allowed_commands):
                 return await handler(event, data)
-            # Allow sending contact (phone number)
-            if event.message.contact:
+            if msg.contact:
                 return await handler(event, data)
-            # Allow sending photos (for payment proofs, offers, etc)
-            if event.message.photo:
+            if msg.photo:
                 return await handler(event, data)
-        
-        # Allow language selection callbacks
-        if event.callback_query and event.callback_query.data in allowed_callbacks:
+
+        if cb and cb.data in allowed_callbacks:
             return await handler(event, data)
-        
-        # Check FSM state — if user is in ANY FSM process, allow
+
         state = data.get('state')
         if state:
             current_state = await state.get_state()
             if current_state:
-                # User is in FSM process (registration, ordering, etc) — allow
                 return await handler(event, data)
-        
-        # Check user registration
+
         user = self.db.get_user(user_id)
-        user_phone = user.get('phone') if isinstance(user, dict) else (user[3] if user and len(user) > 3 else None)
+        # Both backends now return dict
+        user_phone = user.get('phone') if user else None
         if not user or not user_phone:
             lang = self.db.get_user_language(user_id) if user else 'ru'
-            
-            # If this is a message
-            if event.message:
-                await event.message.answer(
+            if msg:
+                await msg.answer(
                     self.get_text(lang, 'registration_required'),
                     parse_mode="HTML",
                     reply_markup=self.phone_request_keyboard(lang)
                 )
-            # If this is a callback
-            elif event.callback_query:
-                await event.callback_query.answer(
+            elif cb:
+                await cb.answer(
                     self.get_text(lang, 'registration_required'),
                     show_alert=True
                 )
-            return  # Block further processing
-        
-        # User is registered — continue
+            return
+
         return await handler(event, data)

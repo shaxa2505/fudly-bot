@@ -1,11 +1,16 @@
 """
 Script to port missing methods from database.py to database_pg.py
-Converts SQLite syntax to PostgreSQL syntax
+Converts SQLite syntax to PostgreSQL syntax.
+
+Notes:
+- This helper is purely textual; it does NOT execute SQL.
+- Added type hints to satisfy static analysis.
 """
 import re
+from typing import List, Tuple
 
-# SQL syntax conversions
-conversions = [
+# SQL syntax conversions (pattern -> replacement)
+conversions: List[Tuple[str, str]] = [
     # SQLite placeholders to PostgreSQL
     (r'\?', '%s'),
     
@@ -27,9 +32,13 @@ conversions = [
     (r"try:\s+conn\.close\(\)\s+except.*?pass", ""),
 ]
 
-def convert_method(sqlite_code):
-    """Convert SQLite method to PostgreSQL"""
-    pg_code = sqlite_code
+def convert_method(sqlite_code: str) -> str:
+    """Convert a snippet of SQLite-oriented code to PostgreSQL-oriented code.
+
+    This performs best-effort regex substitutions defined in `conversions`.
+    It is intentionally conservative; manual review is still required.
+    """
+    pg_code: str = sqlite_code
     
     for pattern, replacement in conversions:
         pg_code = re.sub(pattern, replacement, pg_code)
