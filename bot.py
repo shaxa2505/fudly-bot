@@ -185,27 +185,40 @@ def get_appropriate_menu(user_id: int, lang: str):
 bot = Bot(token=TOKEN)
 
 # Try to use Redis for FSM storage (Railway), fallback to MemoryStorage
-try:
-    from aiogram.fsm.storage.redis import RedisStorage, DefaultKeyBuilder
-    import redis.asyncio as redis_async
-    
-    # Get Redis URL from environment (Railway provides REDIS_URL)
-    REDIS_URL = os.getenv("REDIS_URL")
-    
-    if REDIS_URL:
-        # Parse Redis URL
-        redis_client = redis_async.from_url(REDIS_URL)
+storage = None
+REDIS_URL = os.getenv("REDIS_URL")
+
+if REDIS_URL and REDIS_URL.strip():
+    try:
+        from aiogram.fsm.storage.redis import RedisStorage, DefaultKeyBuilder
+        import redis.asyncio as redis_async
+        
+        # Parse Redis URL and create client
+        redis_client = redis_async.from_url(
+            REDIS_URL,
+            encoding="utf-8",
+            decode_responses=True
+        )
         storage = RedisStorage(redis_client, key_builder=DefaultKeyBuilder(with_destiny=True))
-        print("✅ Using Redis for FSM storage (persistent)")
-        logger.info("✅ Redis FSM storage initialized")
-    else:
-        storage = MemoryStorage()
-        print("⚠️ Redis URL not found, using MemoryStorage (states lost on restart)")
-        logger.warning("⚠️ Using MemoryStorage - FSM states will be lost on restart")
-except ImportError:
+        print(f"✅ Using Redis for FSM storage (persistent): {REDIS_URL.split('@')[0]}@...")
+        logger.info(f"✅ Redis FSM storage initialized: {REDIS_URL[:20]}...")
+    except ImportError as e:
+        print(f"⚠️ Redis module not available: {e}")
+        logger.warning(f"⚠️ Redis import failed: {e}")
+        storage = None
+    except Exception as e:
+        print(f"⚠️ Redis connection failed: {e}")
+        logger.warning(f"⚠️ Redis initialization failed: {e}")
+        storage = None
+else:
+    print("⚠️ REDIS_URL not set")
+    logger.warning("⚠️ REDIS_URL environment variable not found")
+
+# Fallback to MemoryStorage if Redis failed
+if storage is None:
     storage = MemoryStorage()
-    print("⚠️ Redis not available, using MemoryStorage")
-    logger.warning("⚠️ Redis module not found, using MemoryStorage")
+    print("⚠️ Using MemoryStorage (FSM states will be lost on restart)")
+    logger.warning("⚠️ Using MemoryStorage - FSM states will be lost on container restart")
 
 dp = Dispatcher(storage=storage)
 db = Database()

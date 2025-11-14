@@ -16,13 +16,20 @@
 2. Нажмите **+ New** → **Database** → **Add Redis**
 3. Railway автоматически создаст Redis инстанс и переменную окружения `REDIS_URL`
 
-### Шаг 2: Проверьте переменную окружения
+### Шаг 2: Подключите Redis к боту
 
-1. В Railway перейдите в ваш bot service
-2. Откройте **Variables**
-3. Убедитесь что есть переменная `REDIS_URL`
-   - Должна выглядеть так: `redis://default:password@redis.railway.internal:6379`
-   - Railway добавляет её автоматически при подключении Redis
+1. В Railway откройте **Redis service** который вы создали
+2. Перейдите в **Connect**
+3. Скопируйте **Redis Connection URL** (должен выглядеть как `redis://default:password@...`)
+4. Откройте ваш **bot service**
+5. Перейдите в **Variables**
+6. Нажмите **+ New Variable**
+7. Добавьте:
+   - **Variable Name**: `REDIS_URL`
+   - **Value**: вставьте скопированный Redis URL
+8. Нажмите **Add**
+
+**ВАЖНО:** Railway НЕ создает REDIS_URL автоматически! Нужно добавить вручную.
 
 ### Шаг 3: Деплой обновленного кода
 
