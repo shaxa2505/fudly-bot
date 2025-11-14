@@ -475,17 +475,33 @@ class Database:
                          ('inactive', offer_id))
     
     # Order management methods
-    def create_order(self, user_id: int, offer_id: int, store_id: int,
-                     delivery_address: str, quantity: int = 1, total_price: float = 0):
+    def create_order(self, user_id: int, store_id: int, offer_id: int, quantity: int,
+                     order_type: str, delivery_address: str = None, delivery_price: int = 0,
+                     payment_method: str = None):
         """Create new order"""
         with self.get_connection() as conn:
             cursor = conn.cursor()
+            
+            # Get offer price
+            offer = self.get_offer(offer_id)
+            if not offer:
+                return None
+            
+            discount_price = offer['discount_price']
+            total_amount = (discount_price * quantity) + delivery_price
+            
+            # Generate pickup code for pickup orders
+            import random
+            import string
+            pickup_code = ''.join(random.choices(string.ascii_uppercase + string.digits, k=6)) if order_type == 'pickup' else None
+            
             cursor.execute('''
-                INSERT INTO orders (user_id, offer_id, store_id, delivery_address, 
-                                  quantity, total_price)
-                VALUES (%s, %s, %s, %s, %s, %s)
+                INSERT INTO orders (user_id, store_id, offer_id, quantity, delivery_address,
+                                  total_price, payment_method, payment_status, order_status)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
                 RETURNING order_id
-            ''', (user_id, offer_id, store_id, delivery_address, quantity, total_price))
+            ''', (user_id, store_id, offer_id, quantity, delivery_address,
+                  total_amount, payment_method or 'card', 'pending', 'pending'))
             order_id = cursor.fetchone()[0]
             logger.info(f"Order {order_id} created by user {user_id}")
             return order_id
@@ -505,6 +521,21 @@ class Database:
                 UPDATE orders SET payment_proof_photo_id = %s, payment_status = %s 
                 WHERE order_id = %s
             ''', (photo_id, 'proof_submitted', order_id))
+    
+    def update_payment_status(self, order_id: int, status: str, photo_id: str = None):
+        """Update payment status and optionally save proof photo"""
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            if photo_id:
+                cursor.execute('''
+                    UPDATE orders SET payment_status = %s, payment_proof_photo_id = %s
+                    WHERE order_id = %s
+                ''', (status, photo_id, order_id))
+            else:
+                cursor.execute('''
+                    UPDATE orders SET payment_status = %s
+                    WHERE order_id = %s
+                ''', (status, order_id))
     
     def update_order_status(self, order_id: int, order_status: str, payment_status: str = None):
         """Update order status"""

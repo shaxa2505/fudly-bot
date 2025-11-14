@@ -127,6 +127,16 @@ def normalize_city(city: str) -> str:
     """Преобразует название города в русский формат для поиска в БД"""
     return CITY_UZ_TO_RU.get(city, city)
 
+def db_get(data, key, index=None):
+    """Universal accessor for dict (PostgreSQL) or tuple (SQLite)"""
+    if data is None:
+        return None
+    if isinstance(data, dict):
+        return data.get(key)
+    elif isinstance(data, (tuple, list)) and index is not None:
+        return data[index] if len(data) > index else None
+    return None
+
 def normalize_category(category: str) -> str:
     """Преобразует отображаемое название категории в английский ключ для БД"""
     category_map = {
@@ -2602,7 +2612,25 @@ async def order_payment_proof(message: types.Message, state: FSMContext):
     
     offer = db.get_offer(offer_id)
     store = db.get_store(store_id)
-    delivery_price = store[-2] if len(store) >= 2 else 10000
+    
+    # Universal access for dict (PostgreSQL) or tuple (SQLite)
+    if isinstance(store, dict):
+        owner_id = store['owner_id']
+        store_name = store['name']
+        delivery_price = 10000  # Default delivery price for PostgreSQL
+    else:
+        owner_id = store[1]
+        store_name = store[2]
+        delivery_price = store[-2] if len(store) >= 2 else 10000
+    
+    if isinstance(offer, dict):
+        offer_title = offer['title']
+        offer_price = offer['discount_price']
+        offer_quantity = offer['quantity']
+    else:
+        offer_title = offer[2]
+        offer_price = offer[5]
+        offer_quantity = offer[6]
     
     # Получаем file_id фото
     photo_id = message.photo[-1].file_id
@@ -2630,12 +2658,15 @@ async def order_payment_proof(message: types.Message, state: FSMContext):
     await state.clear()
     
     # Уменьшаем количество товара
-    new_quantity = offer[6] - quantity
+    new_quantity = offer_quantity - quantity
     db.update_offer_quantity(offer_id, new_quantity)
     
     # Уведомление партнёру со скриншотом
     customer = db.get_user(message.from_user.id)
-    customer_phone = customer[3] if customer and customer[3] else "Не указан"
+    if isinstance(customer, dict):
+        customer_phone = customer.get('phone', 'Не указан')
+    else:
+        customer_phone = customer[3] if customer and customer[3] else "Не указан"
     
     currency_ru = 'сум'
     currency_uz = "so'm"
@@ -2652,7 +2683,6 @@ async def order_payment_proof(message: types.Message, state: FSMContext):
     notification_kb.button(text="❌ " + ("Отклонить" if lang == 'ru' else "Rad etish"), callback_data=f"reject_payment_{order_id}")
     notification_kb.adjust(2)
     
-    owner_id = store[1]
     print(f"[DEBUG] Sending order notification to owner {owner_id} for order {order_id}")
     logger.info(f"📤 Sending order notification to store owner {owner_id}")
     
@@ -2661,14 +2691,14 @@ async def order_payment_proof(message: types.Message, state: FSMContext):
             chat_id=owner_id,
             photo=photo_id,
             caption=f"🔔 <b>{'Новый заказ с доставкой!' if lang == 'ru' else 'Yangi buyurtma yetkazib berish bilan!'}</b>\n\n"
-                    f"🏪 {store[2]}\n"
-                    f"🍽 {offer[2]}\n"
+                    f"🏪 {store_name}\n"
+                    f"🍽 {offer_title}\n"
                     f"📦 {'Количество' if lang == 'ru' else 'Miqdor'}: {quantity} {unit_ru if lang == 'ru' else unit_uz}\n"
                     f"👤 {message.from_user.first_name}\n"
                     f"📱 {'Телефон' if lang == 'ru' else 'Telefon'}: <code>{customer_phone}</code>\n"
                     f"📍 {'Адрес' if lang == 'ru' else 'Manzil'}: {address}\n"
                     f"💰 {payment_ru if lang == 'ru' else payment_uz}: {card_transfer_ru if lang == 'ru' else card_transfer_uz}\n"
-                    f"💵 {'Сумма' if lang == 'ru' else 'Summa'}: {(offer[5] * quantity) + delivery_price:,} {currency_ru if lang == 'ru' else currency_uz}\n\n"
+                    f"💵 {'Сумма' if lang == 'ru' else 'Summa'}: {(offer_price * quantity) + delivery_price:,} {currency_ru if lang == 'ru' else currency_uz}\n\n"
                     f"📸 {'Скриншот оплаты выше' if lang == 'ru' else screenshot_text}",
             parse_mode="HTML",
             reply_markup=notification_kb.as_markup()
@@ -2680,9 +2710,16 @@ async def order_payment_proof(message: types.Message, state: FSMContext):
         print(f"[DEBUG] ❌ Failed to send notification: {e}")
     
     # Подтверждение клиенту
-    total_amount = (offer[5] * quantity) + delivery_price
+    total_amount = (offer_price * quantity) + delivery_price
     user = db.get_user(message.from_user.id)
-    menu = main_menu_seller(lang) if user and user[6] == "seller" else main_menu_customer(lang)
+    
+    # Handle dict or tuple user
+    if isinstance(user, dict):
+        user_role = user.get('role', 'customer')
+    else:
+        user_role = user[6] if user and len(user) > 6 else 'customer'
+    
+    menu = main_menu_seller(lang) if user_role == "seller" else main_menu_customer(lang)
     
     currency_ru = 'сум'
     currency_uz = "so'm"
@@ -2697,7 +2734,7 @@ async def order_payment_proof(message: types.Message, state: FSMContext):
     await message.answer(
         f"✅ <b>{'Заказ оформлен!' if lang == 'ru' else 'Buyurtma qabul qilindi!'}</b>\n\n"
         f"📦 {'Заказ' if lang == 'ru' else 'Buyurtma'} #{order_id}\n"
-        f"🍽 {offer[2]}\n"
+        f"🍽 {offer_title}\n"
         f"📦 {'Количество' if lang == 'ru' else 'Miqdor'}: {quantity} {unit_ru if lang == 'ru' else unit_uz}\n"
         f"📍 {'Адрес доставки' if lang == 'ru' else 'Yetkazib berish manzili'}: {address}\n"
         f"💰 {payment_ru if lang == 'ru' else payment_uz}: {card_transfer_ru if lang == 'ru' else card_transfer_uz}\n"
