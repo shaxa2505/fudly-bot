@@ -42,6 +42,7 @@ class Database:
             database_url: PostgreSQL connection string (postgresql://user:pass@host:port/dbname)
         """
         self.database_url = database_url or DATABASE_URL
+        self.db_name = "PostgreSQL"  # For compatibility with SQLite code
         
         if not self.database_url:
             raise ValueError("DATABASE_URL environment variable is required for PostgreSQL")
@@ -349,6 +350,20 @@ class Database:
         """Get user language"""
         user = self.get_user(user_id)
         return user['language'] if user else 'ru'
+    
+    def set_admin(self, user_id: int):
+        """Set user as admin"""
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute('UPDATE users SET is_admin = 1 WHERE user_id = %s', (user_id,))
+    
+    def is_admin(self, user_id: int) -> bool:
+        """Check if user is admin"""
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute('SELECT is_admin FROM users WHERE user_id = %s', (user_id,))
+            result = cursor.fetchone()
+            return result and result[0] == 1
     
     # Store management methods
     def add_store(self, owner_id: int, name: str, city: str, address: str = None,

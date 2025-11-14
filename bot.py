@@ -2570,6 +2570,158 @@ async def order_delivery_address(message: types.Message, state: FSMContext):
         reply_markup=cancel_keyboard(lang)
     )
 
+@dp.callback_query(F.data == "payment_card")
+async def order_payment_card(callback: types.CallbackQuery, state: FSMContext):
+    """Оплата переводом на карту - запрашиваем скриншот"""
+    lang = db.get_user_language(callback.from_user.id)
+    
+    # Сохраняем способ оплаты
+    await state.update_data(payment_method='card')
+    await state.set_state(OrderDelivery.payment_proof)
+    print(f"[DEBUG] 💳 Set state to payment_proof for user {callback.from_user.id}")
+    logger.info(f"💳 Waiting for payment screenshot from user {callback.from_user.id}")
+    
+    # Получаем реквизиты платформенной карты
+    payment_card = db.get_platform_payment_card()
+    
+    if not payment_card:
+        await callback.message.answer(
+            "❌ " + ("Платёжные реквизиты временно недоступны. Выберите оплату наличными." if lang == 'ru' else "To'lov rekvizitlari vaqtincha mavjud emas. Naqd to'lovni tanlang.")
+        )
+        await state.set_state(OrderDelivery.payment_method)
+        return
+    
+    card_number = payment_card[1]
+    card_holder = payment_card[2]
+    
+    data = await state.get_data()
+    store = db.get_store(data['store_id'])
+    delivery_price = store[-2] if len(store) >= 2 else 10000
+    offer = db.get_offer(data['offer_id'])
+    quantity = data['quantity']
+    total_amount = (offer[5] * quantity) + delivery_price
+    
+    currency_ru = 'сум'
+    currency_uz = "so'm"
+    transfer_ru = 'Переведите сумму на карту'
+    transfer_uz = "Kartaga pul o'tkazing"
+    screenshot_ru = 'После перевода отправьте скриншот чека'
+    screenshot_uz = "O'tkazmadan keyin chek skrinshotini yuboring"
+    await callback.message.answer(
+        f"💳 {transfer_ru if lang == 'ru' else transfer_uz}:\n\n"
+        f"💰 {'Сумма' if lang == 'ru' else 'Summa'}: <b>{total_amount:,} {currency_ru if lang == 'ru' else currency_uz}</b>\n"
+        f"💳 {'Номер карты' if lang == 'ru' else 'Karta raqami'}: <code>{card_number}</code>\n"
+        f"👤 {'Получатель' if lang == 'ru' else 'Qabul qiluvchi'}: {card_holder}\n\n"
+        f"{screenshot_ru if lang == 'ru' else screenshot_uz}",
+        parse_mode="HTML",
+        reply_markup=cancel_keyboard(lang)
+    )
+    await callback.answer()
+
+@dp.callback_query(F.data == "payment_cash")
+async def order_payment_cash(callback: types.CallbackQuery, state: FSMContext):
+    """Оплата наличными - создаём заказ"""
+    lang = db.get_user_language(callback.from_user.id)
+    
+    # Rate limit
+    if not can_proceed(callback.from_user.id, "order_confirm"):
+        await callback.answer(get_text(lang, 'operation_cancelled'), show_alert=True)
+        return
+    
+    data = await state.get_data()
+    offer_id = data['offer_id']
+    store_id = data['store_id']
+    quantity = data['quantity']
+    address = data['address']
+    
+    offer = db.get_offer(offer_id)
+    store = db.get_store(store_id)
+    delivery_price = store[-2] if len(store) >= 2 else 10000
+    
+    # Создаём заказ
+    order_id = db.create_order(
+        user_id=callback.from_user.id,
+        store_id=store_id,
+        offer_id=offer_id,
+        quantity=quantity,
+        order_type='delivery',
+        delivery_address=address,
+        delivery_price=delivery_price,
+        payment_method='cash'
+    )
+    
+    if not order_id:
+        await callback.message.answer("❌ " + ("Ошибка создания заказа" if lang == 'ru' else "Buyurtma yaratishda xatolik"))
+        await state.clear()
+        return
+    
+    await state.clear()
+    
+    # Уменьшаем количество товара
+    new_quantity = offer[6] - quantity
+    db.update_offer_quantity(offer_id, new_quantity)
+    
+    # Уведомление партнёру
+    customer = db.get_user(callback.from_user.id)
+    customer_phone = customer[3] if customer and customer[3] else "Не указан"
+    
+    currency_ru = 'сум'
+    currency_uz = "so'm"
+    unit_ru = 'шт'
+    unit_uz = 'dona'
+    payment_ru = 'Оплата'
+    payment_uz = "To'lov"
+    
+    notification_kb = InlineKeyboardBuilder()
+    notification_kb.button(text="✅ " + ("Подтвердить" if lang == 'ru' else "Tasdiqlash"), callback_data=f"confirm_order_{order_id}")
+    notification_kb.button(text="❌ " + ("Отменить" if lang == 'ru' else "Bekor qilish"), callback_data=f"cancel_order_{order_id}")
+    notification_kb.adjust(2)
+    
+    try:
+        await bot.send_message(
+            store[1],
+            f"🔔 <b>{'Новый заказ с доставкой!' if lang == 'ru' else 'Yangi buyurtma yetkazib berish bilan!'}</b>\n\n"
+            f"🏪 {store[2]}\n"
+            f"🍽 {offer[2]}\n"
+            f"📦 {'Количество' if lang == 'ru' else 'Miqdor'}: {quantity} {unit_ru if lang == 'ru' else unit_uz}\n"
+            f"👤 {callback.from_user.first_name}\n"
+            f"📱 {'Телефон' if lang == 'ru' else 'Telefon'}: <code>{customer_phone}</code>\n"
+            f"📍 {'Адрес' if lang == 'ru' else 'Manzil'}: {address}\n"
+            f"💰 {payment_ru if lang == 'ru' else payment_uz}: {'Наличными' if lang == 'ru' else 'Naqd'}\n"
+            f"💵 {'Сумма' if lang == 'ru' else 'Summa'}: {(offer[5] * quantity) + delivery_price:,} {currency_ru if lang == 'ru' else currency_uz}",
+            parse_mode="HTML",
+            reply_markup=notification_kb.as_markup()
+        )
+    except Exception as e:
+        logger.error(f"Error sending order notification: {e}")
+    
+    # Подтверждение клиенту
+    total_amount = (offer[5] * quantity) + delivery_price
+    user = db.get_user(callback.from_user.id)
+    menu = main_menu_seller(lang) if user and user[6] == "seller" else main_menu_customer(lang)
+    
+    currency_ru = 'сум'
+    currency_uz = "so'm"
+    unit_ru = 'шт'
+    unit_uz = 'dona'
+    payment_ru = 'Оплата'
+    payment_uz = "To'lov"
+    contact_ru = 'Магазин свяжется с вами для подтверждения заказа'
+    contact_uz = "Do'kon siz bilan bog'lanadi"
+    await callback.message.answer(
+        f"✅ <b>{'Заказ оформлен!' if lang == 'ru' else 'Buyurtma qabul qilindi!'}</b>\n\n"
+        f"📦 {'Заказ' if lang == 'ru' else 'Buyurtma'} #{order_id}\n"
+        f"🍽 {offer[2]}\n"
+        f"📦 {'Количество' if lang == 'ru' else 'Miqdor'}: {quantity} {unit_ru if lang == 'ru' else unit_uz}\n"
+        f"📍 {'Адрес доставки' if lang == 'ru' else 'Yetkazib berish manzili'}: {address}\n"
+        f"💰 {payment_ru if lang == 'ru' else payment_uz}: {'Наличными курьеру' if lang == 'ru' else 'Kuryerga naqd'}\n"
+        f"💵 {'Итого' if lang == 'ru' else 'Jami'}: <b>{total_amount:,} {currency_ru if lang == 'ru' else currency_uz}</b>\n\n"
+        f"{contact_ru if lang == 'ru' else contact_uz}",
+        parse_mode="HTML"
+    )
+    await callback.message.answer("✅ " + ("Готово!" if lang == 'ru' else "Tayyor!"), reply_markup=menu)
+    await callback.answer()
+
 @dp.message(OrderDelivery.payment_proof, F.photo)
 async def order_payment_proof(message: types.Message, state: FSMContext):
     """Обработка скриншота оплаты и создание заказа"""
@@ -7433,6 +7585,10 @@ async def cmd_migrate_db(message: types.Message):
         return
     
     try:
+        if DATABASE_URL:
+            await message.answer("⚠️ Миграция не требуется для PostgreSQL.\nБД автоматически создаётся при запуске.")
+            return
+        
         await message.answer("🔄 Запуск миграции базы данных...")
         
         # Пересоздаём объект базы данных для вызова init_db
@@ -7460,6 +7616,10 @@ async def cmd_enable_delivery(message: types.Message):
         return
     
     try:
+        if DATABASE_URL:
+            await message.answer("⚠️ Эта команда работает только с SQLite.\nДля PostgreSQL доставка работает автоматически.")
+            return
+        
         await message.answer("🔄 Включаю доставку для всех магазинов...")
         
         conn = sqlite3.connect(db.db_name)
@@ -7626,8 +7786,11 @@ async def main():
     
     # ПРИНУДИТЕЛЬНАЯ МИГРАЦИЯ БД ДЛЯ RAILWAY
     try:
-        print("🔄 Проверка структуры базы данных...")
-        conn = sqlite3.connect(db.db_name)
+        if DATABASE_URL:
+            print("✅ PostgreSQL - миграция не требуется")
+        else:
+            print("🔄 Проверка структуры базы данных...")
+            conn = sqlite3.connect(db.db_name)
         cursor = conn.cursor()
         
         # Проверяем наличие полей доставки
@@ -7691,14 +7854,14 @@ async def main():
                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'active', ?, ?)
                 ''', (store_id, title, desc, orig_price, disc_price, qty, now.strftime('%Y-%m-%d %H:%M:%S'), tomorrow.strftime('%Y-%m-%d %H:%M:%S'), exp, unit, cat))
             
-            conn.commit()
-            print(f"✅ Создан тестовый магазин с {len(test_products)} товарами!")
-        else:
-            cursor.execute('SELECT COUNT(*) FROM stores WHERE status = "active"')
-            stores_count = cursor.fetchone()[0]
-            print(f"✅ В БД есть {stores_count} активных магазинов и {offers_count} активных товаров")
-        
-        conn.close()
+                conn.commit()
+                print(f"✅ Создан тестовый магазин с {len(test_products)} товарами!")
+            else:
+                cursor.execute('SELECT COUNT(*) FROM stores WHERE status = "active"')
+                stores_count = cursor.fetchone()[0]
+                print(f"✅ В БД есть {stores_count} активных магазинов и {offers_count} активных товаров")
+            
+            conn.close()
     except Exception as e:
         print(f"⚠️ Ошибка миграции: {e}")
     
