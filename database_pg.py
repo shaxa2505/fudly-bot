@@ -163,9 +163,18 @@ class Database:
                     photo_id TEXT,
                     status TEXT DEFAULT 'active',
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    unit TEXT DEFAULT 'шт',
+                    category TEXT DEFAULT 'other',
                     FOREIGN KEY (store_id) REFERENCES stores(store_id)
                 )
             ''')
+            
+            # Migration: Add unit and category columns if they don't exist
+            try:
+                cursor.execute('ALTER TABLE offers ADD COLUMN IF NOT EXISTS unit TEXT DEFAULT \'шт\'')
+                cursor.execute('ALTER TABLE offers ADD COLUMN IF NOT EXISTS category TEXT DEFAULT \'other\'')
+            except Exception as e:
+                logger.warning(f"Migration for offers table: {e}")
             
             # Orders table
             cursor.execute('''
@@ -624,18 +633,21 @@ class Database:
     def add_offer(self, store_id: int, title: str, description: str = None,
                   original_price: float = None, discount_price: float = None,
                   quantity: int = 1, available_from: str = None, available_until: str = None,
-                  expiry_date: str = None, photo_id: str = None):
-        """Add new offer"""
+                  photo_id: str = None, expiry_date: str = None, unit: str = 'шт', category: str = 'other'):
+        """Add new offer - compatible with SQLite version parameter order"""
         with self.get_connection() as conn:
             cursor = conn.cursor()
             cursor.execute('''
                 INSERT INTO offers (store_id, title, description, original_price, discount_price,
-                                  quantity, available_from, available_until, expiry_date, photo_id)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                                  quantity, available_from, available_until, expiry_date, photo_id, unit, category)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                 RETURNING offer_id
             ''', (store_id, title, description, original_price, discount_price,
-                  quantity, available_from, available_until, expiry_date, photo_id))
-            offer_id = cursor.fetchone()[0]
+                  quantity, available_from, available_until, expiry_date, photo_id, unit, category))
+            result = cursor.fetchone()
+            if not result:
+                raise ValueError("Failed to create offer")
+            offer_id = result[0]
             logger.info(f"Offer {offer_id} added to store {store_id}")
             return offer_id
     

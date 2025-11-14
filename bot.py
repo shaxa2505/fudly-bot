@@ -1811,57 +1811,64 @@ async def select_offer(callback: types.CallbackQuery):
             await callback.answer(get_text(lang, 'no_offers'), show_alert=True)
             return
         
-        # Показываем детали как в старом коде
-        discount_percent = int((1 - offer[5] / offer[4]) * 100) if offer[4] and offer[4] > 0 else 0
+        # Используем универсальные функции для доступа к полям
+        title = get_offer_field(offer, 'title', 'Товар')
+        description = get_offer_field(offer, 'description', '')
+        original_price = get_offer_field(offer, 'original_price', 0)
+        discount_price = get_offer_field(offer, 'discount_price', 0)
+        quantity = get_offer_field(offer, 'quantity', 0)
+        available_from = get_offer_field(offer, 'available_from', '')
+        available_until = get_offer_field(offer, 'available_until', '')
+        expiry_date = get_offer_field(offer, 'expiry_date', '')
+        unit = get_offer_field(offer, 'unit', get_text(lang, 'unit'))
+        store_id = get_offer_field(offer, 'store_id', 0)
         
-        text = f"🍽 <b>{offer[2]}</b>\n"
-        text += f"📝 {offer[3]}\n\n"
-        text += f"💰 {int(offer[4]):,} ➜ <b>{int(offer[5]):,} {get_text(lang, 'currency')}</b> (-{discount_percent}%)\n"
+        # Вычисляем скидку
+        discount_percent = int((1 - discount_price / original_price) * 100) if original_price and original_price > 0 else 0
         
-        # unit находится в offers[13] (после ALTER TABLE), но после JOIN [13] это store_name
-        # Проверяем длину: если len(offer) == 19, то [13]=unit, [14]=category, [15]=store_name...
-        # Если len(offer) == 18, то нет unit/category, [13]=store_name...
-        if len(offer) >= 19:
-            # Есть unit и category поля
-            unit = offer[13] if offer[13] else get_text(lang, 'unit')
-        else:
-            # Старая структура без unit/category
-            unit = get_text(lang, 'unit')
-        text += f"📦 {get_text(lang, 'available')}: {offer[6]} {unit}\n"
-        text += f"🕐 {get_text(lang, 'time')}: {offer[7]} - {offer[8]}\n"
+        text = f"🍽 <b>{title}</b>\n"
+        if description:
+            text += f"📝 {description}\n\n"
+        text += f"💰 {int(original_price):,} ➜ <b>{int(discount_price):,} {get_text(lang, 'currency')}</b> (-{discount_percent}%)\n"
+        text += f"📦 {get_text(lang, 'available')}: {quantity} {unit}\n"
+        text += f"🕐 {get_text(lang, 'time')}: {available_from} - {available_until}\n"
         
         # Таймер срока годности
-        # АКТУАЛЬНАЯ структура: [12]=expiry_date, [9]=status, [10]=photo, [11]=created_at
-        if len(offer) > 12 and offer[12]:
-            time_remaining = db.get_time_remaining(offer[12])
+        if expiry_date:
+            time_remaining = db.get_time_remaining(expiry_date)
             if time_remaining:
                 text += f"{time_remaining}\n"
-            text += f"📅 {get_text(lang, 'expires_on')}: {offer[12]}\n"
+            text += f"📅 {get_text(lang, 'expires_on')}: {expiry_date}\n"
         
-        if len(offer) > 16:
-            # Магазин и адрес (после JOIN)
-            # [13]=unit, [14]=category, [15]=store_name, [16]=address, [17]=city
-            text += f"🏪 {offer[15]}\n"  # store_name
-            text += f"📍 {offer[16]}, {offer[17]}"  # address, city
-        
-        # Получаем store_id для кнопки "Назад"
-        store_id = offer[1]  # store_id на позиции 1
+        # Магазин и адрес (если есть в результате JOIN)
+        if isinstance(offer, dict):
+            store_name = offer.get('store_name', '')
+            address = offer.get('address', '')
+            city = offer.get('city', '')
+            if store_name:
+                text += f"🏪 {store_name}\n"
+            if address:
+                text += f"📍 {address}"
+                if city:
+                    text += f", {city}"
         
         # Создаем клавиатуру с кнопкой "Назад"
+        offer_id_val = get_offer_field(offer, 'offer_id', offer_id)
         keyboard = InlineKeyboardBuilder()
-        keyboard.button(text=get_text(lang, 'book'), callback_data=f"book_{offer[0]}")
+        keyboard.button(text=get_text(lang, 'book'), callback_data=f"book_{offer_id_val}")
         keyboard.button(text=get_text(lang, 'back'), callback_data=f"back_to_offers_{store_id}")
         keyboard.adjust(1)
         
-        # Проверяем, есть ли фото у предложения (индекс 11 - поле photo)
-        logger.info(f"Offer {offer_id}: len={len(offer)}, photo=[11]={offer[11] if len(offer) > 11 else 'N/A'}")
-        if len(offer) > 11 and offer[11] and str(offer[11]).strip():
+        # Проверяем, есть ли фото у предложения
+        photo_id = get_offer_field(offer, 'photo_id') or get_offer_field(offer, 'photo')
+        logger.info(f"Offer {offer_id}: photo_id={photo_id}")
+        if photo_id and str(photo_id).strip():
             try:
-                logger.info(f"Trying to send photo: {offer[11][:50]}...")
+                logger.info(f"Trying to send photo: {str(photo_id)[:50]}...")
                 # Удаляем старое сообщение и отправляем новое с фото
                 await callback.message.delete()
                 await callback.message.answer_photo(
-                    photo=offer[11],
+                    photo=photo_id,
                     caption=text,
                     parse_mode="HTML",
                     reply_markup=keyboard.as_markup()
@@ -3741,11 +3748,11 @@ async def select_category_simple(callback: types.CallbackQuery, state: FSMContex
     )
     await callback.answer()
 
-@dp.callback_query(F.data.startswith("exp_"), CreateOffer.category)
+@dp.callback_query(F.data.startswith("exp_"))
 async def select_expiry_simple(callback: types.CallbackQuery, state: FSMContext):
-    """Выбор срока годности и создание товара"""
+    """Выбор срока годности и создание товара - работает с состоянием или без"""
     lang = db.get_user_language(callback.from_user.id)
-    exp_key = callback.data.split("_")[1]
+    exp_key = callback.data.split("_")[1] if "_" in callback.data else "today"
     
     from datetime import datetime, timedelta
     today = datetime.now()
@@ -3766,9 +3773,18 @@ async def select_expiry_simple(callback: types.CallbackQuery, state: FSMContext)
     
     data = await state.get_data()
     
-    # Проверяем что категория выбрана
-    if 'category' not in data:
-        await callback.answer("❌ Ошибка: категория не выбрана", show_alert=True)
+    # Проверяем что категория выбрана и есть необходимые данные
+    if not data or 'category' not in data:
+        await callback.answer("❌ Ошибка: категория не выбрана. Начните создание товара заново.", show_alert=True)
+        await state.clear()
+        return
+    
+    # Проверяем наличие всех необходимых данных
+    required_fields = ['store_id', 'title', 'original_price', 'discount_price', 'quantity']
+    missing_fields = [field for field in required_fields if field not in data]
+    if missing_fields:
+        await callback.answer(f"❌ Ошибка: данные потеряны ({', '.join(missing_fields)}). Начните создание товара заново.", show_alert=True)
+        await state.clear()
         return
     
     # Создаём предложение
@@ -3785,10 +3801,10 @@ async def select_expiry_simple(callback: types.CallbackQuery, state: FSMContext)
         data['quantity'],
         "18:00",  # available_from
         "21:00",  # available_until
-        photo,
-        expiry_date,
-        data.get('unit', 'шт'),
-        category
+        photo,  # photo_id
+        expiry_date,  # expiry_date
+        data.get('unit', 'шт'),  # unit
+        category  # category
     )
     
     logger.info(f"Offer created with ID: {offer_id}, category: {category}, photo: {photo}")
@@ -4350,7 +4366,10 @@ async def bulk_create_count(message: types.Message, state: FSMContext):
                 data['quantity'],
                 data['available_from'],
                 data['available_until'],
-                data.get('photo')
+                data.get('photo'),  # photo_id
+                data.get('expiry_date'),  # expiry_date
+                data.get('unit', 'шт'),  # unit
+                data.get('category', 'other')  # category
             )
             if offer_id:
                 created += 1
@@ -4874,8 +4893,8 @@ async def duplicate_offer(callback: types.CallbackQuery):
             quantity=offer[6],
             available_from=offer[7],
             available_until=offer[8],
-            photo=offer[11],  # photo на позиции [11]
-            expiry_date=offer[9] if len(offer) > 9 else None,
+            photo_id=offer[11] if len(offer) > 11 else None,  # photo на позиции [11]
+            expiry_date=offer[12] if len(offer) > 12 else None,  # expiry_date на позиции [12]
             unit=unit_val,
             category=category_val
         )
