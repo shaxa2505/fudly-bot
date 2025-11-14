@@ -20,9 +20,10 @@ def setup(dp_or_router: Any, db: Any, get_text: Callable, get_cities: Callable, 
         user_id = message.from_user.id
         lang = db.get_user_language(user_id)
         user = db.get_user(user_id)
-        current_city = user[4] if user and len(user) > 4 else None
-        if not current_city:
-            current_city = get_cities(lang)[0]
+        if isinstance(user, dict):
+            current_city = user.get('city') or get_cities(lang)[0]
+        else:
+            current_city = user[4] if user and len(user) > 4 else get_cities(lang)[0]
         
         # Get city statistics
         stats_text = ""
@@ -66,7 +67,8 @@ def setup(dp_or_router: Any, db: Any, get_text: Callable, get_cities: Callable, 
         """Return to main menu"""
         lang = db.get_user_language(callback.from_user.id)
         user = db.get_user(callback.from_user.id)
-        menu = main_menu_seller(lang) if user and user[6] == "seller" else main_menu_customer(lang)
+        user_role = user.get('role', 'customer') if isinstance(user, dict) else (user[6] if user and len(user) > 6 else 'customer')
+        menu = main_menu_seller(lang) if user_role == "seller" else main_menu_customer(lang)
         
         await callback.message.delete()
         await callback.message.answer(
@@ -96,7 +98,8 @@ def setup(dp_or_router: Any, db: Any, get_text: Callable, get_cities: Callable, 
         db.update_user_city(user_id, new_city)
         
         # Get updated main menu
-        menu = main_menu_seller(lang) if user and user[6] == "seller" else main_menu_customer(lang)
+        user_role = user.get('role', 'customer') if isinstance(user, dict) else (user[6] if user and len(user) > 6 else 'customer')
+        menu = main_menu_seller(lang) if user_role == "seller" else main_menu_customer(lang)
         
         await message.answer(
             f"✅ {get_text(lang, 'city_changed', city=new_city)}\n\n"
@@ -186,8 +189,12 @@ def setup(dp_or_router: Any, db: Any, get_text: Callable, get_cities: Callable, 
         db.update_user_language(callback.from_user.id, lang)
         await callback.message.edit_text(get_text(lang, 'language_changed'))
         
+        # Extract user data
+        user_phone = user.get('phone') if isinstance(user, dict) else (user[3] if len(user) > 3 else None)
+        user_city = user.get('city') if isinstance(user, dict) else (user[4] if len(user) > 4 else None)
+        
         # If no phone - request it
-        if not user[3]:
+        if not user_phone:
             await callback.message.answer(
                 get_text(lang, 'welcome_phone_step'),
                 parse_mode="HTML",
@@ -197,7 +204,7 @@ def setup(dp_or_router: Any, db: Any, get_text: Callable, get_cities: Callable, 
             return
         
         # If no city - request it
-        if not user[4]:
+        if not user_city:
             await callback.message.answer(
                 get_text(lang, 'choose_city'),
                 parse_mode="HTML",
@@ -207,9 +214,10 @@ def setup(dp_or_router: Any, db: Any, get_text: Callable, get_cities: Callable, 
             return
         
         # Show main menu
-        menu = main_menu_seller(lang) if user[6] == "seller" else main_menu_customer(lang)
+        user_role = user.get('role', 'customer') if isinstance(user, dict) else (user[6] if len(user) > 6 else 'customer')
+        menu = main_menu_seller(lang) if user_role == "seller" else main_menu_customer(lang)
         await callback.message.answer(
-            get_text(lang, 'welcome_back', name=callback.from_user.first_name, city=user[4]),
+            get_text(lang, 'welcome_back', name=callback.from_user.first_name, city=user_city),
             parse_mode="HTML",
             reply_markup=menu
         )
@@ -223,7 +231,8 @@ def setup(dp_or_router: Any, db: Any, get_text: Callable, get_cities: Callable, 
         if current_state in ['Registration:phone', 'Registration:city']:
             user = db.get_user(message.from_user.id)
             # If no phone number — registration is mandatory, cancellation prohibited
-            if not user or not user[3]:
+            user_phone = user.get('phone') if isinstance(user, dict) else (user[3] if user and len(user) > 3 else None)
+            if not user or not user_phone:
                 await message.answer(
                     "❌ Регистрация обязательна для использования бота.\n\n"
                     "📱 Пожалуйста, поделитесь номером телефона.",
@@ -250,7 +259,7 @@ def setup(dp_or_router: Any, db: Any, get_text: Callable, get_cities: Callable, 
                 preferred_menu = None
 
         user = db.get_user(message.from_user.id)
-        role = user[6] if user and len(user) > 6 else "customer"
+        role = user.get('role', 'customer') if isinstance(user, dict) else (user[6] if user and len(user) > 6 else 'customer')
         
         # CRITICAL: When cancelling RegisterStore ALWAYS return to customer menu
         # because user does NOT YET have an approved store

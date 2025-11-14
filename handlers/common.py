@@ -53,7 +53,10 @@ def get_appropriate_menu(user_id: int, lang: str, db: Any, main_menu_seller: Cal
     if not user:
         return main_menu_customer(lang)
     
-    role = user[6] if len(user) > 6 else "customer"
+    if isinstance(user, dict):
+        role = user.get('role', 'customer')
+    else:
+        role = user[6] if len(user) > 6 else "customer"
     
     # If partner - check for approved store
     if role == "seller":
@@ -212,7 +215,8 @@ class RegistrationCheckMiddleware(BaseMiddleware):
         
         # Check user registration
         user = self.db.get_user(user_id)
-        if not user or not user[3]:  # user[3] is phone
+        user_phone = user.get('phone') if isinstance(user, dict) else (user[3] if user and len(user) > 3 else None)
+        if not user or not user_phone:
             lang = self.db.get_user_language(user_id) if user else 'ru'
             
             # If this is a message

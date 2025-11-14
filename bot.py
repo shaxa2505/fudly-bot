@@ -25,6 +25,20 @@ import sqlite3
 from datetime import datetime, timedelta, timezone
 from dotenv import load_dotenv
 
+# Helper function for safe user data access (dict from PostgreSQL, tuple from SQLite)
+def get_user_field(user, field_name: str, default=None):
+    """Safely extract field from user (dict or tuple)"""
+    if not user:
+        return default
+    if isinstance(user, dict):
+        return user.get(field_name, default)
+    # Tuple indexing: 0=id, 1=lang, 2=name, 3=phone, 4=city, 5=created_at, 6=role, 7=store_id, 8=notif
+    field_map = {'id': 0, 'language': 1, 'name': 2, 'phone': 3, 'city': 4, 'created_at': 5, 'role': 6, 'store_id': 7, 'notifications_enabled': 8}
+    idx = field_map.get(field_name)
+    if idx is not None and len(user) > idx:
+        return user[idx]
+    return default
+
 # Use PostgreSQL if DATABASE_URL is set, otherwise fallback to SQLite
 if os.getenv('DATABASE_URL'):
     from database_pg import Database
@@ -187,7 +201,7 @@ def get_appropriate_menu(user_id: int, lang: str):
     if not user:
         return main_menu_customer(lang)
     
-    role = user[6] if len(user) > 6 else "customer"
+    role = get_user_field(user, 'role', 'customer')
     
     # Если партнёр - проверяем наличие одобренного магазина
     if role == "seller":
@@ -356,7 +370,7 @@ from typing import Callable, Dict, Any, Awaitable
 #     """Вернуться в главное меню"""
 #     lang = db.get_user_language(callback.from_user.id)
 #     user = db.get_user(callback.from_user.id)
-#     menu = main_menu_seller(lang) if user and user[6] == "seller" else main_menu_customer(lang)
+#     menu = main_menu_seller(lang) if user and (get_user_field(user, 'role', 'customer') == 'seller') else main_menu_customer(lang)
     
 #     await callback.message.delete()
 #     await callback.message.answer(
@@ -387,7 +401,7 @@ from typing import Callable, Dict, Any, Awaitable
 #     db.update_user_city(user_id, new_city)
     
 #     # Получаем обновлённое главное меню
-#     menu = main_menu_seller(lang) if user and user[6] == "seller" else main_menu_customer(lang)
+#     menu = main_menu_seller(lang) if user and (get_user_field(user, 'role', 'customer') == 'seller') else main_menu_customer(lang)
     
 #     await message.answer(
 #         f"✅ {get_text(lang, 'city_changed', city=new_city)}\n\n"
@@ -413,7 +427,7 @@ from typing import Callable, Dict, Any, Awaitable
 #     lang = db.get_user_language(message.from_user.id)
     
 #     # Проверка телефона
-#     if not user[3]:
+#     if not get_user_field(user, 'phone'):
 #         await message.answer(
 #             get_text(lang, 'welcome', name=message.from_user.first_name),
 #             parse_mode="HTML",
@@ -433,7 +447,7 @@ from typing import Callable, Dict, Any, Awaitable
 #         return
     
 #     # Приветствие
-#     menu = main_menu_seller(lang) if user[6] == "seller" else main_menu_customer(lang)
+#     menu = main_menu_seller(lang) if (get_user_field(user, 'role', 'customer') == 'seller') else main_menu_customer(lang)
 #     await message.answer(
 #         get_text(lang, 'welcome_back', name=message.from_user.first_name, city=user[4]),
 #         parse_mode="HTML",
@@ -758,7 +772,7 @@ async def admin_bookings(message: types.Message):
 #     """Выход из админ-панели"""
 #     lang = db.get_user_language(message.from_user.id)
 #     user = db.get_user(message.from_user.id)
-#     menu = main_menu_seller(lang) if user and user[6] == "seller" else main_menu_customer(lang)
+#     menu = main_menu_seller(lang) if user and (get_user_field(user, 'role', 'customer') == 'seller') else main_menu_customer(lang)
 #     await message.answer(
 #         "👋 Выход из админ-панели",
 #         reply_markup=menu
@@ -793,7 +807,7 @@ async def admin_bookings(message: types.Message):
 #     await callback.message.edit_text(get_text(lang, 'language_changed'))
     
 #     # Если нет телефона - запрашиваем
-#     if not user[3]:
+#     if not get_user_field(user, 'phone'):
 #         await callback.message.answer(
 #             get_text(lang, 'welcome', name=callback.from_user.first_name),
 #             parse_mode="HTML",
@@ -813,7 +827,7 @@ async def admin_bookings(message: types.Message):
 #         return
     
 #     # Показываем главное меню
-#     menu = main_menu_seller(lang) if user[6] == "seller" else main_menu_customer(lang)
+#     menu = main_menu_seller(lang) if (get_user_field(user, 'role', 'customer') == 'seller') else main_menu_customer(lang)
 #     await callback.message.answer(
 #         get_text(lang, 'welcome_back', name=callback.from_user.first_name, city=user[4]),
 #         parse_mode="HTML",
@@ -832,7 +846,7 @@ async def admin_bookings(message: types.Message):
 #     if current_state in ['Registration:phone', 'Registration:city']:
 #         user = db.get_user(message.from_user.id)
 #         # Если нет номера телефона — регистрация обязательна, отмена запрещена
-#         if not user or not user[3]:
+#         if not user or not get_user_field(user, 'phone'):
 #             await message.answer(
 #                 "❌ Регистрация обязательна для использования бота.\n\n"
 #                 "📱 Пожалуйста, поделитесь номером телефона.",
@@ -859,7 +873,7 @@ async def admin_bookings(message: types.Message):
 #             preferred_menu = None
 
 #     user = db.get_user(message.from_user.id)
-#     role = user[6] if user and len(user) > 6 else "customer"
+#     role = get_user_field(user, 'role', 'customer') if user and len(user) > 6 else "customer"
     
 #     # КРИТИЧНО: При отмене RegisterStore ВСЕГДА возвращаем на меню клиента
 #     # потому что у пользователя ещё НЕТ одобренного магазина
@@ -1005,7 +1019,7 @@ async def hot_offers_handler(message: types.Message, state: FSMContext):
         await message.answer(get_text(lang, 'error'))
         return
     
-    city = user[4]  # город пользователя
+    city = get_user_field(user, 'city')  # город пользователя
     search_city = normalize_city(city)  # Нормализуем для поиска в БД
     
     logger.info(f"🔥 User city: {city}, Search city: {search_city}")
@@ -1085,7 +1099,7 @@ async def hot_offers_pagination(callback: types.CallbackQuery, state: FSMContext
             await callback.answer(get_text(lang, 'error'), show_alert=True)
             return
         
-        city = user[4]
+        city = get_user_field(user, 'city')
         search_city = normalize_city(city)
         
         # Извлекаем offset из callback_data
@@ -1180,7 +1194,7 @@ async def business_type_selected(callback: types.CallbackQuery, state: FSMContex
     
     # Получаем выбранный тип заведения
     business_type = callback.data.replace("biztype_", "")
-    city = user[4]
+    city = get_user_field(user, 'city')
     search_city = normalize_city(city)
     
     # Переводим тип на английский для БД
@@ -1618,7 +1632,7 @@ async def show_all_offers(callback: types.CallbackQuery):
         await callback.answer(get_text(lang, 'error'), show_alert=True)
         return
     
-    city = user[4]
+    city = get_user_field(user, 'city')
     offers = db.get_top_offers_by_city(city, limit=20)
     
     if not offers:
@@ -1651,7 +1665,7 @@ async def filter_offers_by_category(callback: types.CallbackQuery):
         await callback.answer(get_text(lang, 'error'), show_alert=True)
         return
     
-    city = user[4]
+    city = get_user_field(user, 'city')
     cat_index = int(callback.data.split("_")[-1])
     categories = get_categories(lang)
     
@@ -1766,7 +1780,7 @@ async def back_to_hot_offers(callback: types.CallbackQuery, state: FSMContext):
         await callback.answer(get_text(lang, 'error'), show_alert=True)
         return
     
-    city = user[4]
+    city = get_user_field(user, 'city')
     search_city = normalize_city(city)
     
     # Получаем топ-20 горячих предложений
@@ -2028,7 +2042,7 @@ async def select_category(callback: types.CallbackQuery):
             await callback.answer(get_text(lang, 'error'), show_alert=True)
             return
         
-        city = user[4]
+        city = get_user_field(user, 'city')
         search_city = normalize_city(city)
         
         categories = get_categories(lang)
@@ -2075,7 +2089,7 @@ async def stores_pagination(callback: types.CallbackQuery):
             await callback.answer(get_text(lang, 'error'), show_alert=True)
             return
         
-        city = user[4]
+        city = get_user_field(user, 'city')
         search_city = normalize_city(city)
         
         parts = callback.data.split("_")  # stores_next_{catIndex}_{offset}
@@ -2401,7 +2415,7 @@ async def book_offer_quantity(message: types.Message, state: FSMContext):
         text += f"\n📦 Количество: {quantity} шт."
         
         user = db.get_user(message.from_user.id)
-        menu = main_menu_seller(lang) if user and user[6] == "seller" else main_menu_customer(lang)
+        menu = main_menu_seller(lang) if user and (get_user_field(user, 'role', 'customer') == 'seller') else main_menu_customer(lang)
         
         await message.answer(text, parse_mode="HTML", reply_markup=booking_keyboard(booking_id, lang))
         await message.answer("✅ Готово!", reply_markup=menu)
@@ -2706,7 +2720,7 @@ async def order_payment_cash(callback: types.CallbackQuery, state: FSMContext):
     # Подтверждение клиенту
     total_amount = (offer[5] * quantity) + delivery_price
     user = db.get_user(callback.from_user.id)
-    menu = main_menu_seller(lang) if user and user[6] == "seller" else main_menu_customer(lang)
+    menu = main_menu_seller(lang) if user and (get_user_field(user, 'role', 'customer') == 'seller') else main_menu_customer(lang)
     
     currency_ru = 'сум'
     currency_uz = "so'm"
@@ -2877,7 +2891,7 @@ async def order_payment_proof(message: types.Message, state: FSMContext):
     if isinstance(user, dict):
         user_role = user.get('role', 'customer')
     else:
-        user_role = user[6] if user and len(user) > 6 else 'customer'
+        user_role = get_user_field(user, 'role', 'customer') if user and len(user) > 6 else 'customer'
     
     menu = main_menu_seller(lang) if user_role == "seller" else main_menu_customer(lang)
     
@@ -3292,10 +3306,10 @@ async def handle_main_menu(callback: types.CallbackQuery):
         return
     
     lang = db.get_user_language(callback.from_user.id)
-    menu = main_menu_seller(lang) if user[6] == "seller" else main_menu_customer(lang)
+    menu = main_menu_seller(lang) if (get_user_field(user, 'role', 'customer') == 'seller') else main_menu_customer(lang)
     
     await callback.message.answer(
-        get_text(lang, 'welcome_back', name=callback.from_user.first_name, city=user[4]),
+        get_text(lang, 'welcome_back', name=callback.from_user.first_name, city=get_user_field(user, 'city')),
         parse_mode="HTML",
         reply_markup=menu
     )
@@ -3644,7 +3658,7 @@ async def become_partner(message: types.Message, state: FSMContext):
     
     # Проверяем: если уже партнер И есть магазин - просто переключаем режим
     # user: [0]user_id, [1]username, [2]first_name, [3]phone, [4]city, [5]language, [6]role, [7]is_admin, [8]notifications
-    if user[6] == 'seller':
+    if (get_user_field(user, 'role', 'customer') == 'seller'):
         # Проверяем, есть ли у партнера ОДОБРЕННЫЙ магазин
         if has_approved_store(message.from_user.id):
             # Remember seller view preference
@@ -3741,7 +3755,7 @@ async def register_store_description(message: types.Message, state: FSMContext):
     
     # Используем телефон пользователя из профиля
     user = db.get_user(message.from_user.id)
-    owner_phone = user[3] if user and len(user) > 3 else None
+    owner_phone = get_user_field(user, 'phone') if user and len(user) > 3 else None
     
     # Создаём заявку на магазин (статус pending)
     store_id = db.add_store(
@@ -5436,7 +5450,7 @@ async def all_stores(message: types.Message):
         await message.answer(get_text(lang, 'error'))
         return
     
-    city = user[4]  # город пользователя
+    city = get_user_field(user, 'city')  # город пользователя
     search_city = normalize_city(city)
     
     # Получаем количество магазинов по категориям
@@ -5478,7 +5492,7 @@ async def show_top_stores(callback: types.CallbackQuery):
         await callback.answer(get_text(lang, 'error'), show_alert=True)
         return
     
-    city = user[4]
+    city = get_user_field(user, 'city')
     search_city = normalize_city(city)
     
     stores = db.get_top_stores_by_city(search_city, limit=10)
@@ -5511,7 +5525,7 @@ async def show_stores_by_category(callback: types.CallbackQuery):
         await callback.answer(get_text(lang, 'error'), show_alert=True)
         return
     
-    city = user[4]
+    city = get_user_field(user, 'city')
     search_city = normalize_city(city)
     cat_index = int(callback.data.split("_")[-1])
     categories = get_categories(lang)
@@ -5764,9 +5778,7 @@ async def show_my_city(message: types.Message, state: FSMContext):
     user_id = message.from_user.id
     lang = db.get_user_language(user_id)
     user = db.get_user(user_id)
-    current_city = user[4] if user and len(user) > 4 else None
-    if not current_city:
-        current_city = "Не выбран"
+    current_city = get_user_field(user, 'city') or "Не выбран"
     text = f"🌆 {get_text(lang, 'your_city') if 'your_city' in globals() else 'Ваш город'}: {current_city}\n\n{get_text(lang, 'change_city_prompt') if 'change_city_prompt' in globals() else 'Хотите изменить город?'}"
     await message.answer(
         text,
@@ -5865,7 +5877,7 @@ async def show_analytics(message: types.Message):
     lang = db.get_user_language(message.from_user.id)
     user = db.get_user(message.from_user.id)
     
-    if user[6] != 'seller':
+    if (get_user_field(user, 'role', 'customer') != 'seller'):
         await message.answer(get_text(lang, 'not_seller'))
         return
     
@@ -5949,13 +5961,13 @@ async def profile(message: types.Message):
     lang_text = 'Русский' if lang == 'ru' else 'Ozbekcha'
     
     text = f"{get_text(lang, 'your_profile')}\n\n"
-    text += f"{get_text(lang, 'name')}: {user[2]}\n"
-    text += f"{get_text(lang, 'phone')}: {user[3]}\n"
-    text += f"{get_text(lang, 'city')}: {user[4]}\n"
+    text += f"{get_text(lang, 'name')}: {get_user_field(user, 'name')}\n"
+    text += f"{get_text(lang, 'phone')}: {get_user_field(user, 'phone')}\n"
+    text += f"{get_text(lang, 'city')}: {get_user_field(user, 'city')}\n"
     text += f"{get_text(lang, 'language')}: {lang_text}\n"
     
     # Добавляем статистику покупок для покупателей
-    if user[6] == 'customer' or user_view_mode.get(message.from_user.id) == 'customer':
+    if (get_user_field(user, 'role', 'customer') == 'customer') or user_view_mode.get(message.from_user.id) == 'customer':
         bookings = db.get_user_bookings(message.from_user.id)
         try:
             orders = db.get_user_orders(message.from_user.id)
@@ -5979,7 +5991,7 @@ async def profile(message: types.Message):
             text += f"({'из них доставок' if lang == 'ru' else 'shulardan yetkazish'}: {completed_orders})\n"
     
     # Добавляем статистику для продавцов
-    elif user[6] == 'seller':
+    elif (get_user_field(user, 'role', 'customer') == 'seller'):
         stores = db.get_user_stores(message.from_user.id)
         if stores:
             total_bookings = 0
@@ -6014,7 +6026,7 @@ async def profile(message: types.Message):
     await message.answer(
         text,
         parse_mode="HTML",
-        reply_markup=settings_keyboard(user[8], lang, role=user[6])
+        reply_markup=settings_keyboard(get_user_field(user, 'notifications_enabled'), lang, role=get_user_field(user, 'role', 'customer'))
     )
 
 @dp.callback_query(F.data == "profile_change_city")
@@ -6057,7 +6069,7 @@ async def become_partner_cb(callback: types.CallbackQuery, state: FSMContext):
         await callback.answer()
         return
     
-    if user[6] == 'seller':
+    if (get_user_field(user, 'role', 'customer') == 'seller'):
         stores = db.get_user_stores(callback.from_user.id)
         # Проверяем наличие ОДОБРЕННОГО магазина
         approved_stores = [s for s in stores if s[4] == "active"]
@@ -6126,7 +6138,7 @@ async def toggle_notifications_callback(callback: types.CallbackQuery):
     text = get_text(lang, 'notifications_enabled') if new_enabled else get_text(lang, 'notifications_disabled')
     # Determine role for proper settings keyboard
     user = db.get_user(callback.from_user.id)
-    role = user[6] if user and len(user) > 6 else 'customer'
+    role = get_user_field(user, 'role', 'customer') if user and len(user) > 6 else 'customer'
     try:
         await callback.message.edit_text(text, parse_mode="HTML", reply_markup=settings_keyboard(new_enabled, lang, role=role))
     except Exception:
@@ -6197,9 +6209,9 @@ async def confirm_delete_no(callback: types.CallbackQuery):
         return
 
     try:
-        await callback.message.edit_text(get_text(lang, 'operation_cancelled'), reply_markup=settings_keyboard(user[8], lang, role=user[6]))
+        await callback.message.edit_text(get_text(lang, 'operation_cancelled'), reply_markup=settings_keyboard(get_user_field(user, 'notifications_enabled'), lang, role=get_user_field(user, 'role', 'customer')))
     except Exception:
-        await callback.message.answer(get_text(lang, 'operation_cancelled'), reply_markup=settings_keyboard(user[8], lang, role=user[6]))
+        await callback.message.answer(get_text(lang, 'operation_cancelled'), reply_markup=settings_keyboard(get_user_field(user, 'notifications_enabled'), lang, role=get_user_field(user, 'role', 'customer')))
 
     await callback.answer()
 
@@ -6224,7 +6236,7 @@ async def partner_today_stats(message: types.Message):
     user = db.get_user(message.from_user.id)
     
     # Проверяем, что это партнёр
-    if not user or user[6] != 'seller':
+    if not user or (get_user_field(user, 'role', 'customer') != 'seller'):
         await message.answer(get_text(lang, 'access_denied'))
         return
     

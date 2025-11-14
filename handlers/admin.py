@@ -140,7 +140,8 @@ def setup(dp_or_router, db, get_text, admin_menu):
         from keyboards import main_menu_customer, main_menu_seller
         
         # Return to appropriate main menu based on user role
-        menu = main_menu_seller(lang) if user and user[6] == "seller" else main_menu_customer(lang)
+        user_role = user.get('role', 'customer') if isinstance(user, dict) else (user[6] if user and len(user) > 6 else 'customer')
+        menu = main_menu_seller(lang) if user_role == "seller" else main_menu_customer(lang)
         
         await message.answer(
             "👋 Выход из админ-панели",
