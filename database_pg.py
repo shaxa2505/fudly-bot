@@ -1095,7 +1095,7 @@ class Database:
             cursor = conn.cursor(cursor_factory=RealDictCursor)
             cursor.execute('''
                 SELECT o.*, s.name as store_name, s.address, s.city, s.category,
-                       CAST((o.original_price - o.discount_price) AS REAL) / o.original_price * 100 as discount_percent
+                       CAST((o.original_price - o.discount_price) AS NUMERIC) / o.original_price * 100 as discount_percent
                 FROM offers o
                 JOIN stores s ON o.store_id = s.store_id
                 WHERE s.city = %s AND s.category = %s AND s.status = 'active'
