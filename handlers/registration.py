@@ -9,7 +9,7 @@ from handlers.common import Registration
 router = Router()
 
 
-def setup(dp_or_router, db, get_text, get_cities, city_keyboard, main_menu_customer, 
+def setup(dp_or_router, db, get_text, get_cities, city_keyboard, phone_request_keyboard, main_menu_customer, 
           validator, rate_limiter, logger, secure_user_input):
     """Setup registration handlers with dependencies"""
     

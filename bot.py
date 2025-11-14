@@ -189,11 +189,31 @@ def get_store_field(store, field_name: str, default=None):
     field_map = {
         'store_id': 0, 'owner_id': 1, 'name': 2, 'city': 3, 'address': 4,
         'description': 5, 'category': 6, 'phone': 7, 'status': 8,
-        'rejection_reason': 9, 'created_at': 10, 'business_type': 11
+        'rejection_reason': 9, 'created_at': 10, 'business_type': 11,
+        'delivery_enabled': 12, 'delivery_price': 13, 'min_order_amount': 14
     }
     idx = field_map.get(field_name)
     if idx is not None and len(store) > idx:
         return store[idx]
+    return default
+
+def get_offer_field(offer, field_name: str, default=None):
+    """Safely extract field from offer (dict from PostgreSQL, tuple from SQLite)"""
+    if not offer:
+        return default
+    if isinstance(offer, dict):
+        return offer.get(field_name, default)
+    # Tuple indexing для offers: 0=offer_id, 1=store_id, 2=title, 3=description, 4=original_price,
+    # 5=discount_price, 6=quantity, 7=available_from, 8=available_until, 9=expiry_date,
+    # 10=status, 11=photo, 12=created_at, 13=unit, 14=category
+    field_map = {
+        'offer_id': 0, 'store_id': 1, 'title': 2, 'description': 3, 'original_price': 4,
+        'discount_price': 5, 'quantity': 6, 'available_from': 7, 'available_until': 8,
+        'expiry_date': 9, 'status': 10, 'photo': 11, 'created_at': 12, 'unit': 13, 'category': 14
+    }
+    idx = field_map.get(field_name)
+    if idx is not None and len(offer) > idx:
+        return offer[idx]
     return default
 
 def normalize_category(category: str) -> str:
@@ -324,7 +344,7 @@ if ADMIN_ID > 0:
 from handlers import registration, user_commands, admin
 
 # Setup registration handlers
-registration.setup(dp, db, get_text, get_cities, city_keyboard, main_menu_customer,
+registration.setup(dp, db, get_text, get_cities, city_keyboard, phone_request_keyboard, main_menu_customer,
                   validator, rate_limiter, logger, secure_user_input)
 
 # Setup user command handlers
@@ -815,7 +835,7 @@ async def business_type_selected(callback: types.CallbackQuery, state: FSMContex
     
     # Сохраняем список магазинов в FSM state
     await state.set_state(BrowseOffers.store_list)
-    await state.update_data(store_list=[store[0] for store in stores])  # Сохраняем store_id
+    await state.update_data(store_list=[get_store_field(store, 'store_id') for store in stores])  # Сохраняем store_id
     
     logger.info(f"🏪 Set state to store_list with {len(stores)} stores")
     
@@ -842,13 +862,15 @@ async def business_type_selected(callback: types.CallbackQuery, state: FSMContex
     text += f"📍 {city}\n\n"
     
     for idx, store in enumerate(stores, 1):
-        store_name = store[2]
-        store_address = store[4] if len(store) > 4 else ""
-        offers_count = store[-1] if len(store) > 12 else 0  # последнее поле - offers_count
+        store_id = get_store_field(store, 'store_id')
+        store_name = get_store_field(store, 'name', 'Магазин')
+        store_address = get_store_field(store, 'address', '')
+        # Для get_stores_by_business_type последнее поле может быть offers_count
+        offers_count = get_store_field(store, 'offers_count', 0) if isinstance(store, dict) else (store[-1] if len(store) > 12 else 0)
         
         # Получаем рейтинг магазина
-        avg_rating = db.get_store_average_rating(store[0])
-        ratings_count = len(db.get_store_ratings(store[0]))
+        avg_rating = db.get_store_average_rating(store_id)
+        ratings_count = len(db.get_store_ratings(store_id))
         
         text += f"{idx}. <b>{store_name}</b>\n"
         if store_address:
@@ -916,16 +938,15 @@ async def show_store_card(message: types.Message, store_id: int, lang: str):
         await message.answer("Магазин не найден" if lang == 'ru' else "Do'kon topilmadi")
         return
     
-    logger.info(f"✅ Store found: {store[2] if len(store) > 2 else 'unknown'}, length={len(store)}")
-    
     # Получаем данные о магазине
-    store_name = store[2]
-    store_city = store[3]
-    store_address = store[4]
-    store_description = store[5]
-    store_category = store[6]
-    store_phone = store[7]
-    business_type = store[11] if len(store) > 11 else 'supermarket'
+    store_name = get_store_field(store, 'name', 'Магазин')
+    store_city = get_store_field(store, 'city', '')
+    store_address = get_store_field(store, 'address', '')
+    store_description = get_store_field(store, 'description', '')
+    store_category = get_store_field(store, 'category', '')
+    store_phone = get_store_field(store, 'phone', '')
+    business_type = get_store_field(store, 'business_type', 'supermarket')
+    logger.info(f"✅ Store found: {store_name}, id={store_id}")
     
     # Получаем рейтинг и количество отзывов
     avg_rating = db.get_store_average_rating(store_id)
@@ -1035,44 +1056,30 @@ async def select_offer_by_number(message: types.Message, state: FSMContext):
     await show_offer_details(message, offer_data, lang)
 
 
-async def show_offer_details(message: types.Message, offer_data: tuple, lang: str):
-    """Показать детальную информацию о предложении"""
-    # АКТУАЛЬНАЯ структура get_offer():
-    # [0]=offer_id, [1]=store_id, [2]=title, [3]=description,
-    # [4]=original_price, [5]=discount_price, [6]=quantity, [7]=available_from,
-    # [8]=available_until, [9]=expiry_date, [10]=status, [11]=photo, [12]=created_at, [13]=unit, [14]=category
-    
-    offer_id = offer_data[0]
-    store_id = offer_data[1]
-    product_name = offer_data[2]
-    description = offer_data[3]
-    original_price = offer_data[4]
-    discount_price = offer_data[5]
-    quantity = offer_data[6]
-    expiry_date = offer_data[9]
-    photo = offer_data[11]
-    unit = offer_data[13] if len(offer_data) > 13 else 'шт'
-    category = offer_data[14] if len(offer_data) > 14 else 'other'
+async def show_offer_details(message: types.Message, offer_data, lang: str):
+    """Показать детальную информацию о предложении (работает с dict и tuple)"""
+    # Универсальный доступ к полям offer
+    offer_id = get_offer_field(offer_data, 'offer_id')
+    store_id = get_offer_field(offer_data, 'store_id')
+    product_name = get_offer_field(offer_data, 'title', 'Товар')
+    description = get_offer_field(offer_data, 'description', '')
+    original_price = get_offer_field(offer_data, 'original_price', 0)
+    discount_price = get_offer_field(offer_data, 'discount_price', 0)
+    quantity = get_offer_field(offer_data, 'quantity', 0)
+    expiry_date = get_offer_field(offer_data, 'expiry_date', '')
+    photo = get_offer_field(offer_data, 'photo') or get_offer_field(offer_data, 'photo_id')
+    unit = get_offer_field(offer_data, 'unit', 'шт')
+    category = get_offer_field(offer_data, 'category', 'other')
     
     # Получаем информацию о магазине
     store_info = db.get_store(store_id)
     if store_info:
-        # Handle both dict (PostgreSQL) and tuple (SQLite)
-        if isinstance(store_info, dict):
-            store_name = store_info.get('name', 'Магазин')
-            store_address = store_info.get('address', '')
-            store_city = store_info.get('city', '')
-            delivery_enabled = 1  # PostgreSQL always has delivery enabled
-            delivery_price = 10000  # Default for PostgreSQL
-            min_order_amount = 20000  # Default for PostgreSQL
-        else:
-            store_name = store_info[2]
-            store_address = store_info[4]
-            store_city = store_info[3]
-            # Индексы для новых полей доставки (в конце таблицы stores)
-            delivery_enabled = store_info[-3] if len(store_info) >= 3 else 0
-            delivery_price = store_info[-2] if len(store_info) >= 2 else 10000
-            min_order_amount = store_info[-1] if len(store_info) >= 1 else 20000
+        store_name = get_store_field(store_info, 'name', 'Магазин')
+        store_address = get_store_field(store_info, 'address', '')
+        store_city = get_store_field(store_info, 'city', '')
+        delivery_enabled = get_store_field(store_info, 'delivery_enabled', 0)
+        delivery_price = get_store_field(store_info, 'delivery_price', 10000)
+        min_order_amount = get_store_field(store_info, 'min_order_amount', 20000)
     else:
         store_name = "Магазин"
         store_address = ""
@@ -1159,28 +1166,33 @@ async def show_offer_details(message: types.Message, offer_data: tuple, lang: st
         await message.answer(text, parse_mode="HTML", reply_markup=builder.as_markup())
 
 
-async def send_offer_card(message: types.Message, offer: tuple, lang: str):
-    """Отправить карточку предложения"""
-    # Распаковываем данные предложения
-    # АКТУАЛЬНАЯ структура (после ALTER TABLE):
-    # [0]=offer_id, [1]=store_id, [2]=title, [3]=description,
-    # [4]=original_price, [5]=discount_price, [6]=quantity, [7]=available_from,
-    # [8]=available_until, [9]=status, [10]=photo, [11]=created_at,
-    # [12]=expiry_date, [13]=unit, [14]=category
-    # После JOIN с stores: [15]=store_name, [16]=store_address, [17]=store_city,
-    # [18]=store_category, [19]=discount_percent (если добавлено в запросе)
+async def send_offer_card(message: types.Message, offer, lang: str):
+    """Отправить карточку предложения (работает с dict и tuple)"""
+    # Универсальный доступ к полям offer
+    offer_id = get_offer_field(offer, 'offer_id')
+    store_id = get_offer_field(offer, 'store_id')
+    product_name = get_offer_field(offer, 'title', 'Товар')
+    original_price = get_offer_field(offer, 'original_price', 0)
+    discount_price = get_offer_field(offer, 'discount_price', 0)
+    quantity = get_offer_field(offer, 'quantity', 0)
+    expiry_date = get_offer_field(offer, 'expiry_date', '')
     
-    offer_id = offer[0]
-    store_id = offer[1]
-    product_name = offer[2]
-    original_price = offer[4]
-    discount_price = offer[5]
-    quantity = offer[6]
-    expiry_date = offer[12]  # ПРАВИЛЬНЫЙ индекс для expiry_date (после ALTER TABLE)
-    store_name = offer[15] if len(offer) > 15 else "Магазин"
-    store_address = offer[16] if len(offer) > 16 else ""
-    store_category = offer[18] if len(offer) > 18 else ""
-    discount_percent = offer[19] if len(offer) > 19 else 0
+    # Для get_hot_offers и других запросов с JOIN могут быть дополнительные поля
+    if isinstance(offer, dict):
+        store_name = offer.get('store_name', 'Магазин')
+        store_address = offer.get('address', '')
+        store_category = offer.get('category', '')
+        discount_percent = offer.get('discount_percent', 0)
+    else:
+        # Tuple format: может быть разная длина в зависимости от запроса
+        store_name = offer[15] if len(offer) > 15 else "Магазин"
+        store_address = offer[16] if len(offer) > 16 else ""
+        store_category = offer[18] if len(offer) > 18 else ""
+        discount_percent = offer[19] if len(offer) > 19 else 0
+    
+    # Если discount_percent не вычислен, вычисляем
+    if discount_percent == 0 and original_price > 0:
+        discount_percent = int((1 - discount_price / original_price) * 100)
     
     # Формируем текст карточки
     text = f"🔥 <b>{product_name}</b>\n\n"
@@ -1294,16 +1306,19 @@ async def filter_offers_by_store(callback: types.CallbackQuery):
     
     offers = db.get_active_offers(store_id=store_id)
     
+    store_name = get_store_field(store, 'name', 'Магазин')
+    store_address = get_store_field(store, 'address', '')
+    
     if not offers:
-        await callback.answer(f"😔 В магазине {store[2]} нет активных предложений", show_alert=True)
+        await callback.answer(f"😔 В магазине {store_name} нет активных предложений", show_alert=True)
         return
     
     await callback.answer()
     
     # Обновляем сообщение
     await callback.message.edit_text(
-        f"🏪 <b>{store[2]}</b>\n"
-        f"📍 {store[4]}\n\n"
+        f"🏪 <b>{store_name}</b>\n"
+        f"📍 {store_address}\n\n"
         f"{'Найдено' if lang == 'ru' else 'Topildi'}: {len(offers)} {'предложений' if lang == 'ru' else 'taklif'}",
         parse_mode="HTML",
         reply_markup=offers_category_filter(lang)
@@ -1335,11 +1350,18 @@ async def show_store_info(callback: types.CallbackQuery):
     avg_rating = db.get_store_average_rating(store_id)
     ratings_count = len(db.get_store_ratings(store_id))
     
-    text = f"🏪 <b>{store[2]}</b>\n\n"
-    text += f"🏷 {store[6]}\n"
-    text += f"📍 {store[3]}, {store[4]}\n"
-    text += f"📝 {store[5]}\n"
-    text += f"📞 {store[7]}\n"
+    store_name = get_store_field(store, 'name', 'Магазин')
+    store_category = get_store_field(store, 'category', '')
+    store_city = get_store_field(store, 'city', '')
+    store_address = get_store_field(store, 'address', '')
+    store_description = get_store_field(store, 'description', '')
+    store_phone = get_store_field(store, 'phone', '')
+    
+    text = f"🏪 <b>{store_name}</b>\n\n"
+    text += f"🏷 {store_category}\n"
+    text += f"📍 {store_city}, {store_address}\n"
+    text += f"📝 {store_description}\n"
+    text += f"📞 {store_phone}\n"
     text += f"⭐ Рейтинг: {avg_rating:.1f}/5 ({ratings_count} отзывов)"
     
     builder = InlineKeyboardBuilder()
@@ -1432,7 +1454,7 @@ async def show_store_offers(callback: types.CallbackQuery, state: FSMContext):
     await state.update_data(offer_list=[offer[0] for offer in offers])
     
     # Формируем список товаров
-    store_name = store[2]
+    store_name = get_store_field(store, 'name', 'Магазин')
     text = f"🛍 <b>{store_name}</b>\n"
     text += f"{'Все товары' if lang == 'ru' else 'Barcha mahsulotlar'}\n\n"
     
@@ -1937,7 +1959,7 @@ async def book_offer_quantity(message: types.Message, state: FSMContext):
             partner_lang = db.get_user_language(store[1])
             # Получаем телефон клиента для партнёра
             customer = db.get_user(message.from_user.id)
-            customer_phone = customer[3] if customer and customer[3] else "Не указан"
+            customer_phone = get_user_field(customer, 'phone', 'Не указан')
             
             # Создаём inline-клавиатуру для быстрых действий
             from aiogram.utils.keyboard import InlineKeyboardBuilder
@@ -1946,17 +1968,20 @@ async def book_offer_quantity(message: types.Message, state: FSMContext):
             notification_kb.button(text="❌ Отменить", callback_data=f"cancel_booking_{booking_id}")
             notification_kb.adjust(2)
             
+            owner_id = get_store_field(store, 'owner_id')
+            store_name = get_store_field(store, 'name', 'Магазин')
+            offer_title = offer[2] if isinstance(offer, tuple) and len(offer) > 2 else (offer.get('title', 'Товар') if isinstance(offer, dict) else 'Товар')
             try:
                 await bot.send_message(
-                    store[1],
+                    owner_id,
                     f"🔔 <b>Новое бронирование!</b>\n\n"
-                    f"🏪 {store[2]}\n"
-                    f"🍽 {offer[2]}\n"
+                    f"🏪 {store_name}\n"
+                    f"🍽 {offer_title}\n"
                     f"📦 Количество: {quantity} шт.\n"
                     f"👤 {message.from_user.first_name}\n"
                     f"📱 Телефон: <code>{customer_phone}</code>\n"
                     f"🎫 <code>{code}</code>\n"
-                    f"💰 {int(offer[5] * quantity):,} сум",
+                    f"💰 {int(get_offer_field(offer, 'discount_price', 0) * quantity):,} сум",
                     parse_mode="HTML",
                     reply_markup=notification_kb.as_markup()
                 )
@@ -2262,12 +2287,13 @@ async def order_payment_cash(callback: types.CallbackQuery, state: FSMContext):
     await state.clear()
     
     # Уменьшаем количество товара
-    new_quantity = offer[6] - quantity
+    offer_quantity = get_offer_field(offer, 'quantity', 0)
+    new_quantity = offer_quantity - quantity
     db.update_offer_quantity(offer_id, new_quantity)
     
     # Уведомление партнёру
     customer = db.get_user(callback.from_user.id)
-    customer_phone = customer[3] if customer and customer[3] else "Не указан"
+    customer_phone = get_user_field(customer, 'phone', 'Не указан')
     
     currency_ru = 'сум'
     currency_uz = "so'm"
@@ -2292,7 +2318,7 @@ async def order_payment_cash(callback: types.CallbackQuery, state: FSMContext):
             f"📱 {'Телефон' if lang == 'ru' else 'Telefon'}: <code>{customer_phone}</code>\n"
             f"📍 {'Адрес' if lang == 'ru' else 'Manzil'}: {address}\n"
             f"💰 {payment_ru if lang == 'ru' else payment_uz}: {'Наличными' if lang == 'ru' else 'Naqd'}\n"
-            f"💵 {'Сумма' if lang == 'ru' else 'Summa'}: {(offer[5] * quantity) + delivery_price:,} {currency_ru if lang == 'ru' else currency_uz}",
+            f"💵 {'Сумма' if lang == 'ru' else 'Summa'}: {(offer_price * quantity) + delivery_price:,} {currency_ru if lang == 'ru' else currency_uz}",
             parse_mode="HTML",
             reply_markup=notification_kb.as_markup()
         )
@@ -2300,7 +2326,8 @@ async def order_payment_cash(callback: types.CallbackQuery, state: FSMContext):
         logger.error(f"Error sending order notification: {e}")
     
     # Подтверждение клиенту
-    total_amount = (offer[5] * quantity) + delivery_price
+    offer_price = get_offer_field(offer, 'discount_price', 0)
+    total_amount = (offer_price * quantity) + delivery_price
     user = db.get_user(callback.from_user.id)
     menu = main_menu_seller(lang) if user and (get_user_field(user, 'role', 'customer') == 'seller') else main_menu_customer(lang)
     
@@ -2370,14 +2397,9 @@ async def order_payment_proof(message: types.Message, state: FSMContext):
     store = db.get_store(store_id)
     
     # Universal access for dict (PostgreSQL) or tuple (SQLite)
-    if isinstance(store, dict):
-        owner_id = store['owner_id']
-        store_name = store['name']
-        delivery_price = 10000  # Default delivery price for PostgreSQL
-    else:
-        owner_id = store[1]
-        store_name = store[2]
-        delivery_price = store[-2] if len(store) >= 2 else 10000
+    owner_id = get_store_field(store, 'owner_id')
+    store_name = get_store_field(store, 'name', 'Магазин')
+    delivery_price = get_store_field(store, 'delivery_price', 10000)
     
     if isinstance(offer, dict):
         offer_title = offer['title']
@@ -2843,8 +2865,8 @@ async def cancel_booking(callback: types.CallbackQuery):
             customer_id,
             f"❌ <b>Бронирование отменено</b>\n\n"
             f"🎫 Бронь #{booking_id}\n"
-            f"🏪 {store[2] if store else 'Магазин'}\n"
-            f"🍽 {offer[2]}\n\n"
+            f"🏪 {get_store_field(store, 'name', 'Магазин') if store else 'Магазин'}\n"
+            f"🍽 {offer[2] if isinstance(offer, tuple) and len(offer) > 2 else (offer.get('title', 'Товар') if isinstance(offer, dict) else 'Товар')}\n\n"
             f"Извините за неудобства. Товар снова доступен для бронирования.",
             parse_mode="HTML",
             reply_markup=customer_kb.as_markup()
@@ -2945,7 +2967,8 @@ async def rate_booking(callback: types.CallbackQuery):
         keyboard.button(text=f"{'⭐' * rating}", callback_data=f"booking_rate_{booking_id}_{rating}")
     keyboard.adjust(5)
     
-    text = f"⭐ <b>Оцените ваш заказ</b>\n\n🎫 #{booking_id}\n🏪 {store[2]}\n\nВыберите оценку:"
+    store_name = get_store_field(store, 'name', 'Магазин')
+    text = f"⭐ <b>Оцените ваш заказ</b>\n\n🎫 #{booking_id}\n🏪 {store_name}\n\nВыберите оценку:"
     await callback.message.edit_text(text, parse_mode="HTML", reply_markup=keyboard.as_markup())
     await callback.answer()
 
@@ -4201,7 +4224,9 @@ async def bulk_create_start(message: types.Message, state: FSMContext):
         )
         text = ""
         for i, store in enumerate(stores, 1):
-            text += f"{i}. 🏪 {store[2]} - 📍 {store[3]}\n"
+            store_name = get_store_field(store, 'name', 'Магазин')
+            store_city = get_store_field(store, 'city', '')
+            text += f"{i}. 🏪 {store_name} - 📍 {store_city}\n"
         await message.answer(text)
         await state.set_state(BulkCreate.store)
 
@@ -4214,9 +4239,11 @@ async def bulk_create_store_selected(message: types.Message, state: FSMContext):
         store_num = int(message.text)
         if 1 <= store_num <= len(stores):
             selected_store = stores[store_num - 1]
-            await state.update_data(store_id=selected_store[0])
+            store_id = get_store_field(selected_store, 'store_id')
+            store_name = get_store_field(selected_store, 'name', 'Магазин')
+            await state.update_data(store_id=store_id)
             await message.answer(
-                get_text(lang, 'bulk_create_start', store_name=selected_store[2]),
+                get_text(lang, 'bulk_create_start', store_name=store_name),
                 parse_mode="HTML",
                 reply_markup=cancel_keyboard(lang)
             )
@@ -4470,7 +4497,7 @@ async def quantity_add(callback: types.CallbackQuery):
     
     # Проверка владельца
     user_stores = db.get_user_stores(callback.from_user.id)
-    if not any(store[0] == offer[1] for store in user_stores):
+    if not any(get_store_field(store, 'store_id') == offer[1] for store in user_stores):
         await callback.answer(get_text(lang, "not_your_offer"), show_alert=True)
         return
     
@@ -4495,7 +4522,7 @@ async def quantity_subtract(callback: types.CallbackQuery):
     
     # Проверка владельца
     user_stores = db.get_user_stores(callback.from_user.id)
-    if not any(store[0] == offer[1] for store in user_stores):
+    if not any(get_store_field(store, 'store_id') == offer[1] for store in user_stores):
         await callback.answer(get_text(lang, "not_your_offer"), show_alert=True)
         return
     
@@ -4524,7 +4551,7 @@ async def extend_offer(callback: types.CallbackQuery):
     
     # Проверка владельца
     user_stores = db.get_user_stores(callback.from_user.id)
-    if not any(store[0] == offer[1] for store in user_stores):
+    if not any(get_store_field(store, 'store_id') == offer[1] for store in user_stores):
         await callback.answer(get_text(lang, "not_your_offer"), show_alert=True)
         return
     
@@ -4584,7 +4611,7 @@ async def deactivate_offer(callback: types.CallbackQuery):
     
     # Проверка владельца
     user_stores = db.get_user_stores(callback.from_user.id)
-    if not any(store[0] == offer[1] for store in user_stores):
+    if not any(get_store_field(store, 'store_id') == offer[1] for store in user_stores):
         await callback.answer(get_text(lang, "not_your_offer"), show_alert=True)
         return
     
@@ -4608,7 +4635,7 @@ async def activate_offer(callback: types.CallbackQuery):
     
     # Проверка владельца
     user_stores = db.get_user_stores(callback.from_user.id)
-    if not any(store[0] == offer[1] for store in user_stores):
+    if not any(get_store_field(store, 'store_id') == offer[1] for store in user_stores):
         await callback.answer(get_text(lang, "not_your_offer"), show_alert=True)
         return
     
@@ -4632,7 +4659,7 @@ async def delete_offer(callback: types.CallbackQuery):
     
     # Проверка владельца
     user_stores = db.get_user_stores(callback.from_user.id)
-    if not any(store[0] == offer[1] for store in user_stores):
+    if not any(get_store_field(store, 'store_id') == offer[1] for store in user_stores):
         await callback.answer(get_text(lang, "not_your_offer"), show_alert=True)
         return
     
@@ -4656,7 +4683,7 @@ async def edit_offer(callback: types.CallbackQuery):
     
     # Проверка владельца
     user_stores = db.get_user_stores(callback.from_user.id)
-    if not any(store[0] == offer[1] for store in user_stores):
+    if not any(get_store_field(store, 'store_id') == offer[1] for store in user_stores):
         await callback.answer(get_text(lang, "not_your_offer"), show_alert=True)
         return
     
@@ -4690,7 +4717,7 @@ async def edit_time_start(callback: types.CallbackQuery, state: FSMContext):
     
     # Проверка владельца
     user_stores = db.get_user_stores(callback.from_user.id)
-    if not any(store[0] == offer[1] for store in user_stores):
+    if not any(get_store_field(store, 'store_id') == offer[1] for store in user_stores):
         await callback.answer(get_text(lang, "not_your_offer"), show_alert=True)
         return
     
@@ -7732,7 +7759,7 @@ if __name__ == "__main__":
                         setting_id INTEGER PRIMARY KEY AUTOINCREMENT,
                         card_number TEXT NOT NULL,
                         card_holder TEXT NOT NULL,
-                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 )
             ''')
             
