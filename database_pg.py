@@ -959,6 +959,356 @@ class Database:
             
             return stats
     
+    # ============== OFFER QUANTITY & EXPIRY METHODS ==============
+    
+    def increment_offer_quantity(self, offer_id: int, amount: int = 1):
+        """Увеличить количество товара (при отмене бронирования)"""
+        conn = self.pool.getconn()
+        try:
+            cursor = conn.cursor(cursor_factory=RealDictCursor)
+            # Получаем текущее количество
+            cursor.execute('SELECT quantity FROM offers WHERE offer_id = %s', (offer_id,))
+            row = cursor.fetchone()
+            if row:
+                current_qty = row['quantity'] if row['quantity'] is not None else 0
+                new_qty = current_qty + amount
+                self.update_offer_quantity(offer_id, new_qty)
+        finally:
+            self.pool.putconn(conn)
+    
+    def update_offer_expiry(self, offer_id: int, new_expiry: str):
+        """Обновить срок годности товара"""
+        conn = self.pool.getconn()
+        try:
+            cursor = conn.cursor()
+            cursor.execute('UPDATE offers SET expiry_date = %s WHERE offer_id = %s', (new_expiry, offer_id))
+            conn.commit()
+        finally:
+            self.pool.putconn(conn)
+    
+    def delete_expired_offers(self):
+        """Удаляет предложения с истёкшим сроком годности"""
+        conn = self.pool.getconn()
+        try:
+            cursor = conn.cursor()
+            # Деактивируем товары с истёкшим сроком годности
+            cursor.execute('''
+                UPDATE offers 
+                SET status = 'inactive' 
+                WHERE status = 'active' 
+                AND expiry_date IS NOT NULL
+                AND expiry_date::date < CURRENT_DATE
+            ''')
+            conn.commit()
+        finally:
+            self.pool.putconn(conn)
+    
+    # ============== RATING METHODS ==============
+    
+    def add_rating(self, booking_id: int, user_id: int, store_id: int, rating: int, comment: str = None):
+        """Добавить рейтинг"""
+        conn = self.pool.getconn()
+        try:
+            cursor = conn.cursor()
+            cursor.execute('''
+                INSERT INTO ratings (booking_id, user_id, store_id, rating, comment)
+                VALUES (%s, %s, %s, %s, %s)
+            ''', (booking_id, user_id, store_id, rating, comment))
+            conn.commit()
+        finally:
+            self.pool.putconn(conn)
+    
+    def get_store_ratings(self, store_id: int) -> List[dict]:
+        """Получить все рейтинги магазина"""
+        conn = self.pool.getconn()
+        try:
+            cursor = conn.cursor(cursor_factory=RealDictCursor)
+            cursor.execute('''
+                SELECT r.*, u.first_name, u.username
+                FROM ratings r
+                JOIN users u ON r.user_id = u.user_id
+                WHERE r.store_id = %s
+                ORDER BY r.created_at DESC
+            ''', (store_id,))
+            return cursor.fetchall()
+        finally:
+            self.pool.putconn(conn)
+    
+    def get_store_average_rating(self, store_id: int) -> float:
+        """Получить средний рейтинг магазина"""
+        conn = self.pool.getconn()
+        try:
+            cursor = conn.cursor()
+            cursor.execute('SELECT AVG(rating) FROM ratings WHERE store_id = %s', (store_id,))
+            result = cursor.fetchone()
+            return round(result[0], 1) if result and result[0] else 0.0
+        finally:
+            self.pool.putconn(conn)
+    
+    def has_rated_booking(self, booking_id: int) -> bool:
+        """Проверить, оценил ли пользователь бронирование"""
+        conn = self.pool.getconn()
+        try:
+            cursor = conn.cursor()
+            cursor.execute('SELECT COUNT(*) FROM ratings WHERE booking_id = %s', (booking_id,))
+            count = cursor.fetchone()[0]
+            return count > 0
+        finally:
+            self.pool.putconn(conn)
+    
+    # ============== STORE SALES STATISTICS ==============
+    
+    def get_store_sales_stats(self, store_id: int) -> dict:
+        """Получить статистику продаж магазина"""
+        conn = self.pool.getconn()
+        try:
+            cursor = conn.cursor()
+            
+            stats = {}
+            
+            # Всего продано
+            cursor.execute('''
+                SELECT COUNT(*), SUM(o.discount_price)
+                FROM bookings b
+                JOIN offers o ON b.offer_id = o.offer_id
+                WHERE o.store_id = %s AND b.status = 'completed'
+            ''', (store_id,))
+            result = cursor.fetchone()
+            stats['total_sales'] = result[0] if result[0] else 0
+            stats['total_revenue'] = result[1] if result[1] else 0
+            
+            # Активные брони
+            cursor.execute('''
+                SELECT COUNT(*)
+                FROM bookings b
+                JOIN offers o ON b.offer_id = o.offer_id
+                WHERE o.store_id = %s AND b.status = 'pending'
+            ''', (store_id,))
+            stats['pending_bookings'] = cursor.fetchone()[0]
+            
+            return stats
+        finally:
+            self.pool.putconn(conn)
+    
+    # ============== STORE FILTERING METHODS ==============
+    
+    def get_stores_by_category(self, category: str, city: str = None) -> List[dict]:
+        """Получить магазины по категории и опционально по городу"""
+        conn = self.pool.getconn()
+        try:
+            cursor = conn.cursor(cursor_factory=RealDictCursor)
+            if city:
+                cursor.execute('''
+                    SELECT * 
+                    FROM stores 
+                    WHERE category = %s AND city = %s AND status = 'active'
+                    ORDER BY name
+                ''', (category, city))
+            else:
+                cursor.execute('''
+                    SELECT * 
+                    FROM stores 
+                    WHERE category = %s AND status = 'active'
+                    ORDER BY name
+                ''', (category,))
+            return cursor.fetchall()
+        finally:
+            self.pool.putconn(conn)
+    
+    def get_offers_by_city_and_category(self, city: str, category: str, limit: int = 20) -> List[dict]:
+        """Получить предложения в городе по категории магазина"""
+        conn = self.pool.getconn()
+        try:
+            cursor = conn.cursor(cursor_factory=RealDictCursor)
+            cursor.execute('''
+                SELECT o.*, s.name as store_name, s.address, s.city, s.category,
+                       CAST((o.original_price - o.discount_price) AS REAL) / o.original_price * 100 as discount_percent
+                FROM offers o
+                JOIN stores s ON o.store_id = s.store_id
+                WHERE s.city = %s AND s.category = %s AND s.status = 'active'
+                      AND o.status = 'active' AND o.quantity > 0 
+                      AND o.expiry_date::date >= CURRENT_DATE
+                ORDER BY discount_percent DESC, o.created_at DESC
+                LIMIT %s
+            ''', (city, category, limit))
+            return cursor.fetchall()
+        finally:
+            self.pool.putconn(conn)
+    
+    def get_stores_count_by_category(self, city: str) -> dict:
+        """Получить количество магазинов по каждой категории в городе"""
+        conn = self.pool.getconn()
+        try:
+            cursor = conn.cursor()
+            cursor.execute('''
+                SELECT category, COUNT(*) as count
+                FROM stores
+                WHERE city = %s AND status = 'active'
+                GROUP BY category
+            ''', (city,))
+            results = cursor.fetchall()
+            # Возвращаем словарь {категория: количество}
+            return {row[0]: row[1] for row in results}
+        finally:
+            self.pool.putconn(conn)
+    
+    def get_top_stores_by_city(self, city: str, limit: int = 10) -> List[dict]:
+        """Получить топ магазины по рейтингу в городе"""
+        conn = self.pool.getconn()
+        try:
+            cursor = conn.cursor(cursor_factory=RealDictCursor)
+            cursor.execute('''
+                SELECT s.*, 
+                       COALESCE(AVG(r.rating), 0) as avg_rating,
+                       COUNT(r.rating_id) as ratings_count
+                FROM stores s
+                LEFT JOIN ratings r ON s.store_id = r.store_id
+                WHERE s.city = %s AND s.status = 'active'
+                GROUP BY s.store_id
+                ORDER BY avg_rating DESC, ratings_count DESC
+                LIMIT %s
+            ''', (city, limit))
+            return cursor.fetchall()
+        finally:
+            self.pool.putconn(conn)
+    
+    # ============== FAVORITES & ANALYTICS ==============
+    
+    def get_favorites(self, user_id: int) -> List[dict]:
+        """Получить избранные магазины пользователя"""
+        conn = self.pool.getconn()
+        try:
+            cursor = conn.cursor(cursor_factory=RealDictCursor)
+            cursor.execute('''
+                SELECT s.* FROM stores s
+                JOIN favorites f ON s.store_id = f.store_id
+                WHERE f.user_id = %s AND s.status = 'active'
+                ORDER BY f.created_at DESC
+            ''', (user_id,))
+            return cursor.fetchall()
+        finally:
+            self.pool.putconn(conn)
+    
+    def get_store_analytics(self, store_id: int) -> dict:
+        """Получить аналитику магазина"""
+        conn = self.pool.getconn()
+        try:
+            cursor = conn.cursor()
+            
+            # Общая статистика
+            cursor.execute('''
+                SELECT 
+                    COUNT(*) as total_bookings,
+                    SUM(CASE WHEN status = 'completed' THEN 1 ELSE 0 END) as completed,
+                    SUM(CASE WHEN status = 'cancelled' THEN 1 ELSE 0 END) as cancelled
+                FROM bookings b
+                JOIN offers o ON b.offer_id = o.offer_id
+                WHERE o.store_id = %s
+            ''', (store_id,))
+            stats = cursor.fetchone()
+            
+            # Продажи по дням недели
+            cursor.execute('''
+                SELECT 
+                    EXTRACT(DOW FROM b.created_at)::INTEGER as day_of_week,
+                    COUNT(*) as count
+                FROM bookings b
+                JOIN offers o ON b.offer_id = o.offer_id
+                WHERE o.store_id = %s AND b.status = 'completed'
+                GROUP BY day_of_week
+            ''', (store_id,))
+            days = cursor.fetchall()
+            
+            # Популярные категории
+            cursor.execute('''
+                SELECT 
+                    o.category,
+                    COUNT(*) as count
+                FROM bookings b
+                JOIN offers o ON b.offer_id = o.offer_id
+                WHERE o.store_id = %s AND b.status = 'completed'
+                GROUP BY o.category
+                ORDER BY count DESC
+                LIMIT 5
+            ''', (store_id,))
+            categories = cursor.fetchall()
+            
+            # Средний рейтинг
+            cursor.execute('''
+                SELECT AVG(rating) as avg_rating, COUNT(*) as rating_count
+                FROM ratings
+                WHERE store_id = %s
+            ''', (store_id,))
+            rating = cursor.fetchone()
+            
+            return {
+                'total_bookings': stats[0] or 0,
+                'completed': stats[1] or 0,
+                'cancelled': stats[2] or 0,
+                'conversion_rate': (stats[1] / stats[0] * 100) if stats[0] > 0 else 0,
+                'days_of_week': dict(days) if days else {},
+                'popular_categories': categories or [],
+                'avg_rating': rating[0] or 0,
+                'rating_count': rating[1] or 0
+            }
+        finally:
+            self.pool.putconn(conn)
+    
+    # ============== UTILITY METHODS ==============
+    
+    @staticmethod
+    def get_time_remaining(expiry_date: str) -> str:
+        """
+        Возвращает строку с оставшимся временем до истечения срока годности
+        Формат: '🕐 Годен: 2 дня' или '⏰ Срок годности истек'
+        """
+        if not expiry_date:
+            return ""
+        
+        from datetime import datetime
+        
+        try:
+            # Парсим дату истечения срока годности
+            if isinstance(expiry_date, str):
+                if ' ' in expiry_date:
+                    # Если есть время, пробуем разные форматы
+                    try:
+                        end_date = datetime.strptime(expiry_date, '%Y-%m-%d %H:%M:%S')
+                    except ValueError:
+                        try:
+                            end_date = datetime.strptime(expiry_date, '%Y-%m-%d %H:%M')
+                        except ValueError:
+                            return ""
+                elif '-' in expiry_date:
+                    # Если только дата в формате YYYY-MM-DD
+                    end_date = datetime.strptime(expiry_date, '%Y-%m-%d')
+                elif '.' in expiry_date:
+                    # Если дата в формате DD.MM.YYYY
+                    end_date = datetime.strptime(expiry_date, '%d.%m.%Y')
+                else:
+                    return ""
+            else:
+                return ""
+            
+            # Считаем разницу
+            now = datetime.now()
+            delta = end_date - now
+            
+            if delta.days < 0:
+                return "⏰ Срок годности истек"
+            elif delta.days == 0:
+                hours = delta.seconds // 3600
+                if hours > 0:
+                    return f"🕐 Годен: {hours} ч"
+                else:
+                    return "⏰ Срок истекает сегодня"
+            elif delta.days == 1:
+                return "🕐 Годен: 1 день"
+            else:
+                return f"🕐 Годен: {delta.days} дня" if delta.days < 5 else f"🕐 Годен: {delta.days} дней"
+        except Exception:
+            return ""
+    
     # Order management methods
     def create_order(self, user_id: int, store_id: int, offer_id: int, quantity: int,
                      order_type: str, delivery_address: str = None, delivery_price: int = 0,
