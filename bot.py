@@ -133,6 +133,24 @@ def db_get(data, key, index=None):
         return data[index] if len(data) > index else None
     return None
 
+def get_store_field(store, field_name: str, default=None):
+    """Safely extract field from store (dict from PostgreSQL, tuple from SQLite)"""
+    if not store:
+        return default
+    if isinstance(store, dict):
+        return store.get(field_name, default)
+    # Tuple indexing: 0=store_id, 1=owner_id, 2=name, 3=city, 4=address, 5=description,
+    # 6=category, 7=phone, 8=status, 9=rejection_reason, 10=created_at, 11=business_type
+    field_map = {
+        'store_id': 0, 'owner_id': 1, 'name': 2, 'city': 3, 'address': 4,
+        'description': 5, 'category': 6, 'phone': 7, 'status': 8,
+        'rejection_reason': 9, 'created_at': 10, 'business_type': 11
+    }
+    idx = field_map.get(field_name)
+    if idx is not None and len(store) > idx:
+        return store[idx]
+    return default
+
 def normalize_category(category: str) -> str:
     """Преобразует отображаемое название категории в английский ключ для БД"""
     category_map = {
@@ -6946,8 +6964,8 @@ async def approve_store(callback: types.CallbackQuery):
         await callback.answer("❌ Магазин не найден", show_alert=True)
         return
     
-    owner_id = store[1]
-    store_name = store[2]
+    owner_id = get_store_field(store, 'owner_id')
+    store_name = get_store_field(store, 'name')
     
     # Одобряем магазин (включает обновление роли владельца)
     success = db.approve_store(store_id)
