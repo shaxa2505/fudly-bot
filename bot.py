@@ -41,6 +41,7 @@ USE_WEBHOOK = os.getenv("USE_WEBHOOK", "false").lower() in ("true", "1", "yes")
 WEBHOOK_URL = os.getenv("WEBHOOK_URL", "")
 WEBHOOK_PATH = os.getenv("WEBHOOK_PATH", "/webhook")
 PORT = int(os.getenv("PORT", "8080"))
+SECRET_TOKEN = os.getenv("SECRET_TOKEN", "")
 
 # Helper function for safe user data access (dict from PostgreSQL, tuple from SQLite)
 def get_user_field(user, field_name: str, default=None):
