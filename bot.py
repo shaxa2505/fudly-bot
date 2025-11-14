@@ -83,6 +83,10 @@ from localization import get_text, get_cities, get_categories, normalize_categor
 # In-memory per-session view mode override: {'seller'|'customer'}
 user_view_mode = {}
 
+# Simple in-memory cache for user data (reduces DB calls)
+user_cache = {}  # {user_id: {'lang': str, 'role': str, 'ts': float}}
+CACHE_TTL = 300  # 5 minutes
+
 # Production optimizations (optional imports with fallbacks)
 try:
     from security import validator, rate_limiter, secure_user_input, validate_admin_action
@@ -221,6 +225,10 @@ def get_appropriate_menu(user_id: int, lang: str):
         return main_menu_customer(lang)
     
     role = get_user_field(user, 'role', 'customer')
+    
+    # Унификация ролей: store_owner -> seller
+    if role == 'store_owner':
+        role = 'seller'
     
     # Если партнёр - проверяем наличие одобренного магазина
     if role == "seller":

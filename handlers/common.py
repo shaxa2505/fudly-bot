@@ -61,6 +61,10 @@ def get_appropriate_menu(
     # Both backends now return dict
     role = user.get('role', 'customer')
     
+    # Unify roles: store_owner -> seller
+    if role == 'store_owner':
+        role = 'seller'
+    
     # If partner - check for approved store
     if role == "seller":
         if has_approved_store(user_id, db):
