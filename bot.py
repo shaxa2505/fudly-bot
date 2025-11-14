@@ -371,19 +371,17 @@ async def admin_stores(message: types.Message):
     if not db.is_admin(message.from_user.id):
         return
     
-    conn = db.get_connection()
-    cursor = conn.cursor()
-    
-    cursor.execute('SELECT COUNT(*) FROM stores WHERE status = "active"')
-    active = cursor.fetchone()[0]
-    
-    cursor.execute('SELECT COUNT(*) FROM stores WHERE status = "pending"')
-    pending = cursor.fetchone()[0]
-    
-    cursor.execute('SELECT COUNT(*) FROM stores WHERE status = "rejected"')
-    rejected = cursor.fetchone()[0]
-    
-    conn.close()
+    with db.get_connection() as conn:
+        cursor = conn.cursor()
+        
+        cursor.execute("SELECT COUNT(*) FROM stores WHERE status = 'active'")
+        active = cursor.fetchone()[0]
+        
+        cursor.execute("SELECT COUNT(*) FROM stores WHERE status = 'pending'")
+        pending = cursor.fetchone()[0]
+        
+        cursor.execute("SELECT COUNT(*) FROM stores WHERE status = 'rejected'")
+        rejected = cursor.fetchone()[0]
     
     text = "🏪 <b>Магазины</b>\n\n"
     text += f"✅ Активные: {active}\n"
@@ -5936,20 +5934,20 @@ async def admin_moderation_callback(callback: types.CallbackQuery):
     await bot.send_message(callback.message.chat.id, get_text(lang, 'pending_stores_count', count=len(pending)))
     
     for store in pending:
-        text = f"🏪 <b>{store[2]}</b>\n\n"
-        text += f"От: {store[8]} (@{store[9] or 'нет'})\n"
-        text += f"ID: <code>{store[1]}</code>\n\n"
-        text += f"📍 {store[3]}, {store[4]}\n"
-        text += f"🏷 {store[6]}\n"
-        text += f"📱 {store[7]}\n"
-        text += f"📝 {store[5]}\n"
-        text += f"📅 {store[10]}"
+        text = f"🏪 <b>{store['name']}</b>\n\n"
+        text += f"От: {store['first_name']} (@{store.get('username') or 'нет'})\n"
+        text += f"ID: <code>{store['store_id']}</code>\n\n"
+        text += f"📍 {store['city']}, {store['address']}\n"
+        text += f"🏷 {store['category']}\n"
+        text += f"📱 {store['phone']}\n"
+        text += f"📝 {store['description']}\n"
+        text += f"📅 {store['created_at']}"
         
         await bot.send_message(
             callback.message.chat.id,
             text,
             parse_mode="HTML",
-            reply_markup=moderation_keyboard(store[0])
+            reply_markup=moderation_keyboard(store['store_id'])
         )
         await asyncio.sleep(0.3)
 

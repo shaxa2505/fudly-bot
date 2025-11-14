@@ -407,13 +407,6 @@ class Database:
                 WHERE store_id = %s
             ''', (status, rejection_reason, store_id))
     
-    def get_pending_stores(self):
-        """Get all pending stores"""
-        with self.get_connection() as conn:
-            cursor = conn.cursor(cursor_factory=RealDictCursor)
-            cursor.execute('SELECT * FROM stores WHERE status = %s', ('pending',))
-            return [dict(row) for row in cursor.fetchall()]
-    
     def get_approved_stores(self, city: str = None):
         """Get approved stores, optionally filtered by city"""
         with self.get_connection() as conn:
