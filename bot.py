@@ -29,9 +29,9 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # Get bot token from environment
-TOKEN = os.getenv("BOT_TOKEN")
+TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 if not TOKEN:
-    raise ValueError("BOT_TOKEN environment variable is not set")
+    raise ValueError("TELEGRAM_BOT_TOKEN environment variable is not set")
 
 # Helper function for safe user data access (dict from PostgreSQL, tuple from SQLite)
 def get_user_field(user, field_name: str, default=None):
