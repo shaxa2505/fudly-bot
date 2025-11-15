@@ -10,30 +10,24 @@ TEXTS = {
         # Приветствие
         'choose_language': '🌍 Выберите язык / Tilni tanlang',
         'language_changed': '✅ Язык изменён на Русский',
-        'welcome': '''👋 <b>Привет! Я Fudly Bot!</b>
+        'welcome': '''<b>Добро пожаловать в Fudly!</b>
 
-🔥 Получай горячие предложения с большими скидками
-💰 Экономь до 70% на продуктах
-🚚 Доставка или самовывоз
-
-<b>Давайте начнём! Это займёт 1 минуту ⏱</b>''',
+Получайте товары со скидками до 70%.
+Доставка или самовывоз.''',
         
-        'welcome_phone_step': '''Шаг 1/3 ━━━━━━○○○○
+        'welcome_phone_step': '''Шаг 1/2
 
-📱 <b>Ваш номер телефона</b>
+<b>Укажите ваш номер телефона</b>
 
-<b>Нужен для:</b>
-✓ Связи с магазином при бронировании
-✓ Уведомлений о статусе заказа
-✓ Безопасности вашего аккаунта
-
-🔒 <i>Ваши данные защищены</i>''',
+Необходим для связи с магазином и уведомлений.''',
         
-        'welcome_city_step': '''Шаг 2/3 ━━━━━━━━○○
+                'welcome_phone_step': '''Шаг 1/2
 
-📍 <b>Выберите ваш город</b>
+<b>Укажите ваш номер телефона</b>
 
-Мы покажем предложения рядом с вами''',
+Необходим для связи с магазином и уведомлений.''',
+        
+        'welcome_back': '''Добро пожаловать!''',
         
         'registration_complete': '''Шаг 3/3 ━━━━━━━━━━ ✅
 
@@ -379,50 +373,18 @@ TEXTS = {
         # Salomlashish
         'choose_language': '🌍 Выберите язык / Tilni tanlang',
         'language_changed': '✅ Til O\'zbekchaga o\'zgartirildi',
-        'welcome': '''👋 <b>Salom! Men Fudly Bot!</b>
+        'welcome': '''<b>Fudly ga xush kelibsiz!</b>
 
-🔥 Katta chegirmalar bilan issiq takliflarni oling
-💰 Mahsulotlarga 70% gacha tejang
-🚚 Yetkazib berish yoki olib ketish
-
-<b>Keling boshlaylik! Bu 1 daqiqa oladi ⏱</b>''',
+70% gacha chegirmalar bilan mahsulotlar oling.
+Yetkazib berish yoki olib ketish.''',
         
-        'welcome_phone_step': '''Qadam 1/3 ━━━━━━○○○○
+        'welcome_phone_step': '''Qadam 1/2
 
-📱 <b>Telefon raqamingiz</b>
+<b>Telefon raqamingizni kiriting</b>
 
-<b>Kerak:</b>
-✓ Bron qilganda do'kon bilan aloqa uchun
-✓ Buyurtma holati haqida xabarnomalar
-✓ Hisobingiz xavfsizligi uchun
-
-🔒 <i>Ma'lumotlaringiz himoyalangan</i>''',
+Do'kon bilan aloqa va xabarnomalar uchun zarur.''',
         
-        'welcome_city_step': '''Qadam 2/3 ━━━━━━━━○○
-
-📍 <b>Shahringizni tanlang</b>
-
-Yaqiningizdagi takliflarni ko'rsatamiz''',
-        
-        'registration_complete': '''Qadam 3/3 ━━━━━━━━━━ ✅
-
-🎉 <b>Ro'yxatdan o'tish tugallandi!</b>
-
-<b>Nimani sinab ko'rish:</b>
-🔥 <b>Issiq</b> - eng yaxshi chegirmalar
-🏪 <b>Joylar</b> - yaqin do'konlar
-🛒 <b>Savat</b> - buyurtmalaringiz
-
-💡 <b>Maslahat:</b> Har kuni "Issiq"ni tekshiring! 
-Ertalab yangi takliflar qo'shiladi 🌅''',
-        
-        'welcome_back': '''🍽 <b>Fudly ga qaytganingizdan xursandmiz!</b>
-
-Salom, {name}! 👋
-
-📍 Sizning shahringiz: {city}
-
-Harakatni tanlang:''',
+        'welcome_back': '''Xush kelibsiz!''',
 
         'registration_required': '''❌ <b>Ro'yxatdan o'tish talab qilinadi</b>
 
@@ -803,6 +765,35 @@ def get_categories(lang: str) -> list[str]:
         return ["Ресторан", "Кафе", "Пекарня", "Супермаркет", "Кондитерская", "Фастфуд"]
     else:
         return ["Restoran", "Kafe", "Nonvoyxona", "Supermarket", "Qandolatxona", "Fastfud"]
+
+def get_product_categories(lang: str) -> list[str]:
+    """Получить список категорий товаров"""
+    if lang == 'ru':
+        return [
+            "Хлеб",
+            "Молочные",
+            "Мясо",
+            "Рыба",
+            "Овощи",
+            "Фрукты",
+            "Сыры",
+            "Напитки",
+            "Готовая еда",
+            "Другое"
+        ]
+    else:
+        return [
+            "Non",
+            "Sut",
+            "Go'sht",
+            "Baliq",
+            "Sabzavot",
+            "Meva",
+            "Pishloq",
+            "Ichimlik",
+            "Tayyor ovqat",
+            "Boshqa"
+        ]
 
 def normalize_category(category: str) -> str:
     """Нормализовать категорию к русскому для БД"""

@@ -31,12 +31,12 @@ def language_keyboard():
 # ============== ОСНОВНЫЕ МЕНЮ ==============
 
 def main_menu_customer(lang: str = 'ru'):
-    """Новое главное меню для покупателя - компактное и удобное"""
+    """Главное меню для покупателя - оптимизированное для быстрого доступа"""
     builder = ReplyKeyboardBuilder()
-    builder.button(text="🔥 Горячее" if lang == 'ru' else "🔥 Issiq")
-    builder.button(text="🏪 Места" if lang == 'ru' else "🏪 Joylar")
-    builder.button(text="🛒 Корзина" if lang == 'ru' else "🛒 Savatcha")
-    builder.button(text="⚙️ Профиль" if lang == 'ru' else "⚙️ Profil")
+    builder.button(text="Горячее" if lang == 'ru' else "Issiq")
+    builder.button(text="Категории" if lang == 'ru' else "Kategoriyalar")
+    builder.button(text="Заказы" if lang == 'ru' else "Buyurtmalar")
+    builder.button(text="Профиль" if lang == 'ru' else "Profil")
     builder.adjust(2, 2)  # 2 ряда по 2 кнопки
     return builder.as_markup(resize_keyboard=True)
 
@@ -304,148 +304,21 @@ def product_categories_keyboard(lang: str = 'ru'):
     builder.adjust(2, 2, 2, 2, 2, 2, 2, 2, 2)  # По 2 кнопки в ряду
     return builder.as_markup(resize_keyboard=True)
 
-def store_category_selection(lang: str = 'ru'):
-    """Inline клавиатура для выбора категории заведения"""
-    builder = InlineKeyboardBuilder()
-    
-    categories = get_categories(lang)
-    
-    for i, category in enumerate(categories):
-        builder.button(text=category, callback_data=f"cat_{i}")
-    
-    builder.adjust(2)  # 2 кнопки в ряду
-    return builder.as_markup()
-
 def offers_category_filter(lang: str = 'ru'):
-    """Inline клавиатура с фильтрами по категориям для предложений"""
+    """Inline клавиатура с фильтрами по категориям товаров"""
+    from localization import get_product_categories
     builder = InlineKeyboardBuilder()
     
-    categories = get_categories(lang)
+    categories = get_product_categories(lang)
     
     # Кнопка "Все предложения"
-    builder.button(text="🔥 Все" if lang == 'ru' else "🔥 Hammasi", callback_data="offers_all")
+    builder.button(text="Все" if lang == 'ru' else "Hammasi", callback_data="offers_all")
     
-    # Категории для фильтрации
+    # Категории товаров для фильтрации
     for i, category in enumerate(categories):
-        # Убираем эмодзи для компактности, оставляем только текст
-        cat_text = category.split()[0] if len(category.split()) > 0 else category
-        builder.button(text=cat_text, callback_data=f"offers_cat_{i}")
+        builder.button(text=category, callback_data=f"offers_cat_{i}")
     
-    builder.adjust(2, 2, 2, 1)  # 2-2-2-1 кнопок в рядах
-    return builder.as_markup()
-
-def stores_category_selection(lang: str = 'ru', counts: dict = None):
-    """Inline клавиатура для выбора категории магазинов с количеством"""
-    builder = InlineKeyboardBuilder()
-    
-    categories = get_categories(lang)
-    
-    # Кнопка "Топ по рейтингу"
-    builder.button(text="⭐ Топ по рейтингу" if lang == 'ru' else "⭐ Top reytingli", 
-                   callback_data="stores_top")
-    
-    # Категории с количеством магазинов
-    for i, category in enumerate(categories):
-        count = counts.get(category, 0) if counts else 0
-        button_text = f"{category} ({count})" if count > 0 else category
-        builder.button(text=button_text, callback_data=f"stores_cat_{i}")
-    
-    builder.adjust(1, 2, 2, 2)  # 1 кнопка топ, потом по 2
-    return builder.as_markup()
-
-def store_selection(stores, lang: str = 'ru', cat_index: int | None = None, offset: int = 0, page_size: int = 10):
-    """Inline клавиатура для выбора магазина с пагинацией."""
-    builder = InlineKeyboardBuilder()
-
-    total = len(stores)
-    start = max(0, offset)
-    end = min(total, start + page_size)
-
-    for store in stores[start:end]:
-        # store tuple from get_stores_by_category: [0]=store_id, [1]=name, [2]=address, [3]=category, [4]=city
-        if not store or len(store) < 2:
-            continue  # Пропускаем некорректные записи
-        
-        store_id = store[0] if len(store) > 0 else 0
-        store_name = store[1] if len(store) > 1 else "Магазин"
-        city = store[4] if len(store) > 4 else ''
-        
-        # Формируем текст кнопки с обрезкой длинных названий
-        if city:
-            button_text = f"{store_name} ({city})"
-        else:
-            button_text = store_name
-        
-        # Обрезаем длинный текст
-        if len(button_text) > 50:
-            button_text = button_text[:47] + "..."
-        
-        builder.button(text=button_text, callback_data=f"store_{store_id}")
-
-    # Навигация по страницам
-    nav_row = []
-    if start > 0 and cat_index is not None:
-        prev_off = max(0, start - page_size)
-        nav_row.append(("⬅️", f"stores_prev_{cat_index}_{prev_off}"))
-    if end < total and cat_index is not None:
-        next_off = end
-        nav_row.append(("➡️", f"stores_next_{cat_index}_{next_off}"))
-    for txt, cb in nav_row:
-        builder.button(text=txt, callback_data=cb)
-
-    builder.button(text=get_text(lang, 'back'), callback_data="back_to_categories")
-    builder.adjust(1)
-    return builder.as_markup()
-
-def offer_selection(offers, lang: str = 'ru', store_id: int | None = None, offset: int = 0, page_size: int = 10):
-    """Inline клавиатура для выбора предложения с простейшей пагинацией."""
-    builder = InlineKeyboardBuilder()
-
-    total = len(offers)
-    start = max(0, offset)
-    end = min(total, start + page_size)
-
-    for offer in offers[start:end]:
-        if not offer or len(offer) < 3:
-            continue  # Пропускаем некорректные записи
-        
-        # Защита от деления на ноль и ошибок индексации
-        try:
-            offer_id = offer[0] if len(offer) > 0 else 0
-            offer_title = offer[2] if len(offer) > 2 else "Предложение"
-            original_price = offer[4] if len(offer) > 4 and offer[4] is not None else 0
-            discount_price = offer[5] if len(offer) > 5 and offer[5] is not None else 0
-            
-            # Вычисляем скидку безопасно
-            if original_price and original_price > 0:
-                discount_percent = int((1 - discount_price / original_price) * 100)
-            else:
-                discount_percent = 0
-            
-            # Обрезаем длинный текст кнопки
-            button_text = f"{offer_title} (-{discount_percent}%)"
-            if len(button_text) > 50:
-                button_text = button_text[:47] + "..."
-            builder.button(text=button_text, callback_data=f"offer_{offer_id}")
-        except (IndexError, ZeroDivisionError, TypeError) as e:
-            # Пропускаем проблемные записи
-            import logging
-            logging.warning(f"Error creating offer button: {e}, offer={offer}")
-            continue
-
-    # Навигация
-    nav_row = []
-    if start > 0 and store_id is not None:
-        prev_off = max(0, start - page_size)
-        nav_row.append(("⬅️", f"offers_prev_{store_id}_{prev_off}"))
-    if end < total and store_id is not None:
-        next_off = end
-        nav_row.append(("➡️", f"offers_next_{store_id}_{next_off}"))
-    for txt, cb in nav_row:
-        builder.button(text=txt, callback_data=cb)
-
-    builder.button(text=get_text(lang, 'back'), callback_data="back_to_stores")
-    builder.adjust(1)
+    builder.adjust(3, 3, 3, 2)  # 3-3-3-2 кнопок в рядах
     return builder.as_markup()
 
 # ============== ПОИСК И ФИЛЬТРЫ ==============

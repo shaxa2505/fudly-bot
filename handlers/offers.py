@@ -1,0 +1,695 @@
+"""Handlers for browsing hot offers, stores, and offer filters."""
+from __future__ import annotations
+
+import asyncio
+from typing import Any, Callable, List
+
+from aiogram import Dispatcher, F, types
+from aiogram.fsm.context import FSMContext
+
+from app.core.utils import get_user_field, normalize_city
+from app.keyboards import offers as offer_keyboards
+from app.services.offer_service import OfferDetails, OfferListItem, OfferService
+from app.templates import offers as offer_templates
+from handlers.common import BrowseOffers
+from localization import get_categories, get_product_categories, get_text, normalize_category
+from keyboards import business_type_keyboard, offers_category_filter
+
+FetchOffersFn = Callable[[str, int], List[OfferListItem]]
+
+def setup(
+    dp: Dispatcher,
+    db: Any,
+    offer_service: OfferService,
+    logger: Any,
+) -> None:
+    """Register offer-related handlers on dispatcher."""
+
+    @dp.message(F.text.contains("Горячее") | F.text.contains("Issiq") | F.text.contains("🔥 Горячее") | F.text.contains("🔥 Issiq"))
+    async def hot_offers_handler(message: types.Message, state: FSMContext):
+        if not message.from_user:
+            return
+        user_id = message.from_user.id
+        lang = db.get_user_language(user_id)
+        user = db.get_user(user_id)
+        if not user:
+            await message.answer(get_text(lang, "error"))
+            return
+        city = get_user_field(user, "city", "Ташкент")
+        search_city = normalize_city(city)
+        await _send_hot_offers_list(
+            message,
+            state,
+            lang,
+            city,
+            search_city,
+            offer_service,
+            logger,
+        )
+
+    @dp.message(F.text.contains("Категории") | F.text.contains("Kategoriyalar"))
+    async def show_categories_handler(message: types.Message):
+        """Показать категории товаров для фильтрации"""
+        if not message.from_user:
+            return
+        lang = db.get_user_language(message.from_user.id)
+        user = db.get_user(message.from_user.id)
+        if not user:
+            await message.answer(get_text(lang, "error"))
+            return
+        city = get_user_field(user, "city", "Ташкент")
+        
+        text = f"<b>{'Категории товаров' if lang == 'ru' else 'Mahsulot turlari'}</b>\n\n"
+        text += f"📍 {city}\n\n"
+        text += "Выберите категорию:" if lang == 'ru' else "Kategoriyani tanlang:"
+        
+        await message.answer(
+            text,
+            parse_mode="HTML",
+            reply_markup=offers_category_filter(lang)
+        )
+
+    @dp.callback_query(F.data == "hot_offers_refresh")
+    async def hot_offers_refresh(callback: types.CallbackQuery, state: FSMContext):
+        """Обновление списка горячих предложений"""
+        if not callback.from_user:
+            await callback.answer()
+            return
+        msg = _callback_message(callback)
+        if not msg:
+            await callback.answer()
+            return
+        user_id = callback.from_user.id
+        lang = db.get_user_language(user_id)
+        user = db.get_user(user_id)
+        if not user:
+            await callback.answer(get_text(lang, "error"), show_alert=True)
+            return
+        city = get_user_field(user, "city", "Ташкент")
+        search_city = normalize_city(city)
+        await _send_hot_offers_list(
+            msg,
+            state,
+            lang,
+            city,
+            search_city,
+            offer_service,
+            logger,
+        )
+        await callback.answer("✓" if lang == "ru" else "✓", show_alert=False)
+
+    @dp.callback_query(F.data.startswith("hot_offers_next_"))
+    async def hot_offers_pagination(callback: types.CallbackQuery, state: FSMContext):
+        try:
+            if not callback.from_user or not callback.data:
+                await callback.answer()
+                return
+            user_id = callback.from_user.id
+            lang = db.get_user_language(user_id)
+            user = db.get_user(user_id)
+            if not user:
+                await callback.answer(get_text(lang, "error"), show_alert=True)
+                return
+            city = get_user_field(user, "city", "Ташкент")
+            search_city = normalize_city(city)
+            offset = int(callback.data.split("_")[-1])
+            msg = _callback_message(callback)
+            if not msg:
+                await callback.answer()
+                return
+            result = offer_service.list_hot_offers(search_city, limit=20, offset=offset)
+            if not result.items:
+                await callback.answer(
+                    "Больше предложений нет" if lang == "ru" else "Boshqa takliflar yo'q",
+                    show_alert=True,
+                )
+                return
+            await _append_offer_ids(state, result.items)
+            select_hint = get_text(lang, "select_by_number")
+            text = offer_templates.render_hot_offers_list(
+                lang,
+                city,
+                result.items,
+                result.total,
+                select_hint,
+                offset=offset,
+            )
+            has_more = offset + len(result.items) < result.total
+            keyboard = offer_keyboards.hot_offers_pagination_keyboard(
+                lang, has_more, offset + 20
+            )
+            await msg.answer(text, parse_mode="HTML", reply_markup=keyboard)
+            await callback.answer()
+        except Exception as exc:  # pragma: no cover - defensive logging
+            logger.error("hot_offers_pagination error: %s", exc)
+            lang = db.get_user_language(callback.from_user.id)
+            await callback.answer(
+                "Ошибка" if lang == "ru" else "Xato", show_alert=True
+            )
+
+    @dp.message(F.text.contains("Магазины") | F.text.contains("Do'konlar") | F.text.contains("🏪 Места") | F.text.contains("🏪 Joylar"))
+    async def browse_places_handler(message: types.Message):
+        if not message.from_user:
+            return
+        lang = db.get_user_language(message.from_user.id)
+        await message.answer(
+            get_text(lang, "browse_by_business_type"),
+            parse_mode="HTML",
+            reply_markup=business_type_keyboard(lang),
+        )
+
+    @dp.callback_query(F.data.startswith("biztype_"))
+    async def business_type_selected(callback: types.CallbackQuery, state: FSMContext):
+        if not callback.from_user:
+            await callback.answer()
+            return
+        msg = _callback_message(callback)
+        if not msg:
+            await callback.answer()
+            return
+        lang = db.get_user_language(callback.from_user.id)
+        user = db.get_user(callback.from_user.id)
+        if not user:
+            await callback.answer(get_text(lang, "error"))
+            return
+        data = callback.data or ""
+        business_type = data.replace("biztype_", "")
+        city = get_user_field(user, "city", "Ташкент")
+        search_city = normalize_city(city)
+        stores = offer_service.list_stores_by_type(search_city, business_type)
+        if not stores:
+            await msg.edit_text(_no_stores_text(lang, business_type))
+            await callback.answer()
+            return
+        await state.set_state(BrowseOffers.store_list)
+        await state.update_data(store_list=[store.id for store in stores])
+        text = offer_templates.render_business_type_store_list(lang, business_type, city, stores)
+        await msg.edit_text(text, parse_mode="HTML")
+        await callback.answer()
+
+    @dp.message(BrowseOffers.store_list, F.text.regexp(r"^\d+$"))
+    async def select_store_by_number(message: types.Message, state: FSMContext):
+        if not message.from_user:
+            return
+        lang = db.get_user_language(message.from_user.id)
+        data = await state.get_data()
+        store_list: List[int] = data.get("store_list", [])
+        if not store_list:
+            await message.answer(get_text(lang, "error"))
+            await state.clear()
+            return
+        try:
+            if not message.text:
+                await message.answer(_invalid_number_text(lang, "магазина"))
+                return
+            number = int(message.text)
+        except ValueError:
+            await message.answer(_invalid_number_text(lang, "магазина"))
+            return
+        if number < 1 or number > len(store_list):
+            await message.answer(_range_text(lang, len(store_list), "магазина"))
+            return
+        store_id = store_list[number - 1]
+        await state.clear()
+        await _send_store_card(message, store_id, lang)
+
+    @dp.message(BrowseOffers.offer_list, F.text.regexp(r"^\d+$"))
+    async def select_offer_by_number(message: types.Message, state: FSMContext):
+        if not message.from_user:
+            return
+        lang = db.get_user_language(message.from_user.id)
+        data = await state.get_data()
+        offer_list: List[int] = data.get("offer_list", [])
+        if not offer_list:
+            await message.answer(get_text(lang, "error"))
+            await state.clear()
+            return
+        try:
+            if not message.text:
+                await message.answer(_invalid_number_text(lang, "товара"))
+                return
+            number = int(message.text)
+        except ValueError:
+            await message.answer(_invalid_number_text(lang, "товара"))
+            return
+        if number < 1 or number > len(offer_list):
+            await message.answer(_range_text(lang, len(offer_list), "товара"))
+            return
+        offer_id = offer_list[number - 1]
+        details = offer_service.get_offer_details(offer_id)
+        if not details:
+            await message.answer(get_text(lang, "error"))
+            await state.clear()
+            return
+        await state.clear()
+        await _send_offer_details(message, details, lang)
+
+    @dp.callback_query(F.data == "offers_all")
+    async def show_all_offers(callback: types.CallbackQuery):
+        await _show_offers_catalog(callback, offer_service.list_top_offers, logger)
+
+    @dp.callback_query(F.data.startswith("offers_cat_"))
+    async def filter_offers_by_category(callback: types.CallbackQuery):
+        if not callback.from_user or not callback.data:
+            await callback.answer()
+            return
+        msg = _callback_message(callback)
+        if not msg:
+            await callback.answer()
+            return
+        lang = db.get_user_language(callback.from_user.id)
+        user = db.get_user(callback.from_user.id)
+        if not user:
+            await callback.answer(get_text(lang, "error"), show_alert=True)
+            return
+        city = get_user_field(user, "city", "Ташкент")
+        categories = get_product_categories(lang)  # Используем категории товаров
+        cat_index = int(callback.data.split("_")[-1])
+        if cat_index >= len(categories):
+            await callback.answer("Ошибка", show_alert=True)
+            return
+        category = categories[cat_index]
+        normalized = normalize_category(category)
+        offers = offer_service.list_offers_by_category(city, normalized, limit=20)
+        if not offers:
+            await callback.answer(
+                f"😔 В категории {category} нет предложений",
+                show_alert=True,
+            )
+            return
+        await callback.answer()
+        header = (
+            f"🔥 <b>{category.upper()}</b>\n"
+            f"📍 {city}\n\n"
+            f"{'Найдено' if lang == 'ru' else 'Topildi'}: {len(offers)}"
+        )
+        await msg.edit_text(
+            header,
+            parse_mode="HTML",
+            reply_markup=offers_category_filter(lang),
+        )
+        for offer in offers[:10]:
+            await _send_offer_card(msg, offer, lang)
+            await asyncio.sleep(0.1)
+
+    @dp.callback_query(F.data.startswith("filter_store_"))
+    async def filter_offers_by_store(callback: types.CallbackQuery):
+        if not callback.from_user or not callback.data:
+            await callback.answer()
+            return
+        msg = _callback_message(callback)
+        if not msg:
+            await callback.answer()
+            return
+        lang = db.get_user_language(callback.from_user.id)
+        store_id = int(callback.data.split("_")[-1])
+        store = offer_service.get_store(store_id)
+        if not store:
+            await callback.answer("❌ Магазин не найден", show_alert=True)
+            return
+        offers = offer_service.list_active_offers_by_store(store_id)
+        if not offers:
+            await callback.answer(
+                "😔 В магазине нет активных предложений",
+                show_alert=True,
+            )
+            return
+        await callback.answer()
+        header = (
+            f"🏪 <b>{store.name}</b>\n"
+            f"📍 {store.address or ''}\n\n"
+            f"{'Найдено' if lang == 'ru' else 'Topildi'}: {len(offers)}"
+        )
+        await msg.edit_text(
+            header,
+            parse_mode="HTML",
+            reply_markup=offers_category_filter(lang),
+        )
+        for offer in offers[:10]:
+            await _send_offer_card(msg, offer, lang)
+            await asyncio.sleep(0.1)
+
+    @dp.callback_query(F.data == "filter_all")
+    async def show_all_offers_filter(callback: types.CallbackQuery):
+        await _show_offers_catalog(callback, offer_service.list_top_offers, logger)
+
+    @dp.callback_query(F.data.startswith("store_info_"))
+    async def show_store_info(callback: types.CallbackQuery):
+        if not callback.from_user or not callback.data:
+            await callback.answer()
+            return
+        msg = _callback_message(callback)
+        if not msg:
+            await callback.answer()
+            return
+        lang = db.get_user_language(callback.from_user.id)
+        store_id = int(callback.data.split("_")[-1])
+        await _send_store_card(msg, store_id, lang)
+        await callback.answer()
+
+    @dp.callback_query(F.data == "back_to_hot")
+    async def back_to_hot(callback: types.CallbackQuery, state: FSMContext):
+        if not callback.from_user:
+            await callback.answer()
+            return
+        msg = _callback_message(callback)
+        if not msg:
+            await callback.answer()
+            return
+        user_id = callback.from_user.id
+        lang = db.get_user_language(user_id)
+        user = db.get_user(user_id)
+        if not user:
+            await callback.answer(get_text(lang, "error"), show_alert=True)
+            return
+        city = get_user_field(user, "city", "Ташкент")
+        search_city = normalize_city(city)
+        await _send_hot_offers_list(
+            msg,
+            state,
+            lang,
+            city,
+            search_city,
+            offer_service,
+            logger,
+        )
+        await callback.answer()
+
+    @dp.callback_query(F.data.startswith("store_offers_"))
+    async def show_store_offers(callback: types.CallbackQuery, state: FSMContext):
+        if not callback.from_user or not callback.data:
+            await callback.answer()
+            return
+        msg = _callback_message(callback)
+        if not msg:
+            await callback.answer()
+            return
+        lang = db.get_user_language(callback.from_user.id)
+        store_id = int(callback.data.split("_")[-1])
+        store = offer_service.get_store(store_id)
+        if not store:
+            await callback.answer(
+                "Магазин не найден" if lang == "ru" else "Do'kon topilmadi",
+                show_alert=True,
+            )
+            return
+        offers = offer_service.list_store_offers(store_id)
+        if not offers:
+            await callback.answer(
+                "В магазине пока нет активных предложений"
+                if lang == "ru"
+                else "Do'konda hali takliflar yo'q",
+                show_alert=True,
+            )
+            return
+        await _set_offer_state(state, offers)
+        page = offers[:20]
+        text = offer_templates.render_store_offers_list(
+            lang,
+            store.name,
+            page,
+            offset=0,
+            total=len(offers),
+        )
+        keyboard = offer_keyboards.store_offers_keyboard(
+            lang,
+            store_id,
+            has_more=len(offers) > 20,
+            next_offset=20 if len(offers) > 20 else None,
+        )
+        await msg.answer(text, parse_mode="HTML", reply_markup=keyboard)
+        await callback.answer()
+
+    @dp.callback_query(F.data.startswith("store_offers_next_"))
+    async def store_offers_pagination(callback: types.CallbackQuery, state: FSMContext):
+        if not callback.from_user or not callback.data:
+            await callback.answer()
+            return
+        msg = _callback_message(callback)
+        if not msg:
+            await callback.answer()
+            return
+        lang = db.get_user_language(callback.from_user.id)
+        parts = callback.data.split("_")
+        store_id = int(parts[3])
+        offset = int(parts[4])
+        store = offer_service.get_store(store_id)
+        if not store:
+            await callback.answer("Магазин не найден", show_alert=True)
+            return
+        offers = offer_service.list_store_offers(store_id)
+        if offset >= len(offers):
+            await callback.answer(
+                "Больше товаров нет" if lang == "ru" else "Boshqa mahsulotlar yo'q",
+                show_alert=True,
+            )
+            return
+        page = offers[offset : offset + 20]
+        await _set_offer_state(state, offers)
+        text = offer_templates.render_store_offers_list(
+            lang,
+            store.name,
+            page,
+            offset=offset,
+            total=len(offers),
+        )
+        has_more = offset + len(page) < len(offers)
+        keyboard = offer_keyboards.store_offers_keyboard(
+            lang,
+            store_id,
+            has_more,
+            offset + 20 if has_more else None,
+        )
+        await msg.answer(text, parse_mode="HTML", reply_markup=keyboard)
+        await callback.answer()
+
+    @dp.callback_query(F.data.startswith("store_reviews_"))
+    async def show_store_reviews(callback: types.CallbackQuery):
+        if not callback.from_user or not callback.data:
+            await callback.answer()
+            return
+        msg = _callback_message(callback)
+        if not msg:
+            await callback.answer()
+            return
+        lang = db.get_user_language(callback.from_user.id)
+        store_id = int(callback.data.split("_")[-1])
+        store = offer_service.get_store(store_id)
+        if not store:
+            await callback.answer("Магазин не найден", show_alert=True)
+            return
+        avg_rating, reviews = offer_service.get_store_reviews(store_id)
+        text = offer_templates.render_store_reviews(lang, store.name, avg_rating, reviews)
+        keyboard = offer_keyboards.store_reviews_keyboard(lang, store_id)
+        await msg.answer(text, parse_mode="HTML", reply_markup=keyboard)
+        await callback.answer()
+
+    @dp.callback_query(F.data.startswith("back_to_store_"))
+    async def back_to_store_card(callback: types.CallbackQuery):
+        if not callback.from_user or not callback.data:
+            await callback.answer()
+            return
+        msg = _callback_message(callback)
+        if not msg:
+            await callback.answer()
+            return
+        lang = db.get_user_language(callback.from_user.id)
+        store_id = int(callback.data.split("_")[-1])
+        await _send_store_card(msg, store_id, lang)
+        await callback.answer()
+
+    @dp.callback_query(F.data == "back_to_places")
+    async def back_to_places_menu(callback: types.CallbackQuery):
+        if not callback.from_user:
+            await callback.answer()
+            return
+        lang = db.get_user_language(callback.from_user.id)
+        msg = _callback_message(callback)
+        if not msg:
+            await callback.answer()
+            return
+        await msg.answer(
+            get_text(lang, "browse_by_business_type"),
+            parse_mode="HTML",
+            reply_markup=business_type_keyboard(lang),
+        )
+        await callback.answer()
+
+    # Touch handler names so static analysis does not flag them as unused.
+    _ = (
+        hot_offers_handler,
+        show_categories_handler,
+        hot_offers_refresh,
+        hot_offers_pagination,
+        browse_places_handler,
+        business_type_selected,
+        select_store_by_number,
+        select_offer_by_number,
+        show_all_offers,
+        filter_offers_by_category,
+        filter_offers_by_store,
+        show_all_offers_filter,
+        show_store_info,
+        back_to_hot,
+        show_store_offers,
+        store_offers_pagination,
+        show_store_reviews,
+        back_to_store_card,
+        back_to_places_menu,
+    )
+
+    # ------------------------------------------------------------------
+    # Helper closures
+    # ------------------------------------------------------------------
+
+    async def _send_hot_offers_list(
+        target: types.Message,
+        state: FSMContext,
+        lang: str,
+        city: str,
+        search_city: str,
+        service: OfferService,
+        log: Any,
+    ) -> None:
+        try:
+            result = service.list_hot_offers(search_city, limit=20, offset=0)
+            if not result.items:
+                await target.answer(offer_templates.render_hot_offers_empty(lang))
+                return
+            await state.set_state(BrowseOffers.offer_list)
+            await state.update_data(offer_list=[offer.id for offer in result.items])
+            select_hint = get_text(lang, "select_by_number")
+            text = offer_templates.render_hot_offers_list(
+                lang,
+                city,
+                result.items,
+                result.total,
+                select_hint,
+                offset=0,
+            )
+            has_more = len(result.items) < result.total
+            keyboard = offer_keyboards.hot_offers_pagination_keyboard(
+                lang,
+                has_more,
+                next_offset=20,
+            )
+            await target.answer(text, parse_mode="HTML", reply_markup=keyboard)
+        except Exception as exc:  # pragma: no cover
+            log.error("Failed to send hot offers: %s", exc)
+            await target.answer(f"😔 {get_text(lang, 'error')}")
+
+    async def _send_store_card(message: types.Message, store_id: int, lang: str) -> None:
+        store = offer_service.get_store(store_id)
+        if not store:
+            await message.answer(
+                "Магазин не найден" if lang == "ru" else "Do'kon topilmadi"
+            )
+            return
+        text = offer_templates.render_store_card(lang, store)
+        keyboard = offer_keyboards.store_card_keyboard(
+            lang, store_id, store.offers_count, store.ratings_count
+        )
+        await message.answer(text, parse_mode="HTML", reply_markup=keyboard)
+
+    async def _send_offer_details(message: types.Message, offer: OfferDetails, lang: str) -> None:
+        store = offer_service.get_store(offer.store_id)
+        text = offer_templates.render_offer_details(lang, offer, store)
+        keyboard = offer_keyboards.offer_details_keyboard(
+            lang, offer.id, offer.store_id, store.delivery_enabled if store else False
+        )
+        if offer.photo:
+            try:
+                await message.answer_photo(
+                    photo=offer.photo,
+                    caption=text,
+                    parse_mode="HTML",
+                    reply_markup=keyboard,
+                )
+                return
+            except Exception:  # pragma: no cover - fallback to text only
+                pass
+        await message.answer(text, parse_mode="HTML", reply_markup=keyboard)
+
+    async def _send_offer_card(message: types.Message, offer: OfferListItem, lang: str) -> None:
+        text = offer_templates.render_offer_card(lang, offer)
+        keyboard = offer_keyboards.offer_quick_keyboard(lang, offer.id, offer.store_id)
+        await message.answer(text, parse_mode="HTML", reply_markup=keyboard)
+
+    async def _show_offers_catalog(
+        callback: types.CallbackQuery,
+        fetcher: FetchOffersFn,
+        log: Any,
+    ) -> None:
+        if not callback.from_user:
+            await callback.answer()
+            return
+        msg = _callback_message(callback)
+        if not msg:
+            await callback.answer()
+            return
+        lang = db.get_user_language(callback.from_user.id)
+        user = db.get_user(callback.from_user.id)
+        if not user:
+            await callback.answer(get_text(lang, "error"), show_alert=True)
+            return
+        city = get_user_field(user, "city", "Ташкент")
+        offers: List[OfferListItem] = fetcher(city, 20)
+        if not offers:
+            await callback.answer("😔 Нет доступных предложений", show_alert=True)
+            return
+        await callback.answer()
+        header = (
+            f"🔥 <b>{'ВСЕ ПРЕДЛОЖЕНИЯ' if lang == 'ru' else 'BARCHA TAKLIFLAR'}</b>\n"
+            f"📍 {city}\n\n"
+            f"{'Найдено' if lang == 'ru' else 'Topildi'}: {len(offers)}"
+        )
+        await msg.edit_text(
+            header,
+            parse_mode="HTML",
+            reply_markup=offers_category_filter(lang),
+        )
+        for offer in offers[:10]:
+            await _send_offer_card(msg, offer, lang)
+            await asyncio.sleep(0.1)
+
+    async def _set_offer_state(state: FSMContext, offers: List[OfferListItem]) -> None:
+        await state.set_state(BrowseOffers.offer_list)
+        await state.update_data(offer_list=[offer.id for offer in offers])
+
+    async def _append_offer_ids(state: FSMContext, offers: List[OfferListItem]) -> None:
+        data = await state.get_data()
+        existing: List[int] = data.get("offer_list", [])
+        for offer in offers:
+            if offer.id not in existing:
+                existing.append(offer.id)
+        await state.update_data(offer_list=existing)
+
+    def _callback_message(callback: types.CallbackQuery) -> types.Message | None:
+        """Return callback's message when accessible."""
+        message = callback.message
+        return message if isinstance(message, types.Message) else None
+
+    def _no_stores_text(lang: str, business_type: str) -> str:
+        names = {
+            "supermarket": get_text(lang, "supermarkets"),
+            "restaurant": get_text(lang, "restaurants"),
+            "bakery": get_text(lang, "bakeries"),
+            "cafe": get_text(lang, "cafes"),
+            "pharmacy": get_text(lang, "pharmacies"),
+            "delivery": "🚚 Доставка" if lang == "ru" else "🚚 Yetkazish",
+        }
+        no_stores = (
+            "В этой категории пока нет магазинов с активными предложениями"
+            if lang == "ru"
+            else "Bu kategoriyada hali do'konlar yo'q"
+        )
+        return f"😔 {names.get(business_type, business_type)}\n\n{no_stores}"
+
+    def _invalid_number_text(lang: str, subject: str) -> str:
+        base = "Пожалуйста, введите корректный номер" if lang == "ru" else "Iltimos, to'g'ri raqam kiriting"
+        return f"❌ {base}"
+
+    def _range_text(lang: str, max_value: int, subject: str) -> str:
+        if lang == "ru":
+            return f"❌ Номер должен быть от 1 до {max_value}"
+        return f"❌ Raqam 1 dan {max_value} gacha bo'lishi kerak"

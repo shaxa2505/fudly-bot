@@ -146,137 +146,8 @@ if ADMIN_ID > 0:
     except Exception as e:
         print(f"⚠️ Ошибка при установке админа: {e}")
 
-# ============== FALLBACK HANDLERS (defined early, registered late) ==============
-
-from aiogram import Router
-fallback_router = Router(name="fallback_handlers")
-
-@fallback_router.message(F.photo)
-async def unexpected_photo_handler(message: types.Message, state: FSMContext):
-    """Обработчик для фото без активного состояния"""
-    lang = db.get_user_language(message.from_user.id)
-    current_state = await state.get_state()
-    
-    logger.warning(f"⚠️ User {message.from_user.id} sent photo without FSM state (current: {current_state})")
-    
-    await message.answer(
-        "⚠️ " + (
-            "Произошла ошибка: данные заказа потеряны.\n\n"
-            "Это может произойти если:\n"
-            "• Прошло много времени между шагами\n"
-            "• Сервер был перезапущен\n\n"
-            "Пожалуйста, начните оформление заказа заново:\n"
-            "1. Откройте 🔥 Горячее или 📍 Места\n"
-            "2. Выберите товар\n"
-            "3. Нажмите 🚚 Заказать с доставкой"
-            if lang == 'ru' else
-            "⚠️ Xatolik: buyurtma ma'lumotlari yo'qoldi.\n\n"
-            "Bu quyidagi hollarda sodir bo'lishi mumkin:\n"
-            "• Qadamlar orasida ko'p vaqt o'tdi\n"
-            "• Server qayta ishga tushirildi\n\n"
-            "Iltimos, buyurtmani qaytadan boshlang:\n"
-            "1. 🔥 Issiq yoki 📍 Joylar ni oching\n"
-            "2. Mahsulotni tanlang\n"
-            "3. 🚚 Yetkazib berish bilan tugmasini bosing"
-        ),
-        reply_markup=get_appropriate_menu(message.from_user.id, lang)
-    )
-
-@fallback_router.message(F.text)
-async def unknown_message_debug(message: types.Message, state: FSMContext):
-    """Отладочный обработчик для неизвестных текстовых сообщений"""
-    lang = db.get_user_language(message.from_user.id)
-    current_state = await state.get_state()
-    user_id = message.from_user.id
-    text = message.text
-    
-    # ПОДРОБНОЕ ЛОГИРОВАНИЕ ДЛЯ ОТЛАДКИ
-    logger.warning(f"⚠️ НЕИЗВЕСТНОЕ СООБЩЕНИЕ от {user_id}: '{text}' (состояние: {current_state})")
-    logger.warning(f"   User ID: {user_id}, Username: {message.from_user.username}")
-    logger.warning(f"   Chat ID: {message.chat.id}, Message ID: {message.message_id}")
-    
-    # Проверяем роль пользователя
-    user_data = db.get_user(user_id)
-    if user_data:
-        logger.warning(f"   Роль пользователя: {user_data.get('role', 'неизвестно')}")
-    else:
-        logger.warning(f"   ❌ Пользователь не найден в БД!")
-    
-    # Если пользователь вводит число, но нет активного состояния - подсказываем
-    if text.isdigit():
-        hint_ru = "Чтобы выбрать товар по номеру, сначала откройте список товаров через кнопку 🔥 Горячее или 📍 Места"
-        hint_uz = "Mahsulotni raqam bo'yicha tanlash uchun avval 🔥 Issiq yoki 📍 Joylar tugmasidan mahsulotlar ro'yxatini oching"
-        await message.answer(hint_ru if lang == 'ru' else hint_uz)
-    else:
-        # Отправляем диагностическое сообщение
-        await message.answer(
-            f"⚠️ DEBUG: Неизвестная команда\n"
-            f"Текст: {text}\n"
-            f"Состояние: {current_state}\n"
-            f"Роль: {user_data.get('role', 'неизвестно') if user_data else 'НЕ В БД'}"
-        )
-
-@fallback_router.callback_query()
-async def catch_all_callbacks(callback: types.CallbackQuery):
-    """Логирование всех callback_data для отладки непойманных обработчиков"""
-    data = callback.data or ""
-    user_id = callback.from_user.id
-    
-    # ПОДРОБНОЕ ЛОГИРОВАНИЕ ДЛЯ ОТЛАДКИ
-    logger.warning(f"⚠️ UNHANDLED CALLBACK от {user_id}: '{data}'")
-    logger.warning(f"   User ID: {user_id}, Username: {callback.from_user.username}")
-    logger.warning(f"   Message ID: {callback.message.message_id if callback.message else 'None'}")
-    
-    # Проверяем роль пользователя
-    user_data = db.get_user(user_id)
-    if user_data:
-        logger.warning(f"   Роль пользователя: {user_data.get('role', 'неизвестно')}")
-    
-    try:
-        await callback.answer("⚠️ DEBUG: Необработанный callback")
-    except Exception:
-        pass
-
 # Register modular handlers from handlers package
-# ============== PHASE 3: EXTRACTED HANDLERS INTEGRATION ==============
-# Import extracted handler modules (FIRST - for router registration priority)
-from handlers import bookings, orders, partner, booking_rating, common_user
-from handlers.seller import create_offer, management, analytics, order_management
-from handlers.user import profile, favorites
-from handlers.admin import dashboard as admin_dashboard, legacy as admin_legacy
-
-# Setup dependencies for extracted handlers
-bookings.setup_dependencies(db, cache, bot, METRICS)
-orders.setup_dependencies(db, bot, user_view_mode)
-partner.setup_dependencies(db, bot, user_view_mode)
-create_offer.setup_dependencies(db, bot)
-management.setup_dependencies(db, bot)
-analytics.setup_dependencies(db, bot)
-profile.setup_dependencies(db, bot, user_view_mode)
-favorites.setup_dependencies(db, bot, user_view_mode)
-order_management.setup(bot, db)
-booking_rating.setup(bot, db)
-common_user.setup(bot, db, user_view_mode, get_text, main_menu_customer)
-admin_dashboard.setup(bot, db, get_text, moderation_keyboard, get_uzb_time)
-admin_legacy.setup(bot, db, get_text, moderation_keyboard, get_uzb_time, ADMIN_ID, DATABASE_URL)
-
-# Include extracted routers in dispatcher (SPECIFIC HANDLERS FIRST - higher priority)
-dp.include_router(profile.router)  # User profile
-dp.include_router(favorites.router)  # User favorites
-dp.include_router(create_offer.router)  # Seller: ➕ Добавить
-dp.include_router(management.router)  # Seller: 📦 Мои товары
-dp.include_router(analytics.router)  # Seller: 📊 Аналитика
-dp.include_router(order_management.router)  # Seller: order operations
-dp.include_router(orders.router)  # Orders: 🎫 Заказы
-dp.include_router(bookings.router)  # Bookings
-dp.include_router(partner.router)  # Partner registration
-dp.include_router(booking_rating.router)  # Booking ratings
-dp.include_router(common_user.router)  # Common user operations
-dp.include_router(admin_dashboard.router)  # Admin dashboard
-dp.include_router(admin_legacy.router)  # Admin legacy
-
-# ============== REGISTRATION & COMMANDS (AFTER SPECIFIC ROUTERS) ==============
-from handlers import registration, user_commands, admin_panel, admin_stats, offers
+from handlers import registration, user_commands, admin, admin_stats, offers
 
 # Setup registration handlers
 registration.setup(dp, db, get_text, get_cities, city_keyboard, phone_request_keyboard, main_menu_customer,
@@ -286,10 +157,10 @@ registration.setup(dp, db, get_text, get_cities, city_keyboard, phone_request_ke
 user_commands.setup(dp, db, get_text, get_cities, city_keyboard, language_keyboard,
                    phone_request_keyboard, main_menu_seller, main_menu_customer)
 
-# Setup admin panel handlers
-admin_panel.setup(dp, db, get_text, admin_menu)
+# Setup admin handlers
+admin.setup(dp, db, get_text, admin_menu)
 
-# Setup offer browsing handlers (AFTER specific handlers to avoid catching their messages)
+# Setup offer browsing handlers
 offers.setup(dp, db, offer_service, logger)
 
 # Setup admin statistics handlers
@@ -298,8 +169,42 @@ admin_stats.setup(dp, admin_service, logger)
 # Register middleware for registration check
 dp.update.middleware(RegistrationCheckMiddleware(db, get_text, phone_request_keyboard))
 
-# Register fallback router LAST (LOWEST PRIORITY - catches everything else)
-dp.include_router(fallback_router)
+# ============== PHASE 3: EXTRACTED HANDLERS INTEGRATION ==============
+# Import extracted handler modules
+from handlers import bookings, orders, partner, booking_rating, common_user
+from handlers.seller import create_offer, management, analytics, order_management
+from handlers.user import profile, favorites
+from handlers.admin import dashboard as admin_dashboard, legacy as admin_legacy
+
+# Setup dependencies for extracted handlers
+bookings.setup_dependencies(db, cache, bot, METRICS)  # bookings needs cache and METRICS
+orders.setup_dependencies(db, bot, user_view_mode)
+partner.setup_dependencies(db, bot, user_view_mode)
+create_offer.setup_dependencies(db, bot)  # seller modules need only db and bot
+management.setup_dependencies(db, bot)
+analytics.setup_dependencies(db, bot)
+profile.setup_dependencies(db, bot, user_view_mode)
+favorites.setup_dependencies(db, bot, user_view_mode)
+order_management.setup(bot, db)  # New: seller order management
+booking_rating.setup(bot, db)  # New: booking ratings
+common_user.setup(bot, db, user_view_mode, get_text, main_menu_customer)  # New: common user functionality
+admin_dashboard.setup(bot, db, get_text, moderation_keyboard, get_uzb_time)  # New: admin dashboard
+admin_legacy.setup(bot, db, get_text, moderation_keyboard, get_uzb_time, ADMIN_ID, DATABASE_URL)  # New: legacy admin handlers
+
+# Include extracted routers in dispatcher
+dp.include_router(bookings.router)
+dp.include_router(orders.router)
+dp.include_router(partner.router)
+dp.include_router(create_offer.router)
+dp.include_router(management.router)
+dp.include_router(analytics.router)
+dp.include_router(profile.router)
+dp.include_router(favorites.router)
+dp.include_router(order_management.router)  # New
+dp.include_router(booking_rating.router)  # New
+dp.include_router(common_user.router)  # New
+dp.include_router(admin_dashboard.router)  # New
+dp.include_router(admin_legacy.router)  # New
 
 # ============== REMAINING HANDLERS (TO BE MIGRATED) ==============
 # Note: The handlers below will be gradually moved to the handlers/ package
@@ -544,73 +449,672 @@ dp.include_router(fallback_router)
 # Lines 634-642: Handlers extracted to common_user module
 # Lines 647-726: Handlers extracted to seller/analytics module
 # Lines 447-1286: Handlers extracted to admin/dashboard module (17 handlers)
-# Lines 452-1064: Handlers extracted to admin/legacy module (10 handlers: analytics, moderation, system commands)
 
-# ============== FALLBACK HANDLERS (will be registered LAST) ==============
+# ============== АДМИН ПАНЕЛЬ - ОБРАБОТЧИКИ (продолжение) ==============
 
-def setup_fallback_handlers():
-    """Register fallback handlers AFTER all specific handlers"""
+@dp.message(F.text == "📈 Аналитика")
+async def admin_analytics(message: types.Message):
+    await message.answer("⏳ Собираю статистику...")
     
-    @dp.message(F.photo)
-    async def unexpected_photo_handler(message: types.Message, state: FSMContext):
-        """Обработчик для фото без активного состояния"""
-        lang = db.get_user_language(message.from_user.id)
-        current_state = await state.get_state()
+    with db.get_connection() as conn:
+        cursor = conn.cursor()
         
-        logger.warning(f"⚠️ User {message.from_user.id} sent photo without FSM state (current: {current_state})")
+        # Статистика по пользователям
+        cursor.execute('SELECT COUNT(*) FROM users')
+        total_users = cursor.fetchone()[0]
+        cursor.execute('SELECT COUNT(*) FROM users WHERE role = "seller"')
+        sellers = cursor.fetchone()[0]
+        cursor.execute('SELECT COUNT(*) FROM users WHERE role = "customer"')
+        customers = cursor.fetchone()[0]
+        
+        # Статистика по магазинам
+        cursor.execute('SELECT COUNT(*) FROM stores')
+        total_stores = cursor.fetchone()[0]
+        cursor.execute('SELECT COUNT(*) FROM stores WHERE status = "active"')
+        approved_stores = cursor.fetchone()[0]
+        cursor.execute('SELECT COUNT(*) FROM stores WHERE status = "pending"')
+        pending_stores = cursor.fetchone()[0]
+        cursor.execute('SELECT COUNT(*) FROM stores WHERE status = "rejected"')
+        rejected_stores = cursor.fetchone()[0]
+        
+        # Статистика по городам
+        cursor.execute('SELECT city, COUNT(*) FROM stores GROUP BY city ORDER BY COUNT(*) DESC LIMIT 5')
+        top_cities = cursor.fetchall()
+        
+        # Статистика по категориям
+        cursor.execute('SELECT category, COUNT(*) FROM stores GROUP BY category ORDER BY COUNT(*) DESC LIMIT 5')
+        top_categories = cursor.fetchall()
+        
+        # Статистика по предложениям
+        cursor.execute('SELECT COUNT(*) FROM offers')
+        total_offers = cursor.fetchone()[0]
+        cursor.execute('SELECT COUNT(*) FROM offers WHERE status = "active"')
+        active_offers = cursor.fetchone()[0]
+        cursor.execute('SELECT SUM(original_price) FROM offers WHERE status = "active"')
+        total_original_price = cursor.fetchone()[0] or 0
+        cursor.execute('SELECT SUM(discount_price) FROM offers WHERE status = "active"')
+        total_discounted_price = cursor.fetchone()[0] or 0
+        
+        # Статистика по бронированиям
+        cursor.execute('SELECT COUNT(*) FROM bookings')
+        total_bookings = cursor.fetchone()[0]
+        cursor.execute('SELECT COUNT(*) FROM bookings WHERE status = "active"')
+        active_bookings = cursor.fetchone()[0]
+        cursor.execute('SELECT COUNT(*) FROM bookings WHERE status = "completed"')
+        completed_bookings = cursor.fetchone()[0]
+        cursor.execute('SELECT COUNT(*) FROM bookings WHERE status = "cancelled"')
+        cancelled_bookings = cursor.fetchone()[0]
+        cursor.execute('SELECT SUM(quantity) FROM bookings WHERE status IN ("active", "completed")')
+        total_quantity = cursor.fetchone()[0] or 0
+        
+        # Доход (экономия покупателей)
+        cursor.execute('''
+            SELECT SUM((o.original_price - o.discount_price) * b.quantity)
+            FROM bookings b
+            JOIN offers o ON b.offer_id = o.offer_id
+            WHERE b.status IN ("active", "completed")
+        ''')
+        total_savings = cursor.fetchone()[0] or 0
+        
+        # Самые активные магазины
+        cursor.execute('''
+            SELECT s.name, COUNT(b.booking_id) as bookings_count
+            FROM stores s
+            LEFT JOIN offers o ON s.store_id = o.store_id
+            LEFT JOIN bookings b ON o.offer_id = b.offer_id
+            WHERE b.status IN ("active", "completed")
+            GROUP BY s.store_id
+            ORDER BY bookings_count DESC
+            LIMIT 5
+        ''')
+        top_stores = cursor.fetchall()
+    
+    # Формируем текстовый отчёт
+    """Детальная аналитика системы"""
+    lang = 'ru'
+    if not db.is_admin(message.from_user.id):
+        await message.answer(get_text(lang, 'access_denied'))
+        return
+    
+    await message.answer("⏳ Собираю статистику...")
+    
+    with db.get_connection() as conn:
+        cursor = conn.cursor()
+        
+        # Статистика по пользователям
+        cursor.execute('SELECT COUNT(*) FROM users')
+        total_users = cursor.fetchone()[0]
+        cursor.execute('SELECT COUNT(*) FROM users WHERE role = "seller"')
+        sellers = cursor.fetchone()[0]
+        cursor.execute('SELECT COUNT(*) FROM users WHERE role = "customer"')
+        customers = cursor.fetchone()[0]
+        
+        # Статистика по магазинам
+        cursor.execute('SELECT COUNT(*) FROM stores')
+        total_stores = cursor.fetchone()[0]
+        cursor.execute('SELECT COUNT(*) FROM stores WHERE status = "active"')
+        approved_stores = cursor.fetchone()[0]
+        cursor.execute('SELECT COUNT(*) FROM stores WHERE status = "pending"')
+        pending_stores = cursor.fetchone()[0]
+        cursor.execute('SELECT COUNT(*) FROM stores WHERE status = "rejected"')
+        rejected_stores = cursor.fetchone()[0]
+    
+    # Статистика по городам
+    cursor.execute('SELECT city, COUNT(*) FROM stores GROUP BY city ORDER BY COUNT(*) DESC LIMIT 5')
+    top_cities = cursor.fetchall()
+    
+    # Статистика по категориям
+    cursor.execute('SELECT category, COUNT(*) FROM stores GROUP BY category ORDER BY COUNT(*) DESC LIMIT 5')
+    top_categories = cursor.fetchall()
+    
+    # Статистика по предложениям
+    cursor.execute('SELECT COUNT(*) FROM offers')
+    total_offers = cursor.fetchone()[0]
+    cursor.execute('SELECT COUNT(*) FROM offers WHERE status = "active"')
+    active_offers = cursor.fetchone()[0]
+    cursor.execute('SELECT SUM(original_price) FROM offers WHERE status = "active"')
+    total_original_price = cursor.fetchone()[0] or 0
+    cursor.execute('SELECT SUM(discount_price) FROM offers WHERE status = "active"')
+    total_discounted_price = cursor.fetchone()[0] or 0
+    
+    # Статистика по бронированиям
+    cursor.execute('SELECT COUNT(*) FROM bookings')
+    total_bookings = cursor.fetchone()[0]
+    cursor.execute('SELECT COUNT(*) FROM bookings WHERE status = "active"')
+    active_bookings = cursor.fetchone()[0]
+    cursor.execute('SELECT COUNT(*) FROM bookings WHERE status = "completed"')
+    completed_bookings = cursor.fetchone()[0]
+    cursor.execute('SELECT COUNT(*) FROM bookings WHERE status = "cancelled"')
+    cancelled_bookings = cursor.fetchone()[0]
+    cursor.execute('SELECT SUM(quantity) FROM bookings WHERE status IN ("active", "completed")')
+    total_quantity = cursor.fetchone()[0] or 0
+    
+    # Доход (экономия покупателей)
+    cursor.execute('''
+        SELECT SUM((o.original_price - o.discount_price) * b.quantity)
+        FROM bookings b
+        JOIN offers o ON b.offer_id = o.offer_id
+        WHERE b.status IN ("active", "completed")
+    ''')
+    total_savings = cursor.fetchone()[0] or 0
+    
+    # Самые активные магазины
+    cursor.execute('''
+        SELECT s.name, COUNT(b.booking_id) as bookings_count
+        FROM stores s
+        LEFT JOIN offers o ON s.store_id = o.store_id
+        LEFT JOIN bookings b ON o.offer_id = b.offer_id
+        WHERE b.status IN ("active", "completed")
+        GROUP BY s.store_id
+        ORDER BY bookings_count DESC
+        LIMIT 5
+    ''')
+    top_stores = cursor.fetchall()
+    
+    conn.close()
+    
+    # Формируем текстовый отчёт
+    text = "📈 <b>ПОЛНАЯ СТАТИСТИКА СИСТЕМЫ</b>\n\n"
+    
+    text += "👥 <b>ПОЛЬЗОВАТЕЛИ</b>\n"
+    text += f"Всего: {total_users}\n"
+    text += f"🏪 Партнеров: {sellers}\n"
+    text += f"🛍 Покупателей: {customers}\n\n"
+    
+    text += "🏪 <b>МАГАЗИНЫ</b>\n"
+    text += f"Всего: {total_stores}\n"
+    text += f"✅ Одобрено: {approved_stores}\n"
+    text += f"⏳ На модерации: {pending_stores}\n"
+    text += f"❌ Отклонено: {rejected_stores}\n\n"
+    
+    if top_cities:
+        text += "📍 <b>ТОП-5 ГОРОДОВ</b>\n"
+        for city, count in top_cities:
+            text += f"• {city}: {count}\n"
+        text += "\n"
+    
+    if top_categories:
+        text += "🏷 <b>ТОП-5 КАТЕГОРИЙ</b>\n"
+        for category, count in top_categories:
+            text += f"• {category}: {count}\n"
+        text += "\n"
+    
+    text += "🍽 <b>ПРЕДЛОЖЕНИЯ</b>\n"
+    text += f"Всего: {total_offers}\n"
+    text += f"✅ Активных: {active_offers}\n"
+    text += f"💰 Общая стоимость: {int(total_original_price):,} сум\n"
+    text += f"💸 Со скидкой: {int(total_discounted_price):,} сум\n\n"
+    
+    text += "📋 <b>БРОНИРОВАНИЯ</b>\n"
+    text += f"Всего: {total_bookings}\n"
+    text += f"✅ Активных: {active_bookings}\n"
+    text += f"✔️ Завершен: {completed_bookings}\n"
+    text += f"❌ Отменен: {cancelled_bookings}\n"
+    text += f"📦 Товаров забронировано: {total_quantity} шт\n"
+    text += f"💰 Экономия покупателей: {int(total_savings):,} сум\n\n"
+    
+    if top_stores:
+        text += "🏆 <b>ТОП-5 МАГАЗИНОВ</b>\n"
+        for store_name, bookings_count in top_stores:
+            text += f"• {store_name}: {bookings_count} заказов\n"
+    
+    await message.answer(text, parse_mode="HTML")
+    
+    # Создаём CSV файл
+    import csv
+    from datetime import datetime
+    from aiogram.types import FSInputFile
+    
+    filename = f"statistics_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
+    
+    with open(filename, 'w', encoding='utf-8-sig', newline='') as f:
+        writer = csv.writer(f)
+        
+        # Заголовок
+        writer.writerow(['ПОЛНАЯ СТАТИСТИКА FUDLY'])
+        writer.writerow(['Дата создания', datetime.now().strftime('%Y-%m-%d %H:%M:%S')])
+        writer.writerow([])
+        
+        # Пользователи
+        writer.writerow(['ПОЛЬЗОВАТЕЛИ'])
+        writer.writerow(['Всего', total_users])
+        writer.writerow(['Партнёров', sellers])
+        writer.writerow(['Покупателей', customers])
+        writer.writerow([])
+        
+        # Магазины
+        writer.writerow(['МАГАЗИНЫ'])
+        writer.writerow(['Всего', total_stores])
+        writer.writerow(['Одобрено', approved_stores])
+        writer.writerow(['На модерации', pending_stores])
+        writer.writerow(['Отклонено', rejected_stores])
+        writer.writerow([])
+        
+        # Города
+        if top_cities:
+            writer.writerow(['ТОП ГОРОДА'])
+            writer.writerow(['Город', 'Количество'])
+            for city, count in top_cities:
+                writer.writerow([city, count])
+            writer.writerow([])
+        
+        # Категории
+        if top_categories:
+            writer.writerow(['ТОП КАТЕГОРИИ'])
+            writer.writerow(['Категория', 'Количество'])
+            for category, count in top_categories:
+                writer.writerow([category, count])
+            writer.writerow([])
+        
+        # Предложения
+        writer.writerow(['ПРЕДЛОЖЕНИЯ'])
+        writer.writerow(['Всего', total_offers])
+        writer.writerow(['Активных', active_offers])
+        writer.writerow(['Общая стоимость (сум)', int(total_original_price)])
+        writer.writerow(['Со скидкой (сум)', int(total_discounted_price)])
+        writer.writerow([])
+        
+        # Бронирования
+        writer.writerow(['БРОНИРОВАНИЯ'])
+        writer.writerow(['Всего', total_bookings])
+        writer.writerow(['Активных', active_bookings])
+        writer.writerow(['Завершено', completed_bookings])
+        writer.writerow(['Отменено', cancelled_bookings])
+        writer.writerow(['Товаров забронировано', total_quantity])
+        writer.writerow(['Экономия покупателей (сум)', int(total_savings)])
+        writer.writerow([])
+        
+        # Топ магазины
+        if top_stores:
+            writer.writerow(['ТОП МАГАЗИНЫ'])
+            writer.writerow(['Название', 'Заказов'])
+            for store_name, bookings_count in top_stores:
+                writer.writerow([store_name, bookings_count])
+    
+    # Отправляем файл
+    document = FSInputFile(filename)
+    await message.answer_document(
+        document=document,
+        caption="📊 Полная статистика в формате CSV"
+    )
+    
+    # Удаляем файл после отправки
+    import os
+    os.remove(filename)
+
+@dp.message(F.text == "🏪 Заявки на партнерство")
+async def admin_pending_stores(message: types.Message):
+    lang = 'ru'  # Админ-панель только на русском
+    if not db.is_admin(message.from_user.id):
+        await message.answer(get_text(lang, 'access_denied'))
+        return
+    
+    pending = db.get_pending_stores()
+    
+    if not pending:
+        await message.answer(get_text(lang, 'no_pending_stores'))
+        return
+    
+    await message.answer(get_text(lang, 'pending_stores_count', count=len(pending)))
+    
+    for store in pending:
+        text = f"🏪 <b>{store[2]}</b>\n\n"
+        text += f"От: {store[8]} (@{store[9] or 'нет'})\n"
+        text += f"ID: <code>{store[1]}</code>\n\n"
+        text += f"📍 {store[3]}, {store[4]}\n"
+        text += f"🏷 {store[6]}\n"
+        text += f"📱 {store[7]}\n"
+        text += f"📝 {store[5]}\n"
+        text += f"📅 {store[10]}"
         
         await message.answer(
-            "⚠️ " + (
-                "Произошла ошибка: данные заказа потеряны.\n\n"
-                "Это может произойти если:\n"
-                "• Прошло много времени между шагами\n"
-                "• Сервер был перезапущен\n\n"
-                "Пожалуйста, начните оформление заказа заново:\n"
-                "1. Откройте 🔥 Горячее или 📍 Места\n"
-                "2. Выберите товар\n"
-                "3. Нажмите 🚚 Заказать с доставкой"
-                if lang == 'ru' else
-                "⚠️ Xatolik: buyurtma ma'lumotlari yo'qoldi.\n\n"
-                "Bu quyidagi hollarda sodir bo'lishi mumkin:\n"
-                "• Qadamlar orasida ko'p vaqt o'tdi\n"
-                "• Server qayta ishga tushirildi\n\n"
-                "Iltimos, buyurtmani qaytadan boshlang:\n"
-                "1. 🔥 Issiq yoki 📍 Joylar ni oching\n"
-                "2. Mahsulotni tanlang\n"
-                "3. 🚚 Yetkazib berish bilan tugmasini bosing"
-            ),
-            reply_markup=get_appropriate_menu(message.from_user.id, lang)
+            text,
+            parse_mode="HTML",
+            reply_markup=moderation_keyboard(store[0])
         )
-    
-    @dp.message(F.text)
-    async def unknown_message_debug(message: types.Message, state: FSMContext):
-        """Отладочный обработчик для неизвестных текстовых сообщений"""
-        lang = db.get_user_language(message.from_user.id)
-        current_state = await state.get_state()
-        
-        # Если пользователь вводит число, но нет активного состояния - подсказываем
-        if message.text.isdigit():
-            hint_ru = "Чтобы выбрать товар по номеру, сначала откройте список товаров через кнопку 🔥 Горячее или 📍 Места"
-            hint_uz = "Mahsulotni raqam bo'yicha tanlash uchun avval 🔥 Issiq yoki 📍 Joylar tugmasidan mahsulotlar ro'yxatini oching"
-            await message.answer(hint_ru if lang == 'ru' else hint_uz)
-        else:
-            # Просто логируем для отладки без спама пользователю
-            logger.debug(f"⚠️ НЕИЗВЕСТНОЕ СООБЩЕНИЕ от {message.from_user.id}: '{message.text}' (состояние: {current_state})")
+        await asyncio.sleep(0.3)
 
-# ============== CATCH ALL CALLBACKS ==============
-
-def setup_catch_all():
-    """Register catch-all callback handler LAST"""
+@dp.callback_query(F.data.startswith("approve_"))
+async def approve_store(callback: types.CallbackQuery):
+    lang = 'ru'  # Админ-панель на русском
+    if not db.is_admin(callback.from_user.id):
+        await callback.answer(get_text(lang, 'access_denied'), show_alert=True)
+        return
     
-    @dp.callback_query()
-    async def catch_all_callbacks(callback: types.CallbackQuery):
-        """Логирование всех callback_data для отладки непойманных обработчиков"""
-        data = callback.data or ""
-        logger.info(f"UNHANDLED callback: {data}")
+    store_id = int(callback.data.split("_")[2])
+    
+    # Получаем данные магазина до одобрения
+    store = db.get_store(store_id)
+    if not store:
+        await callback.answer("❌ Магазин не найден", show_alert=True)
+        return
+    
+    owner_id = get_store_field(store, 'owner_id')
+    store_name = get_store_field(store, 'name')
+    
+    # Одобряем магазин (включает обновление роли владельца)
+    success = db.approve_store(store_id)
+    
+    if success:
+        # Уведомляем владельца
         try:
-            await callback.answer()
+            owner_lang = db.get_user_language(owner_id)
+            await bot.send_message(
+                owner_id,
+                get_text(owner_lang, 'store_approved'),
+                parse_mode="HTML",
+                reply_markup=main_menu_seller(owner_lang)
+            )
+        except Exception as e:
+            logger.error(f"Failed to notify store owner {owner_id}: {e}")
+        
+        # Обновляем сообщение
+        await callback.message.edit_text(
+            callback.message.text + "\n\n✅ <b>ОДОБРЕНО</b>",
+            parse_mode="HTML"
+        )
+        await callback.answer(f"✅ Магазин '{store_name}' одобрен!")
+    else:
+        await callback.answer("❌ Ошибка при одобрении магазина", show_alert=True)
+
+@dp.callback_query(F.data.startswith("reject_"))
+async def reject_store(callback: types.CallbackQuery):
+    lang = 'ru'  # Админ-панель на русском
+    if not db.is_admin(callback.from_user.id):
+        await callback.answer(get_text(lang, 'access_denied'), show_alert=True)
+        return
+    
+    store_id = int(callback.data.split("_")[2])
+    db.reject_store(store_id, "Не соответствует требованиям")
+    
+    # Уведомляем владельца
+    store = db.get_store(store_id)
+    if store:
+        owner_id = store[1]
+        try:
+            owner_lang = db.get_user_language(owner_id)
+            await bot.send_message(
+                owner_id,
+                get_text(owner_lang, 'store_rejected'),
+                parse_mode="HTML"
+            )
         except Exception:
             pass
+    
+    await callback.message.edit_text(
+        callback.message.text + "\n\n❌ <b>ОТКЛОНЕНО</b>",
+        parse_mode="HTML"
+    )
+    await callback.answer(get_text(lang, 'store_rejected_admin'))
+
+@dp.message(F.text == "📋 Все предложения")
+async def admin_all_offers(message: types.Message):
+    lang = 'ru'
+    if not db.is_admin(message.from_user.id):
+        await message.answer(get_text(lang, 'access_denied'))
+        return
+    
+    offers = db.get_active_offers()
+    if not offers:
+        await message.answer(f"📋 <b>{get_text(lang, 'all_offers')}</b>\n\n{get_text(lang, 'no_active_offers')}", parse_mode="HTML")
+        return
+    
+    text = f"📋 <b>{get_text(lang, 'all_offers')} ({len(offers)})</b>\n\n"
+    
+    for i, offer in enumerate(offers[:10]):  # Показываем первые 10
+        discount_percent = int((1 - offer[5] / offer[4]) * 100) if offer[4] > 0 else 0
+        
+        # Получаем единицы измерения
+        # unit находится в [13] если есть, иначе используем по умолчанию
+        # После JOIN структура: [0-12] offers базовые, [13]unit (если есть), [14]category (если есть)
+        # [15] или [13]store_name, [16] или [14]address, [17] или [15]city
+        if len(offer) >= 19:
+            # Новая структура с unit/category
+            unit = offer[13] if offer[13] else 'шт'
+        else:
+            # Старая структура без unit/category
+            unit = 'шт'
+        
+        text += f"{i+1}. <b>{offer[2]}</b>\n"
+        text += f"   💰 {int(offer[4]):,} ➜ {int(offer[5]):,} сум (-{discount_percent}%)\n"
+        text += f"   📦 {offer[6]} {unit}\n"
+        
+        # Показываем срок годности
+        if len(offer) > 12 and offer[12]:
+            text += f"   📅 До: {offer[12]}\n"
+        
+        # Показываем магазин (индексы для JOIN: 15-store_name, 17-city)
+        if len(offer) > 17:
+            # Индексы зависят от наличия unit/category
+            if len(offer) >= 19:
+                # Новая структура: [15]store_name, [17]city
+                store_name = offer[15] if len(offer) > 15 else ""
+                city = offer[17] if len(offer) > 17 else ""
+            else:
+                # Старая структура: [13]store_name, [15]city
+                store_name = offer[13] if len(offer) > 13 else ""
+                city = offer[15] if len(offer) > 15 else ""
+            if store_name or city:
+                text += f"🏪 {store_name} ({city})\n"
+        text += "\n"
+    
+    if len(offers) > 10:
+        text += f"... и еще {len(offers) - 10} предложений"
+    
+    await message.answer(text, parse_mode="HTML")
+
+@dp.message(F.text == "🏪 Все магазины")
+async def admin_all_stores(message: types.Message):
+    lang = 'ru'
+    if not db.is_admin(message.from_user.id):
+        await message.answer(get_text(lang, 'access_denied'))
+        return
+    
+    with db.get_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute('SELECT * FROM stores ORDER BY created_at DESC')
+        stores = cursor.fetchall()
+    
+    if not stores:
+        await message.answer("Магазинов нет")
+        return
+    
+    await message.answer(f"🏪 <b>Все магазины ({len(stores)})</b>", parse_mode="HTML")
+    
+    for store in stores[:20]:
+        status_emoji = {
+            'active': '✅',
+            'approved': '✅',
+            'pending': '⏳',
+            'rejected': '❌'
+        }.get(store[8], '❓')
+        
+        text = f"{status_emoji} <b>{store[2]}</b>\n"
+        text += f"ID: {store[0]}\n"
+        text += f"📍 {store[3]}, {store[4]}\n"
+        text += f"🏷 {store[6]}\n"
+        text += f"Статус: {store[8]}"
+        
+        # Создаем inline кнопку для удаления
+        from aiogram.utils.keyboard import InlineKeyboardBuilder
+        builder = InlineKeyboardBuilder()
+        builder.button(text="🗑 Удалить магазин", callback_data=f"delete_store_{store[0]}")
+        
+        await message.answer(text, parse_mode="HTML", reply_markup=builder.as_markup())
+        await asyncio.sleep(0.2)
+
+@dp.callback_query(F.data.startswith("delete_store_"))
+async def delete_store_callback(request: types.CallbackQuery):
+    lang = 'ru'
+    if not db.is_admin(request.from_user.id):
+        await request.answer(get_text(lang, 'access_denied'), show_alert=True)
+        return
+    
+    store_id = int(request.data.split("_")[2])
+    
+    try:
+        db.delete_store(store_id)
+        await request.message.edit_text(
+            request.message.text + "\n\n🗑 <b>УДАЛЕНО</b>",
+            parse_mode="HTML"
+        )
+        await request.answer("✅ Магазин удалён!")
+    except Exception as e:
+        await request.answer(f"❌ Ошибка: {str(e)}", show_alert=True)
+
+@dp.message(F.text == "📢 Рассылка")
+async def admin_broadcast(message: types.Message):
+    lang = 'ru'
+    if not db.is_admin(message.from_user.id):
+        await message.answer(get_text(lang, 'access_denied'))
+        return
+    
+    await message.answer("📢 Функция рассылки в разработке")
+
+@dp.message(F.text == "⚙️ Настройки")
+async def admin_settings(message: types.Message):
+    lang = 'ru'
+    if not db.is_admin(message.from_user.id):
+        await message.answer(get_text(lang, 'access_denied'))
+        return
+    
+    await message.answer("⚙️ Настройки админа в разработке")
+
+# ============== АДМИНСКИЕ КОМАНДЫ ДЛЯ МИГРАЦИИ ==============
+
+@dp.message(Command("migrate_db"))
+async def cmd_migrate_db(message: types.Message):
+    """Команда для ручного запуска миграции БД (только для админа)"""
+    if message.from_user.id != ADMIN_ID:
+        await message.answer("❌ Доступ запрещён")
+        return
+    
+    try:
+        if DATABASE_URL:
+            await message.answer("⚠️ Миграция не требуется для PostgreSQL.\nБД автоматически создаётся при запуске.")
+            return
+        
+        await message.answer("🔄 Запуск миграции базы данных...")
+        
+        # Пересоздаём объект базы данных для вызова init_db
+        temp_db = Database(db.db_name)
+        
+        await message.answer("✅ Миграция завершена!\n\nПроверьте наличие таблиц:")
+        
+        conn = sqlite3.connect(db.db_name)
+        cursor = conn.cursor()
+        cursor.execute("SELECT name FROM sqlite_master WHERE type='table'")
+        tables = cursor.fetchall()
+        conn.close()
+        
+        tables_text = "\n".join([f"✅ {t[0]}" for t in tables])
+        await message.answer(f"📊 Таблицы в БД:\n{tables_text}")
+        
+    except Exception as e:
+        await message.answer(f"❌ Ошибка миграции: {e}")
+
+@dp.message(Command("enable_delivery"))
+async def cmd_enable_delivery(message: types.Message):
+    """Команда для включения доставки для всех магазинов (только для админа)"""
+    if message.from_user.id != ADMIN_ID:
+        await message.answer("❌ Доступ запрещён")
+        return
+    
+    try:
+        if DATABASE_URL:
+            await message.answer("⚠️ Эта команда работает только с SQLite.\nДля PostgreSQL доставка работает автоматически.")
+            return
+        
+        await message.answer("🔄 Включаю доставку для всех магазинов...")
+        
+        conn = sqlite3.connect(db.db_name)
+        cursor = conn.cursor()
+        
+        # Проверяем наличие таблицы stores и полей доставки
+        cursor.execute("PRAGMA table_info(stores)")
+        columns = [col[1] for col in cursor.fetchall()]
+        
+        if 'delivery_enabled' not in columns:
+            await message.answer("❌ Таблица stores не имеет полей доставки. Запустите /migrate_db")
+            conn.close()
+            return
+        
+        # Включаем доставку
+        cursor.execute('''
+            UPDATE stores 
+            SET delivery_enabled = 1,
+                delivery_price = 15000,
+                min_order_amount = 30000
+            WHERE delivery_enabled = 0
+        ''')
+        updated = cursor.rowcount
+        conn.commit()
+        
+        # Проверяем результат
+        cursor.execute('SELECT store_id, name, delivery_enabled FROM stores')
+        stores = cursor.fetchall()
+        conn.close()
+        
+        result = f"✅ Доставка включена для {updated} магазина(ов)\n\n"
+        result += "📊 Статус магазинов:\n"
+        for store in stores:
+            status = "✅" if store[2] else "❌"
+            result += f"{status} {store[1]} (ID: {store[0]})\n"
+        
+        await message.answer(result)
+        
+    except Exception as e:
+        await message.answer(f"❌ Ошибка: {e}")
+
+# ============== ОТЛАДКА - НЕИЗВЕСТНЫЕ СООБЩЕНИЯ ==============
+
+@dp.message(F.photo)
+async def unexpected_photo_handler(message: types.Message, state: FSMContext):
+    """Обработчик для фото без активного состояния (например после перезапуска Railway)"""
+    lang = db.get_user_language(message.from_user.id)
+    current_state = await state.get_state()
+    
+    logger.warning(f"⚠️ User {message.from_user.id} sent photo without FSM state (current: {current_state})")
+    print(f"[DEBUG] ⚠️ Unexpected photo from {message.from_user.id}, state: {current_state}")
+    
+    # Объясняем что произошло и как исправить
+    await message.answer(
+        "⚠️ " + (
+            "Произошла ошибка: данные заказа потеряны.\n\n"
+            "Это может произойти если:\n"
+            "• Прошло много времени между шагами\n"
+            "• Сервер был перезапущен\n\n"
+            "Пожалуйста, начните оформление заказа заново:\n"
+            "1. Откройте 🔥 Горячее или 📍 Места\n"
+            "2. Выберите товар\n"
+            "3. Нажмите 🚚 Заказать с доставкой"
+            if lang == 'ru' else
+            "⚠️ Xatolik: buyurtma ma'lumotlari yo'qoldi.\n\n"
+            "Bu quyidagi hollarda sodir bo'lishi mumkin:\n"
+            "• Qadamlar orasida ko'p vaqt o'tdi\n"
+            "• Server qayta ishga tushirildi\n\n"
+            "Iltimos, buyurtmani qaytadan boshlang:\n"
+            "1. 🔥 Issiq yoki 📍 Joylar ni oching\n"
+            "2. Mahsulotni tanlang\n"
+            "3. 🚚 Yetkazib berish bilan tugmasini bosing"
+        ),
+        reply_markup=get_appropriate_menu(message.from_user.id, lang)
+    )
+
+@dp.message(F.text)
+async def unknown_message_debug(message: types.Message, state: FSMContext):
+    """Отладочный обработчик для неизвестных текстовых сообщений"""
+    lang = db.get_user_language(message.from_user.id)
+    current_state = await state.get_state()
+    
+    # Если пользователь вводит число, но нет активного состояния - подсказываем
+    if message.text.isdigit():
+        hint_ru = "Чтобы выбрать товар по номеру, сначала откройте список товаров через кнопку 🔥 Горячее или 📍 Места"
+        hint_uz = "Mahsulotni raqam bo'yicha tanlash uchun avval 🔥 Issiq yoki 📍 Joylar tugmasidan mahsulotlar ro'yxatini oching"
+        await message.answer(hint_ru if lang == 'ru' else hint_uz)
+    else:
+        # Просто логируем для отладки без спама пользователю
+        print(f"⚠️ НЕИЗВЕСТНОЕ СООБЩЕНИЕ от {message.from_user.id}: '{message.text}' (состояние: {current_state})")
 
 # ============== ЗАПУСК БОТА ==============
 
@@ -659,8 +1163,23 @@ async def on_shutdown():
     await bot.session.close()
     print("👋 Бот остановлен")
 
-# ============== HANDLER REGISTRATION ==============
-# NOTE: Fallback handlers registered LAST via setup functions called in main()
+# ============== ОТЛАДКА НЕОБРАБОТАННЫХ CALLBACKS ==============
+
+@dp.callback_query()
+async def catch_all_callbacks(callback: types.CallbackQuery):
+    """Логирование всех callback_data для отладки непойманных обработчиков"""
+    data = callback.data or ""
+    print(f"[CATCH_ALL] Received callback: {data} from user {callback.from_user.id}")
+    try:
+        logger.info(f"UNHANDLED callback: {data}")
+        print(f"UNHANDLED callback: {data}")
+    except Exception:
+        pass
+    # Закрываем спиннер без алерта
+    try:
+        await callback.answer()
+    except Exception:
+        pass
 
 # ============== ЗАПУСК БОТА ==============
 

@@ -22,24 +22,39 @@ def setup(dp_or_router, db, get_text, get_cities, city_keyboard, phone_request_k
         # Validate phone format
         if not validator.validate_phone(phone):
             await message.answer(
-                "❌ Неверный формат номера телефона. Пожалуйста, используйте кнопку ниже.",
+                "Неверный формат номера. Используйте кнопку ниже." if lang == 'ru' else "Telefon raqami noto'g'ri. Quyidagi tugmadan foydalaning.",
                 reply_markup=phone_request_keyboard(lang)
             )
             return
         
-        # Update phone number
+        # Save phone and set default city (Tashkent)
         db.update_user_phone(message.from_user.id, phone)
+        db.update_user_city(message.from_user.id, "Ташкент")
+        
+        # Clear state and show main menu
+        await state.clear()
+        
+        # Compact, professional message
+        welcome_text = (
+            f"Регистрация завершена.\n"
+            f"Ваш город: <b>Ташкент</b>\n\n"
+            f"Изменить город можно в Профиле."
+            if lang == 'ru' else
+            f"Ro'yxatdan o'tish yakunlandi.\n"
+            f"Sizning shahringiz: <b>Toshkent</b>\n\n"
+            f"Shaharni Profilda o'zgartirish mumkin."
+        )
         
         await message.answer(
-            get_text(lang, 'welcome_city_step'),
+            welcome_text,
             parse_mode="HTML",
-            reply_markup=city_keyboard(lang, allow_cancel=False)
+            reply_markup=main_menu_customer(lang)
         )
-        await state.set_state(Registration.city)
 
     @dp_or_router.message(Registration.city)
     @secure_user_input
     async def process_city(message: types.Message, state: FSMContext):
+        """Handle city selection (now used only when changing city from profile)"""
         lang = db.get_user_language(message.from_user.id)
         
         # Rate limiting check
@@ -61,8 +76,10 @@ def setup(dp_or_router, db, get_text, get_cities, city_keyboard, phone_request_k
         if city_text in cities:
             db.update_user_city(message.from_user.id, city_text)
             await state.clear()
+            
+            # Compact confirmation
             await message.answer(
-                get_text(lang, 'registration_complete'),
+                f"Город изменён на <b>{city_text}</b>" if lang == 'ru' else f"Shahar <b>{city_text}</b>ga o'zgartirildi",
                 parse_mode="HTML",
                 reply_markup=main_menu_customer(lang)
             )

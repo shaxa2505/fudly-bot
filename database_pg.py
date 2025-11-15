@@ -1,15 +1,16 @@
-# type: ignore
 """
 PostgreSQL Database Module for Fudly Bot
 Replaces SQLite with PostgreSQL for production deployment
 """
+from __future__ import annotations
+
 import os
-import psycopg2
-from psycopg2.extras import RealDictCursor
-from psycopg2.pool import SimpleConnectionPool
-from datetime import datetime, timedelta
-from typing import List, Optional, Tuple, Any
 from contextlib import contextmanager
+from datetime import datetime, timedelta
+from typing import Any, List, Optional, Tuple
+
+from psycopg.rows import dict_row
+from psycopg_pool import ConnectionPool
 
 # Logging
 try:
@@ -20,12 +21,15 @@ except ImportError:
 
 # Cache (optional)
 try:
-    from cache import cache
+    from cache import cache  # type: ignore[import]
 except ImportError:
     class SimpleCache:
-        def get(self, key): return None
-        def set(self, key, value, ex=None): pass
-        def delete(self, key): pass
+        def get(self, key: str) -> Any:
+            return None
+        def set(self, key: str, value: Any, ex: Optional[int] = None) -> None:
+            pass
+        def delete(self, key: str) -> None:
+            pass
     cache = SimpleCache()
 
 # Database connection configuration
@@ -61,7 +65,7 @@ def fix_railway_database_url(url: str) -> str:
     return url
 
 class Database:
-    def __init__(self, database_url: str = None):
+    def __init__(self, database_url: Optional[str] = None):
         """
         Initialize PostgreSQL database connection
         
@@ -81,10 +85,10 @@ class Database:
         
         # Initialize connection pool
         try:
-            self.pool = SimpleConnectionPool(
-                MIN_CONNECTIONS,
-                MAX_CONNECTIONS,
-                self.database_url
+            self.pool = ConnectionPool(
+                conninfo=self.database_url,
+                min_size=MIN_CONNECTIONS,
+                max_size=MAX_CONNECTIONS
             )
             logger.info(f"✅ PostgreSQL connection pool created (min={MIN_CONNECTIONS}, max={MAX_CONNECTIONS})")
         except Exception as e:
@@ -97,16 +101,14 @@ class Database:
     @contextmanager
     def get_connection(self):
         """Context manager for database connections from pool"""
-        conn = self.pool.getconn()
-        try:
-            yield conn
-            conn.commit()
-        except Exception as e:
-            conn.rollback()
-            logger.error(f"Database error: {e}")
-            raise
-        finally:
-            self.pool.putconn(conn)
+        with self.pool.connection() as conn:
+            try:
+                yield conn
+                conn.commit()
+            except Exception as e:
+                conn.rollback()
+                logger.error(f"Database error: {e}")
+                raise
     
     def init_db(self):
         """Initialize PostgreSQL database schema"""
@@ -143,6 +145,10 @@ class Database:
                     status TEXT DEFAULT 'pending',
                     rejection_reason TEXT,
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    business_type TEXT DEFAULT 'supermarket',
+                    delivery_enabled INTEGER DEFAULT 1,
+                    delivery_price INTEGER DEFAULT 15000,
+                    min_order_amount INTEGER DEFAULT 30000,
                     FOREIGN KEY (owner_id) REFERENCES users(user_id)
                 )
             ''')
@@ -383,18 +389,39 @@ class Database:
                 except:
                     pass
             
+            # Migrate stores table to add delivery fields
+            try:
+                cursor.execute("""
+                    SELECT column_name 
+                    FROM information_schema.columns 
+                    WHERE table_name='stores' AND column_name='delivery_enabled'
+                """)
+                has_delivery = cursor.fetchone() is not None
+                
+                if not has_delivery:
+                    logger.info("⚠️ Adding delivery fields to stores table...")
+                    cursor.execute("ALTER TABLE stores ADD COLUMN IF NOT EXISTS business_type TEXT DEFAULT 'supermarket'")
+                    cursor.execute("ALTER TABLE stores ADD COLUMN IF NOT EXISTS delivery_enabled INTEGER DEFAULT 1")
+                    cursor.execute("ALTER TABLE stores ADD COLUMN IF NOT EXISTS delivery_price INTEGER DEFAULT 15000")
+                    cursor.execute("ALTER TABLE stores ADD COLUMN IF NOT EXISTS min_order_amount INTEGER DEFAULT 30000")
+                    # Enable delivery for all existing stores
+                    cursor.execute("UPDATE stores SET delivery_enabled = 1 WHERE delivery_enabled IS NULL")
+                    logger.info("✅ Delivery fields added to stores table")
+            except Exception as e:
+                logger.error(f"Error adding delivery fields to stores: {e}")
+            
             conn.commit()
             logger.info("✅ PostgreSQL database schema initialized successfully")
     
     def close(self):
         """Close all connections in the pool"""
         if hasattr(self, 'pool') and self.pool:
-            self.pool.closeall()
+            self.pool.close()
             logger.info("PostgreSQL connection pool closed")
     
     # User management methods
-    def add_user(self, user_id: int, username: str = None, first_name: str = None, 
-                 phone: str = None, city: str = 'Ташкент', language: str = 'ru'):
+    def add_user(self, user_id: int, username: Optional[str] = None, first_name: Optional[str] = None,
+                 phone: Optional[str] = None, city: str = 'Ташкент', language: str = 'ru') -> None:
         """Add or update user"""
         with self.get_connection() as conn:
             cursor = conn.cursor()
@@ -410,12 +437,13 @@ class Database:
             ''', (user_id, username, first_name, phone, city, language))
             logger.info(f"User {user_id} added/updated")
     
-    def get_user(self, user_id: int):
+    def get_user(self, user_id: int) -> Optional[dict[str, Any]]:
         """Get user by ID"""
         with self.get_connection() as conn:
-            cursor = conn.cursor(cursor_factory=RealDictCursor)
+            cursor = conn.cursor(row_factory=dict_row)
             cursor.execute('SELECT * FROM users WHERE user_id = %s', (user_id,))
-            return dict(cursor.fetchone()) if cursor.rowcount > 0 else None
+            result = cursor.fetchone()
+            return dict(result) if result else None
     
     def update_user_phone(self, user_id: int, phone: str):
         """Update user phone"""
@@ -444,14 +472,14 @@ class Database:
     def get_user_stores(self, owner_id: int):
         """Return all stores belonging to an owner"""
         with self.get_connection() as conn:
-            cursor = conn.cursor(cursor_factory=RealDictCursor)
+            cursor = conn.cursor(row_factory=dict_row)
             cursor.execute('SELECT * FROM stores WHERE owner_id = %s ORDER BY created_at DESC', (owner_id,))
             return list(cursor.fetchall())
 
     def get_stores_by_city(self, city: str):
         """Return active stores for a given city (compact projection)"""
         with self.get_connection() as conn:
-            cursor = conn.cursor(cursor_factory=RealDictCursor)
+            cursor = conn.cursor(row_factory=dict_row)
             cursor.execute("""
                 SELECT store_id, name, address, category, city
                 FROM stores
@@ -460,12 +488,12 @@ class Database:
             """, (city,))
             return list(cursor.fetchall())
 
-    def get_active_offers(self, city: str = None, store_id: int = None):
+    def get_active_offers(self, city: Optional[str] = None, store_id: Optional[int] = None) -> List[dict[str, Any]]:
         """Return active offers, optionally filtered by city or store.
         Matches the flexible signature used in handlers.
         """
         with self.get_connection() as conn:
-            cursor = conn.cursor(cursor_factory=RealDictCursor)
+            cursor = conn.cursor(row_factory=dict_row)
             base = ["SELECT o.*, s.city FROM offers o JOIN stores s ON o.store_id = s.store_id WHERE o.status = 'active'"]
             params = []
             if city:
@@ -524,7 +552,7 @@ class Database:
     def get_favorites(self, user_id: int):
         """Return list of favorite stores for user"""
         with self.get_connection() as conn:
-            cursor = conn.cursor(cursor_factory=RealDictCursor)
+            cursor = conn.cursor(row_factory=dict_row)
             cursor.execute('''
                 SELECT f.store_id, s.name, s.city, s.category, s.address
                 FROM favorites f
@@ -547,7 +575,7 @@ class Database:
     def get_booking_history(self, user_id: int, limit: int = 50):
         """Return recent bookings for user"""
         with self.get_connection() as conn:
-            cursor = conn.cursor(cursor_factory=RealDictCursor)
+            cursor = conn.cursor(row_factory=dict_row)
             cursor.execute('''
                 SELECT b.*, o.title, o.discount_price
                 FROM bookings b
@@ -561,7 +589,7 @@ class Database:
     def get_platform_payment_card(self):
         """Return generic platform payment card (first settings row)"""
         with self.get_connection() as conn:
-            cursor = conn.cursor(cursor_factory=RealDictCursor)
+            cursor = conn.cursor(row_factory=dict_row)
             cursor.execute('SELECT card_number, card_holder FROM payment_settings ORDER BY created_at ASC LIMIT 1')
             row = cursor.fetchone()
             return dict(row) if row else None
@@ -581,8 +609,8 @@ class Database:
             return result and result[0] == 1
     
     # Store management methods
-    def add_store(self, owner_id: int, name: str, city: str, address: str = None,
-                  description: str = None, category: str = 'Ресторан', phone: str = None):
+    def add_store(self, owner_id: int, name: str, city: str, address: Optional[str] = None,
+                  description: Optional[str] = None, category: str = 'Ресторан', phone: Optional[str] = None) -> int:
         """Add new store"""
         with self.get_connection() as conn:
             cursor = conn.cursor()
@@ -598,14 +626,14 @@ class Database:
     def get_store_by_owner(self, owner_id: int):
         """Get store by owner ID"""
         with self.get_connection() as conn:
-            cursor = conn.cursor(cursor_factory=RealDictCursor)
+            cursor = conn.cursor(row_factory=dict_row)
             cursor.execute('SELECT * FROM stores WHERE owner_id = %s', (owner_id,))
             return dict(cursor.fetchone()) if cursor.rowcount > 0 else None
     
     def get_store(self, store_id: int):
         """Get store by ID"""
         with self.get_connection() as conn:
-            cursor = conn.cursor(cursor_factory=RealDictCursor)
+            cursor = conn.cursor(row_factory=dict_row)
             cursor.execute('SELECT * FROM stores WHERE store_id = %s', (store_id,))
             return dict(cursor.fetchone()) if cursor.rowcount > 0 else None
     
@@ -621,7 +649,7 @@ class Database:
     def get_approved_stores(self, city: str = None):
         """Get approved stores, optionally filtered by city"""
         with self.get_connection() as conn:
-            cursor = conn.cursor(cursor_factory=RealDictCursor)
+            cursor = conn.cursor(row_factory=dict_row)
             if city:
                 cursor.execute('SELECT * FROM stores WHERE status = %s AND city = %s', 
                              ('approved', city))
@@ -654,14 +682,14 @@ class Database:
     def get_offer(self, offer_id: int):
         """Get offer by ID"""
         with self.get_connection() as conn:
-            cursor = conn.cursor(cursor_factory=RealDictCursor)
+            cursor = conn.cursor(row_factory=dict_row)
             cursor.execute('SELECT * FROM offers WHERE offer_id = %s', (offer_id,))
             return dict(cursor.fetchone()) if cursor.rowcount > 0 else None
     
     def get_store_offers(self, store_id: int, status: str = 'active'):
         """Get all offers for a store"""
         with self.get_connection() as conn:
-            cursor = conn.cursor(cursor_factory=RealDictCursor)
+            cursor = conn.cursor(row_factory=dict_row)
             cursor.execute('SELECT * FROM offers WHERE store_id = %s AND status = %s', 
                          (store_id, status))
             return [dict(row) for row in cursor.fetchall()]
@@ -669,7 +697,7 @@ class Database:
     def get_active_offers(self, city: str = None):
         """Get all active offers, optionally filtered by city"""
         with self.get_connection() as conn:
-            cursor = conn.cursor(cursor_factory=RealDictCursor)
+            cursor = conn.cursor(row_factory=dict_row)
             if city:
                 cursor.execute('''
                     SELECT o.* FROM offers o
@@ -699,7 +727,7 @@ class Database:
         Sorted by: discount_percent DESC, expiry_date ASC
         """
         with self.get_connection() as conn:
-            cursor = conn.cursor(cursor_factory=RealDictCursor)
+            cursor = conn.cursor(row_factory=dict_row)
             
             query = '''
                 SELECT o.*, s.name as store_name, s.address, s.city, s.category,
@@ -771,7 +799,7 @@ class Database:
     def get_user_stores(self, owner_id: int):
         """Get ALL stores for user (any status)"""
         with self.get_connection() as conn:
-            cursor = conn.cursor(cursor_factory=RealDictCursor)
+            cursor = conn.cursor(row_factory=dict_row)
             cursor.execute('''
                 SELECT s.*, u.first_name, u.username 
                 FROM stores s
@@ -784,7 +812,7 @@ class Database:
     def get_offers_by_store(self, store_id: int):
         """Get active offers for store"""
         with self.get_connection() as conn:
-            cursor = conn.cursor(cursor_factory=RealDictCursor)
+            cursor = conn.cursor(row_factory=dict_row)
             cursor.execute('''
                 SELECT o.*, s.name, s.address, s.city, s.category
                 FROM offers o
@@ -797,7 +825,7 @@ class Database:
     def get_top_offers_by_city(self, city: str, limit: int = 10):
         """Get top offers in city (by discount)"""
         with self.get_connection() as conn:
-            cursor = conn.cursor(cursor_factory=RealDictCursor)
+            cursor = conn.cursor(row_factory=dict_row)
             cursor.execute('''
                 SELECT o.*, s.name, s.address, s.city, s.category,
                        CAST((o.original_price - o.discount_price)::float / o.original_price * 100 AS INTEGER) as discount_percent
@@ -885,7 +913,7 @@ class Database:
     def get_booking(self, booking_id: int):
         """Get booking by ID"""
         with self.get_connection() as conn:
-            cursor = conn.cursor(cursor_factory=RealDictCursor)
+            cursor = conn.cursor(row_factory=dict_row)
             cursor.execute('''
                 SELECT booking_id, offer_id, user_id, status, booking_code, 
                        pickup_time, COALESCE(quantity, 1) as quantity, created_at 
@@ -898,7 +926,7 @@ class Database:
     def get_booking_by_code(self, booking_code: str):
         """Get booking by code"""
         with self.get_connection() as conn:
-            cursor = conn.cursor(cursor_factory=RealDictCursor)
+            cursor = conn.cursor(row_factory=dict_row)
             cursor.execute('''
                 SELECT b.booking_id, b.offer_id, b.user_id, b.status, b.booking_code,
                        b.pickup_time, COALESCE(b.quantity, 1) as quantity, b.created_at,
@@ -913,7 +941,7 @@ class Database:
     def get_store_bookings(self, store_id: int):
         """Get all bookings for store"""
         with self.get_connection() as conn:
-            cursor = conn.cursor(cursor_factory=RealDictCursor)
+            cursor = conn.cursor(row_factory=dict_row)
             cursor.execute('''
                 SELECT b.*, o.title, u.first_name, u.username, u.phone
                 FROM bookings b
@@ -1003,7 +1031,7 @@ class Database:
     def get_pending_stores(self):
         """Get all pending stores"""
         with self.get_connection() as conn:
-            cursor = conn.cursor(cursor_factory=RealDictCursor)
+            cursor = conn.cursor(row_factory=dict_row)
             cursor.execute('''
                 SELECT s.*, u.first_name, u.username
                 FROM stores s
@@ -1031,14 +1059,14 @@ class Database:
     def get_stores_by_city(self, city: str):
         """Get all active stores in city"""
         with self.get_connection() as conn:
-            cursor = conn.cursor(cursor_factory=RealDictCursor)
+            cursor = conn.cursor(row_factory=dict_row)
             cursor.execute('SELECT * FROM stores WHERE city = %s AND status = %s', (city, 'active'))
             return [dict(row) for row in cursor.fetchall()]
     
     def get_stores_by_business_type(self, business_type: str, city: str = None):
         """Get stores by business type (using category field) with active offers count"""
         with self.get_connection() as conn:
-            cursor = conn.cursor(cursor_factory=RealDictCursor)
+            cursor = conn.cursor(row_factory=dict_row)
             
             query = '''
                 SELECT s.*, 
@@ -1068,7 +1096,7 @@ class Database:
     def get_all_users(self):
         """Get all users with notifications enabled"""
         with self.get_connection() as conn:
-            cursor = conn.cursor(cursor_factory=RealDictCursor)
+            cursor = conn.cursor(row_factory=dict_row)
             cursor.execute('SELECT * FROM users WHERE notifications_enabled = 1')
             return [dict(row) for row in cursor.fetchall()]
     
@@ -1095,7 +1123,7 @@ class Database:
     def get_platform_payment_card(self):
         """Get platform payment card"""
         with self.get_connection() as conn:
-            cursor = conn.cursor(cursor_factory=RealDictCursor)
+            cursor = conn.cursor(row_factory=dict_row)
             cursor.execute('SELECT * FROM payment_settings LIMIT 1')
             result = cursor.fetchone()
             return dict(result) if result else None
@@ -1133,7 +1161,7 @@ class Database:
     def get_booking_history(self, user_id: int):
         """Get user booking history"""
         with self.get_connection() as conn:
-            cursor = conn.cursor(cursor_factory=RealDictCursor)
+            cursor = conn.cursor(row_factory=dict_row)
             cursor.execute('''
                 SELECT b.*, o.title, s.name as store_name
                 FROM bookings b
@@ -1205,7 +1233,7 @@ class Database:
     def increment_offer_quantity(self, offer_id: int, amount: int = 1):
         """Увеличить количество товара (при отмене бронирования)"""
         with self.get_connection() as conn:
-            cursor = conn.cursor(cursor_factory=RealDictCursor)
+            cursor = conn.cursor(row_factory=dict_row)
             # Получаем текущее количество
             cursor.execute('SELECT quantity FROM offers WHERE offer_id = %s', (offer_id,))
             row = cursor.fetchone()
@@ -1247,7 +1275,7 @@ class Database:
     def get_store_ratings(self, store_id: int) -> List[dict]:
         """Получить все рейтинги магазина"""
         with self.get_connection() as conn:
-            cursor = conn.cursor(cursor_factory=RealDictCursor)
+            cursor = conn.cursor(row_factory=dict_row)
             cursor.execute('''
                 SELECT r.*, u.first_name, u.username
                 FROM ratings r
@@ -1309,7 +1337,7 @@ class Database:
     def get_stores_by_category(self, category: str, city: str = None) -> List[dict]:
         """Получить магазины по категории и опционально по городу"""
         with self.get_connection() as conn:
-            cursor = conn.cursor(cursor_factory=RealDictCursor)
+            cursor = conn.cursor(row_factory=dict_row)
             if city:
                 cursor.execute('''
                     SELECT * 
@@ -1329,7 +1357,7 @@ class Database:
     def get_offers_by_city_and_category(self, city: str, category: str, limit: int = 20) -> List[dict]:
         """Получить предложения в городе по категории магазина"""
         with self.get_connection() as conn:
-            cursor = conn.cursor(cursor_factory=RealDictCursor)
+            cursor = conn.cursor(row_factory=dict_row)
             cursor.execute('''
                 SELECT o.*, s.name as store_name, s.address, s.city, s.category,
                        CAST((o.original_price - o.discount_price) AS NUMERIC) / o.original_price * 100 as discount_percent
@@ -1360,7 +1388,7 @@ class Database:
     def get_top_stores_by_city(self, city: str, limit: int = 10) -> List[dict]:
         """Получить топ магазины по рейтингу в городе"""
         with self.get_connection() as conn:
-            cursor = conn.cursor(cursor_factory=RealDictCursor)
+            cursor = conn.cursor(row_factory=dict_row)
             cursor.execute('''
                 SELECT s.*, 
                        COALESCE(AVG(r.rating), 0) as avg_rating,
@@ -1379,7 +1407,7 @@ class Database:
     def get_favorites(self, user_id: int) -> List[dict]:
         """Получить избранные магазины пользователя"""
         with self.get_connection() as conn:
-            cursor = conn.cursor(cursor_factory=RealDictCursor)
+            cursor = conn.cursor(row_factory=dict_row)
             cursor.execute('''
                 SELECT s.* FROM stores s
                 JOIN favorites f ON s.store_id = f.store_id
@@ -1540,7 +1568,7 @@ class Database:
     def get_order(self, order_id: int):
         """Get order by ID"""
         with self.get_connection() as conn:
-            cursor = conn.cursor(cursor_factory=RealDictCursor)
+            cursor = conn.cursor(row_factory=dict_row)
             cursor.execute('SELECT * FROM orders WHERE order_id = %s', (order_id,))
             return dict(cursor.fetchone()) if cursor.rowcount > 0 else None
     
@@ -1584,7 +1612,7 @@ class Database:
     def get_user_orders(self, user_id: int):
         """Get all orders for a user"""
         with self.get_connection() as conn:
-            cursor = conn.cursor(cursor_factory=RealDictCursor)
+            cursor = conn.cursor(row_factory=dict_row)
             cursor.execute('SELECT * FROM orders WHERE user_id = %s ORDER BY created_at DESC', 
                          (user_id,))
             return [dict(row) for row in cursor.fetchall()]
@@ -1592,7 +1620,7 @@ class Database:
     def get_store_orders(self, store_id: int):
         """Get all orders for a store"""
         with self.get_connection() as conn:
-            cursor = conn.cursor(cursor_factory=RealDictCursor)
+            cursor = conn.cursor(row_factory=dict_row)
             cursor.execute('SELECT * FROM orders WHERE store_id = %s ORDER BY created_at DESC', 
                          (store_id,))
             return [dict(row) for row in cursor.fetchall()]
@@ -1617,7 +1645,7 @@ class Database:
     def get_payment_card(self, store_id: int):
         """Get payment card for store"""
         with self.get_connection() as conn:
-            cursor = conn.cursor(cursor_factory=RealDictCursor)
+            cursor = conn.cursor(row_factory=dict_row)
             cursor.execute('SELECT * FROM payment_settings WHERE store_id = %s', (store_id,))
             return dict(cursor.fetchone()) if cursor.rowcount > 0 else None
     
@@ -1636,7 +1664,7 @@ class Database:
     def get_user_bookings(self, user_id: int):
         """Get user bookings"""
         with self.get_connection() as conn:
-            cursor = conn.cursor(cursor_factory=RealDictCursor)
+            cursor = conn.cursor(row_factory=dict_row)
             cursor.execute('SELECT * FROM bookings WHERE user_id = %s AND status = %s', 
                          (user_id, 'active'))
             return [dict(row) for row in cursor.fetchall()]
@@ -1661,7 +1689,7 @@ class Database:
     def get_user_notifications(self, user_id: int, unread_only: bool = False):
         """Get user notifications"""
         with self.get_connection() as conn:
-            cursor = conn.cursor(cursor_factory=RealDictCursor)
+            cursor = conn.cursor(row_factory=dict_row)
             if unread_only:
                 cursor.execute('''
                     SELECT * FROM notifications 
@@ -1720,3 +1748,4 @@ class Database:
             cursor = conn.cursor()
             cursor.execute('SELECT COUNT(*) FROM orders')
             return cursor.fetchone()[0]
+

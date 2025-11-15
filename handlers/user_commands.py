@@ -138,7 +138,7 @@ def setup(
         user_city = user.get('city')
         user_role = user.get('role', 'customer')
         
-        # Check phone
+        # Check phone (city will be set automatically with phone)
         if not user_phone:
             await message.answer(
                 get_text(lang, 'welcome_phone_step'),
@@ -148,20 +148,10 @@ def setup(
             await state.set_state(Registration.phone)
             return
         
-        # Check city
-        if not user_city:
-            await message.answer(
-                get_text(lang, 'welcome_city_step'),
-                parse_mode="HTML",
-                reply_markup=city_keyboard(lang, allow_cancel=False)
-            )
-            await state.set_state(Registration.city)
-            return
-        
         # Welcome message
         menu = main_menu_seller(lang) if user_role == "seller" else main_menu_customer(lang)
         await message.answer(
-            get_text(lang, 'welcome_back', name=message.from_user.first_name, city=user_city),  # type: ignore[union-attr]
+            get_text(lang, 'welcome_back', name=message.from_user.first_name, city=user_city or 'Ташкент'),  # type: ignore[union-attr]
             parse_mode="HTML",
             reply_markup=menu
         )
@@ -195,7 +185,7 @@ def setup(
         user_phone = user.get('phone')
         user_city = user.get('city')
         
-        # If no phone - request it
+        # If no phone - request it (city will be set automatically)
         if not user_phone:
             await callback.message.answer(
                 get_text(lang, 'welcome_phone_step'),
@@ -205,21 +195,11 @@ def setup(
             await state.set_state(Registration.phone)
             return
         
-        # If no city - request it
-        if not user_city:
-            await callback.message.answer(
-                get_text(lang, 'choose_city'),
-                parse_mode="HTML",
-                reply_markup=city_keyboard(lang, allow_cancel=False)
-            )
-            await state.set_state(Registration.city)
-            return
-        
         # Show main menu
         user_role = user.get('role', 'customer') if user else 'customer'
         menu = main_menu_seller(lang) if user_role == "seller" else main_menu_customer(lang)
         await callback.message.answer(
-            get_text(lang, 'welcome_back', name=callback.from_user.first_name, city=user_city),
+            get_text(lang, 'welcome_back', name=callback.from_user.first_name, city=user_city or 'Ташкент'),
             parse_mode="HTML",
             reply_markup=menu
         )

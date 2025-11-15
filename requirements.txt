@@ -18,11 +18,12 @@ pytest-cov>=4.1.0
 pytest-asyncio>=0.21.0
 
 # PostgreSQL database (Railway)
-psycopg2-binary>=2.9.9
+psycopg[binary]>=3.2
+psycopg-pool>=3.2
 
 # Production Features (optional - graceful fallback if not installed)
 # Uncomment if needed:
-# redis>=4.5.0                   # For Redis caching
+redis>=5.0.0                     # For Redis caching (enabled - Phase 3)
 python-json-logger>=2.0.0        # For structured logging (enabled)
 # Pillow>=10.0.0                 # For image processing
 # sentry-sdk>=1.40.0             # For error tracking

@@ -1,0 +1,216 @@
+"""Seller analytics handlers."""
+from __future__ import annotations
+
+from datetime import datetime
+from typing import Any
+
+from aiogram import F, Router, types
+from aiogram.utils.keyboard import InlineKeyboardBuilder
+
+from database_protocol import DatabaseProtocol
+from localization import get_text
+from logging_config import logger
+
+# Module-level dependencies
+db: DatabaseProtocol | None = None
+bot: Any | None = None
+
+router = Router()
+
+
+def setup_dependencies(database: DatabaseProtocol, bot_instance: Any) -> None:
+    """Setup module dependencies."""
+    global db, bot
+    db = database
+    bot = bot_instance
+
+
+def get_user_field(user: Any, field: str, default: Any = None) -> Any:
+    """Extract field from user tuple/dict."""
+    if isinstance(user, dict):
+        return user.get(field, default)
+    field_map = {
+        "user_id": 0,
+        "username": 1,
+        "first_name": 2,
+        "phone": 3,
+        "city": 4,
+        "language": 5,
+        "role": 6,
+    }
+    idx = field_map.get(field)
+    if idx is not None and isinstance(user, (tuple, list)) and idx < len(user):
+        return user[idx]
+    return default
+
+
+def get_store_field(store: Any, field: str, default: Any = None) -> Any:
+    """Extract field from store tuple/dict."""
+    if isinstance(store, dict):
+        return store.get(field, default)
+    field_map = {
+        "store_id": 0,
+        "user_id": 1,
+        "name": 2,
+        "category": 3,
+        "status": 4,
+    }
+    idx = field_map.get(field)
+    if idx is not None and isinstance(store, (tuple, list)) and idx < len(store):
+        return store[idx]
+    return default
+
+
+@router.message(F.text.in_(["📊 Аналитика", "📊 Analitika"]))
+async def show_analytics(message: types.Message) -> None:
+    """Show analytics menu for seller."""
+    if not db:
+        await message.answer("System error")
+        return
+
+    lang = db.get_user_language(message.from_user.id)
+    user = db.get_user(message.from_user.id)
+
+    if get_user_field(user, "role", "customer") != "seller":
+        await message.answer(get_text(lang, "not_seller"))
+        return
+
+    stores = db.get_user_stores(message.from_user.id)
+
+    if not stores:
+        await message.answer(get_text(lang, "no_stores"))
+        return
+
+    keyboard = InlineKeyboardBuilder()
+    for store in stores:
+        keyboard.button(text=f"📊 {store[2]}", callback_data=f"analytics_{store[0]}")
+    keyboard.adjust(1)
+
+    await message.answer(
+        get_text(lang, "select_store_for_analytics"), reply_markup=keyboard.as_markup()
+    )
+
+
+@router.callback_query(F.data.startswith("analytics_"))
+async def show_store_analytics(callback: types.CallbackQuery) -> None:
+    """Show detailed store analytics."""
+    if not db:
+        await callback.answer("System error")
+        return
+
+    store_id = int(callback.data.split("_")[1])
+    lang = db.get_user_language(callback.from_user.id)
+
+    analytics = db.get_store_analytics(store_id)
+    store = db.get_store(store_id)
+
+    text = f"📊 <b>Аналитика магазина {store[2]}</b>\n\n"
+
+    text += "📈 <b>ОБЩАЯ СТАТИСТИКА</b>\n"
+    text += f"📦 Всего бронирований: {analytics['total_bookings']}\n"
+    text += f"✅ Выдано: {analytics['completed']}\n"
+    text += f"❌ Отменено: {analytics['cancelled']}\n"
+    text += f"💰 Конверсия: {analytics['conversion_rate']:.1f}%\n\n"
+
+    if analytics.get("days_of_week"):
+        text += "📅 <b>ПО ДНЯМ НЕДЕЛИ</b>\n"
+        days_ru = ["Вс", "Пн", "Вт", "Ср", "Чт", "Пт", "Сб"]
+        for day, count in analytics["days_of_week"].items():
+            text += f"{days_ru[day]}: {count} бронирований\n"
+        text += "\n"
+
+    if analytics.get("popular_categories"):
+        text += "🏷 <b>ПОПУЛЯРНЫЕ КАТЕГОРИИ</b>\n"
+        for cat, count in analytics["popular_categories"][:5]:
+            text += f"{cat}: {count} бронирований\n"
+        text += "\n"
+
+    if analytics.get("avg_rating"):
+        text += "⭐ <b>СРЕДНИЙ РЕЙТИНГ</b>\n"
+        text += f"{analytics['avg_rating']:.1f}/5 ({analytics['rating_count']} отзывов)\n"
+
+    await callback.message.answer(text, parse_mode="HTML")
+    await callback.answer()
+
+
+@router.message(F.text.contains("Сегодня") | F.text.contains("Bugun"))
+async def partner_today_stats(message: types.Message) -> None:
+    """Компактная статистика партнёра за сегодня"""
+    if not db:
+        await message.answer("System error")
+        return
+    
+    lang = db.get_user_language(message.from_user.id)
+    user = db.get_user(message.from_user.id)
+    
+    # Проверяем, что это партнёр
+    if not user or (get_user_field(user, 'role', 'customer') != 'seller'):
+        await message.answer(get_text(lang, 'access_denied'))
+        return
+    
+    stores = db.get_user_stores(message.from_user.id)
+    if not stores:
+        await message.answer(get_text(lang, 'no_stores'))
+        return
+    
+    with db.get_connection() as conn:
+        cursor = conn.cursor()
+        
+        # Собираем ID всех магазинов партнёра
+        store_ids = [get_store_field(store, 'store_id') for store in stores]
+        placeholders = ','.join('?' * len(store_ids))
+        
+        # Статистика за сегодня
+        today = datetime.now().strftime('%Y-%m-%d')
+        
+        # Заказы за сегодня
+        cursor.execute(f'''
+            SELECT COUNT(*), SUM(b.quantity), SUM(o.discount_price * b.quantity)
+            FROM bookings b
+            JOIN offers o ON b.offer_id = o.offer_id
+            WHERE o.store_id IN ({placeholders})
+            AND DATE(b.created_at) = ?
+            AND b.status != 'cancelled'
+        ''', (*store_ids, today))
+        
+        orders_count, items_sold, revenue = cursor.fetchone()
+        orders_count = orders_count or 0
+        items_sold = int(items_sold or 0)
+        revenue = int(revenue or 0)
+        
+        # Активные товары
+        cursor.execute(f'''
+            SELECT COUNT(*)
+            FROM offers
+            WHERE store_id IN ({placeholders})
+            AND status = 'active'
+        ''', store_ids)
+        active_offers = cursor.fetchone()[0]
+        
+        # ТОП товар
+        cursor.execute(f'''
+            SELECT o.title, COUNT(*) as cnt
+            FROM bookings b
+            JOIN offers o ON b.offer_id = o.offer_id
+            WHERE o.store_id IN ({placeholders})
+            AND DATE(b.created_at) = ?
+            AND b.status != 'cancelled'
+            GROUP BY o.title
+            ORDER BY cnt DESC
+            LIMIT 1
+        ''', (*store_ids, today))
+        
+        top_item = cursor.fetchone()
+        top_item_text = f"\n🏆 ТОП товар: {top_item[0]} ({top_item[1]} заказов)" if top_item else ""
+    
+    text = f"""📊 <b>СТАТИСТИКА СЕГОДНЯ</b>
+
+💰 Выручка: {revenue:,} сум
+📦 Товаров продано: {items_sold} шт
+🛒 Заказов: {orders_count}
+📋 Активных товаров: {active_offers}{top_item_text}
+
+Обновлено: {datetime.now().strftime('%H:%M')}
+"""
+    
+    await message.answer(text, parse_mode="HTML")

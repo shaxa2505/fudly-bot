@@ -1,14 +1,46 @@
 """
 Common utilities, state classes, and middleware
 """
-from aiogram.fsm.state import State, StatesGroup
 from aiogram import BaseMiddleware
-from typing import Callable, Dict, Any, Awaitable
-from database_protocol import DatabaseProtocol
-from datetime import timezone, timedelta, datetime
+from datetime import datetime, timedelta, timezone
+from typing import Any, Awaitable, Callable, Dict
 import logging
 
+from database_protocol import DatabaseProtocol
+from handlers.common_states.states import (
+    BookOffer,
+    BrowseOffers,
+    BulkCreate,
+    ChangeCity,
+    ConfirmOrder,
+    CreateOffer,
+    EditOffer,
+    OrderDelivery,
+    Registration,
+    RegisterStore,
+)
+
 logger = logging.getLogger('fudly')
+
+# Export states for backward compatibility
+__all__ = [
+    "Registration",
+    "RegisterStore",
+    "CreateOffer",
+    "BulkCreate",
+    "ChangeCity",
+    "EditOffer",
+    "ConfirmOrder",
+    "BookOffer",
+    "BrowseOffers",
+    "OrderDelivery",
+    "user_view_mode",
+    "normalize_city",
+    "get_uzb_time",
+    "has_approved_store",
+    "get_appropriate_menu",
+    "RegistrationCheckMiddleware",
+]
 
 # In-memory per-session view mode override: {'seller'|'customer'}
 user_view_mode = {}
@@ -74,85 +106,6 @@ def get_appropriate_menu(
             return main_menu_customer(lang)
     
     return main_menu_customer(lang)
-
-
-# ============== FSM STATES ==============
-
-class Registration(StatesGroup):
-    phone = State()
-    city = State()
-
-class RegisterStore(StatesGroup):
-    city = State()
-    category = State()
-    name = State()
-    address = State()
-    description = State()
-    phone = State()
-
-class CreateOffer(StatesGroup):
-    store = State()
-    title = State()
-    photo = State()
-    original_price = State()
-    discount_price = State()
-    quantity = State()
-    unit = State()
-    category = State()
-    available_from = State()
-    expiry_date = State()
-    available_until = State()
-
-class BulkCreate(StatesGroup):
-    store = State()
-    count = State()
-    titles = State()
-    description = State()
-    photos = State()
-    photo = State()
-    original_prices = State()
-    original_price = State()
-    discount_prices = State()
-    discount_price = State()
-    quantities = State()
-    quantity = State()
-    available_from = State()
-    available_untils = State()
-    available_until = State()
-    categories = State()
-    units = State()
-
-class ChangeCity(StatesGroup):
-    new_city = State()
-    city = State()
-
-class EditOffer(StatesGroup):
-    offer_id = State()
-    field = State()
-    value = State()
-    available_from = State()
-    available_until = State()
-
-class ConfirmOrder(StatesGroup):
-    offer_id = State()
-    booking_code = State()
-
-class BookOffer(StatesGroup):
-    quantity = State()
-
-class BrowseOffers(StatesGroup):
-    """State for browsing numbered offer lists"""
-    offer_list = State()  # Stores current list of offers
-    store_list = State()  # Stores current list of stores (for "Места")
-    business_type = State()  # Current business type filter
-
-class OrderDelivery(StatesGroup):
-    """State for ordering with delivery"""
-    offer_id = State()  # ID товара
-    quantity = State()  # Количество
-    address = State()  # Адрес доставки
-    payment_method = State()  # Способ оплаты
-    payment_proof = State()  # Скриншот оплаты
 
 
 # ============== MIDDLEWARE: REGISTRATION CHECK ==============

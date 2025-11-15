@@ -1,30 +1,33 @@
-# type: ignore
-import sqlite3
+"""SQLite Database implementation for Fudly Bot."""
+from __future__ import annotations
+
 import os
+import sqlite3
 from datetime import datetime, timedelta
-from typing import List, Optional, Tuple
+from typing import Any, List, Optional, Tuple
 
 # Простое логирование (fallback если нет logging_config)
 try:
     from logging_config import logger
 except ImportError:
     import logging
+
     logger = logging.getLogger(__name__)
 
 # Импорт кэша
 try:
-    from cache import cache
+    from cache import cache  # type: ignore[import]
 except ImportError:
     # Простой кэш-заглушка (для совместимости)
     class SimpleCache:
         """Простая заглушка кэша без зависимостей"""
-        def get(self, key):
+        def get(self, key: str) -> Any:
             return None
         
-        def set(self, key, value, ex=None):
+        def set(self, key: str, value: Any, ex: Optional[int] = None) -> None:
             pass
         
-        def delete(self, key):
+        def delete(self, key: str) -> None:
             pass
     
     cache = SimpleCache()
@@ -371,7 +374,7 @@ class Database:
                 pass
     
     # Методы для пользователей
-    def add_user(self, user_id: int, username: Optional[str] = None, first_name: Optional[str] = None, role: str = 'customer', city: str = None):
+    def add_user(self, user_id: int, username: Optional[str] = None, first_name: Optional[str] = None, role: str = 'customer', city: Optional[str] = None) -> None:
         conn = self.get_connection()
         cursor = conn.cursor()
         cursor.execute('''
@@ -388,7 +391,7 @@ class Database:
         except Exception:
             pass
     
-    def get_user(self, user_id: int) -> Optional[dict]:
+    def get_user(self, user_id: int) -> Optional[dict[str, Any]]:
         """Return user as dict (unified with PostgreSQL)."""
         conn = self.get_connection()
         try:
@@ -485,7 +488,7 @@ class Database:
             pass
         return store_id
     
-    def get_user_stores(self, owner_id: int) -> List[dict]:
+    def get_user_stores(self, owner_id: int) -> List[dict[str, Any]]:
         """Return all user stores as list of dicts (unified with PostgreSQL)."""
         conn = self.get_connection()
         cursor = conn.cursor()
@@ -498,7 +501,7 @@ class Database:
             columns.extend(['business_type', 'delivery_enabled', 'delivery_price', 'min_order_amount'])
         return [dict(zip(columns[:len(row)], row)) for row in rows]
     
-    def get_approved_stores(self, owner_id: int) -> List[dict]:
+    def get_approved_stores(self, owner_id: int) -> List[dict[str, Any]]:
         """Return only approved stores as list of dicts."""
         conn = self.get_connection()
         try:
@@ -516,7 +519,7 @@ class Database:
             except Exception:
                 pass
     
-    def get_store(self, store_id: int) -> Optional[dict]:
+    def get_store(self, store_id: int) -> Optional[dict[str, Any]]:
         key = f'store:{store_id}'
         try:
             cached = cache.get(key)
@@ -549,7 +552,7 @@ class Database:
 
         return store
     
-    def get_stores_by_city(self, city: str) -> List[dict]:
+    def get_stores_by_city(self, city: str) -> List[dict[str, Any]]:
         key = f'stores:city:{city}'
         try:
             cached = cache.get(key)
@@ -667,7 +670,7 @@ class Database:
             pass
         return offer_id
     
-    def get_active_offers(self, city: str = None, store_id: int = None) -> List[dict]:
+    def get_active_offers(self, city: Optional[str] = None, store_id: Optional[int] = None) -> List[dict[str, Any]]:
         # Cache keys: offers:all, offers:city:<city>, offers:store:<id>
         cache_key = 'offers:all'
         if store_id:
