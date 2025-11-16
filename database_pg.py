@@ -1348,6 +1348,7 @@ class Database:
                 AND expiry_date IS NOT NULL
                 AND expiry_date::date < CURRENT_DATE
             ''')
+            return cursor.rowcount  # Return number of updated rows
     
     # ============== RATING METHODS ==============
     
