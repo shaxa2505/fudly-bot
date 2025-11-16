@@ -83,7 +83,7 @@ def setup(
             if callback.from_user.id not in common_user.user_view_mode:
                 common_user.user_view_mode[callback.from_user.id] = 'seller'
         
-        menu = main_menu_seller(lang) if user_role == "seller" else main_menu_customer(lang, show_seller_switch=False)
+        menu = main_menu_seller(lang) if user_role == "seller" else main_menu_customer(lang)
         
         await callback.message.delete()  # type: ignore[union-attr]
         await callback.message.answer(  # type: ignore[union-attr]
@@ -114,7 +114,7 @@ def setup(
         
         # Get updated main menu
         user_role = user.role or 'customer' if user else 'customer'
-        menu = main_menu_seller(lang) if user_role == "seller" else main_menu_customer(lang, show_seller_switch=False)
+        menu = main_menu_seller(lang) if user_role == "seller" else main_menu_customer(lang)
         
         await message.answer(
             f"✅ {get_text(lang, 'city_changed', city=new_city)}\n\n"
@@ -166,7 +166,7 @@ def setup(
             common_user.user_view_mode[message.from_user.id] = 'seller'
         
         # Welcome message
-        menu = main_menu_seller(lang) if user_role == "seller" else main_menu_customer(lang, show_seller_switch=False)
+        menu = main_menu_seller(lang) if user_role == "seller" else main_menu_customer(lang)
         await message.answer(
             get_text(lang, 'welcome_back', name=message.from_user.first_name, city=user_city or 'Ташкент'),  # type: ignore[union-attr]
             parse_mode="HTML",
@@ -214,7 +214,7 @@ def setup(
         
         # Show main menu
         user_role = user.role or 'customer' if user else 'customer'
-        menu = main_menu_seller(lang) if user_role == "seller" else main_menu_customer(lang, show_seller_switch=False)
+        menu = main_menu_seller(lang) if user_role == "seller" else main_menu_customer(lang)
         await callback.message.answer(
             get_text(lang, 'welcome_back', name=callback.from_user.first_name, city=user_city or 'Ташкент'),
             parse_mode="HTML",

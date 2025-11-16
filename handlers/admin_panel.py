@@ -139,7 +139,7 @@ def setup(dp_or_router, db, get_text, admin_menu):
         
         # Return to appropriate main menu based on user role
         user_role = user.role if user else 'customer'
-        menu = main_menu_seller(lang) if user_role == "seller" else main_menu_customer(lang, show_seller_switch=False)
+        menu = main_menu_seller(lang) if user_role == "seller" else main_menu_customer(lang)
         
         await message.answer(
             "👋 Выход из админ-панели",
