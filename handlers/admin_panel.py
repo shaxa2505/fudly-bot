@@ -69,24 +69,25 @@ def setup(dp_or_router, db, get_text, admin_menu):
             cursor.execute("SELECT COUNT(*) FROM bookings WHERE status = 'pending'")
             pending_bookings = cursor.fetchone()[0]
             
-            # Today's statistics (Uzbek time)
-            today = get_uzb_time().strftime('%Y-%m-%d')
+            # Today's statistics
+            from datetime import datetime
+            today = datetime.now().strftime('%Y-%m-%d')
             
-            cursor.execute('SELECT COUNT(*) FROM bookings WHERE DATE(created_at) = ?', (today,))
+            cursor.execute('SELECT COUNT(*) FROM bookings WHERE DATE(created_at) = %s', (today,))
             today_bookings = cursor.fetchone()[0]
             
             cursor.execute('''
                 SELECT SUM(o.discount_price * b.quantity)
                 FROM bookings b
                 JOIN offers o ON b.offer_id = o.offer_id
-                WHERE DATE(b.created_at) = ? AND b.status != 'cancelled'
-            ''', (today,))
+                WHERE DATE(b.created_at) = %s AND b.status != %s
+            ''', (today, 'cancelled'))
             today_revenue = cursor.fetchone()[0] or 0
             
             # New users today
             cursor.execute('''
                 SELECT COUNT(*) FROM users 
-                WHERE DATE(created_at) = ?
+                WHERE DATE(created_at) = %s
             ''', (today,))
             today_users = cursor.fetchone()[0]
         
