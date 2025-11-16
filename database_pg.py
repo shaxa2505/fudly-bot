@@ -1706,12 +1706,16 @@ class Database:
                          (user_id,))
             return [dict(row) for row in cursor.fetchall()]
     
-    def get_store_orders(self, store_id: int):
-        """Get all orders for a store"""
+    def get_store_orders(self, store_id: int, status: str = None):
+        """Get all orders for a store, optionally filtered by status"""
         with self.get_connection() as conn:
             cursor = conn.cursor(row_factory=dict_row)
-            cursor.execute('SELECT * FROM orders WHERE store_id = %s ORDER BY created_at DESC', 
-                         (store_id,))
+            if status:
+                cursor.execute('SELECT * FROM orders WHERE store_id = %s AND order_status = %s ORDER BY created_at DESC', 
+                             (store_id, status))
+            else:
+                cursor.execute('SELECT * FROM orders WHERE store_id = %s ORDER BY created_at DESC', 
+                             (store_id,))
             return [dict(row) for row in cursor.fetchall()]
     
     # Payment settings methods
