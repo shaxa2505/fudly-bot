@@ -468,6 +468,28 @@ class Database:
         user = self.get_user(user_id)
         return user['language'] if user else 'ru'
 
+    def get_user_model(self, user_id: int) -> Optional['User']:
+        """Return user as Pydantic model (NEW - type-safe).
+        
+        Returns:
+            User model or None if not found
+        """
+        try:
+            from app.domain import User
+        except ImportError:
+            logger.error("Domain models not available. Install pydantic.")
+            return None
+        
+        user_dict = self.get_user(user_id)
+        if not user_dict:
+            return None
+        
+        try:
+            return User.from_db_row(user_dict)
+        except Exception as e:
+            logger.error(f"Failed to convert user {user_id} to model: {e}")
+            return None
+
     # ===================== ADDITIONAL / PORTED METHODS (from SQLite) =====================
     def get_user_stores(self, owner_id: int):
         """Return all stores belonging to an owner"""
