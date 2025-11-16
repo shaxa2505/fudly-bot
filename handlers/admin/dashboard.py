@@ -131,21 +131,31 @@ async def admin_moderation_callback(callback: types.CallbackQuery):
     await bot.send_message(callback.message.chat.id, get_text(lang, 'pending_stores_count', count=len(pending)))
     
     for store in pending:
-        # Store tuple structure: store_id(0), owner_id(1), name(2), city(3), address(4), 
-        # description(5), category(6), phone(7), status(8), rejection_reason(9), 
-        # created_at(10), business_type(11), delivery_enabled(12), delivery_price(13), 
-        # min_order_amount(14), first_name(15), username(16)
-        
-        store_id = store[0]
-        name = store[2]
-        city = store[3]
-        address = store[4] or "не указан"
-        description = store[5] or "нет описания"
-        category = store[6]
-        phone = store[7] or "не указан"
-        created_at = store[10]
-        first_name = store[15] if len(store) > 15 else "Неизвестно"
-        username = store[16] if len(store) > 16 else None
+        # PostgreSQL returns dicts, SQLite returns tuples
+        # Support both formats for compatibility
+        if isinstance(store, dict):
+            store_id = store['store_id']
+            name = store['name']
+            city = store['city']
+            address = store.get('address') or "не указан"
+            description = store.get('description') or "нет описания"
+            category = store.get('category', 'Ресторан')
+            phone = store.get('phone') or "не указан"
+            created_at = store.get('created_at', '')
+            first_name = store.get('first_name', 'Неизвестно')
+            username = store.get('username')
+        else:
+            # Tuple format (SQLite)
+            store_id = store[0]
+            name = store[2]
+            city = store[3]
+            address = store[4] or "не указан"
+            description = store[5] or "нет описания"
+            category = store[6]
+            phone = store[7] or "не указан"
+            created_at = store[10]
+            first_name = store[15] if len(store) > 15 else "Неизвестно"
+            username = store[16] if len(store) > 16 else None
         
         text = f"🏪 <b>{name}</b>\n\n"
         text += f"От: {first_name} (@{username or 'нет'})\n"
