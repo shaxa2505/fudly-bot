@@ -490,6 +490,72 @@ class Database:
             logger.error(f"Failed to convert user {user_id} to model: {e}")
             return None
 
+    def get_store_model(self, store_id: int) -> Optional['Store']:
+        """Get store as Pydantic model (new API).
+        
+        Returns:
+            Store model with type safety and validation, or None if not found.
+        """
+        try:
+            from app.domain import Store
+        except ImportError:
+            logger.error("Domain models not available. Install pydantic.")
+            return None
+        
+        store_dict = self.get_store(store_id)
+        if not store_dict:
+            return None
+        
+        try:
+            return Store.from_db_row(store_dict)
+        except Exception as e:
+            logger.error(f"Failed to convert store {store_id} to model: {e}")
+            return None
+
+    def get_offer_model(self, offer_id: int) -> Optional['Offer']:
+        """Get offer as Pydantic model (new API).
+        
+        Returns:
+            Offer model with type safety and validation, or None if not found.
+        """
+        try:
+            from app.domain import Offer
+        except ImportError:
+            logger.error("Domain models not available. Install pydantic.")
+            return None
+        
+        offer_tuple = self.get_offer(offer_id)
+        if not offer_tuple:
+            return None
+        
+        try:
+            return Offer.from_db_row(offer_tuple)
+        except Exception as e:
+            logger.error(f"Failed to convert offer {offer_id} to model: {e}")
+            return None
+
+    def get_booking_model(self, booking_id: int) -> Optional['Booking']:
+        """Get booking as Pydantic model (new API).
+        
+        Returns:
+            Booking model with type safety and validation, or None if not found.
+        """
+        try:
+            from app.domain import Booking
+        except ImportError:
+            logger.error("Domain models not available. Install pydantic.")
+            return None
+        
+        booking_tuple = self.get_booking(booking_id)
+        if not booking_tuple:
+            return None
+        
+        try:
+            return Booking.from_db_row(booking_tuple)
+        except Exception as e:
+            logger.error(f"Failed to convert booking {booking_id} to model: {e}")
+            return None
+
     # ===================== ADDITIONAL / PORTED METHODS (from SQLite) =====================
     def get_user_stores(self, owner_id: int):
         """Return all stores belonging to an owner"""
