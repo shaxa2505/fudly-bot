@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import logging
+import os
 from typing import Any, Awaitable, Callable, TypeVar
 
 T = TypeVar("T")
@@ -63,7 +64,7 @@ except ImportError as exc:  # pragma: no cover - fallback for local dev
         """Background tasks placeholder."""
         logger.info("Background tasks placeholder")
 
-    PRODUCTION_FEATURES: bool = False
+    PRODUCTION_FEATURES: bool = os.getenv("PRODUCTION_FEATURES", "False").lower() == "true"
 
 __all__ = [
     "validator",

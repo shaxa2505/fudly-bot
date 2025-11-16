@@ -8,11 +8,14 @@
 - Системные команды (migrate_db, enable_delivery)
 """
 
+import csv
+import logging
 from aiogram import Router, types, F
 from aiogram.filters import Command
 from aiogram.types import FSInputFile, InlineKeyboardMarkup, InlineKeyboardButton
 from aiogram.utils.keyboard import InlineKeyboardBuilder
-import csv
+
+logger = logging.getLogger(__name__)
 import sqlite3
 import os
 from datetime import datetime
@@ -293,13 +296,20 @@ async def approve_store(callback: types.CallbackQuery):
         return
     
     try:
-        store_id = int(callback.data.split("_")[1])
+        # callback.data format: "approve_store_6" -> split by "_" -> take last element
+        store_id = int(callback.data.split("_")[-1])
+    except (ValueError, IndexError) as e:
+        logger.error(f"Invalid store_id in callback data: {callback.data}, error: {e}")
+        await callback.answer("❌ Неверный запрос", show_alert=True)
+        return
+    
+    try:
         
         # Обновляем статус магазина
         _db.update_store_status(store_id, 'active')
         
         # Получаем данные о магазине
-        store = _db.get_store_by_id(store_id)
+        store = _db.get_store(store_id)
         
         # Обновляем роль владельца на seller
         _db.update_user_role(store['owner_id'], 'seller')
@@ -331,13 +341,20 @@ async def reject_store(callback: types.CallbackQuery):
         return
     
     try:
-        store_id = int(callback.data.split("_")[1])
+        # callback.data format: "reject_store_6" -> split by "_" -> take last element
+        store_id = int(callback.data.split("_")[-1])
+    except (ValueError, IndexError) as e:
+        logger.error(f"Invalid store_id in callback data: {callback.data}, error: {e}")
+        await callback.answer("❌ Неверный запрос", show_alert=True)
+        return
+    
+    try:
         
         # Обновляем статус
         _db.update_store_status(store_id, 'rejected')
         
         # Получаем данные о магазине
-        store = _db.get_store_by_id(store_id)
+        store = _db.get_store(store_id)
         
         # Уведомляем владельца
         lang = _db.get_user_language(store['owner_id'])
@@ -442,7 +459,13 @@ async def delete_store_callback(callback: types.CallbackQuery):
     
     try:
         store_id = int(callback.data.split("_")[2])
-        store = _db.get_store_by_id(store_id)
+    except (ValueError, IndexError) as e:
+        logger.error(f"Invalid store_id in callback data: {callback.data}, error: {e}")
+        await callback.answer("❌ Неверный запрос", show_alert=True)
+        return
+    
+    try:
+        store = _db.get_store(store_id)
         
         # Удаляем магазин
         _db.delete_store(store_id)

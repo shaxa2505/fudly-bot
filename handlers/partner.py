@@ -8,10 +8,12 @@ from aiogram.fsm.context import FSMContext
 
 from database_protocol import DatabaseProtocol
 from handlers.common_states.states import RegisterStore
-from keyboards import (
+from app.keyboards import (
     cancel_keyboard,
     category_keyboard,
+    category_inline_keyboard,
     city_keyboard,
+    city_inline_keyboard,
     language_keyboard,
     main_menu_customer,
     main_menu_seller,
@@ -42,28 +44,6 @@ def setup_dependencies(
     db = database
     bot = bot_instance
     user_view_mode = view_mode_dict
-
-
-def get_user_field(user: Any, field: str, default: Any = None) -> Any:
-    """Extract field from user tuple/dict."""
-    if isinstance(user, dict):
-        return user.get(field, default)
-    # For tuple: [0]user_id, [1]username, [2]first_name, [3]phone, [4]city, [5]language, [6]role, [7]is_admin, [8]notifications
-    field_map = {
-        "user_id": 0,
-        "username": 1,
-        "first_name": 2,
-        "phone": 3,
-        "city": 4,
-        "language": 5,
-        "role": 6,
-        "is_admin": 7,
-        "notifications": 8,
-    }
-    idx = field_map.get(field)
-    if idx is not None and isinstance(user, (tuple, list)) and idx < len(user):
-        return user[idx]
-    return default
 
 
 def has_approved_store(user_id: int) -> bool:
@@ -114,7 +94,7 @@ async def become_partner(message: types.Message, state: FSMContext) -> None:
         return
     
     lang = db.get_user_language(message.from_user.id)
-    user = db.get_user(message.from_user.id)
+    user = db.get_user_model(message.from_user.id)
     
     # Check if user exists in DB
     if not user:
@@ -124,7 +104,7 @@ async def become_partner(message: types.Message, state: FSMContext) -> None:
         return
     
     # If already a seller with approved store - switch to seller mode
-    if get_user_field(user, "role", "customer") == "seller":
+    if user.role == "seller":
         if has_approved_store(message.from_user.id):
             # Remember seller view preference
             if user_view_mode is not None:
@@ -171,9 +151,15 @@ async def become_partner(message: types.Message, state: FSMContext) -> None:
 
 @router.message(RegisterStore.city)
 async def register_store_city(message: types.Message, state: FSMContext) -> None:
-    """City selected for store registration."""
+    """City selected for store registration (text fallback for reply keyboard)."""
     if not db:
         await message.answer("System error")
+        return
+    
+    # Check if we're actually in the city state
+    current_state = await state.get_state()
+    if current_state != RegisterStore.city:
+        # Not in city selection state, ignore
         return
     
     lang = db.get_user_language(message.from_user.id)
@@ -192,14 +178,20 @@ async def register_store_city(message: types.Message, state: FSMContext) -> None
 
 @router.message(RegisterStore.category)
 async def register_store_category(message: types.Message, state: FSMContext) -> None:
-    """Category selected for store registration."""
+    """Category selected for store registration (text fallback for reply keyboard)."""
     if not db:
         await message.answer("System error")
         return
     
+    # Check if we're actually in the category state
+    current_state = await state.get_state()
+    if current_state != RegisterStore.category:
+        # Not in category selection state, ignore
+        return
+    
     lang = db.get_user_language(message.from_user.id)
     categories = get_categories(lang)
-    cat_text = message.text.replace("🏷 ", "").strip()
+    cat_text = message.text.replace("🏷 ", "").replace("▫️ ", "").strip()
     
     if cat_text in categories:
         # CRITICAL: Normalize category to Russian for DB consistency
@@ -254,8 +246,8 @@ async def register_store_description(message: types.Message, state: FSMContext) 
     data = await state.get_data()
     
     # Use phone from user profile
-    user = db.get_user(message.from_user.id)
-    owner_phone = get_user_field(user, "phone") if user else None
+    user = db.get_user_model(message.from_user.id)
+    owner_phone = user.phone if user else None
     
     # Create store application (status: pending)
     store_id = db.add_store(
@@ -307,7 +299,7 @@ async def register_store_description(message: types.Message, state: FSMContext) 
             pass
 
 
-@router.callback_query(F.data == "become_partner")
+@router.callback_query(F.data == "become_partner_cb")
 async def become_partner_cb(callback: types.CallbackQuery, state: FSMContext) -> None:
     """Start partner registration from profile (inline)."""
     if not db or not bot:
@@ -315,7 +307,7 @@ async def become_partner_cb(callback: types.CallbackQuery, state: FSMContext) ->
         return
     
     lang = db.get_user_language(callback.from_user.id)
-    user = db.get_user(callback.from_user.id)
+    user = db.get_user_model(callback.from_user.id)
     
     if not user:
         await callback.message.answer(
@@ -325,7 +317,7 @@ async def become_partner_cb(callback: types.CallbackQuery, state: FSMContext) ->
         return
     
     # If already seller - check store status
-    if get_user_field(user, "role", "customer") == "seller":
+    if user.role == "seller":
         stores = db.get_user_stores(callback.from_user.id)
         # Check for approved store (status == "active")
         approved_stores = [s for s in stores if s[6] == "active"]
@@ -367,7 +359,7 @@ async def become_partner_cb(callback: types.CallbackQuery, state: FSMContext) ->
         await callback.message.edit_text(
             get_text(lang, "become_partner_text"),
             parse_mode="HTML",
-            reply_markup=city_keyboard(lang),
+            reply_markup=city_inline_keyboard(lang),
         )
     except Exception:
         await callback.message.answer(
@@ -377,4 +369,89 @@ async def become_partner_cb(callback: types.CallbackQuery, state: FSMContext) ->
         )
     await state.set_state(RegisterStore.city)
     await callback.answer()
+
+
+@router.callback_query(F.data.startswith("reg_city_"))
+async def register_store_city_callback(callback: types.CallbackQuery, state: FSMContext) -> None:
+    """City selected for store registration via inline button."""
+    if not db:
+        await callback.answer("System error", show_alert=True)
+        return
+    
+    lang = db.get_user_language(callback.from_user.id)
+    city_text = callback.data.replace("reg_city_", "")
+    
+    # Normalize city to Russian for DB consistency
+    normalized_city = normalize_city(city_text)
+    await state.update_data(city=normalized_city)
+    
+    try:
+        await callback.message.edit_text(
+            get_text(lang, "store_category"),
+            reply_markup=category_inline_keyboard(lang)
+        )
+    except Exception:
+        await callback.message.answer(
+            get_text(lang, "store_category"),
+            reply_markup=category_keyboard(lang)
+        )
+    
+    await state.set_state(RegisterStore.category)
+    await callback.answer()
+
+
+@router.callback_query(F.data.startswith("reg_cat_"))
+async def register_store_category_callback(callback: types.CallbackQuery, state: FSMContext) -> None:
+    """Category selected for store registration via inline button."""
+    if not db:
+        await callback.answer("System error", show_alert=True)
+        return
+    
+    lang = db.get_user_language(callback.from_user.id)
+    category_id = callback.data.replace("reg_cat_", "")
+    
+    # Map category ID to display name
+    category_map = {
+        'supermarket': 'Супермаркет' if lang == 'ru' else 'Supermarket',
+        'restaurant': 'Ресторан' if lang == 'ru' else 'Restaurant',
+        'bakery': 'Пекарня' if lang == 'ru' else 'Nonvoyxona',
+        'cafe': 'Кафе' if lang == 'ru' else 'Kafe',
+        'confectionery': 'Кондитерская' if lang == 'ru' else 'Qandolatchilik',
+        'fastfood': 'Фастфуд' if lang == 'ru' else 'Fastfud',
+    }
+    
+    category = category_map.get(category_id, category_id)
+    await state.update_data(category=category)
+    
+    name_prompt = get_text(lang, "store_name")
+    try:
+        await callback.message.edit_text(
+            name_prompt,
+            reply_markup=None
+        )
+    except Exception:
+        await callback.message.answer(name_prompt)
+    
+    await state.set_state(RegisterStore.name)
+    await callback.answer()
+
+
+@router.callback_query(F.data == "reg_cancel")
+async def register_cancel_callback(callback: types.CallbackQuery, state: FSMContext) -> None:
+    """Cancel partner registration via inline button."""
+    if not db:
+        await callback.answer("System error", show_alert=True)
+        return
+    
+    lang = db.get_user_language(callback.from_user.id)
+    await state.clear()
+    
+    cancel_text = get_text(lang, "cancelled")
+    try:
+        await callback.message.edit_text(cancel_text)
+    except Exception:
+        await callback.message.answer(cancel_text)
+    
+    await callback.answer()
+
 

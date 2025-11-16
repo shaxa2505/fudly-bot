@@ -85,22 +85,30 @@ def get_appropriate_menu(
     main_menu_seller: Callable[[str], Any],
     main_menu_customer: Callable[[str], Any]
 ) -> Any:
-    """Return appropriate menu for user based on their store approval status"""
-    user = db.get_user(user_id)
+    """Return appropriate menu for user based on their store approval status and current mode"""
+    user = db.get_user_model(user_id)
     if not user:
         return main_menu_customer(lang)
     
     # Both backends now return dict
-    role = user.get('role', 'customer')
+    role = user.role
     
     # Unify roles: store_owner -> seller
     if role == 'store_owner':
         role = 'seller'
     
+    # Check current view mode
+    current_mode = user_view_mode.get(user_id, 'customer')
+    
     # If partner - check for approved store
     if role == "seller":
         if has_approved_store(user_id, db):
-            return main_menu_seller(lang)
+            # Seller with approved store
+            if current_mode == 'seller':
+                return main_menu_seller(lang)
+            else:
+                # In customer mode - show customer menu
+                return main_menu_customer(lang)
         else:
             # No approved store - show customer menu
             return main_menu_customer(lang)
@@ -172,9 +180,9 @@ class RegistrationCheckMiddleware(BaseMiddleware):
             if current_state:
                 return await handler(event, data)
 
-        user = self.db.get_user(user_id)
+        user = self.db.get_user_model(user_id)
         # Both backends now return dict
-        user_phone = user.get('phone') if user else None
+        user_phone = user.phone if user else None
         if not user or not user_phone:
             lang = self.db.get_user_language(user_id) if user else 'ru'
             if msg:

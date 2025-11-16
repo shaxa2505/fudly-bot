@@ -23,6 +23,9 @@ class OfferListItem:
     quantity: int | None = None
     unit: str | None = None
     expiry_date: str | None = None
+    delivery_enabled: bool = False
+    delivery_price: float = 0.0
+    min_order_amount: float = 0.0
 
 
 @dataclass(slots=True)
@@ -224,14 +227,20 @@ class OfferService:
         discount_price = self._safe_float(get_offer_field(data, "discount_price", get_field(data, 5, 0)))
         quantity = get_offer_field(data, "quantity", get_field(data, 6, 0))
         expiry_date = get_offer_field(data, "expiry_date", get_field(data, 9, ""))
-        store_name = str(get_field(data, "store_name", get_field(data, 15, "Магазин")))
-        store_address = get_field(data, "address", get_field(data, 16, ""))
-        store_category = get_field(data, "store_category", get_field(data, 18, ""))
+        store_name = str(get_field(data, "store_name", get_field(data, 14, "Магазин")))
+        store_address = get_field(data, "address", get_field(data, 15, ""))
+        store_category = get_field(data, "store_category", get_field(data, 17, ""))
         unit = get_offer_field(data, "unit", get_field(data, 13, "шт"))
-        discount_percent_src = get_field(data, "discount_percent", get_field(data, 19, 0))
+        discount_percent_src = get_field(data, "discount_percent", get_field(data, 18, 0))
         discount_percent = self._safe_float(discount_percent_src, 0.0)
         if not discount_percent and original_price:
             discount_percent = max(0.0, round((1 - (discount_price / original_price)) * 100, 1))
+        
+        # Extract delivery info from joined store fields (indices 19, 20, 21)
+        delivery_enabled = bool(get_field(data, "delivery_enabled", get_field(data, 19, 0)))
+        delivery_price = self._safe_float(get_field(data, "delivery_price", get_field(data, 20, 0)), 0.0)
+        min_order_amount = self._safe_float(get_field(data, "min_order_amount", get_field(data, 21, 0)), 0.0)
+        
         return OfferListItem(
             id=offer_id,
             store_id=store_id,
@@ -245,6 +254,9 @@ class OfferService:
             quantity=int(quantity or 0),
             unit=unit,
             expiry_date=expiry_date,
+            delivery_enabled=delivery_enabled,
+            delivery_price=delivery_price,
+            min_order_amount=min_order_amount,
         )
 
     def _to_store_summary(self, store: Any) -> StoreSummary:

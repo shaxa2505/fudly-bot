@@ -72,21 +72,21 @@ def setup(dp_or_router, db, get_text, admin_menu):
             # Today's statistics (Uzbek time)
             today = get_uzb_time().strftime('%Y-%m-%d')
             
-            cursor.execute('SELECT COUNT(*) FROM bookings WHERE DATE(created_at) = %s', (today,))
+            cursor.execute('SELECT COUNT(*) FROM bookings WHERE DATE(created_at) = ?', (today,))
             today_bookings = cursor.fetchone()[0]
             
             cursor.execute('''
                 SELECT SUM(o.discount_price * b.quantity)
                 FROM bookings b
                 JOIN offers o ON b.offer_id = o.offer_id
-                WHERE DATE(b.created_at) = %s AND b.status != 'cancelled'
+                WHERE DATE(b.created_at) = ? AND b.status != 'cancelled'
             ''', (today,))
             today_revenue = cursor.fetchone()[0] or 0
             
             # New users today
             cursor.execute('''
                 SELECT COUNT(*) FROM users 
-                WHERE DATE(created_at) = %s
+                WHERE DATE(created_at) = ?
             ''', (today,))
             today_users = cursor.fetchone()[0]
         
@@ -132,14 +132,14 @@ def setup(dp_or_router, db, get_text, admin_menu):
             return
         
         lang = db.get_user_language(message.from_user.id)
-        user = db.get_user(message.from_user.id)
+        user = db.get_user_model(message.from_user.id)
         
         # Import here to avoid circular dependencies
-        from keyboards import main_menu_customer, main_menu_seller
+        from app.keyboards import main_menu_customer, main_menu_seller
         
         # Return to appropriate main menu based on user role
-        user_role = user.get('role', 'customer') if isinstance(user, dict) else (user[6] if user and len(user) > 6 else 'customer')
-        menu = main_menu_seller(lang) if user_role == "seller" else main_menu_customer(lang)
+        user_role = user.role if user else 'customer'
+        menu = main_menu_seller(lang) if user_role == "seller" else main_menu_customer(lang, show_seller_switch=False)
         
         await message.answer(
             "👋 Выход из админ-панели",

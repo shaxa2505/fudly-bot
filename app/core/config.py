@@ -42,9 +42,22 @@ def load_settings() -> Settings:
     admin_id = int(os.getenv("ADMIN_ID", "0"))
     database_url = os.getenv("DATABASE_URL")
 
+    # Smart webhook detection: auto-enable on Railway/Heroku if URL provided
+    use_webhook = _str_to_bool(os.getenv("USE_WEBHOOK", "false"))
+    webhook_url = os.getenv("WEBHOOK_URL", "")
+    
+    # Auto-enable webhook if WEBHOOK_URL is set and USE_WEBHOOK not explicitly disabled
+    if webhook_url and not os.getenv("USE_WEBHOOK"):
+        use_webhook = True
+    
+    # Disable webhook if URL is missing even if USE_WEBHOOK=true
+    if use_webhook and not webhook_url:
+        print("⚠️ USE_WEBHOOK=true but WEBHOOK_URL is empty, falling back to polling")
+        use_webhook = False
+
     webhook = WebhookConfig(
-        enabled=_str_to_bool(os.getenv("USE_WEBHOOK", "false")),
-        url=os.getenv("WEBHOOK_URL", ""),
+        enabled=use_webhook,
+        url=webhook_url,
         path=os.getenv("WEBHOOK_PATH", "/webhook"),
         port=int(os.getenv("PORT", "8080")),
         secret_token=os.getenv("SECRET_TOKEN", ""),

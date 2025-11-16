@@ -9,7 +9,7 @@ from aiogram.utils.keyboard import InlineKeyboardBuilder
 
 from database_protocol import DatabaseProtocol
 from handlers.common_states.states import OrderDelivery
-from keyboards import cancel_keyboard, main_menu_customer, main_menu_seller
+from app.keyboards import cancel_keyboard, main_menu_customer, main_menu_seller
 from localization import get_text
 from logging_config import logger
 
@@ -35,27 +35,6 @@ def can_proceed(user_id: int, action: str) -> bool:
     """Rate limiting check - placeholder."""
     # TODO: Implement actual rate limiting
     return True
-
-
-def get_user_field(user: Any, field: str, default: Any = None) -> Any:
-    """Extract field from user tuple/dict."""
-    if isinstance(user, dict):
-        return user.get(field, default)
-    field_map = {
-        "user_id": 0,
-        "username": 1,
-        "first_name": 2,
-        "phone": 3,
-        "city": 4,
-        "language": 5,
-        "role": 6,
-        "is_admin": 7,
-        "notifications": 8,
-    }
-    idx = field_map.get(field)
-    if idx is not None and isinstance(user, (tuple, list)) and idx < len(user):
-        return user[idx]
-    return default
 
 
 def get_store_field(store: Any, field: str, default: Any = None) -> Any:
@@ -127,7 +106,13 @@ async def order_delivery_start(callback: types.CallbackQuery, state: FSMContext)
         await callback.answer(get_text(lang, "operation_cancelled"), show_alert=True)
         return
 
-    offer_id = int(callback.data.split("_")[2])
+    try:
+        offer_id = int(callback.data.split("_")[2])
+    except (ValueError, IndexError) as e:
+        logger.error(f"Invalid offer_id in callback data: {callback.data}, error: {e}")
+        await callback.answer(get_text(lang, "error"), show_alert=True)
+        return
+    
     offer = db.get_offer(offer_id)
 
     if not offer or get_offer_field(offer, "quantity", 0) <= 0:
@@ -399,8 +384,8 @@ async def order_payment_proof(message: types.Message, state: FSMContext) -> None
     new_quantity = offer_quantity - quantity
     db.update_offer_quantity(offer_id, new_quantity)
 
-    customer = db.get_user(message.from_user.id)
-    customer_phone = get_user_field(customer, "phone", "Не указан")
+    customer = db.get_user_model(message.from_user.id)
+    customer_phone = customer.phone if customer else "Не указан"
 
     currency_ru = "сум"
     currency_uz = "so'm"
@@ -448,8 +433,8 @@ async def order_payment_proof(message: types.Message, state: FSMContext) -> None
         logger.error(f"❌ Error sending order notification to {owner_id}: {e}")
 
     total_amount = (offer_price * quantity) + delivery_price
-    user = db.get_user(message.from_user.id)
-    user_role = get_user_field(user, "role", "customer")
+    user = db.get_user_model(message.from_user.id)
+    user_role = user.role if user else "customer"
     menu = main_menu_seller(lang) if user_role == "seller" else main_menu_customer(lang)
 
     # Uzbek text without apostrophes in f-string
@@ -503,7 +488,13 @@ async def confirm_payment(callback: types.CallbackQuery) -> None:
         return
 
     lang = db.get_user_language(callback.from_user.id)
-    order_id = int(callback.data.split("_")[2])
+    
+    try:
+        order_id = int(callback.data.split("_")[2])
+    except (ValueError, IndexError) as e:
+        logger.error(f"Invalid order_id in callback data: {callback.data}, error: {e}")
+        await callback.answer(get_text(lang, "error"), show_alert=True)
+        return
 
     order = db.get_order(order_id)
     if not order:
@@ -550,7 +541,13 @@ async def reject_payment(callback: types.CallbackQuery) -> None:
         return
 
     lang = db.get_user_language(callback.from_user.id)
-    order_id = int(callback.data.split("_")[2])
+    
+    try:
+        order_id = int(callback.data.split("_")[2])
+    except (ValueError, IndexError) as e:
+        logger.error(f"Invalid order_id in callback data: {callback.data}, error: {e}")
+        await callback.answer(get_text(lang, "error"), show_alert=True)
+        return
 
     order = db.get_order(order_id)
     if not order:
@@ -607,7 +604,13 @@ async def confirm_order(callback: types.CallbackQuery) -> None:
         return
 
     lang = db.get_user_language(callback.from_user.id)
-    order_id = int(callback.data.split("_")[2])
+    
+    try:
+        order_id = int(callback.data.split("_")[2])
+    except (ValueError, IndexError) as e:
+        logger.error(f"Invalid order_id in callback data: {callback.data}, error: {e}")
+        await callback.answer(get_text(lang, "error"), show_alert=True)
+        return
 
     order = db.get_order(order_id)
     if not order:
@@ -651,7 +654,13 @@ async def cancel_order(callback: types.CallbackQuery) -> None:
         return
 
     lang = db.get_user_language(callback.from_user.id)
-    order_id = int(callback.data.split("_")[2])
+    
+    try:
+        order_id = int(callback.data.split("_")[2])
+    except (ValueError, IndexError) as e:
+        logger.error(f"Invalid order_id in callback data: {callback.data}, error: {e}")
+        await callback.answer(get_text(lang, "error"), show_alert=True)
+        return
 
     order = db.get_order(order_id)
     if not order:
@@ -700,7 +709,13 @@ async def cancel_order_customer(callback: types.CallbackQuery) -> None:
         return
 
     lang = db.get_user_language(callback.from_user.id)
-    order_id = int(callback.data.split("_")[3])
+    
+    try:
+        order_id = int(callback.data.split("_")[3])
+    except (ValueError, IndexError) as e:
+        logger.error(f"Invalid order_id in callback data: {callback.data}, error: {e}")
+        await callback.answer(get_text(lang, "error"), show_alert=True)
+        return
 
     order = db.get_order(order_id)
     if not order:

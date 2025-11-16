@@ -62,7 +62,7 @@ common_has_approved_store = handlers_common_module.has_approved_store
 handler_user_view_mode = handlers_common_module.user_view_mode
 get_uzb_time = handlers_common_module.get_uzb_time
 
-from keyboards import (
+from app.keyboards import (
     admin_menu,
     booking_filters_keyboard,
     cancel_keyboard,
@@ -88,6 +88,11 @@ WEBHOOK_URL = settings.webhook.url
 WEBHOOK_PATH = settings.webhook.path
 PORT = settings.webhook.port
 SECRET_TOKEN = settings.webhook.secret_token
+
+# Optional: allow overriding lock port or disabling duplicate-run check via env
+LOCK_PORT = int(os.getenv("LOCK_PORT", "8444"))
+DISABLE_LOCK = os.getenv("DISABLE_LOCK", "0").strip().lower() in {"1", "true", "yes"}
+POLLING_HEALTH_PORT = int(os.getenv("POLLING_HEALTH_PORT", "0") or 0)
 
 bot, dp, db, cache = build_application(settings)
 offer_service = OfferService(db, cache)
@@ -256,7 +261,7 @@ profile.setup_dependencies(db, bot, user_view_mode)
 favorites.setup_dependencies(db, bot, user_view_mode)
 order_management.setup(bot, db)
 booking_rating.setup(bot, db)
-common_user.setup(bot, db, user_view_mode, get_text, main_menu_customer)
+common_user.setup(bot, db, user_view_mode, get_text, main_menu_customer, booking_filters_keyboard, main_menu_seller)
 admin_dashboard.setup(bot, db, get_text, moderation_keyboard, get_uzb_time)
 admin_legacy.setup(bot, db, get_text, moderation_keyboard, get_uzb_time, ADMIN_ID, DATABASE_URL)
 
@@ -887,6 +892,49 @@ async def main():
             allowed_updates=dp.resolve_used_update_types(),
             drop_pending_updates=True
         ))
+        # Дополнительный HTTP-сервер здоровья/метрик для polling-режима (по желанию)
+        health_runner = None
+        if POLLING_HEALTH_PORT > 0:
+            try:
+                from aiohttp import web  # lazy import
+
+                async def health_check(_request):
+                    return web.json_response({"status": "ok", "mode": "polling"})
+
+                def _metrics_text():
+                    help_map = {
+                        "updates_received": "Total updates received",
+                        "updates_errors": "Total webhook errors",
+                        "bookings_created": "Total bookings created",
+                        "bookings_cancelled": "Total bookings cancelled",
+                    }
+                    lines = []
+                    for key, val in METRICS.items():
+                        metric = f"fudly_{key}"
+                        lines.append(f"# HELP {metric} {help_map.get(key, key)}")
+                        lines.append(f"# TYPE {metric} counter")
+                        try:
+                            v = int(val)
+                        except Exception:
+                            v = 0
+                        lines.append(f"{metric} {v}")
+                    return "\n".join(lines) + "\n"
+
+                async def metrics_prom(_request):
+                    return web.Response(text=_metrics_text(), content_type='text/plain; version=0.0.4; charset=utf-8')
+
+                app = web.Application()
+                app.router.add_get("/health", health_check)
+                app.router.add_get("/metrics", metrics_prom)
+                app.router.add_get("/", health_check)
+
+                health_runner = web.AppRunner(app)
+                await health_runner.setup()
+                site = web.TCPSite(health_runner, '0.0.0.0', POLLING_HEALTH_PORT)
+                await site.start()
+                print(f"🩺 Health server (polling) on port {POLLING_HEALTH_PORT}")
+            except Exception as e:
+                print(f"⚠️ Failed to start polling health server: {e}")
         
         try:
             await shutdown_event.wait()
@@ -904,22 +952,34 @@ async def main():
                 await cleanup_task
             except asyncio.CancelledError:
                 pass
+            if health_runner is not None:
+                try:
+                    await health_runner.cleanup()
+                except Exception:
+                    pass
             await on_shutdown()
 
 # ============================================
 # ЗАЩИТА ОТ МНОЖЕСТВЕННОГО ЗАПУСКА
 # ============================================
 
-def is_bot_already_running(port=8444):
-    """Проверяет, не запущен ли уже бот на этом порту"""
+def is_bot_already_running(port: int | None = None) -> bool:
+    """Проверяет, не запущен ли уже бот (лок-биндинг TCP порта).
+
+    Можно отключить через переменную окружения `DISABLE_LOCK=1`.
+    Порт можно переопределить через `LOCK_PORT`.
+    """
+    if DISABLE_LOCK:
+        return False
+    p = port or LOCK_PORT
     try:
         sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        sock.bind(('127.0.0.1', port))
+        sock.bind(('127.0.0.1', p))
         sock.close()
         return False
     except OSError:
-        print(f"🛑 ОШИБКА: Бот уже запущен на порту {port}!")
-        print("⚠️ Остановите другой экземпляр перед запуском нового.")
+        print(f"🛑 ОШИБКА: Бот уже запущен на порту {p}!")
+        print("⚠️ Остановите другой экземпляр перед запуском нового или установите DISABLE_LOCK=1.")
         return True
 
 # Глобальная переменная для graceful shutdown

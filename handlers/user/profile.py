@@ -9,7 +9,7 @@ from aiogram.utils.keyboard import InlineKeyboardBuilder
 
 from database_protocol import DatabaseProtocol
 from handlers.common_states.states import ChangeCity, RegisterStore
-from keyboards import (
+from app.keyboards import (
     city_keyboard,
     language_keyboard,
     main_menu_customer,
@@ -35,29 +35,6 @@ def setup_dependencies(
     db = database
     bot = bot_instance
     user_view_mode = view_mode_dict
-
-
-def get_user_field(user: Any, field: str, default: Any = None) -> Any:
-    """Extract field from user tuple/dict."""
-    if isinstance(user, dict):
-        return user.get(field, default)
-    field_map = {
-        "user_id": 0,
-        "username": 1,
-        "first_name": 2,
-        "name": 2,
-        "phone": 3,
-        "city": 4,
-        "language": 5,
-        "role": 6,
-        "is_admin": 7,
-        "notifications": 8,
-        "notifications_enabled": 8,
-    }
-    idx = field_map.get(field)
-    if idx is not None and isinstance(user, (tuple, list)) and idx < len(user):
-        return user[idx]
-    return default
 
 
 def get_store_field(store: Any, field: str, default: Any = None) -> Any:
@@ -93,7 +70,7 @@ async def profile(message: types.Message) -> None:
         return
 
     lang = db.get_user_language(message.from_user.id)
-    user = db.get_user(message.from_user.id)
+    user = db.get_user_model(message.from_user.id)
 
     if not user:
         await message.answer(
@@ -104,13 +81,16 @@ async def profile(message: types.Message) -> None:
     lang_text = "Русский" if lang == "ru" else "Ozbekcha"
 
     text = f"{get_text(lang, 'your_profile')}\n\n"
-    text += f"{get_text(lang, 'name')}: {get_user_field(user, 'name')}\n"
-    text += f"{get_text(lang, 'phone')}: {get_user_field(user, 'phone')}\n"
-    text += f"{get_text(lang, 'city')}: {get_user_field(user, 'city')}\n"
+    text += f"{get_text(lang, 'name')}: {user.first_name or 'N/A'}\n"
+    text += f"{get_text(lang, 'phone')}: {user.phone or 'N/A'}\n"
+    text += f"{get_text(lang, 'city')}: {user.city or 'N/A'}\n"
     text += f"{get_text(lang, 'language')}: {lang_text}\n"
 
+    # Determine current mode for settings keyboard
+    current_mode = user_view_mode.get(message.from_user.id, "customer") if user_view_mode else "customer"
+    
     # Customer statistics
-    if (get_user_field(user, "role", "customer") == "customer") or (
+    if (user.role == "customer" or user.role is None) or (
         user_view_mode and user_view_mode.get(message.from_user.id) == "customer"
     ):
         bookings = db.get_user_bookings(message.from_user.id)
@@ -142,7 +122,7 @@ async def profile(message: types.Message) -> None:
             text += f"({'из них доставок' if lang == 'ru' else 'shulardan yetkazish'}: {completed_orders})\n"
 
     # Seller statistics
-    elif get_user_field(user, "role", "customer") == "seller":
+    elif user.role == "seller":
         stores = db.get_user_stores(message.from_user.id)
         if stores:
             total_bookings = 0
@@ -178,9 +158,10 @@ async def profile(message: types.Message) -> None:
         text,
         parse_mode="HTML",
         reply_markup=settings_keyboard(
-            get_user_field(user, "notifications_enabled"),
+            user.notifications_enabled if hasattr(user, 'notifications_enabled') else True,
             lang,
-            role=get_user_field(user, "role", "customer"),
+            role=user.role or "customer",
+            current_mode=current_mode,
         ),
     )
 
@@ -212,23 +193,59 @@ async def profile_change_city(callback: types.CallbackQuery, state: FSMContext) 
 @router.callback_query(F.data == "switch_to_customer")
 async def switch_to_customer_cb(callback: types.CallbackQuery) -> None:
     """Switch to customer mode from profile."""
-    if not db or not user_view_mode:
-        await callback.answer("System error")
+    if not db or user_view_mode is None:
+        logger.error(f"❌ switch_to_customer_cb: db={db is not None}, user_view_mode={user_view_mode is not None}")
+        await callback.answer("System error", show_alert=True)
         return
 
-    lang = db.get_user_language(callback.from_user.id)
-    user_view_mode[callback.from_user.id] = "customer"
     try:
-        await callback.message.edit_text(
-            get_text(lang, "switched_to_customer"),
-            reply_markup=main_menu_customer(lang),
-        )
-    except Exception:
+        lang = db.get_user_language(callback.from_user.id)
+        user_view_mode[callback.from_user.id] = "customer"
+        logger.info(f"✅ User {callback.from_user.id} switched to customer mode")
+        
+        # Send new message with ReplyKeyboard (cannot use edit_text with ReplyKeyboard)
         await callback.message.answer(
             get_text(lang, "switched_to_customer"),
             reply_markup=main_menu_customer(lang),
         )
-    await callback.answer()
+        await callback.answer()
+    except Exception as e:
+        logger.error(f"❌ Error in switch_to_customer_cb: {e}", exc_info=True)
+        await callback.answer("Произошла ошибка", show_alert=True)
+
+
+@router.callback_query(F.data == "switch_to_seller")
+async def switch_to_seller_cb(callback: types.CallbackQuery) -> None:
+    """Switch to seller mode from profile."""
+    if not db or user_view_mode is None:
+        logger.error(f"❌ switch_to_seller_cb: db={db is not None}, user_view_mode={user_view_mode is not None}")
+        await callback.answer("System error", show_alert=True)
+        return
+
+    try:
+        lang = db.get_user_language(callback.from_user.id)
+        user = db.get_user_model(callback.from_user.id)
+        
+        # Check if user is actually a seller
+        if not user or user.role != "seller":
+            await callback.answer(
+                "Только партнеры могут использовать этот режим" if lang == "ru" else "Faqat hamkorlar bu rejimdan foydalanishlari mumkin",
+                show_alert=True
+            )
+            return
+        
+        user_view_mode[callback.from_user.id] = "seller"
+        logger.info(f"✅ User {callback.from_user.id} switched to seller mode")
+        
+        # Send new message with ReplyKeyboard
+        await callback.message.answer(
+            "Переключено в режим партнера" if lang == "ru" else "Hamkor rejimiga o'tkazildi",
+            reply_markup=main_menu_seller(lang),
+        )
+        await callback.answer()
+    except Exception as e:
+        logger.error(f"❌ Error in switch_to_seller_cb: {e}", exc_info=True)
+        await callback.answer("Произошла ошибка", show_alert=True)
 
 
 @router.callback_query(F.data == "change_language")
@@ -264,18 +281,19 @@ async def toggle_notifications_callback(callback: types.CallbackQuery) -> None:
         if new_enabled
         else get_text(lang, "notifications_disabled")
     )
-    user = db.get_user(callback.from_user.id)
-    role = get_user_field(user, "role", "customer")
+    user = db.get_user_model(callback.from_user.id)
+    role = user.role if user else "customer"
+    current_mode = user_view_mode.get(callback.from_user.id, "customer") if user_view_mode else "customer"
 
     try:
         await callback.message.edit_text(
             text,
             parse_mode="HTML",
-            reply_markup=settings_keyboard(new_enabled, lang, role=role),
+            reply_markup=settings_keyboard(new_enabled, lang, role=role, current_mode=current_mode),
         )
     except Exception:
         await callback.message.answer(
-            text, reply_markup=settings_keyboard(new_enabled, lang, role=role)
+            text, reply_markup=settings_keyboard(new_enabled, lang, role=role, current_mode=current_mode)
         )
 
     await callback.answer()
@@ -356,29 +374,34 @@ async def confirm_delete_no(callback: types.CallbackQuery) -> None:
         return
 
     lang = db.get_user_language(callback.from_user.id)
-    user = db.get_user(callback.from_user.id)
+    user = db.get_user_model(callback.from_user.id)
 
     if not user:
         await callback.message.edit_text(get_text(lang, "account_deleted"))
         await callback.answer()
         return
 
+    role = user.role
+    current_mode = user_view_mode.get(callback.from_user.id, "customer") if user_view_mode else "customer"
+
     try:
         await callback.message.edit_text(
             get_text(lang, "operation_cancelled"),
             reply_markup=settings_keyboard(
-                get_user_field(user, "notifications_enabled"),
+                user.notifications_enabled if user else False,
                 lang,
-                role=get_user_field(user, "role", "customer"),
+                role=user.role if user else "customer",
+                current_mode=current_mode,
             ),
         )
     except Exception:
         await callback.message.answer(
             get_text(lang, "operation_cancelled"),
             reply_markup=settings_keyboard(
-                get_user_field(user, "notifications_enabled"),
+                user.notifications_enabled if user else False,
                 lang,
-                role=get_user_field(user, "role", "customer"),
+                role=user.role if user else "customer",
+                current_mode=current_mode,
             ),
         )
 
@@ -388,12 +411,18 @@ async def confirm_delete_no(callback: types.CallbackQuery) -> None:
 @router.message(F.text.contains("Режим покупателя") | F.text.contains("Xaridor rejimi"))
 async def switch_to_customer(message: types.Message) -> None:
     """Switch to customer mode."""
-    if not db or not user_view_mode:
+    if not db or user_view_mode is None:
         await message.answer("System error")
         return
 
     lang = db.get_user_language(message.from_user.id)
+    user = db.get_user_model(message.from_user.id)
     user_view_mode[message.from_user.id] = "customer"
+    
+    # Check if user is seller to show switch button
+    is_seller = user and user.role == "seller"
+    
     await message.answer(
-        get_text(lang, "switched_to_customer"), reply_markup=main_menu_customer(lang)
+        get_text(lang, "switched_to_customer"), 
+        reply_markup=main_menu_customer(lang)
     )

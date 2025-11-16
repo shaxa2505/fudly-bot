@@ -3,13 +3,19 @@ from __future__ import annotations
 
 import json
 from typing import Any, Optional
+import importlib.util
 
-try:
-    import redis
-    from redis import Redis
-    REDIS_AVAILABLE = True
-except ImportError:
-    REDIS_AVAILABLE = False
+# Determine availability once to avoid reassigning constants
+REDIS_AVAILABLE: bool = importlib.util.find_spec("redis") is not None
+
+# Expose a patchable `redis` symbol whether or not the package is installed
+if REDIS_AVAILABLE:
+    import redis as redis  # type: ignore
+else:
+    class _DummyRedisModule:  # minimal stub so tests can patch `redis.Redis`
+        class Redis:  # type: ignore
+            pass
+    redis = _DummyRedisModule()  # type: ignore
 
 
 class RedisCache:
@@ -24,10 +30,16 @@ class RedisCache:
             db: Redis database number
             password: Redis password (if required)
         """
+        # If redis package explicitly marked unavailable, fail fast
         if not REDIS_AVAILABLE:
             raise ImportError("redis package not installed. Install with: pip install redis")
+
+        # Require a usable `redis.Redis` constructor (tests may patch this)
+        if not hasattr(redis, "Redis"):
+            raise ImportError("redis package not installed. Install with: pip install redis")
         
-        self._client: Redis = redis.Redis(
+        # Use Any for client type to avoid runtime/type issues if redis is patched in tests
+        self._client: Any = redis.Redis(
             host=host,
             port=port,
             db=db,

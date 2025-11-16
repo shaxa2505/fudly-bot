@@ -9,7 +9,7 @@ from aiogram.utils.keyboard import InlineKeyboardBuilder
 
 from database_protocol import DatabaseProtocol
 from handlers.common_states.states import ChangeCity
-from keyboards import city_keyboard, main_menu_customer, main_menu_seller
+from app.keyboards import city_keyboard, main_menu_customer, main_menu_seller
 from localization import get_cities, get_text
 from logging_config import logger
 from security import secure_user_input, validator
@@ -32,25 +32,6 @@ def setup_dependencies(
     user_view_mode = view_mode_dict
 
 
-def get_user_field(user: Any, field: str, default: Any = None) -> Any:
-    """Extract field from user tuple/dict."""
-    if isinstance(user, dict):
-        return user.get(field, default)
-    field_map = {
-        "user_id": 0,
-        "username": 1,
-        "first_name": 2,
-        "phone": 3,
-        "city": 4,
-        "language": 5,
-        "role": 6,
-    }
-    idx = field_map.get(field)
-    if idx is not None and isinstance(user, (tuple, list)) and idx < len(user):
-        return user[idx]
-    return default
-
-
 def get_appropriate_menu(user_id: int, lang: str) -> Any:
     """Get appropriate menu based on user view mode."""
     if user_view_mode and user_view_mode.get(user_id) == "seller":
@@ -67,8 +48,8 @@ async def show_my_city(message: types.Message, state: FSMContext) -> None:
 
     user_id = message.from_user.id
     lang = db.get_user_language(user_id)
-    user = db.get_user(user_id)
-    current_city = get_user_field(user, "city") or "Не выбран"
+    user = db.get_user_model(user_id)
+    current_city = user.city if user else "Не выбран"
 
     text = f"🌆 {get_text(lang, 'your_city') if 'your_city' in dir() else 'Ваш город'}: {current_city}\n\n{get_text(lang, 'change_city_prompt') if 'change_city_prompt' in dir() else 'Хотите изменить город?'}"
 
@@ -151,9 +132,15 @@ async def toggle_favorite(callback: types.CallbackQuery) -> None:
         await callback.answer("System error")
         return
 
-    store_id = int(callback.data.split("_")[1])
     user_id = callback.from_user.id
     lang = db.get_user_language(user_id)
+    
+    try:
+        store_id = int(callback.data.split("_")[1])
+    except (ValueError, IndexError) as e:
+        logger.error(f"Invalid store_id in callback data: {callback.data}, error: {e}")
+        await callback.answer(get_text(lang, "error"), show_alert=True)
+        return
 
     if db.is_favorite(user_id, store_id):
         await callback.answer(get_text(lang, "already_in_favorites"), show_alert=True)
@@ -169,9 +156,15 @@ async def remove_favorite(callback: types.CallbackQuery) -> None:
         await callback.answer("System error")
         return
 
-    store_id = int(callback.data.split("_")[1])
     user_id = callback.from_user.id
     lang = db.get_user_language(user_id)
+    
+    try:
+        store_id = int(callback.data.split("_")[1])
+    except (ValueError, IndexError) as e:
+        logger.error(f"Invalid store_id in callback data: {callback.data}, error: {e}")
+        await callback.answer(get_text(lang, "error"), show_alert=True)
+        return
 
     db.remove_favorite(user_id, store_id)
     await callback.message.delete()

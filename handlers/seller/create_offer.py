@@ -10,7 +10,7 @@ from aiogram.utils.keyboard import InlineKeyboardBuilder
 
 from database_protocol import DatabaseProtocol
 from handlers.common_states.states import CreateOffer
-from keyboards import cancel_keyboard, main_menu_seller
+from app.keyboards import cancel_keyboard, main_menu_seller
 from localization import get_text
 from logging_config import logger
 
@@ -298,7 +298,13 @@ async def select_discount_percent(
         return
     
     lang = db.get_user_language(callback.from_user.id)
-    percent = int(callback.data.split("_")[1])
+    
+    try:
+        percent = int(callback.data.split("_")[1])
+    except (ValueError, IndexError) as e:
+        logger.error(f"Invalid discount percent in callback data: {callback.data}, error: {e}")
+        await callback.answer(get_text(lang, "error"), show_alert=True)
+        return
     
     await state.update_data(discount_percent=percent)
     await callback.message.edit_text(

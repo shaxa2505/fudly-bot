@@ -35,18 +35,6 @@ wheels/
 .installed.cfg
 *.egg
 
-# Временные скрипты
-fix_*.py
-check_*.py
-analyze_*.py
-cleanup_*.py
-verify_*.py
-test_*.py
-
-# Backup папки
-бекап/
-backup*/
-
 # IDE
 .vscode/
 .idea/
@@ -56,9 +44,25 @@ backup*/
 
 # Логи
 *.log
+logs/
+
+# Coverage
+htmlcov/
+.coverage
+.pytest_cache/
 
 # OS
 .DS_Store
 Thumbs.db
 
+# Backups (НЕ КОММИТИТЬ!)
 *.backup
+*.backup[0-9]
+*.bak
+*~
+.backup/
+backup/
+
+# Temporary files
+*.tmp
+*.temp

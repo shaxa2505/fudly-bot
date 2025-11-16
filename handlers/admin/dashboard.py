@@ -131,20 +131,36 @@ async def admin_moderation_callback(callback: types.CallbackQuery):
     await bot.send_message(callback.message.chat.id, get_text(lang, 'pending_stores_count', count=len(pending)))
     
     for store in pending:
-        text = f"🏪 <b>{store['name']}</b>\n\n"
-        text += f"От: {store['first_name']} (@{store.get('username') or 'нет'})\n"
-        text += f"ID: <code>{store['store_id']}</code>\n\n"
-        text += f"📍 {store['city']}, {store['address']}\n"
-        text += f"🏷 {store['category']}\n"
-        text += f"📱 {store['phone']}\n"
-        text += f"📝 {store['description']}\n"
-        text += f"📅 {store['created_at']}"
+        # Store tuple structure: store_id(0), owner_id(1), name(2), city(3), address(4), 
+        # description(5), category(6), phone(7), status(8), rejection_reason(9), 
+        # created_at(10), business_type(11), delivery_enabled(12), delivery_price(13), 
+        # min_order_amount(14), first_name(15), username(16)
+        
+        store_id = store[0]
+        name = store[2]
+        city = store[3]
+        address = store[4] or "не указан"
+        description = store[5] or "нет описания"
+        category = store[6]
+        phone = store[7] or "не указан"
+        created_at = store[10]
+        first_name = store[15] if len(store) > 15 else "Неизвестно"
+        username = store[16] if len(store) > 16 else None
+        
+        text = f"🏪 <b>{name}</b>\n\n"
+        text += f"От: {first_name} (@{username or 'нет'})\n"
+        text += f"ID: <code>{store_id}</code>\n\n"
+        text += f"📍 {city}, {address}\n"
+        text += f"🏷 {category}\n"
+        text += f"📱 {phone}\n"
+        text += f"📝 {description}\n"
+        text += f"📅 {created_at}"
         
         await bot.send_message(
             callback.message.chat.id,
             text,
             parse_mode="HTML",
-            reply_markup=moderation_keyboard(store['store_id'])
+            reply_markup=moderation_keyboard(store_id)
         )
         await asyncio.sleep(0.3)
 
@@ -341,7 +357,12 @@ async def admin_list_sellers_callback(callback: types.CallbackQuery):
 
 @router.callback_query(F.data.startswith("admin_delete_user_stores_"))
 async def admin_delete_user_stores_callback(callback: types.CallbackQuery):
-    user_id = int(callback.data.split("_")[-1])
+    try:
+        user_id = int(callback.data.split("_")[-1])
+    except (ValueError, IndexError) as e:
+        logger.error(f"Invalid user_id in callback data: {callback.data}, error: {e}")
+        await callback.answer("❌ Неверный запрос", show_alert=True)
+        return
     
     with db.get_connection() as conn:
         cursor = conn.cursor()
@@ -393,7 +414,12 @@ async def admin_confirm_delete_stores_callback(callback: types.CallbackQuery):
         await callback.answer("❌ Доступ запрещён", show_alert=True)
         return
     
-    user_id = int(callback.data.split("_")[-1])
+    try:
+        user_id = int(callback.data.split("_")[-1])
+    except (ValueError, IndexError) as e:
+        logger.error(f"Invalid user_id in callback data: {callback.data}, error: {e}")
+        await callback.answer("❌ Неверный запрос", show_alert=True)
+        return
     
     conn = db.get_connection()
     cursor = conn.cursor()
@@ -502,7 +528,12 @@ async def admin_block_store_callback(callback: types.CallbackQuery):
         await callback.answer("❌ Доступ запрещён", show_alert=True)
         return
     
-    store_id = int(callback.data.split("_")[-1])
+    try:
+        store_id = int(callback.data.split("_")[-1])
+    except (ValueError, IndexError) as e:
+        logger.error(f"Invalid store_id in callback data: {callback.data}, error: {e}")
+        await callback.answer("❌ Неверный запрос", show_alert=True)
+        return
     
     with db.get_connection() as conn:
         cursor = conn.cursor()

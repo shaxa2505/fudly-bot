@@ -6,11 +6,16 @@ services:
     container_name: fudly-bot
     restart: unless-stopped
     environment:
-      - BOT_TOKEN=${BOT_TOKEN}
+      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
+      - ADMIN_ID=${ADMIN_ID}
       - DATABASE_URL=${DATABASE_URL}
-      - USE_POSTGRES=${USE_POSTGRES:-false}
+      - USE_WEBHOOK=${USE_WEBHOOK:-false}
       - WEBHOOK_URL=${WEBHOOK_URL}
-      - ADMIN_IDS=${ADMIN_IDS}
+      - WEBHOOK_PATH=${WEBHOOK_PATH:-/webhook}
+      - PORT=${PORT:-8080}
+      - SECRET_TOKEN=${SECRET_TOKEN}
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+      - REDIS_URL=${REDIS_URL}
     volumes:
       - ./data:/app/data
       - ./logs:/app/logs

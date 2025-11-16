@@ -29,8 +29,8 @@ def setup(
     async def change_city(message: types.Message, state: Optional[FSMContext] = None):
         user_id = message.from_user.id  # type: ignore[union-attr]  # type: ignore[union-attr]
         lang = db.get_user_language(user_id)
-        user = db.get_user(user_id)
-        current_city = user.get('city') if user else get_cities(lang)[0]
+        user = db.get_user_model(user_id)
+        current_city = user.city if user else get_cities(lang)[0]
         if not current_city:
             current_city = get_cities(lang)[0]
         
@@ -73,9 +73,17 @@ def setup(
     async def back_to_main_menu(callback: types.CallbackQuery):
         """Return to main menu"""
         lang = db.get_user_language(callback.from_user.id)
-        user = db.get_user(callback.from_user.id)
-        user_role = user.get('role', 'customer') if user else 'customer'
-        menu = main_menu_seller(lang) if user_role == "seller" else main_menu_customer(lang)
+        user = db.get_user_model(callback.from_user.id)
+        user_role = user.role if user else 'customer'
+        
+        # Initialize user_view_mode for sellers
+        from handlers import common_user
+        if common_user.user_view_mode is not None and user_role == 'seller':
+            # If not set, default to seller mode for sellers
+            if callback.from_user.id not in common_user.user_view_mode:
+                common_user.user_view_mode[callback.from_user.id] = 'seller'
+        
+        menu = main_menu_seller(lang) if user_role == "seller" else main_menu_customer(lang, show_seller_switch=False)
         
         await callback.message.delete()  # type: ignore[union-attr]
         await callback.message.answer(  # type: ignore[union-attr]
@@ -89,7 +97,7 @@ def setup(
         """Quick city change handler (without FSM state)"""
         user_id = message.from_user.id
         lang = db.get_user_language(user_id)
-        user = db.get_user(user_id)
+        user = db.get_user_model(user_id)
         
         # IMPORTANT: Check current FSM state
         # If user is in registration process (store or self), skip
@@ -105,8 +113,8 @@ def setup(
         db.update_user_city(user_id, new_city)
         
         # Get updated main menu
-        user_role = user.get('role', 'customer') if user else 'customer'
-        menu = main_menu_seller(lang) if user_role == "seller" else main_menu_customer(lang)
+        user_role = user.role or 'customer' if user else 'customer'
+        menu = main_menu_seller(lang) if user_role == "seller" else main_menu_customer(lang, show_seller_switch=False)
         
         await message.answer(
             f"✅ {get_text(lang, 'city_changed', city=new_city)}\n\n"
@@ -117,7 +125,7 @@ def setup(
 
     @dp_or_router.message(Command("start"))
     async def cmd_start(message: types.Message, state: FSMContext):
-        user = db.get_user(message.from_user.id)  # type: ignore[union-attr]
+        user = db.get_user_model(message.from_user.id)  # type: ignore[union-attr]
         
         if not user:
             # New user - show welcome message + language selection
@@ -134,9 +142,10 @@ def setup(
         lang = db.get_user_language(message.from_user.id)
         
         # Both backends now return dict
-        user_phone = user.get('phone')
-        user_city = user.get('city')
-        user_role = user.get('role', 'customer')
+        # Extract user data to check if already registered
+        user_phone = user.phone
+        user_city = user.city
+        user_role = user.role or 'customer'
         
         # Check phone (city will be set automatically with phone)
         if not user_phone:
@@ -148,8 +157,16 @@ def setup(
             await state.set_state(Registration.phone)
             return
         
+        # Initialize user_view_mode based on user role
+        # This is handled in bot.py - user_view_mode dict is shared
+        # Set default mode based on role
+        from handlers import common_user
+        if common_user.user_view_mode is not None and user_role == 'seller':
+            # If user is seller, default to seller mode
+            common_user.user_view_mode[message.from_user.id] = 'seller'
+        
         # Welcome message
-        menu = main_menu_seller(lang) if user_role == "seller" else main_menu_customer(lang)
+        menu = main_menu_seller(lang) if user_role == "seller" else main_menu_customer(lang, show_seller_switch=False)
         await message.answer(
             get_text(lang, 'welcome_back', name=message.from_user.first_name, city=user_city or 'Ташкент'),  # type: ignore[union-attr]
             parse_mode="HTML",
@@ -161,7 +178,7 @@ def setup(
         lang = callback.data.split("_")[1]  # type: ignore[union-attr]
         
         # Show menu after language selection
-        user = db.get_user(callback.from_user.id)
+        user = db.get_user_model(callback.from_user.id)
         
         # CHECK: if user is not in DB (new user)
         if not user:
@@ -182,8 +199,8 @@ def setup(
         await callback.message.edit_text(get_text(lang, 'language_changed'))
         
         # Extract user data
-        user_phone = user.get('phone')
-        user_city = user.get('city')
+        user_phone = user.phone
+        user_city = user.city
         
         # If no phone - request it (city will be set automatically)
         if not user_phone:
@@ -196,8 +213,8 @@ def setup(
             return
         
         # Show main menu
-        user_role = user.get('role', 'customer') if user else 'customer'
-        menu = main_menu_seller(lang) if user_role == "seller" else main_menu_customer(lang)
+        user_role = user.role or 'customer' if user else 'customer'
+        menu = main_menu_seller(lang) if user_role == "seller" else main_menu_customer(lang, show_seller_switch=False)
         await callback.message.answer(
             get_text(lang, 'welcome_back', name=callback.from_user.first_name, city=user_city or 'Ташкент'),
             parse_mode="HTML",
@@ -211,9 +228,9 @@ def setup(
         
         # BLOCK cancellation of mandatory registration
         if current_state in ['Registration:phone', 'Registration:city']:
-            user = db.get_user(message.from_user.id)  # type: ignore[union-attr]
+            user = db.get_user_model(message.from_user.id)  # type: ignore[union-attr]
             # If no phone number — registration is mandatory, cancellation prohibited
-            user_phone = user.get('phone') if user else None
+            user_phone = user.phone if user else None
             if not user or not user_phone:
                 await message.answer(
                     "❌ Регистрация обязательна для использования бота.\n\n"
@@ -240,8 +257,8 @@ def setup(
             except Exception:
                 preferred_menu = None
 
-        user = db.get_user(message.from_user.id)
-        role = user.get('role', 'customer') if user else 'customer'
+        user = db.get_user_model(message.from_user.id)
+        role = user.role if user else 'customer'
         
         # CRITICAL: When cancelling RegisterStore ALWAYS return to customer menu
         # because user does NOT YET have an approved store

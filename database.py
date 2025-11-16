@@ -6,6 +6,14 @@ import sqlite3
 from datetime import datetime, timedelta
 from typing import Any, List, Optional, Tuple
 
+# Domain models
+try:
+    from app.domain import User, Store, Offer, Booking
+    DOMAIN_MODELS_AVAILABLE = True
+except ImportError:
+    DOMAIN_MODELS_AVAILABLE = False
+    User = Store = Offer = Booking = None  # type: ignore
+
 # Простое логирование (fallback если нет logging_config)
 try:
     from logging_config import logger
@@ -40,7 +48,7 @@ class Database:
         self.db_name = db_name or DB_PATH
         self.init_db()
     
-    def get_connection(self):
+    def get_connection(self) -> sqlite3.Connection:
         """Возвращает подключение к базе данных"""
         conn = sqlite3.connect(self.db_name, timeout=int(os.environ.get('DB_TIMEOUT', 30)))
         try:
@@ -49,7 +57,7 @@ class Database:
             pass
         return conn
     
-    def init_db(self):
+    def init_db(self) -> None:
         """Инициализация базы данных"""
         conn = self.get_connection()
         cursor = conn.cursor()
@@ -413,7 +421,26 @@ class Database:
             except Exception:
                 pass
     
-    def update_user_city(self, user_id: int, city: str):
+    def get_user_model(self, user_id: int) -> Optional['User']:
+        """Return user as Pydantic model (NEW - type-safe).
+        
+        Returns:
+            User model or None if not found
+        """
+        if not DOMAIN_MODELS_AVAILABLE:
+            raise ImportError("Domain models not available. Install pydantic.")
+        
+        user_dict = self.get_user(user_id)
+        if not user_dict:
+            return None
+        
+        try:
+            return User.from_db_row(user_dict)
+        except Exception as e:
+            logger.error(f"Failed to convert user {user_id} to model: {e}")
+            return None
+    
+    def update_user_city(self, user_id: int, city: str) -> None:
         conn = self.get_connection()
         try:
             cursor = conn.cursor()
@@ -425,7 +452,7 @@ class Database:
             except Exception:
                 pass
     
-    def update_user_role(self, user_id: int, role: str):
+    def update_user_role(self, user_id: int, role: str) -> None:
         conn = self.get_connection()
         try:
             cursor = conn.cursor()
@@ -437,7 +464,7 @@ class Database:
             except Exception:
                 pass
     
-    def update_user_phone(self, user_id: int, phone: str):
+    def update_user_phone(self, user_id: int, phone: str) -> None:
         conn = self.get_connection()
         try:
             cursor = conn.cursor()
@@ -449,7 +476,25 @@ class Database:
             except Exception:
                 pass
     
-    def update_user_language(self, user_id: int, language: str):
+    def update_user_profile(self, user_id: int, city: Optional[str] = None, phone: Optional[str] = None, full_name: Optional[str] = None) -> None:
+        """Update multiple user profile fields atomically."""
+        conn = self.get_connection()
+        try:
+            cursor = conn.cursor()
+            if city:
+                cursor.execute('UPDATE users SET city = ? WHERE user_id = ?', (city, user_id))
+            if phone:
+                cursor.execute('UPDATE users SET phone = ? WHERE user_id = ?', (phone, user_id))
+            if full_name:
+                cursor.execute('UPDATE users SET first_name = ? WHERE user_id = ?', (full_name, user_id))
+            conn.commit()
+        finally:
+            try:
+                conn.close()
+            except Exception:
+                pass
+    
+    def update_user_language(self, user_id: int, language: str) -> None:
         """Обновить язык пользователя"""
         conn = self.get_connection()
         cursor = conn.cursor()
@@ -552,6 +597,32 @@ class Database:
 
         return store
     
+    def get_store_model(self, store_id: int) -> Optional['Store']:
+        """Get store as Pydantic model (new API).
+        
+        Returns:
+            Store model with type safety and validation, or None if not found.
+        
+        Example:
+            store = db.get_store_model(123)
+            if store:
+                print(store.name)  # Type-safe access
+                if store.is_active:  # Use property instead of store['status'] == 'active'
+                    print(store.full_address)  # Computed property
+        """
+        if not DOMAIN_MODELS_AVAILABLE:
+            raise ImportError("Domain models not available. Install pydantic.")
+        
+        store_dict = self.get_store(store_id)
+        if not store_dict:
+            return None
+        
+        try:
+            return Store.from_db_row(store_dict)
+        except Exception as e:
+            logger.error(f"Failed to convert store {store_id} to model: {e}")
+            return None
+    
     def get_stores_by_city(self, city: str) -> List[dict[str, Any]]:
         key = f'stores:city:{city}'
         try:
@@ -581,6 +652,34 @@ class Database:
             pass
 
         return stores
+    
+    def get_stores_by_status(self, status: str) -> List[Tuple[Any, ...]]:
+        """Get stores filtered by status (pending/approved/rejected)."""
+        conn = self.get_connection()
+        try:
+            cursor = conn.cursor()
+            cursor.execute('SELECT * FROM stores WHERE status = ?', (status,))
+            stores = cursor.fetchall()
+            return stores
+        finally:
+            try:
+                conn.close()
+            except Exception:
+                pass
+    
+    def update_store_status(self, store_id: int, status: str) -> bool:
+        """Update store status to pending/approved/rejected."""
+        conn = self.get_connection()
+        try:
+            cursor = conn.cursor()
+            cursor.execute('UPDATE stores SET status = ? WHERE store_id = ?', (status, store_id))
+            conn.commit()
+            return cursor.rowcount > 0
+        finally:
+            try:
+                conn.close()
+            except Exception:
+                pass
     
     def _format_datetime_field(self, time_input: str) -> str:
         """
@@ -642,7 +741,7 @@ class Database:
     # Методы для предложений
     def add_offer(self, store_id: int, title: str, description: str, original_price: float, 
                   discount_price: float, quantity: int, available_from: str, available_until: str, 
-                  photo: str = None, expiry_date: str = None, unit: str = 'шт', category: str = 'other') -> int:
+                  photo: Optional[str] = None, expiry_date: Optional[str] = None, unit: str = 'шт', category: str = 'other') -> int:
         
         # Приводим время к стандартному формату
         formatted_from = self._format_datetime_field(available_from)
@@ -778,7 +877,7 @@ class Database:
 
         return valid_offers
     
-    def get_hot_offers(self, city: str = None, limit: int = 20, offset: int = 0, business_type: str = None) -> List[Tuple]:
+    def get_hot_offers(self, city: Optional[str] = None, limit: int = 20, offset: int = 0, business_type: Optional[str] = None) -> List[Tuple[Any, ...]]:
         """Получить горячие предложения (топ по скидке и времени окончания)
         
         Args:
@@ -796,7 +895,8 @@ class Database:
         # Формируем запрос с JOIN для получения информации о магазине
         query = '''
             SELECT o.*, s.name as store_name, s.address, s.city, s.business_type,
-                   CAST((1.0 - o.discount_price / o.original_price) * 100 AS INTEGER) as discount_percent
+                   CAST((1.0 - o.discount_price / o.original_price) * 100 AS INTEGER) as discount_percent,
+                   s.delivery_enabled, s.delivery_price, s.min_order_amount
             FROM offers o
             JOIN stores s ON o.store_id = s.store_id
             WHERE o.status = 'active' 
@@ -917,6 +1017,33 @@ class Database:
             except Exception:
                 pass
     
+    def get_offer_model(self, offer_id: int) -> Optional['Offer']:
+        """Get offer as Pydantic model (new API).
+        
+        Returns:
+            Offer model with type safety and validation, or None if not found.
+        
+        Example:
+            offer = db.get_offer_model(456)
+            if offer:
+                print(f"{offer.title}: {offer.discount_price}")  # Type-safe
+                print(f"Savings: {offer.savings_amount}")  # Computed property
+                if offer.is_available:  # Property instead of complex logic
+                    print(offer.formatted_times)  # Helper method
+        """
+        if not DOMAIN_MODELS_AVAILABLE:
+            raise ImportError("Domain models not available. Install pydantic.")
+        
+        offer_tuple = self.get_offer(offer_id)
+        if not offer_tuple:
+            return None
+        
+        try:
+            return Offer.from_db_row(offer_tuple)
+        except Exception as e:
+            logger.error(f"Failed to convert offer {offer_id} to model: {e}")
+            return None
+    
     def get_store_offers(self, store_id: int) -> List[Tuple]:
         """Получить товары магазина с информацией о магазине (оптимизировано с JOIN)"""
         conn = self.get_connection()
@@ -937,7 +1064,7 @@ class Database:
             except Exception:
                 pass
     
-    def update_offer_quantity(self, offer_id: int, new_quantity: int):
+    def update_offer_quantity(self, offer_id: int, new_quantity: int) -> None:
         """Обновить количество товара и автоматически управлять статусом"""
         conn = self.get_connection()
         cursor = conn.cursor()
@@ -999,7 +1126,7 @@ class Database:
         except Exception:
             pass
     
-    def update_offer_expiry(self, offer_id: int, new_expiry: str):
+    def update_offer_expiry(self, offer_id: int, new_expiry: str) -> None:
         """Обновить срок годности товара"""
         conn = self.get_connection()
         cursor = conn.cursor()
@@ -1185,6 +1312,48 @@ class Database:
             except Exception:
                 pass
     
+    def get_user_bookings_by_status(self, user_id: int, status: str) -> List[Tuple]:
+        """Get user bookings filtered by status.
+        
+        Args:
+            user_id: User ID
+            status: 'active', 'completed', or 'cancelled'
+        
+        Returns:
+            List of booking tuples
+        """
+        conn = self.get_connection()
+        try:
+            cursor = conn.cursor()
+            
+            # Map status to database values
+            if status == "active":
+                status_filter = "('pending', 'confirmed')"
+            elif status == "completed":
+                status_filter = "('completed')"
+            elif status == "cancelled":
+                status_filter = "('cancelled')"
+            else:
+                status_filter = "('pending', 'confirmed')"
+            
+            cursor.execute(f'''
+                SELECT b.booking_id, b.offer_id, b.user_id, b.status, b.booking_code,
+                       b.pickup_time, COALESCE(b.quantity, 1) as quantity, b.created_at,
+                       o.title, o.discount_price, o.available_until, s.name, s.address, s.city
+                FROM bookings b
+                JOIN offers o ON b.offer_id = o.offer_id
+                JOIN stores s ON o.store_id = s.store_id
+                WHERE b.user_id = ? AND b.status IN {status_filter}
+                ORDER BY b.created_at DESC
+            ''', (user_id,))
+            bookings = cursor.fetchall()
+            return bookings
+        finally:
+            try:
+                conn.close()
+            except Exception:
+                pass
+    
     def get_booking(self, booking_id: int) -> Optional[Tuple]:
         conn = self.get_connection()
         try:
@@ -1204,6 +1373,32 @@ class Database:
                 conn.close()
             except Exception:
                 pass
+    
+    def get_booking_model(self, booking_id: int) -> Optional['Booking']:
+        """Get booking as Pydantic model (new API).
+        
+        Returns:
+            Booking model with type safety and validation, or None if not found.
+        
+        Example:
+            booking = db.get_booking_model(789)
+            if booking:
+                print(f"Code: {booking.booking_code}")  # Type-safe
+                if booking.is_active:  # Property instead of status == 'pending'
+                    print(booking.formatted_pickup_time)  # Helper method
+        """
+        if not DOMAIN_MODELS_AVAILABLE:
+            raise ImportError("Domain models not available. Install pydantic.")
+        
+        booking_tuple = self.get_booking(booking_id)
+        if not booking_tuple:
+            return None
+        
+        try:
+            return Booking.from_db_row(booking_tuple)
+        except Exception as e:
+            logger.error(f"Failed to convert booking {booking_id} to model: {e}")
+            return None
     
     def get_booking_by_code(self, booking_code: str) -> Optional[Tuple]:
         """Получить бронирование по коду"""
@@ -1458,8 +1653,10 @@ class Database:
             INSERT INTO ratings (booking_id, user_id, store_id, rating, comment)
             VALUES (?, ?, ?, ?, ?)
         ''', (booking_id, user_id, store_id, rating, comment))
+        rating_id = cursor.lastrowid
         conn.commit()
         conn.close()
+        return rating_id
     
     def get_store_ratings(self, store_id: int) -> List[Tuple]:
         conn = self.get_connection()
@@ -1521,17 +1718,7 @@ class Database:
         conn.close()
         return stats
 
-    # Методы для рейтингов
-    def add_rating(self, booking_id: int, user_id: int, store_id: int, rating: int, comment: str = None):
-        """Добавить рейтинг"""
-        conn = self.get_connection()
-        cursor = conn.cursor()
-        cursor.execute('''
-            INSERT INTO ratings (booking_id, user_id, store_id, rating, comment)
-            VALUES (?, ?, ?, ?, ?)
-        ''', (booking_id, user_id, store_id, rating, comment))
-        conn.commit()
-        conn.close()
+    # Duplicate add_rating() removed - using the one at line 1560
     
     def get_store_ratings(self, store_id: int) -> List[Tuple]:
         """Получить все рейтинги магазина"""
@@ -1677,6 +1864,46 @@ class Database:
         history = cursor.fetchall()
         conn.close()
         return history
+    
+    def get_bookings_for_store(self, store_id: int, status: str = None) -> List[dict]:
+        """Get all bookings for a store."""
+        conn = self.get_connection()
+        cursor = conn.cursor()
+        try:
+            if status:
+                cursor.execute('''
+                    SELECT b.booking_id, b.offer_id, b.user_id, b.status, b.booking_code,
+                           b.pickup_time, COALESCE(b.quantity, 1) as quantity, b.created_at
+                    FROM bookings b
+                    JOIN offers o ON b.offer_id = o.offer_id
+                    WHERE o.store_id = ? AND b.status = ?
+                    ORDER BY b.created_at DESC
+                ''', (store_id, status))
+            else:
+                cursor.execute('''
+                    SELECT b.booking_id, b.offer_id, b.user_id, b.status, b.booking_code,
+                           b.pickup_time, COALESCE(b.quantity, 1) as quantity, b.created_at
+                    FROM bookings b
+                    JOIN offers o ON b.offer_id = o.offer_id
+                    WHERE o.store_id = ?
+                    ORDER BY b.created_at DESC
+                ''', (store_id,))
+            rows = cursor.fetchall()
+            bookings = []
+            for row in rows:
+                bookings.append({
+                    'booking_id': row[0],
+                    'offer_id': row[1],
+                    'user_id': row[2],
+                    'status': row[3],
+                    'booking_code': row[4],
+                    'pickup_time': row[5],
+                    'quantity': row[6],
+                    'created_at': row[7],
+                })
+            return bookings
+        finally:
+            conn.close()
     
     def get_user_savings(self, user_id: int) -> float:
         """Подсчитывает сколько пользователь сэкономил"""
@@ -2003,7 +2230,8 @@ class Database:
         try:
             cursor.execute('''
                 SELECT o.*, s.name, s.address, s.city, s.category,
-                       CAST((o.original_price - o.discount_price) AS REAL) / o.original_price * 100 as discount_percent
+                       CAST((o.original_price - o.discount_price) AS REAL) / o.original_price * 100 as discount_percent,
+                       s.delivery_enabled, s.delivery_price, s.min_order_amount
                 FROM offers o
                 JOIN stores s ON o.store_id = s.store_id
                 WHERE s.city = ? AND s.category = ? AND s.status = 'active'
@@ -2013,6 +2241,42 @@ class Database:
                 LIMIT ?
             ''', (city, category, limit))
             return cursor.fetchall()
+        finally:
+            conn.close()
+    
+    def get_offers_by_city(self, city: str, limit: int = 50) -> List[dict]:
+        """Get all active offers in a city."""
+        conn = self.get_connection()
+        cursor = conn.cursor()
+        try:
+            cursor.execute('''
+                SELECT o.offer_id, o.store_id, o.title, o.description, 
+                       o.original_price, o.discount_price, o.quantity,
+                       o.available_from, o.available_until, o.expiry_date, o.status
+                FROM offers o
+                JOIN stores s ON o.store_id = s.store_id
+                WHERE s.city = ? AND o.status = 'active' AND o.quantity > 0
+                ORDER BY o.created_at DESC
+                LIMIT ?
+            ''', (city, limit))
+            rows = cursor.fetchall()
+            # Convert to dict for easier access in tests
+            offers = []
+            for row in rows:
+                offers.append({
+                    'offer_id': row[0],
+                    'store_id': row[1],
+                    'title': row[2],
+                    'description': row[3],
+                    'original_price': row[4],
+                    'discount_price': row[5],
+                    'quantity': row[6],
+                    'available_from': row[7],
+                    'available_until': row[8],
+                    'expiry_date': row[9],
+                    'status': row[10],
+                })
+            return offers
         finally:
             conn.close()
     

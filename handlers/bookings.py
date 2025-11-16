@@ -8,7 +8,7 @@ from aiogram.utils.keyboard import InlineKeyboardBuilder
 from app.core.cache import CacheManager
 from database_protocol import DatabaseProtocol
 from handlers.common_states.states import BookOffer, OrderDelivery
-from keyboards import cancel_keyboard
+from app.keyboards import cancel_keyboard
 from localization import get_text
 from logging_config import logger
 
@@ -22,19 +22,19 @@ def can_proceed(user_id: int, action: str) -> bool:
 router = Router()
 
 
-# Helper functions (will be passed as dependencies)
-def get_user_field(user: any, field: str, default: any = None) -> any:
-    """Extract field from user tuple/dict."""
-    if isinstance(user, dict):
-        return user.get(field, default)
-    # Tuple access - needs mapping
-    return default
-
-
 def get_store_field(store: any, field: str, default: any = None) -> any:
     """Extract field from store tuple/dict."""
     if isinstance(store, dict):
         return store.get(field, default)
+    if isinstance(store, (tuple, list)):
+        field_map = {
+            "store_id": 0, "owner_id": 1, "name": 2, "city": 3,
+            "address": 4, "description": 5, "category": 6, "phone": 7,
+            "status": 8, "rejection_reason": 9, "created_at": 10
+        }
+        idx = field_map.get(field)
+        if idx is not None and len(store) > idx:
+            return store[idx]
     return default
 
 
@@ -42,6 +42,17 @@ def get_offer_field(offer: any, field: str, default: any = None) -> any:
     """Extract field from offer tuple/dict."""
     if isinstance(offer, dict):
         return offer.get(field, default)
+    if isinstance(offer, (tuple, list)):
+        field_map = {
+            "offer_id": 0, "store_id": 1, "title": 2, "description": 3,
+            "original_price": 4, "discount_price": 5, "quantity": 6,
+            "available_from": 7, "available_until": 8, "expiry_date": 9,
+            "status": 10, "photo": 11, "created_at": 12, "unit": 13,
+            "category": 14, "store_name": 15, "address": 16, "city": 17
+        }
+        idx = field_map.get(field)
+        if idx is not None and len(offer) > idx:
+            return offer[idx]
     return default
 
 
@@ -90,7 +101,13 @@ async def book_offer_start(callback: types.CallbackQuery, state: FSMContext) -> 
         await callback.answer(get_text(lang, "operation_cancelled"), show_alert=True)
         return
     
-    offer_id = int(callback.data.split("_")[1])
+    try:
+        offer_id = int(callback.data.split("_")[1])
+    except (ValueError, IndexError) as e:
+        logger.error(f"Invalid offer_id in callback data: {callback.data}, error: {e}")
+        await callback.answer(get_text(lang, "error"), show_alert=True)
+        return
+    
     offer = db.get_offer(offer_id)
     
     if not offer or offer[6] <= 0:
@@ -103,10 +120,10 @@ async def book_offer_start(callback: types.CallbackQuery, state: FSMContext) -> 
     
     # Ask for quantity
     await callback.message.answer(
-        f"🍽 <b>{offer[2]}</b>\n\n"
-        f"📦 Доступно: {offer[6]} шт.\n"
-        f"💰 Цена за 1 шт: {int(offer[5]):,} сум\n\n"
-        f"Сколько вы хотите забронировать? (1-{offer[6]})",
+        f"📦 <b>{offer[2]}</b>\n\n"
+        f"📋 Доступно: {offer[6]} шт\n"
+        f"💰 Цена: {int(offer[5]):,} сум/шт\n\n"
+        f"Сколько хотите забронировать? (1-{offer[6]})",
         parse_mode="HTML",
         reply_markup=cancel_keyboard(lang),
     )
@@ -134,11 +151,45 @@ async def book_offer_quantity(message: types.Message, state: FSMContext) -> None
             return
         
         data = await state.get_data()
-        offer_id = data["offer_id"]
+        offer_id = data.get("offer_id")
+        if not offer_id:
+            await message.answer("❌ Ошибка: товар не выбран")
+            await state.clear()
+            return
+            
         offer = db.get_offer(offer_id)
         
-        if not offer or offer[6] < quantity:
-            await message.answer(f"❌ Доступно только {offer[6] if offer else 0} шт.")
+        if not offer:
+            await message.answer("❌ Предложение не найдено")
+            await state.clear()
+            return
+            
+        # Safe access to quantity field - handle different offer structures
+        try:
+            if isinstance(offer, (tuple, list)):
+                available_qty = offer[6] if len(offer) > 6 else 0
+                offer_title = offer[2] if len(offer) > 2 else "Товар"
+                offer_price = offer[5] if len(offer) > 5 else 0
+                store_id = offer[1] if len(offer) > 1 else None
+                offer_address = offer[16] if len(offer) > 16 else "Адрес не указан"
+            elif isinstance(offer, dict):
+                available_qty = offer.get('quantity', 0)
+                offer_title = offer.get('title', 'Товар')
+                offer_price = offer.get('discount_price', 0)
+                store_id = offer.get('store_id')
+                offer_address = offer.get('address', 'Адрес не указан')
+            else:
+                await message.answer("❌ Ошибка формата данных")
+                await state.clear()
+                return
+        except (IndexError, KeyError, TypeError) as e:
+            logger.error(f"Error accessing offer fields: {e}, offer type: {type(offer)}")
+            await message.answer("❌ Ошибка обработки товара")
+            await state.clear()
+            return
+            
+        if available_qty < quantity:
+            await message.answer(f"❌ Доступно только {available_qty} шт.")
             return
         
         # Try to atomically book item and create booking
@@ -147,7 +198,7 @@ async def book_offer_quantity(message: types.Message, state: FSMContext) -> None
         )
         if not ok or booking_id is None or code is None:
             await message.answer(
-                "❌ К сожалению, выбранное количество уже недоступно. Обновите список предложений."
+                "❌ К сожалению, выбранное количество уже недоступно."
             )
             await state.clear()
             return
@@ -160,57 +211,53 @@ async def book_offer_quantity(message: types.Message, state: FSMContext) -> None
         await state.clear()
         
         # Notify partner with inline quick actions
-        store = db.get_store(offer[1])
-        if store:
-            partner_lang = db.get_user_language(store[1])
-            # Get customer phone for partner
-            customer = db.get_user(message.from_user.id)
-            customer_phone = get_user_field(customer, "phone", "Не указан")
-            
-            # Create inline keyboard for quick actions
-            notification_kb = InlineKeyboardBuilder()
-            notification_kb.button(text="✅ Выдано", callback_data=f"complete_booking_{booking_id}")
-            notification_kb.button(text="❌ Отменить", callback_data=f"cancel_booking_{booking_id}")
-            notification_kb.adjust(2)
-            
-            owner_id = get_store_field(store, "owner_id")
-            store_name = get_store_field(store, "name", "Магазин")
-            offer_title = (
-                offer[2]
-                if isinstance(offer, tuple) and len(offer) > 2
-                else (
-                    offer.get("title", "Товар")
-                    if isinstance(offer, dict)
-                    else "Товар"
-                )
-            )
-            try:
-                await bot.send_message(
-                    owner_id,
-                    f"🔔 <b>Новое бронирование!</b>\n\n"
-                    f"🏪 {store_name}\n"
-                    f"🍽 {offer_title}\n"
-                    f"📦 Количество: {quantity} шт.\n"
-                    f"👤 {message.from_user.first_name}\n"
-                    f"📱 Телефон: <code>{customer_phone}</code>\n"
-                    f"🎫 <code>{code}</code>\n"
-                    f"💰 {int(get_offer_field(offer, 'discount_price', 0) * quantity):,} сум",
-                    parse_mode="HTML",
-                    reply_markup=notification_kb.as_markup(),
-                )
-            except Exception:
-                pass
+        if store_id:
+            store = db.get_store(store_id)
+            if store:
+                owner_id = get_store_field(store, "owner_id")
+                if not owner_id:
+                    logger.warning(f"Store {store_id} has no owner_id")
+                    await state.clear()
+                    return
+                partner_lang = db.get_user_language(owner_id)
+                # Get customer phone for partner
+                customer = db.get_user_model(message.from_user.id)
+                customer_phone = customer.phone if customer else "Не указан"
+                
+                # Create inline keyboard for quick actions
+                notification_kb = InlineKeyboardBuilder()
+                notification_kb.button(text="✓ Выдано", callback_data=f"complete_booking_{booking_id}")
+                notification_kb.button(text="× Отменить", callback_data=f"cancel_booking_{booking_id}")
+                notification_kb.adjust(2)
+                
+                store_name = get_store_field(store, "name", "Магазин")
+                
+                try:
+                    await bot.send_message(
+                        owner_id,
+                        f"🔔 <b>Новый заказ</b>\n\n"
+                        f"🏪 {store_name}\n"
+                        f"📦 {offer_title} × {quantity} шт\n\n"
+                        f"👤 {message.from_user.first_name}\n"
+                        f"📱 <code>{customer_phone}</code>\n"
+                        f"🎫 <code>{code}</code>\n"
+                        f"💰 {int(offer_price * quantity):,} сум",
+                        parse_mode="HTML",
+                        reply_markup=notification_kb.as_markup(),
+                    )
+                except Exception as e:
+                    logger.error(f"Failed to notify partner: {e}")
         
-        total_price = int(offer[5] * quantity)
+        total_price = int(offer_price * quantity)
         
         # Show booking confirmation to customer
         await message.answer(
-            f"✅ <b>Бронирование создано!</b>\n\n"
-            f"🍽 {offer[2]}\n"
-            f"📦 Количество: {quantity} шт.\n"
-            f"💰 Итого: {total_price:,} сум\n"
+            f"✅ <b>Заказ создан!</b>\n\n"
+            f"📦 {offer_title}\n"
+            f"🔢 {quantity} шт\n"
+            f"💰 {total_price:,} сум\n\n"
             f"🎫 Код: <code>{code}</code>\n\n"
-            f"📍 Забрать можно по адресу:\n{offer[16] if len(offer) > 16 else 'Адрес не указан'}",
+            f"📍 Адрес:\n{offer_address}",
             parse_mode="HTML",
         )
         
@@ -253,7 +300,7 @@ async def my_bookings(message: types.Message) -> None:
         )
         return
     
-    text = f"🛒 <b>{get_text(lang, 'my_bookings')}</b>\n\n"
+    text = f"📦 <b>{get_text(lang, 'my_bookings')}</b>\n\n"
     
     for booking in active[:10]:  # Show max 10
         booking_id = booking[0]
@@ -266,8 +313,8 @@ async def my_bookings(message: types.Message) -> None:
         total = int(offer[5] * quantity)
         
         text += (
-            f"🍽 <b>{offer[2]}</b>\n"
-            f"📦 {quantity} шт. × {int(offer[5]):,} = {total:,} сум\n"
+            f"📦 <b>{offer[2]}</b>\n"
+            f"🔢 {quantity} шт • {total:,} сум\n"
             f"🎫 <code>{code}</code>\n"
             f"📅 {booking[5]}\n\n"
         )
@@ -305,19 +352,25 @@ async def filter_bookings(callback: types.CallbackQuery) -> None:
     
     for booking in bookings[:10]:
         booking_id = booking[0]
-        offer = db.get_offer(booking[2])
-        if not offer:
-            continue
+        offer_id = booking[1]
+        status_val = booking[3]
+        booking_code = booking[4]
+        pickup_time = booking[5]
+        quantity = booking[6]
+        created_at = booking[7]
         
-        quantity = booking[3]
-        code = booking[6]
-        total = int(offer[5] * quantity)
+        # Joined fields from query
+        offer_title = booking[8] if len(booking) > 8 else "Товар"
+        offer_price = booking[9] if len(booking) > 9 else 0
+        store_name = booking[11] if len(booking) > 11 else ""
+        
+        total = int(offer_price * quantity)
         
         text += (
-            f"🍽 <b>{offer[2]}</b>\n"
-            f"📦 {quantity} шт. × {int(offer[5]):,} = {total:,} сум\n"
-            f"🎫 <code>{code}</code>\n"
-            f"📅 {booking[5]}\n\n"
+            f"🍽 <b>{offer_title}</b>\n"
+            f"📦 {quantity} шт. × {int(offer_price):,} = {total:,} сум\n"
+            f"🎫 <code>{booking_code}</code>\n"
+            f"📅 {created_at}\n\n"
         )
     
     await callback.message.edit_text(text, parse_mode="HTML")
@@ -332,7 +385,13 @@ async def cancel_booking(callback: types.CallbackQuery) -> None:
         return
     
     lang = db.get_user_language(callback.from_user.id)
-    booking_id = int(callback.data.split("_")[2])
+    
+    try:
+        booking_id = int(callback.data.split("_")[2])
+    except (ValueError, IndexError) as e:
+        logger.error(f"Invalid booking_id in callback data: {callback.data}, error: {e}")
+        await callback.answer(get_text(lang, "error"), show_alert=True)
+        return
     
     # Check if booking exists and belongs to user
     booking = db.get_booking(booking_id)
@@ -358,7 +417,13 @@ async def complete_booking(callback: types.CallbackQuery) -> None:
         return
     
     lang = db.get_user_language(callback.from_user.id)
-    booking_id = int(callback.data.split("_")[2])
+    
+    try:
+        booking_id = int(callback.data.split("_")[2])
+    except (ValueError, IndexError) as e:
+        logger.error(f"Invalid booking_id in callback data: {callback.data}, error: {e}")
+        await callback.answer(get_text(lang, "error"), show_alert=True)
+        return
     
     # Check if booking exists
     booking = db.get_booking(booking_id)
@@ -386,7 +451,13 @@ async def rate_booking(callback: types.CallbackQuery) -> None:
         return
     
     lang = db.get_user_language(callback.from_user.id)
-    booking_id = int(callback.data.split("_")[2])
+    
+    try:
+        booking_id = int(callback.data.split("_")[2])
+    except (ValueError, IndexError) as e:
+        logger.error(f"Invalid booking_id in callback data: {callback.data}, error: {e}")
+        await callback.answer(get_text(lang, "error"), show_alert=True)
+        return
     
     # Check if booking exists and is completed
     booking = db.get_booking(booking_id)

@@ -3,9 +3,10 @@ Seller Order Management Handlers
 Handles order confirmation, cancellation, and payment operations
 """
 
+import logging
 from aiogram import Router, F, types
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
-import logging
+from localization import get_text
 
 logger = logging.getLogger(__name__)
 
@@ -24,7 +25,13 @@ def setup(bot_instance, db_instance):
 async def confirm_order(callback: types.CallbackQuery):
     """Подтверждение заказа продавцом"""
     lang = db.get_user_language(callback.from_user.id)
-    order_id = int(callback.data.split("_")[2])
+    
+    try:
+        order_id = int(callback.data.split("_")[2])
+    except (ValueError, IndexError) as e:
+        logger.error(f"Invalid order_id in callback data: {callback.data}, error: {e}")
+        await callback.answer(get_text(lang, "error"), show_alert=True)
+        return
     
     order = db.get_order(order_id)
     if not order:
@@ -61,7 +68,13 @@ async def confirm_order(callback: types.CallbackQuery):
 async def cancel_order(callback: types.CallbackQuery):
     """Отмена заказа продавцом"""
     lang = db.get_user_language(callback.from_user.id)
-    order_id = int(callback.data.split("_")[2])
+    
+    try:
+        order_id = int(callback.data.split("_")[2])
+    except (ValueError, IndexError) as e:
+        logger.error(f"Invalid order_id in callback data: {callback.data}, error: {e}")
+        await callback.answer(get_text(lang, "error"), show_alert=True)
+        return
     
     order = db.get_order(order_id)
     if not order:
@@ -104,7 +117,13 @@ async def cancel_order(callback: types.CallbackQuery):
 async def confirm_payment(callback: types.CallbackQuery):
     """Подтверждение оплаты продавцом"""
     lang = db.get_user_language(callback.from_user.id)
-    order_id = int(callback.data.split("_")[2])
+    
+    try:
+        order_id = int(callback.data.split("_")[2])
+    except (ValueError, IndexError) as e:
+        logger.error(f"Invalid order_id in callback data: {callback.data}, error: {e}")
+        await callback.answer(get_text(lang, "error"), show_alert=True)
+        return
     
     order = db.get_order(order_id)
     if not order:
@@ -145,7 +164,13 @@ async def confirm_payment(callback: types.CallbackQuery):
 async def reject_payment(callback: types.CallbackQuery):
     """Отклонение оплаты продавцом"""
     lang = db.get_user_language(callback.from_user.id)
-    order_id = int(callback.data.split("_")[2])
+    
+    try:
+        order_id = int(callback.data.split("_")[2])
+    except (ValueError, IndexError) as e:
+        logger.error(f"Invalid order_id in callback data: {callback.data}, error: {e}")
+        await callback.answer(get_text(lang, "error"), show_alert=True)
+        return
     
     order = db.get_order(order_id)
     if not order:

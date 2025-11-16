@@ -25,25 +25,6 @@ def setup_dependencies(database: DatabaseProtocol, bot_instance: Any) -> None:
     bot = bot_instance
 
 
-def get_user_field(user: Any, field: str, default: Any = None) -> Any:
-    """Extract field from user tuple/dict."""
-    if isinstance(user, dict):
-        return user.get(field, default)
-    field_map = {
-        "user_id": 0,
-        "username": 1,
-        "first_name": 2,
-        "phone": 3,
-        "city": 4,
-        "language": 5,
-        "role": 6,
-    }
-    idx = field_map.get(field)
-    if idx is not None and isinstance(user, (tuple, list)) and idx < len(user):
-        return user[idx]
-    return default
-
-
 def get_store_field(store: Any, field: str, default: Any = None) -> Any:
     """Extract field from store tuple/dict."""
     if isinstance(store, dict):
@@ -69,9 +50,9 @@ async def show_analytics(message: types.Message) -> None:
         return
 
     lang = db.get_user_language(message.from_user.id)
-    user = db.get_user(message.from_user.id)
+    user = db.get_user_model(message.from_user.id)
 
-    if get_user_field(user, "role", "customer") != "seller":
+    if (user.role if user else "customer") != "seller":
         await message.answer(get_text(lang, "not_seller"))
         return
 
@@ -98,8 +79,14 @@ async def show_store_analytics(callback: types.CallbackQuery) -> None:
         await callback.answer("System error")
         return
 
-    store_id = int(callback.data.split("_")[1])
     lang = db.get_user_language(callback.from_user.id)
+    
+    try:
+        store_id = int(callback.data.split("_")[1])
+    except (ValueError, IndexError) as e:
+        logger.error(f"Invalid store_id in callback data: {callback.data}, error: {e}")
+        await callback.answer(get_text(lang, "error"), show_alert=True)
+        return
 
     analytics = db.get_store_analytics(store_id)
     store = db.get_store(store_id)
@@ -141,10 +128,10 @@ async def partner_today_stats(message: types.Message) -> None:
         return
     
     lang = db.get_user_language(message.from_user.id)
-    user = db.get_user(message.from_user.id)
+    user = db.get_user_model(message.from_user.id)
     
     # Проверяем, что это партнёр
-    if not user or (get_user_field(user, 'role', 'customer') != 'seller'):
+    if not user or user.role != 'seller':
         await message.answer(get_text(lang, 'access_denied'))
         return
     

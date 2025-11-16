@@ -20,10 +20,31 @@ def render_hot_offers_list(
     lines.append(f"Показано: {shown} из {total_count}")
     lines.append("")
 
+    # Category emoji mapping
+    category_emoji = {
+        "bakery": "🍞",
+        "dairy": "🥛", 
+        "meat": "🥩",
+        "fish": "🐟",
+        "vegetables": "🥬",
+        "fruits": "🍎",
+        "cheese": "🧀",
+        "beverages": "🥤",
+        "ready_food": "🍱",
+        "other": "🏪"
+    }
+
     for idx, offer in enumerate(offers, offset + 1):
         name = _trim_title(offer.title)
         price_line = _format_price_line(offer, lang)
-        store_line = f"   {offer.store_name}"
+        
+        # Get category emoji
+        category = offer.store_category or "other"
+        emoji = category_emoji.get(category, "🏪")
+        
+        # Format store line with emoji
+        store_line = f"   {emoji} {offer.store_name}"
+        
         lines.append(f"{idx}. <b>{name}</b>")
         lines.append(store_line)
         lines.append(f"   {price_line}")
@@ -227,15 +248,28 @@ def render_store_reviews(
 
 
 def render_offer_card(lang: str, offer: OfferListItem) -> str:
+    """Render offer card with full details and delivery info."""
     lines = [f"<b>{offer.title}</b>"]
+    
+    # Price line with discount
     lines.append(_format_price_line(offer, lang))
-    lines.append(offer.store_name)
+    lines.append("")
+    
+    # Store location
+    lines.append(f"🏪 {offer.store_name}")
     if offer.store_address:
-        lines.append(offer.store_address)
+        lines.append(f"📍 {offer.store_address}")
+    lines.append("")
+    
+    # Stock and expiry
+    stock_lines = []
     if offer.quantity is not None:
-        stock_label = "Осталось" if lang == "ru" else "Qoldi"
-        lines.append(f"{stock_label}: {offer.quantity} {offer.unit or ''}".strip())
+        stock_label = "Доступно" if lang == "ru" else "Mavjud"
+        unit = offer.unit or ""
+        stock_lines.append(f"{stock_label}: <b>{offer.quantity} {unit}</b>".strip())
+    
     if offer.expiry_date:
+        expiry_label = "Годен до" if lang == "ru" else "Yaroqlilik"
         expiry_str = str(offer.expiry_date)[:10]
         try:
             from datetime import datetime
@@ -243,7 +277,21 @@ def render_offer_card(lang: str, offer: OfferListItem) -> str:
             expiry_str = dt.strftime("%d.%m.%Y")
         except:
             pass
-        lines.append(f"До: {expiry_str}")
+        stock_lines.append(f"{expiry_label}: {expiry_str}")
+    
+    if stock_lines:
+        lines.extend(stock_lines)
+    
+    # Delivery info
+    if offer.delivery_enabled:
+        lines.append("")
+        currency = "сум" if lang == "ru" else "so'm"
+        delivery_label = "Доставка" if lang == "ru" else "Yetkazib berish"
+        lines.append(f"🚚 {delivery_label}: {offer.delivery_price:,.0f} {currency}")
+        if offer.min_order_amount:
+            min_label = "Мин. заказ" if lang == "ru" else "Min. buyurtma"
+            lines.append(f"   {min_label}: {offer.min_order_amount:,.0f} {currency}")
+    
     return "\n".join(lines)
 
 

@@ -46,8 +46,7 @@ def setup(dp_or_router, db, get_text, get_cities, city_keyboard, phone_request_k
         )
         
         await message.answer(
-            welcome_text,
-            parse_mode="HTML",
+            get_text(lang, "registration_complete"),
             reply_markup=main_menu_customer(lang)
         )
 
@@ -78,7 +77,7 @@ def setup(dp_or_router, db, get_text, get_cities, city_keyboard, phone_request_k
             await state.clear()
             
             # Compact confirmation
-            await message.answer(
+            await callback.message.answer(
                 f"Город изменён на <b>{city_text}</b>" if lang == 'ru' else f"Shahar <b>{city_text}</b>ga o'zgartirildi",
                 parse_mode="HTML",
                 reply_markup=main_menu_customer(lang)

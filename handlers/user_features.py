@@ -4,15 +4,16 @@ Extracted from bot.py for better modularity
 """
 from __future__ import annotations
 
+import logging
 from typing import Any, Callable
 
 from aiogram import F, Router, types
 from aiogram.fsm.context import FSMContext
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
-from app.core.utils import get_user_field
 from database_protocol import DatabaseProtocol
 
+logger = logging.getLogger(__name__)
 router = Router()
 
 
@@ -58,15 +59,15 @@ def setup(
         completed_orders = [o for o in orders if o[10] == "completed"]
         cancelled_orders = [o for o in orders if o[10] == "cancelled"]
 
-        total_text = f"🛒 <b>{'Корзина' if lang == 'ru' else 'Savat'}</b>\n\n"
-        total_text += f"📦 <b>{'Бронирования (самовывоз)' if lang == 'ru' else 'Bronlar (olib ketish)'}</b>\n"
-        total_text += f"🟢 {'Активные' if lang == 'ru' else 'Faol'}: {len(active_bookings)}\n"
-        total_text += f"✅ {'Завершенные' if lang == 'ru' else 'Yakunlangan'}: {len(completed_bookings)}\n"
-        total_text += f"❌ {'Отмененные' if lang == 'ru' else 'Bekor qilingan'}: {len(cancelled_bookings)}\n\n"
-        total_text += f"🚚 <b>{'Заказы с доставкой' if lang == 'ru' else 'Yetkazib berish buyurtmalari'}</b>\n"
-        total_text += f"🟢 {'Активные' if lang == 'ru' else 'Faol'}: {len(active_orders)}\n"
-        total_text += f"✅ {'Завершенные' if lang == 'ru' else 'Yakunlangan'}: {len(completed_orders)}\n"
-        total_text += f"❌ {'Отмененные' if lang == 'ru' else 'Bekor qilingan'}: {len(cancelled_orders)}"
+        total_text = f"<b>{'Мои заказы' if lang == 'ru' else 'Mening buyurtmalarim'}</b>\n\n"
+        total_text += f"<b>{'Самовывоз' if lang == 'ru' else 'Olib ketish'}</b>\n"
+        total_text += f"• {'Активные' if lang == 'ru' else 'Faol'} ({len(active_bookings)})\n"
+        total_text += f"• {'Завершенные' if lang == 'ru' else 'Yakunlangan'} ({len(completed_bookings)})\n"
+        total_text += f"• {'Отмененные' if lang == 'ru' else 'Bekor qilingan'} ({len(cancelled_bookings)})\n\n"
+        total_text += f"<b>{'Доставка' if lang == 'ru' else 'Yetkazib berish'}</b>\n"
+        total_text += f"• {'Активные' if lang == 'ru' else 'Faol'} ({len(active_orders)})\n"
+        total_text += f"• {'Завершенные' if lang == 'ru' else 'Yakunlangan'} ({len(completed_orders)})\n"
+        total_text += f"• {'Отмененные' if lang == 'ru' else 'Bekor qilingan'} ({len(cancelled_orders)})"
 
         await message.answer(
             total_text,
@@ -118,9 +119,15 @@ def setup(
     @dp_or_router.callback_query(F.data.startswith("favorite_"))
     async def toggle_favorite(callback: types.CallbackQuery):
         """Add store to favorites"""
-        store_id = int(callback.data.split("_")[1])
         user_id = callback.from_user.id
         lang = db.get_user_language(user_id)
+        
+        try:
+            store_id = int(callback.data.split("_")[1])
+        except (ValueError, IndexError) as e:
+            logger.error(f"Invalid store_id in callback data: {callback.data}, error: {e}")
+            await callback.answer(get_text(lang, "error"), show_alert=True)
+            return
 
         # Check if already in favorites
         if db.is_favorite(user_id, store_id):
@@ -132,9 +139,15 @@ def setup(
     @dp_or_router.callback_query(F.data.startswith("unfavorite_"))
     async def remove_favorite(callback: types.CallbackQuery):
         """Remove store from favorites"""
-        store_id = int(callback.data.split("_")[1])
         user_id = callback.from_user.id
         lang = db.get_user_language(user_id)
+        
+        try:
+            store_id = int(callback.data.split("_")[1])
+        except (ValueError, IndexError) as e:
+            logger.error(f"Invalid store_id in callback data: {callback.data}, error: {e}")
+            await callback.answer(get_text(lang, "error"), show_alert=True)
+            return
 
         db.remove_favorite(user_id, store_id)
         await callback.message.delete()
@@ -160,8 +173,8 @@ def setup(
         )
 
         # Determine role for proper settings keyboard
-        user = db.get_user(callback.from_user.id)
-        role = get_user_field(user, "role", "customer") if user and len(user) > 6 else "customer"
+        user = db.get_user_model(callback.from_user.id)
+        role = user.role if user else "customer"
 
         try:
             await callback.message.edit_text(
@@ -226,9 +239,9 @@ def setup(
     async def cancel_delete_account(callback: types.CallbackQuery):
         """Cancel account deletion"""
         lang = db.get_user_language(callback.from_user.id)
-        user = db.get_user(callback.from_user.id)
-        role = get_user_field(user, "role", "customer") if user else "customer"
-        notifications_enabled = get_user_field(user, "notifications_enabled", 1) if user else 1
+        user = db.get_user_model(callback.from_user.id)
+        role = user.role if user else "customer"
+        notifications_enabled = user.notifications_enabled if user else True
 
         try:
             await callback.message.edit_text(

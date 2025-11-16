@@ -12,7 +12,7 @@ from aiogram.utils.keyboard import InlineKeyboardBuilder
 
 from database_protocol import DatabaseProtocol
 from handlers.common_states.states import EditOffer
-from keyboards import main_menu_seller
+from app.keyboards import main_menu_seller
 from localization import get_text
 from logging_config import logger
 
@@ -180,7 +180,13 @@ async def quantity_add(callback: types.CallbackQuery) -> None:
         return
 
     lang = db.get_user_language(callback.from_user.id)
-    offer_id = int(callback.data.split("_")[2])
+    
+    try:
+        offer_id = int(callback.data.split("_")[2])
+    except (ValueError, IndexError) as e:
+        logger.error(f"Invalid offer_id in callback data: {callback.data}, error: {e}")
+        await callback.answer(get_text(lang, "error"), show_alert=True)
+        return
 
     offer = db.get_offer(offer_id)
     if not offer:
@@ -207,7 +213,13 @@ async def quantity_subtract(callback: types.CallbackQuery) -> None:
         return
 
     lang = db.get_user_language(callback.from_user.id)
-    offer_id = int(callback.data.split("_")[2])
+    
+    try:
+        offer_id = int(callback.data.split("_")[2])
+    except (ValueError, IndexError) as e:
+        logger.error(f"Invalid offer_id in callback data: {callback.data}, error: {e}")
+        await callback.answer(get_text(lang, "error"), show_alert=True)
+        return
 
     offer = db.get_offer(offer_id)
     if not offer:
@@ -240,7 +252,13 @@ async def extend_offer(callback: types.CallbackQuery) -> None:
         return
 
     lang = db.get_user_language(callback.from_user.id)
-    offer_id = int(callback.data.split("_")[2])
+    
+    try:
+        offer_id = int(callback.data.split("_")[2])
+    except (ValueError, IndexError) as e:
+        logger.error(f"Invalid offer_id in callback data: {callback.data}, error: {e}")
+        await callback.answer(get_text(lang, "error"), show_alert=True)
+        return
 
     offer = db.get_offer(offer_id)
     if not offer:
@@ -317,7 +335,13 @@ async def deactivate_offer(callback: types.CallbackQuery) -> None:
         return
 
     lang = db.get_user_language(callback.from_user.id)
-    offer_id = int(callback.data.split("_")[2])
+    
+    try:
+        offer_id = int(callback.data.split("_")[2])
+    except (ValueError, IndexError) as e:
+        logger.error(f"Invalid offer_id in callback data: {callback.data}, error: {e}")
+        await callback.answer(get_text(lang, "error"), show_alert=True)
+        return
 
     offer = db.get_offer(offer_id)
     if not offer:
@@ -343,7 +367,13 @@ async def activate_offer(callback: types.CallbackQuery) -> None:
         return
 
     lang = db.get_user_language(callback.from_user.id)
-    offer_id = int(callback.data.split("_")[2])
+    
+    try:
+        offer_id = int(callback.data.split("_")[2])
+    except (ValueError, IndexError) as e:
+        logger.error(f"Invalid offer_id in callback data: {callback.data}, error: {e}")
+        await callback.answer(get_text(lang, "error"), show_alert=True)
+        return
 
     offer = db.get_offer(offer_id)
     if not offer:
@@ -369,7 +399,13 @@ async def delete_offer(callback: types.CallbackQuery) -> None:
         return
 
     lang = db.get_user_language(callback.from_user.id)
-    offer_id = int(callback.data.split("_")[2])
+    
+    try:
+        offer_id = int(callback.data.split("_")[2])
+    except (ValueError, IndexError) as e:
+        logger.error(f"Invalid offer_id in callback data: {callback.data}, error: {e}")
+        await callback.answer(get_text(lang, "error"), show_alert=True)
+        return
 
     offer = db.get_offer(offer_id)
     if not offer:
@@ -395,7 +431,13 @@ async def edit_offer(callback: types.CallbackQuery) -> None:
         return
 
     lang = db.get_user_language(callback.from_user.id)
-    offer_id = int(callback.data.split("_")[2])
+    
+    try:
+        offer_id = int(callback.data.split("_")[2])
+    except (ValueError, IndexError) as e:
+        logger.error(f"Invalid offer_id in callback data: {callback.data}, error: {e}")
+        await callback.answer(get_text(lang, "error"), show_alert=True)
+        return
 
     offer = db.get_offer(offer_id)
     if not offer:
@@ -446,7 +488,13 @@ async def edit_time_start(callback: types.CallbackQuery, state: FSMContext) -> N
         return
 
     lang = db.get_user_language(callback.from_user.id)
-    offer_id = int(callback.data.split("_")[2])
+    
+    try:
+        offer_id = int(callback.data.split("_")[2])
+    except (ValueError, IndexError) as e:
+        logger.error(f"Invalid offer_id in callback data: {callback.data}, error: {e}")
+        await callback.answer(get_text(lang, "error"), show_alert=True)
+        return
 
     offer = db.get_offer(offer_id)
     if not offer:
