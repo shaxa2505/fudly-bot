@@ -103,14 +103,27 @@ async def show_favorites(message: types.Message) -> None:
     )
 
     for store in favorites:
-        store_id = store[0]
+        # Support both dict (PostgreSQL) and tuple (SQLite) formats
+        if isinstance(store, dict):
+            store_id = store['store_id']
+            store_name = store['name']
+            category = store.get('category', 'Магазин')
+            address = store.get('address', '')
+            description = store.get('description', '')
+        else:
+            store_id = store[0]
+            store_name = store[2]
+            category = store[6]
+            address = store[4]
+            description = store[5]
+            
         avg_rating = db.get_store_average_rating(store_id)
         ratings = db.get_store_ratings(store_id)
 
-        text = f"""🏪 <b>{store[2]}</b>
-🏷 {store[6]}
-📍 {store[4]}
-📝 {store[5]}
+        text = f"""🏪 <b>{store_name}</b>
+🏷 {category}
+📍 {address}
+📝 {description}
 ⭐ Рейтинг: {avg_rating:.1f}/5 ({len(ratings)} отзывов)"""
 
         keyboard = InlineKeyboardBuilder()
