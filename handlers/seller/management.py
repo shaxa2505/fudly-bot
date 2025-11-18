@@ -53,6 +53,173 @@ def get_store_field(store: Any, field: str, default: Any = None) -> Any:
 
 
 @router.message(
+    F.text.contains("🎫 Заказы") | F.text.contains("Заказы") | F.text.contains("Buyurtmalar")
+)
+async def seller_orders(message: types.Message) -> None:
+    """Display seller's orders and bookings from all stores."""
+    if not db:
+        await message.answer("System error")
+        return
+
+    lang = db.get_user_language(message.from_user.id)
+    stores = db.get_user_stores(message.from_user.id)
+
+    if not stores:
+        await message.answer(get_text(lang, "no_stores"))
+        return
+
+    # Collect all bookings and orders from all stores
+    all_bookings = []
+    all_orders = []
+    
+    for store in stores:
+        store_id = get_store_field(store, "store_id")
+        store_bookings = db.get_store_bookings(store_id)
+        all_bookings.extend(store_bookings)
+        
+        try:
+            store_orders = db.get_store_orders(store_id)
+            all_orders.extend(store_orders)
+        except Exception:
+            pass
+
+    if not all_bookings and not all_orders:
+        await message.answer(
+            "┌─────────────────────────┐\n"
+            f"│  🎫 <b>{'ЗАКАЗЫ' if lang == 'ru' else 'BUYURTMALAR'}</b>  │\n"
+            "└─────────────────────────┘\n\n"
+            f"❌ {'Пока нет заказов' if lang == 'ru' else 'Hali buyurtmalar yo`q'}\n\n"
+            f"💡 {'Когда клиенты сделают заказ, он появится здесь' if lang == 'ru' else 'Mijozlar buyurtma berganida, u bu yerda paydo bo`ladi'}",
+            parse_mode="HTML"
+        )
+        return
+
+    # Count by status - safe dict/tuple access
+    pending_bookings = []
+    confirmed_bookings = []
+    completed_bookings = []
+    cancelled_bookings = []
+    
+    for b in all_bookings:
+        status = b.get('status') if isinstance(b, dict) else (b[3] if len(b) > 3 else None)
+        if status == 'pending':
+            pending_bookings.append(b)
+        elif status == 'confirmed':
+            confirmed_bookings.append(b)
+        elif status == 'completed':
+            completed_bookings.append(b)
+        elif status == 'cancelled':
+            cancelled_bookings.append(b)
+
+    pending_orders = []
+    confirmed_orders = []
+    completed_orders = []
+    cancelled_orders = []
+    
+    for o in all_orders:
+        status = o.get('order_status') if isinstance(o, dict) else (o[10] if len(o) > 10 else None)
+        if status in ['pending', 'preparing']:
+            pending_orders.append(o)
+        elif status in ['confirmed', 'delivering']:
+            confirmed_orders.append(o)
+        elif status == 'completed':
+            completed_orders.append(o)
+        elif status == 'cancelled':
+            cancelled_orders.append(o)
+
+    # Status filter buttons
+    filter_kb = InlineKeyboardBuilder()
+    filter_kb.button(text=f"⏳ Новые ({len(pending_bookings) + len(pending_orders)})", callback_data="seller_orders_pending")
+    filter_kb.button(text=f"✅ Активные ({len(confirmed_bookings) + len(confirmed_orders)})", callback_data="seller_orders_active")
+    filter_kb.button(text=f"🎉 Выполненные ({len(completed_bookings) + len(completed_orders)})", callback_data="seller_orders_completed")
+    filter_kb.adjust(2, 1)
+
+    await message.answer(
+        "┌─────────────────────────┐\n"
+        f"│  🎫 <b>{'ЗАКАЗЫ' if lang == 'ru' else 'BUYURTMALAR'}</b>  │\n"
+        "└─────────────────────────┘\n\n"
+        f"📋 <b>{'САМОВЫВОЗ (БРОНИ)' if lang == 'ru' else 'OLIB KETISH'}</b>\n"
+        f"⏳ Новые: <b>{len(pending_bookings)}</b>\n"
+        f"✅ Подтверждённые: <b>{len(confirmed_bookings)}</b>\n"
+        f"🎉 Выполненные: <b>{len(completed_bookings)}</b>\n"
+        f"❌ Отменённые: <b>{len(cancelled_bookings)}</b>\n\n"
+        f"🚚 <b>{'ДОСТАВКА' if lang == 'ru' else 'YETKAZIB BERISH'}</b>\n"
+        f"⏳ Новые: <b>{len(pending_orders)}</b>\n"
+        f"✅ В процессе: <b>{len(confirmed_orders)}</b>\n"
+        f"🎉 Выполненные: <b>{len(completed_orders)}</b>\n"
+        f"❌ Отменённые: <b>{len(cancelled_orders)}</b>\n\n"
+        f"{'Выберите фильтр для просмотра:' if lang == 'ru' else 'Ko`rish uchun filtrni tanlang:'}",
+        parse_mode="HTML",
+        reply_markup=filter_kb.as_markup()
+    )
+
+    # Show first 5 pending items immediately
+    items_to_show = (pending_bookings + pending_orders)[:5]
+    
+    for item in items_to_show:
+        await _send_order_card(message, item, lang, is_booking=item in pending_bookings)
+        await asyncio.sleep(0.1)
+
+
+async def _send_order_card(message: types.Message, order: Any, lang: str, is_booking: bool = True) -> None:
+    """Send order/booking card with action buttons."""
+    if is_booking:
+        # Booking fields
+        booking_id = order.get('booking_id') if isinstance(order, dict) else order[0]
+        offer_title = order.get('title') if isinstance(order, dict) else (order[4] if len(order) > 4 else 'Товар')
+        user_name = order.get('first_name', 'Клиент') if isinstance(order, dict) else (order[5] if len(order) > 5 else 'Клиент')
+        phone = order.get('phone', 'Не указан') if isinstance(order, dict) else (order[7] if len(order) > 7 else 'Не указан')
+        quantity = order.get('quantity', 1) if isinstance(order, dict) else (order[6] if len(order) > 6 else 1)
+        status = order.get('status', 'pending') if isinstance(order, dict) else (order[3] if len(order) > 3 else 'pending')
+        booking_code = order.get('booking_code', '') if isinstance(order, dict) else (order[8] if len(order) > 8 else '')
+        created_at = order.get('created_at') if isinstance(order, dict) else (order[9] if len(order) > 9 else None)
+        
+        status_emoji = {"pending": "⏳", "confirmed": "✅", "completed": "🎉", "cancelled": "❌"}.get(status, "📦")
+        
+        text = f"{status_emoji} <b>{'САМОВЫВОЗ' if lang == 'ru' else 'OLIB KETISH'}</b>\n\n"
+        text += f"📦 {offer_title}\n"
+        text += f"🔢 {'Количество' if lang == 'ru' else 'Miqdor'}: <b>{quantity}</b>\n\n"
+        text += f"👤 {user_name}\n"
+        text += f"📱 <code>{phone}</code>\n"
+        text += f"🎫 {'Код' if lang == 'ru' else 'Kod'}: <code>{booking_code}</code>\n"
+        if created_at:
+            text += f"🕐 {created_at}\n"
+        
+        builder = InlineKeyboardBuilder()
+        if status == "pending":
+            builder.button(text="✅ Подтвердить" if lang == "ru" else "✅ Tasdiqlash", callback_data=f"confirm_booking_{booking_id}")
+            builder.button(text="❌ Отменить" if lang == "ru" else "❌ Bekor qilish", callback_data=f"cancel_booking_{booking_id}")
+            builder.adjust(2)
+        elif status == "confirmed":
+            builder.button(text="🎉 Выдано" if lang == "ru" else "🎉 Berildi", callback_data=f"complete_booking_{booking_id}")
+            builder.button(text="❌ Отменить" if lang == "ru" else "❌ Bekor qilish", callback_data=f"cancel_booking_{booking_id}")
+            builder.adjust(2)
+    else:
+        # Order fields (delivery)
+        order_id = order.get('order_id') if isinstance(order, dict) else order[0]
+        user_name = order.get('user_name', 'Клиент') if isinstance(order, dict) else 'Клиент'
+        quantity = order.get('quantity', 1) if isinstance(order, dict) else (order[9] if len(order) > 9 else 1)
+        address = order.get('delivery_address', 'Не указан') if isinstance(order, dict) else (order[4] if len(order) > 4 else 'Не указан')
+        status = order.get('order_status', 'pending') if isinstance(order, dict) else (order[10] if len(order) > 10 else 'pending')
+        
+        status_emoji = {"pending": "⏳", "confirmed": "✅", "preparing": "👨‍🍳", "delivering": "🚚", "completed": "🎉", "cancelled": "❌"}.get(status, "📦")
+        
+        text = f"{status_emoji} <b>{'ДОСТАВКА' if lang == 'ru' else 'YETKAZIB BERISH'}</b>\n\n"
+        text += f"📦 {'Заказ' if lang == 'ru' else 'Buyurtma'} #{order_id}\n"
+        text += f"🔢 {quantity} {'шт' if lang == 'ru' else 'dona'}\n\n"
+        text += f"👤 {user_name}\n"
+        text += f"📍 {address}\n"
+        
+        builder = InlineKeyboardBuilder()
+        if status == "pending":
+            builder.button(text="✅ Принять" if lang == "ru" else "✅ Qabul qilish", callback_data=f"confirm_order_{order_id}")
+            builder.button(text="❌ Отменить" if lang == "ru" else "❌ Bekor qilish", callback_data=f"cancel_order_{order_id}")
+            builder.adjust(2)
+    
+    await message.answer(text, parse_mode="HTML", reply_markup=builder.as_markup())
+
+
+@router.message(
     F.text.contains("Мои товары") | F.text.contains("Mening mahsulotlarim")
 )
 async def my_offers(message: types.Message) -> None:
@@ -265,6 +432,82 @@ async def filter_offers(callback: types.CallbackQuery) -> None:
         await callback.message.answer(
             f"ℹ️ {'Показано первые 10 из' if lang == 'ru' else 'Birinchi 10 ta'} {len(filtered)}"
         )
+
+
+# Order action handlers
+@router.callback_query(F.data.startswith("confirm_booking_"))
+async def confirm_booking_handler(callback: types.CallbackQuery) -> None:
+    """Confirm a booking."""
+    if not db:
+        await callback.answer("System error", show_alert=True)
+        return
+    
+    booking_id = int(callback.data.split("_")[2])
+    lang = db.get_user_language(callback.from_user.id)
+    
+    try:
+        db.update_booking_status(booking_id, "confirmed")
+        await callback.answer(f"✅ {'Бронь подтверждена' if lang == 'ru' else 'Bron tasdiqlandi'}", show_alert=True)
+        
+        # Update message
+        if callback.message and callback.message.text:
+            new_text = callback.message.text.replace("⏳", "✅")
+            builder = InlineKeyboardBuilder()
+            builder.button(text="🎉 Выдано" if lang == "ru" else "🎉 Berildi", callback_data=f"complete_booking_{booking_id}")
+            builder.button(text="❌ Отменить" if lang == "ru" else "❌ Bekor qilish", callback_data=f"cancel_booking_{booking_id}")
+            builder.adjust(2)
+            await callback.message.edit_text(new_text, parse_mode="HTML", reply_markup=builder.as_markup())
+    except Exception as e:
+        logger.error(f"Error confirming booking: {e}")
+        await callback.answer(f"❌ {'Ошибка' if lang == 'ru' else 'Xatolik'}", show_alert=True)
+
+
+@router.callback_query(F.data.startswith("complete_booking_"))
+async def complete_booking_handler(callback: types.CallbackQuery) -> None:
+    """Mark booking as completed."""
+    if not db:
+        await callback.answer("System error", show_alert=True)
+        return
+    
+    booking_id = int(callback.data.split("_")[2])
+    lang = db.get_user_language(callback.from_user.id)
+    
+    try:
+        db.complete_booking(booking_id)
+        await callback.answer(f"🎉 {'Заказ выполнен!' if lang == 'ru' else 'Buyurtma bajarildi!'}", show_alert=True)
+        
+        # Update message
+        if callback.message and callback.message.text:
+            new_text = callback.message.text.replace("✅", "🎉").replace("⏳", "🎉")
+            new_text += f"\n\n<b>{'✅ ВЫДАНО' if lang == 'ru' else '✅ BERILDI'}</b>"
+            await callback.message.edit_text(new_text, parse_mode="HTML")
+    except Exception as e:
+        logger.error(f"Error completing booking: {e}")
+        await callback.answer(f"❌ {'Ошибка' if lang == 'ru' else 'Xatolik'}", show_alert=True)
+
+
+@router.callback_query(F.data.startswith("cancel_booking_"))
+async def cancel_booking_handler(callback: types.CallbackQuery) -> None:
+    """Cancel a booking."""
+    if not db:
+        await callback.answer("System error", show_alert=True)
+        return
+    
+    booking_id = int(callback.data.split("_")[2])
+    lang = db.get_user_language(callback.from_user.id)
+    
+    try:
+        db.cancel_booking(booking_id)
+        await callback.answer(f"❌ {'Бронь отменена' if lang == 'ru' else 'Bron bekor qilindi'}", show_alert=True)
+        
+        # Update message
+        if callback.message and callback.message.text:
+            new_text = callback.message.text.replace("✅", "❌").replace("⏳", "❌")
+            new_text += f"\n\n<b>{'❌ ОТМЕНЕНО' if lang == 'ru' else '❌ BEKOR QILINDI'}</b>"
+            await callback.message.edit_text(new_text, parse_mode="HTML")
+    except Exception as e:
+        logger.error(f"Error cancelling booking: {e}")
+        await callback.answer(f"❌ {'Ошибка' if lang == 'ru' else 'Xatolik'}", show_alert=True)
 
 
 @router.callback_query(F.data.startswith("qty_add_"))
