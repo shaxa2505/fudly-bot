@@ -74,17 +74,15 @@ def get_store_field(store: Any, field: str, default: Any = None) -> Any:
     F.text.contains("🎫 Заказы") | F.text.contains("Заказы") | F.text.contains("Buyurtmalar")
 )
 async def seller_orders(message: types.Message) -> Any:
-    """Display seller's orders and bookings from all stores. Now only catches sellers (common_user.router registered first)."""
+    """Display seller's orders and bookings from all stores. Only for sellers WITH stores."""
     if not db:
         await message.answer("⚠️ Database not available")
         return
     
-    # User is a seller - check if has stores
+    # Check if user has stores - if not, skip this handler (let common_user handle it)
     stores = db.get_user_stores(message.from_user.id)
     if not stores:
-        # Has no stores - show appropriate message
-        lang = db.get_user_language(message.from_user.id)
-        await message.answer(get_text(lang, "no_stores"))
+        # No stores - this is a regular customer, skip to common_user.router
         return
 
     lang = db.get_user_language(message.from_user.id)
