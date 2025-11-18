@@ -796,8 +796,32 @@ def get_product_categories(lang: str) -> list[str]:
         ]
 
 def normalize_category(category: str) -> str:
-    """Нормализовать категорию к русскому для БД"""
-    mapping = {
+    """Нормализовать категорию к английскому для БД (для таблицы offers)"""
+    # Маппинг категорий товаров (product categories) в английские названия БД
+    product_mapping = {
+        'Хлеб': 'bakery',
+        'Non': 'bakery',
+        'Молочные': 'dairy',
+        'Sut': 'dairy',
+        'Мясо': 'meat',
+        'Go\'sht': 'meat',
+        'Рыба': 'fish',
+        'Baliq': 'fish',
+        'Овощи': 'vegetables',
+        'Sabzavot': 'vegetables',
+        'Фрукты': 'fruits',
+        'Meva': 'fruits',
+        'Сыры': 'cheese',
+        'Pishloq': 'cheese',
+        'Напитки': 'drinks',
+        'Ichimlik': 'drinks',
+        'Готовая еда': 'ready_food',
+        'Tayyor ovqat': 'ready_food',
+        'Другое': 'other',
+        'Boshqa': 'other'
+    }
+    # Маппинг категорий магазинов (store categories)
+    store_mapping = {
         'Restoran': 'Ресторан',
         'Kafe': 'Кафе',
         'Nonvoyxona': 'Пекарня',
@@ -805,4 +829,5 @@ def normalize_category(category: str) -> str:
         'Qandolatxona': 'Кондитерская',
         'Fastfud': 'Фастфуд'
     }
-    return mapping.get(category, category)
+    # Сначала пробуем найти в product_mapping, потом в store_mapping
+    return product_mapping.get(category, store_mapping.get(category, category))

@@ -93,6 +93,12 @@ async def become_partner(message: types.Message, state: FSMContext) -> None:
         await message.answer("System error")
         return
     
+    # Отправляем приветственный стикер
+    try:
+        await message.answer_sticker("CAACAgIAAxkBAAEGc3ZnW7HYzWGxKQABfLqvPQABaKyP5k0AAtAOAAI0D3FJ_vgAAczKO4CINgQ")
+    except Exception:
+        pass  # Если стикер не найден, продолжаем без него
+    
     lang = db.get_user_language(message.from_user.id)
     user = db.get_user_model(message.from_user.id)
     

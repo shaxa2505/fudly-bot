@@ -316,6 +316,8 @@ async def book_offer_quantity(message: types.Message, state: FSMContext) -> None
     | F.text.contains("Mening buyurt")
     | F.text.contains("🛒 Корзина")
     | F.text.contains("🛒 Savat")
+    | F.text.contains("Корзина")
+    | F.text.contains("Savat")
 )
 async def my_bookings(message: types.Message) -> None:
     """Show user's bookings."""

@@ -1470,15 +1470,15 @@ class Database:
             return cursor.fetchall()
     
     def get_offers_by_city_and_category(self, city: str, category: str, limit: int = 20) -> List[dict]:
-        """Получить предложения в городе по категории магазина"""
+        """Получить предложения в городе по категории товара (offers.category)"""
         with self.get_connection() as conn:
             cursor = conn.cursor(row_factory=dict_row)
             cursor.execute('''
-                SELECT o.*, s.name as store_name, s.address, s.city, s.category,
+                SELECT o.*, s.name as store_name, s.address, s.city, s.category as store_category,
                        CAST((o.original_price - o.discount_price) AS NUMERIC) / o.original_price * 100 as discount_percent
                 FROM offers o
                 JOIN stores s ON o.store_id = s.store_id
-                WHERE s.city = %s AND s.category = %s AND s.status = 'active'
+                WHERE s.city = %s AND o.category = %s AND s.status = 'active'
                       AND o.status = 'active' AND o.quantity > 0 
                       AND o.expiry_date::date >= CURRENT_DATE
                 ORDER BY discount_percent DESC, o.created_at DESC

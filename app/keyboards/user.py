@@ -16,7 +16,7 @@ def main_menu_customer(lang: str = 'ru') -> ReplyKeyboardMarkup:
     builder = ReplyKeyboardBuilder()
     builder.button(text="🔥 Горячее" if lang == 'ru' else "🔥 Issiq")
     builder.button(text="📂 Категории" if lang == 'ru' else "📂 Kategoriyalar")
-    builder.button(text="📦 Заказы" if lang == 'ru' else "📦 Buyurtmalar")
+    builder.button(text="🛒 Корзина" if lang == 'ru' else "🛒 Savat")
     builder.button(text="👤 Профиль" if lang == 'ru' else "👤 Profil")
     builder.adjust(2, 2)
     return builder.as_markup(resize_keyboard=True)
