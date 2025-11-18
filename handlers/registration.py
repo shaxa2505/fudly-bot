@@ -47,6 +47,7 @@ def setup(dp_or_router, db, get_text, get_cities, city_keyboard, phone_request_k
         
         await message.answer(
             get_text(lang, "registration_complete"),
+            parse_mode="HTML",
             reply_markup=main_menu_customer(lang)
         )
 
