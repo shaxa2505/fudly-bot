@@ -273,15 +273,35 @@ async def book_offer_quantity(message: types.Message, state: FSMContext) -> None
         
         total_price = int(offer_price * quantity)
         
-        # Show booking confirmation to customer
+        # Get store name for better UX
+        store_name = "Магазин"
+        if store_id:
+            store = db.get_store(store_id)
+            if store:
+                store_name = get_store_field(store, "name", "Магазин")
+        
+        # Get offer expiry if available
+        expiry_text = ""
+        if isinstance(offer, (tuple, list)) and len(offer) > 17:
+            expiry_date = offer[17]  # expiry_date field
+            if expiry_date:
+                expiry_text = f"\n🕐 <b>Забрать до:</b> {expiry_date}\n"
+        
+        # Show booking confirmation to customer with full details
+        from app.keyboards.user import main_menu_customer
+        
         await message.answer(
-            f"✅ <b>Заказ создан!</b>\n\n"
-            f"📦 {offer_title}\n"
-            f"🔢 {quantity} шт\n"
-            f"💰 {total_price:,} сум\n\n"
-            f"🎫 Код: <code>{code}</code>\n\n"
-            f"📍 Адрес:\n{offer_address}",
+            f"✅ <b>Заказ успешно создан!</b>\n\n"
+            f"🏪 <b>Магазин:</b> {store_name}\n"
+            f"📦 <b>Товар:</b> {offer_title}\n"
+            f"🔢 <b>Количество:</b> {quantity} шт\n"
+            f"💰 <b>К оплате:</b> {total_price:,} сум\n"
+            f"{expiry_text}"
+            f"\n🎫 <b>Код бронирования:</b> <code>{code}</code>\n\n"
+            f"📍 <b>Адрес получения:</b>\n{offer_address}\n\n"
+            f"⚠️ <b>Важно:</b> Покажите этот код при получении заказа!",
             parse_mode="HTML",
+            reply_markup=main_menu_customer(lang),
         )
         
     except ValueError:
