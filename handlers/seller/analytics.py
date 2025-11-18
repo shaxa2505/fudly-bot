@@ -151,7 +151,7 @@ async def partner_today_stats(message: types.Message) -> None:
         
         # Собираем ID всех магазинов партнёра
         store_ids = [get_store_field(store, 'store_id') for store in stores]
-        placeholders = ','.join('?' * len(store_ids))
+        placeholders = ','.join('%s' * len(store_ids))
         
         # Статистика за сегодня
         today = datetime.now().strftime('%Y-%m-%d')
@@ -162,7 +162,7 @@ async def partner_today_stats(message: types.Message) -> None:
             FROM bookings b
             JOIN offers o ON b.offer_id = o.offer_id
             WHERE o.store_id IN ({placeholders})
-            AND DATE(b.created_at) = ?
+            AND DATE(b.created_at) = %s
             AND b.status != 'cancelled'
         ''', (*store_ids, today))
         

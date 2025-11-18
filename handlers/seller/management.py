@@ -452,6 +452,79 @@ async def filter_offers(callback: types.CallbackQuery) -> None:
         )
 
 
+# Order filter handlers
+@router.callback_query(F.data == "seller_orders_pending")
+async def filter_orders_pending(callback: types.CallbackQuery) -> None:
+    """Show pending orders/bookings."""
+    if not db:
+        await callback.answer("System error", show_alert=True)
+        return
+    
+    lang = db.get_user_language(callback.from_user.id)
+    stores = db.get_user_stores(callback.from_user.id)
+    
+    pending_items = []
+    for store in stores:
+        store_id = get_store_field(store, "store_id")
+        bookings = db.get_store_bookings(store_id) or []
+        pending_items.extend([b for b in bookings if (b.get('status') if isinstance(b, dict) else (b[3] if len(b) > 3 else None)) == 'pending'])
+    
+    await callback.answer()
+    await callback.message.answer(f"⏳ {'Новые заказы' if lang == 'ru' else 'Yangi buyurtmalar'}: <b>{len(pending_items)}</b>", parse_mode="HTML")
+    
+    for item in pending_items[:10]:
+        await _send_order_card(callback.message, item, lang, is_booking=True)
+        await asyncio.sleep(0.1)
+
+
+@router.callback_query(F.data == "seller_orders_active")
+async def filter_orders_active(callback: types.CallbackQuery) -> None:
+    """Show active orders/bookings."""
+    if not db:
+        await callback.answer("System error", show_alert=True)
+        return
+    
+    lang = db.get_user_language(callback.from_user.id)
+    stores = db.get_user_stores(callback.from_user.id)
+    
+    active_items = []
+    for store in stores:
+        store_id = get_store_field(store, "store_id")
+        bookings = db.get_store_bookings(store_id) or []
+        active_items.extend([b for b in bookings if (b.get('status') if isinstance(b, dict) else (b[3] if len(b) > 3 else None)) == 'confirmed'])
+    
+    await callback.answer()
+    await callback.message.answer(f"✅ {'Активные заказы' if lang == 'ru' else 'Faol buyurtmalar'}: <b>{len(active_items)}</b>", parse_mode="HTML")
+    
+    for item in active_items[:10]:
+        await _send_order_card(callback.message, item, lang, is_booking=True)
+        await asyncio.sleep(0.1)
+
+
+@router.callback_query(F.data == "seller_orders_completed")
+async def filter_orders_completed(callback: types.CallbackQuery) -> None:
+    """Show completed orders/bookings."""
+    if not db:
+        await callback.answer("System error", show_alert=True)
+        return
+    
+    lang = db.get_user_language(callback.from_user.id)
+    stores = db.get_user_stores(callback.from_user.id)
+    
+    completed_items = []
+    for store in stores:
+        store_id = get_store_field(store, "store_id")
+        bookings = db.get_store_bookings(store_id) or []
+        completed_items.extend([b for b in bookings if (b.get('status') if isinstance(b, dict) else (b[3] if len(b) > 3 else None)) == 'completed'])
+    
+    await callback.answer()
+    await callback.message.answer(f"🎉 {'Выполненные заказы' if lang == 'ru' else 'Bajarilgan buyurtmalar'}: <b>{len(completed_items)}</b>", parse_mode="HTML")
+    
+    for item in completed_items[:10]:
+        await _send_order_card(callback.message, item, lang, is_booking=True)
+        await asyncio.sleep(0.1)
+
+
 # Order action handlers
 @router.callback_query(F.data.startswith("confirm_booking_"))
 async def confirm_booking_handler(callback: types.CallbackQuery) -> None:
@@ -871,7 +944,8 @@ async def edit_time_start(callback: types.CallbackQuery, state: FSMContext) -> N
         return
 
     user_stores = db.get_user_stores(callback.from_user.id)
-    if not any(get_store_field(store, "store_id") == offer[1] for store in user_stores):
+    offer_store_id = get_offer_field(offer, "store_id")
+    if not any(get_store_field(store, "store_id") == offer_store_id for store in user_stores):
         await callback.answer(get_text(lang, "not_your_offer"), show_alert=True)
         return
 
@@ -1054,24 +1128,22 @@ async def duplicate_offer(callback: types.CallbackQuery) -> None:
     offer = db.get_offer(offer_id)
 
     if offer:
-        unit_val = (
-            offer[13]
-            if len(offer) > 13 and isinstance(offer[13], str) and len(offer[13]) <= 5
-            else "шт"
-        )
-        category_val = offer[14] if len(offer) > 14 and offer[14] else "other"
+        unit_val = get_offer_field(offer, "unit", "шт")
+        if not unit_val or not isinstance(unit_val, str) or len(unit_val) > 5:
+            unit_val = "шт"
+        category_val = get_offer_field(offer, "category", "other") or "other"
 
         db.add_offer(
-            store_id=offer[1],
-            title=offer[2],
-            description=offer[3],
-            original_price=offer[4],
-            discount_price=offer[5],
-            quantity=offer[6],
-            available_from=offer[7],
-            available_until=offer[8],
-            photo_id=offer[11] if len(offer) > 11 else None,
-            expiry_date=offer[9] if len(offer) > 9 else None,
+            store_id=get_offer_field(offer, "store_id"),
+            title=get_offer_field(offer, "title"),
+            description=get_offer_field(offer, "description"),
+            original_price=get_offer_field(offer, "original_price"),
+            discount_price=get_offer_field(offer, "discount_price"),
+            quantity=get_offer_field(offer, "quantity"),
+            available_from=get_offer_field(offer, "available_from"),
+            available_until=get_offer_field(offer, "available_until"),
+            photo_id=get_offer_field(offer, "photo"),
+            expiry_date=get_offer_field(offer, "expiry_date"),
             unit=unit_val,
             category=category_val,
         )
