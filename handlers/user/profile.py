@@ -80,11 +80,11 @@ async def profile(message: types.Message) -> None:
 
     lang_text = "Русский" if lang == "ru" else "Ozbekcha"
 
-    text = f"{get_text(lang, 'your_profile')}\n\n"
-    text += f"{get_text(lang, 'name')}: {user.first_name or 'N/A'}\n"
-    text += f"{get_text(lang, 'phone')}: {user.phone or 'N/A'}\n"
-    text += f"{get_text(lang, 'city')}: {user.city or 'N/A'}\n"
-    text += f"{get_text(lang, 'language')}: {lang_text}\n"
+    text = f"👤 <b>{get_text(lang, 'your_profile')}</b>\n\n"
+    text += f"📝 {get_text(lang, 'name')}: <b>{user.first_name or 'N/A'}</b>\n"
+    text += f"📱 {get_text(lang, 'phone')}: <code>{user.phone or 'N/A'}</code>\n"
+    text += f"📍 {get_text(lang, 'city')}: <b>{user.city or 'N/A'}</b>\n"
+    text += f"🌍 {get_text(lang, 'language')}: {lang_text}\n"
 
     # Determine current mode for settings keyboard
     current_mode = user_view_mode.get(message.from_user.id, "customer") if user_view_mode else "customer"

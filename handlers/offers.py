@@ -616,7 +616,7 @@ def setup(
         try:
             result = service.list_hot_offers(search_city, limit=20, offset=0)
             if not result.items:
-                await target.answer(offer_templates.render_hot_offers_empty(lang))
+                await target.answer(offer_templates.render_hot_offers_empty(lang), parse_mode="HTML")
                 return
             await state.set_state(BrowseOffers.offer_list)
             await state.update_data(offer_list=[offer.id for offer in result.items])
