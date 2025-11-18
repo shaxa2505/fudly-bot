@@ -302,7 +302,12 @@ offers.setup(dp, db, offer_service, logger)
 # Setup admin statistics handlers
 admin_stats.setup(dp, admin_service, logger)
 
-# Register middleware for registration check
+# Register middlewares
+# 1. Rate limiting (FIRST - before any processing)
+from app.middlewares.rate_limit import RateLimitMiddleware
+dp.update.middleware(RateLimitMiddleware(rate_limit=30, burst_limit=5))
+
+# 2. Registration check
 dp.update.middleware(RegistrationCheckMiddleware(db, get_text, phone_request_keyboard))
 
 # Register fallback router LAST (LOWEST PRIORITY - catches everything else)
