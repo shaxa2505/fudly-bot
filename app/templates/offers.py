@@ -200,12 +200,6 @@ def render_offer_details(lang: str, offer: OfferDetails, store: StoreDetails | N
             lines.append(f"   {min_label}: {store.min_order_amount:,.0f} {currency}")
     
     return "\n".join(lines)
-        lines.append(f"{delivery_label}: {store.delivery_price:,.0f} {currency}")
-        if store.min_order_amount:
-            min_label = "Мин. заказ" if lang == "ru" else "Min. buyurtma"
-            lines.append(f"{min_label}: {store.min_order_amount:,.0f} {currency}")
-
-    return "\n".join(lines)
 
 
 def render_store_offers_list(
