@@ -93,13 +93,13 @@ async def seller_orders(message: types.Message) -> None:
     for store in stores:
         store_id = get_store_field(store, "store_id")
         store_bookings = db.get_store_bookings(store_id)
-        all_bookings.extend(store_bookings)
+        if store_bookings:
+            all_bookings.extend(store_bookings)
         
-        try:
-            store_orders = db.get_store_orders(store_id)
+        # Get delivery orders
+        store_orders = db.get_store_orders(store_id)
+        if store_orders:
             all_orders.extend(store_orders)
-        except Exception:
-            pass
 
     if not all_bookings and not all_orders:
         await message.answer(
