@@ -246,7 +246,7 @@ async def catch_all_callbacks(callback: types.CallbackQuery):
 # ============== PHASE 3: EXTRACTED HANDLERS INTEGRATION ==============
 # Import extracted handler modules (FIRST - for router registration priority)
 from handlers import bookings, orders, partner, booking_rating, common_user
-from handlers.seller import create_offer, management, analytics, order_management
+from handlers.seller import create_offer, management, analytics, order_management, bulk_import
 from handlers.user import profile, favorites
 from handlers.admin import dashboard as admin_dashboard, legacy as admin_legacy
 
@@ -257,6 +257,7 @@ partner.setup_dependencies(db, bot, user_view_mode)
 create_offer.setup_dependencies(db, bot)
 management.setup_dependencies(db, bot)
 analytics.setup_dependencies(db, bot)
+bulk_import.setup_dependencies(db, bot)  # Bulk import dependencies
 profile.setup_dependencies(db, bot, user_view_mode)
 favorites.setup_dependencies(db, bot, user_view_mode)
 order_management.setup(bot, db)
@@ -266,6 +267,7 @@ admin_dashboard.setup(bot, db, get_text, moderation_keyboard, get_uzb_time)
 admin_legacy.setup(bot, db, get_text, moderation_keyboard, get_uzb_time, ADMIN_ID, DATABASE_URL)
 
 # Include extracted routers in dispatcher (SPECIFIC HANDLERS FIRST - higher priority)
+dp.include_router(bulk_import.router)  # Seller: 📦 Массовый импорт
 dp.include_router(profile.router)  # User profile
 dp.include_router(favorites.router)  # User favorites
 dp.include_router(create_offer.router)  # Seller: ➕ Добавить

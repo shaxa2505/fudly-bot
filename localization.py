@@ -70,6 +70,7 @@ TEXTS = {
         'my_items': 'Мои товары',
         'orders': 'Заказы',
         'today_stats': '📊 Сегодня',
+        'bulk_import': '📦 Массовый импорт',
         'back_to_customer': 'Режим покупателя',
         
         # Старые ключи (для совместимости)
@@ -407,7 +408,8 @@ Ro'yxatdan o'tish uchun /start bosing.''',
         'my_items': '📦 Mening mahsulotlarim',
         'orders': '🎫 Buyurtmalar',
         'today_stats': '📊 Bugun',
-        'back_to_customer': '� Xaridor rejimi',
+        'bulk_import': '📦 Ommaviy import',
+        'back_to_customer': '🔙 Xaridor rejimi',
         
         # Eski kalitlar (muvofiqligi uchun)
         'add_offer': '➕ Qo\'shish',
