@@ -65,11 +65,11 @@ async def start_bulk_import(message: types.Message, state: FSMContext):
     # Keyboard with import options
     kb = InlineKeyboardBuilder()
     kb.button(
-        text="📸 Альбом фото" if lang == 'ru' else "📸 Rasm albomi",
+        text="📸 Альбом фото (до 10)" if lang == 'ru' else "📸 Rasm albomi (10 tagacha)",
         callback_data="import_method_photos"
     )
     kb.button(
-        text="📄 CSV + ZIP" if lang == 'ru' else "📄 CSV + ZIP",
+        text="📄 CSV + ZIP (100+)" if lang == 'ru' else "📄 CSV + ZIP (100+)",
         callback_data="import_method_csv"
     )
     kb.adjust(1)
@@ -78,33 +78,39 @@ async def start_bulk_import(message: types.Message, state: FSMContext):
 
 Выберите способ импорта:
 
-<b>📸 Альбом фото</b>
-• До 10 товаров за раз
-• Быстрый ввод данных
-• Добавьте описание к каждому фото
+┏━━━━━━━━━━━━━━━━━━━━━━━━┓
+┃ <b>📸 Альбом фото</b>
+┃ ✅ Быстрый ввод
+┃ ✅ До 10 товаров за раз
+┃ ⏱ ~2 минуты на 10 товаров
+┗━━━━━━━━━━━━━━━━━━━━━━━━┛
 
-<b>📄 CSV + ZIP</b>
-• Любое количество товаров
-• Загрузите CSV файл с данными
-• Загрузите ZIP архив с фото
-• <b>Я отправлю пример файлов!</b>
+┏━━━━━━━━━━━━━━━━━━━━━━━━┓
+┃ <b>📄 CSV + ZIP</b>
+┃ ✅ Любое количество
+┃ ✅ Удобно для 100+ товаров
+┃ ✅ Скачайте пример файла
+┃ ⏱ ~5 минут на 100 товаров
+┗━━━━━━━━━━━━━━━━━━━━━━━━┛
 
-Что выбираете?"""
+💡 <i>Новичкам рекомендуем Альбом фото</i>"""
 
     if lang != 'ru':
         instructions = """📦 <b>Ommaviy import</b>
 
 Import usulini tanlang:
 
-<b>📸 Rasm albomi</b>
-• Bir vaqtda 10 tagacha mahsulot
-• Tez ma'lumot kiritish
+┏━━━━━━━━━━━━━━━━━━━━━━━━┓
+┃ <b>📸 Rasm albomi</b>
+┃ ✅ Tez kiritish
+┃ ✅ 10 tagacha mahsulot
+┗━━━━━━━━━━━━━━━━━━━━━━━━┛
 
-<b>📄 CSV + ZIP</b>
-• Istalgan miqdorda mahsulot
-• <b>Misol fayllarni yuboraman!</b>
-
-Qaysi usulni tanlaysiz?"""
+┏━━━━━━━━━━━━━━━━━━━━━━━━┓
+┃ <b>📄 CSV + ZIP</b>
+┃ ✅ Istalgan miqdor
+┃ ✅ 100+ mahsulotlar uchun
+┗━━━━━━━━━━━━━━━━━━━━━━━━┛"""
     
     await message.answer(instructions, parse_mode="HTML", reply_markup=kb.as_markup())
 
@@ -382,13 +388,8 @@ async def confirm_bulk_import(callback: types.CallbackQuery, state: FSMContext):
     available_from = now.strftime('%Y-%m-%d %H:%M:%S')
     available_until = (now + timedelta(days=30)).strftime('%Y-%m-%d %H:%M:%S')
     
-    # Determine which photo parameter to use based on database type
-    is_postgres = hasattr(db, 'pool') or (hasattr(db, 'db_name') and 'PostgreSQL' in str(db.db_name))
-    photo_param = 'photo_id' if is_postgres else 'photo'
-    
     for offer in offers:
         try:
-            photo_file_id = offer.get('photo_file_id')
             db.add_offer(
                 store_id=store_id,
                 title=offer['title'],
@@ -400,7 +401,7 @@ async def confirm_bulk_import(callback: types.CallbackQuery, state: FSMContext):
                 available_until=available_until,
                 expiry_date=offer['expiry_date'],
                 unit=offer.get('unit', 'шт'),
-                **{photo_param: photo_file_id}
+                photo_id=offer.get('photo_file_id')
             )
             success_count += 1
         except Exception as e:
@@ -543,13 +544,13 @@ async def receive_csv(message: types.Message, state: FSMContext):
         await state.update_data(products=products)
         
         await message.answer(
-            f"✅ CSV загружен: {len(products)} товаров\n\n"
-            f"<b>Теперь отправьте ZIP архив с фотографиями</b>\n"
-            f"📁 Имена файлов должны совпадать с CSV\n\n"
+            f"✅ CSV загружен: <b>{len(products)} товаров</b>\n\n"
+            f"📦 <b>Теперь отправьте ZIP архив с фотографиями</b>\n"
+            f"📂 Имена файлов должны совпадать с CSV\n\n"
             f"❌ Отмена - /cancel"
             if lang == 'ru' else
-            f"✅ CSV yuklandi: {len(products)} mahsulot\n\n"
-            f"<b>Endi rasmlar bilan ZIP arxivni yuboring</b>\n\n"
+            f"✅ CSV yuklandi: <b>{len(products)} mahsulot</b>\n\n"
+            f"📦 <b>Endi rasmlar bilan ZIP arxivni yuboring</b>\n\n"
             f"❌ Bekor qilish - /cancel",
             parse_mode="HTML"
         )
@@ -618,7 +619,13 @@ async def receive_zip(message: types.Message, state: FSMContext):
             await state.set_state(BulkImport.waiting_csv)
             return
         
-        await message.answer("⏳ Обрабатываю..." if lang == 'ru' else "⏳ Qayta ishlanmoqda...")
+        await message.answer(
+            f"⌛ <b>Обрабатываю {len(products)} товаров...</b>\n"
+            f"📷 Загрузка фото в Telegram...\n"
+            f"📦 Добавление в базу данных..."
+            if lang == 'ru' else
+            f"⌛ <b>{len(products)} mahsulot qayta ishlanmoqda...</b>"
+        )
         
         # Process each product
         success_count = 0
@@ -668,10 +675,6 @@ async def receive_zip(message: types.Message, state: FSMContext):
                 available_from = now.strftime('%Y-%m-%d %H:%M:%S')
                 available_until = (now + timedelta(days=30)).strftime('%Y-%m-%d %H:%M:%S')
                 
-                # Determine which photo parameter to use based on database type
-                is_postgres = hasattr(db, 'pool') or (hasattr(db, 'db_name') and 'PostgreSQL' in str(db.db_name))
-                photo_param = 'photo_id' if is_postgres else 'photo'
-                
                 db.add_offer(
                     store_id=store_id,
                     title=title,
@@ -683,7 +686,7 @@ async def receive_zip(message: types.Message, state: FSMContext):
                     available_until=available_until,
                     expiry_date=expiry_date,
                     unit=unit,
-                    **{photo_param: photo_file_id}
+                    photo_id=photo_file_id
                 )
                 
                 success_count += 1
@@ -694,14 +697,14 @@ async def receive_zip(message: types.Message, state: FSMContext):
         
         # Result
         result_text = f"✅ <b>Импорт завершен!</b>\n\n" if lang == 'ru' else f"✅ <b>Import tugadi!</b>\n\n"
-        result_text += f"✅ Успешно: {success_count}\n" if lang == 'ru' else f"✅ Muvaffaqiyatli: {success_count}\n"
+        result_text += f"✅ Успешно: <b>{success_count}</b>\n" if lang == 'ru' else f"✅ Muvaffaqiyatli: <b>{success_count}</b>\n"
         
         if failed_count:
-            result_text += f"❌ Ошибок: {failed_count}\n" if lang == 'ru' else f"❌ Xatolar: {failed_count}\n"
+            result_text += f"❌ Ошибок: <b>{failed_count}</b>\n" if lang == 'ru' else f"❌ Xatolar: <b>{failed_count}</b>\n"
             if errors:
                 result_text += f"\n<b>Детали:</b>\n" + "\n".join(errors[:10])
                 if len(errors) > 10:
-                    result_text += f"\n\n...и еще {len(errors)-10} ошибок"
+                    result_text += f"\n\n...\u0438 еще {len(errors)-10} ошибок"
         
         await message.answer(result_text, parse_mode="HTML")
         await state.clear()

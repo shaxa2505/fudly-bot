@@ -1,4 +1,4 @@
-"""Database factory selecting PostgreSQL or SQLite backend."""
+"""Database factory - PostgreSQL only."""
 from __future__ import annotations
 
 from typing import Optional
@@ -7,24 +7,17 @@ from .security import logger
 
 
 def create_database(database_url: Optional[str]):
-    """Return proper Database implementation based on env settings."""
-    if database_url:
-        from database_pg import Database as PostgresDatabase
+    """Return PostgreSQL Database implementation."""
+    if not database_url:
+        raise ValueError(
+            "❌ DATABASE_URL is required! "
+            "SQLite support removed - use PostgreSQL only.\n"
+            "For local development, set up PostgreSQL locally or use Docker:\n"
+            "  docker run -d -p 5432:5432 -e POSTGRES_PASSWORD=password postgres"
+        )
+    
+    from database_pg import Database as PostgresDatabase
 
-        logger.info("Using PostgreSQL database")
-        print("🐘 Using PostgreSQL database")
-        try:
-            return PostgresDatabase(database_url=database_url)
-        except Exception as exc:
-            logger.error(
-                "PostgreSQL initialization failed, falling back to SQLite: %s",
-                exc,
-                exc_info=True,
-            )
-            print("⚠️ PostgreSQL unavailable, switching to SQLite for local run")
-
-    from database import Database
-
-    logger.info("Using SQLite database (local development)")
-    print("📁 Using SQLite database (local development)")
-    return Database()
+    logger.info("Using PostgreSQL database")
+    print("🐘 Using PostgreSQL database")
+    return PostgresDatabase(database_url=database_url)
