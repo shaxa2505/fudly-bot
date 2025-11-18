@@ -49,15 +49,23 @@ async def my_orders_handler(message: types.Message) -> None:
         await message.answer(text, parse_mode="HTML")
         return
     
+    # Helper to safely get field from dict or tuple
+    def get_field(item, field, index, default=None):
+        if isinstance(item, dict):
+            return item.get(field, default)
+        if isinstance(item, (list, tuple)) and len(item) > index:
+            return item[index]
+        return default
+    
     # Group bookings by status
-    active_bookings = [b for b in bookings if b[3] in ("pending", "confirmed")]
-    completed_bookings = [b for b in bookings if b[3] == "completed"]
-    cancelled_bookings = [b for b in bookings if b[3] == "cancelled"]
+    active_bookings = [b for b in bookings if get_field(b, 'status', 3) in ("pending", "confirmed")]
+    completed_bookings = [b for b in bookings if get_field(b, 'status', 3) == "completed"]
+    cancelled_bookings = [b for b in bookings if get_field(b, 'status', 3) == "cancelled"]
     
     # Group orders by status
-    active_orders = [o for o in orders if o[10] in ["pending", "confirmed", "preparing", "delivering"]]
-    completed_orders = [o for o in orders if o[10] == "completed"]
-    cancelled_orders = [o for o in orders if o[10] == "cancelled"]
+    active_orders = [o for o in orders if get_field(o, 'order_status', 10) in ["pending", "confirmed", "preparing", "delivering"]]
+    completed_orders = [o for o in orders if get_field(o, 'order_status', 10) == "completed"]
+    cancelled_orders = [o for o in orders if get_field(o, 'order_status', 10) == "cancelled"]
     
     text = f"📦 <b>{'Мои заказы' if lang == 'ru' else 'Mening buyurtmalarim'}</b>\n\n"
     

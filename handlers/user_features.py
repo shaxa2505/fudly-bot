@@ -47,17 +47,25 @@ def setup(
             await message.answer(f"🛒 {empty_text}\n\n{desc_ru if lang == 'ru' else desc_uz}")
             return
 
+        # Helper to safely get field from dict or tuple
+        def get_field(item, field, index, default=None):
+            if isinstance(item, dict):
+                return item.get(field, default)
+            if isinstance(item, (list, tuple)) and len(item) > index:
+                return item[index]
+            return default
+
         # Split bookings by status
-        active_bookings = [b for b in bookings if b[3] in ["pending", "confirmed"]]
-        completed_bookings = [b for b in bookings if b[3] == "completed"]
-        cancelled_bookings = [b for b in bookings if b[3] == "cancelled"]
+        active_bookings = [b for b in bookings if get_field(b, 'status', 3) in ["pending", "confirmed"]]
+        completed_bookings = [b for b in bookings if get_field(b, 'status', 3) == "completed"]
+        cancelled_bookings = [b for b in bookings if get_field(b, 'status', 3) == "cancelled"]
 
         # Split orders by status
         active_orders = [
-            o for o in orders if o[10] in ["pending", "confirmed", "preparing", "delivering"]
+            o for o in orders if get_field(o, 'order_status', 10) in ["pending", "confirmed", "preparing", "delivering"]
         ]
-        completed_orders = [o for o in orders if o[10] == "completed"]
-        cancelled_orders = [o for o in orders if o[10] == "cancelled"]
+        completed_orders = [o for o in orders if get_field(o, 'order_status', 10) == "completed"]
+        cancelled_orders = [o for o in orders if get_field(o, 'order_status', 10) == "cancelled"]
 
         total_text = f"<b>{'Мои заказы' if lang == 'ru' else 'Mening buyurtmalarim'}</b>\n\n"
         total_text += f"<b>{'Самовывоз' if lang == 'ru' else 'Olib ketish'}</b>\n"
