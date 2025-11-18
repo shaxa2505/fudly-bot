@@ -99,17 +99,23 @@ async def profile(message: types.Message) -> None:
         except Exception:
             orders = []
 
-        active_bookings = len([b for b in bookings if b[3] in ["pending", "confirmed"]])
-        completed_bookings = len([b for b in bookings if b[3] == "completed"])
+        # Helper to get field from booking/order (dict or tuple)
+        def get_field(item, field, index):
+            if isinstance(item, dict):
+                return item.get(field)
+            return item[index] if isinstance(item, (list, tuple)) and len(item) > index else None
+
+        active_bookings = len([b for b in bookings if get_field(b, 'status', 3) in ["pending", "confirmed"]])
+        completed_bookings = len([b for b in bookings if get_field(b, 'status', 3) == "completed"])
 
         active_orders = len(
             [
                 o
                 for o in orders
-                if o[10] in ["pending", "confirmed", "preparing", "delivering"]
+                if get_field(o, 'order_status', 10) in ["pending", "confirmed", "preparing", "delivering"]
             ]
         )
-        completed_orders = len([o for o in orders if o[10] == "completed"])
+        completed_orders = len([o for o in orders if get_field(o, 'order_status', 10) == "completed"])
 
         total_active = active_bookings + active_orders
         total_completed = completed_bookings + completed_orders
