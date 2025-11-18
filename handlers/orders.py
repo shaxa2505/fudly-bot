@@ -21,6 +21,15 @@ user_view_mode: dict[int, str] | None = None
 router = Router()
 
 
+def get_order_field(order, field: str, index: int):
+    """Helper to get field from order dict or tuple."""
+    if isinstance(order, dict):
+        return order.get(field)
+    if isinstance(order, (list, tuple)) and len(order) > index:
+        return order[index]
+    return None
+
+
 def setup_dependencies(
     database: DatabaseProtocol, bot_instance: Any, view_mode_dict: dict[int, str]
 ) -> None:
@@ -516,21 +525,21 @@ async def confirm_payment(callback: types.CallbackQuery) -> None:
         caption=callback.message.caption + f"\n\n✅ {payment_confirmed_text}"
     )
 
-    customer_lang = db.get_user_language(order[1])
+    customer_lang = db.get_user_language(get_order_field(order, 'user_id', 1))
     confirmed_ru = "Оплата подтверждена!"
     confirmed_uz = "To'lov tasdiqlandi!"
     prep_ru = "Магазин начинает подготовку вашего заказа"
     prep_uz = "Do'kon buyurtmangizni tayyorlaydi"
     try:
         await bot.send_message(
-            order[1],
+            get_order_field(order, 'user_id', 1),
             f"✅ <b>{confirmed_ru if customer_lang == 'ru' else confirmed_uz}</b>\n\n"
             f"📦 {'Заказ' if customer_lang == 'ru' else 'Buyurtma'} #{order_id}\n"
             f"{prep_ru if customer_lang == 'ru' else prep_uz}",
             parse_mode="HTML",
         )
     except Exception as e:
-        logger.error(f"Failed to notify customer {order[1]}: {e}")
+        logger.error(f"Failed to notify customer {get_order_field(order, 'user_id', 1)}: {e}")
 
     await callback.answer()
 
@@ -588,7 +597,7 @@ async def reject_payment(callback: types.CallbackQuery) -> None:
         caption=callback.message.caption + f"\n\n❌ {payment_rejected_text}"
     )
 
-    customer_lang = db.get_user_language(order[1])
+    customer_lang = db.get_user_language(get_order_field(order, 'user_id', 1))
     reject_title_ru = "Оплата не подтверждена"
     reject_title_uz = "To'lov tasdiqlanmadi"
     reject_msg_ru = "Магазин не смог подтвердить вашу оплату. Заказ отменён."
@@ -597,7 +606,7 @@ async def reject_payment(callback: types.CallbackQuery) -> None:
     reject_note_uz = "Iltimos, o'tkazma to'g'riligini tekshiring yoki do'kon bilan bog'laning"
     try:
         await bot.send_message(
-            order[1],
+            get_order_field(order, 'user_id', 1),
             f"❌ <b>{reject_title_ru if customer_lang == 'ru' else reject_title_uz}</b>\n\n"
             f"📦 {'Заказ' if customer_lang == 'ru' else 'Buyurtma'} #{order_id}\n"
             f"{reject_msg_ru if customer_lang == 'ru' else reject_msg_uz}\n"
@@ -605,7 +614,7 @@ async def reject_payment(callback: types.CallbackQuery) -> None:
             parse_mode="HTML",
         )
     except Exception as e:
-        logger.error(f"Failed to notify customer {order[1]}: {e}")
+        logger.error(f"Failed to notify customer {get_order_field(order, 'user_id', 1)}: {e}")
 
     await callback.answer()
 
@@ -641,21 +650,21 @@ async def confirm_order(callback: types.CallbackQuery) -> None:
         + f"\n\n✅ {'Заказ подтверждён!' if lang == 'ru' else 'Buyurtma tasdiqlandi!'}"
     )
 
-    customer_lang = db.get_user_language(order[1])
+    customer_lang = db.get_user_language(get_order_field(order, 'user_id', 1))
     order_confirmed_ru = "Заказ подтверждён!"
     order_confirmed_uz = "Buyurtma tasdiqlandi!"
     prep_msg_ru = "Магазин начинает подготовку вашего заказа"
     prep_msg_uz = "Do'kon buyurtmangizni tayyorlaydi"
     try:
         await bot.send_message(
-            order[1],
+            get_order_field(order, 'user_id', 1),
             f"✅ <b>{order_confirmed_ru if customer_lang == 'ru' else order_confirmed_uz}</b>\n\n"
             f"📦 {'Заказ' if customer_lang == 'ru' else 'Buyurtma'} #{order_id}\n"
             f"{prep_msg_ru if customer_lang == 'ru' else prep_msg_uz}",
             parse_mode="HTML",
         )
     except Exception as e:
-        logger.error(f"Failed to notify customer {order[1]}: {e}")
+        logger.error(f"Failed to notify customer {get_order_field(order, 'user_id', 1)}: {e}")
 
     await callback.answer()
 
@@ -696,21 +705,21 @@ async def cancel_order(callback: types.CallbackQuery) -> None:
         + f"\n\n❌ {'Заказ отменён' if lang == 'ru' else 'Buyurtma bekor qilindi'}"
     )
 
-    customer_lang = db.get_user_language(order[1])
+    customer_lang = db.get_user_language(get_order_field(order, 'user_id', 1))
     cancel_ru = "Заказ отменён"
     cancel_uz = "Buyurtma bekor qilindi"
     cancel_msg_ru = "К сожалению, магазин отменил ваш заказ"
     cancel_msg_uz = "Afsuski, do'kon buyurtmangizni bekor qildi"
     try:
         await bot.send_message(
-            order[1],
+            get_order_field(order, 'user_id', 1),
             f"❌ <b>{cancel_ru if customer_lang == 'ru' else cancel_uz}</b>\n\n"
             f"📦 {'Заказ' if customer_lang == 'ru' else 'Buyurtma'} #{order_id}\n"
             f"{cancel_msg_ru if customer_lang == 'ru' else cancel_msg_uz}",
             parse_mode="HTML",
         )
     except Exception as e:
-        logger.error(f"Failed to notify customer {order[1]}: {e}")
+        logger.error(f"Failed to notify customer {get_order_field(order, 'user_id', 1)}: {e}")
 
     await callback.answer()
 
@@ -739,7 +748,7 @@ async def cancel_order_customer(callback: types.CallbackQuery) -> None:
         )
         return
 
-    if order[1] != callback.from_user.id:
+    if get_order_field(order, 'user_id', 1) != callback.from_user.id:
         await callback.answer(
             "❌ "
             + (
