@@ -775,11 +775,16 @@ class Database:
             return dict(cursor.fetchone()) if cursor.rowcount > 0 else None
     
     def get_store_offers(self, store_id: int, status: str = 'active'):
-        """Get all offers for a store"""
+        """Get all offers for a store (excluding expired ones)"""
         with self.get_connection() as conn:
             cursor = conn.cursor(row_factory=dict_row)
-            cursor.execute('SELECT * FROM offers WHERE store_id = %s AND status = %s', 
-                         (store_id, status))
+            cursor.execute('''
+                SELECT * FROM offers 
+                WHERE store_id = %s 
+                AND status = %s
+                AND (expiry_date IS NULL OR expiry_date::date >= CURRENT_DATE)
+                ORDER BY created_at DESC
+            ''', (store_id, status))
             return [dict(row) for row in cursor.fetchall()]
     
     def get_active_offers(self, city: str = None):
@@ -828,6 +833,7 @@ class Database:
                 AND (s.status = 'approved' OR s.status = 'active')
                 AND (o.available_until IS NULL OR LENGTH(o.available_until) < 6 OR 
                      (LENGTH(o.available_until) > 10 AND o.available_until::timestamp >= NOW()))
+                AND (o.expiry_date IS NULL OR o.expiry_date::date >= CURRENT_DATE)
             '''
             
             params = []

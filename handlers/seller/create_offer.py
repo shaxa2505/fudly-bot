@@ -67,13 +67,17 @@ async def add_offer_start(message: types.Message, state: FSMContext) -> None:
         store_name = get_store_field(stores[0], "name", "Магазин")
         await state.update_data(store_id=store_id)
         
-        # Keyboard with "Without photo" button
+        # Keyboard with "Without photo" and "Cancel" buttons
         builder = InlineKeyboardBuilder()
         builder.button(
             text="📝 Без фото" if lang == "ru" else "📝 Fotosiz",
             callback_data="create_no_photo",
         )
-        builder.adjust(1)
+        builder.button(
+            text="❌ Отменить" if lang == "ru" else "❌ Bekor qilish",
+            callback_data="create_cancel",
+        )
+        builder.adjust(1, 1)
         
         step1_text = (
             f"🏪 <b>{store_name}</b>\n\n"
@@ -220,6 +224,23 @@ async def offer_without_photo(callback: types.CallbackQuery, state: FSMContext) 
         f"<b>{'ШАГ 1 из 3' if lang == 'ru' else '1-QADAM 3 tadan'}</b>\n\n"
         f"📝 {'Введите название товара' if lang == 'ru' else 'Mahsulot nomini kiriting'}:",
         parse_mode="HTML",
+    )
+    await callback.answer()
+
+
+@router.callback_query(F.data == "create_cancel")
+async def cancel_create_offer(callback: types.CallbackQuery, state: FSMContext) -> None:
+    """Cancel offer creation."""
+    if not db:
+        await callback.answer("System error", show_alert=True)
+        return
+    
+    lang = db.get_user_language(callback.from_user.id)
+    await state.clear()
+    
+    await callback.message.edit_text(
+        f"❌ {'Создание товара отменено' if lang == 'ru' else 'Mahsulot yaratish bekor qilindi'}",
+        parse_mode="HTML"
     )
     await callback.answer()
 
