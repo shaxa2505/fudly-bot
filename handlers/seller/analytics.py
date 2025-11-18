@@ -151,20 +151,21 @@ async def partner_today_stats(message: types.Message) -> None:
         
         # Собираем ID всех магазинов партнёра
         store_ids = [get_store_field(store, 'store_id') for store in stores]
-        placeholders = ','.join('%s' * len(store_ids))
+        placeholders = ','.join(['%s'] * len(store_ids))
         
         # Статистика за сегодня
         today = datetime.now().strftime('%Y-%m-%d')
         
         # Заказы за сегодня
-        cursor.execute(f'''
+        query1 = f'''
             SELECT COUNT(*), SUM(b.quantity), SUM(o.discount_price * b.quantity)
             FROM bookings b
             JOIN offers o ON b.offer_id = o.offer_id
             WHERE o.store_id IN ({placeholders})
             AND DATE(b.created_at) = %s
             AND b.status != 'cancelled'
-        ''', (*store_ids, today))
+        '''
+        cursor.execute(query1, (*store_ids, today))
         
         orders_count, items_sold, revenue = cursor.fetchone()
         orders_count = orders_count or 0
@@ -172,16 +173,17 @@ async def partner_today_stats(message: types.Message) -> None:
         revenue = int(revenue or 0)
         
         # Активные товары
-        cursor.execute(f'''
+        query2 = f'''
             SELECT COUNT(*)
             FROM offers
             WHERE store_id IN ({placeholders})
             AND status = 'active'
-        ''', store_ids)
+        '''
+        cursor.execute(query2, tuple(store_ids))
         active_offers = cursor.fetchone()[0]
         
         # ТОП товар
-        cursor.execute(f'''
+        query3 = f'''
             SELECT o.title, COUNT(*) as cnt
             FROM bookings b
             JOIN offers o ON b.offer_id = o.offer_id
@@ -191,7 +193,8 @@ async def partner_today_stats(message: types.Message) -> None:
             GROUP BY o.title
             ORDER BY cnt DESC
             LIMIT 1
-        ''', (*store_ids, today))
+        '''
+        cursor.execute(query3, (*store_ids, today))
         
         top_item = cursor.fetchone()
         top_item_text = f"\n🏆 ТОП товар: {top_item[0]} ({top_item[1]} заказов)" if top_item else ""
