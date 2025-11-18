@@ -81,7 +81,6 @@ async def add_offer_start(message: types.Message, state: FSMContext) -> None:
         
         step1_text = (
             f"🏪 <b>{store_name}</b>\n\n"
-            f"<b>{'ШАГ 1 из 3: НАЗВАНИЕ И ФОТО' if lang == 'ru' else '1-QADAM 3 tadan: NOM VA RASM'}</b>\n\n"
             f"📝 {'Введите название товара' if lang == 'ru' else 'Mahsulot nomini kiriting'}\n\n"
             f"🖼 {'Можете сразу отправить фото с названием в подписи или нажать кнопку' if lang == 'ru' else 'Rasmni nom bilan yuboring yoki tugmani bosing'}"
         )
@@ -197,44 +196,26 @@ async def create_offer_title(message: types.Message, state: FSMContext) -> None:
     data = await state.get_data()
     await state.update_data(title=message.text)
     
-    # Check if user already chose "No photo"
-    if data.get("photo") is None and "photo" in data:
-        # Photo already skipped - go to step 2 (prices)
-        builder = InlineKeyboardBuilder()
-        builder.button(text="30%", callback_data="discount_30")
-        builder.button(text="40%", callback_data="discount_40")
-        builder.button(text="50%", callback_data="discount_50")
-        builder.button(text="60%", callback_data="discount_60")
-        builder.adjust(4)
-        
-        await message.answer(
-            f"<b>{'ШАГ 2 из 3: ЦЕНЫ И КОЛИЧЕСТВО' if lang == 'ru' else '2-QADAM 3 tadan: NARXLAR VA MIQDOR'}</b>\n\n"
-            f"💡 {'Быстрый формат' if lang == 'ru' else 'Tez format'}:\n"
-            f"<code>{'обычная_цена скидка% количество' if lang == 'ru' else 'oddiy_narx chegirma% miqdor'}</code>\n\n"
-            f"📝 {'Пример' if lang == 'ru' else 'Misol'}: <code>1000 40% 50</code>\n"
-            f"   {'(обычная цена 1000, скидка 40%, количество 50)' if lang == 'ru' else '(oddiy narx 1000, chegirma 40%, miqdor 50)'}\n\n"
-            f"{'Или введите только обычную цену и выберите % скидки кнопкой ⬇️' if lang == 'ru' else 'Yoki faqat oddiy narxni kiriting va tugma bilan % chegirmani tanlang ⬇️'}",
-            parse_mode="HTML",
-            reply_markup=builder.as_markup(),
-        )
-        await state.set_state(CreateOffer.original_price)
-        return
-    
-    # Photo not skipped - ask for photo
+    # If photo was sent with title (caption), it's already saved
+    # Go directly to step 2 (prices)
     builder = InlineKeyboardBuilder()
-    builder.button(
-        text="📝 Без фото" if lang == "ru" else "📝 Fotosiz",
-        callback_data="create_skip_photo",
-    )
-    builder.adjust(1)
+    builder.button(text="30%", callback_data="discount_30")
+    builder.button(text="40%", callback_data="discount_40")
+    builder.button(text="50%", callback_data="discount_50")
+    builder.button(text="60%", callback_data="discount_60")
+    builder.adjust(4)
     
     await message.answer(
-        f"✅ {'Название' if lang == 'ru' else 'Nom'}: <b>{message.text}</b>\n\n"
-        f"📸 {'Теперь отправьте фото товара или нажмите кнопку' if lang == 'ru' else 'Endi mahsulot rasmini yuboring yoki tugmani bosing'}",
+        f"💰 <b>{'ЦЕНЫ И КОЛИЧЕСТВО' if lang == 'ru' else 'NARXLAR VA MIQDOR'}</b>\n\n"
+        f"💡 {'Быстрый формат' if lang == 'ru' else 'Tez format'}:\n"
+        f"<code>{'обычная_цена скидка% количество' if lang == 'ru' else 'oddiy_narx chegirma% miqdor'}</code>\n\n"
+        f"📝 {'Пример' if lang == 'ru' else 'Misol'}: <code>1000 40% 50</code>\n"
+        f"   {'(обычная цена 1000, скидка 40%, количество 50)' if lang == 'ru' else '(oddiy narx 1000, chegirma 40%, miqdor 50)'}\n\n"
+        f"{'Или введите только обычную цену и выберите % скидки кнопкой ⬇️' if lang == 'ru' else 'Yoki faqat oddiy narxni kiriting va tugma bilan % chegirmani tanlang ⬇️'}",
         parse_mode="HTML",
         reply_markup=builder.as_markup(),
     )
-    await state.set_state(CreateOffer.photo)
+    await state.set_state(CreateOffer.original_price)
 
 
 @router.callback_query(F.data == "create_no_photo")
@@ -247,7 +228,6 @@ async def offer_without_photo(callback: types.CallbackQuery, state: FSMContext) 
     lang = db.get_user_language(callback.from_user.id)
     await state.update_data(photo=None)  # Set photo to None
     await callback.message.edit_text(
-        f"<b>{'ШАГ 1 из 3' if lang == 'ru' else '1-QADAM 3 tadan'}</b>\n\n"
         f"📝 {'Введите название товара' if lang == 'ru' else 'Mahsulot nomini kiriting'}:",
         parse_mode="HTML",
     )
@@ -290,7 +270,7 @@ async def skip_photo_goto_step2(callback: types.CallbackQuery, state: FSMContext
     builder.adjust(4)
     
     await callback.message.edit_text(
-        f"<b>{'ШАГ 2 из 3: ЦЕНЫ И КОЛИЧЕСТВО' if lang == 'ru' else '2-QADAM 3 tadan: NARXLAR VA MIQDOR'}</b>\n\n"
+        f"💰 <b>{'ЦЕНЫ И КОЛИЧЕСТВО' if lang == 'ru' else 'NARXLAR VA MIQDOR'}</b>\n\n"
         f"{'Введите в формате' if lang == 'ru' else 'Formatda kiriting'}:\n"
         f"<code>{'обычная_цена скидка количество' if lang == 'ru' else 'oddiy_narx chegirma miqdor'}</code>\n\n"
         f"{'Пример' if lang == 'ru' else 'Misol'}: <code>1000 40% 50</code>\n"

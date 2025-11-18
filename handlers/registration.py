@@ -27,9 +27,9 @@ def setup(dp_or_router, db, get_text, get_cities, city_keyboard, phone_request_k
             )
             return
         
-        # Save phone and set default city (Tashkent)
+        # Save phone and set default city (Samarkand)
         db.update_user_phone(message.from_user.id, phone)
-        db.update_user_city(message.from_user.id, "Ташкент")
+        db.update_user_city(message.from_user.id, "Самарканд")
         
         # Clear state and show main menu
         await state.clear()
@@ -37,11 +37,11 @@ def setup(dp_or_router, db, get_text, get_cities, city_keyboard, phone_request_k
         # Compact, professional message
         welcome_text = (
             f"Регистрация завершена.\n"
-            f"Ваш город: <b>Ташкент</b>\n\n"
+            f"Ваш город: <b>Самарканд</b>\n\n"
             f"Изменить город можно в Профиле."
             if lang == 'ru' else
             f"Ro'yxatdan o'tish yakunlandi.\n"
-            f"Sizning shahringiz: <b>Toshkent</b>\n\n"
+            f"Sizning shahringiz: <b>Samarqand</b>\n\n"
             f"Shaharni Profilda o'zgartirish mumkin."
         )
         
