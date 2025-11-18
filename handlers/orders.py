@@ -559,13 +559,25 @@ async def reject_payment(callback: types.CallbackQuery) -> None:
         )
         return
 
-    db.update_payment_status(order_id, "pending")
-    db.update_order_status(order_id, "cancelled")
+    db.update_payment_status(order_id, "confirmed")
+    db.update_order_status(order_id, "confirmed")
 
-    offer = db.get_offer(order[3])
+    # Helper for dict/tuple
+    def get_order_field(o, field, index):
+        return o.get(field) if isinstance(o, dict) else (o[index] if len(o) > index else None)
+    
+    offer_id = get_order_field(order, 'offer_id', 3)
+    quantity = get_order_field(order, 'quantity', 4)
+    offer = db.get_offer(offer_id)
     if offer:
-        new_quantity = get_offer_field(offer, "quantity", 0) + order[4]
-        db.update_offer_quantity(order[3], new_quantity)
+        new_quantity = get_offer_field(offer, "quantity", 0) + quantity
+        db.update_offer_quantity(offer_id, new_quantity)
+    offer_id = get_order_field(order, 'offer_id', 3)
+    quantity = get_order_field(order, 'quantity', 4)
+    offer = db.get_offer(offer_id)
+    if offer:
+        new_quantity = get_offer_field(offer, "quantity", 0) + quantity
+        db.update_offer_quantity(offer_id, new_quantity)
 
     payment_rejected_text = (
         "Оплата отклонена, заказ отменён"
@@ -739,13 +751,18 @@ async def cancel_order_customer(callback: types.CallbackQuery) -> None:
         )
         return
 
-    if order[10] not in ["pending", "confirmed"]:
+    # Helper for dict/tuple
+    def get_order_field(o, field, index):
+        return o.get(field) if isinstance(o, dict) else (o[index] if len(o) > index else None)
+    
+    order_status = get_order_field(order, 'order_status', 10)
+    if order_status not in ["pending", "confirmed"]:
         await callback.answer(
             "❌ "
             + (
-                "Заказ нельзя отменить"
+                "Заказ уже обработан"
                 if lang == "ru"
-                else "Buyurtmani bekor qilib bo'lmaydi"
+                else "Buyurtma allaqachon qayta ishlangan"
             ),
             show_alert=True,
         )
@@ -753,10 +770,12 @@ async def cancel_order_customer(callback: types.CallbackQuery) -> None:
 
     db.update_order_status(order_id, "cancelled")
 
-    offer = db.get_offer(order[3])
+    offer_id = get_order_field(order, 'offer_id', 3)
+    quantity = get_order_field(order, 'quantity', 4)
+    offer = db.get_offer(offer_id)
     if offer:
-        new_quantity = get_offer_field(offer, "quantity", 0) + order[4]
-        db.update_offer_quantity(order[3], new_quantity)
+        new_quantity = get_offer_field(offer, "quantity", 0) + quantity
+        db.update_offer_quantity(offer_id, new_quantity)
 
     await callback.message.edit_text(
         callback.message.text

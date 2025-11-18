@@ -84,11 +84,18 @@ async def cancel_order(callback: types.CallbackQuery):
     # Обновляем статус
     db.update_order_status(order_id, 'cancelled')
     
+    # Helper for dict/tuple
+    def get_field(item, field, index):
+        return item.get(field) if isinstance(item, dict) else (item[index] if len(item) > index else None)
+    
     # Возвращаем товар в наличие
-    offer = db.get_offer(order[3])  # offer_id
+    offer_id = get_field(order, 'offer_id', 3)
+    quantity = get_field(order, 'quantity', 4)
+    offer = db.get_offer(offer_id)
     if offer:
-        new_quantity = offer[6] + order[4]  # quantity
-        db.update_offer_quantity(order[3], new_quantity)
+        offer_quantity = get_field(offer, 'quantity', 6)
+        new_quantity = offer_quantity + quantity
+        db.update_offer_quantity(offer_id, new_quantity)
     
     # Уведомляем продавца
     await callback.message.edit_text(
@@ -181,11 +188,18 @@ async def reject_payment(callback: types.CallbackQuery):
     db.update_payment_status(order_id, 'pending')
     db.update_order_status(order_id, 'cancelled')
     
+    # Helper for dict/tuple
+    def get_field(item, field, index):
+        return item.get(field) if isinstance(item, dict) else (item[index] if len(item) > index else None)
+    
     # Возвращаем товар в наличие
-    offer = db.get_offer(order[3])  # offer_id
+    offer_id = get_field(order, 'offer_id', 3)
+    quantity = get_field(order, 'quantity', 4)
+    offer = db.get_offer(offer_id)
     if offer:
-        new_quantity = offer[6] + order[4]  # quantity
-        db.update_offer_quantity(order[3], new_quantity)
+        offer_quantity = get_field(offer, 'quantity', 6)
+        new_quantity = offer_quantity + quantity
+        db.update_offer_quantity(offer_id, new_quantity)
     
     # Уведомляем продавца
     payment_rejected_text = 'Оплата отклонена, заказ отменён' if lang == 'ru' else "To'lov rad etildi, buyurtma bekor qilindi"
