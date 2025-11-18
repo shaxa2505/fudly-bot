@@ -939,11 +939,15 @@ class Database:
         import random
         import string
         
+        logger.info(f"🔵 create_booking_atomic START: offer_id={offer_id}, user_id={user_id}, quantity={quantity}")
+        
         conn = None
         try:
             conn = self.pool.getconn()
             conn.autocommit = False  # Start transaction
             cursor = conn.cursor()
+            
+            logger.info(f"🔵 Checking offer status...")
             
             # Check and reserve product atomically
             cursor.execute('''
@@ -953,12 +957,17 @@ class Database:
             ''', (offer_id,))
             offer = cursor.fetchone()
             
+            logger.info(f"🔵 Offer check result: {offer}")
+            
             if not offer or offer[0] is None or offer[0] < quantity or offer[1] != 'active':
                 conn.rollback()
+                logger.warning(f"🔵 Offer check FAILED: not available")
                 return (False, None, None)
             
             current_quantity = offer[0]
             new_quantity = current_quantity - quantity
+            
+            logger.info(f"🔵 Updating quantity: {current_quantity} -> {new_quantity}")
             
             # Update quantity atomically
             cursor.execute('''
@@ -970,10 +979,15 @@ class Database:
             
             if cursor.rowcount == 0:
                 conn.rollback()
+                logger.warning(f"🔵 Quantity update FAILED: rowcount=0")
                 return (False, None, None)
+            
+            logger.info(f"🔵 Quantity updated successfully")
             
             # Generate unique booking code
             booking_code = ''.join(random.choices(string.ascii_uppercase + string.digits, k=6))
+            
+            logger.info(f"🔵 Creating booking with code={booking_code}")
             
             # Create booking
             cursor.execute('''
@@ -983,7 +997,10 @@ class Database:
             ''', (offer_id, user_id, booking_code, quantity))
             booking_id = cursor.fetchone()[0]
             
+            logger.info(f"🔵 Booking created: booking_id={booking_id}")
+            
             conn.commit()
+            logger.info(f"✅ create_booking_atomic SUCCESS: booking_id={booking_id}, code={booking_code}")
             return (True, booking_id, booking_code)
             
         except Exception as e:
@@ -992,7 +1009,9 @@ class Database:
                     conn.rollback()
                 except Exception:
                     pass
-            logger.error(f"Error creating booking atomically: {e}")
+            logger.error(f"❌ Error creating booking atomically: {type(e).__name__}: {e}")
+            import traceback
+            traceback.print_exc()
             return (False, None, None)
         finally:
             if conn:

@@ -145,6 +145,8 @@ async def book_offer_quantity(message: types.Message, state: FSMContext) -> None
         return
     
     try:
+        logger.info(f"📦 BOOKING: User {message.from_user.id} entered quantity: {message.text}")
+        
         quantity = int(message.text)
         if quantity < 1:
             await message.answer("❌ Количество должно быть больше 0")
@@ -152,12 +154,15 @@ async def book_offer_quantity(message: types.Message, state: FSMContext) -> None
         
         data = await state.get_data()
         offer_id = data.get("offer_id")
+        logger.info(f"📦 BOOKING: offer_id from state: {offer_id}")
+        
         if not offer_id:
             await message.answer("❌ Ошибка: товар не выбран")
             await state.clear()
             return
             
         offer = db.get_offer(offer_id)
+        logger.info(f"📦 BOOKING: offer retrieved: {offer is not None}")
         
         if not offer:
             await message.answer("❌ Предложение не найдено")
@@ -193,15 +198,23 @@ async def book_offer_quantity(message: types.Message, state: FSMContext) -> None
             return
         
         # Try to atomically book item and create booking
+        logger.info(f"📦 BOOKING: Calling create_booking_atomic - offer_id={offer_id}, user_id={message.from_user.id}, quantity={quantity}")
+        
         ok, booking_id, code = db.create_booking_atomic(
             offer_id, message.from_user.id, quantity
         )
+        
+        logger.info(f"📦 BOOKING: create_booking_atomic result - ok={ok}, booking_id={booking_id}, code={code}")
+        
         if not ok or booking_id is None or code is None:
+            logger.error(f"📦 BOOKING FAILED: ok={ok}, booking_id={booking_id}, code={code}")
             await message.answer(
                 "❌ К сожалению, выбранное количество уже недоступно."
             )
             await state.clear()
             return
+        
+        logger.info(f"✅ BOOKING SUCCESS: booking_id={booking_id}, code={code}")
         
         try:
             METRICS["bookings_created"] += 1
