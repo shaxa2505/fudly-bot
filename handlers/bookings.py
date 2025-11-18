@@ -110,9 +110,19 @@ async def book_offer_start(callback: types.CallbackQuery, state: FSMContext) -> 
     
     offer = db.get_offer(offer_id)
     
-    if not offer or offer[6] <= 0:
+    if not offer:
         await callback.answer(get_text(lang, "no_offers"), show_alert=True)
         return
+    
+    # Get quantity safely from dict/tuple
+    quantity = get_offer_field(offer, "quantity", 0)
+    if quantity <= 0:
+        await callback.answer(get_text(lang, "no_offers"), show_alert=True)
+        return
+    
+    # Get other fields safely
+    title = get_offer_field(offer, "title", "Товар")
+    price = get_offer_field(offer, "discount_price", 0)
     
     # Save offer_id to state
     await state.update_data(offer_id=offer_id)
@@ -120,10 +130,10 @@ async def book_offer_start(callback: types.CallbackQuery, state: FSMContext) -> 
     
     # Ask for quantity
     await callback.message.answer(
-        f"📦 <b>{offer[2]}</b>\n\n"
-        f"📋 Доступно: {offer[6]} шт\n"
-        f"💰 Цена: {int(offer[5]):,} сум/шт\n\n"
-        f"Сколько хотите забронировать? (1-{offer[6]})",
+        f"📦 <b>{title}</b>\n\n"
+        f"📋 Доступно: {quantity} шт\n"
+        f"💰 Цена: {int(price):,} сум/шт\n\n"
+        f"Сколько хотите забронировать? (1-{quantity})",
         parse_mode="HTML",
         reply_markup=cancel_keyboard(lang),
     )
