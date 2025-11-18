@@ -49,7 +49,8 @@ class PostgreSQLStorage(BaseStorage):
     async def set_data(self, key: StorageKey, data: Dict[str, Any]) -> None:
         """Set data for user."""
         user_id = key.user_id
-        data_json = json.dumps(data)
+        # PostgreSQL JSONB column accepts dict directly, no need to serialize
+        data_json = json.dumps(data) if not isinstance(data, str) else data
         
         with self.db.get_connection() as conn:
             cursor = conn.cursor()
@@ -75,6 +76,9 @@ class PostgreSQLStorage(BaseStorage):
             )
             result = cursor.fetchone()
             if result and result[0]:
+                # PostgreSQL JSONB returns dict directly, not string
+                if isinstance(result[0], dict):
+                    return result[0]
                 return json.loads(result[0])
             return {}
 
