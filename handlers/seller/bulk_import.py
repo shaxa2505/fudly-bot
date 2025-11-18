@@ -31,7 +31,7 @@ class BulkImport(StatesGroup):
     waiting_zip = State()
 
 
-@router.message(F.text.in_(["📦 Массовый импорт", "📦 Ommaviy import"]))
+@router.message(F.text.in_(["📦 Массовый импорт", "📦 Ommaviy import", "📥 Массовый импорт", "📥 Ommaviy import"]))
 async def start_bulk_import(message: types.Message, state: FSMContext):
     """Start bulk import process"""
     
