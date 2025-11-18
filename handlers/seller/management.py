@@ -81,12 +81,13 @@ async def seller_orders(message: types.Message) -> None:
 
     lang = db.get_user_language(message.from_user.id)
     
-    # Check if user is a seller
+    # Check if user is a seller - if not, skip to next handler
     user = db.get_user_model(message.from_user.id)
     if not user or user.role != 'seller':
-        # Not a seller - skip this handler, let common_user.router handle it
+        # Not a seller - this handler should not process this message
         return
     
+    # User is a seller - process the orders
     stores = db.get_user_stores(message.from_user.id)
 
     if not stores:
