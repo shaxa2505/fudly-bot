@@ -30,6 +30,24 @@ def setup_dependencies(database: DatabaseProtocol, bot_instance: Any) -> None:
     bot = bot_instance
 
 
+def get_offer_field(offer: Any, field: str, default: Any = None) -> Any:
+    """Extract field from offer tuple/dict."""
+    if isinstance(offer, dict):
+        return offer.get(field, default)
+    if isinstance(offer, (tuple, list)):
+        field_map = {
+            "offer_id": 0, "store_id": 1, "title": 2, "description": 3,
+            "original_price": 4, "discount_price": 5, "quantity": 6,
+            "available_from": 7, "available_until": 8, "expiry_date": 9,
+            "status": 10, "photo": 11, "created_at": 12, "unit": 13,
+            "category": 14, "store_name": 15, "address": 16, "city": 17
+        }
+        idx = field_map.get(field)
+        if idx is not None and len(offer) > idx:
+            return offer[idx]
+    return default
+
+
 def get_store_field(store: Any, field: str, default: Any = None) -> Any:
     """Extract field from store tuple/dict."""
     if isinstance(store, dict):
@@ -612,7 +630,8 @@ async def extend_offer(callback: types.CallbackQuery) -> None:
         return
 
     user_stores = db.get_user_stores(callback.from_user.id)
-    if not any(get_store_field(store, "store_id") == offer[1] for store in user_stores):
+    offer_store_id = get_offer_field(offer, "store_id")
+    if not any(get_store_field(store, "store_id") == offer_store_id for store in user_stores):
         await callback.answer(get_text(lang, "not_your_offer"), show_alert=True)
         return
 
@@ -695,7 +714,8 @@ async def deactivate_offer(callback: types.CallbackQuery) -> None:
         return
 
     user_stores = db.get_user_stores(callback.from_user.id)
-    if not any(get_store_field(store, "store_id") == offer[1] for store in user_stores):
+    offer_store_id = get_offer_field(offer, "store_id")
+    if not any(get_store_field(store, "store_id") == offer_store_id for store in user_stores):
         await callback.answer(get_text(lang, "not_your_offer"), show_alert=True)
         return
 
@@ -727,7 +747,8 @@ async def activate_offer(callback: types.CallbackQuery) -> None:
         return
 
     user_stores = db.get_user_stores(callback.from_user.id)
-    if not any(get_store_field(store, "store_id") == offer[1] for store in user_stores):
+    offer_store_id = get_offer_field(offer, "store_id")
+    if not any(get_store_field(store, "store_id") == offer_store_id for store in user_stores):
         await callback.answer(get_text(lang, "not_your_offer"), show_alert=True)
         return
 
@@ -759,7 +780,8 @@ async def delete_offer(callback: types.CallbackQuery) -> None:
         return
 
     user_stores = db.get_user_stores(callback.from_user.id)
-    if not any(get_store_field(store, "store_id") == offer[1] for store in user_stores):
+    offer_store_id = get_offer_field(offer, "store_id")
+    if not any(get_store_field(store, "store_id") == offer_store_id for store in user_stores):
         await callback.answer(get_text(lang, "not_your_offer"), show_alert=True)
         return
 
@@ -791,7 +813,8 @@ async def edit_offer(callback: types.CallbackQuery) -> None:
         return
 
     user_stores = db.get_user_stores(callback.from_user.id)
-    if not any(get_store_field(store, "store_id") == offer[1] for store in user_stores):
+    offer_store_id = get_offer_field(offer, "store_id")
+    if not any(get_store_field(store, "store_id") == offer_store_id for store in user_stores):
         await callback.answer(get_text(lang, "not_your_offer"), show_alert=True)
         return
 
