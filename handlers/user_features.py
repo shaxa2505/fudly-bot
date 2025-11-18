@@ -97,14 +97,20 @@ def setup(
         )
 
         for store in favorites:
-            store_id = store[0]
+            # Dict-compatible access
+            store_id = store.get('store_id') if isinstance(store, dict) else store[0]
+            store_name = store.get('name') if isinstance(store, dict) else (store[2] if len(store) > 2 else 'Без названия')
+            category = store.get('category') if isinstance(store, dict) else (store[6] if len(store) > 6 else 'Магазин')
+            address = store.get('address') if isinstance(store, dict) else (store[4] if len(store) > 4 else '')
+            description = store.get('description') if isinstance(store, dict) else (store[5] if len(store) > 5 else '')
+            
             avg_rating = db.get_store_average_rating(store_id)
             ratings = db.get_store_ratings(store_id)
 
-            text = f"""🏪 <b>{store[2]}</b>
-🏷 {store[6]}
-📍 {store[4]}
-📝 {store[5]}
+            text = f"""🏪 <b>{store_name}</b>
+🏷 {category}
+📍 {address}
+📝 {description}
 ⭐ Рейтинг: {avg_rating:.1f}/5 ({len(ratings)} отзывов)"""
 
             keyboard = InlineKeyboardBuilder()

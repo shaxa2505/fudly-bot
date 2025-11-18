@@ -145,17 +145,17 @@ async def admin_moderation_callback(callback: types.CallbackQuery):
             first_name = store.get('first_name', 'Неизвестно')
             username = store.get('username')
         else:
-            # Tuple format (SQLite)
-            store_id = store[0]
-            name = store[2]
-            city = store[3]
-            address = store[4] or "не указан"
-            description = store[5] or "нет описания"
-            category = store[6]
-            phone = store[7] or "не указан"
-            created_at = store[10]
-            first_name = store[15] if len(store) > 15 else "Неизвестно"
-            username = store[16] if len(store) > 16 else None
+            # PostgreSQL also returns dict format now, so this branch is just for safety
+            store_id = store[0] if isinstance(store, (list, tuple)) and len(store) > 0 else 0
+            name = store[2] if isinstance(store, (list, tuple)) and len(store) > 2 else 'Без названия'
+            city = store[3] if isinstance(store, (list, tuple)) and len(store) > 3 else ''
+            address = (store[4] if isinstance(store, (list, tuple)) and len(store) > 4 else '') or "не указан"
+            description = (store[5] if isinstance(store, (list, tuple)) and len(store) > 5 else '') or "нет описания"
+            category = store[6] if isinstance(store, (list, tuple)) and len(store) > 6 else 'Ресторан'
+            phone = (store[7] if isinstance(store, (list, tuple)) and len(store) > 7 else '') or "не указан"
+            created_at = store[10] if isinstance(store, (list, tuple)) and len(store) > 10 else ''
+            first_name = store[15] if isinstance(store, (list, tuple)) and len(store) > 15 else "Неизвестно"
+            username = store[16] if isinstance(store, (list, tuple)) and len(store) > 16 else None
         
         text = f"🏪 <b>{name}</b>\n\n"
         text += f"От: {first_name} (@{username or 'нет'})\n"
@@ -378,7 +378,7 @@ async def admin_delete_user_stores_callback(callback: types.CallbackQuery):
         cursor = conn.cursor()
         
         # Получаем информацию о пользователе
-        cursor.execute('SELECT first_name, username FROM users WHERE user_id = ?', (user_id,))
+        cursor.execute('SELECT first_name, username FROM users WHERE user_id = %s', (user_id,))
         user_info = cursor.fetchone()
         
         if not user_info:
@@ -388,7 +388,7 @@ async def admin_delete_user_stores_callback(callback: types.CallbackQuery):
         first_name, username = user_info
         
         # Получаем список магазинов
-        cursor.execute('SELECT store_id, name, status FROM stores WHERE owner_id = ?', (user_id,))
+        cursor.execute('SELECT store_id, name, status FROM stores WHERE owner_id = %s', (user_id,))
         stores = cursor.fetchall()
     
     if not stores:
@@ -435,7 +435,7 @@ async def admin_confirm_delete_stores_callback(callback: types.CallbackQuery):
     cursor = conn.cursor()
     
     # Получаем магазины
-    cursor.execute('SELECT store_id FROM stores WHERE owner_id = ?', (user_id,))
+    cursor.execute('SELECT store_id FROM stores WHERE owner_id = %s', (user_id,))
     stores = cursor.fetchall()
     
     if not stores:
@@ -445,13 +445,13 @@ async def admin_confirm_delete_stores_callback(callback: types.CallbackQuery):
     
     # Удаляем все товары магазинов
     for (store_id,) in stores:
-        cursor.execute('UPDATE offers SET status = "deleted" WHERE store_id = ?', (store_id,))
+        cursor.execute('UPDATE offers SET status = "deleted" WHERE store_id = %s', (store_id,))
     
     # Удаляем магазины (меняем статус на rejected)
-    cursor.execute('UPDATE stores SET status = "rejected" WHERE owner_id = ?', (user_id,))
+    cursor.execute('UPDATE stores SET status = "rejected" WHERE owner_id = %s', (user_id,))
     
     # Меняем роль пользователя на customer
-    cursor.execute('UPDATE users SET role = "customer" WHERE user_id = ?', (user_id,))
+    cursor.execute('UPDATE users SET role = "customer" WHERE user_id = %s', (user_id,))
     
     conn.commit()
     conn.close()
@@ -548,7 +548,7 @@ async def admin_block_store_callback(callback: types.CallbackQuery):
     with db.get_connection() as conn:
         cursor = conn.cursor()
         
-        cursor.execute('SELECT name FROM stores WHERE store_id = ?', (store_id,))
+        cursor.execute('SELECT name FROM stores WHERE store_id = %s', (store_id,))
         store = cursor.fetchone()
         
         if not store:
@@ -556,10 +556,10 @@ async def admin_block_store_callback(callback: types.CallbackQuery):
             return
         
         # Блокируем магазин
-        cursor.execute('UPDATE stores SET status = "rejected" WHERE store_id = ?', (store_id,))
+        cursor.execute('UPDATE stores SET status = "rejected" WHERE store_id = %s', (store_id,))
         
         # Деактивируем все товары
-        cursor.execute('UPDATE offers SET status = "inactive" WHERE store_id = ?', (store_id,))
+        cursor.execute('UPDATE offers SET status = "inactive" WHERE store_id = %s', (store_id,))
     
     await callback.message.edit_text(
         f"🚫 <b>Магазин заблокирован</b>\n\n"

@@ -111,11 +111,12 @@ async def show_favorites(message: types.Message) -> None:
             address = store.get('address', '')
             description = store.get('description', '')
         else:
-            store_id = store[0]
-            store_name = store[2]
-            category = store[6]
-            address = store[4]
-            description = store[5]
+            # PostgreSQL now returns dict, but keep as fallback
+            store_id = store[0] if len(store) > 0 else 0
+            store_name = store[2] if len(store) > 2 else 'Без названия'
+            category = store[6] if len(store) > 6 else 'Магазин'
+            address = store[4] if len(store) > 4 else ''
+            description = store[5] if len(store) > 5 else ''
             
         avg_rating = db.get_store_average_rating(store_id)
         ratings = db.get_store_ratings(store_id)

@@ -91,12 +91,13 @@ async def my_offers(message: types.Message) -> None:
     )
 
     for offer in all_offers[:20]:
-        offer_id = offer[0]
-        title = offer[2]
-        original_price = int(offer[4])
-        discount_price = int(offer[5])
-        quantity = offer[6]
-        status = offer[10] if len(offer) > 10 else "active"
+        # Dict-compatible access
+        offer_id = offer.get('offer_id') if isinstance(offer, dict) else offer[0]
+        title = offer.get('title') if isinstance(offer, dict) else (offer[2] if len(offer) > 2 else 'Без названия')
+        original_price = int(offer.get('original_price', 0) if isinstance(offer, dict) else (offer[4] if len(offer) > 4 else 0))
+        discount_price = int(offer.get('discount_price', 0) if isinstance(offer, dict) else (offer[5] if len(offer) > 5 else 0))
+        quantity = offer.get('quantity', 0) if isinstance(offer, dict) else (offer[6] if len(offer) > 6 else 0)
+        status = offer.get('status', 'active') if isinstance(offer, dict) else (offer[10] if len(offer) > 10 else "active")
 
         unit = offer[13] if len(offer) >= 14 and offer[13] else "шт"
 

@@ -303,8 +303,10 @@ async def my_bookings(message: types.Message) -> None:
     text = f"📦 <b>{get_text(lang, 'my_bookings')}</b>\n\n"
     
     for booking in active[:10]:  # Show max 10
-        booking_id = booking[0]
-        offer = db.get_offer(booking[2])
+        # Dict-compatible access
+        booking_id = booking.get('booking_id') if isinstance(booking, dict) else booking[0]
+        offer_id = booking.get('offer_id') if isinstance(booking, dict) else booking[2]
+        offer = db.get_offer(offer_id)
         if not offer:
             continue
         
@@ -351,13 +353,14 @@ async def filter_bookings(callback: types.CallbackQuery) -> None:
     text = f"🛒 <b>{get_text(lang, 'bookings')} ({status})</b>\n\n"
     
     for booking in bookings[:10]:
-        booking_id = booking[0]
-        offer_id = booking[1]
-        status_val = booking[3]
-        booking_code = booking[4]
-        pickup_time = booking[5]
-        quantity = booking[6]
-        created_at = booking[7]
+        # Dict-compatible access
+        booking_id = booking.get('booking_id') if isinstance(booking, dict) else booking[0]
+        offer_id = booking.get('offer_id') if isinstance(booking, dict) else (booking[1] if len(booking) > 1 else 0)
+        status_val = booking.get('status') if isinstance(booking, dict) else (booking[3] if len(booking) > 3 else '')
+        booking_code = booking.get('code') if isinstance(booking, dict) else (booking[4] if len(booking) > 4 else '')
+        pickup_time = booking.get('pickup_time') if isinstance(booking, dict) else (booking[5] if len(booking) > 5 else '')
+        quantity = booking.get('quantity') if isinstance(booking, dict) else (booking[6] if len(booking) > 6 else 1)
+        created_at = booking.get('created_at') if isinstance(booking, dict) else (booking[7] if len(booking) > 7 else '')
         
         # Joined fields from query
         offer_title = booking[8] if len(booking) > 8 else "Товар"

@@ -601,8 +601,12 @@ async def cmd_enable_delivery(message: types.Message):
         result = f"✅ Доставка включена для {updated} магазина(ов)\n\n"
         result += "📊 Статус магазинов:\n"
         for store in stores:
-            status = "✅" if store[2] else "❌"
-            result += f"{status} {store[1]} (ID: {store[0]})\n"
+            # Dict-compatible access
+            store_id = store.get('store_id') if isinstance(store, dict) else (store[0] if len(store) > 0 else 0)
+            store_name = store.get('name') if isinstance(store, dict) else (store[1] if len(store) > 1 else 'Без названия')
+            delivery_enabled = store.get('delivery_enabled') if isinstance(store, dict) else (store[2] if len(store) > 2 else False)
+            status = "✅" if delivery_enabled else "❌"
+            result += f"{status} {store_name} (ID: {store_id})\n"
         
         await message.answer(result)
     

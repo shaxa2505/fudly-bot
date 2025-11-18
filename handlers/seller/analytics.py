@@ -64,7 +64,10 @@ async def show_analytics(message: types.Message) -> None:
 
     keyboard = InlineKeyboardBuilder()
     for store in stores:
-        keyboard.button(text=f"📊 {store[2]}", callback_data=f"analytics_{store[0]}")
+        # Dict-compatible access
+        store_id = store.get('store_id') if isinstance(store, dict) else store[0]
+        store_name = store.get('name') if isinstance(store, dict) else store[2]
+        keyboard.button(text=f"📊 {store_name}", callback_data=f"analytics_{store_id}")
     keyboard.adjust(1)
 
     await message.answer(
@@ -90,8 +93,11 @@ async def show_store_analytics(callback: types.CallbackQuery) -> None:
 
     analytics = db.get_store_analytics(store_id)
     store = db.get_store(store_id)
+    
+    # Dict-compatible access
+    store_name = store.get('name') if isinstance(store, dict) else store[2]
 
-    text = f"📊 <b>Аналитика магазина {store[2]}</b>\n\n"
+    text = f"📊 <b>Аналитика магазина {store_name}</b>\n\n"
 
     text += "📈 <b>ОБЩАЯ СТАТИСТИКА</b>\n"
     text += f"📦 Всего бронирований: {analytics['total_bookings']}\n"
