@@ -28,5 +28,5 @@ cachetools>=5.3.0
 # Uncomment if needed:
 redis>=5.0.0                     # For Redis caching (enabled - Phase 3)
 python-json-logger>=2.0.0        # For structured logging (enabled)
+sentry-sdk>=1.40.0               # For error tracking and monitoring
 # Pillow>=10.0.0                 # For image processing
-# sentry-sdk>=1.40.0             # For error tracking

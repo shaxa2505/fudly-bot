@@ -151,6 +151,21 @@ if ADMIN_ID > 0:
     except Exception as e:
         print(f"⚠️ Ошибка при установке админа: {e}")
 
+# Initialize Sentry for error tracking
+try:
+    from app.core.sentry_integration import init_sentry
+    sentry_enabled = init_sentry(
+        environment="production" if USE_WEBHOOK else "development",
+        enable_logging=True,
+        sample_rate=1.0,
+        traces_sample_rate=0.1
+    )
+    if sentry_enabled:
+        print("✅ Sentry error tracking enabled")
+except Exception as e:
+    print(f"⚠️ Sentry initialization failed: {e}")
+    sentry_enabled = False
+
 # ============== FALLBACK HANDLERS (defined early, registered late) ==============
 
 from aiogram import Router
@@ -823,9 +838,53 @@ async def main():
                 METRICS["updates_errors"] += 1
                 return web.Response(status=200, text="OK")
         
-        # Health check endpoint
+        # Health check endpoint with DB status
         async def health_check(request):
-            return web.json_response({"status": "ok", "bot": "Fudly"})
+            """Comprehensive health check endpoint."""
+            try:
+                # Check database connection
+                db_healthy = True
+                db_error = None
+                try:
+                    with db.get_connection() as conn:
+                        cursor = conn.cursor()
+                        cursor.execute("SELECT 1")
+                        cursor.fetchone()
+                except Exception as e:
+                    db_healthy = False
+                    db_error = str(e)
+                
+                status = {
+                    "status": "healthy" if db_healthy else "degraded",
+                    "bot": "Fudly",
+                    "timestamp": datetime.now().isoformat(),
+                    "components": {
+                        "database": {
+                            "status": "healthy" if db_healthy else "unhealthy",
+                            "error": db_error
+                        },
+                        "bot": {"status": "healthy"}
+                    }
+                }
+                
+                # Add metrics
+                status["metrics"] = {
+                    "updates_received": METRICS.get("updates_received", 0),
+                    "updates_errors": METRICS.get("updates_errors", 0),
+                    "error_rate": round(
+                        METRICS.get("updates_errors", 0) / max(METRICS.get("updates_received", 1), 1) * 100, 2
+                    )
+                }
+                
+                http_status = 200 if db_healthy else 503
+                return web.json_response(status, status=http_status)
+            except Exception as e:
+                logger.error(f"Health check failed: {e}")
+                return web.json_response({
+                    "status": "error",
+                    "error": str(e)
+                }, status=500)
+        
         async def version_info(request):
             return web.json_response({
                 "app": "Fudly",
