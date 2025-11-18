@@ -271,8 +271,9 @@ async def order_delivery_address(message: types.Message, state: FSMContext) -> N
         await state.clear()
         return
 
-    card_number = payment_card[1]
-    card_holder = payment_card[2]
+    # Dict-compatible access for PostgreSQL
+    card_number = payment_card.get('card_number') if isinstance(payment_card, dict) else payment_card[1]
+    card_holder = payment_card.get('card_holder') if isinstance(payment_card, dict) else payment_card[2]
 
     data = await state.get_data()
     store = db.get_store(data["store_id"])
