@@ -467,10 +467,24 @@ async def filter_orders_pending(callback: types.CallbackQuery) -> None:
     for store in stores:
         store_id = get_store_field(store, "store_id")
         bookings = db.get_store_bookings(store_id) or []
-        pending_items.extend([b for b in bookings if (b.get('status') if isinstance(b, dict) else (b[3] if len(b) > 3 else None)) == 'pending'])
+        for b in bookings:
+            status = b.get('status') if isinstance(b, dict) else (b[3] if len(b) > 3 else None)
+            if status == 'pending':
+                pending_items.append(b)
     
     await callback.answer()
-    await callback.message.answer(f"⏳ {'Новые заказы' if lang == 'ru' else 'Yangi buyurtmalar'}: <b>{len(pending_items)}</b>", parse_mode="HTML")
+    
+    if not pending_items:
+        await callback.message.edit_text(
+            f"⏳ {'Новых заказов нет' if lang == 'ru' else 'Yangi buyurtmalar yo`q'}",
+            parse_mode="HTML"
+        )
+        return
+    
+    await callback.message.edit_text(
+        f"⏳ {'Новые заказы' if lang == 'ru' else 'Yangi buyurtmalar'}: <b>{len(pending_items)}</b>",
+        parse_mode="HTML"
+    )
     
     for item in pending_items[:10]:
         await _send_order_card(callback.message, item, lang, is_booking=True)
@@ -491,10 +505,24 @@ async def filter_orders_active(callback: types.CallbackQuery) -> None:
     for store in stores:
         store_id = get_store_field(store, "store_id")
         bookings = db.get_store_bookings(store_id) or []
-        active_items.extend([b for b in bookings if (b.get('status') if isinstance(b, dict) else (b[3] if len(b) > 3 else None)) == 'confirmed'])
+        for b in bookings:
+            status = b.get('status') if isinstance(b, dict) else (b[3] if len(b) > 3 else None)
+            if status == 'confirmed':
+                active_items.append(b)
     
     await callback.answer()
-    await callback.message.answer(f"✅ {'Активные заказы' if lang == 'ru' else 'Faol buyurtmalar'}: <b>{len(active_items)}</b>", parse_mode="HTML")
+    
+    if not active_items:
+        await callback.message.edit_text(
+            f"✅ {'Активных заказов нет' if lang == 'ru' else 'Faol buyurtmalar yo`q'}",
+            parse_mode="HTML"
+        )
+        return
+    
+    await callback.message.edit_text(
+        f"✅ {'Активные заказы' if lang == 'ru' else 'Faol buyurtmalar'}: <b>{len(active_items)}</b>",
+        parse_mode="HTML"
+    )
     
     for item in active_items[:10]:
         await _send_order_card(callback.message, item, lang, is_booking=True)
@@ -515,10 +543,24 @@ async def filter_orders_completed(callback: types.CallbackQuery) -> None:
     for store in stores:
         store_id = get_store_field(store, "store_id")
         bookings = db.get_store_bookings(store_id) or []
-        completed_items.extend([b for b in bookings if (b.get('status') if isinstance(b, dict) else (b[3] if len(b) > 3 else None)) == 'completed'])
+        for b in bookings:
+            status = b.get('status') if isinstance(b, dict) else (b[3] if len(b) > 3 else None)
+            if status == 'completed':
+                completed_items.append(b)
     
     await callback.answer()
-    await callback.message.answer(f"🎉 {'Выполненные заказы' if lang == 'ru' else 'Bajarilgan buyurtmalar'}: <b>{len(completed_items)}</b>", parse_mode="HTML")
+    
+    if not completed_items:
+        await callback.message.edit_text(
+            f"🎉 {'Выполненных заказов нет' if lang == 'ru' else 'Bajarilgan buyurtmalar yo`q'}",
+            parse_mode="HTML"
+        )
+        return
+    
+    await callback.message.edit_text(
+        f"🎉 {'Выполненные заказы' if lang == 'ru' else 'Bajarilgan buyurtmalar'}: <b>{len(completed_items)}</b>",
+        parse_mode="HTML"
+    )
     
     for item in completed_items[:10]:
         await _send_order_card(callback.message, item, lang, is_booking=True)
@@ -919,6 +961,20 @@ async def edit_offer(callback: types.CallbackQuery) -> None:
     except Exception:
         await callback.answer(get_text(lang, "edit_unavailable"), show_alert=True)
 
+    await callback.answer()
+
+
+@router.callback_query(F.data.startswith("back_to_offer_"))
+async def back_to_offer(callback: types.CallbackQuery) -> None:
+    """Return to offer management view."""
+    if not db:
+        await callback.answer("System error")
+        return
+    
+    lang = db.get_user_language(callback.from_user.id)
+    offer_id = int(callback.data.split("_")[3])
+    
+    await update_offer_message(callback, offer_id, lang)
     await callback.answer()
 
 
