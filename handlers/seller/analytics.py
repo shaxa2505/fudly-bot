@@ -186,7 +186,7 @@ async def partner_today_stats(message: types.Message) -> None:
             FROM bookings b
             JOIN offers o ON b.offer_id = o.offer_id
             WHERE o.store_id IN ({placeholders})
-            AND DATE(b.created_at) = ?
+            AND DATE(b.created_at) = %s
             AND b.status != 'cancelled'
             GROUP BY o.title
             ORDER BY cnt DESC
