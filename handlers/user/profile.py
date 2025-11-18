@@ -135,14 +135,28 @@ async def profile(message: types.Message) -> None:
                     store_id = store[0]  # Fallback for tuple format
                 store_bookings = db.get_store_bookings(store_id)
 
-                completed_bookings = [b for b in store_bookings if b[3] == "completed"]
+                # Filter completed bookings - handle dict format from PostgreSQL
+                completed_bookings = []
+                for b in store_bookings:
+                    status = b.get('status') if isinstance(b, dict) else (b[3] if len(b) > 3 else None)
+                    if status == "completed":
+                        completed_bookings.append(b)
+                
                 total_bookings += len(completed_bookings)
 
                 for booking in completed_bookings:
                     try:
-                        quantity = int(booking[6]) if len(booking) > 6 else 1
-                        price = float(booking[9]) if len(booking) > 9 else 0
-                        total_revenue += int(quantity * price)
+                        if isinstance(booking, dict):
+                            quantity = int(booking.get('quantity', 1))
+                            # Calculate price from offer
+                            offer = db.get_offer(booking.get('offer_id'))
+                            if offer:
+                                price = float(offer.get('discount_price', 0)) if isinstance(offer, dict) else float(offer[5]) if len(offer) > 5 else 0
+                                total_revenue += int(quantity * price)
+                        else:
+                            quantity = int(booking[6]) if len(booking) > 6 else 1
+                            price = float(booking[9]) if len(booking) > 9 else 0
+                            total_revenue += int(quantity * price)
                     except Exception:
                         pass
 
