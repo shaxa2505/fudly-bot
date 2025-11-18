@@ -531,12 +531,16 @@ async def quantity_add(callback: types.CallbackQuery) -> None:
         await callback.answer(get_text(lang, "offer_not_found"), show_alert=True)
         return
 
+    # Safe field access
+    offer_store_id = offer.get('store_id') if isinstance(offer, dict) else (offer[1] if len(offer) > 1 else None)
+    current_quantity = offer.get('quantity') if isinstance(offer, dict) else (offer[6] if len(offer) > 6 else 0)
+
     user_stores = db.get_user_stores(callback.from_user.id)
-    if not any(get_store_field(store, "store_id") == offer[1] for store in user_stores):
+    if not any(get_store_field(store, "store_id") == offer_store_id for store in user_stores):
         await callback.answer(get_text(lang, "not_your_offer"), show_alert=True)
         return
 
-    new_quantity = offer[6] + 1
+    new_quantity = current_quantity + 1
     db.update_offer_quantity(offer_id, new_quantity)
 
     await update_offer_message(callback, offer_id, lang)
@@ -551,7 +555,7 @@ async def quantity_subtract(callback: types.CallbackQuery) -> None:
         return
 
     lang = db.get_user_language(callback.from_user.id)
-    
+
     try:
         offer_id = int(callback.data.split("_")[2])
     except (ValueError, IndexError) as e:
@@ -564,12 +568,16 @@ async def quantity_subtract(callback: types.CallbackQuery) -> None:
         await callback.answer(get_text(lang, "offer_not_found"), show_alert=True)
         return
 
+    # Safe field access
+    offer_store_id = offer.get('store_id') if isinstance(offer, dict) else (offer[1] if len(offer) > 1 else None)
+    current_quantity = offer.get('quantity') if isinstance(offer, dict) else (offer[6] if len(offer) > 6 else 0)
+
     user_stores = db.get_user_stores(callback.from_user.id)
-    if not any(get_store_field(store, "store_id") == offer[1] for store in user_stores):
+    if not any(get_store_field(store, "store_id") == offer_store_id for store in user_stores):
         await callback.answer(get_text(lang, "not_your_offer"), show_alert=True)
         return
 
-    new_quantity = max(0, offer[6] - 1)
+    new_quantity = max(0, current_quantity - 1)
     db.update_offer_quantity(offer_id, new_quantity)
 
     await update_offer_message(callback, offer_id, lang)
@@ -933,31 +941,41 @@ async def update_offer_message(
     if not offer:
         return
 
-    title = offer[2]
-    original_price = int(offer[4])
-    discount_price = int(offer[5])
-    quantity = offer[6]
-    status = offer[10] if len(offer) > 10 else "active"
+    # Safe field extraction
+    title = offer.get('title') if isinstance(offer, dict) else (offer[2] if len(offer) > 2 else 'Товар')
+    original_price = int(offer.get('original_price', 0) if isinstance(offer, dict) else (offer[4] if len(offer) > 4 else 0))
+    discount_price = int(offer.get('discount_price', 0) if isinstance(offer, dict) else (offer[5] if len(offer) > 5 else 0))
+    quantity = offer.get('quantity', 0) if isinstance(offer, dict) else (offer[6] if len(offer) > 6 else 0)
+    status = offer.get('status', 'active') if isinstance(offer, dict) else (offer[10] if len(offer) > 10 else 'active')
+    unit = offer.get('unit', 'шт') if isinstance(offer, dict) else (offer[13] if len(offer) > 13 and offer[13] else 'шт')
+    available_from = offer.get('available_from') if isinstance(offer, dict) else (offer[7] if len(offer) > 7 else '')
+    available_until = offer.get('available_until') if isinstance(offer, dict) else (offer[8] if len(offer) > 8 else '')
+    expiry_date = offer.get('expiry_date') if isinstance(offer, dict) else (offer[9] if len(offer) > 9 else None)
 
-    unit = offer[13] if len(offer) >= 14 and offer[13] else "шт"
-
-    discount_percent = (
-        int((1 - discount_price / original_price) * 100) if original_price > 0 else 0
-    )
+    discount_percent = int((1 - discount_price / original_price) * 100) if original_price > 0 else 0
 
     status_emoji = "✅" if status == "active" else "❌"
     text = f"{status_emoji} <b>{title}</b>\n\n"
-    text += f"💰 {original_price:,} ➜ <b>{discount_price:,}</b> сум (-{discount_percent}%)\n"
-    text += f"📦 {'Осталось' if lang == 'ru' else 'Qoldi'}: <b>{quantity}</b> {unit}\n"
-
-    if len(offer) > 9 and offer[9]:
-        expiry_info = db.get_time_remaining(offer[9])
+    
+    # Price box
+    text += "┌─────────────────┐\n"
+    text += f"│ <s>{original_price:,}</s> ➜ <b>{discount_price:,}</b> сум │\n"
+    text += f"│ 💥 Скидка <b>-{discount_percent}%</b>  │\n"
+    text += "└─────────────────┘\n\n"
+    
+    # Stock
+    stock_emoji = "🟢" if quantity > 10 else "🟡" if quantity > 0 else "🔴"
+    text += f"{stock_emoji} Остаток: <b>{quantity}</b> {unit}\n"
+    
+    # Time
+    if available_from and available_until:
+        text += f"🕐 {available_from} - {available_until}\n"
+    
+    # Expiry
+    if expiry_date:
+        expiry_info = db.get_time_remaining(expiry_date)
         if expiry_info:
-            text += f"{expiry_info}\n"
-        else:
-            text += f"📅 До: {offer[9]}\n"
-
-    text += f"🕐 {offer[7]} - {offer[8]}"
+            text += f"⏰ {expiry_info}\n"
 
     builder = InlineKeyboardBuilder()
 
