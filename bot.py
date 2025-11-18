@@ -271,6 +271,7 @@ dp.include_router(bulk_import.router)  # Seller: 📦 Массовый импо�
 dp.include_router(profile.router)  # User profile
 dp.include_router(favorites.router)  # User favorites
 dp.include_router(create_offer.router)  # Seller: ➕ Добавить
+dp.include_router(common_user.router)  # Common user operations (BEFORE management for Orders button)
 dp.include_router(management.router)  # Seller: 📦 Мои товары
 dp.include_router(analytics.router)  # Seller: 📊 Аналитика
 dp.include_router(order_management.router)  # Seller: order operations
@@ -278,7 +279,6 @@ dp.include_router(orders.router)  # Orders: 🎫 Заказы
 dp.include_router(bookings.router)  # Bookings
 dp.include_router(partner.router)  # Partner registration
 dp.include_router(booking_rating.router)  # Booking ratings
-dp.include_router(common_user.router)  # Common user operations
 dp.include_router(admin_dashboard.router)  # Admin dashboard
 dp.include_router(admin_legacy.router)  # Admin legacy
 
