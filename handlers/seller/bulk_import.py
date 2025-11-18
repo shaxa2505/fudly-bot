@@ -377,8 +377,17 @@ async def confirm_bulk_import(callback: types.CallbackQuery, state: FSMContext):
     success_count = 0
     failed_count = 0
     
+    from datetime import datetime, timedelta
+    now = datetime.now()
+    available_from = now.strftime('%Y-%m-%d %H:%M:%S')
+    available_until = (now + timedelta(days=30)).strftime('%Y-%m-%d %H:%M:%S')
+    
+    # Determine which photo parameter to use based on database type
+    photo_param = 'photo_id' if 'Pg' in db.__class__.__name__ or 'PostgreSQL' in db.__class__.__name__ else 'photo'
+    
     for offer in offers:
         try:
+            photo_file_id = offer.get('photo_file_id')
             db.add_offer(
                 store_id=store_id,
                 title=offer['title'],
@@ -386,9 +395,11 @@ async def confirm_bulk_import(callback: types.CallbackQuery, state: FSMContext):
                 original_price=offer['original_price'],
                 discount_price=offer['discount_price'],
                 quantity=offer['quantity'],
+                available_from=available_from,
+                available_until=available_until,
                 expiry_date=offer['expiry_date'],
                 unit=offer.get('unit', 'шт'),
-                photo=offer.get('photo_file_id')
+                **{photo_param: photo_file_id}
             )
             success_count += 1
         except Exception as e:
@@ -651,6 +662,14 @@ async def receive_zip(message: types.Message, state: FSMContext):
                     continue
                 
                 # Add to database
+                from datetime import datetime, timedelta
+                now = datetime.now()
+                available_from = now.strftime('%Y-%m-%d %H:%M:%S')
+                available_until = (now + timedelta(days=30)).strftime('%Y-%m-%d %H:%M:%S')
+                
+                # Determine which photo parameter to use based on database type
+                photo_param = 'photo_id' if 'Pg' in db.__class__.__name__ or 'PostgreSQL' in db.__class__.__name__ else 'photo'
+                
                 db.add_offer(
                     store_id=store_id,
                     title=title,
@@ -658,9 +677,11 @@ async def receive_zip(message: types.Message, state: FSMContext):
                     original_price=original_price,
                     discount_price=discount_price,
                     quantity=quantity,
+                    available_from=available_from,
+                    available_until=available_until,
                     expiry_date=expiry_date,
                     unit=unit,
-                    photo=photo_file_id
+                    **{photo_param: photo_file_id}
                 )
                 
                 success_count += 1
