@@ -49,15 +49,15 @@ class PostgreSQLStorage(BaseStorage):
     async def set_data(self, key: StorageKey, data: Dict[str, Any]) -> None:
         """Set data for user."""
         user_id = key.user_id
-        # PostgreSQL JSONB column accepts dict directly, no need to serialize
-        data_json = json.dumps(data) if not isinstance(data, str) else data
+        # PostgreSQL JSONB column needs JSON string, not dict
+        data_json = json.dumps(data)
         
         with self.db.get_connection() as conn:
             cursor = conn.cursor()
             cursor.execute(
                 """
                 INSERT INTO fsm_states (user_id, data, updated_at)
-                VALUES (%s, %s, CURRENT_TIMESTAMP)
+                VALUES (%s, %s::jsonb, CURRENT_TIMESTAMP)
                 ON CONFLICT (user_id)
                 DO UPDATE SET data = EXCLUDED.data, updated_at = CURRENT_TIMESTAMP
                 """,

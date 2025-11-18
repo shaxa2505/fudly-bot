@@ -68,7 +68,7 @@ TEXTS = {
         # Партнёр - новые короткие названия
         'add_item': '➕ Добавить',
         'my_items': '📦 Мои товары',
-        'orders': '🎫 Заказы',
+        'orders': '🎫 Заказы продавца',
         'today_stats': '📊 Сегодня',
         'bulk_import': '📥 Массовый импорт',
         'back_to_customer': '🛒 Режим покупателя',
@@ -407,7 +407,7 @@ Ro'yxatdan o'tish uchun /start bosing.''',
         # Hamkor - yangi qisqa nomlar
         'add_item': '➕ Qo\'shish',
         'my_items': '📦 Mening mahsulotlarim',
-        'orders': '🎫 Buyurtmalar',
+        'orders': '🎫 Buyurtmalar (sotuvchi)',
         'today_stats': '📊 Bugun',
         'bulk_import': '📦 Ommaviy import',
         'back_to_customer': '🔙 Xaridor rejimi',

@@ -71,7 +71,7 @@ def get_store_field(store: Any, field: str, default: Any = None) -> Any:
 
 
 @router.message(
-    F.text.contains("🎫 Заказы") | F.text.contains("Заказы") | F.text.contains("Buyurtmalar")
+    F.text.contains("🎫 Заказы продавца") | F.text.contains("Zakazlar (sotuvchi)")
 )
 async def seller_orders(message: types.Message) -> Any:
     """Display seller's orders and bookings from all stores. Only for sellers WITH stores."""
@@ -79,16 +79,15 @@ async def seller_orders(message: types.Message) -> Any:
         await message.answer("⚠️ Database not available")
         return
     
-    # Check if user has stores - if not, skip this handler (let common_user handle it)
+    # Check if user has stores - if not, don't handle this message
     try:
         stores = db.get_user_stores(message.from_user.id)
+        if not stores:
+            # No stores - don't handle, let event propagate
+            raise ValueError("No stores")
     except Exception as e:
-        logger.error(f"Error getting stores: {e}")
-        return
-    
-    if not stores:
-        # No stores - this is a regular customer, skip to common_user.router
-        return
+        logger.debug(f"seller_orders skipped: {e}")
+        raise
 
     lang = db.get_user_language(message.from_user.id)
 
