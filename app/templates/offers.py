@@ -145,28 +145,41 @@ def render_store_card(lang: str, store: StoreDetails) -> str:
 
 
 def render_offer_details(lang: str, offer: OfferDetails, store: StoreDetails | None = None) -> str:
-    lines = [f"<b>{offer.title}</b>"]
-    if offer.description:
-        lines.append(offer.description)
-        lines.append("")
-    lines.append(_format_price_line(offer, lang))
+    lines = []
+    
+    # Title with emoji
+    lines.append(f"🎉 <b>{offer.title}</b>")
     lines.append("")
     
-    # Магазин и адрес (без эмоджи, элегантно)
+    # Description
+    if offer.description:
+        lines.append(f"📝 {offer.description}")
+        lines.append("")
+    
+    # Price section with box
+    lines.append("┌────────────────────────")
+    price_line = _format_price_line(offer, lang)
+    lines.append(f"│ {price_line}")
+    lines.append("└────────────────────────")
+    lines.append("")
+    
+    # Store info
     store_name = store.name if store else offer.store_name
     store_address = store.address if store else offer.store_address
     store_city = store.city if store else offer.store_city
-    lines.append(store_name)
+    
+    lines.append(f"🏪 <b>{store_name}</b>")
     if store_address or store_city:
         location = " · ".join(filter(None, [store_address, store_city]))
-        lines.append(location)
+        lines.append(f"📍 {location}")
     lines.append("")
     
-    # Доступность и срок годности
-    lines.append(f"{'Доступно' if lang == 'ru' else 'Mavjud'}: {offer.quantity} {offer.unit}")
+    # Stock and expiry
+    stock_label = "Доступно" if lang == "ru" else "Mavjud"
+    lines.append(f"📦 {stock_label}: <b>{offer.quantity} {offer.unit}</b>")
+    
     if offer.expiry_date:
         expiry_label = "Годен до" if lang == "ru" else "Yaroqlilik"
-        # Форматируем дату красиво: DD.MM.YYYY
         expiry_str = str(offer.expiry_date)[:10]
         try:
             from datetime import datetime
@@ -174,13 +187,19 @@ def render_offer_details(lang: str, offer: OfferDetails, store: StoreDetails | N
             expiry_str = dt.strftime("%d.%m.%Y")
         except:
             pass
-        lines.append(f"{expiry_label}: {expiry_str}")
+        lines.append(f"⏰ {expiry_label}: {expiry_str}")
 
     # Доставка (если доступна)
     if store and store.delivery_enabled:
         lines.append("")
         currency = "сум" if lang == "ru" else "so'm"
         delivery_label = "Доставка" if lang == "ru" else "Yetkazib berish"
+        lines.append(f"🚚 {delivery_label}: <b>{store.delivery_price:,.0f} {currency}</b>")
+        if store.min_order_amount:
+            min_label = "Мин. заказ" if lang == "ru" else "Min. buyurtma"
+            lines.append(f"   {min_label}: {store.min_order_amount:,.0f} {currency}")
+    
+    return "\n".join(lines)
         lines.append(f"{delivery_label}: {store.delivery_price:,.0f} {currency}")
         if store.min_order_amount:
             min_label = "Мин. заказ" if lang == "ru" else "Min. buyurtma"

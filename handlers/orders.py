@@ -119,7 +119,8 @@ async def order_delivery_start(callback: types.CallbackQuery, state: FSMContext)
         await callback.answer(get_text(lang, "no_offers"), show_alert=True)
         return
 
-    store = db.get_store(get_offer_field(offer, "store_id"))
+    store_id = get_offer_field(offer, "store_id")
+    store = db.get_store(store_id)
     if not store:
         await callback.answer("❌ Магазин не найден", show_alert=True)
         return
@@ -138,7 +139,7 @@ async def order_delivery_start(callback: types.CallbackQuery, state: FSMContext)
         return
 
     await state.update_data(
-        offer_id=offer_id, store_id=get_offer_field(offer, "store_id")
+        offer_id=offer_id, store_id=store_id
     )
     await state.set_state(OrderDelivery.quantity)
 
