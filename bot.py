@@ -152,6 +152,8 @@ if ADMIN_ID > 0:
         print(f"⚠️ Ошибка при установке админа: {e}")
 
 # Initialize Sentry for error tracking
+print("🔧 Initializing Sentry error tracking...")
+print(f"   SENTRY_DSN present: {'Yes' if os.getenv('SENTRY_DSN') else 'No'}")
 try:
     from app.core.sentry_integration import init_sentry
     sentry_enabled = init_sentry(
@@ -161,9 +163,14 @@ try:
         traces_sample_rate=0.1
     )
     if sentry_enabled:
+        print("✅ Sentry initialized for production environment")
         print("✅ Sentry error tracking enabled")
+    else:
+        print("⚠️ Sentry not enabled (check SENTRY_DSN)")
 except Exception as e:
     print(f"⚠️ Sentry initialization failed: {e}")
+    import traceback
+    traceback.print_exc()
     sentry_enabled = False
 
 # ============== FALLBACK HANDLERS (defined early, registered late) ==============
