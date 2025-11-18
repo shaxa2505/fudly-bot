@@ -383,7 +383,8 @@ async def confirm_bulk_import(callback: types.CallbackQuery, state: FSMContext):
     available_until = (now + timedelta(days=30)).strftime('%Y-%m-%d %H:%M:%S')
     
     # Determine which photo parameter to use based on database type
-    photo_param = 'photo_id' if 'Pg' in db.__class__.__name__ or 'PostgreSQL' in db.__class__.__name__ else 'photo'
+    is_postgres = hasattr(db, 'pool') or (hasattr(db, 'db_name') and 'PostgreSQL' in str(db.db_name))
+    photo_param = 'photo_id' if is_postgres else 'photo'
     
     for offer in offers:
         try:
@@ -668,7 +669,8 @@ async def receive_zip(message: types.Message, state: FSMContext):
                 available_until = (now + timedelta(days=30)).strftime('%Y-%m-%d %H:%M:%S')
                 
                 # Determine which photo parameter to use based on database type
-                photo_param = 'photo_id' if 'Pg' in db.__class__.__name__ or 'PostgreSQL' in db.__class__.__name__ else 'photo'
+                is_postgres = hasattr(db, 'pool') or (hasattr(db, 'db_name') and 'PostgreSQL' in str(db.db_name))
+                photo_param = 'photo_id' if is_postgres else 'photo'
                 
                 db.add_offer(
                     store_id=store_id,
