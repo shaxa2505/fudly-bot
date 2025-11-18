@@ -81,95 +81,189 @@ async def my_offers(message: types.Message) -> None:
     logger.info(f"Total offers: {len(all_offers)}")
 
     if not all_offers:
-        await message.answer(get_text(lang, "no_offers_yet"))
+        await message.answer(
+            "📦 <b>" + ("Ваши товары" if lang == 'ru' else "Sizning mahsulotlaringiz") + "</b>\n\n"
+            "❌ " + get_text(lang, "no_offers_yet") + "\n\n"
+            "💡 " + ("Нажмите ➕ Добавить чтобы создать первый товар" if lang == 'ru' else "➕ Qo'shish tugmasini bosing"),
+            parse_mode="HTML"
+        )
         return
 
+    # Count active and inactive
+    active_count = sum(1 for o in all_offers if (o.get('status') if isinstance(o, dict) else o[10]) == 'active')
+    inactive_count = len(all_offers) - active_count
+
+    # Filter menu
+    filter_kb = InlineKeyboardBuilder()
+    filter_kb.button(text=f"✅ Активные ({active_count})", callback_data="filter_offers_active")
+    filter_kb.button(text=f"❌ Неактивные ({inactive_count})", callback_data="filter_offers_inactive")
+    filter_kb.button(text=f"📋 Все ({len(all_offers)})", callback_data="filter_offers_all")
+    filter_kb.adjust(2, 1)
+
     await message.answer(
-        f"📦 <b>{'Ваши товары' if lang == 'ru' else 'Sizning mahsulotlaringiz'}</b>\n"
-        f"{'Найдено' if lang == 'ru' else 'Topildi'}: {len(all_offers)} {'товаров' if lang == 'ru' else 'mahsulot'}",
+        "┌─────────────────────────┐\n"
+        f"│  📦 <b>{'ВАШИ ТОВАРЫ' if lang == 'ru' else 'MAHSULOTLARINGIZ'}</b>  │\n"
+        "└─────────────────────────┘\n\n"
+        f"✅ Активных: <b>{active_count}</b>\n"
+        f"❌ Неактивных: <b>{inactive_count}</b>\n"
+        f"📊 Всего: <b>{len(all_offers)}</b>",
         parse_mode="HTML",
+        reply_markup=filter_kb.as_markup()
     )
 
-    for offer in all_offers[:20]:
-        # Dict-compatible access
-        offer_id = offer.get('offer_id') if isinstance(offer, dict) else offer[0]
-        title = offer.get('title') if isinstance(offer, dict) else (offer[2] if len(offer) > 2 else 'Без названия')
-        original_price = int(offer.get('original_price', 0) if isinstance(offer, dict) else (offer[4] if len(offer) > 4 else 0))
-        discount_price = int(offer.get('discount_price', 0) if isinstance(offer, dict) else (offer[5] if len(offer) > 5 else 0))
-        quantity = offer.get('quantity', 0) if isinstance(offer, dict) else (offer[6] if len(offer) > 6 else 0)
-        status = offer.get('status', 'active') if isinstance(offer, dict) else (offer[10] if len(offer) > 10 else "active")
+    # Show first 10 offers
+    for offer in all_offers[:10]:
+        await _send_offer_card(message, offer, lang)
+        await asyncio.sleep(0.1)
 
-        unit = offer[13] if len(offer) >= 14 and offer[13] else "шт"
-
-        discount_percent = (
-            int((1 - discount_price / original_price) * 100) if original_price > 0 else 0
+    if len(all_offers) > 10:
+        await message.answer(
+            f"ℹ️ {'Показано первые 10 товаров из' if lang == 'ru' else 'Birinchi 10 ta mahsulot'} {len(all_offers)}\n"
+            f"{'Используйте фильтры выше для поиска' if lang == 'ru' else 'Qidirish uchun filtrlardan foydalaning'}"
         )
 
-        status_emoji = "✅" if status == "active" else "❌"
-        text = f"{status_emoji} <b>{title}</b>\n\n"
-        text += f"💰 {original_price:,} ➜ <b>{discount_price:,}</b> сум (-{discount_percent}%)\n"
-        text += f"📦 {'Осталось' if lang == 'ru' else 'Qoldi'}: <b>{quantity}</b> {unit}\n"
 
-        if len(offer) > 9 and offer[9]:
-            expiry_info = db.get_time_remaining(offer[9])
-            if expiry_info:
-                text += f"{expiry_info}\n"
-            else:
-                text += f"📅 До: {offer[9]}\n"
+async def _send_offer_card(message: types.Message, offer: Any, lang: str) -> None:
+    """Send single offer card with management buttons."""
+    # Safe field extraction
+    offer_id = offer.get('offer_id') if isinstance(offer, dict) else offer[0]
+    title = offer.get('title') if isinstance(offer, dict) else (offer[2] if len(offer) > 2 else 'Без названия')
+    original_price = int(offer.get('original_price', 0) if isinstance(offer, dict) else (offer[4] if len(offer) > 4 else 0))
+    discount_price = int(offer.get('discount_price', 0) if isinstance(offer, dict) else (offer[5] if len(offer) > 5 else 0))
+    quantity = offer.get('quantity', 0) if isinstance(offer, dict) else (offer[6] if len(offer) > 6 else 0)
+    status = offer.get('status', 'active') if isinstance(offer, dict) else (offer[10] if len(offer) > 10 else "active")
+    photo = offer.get('photo') if isinstance(offer, dict) else (offer[11] if len(offer) > 11 else None)
+    unit = offer.get('unit', 'шт') if isinstance(offer, dict) else (offer[13] if len(offer) > 13 and offer[13] else 'шт')
+    available_from = offer.get('available_from') if isinstance(offer, dict) else (offer[7] if len(offer) > 7 else None)
+    available_until = offer.get('available_until') if isinstance(offer, dict) else (offer[8] if len(offer) > 8 else None)
+    expiry_date = offer.get('expiry_date') if isinstance(offer, dict) else (offer[9] if len(offer) > 9 else None)
 
-        text += f"🕐 {offer[7]} - {offer[8]}"
+    discount_percent = int((1 - discount_price / original_price) * 100) if original_price > 0 else 0
 
-        builder = InlineKeyboardBuilder()
+    # Build card
+    status_emoji = "✅" if status == "active" else "❌"
+    text = f"{status_emoji} <b>{title}</b>\n\n"
+    
+    # Price box
+    text += "┌─────────────────┐\n"
+    text += f"│ <s>{original_price:,}</s> ➜ <b>{discount_price:,}</b> сум │\n"
+    text += f"│ 💥 Скидка <b>-{discount_percent}%</b>  │\n"
+    text += "└─────────────────┘\n\n"
+    
+    # Stock
+    stock_emoji = "🟢" if quantity > 10 else "🟡" if quantity > 0 else "🔴"
+    text += f"{stock_emoji} Остаток: <b>{quantity}</b> {unit}\n"
+    
+    # Time
+    if available_from and available_until:
+        text += f"🕐 {available_from} - {available_until}\n"
+    
+    # Expiry
+    if expiry_date and db:
+        expiry_info = db.get_time_remaining(expiry_date)
+        if expiry_info:
+            text += f"⏰ {expiry_info}\n"
 
-        if status == "active":
-            builder.button(text="➕ +1", callback_data=f"qty_add_{offer_id}")
-            builder.button(text="➖ -1", callback_data=f"qty_sub_{offer_id}")
-            builder.button(
-                text="📝 Изменить" if lang == "ru" else "📝 Tahrirlash",
-                callback_data=f"edit_offer_{offer_id}",
-            )
-            builder.button(
-                text="🔄 Продлить" if lang == "ru" else "🔄 Uzaytirish",
-                callback_data=f"extend_offer_{offer_id}",
-            )
-            builder.button(
-                text="❌ Снять" if lang == "ru" else "❌ O'chirish",
-                callback_data=f"deactivate_offer_{offer_id}",
-            )
-            builder.adjust(2, 2, 1)
-        else:
-            builder.button(
-                text="✅ Активировать" if lang == "ru" else "✅ Faollashtirish",
-                callback_data=f"activate_offer_{offer_id}",
-            )
-            builder.button(
-                text="🗑 Удалить" if lang == "ru" else "🗑 O'chirish",
-                callback_data=f"delete_offer_{offer_id}",
-            )
-            builder.adjust(2)
+    # Management buttons
+    builder = InlineKeyboardBuilder()
 
-        if len(offer) > 11 and offer[11]:
-            try:
-                await message.answer_photo(
-                    photo=offer[11],
-                    caption=text,
-                    parse_mode="HTML",
-                    reply_markup=builder.as_markup(),
-                )
-            except Exception:
-                await message.answer(
-                    text, parse_mode="HTML", reply_markup=builder.as_markup()
-                )
-        else:
+    if status == "active":
+        builder.button(text="➕ +1", callback_data=f"qty_add_{offer_id}")
+        builder.button(text="➖ -1", callback_data=f"qty_sub_{offer_id}")
+        builder.button(
+            text="📝 Изменить" if lang == "ru" else "📝 Tahrirlash",
+            callback_data=f"edit_offer_{offer_id}",
+        )
+        builder.button(
+            text="🔄 Продлить" if lang == "ru" else "🔄 Uzaytirish",
+            callback_data=f"extend_offer_{offer_id}",
+        )
+        builder.button(
+            text="❌ Снять" if lang == "ru" else "❌ O'chirish",
+            callback_data=f"deactivate_offer_{offer_id}",
+        )
+        builder.adjust(2, 2, 1)
+    else:
+        builder.button(
+            text="✅ Активировать" if lang == "ru" else "✅ Faollashtirish",
+            callback_data=f"activate_offer_{offer_id}",
+        )
+        builder.button(
+            text="🗑 Удалить" if lang == "ru" else "🗑 O'chirish",
+            callback_data=f"delete_offer_{offer_id}",
+        )
+        builder.adjust(2)
+
+    if photo:
+        try:
+            await message.answer_photo(
+                photo=photo,
+                caption=text,
+                parse_mode="HTML",
+                reply_markup=builder.as_markup(),
+            )
+        except Exception:
             await message.answer(
                 text, parse_mode="HTML", reply_markup=builder.as_markup()
             )
+    else:
+        await message.answer(
+            text, parse_mode="HTML", reply_markup=builder.as_markup()
+        )
 
+
+# Filter handlers for "Мои товары"
+@router.callback_query(F.data.startswith("filter_offers_"))
+async def filter_offers(callback: types.CallbackQuery) -> None:
+    """Filter offers by status."""
+    if not db:
+        await callback.answer("System error", show_alert=True)
+        return
+
+    filter_type = callback.data.split("_")[-1]  # active, inactive, all
+    lang = db.get_user_language(callback.from_user.id)
+    stores = db.get_user_stores(callback.from_user.id)
+
+    if not stores:
+        await callback.answer(get_text(lang, "no_stores"), show_alert=True)
+        return
+
+    all_offers = []
+    for store in stores:
+        store_id = get_store_field(store, "store_id")
+        offers = db.get_store_offers(store_id)
+        all_offers.extend(offers)
+
+    # Apply filter
+    if filter_type == "active":
+        filtered = [o for o in all_offers if (o.get('status') if isinstance(o, dict) else o[10]) == 'active']
+        title = "✅ Активные товары"
+    elif filter_type == "inactive":
+        filtered = [o for o in all_offers if (o.get('status') if isinstance(o, dict) else o[10]) != 'active']
+        title = "❌ Неактивные товары"
+    else:
+        filtered = all_offers
+        title = "📋 Все товары"
+
+    if not filtered:
+        await callback.answer(f"{'Нет товаров в этой категории' if lang == 'ru' else 'Bu kategoriyada mahsulot yo`q'}", show_alert=True)
+        return
+
+    await callback.answer()
+    
+    await callback.message.answer(
+        f"<b>{title}</b>\n\n"
+        f"{'Найдено' if lang == 'ru' else 'Topildi'}: <b>{len(filtered)}</b>",
+        parse_mode="HTML"
+    )
+
+    for offer in filtered[:10]:
+        await _send_offer_card(callback.message, offer, lang)
         await asyncio.sleep(0.1)
 
-    if len(all_offers) > 20:
-        await message.answer(
-            f"... {'и ещё' if lang == 'ru' else 'va yana'} {len(all_offers) - 20} {'товаров' if lang == 'ru' else 'mahsulot'}"
+    if len(filtered) > 10:
+        await callback.message.answer(
+            f"ℹ️ {'Показано первые 10 из' if lang == 'ru' else 'Birinchi 10 ta'} {len(filtered)}"
         )
 
 
