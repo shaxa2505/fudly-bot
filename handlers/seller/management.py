@@ -80,7 +80,12 @@ async def seller_orders(message: types.Message) -> Any:
         return
     
     # Check if user has stores - if not, skip this handler (let common_user handle it)
-    stores = db.get_user_stores(message.from_user.id)
+    try:
+        stores = db.get_user_stores(message.from_user.id)
+    except Exception as e:
+        logger.error(f"Error getting stores: {e}")
+        return
+    
     if not stores:
         # No stores - this is a regular customer, skip to common_user.router
         return
