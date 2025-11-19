@@ -324,7 +324,7 @@ async def order_delivery_address(message: types.Message, state: FSMContext, db: 
 
 
 @router.message(OrderDelivery.payment_proof, F.photo)
-async def order_payment_proof(message: types.Message, state: FSMContext) -> None:
+async def order_payment_proof(message: types.Message, state: FSMContext, db: DatabaseProtocol, bot: Any) -> None:
     """Process payment screenshot and create order."""
     logger.info(f"📸 Payment screenshot received from user {message.from_user.id}")
 
@@ -476,7 +476,7 @@ async def order_payment_proof(message: types.Message, state: FSMContext) -> None
 
 
 @router.message(OrderDelivery.payment_proof)
-async def order_payment_proof_invalid(message: types.Message, state: FSMContext) -> None:
+async def order_payment_proof_invalid(message: types.Message, state: FSMContext, db: DatabaseProtocol) -> None:
     """Handle non-photo messages in payment proof state."""
     if not db:
         await message.answer("System error")
@@ -499,7 +499,7 @@ async def order_payment_proof_invalid(message: types.Message, state: FSMContext)
 
 
 @router.callback_query(F.data.startswith("confirm_payment_"))
-async def confirm_payment(callback: types.CallbackQuery) -> None:
+async def confirm_payment(callback: types.CallbackQuery, db: DatabaseProtocol, bot: Any) -> None:
     """Confirm payment by seller."""
     if not db or not bot:
         await callback.answer("System error")
@@ -552,7 +552,7 @@ async def confirm_payment(callback: types.CallbackQuery) -> None:
 
 
 @router.callback_query(F.data.startswith("reject_payment_"))
-async def reject_payment(callback: types.CallbackQuery) -> None:
+async def reject_payment(callback: types.CallbackQuery, db: DatabaseProtocol, bot: Any) -> None:
     """Reject payment by seller."""
     if not db or not bot:
         await callback.answer("System error")
@@ -627,7 +627,7 @@ async def reject_payment(callback: types.CallbackQuery) -> None:
 
 
 @router.callback_query(F.data.startswith("confirm_order_"))
-async def confirm_order(callback: types.CallbackQuery) -> None:
+async def confirm_order(callback: types.CallbackQuery, db: DatabaseProtocol, bot: Any) -> None:
     """Confirm order by seller."""
     if not db or not bot:
         await callback.answer("System error")
@@ -677,7 +677,7 @@ async def confirm_order(callback: types.CallbackQuery) -> None:
 
 
 @router.callback_query(F.data.startswith("cancel_order_"))
-async def cancel_order(callback: types.CallbackQuery) -> None:
+async def cancel_order(callback: types.CallbackQuery, db: DatabaseProtocol, bot: Any) -> None:
     """Cancel order by seller."""
     if not db or not bot:
         await callback.answer("System error")
@@ -732,7 +732,7 @@ async def cancel_order(callback: types.CallbackQuery) -> None:
 
 
 @router.callback_query(F.data.startswith("cancel_order_customer_"))
-async def cancel_order_customer(callback: types.CallbackQuery) -> None:
+async def cancel_order_customer(callback: types.CallbackQuery, db: DatabaseProtocol, bot: Any) -> None:
     """Cancel order by customer."""
     if not db or not bot:
         await callback.answer("System error")

@@ -6,6 +6,7 @@ from aiogram.fsm.context import FSMContext
 
 from app.keyboards import main_menu_customer, search_cancel_keyboard, offer_quick_keyboard
 from app.services.offer_service import OfferService
+from app.templates.offers import render_offer_card
 from database_protocol import DatabaseProtocol
 from handlers.common_states.states import Search
 from localization import get_text
@@ -69,25 +70,8 @@ def setup(
         
         # Show results (limit to 10)
         for offer in results[:10]:
-            # We need to send offer card. 
-            # Since we don't have access to _send_offer_card from here easily without importing,
-            # let's use a simplified version or import it if possible.
-            # Better to use the same format as in offers.py
-            
-            # Construct caption
-            price_line = (
-                f"<s>{offer.original_price:,.0f}</s> ➡️ <b>{offer.discount_price:,.0f} UZS</b>"
-                if offer.original_price > offer.discount_price
-                else f"<b>{offer.discount_price:,.0f} UZS</b>"
-            )
-            
-            caption = (
-                f"<b>{offer.title}</b>\n"
-                f"🏪 {offer.store_name}\n"
-                f"{price_line}\n"
-                f"📦 {offer.quantity} {offer.unit}\n"
-                f"🕒 {offer.expiry_date}"
-            )
+            # Construct caption using template
+            caption = render_offer_card(lang, offer)
             
             keyboard = offer_quick_keyboard(
                 lang, 
@@ -96,5 +80,17 @@ def setup(
                 offer.delivery_enabled
             )
             
-            await message.answer(caption, parse_mode="HTML", reply_markup=keyboard)
+            if offer.photo:
+                try:
+                    await message.answer_photo(
+                        photo=offer.photo,
+                        caption=caption,
+                        parse_mode="HTML",
+                        reply_markup=keyboard
+                    )
+                except Exception:
+                    # Fallback if photo is invalid
+                    await message.answer(caption, parse_mode="HTML", reply_markup=keyboard)
+            else:
+                await message.answer(caption, parse_mode="HTML", reply_markup=keyboard)
 

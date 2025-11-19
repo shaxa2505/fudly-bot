@@ -26,6 +26,7 @@ class OfferListItem:
     delivery_enabled: bool = False
     delivery_price: float = 0.0
     min_order_amount: float = 0.0
+    photo: str | None = None
 
 
 @dataclass(slots=True)
@@ -241,6 +242,8 @@ class OfferService:
         delivery_price = self._safe_float(get_field(data, "delivery_price", get_field(data, 20, 0)), 0.0)
         min_order_amount = self._safe_float(get_field(data, "min_order_amount", get_field(data, 21, 0)), 0.0)
         
+        photo = get_offer_field(data, "photo", get_field(data, 8, None))
+        
         return OfferListItem(
             id=offer_id,
             store_id=store_id,
@@ -257,6 +260,7 @@ class OfferService:
             delivery_enabled=delivery_enabled,
             delivery_price=delivery_price,
             min_order_amount=min_order_amount,
+            photo=photo,
         )
 
     def _to_store_summary(self, store: Any) -> StoreSummary:
