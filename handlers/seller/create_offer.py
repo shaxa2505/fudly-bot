@@ -116,10 +116,13 @@ async def _ask_for_data(message: types.Message, lang: str, store_name: str, stat
         "25.12"
     )
     
+    step_1_text = "ШАГ 1 из 2: ДАННЫЕ ТОВАРА" if lang == "ru" else "1-QADAM 2 tadan: MAHSULOT MA'LUMOTLARI"
+    send_format_text = "Отправьте данные в формате:" if lang == "ru" else "Ma'lumotlarni formatda yuboring:"
+    
     text = (
         f"🏪 <b>{store_name}</b>\n\n"
-        f"<b>{'ШАГ 1 из 2: ДАННЫЕ ТОВАРА' if lang == 'ru' else '1-QADAM 2 tadan: MAHSULOT MA\'LUMOTLARI'}</b>\n\n"
-        f"{'Отправьте данные в формате:' if lang == 'ru' else 'Ma\'lumotlarni formatda yuboring:'}\n\n"
+        f"<b>{step_1_text}</b>\n\n"
+        f"{send_format_text}\n\n"
         f"1️⃣ {'Название товара' if lang == 'ru' else 'Mahsulot nomi'}\n"
         f"2️⃣ {'Цена Скидка% Количество' if lang == 'ru' else 'Narx Chegirma% Miqdor'}\n"
         f"3️⃣ {'Срок годности (дд.мм)' if lang == 'ru' else 'Yaroqlilik muddati (kk.oo)'}\n\n"

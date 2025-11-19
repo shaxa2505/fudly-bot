@@ -29,3 +29,6 @@ redis>=5.0.0                     # For Redis caching
 python-json-logger>=2.0.0        # For structured logging
 sentry-sdk>=1.40.0               # For error tracking and monitoring
 # Pillow>=10.0.0                 # For image processing (optional)
+
+# AI Integration
+google-generativeai>=0.3.0       # For Google Gemini API
