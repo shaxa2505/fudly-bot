@@ -341,8 +341,12 @@ async def my_bookings(message: types.Message) -> None:
         await message.answer(empty_msg, parse_mode="HTML")
         return
     
-    # Filter active bookings
-    active = [b for b in bookings if b[7] == "active"]
+    # Filter active bookings (bookings are returned as dicts from PostgreSQL)
+    if isinstance(bookings[0], dict):
+        active = [b for b in bookings if b.get('status') == 'active']
+    else:
+        # Fallback for tuple format
+        active = [b for b in bookings if b[7] == "active"]
     
     if not active:
         no_active_msg = (
@@ -361,21 +365,38 @@ async def my_bookings(message: types.Message) -> None:
     
     for booking in active[:10]:  # Show max 10
         # Dict-compatible access
-        booking_id = booking.get('booking_id') if isinstance(booking, dict) else booking[0]
-        offer_id = booking.get('offer_id') if isinstance(booking, dict) else booking[2]
+        if isinstance(booking, dict):
+            booking_id = booking.get('booking_id')
+            offer_id = booking.get('offer_id')
+            quantity = booking.get('quantity', 1)
+            code = booking.get('booking_code', '')
+            created_at = booking.get('created_at', '')
+        else:
+            booking_id = booking[0]
+            offer_id = booking[2]
+            quantity = booking[3]
+            code = booking[6]
+            created_at = booking[5]
+        
         offer = db.get_offer(offer_id)
         if not offer:
             continue
         
-        quantity = booking[3]
-        code = booking[6]
-        total = int(offer[5] * quantity)
+        # Get offer details (handle both dict and tuple)
+        if isinstance(offer, dict):
+            offer_title = offer.get('title', 'Товар')
+            offer_price = offer.get('discount_price', 0)
+        else:
+            offer_title = offer[2]
+            offer_price = offer[5]
+        
+        total = int(offer_price * quantity)
         
         text += (
-            f"📦 <b>{offer[2]}</b>\n"
+            f"📦 <b>{offer_title}</b>\n"
             f"🔢 {quantity} шт • {total:,} сум\n"
             f"🎫 <code>{code}</code>\n"
-            f"📅 {booking[5]}\n\n"
+            f"📅 {created_at}\n\n"
         )
     
     await message.answer(

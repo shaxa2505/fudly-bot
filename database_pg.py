@@ -1854,11 +1854,11 @@ class Database:
             return cursor.fetchone()[0]
     
     def get_user_bookings(self, user_id: int):
-        """Get user bookings"""
+        """Get all user bookings (not just active)"""
         with self.get_connection() as conn:
             cursor = conn.cursor(row_factory=dict_row)
-            cursor.execute('SELECT * FROM bookings WHERE user_id = %s AND status = %s', 
-                         (user_id, 'active'))
+            cursor.execute('SELECT * FROM bookings WHERE user_id = %s ORDER BY created_at DESC', 
+                         (user_id,))
             return [dict(row) for row in cursor.fetchall()]
     
     def cancel_booking(self, booking_id: int):
