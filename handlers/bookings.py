@@ -329,20 +329,32 @@ async def my_bookings(message: types.Message) -> None:
     bookings = db.get_user_bookings(message.from_user.id)
     
     if not bookings:
-        await message.answer(
-            get_text(lang, "no_bookings"),
-            reply_markup=get_bookings_filter_keyboard(lang),
+        empty_msg = (
+            f"🛒 <b>Корзина пуста</b>\n\n"
+            f"🔥 Посмотрите раздел <b>Горячее</b> или <b>Категории</b>\n"
+            f"✨ Выберите товары со скидками!"
+            if lang == 'ru' else
+            f"🛒 <b>Savat bo'sh</b>\n\n"
+            f"🔥 <b>Issiq</b> yoki <b>Kategoriyalar</b> bo'limiga o'ting\n"
+            f"✨ Chegirmali mahsulotlarni tanlang!"
         )
+        await message.answer(empty_msg, parse_mode="HTML")
         return
     
     # Filter active bookings
     active = [b for b in bookings if b[7] == "active"]
     
     if not active:
-        await message.answer(
-            get_text(lang, "no_active_bookings"),
-            reply_markup=get_bookings_filter_keyboard(lang),
+        no_active_msg = (
+            f"🛒 <b>Активных заказов нет</b>\n\n"
+            f"✅ Все ваши заказы уже выполнены\n"
+            f"🔥 Сделайте новый заказ в разделе <b>Горячее</b>!"
+            if lang == 'ru' else
+            f"🛒 <b>Faol buyurtmalar yo'q</b>\n\n"
+            f"✅ Barcha buyurtmalaringiz bajarilgan\n"
+            f"🔥 <b>Issiq</b> bo'limidan yangi buyurtma bering!"
         )
+        await message.answer(no_active_msg, parse_mode="HTML")
         return
     
     text = f"📦 <b>{get_text(lang, 'my_bookings')}</b>\n\n"
@@ -367,7 +379,7 @@ async def my_bookings(message: types.Message) -> None:
         )
     
     await message.answer(
-        text, parse_mode="HTML", reply_markup=get_bookings_filter_keyboard(lang)
+        text, parse_mode="HTML"
     )
 
 
