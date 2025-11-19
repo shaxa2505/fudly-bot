@@ -283,7 +283,7 @@ async def skip_photo_goto_step2(callback: types.CallbackQuery, state: FSMContext
     await callback.answer()
 
 
-@router.message(CreateOffer.photo, F.photo)
+@router.message(CreateOffer.photo, F.photo | F.document)
 async def create_offer_photo_received(
     message: types.Message, state: FSMContext
 ) -> None:
@@ -293,7 +293,22 @@ async def create_offer_photo_received(
         return
     
     lang = db.get_user_language(message.from_user.id)
-    photo_id = message.photo[-1].file_id
+    
+    # Handle photo or document
+    if message.photo:
+        photo_id = message.photo[-1].file_id
+    elif message.document:
+        # Check mime type
+        if message.document.mime_type and message.document.mime_type.startswith('image/'):
+            photo_id = message.document.file_id
+        else:
+            await message.answer(
+                "❌ " + ("Пожалуйста, отправьте изображение (JPG/PNG)" if lang == "ru" else "Iltimos, rasm yuboring (JPG/PNG)")
+            )
+            return
+    else:
+        return
+
     await state.update_data(photo=photo_id)
     
     builder = InlineKeyboardBuilder()
@@ -476,7 +491,8 @@ async def select_category_simple(
         text=f"Завтра {tomorrow.strftime('%d.%m')}", callback_data="exp_tomorrow"
     )
     builder.button(text="Неделя", callback_data="exp_week")
-    builder.adjust(3)
+    builder.button(text="📅 Другая дата", callback_data="exp_custom")
+    builder.adjust(2, 2)
     
     category_names = {
         "bakery": "🍞 Выпечка",
@@ -521,13 +537,86 @@ async def select_expiry_simple(
     else:
         expiry_date = today.strftime("%Y-%m-%d")
     
+    await _finalize_offer_creation(callback.message, state, expiry_date, lang)
+    await callback.answer("✅ Готово!" if lang == "ru" else "✅ Tayyor!")
+
+
+@router.callback_query(F.data == "exp_custom")
+async def ask_custom_expiry(callback: types.CallbackQuery, state: FSMContext) -> None:
+    """Ask for custom expiry date."""
+    if not db:
+        await callback.answer("System error", show_alert=True)
+        return
+    
+    lang = db.get_user_language(callback.from_user.id)
+    
+    await callback.message.edit_text(
+        f"📅 <b>{'ВВЕДИТЕ ДАТУ' if lang == 'ru' else 'SANANI KIRITING'}</b>\n\n"
+        f"{'Введите дату окончания срока годности в формате:' if lang == 'ru' else 'Yaroqlilik muddati tugash sanasini formatda kiriting:'}\n"
+        f"<code>DD.MM.YYYY</code> {'(например' if lang == 'ru' else '(masalan'} 31.12.2025)\n"
+        f"{'Или просто' if lang == 'ru' else 'Yoki shunchaki'} <code>DD.MM</code> {'(текущий год)' if lang == 'ru' else '(joriy yil)'}",
+        parse_mode="HTML"
+    )
+    await state.set_state(CreateOffer.expiry_date)
+    await callback.answer()
+
+
+@router.message(CreateOffer.expiry_date)
+async def process_custom_expiry(message: types.Message, state: FSMContext) -> None:
+    """Process custom expiry date input."""
+    if not db:
+        await message.answer("System error")
+        return
+    
+    lang = db.get_user_language(message.from_user.id)
+    text = message.text.strip()
+    
+    try:
+        # Try parsing DD.MM.YYYY
+        if len(text.split('.')) == 3:
+            date_obj = datetime.strptime(text, "%d.%m.%Y")
+        # Try parsing DD.MM (assume current year)
+        elif len(text.split('.')) == 2:
+            today = datetime.now()
+            date_obj = datetime.strptime(f"{text}.{today.year}", "%d.%m.%Y")
+            # If date is in the past, assume next year? Or just fail?
+            # Let's assume if it's today or future, it's this year. If past, maybe user made mistake.
+            if date_obj.date() < today.date():
+                # If it's clearly past (e.g. entered 01.01 in December), maybe next year?
+                # For safety, just warn.
+                pass
+        else:
+            raise ValueError("Invalid format")
+            
+        if date_obj.date() < datetime.now().date():
+            await message.answer(
+                "❌ " + ("Дата не может быть в прошлом" if lang == "ru" else "Sana o'tmishda bo'lishi mumkin emas")
+            )
+            return
+            
+        expiry_date = date_obj.strftime("%Y-%m-%d")
+        
+        # Proceed to create offer (reuse logic from select_expiry_simple)
+        # We need to call a common function or copy-paste logic. 
+        # Since I cannot easily refactor into a common function without changing too much, 
+        # I will call a helper method or just duplicate the creation logic (it's not too long).
+        
+        await _finalize_offer_creation(message, state, expiry_date, lang)
+        
+    except ValueError:
+        await message.answer(
+            "❌ " + ("Неверный формат даты. Используйте DD.MM.YYYY" if lang == "ru" else "Noto'g'ri sana formati. DD.MM.YYYY ishlating")
+        )
+
+
+async def _finalize_offer_creation(message: types.Message, state: FSMContext, expiry_date: str, lang: str):
+    """Finalize offer creation with given expiry date."""
     data = await state.get_data()
     
     # Validate category and required data
     if not data or "category" not in data:
-        await callback.answer(
-            "❌ Ошибка: категория не выбрана. Начните создание товара заново.",
-            show_alert=True,
+        await message.answer(
+            "❌ Ошибка: категория не выбрана. Начните создание товара заново."
         )
         await state.clear()
         return
@@ -541,9 +630,8 @@ async def select_expiry_simple(
     ]
     missing_fields = [field for field in required_fields if field not in data]
     if missing_fields:
-        await callback.answer(
-            f"❌ Ошибка: данные потеряны ({', '.join(missing_fields)}). Начните создание товара заново.",
-            show_alert=True,
+        await message.answer(
+            f"❌ Ошибка: данные потеряны ({', '.join(missing_fields)}). Начните создание товара заново."
         )
         await state.clear()
         return
@@ -551,9 +639,6 @@ async def select_expiry_simple(
     # Create offer
     category = data.get("category", "other")
     photo = data.get("photo")
-    logger.info(
-        f"Creating offer: store_id={data.get('store_id')}, title={data.get('title')}, category={category}, photo={photo}"
-    )
     
     offer_id = db.add_offer(
         data["store_id"],
@@ -586,7 +671,7 @@ async def select_expiry_simple(
     }
     category_display = category_names.get(data.get("category", "other"), "🎯 Другое")
     
-    await callback.message.edit_text(
+    await message.answer(
         f"✅ <b>{'ТОВАР СОЗДАН!' if lang == 'ru' else 'MAHSULOT YARATILDI!'}</b>\n\n"
         f"📦 {data['title']}\n"
         f"🏷️ {category_display}\n"
@@ -597,40 +682,7 @@ async def select_expiry_simple(
         parse_mode="HTML",
     )
     
-    await callback.message.answer(
+    await message.answer(
         f"{'Что дальше?' if lang == 'ru' else 'Keyingi qadam?'}",
         reply_markup=main_menu_seller(lang),
     )
-    
-    await callback.answer("✅ Готово!" if lang == "ru" else "✅ Tayyor!")
-
-
-@router.message(CreateOffer.photo)
-async def create_offer_photo_fallback(
-    message: types.Message, state: FSMContext
-) -> None:
-    """Fallback if user sent text instead of photo - skip photo."""
-    if not db:
-        await message.answer("System error")
-        return
-    
-    lang = db.get_user_language(message.from_user.id)
-    
-    builder = InlineKeyboardBuilder()
-    builder.button(text="30%", callback_data="discount_30")
-    builder.button(text="40%", callback_data="discount_40")
-    builder.button(text="50%", callback_data="discount_50")
-    builder.button(text="60%", callback_data="discount_60")
-    builder.adjust(4)
-    
-    await message.answer(
-        f"<b>{'ШАГ 2 из 3: ЦЕНЫ И КОЛИЧЕСТВО' if lang == 'ru' else '2-QADAM 3 tadan: NARXLAR VA MIQDOR'}</b>\n\n"
-        f"{'Введите в формате' if lang == 'ru' else 'Formatda kiriting'}:\n"
-        f"<code>{'обычная_цена скидка количество' if lang == 'ru' else 'oddiy_narx chegirma miqdor'}</code>\n\n"
-        f"{'Пример' if lang == 'ru' else 'Misol'}: <code>1000 40% 50</code>\n"
-        f"{'(цена 1000, скидка 40%, количество 50 шт)' if lang == 'ru' else '(narx 1000, chegirma 40%, miqdor 50 dona)'}\n\n"
-        f"{'Или просто введите обычную цену и выберите % скидки:' if lang == 'ru' else 'Yoki oddiy narxni kiriting va chegirma % tanlang:'}",
-        parse_mode="HTML",
-        reply_markup=builder.as_markup(),
-    )
-    await state.set_state(CreateOffer.original_price)
