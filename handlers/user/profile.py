@@ -358,12 +358,15 @@ async def confirm_delete_yes(callback: types.CallbackQuery) -> None:
         await callback.answer("System error")
         return
 
+    # Get language BEFORE deleting user
     lang = db.get_user_language(callback.from_user.id)
 
     try:
         db.delete_user(callback.from_user.id)
-    except Exception:
-        await callback.answer(get_text(lang, "access_denied"), show_alert=True)
+        logger.info(f"User {callback.from_user.id} deleted their account successfully")
+    except Exception as e:
+        logger.error(f"Error deleting user {callback.from_user.id}: {e}")
+        await callback.answer(get_text(lang, "error"), show_alert=True)
         return
 
     try:

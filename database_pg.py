@@ -1249,10 +1249,48 @@ class Database:
             cursor.execute('UPDATE users SET role = %s WHERE user_id = %s', (role, user_id))
     
     def delete_user(self, user_id: int):
-        """Delete user"""
+        """Delete user and all related data (cascading delete)"""
         with self.get_connection() as conn:
             cursor = conn.cursor()
+            
+            # Delete in order to respect foreign key constraints
+            # 1. Delete ratings (references bookings, stores, orders, users)
+            cursor.execute('DELETE FROM ratings WHERE user_id = %s', (user_id,))
+            
+            # 2. Delete favorites (references users, stores)
+            cursor.execute('DELETE FROM favorites WHERE user_id = %s', (user_id,))
+            
+            # 3. Delete notifications (references users)
+            cursor.execute('DELETE FROM notifications WHERE user_id = %s', (user_id,))
+            
+            # 4. Delete bookings (references users, offers, stores)
+            cursor.execute('DELETE FROM bookings WHERE user_id = %s', (user_id,))
+            
+            # 5. Delete orders related to user's stores (if seller)
+            cursor.execute('''
+                DELETE FROM orders 
+                WHERE store_id IN (SELECT store_id FROM stores WHERE owner_id = %s)
+            ''', (user_id,))
+            
+            # 6. Delete payment settings for user's stores
+            cursor.execute('''
+                DELETE FROM payment_settings 
+                WHERE store_id IN (SELECT store_id FROM stores WHERE owner_id = %s)
+            ''', (user_id,))
+            
+            # 7. Delete offers for user's stores
+            cursor.execute('''
+                DELETE FROM offers 
+                WHERE store_id IN (SELECT store_id FROM stores WHERE owner_id = %s)
+            ''', (user_id,))
+            
+            # 8. Delete user's stores
+            cursor.execute('DELETE FROM stores WHERE owner_id = %s', (user_id,))
+            
+            # 9. Finally delete the user
             cursor.execute('DELETE FROM users WHERE user_id = %s', (user_id,))
+            
+            logger.info(f"Successfully deleted user {user_id} and all related data")
     
     def delete_store(self, store_id: int):
         """Delete store"""
