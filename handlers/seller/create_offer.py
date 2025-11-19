@@ -266,10 +266,14 @@ async def process_offer_data(message: types.Message, state: FSMContext) -> None:
         callback_data="create_skip_photo",
     )
     
+    step_2_text = "ШАГ 2 из 2: ФОТО" if lang == "ru" else "2-QADAM 2 tadan: RASM"
+    photo_prompt = "Отправьте фото товара или нажмите кнопку пропустить." if lang == "ru" else "Mahsulot rasmini yuboring yoki o'tkazib yuborish tugmasini bosing."
+    category_text = "Категория определена как:" if lang == "ru" else "Kategoriya aniqlandi:"
+
     await message.answer(
-        f"<b>{'ШАГ 2 из 2: ФОТО' if lang == 'ru' else '2-QADAM 2 tadan: RASM'}</b>\n\n"
-        f"📸 {'Отправьте фото товара или нажмите кнопку пропустить.' if lang == 'ru' else 'Mahsulot rasmini yuboring yoki o\'tkazib yuborish tugmasini bosing.'}\n\n"
-        f"✅ {'Категория определена как:' if lang == 'ru' else 'Kategoriya aniqlandi:'} <b>{category}</b>",
+        f"<b>{step_2_text}</b>\n\n"
+        f"📸 {photo_prompt}\n\n"
+        f"✅ {category_text} <b>{category}</b>",
         parse_mode="HTML",
         reply_markup=builder.as_markup()
     )

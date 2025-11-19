@@ -1,6 +1,7 @@
 """Search handlers."""
 from __future__ import annotations
 
+import re
 from aiogram import F, Router, types
 from aiogram.fsm.context import FSMContext
 
@@ -12,6 +13,68 @@ from handlers.common_states.states import Search
 from localization import get_text
 
 router = Router()
+
+# Словарь синонимов и переводов для поиска
+SEARCH_KEYWORDS = {
+    "ru": {
+        "чай": ["чай", "choy", "чой", "ахмад", "акбар", "бернар"],
+        "кофе": ["кофе", "qahva", "кахва", "нескафе", "nescafe"],
+        "молоко": ["молоко", "sut", "сут", "кефир", "йогурт"],
+        "хлеб": ["хлеб", "non", "нон", "булка", "лепешка"],
+        "мясо": ["мясо", "go'sht", "гушт", "курица", "говядина", "свинина"],
+        "фрукты": ["фрукты", "meva", "мева", "яблоко", "банан", "апельсин"],
+        "овощи": ["овощи", "sabzavot", "сабзавот", "помидор", "огурец", "картошка"],
+        "вода": ["вода", "suv", "сув", "минералка", "газировка"],
+        "сок": ["сок", "sharbat", "шарбат", "напиток"],
+        "сыр": ["сыр", "pishloq", "пишлок", "брынза"],
+        "колбаса": ["колбаса", "kolbasa", "колбаса", "сосиски"],
+    },
+    "uz": {
+        "choy": ["choy", "чай", "чой", "ahmad", "akbar", "bernard"],
+        "qahva": ["qahva", "кофе", "кахва", "nescafe", "нескафе"],
+        "sut": ["sut", "молоко", "сут", "kefir", "yogurt"],
+        "non": ["non", "хлеб", "нон", "bulka", "lepeshka"],
+        "go'sht": ["go'sht", "мясо", "гушт", "tovuq", "mol", "cho'chqa"],
+        "meva": ["meva", "фрукты", "мева", "olma", "banan", "apelsin"],
+        "sabzavot": ["sabzavot", "овощи", "сабзавот", "pomidor", "bodring", "kartoshka"],
+        "suv": ["suv", "вода", "сув", "mineral", "gazlangan"],
+        "sharbat": ["sharbat", "сок", "шарбат", "ichimlik"],
+        "pishloq": ["pishloq", "сыр", "пишлок", "brynza"],
+        "kolbasa": ["kolbasa", "колбаса", "колбаса", "sosiska"],
+    }
+}
+
+def normalize_text(text: str) -> str:
+    """Нормализация текста для поиска"""
+    if not text:
+        return ""
+    # Приводим к нижнему регистру и удаляем лишние пробелы
+    text = text.lower().strip()
+    # Удаляем специальные символы, оставляем буквы, цифры и пробелы
+    text = re.sub(r'[^\w\s]', ' ', text)
+    # Заменяем множественные пробелы на один
+    text = re.sub(r'\s+', ' ', text)
+    return text
+
+def expand_search_query(query: str, lang: str) -> list[str]:
+    """Расширяет поисковый запрос синонимами и ключевыми словами"""
+    normalized_query = normalize_text(query)
+    words = normalized_query.split()
+    
+    expanded_terms = set(words)  # Начинаем с оригинальных слов
+    
+    # Добавляем синонимы для каждого слова
+    for word in words:
+        if len(word) < 2:  # Пропускаем слишком короткие слова
+            continue
+            
+        # Ищем слово в словаре ключевых слов
+        for category, keywords in SEARCH_KEYWORDS.get(lang, {}).items():
+            if word in keywords:
+                expanded_terms.update(keywords)
+                break
+    
+    return list(expanded_terms)
 
 def setup(
     dp: Router,
@@ -33,7 +96,7 @@ def setup(
 
     @dp.message(Search.query)
     async def process_search_query(message: types.Message, state: FSMContext):
-        """Process search query."""
+        """Process search query with improved search."""
         lang = db.get_user_language(message.from_user.id)
         
         # Handle cancellation
@@ -45,39 +108,90 @@ def setup(
             )
             return
             
-        query = message.text
+        query = message.text.strip()
         if len(query) < 2:
             await message.answer(
                 "Введите минимум 2 символа" if lang == "ru" else "Kamida 2 ta belgi kiriting"
             )
             return
-            
+        
+        # Расширяем запрос синонимами
+        search_terms = expand_search_query(query, lang)
+        
         # Perform search
-        user = db.get_user_model(message.from_user.id)
-        city = user.city if user else None
+        # Use get_user instead of get_user_model if protocol doesn't support it
+        user_data = db.get_user(message.from_user.id)
+        city = user_data.get("city") if user_data else None
         
-        results = offer_service.search_offers(query, city)
+        # Ищем по расширенным терминам
+        all_results = []
+        seen_offer_ids = set()
         
-        if not results:
-            text = (
-                "😔 <b>Ничего не найдено</b>\n\n"
-                "Попробуйте изменить запрос или поищите в разделе «Горячее»."
-                if lang == "ru"
-                else "😔 <b>Hech narsa topilmadi</b>\n\n"
-                "So'rovni o'zgartirib ko'ring yoki «Issiq» bo'limidan qidiring."
+        for term in search_terms:
+            if len(term) < 2:  # Пропускаем короткие термины
+                continue
+                
+            results = offer_service.search_offers(term, city)
+            
+            for offer in results:
+                if offer.id not in seen_offer_ids:
+                    seen_offer_ids.add(offer.id)
+                    all_results.append(offer)
+        
+        # Сортируем результаты по релевантности (сначала те, где запрос в начале названия)
+        def relevance_score(offer_title: str) -> int:
+            title_lower = normalize_text(offer_title)
+            score = 0
+            
+            # Высший приоритет - точное совпадение
+            if normalize_text(query) in title_lower:
+                score += 100
+                
+            # Приоритет для совпадений в начале названия
+            for term in search_terms:
+                if title_lower.startswith(term):
+                    score += 50
+                elif term in title_lower:
+                    score += 10
+                    
+            return score
+        
+        all_results.sort(key=lambda x: relevance_score(x.title), reverse=True)
+        
+        if not all_results:
+            # Показываем подсказки для улучшения поиска
+            tips_ru = [
+                "💡 <b>Советы для поиска:</b>",
+                "• Используйте простые слова: <i>чай, молоко, хлеб</i>",
+                "• Ищите на русском или узбекском",
+                "• Попробуйте похожие товары в разделе «Горячее»"
+            ]
+            
+            tips_uz = [
+                "💡 <b>Qidiruv bo'yicha maslahatlar:</b>", 
+                "• Oddiy so'zlardan foydalaning: <i>choy, sut, non</i>",
+                "• Rus yoki o'zbek tilida qidiring",
+                "• «Issiq» bo'limida o'xshash mahsulotlarni ko'rib chiqing"
+            ]
+            
+            tips = tips_ru if lang == "ru" else tips_uz
+            
+            await message.answer(
+                "😔 <b>Ничего не найдено</b>\n\n" + "\n".join(tips) if lang == "ru"
+                else "😔 <b>Hech narsa topilmadi</b>\n\n" + "\n".join(tips_uz),
+                parse_mode="HTML"
             )
-            await message.answer(text, parse_mode="HTML")
             return
             
         await message.answer(
-            f"{get_text(lang, 'search_results')} {len(results)}",
+            f"🔍 {get_text(lang, 'search_results')}: {len(all_results)}" if lang == "ru"
+            else f"🔍 {get_text(lang, 'search_results')}: {len(all_results)}",
             reply_markup=main_menu_customer(lang)
         )
         await state.clear()
         
-        # Show results (limit to 10)
-        for offer in results[:10]:
-            # Construct caption using template
+        # Show results (limit to 15)
+        for offer in all_results[:15]:
             caption = render_offer_card(lang, offer)
             
             keyboard = offer_quick_keyboard(
@@ -96,7 +210,59 @@ def setup(
                         reply_markup=keyboard
                     )
                 except Exception:
-                    # Fallback if photo is invalid
+                    await message.answer(caption, parse_mode="HTML", reply_markup=keyboard)
+            else:
+                await message.answer(caption, parse_mode="HTML", reply_markup=keyboard)
+
+    @dp.message(F.text.in_(["🎯 Горячее", "🎯 Issiq"]))
+    async def show_hot_offers(message: types.Message):
+        """Show popular/hot offers."""
+        lang = db.get_user_language(message.from_user.id)
+        
+        # Use get_user instead of get_user_model
+        user_data = db.get_user(message.from_user.id)
+        city = user_data.get("city") if user_data else "Ташкент"
+        
+        # Получаем популярные товары (можно добавить логику для определения "горячих")
+        # Используем list_hot_offers как аналог get_popular_offers
+        result = offer_service.list_hot_offers(city or "Ташкент", limit=10)
+        popular_offers = result.items
+        
+        if not popular_offers:
+            text = (
+                "😔 <b>Популярные товары пока отсутствуют</b>\n\n"
+                "Загляните сюда позже или воспользуйтесь поиском."
+                if lang == "ru"
+                else "😔 <b>Hozircha mashhur mahsulotlar yo'q</b>\n\n"
+                "Keyinroq qaytib keling yoki qidiruvdan foydalaning."
+            )
+            await message.answer(text, parse_mode="HTML")
+            return
+            
+        await message.answer(
+            "🎯 <b>Горячие предложения</b>" if lang == "ru" else "🎯 <b>Issiq takliflar</b>",
+            parse_mode="HTML"
+        )
+        
+        for offer in popular_offers:
+            caption = render_offer_card(lang, offer)
+            
+            keyboard = offer_quick_keyboard(
+                lang, 
+                offer.id, 
+                offer.store_id, 
+                offer.delivery_enabled
+            )
+            
+            if offer.photo:
+                try:
+                    await message.answer_photo(
+                        photo=offer.photo,
+                        caption=caption,
+                        parse_mode="HTML",
+                        reply_markup=keyboard
+                    )
+                except Exception:
                     await message.answer(caption, parse_mode="HTML", reply_markup=keyboard)
             else:
                 await message.answer(caption, parse_mode="HTML", reply_markup=keyboard)
