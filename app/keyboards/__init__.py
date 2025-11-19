@@ -47,6 +47,7 @@ from .common import (
 # User keyboards
 from .user import (
     main_menu_customer,
+    search_cancel_keyboard,
     settings_keyboard,
     booking_filters_keyboard,
     booking_keyboard,
@@ -104,6 +105,7 @@ __all__ = [
     "product_categories_keyboard",
     # User
     "main_menu_customer",
+    "search_cancel_keyboard",
     "settings_keyboard",
     "booking_filters_keyboard",
     "booking_keyboard",
