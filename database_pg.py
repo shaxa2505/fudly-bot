@@ -794,8 +794,13 @@ class Database:
     def add_offer(self, store_id: int, title: str, description: str = None,
                   original_price: float = None, discount_price: float = None,
                   quantity: int = 1, available_from: str = None, available_until: str = None,
-                  photo_id: str = None, expiry_date: str = None, unit: str = 'шт', category: str = 'other'):
+                  photo_id: str = None, expiry_date: str = None, unit: str = 'шт', category: str = 'other',
+                  photo: str = None):
         """Add new offer - compatible with SQLite version parameter order"""
+        
+        # Support both photo and photo_id (protocol uses photo, legacy uses photo_id)
+        actual_photo_id = photo if photo is not None else photo_id
+        
         with self.get_connection() as conn:
             cursor = conn.cursor()
             cursor.execute('''
@@ -804,7 +809,7 @@ class Database:
                 VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                 RETURNING offer_id
             ''', (store_id, title, description, original_price, discount_price,
-                  quantity, available_from, available_until, expiry_date, photo_id, unit, category))
+                  quantity, available_from, available_until, expiry_date, actual_photo_id, unit, category))
             result = cursor.fetchone()
             if not result:
                 raise ValueError("Failed to create offer")
@@ -2002,7 +2007,8 @@ class Database:
             LIMIT 50
         """
         search_term = f"%{query}%"
-        with self.get_cursor() as cur:
-            cur.execute(sql, (city, search_term, search_term, search_term))
-            return cur.fetchall()
+        with self.get_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute(sql, (city, search_term, search_term, search_term))
+                return cur.fetchall()
 
