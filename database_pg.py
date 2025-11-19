@@ -1250,7 +1250,6 @@ class Database:
             
             query += '''
                 GROUP BY s.store_id
-                HAVING COUNT(o.offer_id) > 0
                 ORDER BY COUNT(o.offer_id) DESC, s.name
             '''
             
