@@ -1990,7 +1990,7 @@ class Database:
                 o.offer_id, o.store_id, o.title, o.description, 
                 o.original_price, o.discount_price, o.quantity, 
                 o.available_from, o.available_until, o.expiry_date, 
-                o.status, o.photo, o.created_at, o.unit,
+                o.status, o.photo_id as photo, o.created_at, o.unit,
                 s.name as store_name, s.address, s.category as store_category,
                 o.discount_percent, s.delivery_enabled, s.delivery_price, s.min_order_amount
             FROM offers o

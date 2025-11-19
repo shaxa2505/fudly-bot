@@ -242,7 +242,13 @@ class OfferService:
         delivery_price = self._safe_float(get_field(data, "delivery_price", get_field(data, 20, 0)), 0.0)
         min_order_amount = self._safe_float(get_field(data, "min_order_amount", get_field(data, 21, 0)), 0.0)
         
-        photo = get_offer_field(data, "photo", get_field(data, 8, None))
+        # Try to get photo from 'photo' or 'photo_id'
+        photo = get_offer_field(data, "photo")
+        if not photo:
+            photo = get_offer_field(data, "photo_id")
+        # Fallback to index 8 if neither found (legacy tuple support)
+        if not photo:
+            photo = get_field(data, 8, None)
         
         return OfferListItem(
             id=offer_id,
