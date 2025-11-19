@@ -86,9 +86,9 @@ async def my_orders_handler(message: types.Message) -> None:
         parse_mode="HTML",
         reply_markup=booking_filters_keyboard(
             lang, 
-            len(active_bookings), 
-            len(completed_bookings), 
-            len(cancelled_bookings)
+            len(active_bookings) + len(active_orders), 
+            len(completed_bookings) + len(completed_orders), 
+            len(cancelled_bookings) + len(cancelled_orders)
         )
     )
 

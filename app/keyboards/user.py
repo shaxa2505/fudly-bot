@@ -14,11 +14,11 @@ def main_menu_customer(lang: str = 'ru') -> ReplyKeyboardMarkup:
         lang: Interface language
     """
     builder = ReplyKeyboardBuilder()
-    builder.button(text=get_text(lang, 'hot_offers'))
-    builder.button(text=get_text(lang, 'establishments'))
-    builder.button(text=get_text(lang, 'search'))
-    builder.button(text=get_text(lang, 'my_cart'))
-    builder.button(text=get_text(lang, 'profile'))
+    builder.button(text=f"🔥 {get_text(lang, 'hot_offers')}")
+    builder.button(text=f"🏪 {get_text(lang, 'establishments')}")
+    builder.button(text=f"🔍 {get_text(lang, 'search')}")
+    builder.button(text=f"🛒 {get_text(lang, 'my_cart')}")
+    builder.button(text=f"👤 {get_text(lang, 'profile')}")
     builder.adjust(2, 1, 2)
     return builder.as_markup(resize_keyboard=True)
 
@@ -26,7 +26,7 @@ def main_menu_customer(lang: str = 'ru') -> ReplyKeyboardMarkup:
 def search_cancel_keyboard(lang: str = 'ru') -> ReplyKeyboardMarkup:
     """Keyboard for cancelling search."""
     builder = ReplyKeyboardBuilder()
-    builder.button(text=get_text(lang, 'cancel'))
+    builder.button(text=f"❌ {get_text(lang, 'cancel')}")
     builder.adjust(1)
     return builder.as_markup(resize_keyboard=True)
 

@@ -4,6 +4,7 @@ from __future__ import annotations
 from aiogram import F, Router, types
 from aiogram.fsm.context import FSMContext
 from aiogram.utils.keyboard import InlineKeyboardBuilder
+from typing import Any
 
 from app.core.cache import CacheManager
 from database_protocol import DatabaseProtocol
@@ -22,7 +23,7 @@ def can_proceed(user_id: int, action: str) -> bool:
 router = Router()
 
 
-def get_store_field(store: any, field: str, default: any = None) -> any:
+def get_store_field(store: Any, field: str, default: Any = None) -> Any:
     """Extract field from store tuple/dict."""
     if isinstance(store, dict):
         return store.get(field, default)
@@ -38,7 +39,7 @@ def get_store_field(store: any, field: str, default: any = None) -> any:
     return default
 
 
-def get_offer_field(offer: any, field: str, default: any = None) -> any:
+def get_offer_field(offer: Any, field: str, default: Any = None) -> Any:
     """Extract field from offer tuple/dict."""
     if isinstance(offer, dict):
         return offer.get(field, default)
@@ -56,6 +57,21 @@ def get_offer_field(offer: any, field: str, default: any = None) -> any:
     return default
 
 
+def get_booking_field(booking: Any, field: str, default: Any = None) -> Any:
+    """Extract field from booking tuple/dict."""
+    if isinstance(booking, dict):
+        return booking.get(field, default)
+    if isinstance(booking, (tuple, list)):
+        field_map = {
+            "booking_id": 0, "offer_id": 1, "user_id": 2, "status": 3,
+            "code": 4, "pickup_time": 5, "quantity": 6, "created_at": 7
+        }
+        idx = field_map.get(field)
+        if idx is not None and len(booking) > idx:
+            return booking[idx]
+    return default
+
+
 def get_bookings_filter_keyboard(lang: str):
     """Create bookings filter keyboard."""
     builder = InlineKeyboardBuilder()
@@ -69,14 +85,14 @@ def get_bookings_filter_keyboard(lang: str):
 # Module-level dependencies (will be set during router registration)
 db: DatabaseProtocol | None = None
 cache: CacheManager | None = None
-bot: any = None  # Bot instance
+bot: Any = None  # Bot instance
 METRICS: dict | None = None
 
 
 def setup_dependencies(
     database: DatabaseProtocol,
     cache_manager: CacheManager,
-    bot_instance: any,
+    bot_instance: Any,
     metrics: dict,
 ) -> None:
     """Setup module dependencies."""
@@ -201,7 +217,7 @@ async def book_offer_quantity(message: types.Message, state: FSMContext) -> None
                 offer_title = offer.get('title', 'Товар')
                 offer_price = offer.get('discount_price', 0)
                 store_id = offer.get('store_id')
-                offer_address = offer.get('address', 'Адрес не указан')
+                offer_address = offer.get('address', 'Адрес не указана')
             else:
                 await message.answer("❌ Ошибка формата данных")
                 await state.clear()
@@ -492,6 +508,14 @@ async def cancel_booking(callback: types.CallbackQuery) -> None:
     # Cancel booking
     success = db.cancel_booking(booking_id)
     if success:
+        # Return quantity to offer
+        offer_id = get_booking_field(booking, "offer_id", 1)
+        quantity = get_booking_field(booking, "quantity", 6)
+        offer = db.get_offer(offer_id)
+        if offer:
+            current_qty = get_offer_field(offer, "quantity", 0)
+            db.update_offer_quantity(offer_id, current_qty + quantity)
+
         await callback.answer(get_text(lang, "booking_cancelled"), show_alert=True)
         # Refresh message
         await filter_bookings(callback)

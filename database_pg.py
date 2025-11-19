@@ -1977,3 +1977,31 @@ class Database:
             cursor.execute('SELECT COUNT(*) FROM orders')
             return cursor.fetchone()[0]
 
+    def search_offers(self, query: str, city: str) -> List[Any]:
+        """Search offers by title or store name."""
+        sql = """
+            SELECT 
+                o.offer_id, o.store_id, o.title, o.description, 
+                o.original_price, o.discount_price, o.quantity, 
+                o.available_from, o.available_until, o.expiry_date, 
+                o.status, o.photo, o.created_at, o.unit,
+                s.name as store_name, s.address, s.category as store_category,
+                o.discount_percent, s.delivery_enabled, s.delivery_price, s.min_order_amount
+            FROM offers o
+            JOIN stores s ON o.store_id = s.store_id
+            WHERE o.status = 'active' 
+            AND s.status = 'approved'
+            AND s.city = %s
+            AND (
+                LOWER(o.title) LIKE LOWER(%s) OR 
+                LOWER(s.name) LIKE LOWER(%s) OR
+                LOWER(s.category) LIKE LOWER(%s)
+            )
+            ORDER BY o.created_at DESC
+            LIMIT 50
+        """
+        search_term = f"%{query}%"
+        with self.get_cursor() as cur:
+            cur.execute(sql, (city, search_term, search_term, search_term))
+            return cur.fetchall()
+

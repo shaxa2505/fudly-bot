@@ -24,8 +24,8 @@ class RateLimitMiddleware(BaseMiddleware):
     
     def __init__(
         self,
-        rate_limit: int = 30,  # requests per minute
-        burst_limit: int = 5,   # requests per 10 seconds
+        rate_limit: int = 100,  # requests per minute
+        burst_limit: int = 20,   # requests per 10 seconds
     ):
         """Initialize rate limiter with configurable limits.
         

@@ -9,12 +9,12 @@ def hot_offers_pagination_keyboard(lang: str, has_more: bool, next_offset: int) 
     builder = InlineKeyboardBuilder()
     
     # Кнопка "Обновить" всегда слева
-    refresh_text = "Обновить" if lang == "ru" else "Yangilash"
+    refresh_text = "🔄 Обновить" if lang == "ru" else "🔄 Yangilash"
     builder.button(text=refresh_text, callback_data="hot_offers_refresh")
     
     # Кнопка "Далее" справа (если есть ещё товары)
     if has_more:
-        next_text = "Далее →" if lang == "ru" else "Keyingi →"
+        next_text = "Далее ➡️" if lang == "ru" else "Keyingi ➡️"
         builder.button(text=next_text, callback_data=f"hot_offers_next_{next_offset}")
         builder.adjust(2)  # Две кнопки в ряд
     else:
@@ -37,12 +37,12 @@ def store_card_keyboard(lang: str, store_id: int, offers_count: int, ratings_cou
 
 def offer_details_keyboard(lang: str, offer_id: int, store_id: int, delivery_enabled: bool) -> InlineKeyboardMarkup:
     builder = InlineKeyboardBuilder()
-    pickup = "Забронировать" if lang == "ru" else "Bron qilish"
+    pickup = "✅ Забронировать" if lang == "ru" else "✅ Bron qilish"
     builder.button(text=pickup, callback_data=f"book_{offer_id}")
     if delivery_enabled:
-        delivery = "Заказать с доставкой" if lang == "ru" else "Yetkazib berish"
+        delivery = "🚚 Заказать с доставкой" if lang == "ru" else "🚚 Yetkazib berish"
         builder.button(text=delivery, callback_data=f"order_delivery_{offer_id}")
-    about = "О магазине" if lang == "ru" else "Do'kon haqida"
+    about = "🏪 О магазине" if lang == "ru" else "🏪 Do'kon haqida"
     builder.button(text=about, callback_data=f"store_info_{store_id}")
     builder.adjust(1)
     return builder.as_markup()
@@ -50,12 +50,12 @@ def offer_details_keyboard(lang: str, offer_id: int, store_id: int, delivery_ena
 
 def offer_quick_keyboard(lang: str, offer_id: int, store_id: int, delivery_enabled: bool = False) -> InlineKeyboardMarkup:
     builder = InlineKeyboardBuilder()
-    pickup = "Забронировать" if lang == "ru" else "Bron qilish"
+    pickup = "✅ Забронировать" if lang == "ru" else "✅ Bron qilish"
     builder.button(text=pickup, callback_data=f"book_{offer_id}")
     if delivery_enabled:
-        delivery = "Заказать с доставкой" if lang == "ru" else "Yetkazib berish"
+        delivery = "🚚 Заказать с доставкой" if lang == "ru" else "🚚 Yetkazib berish"
         builder.button(text=delivery, callback_data=f"order_delivery_{offer_id}")
-    about = "О магазине" if lang == "ru" else "Do'kon haqida"
+    about = "🏪 О магазине" if lang == "ru" else "🏪 Do'kon haqida"
     builder.button(text=about, callback_data=f"store_info_{store_id}")
     builder.adjust(1)
     return builder.as_markup()

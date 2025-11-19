@@ -303,6 +303,11 @@ class OfferService:
         # Use a default city if None, or handle it in list_hot_offers
         search_city = city or "Ташкент" 
         
+        # Fetch active offers directly from DB if possible, otherwise fallback to hot offers
+        if hasattr(self._db, "search_offers"):
+             raw_offers = self._db.search_offers(query, search_city)
+             return [self._to_offer_list_item(row) for row in raw_offers]
+
         result = self.list_hot_offers(city=search_city, limit=1000) # Fetch a reasonable amount
         all_offers = result.items
         query = query.lower()

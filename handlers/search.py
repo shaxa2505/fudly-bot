@@ -59,7 +59,14 @@ def setup(
         results = offer_service.search_offers(query, city)
         
         if not results:
-            await message.answer(get_text(lang, "no_results"))
+            text = (
+                "😔 <b>Ничего не найдено</b>\n\n"
+                "Попробуйте изменить запрос или поищите в разделе «Горячее»."
+                if lang == "ru"
+                else "😔 <b>Hech narsa topilmadi</b>\n\n"
+                "So'rovni o'zgartirib ko'ring yoki «Issiq» bo'limidan qidiring."
+            )
+            await message.answer(text, parse_mode="HTML")
             return
             
         await message.answer(
