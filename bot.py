@@ -267,7 +267,7 @@ async def catch_all_callbacks(callback: types.CallbackQuery):
 # Register modular handlers from handlers package
 # ============== PHASE 3: EXTRACTED HANDLERS INTEGRATION ==============
 # Import extracted handler modules (FIRST - for router registration priority)
-from handlers import bookings, orders, partner, booking_rating, common_user
+from handlers import bookings, orders, partner, common_user
 from handlers.seller import create_offer, management, analytics, order_management, bulk_import
 from handlers.user import profile, favorites
 from handlers.admin import dashboard as admin_dashboard, legacy as admin_legacy
@@ -283,7 +283,6 @@ bulk_import.setup_dependencies(db, bot)  # Bulk import dependencies
 profile.setup_dependencies(db, bot, user_view_mode)
 favorites.setup_dependencies(db, bot, user_view_mode)
 order_management.setup(bot, db)
-booking_rating.setup(bot, db)
 common_user.setup(bot, db, user_view_mode, get_text, main_menu_customer, booking_filters_keyboard, main_menu_seller)
 admin_dashboard.setup(bot, db, get_text, moderation_keyboard, get_uzb_time)
 admin_legacy.setup(bot, db, get_text, moderation_keyboard, get_uzb_time, ADMIN_ID, DATABASE_URL)
@@ -298,9 +297,8 @@ dp.include_router(analytics.router)  # Seller: 📊 Аналитика
 dp.include_router(order_management.router)  # Seller: order operations
 dp.include_router(common_user.router)  # Common user operations (AFTER management so sellers are handled first)
 dp.include_router(orders.router)  # Orders: 🎫 Заказы
-dp.include_router(bookings.router)  # Bookings
+dp.include_router(bookings.router)  # Bookings and ratings
 dp.include_router(partner.router)  # Partner registration
-dp.include_router(booking_rating.router)  # Booking ratings
 dp.include_router(admin_dashboard.router)  # Admin dashboard
 dp.include_router(admin_legacy.router)  # Admin legacy
 

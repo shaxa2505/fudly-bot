@@ -1387,6 +1387,41 @@ class Database:
                 VALUES (%s, %s, %s, %s, %s)
             ''', (booking_id, user_id, store_id, rating, comment))
     
+    def save_booking_rating(self, booking_id: int, rating: int) -> bool:
+        """Сохранить оценку заказа (используется в bookings.py)"""
+        try:
+            # Получить информацию о бронировании
+            booking = self.get_booking(booking_id)
+            if not booking:
+                logger.error(f"Booking {booking_id} not found")
+                return False
+            
+            # Извлечь user_id и offer_id
+            if isinstance(booking, dict):
+                user_id = booking.get('user_id')
+                offer_id = booking.get('offer_id')
+            else:
+                user_id = booking[1]
+                offer_id = booking[2]
+            
+            # Получить store_id из offer
+            offer = self.get_offer(offer_id)
+            if not offer:
+                logger.error(f"Offer {offer_id} not found")
+                return False
+            
+            if isinstance(offer, dict):
+                store_id = offer.get('store_id')
+            else:
+                store_id = offer[1]
+            
+            # Сохранить рейтинг
+            self.add_rating(booking_id, user_id, store_id, rating)
+            return True
+        except Exception as e:
+            logger.error(f"Error saving booking rating: {e}")
+            return False
+    
     def get_store_ratings(self, store_id: int) -> List[dict]:
         """Получить все рейтинги магазина"""
         with self.get_connection() as conn:
