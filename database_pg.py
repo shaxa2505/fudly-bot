@@ -742,15 +742,16 @@ class Database:
     
     # Store management methods
     def add_store(self, owner_id: int, name: str, city: str, address: Optional[str] = None,
-                  description: Optional[str] = None, category: str = 'Ресторан', phone: Optional[str] = None) -> int:
+                  description: Optional[str] = None, category: str = 'Ресторан', 
+                  phone: Optional[str] = None, business_type: str = 'supermarket') -> int:
         """Add new store"""
         with self.get_connection() as conn:
             cursor = conn.cursor()
             cursor.execute('''
-                INSERT INTO stores (owner_id, name, city, address, description, category, phone)
-                VALUES (%s, %s, %s, %s, %s, %s, %s)
+                INSERT INTO stores (owner_id, name, city, address, description, category, phone, business_type)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
                 RETURNING store_id
-            ''', (owner_id, name, city, address, description, category, phone))
+            ''', (owner_id, name, city, address, description, category, phone, business_type))
             store_id = cursor.fetchone()[0]
             logger.info(f"Store {store_id} added by user {owner_id}")
             return store_id
@@ -1222,7 +1223,7 @@ class Database:
             return [dict(row) for row in cursor.fetchall()]
     
     def get_stores_by_business_type(self, business_type: str, city: str = None):
-        """Get stores by business type (using category field) with active offers count"""
+        """Get stores by business type (using business_type field) with active offers count"""
         with self.get_connection() as conn:
             cursor = conn.cursor(row_factory=dict_row)
             
@@ -1234,7 +1235,7 @@ class Database:
                     AND o.status = 'active' 
                     AND o.quantity > 0
                 WHERE (s.status = 'active' OR s.status = 'approved')
-                AND s.category = %s
+                AND s.business_type = %s
             '''
             params = [business_type]
             

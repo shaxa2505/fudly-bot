@@ -257,13 +257,14 @@ async def register_store_description(message: types.Message, state: FSMContext) 
     
     # Create store application (status: pending)
     store_id = db.add_store(
-        message.from_user.id,
-        data["name"],
-        data["city"],
-        data["address"],
-        data["description"],
-        data["category"],
-        owner_phone,
+        owner_id=message.from_user.id,
+        name=data["name"],
+        city=data["city"],
+        address=data["address"],
+        description=data["description"],
+        category=data["category"],
+        phone=owner_phone,
+        business_type=data.get("business_type", "supermarket")
     )
     
     await state.clear()
@@ -427,7 +428,7 @@ async def register_store_category_callback(callback: types.CallbackQuery, state:
     }
     
     category = category_map.get(category_id, category_id)
-    await state.update_data(category=category)
+    await state.update_data(category=category, business_type=category_id)
     
     name_prompt = get_text(lang, "store_name")
     try:

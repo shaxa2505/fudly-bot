@@ -48,6 +48,7 @@ class DatabaseProtocol(Protocol):
         description: Optional[str] = None,
         category: str = "Ресторан",
         phone: Optional[str] = None,
+        business_type: str = "supermarket",
     ) -> int: ...
 
     def get_user_stores(self, owner_id: int) -> List[StoreDict]: ...
