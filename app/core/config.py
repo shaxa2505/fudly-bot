@@ -28,6 +28,7 @@ class Settings:
     bot_token: str
     admin_id: int
     database_url: Optional[str]
+    redis_url: Optional[str]
     webhook: WebhookConfig
 
 
@@ -41,6 +42,7 @@ def load_settings() -> Settings:
 
     admin_id = int(os.getenv("ADMIN_ID", "0"))
     database_url = os.getenv("DATABASE_URL")
+    redis_url = os.getenv("REDIS_URL")
 
     # Smart webhook detection: auto-enable on Railway/Heroku if URL provided
     use_webhook = _str_to_bool(os.getenv("USE_WEBHOOK", "false"))
@@ -67,5 +69,6 @@ def load_settings() -> Settings:
         bot_token=token,
         admin_id=admin_id,
         database_url=database_url,
+        redis_url=redis_url,
         webhook=webhook,
     )

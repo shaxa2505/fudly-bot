@@ -21,6 +21,7 @@ services:
       - ./logs:/app/logs
     depends_on:
       - postgres
+      - redis
     networks:
       - fudly-network
 

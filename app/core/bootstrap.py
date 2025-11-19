@@ -3,6 +3,7 @@ from __future__ import annotations
 
 from aiogram import Bot, Dispatcher
 from aiogram.fsm.storage.memory import MemoryStorage
+from aiogram.fsm.storage.redis import RedisStorage
 
 from .cache import CacheManager
 from .config import Settings
@@ -15,8 +16,19 @@ def build_application(settings: Settings):
     bot = Bot(token=settings.bot_token)
     db = create_database(settings.database_url)
     
-    # Use PostgreSQL storage for production, Memory for local dev
-    if settings.database_url and 'postgresql' in settings.database_url:
+    # Priority 1: Redis (Best for production)
+    if settings.redis_url:
+        try:
+            storage = RedisStorage.from_url(settings.redis_url)
+            print("🚀 Using Redis for FSM storage")
+            logger.info("Using Redis for FSM storage")
+        except Exception as e:
+            print(f"⚠️ Failed to initialize Redis storage: {e}")
+            storage = MemoryStorage()
+            logger.warning("Failed to initialize Redis storage, using MemoryStorage")
+
+    # Priority 2: PostgreSQL (Good fallback)
+    elif settings.database_url and 'postgresql' in settings.database_url:
         try:
             from fsm_storage_pg import PostgreSQLStorage
             storage = PostgreSQLStorage(db)
@@ -28,6 +40,8 @@ def build_application(settings: Settings):
             print("💾 Falling back to MemoryStorage (states will be lost on restart)")
             storage = MemoryStorage()
             logger.warning("Failed to initialize PostgreSQL storage, using MemoryStorage")
+    
+    # Priority 3: Memory (Local dev)
     else:
         storage = MemoryStorage()
         print("💾 Using SQLite database with MemoryStorage")

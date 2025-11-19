@@ -62,19 +62,13 @@ async def test_registration_language_flow(temp_db: Database, monkeypatch: pytest
     # Prepare dispatcher and router with handlers wired
     storage = MemoryStorage()
     dp = Dispatcher(storage=storage)
-    r = Router()
-    user_commands.setup(
-        r,
-        temp_db,
-        get_text,
-        get_cities,
-        city_keyboard,
-        language_keyboard,
-        phone_request_keyboard,
-        main_menu_seller,
-        main_menu_customer,
-    )
-    dp.include_router(r)
+    
+    # Inject DB middleware
+    from app.middlewares.db_middleware import DbSessionMiddleware
+    dp.update.middleware(DbSessionMiddleware(temp_db))
+    
+    # Include router
+    dp.include_router(user_commands.router)
 
     # Create a bot and monkeypatch network methods to avoid real API calls
     bot = Bot(token="42:TEST")

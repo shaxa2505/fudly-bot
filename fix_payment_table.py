@@ -1,8 +1,12 @@
 """Fix payment_settings table structure via DATABASE_URL"""
 import os
 
-# Вставьте сюда ваш Connection URL из Railway (замените звездочки на реальный пароль)
-DATABASE_URL = "postgresql://postgres:KennsaDxjQBMCnwlHFJsxIvfefLGAAyO@interchange.proxy.rlwy.net:43976/railway"
+# Get DATABASE_URL from environment
+DATABASE_URL = os.getenv("DATABASE_URL")
+
+if not DATABASE_URL:
+    print("❌ DATABASE_URL environment variable is not set")
+    exit(1)
 
 print("Installing psycopg2...")
 os.system("pip install psycopg2-binary")

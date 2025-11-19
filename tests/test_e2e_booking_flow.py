@@ -116,7 +116,7 @@ async def test_book_offer_quantity_flow(temp_db: Database, monkeypatch: pytest.M
         return TgUser(id=42, is_bot=True, first_name="FudlyBot")
     monkeypatch.setattr(Bot, "get_me", fake_get_me, raising=True)
     from aiogram.methods import SendMessage, EditMessageText, AnswerCallbackQuery
-    async def fake_bot_call(self, method):
+    async def fake_bot_call(self, method, request_timeout=None):
         if isinstance(method, SendMessage):
             return await fake_send_message(self, method.chat_id, method.text)
         if isinstance(method, EditMessageText):
@@ -169,9 +169,7 @@ async def test_book_offer_quantity_flow(temp_db: Database, monkeypatch: pytest.M
     # Validate booking created and confirmation sent
     bookings_list = temp_db.get_user_bookings(user_id)
     assert len(bookings_list) == 1
-    assert any("Заказ создан" in (e.text or "") for e in sent if e.text)
-
-
+    assert any("Заказ успешно создан" in (e.text or "") for e in sent if e.text)
 @pytest.mark.asyncio
 async def test_cancel_booking_via_callback(temp_db: Database, monkeypatch: pytest.MonkeyPatch):
     # Seed DB: user, store, offer, booking

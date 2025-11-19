@@ -310,16 +310,10 @@ dp.include_router(admin_legacy.router)  # Admin legacy
 # ============== REGISTRATION & COMMANDS (AFTER SPECIFIC ROUTERS) ==============
 from handlers import registration, user_commands, admin_panel, admin_stats, offers
 
-# Setup registration handlers
-registration.setup(dp, db, get_text, get_cities, city_keyboard, phone_request_keyboard, main_menu_customer,
-                  validator, rate_limiter, logger, secure_user_input)
-
-# Setup user command handlers
-user_commands.setup(dp, db, get_text, get_cities, city_keyboard, language_keyboard,
-                   phone_request_keyboard, main_menu_seller, main_menu_customer)
-
-# Setup admin panel handlers
-admin_panel.setup(dp, db, get_text, admin_menu)
+# Include routers for refactored modules
+dp.include_router(registration.router)
+dp.include_router(user_commands.router)
+dp.include_router(admin_panel.router)
 
 # Setup offer browsing handlers (AFTER specific handlers to avoid catching their messages)
 offers.setup(dp, db, offer_service, logger)
