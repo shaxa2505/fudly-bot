@@ -186,6 +186,15 @@ async def order_delivery_quantity(message: types.Message, state: FSMContext, db:
     """Process quantity and request delivery address."""
     lang = db.get_user_language(message.from_user.id)
 
+    # Check for cancellation
+    if message.text in [f"❌ {get_text('ru', 'cancel')}", f"❌ {get_text('uz', 'cancel')}", "Отмена", "Bekor qilish", "/cancel"]:
+        await state.clear()
+        await message.answer(
+            get_text(lang, 'operation_cancelled'),
+            reply_markup=main_menu_customer(lang)
+        )
+        return
+
     try:
         quantity = int(message.text)
         if quantity < 1:

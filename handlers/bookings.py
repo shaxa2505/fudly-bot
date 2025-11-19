@@ -8,7 +8,7 @@ from aiogram.utils.keyboard import InlineKeyboardBuilder
 from app.core.cache import CacheManager
 from database_protocol import DatabaseProtocol
 from handlers.common_states.states import BookOffer, OrderDelivery
-from app.keyboards import cancel_keyboard
+from app.keyboards import cancel_keyboard, main_menu_customer
 from localization import get_text
 from logging_config import logger
 
@@ -154,6 +154,15 @@ async def book_offer_quantity(message: types.Message, state: FSMContext) -> None
         await message.answer(get_text(lang, "operation_cancelled"))
         return
     
+    # Check for cancellation
+    if message.text in ["❌ Отмена", "❌ Bekor qilish", "/cancel"]:
+        await state.clear()
+        await message.answer(
+            get_text(lang, "action_cancelled"),
+            reply_markup=main_menu_customer(lang)
+        )
+        return
+
     try:
         logger.info(f"📦 BOOKING: User {message.from_user.id} entered quantity: {message.text}")
         
