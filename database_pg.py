@@ -1992,7 +1992,8 @@ class Database:
                 o.available_from, o.available_until, o.expiry_date, 
                 o.status, o.photo_id as photo, o.created_at, o.unit,
                 s.name as store_name, s.address, s.category as store_category,
-                o.discount_percent, s.delivery_enabled, s.delivery_price, s.min_order_amount
+                CAST((1.0 - o.discount_price::float / o.original_price::float) * 100 AS INTEGER) as discount_percent,
+                s.delivery_enabled, s.delivery_price, s.min_order_amount
             FROM offers o
             JOIN stores s ON o.store_id = s.store_id
             WHERE o.status = 'active' 
