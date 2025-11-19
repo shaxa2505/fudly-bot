@@ -111,3 +111,16 @@ class OrderDelivery(StatesGroup):
     address = State()  # Адрес доставки
     payment_method = State()  # Способ оплаты
     payment_proof = State()  # Скриншот оплаты
+
+
+class Search(StatesGroup):
+    """Search flow states."""
+
+    query = State()
+
+
+class Browse(StatesGroup):
+    """Browsing flow states."""
+
+    viewing_store = State()
+    viewing_category = State()

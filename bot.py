@@ -103,6 +103,10 @@ dp.update.middleware(DbSessionMiddleware(db))
 offer_service = OfferService(db, cache)
 admin_service = AdminService(db, bool(DATABASE_URL))
 
+# Import search handler
+from handlers import search as search_handler
+search_handler.setup(dp, db, offer_service)
+
 # Initialize metrics dictionary
 METRICS: Dict[str, int] = {
     "updates_received": 0,

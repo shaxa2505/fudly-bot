@@ -289,3 +289,25 @@ class OfferService:
             return int(value or 0)
         except (TypeError, ValueError):
             return 0
+
+    def search_offers(self, query: str, city: str | None = None) -> List[OfferListItem]:
+        """Search active offers by title or store name."""
+        # This is a simplified search. Ideally, this should be done in the repository/DB layer.
+        # For now, we'll fetch all active offers and filter in Python.
+        # Optimization: Add search method to repository later.
+        
+        # Use a default city if None, or handle it in list_hot_offers
+        search_city = city or "Ташкент" 
+        
+        result = self.list_hot_offers(city=search_city, limit=1000) # Fetch a reasonable amount
+        all_offers = result.items
+        query = query.lower()
+        
+        results = []
+        for offer in all_offers:
+            if (query in offer.title.lower() or 
+                query in offer.store_name.lower() or 
+                (offer.store_category and query in offer.store_category.lower())):
+                results.append(offer)
+                
+        return results

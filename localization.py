@@ -64,6 +64,12 @@ TEXTS = {
         'my_city': '🌆 Мой город',
         'profile': 'Профиль',
         'become_partner': 'Стать партнером',
+        'establishments': '🏪 Заведения',
+        'search': '🔍 Поиск',
+        'enter_search_query': 'Введите название товара или магазина:',
+        'search_results': 'Результаты поиска:',
+        'no_results': 'Ничего не найдено',
+        'select_category_in_store': 'Выберите категорию в этом заведении:',
         
         # Партнёр - новые короткие названия
         'add_item': '➕ Добавить',
@@ -406,6 +412,12 @@ Ro'yxatdan o'tish uchun /start bosing.''',
         'your_city': 'Sizning shahringiz',
         'profile': '👤 Profil',
         'become_partner': '🏪 Hamkor bolish',
+        'establishments': '🏪 Muassasalar',
+        'search': '🔍 Qidirish',
+        'enter_search_query': 'Mahsulot yoki do\'kon nomini kiriting:',
+        'search_results': 'Qidiruv natijalari:',
+        'no_results': 'Hech narsa topilmadi',
+        'select_category_in_store': 'Ushbu muassasada toifani tanlang:',
         
         # Hamkor - yangi qisqa nomlar
         'add_item': '➕ Qo\'shish',

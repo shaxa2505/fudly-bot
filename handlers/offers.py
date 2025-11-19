@@ -47,6 +47,18 @@ def setup(
             logger,
         )
 
+    @dp.message(F.text.in_(["🏪 Заведения", "🏪 Muassasalar"]))
+    async def show_establishments_handler(message: types.Message) -> None:
+        """Show establishment types."""
+        if not message.from_user:
+            return
+        lang = db.get_user_language(message.from_user.id)
+        
+        await message.answer(
+            get_text(lang, "choose_category"), # Reusing key or need new one? "choose_category" might be for product category
+            reply_markup=business_type_keyboard(lang)
+        )
+
     @dp.message(F.text.contains("Категории") | F.text.contains("Kategoriyalar"))
     async def show_categories_handler(message: types.Message) -> None:
         """Показать категории товаров для фильтрации"""
@@ -157,7 +169,7 @@ def setup(
                 "Ошибка" if lang == "ru" else "Xato", show_alert=True
             )
 
-    @dp.message(F.text.contains("Магазины") | F.text.contains("Do'konlar") | F.text.contains("🏪 Места") | F.text.contains("🏪 Joylar"))
+    @dp.message(F.text.in_(["🏪 Заведения", "🏪 Muassasalar", "🏪 Места", "🏪 Joylar"]))
     async def browse_places_handler(message: types.Message) -> None:
         if not message.from_user:
             return
@@ -259,7 +271,7 @@ def setup(
         await _show_offers_catalog(callback, offer_service.list_top_offers, logger)
 
     @dp.callback_query(F.data.startswith("offers_cat_"))
-    async def filter_offers_by_category(callback: types.CallbackQuery):
+    async def filter_offers_by_category(callback: types.CallbackQuery, state: FSMContext):
         if not callback.from_user or not callback.data:
             await callback.answer()
             return
@@ -287,7 +299,21 @@ def setup(
             return
         category = categories[cat_index]
         normalized = normalize_category(category)
-        offers = offer_service.list_offers_by_category(city, normalized, limit=20)
+        
+        # Check if we are viewing a specific store
+        state_data = await state.get_data()
+        viewing_store_id = state_data.get("viewing_store_id")
+        
+        if viewing_store_id:
+            # Filter by store AND category
+            offers = offer_service.list_active_offers_by_store(viewing_store_id)
+            # Filter in memory for now as list_active_offers_by_store returns all
+            # Ideally should have list_store_offers_by_category
+            offers = [o for o in offers if o.store_category == normalized or o.store_category == category]
+        else:
+            # Global category filter
+            offers = offer_service.list_offers_by_category(city, normalized, limit=20)
+            
         if not offers:
             no_offers_msg = f"😔 {'В категории' if lang == 'ru' else 'Toifada'} {category} {'нет предложений' if lang == 'ru' else 'takliflar yoq'}"
             await callback.answer(no_offers_msg, show_alert=True)
@@ -315,7 +341,7 @@ def setup(
             await asyncio.sleep(0.1)
 
     @dp.callback_query(F.data.startswith("filter_store_"))
-    async def filter_offers_by_store(callback: types.CallbackQuery):
+    async def filter_offers_by_store(callback: types.CallbackQuery, state: FSMContext):
         if not callback.from_user or not callback.data:
             await callback.answer()
             return
@@ -336,27 +362,35 @@ def setup(
         if not store:
             await callback.answer("× Магазин не найден", show_alert=True)
             return
-        offers = offer_service.list_active_offers_by_store(store_id)
-        if not offers:
-            await callback.answer(
-                "😔 В магазине нет активных предложений",
-                show_alert=True,
-            )
-            return
-        await callback.answer()
+            
+        # Save store_id to state so we can filter by category later
+        await state.update_data(viewing_store_id=store_id)
+        
+        # Show categories for this store instead of all offers
+        # We need a keyboard with categories available in this store
+        # For now, let's show the generic category filter but maybe we should filter it?
+        # Or just show the store card with "All products" and "Categories"
+        
+        # The user requested: "choice of establishment, then categories"
+        # So when clicking a store, we should ask "Select category"
+        
         header = (
             f"<b>{store.name}</b>\n"
             f"{store.address or ''}\n\n"
-            f"{'Найдено' if lang == 'ru' else 'Topildi'}: {len(offers)}"
+            f"{get_text(lang, 'select_category_in_store')}"
         )
+        
+        # We reuse offers_category_filter but ideally it should be filtered by what the store has.
+        # For MVP, showing all categories is acceptable, or we can check what categories the store has.
+        # Let's stick to the requested flow: Store -> Category -> Offers
+        
         await msg.edit_text(
             header,
             parse_mode="HTML",
             reply_markup=offers_category_filter(lang),
         )
-        for offer in offers[:10]:
-            await _send_offer_card(msg, offer, lang)
-            await asyncio.sleep(0.1)
+        # Do NOT show offers list immediately
+
 
     @dp.callback_query(F.data == "filter_all")
     async def show_all_offers_filter(callback: types.CallbackQuery):
