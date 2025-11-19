@@ -32,6 +32,49 @@ except ImportError:
             pass
     cache = SimpleCache()
 
+class HybridRow:
+    """
+    A row object that supports both index access (like a tuple) and key access (like a dict).
+    This allows for a smooth transition from tuple-based code to dict-based code.
+    """
+    def __init__(self, cursor, values):
+        self._data = dict(zip([d.name for d in cursor.description], values))
+        self._values = values
+        
+    def __getitem__(self, key):
+        if isinstance(key, int):
+            return self._values[key]
+        return self._data[key]
+        
+    def get(self, key, default=None):
+        return self._data.get(key, default)
+        
+    def __iter__(self):
+        return iter(self._values)
+        
+    def __repr__(self):
+        return repr(self._data)
+        
+    def __len__(self):
+        return len(self._values)
+        
+    def keys(self):
+        return self._data.keys()
+        
+    def values(self):
+        return self._data.values()
+        
+    def items(self):
+        return self._data.items()
+
+def hybrid_row_factory(cursor):
+    """
+    Row factory that returns HybridRow objects.
+    """
+    def make_row(values):
+        return HybridRow(cursor, values)
+    return make_row
+
 # Database connection configuration
 DATABASE_URL = os.environ.get('DATABASE_URL', '')
 MIN_CONNECTIONS = int(os.environ.get('DB_MIN_CONN', '1'))
@@ -88,7 +131,8 @@ class Database:
             self.pool = ConnectionPool(
                 conninfo=self.database_url,
                 min_size=MIN_CONNECTIONS,
-                max_size=MAX_CONNECTIONS
+                max_size=MAX_CONNECTIONS,
+                kwargs={"row_factory": hybrid_row_factory}
             )
             logger.info(f"✅ PostgreSQL connection pool created (min={MIN_CONNECTIONS}, max={MAX_CONNECTIONS})")
         except Exception as e:
@@ -1220,7 +1264,7 @@ class Database:
             cursor = conn.cursor()
             cursor.execute('SELECT user_id FROM users WHERE is_admin = 1')
             return [row[0] for row in cursor.fetchall()]
-    
+
     def toggle_notifications(self, user_id: int):
         """Toggle notifications for user"""
         with self.get_connection() as conn:
@@ -1233,14 +1277,6 @@ class Database:
                              (new_value, user_id))
                 return new_value
             return None
-    
-    def get_platform_payment_card(self):
-        """Get platform payment card"""
-        with self.get_connection() as conn:
-            cursor = conn.cursor(row_factory=dict_row)
-            cursor.execute('SELECT * FROM payment_settings LIMIT 1')
-            result = cursor.fetchone()
-            return dict(result) if result else None
     
     def update_user_role(self, user_id: int, role: str):
         """Update user role"""

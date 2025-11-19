@@ -27,28 +27,14 @@ def setup(dp_or_router, db, get_text, get_cities, city_keyboard, phone_request_k
             )
             return
         
-        # Save phone and set default city (Samarkand)
+        # Save phone
         db.update_user_phone(message.from_user.id, phone)
-        db.update_user_city(message.from_user.id, "Самарканд")
         
-        # Clear state and show main menu
-        await state.clear()
-        
-        # Compact, professional message
-        welcome_text = (
-            f"Регистрация завершена.\n"
-            f"Ваш город: <b>Самарканд</b>\n\n"
-            f"Изменить город можно в Профиле."
-            if lang == 'ru' else
-            f"Ro'yxatdan o'tish yakunlandi.\n"
-            f"Sizning shahringiz: <b>Samarqand</b>\n\n"
-            f"Shaharni Profilda o'zgartirish mumkin."
-        )
-        
+        # Ask for city
+        await state.set_state(Registration.city)
         await message.answer(
-            get_text(lang, "registration_complete"),
-            parse_mode="HTML",
-            reply_markup=main_menu_customer(lang)
+            get_text(lang, "choose_city"),
+            reply_markup=city_keyboard(lang)
         )
 
     @dp_or_router.message(Registration.city)
@@ -78,8 +64,8 @@ def setup(dp_or_router, db, get_text, get_cities, city_keyboard, phone_request_k
             await state.clear()
             
             # Compact confirmation
-            await callback.message.answer(
-                f"Город изменён на <b>{city_text}</b>" if lang == 'ru' else f"Shahar <b>{city_text}</b>ga o'zgartirildi",
+            await message.answer(
+                get_text(lang, "registration_complete"),
                 parse_mode="HTML",
                 reply_markup=main_menu_customer(lang)
             )

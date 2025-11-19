@@ -25,7 +25,7 @@ def setup(
     """Setup user command handlers with dependencies"""
     from handlers.common import Registration, user_view_mode, has_approved_store
     
-    @dp_or_router.message(F.text == "Мой город")
+    @dp_or_router.message(F.text.in_([get_text('ru', 'my_city'), get_text('uz', 'my_city')]))
     async def change_city(message: types.Message, state: Optional[FSMContext] = None):
         user_id = message.from_user.id  # type: ignore[union-attr]  # type: ignore[union-attr]
         lang = db.get_user_language(user_id)

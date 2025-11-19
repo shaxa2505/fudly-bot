@@ -13,11 +13,6 @@ from app.keyboards import cancel_keyboard, main_menu_customer, main_menu_seller
 from localization import get_text
 from logging_config import logger
 
-# Module-level dependencies
-db: DatabaseProtocol | None = None
-bot: Any | None = None
-user_view_mode: dict[int, str] | None = None
-
 router = Router()
 
 
@@ -34,10 +29,9 @@ def setup_dependencies(
     database: DatabaseProtocol, bot_instance: Any, view_mode_dict: dict[int, str]
 ) -> None:
     """Setup module dependencies."""
-    global db, bot, user_view_mode
-    db = database
-    bot = bot_instance
-    user_view_mode = view_mode_dict
+    # This function is kept for backward compatibility but does nothing now
+    # Dependencies are injected via middleware
+    pass
 
 
 def can_proceed(user_id: int, action: str) -> bool:
@@ -48,6 +42,15 @@ def can_proceed(user_id: int, action: str) -> bool:
 
 def get_store_field(store: Any, field: str, default: Any = None) -> Any:
     """Extract field from store tuple/dict."""
+    if not store:
+        return default
+        
+    # Try dict-like access first (works for dict and HybridRow)
+    try:
+        return store[field]
+    except (KeyError, TypeError, IndexError):
+        pass
+
     if isinstance(store, dict):
         return store.get(field, default)
     field_map = {
@@ -73,6 +76,15 @@ def get_store_field(store: Any, field: str, default: Any = None) -> Any:
 
 def get_offer_field(offer: Any, field: str, default: Any = None) -> Any:
     """Extract field from offer tuple/dict."""
+    if not offer:
+        return default
+        
+    # Try dict-like access first (works for dict and HybridRow)
+    try:
+        return offer[field]
+    except (KeyError, TypeError, IndexError):
+        pass
+
     if isinstance(offer, dict):
         return offer.get(field, default)
     field_map = {
@@ -97,18 +109,16 @@ def get_offer_field(offer: Any, field: str, default: Any = None) -> Any:
 
 def get_appropriate_menu(user_id: int, lang: str) -> Any:
     """Get appropriate menu based on user view mode."""
+    # TODO: Inject user_view_mode properly
+    from handlers.common import user_view_mode
     if user_view_mode and user_view_mode.get(user_id) == "seller":
         return main_menu_seller(lang)
     return main_menu_customer(lang)
 
 
 @router.callback_query(F.data.startswith("order_delivery_"))
-async def order_delivery_start(callback: types.CallbackQuery, state: FSMContext) -> None:
+async def order_delivery_start(callback: types.CallbackQuery, state: FSMContext, db: DatabaseProtocol) -> None:
     """Start delivery order - request quantity."""
-    if not db:
-        await callback.answer("System error")
-        return
-
     lang = db.get_user_language(callback.from_user.id)
 
     if not can_proceed(callback.from_user.id, "order_start"):
@@ -172,12 +182,8 @@ async def order_delivery_start(callback: types.CallbackQuery, state: FSMContext)
 
 
 @router.message(OrderDelivery.quantity)
-async def order_delivery_quantity(message: types.Message, state: FSMContext) -> None:
+async def order_delivery_quantity(message: types.Message, state: FSMContext, db: DatabaseProtocol) -> None:
     """Process quantity and request delivery address."""
-    if not db:
-        await message.answer("System error")
-        return
-
     lang = db.get_user_language(message.from_user.id)
 
     try:
@@ -238,12 +244,8 @@ async def order_delivery_quantity(message: types.Message, state: FSMContext) -> 
 
 
 @router.message(OrderDelivery.address)
-async def order_delivery_address(message: types.Message, state: FSMContext) -> None:
+async def order_delivery_address(message: types.Message, state: FSMContext, db: DatabaseProtocol, bot: Any) -> None:
     """Process delivery address and request payment."""
-    if not db or not bot:
-        await message.answer("System error")
-        return
-
     lang = db.get_user_language(message.from_user.id)
 
     address = message.text.strip()
@@ -315,10 +317,6 @@ async def order_delivery_address(message: types.Message, state: FSMContext) -> N
 @router.message(OrderDelivery.payment_proof, F.photo)
 async def order_payment_proof(message: types.Message, state: FSMContext) -> None:
     """Process payment screenshot and create order."""
-    if not db or not bot:
-        await message.answer("System error")
-        return
-
     logger.info(f"📸 Payment screenshot received from user {message.from_user.id}")
 
     lang = db.get_user_language(message.from_user.id)
@@ -579,13 +577,13 @@ async def reject_payment(callback: types.CallbackQuery) -> None:
     quantity = get_order_field(order, 'quantity', 4)
     offer = db.get_offer(offer_id)
     if offer:
-        new_quantity = get_offer_field(offer, "quantity", 0) + quantity
+        new_quantity = get_order_field(offer, "quantity", 0) + quantity
         db.update_offer_quantity(offer_id, new_quantity)
     offer_id = get_order_field(order, 'offer_id', 3)
     quantity = get_order_field(order, 'quantity', 4)
     offer = db.get_offer(offer_id)
     if offer:
-        new_quantity = get_offer_field(offer, "quantity", 0) + quantity
+        new_quantity = get_order_field(offer, "quantity", 0) + quantity
         db.update_offer_quantity(offer_id, new_quantity)
 
     payment_rejected_text = (

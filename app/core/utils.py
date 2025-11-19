@@ -29,8 +29,16 @@ def get_user_field(user: Any, field_name: str, default: Any = None) -> Any:
     """Safely extract field from user (dict or tuple)."""
     if not user:
         return default
+    
+    # Try dict-like access first (works for dict and HybridRow)
+    try:
+        return user[field_name]
+    except (KeyError, TypeError, IndexError):
+        pass
+        
     if isinstance(user, Mapping):
         return user.get(field_name, default)
+        
     # Tuple indexing: 0=id, 1=lang, 2=name, 3=phone, 4=city, 5=created_at, 6=role, 7=store_id, 8=notif
     field_map = {
         "id": 0,
@@ -44,7 +52,7 @@ def get_user_field(user: Any, field_name: str, default: Any = None) -> Any:
         "notifications_enabled": 8,
     }
     idx = field_map.get(field_name)
-    if idx is not None and len(user) > idx:
+    if idx is not None and isinstance(user, (tuple, list)) and len(user) > idx:
         return user[idx]
     return default
 

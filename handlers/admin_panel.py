@@ -70,8 +70,7 @@ def setup(dp_or_router, db, get_text, admin_menu):
             pending_bookings = cursor.fetchone()[0]
             
             # Today's statistics
-            from datetime import datetime
-            today = datetime.now().strftime('%Y-%m-%d')
+            today = get_uzb_time().strftime('%Y-%m-%d')
             
             cursor.execute('SELECT COUNT(*) FROM bookings WHERE DATE(created_at) = %s', (today,))
             today_bookings = cursor.fetchone()[0]

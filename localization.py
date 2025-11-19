@@ -366,6 +366,8 @@ TEXTS = {
         # Валидация/лимиты
         'invalid_city': 'Пожалуйста, выберите город из списка.',
         'rate_limit_exceeded': 'Слишком много запросов. Попробуйте позже.',
+        'my_city': 'Мой город',
+        'your_city': 'Ваш город',
     },
     
     'uz': {
@@ -387,7 +389,7 @@ Do'kon bilan aloqa va xabarnomalar uchun zarur.''',
 
         'registration_required': '''❌ <b>Ro'yxatdan o'tish talab qilinadi</b>
 
-Botdan foydalanish uchun telefon raqamingiz bilan bo'lishingiz kerak.
+Botdan foydalanish uchun telefon raqamingiz bilan bo'lishishingiz kerak.
 Ro'yxatdan o'tish uchun /start bosing.''',
 
         # Tugmalar
@@ -400,7 +402,8 @@ Ro'yxatdan o'tish uchun /start bosing.''',
         'my_bookings': '📋 Mening buyurtmalarim',
         'stores': '🏪 Barcha dokonlar',
         'favorites': '❤️ Sevimlilar',
-        'my_city': '🌆 Mening shahrim',
+        'my_city': 'Mening shahrim',
+        'your_city': 'Sizning shahringiz',
         'profile': '👤 Profil',
         'become_partner': '🏪 Hamkor bolish',
         

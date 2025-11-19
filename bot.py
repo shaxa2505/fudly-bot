@@ -40,6 +40,7 @@ from app.core.security import (
 from app.core.utils import get_store_field, get_user_field
 from app.services.admin_service import AdminService
 from app.services.offer_service import OfferService
+from app.middlewares.db_middleware import DbSessionMiddleware
 
 # Import states from handlers.common_states package
 from handlers.common_states import (
@@ -95,6 +96,10 @@ DISABLE_LOCK = os.getenv("DISABLE_LOCK", "0").strip().lower() in {"1", "true", "
 POLLING_HEALTH_PORT = int(os.getenv("POLLING_HEALTH_PORT", "0") or 0)
 
 bot, dp, db, cache = build_application(settings)
+
+# Register Middlewares
+dp.update.middleware(DbSessionMiddleware(db))
+
 offer_service = OfferService(db, cache)
 admin_service = AdminService(db, bool(DATABASE_URL))
 
