@@ -105,12 +105,20 @@ class OfferService:
     def list_stores_by_type(self, city: str, business_type: str) -> List[StoreSummary]:
         """Return stores for a business type with cached fallback."""
         normalized = self._map_business_type(business_type)
+        
+        from logging import getLogger
+        logger = getLogger(__name__)
+        logger.info(f"🏪 list_stores_by_type: city={city}, business_type={business_type}, normalized={normalized}")
+        
         if business_type == "delivery":
             raw_stores = self._fetch_delivery_enabled_stores(city, normalized)
         elif self._cache:
             raw_stores = self._cache.get_stores_by_type(city, normalized)
         else:
             raw_stores = self._db.get_stores_by_business_type(normalized, city)
+        
+        logger.info(f"🏪 Found {len(raw_stores)} raw stores")
+        
         return [self._to_store_summary(store) for store in raw_stores]
 
     def _fetch_delivery_enabled_stores(self, city: str, normalized: str) -> List[Any]:

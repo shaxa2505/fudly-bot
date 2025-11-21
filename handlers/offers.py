@@ -198,7 +198,13 @@ def setup(
         business_type = data.replace("biztype_", "")
         city = user.city or "Ташкент"
         search_city = normalize_city(city)
+        
+        logger.info(f"🏪 Browse stores: business_type={business_type}, user_city={city}, search_city={search_city}")
+        
         stores = offer_service.list_stores_by_type(search_city, business_type)
+        
+        logger.info(f"🏪 Found {len(stores)} stores for {business_type} in {search_city}")
+        
         if not stores:
             await msg.edit_text(_no_stores_text(lang, business_type))
             await callback.answer()
