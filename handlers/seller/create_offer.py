@@ -195,8 +195,8 @@ async def process_offer_data(message: types.Message, state: FSMContext) -> None:
             
         original_price = float(parts[0])
         
-        # Handle discount (50 or 50%)
-        discount_str = parts[1].replace('%', '')
+        # Handle discount (50 or 50% - both work)
+        discount_str = parts[1].strip().replace('%', '').strip()
         discount_percent = float(discount_str)
         
         quantity = int(parts[2])

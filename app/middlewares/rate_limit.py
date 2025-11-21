@@ -18,8 +18,8 @@ class RateLimitMiddleware(BaseMiddleware):
     """Middleware for rate limiting user requests.
     
     Limits:
-    - 30 requests per minute per user
-    - 5 requests per 10 seconds per user (burst protection)
+    - 100 requests per minute per user
+    - 20 requests per 10 seconds per user (burst protection)
     """
     
     def __init__(
@@ -90,8 +90,8 @@ class RateLimitMiddleware(BaseMiddleware):
                 )
                 try:
                     await event.answer(
-                        "⚠️ Превышен лимит запросов (30 в минуту). Попробуйте через минуту.\n"
-                        "⚠️ So'rovlar limiti oshib ketdi (daqiqada 30 ta). Bir daqiqadan keyin urinib ko'ring."
+                        "⚠️ Превышен лимит запросов (100 в минуту). Попробуйте через минуту.\n"
+                        "⚠️ So'rovlar limiti oshib ketdi (daqiqada 100 ta). Bir daqiqadan keyin urinib ko'ring."
                     )
                 except Exception:
                     pass

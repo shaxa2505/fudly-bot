@@ -87,7 +87,11 @@ async def profile(message: types.Message) -> None:
     text += f"🌍 {get_text(lang, 'language')}: {lang_text}\n"
 
     # Determine current mode for settings keyboard
-    current_mode = user_view_mode.get(message.from_user.id, "customer") if user_view_mode else "customer"
+    # If user is seller, check their current mode, otherwise always customer
+    if user.role == "seller" and user_view_mode:
+        current_mode = user_view_mode.get(message.from_user.id, "customer")
+    else:
+        current_mode = "customer"
     
     # Customer statistics - show when in customer mode
     if current_mode == "customer":
