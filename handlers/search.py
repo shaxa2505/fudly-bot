@@ -123,6 +123,11 @@ def setup(
         # Расширяем запрос синонимами
         search_terms = expand_search_query(query, lang)
         
+        # Log search for debugging
+        from logging import getLogger
+        logger = getLogger(__name__)
+        logger.info(f"🔍 Search: query='{query}', terms={search_terms}, lang={lang}")
+        
         # Perform search
         # Use get_user instead of get_user_model if protocol doesn't support it
         user_data = db.get_user(message.from_user.id)
@@ -131,6 +136,8 @@ def setup(
         # Normalize city (e.g. "Samarqand" -> "Самарканд") to match DB records
         from app.core.utils import normalize_city
         city = normalize_city(raw_city) if raw_city else None
+        
+        logger.info(f"🔍 Search: user_city='{raw_city}', normalized_city='{city}'")
         
         # Ищем по расширенным терминам
         all_results = []
@@ -141,6 +148,7 @@ def setup(
                 continue
                 
             results = offer_service.search_offers(term, city)
+            logger.info(f"🔍 Search term '{term}' found {len(results)} offers")
             
             for offer in results:
                 if offer.id not in seen_offer_ids:

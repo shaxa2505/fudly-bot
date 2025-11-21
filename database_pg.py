@@ -1999,7 +1999,7 @@ class Database:
             JOIN stores s ON o.store_id = s.store_id
             WHERE o.status = 'active' 
             AND o.quantity > 0
-            AND s.status = 'approved'
+            AND (s.status = 'approved' OR s.status = 'active')
             AND s.city ILIKE %s
             AND (
                 LOWER(o.title) LIKE LOWER(%s) OR 
