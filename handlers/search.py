@@ -126,7 +126,11 @@ def setup(
         # Perform search
         # Use get_user instead of get_user_model if protocol doesn't support it
         user_data = db.get_user(message.from_user.id)
-        city = user_data.get("city") if user_data else None
+        raw_city = user_data.get("city") if user_data else None
+        
+        # Normalize city (e.g. "Samarqand" -> "Самарканд") to match DB records
+        from app.core.utils import normalize_city
+        city = normalize_city(raw_city) if raw_city else None
         
         # Ищем по расширенным терминам
         all_results = []
