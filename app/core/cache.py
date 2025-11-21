@@ -158,8 +158,8 @@ class CacheManager:
         if cached_dict and (now - cached_dict["ts"]) < OFFERS_CACHE_TTL:
             return cached_dict["stores"]
         
-        # Fetch from database
-        stores = self._db.get_stores_by_business_type(city, business_type)
+        # Fetch from database - NOTE: parameter order is (business_type, city) not (city, business_type)
+        stores = self._db.get_stores_by_business_type(business_type, city)
         self._stores_cache[cache_key] = {"stores": stores, "ts": now}
         
         # Store in Redis if available

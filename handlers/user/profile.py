@@ -89,10 +89,8 @@ async def profile(message: types.Message) -> None:
     # Determine current mode for settings keyboard
     current_mode = user_view_mode.get(message.from_user.id, "customer") if user_view_mode else "customer"
     
-    # Customer statistics
-    if (user.role == "customer" or user.role is None) or (
-        user_view_mode and user_view_mode.get(message.from_user.id) == "customer"
-    ):
+    # Customer statistics - show when in customer mode
+    if current_mode == "customer":
         bookings = db.get_user_bookings(message.from_user.id)
         try:
             orders = db.get_user_orders(message.from_user.id)
@@ -127,8 +125,8 @@ async def profile(message: types.Message) -> None:
             text += f"✅ {'Завершено' if lang == 'ru' else 'Yakunlangan'}: {total_completed} "
             text += f"({'из них доставок' if lang == 'ru' else 'shulardan yetkazish'}: {completed_orders})\n"
 
-    # Seller statistics
-    elif user.role == "seller":
+    # Seller statistics - show when in seller mode
+    elif current_mode == "seller" or user.role == "seller":
         stores = db.get_user_stores(message.from_user.id)
         if stores:
             total_bookings = 0
