@@ -106,7 +106,7 @@ def setup_dependencies(
 @router.callback_query(F.data.startswith("book_"))
 async def book_offer_start(callback: types.CallbackQuery, state: FSMContext) -> None:
     """Start booking - ask for quantity."""
-    if not db:
+    if not db or not callback.message:
         await callback.answer("System error", show_alert=True)
         return
     
@@ -145,15 +145,19 @@ async def book_offer_start(callback: types.CallbackQuery, state: FSMContext) -> 
     await state.set_state(BookOffer.quantity)
     
     # Ask for quantity
-    await callback.message.answer(
-        f"📦 <b>{title}</b>\n\n"
-        f"📋 Доступно: {quantity} шт\n"
-        f"💰 Цена: {int(price):,} сум/шт\n\n"
-        f"Сколько хотите забронировать? (1-{quantity})",
-        parse_mode="HTML",
-        reply_markup=cancel_keyboard(lang),
-    )
-    await callback.answer()
+    try:
+        await callback.message.answer(
+            f"📦 <b>{title}</b>\n\n"
+            f"📋 Доступно: {quantity} шт\n"
+            f"💰 Цена: {int(price):,} сум/шт\n\n"
+            f"Сколько хотите забронировать? (1-{quantity})",
+            parse_mode="HTML",
+            reply_markup=cancel_keyboard(lang),
+        )
+        await callback.answer()
+    except Exception as e:
+        logger.error(f"Error sending booking message: {e}")
+        await callback.answer(get_text(lang, "error"), show_alert=True)
 
 
 @router.message(BookOffer.quantity)

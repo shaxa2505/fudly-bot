@@ -162,6 +162,17 @@ class RegistrationCheckMiddleware(BaseMiddleware):
 
         allowed_commands = ['/start', '/help']
         allowed_callbacks = ['lang_ru', 'lang_uz']
+        # Allow callback patterns for core functionality (booking, orders, store info)
+        allowed_callback_patterns = [
+            'book_',
+            'order_delivery_',
+            'store_info_',
+            'store_offers_',
+            'store_reviews_',
+            'back_to_store_',
+            'hot_offers_',
+            'filter_',
+        ]
 
         if msg:
             if msg.text and any(msg.text.startswith(cmd) for cmd in allowed_commands):
@@ -171,8 +182,13 @@ class RegistrationCheckMiddleware(BaseMiddleware):
             if msg.photo:
                 return await handler(event, data)
 
-        if cb and cb.data in allowed_callbacks:
-            return await handler(event, data)
+        if cb and cb.data:
+            # Allow specific callbacks or callback patterns
+            if cb.data in allowed_callbacks:
+                return await handler(event, data)
+            # Allow callback patterns (booking, store info, etc.) even without registration
+            if any(cb.data.startswith(pattern) for pattern in allowed_callback_patterns):
+                return await handler(event, data)
 
         state = data.get('state')
         if state:

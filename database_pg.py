@@ -1240,12 +1240,13 @@ class Database:
                     AND o.status = 'active' 
                     AND o.quantity > 0
                 WHERE (s.status = 'active' OR s.status = 'approved')
-                AND s.business_type = %s
+                AND LOWER(s.business_type) = LOWER(%s)
             '''
             params = [business_type]
             
             if city:
-                query += ' AND s.city ILIKE %s'
+                # Allow matching city or if store city is not set
+                query += ' AND (s.city ILIKE %s OR s.city IS NULL)'
                 params.append(f'%{city}%')
             
             query += '''
