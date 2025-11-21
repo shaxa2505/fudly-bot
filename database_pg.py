@@ -1236,7 +1236,7 @@ class Database:
                 SELECT s.*, 
                        COUNT(o.offer_id) as offers_count
                 FROM stores s
-                LEFT JOIN offers o ON s.store_id = o.store_id 
+                INNER JOIN offers o ON s.store_id = o.store_id 
                     AND o.status = 'active' 
                     AND o.quantity > 0
                 WHERE (s.status = 'active' OR s.status = 'approved')
@@ -1251,6 +1251,7 @@ class Database:
             
             query += '''
                 GROUP BY s.store_id
+                HAVING COUNT(o.offer_id) > 0
                 ORDER BY COUNT(o.offer_id) DESC, s.name
             '''
             
@@ -1997,6 +1998,7 @@ class Database:
             FROM offers o
             JOIN stores s ON o.store_id = s.store_id
             WHERE o.status = 'active' 
+            AND o.quantity > 0
             AND s.status = 'approved'
             AND s.city ILIKE %s
             AND (
