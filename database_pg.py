@@ -1232,6 +1232,11 @@ class Database:
         with self.get_connection() as conn:
             cursor = conn.cursor(row_factory=dict_row)
             
+            # Log for debugging
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.info(f"🏪 SQL query: business_type={business_type}, city={city}")
+            
             query = '''
                 SELECT s.*, 
                        COUNT(o.offer_id) as offers_count
@@ -1245,8 +1250,9 @@ class Database:
             params = [business_type]
             
             if city:
-                # Allow matching city or if store city is not set
-                query += ' AND (s.city ILIKE %s OR s.city IS NULL)'
+                # Use exact match first, then try partial match
+                query += ' AND (LOWER(s.city) = LOWER(%s) OR s.city ILIKE %s OR s.city IS NULL)'
+                params.append(city)
                 params.append(f'%{city}%')
             
             query += '''
@@ -1256,7 +1262,13 @@ class Database:
             '''
             
             cursor.execute(query, params)
-            return [dict(row) for row in cursor.fetchall()]
+            results = [dict(row) for row in cursor.fetchall()]
+            
+            logger.info(f"🏪 SQL returned {len(results)} stores")
+            if results:
+                logger.info(f"🏪 First store: {results[0].get('name', 'Unknown')} in {results[0].get('city', 'Unknown')}")
+            
+            return results
     
     def get_all_users(self):
         """Get all users with notifications enabled"""
