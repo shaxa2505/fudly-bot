@@ -69,10 +69,15 @@ def expand_search_query(query: str, lang: str) -> list[str]:
             continue
             
         # Ищем слово в словаре ключевых слов
-        for category, keywords in SEARCH_KEYWORDS.get(lang, {}).items():
-            if word in keywords:
-                expanded_terms.update(keywords)
-                break
+        # Search keywords in both language maps (ru and uz) to improve matching
+        for lookup_lang in ("ru", "uz"):
+            for category, keywords in SEARCH_KEYWORDS.get(lookup_lang, {}).items():
+                if word in keywords:
+                    expanded_terms.update(keywords)
+                    break
+            else:
+                continue
+            break
     
     return list(expanded_terms)
 

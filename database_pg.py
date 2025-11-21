@@ -1997,7 +1997,7 @@ class Database:
             JOIN stores s ON o.store_id = s.store_id
             WHERE o.status = 'active' 
             AND s.status = 'approved'
-            AND s.city = %s
+            AND s.city ILIKE %s
             AND (
                 LOWER(o.title) LIKE LOWER(%s) OR 
                 LOWER(s.name) LIKE LOWER(%s) OR
@@ -2007,8 +2007,10 @@ class Database:
             LIMIT 50
         """
         search_term = f"%{query}%"
+        # Allow partial or empty city filter; if city is None, match any city
+        city_param = f"%{city}%" if city else "%"
         with self.get_connection() as conn:
             with conn.cursor() as cur:
-                cur.execute(sql, (city, search_term, search_term, search_term))
+                cur.execute(sql, (city_param, search_term, search_term, search_term))
                 return cur.fetchall()
 
