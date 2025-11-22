@@ -43,22 +43,108 @@ def get_store_field(store: Any, field: str, default: Any = None) -> Any:
 
 
 def detect_category(title: str) -> str:
-    """Auto-detect category based on title keywords."""
+    """Auto-detect category based on title keywords with improved matching."""
     title_lower = title.lower()
     
+    # Expanded keywords with more variations and common product names
     keywords = {
-        "bakery": ["хлеб", "батон", "лепешка", "торт", "пирожное", "булка", "non", "nan", "bread", "cake", "сомса", "самса", "пирог", "печенье"],
-        "dairy": ["молоко", "кефир", "творог", "сыр", "йогурт", "сметана", "sut", "qatiq", "tvorog", "pishloq", "qaymoq", "сливки", "масло"],
-        "meat": ["мясо", "говядина", "курица", "колбаса", "сосиски", "фарш", "go'sht", "tovuq", "kolbasa", "sosiska", "qiym", "рыба", "baliq"],
-        "fruits": ["яблоко", "банан", "груша", "виноград", "лимон", "апельсин", "olma", "uzum", "limon", "apelsin", "фрукт", "meva"],
-        "vegetables": ["картофель", "лук", "морковь", "помидор", "огурец", "капуста", "kartoshka", "piyoz", "sabzi", "pomidor", "bodring", "karam", "овощ", "sabzavot"],
-        "drinks": ["кола", "вода", "сок", "чай", "кофе", "suv", "choy", "kofe", "pepsi", "fanta", "напиток", "ichimlik"],
+        "bakery": {
+            "keywords": [
+                "хлеб", "батон", "лепешка", "торт", "пирожное", "булка", "багет", "круассан",
+                "non", "nan", "bread", "cake", "pizza", "сомса", "самса", "somsa", 
+                "пирог", "печенье", "кекс", "вафли", "булочка", "сдоба", "baguette",
+                "эклер", "слойка", "пирожок", "чебурек", "беляш", "lavash", "лаваш"
+            ],
+            "priority": 1
+        },
+        "dairy": {
+            "keywords": [
+                "молоко", "кефир", "творог", "сыр", "йогурт", "сметана", "сливки", "масло",
+                "sut", "qatiq", "tvorog", "pishloq", "qaymoq", "yogurt", "ayran", "айран",
+                "ряженка", "простокваша", "брынза", "моцарелла", "голландский", "российский",
+                "milk", "cheese", "butter", "cream", "мороженое", "muzqaymoq"
+            ],
+            "priority": 1
+        },
+        "meat": {
+            "keywords": [
+                "мясо", "говядина", "курица", "колбаса", "сосиски", "фарш", "шашлык",
+                "go'sht", "tovuq", "kolbasa", "sosiska", "qiym", "qovurilgan", 
+                "рыба", "baliq", "fish", "свинина", "баранина", "chicken", "beef",
+                "котлета", "пельмени", "манты", "manti", "стейк", "вырезка", "филе"
+            ],
+            "priority": 1
+        },
+        "fruits": {
+            "keywords": [
+                "яблоко", "банан", "груша", "виноград", "лимон", "апельсин", "мандарин",
+                "olma", "banan", "uzum", "limon", "apelsin", "mandarin", 
+                "фрукт", "meva", "fruit", "ягода", "клубника", "черешня", "вишня",
+                "персик", "абрикос", "слива", "киви", "гранат", "ананас", "арбуз", "дыня"
+            ],
+            "priority": 2
+        },
+        "vegetables": {
+            "keywords": [
+                "картофель", "лук", "морковь", "помидор", "огурец", "капуста", "перец",
+                "kartoshka", "piyoz", "sabzi", "pomidor", "bodring", "karam", 
+                "овощ", "sabzavot", "vegetable", "баклажан", "кабачок", "тыква",
+                "редис", "редька", "свекла", "чеснок", "sarimsoq", "salat", "салат"
+            ],
+            "priority": 2
+        },
+        "drinks": {
+            "keywords": [
+                "кола", "вода", "сок", "чай", "кофе", "пепси", "фанта", "спрайт",
+                "suv", "choy", "kofe", "qahva", "pepsi", "fanta", "sprite", "cola",
+                "напиток", "ichimlik", "drink", "лимонад", "квас", "компот", 
+                "минералка", "газировка", "энергетик", "red bull"
+            ],
+            "priority": 1
+        },
+        "snacks": {
+            "keywords": [
+                "чипсы", "сухарики", "орешки", "семечки", "шоколад", "конфеты",
+                "lays", "pringles", "chocolate", "shokolad", "konfet", 
+                "снеки", "закуска", "орехи", "миндаль", "фисташки", "изюм"
+            ],
+            "priority": 2
+        },
+        "frozen": {
+            "keywords": [
+                "замороженный", "мороженое", "muzlatilgan", "muzqaymoq", 
+                "frozen", "ice cream", "пельмени", "вареники", "заморозка"
+            ],
+            "priority": 1
+        },
     }
     
-    for category, words in keywords.items():
-        if any(word in title_lower for word in words):
-            return category
-            
+    # Score each category
+    category_scores = {}
+    for category, data in keywords.items():
+        score = 0
+        words = data["keywords"]
+        priority = data["priority"]
+        
+        for word in words:
+            if word in title_lower:
+                # Exact match gets higher score
+                if title_lower == word:
+                    score += 10 * priority
+                # Word at start of title gets bonus
+                elif title_lower.startswith(word):
+                    score += 5 * priority
+                # Word anywhere in title
+                else:
+                    score += 2 * priority
+        
+        if score > 0:
+            category_scores[category] = score
+    
+    # Return category with highest score
+    if category_scores:
+        return max(category_scores, key=category_scores.get)
+    
     return "other"
 
 
