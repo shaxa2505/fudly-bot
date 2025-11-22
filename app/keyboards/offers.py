@@ -25,11 +25,9 @@ def hot_offers_pagination_keyboard(lang: str, has_more: bool, next_offset: int) 
 
 def store_card_keyboard(lang: str, store_id: int, offers_count: int, ratings_count: int) -> InlineKeyboardMarkup:
     builder = InlineKeyboardBuilder()
-    products = "🛍 Все товары" if lang == "ru" else "🛍 Barcha mahsulotlar"
-    reviews = "⭐ Отзывы" if lang == "ru" else "⭐ Sharhlar"
+    products = "🛍 Посмотреть товары" if lang == "ru" else "🛍 Mahsulotlarni ko'rish"
     back = "◀️ Назад" if lang == "ru" else "◀️ Orqaga"
     builder.button(text=f"{products} ({offers_count})", callback_data=f"store_offers_{store_id}")
-    builder.button(text=f"{reviews} ({ratings_count})", callback_data=f"store_reviews_{store_id}")
     builder.button(text=back, callback_data="back_to_places")
     builder.adjust(1)
     return builder.as_markup()

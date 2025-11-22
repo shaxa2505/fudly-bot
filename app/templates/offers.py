@@ -128,19 +128,56 @@ def render_store_card(lang: str, store: StoreDetails) -> str:
     emoji = emoji_map.get(store.business_type, "🏪")
     type_name = type_names.get(store.business_type, store.business_type)
 
-    lines = [f"{emoji} <b>{store.name}</b>"]
-    lines.append(f"🏷 {type_name}")
-    location = ", ".join(filter(None, [store.address, store.city]))
-    if location:
-        lines.append(f"📍 {location}")
+    lines = []
+    
+    # Заголовок с названием и типом
+    lines.append(f"{emoji} <b>{store.name}</b>")
+    lines.append(f"<i>{type_name}</i>")
+    lines.append("")
+    
+    # Основная информация
+    lines.append("━━━━━━━━━━━━━━━━")
+    
+    # Адрес и контакты
+    if store.city:
+        city_label = "🏙 Город" if lang == "ru" else "🏙 Shahar"
+        lines.append(f"{city_label}: {store.city}")
+    
+    if store.address:
+        address_label = "📍 Адрес" if lang == "ru" else "📍 Manzil"
+        lines.append(f"{address_label}: {store.address}")
+    
+    if store.phone:
+        phone_label = "📞 Телефон" if lang == "ru" else "📞 Telefon"
+        lines.append(f"{phone_label}: {store.phone}")
+    
+    lines.append("")
+    
+    # Описание
     if store.description:
         lines.append(f"📝 {store.description}")
-    if store.phone:
-        lines.append(f"📞 {store.phone}")
+        lines.append("")
+    
+    # Статистика
+    lines.append("━━━━━━━━━━━━━━━━")
+    
     reviews_text = "отзывов" if lang == "ru" else "sharh"
-    lines.append(f"⭐ {store.rating:.1f}/5 ({store.ratings_count} {reviews_text})")
-    offers_label = "Горячих предложений" if lang == "ru" else "Issiq takliflar"
-    lines.append(f"🔥 {offers_label}: {store.offers_count}")
+    lines.append(f"⭐ Рейтинг: <b>{store.rating:.1f}/5</b> ({store.ratings_count} {reviews_text})")
+    
+    offers_label = "Доступно товаров" if lang == "ru" else "Mavjud mahsulotlar"
+    lines.append(f"🔥 {offers_label}: <b>{store.offers_count}</b>")
+    
+    # Информация о доставке
+    if store.delivery_enabled:
+        delivery_label = "🚚 Доставка" if lang == "ru" else "🚚 Yetkazib berish"
+        available = "Доступна" if lang == "ru" else "Mavjud"
+        lines.append(f"{delivery_label}: {available}")
+        if store.delivery_price > 0:
+            lines.append(f"   Стоимость: {store.delivery_price:,.0f} сум")
+        if store.min_order_amount > 0:
+            min_order = "Минимальный заказ" if lang == "ru" else "Minimal buyurtma"
+            lines.append(f"   {min_order}: {store.min_order_amount:,.0f} сум")
+    
     return "\n".join(lines)
 
 

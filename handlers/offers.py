@@ -766,6 +766,20 @@ def setup(
         keyboard = offer_keyboards.store_card_keyboard(
             lang, store_id, store.offers_count, store.ratings_count
         )
+        
+        # Отправить с фото если есть
+        if hasattr(store, 'photo') and store.photo:
+            try:
+                await message.answer_photo(
+                    photo=store.photo,
+                    caption=text,
+                    parse_mode="HTML",
+                    reply_markup=keyboard
+                )
+                return
+            except Exception:
+                pass  # Fallback to text if photo fails
+        
         await message.answer(text, parse_mode="HTML", reply_markup=keyboard)
 
     async def _send_offer_details(message: types.Message, offer: OfferDetails, lang: str) -> None:
