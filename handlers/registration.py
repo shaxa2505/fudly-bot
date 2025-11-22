@@ -21,14 +21,14 @@ def setup(dp_or_router, db, get_text, get_cities, city_keyboard, phone_request_k
     
 @router.message(Registration.phone, F.contact)
 async def process_phone(message: types.Message, state: FSMContext, db: DatabaseProtocol):
-    # User must be created when choosing language
+    """Process phone number with improved messaging."""
     lang = db.get_user_language(message.from_user.id)
     phone = message.contact.phone_number
     
     # Validate phone format
     if not validator.validate_phone(phone):
         await message.answer(
-            "Неверный формат номера. Используйте кнопку ниже." if lang == 'ru' else "Telefon raqami noto'g'ri. Quyidagi tugmadan foydalaning.",
+            "❌ Неверный формат номера. Используйте кнопку ниже." if lang == 'ru' else "❌ Telefon raqami noto'g'ri. Quyidagi tugmadan foydalaning.",
             reply_markup=phone_request_keyboard(lang)
         )
         return
@@ -36,10 +36,11 @@ async def process_phone(message: types.Message, state: FSMContext, db: DatabaseP
     # Save phone
     db.update_user_phone(message.from_user.id, phone)
     
-    # Ask for city
+    # Ask for city with improved text
     await state.set_state(Registration.city)
     await message.answer(
-        get_text(lang, "choose_city"),
+        get_text(lang, "welcome_city_step"),
+        parse_mode="HTML",
         reply_markup=city_keyboard(lang)
     )
 

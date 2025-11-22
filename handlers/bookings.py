@@ -139,22 +139,32 @@ async def book_offer_start(callback: types.CallbackQuery, state: FSMContext) -> 
     # Get other fields safely
     title = get_offer_field(offer, "title", "Товар")
     price = get_offer_field(offer, "discount_price", 0)
+    store_name = get_offer_field(offer, "store_name", "Магазин")
+    unit = get_offer_field(offer, "unit", "шт")
     
-    # Save offer_id to state
-    await state.update_data(offer_id=offer_id)
+    # Save offer data to state
+    await state.update_data(
+        offer_id=offer_id,
+        title=title,
+        price=price,
+        store_name=store_name,
+        unit=unit,
+        max_quantity=quantity
+    )
     await state.set_state(BookOffer.quantity)
     
-    # Ask for quantity
+    # Ask for quantity with improved message
     try:
-        available_text = "Mavjud" if lang == "uz" else "Доступно"
-        price_text = "Narx" if lang == "uz" else "Цена"
-        how_many = "Nechta buyurtma qilmoqchisiz?" if lang == "uz" else "Сколько хотите забронировать?"
+        text = get_text(lang, "booking_step_quantity").format(
+            title=title,
+            store_name=store_name,
+            price=int(price),
+            quantity=quantity,
+            unit=unit
+        )
         
         await callback.message.answer(
-            f"📦 <b>{title}</b>\n\n"
-            f"📋 {available_text}: {quantity} шт\n"
-            f"💰 {price_text}: {int(price):,} сум/шт\n\n"
-            f"{how_many} (1-{quantity})",
+            text,
             parse_mode="HTML",
             reply_markup=cancel_keyboard(lang),
         )
