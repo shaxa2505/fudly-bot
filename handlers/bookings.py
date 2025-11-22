@@ -975,7 +975,7 @@ async def cancel_booking_confirm(callback: types.CallbackQuery) -> None:
 
     lang = db.get_user_language(callback.from_user.id)
     try:
-        booking_id = int(callback.data.split("_")[3])
+        booking_id = int(callback.data.rsplit("_", 1)[-1])
     except (ValueError, IndexError) as e:
         logger.error(f"Invalid booking_id in callback data: {callback.data}, error: {e}")
         await callback.answer(get_text(lang, "error"), show_alert=True)
@@ -1000,7 +1000,7 @@ async def do_cancel_booking(callback: types.CallbackQuery) -> None:
 
     lang = db.get_user_language(callback.from_user.id)
     try:
-        booking_id = int(callback.data.split("_")[2])
+        booking_id = int(callback.data.rsplit("_", 1)[-1])
     except (ValueError, IndexError) as e:
         logger.error(f"Invalid booking_id in callback data: {callback.data}, error: {e}")
         await callback.answer(get_text(lang, "error"), show_alert=True)
@@ -1043,7 +1043,7 @@ async def contact_store(callback: types.CallbackQuery) -> None:
 
     lang = db.get_user_language(callback.from_user.id)
     try:
-        store_id = int(callback.data.split("_")[2])
+        store_id = int(callback.data.rsplit("_", 1)[-1])
     except (ValueError, IndexError) as e:
         logger.error(f"Invalid store_id in callback data: {callback.data}, error: {e}")
         await callback.answer(get_text(lang, "error"), show_alert=True)
@@ -1081,7 +1081,7 @@ async def booking_details(callback: types.CallbackQuery) -> None:
 
     lang = db.get_user_language(callback.from_user.id)
     try:
-        booking_id = int(callback.data.split("_")[2])
+        booking_id = int(callback.data.rsplit("_", 1)[-1])
     except (ValueError, IndexError) as e:
         logger.error(f"Invalid booking_id in callback data: {callback.data}, error: {e}")
         await callback.answer(get_text(lang, "error"), show_alert=True)
@@ -1140,39 +1140,23 @@ async def booking_details(callback: types.CallbackQuery) -> None:
     total = int(offer_price * quantity)
     currency = "сум" if lang == 'ru' else "so'm"
 
-    delivery_info = ""
-    if delivery_option == 1:
-        if lang == 'ru':
-            delivery_info = f"\n🚚 Доставка: {delivery_address}\n💵 Доставка: {delivery_cost:,} сум"
-        else:
-            delivery_info = f"\n🚚 Yetkazish: {delivery_address}\n💵 Yetkazish: {delivery_cost:,} so'm"
+    # Build a compact card similar to the design: store, item (uppercase), unit price, total, pickup address, code, date
+    title_display = (offer_title or "Товар").upper()
+
+    pickup_block = f"\n📍 <b>Адрес получения:</b> {offer_address}\n" if delivery_option == 0 else ""
 
     text = (
-        (f"✅ <b>Детали бронирования</b>\n\n" if lang == 'ru' else f"✅ <b>Bron tafsilotlari</b>\n\n")
-        + f"🏪 <b>Магазин:</b> {store_name}\n"
-        + f"📦 <b>Товар:</b> {offer_title}\n"
-        + f"🔢 <b>Количество:</b> {quantity} {unit}\n"
+        (f"🏪 <b>{store_name}</b>\n\n" if lang == 'ru' else f"🏪 <b>{store_name}</b>\n\n")
+        + f"<b>{title_display}</b>\n\n"
         + f"💵 <b>Цена за ед.:</b> {int(offer_price):,} {currency}\n"
-        + f"💰 <b>Сумма:</b> {total:,} {currency}"
-        + f"{delivery_info}\n"
-        + (f"\n📍 <b>Адрес получения:</b> {offer_address}\n" if delivery_option == 0 else "")
-        + f"\n🎫 <code>{code}</code>\n"
+        + f"💰 <b>Сумма:</b> {total:,} {currency}\n\n"
+        + pickup_block
+        + f"🎫 <code>{code}</code>\n"
         + f"📅 {created_at}"
     )
 
-    # Action buttons: contact store, confirm cancel, and close
+    # Action buttons: Cancel and Close (two buttons)
     kb = InlineKeyboardBuilder()
-    # Try to get store id/phone from booking/offer
-    store_id = None
-    if isinstance(booking, dict):
-        store_id = booking.get('store_id')
-    else:
-        # assume booking tuple may contain store_id at position 2 or 11 depending on schema
-        store_id = booking[2] if len(booking) > 2 else (booking[11] if len(booking) > 11 else None)
-
-    if store_id:
-        kb.button(text=("Контакт магазина" if lang == 'ru' else "Do'kon bilan aloqa"), callback_data=f"contact_store_{store_id}")
-
     kb.button(text=("Отменить" if lang == 'ru' else "Bekor qilish"), callback_data=f"cancel_booking_confirm_{booking_id}")
     kb.button(text=("Закрыть" if lang == 'ru' else "Yopish"), callback_data=f"noop_{booking_id}")
     kb.adjust(2)
