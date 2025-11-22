@@ -328,7 +328,7 @@ admin_stats.setup(dp, admin_service, logger)
 # Register middlewares
 # 1. Rate limiting (FIRST - before any processing)
 from app.middlewares.rate_limit import RateLimitMiddleware
-dp.update.middleware(RateLimitMiddleware(rate_limit=30, burst_limit=5))
+dp.update.middleware(RateLimitMiddleware(rate_limit=30, burst_limit=20))
 
 # 2. Registration check
 dp.update.middleware(RegistrationCheckMiddleware(db, get_text, phone_request_keyboard))

@@ -564,10 +564,11 @@ def setup(
         category_title = category.replace("_", " ").title() if category != "all" else (
             "Все категории" if lang == "ru" else "Barcha toifalar"
         )
+        products_word = "Mahsulotlar" if lang == "uz" else "Товаров"
         text = (
             f"🏪 <b>{store.name}</b>\n"
             f"📂 {category_title}\n"
-            f"📦 Товаров: {len(offers)}\n\n"
+            f"📦 {products_word}: {len(offers)}\n\n"
         )
         text += offer_templates.render_store_offers_list(
             lang,

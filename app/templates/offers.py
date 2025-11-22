@@ -17,7 +17,9 @@ def render_hot_offers_list(
     header = _hot_header(lang, total_count)
     lines = [header, f"📍 {city}"]
     shown = offset + len(offers)
-    lines.append(f"Показано: {shown} из {total_count}")
+    shown_text = "Ko'rsatilgan" if lang == "uz" else "Показано"
+    of_text = "dan" if lang == "uz" else "из"
+    lines.append(f"{shown_text}: {shown} {of_text} {total_count}")
     lines.append("")
 
     # Category emoji mapping
@@ -173,7 +175,8 @@ def render_store_card(lang: str, store: StoreDetails) -> str:
         available = "Доступна" if lang == "ru" else "Mavjud"
         lines.append(f"{delivery_label}: {available}")
         if store.delivery_price > 0:
-            lines.append(f"   Стоимость: {store.delivery_price:,.0f} сум")
+            cost_label = "Стоимость" if lang == "ru" else "Narxi"
+            lines.append(f"   {cost_label}: {store.delivery_price:,.0f} сум")
         if store.min_order_amount > 0:
             min_order = "Минимальный заказ" if lang == "ru" else "Minimal buyurtma"
             lines.append(f"   {min_order}: {store.min_order_amount:,.0f} сум")
@@ -249,7 +252,9 @@ def render_store_offers_list(
     lines = [f"🛍 <b>{store_name}</b>"]
     lines.append("Все товары" if lang == "ru" else "Barcha mahsulotlar")
     shown = offset + len(offers)
-    lines.append(f"Показано: {shown} из {total}")
+    shown_text = "Ko'rsatilgan" if lang == "uz" else "Показано"
+    of_text = "dan" if lang == "uz" else "из"
+    lines.append(f"{shown_text}: {shown} {of_text} {total}")
     lines.append("")
 
     for idx, offer in enumerate(offers, offset + 1):

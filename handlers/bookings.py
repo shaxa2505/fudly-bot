@@ -146,11 +146,15 @@ async def book_offer_start(callback: types.CallbackQuery, state: FSMContext) -> 
     
     # Ask for quantity
     try:
+        available_text = "Mavjud" if lang == "uz" else "Доступно"
+        price_text = "Narx" if lang == "uz" else "Цена"
+        how_many = "Nechta buyurtma qilmoqchisiz?" if lang == "uz" else "Сколько хотите забронировать?"
+        
         await callback.message.answer(
             f"📦 <b>{title}</b>\n\n"
-            f"📋 Доступно: {quantity} шт\n"
-            f"💰 Цена: {int(price):,} сум/шт\n\n"
-            f"Сколько хотите забронировать? (1-{quantity})",
+            f"📋 {available_text}: {quantity} шт\n"
+            f"💰 {price_text}: {int(price):,} сум/шт\n\n"
+            f"{how_many} (1-{quantity})",
             parse_mode="HTML",
             reply_markup=cancel_keyboard(lang),
         )
@@ -284,16 +288,34 @@ async def book_offer_quantity(message: types.Message, state: FSMContext) -> None
                 
                 store_name = get_store_field(store, "name", "Магазин")
                 
-                try:
-                    await bot.send_message(
-                        owner_id,
+                # Get partner language
+                partner_lang = db.get_user_language(owner_id) if db else "ru"
+                
+                if partner_lang == "uz":
+                    notif_text = (
+                        f"🔔 <b>Yangi buyurtma</b>\n\n"
+                        f"🏪 {store_name}\n"
+                        f"📦 {offer_title} × {quantity} шт\n\n"
+                        f"👤 {message.from_user.first_name}\n"
+                        f"📱 <code>{customer_phone}</code>\n"
+                        f"🎫 <code>{code}</code>\n"
+                        f"💰 {int(offer_price * quantity):,} сум"
+                    )
+                else:
+                    notif_text = (
                         f"🔔 <b>Новый заказ</b>\n\n"
                         f"🏪 {store_name}\n"
                         f"📦 {offer_title} × {quantity} шт\n\n"
                         f"👤 {message.from_user.first_name}\n"
                         f"📱 <code>{customer_phone}</code>\n"
                         f"🎫 <code>{code}</code>\n"
-                        f"💰 {int(offer_price * quantity):,} сум",
+                        f"💰 {int(offer_price * quantity):,} сум"
+                    )
+                
+                try:
+                    await bot.send_message(
+                        owner_id,
+                        notif_text,
                         parse_mode="HTML",
                         reply_markup=notification_kb.as_markup(),
                     )
@@ -319,19 +341,34 @@ async def book_offer_quantity(message: types.Message, state: FSMContext) -> None
         # Show booking confirmation to customer with full details
         from app.keyboards.user import main_menu_customer
         
-        await message.answer(
-            f"✅ <b>Заказ успешно создан!</b>\n\n"
-            f"🏪 <b>Магазин:</b> {store_name}\n"
-            f"📦 <b>Товар:</b> {offer_title}\n"
-            f"🔢 <b>Количество:</b> {quantity} шт\n"
-            f"💰 <b>К оплате:</b> {total_price:,} сум\n"
-            f"{expiry_text}"
-            f"\n🎫 <b>Код бронирования:</b> <code>{code}</code>\n\n"
-            f"📍 <b>Адрес получения:</b>\n{offer_address}\n\n"
-            f"⚠️ <b>Важно:</b> Покажите этот код при получении заказа!",
-            parse_mode="HTML",
-            reply_markup=main_menu_customer(lang),
-        )
+        if lang == "uz":
+            await message.answer(
+                f"✅ <b>Buyurtma muvaffaqiyatli yaratildi!</b>\n\n"
+                f"🏪 <b>Do'kon:</b> {store_name}\n"
+                f"📦 <b>Mahsulot:</b> {offer_title}\n"
+                f"🔢 <b>Miqdor:</b> {quantity} шт\n"
+                f"💰 <b>To'lov:</b> {total_price:,} сум\n"
+                f"{expiry_text}"
+                f"\n🎫 <b>Bron kodi:</b> <code>{code}</code>\n\n"
+                f"📍 <b>Olish manzili:</b>\n{offer_address}\n\n"
+                f"⚠️ <b>Muhim:</b> Buyurtmani olishda bu kodni ko'rsating!",
+                parse_mode="HTML",
+                reply_markup=main_menu_customer(lang),
+            )
+        else:
+            await message.answer(
+                f"✅ <b>Заказ успешно создан!</b>\n\n"
+                f"🏪 <b>Магазин:</b> {store_name}\n"
+                f"📦 <b>Товар:</b> {offer_title}\n"
+                f"🔢 <b>Количество:</b> {quantity} шт\n"
+                f"💰 <b>К оплате:</b> {total_price:,} сум\n"
+                f"{expiry_text}"
+                f"\n🎫 <b>Код бронирования:</b> <code>{code}</code>\n\n"
+                f"📍 <b>Адрес получения:</b>\n{offer_address}\n\n"
+                f"⚠️ <b>Важно:</b> Покажите этот код при получении заказа!",
+                parse_mode="HTML",
+                reply_markup=main_menu_customer(lang),
+            )
         
     except ValueError:
         await message.answer("❌ Пожалуйста, введите число")
