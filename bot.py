@@ -244,13 +244,8 @@ async def unknown_message_debug(message: types.Message, state: FSMContext):
         hint_uz = "Mahsulotni raqam bo'yicha tanlash uchun avval 🔥 Issiq yoki 📍 Joylar tugmasidan mahsulotlar ro'yxatini oching"
         await message.answer(hint_ru if lang == 'ru' else hint_uz)
     else:
-        # Отправляем диагностическое сообщение
-        await message.answer(
-            f"⚠️ DEBUG: Неизвестная команда\n"
-            f"Текст: {text}\n"
-            f"Состояние: {current_state}\n"
-            f"Роль: {user_data.get('role', 'неизвестно') if user_data else 'НЕ В БД'}"
-        )
+        # Убрать DEBUG сообщение - просто игнорировать неизвестные команды
+        pass
 
 @fallback_router.callback_query()
 async def catch_all_callbacks(callback: types.CallbackQuery):

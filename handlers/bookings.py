@@ -219,13 +219,15 @@ async def book_offer_quantity(message: types.Message, state: FSMContext) -> None
                 offer_title = offer[2] if len(offer) > 2 else "Товар"
                 offer_price = offer[5] if len(offer) > 5 else 0
                 store_id = offer[1] if len(offer) > 1 else None
-                offer_address = offer[16] if len(offer) > 16 else "Адрес не указан"
+                no_address = "Manzil ko'rsatilmagan" if lang == "uz" else "Адрес не указан"
+                offer_address = offer[16] if len(offer) > 16 else no_address
             elif isinstance(offer, dict):
                 available_qty = offer.get('quantity', 0)
                 offer_title = offer.get('title', 'Товар')
                 offer_price = offer.get('discount_price', 0)
                 store_id = offer.get('store_id')
-                offer_address = offer.get('address', 'Адрес не указана')
+                no_address = "Manzil ko'rsatilmagan" if lang == "uz" else "Адрес не указан"
+                offer_address = offer.get('address', no_address)
             else:
                 await message.answer("❌ Ошибка формата данных")
                 await state.clear()
