@@ -460,13 +460,24 @@ async def create_booking_final(message: types.Message, state: FSMContext) -> Non
     if isinstance(offer, (tuple, list)):
         offer_title = offer[2] if len(offer) > 2 else "Товар"
         store_id = offer[1] if len(offer) > 1 else None
-        no_address = "Manzil ko'rsatilmagan" if lang == "uz" else "Адрес не указан"
-        offer_address = offer[16] if len(offer) > 16 else no_address
+        offer_address = offer[16] if len(offer) > 16 else ""
     elif isinstance(offer, dict):
         offer_title = offer.get('title', 'Товар')
         store_id = offer.get('store_id')
-        no_address = "Manzil ko'rsatilmagan" if lang == "uz" else "Адрес не указан"
-        offer_address = offer.get('address', no_address)
+        offer_address = offer.get('address', '')
+    
+    # If address is empty, get from store
+    if not offer_address and store_id:
+        store = db.get_store(store_id)
+        if store:
+            if isinstance(store, dict):
+                offer_address = store.get('address', '')
+            elif isinstance(store, (tuple, list)) and len(store) > 3:
+                offer_address = store[3]  # address field
+    
+    # Fallback if still no address
+    if not offer_address:
+        offer_address = "Manzil ko'rsatilmagan" if lang == "uz" else "Адрес не указан"
     else:
         await message.answer("❌ Ошибка формата данных" if lang == "ru" else "❌ Ma'lumot formati xatosi")
         await state.clear()
@@ -667,12 +678,12 @@ async def my_bookings(message: types.Message) -> None:
         await message.answer(empty_msg, parse_mode="HTML")
         return
     
-    # Filter active bookings (pending and confirmed are considered active)
+    # Filter ONLY active bookings (status='active', 'pending', or 'confirmed')
     if isinstance(bookings[0], dict):
-        active = [b for b in bookings if b.get('status') in ['pending', 'confirmed']]
+        active = [b for b in bookings if b.get('status') in ['active', 'pending', 'confirmed']]
     else:
-        # Fallback for tuple format
-        active = [b for b in bookings if b[7] in ["pending", "confirmed"]]
+        # Fallback for tuple format - status is at index 7
+        active = [b for b in bookings if b[7] in ['active', 'pending', 'confirmed']]
     
     if not active:
         no_active_msg = (

@@ -298,18 +298,33 @@ async def register_store_skip_photo(message: types.Message, state: FSMContext) -
 
 @router.message(RegisterStore.photo)
 async def register_store_photo_invalid(message: types.Message, state: FSMContext) -> None:
-    """Handle invalid photo input."""
+    """Handle invalid photo input or text commands."""
     if not db:
         await message.answer("System error")
         return
     
     lang = db.get_user_language(message.from_user.id)
     
-    await message.answer(
-        "❌ Пожалуйста, отправьте фото или используйте /skip для пропуска" if lang == "ru"
-        else "❌ Iltimos, fotosurat yuboring yoki /skip buyrug'idan foydalaning",
-        reply_markup=cancel_keyboard(lang)
-    )
+    # Check if user sent cancel command
+    if message.text and message.text in ["❌ Отмена", "❌ Bekor qilish", "/cancel"]:
+        await state.clear()
+        from app.keyboards.user import main_menu_customer
+        await message.answer(
+            get_text(lang, "action_cancelled"),
+            reply_markup=main_menu_customer(lang)
+        )
+        return
+    
+    # Only show error once, then skip automatically
+    current_state = await state.get_state()
+    if current_state == RegisterStore.photo:
+        await message.answer(
+            "❌ Пожалуйста, отправьте фото или используйте /skip для пропуска" if lang == "ru"
+            else "❌ Iltimos, fotosurat yuboring yoki /skip buyrug'idan foydalaning"
+        )
+        # Auto-skip after invalid input to prevent loop
+        await state.update_data(photo=None)
+        await create_store_from_data(message, state)
 
 
 async def create_store_from_data(message: types.Message, state: FSMContext) -> None:

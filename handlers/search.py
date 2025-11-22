@@ -233,58 +233,55 @@ def setup(
         )
         await state.clear()
         
-        # Show store results first
+        # Show store results first (grouped)
         if store_results:
-            for store in store_results[:5]:  # Show top 5 stores
-                store_info = (
-                    f"🏪 <b>{store.get('name', 'Магазин')}</b>\n"
-                    f"📍 {store.get('address', 'Адрес не указан')}\n"
-                    f"📂 {store.get('category', 'Продукты')}\n"
-                )
+            stores_text = "🏪 <b>Найденные магазины:</b>\n\n" if lang == "ru" else "🏪 <b>Topilgan do'konlar:</b>\n\n"
+            for idx, store in enumerate(store_results[:5], 1):  # Show top 5 stores
+                stores_text += f"{idx}. <b>{store.get('name', 'Магазин')}</b>\n"
+                stores_text += f"📍 {store.get('address', 'Адрес не указан')}\n"
+                stores_text += f"📂 {store.get('category', 'Продукты')}\n"
                 
                 if store.get('delivery_enabled') == 1:
                     delivery_price = store.get('delivery_price', 0)
                     min_order = store.get('min_order_amount', 0)
-                    store_info += (
+                    stores_text += (
                         f"🚚 Доставка: {delivery_price:,} сум (мин. {min_order:,} сум)\n"
                         if lang == "ru"
                         else f"🚚 Yetkazib berish: {delivery_price:,} so'm (min. {min_order:,} so'm)\n"
                     )
-                
-                # Create keyboard to view store
-                from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
-                store_kb = InlineKeyboardMarkup(inline_keyboard=[
-                    [InlineKeyboardButton(
-                        text="Смотреть товары" if lang == "ru" else "Mahsulotlarni ko'rish",
-                        callback_data=f"store_info_{store.get('store_id')}"
-                    )]
-                ])
-                
-                await message.answer(store_info, parse_mode="HTML", reply_markup=store_kb)
+                stores_text += "\n"
+            
+            stores_text += "\n💡 Для просмотра товаров введите номер магазина" if lang == "ru" else "\n💡 Mahsulotlarni ko'rish uchun do'kon raqamini kiriting"
+            await message.answer(stores_text, parse_mode="HTML")
         
-        # Show offer results
-        for offer in all_results[:10]:  # Show top 10 offers
-            caption = render_offer_card(lang, offer)
+        # Show offer results (grouped in media group if possible)
+        if all_results:
+            offers_count = min(10, len(all_results))
+            offers_text = f"\n📦 <b>Найденные товары ({offers_count}):</b>\n" if lang == "ru" else f"\n📦 <b>Topilgan mahsulotlar ({offers_count}):</b>\n"
+            await message.answer(offers_text, parse_mode="HTML")
             
-            keyboard = offer_quick_keyboard(
-                lang, 
-                offer.id, 
-                offer.store_id, 
-                offer.delivery_enabled
-            )
-            
-            if offer.photo:
-                try:
-                    await message.answer_photo(
-                        photo=offer.photo,
-                        caption=caption,
-                        parse_mode="HTML",
-                        reply_markup=keyboard
-                    )
-                except Exception:
+            for offer in all_results[:10]:  # Show top 10 offers
+                caption = render_offer_card(lang, offer)
+                
+                keyboard = offer_quick_keyboard(
+                    lang, 
+                    offer.id, 
+                    offer.store_id, 
+                    offer.delivery_enabled
+                )
+                
+                if offer.photo:
+                    try:
+                        await message.answer_photo(
+                            photo=offer.photo,
+                            caption=caption,
+                            parse_mode="HTML",
+                            reply_markup=keyboard
+                        )
+                    except Exception:
+                        await message.answer(caption, parse_mode="HTML", reply_markup=keyboard)
+                else:
                     await message.answer(caption, parse_mode="HTML", reply_markup=keyboard)
-            else:
-                await message.answer(caption, parse_mode="HTML", reply_markup=keyboard)
 
     @dp.message(F.text.in_(["🎯 Горячее", "🎯 Issiq"]))
     async def show_hot_offers(message: types.Message):

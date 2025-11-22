@@ -730,6 +730,7 @@ def setup(
         # Get store and show categories
         store = offer_service.get_store(store_id)
         if not store:
+            logger.warning(f"Store {store_id} not found in back_to_store_card")
             await callback.answer(
                 "Магазин не найден" if lang == "ru" else "Do'kon topilmadi",
                 show_alert=True
