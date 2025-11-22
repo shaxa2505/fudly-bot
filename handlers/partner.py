@@ -1,6 +1,7 @@
 """Partner registration handlers."""
 from __future__ import annotations
 
+import re
 from typing import Any
 
 from aiogram import F, Router, types
@@ -285,28 +286,24 @@ async def register_store_photo(message: types.Message, state: FSMContext) -> Non
     await create_store_from_data(message, state)
 
 
-@router.message(RegisterStore.photo, F.text.in_(["/skip", "Пропустить", "O'tkazib yuborish"]))
-async def register_store_skip_photo(message: types.Message, state: FSMContext) -> None:
-    """Skip photo upload and create store application."""
+@router.message(RegisterStore.photo, F.text)
+async def register_store_photo_text(message: types.Message, state: FSMContext) -> None:
+    """Handle text input during photo upload."""
     if not db or not bot:
         await message.answer("System error")
         return
     
-    await state.update_data(photo=None)
-    await create_store_from_data(message, state)
-
-
-@router.message(RegisterStore.photo)
-async def register_store_photo_invalid(message: types.Message, state: FSMContext) -> None:
-    """Handle invalid photo input or text commands."""
-    if not db:
-        await message.answer("System error")
+    lang = db.get_user_language(message.from_user.id)
+    text = message.text.lower().strip()
+    
+    # Check for skip command
+    if text in ["/skip", "пропустить", "o'tkazib yuborish", "skip"]:
+        await state.update_data(photo=None)
+        await create_store_from_data(message, state)
         return
     
-    lang = db.get_user_language(message.from_user.id)
-    
-    # Check if user sent cancel command
-    if message.text and message.text in ["❌ Отмена", "❌ Bekor qilish", "/cancel"]:
+    # Check for cancel command
+    if "отмена" in text or "bekor" in text or text == "/cancel":
         await state.clear()
         from app.keyboards.user import main_menu_customer
         await message.answer(
@@ -315,16 +312,51 @@ async def register_store_photo_invalid(message: types.Message, state: FSMContext
         )
         return
     
-    # Only show error once, then skip automatically
-    current_state = await state.get_state()
-    if current_state == RegisterStore.photo:
-        await message.answer(
-            "❌ Пожалуйста, отправьте фото или используйте /skip для пропуска" if lang == "ru"
-            else "❌ Iltimos, fotosurat yuboring yoki /skip buyrug'idan foydalaning"
-        )
-        # Auto-skip after invalid input to prevent loop
-        await state.update_data(photo=None)
-        await create_store_from_data(message, state)
+    # Any other text - show error and auto-skip
+    await message.answer(
+        "❌ Пожалуйста, отправьте фото или используйте /skip для пропуска\n\n"
+        "⏭️ Пропускаю этот шаг..." if lang == "ru"
+        else "❌ Iltimos, fotosurat yuboring yoki /skip buyrug'idan foydalaning\n\n"
+        "⏭️ Bu qadamni o'tkazib yuboraman..."
+    )
+    await state.update_data(photo=None)
+    await create_store_from_data(message, state)
+
+
+@router.message(RegisterStore.photo, F.photo)
+async def register_store_photo(message: types.Message, state: FSMContext) -> None:
+    """Store photo uploaded - create store application."""
+    if not db or not bot:
+        await message.answer("System error")
+        return
+    
+    lang = db.get_user_language(message.from_user.id)
+    
+    # Get the largest photo
+    photo = message.photo[-1]
+    photo_id = photo.file_id
+    
+    await state.update_data(photo=photo_id)
+    await create_store_from_data(message, state)
+
+
+@router.message(RegisterStore.photo)
+async def register_store_photo_invalid(message: types.Message, state: FSMContext) -> None:
+    """Handle any other input - auto-skip to prevent loop."""
+    if not db:
+        await message.answer("System error")
+        return
+    
+    lang = db.get_user_language(message.from_user.id)
+    
+    # Show error and auto-skip
+    await message.answer(
+        "⏭️ Пропускаю фото..." if lang == "ru" else "⏭️ Fotosurat o'tkazib yuborilmoqda..."
+    )
+    
+    # Auto-skip to prevent infinite loop
+    await state.update_data(photo=None)
+    await create_store_from_data(message, state)
 
 
 async def create_store_from_data(message: types.Message, state: FSMContext) -> None:
