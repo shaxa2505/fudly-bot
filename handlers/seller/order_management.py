@@ -36,7 +36,7 @@ async def confirm_order(callback: types.CallbackQuery):
     lang = db.get_user_language(callback.from_user.id)
     
     try:
-        order_id = int(callback.data.split("_")[2])
+        order_id = int(callback.data.rsplit("_", 1)[-1])
     except (ValueError, IndexError) as e:
         logger.error(f"Invalid order_id in callback data: {callback.data}, error: {e}")
         await callback.answer(get_text(lang, "error"), show_alert=True)
@@ -79,7 +79,7 @@ async def cancel_order(callback: types.CallbackQuery):
     lang = db.get_user_language(callback.from_user.id)
     
     try:
-        order_id = int(callback.data.split("_")[2])
+        order_id = int(callback.data.rsplit("_", 1)[-1])
     except (ValueError, IndexError) as e:
         logger.error(f"Invalid order_id in callback data: {callback.data}, error: {e}")
         await callback.answer(get_text(lang, "error"), show_alert=True)
@@ -135,7 +135,7 @@ async def confirm_payment(callback: types.CallbackQuery):
     lang = db.get_user_language(callback.from_user.id)
     
     try:
-        order_id = int(callback.data.split("_")[2])
+        order_id = int(callback.data.rsplit("_", 1)[-1])
     except (ValueError, IndexError) as e:
         logger.error(f"Invalid order_id in callback data: {callback.data}, error: {e}")
         await callback.answer(get_text(lang, "error"), show_alert=True)
@@ -182,7 +182,7 @@ async def reject_payment(callback: types.CallbackQuery):
     lang = db.get_user_language(callback.from_user.id)
     
     try:
-        order_id = int(callback.data.split("_")[2])
+        order_id = int(callback.data.rsplit("_", 1)[-1])
     except (ValueError, IndexError) as e:
         logger.error(f"Invalid order_id in callback data: {callback.data}, error: {e}")
         await callback.answer(get_text(lang, "error"), show_alert=True)

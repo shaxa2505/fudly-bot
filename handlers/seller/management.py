@@ -580,8 +580,13 @@ async def confirm_booking_handler(callback: types.CallbackQuery) -> None:
         await callback.answer("System error", show_alert=True)
         return
     
-    booking_id = int(callback.data.split("_")[2])
     lang = db.get_user_language(callback.from_user.id)
+    try:
+        booking_id = int(callback.data.rsplit("_", 1)[-1])
+    except (ValueError, IndexError) as e:
+        logger.error(f"Invalid booking_id in callback data: {callback.data}, error: {e}")
+        await callback.answer(get_text(lang, "error"), show_alert=True)
+        return
     
     try:
         db.update_booking_status(booking_id, "confirmed")
@@ -607,8 +612,13 @@ async def complete_booking_handler(callback: types.CallbackQuery) -> None:
         await callback.answer("System error", show_alert=True)
         return
     
-    booking_id = int(callback.data.split("_")[2])
     lang = db.get_user_language(callback.from_user.id)
+    try:
+        booking_id = int(callback.data.rsplit("_", 1)[-1])
+    except (ValueError, IndexError) as e:
+        logger.error(f"Invalid booking_id in callback data: {callback.data}, error: {e}")
+        await callback.answer(get_text(lang, "error"), show_alert=True)
+        return
     
     try:
         db.complete_booking(booking_id)
@@ -631,8 +641,15 @@ async def cancel_booking_handler(callback: types.CallbackQuery) -> None:
         await callback.answer("System error", show_alert=True)
         return
     
-    booking_id = int(callback.data.split("_")[2])
     lang = db.get_user_language(callback.from_user.id)
+    try:
+        booking_id = int(callback.data.rsplit("_", 1)[-1])
+    except (ValueError, IndexError) as e:
+        # This callback may be a compound action like cancel_booking_confirm_<id>
+        logger.error(f"Invalid booking_id in callback data: {callback.data}, error: {e}")
+        # Do not show a noisy alert for intermediate callbacks; just acknowledge.
+        await callback.answer()
+        return
     
     try:
         db.cancel_booking(booking_id)
@@ -658,7 +675,7 @@ async def quantity_add(callback: types.CallbackQuery) -> None:
     lang = db.get_user_language(callback.from_user.id)
     
     try:
-        offer_id = int(callback.data.split("_")[2])
+        offer_id = int(callback.data.rsplit("_", 1)[-1])
     except (ValueError, IndexError) as e:
         logger.error(f"Invalid offer_id in callback data: {callback.data}, error: {e}")
         await callback.answer(get_text(lang, "error"), show_alert=True)
@@ -695,7 +712,7 @@ async def quantity_subtract(callback: types.CallbackQuery) -> None:
     lang = db.get_user_language(callback.from_user.id)
 
     try:
-        offer_id = int(callback.data.split("_")[2])
+        offer_id = int(callback.data.rsplit("_", 1)[-1])
     except (ValueError, IndexError) as e:
         logger.error(f"Invalid offer_id in callback data: {callback.data}, error: {e}")
         await callback.answer(get_text(lang, "error"), show_alert=True)
@@ -738,7 +755,7 @@ async def extend_offer(callback: types.CallbackQuery) -> None:
     lang = db.get_user_language(callback.from_user.id)
     
     try:
-        offer_id = int(callback.data.split("_")[2])
+        offer_id = int(callback.data.rsplit("_", 1)[-1])
     except (ValueError, IndexError) as e:
         logger.error(f"Invalid offer_id in callback data: {callback.data}, error: {e}")
         await callback.answer(get_text(lang, "error"), show_alert=True)
@@ -977,7 +994,12 @@ async def back_to_offer(callback: types.CallbackQuery) -> None:
         return
     
     lang = db.get_user_language(callback.from_user.id)
-    offer_id = int(callback.data.split("_")[3])
+    try:
+        offer_id = int(callback.data.rsplit("_", 1)[-1])
+    except (ValueError, IndexError) as e:
+        logger.error(f"Invalid offer_id in callback data: {callback.data}, error: {e}")
+        await callback.answer(get_text(lang, "error"), show_alert=True)
+        return
     
     await update_offer_message(callback, offer_id, lang)
     await callback.answer()
