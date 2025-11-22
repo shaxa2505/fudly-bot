@@ -1061,17 +1061,8 @@ async def contact_store(callback: types.CallbackQuery) -> None:
     if address:
         text += (f"📍 <b>Адрес:</b> {address}\n" if lang == 'ru' else f"📍 <b>Manzil:</b> {address}\n")
 
-    # Provide call button if phone looks valid
-    kb = InlineKeyboardBuilder()
-    if phone and phone != "Не указан":
-        # normalize phone for tel: URL - keep digits and leading +
-        normalized = "+" + re.sub(r"[^0-9]", "", phone) if not phone.startswith("+") else re.sub(r"[^0-9+]", "", phone)
-        kb.button(text=("Позвонить" if lang == 'ru' else "Qo'ng'iroq"), url=f"tel:{normalized}")
-    if address:
-        # no reliable URL for address, just provide it in text
-        pass
-
-    await callback.message.answer(text, parse_mode="HTML", reply_markup=(kb.as_markup() if kb.rows else None))
+    # Send plain contact info (phone and address only)
+    await callback.message.answer(text, parse_mode="HTML")
     await callback.answer()
 
 
