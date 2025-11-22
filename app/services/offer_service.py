@@ -27,6 +27,7 @@ class OfferListItem:
     delivery_price: float = 0.0
     min_order_amount: float = 0.0
     photo: str | None = None
+    category: str = "other"
 
 
 @dataclass(slots=True)
@@ -258,6 +259,9 @@ class OfferService:
         if not photo:
             photo = get_field(data, 8, None)
         
+        # Get category field (index 12 in offers table)
+        category = str(get_offer_field(data, "category", get_field(data, 12, "other")))
+        
         return OfferListItem(
             id=offer_id,
             store_id=store_id,
@@ -275,6 +279,7 @@ class OfferService:
             delivery_price=delivery_price,
             min_order_amount=min_order_amount,
             photo=photo,
+            category=category,
         )
 
     def _to_store_summary(self, store: Any) -> StoreSummary:

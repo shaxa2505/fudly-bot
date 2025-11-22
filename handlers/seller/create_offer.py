@@ -59,8 +59,8 @@ def detect_category(title: str) -> str:
         },
         "dairy": {
             "keywords": [
-                "молоко", "кефир", "творог", "сыр", "йогурт", "сметана", "сливки", "масло",
-                "sut", "qatiq", "tvorog", "pishloq", "qaymoq", "yogurt", "ayran", "айран",
+                "молоко", "кефир", "творог", "сыр", "йогурт", "йогурт", "сметана", "сливки", "масло",
+                "sut", "qatiq", "tvorog", "pishloq", "qaymoq", "yogurt", "yoghurt", "ayran", "айран",
                 "ряженка", "простокваша", "брынза", "моцарелла", "голландский", "российский",
                 "milk", "cheese", "butter", "cream", "мороженое", "muzqaymoq"
             ],
@@ -287,6 +287,9 @@ async def process_offer_data(message: types.Message, state: FSMContext) -> None:
         
         quantity = int(parts[2])
         
+        # Log for debugging
+        logger.info(f"Parsed: price={original_price}, discount={discount_percent}%, quantity={quantity}")
+        
         if original_price <= 0 or quantity <= 0:
             raise ValueError("Price and quantity must be positive")
             
@@ -294,6 +297,7 @@ async def process_offer_data(message: types.Message, state: FSMContext) -> None:
             raise ValueError("Invalid discount percent")
             
         discount_price = original_price * (1 - discount_percent / 100)
+        logger.info(f"Calculated discount_price={discount_price}")
         
     except ValueError:
         await message.answer(

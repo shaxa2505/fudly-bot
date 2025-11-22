@@ -528,13 +528,23 @@ def setup(
         
         # Filter by category if not "all"
         if category != "all":
-            # Normalize category name for comparison
-            category_normalized = category.replace("_", " ").lower()
+            # Map display category to database category value
+            category_map = {
+                "bakery": "bakery",
+                "dairy": "dairy",
+                "meat": "meat",
+                "fruits": "fruits",
+                "vegetables": "vegetables",
+                "drinks": "drinks",
+                "snacks": "snacks",
+                "frozen": "frozen",
+            }
+            db_category = category_map.get(category, category)
+            
+            # Filter offers by their category field
             offers = []
             for offer in all_offers:
-                # Check title for category keywords (simple approach)
-                title_lower = offer.title.lower()
-                if category_normalized in title_lower:
+                if offer.category == db_category:
                     offers.append(offer)
         else:
             offers = all_offers
