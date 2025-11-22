@@ -894,7 +894,9 @@ class Database:
                 AND (s.status = 'approved' OR s.status = 'active')
                 AND (o.available_until IS NULL OR LENGTH(o.available_until) < 6 OR 
                      (LENGTH(o.available_until) > 10 AND o.available_until::timestamp >= NOW()))
-                AND (o.expiry_date IS NULL OR o.expiry_date::date >= CURRENT_DATE)
+                AND (o.expiry_date IS NULL 
+                     OR o.expiry_date !~ '[.]'
+                     OR (o.expiry_date ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}' AND o.expiry_date::date >= CURRENT_DATE))
             '''
             
             params = []
