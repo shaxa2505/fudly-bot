@@ -842,7 +842,9 @@ class Database:
                 SELECT * FROM offers 
                 WHERE store_id = %s 
                 AND status = %s
-                AND (expiry_date IS NULL OR expiry_date::date >= CURRENT_DATE)
+                AND (expiry_date IS NULL 
+                     OR expiry_date !~ '[.]'
+                     OR (expiry_date ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}' AND expiry_date::date >= CURRENT_DATE))
                 ORDER BY created_at DESC
             ''', (store_id, status))
             return [dict(row) for row in cursor.fetchall()]
@@ -856,7 +858,9 @@ class Database:
                     SELECT o.* FROM offers o
                     JOIN stores s ON o.store_id = s.store_id
                     WHERE o.status = %s AND s.status = %s AND s.city = %s
-                    AND (o.expiry_date IS NULL OR o.expiry_date::date >= CURRENT_DATE)
+                    AND (o.expiry_date IS NULL 
+                         OR expiry_date !~ '[.]'
+                         OR (o.expiry_date ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}' AND o.expiry_date::date >= CURRENT_DATE))
                     ORDER BY o.created_at DESC
                 ''', ('active', 'approved', city))
             else:
@@ -975,7 +979,10 @@ class Database:
                 SELECT o.*, s.name, s.address, s.city, s.category
                 FROM offers o
                 JOIN stores s ON o.store_id = s.store_id
-                WHERE o.store_id = %s AND o.quantity > 0 AND o.expiry_date::date >= CURRENT_DATE
+                WHERE o.store_id = %s AND o.quantity > 0 
+                AND (o.expiry_date IS NULL 
+                     OR o.expiry_date !~ '[.]'
+                     OR (o.expiry_date ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}' AND o.expiry_date::date >= CURRENT_DATE))
                 ORDER BY o.created_at DESC
             ''', (store_id,))
             return [dict(row) for row in cursor.fetchall()]
@@ -991,7 +998,9 @@ class Database:
                 JOIN stores s ON o.store_id = s.store_id
                 WHERE s.city = %s AND s.status = 'active' 
                       AND o.status = 'active' AND o.quantity > 0 
-                      AND o.expiry_date::date >= CURRENT_DATE
+                      AND (o.expiry_date IS NULL 
+                           OR o.expiry_date !~ '[.]'
+                           OR (o.expiry_date ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}' AND o.expiry_date::date >= CURRENT_DATE))
                 ORDER BY discount_percent DESC, o.created_at DESC
                 LIMIT %s
             ''', (city, limit))
@@ -1478,6 +1487,7 @@ class Database:
                 SET status = 'inactive' 
                 WHERE status = 'active' 
                 AND expiry_date IS NOT NULL
+                AND expiry_date ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}'
                 AND expiry_date::date < CURRENT_DATE
             ''')
             return cursor.rowcount  # Return number of updated rows
@@ -1621,7 +1631,9 @@ class Database:
                 JOIN stores s ON o.store_id = s.store_id
                 WHERE s.city = %s AND o.category = %s AND s.status = 'active'
                       AND o.status = 'active' AND o.quantity > 0 
-                      AND o.expiry_date::date >= CURRENT_DATE
+                      AND (o.expiry_date IS NULL 
+                           OR o.expiry_date !~ '[.]'
+                           OR (o.expiry_date ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}' AND o.expiry_date::date >= CURRENT_DATE))
                 ORDER BY discount_percent DESC, o.created_at DESC
                 LIMIT %s
             ''', (city, category, limit))
@@ -2026,7 +2038,9 @@ class Database:
             AND o.quantity > 0
             AND (s.status = 'approved' OR s.status = 'active')
             AND s.city ILIKE %s
-            AND (o.expiry_date IS NULL OR o.expiry_date::date >= CURRENT_DATE)
+            AND (o.expiry_date IS NULL 
+                 OR o.expiry_date !~ '[.]'
+                 OR (o.expiry_date ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}' AND o.expiry_date::date >= CURRENT_DATE))
             AND (
                 LOWER(o.title) LIKE LOWER(%s) OR 
                 LOWER(s.name) LIKE LOWER(%s) OR
