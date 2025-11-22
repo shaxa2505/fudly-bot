@@ -307,12 +307,13 @@ dp.include_router(admin_dashboard.router)  # Admin dashboard
 dp.include_router(admin_legacy.router)  # Admin legacy
 
 # ============== REGISTRATION & COMMANDS (AFTER SPECIFIC ROUTERS) ==============
-from handlers import registration, user_commands, admin_panel, admin_stats, offers
+from handlers import registration, user_commands, admin_panel, admin_stats, offers, help as help_handler
 
 # Include routers for refactored modules
 dp.include_router(registration.router)
 dp.include_router(user_commands.router)
 dp.include_router(admin_panel.router)
+dp.include_router(help_handler.router)
 
 # Setup offer browsing handlers (AFTER specific handlers to avoid catching their messages)
 offers.setup(dp, db, offer_service, logger)

@@ -66,6 +66,7 @@ TEXTS = {
         'become_partner': 'Стать партнером',
         'establishments': '🏪 Заведения',
         'search': '🔍 Поиск',
+        'help': '❓ Как это работает',
         'enter_search_query': 'Введите название товара или магазина:',
         'search_results': 'Результаты поиска:',
         'no_results': 'Ничего не найдено',
@@ -134,6 +135,75 @@ TEXTS = {
         'currency': 'сум',
         'unit': 'шт',
         'expires_on': 'Годен до',
+        
+        # Help and FAQ
+        'help_customer': '''❓ <b>Как работает Fudly?</b>
+
+<b>🔥 Горячее</b>
+Товары с самыми большими скидками (30-70%)
+Обновляется каждый день!
+
+<b>🏪 Do'konlar (Магазины)</b>
+1️⃣ Выберите магазин в вашем городе
+2️⃣ Посмотрите категории товаров
+3️⃣ Выберите товар и забронируйте
+
+<b>🔍 Поиск</b>
+Найдите товар по названию
+Пример: йогурт, хлеб, молоко
+
+<b>📦 Как забронировать:</b>
+1️⃣ Нажмите на товар
+2️⃣ Выберите количество
+3️⃣ Получите 8-значный код
+4️⃣ Покажите код продавцу
+
+<b>📱 Статусы заказа:</b>
+⏳ <b>Ожидает подтверждения</b> - магазин проверяет заказ
+✅ <b>Готов к выдаче</b> - приезжайте забрать товар
+🎉 <b>Завершён</b> - вы получили товар
+❌ <b>Отменён</b> - заказ отменён
+
+<b>💡 Советы:</b>
+• Проверяйте раздел "Горячее" каждый день
+• Забирайте товар в указанное время
+• Оценивайте магазины после покупки''',
+
+        'help_partner': '''❓ <b>Как работать партнёром?</b>
+
+<b>➕ Добавление товаров:</b>
+1️⃣ Нажмите "Добавить товар"
+2️⃣ Укажите название, фото, цены
+3️⃣ Категория определится автоматически
+4️⃣ Товар сразу появится у покупателей
+
+<b>📦 Ваши товары</b>
+Просмотр всех ваших товаров
+Можно редактировать или удалить
+
+<b>🎫 Заказы продавца:</b>
+⏳ <b>Новые</b> - покупатель забронировал товар
+   → Подтвердите заказ (кнопка ✅)
+   
+✅ <b>Подтверждённые</b> - покупатель придёт забрать
+   → Попросите 8-значный код
+   → Выдайте товар и завершите заказ
+   
+🎉 <b>Завершённые</b> - товар выдан, деньги получены
+
+❌ <b>Отменённые</b> - заказ не состоялся
+
+<b>📊 Статистика:</b>
+• Сколько товаров продано
+• Какие товары популярны
+• Средний чек
+
+<b>💡 Советы для роста продаж:</b>
+• Делайте скидки 30-70%
+• Загружайте качественные фото
+• Обновляйте товары каждый день
+• Быстро подтверждайте заказы
+• Указывайте точное время забора''',
         
         # Бронирование
         'booking_success': '''<b>Заказ создан</b>
@@ -435,6 +505,7 @@ Ro'yxatdan o'tish uchun /start bosing.''',
         'become_partner': '🏪 Hamkor bolish',
         'establishments': "🏪 Do'konlar",
         'search': '🔍 Qidirish',
+        'help': '❓ Qanday ishlaydi',
         'enter_search_query': 'Mahsulot yoki do\'kon nomini kiriting:',
         'search_results': 'Qidiruv natijalari:',
         'no_results': 'Hech narsa topilmadi',
@@ -503,6 +574,75 @@ Ro'yxatdan o'tish uchun /start bosing.''',
         'currency': 'so\'m',
         'unit': 'dona',
         'expires_on': 'Yaroqlilik muddati',
+        
+        # Help and FAQ
+        'help_customer': '''❓ <b>Fudly qanday ishlaydi?</b>
+
+<b>🔥 Issiq</b>
+Eng katta chegirmali mahsulotlar (30-70%)
+Har kuni yangilanadi!
+
+<b>🏪 Do'konlar</b>
+1️⃣ Shahringizdagi do'konni tanlang
+2️⃣ Mahsulot kategoriyalarini ko'ring
+3️⃣ Mahsulotni tanlang va bron qiling
+
+<b>🔍 Qidirish</b>
+Mahsulotni nomi bo'yicha toping
+Misol: yogurt, non, sut
+
+<b>📦 Qanday bron qilish:</b>
+1️⃣ Mahsulotga bosing
+2️⃣ Miqdorini tanlang
+3️⃣ 8 raqamli kodni oling
+4️⃣ Sotuvchiga kodni ko'rsating
+
+<b>📱 Buyurtma holatlari:</b>
+⏳ <b>Kutilmoqda</b> - do'kon buyurtmani tekshirmoqda
+✅ <b>Tayyor</b> - kelib mahsulotni oling
+🎉 <b>Bajarildi</b> - mahsulotni oldingiz
+❌ <b>Bekor qilindi</b> - buyurtma bekor qilindi
+
+<b>💡 Maslahatlar:</b>
+• Har kuni "Issiq" bo'limini tekshiring
+• Mahsulotni ko'rsatilgan vaqtda oling
+• Xariddan keyin do'konni baholang''',
+
+        'help_partner': '''❓ <b>Hamkor sifatida qanday ishlash?</b>
+
+<b>➕ Mahsulot qo'shish:</b>
+1️⃣ "Mahsulot qo'shish" tugmasini bosing
+2️⃣ Nomi, rasm, narxlarni kiriting
+3️⃣ Kategoriya avtomatik aniqlanadi
+4️⃣ Mahsulot darhol xaridorlarda ko'rinadi
+
+<b>📦 Mening mahsulotlarim</b>
+Barcha mahsulotlaringizni ko'ring
+Tahrirlash yoki o'chirish mumkin
+
+<b>🎫 Sotuvchi buyurtmalari:</b>
+⏳ <b>Yangi</b> - xaridor mahsulotni bron qildi
+   → Buyurtmani tasdiqlang (✅ tugma)
+   
+✅ <b>Tasdiqlangan</b> - xaridor kelib oladi
+   → 8 raqamli kodni so'rang
+   → Mahsulotni bering va buyurtmani yakunlang
+   
+🎉 <b>Bajarilgan</b> - mahsulot berildi, pul olindi
+
+❌ <b>Bekor qilindi</b> - buyurtma amalga oshmadi
+
+<b>📊 Statistika:</b>
+• Qancha mahsulot sotildi
+• Qaysi mahsulotlar mashhur
+• O'rtacha chek
+
+<b>💡 Sotishni oshirish uchun:</b>
+• 30-70% chegirma bering
+• Sifatli rasm yuklang
+• Har kuni mahsulotlarni yangilang
+• Buyurtmalarni tez tasdiqlang
+• Olib ketish vaqtini aniq ko'rsating''',
         
         # Buyurtma
         'booking_success': '''✅ <b>Buyurtma muvaffaqiyatli!</b>
