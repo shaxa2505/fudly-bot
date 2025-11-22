@@ -188,7 +188,7 @@ async def _send_order_card(message: types.Message, order: Any, lang: str, is_boo
     """Send order/booking card with action buttons."""
     if is_booking:
         # Booking fields
-        booking_id = order.get('booking_id') if isinstance(order, dict) else order[0]
+        booking_id = order.get('booking_id') if isinstance(order, dict) else (order[0] if len(order) > 0 else None)
         offer_title = order.get('title') if isinstance(order, dict) else (order[4] if len(order) > 4 else 'Товар')
         user_name = order.get('first_name', 'Клиент') if isinstance(order, dict) else (order[5] if len(order) > 5 else 'Клиент')
         phone = order.get('phone', 'Не указан') if isinstance(order, dict) else (order[7] if len(order) > 7 else 'Не указан')
@@ -196,12 +196,39 @@ async def _send_order_card(message: types.Message, order: Any, lang: str, is_boo
         status = order.get('status', 'pending') if isinstance(order, dict) else (order[3] if len(order) > 3 else 'pending')
         booking_code = order.get('booking_code', '') if isinstance(order, dict) else (order[8] if len(order) > 8 else '')
         created_at = order.get('created_at') if isinstance(order, dict) else (order[9] if len(order) > 9 else None)
+        # Try to enrich with store and price info
+        store_id = order.get('store_id') if isinstance(order, dict) else (order[1] if len(order) > 1 else None)
+        store = db.get_store(store_id) if db and store_id else None
+        store_name = get_store_field(store, 'name', 'Магазин')
+        store_address = get_store_field(store, 'address', '')
+        # Try to get offer/unit price
+        offer_id = order.get('offer_id') if isinstance(order, dict) else (order[2] if len(order) > 2 else None)
+        unit_price = None
+        total_price = None
+        try:
+            if offer_id and db:
+                offer = db.get_offer(offer_id)
+                if offer:
+                    unit_price = offer.get('discount_price') if isinstance(offer, dict) else (offer[5] if len(offer) > 5 else None)
+                    if unit_price is not None:
+                        total_price = int(unit_price) * int(quantity)
+        except Exception:
+            unit_price = None
+            total_price = None
         
         status_emoji = {"pending": "⏳", "confirmed": "✅", "completed": "🎉", "cancelled": "❌"}.get(status, "📦")
         
         text = f"{status_emoji} <b>{'САМОВЫВОЗ' if lang == 'ru' else 'OLIB KETISH'}</b>\n\n"
+        text += f"🏬 <b>{store_name}</b>\n"
+        if store_address:
+            text += f"📍 {store_address}\n"
         text += f"📦 {offer_title}\n"
-        text += f"🔢 {'Количество' if lang == 'ru' else 'Miqdor'}: <b>{quantity}</b>\n\n"
+        if unit_price is not None:
+            text += f"💰 Цена за ед.: <b>{int(unit_price):,}</b>\n"
+        text += f"🔢 {'Количество' if lang == 'ru' else 'Miqdor'}: <b>{quantity}</b>\n"
+        if total_price is not None:
+            text += f"🧾 Итого: <b>{total_price:,}</b>\n"
+        text += "\n"
         text += f"👤 {user_name}\n"
         text += f"📱 <code>{phone}</code>\n"
         text += f"🎫 {'Код' if lang == 'ru' else 'Kod'}: <code>{booking_code}</code>\n"
@@ -209,14 +236,17 @@ async def _send_order_card(message: types.Message, order: Any, lang: str, is_boo
             text += f"🕐 {created_at}\n"
         
         builder = InlineKeyboardBuilder()
+        # always provide details and contact
+        builder.button(text="👁️ Подробнее", callback_data=f"booking_details_seller_{booking_id}")
+        builder.button(text="📞 Контакт", callback_data=f"contact_customer_{booking_id}")
         if status == "pending":
             builder.button(text="✅ Подтвердить" if lang == "ru" else "✅ Tasdiqlash", callback_data=f"confirm_booking_{booking_id}")
             builder.button(text="❌ Отменить" if lang == "ru" else "❌ Bekor qilish", callback_data=f"cancel_booking_{booking_id}")
-            builder.adjust(2)
+            builder.adjust(2, 2)
         elif status == "confirmed":
             builder.button(text="🎉 Выдано" if lang == "ru" else "🎉 Berildi", callback_data=f"complete_booking_{booking_id}")
             builder.button(text="❌ Отменить" if lang == "ru" else "❌ Bekor qilish", callback_data=f"cancel_booking_{booking_id}")
-            builder.adjust(2)
+            builder.adjust(2, 2)
     else:
         # Order fields (delivery)
         order_id = order.get('order_id') if isinstance(order, dict) else order[0]
@@ -494,6 +524,85 @@ async def filter_orders_pending(callback: types.CallbackQuery) -> None:
     for item in pending_items[:10]:
         await _send_order_card(callback.message, item, lang, is_booking=True)
         await asyncio.sleep(0.1)
+
+
+# Seller: booking details and contact handlers
+@router.callback_query(F.data.startswith("booking_details_seller_"))
+async def booking_details_seller(callback: types.CallbackQuery) -> None:
+    """Show extended booking details to seller."""
+    if not db:
+        await callback.answer("System error", show_alert=True)
+        return
+
+    lang = db.get_user_language(callback.from_user.id)
+    try:
+        booking_id = int(callback.data.rsplit("_", 1)[-1])
+    except (ValueError, IndexError) as e:
+        logger.error(f"Invalid booking_id in callback data: {callback.data}, error: {e}")
+        await callback.answer(get_text(lang, "error"), show_alert=True)
+        return
+
+    booking = db.get_booking(booking_id)
+    if not booking:
+        await callback.answer("❌ " + ("Бронь не найдена" if lang == 'ru' else "Bron topilmadi"), show_alert=True)
+        return
+
+    # Safe field extraction
+    customer = booking.get('first_name') if isinstance(booking, dict) else (booking[5] if len(booking) > 5 else 'Клиент')
+    phone = booking.get('phone') if isinstance(booking, dict) else (booking[7] if len(booking) > 7 else 'Не указан')
+    quantity = booking.get('quantity') if isinstance(booking, dict) else (booking[6] if len(booking) > 6 else 1)
+    code = booking.get('booking_code') if isinstance(booking, dict) else (booking[8] if len(booking) > 8 else '')
+    created = booking.get('created_at') if isinstance(booking, dict) else (booking[9] if len(booking) > 9 else None)
+
+    store_id = booking.get('store_id') if isinstance(booking, dict) else (booking[1] if len(booking) > 1 else None)
+    store = db.get_store(store_id) if db and store_id else None
+    store_name = get_store_field(store, 'name', 'Магазин')
+    store_address = get_store_field(store, 'address', '')
+
+    text = f"📋 <b>{'Детали брони' if lang == 'ru' else 'Bron tafsilotlari'}</b>\n\n"
+    text += f"🏬 <b>{store_name}</b>\n"
+    if store_address:
+        text += f"📍 {store_address}\n"
+    text += f"👤 {customer}\n"
+    text += f"📱 {phone}\n"
+    text += f"🔢 {'Количество' if lang == 'ru' else 'Miqdor'}: <b>{quantity}</b>\n"
+    text += f"🎫 {'Код' if lang == 'ru' else 'Kod'}: <code>{code}</code>\n"
+    if created:
+        text += f"🕐 {created}\n"
+
+    await callback.answer()
+    await callback.message.answer(text, parse_mode="HTML")
+
+
+@router.callback_query(F.data.startswith("contact_customer_"))
+async def contact_customer(callback: types.CallbackQuery) -> None:
+    """Send customer contact info to seller (plain text)."""
+    if not db:
+        await callback.answer("System error", show_alert=True)
+        return
+
+    lang = db.get_user_language(callback.from_user.id)
+    try:
+        booking_id = int(callback.data.rsplit("_", 1)[-1])
+    except (ValueError, IndexError) as e:
+        logger.error(f"Invalid booking_id in callback data: {callback.data}, error: {e}")
+        await callback.answer(get_text(lang, "error"), show_alert=True)
+        return
+
+    booking = db.get_booking(booking_id)
+    if not booking:
+        await callback.answer("❌ " + ("Бронь не найдена" if lang == 'ru' else "Bron topilmadi"), show_alert=True)
+        return
+
+    phone = booking.get('phone') if isinstance(booking, dict) else (booking[7] if len(booking) > 7 else 'Не указан')
+    pickup_addr = booking.get('pickup_address') if isinstance(booking, dict) else (booking[4] if len(booking) > 4 else '')
+
+    text = f"📞 Контакт покупателя:\n{phone}\n"
+    if pickup_addr:
+        text += f"📍 Адрес получателя:\n{pickup_addr}\n"
+
+    await callback.answer()
+    await callback.message.answer(text)
 
 
 @router.callback_query(F.data == "seller_orders_active")
