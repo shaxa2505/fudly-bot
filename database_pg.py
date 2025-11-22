@@ -838,7 +838,7 @@ class Database:
             return [dict(row) for row in cursor.fetchall()]
     
     def get_active_offers(self, city: str = None):
-        """Get all active offers, optionally filtered by city"""
+        """Получить все активные предложения, исключая истекшие"""
         with self.get_connection() as conn:
             cursor = conn.cursor(row_factory=dict_row)
             if city:
@@ -846,6 +846,7 @@ class Database:
                     SELECT o.* FROM offers o
                     JOIN stores s ON o.store_id = s.store_id
                     WHERE o.status = %s AND s.status = %s AND s.city = %s
+                    AND (o.expiry_date IS NULL OR o.expiry_date::date >= CURRENT_DATE)
                     ORDER BY o.created_at DESC
                 ''', ('active', 'approved', city))
             else:
@@ -1997,7 +1998,7 @@ class Database:
             return cursor.fetchone()[0]
 
     def search_offers(self, query: str, city: str) -> List[Any]:
-        """Search offers by title or store name."""
+        """Search offers by title or store name (excluding expired)."""
         sql = """
             SELECT 
                 o.offer_id, o.store_id, o.title, o.description, 
@@ -2013,6 +2014,7 @@ class Database:
             AND o.quantity > 0
             AND (s.status = 'approved' OR s.status = 'active')
             AND s.city ILIKE %s
+            AND (o.expiry_date IS NULL OR o.expiry_date::date >= CURRENT_DATE)
             AND (
                 LOWER(o.title) LIKE LOWER(%s) OR 
                 LOWER(s.name) LIKE LOWER(%s) OR
