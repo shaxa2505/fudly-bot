@@ -1,6 +1,7 @@
 """Booking handlers: create bookings, manage bookings, ratings."""
 from __future__ import annotations
 
+import re
 from aiogram import F, Router, types
 from aiogram.fsm.context import FSMContext
 from aiogram.utils.keyboard import InlineKeyboardBuilder
@@ -834,7 +835,7 @@ async def filter_bookings(callback: types.CallbackQuery) -> None:
     await callback.answer()
 
 
-@router.callback_query(F.data.startswith("cancel_booking_"))
+@router.callback_query(lambda c: bool(re.match(r"^cancel_booking_\d+$", c.data)))
 async def cancel_booking(callback: types.CallbackQuery) -> None:
     """Cancel booking."""
     if not db:
@@ -1103,9 +1104,37 @@ async def booking_details(callback: types.CallbackQuery) -> None:
     if offer:
         offer_title = get_offer_field(offer, "title", "Товар")
         offer_price = get_offer_field(offer, "discount_price", 0)
+        # Try to get store name and pickup address from offer
+        store_name = get_offer_field(offer, "store_name", None)
+        offer_address = get_offer_field(offer, "address", None)
+        unit = get_offer_field(offer, "unit", "шт")
     else:
         offer_title = "Товар"
         offer_price = 0
+        store_name = None
+        offer_address = None
+        unit = "шт"
+
+    # If offer doesn't contain pickup address, try store
+    if not offer_address and offer:
+        store_id_for_address = get_offer_field(offer, "store_id")
+        if store_id_for_address:
+            store_obj = db.get_store(store_id_for_address)
+            if store_obj:
+                offer_address = get_store_field(store_obj, "address", "")
+
+    if not store_name and offer:
+        # fallback to store lookup
+        store_id_for_name = get_offer_field(offer, "store_id")
+        if store_id_for_name:
+            store_obj = db.get_store(store_id_for_name)
+            if store_obj:
+                store_name = get_store_field(store_obj, "name", "Магазин")
+
+    if not store_name:
+        store_name = "Магазин"
+    if not offer_address:
+        offer_address = "Адрес не указан" if lang == 'ru' else "Manzil ko'rsatilmagan"
 
     total = int(offer_price * quantity)
     currency = "сум" if lang == 'ru' else "so'm"
@@ -1119,10 +1148,13 @@ async def booking_details(callback: types.CallbackQuery) -> None:
 
     text = (
         (f"✅ <b>Детали бронирования</b>\n\n" if lang == 'ru' else f"✅ <b>Bron tafsilotlari</b>\n\n")
-        + f"🏪 <b>Товар:</b> {offer_title}\n"
-        + f"🔢 <b>Количество:</b> {quantity} шт\n"
+        + f"🏪 <b>Магазин:</b> {store_name}\n"
+        + f"📦 <b>Товар:</b> {offer_title}\n"
+        + f"🔢 <b>Количество:</b> {quantity} {unit}\n"
+        + f"💵 <b>Цена за ед.:</b> {int(offer_price):,} {currency}\n"
         + f"💰 <b>Сумма:</b> {total:,} {currency}"
         + f"{delivery_info}\n"
+        + (f"\n📍 <b>Адрес получения:</b> {offer_address}\n" if delivery_option == 0 else "")
         + f"\n🎫 <code>{code}</code>\n"
         + f"📅 {created_at}"
     )
