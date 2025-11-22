@@ -451,6 +451,21 @@ class Database:
                     # Enable delivery for all existing stores
                     cursor.execute("UPDATE stores SET delivery_enabled = 1 WHERE delivery_enabled IS NULL")
                     logger.info("✅ Delivery fields added to stores table")
+                
+                # Add delivery fields to bookings table
+                cursor.execute("""
+                    SELECT column_name 
+                    FROM information_schema.columns 
+                    WHERE table_name='bookings' AND column_name='delivery_option'
+                """)
+                has_booking_delivery = cursor.fetchone() is not None
+                
+                if not has_booking_delivery:
+                    logger.info("⚠️ Adding delivery fields to bookings table...")
+                    cursor.execute("ALTER TABLE bookings ADD COLUMN IF NOT EXISTS delivery_option INTEGER DEFAULT 0")
+                    cursor.execute("ALTER TABLE bookings ADD COLUMN IF NOT EXISTS delivery_address TEXT")
+                    cursor.execute("ALTER TABLE bookings ADD COLUMN IF NOT EXISTS delivery_cost INTEGER DEFAULT 0")
+                    logger.info("✅ Delivery fields added to bookings table")
             except Exception as e:
                 logger.error(f"Error adding delivery fields to stores: {e}")
             
@@ -743,17 +758,18 @@ class Database:
     # Store management methods
     def add_store(self, owner_id: int, name: str, city: str, address: Optional[str] = None,
                   description: Optional[str] = None, category: str = 'Ресторан', 
-                  phone: Optional[str] = None, business_type: str = 'supermarket') -> int:
+                  phone: Optional[str] = None, business_type: str = 'supermarket',
+                  photo: Optional[str] = None) -> int:
         """Add new store"""
         with self.get_connection() as conn:
             cursor = conn.cursor()
             cursor.execute('''
-                INSERT INTO stores (owner_id, name, city, address, description, category, phone, business_type)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                INSERT INTO stores (owner_id, name, city, address, description, category, phone, business_type, photo)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
                 RETURNING store_id
-            ''', (owner_id, name, city, address, description, category, phone, business_type))
+            ''', (owner_id, name, city, address, description, category, phone, business_type, photo))
             store_id = cursor.fetchone()[0]
-            logger.info(f"Store {store_id} added by user {owner_id}")
+            logger.info(f"Store {store_id} added by user {owner_id}" + (f" with photo" if photo else ""))
             return store_id
     
     def get_store_by_owner(self, owner_id: int):
@@ -2071,6 +2087,49 @@ class Database:
             cursor = conn.cursor(row_factory=dict_row)
             # Pass query 10 times for all placeholders (5 for relevance + 1 city + 4 for WHERE)
             cursor.execute(sql, (query, query, query, query, query, city, query, query, query, query))
+            return [dict(row) for row in cursor.fetchall()]
+
+    def search_stores(self, query: str, city: str) -> List[Any]:
+        """Search stores by name with transliteration support."""
+        sql = """
+            SELECT 
+                store_id, name, address, category, description, city, phone,
+                delivery_enabled, delivery_price, min_order_amount,
+                -- Ranking for relevance
+                (
+                    -- Exact match bonus
+                    CASE WHEN LOWER(name) = LOWER(%s) THEN 100 ELSE 0 END +
+                    -- Starts with bonus
+                    CASE WHEN LOWER(name) LIKE LOWER(%s) || '%%' THEN 50 ELSE 0 END +
+                    -- Contains match
+                    CASE WHEN LOWER(name) LIKE '%%' || LOWER(%s) || '%%' THEN 10 ELSE 0 END +
+                    -- Category match
+                    CASE WHEN LOWER(category) LIKE '%%' || LOWER(%s) || '%%' THEN 15 ELSE 0 END +
+                    -- Transliteration matches (cosmos → космос)
+                    CASE WHEN 
+                        -- Russian to Latin
+                        TRANSLATE(LOWER(name), 'абвгдеёжзийклмнопрстуфхцчшщъыьэюя', 'abvgdeejziiklmnoprstufxcchshshhyyyeua') LIKE '%%' || LOWER(%s) || '%%'
+                        -- Latin to Russian approximation
+                        OR LOWER(name) LIKE '%%' || REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(LOWER(%s), 'a', 'а'), 'e', 'е'), 'o', 'о'), 'p', 'р'), 'c', 'с') || '%%'
+                    THEN 5 ELSE 0 END
+                ) as relevance
+            FROM stores
+            WHERE (status = 'approved' OR status = 'active')
+            AND city ILIKE %s
+            AND (
+                LOWER(name) LIKE '%%' || LOWER(%s) || '%%' OR
+                LOWER(category) LIKE '%%' || LOWER(%s) || '%%' OR
+                LOWER(description) LIKE '%%' || LOWER(%s) || '%%' OR
+                -- Transliteration search
+                TRANSLATE(LOWER(name), 'абвгдеёжзийклмнопрстуфхцчшщъыьэюя', 'abvgdeejziiklmnoprstufxcchshshhyyyeua') LIKE '%%' || LOWER(%s) || '%%'
+            )
+            ORDER BY relevance DESC
+            LIMIT 20
+        """
+        with self.get_connection() as conn:
+            cursor = conn.cursor(row_factory=dict_row)
+            # Pass query 12 times (6 for relevance + 1 city + 5 for WHERE)
+            cursor.execute(sql, (query, query, query, query, query, query, city, query, query, query, query))
             return [dict(row) for row in cursor.fetchall()]
 
 

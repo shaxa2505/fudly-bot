@@ -176,7 +176,7 @@ async def book_offer_start(callback: types.CallbackQuery, state: FSMContext) -> 
 
 @router.message(BookOffer.quantity)
 async def book_offer_quantity(message: types.Message, state: FSMContext) -> None:
-    """Process quantity and create booking."""
+    """Process quantity and ask for delivery choice."""
     if not db or not bot or not METRICS:
         await message.answer("System error")
         return
@@ -202,7 +202,7 @@ async def book_offer_quantity(message: types.Message, state: FSMContext) -> None
         
         quantity = int(message.text)
         if quantity < 1:
-            await message.answer("❌ Количество должно быть больше 0")
+            await message.answer("❌ Количество должно быть больше 0" if lang == "ru" else "❌ Miqdor 0 dan katta bo'lishi kerak")
             return
         
         data = await state.get_data()
@@ -210,7 +210,7 @@ async def book_offer_quantity(message: types.Message, state: FSMContext) -> None
         logger.info(f"📦 BOOKING: offer_id from state: {offer_id}")
         
         if not offer_id:
-            await message.answer("❌ Ошибка: товар не выбран")
+            await message.answer("❌ Ошибка: товар не выбран" if lang == "ru" else "❌ Xatolik: mahsulot tanlanmagan")
             await state.clear()
             return
             
@@ -218,7 +218,7 @@ async def book_offer_quantity(message: types.Message, state: FSMContext) -> None
         logger.info(f"📦 BOOKING: offer retrieved: {offer is not None}")
         
         if not offer:
-            await message.answer("❌ Предложение не найдено")
+            await message.answer("❌ Предложение не найдено" if lang == "ru" else "❌ Taklif topilmadi")
             await state.clear()
             return
             
@@ -226,73 +226,303 @@ async def book_offer_quantity(message: types.Message, state: FSMContext) -> None
         try:
             if isinstance(offer, (tuple, list)):
                 available_qty = offer[6] if len(offer) > 6 else 0
-                offer_title = offer[2] if len(offer) > 2 else "Товар"
                 offer_price = offer[5] if len(offer) > 5 else 0
                 store_id = offer[1] if len(offer) > 1 else None
-                no_address = "Manzil ko'rsatilmagan" if lang == "uz" else "Адрес не указан"
-                offer_address = offer[16] if len(offer) > 16 else no_address
             elif isinstance(offer, dict):
                 available_qty = offer.get('quantity', 0)
-                offer_title = offer.get('title', 'Товар')
                 offer_price = offer.get('discount_price', 0)
                 store_id = offer.get('store_id')
-                no_address = "Manzil ko'rsatilmagan" if lang == "uz" else "Адрес не указан"
-                offer_address = offer.get('address', no_address)
             else:
-                await message.answer("❌ Ошибка формата данных")
+                await message.answer("❌ Ошибка формата данных" if lang == "ru" else "❌ Ma'lumot formati xatosi")
                 await state.clear()
                 return
         except (IndexError, KeyError, TypeError) as e:
             logger.error(f"Error accessing offer fields: {e}, offer type: {type(offer)}")
-            await message.answer("❌ Ошибка обработки товара")
+            await message.answer("❌ Ошибка обработки товара" if lang == "ru" else "❌ Mahsulotni qayta ishlash xatosi")
             await state.clear()
             return
             
         if available_qty < quantity:
-            await message.answer(f"❌ Доступно только {available_qty} шт.")
-            return
-        
-        # Try to atomically book item and create booking
-        logger.info(f"📦 BOOKING: Calling create_booking_atomic - offer_id={offer_id}, user_id={message.from_user.id}, quantity={quantity}")
-        
-        ok, booking_id, code = db.create_booking_atomic(
-            offer_id, message.from_user.id, quantity
-        )
-        
-        logger.info(f"📦 BOOKING: create_booking_atomic result - ok={ok}, booking_id={booking_id}, code={code}")
-        
-        if not ok or booking_id is None or code is None:
-            logger.error(f"📦 BOOKING FAILED: ok={ok}, booking_id={booking_id}, code={code}")
             await message.answer(
-                "❌ К сожалению, выбранное количество уже недоступно."
+                f"❌ Доступно только {available_qty} шт." if lang == "ru" 
+                else f"❌ Faqat {available_qty} dona mavjud"
             )
-            await state.clear()
             return
         
-        logger.info(f"✅ BOOKING SUCCESS: booking_id={booking_id}, code={code}")
+        # Save quantity and check if delivery is available
+        await state.update_data(quantity=quantity)
         
-        try:
-            METRICS["bookings_created"] += 1
-        except Exception:
-            pass
+        # Check if store has delivery enabled
+        delivery_enabled = False
+        delivery_price = 0
+        min_order_amount = 0
         
-        await state.clear()
-        
-        # Notify partner with inline quick actions
         if store_id:
             store = db.get_store(store_id)
             if store:
-                owner_id = get_store_field(store, "owner_id")
-                if not owner_id:
-                    logger.warning(f"Store {store_id} has no owner_id")
-                    await state.clear()
-                    return
+                if isinstance(store, dict):
+                    delivery_enabled = store.get('delivery_enabled', 0) == 1
+                    delivery_price = store.get('delivery_price', 0)
+                    min_order_amount = store.get('min_order_amount', 0)
+                elif isinstance(store, (tuple, list)) and len(store) > 11:
+                    # Assuming delivery fields are at positions 9, 10, 11
+                    delivery_enabled = store[9] == 1 if len(store) > 9 else False
+                    delivery_price = store[10] if len(store) > 10 else 0
+                    min_order_amount = store[11] if len(store) > 11 else 0
+        
+        # Save delivery info
+        await state.update_data(
+            delivery_enabled=delivery_enabled,
+            delivery_price=delivery_price,
+            min_order_amount=min_order_amount,
+            offer_price=offer_price
+        )
+        
+        order_total = int(offer_price * quantity)
+        
+        # If delivery is enabled, ask for delivery choice
+        if delivery_enabled:
+            await state.set_state(BookOffer.delivery_choice)
+            
+            # Create delivery choice keyboard
+            from aiogram.types import ReplyKeyboardMarkup, KeyboardButton
+            
+            if order_total >= min_order_amount:
+                if lang == "ru":
+                    delivery_btn_text = f"🚚 Доставка ({delivery_price:,} сум)"
+                    pickup_text = "🏪 Самовывоз"
+                    delivery_msg = (
+                        f"<b>Шаг 2/3: Выберите способ получения</b>\n\n"
+                        f"📦 Сумма заказа: {order_total:,} сум\n"
+                        f"🚚 Стоимость доставки: {delivery_price:,} сум\n\n"
+                        f"Выберите вариант:"
+                    )
+                else:
+                    delivery_btn_text = f"🚚 Yetkazib berish ({delivery_price:,} so'm)"
+                    pickup_text = "🏪 O'zim olib ketaman"
+                    delivery_msg = (
+                        f"<b>2/3-qadam: Qabul qilish usulini tanlang</b>\n\n"
+                        f"📦 Buyurtma summasi: {order_total:,} so'm\n"
+                        f"🚚 Yetkazib berish narxi: {delivery_price:,} so'm\n\n"
+                        f"Variantni tanlang:"
+                    )
+                
+                delivery_kb = ReplyKeyboardMarkup(
+                    keyboard=[
+                        [KeyboardButton(text=delivery_btn_text)],
+                        [KeyboardButton(text=pickup_text)],
+                        [KeyboardButton(text="❌ Отмена" if lang == "ru" else "❌ Bekor qilish")]
+                    ],
+                    resize_keyboard=True
+                )
+                
+                await message.answer(delivery_msg, parse_mode="HTML", reply_markup=delivery_kb)
+            else:
+                # Order total is below minimum for delivery
+                if lang == "ru":
+                    await message.answer(
+                        f"<b>Шаг 2/3: Способ получения</b>\n\n"
+                        f"📦 Сумма заказа: {order_total:,} сум\n"
+                        f"⚠️ Минимальная сумма для доставки: {min_order_amount:,} сум\n\n"
+                        f"Доступен только самовывоз. Продолжить?",
+                        parse_mode="HTML",
+                        reply_markup=cancel_keyboard(lang)
+                    )
+                else:
+                    await message.answer(
+                        f"<b>2/3-qadam: Qabul qilish usuli</b>\n\n"
+                        f"📦 Buyurtma summasi: {order_total:,} so'm\n"
+                        f"⚠️ Yetkazib berish uchun minimal summa: {min_order_amount:,} so'm\n\n"
+                        f"Faqat o'zim olib ketish mavjud. Davom etamizmi?",
+                        parse_mode="HTML",
+                        reply_markup=cancel_keyboard(lang)
+                    )
+                # Force pickup
+                await state.update_data(delivery_option=0, delivery_cost=0)
+        else:
+            # No delivery available, proceed directly to booking creation
+            await create_booking_final(message, state)
+        
+    except ValueError:
+        await message.answer("❌ Пожалуйста, введите число" if lang == "ru" else "❌ Iltimos, raqam kiriting")
+    except Exception as e:
+        logger.error(f"Error in book_offer_quantity: {e}")
+        await message.answer("❌ Произошла ошибка. Попробуйте позже." if lang == "ru" else "❌ Xatolik yuz berdi. Keyinroq urinib ko'ring.")
+
+
+@router.message(BookOffer.delivery_choice)
+async def book_offer_delivery_choice(message: types.Message, state: FSMContext) -> None:
+    """Process delivery choice."""
+    if not db:
+        await message.answer("System error")
+        return
+    
+    lang = db.get_user_language(message.from_user.id)
+    
+    # Check for cancellation
+    if message.text in ["❌ Отмена", "❌ Bekor qilish", "/cancel"]:
+        await state.clear()
+        await message.answer(
+            get_text(lang, "action_cancelled"),
+            reply_markup=main_menu_customer(lang)
+        )
+        return
+    
+    # Determine delivery option
+    if "Доставка" in message.text or "Yetkazib berish" in message.text:
+        # User wants delivery, ask for address
+        await state.set_state(BookOffer.delivery_address)
+        await message.answer(
+            "📍 <b>Шаг 3/3: Введите адрес доставки</b>\n\n"
+            "Укажите полный адрес (улица, дом, квартира):" if lang == "ru"
+            else
+            "📍 <b>3/3-qadam: Yetkazib berish manzilini kiriting</b>\n\n"
+            "To'liq manzilni kiriting (ko'cha, uy, xonadon):",
+            parse_mode="HTML",
+            reply_markup=cancel_keyboard(lang)
+        )
+    else:
+        # Pickup selected
+        data = await state.get_data()
+        await state.update_data(delivery_option=0, delivery_cost=0, delivery_address="")
+        await create_booking_final(message, state)
+
+
+@router.message(BookOffer.delivery_address)
+async def book_offer_delivery_address(message: types.Message, state: FSMContext) -> None:
+    """Process delivery address and create booking."""
+    if not db:
+        await message.answer("System error")
+        return
+    
+    lang = db.get_user_language(message.from_user.id)
+    
+    # Check for cancellation
+    if message.text in ["❌ Отмена", "❌ Bekor qilish", "/cancel"]:
+        await state.clear()
+        await message.answer(
+            get_text(lang, "action_cancelled"),
+            reply_markup=main_menu_customer(lang)
+        )
+        return
+    
+    address = message.text.strip()
+    
+    if len(address) < 10:
+        await message.answer(
+            "❌ Пожалуйста, укажите полный адрес (минимум 10 символов)" if lang == "ru"
+            else "❌ Iltimos, to'liq manzilni kiriting (kamida 10 ta belgi)"
+        )
+        return
+    
+    # Save delivery details
+    data = await state.get_data()
+    delivery_price = data.get("delivery_price", 0)
+    
+    await state.update_data(
+        delivery_option=1,
+        delivery_cost=delivery_price,
+        delivery_address=address
+    )
+    
+    await create_booking_final(message, state)
+
+
+async def create_booking_final(message: types.Message, state: FSMContext) -> None:
+    """Create the final booking with all details."""
+    if not db or not bot or not METRICS:
+        await message.answer("System error")
+        return
+    
+    lang = db.get_user_language(message.from_user.id)
+    
+    data = await state.get_data()
+    offer_id = data.get("offer_id")
+    quantity = data.get("quantity")
+    delivery_option = data.get("delivery_option", 0)
+    delivery_cost = data.get("delivery_cost", 0)
+    delivery_address = data.get("delivery_address", "")
+    offer_price = data.get("offer_price", 0)
+    
+    if not offer_id or not quantity:
+        await message.answer("❌ Ошибка: данные не найдены" if lang == "ru" else "❌ Xatolik: ma'lumotlar topilmadi")
+        await state.clear()
+        return
+    
+    offer = db.get_offer(offer_id)
+    
+    if not offer:
+        await message.answer("❌ Предложение не найдено" if lang == "ru" else "❌ Taklif topilmadi")
+        await state.clear()
+        return
+    
+    # Get offer details
+    if isinstance(offer, (tuple, list)):
+        offer_title = offer[2] if len(offer) > 2 else "Товар"
+        store_id = offer[1] if len(offer) > 1 else None
+        no_address = "Manzil ko'rsatilmagan" if lang == "uz" else "Адрес не указан"
+        offer_address = offer[16] if len(offer) > 16 else no_address
+    elif isinstance(offer, dict):
+        offer_title = offer.get('title', 'Товар')
+        store_id = offer.get('store_id')
+        no_address = "Manzil ko'rsatilmagan" if lang == "uz" else "Адрес не указан"
+        offer_address = offer.get('address', no_address)
+    else:
+        await message.answer("❌ Ошибка формата данных" if lang == "ru" else "❌ Ma'lumot formati xatosi")
+        await state.clear()
+        return
+    
+    # Create booking atomically
+    logger.info(f"📦 BOOKING: Calling create_booking_atomic - offer_id={offer_id}, user_id={message.from_user.id}, quantity={quantity}")
+    
+    ok, booking_id, code = db.create_booking_atomic(
+        offer_id, message.from_user.id, quantity
+    )
+    
+    logger.info(f"📦 BOOKING: create_booking_atomic result - ok={ok}, booking_id={booking_id}, code={code}")
+    
+    if not ok or booking_id is None or code is None:
+        logger.error(f"📦 BOOKING FAILED: ok={ok}, booking_id={booking_id}, code={code}")
+        await message.answer(
+            "❌ К сожалению, выбранное количество уже недоступно." if lang == "ru"
+            else "❌ Afsuski, tanlangan miqdor mavjud emas."
+        )
+        await state.clear()
+        return
+    
+    # Update booking with delivery details
+    if delivery_option == 1:
+        try:
+            with db.get_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute("""
+                    UPDATE bookings 
+                    SET delivery_option = %s, delivery_address = %s, delivery_cost = %s
+                    WHERE booking_id = %s
+                """, (delivery_option, delivery_address, delivery_cost, booking_id))
+                logger.info(f"✅ Delivery details updated for booking {booking_id}")
+        except Exception as e:
+            logger.error(f"Error updating delivery details: {e}")
+    
+    logger.info(f"✅ BOOKING SUCCESS: booking_id={booking_id}, code={code}, delivery={delivery_option}")
+    
+    try:
+        METRICS["bookings_created"] += 1
+    except Exception:
+        pass
+    
+    await state.clear()
+    
+    # Notify partner
+    if store_id:
+        store = db.get_store(store_id)
+        if store:
+            owner_id = get_store_field(store, "owner_id")
+            if owner_id:
                 partner_lang = db.get_user_language(owner_id)
-                # Get customer phone for partner
                 customer = db.get_user_model(message.from_user.id)
                 customer_phone = customer.phone if customer else "Не указан"
                 
-                # Create inline keyboard for quick actions
                 notification_kb = InlineKeyboardBuilder()
                 notification_kb.button(text="✓ Выдано", callback_data=f"complete_booking_{booking_id}")
                 notification_kb.button(text="× Отменить", callback_data=f"cancel_booking_{booking_id}")
@@ -300,28 +530,39 @@ async def book_offer_quantity(message: types.Message, state: FSMContext) -> None
                 
                 store_name = get_store_field(store, "name", "Магазин")
                 
-                # Get partner language
-                partner_lang = db.get_user_language(owner_id) if db else "ru"
+                delivery_info_partner = ""
+                if delivery_option == 1:
+                    delivery_info_partner = (
+                        f"\n🚚 <b>Доставка:</b> {delivery_address}\n💵 Доставка: {delivery_cost:,} сум"
+                        if partner_lang == "ru"
+                        else f"\n🚚 <b>Yetkazib berish:</b> {delivery_address}\n💵 Yetkazish: {delivery_cost:,} so'm"
+                    )
+                
+                total_amount = int(offer_price * quantity)
+                if delivery_option == 1:
+                    total_amount += delivery_cost
                 
                 if partner_lang == "uz":
                     notif_text = (
                         f"🔔 <b>Yangi buyurtma</b>\n\n"
                         f"🏪 {store_name}\n"
-                        f"📦 {offer_title} × {quantity} шт\n\n"
+                        f"📦 {offer_title} × {quantity} шт\n"
+                        f"{delivery_info_partner}\n"
                         f"👤 {message.from_user.first_name}\n"
                         f"📱 <code>{customer_phone}</code>\n"
                         f"🎫 <code>{code}</code>\n"
-                        f"💰 {int(offer_price * quantity):,} сум"
+                        f"💰 {total_amount:,} so'm"
                     )
                 else:
                     notif_text = (
                         f"🔔 <b>Новый заказ</b>\n\n"
                         f"🏪 {store_name}\n"
-                        f"📦 {offer_title} × {quantity} шт\n\n"
+                        f"📦 {offer_title} × {quantity} шт\n"
+                        f"{delivery_info_partner}\n"
                         f"👤 {message.from_user.first_name}\n"
                         f"📱 <code>{customer_phone}</code>\n"
                         f"🎫 <code>{code}</code>\n"
-                        f"💰 {int(offer_price * quantity):,} сум"
+                        f"💰 {total_amount:,} сум"
                     )
                 
                 try:
@@ -333,60 +574,67 @@ async def book_offer_quantity(message: types.Message, state: FSMContext) -> None
                     )
                 except Exception as e:
                     logger.error(f"Failed to notify partner: {e}")
-        
-        total_price = int(offer_price * quantity)
-        
-        # Get store name for better UX
-        store_name = "Магазин"
-        if store_id:
-            store = db.get_store(store_id)
-            if store:
-                store_name = get_store_field(store, "name", "Магазин")
-        
-        # Get offer expiry if available
-        expiry_text = ""
-        if isinstance(offer, (tuple, list)) and len(offer) > 17:
-            expiry_date = offer[17]  # expiry_date field
-            if expiry_date:
-                expiry_text = f"\n🕐 <b>Забрать до:</b> {expiry_date}\n"
-        
-        # Show booking confirmation to customer with full details
-        from app.keyboards.user import main_menu_customer
-        
-        if lang == "uz":
-            await message.answer(
-                f"✅ <b>Buyurtma muvaffaqiyatli yaratildi!</b>\n\n"
-                f"🏪 <b>Do'kon:</b> {store_name}\n"
-                f"📦 <b>Mahsulot:</b> {offer_title}\n"
-                f"🔢 <b>Miqdor:</b> {quantity} шт\n"
-                f"💰 <b>To'lov:</b> {total_price:,} сум\n"
-                f"{expiry_text}"
-                f"\n🎫 <b>Bron kodi:</b> <code>{code}</code>\n\n"
-                f"📍 <b>Olish manzili:</b>\n{offer_address}\n\n"
-                f"⚠️ <b>Muhim:</b> Buyurtmani olishda bu kodni ko'rsating!",
-                parse_mode="HTML",
-                reply_markup=main_menu_customer(lang),
-            )
-        else:
-            await message.answer(
-                f"✅ <b>Заказ успешно создан!</b>\n\n"
-                f"🏪 <b>Магазин:</b> {store_name}\n"
-                f"📦 <b>Товар:</b> {offer_title}\n"
-                f"🔢 <b>Количество:</b> {quantity} шт\n"
-                f"💰 <b>К оплате:</b> {total_price:,} сум\n"
-                f"{expiry_text}"
-                f"\n🎫 <b>Код бронирования:</b> <code>{code}</code>\n\n"
-                f"📍 <b>Адрес получения:</b>\n{offer_address}\n\n"
-                f"⚠️ <b>Важно:</b> Покажите этот код при получении заказа!",
-                parse_mode="HTML",
-                reply_markup=main_menu_customer(lang),
-            )
-        
-    except ValueError:
-        await message.answer("❌ Пожалуйста, введите число")
-    except Exception as e:
-        logger.error(f"Error in book_offer_quantity: {e}")
-        await message.answer("❌ Произошла ошибка. Попробуйте позже.")
+    
+    # Confirm to customer
+    total_price = int(offer_price * quantity)
+    
+    store_name = "Магазин"
+    if store_id:
+        store = db.get_store(store_id)
+        if store:
+            store_name = get_store_field(store, "name", "Магазин")
+    
+    expiry_text = ""
+    if isinstance(offer, (tuple, list)) and len(offer) > 17:
+        expiry_date = offer[17]
+        if expiry_date:
+            expiry_text = f"\n🕐 <b>Забрать до:</b> {expiry_date}\n" if lang == "ru" else f"\n🕐 <b>Olib ketish muddati:</b> {expiry_date}\n"
+    
+    delivery_info_customer = ""
+    if delivery_option == 1:
+        delivery_info_customer = (
+            f"🚚 <b>Доставка:</b> {delivery_address}\n💵 Доставка: {delivery_cost:,} сум\n"
+            if lang == "ru"
+            else f"🚚 <b>Yetkazib berish:</b> {delivery_address}\n💵 Yetkazish: {delivery_cost:,} so'm\n"
+        )
+        total_with_delivery = total_price + delivery_cost
+    else:
+        total_with_delivery = total_price
+    
+    from app.keyboards.user import main_menu_customer
+    
+    if lang == "uz":
+        await message.answer(
+            f"✅ <b>Buyurtma muvaffaqiyatli yaratildi!</b>\n\n"
+            f"🏪 <b>Do'kon:</b> {store_name}\n"
+            f"📦 <b>Mahsulot:</b> {offer_title}\n"
+            f"🔢 <b>Miqdor:</b> {quantity} шт\n"
+            f"💰 <b>Mahsulot:</b> {total_price:,} so'm\n"
+            f"{delivery_info_customer}"
+            f"💵 <b>Jami:</b> {total_with_delivery:,} so'm\n"
+            f"{expiry_text}"
+            f"\n🎫 <b>Bron kodi:</b> <code>{code}</code>\n\n"
+            + (f"📍 <b>Olish manzili:</b>\n{offer_address}\n\n" if delivery_option == 0 else "")
+            + f"⚠️ <b>Muhim:</b> Buyurtmani {'olishda' if delivery_option == 0 else 'qabul qilishda'} bu kodni ko'rsating!",
+            parse_mode="HTML",
+            reply_markup=main_menu_customer(lang),
+        )
+    else:
+        await message.answer(
+            f"✅ <b>Заказ успешно создан!</b>\n\n"
+            f"🏪 <b>Магазин:</b> {store_name}\n"
+            f"📦 <b>Товар:</b> {offer_title}\n"
+            f"🔢 <b>Количество:</b> {quantity} шт\n"
+            f"💰 <b>Товар:</b> {total_price:,} сум\n"
+            f"{delivery_info_customer}"
+            f"💵 <b>Итого:</b> {total_with_delivery:,} сум\n"
+            f"{expiry_text}"
+            f"\n🎫 <b>Код бронирования:</b> <code>{code}</code>\n\n"
+            + (f"📍 <b>Адрес получения:</b>\n{offer_address}\n\n" if delivery_option == 0 else "")
+            + f"⚠️ <b>Важно:</b> Покажите этот код при {'получении' if delivery_option == 0 else 'получении'} заказа!",
+            parse_mode="HTML",
+            reply_markup=main_menu_customer(lang),
+        )
 
 
 @router.message(
@@ -449,12 +697,19 @@ async def my_bookings(message: types.Message) -> None:
             quantity = booking.get('quantity', 1)
             code = booking.get('booking_code', '')
             created_at = booking.get('created_at', '')
+            delivery_option = booking.get('delivery_option', 0)
+            delivery_address = booking.get('delivery_address', '')
+            delivery_cost = booking.get('delivery_cost', 0)
         else:
             booking_id = booking[0]
             offer_id = booking[2]
             quantity = booking[3]
             code = booking[6]
             created_at = booking[5]
+            # New delivery fields should be at the end (after existing fields)
+            delivery_option = booking[12] if len(booking) > 12 else 0
+            delivery_address = booking[13] if len(booking) > 13 else ''
+            delivery_cost = booking[14] if len(booking) > 14 else 0
         
         offer = db.get_offer(offer_id)
         if not offer:
@@ -470,9 +725,36 @@ async def my_bookings(message: types.Message) -> None:
         
         total = int(offer_price * quantity)
         
+        # Show delivery info if applicable
+        delivery_info = ""
+        if delivery_option == 1:
+            if lang == 'ru':
+                delivery_info = (
+                    f"🚚 Доставка: {delivery_address[:40]}{'...' if len(delivery_address) > 40 else ''}\n"
+                    f"💵 Доставка: {delivery_cost:,} сум\n"
+                )
+                total_with_delivery = total + delivery_cost
+            else:
+                delivery_info = (
+                    f"🚚 Yetkazish: {delivery_address[:40]}{'...' if len(delivery_address) > 40 else ''}\n"
+                    f"💵 Yetkazish: {delivery_cost:,} so'm\n"
+                )
+                total_with_delivery = total + delivery_cost
+        else:
+            total_with_delivery = total
+        
+        currency = "сум" if lang == 'ru' else "so'm"
+        
         text += (
             f"📦 <b>{offer_title}</b>\n"
-            f"🔢 {quantity} шт • {total:,} сум\n"
+            f"🔢 {quantity} шт • {total:,} {currency}\n"
+            f"{delivery_info}"
+        )
+        
+        if delivery_option == 1:
+            text += f"💰 Итого: {total_with_delivery:,} {currency}\n"
+        
+        text += (
             f"🎫 <code>{code}</code>\n"
             f"📅 {created_at}\n\n"
         )

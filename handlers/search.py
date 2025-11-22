@@ -141,10 +141,22 @@ def setup(
         
         logger.info(f"🔍 Search: user_city='{raw_city}', normalized_city='{city}'")
         
-        # Ищем по расширенным терминам
+        # Search both offers and stores
         all_results = []
         seen_offer_ids = set()
+        store_results = []
         
+        # 1. Search stores first
+        if hasattr(db, 'search_stores'):
+            try:
+                stores = db.search_stores(query, city or "Ташкент")
+                logger.info(f"🔍 Store search found {len(stores)} stores")
+                store_results = stores
+            except Exception as e:
+                logger.error(f"Error searching stores: {e}")
+        
+        # 2. Search offers (including by category)
+        # Ищем по расширенным терминам
         for term in search_terms:
             if len(term) < 2:  # Пропускаем короткие термины
                 continue
@@ -177,11 +189,15 @@ def setup(
         
         all_results.sort(key=lambda x: relevance_score(x.title), reverse=True)
         
-        if not all_results:
+        # Check if we have any results (offers or stores)
+        total_results = len(all_results) + len(store_results)
+        
+        if total_results == 0:
             # Показываем подсказки для улучшения поиска
             tips_ru = [
                 "💡 <b>Советы для поиска:</b>",
                 "• Используйте простые слова: <i>чай, молоко, хлеб</i>",
+                "• Попробуйте название магазина: <i>Космос, Korzinka</i>",
                 "• Ищите на русском или узбекском",
                 "• Попробуйте похожие товары в разделе «Горячее»"
             ]
@@ -189,6 +205,7 @@ def setup(
             tips_uz = [
                 "💡 <b>Qidiruv bo'yicha maslahatlar:</b>", 
                 "• Oddiy so'zlardan foydalaning: <i>choy, sut, non</i>",
+                "• Do'kon nomini kiriting: <i>Kosmos, Korzinka</i>",
                 "• Rus yoki o'zbek tilida qidiring",
                 "• «Issiq» bo'limida o'xshash mahsulotlarni ko'rib chiqing"
             ]
@@ -201,16 +218,52 @@ def setup(
                 parse_mode="HTML"
             )
             return
+        
+        # Show results summary
+        result_msg = f"🔍 <b>Результаты поиска:</b> {total_results}\n" if lang == "ru" else f"🔍 <b>Qidiruv natijalari:</b> {total_results}\n"
+        if store_results:
+            result_msg += f"🏪 Магазины: {len(store_results)}\n" if lang == "ru" else f"🏪 Do'konlar: {len(store_results)}\n"
+        if all_results:
+            result_msg += f"📦 Товары: {len(all_results)}" if lang == "ru" else f"📦 Mahsulotlar: {len(all_results)}"
             
         await message.answer(
-            f"🔍 {get_text(lang, 'search_results')}: {len(all_results)}" if lang == "ru"
-            else f"🔍 {get_text(lang, 'search_results')}: {len(all_results)}",
+            result_msg,
+            parse_mode="HTML",
             reply_markup=main_menu_customer(lang)
         )
         await state.clear()
         
-        # Show results (limit to 15)
-        for offer in all_results[:15]:
+        # Show store results first
+        if store_results:
+            for store in store_results[:5]:  # Show top 5 stores
+                store_info = (
+                    f"🏪 <b>{store.get('name', 'Магазин')}</b>\n"
+                    f"📍 {store.get('address', 'Адрес не указан')}\n"
+                    f"📂 {store.get('category', 'Продукты')}\n"
+                )
+                
+                if store.get('delivery_enabled') == 1:
+                    delivery_price = store.get('delivery_price', 0)
+                    min_order = store.get('min_order_amount', 0)
+                    store_info += (
+                        f"🚚 Доставка: {delivery_price:,} сум (мин. {min_order:,} сум)\n"
+                        if lang == "ru"
+                        else f"🚚 Yetkazib berish: {delivery_price:,} so'm (min. {min_order:,} so'm)\n"
+                    )
+                
+                # Create keyboard to view store
+                from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
+                store_kb = InlineKeyboardMarkup(inline_keyboard=[
+                    [InlineKeyboardButton(
+                        text="Смотреть товары" if lang == "ru" else "Mahsulotlarni ko'rish",
+                        callback_data=f"store_info_{store.get('store_id')}"
+                    )]
+                ])
+                
+                await message.answer(store_info, parse_mode="HTML", reply_markup=store_kb)
+        
+        # Show offer results
+        for offer in all_results[:10]:  # Show top 10 offers
             caption = render_offer_card(lang, offer)
             
             keyboard = offer_quick_keyboard(

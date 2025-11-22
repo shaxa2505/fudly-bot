@@ -20,6 +20,7 @@ class RegisterStore(StatesGroup):
     address = State()
     description = State()
     phone = State()
+    photo = State()  # Add photo upload step
 
 
 class CreateOffer(StatesGroup):
@@ -91,6 +92,8 @@ class BookOffer(StatesGroup):
     """Offer booking flow states."""
 
     quantity = State()
+    delivery_choice = State()  # Choose pickup or delivery
+    delivery_address = State()  # Enter delivery address if delivery chosen
 
 
 class BrowseOffers(StatesGroup):

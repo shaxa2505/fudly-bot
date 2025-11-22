@@ -242,13 +242,83 @@ async def register_store_address(message: types.Message, state: FSMContext) -> N
 
 @router.message(RegisterStore.description)
 async def register_store_description(message: types.Message, state: FSMContext) -> None:
-    """Store description entered - create store application."""
+    """Store description entered - ask for photo."""
     if not db or not bot:
         await message.answer("System error")
         return
     
     lang = db.get_user_language(message.from_user.id)
     await state.update_data(description=message.text)
+    
+    # Ask for store photo
+    photo_prompt = (
+        "📸 <b>Шаг 6/6: Фото магазина</b>\n\n"
+        "Отправьте фото вашего магазина или витрины.\n"
+        "Это поможет покупателям узнать ваш магазин!\n\n"
+        "Можете пропустить этот шаг, отправив /skip"
+        if lang == "ru"
+        else
+        "📸 <b>6/6-qadam: Do'kon fotosurati</b>\n\n"
+        "Do'koningiz yoki vitrina fotosuratini yuboring.\n"
+        "Bu xaridorlarga do'koningizni tanishga yordam beradi!\n\n"
+        "Bu qadamni o'tkazib yuborishingiz mumkin: /skip"
+    )
+    
+    await message.answer(photo_prompt, parse_mode="HTML", reply_markup=cancel_keyboard(lang))
+    await state.set_state(RegisterStore.photo)
+
+
+@router.message(RegisterStore.photo, F.photo)
+async def register_store_photo(message: types.Message, state: FSMContext) -> None:
+    """Store photo uploaded - create store application."""
+    if not db or not bot:
+        await message.answer("System error")
+        return
+    
+    lang = db.get_user_language(message.from_user.id)
+    
+    # Get the largest photo
+    photo = message.photo[-1]
+    photo_id = photo.file_id
+    
+    await state.update_data(photo=photo_id)
+    await create_store_from_data(message, state)
+
+
+@router.message(RegisterStore.photo, F.text.in_(["/skip", "Пропустить", "O'tkazib yuborish"]))
+async def register_store_skip_photo(message: types.Message, state: FSMContext) -> None:
+    """Skip photo upload and create store application."""
+    if not db or not bot:
+        await message.answer("System error")
+        return
+    
+    await state.update_data(photo=None)
+    await create_store_from_data(message, state)
+
+
+@router.message(RegisterStore.photo)
+async def register_store_photo_invalid(message: types.Message, state: FSMContext) -> None:
+    """Handle invalid photo input."""
+    if not db:
+        await message.answer("System error")
+        return
+    
+    lang = db.get_user_language(message.from_user.id)
+    
+    await message.answer(
+        "❌ Пожалуйста, отправьте фото или используйте /skip для пропуска" if lang == "ru"
+        else "❌ Iltimos, fotosurat yuboring yoki /skip buyrug'idan foydalaning",
+        reply_markup=cancel_keyboard(lang)
+    )
+
+
+async def create_store_from_data(message: types.Message, state: FSMContext) -> None:
+    """Helper function to create store from state data."""
+    if not db or not bot:
+        await message.answer("System error")
+        return
+    
+    lang = db.get_user_language(message.from_user.id)
     data = await state.get_data()
     
     # Use phone from user profile
@@ -264,7 +334,8 @@ async def register_store_description(message: types.Message, state: FSMContext) 
         description=data["description"],
         category=data["category"],
         phone=owner_phone,
-        business_type=data.get("business_type", "supermarket")
+        business_type=data.get("business_type", "supermarket"),
+        photo=data.get("photo")  # Add photo parameter
     )
     
     await state.clear()
@@ -301,7 +372,21 @@ async def register_store_description(message: types.Message, state: FSMContext) 
                 f"📱 Телефон: {owner_phone or '—'}\n\n"
                 f"Перейдите в админ панель для модерации."
             )
-            await bot.send_message(admin[0], admin_text, parse_mode="HTML")
+            
+            # Send with photo if available
+            if data.get("photo"):
+                try:
+                    await bot.send_photo(
+                        admin[0],
+                        photo=data["photo"],
+                        caption=admin_text,
+                        parse_mode="HTML"
+                    )
+                except Exception:
+                    # Fallback to text if photo fails
+                    await bot.send_message(admin[0], admin_text, parse_mode="HTML")
+            else:
+                await bot.send_message(admin[0], admin_text, parse_mode="HTML")
         except Exception:
             pass
 
