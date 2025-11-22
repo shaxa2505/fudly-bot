@@ -976,7 +976,7 @@ class Database:
         with self.get_connection() as conn:
             cursor = conn.cursor(row_factory=dict_row)
             cursor.execute('''
-                SELECT o.*, s.name, s.address, s.city, s.category
+                SELECT o.*, s.name, s.address, s.city, s.category as store_category, o.category as category
                 FROM offers o
                 JOIN stores s ON o.store_id = s.store_id
                 WHERE o.store_id = %s AND o.quantity > 0 
