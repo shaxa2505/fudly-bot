@@ -478,10 +478,6 @@ async def create_booking_final(message: types.Message, state: FSMContext) -> Non
     # Fallback if still no address
     if not offer_address:
         offer_address = "Manzil ko'rsatilmagan" if lang == "uz" else "Адрес не указан"
-    else:
-        await message.answer("❌ Ошибка формата данных" if lang == "ru" else "❌ Ma'lumot formati xatosi")
-        await state.clear()
-        return
     
     # Create booking atomically
     logger.info(f"📦 BOOKING: Calling create_booking_atomic - offer_id={offer_id}, user_id={message.from_user.id}, quantity={quantity}")
@@ -698,8 +694,11 @@ async def my_bookings(message: types.Message) -> None:
         await message.answer(no_active_msg, parse_mode="HTML")
         return
     
-    text = f"📦 <b>{get_text(lang, 'my_bookings')}</b>\n\n"
-    
+    # Send header first
+    header = f"📦 <b>{get_text(lang, 'my_bookings')}</b>\n\n"
+    await message.answer(header, parse_mode="HTML")
+
+    # Send each booking as a separate message with action buttons
     for booking in active[:10]:  # Show max 10
         # Dict-compatible access
         if isinstance(booking, dict):
@@ -713,29 +712,31 @@ async def my_bookings(message: types.Message) -> None:
             delivery_cost = booking.get('delivery_cost', 0)
         else:
             booking_id = booking[0]
-            offer_id = booking[2]
-            quantity = booking[3]
-            code = booking[6]
-            created_at = booking[5]
-            # New delivery fields should be at the end (after existing fields)
+            offer_id = booking[1] if len(booking) > 1 else None
+            quantity = booking[6] if len(booking) > 6 else 1
+            code = booking[4] if len(booking) > 4 else ''
+            created_at = booking[7] if len(booking) > 7 else ''
             delivery_option = booking[12] if len(booking) > 12 else 0
             delivery_address = booking[13] if len(booking) > 13 else ''
             delivery_cost = booking[14] if len(booking) > 14 else 0
-        
+
+        if not booking_id or not offer_id:
+            continue
+
         offer = db.get_offer(offer_id)
         if not offer:
             continue
-        
+
         # Get offer details (handle both dict and tuple)
         if isinstance(offer, dict):
             offer_title = offer.get('title', 'Товар')
             offer_price = offer.get('discount_price', 0)
         else:
-            offer_title = offer[2]
-            offer_price = offer[5]
-        
+            offer_title = offer[2] if len(offer) > 2 else 'Товар'
+            offer_price = offer[5] if len(offer) > 5 else 0
+
         total = int(offer_price * quantity)
-        
+
         # Show delivery info if applicable
         delivery_info = ""
         if delivery_option == 1:
@@ -753,26 +754,30 @@ async def my_bookings(message: types.Message) -> None:
                 total_with_delivery = total + delivery_cost
         else:
             total_with_delivery = total
-        
+
         currency = "сум" if lang == 'ru' else "so'm"
-        
-        text += (
+
+        body = (
             f"📦 <b>{offer_title}</b>\n"
             f"🔢 {quantity} шт • {total:,} {currency}\n"
             f"{delivery_info}"
         )
-        
+
         if delivery_option == 1:
-            text += f"💰 Итого: {total_with_delivery:,} {currency}\n"
-        
-        text += (
+            body += f"💰 Итого: {total_with_delivery:,} {currency}\n"
+
+        body += (
             f"🎫 <code>{code}</code>\n"
-            f"📅 {created_at}\n\n"
+            f"📅 {created_at}\n"
         )
-    
-    await message.answer(
-        text, parse_mode="HTML"
-    )
+
+        # Build action buttons: Details and Cancel
+        kb = InlineKeyboardBuilder()
+        kb.button(text=("Подробнее" if lang == 'ru' else "Batafsil"), callback_data=f"booking_details_{booking_id}")
+        kb.button(text=("Отменить" if lang == 'ru' else "Bekor qilish"), callback_data=f"cancel_booking_user_{booking_id}")
+        kb.adjust(2)
+
+        await message.answer(body, parse_mode="HTML", reply_markup=kb.as_markup())
 
 
 @router.callback_query(
