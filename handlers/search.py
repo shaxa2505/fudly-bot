@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import re
 from aiogram import F, Router, types
+from aiogram.utils.keyboard import InlineKeyboardBuilder
 from aiogram.fsm.context import FSMContext
 
 from app.keyboards import main_menu_customer, search_cancel_keyboard, offer_quick_keyboard
@@ -233,26 +234,43 @@ def setup(
         )
         await state.clear()
         
-        # Show store results first (grouped)
+        # Show store results first - present each store as a card with a button to view its products
         if store_results:
-            stores_text = "🏪 <b>Найденные магазины:</b>\n\n" if lang == "ru" else "🏪 <b>Topilgan do'konlar:</b>\n\n"
-            for idx, store in enumerate(store_results[:5], 1):  # Show top 5 stores
-                stores_text += f"{idx}. <b>{store.get('name', 'Магазин')}</b>\n"
-                stores_text += f"📍 {store.get('address', 'Адрес не указан')}\n"
-                stores_text += f"📂 {store.get('category', 'Продукты')}\n"
-                
+            # If the user's query likely targets a specific store name, prefer showing store cards
+            norm_q = normalize_text(query)
+            is_store_query = any(norm_q in normalize_text((s.get('name') or s.get('store_name') or '')).lower() for s in store_results)
+
+            # Send up to 5 stores as separate cards each with an inline "Смотреть товары" button
+            for store in store_results[:5]:
+                store_name = store.get('name', 'Магазин')
+                address = store.get('address', 'Адрес не указан')
+                category = store.get('category', 'Продукты')
+
+                stores_card = (
+                    f"🏪 <b>{store_name}</b>\n"
+                    f"📍 {address}\n"
+                    f"📂 {category}\n"
+                )
+
                 if store.get('delivery_enabled') == 1:
                     delivery_price = store.get('delivery_price', 0)
                     min_order = store.get('min_order_amount', 0)
-                    stores_text += (
+                    stores_card += (
                         f"🚚 Доставка: {delivery_price:,} сум (мин. {min_order:,} сум)\n"
                         if lang == "ru"
                         else f"🚚 Yetkazib berish: {delivery_price:,} so'm (min. {min_order:,} so'm)\n"
                     )
-                stores_text += "\n"
-            
-            stores_text += "\n💡 Для просмотра товаров введите номер магазина" if lang == "ru" else "\n💡 Mahsulotlarni ko'rish uchun do'kon raqamini kiriting"
-            await message.answer(stores_text, parse_mode="HTML")
+
+                kb = InlineKeyboardBuilder()
+                sid = store.get('store_id') or store.get('id') or store.get('storeId')
+                kb.button(text=("Смотреть товары" if lang == 'ru' else "Mahsulotlarni ko'rish"), callback_data=f"show_store_products_{sid}")
+                kb.adjust(1)
+
+                await message.answer(stores_card, parse_mode="HTML", reply_markup=kb.as_markup())
+
+            # If user likely searched store name, do not flood with all offers — stop here
+            if is_store_query:
+                return
         
         # Show offer results (grouped in media group if possible)
         if all_results:
@@ -282,6 +300,56 @@ def setup(
                         await message.answer(caption, parse_mode="HTML", reply_markup=keyboard)
                 else:
                     await message.answer(caption, parse_mode="HTML", reply_markup=keyboard)
+
+    @dp.callback_query(F.data.startswith("show_store_products_"))
+    async def show_store_products(callback: types.CallbackQuery) -> None:
+        """Show products for a specific store when user taps 'Смотреть товары'."""
+        if not db:
+            await callback.answer("System error", show_alert=True)
+            return
+
+        lang = db.get_user_language(callback.from_user.id)
+        try:
+            store_id = int(callback.data.rsplit("_", 1)[-1])
+        except (ValueError, IndexError) as e:
+            await callback.answer(get_text(lang, "error"), show_alert=True)
+            return
+
+        # Prefer service method to list active offers for the store
+        try:
+            offers = offer_service.list_active_offers_by_store(store_id)
+        except Exception:
+            offers = []
+
+        if not offers:
+            await callback.answer(get_text(lang, "no_offers"), show_alert=True)
+            return
+
+        # Header
+        header = (
+            f"📦 <b>Товары магазина</b>\n" if lang == 'ru' else f"📦 <b>Do'kon mahsulotlari</b>\n"
+        )
+        await callback.message.answer(header, parse_mode="HTML")
+
+        # Send up to 20 offers from the store
+        for offer in offers[:20]:
+            caption = render_offer_card(lang, offer)
+            keyboard = offer_quick_keyboard(lang, offer.id, offer.store_id, offer.delivery_enabled)
+
+            if getattr(offer, 'photo', None):
+                try:
+                    await callback.message.answer_photo(
+                        photo=offer.photo,
+                        caption=caption,
+                        parse_mode="HTML",
+                        reply_markup=keyboard
+                    )
+                except Exception:
+                    await callback.message.answer(caption, parse_mode="HTML", reply_markup=keyboard)
+            else:
+                await callback.message.answer(caption, parse_mode="HTML", reply_markup=keyboard)
+
+        await callback.answer()
 
     @dp.message(F.text.in_(["🎯 Горячее", "🎯 Issiq"]))
     async def show_hot_offers(message: types.Message):
