@@ -774,7 +774,7 @@ async def my_bookings(message: types.Message) -> None:
         # Build action buttons: Details and Cancel
         kb = InlineKeyboardBuilder()
         kb.button(text=("Подробнее" if lang == 'ru' else "Batafsil"), callback_data=f"booking_details_{booking_id}")
-        kb.button(text=("Отменить" if lang == 'ru' else "Bekor qilish"), callback_data=f"cancel_booking_user_{booking_id}")
+        kb.button(text=("Отменить" if lang == 'ru' else "Bekor qilish"), callback_data=f"cancel_booking_{booking_id}")
         kb.adjust(2)
 
         await message.answer(body, parse_mode="HTML", reply_markup=kb.as_markup())
@@ -963,3 +963,70 @@ async def save_booking_rating(callback: types.CallbackQuery) -> None:
         )
     else:
         await callback.answer(get_text(lang, "error"), show_alert=True)
+
+
+@router.callback_query(F.data.startswith("booking_details_"))
+async def booking_details(callback: types.CallbackQuery) -> None:
+    """Show booking details to the user."""
+    if not db:
+        await callback.answer("System error", show_alert=True)
+        return
+
+    lang = db.get_user_language(callback.from_user.id)
+    try:
+        booking_id = int(callback.data.split("_")[2])
+    except (ValueError, IndexError) as e:
+        logger.error(f"Invalid booking_id in callback data: {callback.data}, error: {e}")
+        await callback.answer(get_text(lang, "error"), show_alert=True)
+        return
+
+    booking = db.get_booking(booking_id)
+    if not booking:
+        await callback.answer(get_text(lang, "booking_not_found"), show_alert=True)
+        return
+
+    # Extract fields safely
+    offer_id = get_booking_field(booking, "offer_id")
+    quantity = get_booking_field(booking, "quantity", 1)
+    code = get_booking_field(booking, "code", "")
+    created_at = get_booking_field(booking, "created_at", "")
+    delivery_option = get_booking_field(booking, "delivery_option", 0)
+    delivery_address = get_booking_field(booking, "delivery_address", "")
+    delivery_cost = get_booking_field(booking, "delivery_cost", 0)
+
+    offer = db.get_offer(offer_id) if offer_id else None
+    if offer:
+        offer_title = get_offer_field(offer, "title", "Товар")
+        offer_price = get_offer_field(offer, "discount_price", 0)
+    else:
+        offer_title = "Товар"
+        offer_price = 0
+
+    total = int(offer_price * quantity)
+    currency = "сум" if lang == 'ru' else "so'm"
+
+    delivery_info = ""
+    if delivery_option == 1:
+        if lang == 'ru':
+            delivery_info = f"\n🚚 Доставка: {delivery_address}\n💵 Доставка: {delivery_cost:,} сум"
+        else:
+            delivery_info = f"\n🚚 Yetkazish: {delivery_address}\n💵 Yetkazish: {delivery_cost:,} so'm"
+
+    text = (
+        (f"✅ <b>Детали бронирования</b>\n\n" if lang == 'ru' else f"✅ <b>Bron tafsilotlari</b>\n\n")
+        + f"🏪 <b>Товар:</b> {offer_title}\n"
+        + f"🔢 <b>Количество:</b> {quantity} шт\n"
+        + f"💰 <b>Сумма:</b> {total:,} {currency}"
+        + f"{delivery_info}\n"
+        + f"\n🎫 <code>{code}</code>\n"
+        + f"📅 {created_at}"
+    )
+
+    # Action buttons: cancel (uses existing handler) and close
+    kb = InlineKeyboardBuilder()
+    kb.button(text=("Отменить" if lang == 'ru' else "Bekor qilish"), callback_data=f"cancel_booking_{booking_id}")
+    kb.button(text=("Закрыть" if lang == 'ru' else "Yopish"), callback_data=f"noop_{booking_id}")
+    kb.adjust(2)
+
+    await callback.message.answer(text, parse_mode="HTML", reply_markup=kb.as_markup())
+    await callback.answer()
