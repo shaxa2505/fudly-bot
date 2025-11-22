@@ -189,8 +189,11 @@ def offers_category_filter(lang: str = 'ru', store_id: int | None = None) -> Inl
     
     builder = InlineKeyboardBuilder()
     
-    # Эмодзи для категорий
-    category_emojis = ["🍞", "🥛", "🥩", "🐟", "🥬", "🍎", "🧀", "🥤", "🍱", "🎁"]
+    # English category IDs for database - order matches get_product_categories
+    category_ids = ["bakery", "dairy", "meat", "fruits", "vegetables", "drinks", "snacks", "frozen"]
+    
+    # Эмодзи для категорий - совпадают с партнёрскими
+    category_emojis = ["🥖", "🥛", "🥩", "🍎", "🥬", "🥤", "🍿", "🧊"]
     categories = get_product_categories(lang)
     
     # "All offers" button на всю ширину
@@ -208,13 +211,15 @@ def offers_category_filter(lang: str = 'ru', store_id: int | None = None) -> Inl
     # Product categories for filtering with emojis
     for i, category in enumerate(categories):
         emoji = category_emojis[i] if i < len(category_emojis) else "📦"
+        cat_id = category_ids[i] if i < len(category_ids) else "other"
+        
         if store_id:
-            # Use category name in callback for store-specific filtering
-            callback_data = f"store_cat_{store_id}_{category.lower().replace(' ', '_')}"
+            # Use English category ID in callback for store-specific filtering
+            callback_data = f"store_cat_{store_id}_{cat_id}"
         else:
             callback_data = f"offers_cat_{i}"
         builder.button(text=f"{emoji} {category}", callback_data=callback_data)
     
     # Раскладка: 1 кнопка "Все", затем по 2 категории в ряд
-    builder.adjust(1, 2, 2, 2, 2, 2, 1)
+    builder.adjust(1, 2, 2, 2, 2)
     return builder.as_markup()

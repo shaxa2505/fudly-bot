@@ -963,53 +963,64 @@ def get_categories(lang: str) -> list[str]:
         return ["Restoran", "Kafe", "Nonvoyxona", "Supermarket", "Qandolatxona", "Fastfud"]
 
 def get_product_categories(lang: str) -> list[str]:
-    """Получить список категорий товаров"""
+    """Получить список категорий товаров - совпадает с теми, что выбирает партнёр"""
     if lang == 'ru':
         return [
-            "Хлеб",
+            "Выпечка",
             "Молочные",
-            "Мясо",
-            "Рыба",
-            "Овощи",
+            "Мясные",
             "Фрукты",
-            "Сыры",
+            "Овощи",
             "Напитки",
-            "Готовая еда",
-            "Другое"
+            "Снеки",
+            "Замороженное"
         ]
     else:
         return [
-            "Non",
-            "Sut",
-            "Go'sht",
-            "Baliq",
-            "Sabzavot",
-            "Meva",
-            "Pishloq",
-            "Ichimlik",
-            "Tayyor ovqat",
-            "Boshqa"
+            "Pishiriq",
+            "Sut mahsulotlari",
+            "Go'sht mahsulotlari",
+            "Mevalar",
+            "Sabzavotlar",
+            "Ichimliklar",
+            "Gaz. ovqatlar",
+            "Muzlatilgan"
         ]
 
 def normalize_category(category: str) -> str:
     """Нормализовать категорию к английскому для БД (для таблицы offers)"""
     # Маппинг категорий товаров (product categories) в английские названия БД
     product_mapping = {
+        # Русский
+        'Выпечка': 'bakery',
+        'Молочные': 'dairy',
+        'Мясные': 'meat',
+        'Фрукты': 'fruits',
+        'Овощи': 'vegetables',
+        'Напитки': 'drinks',
+        'Снеки': 'snacks',
+        'Замороженное': 'frozen',
+        # Узбекский
+        'Pishiriq': 'bakery',
+        'Sut mahsulotlari': 'dairy',
+        'Go\'sht mahsulotlari': 'meat',
+        'Mevalar': 'fruits',
+        'Sabzavotlar': 'vegetables',
+        'Ichimliklar': 'drinks',
+        'Gaz. ovqatlar': 'snacks',
+        'Muzlatilgan': 'frozen',
+        # Старые названия (для совместимости)
         'Хлеб': 'bakery',
         'Non': 'bakery',
-        'Молочные': 'dairy',
         'Sut': 'dairy',
         'Мясо': 'meat',
         'Go\'sht': 'meat',
         'Рыба': 'fish',
         'Baliq': 'fish',
-        'Овощи': 'vegetables',
         'Sabzavot': 'vegetables',
-        'Фрукты': 'fruits',
         'Meva': 'fruits',
         'Сыры': 'cheese',
         'Pishloq': 'cheese',
-        'Напитки': 'drinks',
         'Ichimlik': 'drinks',
         'Готовая еда': 'ready_food',
         'Tayyor ovqat': 'ready_food',
