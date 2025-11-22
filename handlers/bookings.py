@@ -774,7 +774,7 @@ async def my_bookings(message: types.Message) -> None:
         # Build action buttons: Details and Cancel
         kb = InlineKeyboardBuilder()
         kb.button(text=("Подробнее" if lang == 'ru' else "Batafsil"), callback_data=f"booking_details_{booking_id}")
-        kb.button(text=("Отменить" if lang == 'ru' else "Bekor qilish"), callback_data=f"cancel_booking_{booking_id}")
+        kb.button(text=("Отменить" if lang == 'ru' else "Bekor qilish"), callback_data=f"cancel_booking_confirm_{booking_id}")
         kb.adjust(2)
 
         await message.answer(body, parse_mode="HTML", reply_markup=kb.as_markup())
@@ -965,6 +965,111 @@ async def save_booking_rating(callback: types.CallbackQuery) -> None:
         await callback.answer(get_text(lang, "error"), show_alert=True)
 
 
+@router.callback_query(F.data.startswith("cancel_booking_confirm_"))
+async def cancel_booking_confirm(callback: types.CallbackQuery) -> None:
+    """Ask user to confirm cancellation (user flow)."""
+    if not db:
+        await callback.answer("System error", show_alert=True)
+        return
+
+    lang = db.get_user_language(callback.from_user.id)
+    try:
+        booking_id = int(callback.data.split("_")[3])
+    except (ValueError, IndexError) as e:
+        logger.error(f"Invalid booking_id in callback data: {callback.data}, error: {e}")
+        await callback.answer(get_text(lang, "error"), show_alert=True)
+        return
+
+    # Ask confirmation with Yes/No
+    confirm_kb = InlineKeyboardBuilder()
+    confirm_kb.button(text=("Да, отменить" if lang == 'ru' else "Ha, bekor qilish"), callback_data=f"do_cancel_booking_{booking_id}")
+    confirm_kb.button(text=("Нет" if lang == 'ru' else "Yo'q"), callback_data=f"noop_{booking_id}")
+    confirm_kb.adjust(2)
+
+    await callback.message.answer(get_text(lang, "confirm_cancel_booking") or ("Вы уверены, что хотите отменить бронь?" if lang == 'ru' else "Bronni bekor qilmoqchimisiz?"), reply_markup=confirm_kb.as_markup())
+    await callback.answer()
+
+
+@router.callback_query(F.data.startswith("do_cancel_booking_"))
+async def do_cancel_booking(callback: types.CallbackQuery) -> None:
+    """Perform user-initiated cancellation after confirmation."""
+    if not db:
+        await callback.answer("System error", show_alert=True)
+        return
+
+    lang = db.get_user_language(callback.from_user.id)
+    try:
+        booking_id = int(callback.data.split("_")[2])
+    except (ValueError, IndexError) as e:
+        logger.error(f"Invalid booking_id in callback data: {callback.data}, error: {e}")
+        await callback.answer(get_text(lang, "error"), show_alert=True)
+        return
+
+    booking = db.get_booking(booking_id)
+    if not booking:
+        await callback.answer(get_text(lang, "booking_not_found"), show_alert=True)
+        return
+
+    success = db.cancel_booking(booking_id)
+    if success:
+        # Return quantity to offer
+        offer_id = get_booking_field(booking, "offer_id", 1)
+        quantity = get_booking_field(booking, "quantity", 6)
+        offer = db.get_offer(offer_id)
+        if offer:
+            current_qty = get_offer_field(offer, "quantity", 0)
+            db.update_offer_quantity(offer_id, current_qty + quantity)
+
+        await callback.answer(get_text(lang, "booking_cancelled"), show_alert=True)
+        # Optionally edit the confirmation message
+        try:
+            await callback.message.edit_text(get_text(lang, "booking_cancelled"))
+        except Exception:
+            pass
+        # Refresh user's bookings view
+        # Reuse filter_bookings flow to refresh listing
+        await filter_bookings(callback)
+    else:
+        await callback.answer(get_text(lang, "error"), show_alert=True)
+
+
+@router.callback_query(F.data.startswith("contact_store_"))
+async def contact_store(callback: types.CallbackQuery) -> None:
+    """Show store contact info to the user (phone/address)."""
+    if not db:
+        await callback.answer("System error", show_alert=True)
+        return
+
+    lang = db.get_user_language(callback.from_user.id)
+    try:
+        store_id = int(callback.data.split("_")[2])
+    except (ValueError, IndexError) as e:
+        logger.error(f"Invalid store_id in callback data: {callback.data}, error: {e}")
+        await callback.answer(get_text(lang, "error"), show_alert=True)
+        return
+
+    store = db.get_store(store_id)
+    if not store:
+        await callback.answer(get_text(lang, "store_not_found"), show_alert=True)
+        return
+
+    phone = get_store_field(store, "phone", "Не указан")
+    address = get_store_field(store, "address", "")
+
+    text = (f"📞 <b>Телефон:</b> {phone}\n" if lang == 'ru' else f"📞 <b>Telefon:</b> {phone}\n")
+    if address:
+        text += (f"📍 <b>Адрес:</b> {address}\n" if lang == 'ru' else f"📍 <b>Manzil:</b> {address}\n")
+
+    await callback.message.answer(text, parse_mode="HTML")
+    await callback.answer()
+
+
+@router.callback_query(F.data.startswith("noop_"))
+async def noop_callback(callback: types.CallbackQuery) -> None:
+    """No-op callback to close dialogs; simply answer to remove loading state."""
+    await callback.answer()
+
+
 @router.callback_query(F.data.startswith("booking_details_"))
 async def booking_details(callback: types.CallbackQuery) -> None:
     """Show booking details to the user."""
@@ -1022,9 +1127,20 @@ async def booking_details(callback: types.CallbackQuery) -> None:
         + f"📅 {created_at}"
     )
 
-    # Action buttons: cancel (uses existing handler) and close
+    # Action buttons: contact store, confirm cancel, and close
     kb = InlineKeyboardBuilder()
-    kb.button(text=("Отменить" if lang == 'ru' else "Bekor qilish"), callback_data=f"cancel_booking_{booking_id}")
+    # Try to get store id/phone from booking/offer
+    store_id = None
+    if isinstance(booking, dict):
+        store_id = booking.get('store_id')
+    else:
+        # assume booking tuple may contain store_id at position 2 or 11 depending on schema
+        store_id = booking[2] if len(booking) > 2 else (booking[11] if len(booking) > 11 else None)
+
+    if store_id:
+        kb.button(text=("Контакт магазина" if lang == 'ru' else "Do'kon bilan aloqa"), callback_data=f"contact_store_{store_id}")
+
+    kb.button(text=("Отменить" if lang == 'ru' else "Bekor qilish"), callback_data=f"cancel_booking_confirm_{booking_id}")
     kb.button(text=("Закрыть" if lang == 'ru' else "Yopish"), callback_data=f"noop_{booking_id}")
     kb.adjust(2)
 
