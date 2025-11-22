@@ -2022,7 +2022,7 @@ class Database:
             return cursor.fetchone()[0]
 
     def search_offers(self, query: str, city: str) -> List[Any]:
-        """Search offers by title or store name (excluding expired)."""
+        """Search offers by title or store name using advanced PostgreSQL full-text search."""
         sql = """
             SELECT 
                 o.offer_id, o.store_id, o.title, o.description, 
@@ -2031,7 +2031,23 @@ class Database:
                 o.status, o.photo_id as photo, o.created_at, o.unit,
                 s.name as store_name, s.address, s.category as store_category,
                 CAST((1.0 - o.discount_price::float / o.original_price::float) * 100 AS INTEGER) as discount_percent,
-                s.delivery_enabled, s.delivery_price, s.min_order_amount
+                s.delivery_enabled, s.delivery_price, s.min_order_amount,
+                -- Ranking for relevance
+                (
+                    -- Exact match bonus
+                    CASE WHEN LOWER(o.title) = LOWER(%s) THEN 100 ELSE 0 END +
+                    -- Starts with bonus
+                    CASE WHEN LOWER(o.title) LIKE LOWER(%s) || '%%' THEN 50 ELSE 0 END +
+                    -- Contains match
+                    CASE WHEN LOWER(o.title) LIKE '%%' || LOWER(%s) || '%%' THEN 10 ELSE 0 END +
+                    -- Transliteration matches (banan → банан)
+                    CASE WHEN 
+                        -- Russian to Latin
+                        TRANSLATE(LOWER(o.title), 'абвгдеёжзийклмнопрстуфхцчшщъыьэюя', 'abvgdeejziiklmnoprstufxcchshshhyyyeua') LIKE '%%' || LOWER(%s) || '%%'
+                        -- Latin to Russian approximation
+                        OR LOWER(o.title) LIKE '%%' || REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(LOWER(%s), 'a', 'а'), 'e', 'е'), 'o', 'о'), 'p', 'р'), 'c', 'с') || '%%'
+                    THEN 5 ELSE 0 END
+                ) as relevance
             FROM offers o
             JOIN stores s ON o.store_id = s.store_id
             WHERE o.status = 'active' 
@@ -2042,18 +2058,19 @@ class Database:
                  OR o.expiry_date !~ '[.]'
                  OR (o.expiry_date ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}' AND o.expiry_date::date >= CURRENT_DATE))
             AND (
-                LOWER(o.title) LIKE LOWER(%s) OR 
-                LOWER(s.name) LIKE LOWER(%s) OR
-                LOWER(s.category) LIKE LOWER(%s)
+                LOWER(o.title) LIKE '%%' || LOWER(%s) || '%%' OR 
+                LOWER(s.name) LIKE '%%' || LOWER(%s) || '%%' OR
+                LOWER(s.category) LIKE '%%' || LOWER(%s) || '%%' OR
+                -- Transliteration search
+                TRANSLATE(LOWER(o.title), 'абвгдеёжзийклмнопрстуфхцчшщъыьэюя', 'abvgdeejziiklmnoprstufxcchshshhyyyeua') LIKE '%%' || LOWER(%s) || '%%'
             )
-            ORDER BY o.created_at DESC
+            ORDER BY relevance DESC, o.created_at DESC
             LIMIT 50
         """
-        search_term = f"%{query}%"
-        # Allow partial or empty city filter; if city is None, match any city
-        city_param = f"%{city}%" if city else "%"
         with self.get_connection() as conn:
-            with conn.cursor() as cur:
-                cur.execute(sql, (city_param, search_term, search_term, search_term))
-                return cur.fetchall()
+            cursor = conn.cursor(row_factory=dict_row)
+            # Pass query 10 times for all placeholders (5 for relevance + 1 city + 4 for WHERE)
+            cursor.execute(sql, (query, query, query, query, query, city, query, query, query, query))
+            return [dict(row) for row in cursor.fetchall()]
+
 
