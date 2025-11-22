@@ -168,27 +168,35 @@ async def add_offer_start(message: types.Message, state: FSMContext) -> None:
         await message.answer(get_text(lang, "no_approved_stores"))
         return
     
-    if len(stores) == 1:
-        # One store - start creation immediately
-        store_id = get_store_field(stores[0], "store_id")
-        store_name = get_store_field(stores[0], "name", "Магазин")
-        await state.update_data(store_id=store_id)
-        await _ask_for_data(message, lang, store_name, state)
-    else:
-        # Multiple stores - need to choose
-        await message.answer(
-            get_text(lang, "choose_store"), reply_markup=cancel_keyboard(lang)
-        )
-        text = ""
-        for i, store in enumerate(stores, 1):
-            store_name = get_store_field(store, "name", "Магазин")
-            store_city = get_store_field(store, "city", "")
-            text += f"{i}. 🏪 {store_name} - 📍 {store_city}\n"
-        await message.answer(text)
-        await state.set_state(CreateOffer.store)
+    # Partner has only one store - auto-select it
+    store_id = get_store_field(stores[0], "store_id")
+    store_name = get_store_field(stores[0], "name", "Магазин")
+    await state.update_data(store_id=store_id, store_name=store_name)
+    await _ask_for_category(message, lang, store_name, state)
 
 
-async def _ask_for_data(message: types.Message, lang: str, store_name: str, state: FSMContext):
+async def _ask_for_category(message: types.Message, lang: str, store_name: str, state: FSMContext):
+    """Ask seller to choose product category."""
+    from app.keyboards import product_categories_keyboard
+    
+    step_text = "ШАГ 1 из 3: КАТЕГОРИЯ" if lang == "ru" else "1-QADAM 3 tadan: KATEGORIYA"
+    choose_text = "Выберите категорию товара:" if lang == "ru" else "Mahsulot kategoriyasini tanlang:"
+    
+    text = (
+        f"🏪 <b>{store_name}</b>\n\n"
+        f"<b>{step_text}</b>\n\n"
+        f"📂 {choose_text}"
+    )
+    
+    await message.answer(
+        text, 
+        parse_mode="HTML", 
+        reply_markup=product_categories_keyboard(lang)
+    )
+    await state.set_state(CreateOffer.category)
+
+
+async def _ask_for_data(message: types.Message, lang: str, store_name: str, category: str, state: FSMContext):
     """Ask for all data in one message."""
     builder = InlineKeyboardBuilder()
     builder.button(
@@ -202,12 +210,26 @@ async def _ask_for_data(message: types.Message, lang: str, store_name: str, stat
         "25.12"
     )
     
-    step_1_text = "ШАГ 1 из 2: ДАННЫЕ ТОВАРА" if lang == "ru" else "1-QADAM 2 tadan: MAHSULOT MA'LUMOTLARI"
+    # Category name display
+    category_names = {
+        "bakery": "🥖 Выпечка" if lang == "ru" else "🥖 Pishiriq",
+        "dairy": "🥛 Молочные" if lang == "ru" else "🥛 Sut mahsulotlari",
+        "meat": "🥩 Мясные" if lang == "ru" else "🥩 Go'sht mahsulotlari",
+        "fruits": "🍎 Фрукты" if lang == "ru" else "🍎 Mevalar",
+        "vegetables": "🥕 Овощи" if lang == "ru" else "🥕 Sabzavotlar",
+        "drinks": "🥤 Напитки" if lang == "ru" else "🥤 Ichimliklar",
+        "snacks": "🍿 Снеки" if lang == "ru" else "🍿 Gaz. ovqatlar",
+        "frozen": "🧊 Замороженное" if lang == "ru" else "🧊 Muzlatilgan",
+    }
+    category_display = category_names.get(category, category)
+    
+    step_2_text = "ШАГ 2 из 3: ДАННЫЕ ТОВАРА" if lang == "ru" else "2-QADAM 3 tadan: MAHSULOT MA'LUMOTLARI"
     send_format_text = "Отправьте данные в формате:" if lang == "ru" else "Ma'lumotlarni formatda yuboring:"
     
     text = (
-        f"🏪 <b>{store_name}</b>\n\n"
-        f"<b>{step_1_text}</b>\n\n"
+        f"🏪 <b>{store_name}</b>\n"
+        f"📂 {category_display}\n\n"
+        f"<b>{step_2_text}</b>\n\n"
         f"{send_format_text}\n\n"
         f"1️⃣ {'Название товара' if lang == 'ru' else 'Mahsulot nomi'}\n"
         f"2️⃣ {'Цена Скидка% Количество' if lang == 'ru' else 'Narx Chegirma% Miqdor'}\n"
@@ -220,32 +242,28 @@ async def _ask_for_data(message: types.Message, lang: str, store_name: str, stat
     await state.set_state(CreateOffer.title)  # Using 'title' state for the main input
 
 
-@router.message(CreateOffer.store)
-async def create_offer_store_selected(message: types.Message, state: FSMContext) -> None:
-    """Store selected - proceed to data input."""
-    if not db:
-        await message.answer("System error")
+@router.callback_query(CreateOffer.category)
+async def create_offer_category_selected(callback: types.CallbackQuery, state: FSMContext) -> None:
+    """Category selected - proceed to data input."""
+    if not db or not callback.data:
+        await callback.answer("System error", show_alert=True)
         return
     
-    lang = db.get_user_language(message.from_user.id)
-    stores = [
-        s
-        for s in db.get_user_stores(message.from_user.id)
-        if get_store_field(s, "status") == "active"
-    ]
+    lang = db.get_user_language(callback.from_user.id)
     
-    try:
-        store_num = int(message.text)
-        if 1 <= store_num <= len(stores):
-            selected_store = stores[store_num - 1]
-            store_id = get_store_field(selected_store, "store_id")
-            store_name = get_store_field(selected_store, "name", "Магазин")
-            await state.update_data(store_id=store_id)
-            await _ask_for_data(message, lang, store_name, state)
-        else:
-            await message.answer(get_text(lang, "error_invalid_number"))
-    except Exception:
-        await message.answer(get_text(lang, "error_invalid_number"))
+    # Extract category from callback data (format: "product_cat_bakery")
+    if callback.data.startswith("product_cat_"):
+        category = callback.data.replace("product_cat_", "")
+        data = await state.get_data()
+        store_name = data.get("store_name", "Магазин")
+        
+        await state.update_data(category=category)
+        
+        if callback.message:
+            await _ask_for_data(callback.message, lang, store_name, category, state)
+        await callback.answer()
+    else:
+        await callback.answer("Invalid category", show_alert=True)
 
 
 @router.message(CreateOffer.title)
@@ -334,8 +352,9 @@ async def process_offer_data(message: types.Message, state: FSMContext) -> None:
         )
         return
 
-    # Auto-detect category
-    category = detect_category(title)
+    # Get category from state (already selected by user)
+    data = await state.get_data()
+    category = data.get("category", "other")
     
     # Save all data
     await state.update_data(
@@ -349,21 +368,34 @@ async def process_offer_data(message: types.Message, state: FSMContext) -> None:
         description=title  # Use title as description by default
     )
     
-    # Step 2: Ask for Photo
+    # Step 3: Ask for Photo
     builder = InlineKeyboardBuilder()
     builder.button(
         text="➡️ Без фото (Пропустить)" if lang == "ru" else "➡️ Fotosiz (O'tkazib yuborish)",
         callback_data="create_skip_photo",
     )
     
-    step_2_text = "ШАГ 2 из 2: ФОТО" if lang == "ru" else "2-QADAM 2 tadan: RASM"
+    step_3_text = "ШАГ 3 из 3: ФОТО" if lang == "ru" else "3-QADAM 3 tadan: RASM"
     photo_prompt = "Отправьте фото товара или нажмите кнопку пропустить." if lang == "ru" else "Mahsulot rasmini yuboring yoki o'tkazib yuborish tugmasini bosing."
-    category_text = "Категория определена как:" if lang == "ru" else "Kategoriya aniqlandi:"
+    category_text = "Категория:" if lang == "ru" else "Kategoriya:"
+    
+    # Category name display
+    category_names = {
+        "bakery": "🥖 Выпечка" if lang == "ru" else "🥖 Pishiriq",
+        "dairy": "🥛 Молочные" if lang == "ru" else "🥛 Sut mahsulotlari",
+        "meat": "🥩 Мясные" if lang == "ru" else "🥩 Go'sht mahsulotlari",
+        "fruits": "🍎 Фрукты" if lang == "ru" else "🍎 Mevalar",
+        "vegetables": "🥕 Овощи" if lang == "ru" else "🥕 Sabzavotlar",
+        "drinks": "🥤 Напитки" if lang == "ru" else "🥤 Ichimliklar",
+        "snacks": "🍿 Снеки" if lang == "ru" else "🍿 Gaz. ovqatlar",
+        "frozen": "🧊 Замороженное" if lang == "ru" else "🧊 Muzlatilgan",
+    }
+    category_display = category_names.get(category, category)
 
     await message.answer(
-        f"<b>{step_2_text}</b>\n\n"
+        f"<b>{step_3_text}</b>\n\n"
         f"📸 {photo_prompt}\n\n"
-        f"✅ {category_text} <b>{category}</b>",
+        f"✅ {category_text} <b>{category_display}</b>",
         parse_mode="HTML",
         reply_markup=builder.as_markup()
     )

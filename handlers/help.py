@@ -22,17 +22,10 @@ async def show_help(message: types.Message, db: DatabaseProtocol):
     lang = db.get_user_language(user_id)
     user = db.get_user_model(user_id)
     
-    # Determine if user is a partner
-    is_partner = False
+    # Show partner help if user is a seller, otherwise customer help
     if user and user.role == 'seller':
-        stores = db.get_stores_by_owner(user_id)
-        is_partner = len(stores) > 0
-    
-    if is_partner:
-        # Partner help
         help_text = get_text(lang, 'help_partner')
     else:
-        # Customer help
         help_text = get_text(lang, 'help_customer')
     
     await message.answer(help_text, parse_mode='HTML')

@@ -119,30 +119,29 @@ def units_keyboard(lang: str = 'ru') -> ReplyKeyboardMarkup:
     return builder.as_markup(resize_keyboard=True)
 
 
-def product_categories_keyboard(lang: str = 'ru') -> ReplyKeyboardMarkup:
-    """Product categories keyboard for supermarkets."""
-    builder = ReplyKeyboardBuilder()
+def product_categories_keyboard(lang: str = 'ru') -> InlineKeyboardMarkup:
+    """Product categories keyboard with inline buttons for offer creation."""
+    builder = InlineKeyboardBuilder()
     
-    categories_ru = [
-        '🍞 Хлеб и выпечка', '🥛 Молочные продукты', '🥩 Мясо и птица', 
-        '🐟 Рыба и морепродукты', '🥬 Овощи', '🍎 Фрукты и ягоды',
-        '🧀 Сыры', '🥚 Яйца', '🍚 Крупы и макароны', '🥫 Консервы',
-        '🍫 Кондитерские изделия', '🍪 Печенье и снэки', '☕ Чай и кофе', 
-        '🥤 Напитки', '🧴 Бытовая химия', '🧼 Гигиена', '🏠 Для дома', '🎯 Другое'
-    ]
+    # Use same 8 categories as in the customer view
+    categories = {
+        'bakery': '🥖 Выпечка' if lang == 'ru' else '🥖 Pishiriq',
+        'dairy': '🥛 Молочные' if lang == 'ru' else '🥛 Sut mahsulotlari',
+        'meat': '🥩 Мясные' if lang == 'ru' else '🥩 Go\'sht mahsulotlari',
+        'fruits': '🍎 Фрукты' if lang == 'ru' else '🍎 Mevalar',
+        'vegetables': '🥬 Овощи' if lang == 'ru' else '🥬 Sabzavotlar',
+        'drinks': '🥤 Напитки' if lang == 'ru' else '🥤 Ichimliklar',
+        'snacks': '🍿 Снеки' if lang == 'ru' else '🍿 Gaz. ovqatlar',
+        'frozen': '🧊 Замороженное' if lang == 'ru' else '🧊 Muzlatilgan',
+    }
     
-    categories_uz = [
-        '🍞 Non va pishiriq', '🥛 Sut mahsulotlari', '🥩 Go\'sht va parrandalar', 
-        '🐟 Baliq va dengiz mahsulotlari', '🥬 Sabzavotlar', '🍎 Mevalar va rezavorlar',
-        '🧀 Pishloqlar', '🥚 Tuxum', '🍚 Yorma va makaron', '🥫 Konservalar',
-        '🍫 Qandolat mahsulotlari', '🍪 Pechene va sneklar', '☕ Choy va qahva', 
-        '🥤 Ichimliklar', '🧴 Maishiy kimyo', '🧼 Gigiyena', '🏠 Uy uchun', '🎯 Boshqa'
-    ]
+    for cat_id, cat_name in categories.items():
+        builder.button(text=cat_name, callback_data=f"product_cat_{cat_id}")
     
-    categories = categories_uz if lang == 'uz' else categories_ru
-    
-    for category in categories:
-        builder.button(text=category)
-    
-    builder.adjust(2, 2, 2, 2, 2, 2, 2, 2, 2)
-    return builder.as_markup(resize_keyboard=True)
+    builder.button(
+        text=f"❌ {get_text(lang, 'cancel')}", 
+        callback_data="create_cancel"
+    )
+    builder.adjust(2)  # 2 buttons per row
+    return builder.as_markup()
+
