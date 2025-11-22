@@ -370,12 +370,12 @@ async def my_bookings(message: types.Message) -> None:
         await message.answer(empty_msg, parse_mode="HTML")
         return
     
-    # Filter active bookings (bookings are returned as dicts from PostgreSQL)
+    # Filter active bookings (pending and confirmed are considered active)
     if isinstance(bookings[0], dict):
-        active = [b for b in bookings if b.get('status') == 'active']
+        active = [b for b in bookings if b.get('status') in ['pending', 'confirmed']]
     else:
         # Fallback for tuple format
-        active = [b for b in bookings if b[7] == "active"]
+        active = [b for b in bookings if b[7] in ["pending", "confirmed"]]
     
     if not active:
         no_active_msg = (
