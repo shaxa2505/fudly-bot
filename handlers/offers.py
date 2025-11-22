@@ -476,31 +476,104 @@ def setup(
                 show_alert=True,
             )
             return
-        offers = offer_service.list_store_offers(store_id)
-        if not offers:
+        
+        # Show category selection for store
+        text = (
+            f"🏪 <b>{store.name}</b>\n\n"
+            f"📂 Выберите категорию товаров:"
+            if lang == "ru" else
+            f"🏪 <b>{store.name}</b>\n\n"
+            f"📂 Mahsulot toifasini tanlang:"
+        )
+        
+        # Import category keyboard
+        from app.keyboards import offers_category_filter
+        keyboard = offers_category_filter(lang, store_id=store_id)
+        
+        await msg.edit_text(text, parse_mode="HTML", reply_markup=keyboard)
+        await callback.answer()
+    
+    @dp.callback_query(F.data.startswith("store_cat_"))
+    async def show_store_offers_by_category(callback: types.CallbackQuery, state: FSMContext):
+        """Show store offers filtered by category."""
+        if not callback.from_user or not callback.data:
+            await callback.answer()
+            return
+        msg = _callback_message(callback)
+        if not msg:
+            await callback.answer()
+            return
+        lang = db.get_user_language(callback.from_user.id)
+        
+        try:
+            # Parse: store_cat_{store_id}_{category}
+            parts = callback.data.split("_", 3)  # Split into max 4 parts
+            store_id = int(parts[2])
+            category = parts[3] if len(parts) > 3 else "all"
+        except (ValueError, IndexError) as e:
+            logger.error(f"Invalid callback data: {callback.data}, error: {e}")
+            await callback.answer(get_text(lang, "error"), show_alert=True)
+            return
+        
+        store = offer_service.get_store(store_id)
+        if not store:
             await callback.answer(
-                "В магазине пока нет активных предложений"
-                if lang == "ru"
-                else "Do'konda hali takliflar yo'q",
+                "Магазин не найден" if lang == "ru" else "Do'kon topilmadi",
                 show_alert=True,
             )
             return
+        
+        # Get all offers for the store
+        all_offers = offer_service.list_store_offers(store_id)
+        
+        # Filter by category if not "all"
+        if category != "all":
+            # Normalize category name for comparison
+            category_normalized = category.replace("_", " ").lower()
+            offers = []
+            for offer in all_offers:
+                # Check title for category keywords (simple approach)
+                title_lower = offer.title.lower()
+                if category_normalized in title_lower:
+                    offers.append(offer)
+        else:
+            offers = all_offers
+        
+        if not offers:
+            await callback.answer(
+                "В этой категории пока нет товаров"
+                if lang == "ru"
+                else "Bu toifada hali mahsulotlar yo'q",
+                show_alert=True,
+            )
+            return
+        
         await _set_offer_state(state, offers)
         page = offers[:20]
-        text = offer_templates.render_store_offers_list(
+        
+        category_title = category.replace("_", " ").title() if category != "all" else (
+            "Все категории" if lang == "ru" else "Barcha toifalar"
+        )
+        text = (
+            f"🏪 <b>{store.name}</b>\n"
+            f"📂 {category_title}\n"
+            f"📦 Товаров: {len(offers)}\n\n"
+        )
+        text += offer_templates.render_store_offers_list(
             lang,
             store.name,
             page,
             offset=0,
             total=len(offers),
         )
+        
         keyboard = offer_keyboards.store_offers_keyboard(
             lang,
             store_id,
             has_more=len(offers) > 20,
             next_offset=20 if len(offers) > 20 else None,
         )
-        await msg.answer(text, parse_mode="HTML", reply_markup=keyboard)
+        await msg.edit_text(text, parse_mode="HTML", reply_markup=keyboard)
         await callback.answer()
 
     @dp.callback_query(F.data.startswith("store_offers_next_"))

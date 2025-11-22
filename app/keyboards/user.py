@@ -178,8 +178,13 @@ def stores_list_keyboard(stores, lang: str = 'ru') -> InlineKeyboardMarkup:
     return builder.as_markup()
 
 
-def offers_category_filter(lang: str = 'ru') -> InlineKeyboardMarkup:
-    """Inline keyboard with offer category filters."""
+def offers_category_filter(lang: str = 'ru', store_id: int | None = None) -> InlineKeyboardMarkup:
+    """Inline keyboard with offer category filters.
+    
+    Args:
+        lang: Language code
+        store_id: If provided, generates callbacks for store-specific filtering
+    """
     from localization import get_product_categories
     
     builder = InlineKeyboardBuilder()
@@ -189,15 +194,26 @@ def offers_category_filter(lang: str = 'ru') -> InlineKeyboardMarkup:
     categories = get_product_categories(lang)
     
     # "All offers" button на всю ширину
-    builder.button(
-        text=f"📋 {'Все категории' if lang == 'ru' else 'Barcha toifalar'}", 
-        callback_data="offers_all"
-    )
+    if store_id:
+        builder.button(
+            text=f"📋 {'Все категории' if lang == 'ru' else 'Barcha toifalar'}", 
+            callback_data=f"store_cat_{store_id}_all"
+        )
+    else:
+        builder.button(
+            text=f"📋 {'Все категории' if lang == 'ru' else 'Barcha toifalar'}", 
+            callback_data="offers_all"
+        )
     
     # Product categories for filtering with emojis
     for i, category in enumerate(categories):
         emoji = category_emojis[i] if i < len(category_emojis) else "📦"
-        builder.button(text=f"{emoji} {category}", callback_data=f"offers_cat_{i}")
+        if store_id:
+            # Use category name in callback for store-specific filtering
+            callback_data = f"store_cat_{store_id}_{category.lower().replace(' ', '_')}"
+        else:
+            callback_data = f"offers_cat_{i}"
+        builder.button(text=f"{emoji} {category}", callback_data=callback_data)
     
     # Раскладка: 1 кнопка "Все", затем по 2 категории в ряд
     builder.adjust(1, 2, 2, 2, 2, 2, 1)
