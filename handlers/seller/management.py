@@ -548,13 +548,15 @@ async def booking_details_seller(callback: types.CallbackQuery) -> None:
         return
 
     # Safe field extraction
-    customer = booking.get('first_name') if isinstance(booking, dict) else (booking[5] if len(booking) > 5 else 'Клиент')
-    phone = booking.get('phone') if isinstance(booking, dict) else (booking[7] if len(booking) > 7 else 'Не указан')
+    user_id = booking.get('user_id') if isinstance(booking, dict) else (booking[2] if len(booking) > 2 else None)
+    user = db.get_user(user_id) if db and user_id else None
+    customer = user.get('first_name') if isinstance(user, dict) and user.get('first_name') else ('Клиент')
+    phone = user.get('phone') if isinstance(user, dict) else (booking.get('phone') if isinstance(booking, dict) else '')
     quantity = booking.get('quantity') if isinstance(booking, dict) else (booking[6] if len(booking) > 6 else 1)
     code = booking.get('booking_code') if isinstance(booking, dict) else (booking[8] if len(booking) > 8 else '')
     created = booking.get('created_at') if isinstance(booking, dict) else (booking[9] if len(booking) > 9 else None)
 
-    store_id = booking.get('store_id') if isinstance(booking, dict) else (booking[1] if len(booking) > 1 else None)
+    store_id = booking.get('store_id') if isinstance(booking, dict) else (booking[3] if len(booking) > 3 else None)
     store = db.get_store(store_id) if db and store_id else None
     store_name = get_store_field(store, 'name', 'Магазин')
     store_address = get_store_field(store, 'address', '')
@@ -594,15 +596,31 @@ async def contact_customer(callback: types.CallbackQuery) -> None:
         await callback.answer("❌ " + ("Бронь не найдена" if lang == 'ru' else "Bron topilmadi"), show_alert=True)
         return
 
-    phone = booking.get('phone') if isinstance(booking, dict) else (booking[7] if len(booking) > 7 else 'Не указан')
+    # Prefer user record for reliable username/phone
+    user_id = booking.get('user_id') if isinstance(booking, dict) else (booking[2] if len(booking) > 2 else None)
+    user = db.get_user(user_id) if db and user_id else None
+
+    phone = user.get('phone') if isinstance(user, dict) and user.get('phone') else (booking.get('phone') if isinstance(booking, dict) else 'Не указан')
     pickup_addr = booking.get('pickup_address') if isinstance(booking, dict) else (booking[4] if len(booking) > 4 else '')
 
     text = f"📞 Контакт покупателя:\n{phone}\n"
     if pickup_addr:
         text += f"📍 Адрес получателя:\n{pickup_addr}\n"
 
+    # Build optional URL button to open chat with buyer
+    kb = InlineKeyboardBuilder()
+    username = user.get('username') if isinstance(user, dict) else None
+    if username:
+        kb.button(text="✉️ Написать", url=f"https://t.me/{username}")
+    elif user_id:
+        # Fallback: tg://user?id=USERID may work in some clients
+        kb.button(text="✉️ Написать", url=f"tg://user?id={user_id}")
+
     await callback.answer()
-    await callback.message.answer(text)
+    if kb.rows:
+        await callback.message.answer(text, reply_markup=kb.as_markup())
+    else:
+        await callback.message.answer(text)
 
 
 @router.callback_query(F.data == "seller_orders_active")
