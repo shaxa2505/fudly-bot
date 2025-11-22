@@ -404,6 +404,7 @@ def setup(
 
     @dp.callback_query(F.data.startswith("store_info_"))
     async def show_store_info(callback: types.CallbackQuery):
+        """Show store categories directly instead of store card."""
         if not callback.from_user or not callback.data:
             await callback.answer()
             return
@@ -420,7 +421,27 @@ def setup(
             await callback.answer(get_text(lang, "error"), show_alert=True)
             return
         
-        await _send_store_card(msg, store_id, lang)
+        store = offer_service.get_store(store_id)
+        if not store:
+            await callback.answer(
+                "Магазин не найден" if lang == "ru" else "Do'kon topilmadi",
+                show_alert=True,
+            )
+            return
+        
+        # Show category selection directly
+        text = (
+            f"🏪 <b>{store.name}</b>\n\n"
+            f"📂 Выберите категорию товаров:"
+            if lang == "ru" else
+            f"🏪 <b>{store.name}</b>\n\n"
+            f"📂 Mahsulot toifasini tanlang:"
+        )
+        
+        from app.keyboards import offers_category_filter
+        keyboard = offers_category_filter(lang, store_id=store_id)
+        
+        await msg.edit_text(text, parse_mode="HTML", reply_markup=keyboard)
         await callback.answer()
 
     @dp.callback_query(F.data == "back_to_hot")
