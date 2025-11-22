@@ -237,7 +237,8 @@ async def load_test_data(message: types.Message, db: DatabaseProtocol):
         try:
             quantity = random.randint(10, 50)
             days_ahead = random.randint(3, 7)
-            expiry_date = (today + timedelta(days=days_ahead)).strftime("%d.%m.%Y")
+            # Use YYYY-MM-DD format for PostgreSQL compatibility
+            expiry_date = (today + timedelta(days=days_ahead)).strftime("%Y-%m-%d")
             
             offer_id = db.add_offer(
                 store_id=store_id,

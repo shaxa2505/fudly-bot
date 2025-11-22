@@ -178,13 +178,13 @@ def main():
         # Random quantity between 5 and 50
         quantity = random.randint(5, 50)
         
-        # Expiry date 3-7 days from now
+        # Expiry date 3-7 days from now - use YYYY-MM-DD format for PostgreSQL
         days_ahead = random.randint(3, 7)
-        expiry_date = (today + timedelta(days=days_ahead)).strftime("%d.%m.%Y")
+        expiry_date = (today + timedelta(days=days_ahead)).strftime("%Y-%m-%d")
         
-        # Available times (now to end of day)
-        available_from = today.strftime("%d.%m.%Y %H:%M")
-        available_until = (today.replace(hour=23, minute=59)).strftime("%d.%m.%Y %H:%M")
+        # Available times (now to end of day) - use YYYY-MM-DD HH:MM format
+        available_from = today.strftime("%Y-%m-%d %H:%M")
+        available_until = (today.replace(hour=23, minute=59)).strftime("%Y-%m-%d %H:%M")
         
         try:
             if use_postgres:

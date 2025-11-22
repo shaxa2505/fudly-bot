@@ -801,6 +801,16 @@ class Database:
         # Support both photo and photo_id (protocol uses photo, legacy uses photo_id)
         actual_photo_id = photo if photo is not None else photo_id
         
+        # Normalize expiry_date format to YYYY-MM-DD for PostgreSQL
+        if expiry_date and '.' in expiry_date:
+            try:
+                from datetime import datetime
+                # Convert DD.MM.YYYY to YYYY-MM-DD
+                dt = datetime.strptime(expiry_date, '%d.%m.%Y')
+                expiry_date = dt.strftime('%Y-%m-%d')
+            except ValueError:
+                pass  # Keep original format if parsing fails
+        
         with self.get_connection() as conn:
             cursor = conn.cursor()
             cursor.execute('''
