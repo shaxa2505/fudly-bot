@@ -25,7 +25,7 @@ def setup(
 ) -> None:
     """Register offer-related handlers on dispatcher."""
 
-    @dp.message(F.text.contains("Горячее") | F.text.contains("Issiq") | F.text.contains("🔥 Горячее") | F.text.contains("🔥 Issiq"))
+    @dp.message(F.text.in_(["🔥 Горячее", "🔥 Issiq"]))
     async def hot_offers_handler(message: types.Message, state: FSMContext) -> None:
         if not message.from_user:
             return
@@ -47,7 +47,7 @@ def setup(
             logger,
         )
 
-    @dp.message(F.text.in_(["🏪 Заведения", "🏪 Muassasalar"]))
+    @dp.message(F.text.in_(["🏪 Заведения", "🏪 Do'konlar"]))
     async def show_establishments_handler(message: types.Message) -> None:
         """Show establishment types."""
         if not message.from_user:
