@@ -217,6 +217,7 @@ def setup(
 
     @dp.message(BrowseOffers.store_list, F.text.regexp(r"^\d+$"))
     async def select_store_by_number(message: types.Message, state: FSMContext):
+        """Select store by number - show categories directly."""
         if not message.from_user:
             return
         lang = db.get_user_language(message.from_user.id)
@@ -239,7 +240,28 @@ def setup(
             return
         store_id = store_list[number - 1]
         await state.clear()
-        await _send_store_card(message, store_id, lang)
+        
+        # Get store info
+        store = offer_service.get_store(store_id)
+        if not store:
+            await message.answer(
+                "Магазин не найден" if lang == "ru" else "Do'kon topilmadi"
+            )
+            return
+        
+        # Show category selection directly
+        text = (
+            f"🏪 <b>{store.name}</b>\n\n"
+            f"📂 Выберите категорию товаров:"
+            if lang == "ru" else
+            f"🏪 <b>{store.name}</b>\n\n"
+            f"📂 Mahsulot toifasini tanlang:"
+        )
+        
+        from app.keyboards import offers_category_filter
+        keyboard = offers_category_filter(lang, store_id=store_id)
+        
+        await message.answer(text, parse_mode="HTML", reply_markup=keyboard)
 
     @dp.message(BrowseOffers.offer_list, F.text.regexp(r"^\d+$"))
     async def select_offer_by_number(message: types.Message, state: FSMContext):
