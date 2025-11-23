@@ -91,8 +91,8 @@ async def test_booking_expiry_and_reminder(db_instance, monkeypatch):
     # quantity is at index 6 in SQLite get_offer tuple
     old_qty = old_offer[6] if isinstance(old_offer, (list, tuple)) else old_offer.get('quantity')
 
+    # Cancel booking — cancel_booking now returns reserved quantity to the offer atomically
     db.cancel_booking(booking_id)
-    db.increment_offer_quantity_atomic(offer_id, 1)
 
     updated_offer = db.get_offer(offer_id)
     new_qty = updated_offer[6] if isinstance(updated_offer, (list, tuple)) else updated_offer.get('quantity')

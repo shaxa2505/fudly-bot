@@ -327,27 +327,36 @@ async def book_offer_quantity(message: types.Message, state: FSMContext) -> None
                 
                 await message.answer(delivery_msg, parse_mode="HTML", reply_markup=delivery_kb)
             else:
-                # Order total is below minimum for delivery
+                # Order total is below minimum for delivery — show inline confirmation for pickup
+                # (better UX than free-text). We'll set delivery_option to pickup and wait
+                # for user's inline confirmation.
+                from aiogram.utils.keyboard import InlineKeyboardBuilder
+
+                confirm_kb = InlineKeyboardBuilder()
+                yes_text = "Да" if lang == 'ru' else "Ha"
+                no_text = "Нет" if lang == 'ru' else "Yo'q"
+                confirm_kb.button(text=yes_text, callback_data="confirm_pickup_yes")
+                confirm_kb.button(text=no_text, callback_data="confirm_pickup_no")
+                confirm_kb.adjust(2)
+
                 if lang == "ru":
-                    await message.answer(
+                    msg = (
                         f"<b>Шаг 2/3: Способ получения</b>\n\n"
                         f"📦 Сумма заказа: {order_total:,} сум\n"
                         f"⚠️ Минимальная сумма для доставки: {min_order_amount:,} сум\n\n"
-                        f"Доступен только самовывоз. Продолжить?",
-                        parse_mode="HTML",
-                        reply_markup=cancel_keyboard(lang)
+                        f"Доступен только самовывоз. Продолжить?"
                     )
                 else:
-                    await message.answer(
+                    msg = (
                         f"<b>2/3-qadam: Qabul qilish usuli</b>\n\n"
                         f"📦 Buyurtma summasi: {order_total:,} so'm\n"
                         f"⚠️ Yetkazib berish uchun minimal summa: {min_order_amount:,} so'm\n\n"
-                        f"Faqat o'zim olib ketish mavjud. Davom etamizmi?",
-                        parse_mode="HTML",
-                        reply_markup=cancel_keyboard(lang)
+                        f"Faqat o'zim olib ketish mavjud. Davom etamizmi?"
                     )
-                # Force pickup
+
+                # Force pickup in state now; create_booking_final will be called when user confirms
                 await state.update_data(delivery_option=0, delivery_cost=0)
+                await message.answer(msg, parse_mode="HTML", reply_markup=confirm_kb.as_markup())
         else:
             # No delivery available, proceed directly to booking creation
             await create_booking_final(message, state)
@@ -359,37 +368,7 @@ async def book_offer_quantity(message: types.Message, state: FSMContext) -> None
         await message.answer("❌ Произошла ошибка. Попробуйте позже." if lang == "ru" else "❌ Xatolik yuz berdi. Keyinroq urinib ko'ring.")
 
 
-@router.message(BookOffer.delivery_choice)
-async def book_offer_delivery_choice(message: types.Message, state: FSMContext) -> None:
-    """Process delivery choice."""
-    if not db:
-        await message.answer("System error")
-        return
-    
-    lang = db.get_user_language(message.from_user.id)
-    
-    # Check for cancellation
-    if message.text in ["❌ Отмена", "❌ Bekor qilish", "/cancel"]:
-        await state.clear()
-        await message.answer(
-            get_text(lang, "action_cancelled"),
-            reply_markup=main_menu_customer(lang)
-        )
-        return
-    
-    # Determine delivery option
-    if "Доставка" in message.text or "Yetkazib berish" in message.text:
-        # User wants delivery, ask for address
-        await state.set_state(BookOffer.delivery_address)
-        await message.answer(
-            "📍 <b>Шаг 3/3: Введите адрес доставки</b>\n\n"
-            "Укажите полный адрес (улица, дом, квартира):" if lang == "ru"
-            else
-            "📍 <b>3/3-qadam: Yetkazib berish manzilini kiriting</b>\n\n"
-            "To'liq manzilni kiriting (ko'cha, uy, xonadon):",
-            parse_mode="HTML",
-            reply_markup=cancel_keyboard(lang)
-        )
+
     else:
         # Pickup selected
         data = await state.get_data()
@@ -435,6 +414,45 @@ async def book_offer_delivery_address(message: types.Message, state: FSMContext)
     )
     
     await create_booking_final(message, state)
+
+
+@router.callback_query(F.data == "confirm_pickup_yes")
+async def confirm_pickup_yes(callback: types.CallbackQuery, state: FSMContext) -> None:
+    """User confirmed pickup (inline). Proceed with booking creation using stored FSM data."""
+    if not db:
+        await callback.answer("System error", show_alert=True)
+        return
+
+    await callback.answer()
+    try:
+        # callback.message is the message with the inline keyboard
+        await create_booking_final(callback.message, state)
+    except Exception as e:
+        logger.error(f"Error in confirm_pickup_yes: {e}")
+        lang = db.get_user_language(callback.from_user.id) if db else 'ru'
+        try:
+            await callback.message.answer(
+                "❌ Произошла ошибка. Попробуйте позже." if lang == 'ru' else "❌ Xatolik yuz berdi. Keyinroq urinib ko'ring."
+            )
+        except Exception:
+            pass
+
+
+@router.callback_query(F.data == "confirm_pickup_no")
+async def confirm_pickup_no(callback: types.CallbackQuery, state: FSMContext) -> None:
+    """User declined pickup confirmation; clear state and show main menu."""
+    if not db:
+        await callback.answer("System error", show_alert=True)
+        return
+
+    lang = db.get_user_language(callback.from_user.id)
+    await state.clear()
+    from app.keyboards.user import main_menu_customer
+    try:
+        await callback.message.answer(get_text(lang, "action_cancelled"), reply_markup=main_menu_customer(lang))
+    except Exception:
+        pass
+    await callback.answer()
 
 
 async def create_booking_final(message: types.Message, state: FSMContext) -> None:
@@ -636,6 +654,18 @@ async def create_booking_final(message: types.Message, state: FSMContext) -> Non
         expiry_date = offer[17]
         if expiry_date:
             expiry_text = f"\n🕐 <b>Забрать до:</b> {expiry_date}\n" if lang == "ru" else f"\n🕐 <b>Olib ketish muddati:</b> {expiry_date}\n"
+
+    # Add generic auto-cancel notice based on booking duration config
+    try:
+        import os
+        duration_hours = int(os.environ.get('BOOKING_DURATION_HOURS', '2'))
+    except Exception:
+        duration_hours = 2
+
+    if lang == 'ru':
+        auto_cancel_notice = f"\n⚠️ <b>Важно:</b> Бронь будет автоматически отменена через {duration_hours} часов, если вы не заберёте заказ."
+    else:
+        auto_cancel_notice = f"\n⚠️ <b>Diqqat:</b> Bron {duration_hours} soat ichida avtomatik bekor qilinadi, agar buyurtma olinmasa."
     
     delivery_info_customer = ""
     if delivery_option == 1:
@@ -660,6 +690,7 @@ async def create_booking_final(message: types.Message, state: FSMContext) -> Non
             f"{delivery_info_customer}"
             f"💵 <b>Jami:</b> {total_with_delivery:,} so'm\n"
             f"{expiry_text}"
+            f"{auto_cancel_notice}"
             f"\n🎫 <b>Bron kodi:</b> <code>{code}</code>\n\n"
             + (f"📍 <b>Olish manzili:</b>\n{offer_address}\n\n" if delivery_option == 0 else "")
             + f"⚠️ <b>Muhim:</b> Buyurtmani {'olishda' if delivery_option == 0 else 'qabul qilishda'} bu kodni ko'rsating!",
@@ -676,6 +707,7 @@ async def create_booking_final(message: types.Message, state: FSMContext) -> Non
             f"{delivery_info_customer}"
             f"💵 <b>Итого:</b> {total_with_delivery:,} сум\n"
             f"{expiry_text}"
+            f"{auto_cancel_notice}"
             f"\n🎫 <b>Код бронирования:</b> <code>{code}</code>\n\n"
             + (f"📍 <b>Адрес получения:</b>\n{offer_address}\n\n" if delivery_option == 0 else "")
             + f"⚠️ <b>Важно:</b> Покажите этот код при {'получении' if delivery_option == 0 else 'получении'} заказа!",
@@ -684,140 +716,43 @@ async def create_booking_final(message: types.Message, state: FSMContext) -> Non
         )
 
 
-@router.message(
-    F.text.contains("Мои бронирования")
-    | F.text.contains("Mening buyurt")
-    | F.text.contains("🛒 Корзина")
-    | F.text.contains("🛒 Savat")
-    | F.text.contains("Корзина")
-    | F.text.contains("Savat")
-)
-async def my_bookings(message: types.Message) -> None:
-    """Show user's bookings."""
+@router.message(BookOffer.delivery_choice)
+async def book_offer_delivery_choice(message: types.Message, state: FSMContext) -> None:
+    """Process delivery choice."""
     if not db:
         await message.answer("System error")
         return
-    
+
     lang = db.get_user_language(message.from_user.id)
-    bookings = db.get_user_bookings(message.from_user.id)
-    
-    if not bookings:
-        empty_msg = (
-            f"🛒 <b>Корзина пуста</b>\n\n"
-            f"🔥 Посмотрите раздел <b>Горячее</b> или <b>Категории</b>\n"
-            f"✨ Выберите товары со скидками!"
-            if lang == 'ru' else
-            f"🛒 <b>Savat bo'sh</b>\n\n"
-            f"🔥 <b>Issiq</b> yoki <b>Kategoriyalar</b> bo'limiga o'ting\n"
-            f"✨ Chegirmali mahsulotlarni tanlang!"
+
+    # Check for cancellation
+    if message.text in ["❌ Отмена", "❌ Bekor qilish", "/cancel"]:
+        await state.clear()
+        await message.answer(
+            get_text(lang, "action_cancelled"),
+            reply_markup=main_menu_customer(lang)
         )
-        await message.answer(empty_msg, parse_mode="HTML")
         return
-    
-    # Filter ONLY active bookings (status='active', 'pending', or 'confirmed')
-    if isinstance(bookings[0], dict):
-        active = [b for b in bookings if b.get('status') in ['active', 'pending', 'confirmed']]
-    else:
-        # Fallback for tuple format - status is at index 7
-        active = [b for b in bookings if b[7] in ['active', 'pending', 'confirmed']]
-    
-    if not active:
-        no_active_msg = (
-            f"🛒 <b>Активных заказов нет</b>\n\n"
-            f"✅ Все ваши заказы уже выполнены\n"
-            f"🔥 Сделайте новый заказ в разделе <b>Горячее</b>!"
-            if lang == 'ru' else
-            f"🛒 <b>Faol buyurtmalar yo'q</b>\n\n"
-            f"✅ Barcha buyurtmalaringiz bajarilgan\n"
-            f"🔥 <b>Issiq</b> bo'limidan yangi buyurtma bering!"
+
+    # Determine delivery option
+    if "Доставка" in (message.text or "") or "Yetkazib berish" in (message.text or ""):
+        # User wants delivery, ask for address
+        await state.set_state(BookOffer.delivery_address)
+        await message.answer(
+            "📍 <b>Шаг 3/3: Введите адрес доставки</b>\n\n"
+            "Укажите полный адрес (улица, дом, квартира):" if lang == "ru"
+            else
+            "📍 <b>3/3-qadam: Yetkazib berish manzilini kiriting</b>\n\n"
+            "To'liq manzilni kiriting (ko'cha, uy, xonadon):",
+            parse_mode="HTML",
+            reply_markup=cancel_keyboard(lang)
         )
-        await message.answer(no_active_msg, parse_mode="HTML")
         return
-    
-    # Send header first
-    header = f"📦 <b>{get_text(lang, 'my_bookings')}</b>\n\n"
-    await message.answer(header, parse_mode="HTML")
 
-    # Send each booking as a separate message with action buttons
-    for booking in active[:10]:  # Show max 10
-        # Dict-compatible access
-        if isinstance(booking, dict):
-            booking_id = booking.get('booking_id')
-            offer_id = booking.get('offer_id')
-            quantity = booking.get('quantity', 1)
-            code = booking.get('booking_code', '')
-            created_at = booking.get('created_at', '')
-            delivery_option = booking.get('delivery_option', 0)
-            delivery_address = booking.get('delivery_address', '')
-            delivery_cost = booking.get('delivery_cost', 0)
-        else:
-            booking_id = booking[0]
-            offer_id = booking[1] if len(booking) > 1 else None
-            quantity = booking[6] if len(booking) > 6 else 1
-            code = booking[4] if len(booking) > 4 else ''
-            created_at = booking[7] if len(booking) > 7 else ''
-            delivery_option = booking[12] if len(booking) > 12 else 0
-            delivery_address = booking[13] if len(booking) > 13 else ''
-            delivery_cost = booking[14] if len(booking) > 14 else 0
-
-        if not booking_id or not offer_id:
-            continue
-
-        offer = db.get_offer(offer_id)
-        if not offer:
-            continue
-
-        # Get offer details (handle both dict and tuple)
-        if isinstance(offer, dict):
-            offer_title = offer.get('title', 'Товар')
-            offer_price = offer.get('discount_price', 0)
-        else:
-            offer_title = offer[2] if len(offer) > 2 else 'Товар'
-            offer_price = offer[5] if len(offer) > 5 else 0
-
-        total = int(offer_price * quantity)
-
-        # Show delivery info if applicable
-        delivery_info = ""
-        if delivery_option == 1:
-            if lang == 'ru':
-                delivery_info = (
-                    f"🚚 Доставка: {delivery_address[:40]}{'...' if len(delivery_address) > 40 else ''}\n"
-                    f"💵 Доставка: {delivery_cost:,} сум\n"
-                )
-                total_with_delivery = total + delivery_cost
-            else:
-                delivery_info = (
-                    f"🚚 Yetkazish: {delivery_address[:40]}{'...' if len(delivery_address) > 40 else ''}\n"
-                    f"💵 Yetkazish: {delivery_cost:,} so'm\n"
-                )
-                total_with_delivery = total + delivery_cost
-        else:
-            total_with_delivery = total
-
-        currency = "сум" if lang == 'ru' else "so'm"
-
-        body = (
-            f"📦 <b>{offer_title}</b>\n"
-            f"🔢 {quantity} шт • {total:,} {currency}\n"
-            f"{delivery_info}"
-        )
-
-        if delivery_option == 1:
-            body += f"💰 Итого: {total_with_delivery:,} {currency}\n"
-
-        body += (
-            f"🎫 <code>{code}</code>\n"
-            f"📅 {created_at}\n"
-        )
-
-        # Build action buttons: Details and Cancel
-        kb = InlineKeyboardBuilder()
-        kb.button(text=("Подробнее" if lang == 'ru' else "Batafsil"), callback_data=f"booking_details_{booking_id}")
-        kb.button(text=("Отменить" if lang == 'ru' else "Bekor qilish"), callback_data=f"cancel_booking_confirm_{booking_id}")
-        kb.adjust(2)
-
-        await message.answer(body, parse_mode="HTML", reply_markup=kb.as_markup())
+    # Pickup selected
+    data = await state.get_data()
+    await state.update_data(delivery_option=0, delivery_cost=0, delivery_address="")
+    await create_booking_final(message, state)
 
 
 @router.callback_query(

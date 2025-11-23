@@ -1211,8 +1211,58 @@ class Database:
         self.update_booking_status(booking_id, 'completed')
     
     def cancel_booking(self, booking_id: int):
-        """Cancel booking"""
-        self.update_booking_status(booking_id, 'cancelled')
+        """Cancel booking and return reserved quantity to offer atomically.
+
+        Returns:
+            bool: True if cancellation performed, False if booking not found or already finalised.
+        """
+        conn = None
+        try:
+            conn = self.pool.getconn()
+            conn.autocommit = False
+            cursor = conn.cursor()
+
+            # Lock booking row to avoid races
+            cursor.execute('SELECT status, offer_id, quantity FROM bookings WHERE booking_id = %s FOR UPDATE', (booking_id,))
+            row = cursor.fetchone()
+            if not row:
+                conn.rollback()
+                return False
+
+            status, offer_id, qty = row[0], row[1], row[2]
+            if status in ('cancelled', 'completed'):
+                conn.rollback()
+                return False
+
+            qty_to_return = int(qty or 0)
+
+            # Update offers quantity atomically within the same transaction
+            cursor.execute('''
+                UPDATE offers
+                SET quantity = COALESCE(quantity, 0) + %s,
+                    status = CASE WHEN COALESCE(quantity, 0) + %s <= 0 THEN 'inactive' ELSE 'active' END
+                WHERE offer_id = %s
+            ''', (qty_to_return, qty_to_return, offer_id))
+
+            # Mark booking as cancelled
+            cursor.execute('UPDATE bookings SET status = %s WHERE booking_id = %s', ('cancelled', booking_id))
+
+            conn.commit()
+            return True
+        except Exception:
+            try:
+                if conn:
+                    conn.rollback()
+            except Exception:
+                pass
+            raise
+        finally:
+            if conn:
+                try:
+                    conn.autocommit = True
+                    self.pool.putconn(conn)
+                except Exception:
+                    pass
     
     def approve_store(self, store_id: int):
         """Approve store and promote owner to seller"""

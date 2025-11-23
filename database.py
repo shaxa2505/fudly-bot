@@ -1498,8 +1498,63 @@ class Database:
         self.update_booking_status(booking_id, 'completed')
     
     def cancel_booking(self, booking_id: int):
-        """Отменить бронирование"""
-        self.update_booking_status(booking_id, 'cancelled')
+        """Отменить бронирование and return reserved quantity to the offer atomically.
+
+        Returns:
+            bool: True if cancellation performed, False if booking not found or already finalised.
+        """
+        conn = None
+        try:
+            conn = self.get_connection()
+            cursor = conn.cursor()
+            try:
+                cursor.execute('BEGIN')
+            except Exception:
+                pass
+
+            cursor.execute('SELECT status, offer_id, quantity FROM bookings WHERE booking_id = ?', (booking_id,))
+            row = cursor.fetchone()
+            if not row:
+                conn.rollback()
+                return False
+
+            status, offer_id, qty = row[0], row[1], row[2]
+            if status in ('cancelled', 'completed'):
+                conn.rollback()
+                return False
+
+            qty_to_return = int(qty or 0)
+
+            # Increment offer quantity and normalize status
+            cursor.execute('SELECT quantity FROM offers WHERE offer_id = ?', (offer_id,))
+            offer_row = cursor.fetchone()
+            current_offer_qty = offer_row[0] if offer_row and offer_row[0] is not None else 0
+            new_offer_qty = current_offer_qty + qty_to_return
+
+            new_status = 'active' if new_offer_qty > 0 else 'inactive'
+            if new_offer_qty <= 0:
+                new_offer_qty = 0
+
+            cursor.execute('UPDATE offers SET quantity = ?, status = ? WHERE offer_id = ?', (new_offer_qty, new_status, offer_id))
+
+            # Mark booking as cancelled
+            cursor.execute('UPDATE bookings SET status = ? WHERE booking_id = ?', ('cancelled', booking_id))
+
+            conn.commit()
+            return True
+        except Exception:
+            try:
+                if conn:
+                    conn.rollback()
+            except Exception:
+                pass
+            raise
+        finally:
+            try:
+                if conn:
+                    conn.close()
+            except Exception:
+                pass
     
     def get_store_bookings(self, store_id: int) -> List[Tuple]:
         """Получить все бронирования для магазина"""
