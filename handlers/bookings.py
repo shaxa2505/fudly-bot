@@ -681,37 +681,30 @@ async def create_booking_final(message: types.Message, state: FSMContext) -> Non
     
     from app.keyboards.user import main_menu_customer
     
+    # Inform customer that booking is pending partner confirmation (do not expose code yet)
     if lang == "uz":
         await message.answer(
-            f"✅ <b>Buyurtma muvaffaqiyatli yaratildi!</b>\n\n"
+            f"⏳ <b>Buyurtma yuborildi!</b>\n\n"
             f"🏪 <b>Do'kon:</b> {store_name}\n"
             f"📦 <b>Mahsulot:</b> {offer_title}\n"
             f"🔢 <b>Miqdor:</b> {quantity} шт\n"
             f"💰 <b>Mahsulot:</b> {total_price:,} so'm\n"
             f"{delivery_info_customer}"
-            f"💵 <b>Jami:</b> {total_with_delivery:,} so'm\n"
-            f"{expiry_text}"
-            f"{auto_cancel_notice}"
-            f"\n🎫 <b>Bron kodi:</b> <code>{code}</code>\n\n"
-            + (f"📍 <b>Olish manzili:</b>\n{offer_address}\n\n" if delivery_option == 0 else "")
-            + f"⚠️ <b>Muhim:</b> Buyurtmani {'olishda' if delivery_option == 0 else 'qabul qilishda'} bu kodni ko'rsating!",
+            f"💵 <b>Jami:</b> {total_with_delivery:,} so'm\n\n"
+            f"⚠️ <b>Diqqat:</b> Buyurtma sotuvchiga tasdiqlash uchun yuborildi. Kod va yakuniy ma'lumotlar sotuvchi tasdiqlagach yuboriladi.",
             parse_mode="HTML",
             reply_markup=main_menu_customer(lang),
         )
     else:
         await message.answer(
-            f"✅ <b>Заказ успешно создан!</b>\n\n"
+            f"⏳ <b>Заказ отправлен на подтверждение</b>\n\n"
             f"🏪 <b>Магазин:</b> {store_name}\n"
             f"📦 <b>Товар:</b> {offer_title}\n"
             f"🔢 <b>Количество:</b> {quantity} шт\n"
             f"💰 <b>Товар:</b> {total_price:,} сум\n"
             f"{delivery_info_customer}"
-            f"💵 <b>Итого:</b> {total_with_delivery:,} сум\n"
-            f"{expiry_text}"
-            f"{auto_cancel_notice}"
-            f"\n🎫 <b>Код бронирования:</b> <code>{code}</code>\n\n"
-            + (f"📍 <b>Адрес получения:</b>\n{offer_address}\n\n" if delivery_option == 0 else "")
-            + f"⚠️ <b>Важно:</b> Покажите этот код при {'получении' if delivery_option == 0 else 'получении'} заказа!",
+            f"💵 <b>Итого:</b> {total_with_delivery:,} сум\n\n"
+            f"⚠️ <b>Важно:</b> Заказ отправлен продавцу на подтверждение. Код бронирования и финальная информация будут высланы после подтверждения.",
             parse_mode="HTML",
             reply_markup=main_menu_customer(lang),
         )
@@ -883,8 +876,8 @@ async def partner_confirm(callback: types.CallbackQuery) -> None:
     try:
         customer_lang = db.get_user_language(user_id) if user_id and db else 'ru'
         confirm_text = (
-            f"✅ Ваша бронь <code>{code}</code> подтверждена продавцом. Пожалуйста, заберите заказ в течение {int(__import__('os').environ.get('BOOKING_DURATION_HOURS','2'))} часов." if customer_lang == 'ru'
-            else f"✅ Sizning broningiz <code>{code}</code> tasdiqlandi. Iltimos, buyurtmani {int(__import__('os').environ.get('BOOKING_DURATION_HOURS','2'))} soat ichida oling."
+            f"✅ Ваша бронь <code>{code}</code> подтверждена продавцом. Пожалуйста, заберите заказ в течение {int(__import__('os').environ.get('BOOKING_DURATION_HOURS','2'))} часов. Код бронирования: <code>{code}</code>." if customer_lang == 'ru'
+            else f"✅ Sizning broningiz <code>{code}</code> tasdiqlandi. Iltimos, buyurtmani {int(__import__('os').environ.get('BOOKING_DURATION_HOURS','2'))} soat ichida oling. Bron kodi: <code>{code}</code>."
         )
         await bot.send_message(user_id, confirm_text, parse_mode='HTML')
     except Exception as e:
