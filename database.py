@@ -804,7 +804,7 @@ class Database:
                 FROM offers o
                 JOIN stores s ON o.store_id = s.store_id
                 WHERE o.status = 'active' AND o.quantity > 0 AND s.store_id = ? AND s.status = 'active'
-                    AND date(o.expiry_date) >= date('now')
+                    AND (o.expiry_date IS NULL OR date(o.expiry_date) >= date('now'))
                 ORDER BY o.created_at DESC
             ''', (store_id,))
         elif city:
@@ -816,7 +816,7 @@ class Database:
                 FROM offers o
                 JOIN stores s ON o.store_id = s.store_id
                 WHERE o.status = 'active' AND o.quantity > 0 AND s.city = ? AND s.status = 'active'
-                    AND date(o.expiry_date) >= date('now')
+                    AND (o.expiry_date IS NULL OR date(o.expiry_date) >= date('now'))
                 ORDER BY o.created_at DESC
             ''', (city,))
         else:
@@ -828,7 +828,7 @@ class Database:
                 FROM offers o
                 JOIN stores s ON o.store_id = s.store_id
                 WHERE o.status = 'active' AND o.quantity > 0 AND s.status = 'active'
-                    AND date(o.expiry_date) >= date('now')
+                    AND (o.expiry_date IS NULL OR date(o.expiry_date) >= date('now'))
                 ORDER BY o.created_at DESC
             ''')
         
