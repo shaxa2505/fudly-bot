@@ -69,6 +69,7 @@ from app.keyboards import (
     cancel_keyboard,
     city_keyboard,
     language_keyboard,
+    settings_keyboard,
     main_menu_customer,
     main_menu_seller,
     moderation_keyboard,
@@ -272,6 +273,7 @@ async def catch_all_callbacks(callback: types.CallbackQuery):
 # ============== PHASE 3: EXTRACTED HANDLERS INTEGRATION ==============
 # Import extracted handler modules (FIRST - for router registration priority)
 from handlers import bookings, orders, partner, common_user
+from handlers import user_features
 from handlers.seller import create_offer, management, analytics, order_management, bulk_import
 from handlers.user import profile, favorites
 from handlers.admin import dashboard as admin_dashboard, legacy as admin_legacy
@@ -288,6 +290,8 @@ profile.setup_dependencies(db, bot, user_view_mode)
 favorites.setup_dependencies(db, bot, user_view_mode)
 order_management.setup(bot, db)
 common_user.setup(bot, db, user_view_mode, get_text, main_menu_customer, booking_filters_keyboard, main_menu_seller)
+# Setup user feature handlers (cart, favorites, settings)
+user_features.setup(dp, db, get_text, booking_filters_keyboard, settings_keyboard)
 admin_dashboard.setup(bot, db, get_text, moderation_keyboard, get_uzb_time)
 admin_legacy.setup(bot, db, get_text, moderation_keyboard, get_uzb_time, ADMIN_ID, DATABASE_URL)
 
