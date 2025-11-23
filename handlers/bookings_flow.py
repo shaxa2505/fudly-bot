@@ -77,6 +77,52 @@ async def filter_bookings(callback: types.CallbackQuery) -> None:
     await callback.answer()
 
 
+@router.callback_query(F.data.startswith("book_"))
+async def book_offer_start(callback: types.CallbackQuery, state: FSMContext) -> None:
+    """Start booking flow when user presses 'book_{offer_id}' button."""
+    if not db:
+        await callback.answer("System error", show_alert=True)
+        return
+
+    assert callback.from_user is not None
+    user_id = callback.from_user.id
+    lang = db.get_user_language(user_id)
+
+    try:
+        offer_id = int(callback.data.rsplit("_", 1)[1])
+    except (ValueError, IndexError):
+        await callback.answer(get_text(lang, "error"), show_alert=True)
+        return
+
+    offer = db.get_offer(offer_id)
+    if not offer:
+        await callback.answer(get_text(lang, "booking_not_found"), show_alert=True)
+        return
+
+    # Prevent sellers from booking their own offers
+    try:
+        user = db.get_user(user_id)
+        role = user.get('role') if user else None
+    except Exception:
+        role = None
+
+    store_id = get_offer_field(offer, 'store_id')
+    if role in ('seller', 'store_owner') and store_id:
+        store = db.get_store(store_id)
+        owner_id = get_store_field(store, 'owner_id', None) if store else None
+        if owner_id == user_id:
+            await callback.answer(get_text(lang, 'seller_cannot_book_own_offer') or "Вы не можете бронировать собственное предложение", show_alert=True)
+            return
+
+    # Prompt user for quantity and set FSM state
+    await state.update_data(offer_id=offer_id)
+    await state.set_state(BookOffer.quantity)
+
+    prompt = get_text(lang, 'how_many_to_book') or ("Сколько хотите забронировать?" if lang == 'ru' else "Nechta bron qilmoqchisiz?")
+    await _safe_answer_or_send(callback.message, user_id, prompt)
+    await callback.answer()
+
+
 @router.callback_query(F.data.startswith("cancel_booking_"))
 async def cancel_booking(callback: types.CallbackQuery) -> None:
     """Cancel booking."""
