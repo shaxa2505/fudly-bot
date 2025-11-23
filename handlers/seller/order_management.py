@@ -102,9 +102,10 @@ async def cancel_order(callback: types.CallbackQuery):
     quantity = get_field(order, 'quantity', 4)
     offer = db.get_offer(offer_id)
     if offer:
-        offer_quantity = get_field(offer, 'quantity', 6)
-        new_quantity = offer_quantity + quantity
-        db.update_offer_quantity(offer_id, new_quantity)
+            try:
+                db.increment_offer_quantity_atomic(offer_id, quantity)
+            except Exception as e:
+                logger.error(f"Failed to restore quantity for offer {offer_id}: {e}")
     
     # Уведомляем продавца
     await callback.message.edit_text(
@@ -206,9 +207,10 @@ async def reject_payment(callback: types.CallbackQuery):
     quantity = get_field(order, 'quantity', 4)
     offer = db.get_offer(offer_id)
     if offer:
-        offer_quantity = get_field(offer, 'quantity', 6)
-        new_quantity = offer_quantity + quantity
-        db.update_offer_quantity(offer_id, new_quantity)
+            try:
+                db.increment_offer_quantity_atomic(offer_id, quantity)
+            except Exception as e:
+                logger.error(f"Failed to restore quantity for offer {offer_id}: {e}")
     
     # Уведомляем продавца
     payment_rejected_text = 'Оплата отклонена, заказ отменён' if lang == 'ru' else "To'lov rad etildi, buyurtma bekor qilindi"

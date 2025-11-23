@@ -399,8 +399,11 @@ async def order_payment_proof(message: types.Message, state: FSMContext, db: Dat
     db.update_payment_status(order_id, "pending", photo_id)
     await state.clear()
 
-    new_quantity = offer_quantity - quantity
-    db.update_offer_quantity(offer_id, new_quantity)
+    # Decrement offer quantity atomically
+    try:
+        db.increment_offer_quantity_atomic(offer_id, -int(quantity))
+    except Exception as e:
+        logger.error(f"Failed to decrement offer {offer_id} by {quantity}: {e}")
 
     customer = db.get_user_model(message.from_user.id)
     customer_phone = customer.phone if customer else "Не указан"
@@ -586,14 +589,18 @@ async def reject_payment(callback: types.CallbackQuery, db: DatabaseProtocol, bo
     quantity = get_order_field(order, 'quantity', 4)
     offer = db.get_offer(offer_id)
     if offer:
-        new_quantity = get_order_field(offer, "quantity", 0) + quantity
-        db.update_offer_quantity(offer_id, new_quantity)
+        try:
+            db.increment_offer_quantity_atomic(offer_id, int(quantity))
+        except Exception as e:
+            logger.error(f"Failed to restore quantity for offer {offer_id}: {e}")
     offer_id = get_order_field(order, 'offer_id', 3)
     quantity = get_order_field(order, 'quantity', 4)
     offer = db.get_offer(offer_id)
     if offer:
-        new_quantity = get_order_field(offer, "quantity", 0) + quantity
-        db.update_offer_quantity(offer_id, new_quantity)
+        try:
+            db.increment_offer_quantity_atomic(offer_id, int(quantity))
+        except Exception as e:
+            logger.error(f"Failed to restore quantity for offer {offer_id}: {e}")
 
     payment_rejected_text = (
         "Оплата отклонена, заказ отменён"
@@ -704,8 +711,10 @@ async def cancel_order(callback: types.CallbackQuery, db: DatabaseProtocol, bot:
 
     offer = db.get_offer(order[3])
     if offer:
-        new_quantity = get_offer_field(offer, "quantity", 0) + order[4]
-        db.update_offer_quantity(order[3], new_quantity)
+        try:
+            db.increment_offer_quantity_atomic(order[3], int(order[4]))
+        except Exception as e:
+            logger.error(f"Failed to restore quantity for offer {order[3]}: {e}")
 
     await callback.message.edit_text(
         callback.message.text
@@ -790,8 +799,10 @@ async def cancel_order_customer(callback: types.CallbackQuery, db: DatabaseProto
     quantity = get_order_field(order, 'quantity', 4)
     offer = db.get_offer(offer_id)
     if offer:
-        new_quantity = get_offer_field(offer, "quantity", 0) + quantity
-        db.update_offer_quantity(offer_id, new_quantity)
+        try:
+            db.increment_offer_quantity_atomic(offer_id, int(quantity))
+        except Exception as e:
+            logger.error(f"Failed to restore quantity for offer {offer_id}: {e}")
 
     await callback.message.edit_text(
         callback.message.text

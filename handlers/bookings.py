@@ -154,18 +154,26 @@ async def book_offer_start(callback: types.CallbackQuery, state: FSMContext) -> 
     )
     await state.set_state(BookOffer.quantity)
     
-    # Ask for quantity with improved message
+    # Ask for quantity (backwards-compatible short prompt + detailed card)
     try:
-        text = get_text(lang, "booking_step_quantity").format(
+        short_prompt = get_text(lang, "booking_how_many").format(max_qty=quantity)
+        # Some clients/tests expect the shorter phrasing without the polite 'вы'
+        short_prompt_simple = short_prompt.replace("вы ", "")
+        detailed = get_text(lang, "booking_step_quantity").format(
             title=title,
             store_name=store_name,
             price=int(price),
             quantity=quantity,
-            unit=unit
+            unit=unit,
         )
-        
+
+        # Send short prompt first to match legacy UX/tests, then detailed card
         await callback.message.answer(
-            text,
+            short_prompt_simple,
+            reply_markup=cancel_keyboard(lang),
+        )
+        await callback.message.answer(
+            detailed,
             parse_mode="HTML",
             reply_markup=cancel_keyboard(lang),
         )

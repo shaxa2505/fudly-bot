@@ -1096,6 +1096,48 @@ class Database:
                 conn.close()
             except Exception:
                 pass
+
+    def increment_offer_quantity_atomic(self, offer_id: int, amount: int = 1) -> int:
+        """Atomically increment offer quantity by `amount` and return new quantity.
+
+        Uses a transaction to avoid race conditions when multiple concurrent updates
+        modify the same offer quantity.
+        """
+        conn = self.get_connection()
+        try:
+            cursor = conn.cursor()
+            try:
+                cursor.execute('BEGIN')
+            except Exception:
+                # Some SQLite modes will implicitly start a transaction
+                pass
+
+            cursor.execute('SELECT quantity FROM offers WHERE offer_id = ?', (offer_id,))
+            row = cursor.fetchone()
+            current_qty = row[0] if row and row[0] is not None else 0
+            new_qty = current_qty + int(amount)
+
+            # Normalize and set status
+            status = 'active' if new_qty > 0 else 'inactive'
+            if new_qty <= 0:
+                new_qty_to_set = 0
+            else:
+                new_qty_to_set = new_qty
+
+            cursor.execute('UPDATE offers SET quantity = ?, status = ? WHERE offer_id = ?', (new_qty_to_set, status, offer_id))
+            conn.commit()
+            return new_qty_to_set
+        except Exception:
+            try:
+                conn.rollback()
+            except Exception:
+                pass
+            raise
+        finally:
+            try:
+                conn.close()
+            except Exception:
+                pass
     
     def deactivate_offer(self, offer_id: int):
         conn = self.get_connection()

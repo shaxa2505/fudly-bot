@@ -822,8 +822,12 @@ async def quantity_add(callback: types.CallbackQuery) -> None:
         await callback.answer(get_text(lang, "not_your_offer"), show_alert=True)
         return
 
-    new_quantity = current_quantity + 1
-    db.update_offer_quantity(offer_id, new_quantity)
+    try:
+        new_quantity = db.increment_offer_quantity_atomic(offer_id, 1)
+    except Exception as e:
+        logger.error(f"Failed to increment quantity for {offer_id}: {e}")
+        await callback.answer(get_text(lang, "error"), show_alert=True)
+        return
 
     await update_offer_message(callback, offer_id, lang)
     await callback.answer(f"✅ +1 (теперь {new_quantity})")
@@ -859,8 +863,12 @@ async def quantity_subtract(callback: types.CallbackQuery) -> None:
         await callback.answer(get_text(lang, "not_your_offer"), show_alert=True)
         return
 
-    new_quantity = max(0, current_quantity - 1)
-    db.update_offer_quantity(offer_id, new_quantity)
+    try:
+        new_quantity = db.increment_offer_quantity_atomic(offer_id, -1)
+    except Exception as e:
+        logger.error(f"Failed to decrement quantity for {offer_id}: {e}")
+        await callback.answer(get_text(lang, "error"), show_alert=True)
+        return
 
     await update_offer_message(callback, offer_id, lang)
 
