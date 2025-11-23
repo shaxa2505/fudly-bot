@@ -24,6 +24,7 @@ from handlers.bookings_utils import (
     get_offer_field,
     get_booking_field,
     get_bookings_filter_keyboard,
+    get_user_safe,
 )
 
 # This will be imported from bot.py
@@ -480,8 +481,8 @@ async def book_offer_delivery_receipt_photo(message: types.Message, state: FSMCo
         except Exception as e:
             logger.error(f"Failed to decrement offer {offer_id} by {quantity}: {e}")
 
-        customer = db.get_user_model(message.from_user.id)
-        customer_phone = customer.phone if customer else "Не указан"
+        customer = get_user_safe(db, message.from_user.id)
+        customer_phone = getattr(customer, 'phone', None) or "Не указан"
 
         currency_ru = "сум"
         currency_uz = "so'm"
@@ -782,8 +783,8 @@ async def create_booking_final(message: types.Message, state: FSMContext) -> Non
             owner_id = get_store_field(store, "owner_id")
             if owner_id:
                 partner_lang = db.get_user_language(owner_id)
-                customer = db.get_user_model(message.from_user.id)
-                customer_phone = customer.phone if customer else "Не указан"
+                customer = get_user_safe(db, message.from_user.id)
+                customer_phone = getattr(customer, 'phone', None) or "Не указан"
 
                 # Partner should confirm the booking first. Offer Confirm / Reject buttons.
                 notification_kb = InlineKeyboardBuilder()

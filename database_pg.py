@@ -576,7 +576,18 @@ class Database:
         user_dict = self.get_user(user_id)
         if not user_dict:
             return None
-        
+
+        # Sanitize common missing fields before conversion
+        try:
+            if not user_dict.get('first_name'):
+                user_dict['first_name'] = user_dict.get('username') or ''
+            if not user_dict.get('city'):
+                user_dict['city'] = 'Ташкент'
+            if user_dict.get('language') is None:
+                user_dict['language'] = 'ru'
+        except Exception:
+            pass
+
         try:
             return User.from_db_row(user_dict)
         except Exception as e:

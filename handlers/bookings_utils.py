@@ -4,6 +4,7 @@ from __future__ import annotations
 from typing import Any
 from aiogram import types as _ai_types
 from aiogram.utils.keyboard import InlineKeyboardBuilder
+from types import SimpleNamespace
 
 from app.core.cache import CacheManager
 from localization import get_text
@@ -99,3 +100,48 @@ def get_bookings_filter_keyboard(lang: str):
     builder.button(text=get_text(lang, "filter_all"), callback_data="filter_all")
     builder.adjust(3)
     return builder.as_markup()
+
+
+def get_user_safe(db, user_id: int) -> SimpleNamespace:
+    """Return a lightweight user-like object with safe attributes.
+
+    Tries `db.get_user_model` (Pydantic model). If conversion fails or is
+    unavailable, falls back to `db.get_user` (dict) and ensures minimal
+    attributes exist so handlers can continue.
+    """
+    try:
+        user_model = db.get_user_model(user_id)
+        if user_model:
+            return SimpleNamespace(
+                user_id=user_model.user_id,
+                username=getattr(user_model, 'username', None),
+                first_name=getattr(user_model, 'first_name', '') or '',
+                phone=getattr(user_model, 'phone', None),
+                city=getattr(user_model, 'city', 'Ташкент'),
+                language=getattr(user_model, 'language', 'ru'),
+            )
+    except Exception:
+        pass
+
+    # Fallback to raw dict
+    try:
+        row = db.get_user(user_id)
+        if row:
+            first = row.get('first_name') if isinstance(row, dict) else (row[2] if len(row) > 2 else '')
+            phone = row.get('phone') if isinstance(row, dict) else (row[3] if len(row) > 3 else None)
+            username = row.get('username') if isinstance(row, dict) else (row[1] if len(row) > 1 else None)
+            city = row.get('city') if isinstance(row, dict) else (row[4] if len(row) > 4 else 'Ташкент')
+            language = row.get('language') if isinstance(row, dict) else (row[5] if len(row) > 5 else 'ru')
+            return SimpleNamespace(
+                user_id=user_id,
+                username=username,
+                first_name=first or (username or ''),
+                phone=phone,
+                city=city or 'Ташкент',
+                language=language or 'ru',
+            )
+    except Exception:
+        pass
+
+    # Ultimate fallback
+    return SimpleNamespace(user_id=user_id, username=None, first_name='', phone=None, city='Ташкент', language='ru')

@@ -450,7 +450,20 @@ class Database:
         user_dict = self.get_user(user_id)
         if not user_dict:
             return None
-        
+
+        # Sanitize fields to satisfy Pydantic validators (provide sensible defaults)
+        try:
+            if not user_dict.get('first_name'):
+                # Prefer username if present, else empty string
+                user_dict['first_name'] = user_dict.get('username') or ''
+            if not user_dict.get('city'):
+                user_dict['city'] = 'Ташкент'
+            if user_dict.get('language') is None:
+                user_dict['language'] = 'ru'
+        except Exception:
+            # Best-effort sanitization; continue to conversion
+            pass
+
         try:
             return User.from_db_row(user_dict)
         except Exception as e:
