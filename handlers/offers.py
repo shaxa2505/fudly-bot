@@ -442,16 +442,22 @@ def setup(
             logger.error(f"Invalid store_id in callback data: {callback.data}, error: {e}")
             await callback.answer(get_text(lang, "error"), show_alert=True)
             return
-        
+        # Use offer_service for structured store details and db.get_store for raw fields (photo)
         store = offer_service.get_store(store_id)
+        raw_store = None
+        try:
+            raw_store = db.get_store(store_id) if db else None
+        except Exception:
+            raw_store = None
+
         if not store:
             await callback.answer(
                 "Магазин не найден" if lang == "ru" else "Do'kon topilmadi",
                 show_alert=True,
             )
             return
-        
-        # Show category selection directly
+
+        # Show category selection text
         text = (
             f"🏪 <b>{store.name}</b>\n\n"
             f"📂 Выберите категорию товаров:"
@@ -459,10 +465,24 @@ def setup(
             f"🏪 <b>{store.name}</b>\n\n"
             f"📂 Mahsulot toifasini tanlang:"
         )
-        
+
         from app.keyboards import offers_category_filter
         keyboard = offers_category_filter(lang, store_id=store_id)
-        
+
+        # If we have a photo in raw_store, send a photo message with caption and keyboard
+        photo = None
+        if isinstance(raw_store, dict):
+            photo = raw_store.get('photo') or raw_store.get('photo_id')
+
+        if photo:
+            try:
+                await msg.answer_photo(photo=photo, caption=text, parse_mode="HTML", reply_markup=keyboard)
+                await callback.answer()
+                return
+            except Exception:
+                # Fall back to editing text if photo fails
+                pass
+
         await msg.edit_text(text, parse_mode="HTML", reply_markup=keyboard)
         await callback.answer()
 
@@ -843,20 +863,30 @@ def setup(
         keyboard = offer_keyboards.store_card_keyboard(
             lang, store_id, store.offers_count, store.ratings_count
         )
-        
+
+        # Try to fetch raw store data from DB to get photo/photo_id (repo may keep photo field)
+        photo = None
+        try:
+            raw_store = db.get_store(store_id) if db else None
+            if isinstance(raw_store, dict):
+                photo = raw_store.get('photo') or raw_store.get('photo_id')
+        except Exception:
+            photo = None
+
         # Отправить с фото если есть
-        if hasattr(store, 'photo') and store.photo:
+        if photo:
             try:
                 await message.answer_photo(
-                    photo=store.photo,
+                    photo=photo,
                     caption=text,
                     parse_mode="HTML",
                     reply_markup=keyboard
                 )
                 return
             except Exception:
-                pass  # Fallback to text if photo fails
-        
+                # If sending photo fails, fall back to text
+                pass
+
         await message.answer(text, parse_mode="HTML", reply_markup=keyboard)
 
     async def _send_offer_details(message: types.Message, offer: OfferDetails, lang: str) -> None:
