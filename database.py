@@ -42,6 +42,8 @@ except ImportError:
 
 # Module-level settings
 DB_PATH = os.environ.get('DATABASE_PATH', 'fudly.db')
+# Default booking duration (hours) for SQLite adapter — can be overridden via env
+BOOKING_DURATION_HOURS = int(os.environ.get('BOOKING_DURATION_HOURS', '2'))
 
 class Database:
     def __init__(self, db_name: str = "fudly.db"):
@@ -126,6 +128,8 @@ class Database:
                 booking_code TEXT,
                 pickup_time TEXT,
                 quantity INTEGER DEFAULT 1,
+                expiry_time TEXT,
+                reminder_sent INTEGER DEFAULT 0,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 FOREIGN KEY (offer_id) REFERENCES offers(offer_id),
                 FOREIGN KEY (user_id) REFERENCES users(user_id)
@@ -138,6 +142,19 @@ class Database:
             conn.commit()
         except:
             pass  # Поле уже существует
+
+        # Добавляем поле expiry_time и reminder_sent если их нет (для старых БД)
+        try:
+            cursor.execute('ALTER TABLE bookings ADD COLUMN expiry_time TEXT')
+            conn.commit()
+        except Exception:
+            pass
+
+        try:
+            cursor.execute('ALTER TABLE bookings ADD COLUMN reminder_sent INTEGER DEFAULT 0')
+            conn.commit()
+        except Exception:
+            pass
         
         # Добавляем поле expiry_date если его нет (для старых БД)
         try:
@@ -1236,9 +1253,10 @@ class Database:
         conn = self.get_connection()
         try:
             cursor = conn.cursor()
-            cursor.execute('''
-                INSERT INTO bookings (offer_id, user_id, booking_code, status, quantity)
-                VALUES (?, ?, ?, 'pending', ?)
+            # Set expiry_time using SQLite datetime() and default reminder_sent=0
+            cursor.execute(f'''
+                INSERT INTO bookings (offer_id, user_id, booking_code, status, quantity, expiry_time, reminder_sent)
+                VALUES (?, ?, ?, 'pending', ?, datetime('now', '+{BOOKING_DURATION_HOURS} hours'), 0)
             ''', (offer_id, user_id, booking_code, quantity))
             booking_id = cursor.lastrowid
             conn.commit()
@@ -1306,10 +1324,10 @@ class Database:
             # Генерируем уникальный код бронирования
             booking_code = ''.join(random.choices(string.ascii_uppercase + string.digits, k=6))
             
-            # Создаем бронирование
-            cursor.execute('''
-                INSERT INTO bookings (offer_id, user_id, booking_code, status, quantity)
-                VALUES (?, ?, ?, 'pending', ?)
+            # Создаем бронирование и устанавливаем expiry_time (SQLite)
+            cursor.execute(f'''
+                INSERT INTO bookings (offer_id, user_id, booking_code, status, quantity, expiry_time, reminder_sent)
+                VALUES (?, ?, ?, 'pending', ?, datetime('now', '+{BOOKING_DURATION_HOURS} hours'), 0)
             ''', (offer_id, user_id, booking_code, quantity))
             booking_id = cursor.lastrowid
             
