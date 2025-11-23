@@ -489,6 +489,7 @@ async def book_offer_delivery_receipt_photo(message: types.Message, state: FSMCo
         )
         return
 
+    logger.info(f"📷 Received delivery payment proof from user {message.from_user.id}: file_id={photo}")
     # Save receipt photo id to state and proceed to create booking
     await state.update_data(payment_proof_photo_id=photo)
     await create_booking_final(message, state)
@@ -714,15 +715,15 @@ async def create_booking_final(message: types.Message, state: FSMContext) -> Non
                 partner_lang = db.get_user_language(owner_id)
                 customer = db.get_user_model(message.from_user.id)
                 customer_phone = customer.phone if customer else "Не указан"
-                
+
                 # Partner should confirm the booking first. Offer Confirm / Reject buttons.
                 notification_kb = InlineKeyboardBuilder()
                 notification_kb.button(text=("Подтвердить" if partner_lang == 'ru' else "Tasdiqlash"), callback_data=f"partner_confirm_{booking_id}")
                 notification_kb.button(text=("Отклонить" if partner_lang == 'ru' else "Rad etish"), callback_data=f"partner_reject_{booking_id}")
                 notification_kb.adjust(2)
-                
+
                 store_name = get_store_field(store, "name", "Магазин")
-                
+
                 delivery_info_partner = ""
                 if delivery_option == 1:
                     delivery_info_partner = (
@@ -730,13 +731,20 @@ async def create_booking_final(message: types.Message, state: FSMContext) -> Non
                         if partner_lang == "ru"
                         else f"\n🚚 <b>Yetkazib berish:</b> {delivery_address}\n💵 Yetkazish: {delivery_cost:,} so'm"
                     )
-                
+
                 total_amount = int(offer_price * quantity)
                 if delivery_option == 1:
                     total_amount += delivery_cost
                 # Safe booking code display to avoid showing 'None'
                 code_display = code if code else str(booking_id)
-                
+
+                # Try to fetch payment proof from DB (booking was updated earlier)
+                try:
+                    booking_db = db.get_booking(booking_id) or {}
+                    payment_proof = get_booking_field(booking_db, 'payment_proof_photo_id', None)
+                except Exception:
+                    payment_proof = None
+
                 if partner_lang == "uz":
                     notif_text = (
                         f"🔔 <b>Yangi buyurtma</b>\n\n"
@@ -759,9 +767,17 @@ async def create_booking_final(message: types.Message, state: FSMContext) -> Non
                         f"🎫 <code>{code_display}</code>\n"
                         f"💰 {total_amount:,} сум"
                     )
-                
+
                 try:
-                    await _safe_answer_or_send(None, owner_id, notif_text, parse_mode="HTML", reply_markup=notification_kb.as_markup())
+                    # If payment proof exists and looks like a Telegram file_id, send as photo with caption
+                    if payment_proof and isinstance(payment_proof, str):
+                        try:
+                            await bot.send_photo(owner_id, payment_proof, caption=notif_text, parse_mode="HTML", reply_markup=notification_kb.as_markup())
+                        except Exception:
+                            # Fallback to text if send_photo fails
+                            await _safe_answer_or_send(None, owner_id, notif_text, parse_mode="HTML", reply_markup=notification_kb.as_markup())
+                    else:
+                        await _safe_answer_or_send(None, owner_id, notif_text, parse_mode="HTML", reply_markup=notification_kb.as_markup())
                 except Exception as e:
                     logger.error(f"Failed to notify partner: {e}")
     
@@ -1097,11 +1113,47 @@ async def partner_confirm(callback: types.CallbackQuery) -> None:
     code_display = code if code else str(booking_id)
     try:
         customer_lang = db.get_user_language(user_id) if user_id and db else 'ru'
-        confirm_text = (
-            f"✅ Ваша бронь <code>{code_display}</code> подтверждена продавцом. Пожалуйста, заберите заказ в течение {int(__import__('os').environ.get('BOOKING_DURATION_HOURS','2'))} часов. Код бронирования: <code>{code_display}</code>." if customer_lang == 'ru'
-            else f"✅ Sizning broningiz <code>{code_display}</code> tasdiqlandi. Iltimos, buyurtmani {int(__import__('os').environ.get('BOOKING_DURATION_HOURS','2'))} soat ichida oling. Bron kodi: <code>{code_display}</code>."
-        )
-        await bot.send_message(user_id, confirm_text, parse_mode='HTML')
+        # Check if booking is delivery or pickup to vary the message
+        delivery_opt = get_booking_field(booking, 'delivery_option', 0)
+        if int(delivery_opt or 0) == 1:
+            # For delivery: inform customer that seller confirmed and ask them to confirm receipt after delivery
+            if customer_lang == 'ru':
+                confirm_text = (
+                    f"✅ Ваша бронь <code>{code_display}</code> подтверждена продавцом. Продавец оформил доставку. После получения заказа, пожалуйста, подтвердите получение кнопкой ниже."
+                )
+                confirm_btn_text = "Подтвердить получение"
+            else:
+                confirm_text = (
+                    f"✅ Sizning broningiz <code>{code_display}</code> sotuvchi tomonidan tasdiqlandi. Sotuvchi yetkazib berishni boshlaydi. Buyurtmani olganingizdan so'ng, iltimos, quyidagi tugma orqali qabul qilganingizni tasdiqlang."
+                )
+                confirm_btn_text = "Qabul qildim"
+
+            # Inline keyboard for customer to confirm receipt
+            from aiogram.utils.keyboard import InlineKeyboardBuilder as _IKB
+            cust_kb = _IKB()
+            cust_kb.button(text=confirm_btn_text, callback_data=f"customer_received_{booking_id}")
+            cust_kb.adjust(1)
+
+            try:
+                await bot.send_message(user_id, confirm_text, parse_mode='HTML', reply_markup=cust_kb.as_markup())
+            except Exception:
+                # Fallback without keyboard
+                await bot.send_message(user_id, confirm_text, parse_mode='HTML')
+        else:
+            # Pickup: ask to pick up within booking duration (existing behavior)
+            hours = int(__import__('os').environ.get('BOOKING_DURATION_HOURS','2'))
+            if customer_lang == 'ru':
+                confirm_text = (
+                    f"✅ Ваша бронь <code>{code_display}</code> подтверждена продавцом. Пожалуйста, заберите заказ в течение {hours} часов. Код бронирования: <code>{code_display}</code>."
+                )
+            else:
+                confirm_text = (
+                    f"✅ Sizning broningiz <code>{code_display}</code> tasdiqlandi. Iltimos, buyurtmani {hours} soat ichida oling. Bron kodi: <code>{code_display}</code>."
+                )
+            try:
+                await bot.send_message(user_id, confirm_text, parse_mode='HTML')
+            except Exception:
+                logger.error(f"Failed to notify customer about confirmation (pickup) for booking {booking_id}")
     except Exception as e:
         logger.error(f"Failed to notify customer about confirmation: {e}")
 
@@ -1207,6 +1259,72 @@ async def complete_booking(callback: types.CallbackQuery) -> None:
         try:
             text_src = getattr(callback.message, 'text', '') or ''
             await _safe_answer_or_send(callback.message, callback.from_user.id, text_src + "\n\n✅ <b>Выполнено</b>", parse_mode="HTML")
+        except Exception:
+            pass
+    else:
+        await callback.answer(get_text(lang, "error"), show_alert=True)
+
+
+@router.callback_query(F.data.startswith("customer_received_"))
+async def customer_received(callback: types.CallbackQuery) -> None:
+    """Customer confirms they received a delivered booking."""
+    if not db:
+        await callback.answer("System error", show_alert=True)
+        return
+
+    assert callback.from_user is not None
+    lang = db.get_user_language(callback.from_user.id)
+
+    try:
+        booking_id = int((callback.data or "").rsplit("_", 1)[-1])
+    except (ValueError, IndexError) as e:
+        logger.error(f"Invalid booking_id in customer_received callback: {callback.data}, error: {e}")
+        await callback.answer(get_text(lang, "error"), show_alert=True)
+        return
+
+    booking = db.get_booking(booking_id)
+    if not booking:
+        await callback.answer(get_text(lang, "booking_not_found"), show_alert=True)
+        return
+
+    user_id = get_booking_field(booking, 'user_id')
+    if callback.from_user.id != user_id:
+        await callback.answer(get_text(lang, "error"), show_alert=True)
+        return
+
+    # Complete booking
+    success = db.complete_booking(booking_id)
+    if success:
+        # mark reminder sent to avoid further reminders
+        try:
+            with db.get_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute('UPDATE bookings SET reminder_sent = 1 WHERE booking_id = %s', (booking_id,))
+        except Exception:
+            pass
+
+        # Notify partner (store owner) that customer confirmed receipt
+        try:
+            store_id = get_booking_field(booking, 'store_id')
+            if store_id:
+                store = db.get_store(store_id)
+                owner_id = get_store_field(store, 'owner_id') if store else None
+                if owner_id:
+                    try:
+                        await bot.send_message(owner_id, f"Покупатель подтвердил получение заказа #{booking_id}.")
+                    except Exception:
+                        pass
+        except Exception:
+            pass
+
+        # Acknowledge to customer
+        try:
+            await callback.answer(get_text(lang, 'booking_completed') or ("Бронь завершена" if lang == 'ru' else "Bron yakunlandi"), show_alert=True)
+            try:
+                text_src = getattr(callback.message, 'text', '') or ''
+                await _safe_answer_or_send(callback.message, callback.from_user.id, text_src + "\n\n✅ Подтвержено получение. Спасибо!", parse_mode="HTML")
+            except Exception:
+                pass
         except Exception:
             pass
     else:
