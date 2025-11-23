@@ -513,37 +513,6 @@ def setup(
             logger.error(f"Failed to send offer details for {offer_id}: {e}")
             await callback.answer(get_text(lang, "error"), show_alert=True)
         await callback.answer()
-        else:
-            await callback.answer(header, show_alert=True)
-
-        # Send up to 20 offers from the store
-        for offer in offers[:20]:
-            caption = render_offer_card(lang, offer)
-            keyboard = offer_quick_keyboard(lang, offer.id, offer.store_id, offer.delivery_enabled)
-
-            if getattr(offer, 'photo', None):
-                try:
-                    if msg:
-                        await msg.answer_photo(
-                            photo=offer.photo,
-                            caption=caption,
-                            parse_mode="HTML",
-                            reply_markup=keyboard
-                        )
-                    else:
-                        await callback.answer(caption, show_alert=True)
-                except Exception:
-                    if msg:
-                        await msg.answer(caption, parse_mode="HTML", reply_markup=keyboard)
-                    else:
-                        await callback.answer(caption, show_alert=True)
-            else:
-                if msg:
-                    await msg.answer(caption, parse_mode="HTML", reply_markup=keyboard)
-                else:
-                    await callback.answer(caption, show_alert=True)
-
-        await callback.answer()
 
     @dp.message(F.text.in_(["🎯 Горячее", "🎯 Issiq"]))
     async def show_hot_offers(message: types.Message):

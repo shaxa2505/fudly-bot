@@ -877,8 +877,7 @@ async def book_offer_delivery_choice(message: types.Message, state: FSMContext) 
 
 
 @router.callback_query(
-    lambda c: c.data
-    in ["bookings_active", "bookings_completed", "bookings_cancelled"]
+    lambda c: (c.data or "") in ["bookings_active", "bookings_completed", "bookings_cancelled"]
 )
 async def filter_bookings(callback: types.CallbackQuery) -> None:
     """Filter bookings by status."""
@@ -892,7 +891,7 @@ async def filter_bookings(callback: types.CallbackQuery) -> None:
         "bookings_completed": "completed",
         "bookings_cancelled": "cancelled",
     }
-    status = status_map.get(callback.data, "active")
+    status = status_map.get(callback.data or "", "active")
     
     bookings = db.get_user_bookings_by_status(callback.from_user.id, status)
     
@@ -1008,7 +1007,7 @@ async def choose_cancel(callback: types.CallbackQuery, state: FSMContext) -> Non
         pass
 
 
-@router.callback_query(lambda c: bool(re.match(r"^cancel_booking_\d+$", c.data)))
+@router.callback_query(lambda c: bool(re.match(r"^cancel_booking_\d+$", (c.data or ""))))
 async def cancel_booking(callback: types.CallbackQuery) -> None:
     """Cancel booking."""
     if not db:
@@ -1219,7 +1218,8 @@ async def rate_booking(callback: types.CallbackQuery) -> None:
     
     # Check if booking exists and is completed
     booking = db.get_booking(booking_id)
-    if not booking or booking[7] != "completed":
+    status_val = get_booking_field(booking, 'status') if booking else None
+    if not booking or status_val != "completed":
         await callback.answer(get_text(lang, "cannot_rate"), show_alert=True)
         return
     
@@ -1319,14 +1319,8 @@ async def do_cancel_booking(callback: types.CallbackQuery) -> None:
         await callback.answer(get_text(lang, "booking_cancelled"), show_alert=True)
         # Optionally edit the confirmation message
         try:
-            from aiogram import types as _ai_types
-            if isinstance(callback.message, _ai_types.Message):
-                await callback.message.edit_text(get_text(lang, "booking_cancelled"))
-            else:
-                try:
-                    await bot.send_message(callback.from_user.id, get_text(lang, "booking_cancelled"))
-                except Exception:
-                    pass
+            # Use safe helper to edit existing message or send a new one
+            await _safe_answer_or_send(callback.message, callback.from_user.id, get_text(lang, "booking_cancelled"))
         except Exception:
             pass
         # Refresh user's bookings view
@@ -1372,7 +1366,11 @@ async def contact_store(callback: types.CallbackQuery) -> None:
 @router.callback_query(F.data.startswith("noop_"))
 async def noop_callback(callback: types.CallbackQuery) -> None:
     """No-op callback to close dialogs; simply answer to remove loading state."""
-    await callback.answer()
+    try:
+        await callback.answer()
+    except Exception:
+        # ignore errors answering no-op callbacks (e.g., if query already closed)
+        pass
 
 
 @router.callback_query(F.data.startswith("booking_details_"))
