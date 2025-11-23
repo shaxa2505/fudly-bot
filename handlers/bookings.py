@@ -1075,6 +1075,14 @@ async def partner_confirm(callback: types.CallbackQuery) -> None:
         await callback.answer(get_text(lang, "error"), show_alert=True)
         return
 
+    # Mark reminder_sent to avoid worker sending reminders after partner confirmation
+    try:
+        with db.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute('UPDATE bookings SET reminder_sent = 1 WHERE booking_id = %s', (booking_id,))
+    except Exception:
+        pass
+
     # Re-fetch booking to ensure we have the booking_code generated/stored by DB
     try:
         booking = db.get_booking(booking_id) or booking
@@ -1187,6 +1195,13 @@ async def complete_booking(callback: types.CallbackQuery) -> None:
     # Complete booking
     success = db.complete_booking(booking_id)
     if success:
+        # Ensure reminder won't be sent for completed bookings
+        try:
+            with db.get_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute('UPDATE bookings SET reminder_sent = 1 WHERE booking_id = %s', (booking_id,))
+        except Exception:
+            pass
         await callback.answer(get_text(lang, "booking_completed"), show_alert=True)
         # Edit/send message to show completed status using safe helper
         try:

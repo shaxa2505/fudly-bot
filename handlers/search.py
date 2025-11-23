@@ -365,10 +365,12 @@ def setup(
         # Pagination & choose keyboard
         from aiogram.utils.keyboard import InlineKeyboardBuilder
         kb = InlineKeyboardBuilder()
+        # Arrange pagination: first row Prev | Next, second row a single "Выбрать товар" button
         kb.button(text=("⬅️ Назад" if lang == 'ru' else "⬅️ Orqaga"), callback_data=f"store_page_{store_id}_{max(0, page_offset - per_page)}")
-        kb.button(text=("🛒 Выбрать товар" if lang == 'ru' else "🛒 Mahsulotni tanlash"), callback_data=f"store_choose_page_{store_id}_{page_offset}")
         if page_offset + per_page < len(offers):
             kb.button(text=("Вперёд ➡️" if lang == 'ru' else "Oldinga ➡️"), callback_data=f"store_page_{store_id}_{page_offset + per_page}")
+        # Second-row: single selector button
+        kb.button(text=("🛒 Выбрать товар" if lang == 'ru' else "🛒 Mahsulotni tanlash"), callback_data=f"store_choose_page_{store_id}_{page_offset}")
         kb.adjust(2, 1)
 
         if msg:
@@ -414,10 +416,11 @@ def setup(
         # KB
         from aiogram.utils.keyboard import InlineKeyboardBuilder
         kb = InlineKeyboardBuilder()
+        # Prev | Next on first row, selector on second row
         kb.button(text=("⬅️ Назад" if lang == 'ru' else "⬅️ Orqaga"), callback_data=f"store_page_{store_id}_{max(0, offset - per_page)}")
-        kb.button(text=("🛒 Выбрать товар" if lang == 'ru' else "🛒 Mahsulotni tanlash"), callback_data=f"store_choose_page_{store_id}_{offset}")
         if offset + per_page < len(offers):
             kb.button(text=("Вперёд ➡️" if lang == 'ru' else "Oldinga ➡️"), callback_data=f"store_page_{store_id}_{offset + per_page}")
+        kb.button(text=("🛒 Выбрать товар" if lang == 'ru' else "🛒 Mahsulotni tanlash"), callback_data=f"store_choose_page_{store_id}_{offset}")
         kb.adjust(2, 1)
 
         if msg:
