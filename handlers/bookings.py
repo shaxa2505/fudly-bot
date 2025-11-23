@@ -401,17 +401,71 @@ async def book_offer_delivery_address(message: types.Message, state: FSMContext)
         )
         return
     
-    # Save delivery details
+    # Save delivery details and ask for payment/receipt photo
     data = await state.get_data()
     delivery_price = data.get("delivery_price", 0)
-    
+
     await state.update_data(
         delivery_option=1,
         delivery_cost=delivery_price,
         delivery_address=address
     )
-    
+
+    # Ask user to send payment receipt/photo (photo required for delivery)
+    if lang == 'ru':
+        prompt = (
+            "📸 Пожалуйста, отправьте фото чека или подтверждение оплаты для доставки\n\n"
+            "Если вы оплатили картой/онлайн, пришлите фото квитанции."
+        )
+    else:
+        prompt = (
+            "📸 Iltimos, yetkazib berish uchun to'lov kvitansiyasi yoki chek rasmini yuboring\n\n"
+            "Agar onlayn to'lov qilgan bo'lsangiz, kvitansiya rasmini yuboring."
+        )
+
+    await state.set_state(BookOffer.delivery_receipt)
+    await message.answer(prompt, reply_markup=cancel_keyboard(lang))
+
+
+@router.message(BookOffer.delivery_receipt, F.photo)
+async def book_offer_delivery_receipt_photo(message: types.Message, state: FSMContext) -> None:
+    """Receive photo for delivery payment proof and create booking."""
+    if not db:
+        await message.answer("System error")
+        return
+
+    lang = db.get_user_language(message.from_user.id)
+
+    # Get the highest-quality photo file_id
+    photo = None
+    if message.photo:
+        photo = message.photo[-1].file_id
+    elif message.document and message.document.mime_type and message.document.mime_type.startswith('image/'):
+        photo = message.document.file_id
+
+    if not photo:
+        await message.answer(
+            "❌ Пожалуйста, отправьте фото (фото/документ с изображением)" if lang == 'ru' else "❌ Iltimos, rasm yuboring"
+        )
+        return
+
+    # Save receipt photo id to state and proceed to create booking
+    await state.update_data(payment_proof_photo_id=photo)
     await create_booking_final(message, state)
+
+@router.message(BookOffer.delivery_receipt)
+async def book_offer_delivery_receipt_fallback(message: types.Message, state: FSMContext) -> None:
+    """Fallback when user sends non-photo during receipt step."""
+    lang = 'ru'
+    try:
+        lang = db.get_user_language(message.from_user.id)
+    except Exception:
+        pass
+
+    await message.answer(
+        "❗ Пожалуйста, отправьте фото чека или нажмите ❌ Отмена" if lang == 'ru' else "❗ Iltimos, kvitansiya rasmini yuboring yoki ❌ Bekor qilish tugmasini bosing",
+        reply_markup=cancel_keyboard(lang)
+    )
 
 
 @router.callback_query(F.data == "confirm_pickup_yes")
@@ -558,11 +612,20 @@ async def create_booking_final(message: types.Message, state: FSMContext) -> Non
         try:
             with db.get_connection() as conn:
                 cursor = conn.cursor()
-                cursor.execute("""
-                    UPDATE bookings 
-                    SET delivery_option = %s, delivery_address = %s, delivery_cost = %s
-                    WHERE booking_id = %s
-                """, (delivery_option, delivery_address, delivery_cost, booking_id))
+                # Include payment proof photo id if provided
+                payment_proof = data.get('payment_proof_photo_id')
+                if payment_proof:
+                    cursor.execute("""
+                        UPDATE bookings 
+                        SET delivery_option = %s, delivery_address = %s, delivery_cost = %s, payment_proof_photo_id = %s
+                        WHERE booking_id = %s
+                    """, (delivery_option, delivery_address, delivery_cost, payment_proof, booking_id))
+                else:
+                    cursor.execute("""
+                        UPDATE bookings 
+                        SET delivery_option = %s, delivery_address = %s, delivery_cost = %s
+                        WHERE booking_id = %s
+                    """, (delivery_option, delivery_address, delivery_cost, booking_id))
                 logger.info(f"✅ Delivery details updated for booking {booking_id}")
         except Exception as e:
             logger.error(f"Error updating delivery details: {e}")

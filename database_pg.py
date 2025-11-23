@@ -496,6 +496,7 @@ class Database:
                 try:
                     cursor.execute("ALTER TABLE bookings ADD COLUMN IF NOT EXISTS expiry_time TIMESTAMP")
                     cursor.execute("ALTER TABLE bookings ADD COLUMN IF NOT EXISTS reminder_sent INTEGER DEFAULT 0")
+                    cursor.execute("ALTER TABLE bookings ADD COLUMN IF NOT EXISTS payment_proof_photo_id TEXT")
                     logger.info("✅ Added expiry_time and reminder_sent to bookings table")
                 except Exception as e:
                     logger.warning(f"Could not add expiry/reminder columns to bookings: {e}")
@@ -1076,6 +1077,13 @@ class Database:
             
             logger.info(f"🔵 Checking offer status...")
             
+            # Ensure the user exists to satisfy FK constraints (create minimal stub if missing)
+            try:
+                cursor.execute("INSERT INTO users (user_id) VALUES (%s) ON CONFLICT (user_id) DO NOTHING", (user_id,))
+            except Exception:
+                # If inserting user fails, continue and let FK checks handle it later
+                pass
+
             # Enforce per-user active booking limit
             try:
                 cursor.execute("SELECT COUNT(*) FROM bookings WHERE user_id = %s AND status IN ('active','pending','confirmed')", (user_id,))
