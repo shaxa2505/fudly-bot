@@ -11,6 +11,7 @@ from database_protocol import DatabaseProtocol
 from handlers.common_states.states import ChangeCity, RegisterStore
 from app.keyboards import (
     city_keyboard,
+    city_inline_keyboard,
     language_keyboard,
     main_menu_customer,
     main_menu_seller,
@@ -200,7 +201,7 @@ async def profile_change_city(callback: types.CallbackQuery, state: FSMContext) 
         await callback.message.edit_text(
             get_text(lang, "choose_city"),
             parse_mode="HTML",
-            reply_markup=city_keyboard(lang),
+            reply_markup=city_inline_keyboard(lang),
         )
     except Exception:
         await callback.message.answer(
@@ -209,6 +210,41 @@ async def profile_change_city(callback: types.CallbackQuery, state: FSMContext) 
             reply_markup=city_keyboard(lang),
         )
     await state.set_state(ChangeCity.city)
+    await callback.answer()
+
+
+@router.callback_query(F.data.startswith("reg_city_"))
+async def profile_change_city_cb(callback: types.CallbackQuery, state: FSMContext) -> None:
+    """Handle inline city selection from profile change flow."""
+    if not db or not callback.message:
+        await callback.answer("System error", show_alert=True)
+        return
+
+    # Only handle when user is in ChangeCity.city state
+    current_state = await state.get_state()
+    if current_state != ChangeCity.city:
+        # Not in the profile-change state; ignore to avoid cross-handling
+        await callback.answer()
+        return
+
+    if not db:
+        await callback.answer("System error", show_alert=True)
+        return
+    assert callback.from_user is not None
+    lang = db.get_user_language(callback.from_user.id)
+    try:
+        raw = callback.data or ""
+        parts = raw.split("_", 2)
+        city = parts[2] if len(parts) > 2 else ""
+        if not city:
+            raise ValueError("empty city")
+    except Exception:
+        await callback.answer(get_text(lang, "error"), show_alert=True)
+        return
+
+    db.update_user_city(callback.from_user.id, city)
+    await state.clear()
+    await callback.message.answer(get_text(lang, "action_complete"), reply_markup=main_menu_customer(lang))
     await callback.answer()
 
 

@@ -14,6 +14,33 @@ from app.keyboards import cancel_keyboard, main_menu_customer
 from localization import get_text
 from logging_config import logger
 
+from aiogram import types as _ai_types
+
+
+async def _safe_edit_reply_markup(msg_like, **kwargs) -> None:
+    """Edit reply markup if message is accessible (Message), otherwise ignore."""
+    if isinstance(msg_like, _ai_types.Message):
+        try:
+            await msg_like.edit_reply_markup(**kwargs)
+        except Exception:
+            pass
+
+
+async def _safe_answer_or_send(msg_like, user_id: int, text: str, **kwargs) -> None:
+    """Try to answer via message.answer, fallback to bot.send_message."""
+    if isinstance(msg_like, _ai_types.Message):
+        try:
+            await msg_like.answer(text, **kwargs)
+            return
+        except Exception:
+            pass
+    # Fallback to bot-level send
+    if bot:
+        try:
+            await bot.send_message(user_id, text, **kwargs)
+        except Exception:
+            pass
+
 
 # Rate limiting placeholder
 def can_proceed(user_id: int, action: str) -> bool:
@@ -110,6 +137,7 @@ async def book_offer_start(callback: types.CallbackQuery, state: FSMContext) -> 
     if not db or not callback.message:
         await callback.answer("System error", show_alert=True)
         return
+    assert callback.from_user is not None
     
     lang = db.get_user_language(callback.from_user.id)
     
@@ -119,7 +147,11 @@ async def book_offer_start(callback: types.CallbackQuery, state: FSMContext) -> 
         return
     
     try:
-        offer_id = int(callback.data.split("_")[1])
+        raw = callback.data or ""
+        parts = raw.split("_")
+        offer_id = int(parts[1]) if len(parts) > 1 else None
+        if offer_id is None:
+            raise ValueError("missing offer id")
     except (ValueError, IndexError) as e:
         logger.error(f"Invalid offer_id in callback data: {callback.data}, error: {e}")
         await callback.answer(get_text(lang, "error"), show_alert=True)
@@ -168,15 +200,8 @@ async def book_offer_start(callback: types.CallbackQuery, state: FSMContext) -> 
         )
 
         # Send short prompt first to match legacy UX/tests, then detailed card
-        await callback.message.answer(
-            short_prompt_simple,
-            reply_markup=cancel_keyboard(lang),
-        )
-        await callback.message.answer(
-            detailed,
-            parse_mode="HTML",
-            reply_markup=cancel_keyboard(lang),
-        )
+        await _safe_answer_or_send(callback.message, callback.from_user.id, short_prompt_simple, reply_markup=cancel_keyboard(lang))
+        await _safe_answer_or_send(callback.message, callback.from_user.id, detailed, parse_mode="HTML", reply_markup=cancel_keyboard(lang))
         await callback.answer()
     except Exception as e:
         logger.error(f"Error sending booking message: {e}")
@@ -190,6 +215,7 @@ async def book_offer_quantity(message: types.Message, state: FSMContext) -> None
         await message.answer("System error")
         return
     
+    assert message.from_user is not None
     lang = db.get_user_language(message.from_user.id)
     
     # Rate limit booking confirm
@@ -197,8 +223,11 @@ async def book_offer_quantity(message: types.Message, state: FSMContext) -> None
         await message.answer(get_text(lang, "operation_cancelled"))
         return
     
+    # Normalize incoming text safely
+    raw_text = message.text or ""
+
     # Check for cancellation
-    if message.text in ["❌ Отмена", "❌ Bekor qilish", "/cancel"]:
+    if raw_text in ["❌ Отмена", "❌ Bekor qilish", "/cancel"]:
         await state.clear()
         await message.answer(
             get_text(lang, "action_cancelled"),
@@ -207,9 +236,12 @@ async def book_offer_quantity(message: types.Message, state: FSMContext) -> None
         return
 
     try:
-        logger.info(f"📦 BOOKING: User {message.from_user.id} entered quantity: {message.text}")
+        logger.info(f"📦 BOOKING: User {message.from_user.id} entered quantity: {raw_text}")
         
-        quantity = int(message.text)
+        try:
+            quantity = int(raw_text)
+        except Exception:
+            raise ValueError
         if quantity < 1:
             await message.answer("❌ Количество должно быть больше 0" if lang == "ru" else "❌ Miqdor 0 dan katta bo'lishi kerak")
             return
@@ -295,13 +327,18 @@ async def book_offer_quantity(message: types.Message, state: FSMContext) -> None
             
             # Create delivery choice keyboard
             from aiogram.types import ReplyKeyboardMarkup, KeyboardButton
-            
+
+            # Ensure min_order_amount is an int for comparison
+            try:
+                min_order_amount = int(min_order_amount or 0)
+            except Exception:
+                min_order_amount = 0
+
             if order_total >= min_order_amount:
                 if lang == "ru":
                     delivery_btn_text = f"🚚 Доставка ({delivery_price:,} сум)"
                     pickup_text = "🏪 Самовывоз"
                     delivery_msg = (
-                        f"<b>Шаг 2/3: Выберите способ получения</b>\n\n"
                         f"📦 Сумма заказа: {order_total:,} сум\n"
                         f"🚚 Стоимость доставки: {delivery_price:,} сум\n\n"
                         f"Выберите вариант:"
@@ -310,23 +347,23 @@ async def book_offer_quantity(message: types.Message, state: FSMContext) -> None
                     delivery_btn_text = f"🚚 Yetkazib berish ({delivery_price:,} so'm)"
                     pickup_text = "🏪 O'zim olib ketaman"
                     delivery_msg = (
-                        f"<b>2/3-qadam: Qabul qilish usulini tanlang</b>\n\n"
                         f"📦 Buyurtma summasi: {order_total:,} so'm\n"
                         f"🚚 Yetkazib berish narxi: {delivery_price:,} so'm\n\n"
                         f"Variantni tanlang:"
                     )
-                
-                delivery_kb = ReplyKeyboardMarkup(
-                    keyboard=[
-                        [KeyboardButton(text=delivery_btn_text)],
-                        [KeyboardButton(text=pickup_text)],
-                        [KeyboardButton(text="❌ Отмена" if lang == "ru" else "❌ Bekor qilish")]
-                    ],
-                    resize_keyboard=True
-                )
-                
-                await message.answer(delivery_msg, parse_mode="HTML", reply_markup=delivery_kb)
-                # Wait for the user's reply (delivery or pickup). Do not proceed to booking yet.
+
+                from aiogram.utils.keyboard import InlineKeyboardBuilder
+
+                # Build inline buttons for delivery / pickup to avoid text matching and
+                # allow removing buttons after selection.
+                ikb = InlineKeyboardBuilder()
+                ikb.button(text=delivery_btn_text, callback_data="choose_delivery")
+                ikb.button(text=pickup_text, callback_data="choose_pickup")
+                ikb.button(text=("❌ Отмена" if lang == "ru" else "❌ Bekor qilish"), callback_data="choose_cancel")
+                ikb.adjust(2, 1)
+
+                await message.answer(delivery_msg, parse_mode="HTML", reply_markup=ikb.as_markup())
+                # Wait for user's callback (inline). Do not proceed to booking yet.
                 return
             else:
                 # Order total is below minimum for delivery — show inline confirmation for pickup
@@ -343,14 +380,12 @@ async def book_offer_quantity(message: types.Message, state: FSMContext) -> None
 
                 if lang == "ru":
                     msg = (
-                        f"<b>Шаг 2/3: Способ получения</b>\n\n"
                         f"📦 Сумма заказа: {order_total:,} сум\n"
                         f"⚠️ Минимальная сумма для доставки: {min_order_amount:,} сум\n\n"
                         f"Доступен только самовывоз. Продолжить?"
                     )
                 else:
                     msg = (
-                        f"<b>2/3-qadam: Qabul qilish usuli</b>\n\n"
                         f"📦 Buyurtma summasi: {order_total:,} so'm\n"
                         f"⚠️ Yetkazib berish uchun minimal summa: {min_order_amount:,} so'm\n\n"
                         f"Faqat o'zim olib ketish mavjud. Davom etamizmi?"
@@ -380,7 +415,7 @@ async def book_offer_delivery_address(message: types.Message, state: FSMContext)
     if not db:
         await message.answer("System error")
         return
-    
+    assert message.from_user is not None
     lang = db.get_user_language(message.from_user.id)
     
     # Check for cancellation
@@ -392,7 +427,8 @@ async def book_offer_delivery_address(message: types.Message, state: FSMContext)
         )
         return
     
-    address = message.text.strip()
+    raw_addr = message.text or ""
+    address = raw_addr.strip()
     
     if len(address) < 10:
         await message.answer(
@@ -433,7 +469,7 @@ async def book_offer_delivery_receipt_photo(message: types.Message, state: FSMCo
     if not db:
         await message.answer("System error")
         return
-
+    assert message.from_user is not None
     lang = db.get_user_language(message.from_user.id)
 
     # Get the highest-quality photo file_id
@@ -456,6 +492,7 @@ async def book_offer_delivery_receipt_photo(message: types.Message, state: FSMCo
 @router.message(BookOffer.delivery_receipt)
 async def book_offer_delivery_receipt_fallback(message: types.Message, state: FSMContext) -> None:
     """Fallback when user sends non-photo during receipt step."""
+    assert message.from_user is not None
     lang = 'ru'
     try:
         lang = db.get_user_language(message.from_user.id)
@@ -477,15 +514,29 @@ async def confirm_pickup_yes(callback: types.CallbackQuery, state: FSMContext) -
 
     await callback.answer()
     try:
-        # callback.message is the message with the inline keyboard
-        await create_booking_final(callback.message, state)
+        # Remove inline keyboard so buttons disappear (safe)
+        await _safe_edit_reply_markup(callback.message, reply_markup=None)
+
+        # callback.message is the message with the inline keyboard; ensure it's a real Message
+        from aiogram import types as _ai_types
+        if isinstance(callback.message, _ai_types.Message):
+            await create_booking_final(callback.message, state)
+        else:
+            # Fallback: send a new message to the user and use it for replies
+            try:
+                new_msg = await bot.send_message(callback.from_user.id, "Продолжаю обработку брони...")
+                await create_booking_final(new_msg, state)
+            except Exception:
+                raise
     except Exception as e:
         logger.error(f"Error in confirm_pickup_yes: {e}")
         lang = db.get_user_language(callback.from_user.id) if db else 'ru'
         try:
-            await callback.message.answer(
-                "❌ Произошла ошибка. Попробуйте позже." if lang == 'ru' else "❌ Xatolik yuz berdi. Keyinroq urinib ko'ring."
-            )
+            from aiogram import types as _ai_types
+            if isinstance(callback.message, _ai_types.Message):
+                await _safe_answer_or_send(callback.message, callback.from_user.id, "❌ Произошла ошибка. Попробуйте позже." if lang == 'ru' else "❌ Xatolik yuz berdi. Keyinroq urinib ko'ring.")
+            else:
+                await bot.send_message(callback.from_user.id, "❌ Произошла ошибка. Попробуйте позже.")
         except Exception:
             pass
 
@@ -497,11 +548,14 @@ async def confirm_pickup_no(callback: types.CallbackQuery, state: FSMContext) ->
         await callback.answer("System error", show_alert=True)
         return
 
+    assert callback.from_user is not None
     lang = db.get_user_language(callback.from_user.id)
     await state.clear()
+    # Remove inline keyboard first (safe)
+    await _safe_edit_reply_markup(callback.message, reply_markup=None)
     from app.keyboards.user import main_menu_customer
     try:
-        await callback.message.answer(get_text(lang, "action_cancelled"), reply_markup=main_menu_customer(lang))
+        await _safe_answer_or_send(callback.message, callback.from_user.id, get_text(lang, "action_cancelled"), reply_markup=main_menu_customer(lang))
     except Exception:
         pass
     await callback.answer()
@@ -512,7 +566,7 @@ async def create_booking_final(message: types.Message, state: FSMContext) -> Non
     if not db or not bot or not METRICS:
         await message.answer("System error")
         return
-    
+    assert message.from_user is not None
     lang = db.get_user_language(message.from_user.id)
     
     data = await state.get_data()
@@ -535,15 +589,18 @@ async def create_booking_final(message: types.Message, state: FSMContext) -> Non
         await state.clear()
         return
     
-    # Get offer details
+    # Get offer details (set defaults first to avoid unbound vars)
+    offer_title = "Товар"
+    store_id: int | None = None
+    offer_address = ""
     if isinstance(offer, (tuple, list)):
-        offer_title = offer[2] if len(offer) > 2 else "Товар"
-        store_id = offer[1] if len(offer) > 1 else None
-        offer_address = offer[16] if len(offer) > 16 else ""
+        offer_title = offer[2] if len(offer) > 2 else offer_title
+        store_id = offer[1] if len(offer) > 1 else store_id
+        offer_address = offer[16] if len(offer) > 16 else offer_address
     elif isinstance(offer, dict):
-        offer_title = offer.get('title', 'Товар')
+        offer_title = offer.get('title', offer_title)
         store_id = offer.get('store_id')
-        offer_address = offer.get('address', '')
+        offer_address = offer.get('address', offer_address)
     
     # If address is empty, get from store
     if not offer_address and store_id:
@@ -778,6 +835,7 @@ async def book_offer_delivery_choice(message: types.Message, state: FSMContext) 
         await message.answer("System error")
         return
 
+    assert message.from_user is not None
     lang = db.get_user_language(message.from_user.id)
 
     # Check for cancellation
@@ -790,24 +848,26 @@ async def book_offer_delivery_choice(message: types.Message, state: FSMContext) 
         return
 
     # Determine delivery option
-    if "Доставка" in (message.text or "") or "Yetkazib berish" in (message.text or ""):
+    # This handler remains for backward compatibility if a reply keyboard/text option
+    # is used. Prefer inline callbacks (choose_delivery / choose_pickup) which are
+    # handled in dedicated callback handlers below.
+    txt = (message.text or "")
+    if any(k in txt for k in ["Доставка", "Yetkazib berish"]):
         # User wants delivery, ask for address
         await state.set_state(BookOffer.delivery_address)
         await message.answer(
-            "📍 <b>Шаг 3/3: Введите адрес доставки</b>\n\n"
-            "Укажите полный адрес (улица, дом, квартира):" if lang == "ru"
-            else
-            "📍 <b>3/3-qadam: Yetkazib berish manzilini kiriting</b>\n\n"
-            "To'liq manzilni kiriting (ko'cha, uy, xonadon):",
+            "📍 Введите адрес доставки\n\nУкажите полный адрес (улица, дом, квартира):" if lang == "ru"
+            else "📍 Manzilni kiriting\n\nTo'liq manzilni kiriting (ko'cha, uy, xonadon):",
             parse_mode="HTML",
             reply_markup=cancel_keyboard(lang)
         )
         return
 
-    # Pickup selected
-    data = await state.get_data()
-    await state.update_data(delivery_option=0, delivery_cost=0, delivery_address="")
-    await create_booking_final(message, state)
+    # Pickup selected (text)
+    if any(k in txt for k in ["Самовывоз", "O'zim olib ketaman"]):
+        data = await state.get_data()
+        await state.update_data(delivery_option=0, delivery_cost=0, delivery_address="")
+        await create_booking_final(message, state)
 
 
 @router.callback_query(
@@ -819,7 +879,7 @@ async def filter_bookings(callback: types.CallbackQuery) -> None:
     if not db:
         await callback.answer("System error", show_alert=True)
         return
-    
+    assert callback.from_user is not None
     lang = db.get_user_language(callback.from_user.id)
     status_map = {
         "bookings_active": "active",
@@ -860,8 +920,92 @@ async def filter_bookings(callback: types.CallbackQuery) -> None:
             f"📅 {created_at}\n\n"
         )
     
-    await callback.message.edit_text(text, parse_mode="HTML")
+    from aiogram import types as _ai_types
+    if isinstance(callback.message, _ai_types.Message):
+        await callback.message.edit_text(text, parse_mode="HTML")
+    else:
+        # Fallback to bot-level send
+        try:
+            await bot.send_message(callback.from_user.id, text, parse_mode="HTML")
+        except Exception:
+            pass
     await callback.answer()
+
+
+@router.callback_query(F.data == "choose_delivery")
+async def choose_delivery(callback: types.CallbackQuery, state: FSMContext) -> None:
+    """User chose delivery via inline button — ask for address."""
+    if not db:
+        await callback.answer("System error", show_alert=True)
+        return
+
+    assert callback.from_user is not None
+    await callback.answer()
+    lang = db.get_user_language(callback.from_user.id)
+
+    # Remove inline keyboard (safe)
+    await _safe_edit_reply_markup(callback.message, reply_markup=None)
+
+    await state.set_state(BookOffer.delivery_address)
+    await _safe_answer_or_send(callback.message, callback.from_user.id,
+        "📍 Введите адрес доставки\n\nУкажите полный адрес (улица, дом, квартира):" if lang == "ru"
+        else "📍 Manzilni kiriting\n\nTo'liq manzilni kiriting (ko'cha, uy, xonadon):",
+        parse_mode="HTML",
+        reply_markup=cancel_keyboard(lang),
+    )
+
+
+@router.callback_query(F.data == "choose_pickup")
+async def choose_pickup(callback: types.CallbackQuery, state: FSMContext) -> None:
+    """User chose pickup via inline button — proceed to create booking."""
+    if not db or not bot or not METRICS:
+        await callback.answer("System error", show_alert=True)
+        return
+
+    assert callback.from_user is not None
+    await callback.answer()
+    # Remove inline keyboard (safe)
+    await _safe_edit_reply_markup(callback.message, reply_markup=None)
+
+    # Set pickup option and create booking
+    await state.update_data(delivery_option=0, delivery_cost=0, delivery_address="")
+    try:
+        from aiogram import types as _ai_types
+        if isinstance(callback.message, _ai_types.Message):
+            await create_booking_final(callback.message, state)
+        else:
+            new_msg = await bot.send_message(callback.from_user.id, "Продолжаю обработку брони...")
+            await create_booking_final(new_msg, state)
+    except Exception as e:
+        logger.error(f"Error creating booking after pickup: {e}")
+        lang = db.get_user_language(callback.from_user.id)
+        try:
+            from aiogram import types as _ai_types
+            if isinstance(callback.message, _ai_types.Message):
+                await _safe_answer_or_send(callback.message, callback.from_user.id, "❌ Произошла ошибка. Попробуйте позже." if lang == 'ru' else "❌ Xatolik yuz berdi. Keyinroq urinib ko'ring.")
+            else:
+                await bot.send_message(callback.from_user.id, "❌ Произошла ошибка. Попробуйте позже.")
+        except Exception:
+            pass
+
+
+@router.callback_query(F.data == "choose_cancel")
+async def choose_cancel(callback: types.CallbackQuery, state: FSMContext) -> None:
+    """User cancelled delivery choice via inline button."""
+    if not db:
+        await callback.answer("System error", show_alert=True)
+        return
+
+    assert callback.from_user is not None
+    await callback.answer()
+    await _safe_edit_reply_markup(callback.message, reply_markup=None)
+    await state.clear()
+    lang = db.get_user_language(callback.from_user.id)
+    from app.keyboards.user import main_menu_customer
+    try:
+        await _safe_answer_or_send(callback.message, callback.from_user.id, get_text(lang, "action_cancelled"), reply_markup=main_menu_customer(lang))
+    except Exception:
+        pass
 
 
 @router.callback_query(lambda c: bool(re.match(r"^cancel_booking_\d+$", c.data)))
@@ -870,7 +1014,7 @@ async def cancel_booking(callback: types.CallbackQuery) -> None:
     if not db:
         await callback.answer("System error", show_alert=True)
         return
-    
+    assert callback.from_user is not None
     lang = db.get_user_language(callback.from_user.id)
     
     try:
@@ -911,9 +1055,10 @@ async def partner_confirm(callback: types.CallbackQuery) -> None:
         await callback.answer("System error", show_alert=True)
         return
 
+    assert callback.from_user is not None
     lang = db.get_user_language(callback.from_user.id)
     try:
-        booking_id = int(callback.data.rsplit("_", 1)[-1])
+        booking_id = int((callback.data or "").rsplit("_", 1)[-1])
     except (ValueError, IndexError) as e:
         logger.error(f"Invalid booking_id in callback data: {callback.data}, error: {e}")
         await callback.answer(get_text(lang, "error"), show_alert=True)
@@ -950,7 +1095,15 @@ async def partner_confirm(callback: types.CallbackQuery) -> None:
         kb.button(text=("✓ Выдано" if lang == 'ru' else "🎉 Berildi"), callback_data=f"complete_booking_{booking_id}")
         kb.button(text=("× Отменить" if lang == 'ru' else "× Bekor qilish"), callback_data=f"cancel_booking_{booking_id}")
         kb.adjust(2)
-        await callback.message.edit_text((callback.message.text or '') + "\n\n✅ Подтвержена", parse_mode='HTML', reply_markup=kb.as_markup())
+        from aiogram import types as _ai_types
+        if isinstance(callback.message, _ai_types.Message):
+            text_src = callback.message.text or ''
+            await callback.message.edit_text(text_src + "\n\n✅ Подтвержена", parse_mode='HTML', reply_markup=kb.as_markup())
+        else:
+            try:
+                await bot.send_message(callback.from_user.id, "✅ Подтвержена", parse_mode='HTML', reply_markup=kb.as_markup())
+            except Exception:
+                pass
     except Exception:
         pass
 
@@ -964,9 +1117,10 @@ async def partner_reject(callback: types.CallbackQuery) -> None:
         await callback.answer("System error", show_alert=True)
         return
 
+    assert callback.from_user is not None
     lang = db.get_user_language(callback.from_user.id)
     try:
-        booking_id = int(callback.data.rsplit("_", 1)[-1])
+        booking_id = int((callback.data or "").rsplit("_", 1)[-1])
     except (ValueError, IndexError) as e:
         logger.error(f"Invalid booking_id in callback data: {callback.data}, error: {e}")
         await callback.answer(get_text(lang, "error"), show_alert=True)
@@ -992,7 +1146,15 @@ async def partner_reject(callback: types.CallbackQuery) -> None:
             logger.error(f"Failed to notify customer about rejection: {e}")
 
         try:
-            await callback.message.edit_text((callback.message.text or '') + "\n\n❌ Отклонена", parse_mode='HTML')
+            from aiogram import types as _ai_types
+            if isinstance(callback.message, _ai_types.Message):
+                text_src = callback.message.text or ''
+                await callback.message.edit_text(text_src + "\n\n❌ Отклонена", parse_mode='HTML')
+            else:
+                try:
+                    await bot.send_message(callback.from_user.id, "❌ Отклонена", parse_mode='HTML')
+                except Exception:
+                    pass
         except Exception:
             pass
 
@@ -1008,10 +1170,12 @@ async def complete_booking(callback: types.CallbackQuery) -> None:
         await callback.answer("System error", show_alert=True)
         return
     
+    assert callback.from_user is not None
     lang = db.get_user_language(callback.from_user.id)
     
     try:
-        booking_id = int(callback.data.split("_")[2])
+        parts = (callback.data or "").split("_")
+        booking_id = int(parts[2]) if len(parts) > 2 else 0
     except (ValueError, IndexError) as e:
         logger.error(f"Invalid booking_id in callback data: {callback.data}, error: {e}")
         await callback.answer(get_text(lang, "error"), show_alert=True)
@@ -1028,9 +1192,15 @@ async def complete_booking(callback: types.CallbackQuery) -> None:
     if success:
         await callback.answer(get_text(lang, "booking_completed"), show_alert=True)
         # Edit message to show completed status
-        await callback.message.edit_text(
-            callback.message.text + "\n\n✅ <b>Выполнено</b>", parse_mode="HTML"
-        )
+        from aiogram import types as _ai_types
+        if isinstance(callback.message, _ai_types.Message):
+            text_src = callback.message.text or ''
+            await callback.message.edit_text(text_src + "\n\n✅ <b>Выполнено</b>", parse_mode="HTML")
+        else:
+            try:
+                await bot.send_message(callback.from_user.id, "✅ <b>Выполнено</b>", parse_mode="HTML")
+            except Exception:
+                pass
     else:
         await callback.answer(get_text(lang, "error"), show_alert=True)
 
@@ -1042,10 +1212,12 @@ async def rate_booking(callback: types.CallbackQuery) -> None:
         await callback.answer("System error", show_alert=True)
         return
     
+    assert callback.from_user is not None
     lang = db.get_user_language(callback.from_user.id)
     
     try:
-        booking_id = int(callback.data.split("_")[2])
+        parts = (callback.data or "").split("_")
+        booking_id = int(parts[2]) if len(parts) > 2 else 0
     except (ValueError, IndexError) as e:
         logger.error(f"Invalid booking_id in callback data: {callback.data}, error: {e}")
         await callback.answer(get_text(lang, "error"), show_alert=True)
@@ -1063,9 +1235,7 @@ async def rate_booking(callback: types.CallbackQuery) -> None:
         rating_kb.button(text=f"{'⭐' * i}", callback_data=f"booking_rate_{booking_id}_{i}")
     rating_kb.adjust(5)
     
-    await callback.message.answer(
-        get_text(lang, "rate_booking"), reply_markup=rating_kb.as_markup()
-    )
+    await _safe_answer_or_send(callback.message, callback.from_user.id, get_text(lang, "rate_booking"), reply_markup=rating_kb.as_markup())
     await callback.answer()
 
 
@@ -1076,18 +1246,25 @@ async def save_booking_rating(callback: types.CallbackQuery) -> None:
         await callback.answer("System error", show_alert=True)
         return
     
+    assert callback.from_user is not None
     lang = db.get_user_language(callback.from_user.id)
-    parts = callback.data.split("_")
-    booking_id = int(parts[2])
-    rating = int(parts[3])
+    parts = (callback.data or "").split("_")
+    booking_id = int(parts[2]) if len(parts) > 2 else 0
+    rating = int(parts[3]) if len(parts) > 3 else 0
     
     # Save rating
     success = db.save_booking_rating(booking_id, rating)
     if success:
         await callback.answer(get_text(lang, "rating_saved"), show_alert=True)
-        await callback.message.edit_text(
-            f"{callback.message.text}\n\n✅ Оценка: {'⭐' * rating}"
-        )
+        from aiogram import types as _ai_types
+        if isinstance(callback.message, _ai_types.Message):
+            text_src = callback.message.text or ''
+            await callback.message.edit_text(text_src + f"\n\n✅ Оценка: {'⭐' * rating}")
+        else:
+            try:
+                await bot.send_message(callback.from_user.id, f"✅ Оценка: {'⭐' * rating}")
+            except Exception:
+                pass
     else:
         await callback.answer(get_text(lang, "error"), show_alert=True)
 
@@ -1099,9 +1276,10 @@ async def cancel_booking_confirm(callback: types.CallbackQuery) -> None:
         await callback.answer("System error", show_alert=True)
         return
 
+    assert callback.from_user is not None
     lang = db.get_user_language(callback.from_user.id)
     try:
-        booking_id = int(callback.data.rsplit("_", 1)[-1])
+        booking_id = int((callback.data or "").rsplit("_", 1)[-1])
     except (ValueError, IndexError) as e:
         logger.error(f"Invalid booking_id in callback data: {callback.data}, error: {e}")
         await callback.answer(get_text(lang, "error"), show_alert=True)
@@ -1113,7 +1291,7 @@ async def cancel_booking_confirm(callback: types.CallbackQuery) -> None:
     confirm_kb.button(text=("Нет" if lang == 'ru' else "Yo'q"), callback_data=f"noop_{booking_id}")
     confirm_kb.adjust(2)
 
-    await callback.message.answer(get_text(lang, "confirm_cancel_booking") or ("Вы уверены, что хотите отменить бронь?" if lang == 'ru' else "Bronni bekor qilmoqchimisiz?"), reply_markup=confirm_kb.as_markup())
+    await _safe_answer_or_send(callback.message, callback.from_user.id, get_text(lang, "confirm_cancel_booking") or ("Вы уверены, что хотите отменить бронь?" if lang == 'ru' else "Bronni bekor qilmoqchimisiz?"), reply_markup=confirm_kb.as_markup())
     await callback.answer()
 
 
@@ -1124,9 +1302,10 @@ async def do_cancel_booking(callback: types.CallbackQuery) -> None:
         await callback.answer("System error", show_alert=True)
         return
 
+    assert callback.from_user is not None
     lang = db.get_user_language(callback.from_user.id)
     try:
-        booking_id = int(callback.data.rsplit("_", 1)[-1])
+        booking_id = int((callback.data or "").rsplit("_", 1)[-1])
     except (ValueError, IndexError) as e:
         logger.error(f"Invalid booking_id in callback data: {callback.data}, error: {e}")
         await callback.answer(get_text(lang, "error"), show_alert=True)
@@ -1150,7 +1329,14 @@ async def do_cancel_booking(callback: types.CallbackQuery) -> None:
         await callback.answer(get_text(lang, "booking_cancelled"), show_alert=True)
         # Optionally edit the confirmation message
         try:
-            await callback.message.edit_text(get_text(lang, "booking_cancelled"))
+            from aiogram import types as _ai_types
+            if isinstance(callback.message, _ai_types.Message):
+                await callback.message.edit_text(get_text(lang, "booking_cancelled"))
+            else:
+                try:
+                    await bot.send_message(callback.from_user.id, get_text(lang, "booking_cancelled"))
+                except Exception:
+                    pass
         except Exception:
             pass
         # Refresh user's bookings view
@@ -1167,9 +1353,10 @@ async def contact_store(callback: types.CallbackQuery) -> None:
         await callback.answer("System error", show_alert=True)
         return
 
+    assert callback.from_user is not None
     lang = db.get_user_language(callback.from_user.id)
     try:
-        store_id = int(callback.data.rsplit("_", 1)[-1])
+        store_id = int((callback.data or "").rsplit("_", 1)[-1])
     except (ValueError, IndexError) as e:
         logger.error(f"Invalid store_id in callback data: {callback.data}, error: {e}")
         await callback.answer(get_text(lang, "error"), show_alert=True)
@@ -1188,7 +1375,7 @@ async def contact_store(callback: types.CallbackQuery) -> None:
         text += (f"📍 <b>Адрес:</b> {address}\n" if lang == 'ru' else f"📍 <b>Manzil:</b> {address}\n")
 
     # Send plain contact info (phone and address only)
-    await callback.message.answer(text, parse_mode="HTML")
+    await _safe_answer_or_send(callback.message, callback.from_user.id, text, parse_mode="HTML")
     await callback.answer()
 
 
@@ -1205,9 +1392,10 @@ async def booking_details(callback: types.CallbackQuery) -> None:
         await callback.answer("System error", show_alert=True)
         return
 
+    assert callback.from_user is not None
     lang = db.get_user_language(callback.from_user.id)
     try:
-        booking_id = int(callback.data.rsplit("_", 1)[-1])
+        booking_id = int((callback.data or "").rsplit("_", 1)[-1])
     except (ValueError, IndexError) as e:
         logger.error(f"Invalid booking_id in callback data: {callback.data}, error: {e}")
         await callback.answer(get_text(lang, "error"), show_alert=True)
@@ -1287,5 +1475,5 @@ async def booking_details(callback: types.CallbackQuery) -> None:
     kb.button(text=("Закрыть" if lang == 'ru' else "Yopish"), callback_data=f"noop_{booking_id}")
     kb.adjust(2)
 
-    await callback.message.answer(text, parse_mode="HTML", reply_markup=kb.as_markup())
+    await _safe_answer_or_send(callback.message, callback.from_user.id, text, parse_mode="HTML", reply_markup=kb.as_markup())
     await callback.answer()

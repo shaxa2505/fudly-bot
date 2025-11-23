@@ -93,6 +93,7 @@ async def become_partner(message: types.Message, state: FSMContext) -> None:
     if not db:
         await message.answer("System error")
         return
+    assert message.from_user is not None
     
     # Отправляем приветственный стикер
     try:
@@ -148,11 +149,19 @@ async def become_partner(message: types.Message, state: FSMContext) -> None:
                 return
     
     # Not a seller or no store - start registration
-    await message.answer(
-        get_text(lang, "become_partner_text"),
-        parse_mode="HTML",
-        reply_markup=city_keyboard(lang),
-    )
+    # Prefer inline city selection to avoid free-text ambiguity; keep text fallback
+    try:
+        await message.answer(
+            get_text(lang, "become_partner_text"),
+            parse_mode="HTML",
+            reply_markup=city_inline_keyboard(lang),
+        )
+    except Exception:
+        await message.answer(
+            get_text(lang, "become_partner_text"),
+            parse_mode="HTML",
+            reply_markup=city_keyboard(lang),
+        )
     await state.set_state(RegisterStore.city)
 
 
@@ -171,16 +180,75 @@ async def register_store_city(message: types.Message, state: FSMContext) -> None
     
     lang = db.get_user_language(message.from_user.id)
     cities = get_cities(lang)
-    city_text = message.text.replace("📍 ", "").strip()
+    raw_text = message.text or ""
+    city_text = raw_text.replace("📍 ", "").strip()
     
     if city_text in cities:
         # CRITICAL: Normalize city to Russian for DB consistency
         normalized_city = normalize_city(city_text)
         await state.update_data(city=normalized_city)
-        await message.answer(
-            get_text(lang, "store_category"), reply_markup=category_keyboard(lang)
-        )
+        # Move to category selection: prefer inline keyboard
+        try:
+            await message.answer(
+                get_text(lang, "store_category"), reply_markup=category_inline_keyboard(lang)
+            )
+        except Exception:
+            await message.answer(
+                get_text(lang, "store_category"), reply_markup=category_keyboard(lang)
+            )
         await state.set_state(RegisterStore.category)
+
+
+@router.callback_query(F.data.startswith("reg_city_"))
+async def register_store_city_cb(callback: types.CallbackQuery, state: FSMContext) -> None:
+    """Handle inline city selection for partner registration."""
+    if not callback.message:
+        await callback.answer("System error", show_alert=True)
+        return
+    # Only proceed if user is in the RegisterStore.city state
+    current_state = await state.get_state()
+    if current_state != RegisterStore.city:
+        await callback.answer()
+        return
+
+    assert callback.from_user is not None
+    lang = db.get_user_language(callback.from_user.id) if db else 'ru'
+    try:
+        raw = callback.data or ""
+        parts = raw.split("_", 2)
+        city = parts[2] if len(parts) > 2 else ""
+        if not city:
+            raise ValueError("empty city")
+    except Exception:
+        await callback.answer(get_text(lang, "error"), show_alert=True)
+        return
+
+    normalized_city = normalize_city(city)
+    await state.update_data(city=normalized_city)
+    # Send category selection inline (safe send)
+    from aiogram import types as _ai_types
+    text = get_text(lang, "store_category")
+    try:
+        if isinstance(callback.message, _ai_types.Message):
+            try:
+                await callback.message.answer(text, reply_markup=category_inline_keyboard(lang))
+            except Exception:
+                try:
+                    await callback.message.answer(text, reply_markup=category_keyboard(lang))
+                except Exception:
+                    pass
+        else:
+            try:
+                await bot.send_message(callback.from_user.id, text, reply_markup=category_inline_keyboard(lang))
+            except Exception:
+                try:
+                    await bot.send_message(callback.from_user.id, text, reply_markup=category_keyboard(lang))
+                except Exception:
+                    pass
+    except Exception:
+        pass
+    await state.set_state(RegisterStore.category)
+    await callback.answer()
 
 
 @router.message(RegisterStore.category)
@@ -198,7 +266,8 @@ async def register_store_category(message: types.Message, state: FSMContext) -> 
     
     lang = db.get_user_language(message.from_user.id)
     categories = get_categories(lang)
-    cat_text = message.text.replace("🏷 ", "").replace("▫️ ", "").strip()
+    raw_text = message.text or ""
+    cat_text = raw_text.replace("🏷 ", "").replace("▫️ ", "").strip()
     
     if cat_text in categories:
         # CRITICAL: Normalize category to Russian for DB consistency
@@ -208,6 +277,67 @@ async def register_store_category(message: types.Message, state: FSMContext) -> 
             get_text(lang, "store_name"), reply_markup=cancel_keyboard(lang)
         )
         await state.set_state(RegisterStore.name)
+
+
+@router.callback_query(F.data.startswith("reg_cat_"))
+async def register_store_category_cb(callback: types.CallbackQuery, state: FSMContext) -> None:
+    """Handle inline category selection for partner registration."""
+    if not callback.message:
+        await callback.answer("System error", show_alert=True)
+        return
+
+    # Only proceed if user is in the RegisterStore.category state
+    current_state = await state.get_state()
+    if current_state != RegisterStore.category:
+        await callback.answer()
+        return
+
+    assert callback.from_user is not None
+    lang = db.get_user_language(callback.from_user.id) if db else 'ru'
+    try:
+        raw = callback.data or ""
+        parts = raw.split("_", 2)
+        cat_id = parts[2] if len(parts) > 2 else ""
+        if not cat_id:
+            raise ValueError("empty cat_id")
+    except Exception:
+        await callback.answer(get_text(lang, "error"), show_alert=True)
+        return
+
+    # Map common category ids to Russian display names
+    cat_name_map = {
+        'supermarket': 'Супермаркет',
+        'restaurant': 'Ресторан',
+        'bakery': 'Пекарня',
+        'cafe': 'Кафе',
+        'confectionery': 'Кондитерская',
+        'fastfood': 'Фастфуд',
+    }
+    normalized_category = cat_name_map.get(cat_id, cat_id)
+    await state.update_data(category=normalized_category)
+    name_prompt = get_text(lang, "store_name")
+    from aiogram import types as _ai_types
+    try:
+        if isinstance(callback.message, _ai_types.Message):
+            try:
+                await callback.message.answer(name_prompt, reply_markup=cancel_keyboard(lang))
+            except Exception:
+                try:
+                    await callback.message.answer(name_prompt)
+                except Exception:
+                    pass
+        else:
+            try:
+                await bot.send_message(callback.from_user.id, name_prompt, reply_markup=cancel_keyboard(lang))
+            except Exception:
+                try:
+                    await bot.send_message(callback.from_user.id, name_prompt)
+                except Exception:
+                    pass
+    except Exception:
+        pass
+    await state.set_state(RegisterStore.name)
+    await callback.answer()
 
 
 @router.message(RegisterStore.name)
@@ -364,7 +494,7 @@ async def create_store_from_data(message: types.Message, state: FSMContext) -> N
     if not db or not bot:
         await message.answer("System error")
         return
-    
+    assert message.from_user is not None
     lang = db.get_user_language(message.from_user.id)
     data = await state.get_data()
     
@@ -501,11 +631,15 @@ async def become_partner_cb(callback: types.CallbackQuery, state: FSMContext) ->
             reply_markup=city_inline_keyboard(lang),
         )
     except Exception:
-        await callback.message.answer(
-            get_text(lang, "become_partner_text"),
-            parse_mode="HTML",
-            reply_markup=city_keyboard(lang),
-        )
+        from aiogram import types as _ai_types
+        text = get_text(lang, "become_partner_text")
+        try:
+            if isinstance(callback.message, _ai_types.Message):
+                await callback.message.answer(text, parse_mode="HTML", reply_markup=city_keyboard(lang))
+            else:
+                await bot.send_message(callback.from_user.id, text, parse_mode="HTML", reply_markup=city_keyboard(lang))
+        except Exception:
+            pass
     await state.set_state(RegisterStore.city)
     await callback.answer()
 
@@ -516,25 +650,37 @@ async def register_store_city_callback(callback: types.CallbackQuery, state: FSM
     if not db:
         await callback.answer("System error", show_alert=True)
         return
-    
+    assert callback.from_user is not None
     lang = db.get_user_language(callback.from_user.id)
-    city_text = callback.data.replace("reg_city_", "")
-    
+    city_text = (callback.data or "").replace("reg_city_", "")
+
     # Normalize city to Russian for DB consistency
     normalized_city = normalize_city(city_text)
     await state.update_data(city=normalized_city)
-    
+
+    # Safe edit/answer with fallback to bot.send_message
+    from aiogram import types as _ai_types
+    text = get_text(lang, "store_category")
     try:
-        await callback.message.edit_text(
-            get_text(lang, "store_category"),
-            reply_markup=category_inline_keyboard(lang)
-        )
+        if isinstance(callback.message, _ai_types.Message):
+            try:
+                await callback.message.edit_text(text, reply_markup=category_inline_keyboard(lang))
+            except Exception:
+                try:
+                    await callback.message.answer(text, reply_markup=category_keyboard(lang))
+                except Exception:
+                    pass
+        else:
+            try:
+                await bot.send_message(callback.from_user.id, text, reply_markup=category_inline_keyboard(lang))
+            except Exception:
+                try:
+                    await bot.send_message(callback.from_user.id, text, reply_markup=category_keyboard(lang))
+                except Exception:
+                    pass
     except Exception:
-        await callback.message.answer(
-            get_text(lang, "store_category"),
-            reply_markup=category_keyboard(lang)
-        )
-    
+        pass
+
     await state.set_state(RegisterStore.category)
     await callback.answer()
 
@@ -546,8 +692,9 @@ async def register_store_category_callback(callback: types.CallbackQuery, state:
         await callback.answer("System error", show_alert=True)
         return
     
+    assert callback.from_user is not None
     lang = db.get_user_language(callback.from_user.id)
-    category_id = callback.data.replace("reg_cat_", "")
+    category_id = (callback.data or "").replace("reg_cat_", "")
     
     # Map category ID to display name
     category_map = {
@@ -563,14 +710,24 @@ async def register_store_category_callback(callback: types.CallbackQuery, state:
     await state.update_data(category=category, business_type=category_id)
     
     name_prompt = get_text(lang, "store_name")
+    from aiogram import types as _ai_types
     try:
-        await callback.message.edit_text(
-            name_prompt,
-            reply_markup=None
-        )
+        if isinstance(callback.message, _ai_types.Message):
+            try:
+                await callback.message.edit_text(name_prompt, reply_markup=None)
+            except Exception:
+                try:
+                    await callback.message.answer(name_prompt)
+                except Exception:
+                    pass
+        else:
+            try:
+                await bot.send_message(callback.from_user.id, name_prompt)
+            except Exception:
+                pass
     except Exception:
-        await callback.message.answer(name_prompt)
-    
+        pass
+
     await state.set_state(RegisterStore.name)
     await callback.answer()
 
@@ -582,15 +739,29 @@ async def register_cancel_callback(callback: types.CallbackQuery, state: FSMCont
         await callback.answer("System error", show_alert=True)
         return
     
+    assert callback.from_user is not None
     lang = db.get_user_language(callback.from_user.id)
     await state.clear()
-    
+
     cancel_text = get_text(lang, "cancelled")
+    from aiogram import types as _ai_types
     try:
-        await callback.message.edit_text(cancel_text)
+        if isinstance(callback.message, _ai_types.Message):
+            try:
+                await callback.message.edit_text(cancel_text)
+            except Exception:
+                try:
+                    await callback.message.answer(cancel_text)
+                except Exception:
+                    pass
+        else:
+            try:
+                await bot.send_message(callback.from_user.id, cancel_text)
+            except Exception:
+                pass
     except Exception:
-        await callback.message.answer(cancel_text)
-    
+        pass
+
     await callback.answer()
 
 
