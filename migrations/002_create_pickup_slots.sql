@@ -14,14 +14,14 @@ CREATE TABLE IF NOT EXISTS pickup_slots (
 CREATE INDEX IF NOT EXISTS idx_pickup_slots_store_ts ON pickup_slots(store_id, slot_ts);
 
 -- SQLite (the script runner should execute the relevant parts for SQLite)
--- For sqlite3 CLI the following works similarly (types are more permissive):
---
--- CREATE TABLE IF NOT EXISTS pickup_slots (
---     slot_id INTEGER PRIMARY KEY AUTOINCREMENT,
---     store_id INTEGER NOT NULL,
---     slot_ts TEXT NOT NULL,
---     capacity INTEGER NOT NULL DEFAULT 5,
---     reserved INTEGER NOT NULL DEFAULT 0,
---     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
---     UNIQUE(store_id, slot_ts)
--- );
+-- SQLite
+CREATE TABLE IF NOT EXISTS pickup_slots (
+    slot_id INTEGER PRIMARY KEY AUTOINCREMENT,
+    store_id INTEGER NOT NULL,
+    slot_ts TEXT NOT NULL,
+    capacity INTEGER NOT NULL DEFAULT 5,
+    reserved INTEGER NOT NULL DEFAULT 0,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(store_id, slot_ts)
+);
+CREATE INDEX IF NOT EXISTS idx_pickup_slots_store_ts ON pickup_slots(store_id, slot_ts);

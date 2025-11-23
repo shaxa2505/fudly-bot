@@ -17,8 +17,6 @@ from handlers.bookings_utils import (
 )
 from handlers.common import get_uzb_time
 from handlers.common_states.states import BookOffer
-from aiogram import F
-from aiogram.utils.keyboard import InlineKeyboardBuilder
 
 # Dependencies
 db = None

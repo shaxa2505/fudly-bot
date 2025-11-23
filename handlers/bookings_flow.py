@@ -354,8 +354,8 @@ async def select_pickup_callback(callback: types.CallbackQuery, state: FSMContex
 
     try:
         # Save to state and proceed with final booking creation
+        # DO NOT clear the state before calling create_booking_final — it needs to read the saved data.
         await state.update_data(pickup_time=pickup_time_iso)
-        await state.clear()  # create_booking_final will read state data; clear after
         # Call create_booking_final using the callback message as the origin
         await create_booking_final(callback.message, state)
     except Exception as e:
