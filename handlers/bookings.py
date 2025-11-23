@@ -860,13 +860,13 @@ async def cancel_booking(callback: types.CallbackQuery) -> None:
     # Cancel booking
     success = db.cancel_booking(booking_id)
     if success:
-        # Return quantity to offer
+        # Return quantity to offer (atomic increment to avoid race conditions)
         offer_id = get_booking_field(booking, "offer_id", 1)
         quantity = get_booking_field(booking, "quantity", 6)
-        offer = db.get_offer(offer_id)
-        if offer:
-            current_qty = get_offer_field(offer, "quantity", 0)
-            db.update_offer_quantity(offer_id, current_qty + quantity)
+        try:
+            db.increment_offer_quantity_atomic(offer_id, int(quantity or 0))
+        except Exception as e:
+            logger.error(f"Failed to increment offer quantity for offer {offer_id}: {e}")
 
         await callback.answer(get_text(lang, "booking_cancelled"), show_alert=True)
         # Refresh message
@@ -1013,13 +1013,13 @@ async def do_cancel_booking(callback: types.CallbackQuery) -> None:
 
     success = db.cancel_booking(booking_id)
     if success:
-        # Return quantity to offer
+        # Return quantity to offer (atomic increment to avoid race conditions)
         offer_id = get_booking_field(booking, "offer_id", 1)
         quantity = get_booking_field(booking, "quantity", 6)
-        offer = db.get_offer(offer_id)
-        if offer:
-            current_qty = get_offer_field(offer, "quantity", 0)
-            db.update_offer_quantity(offer_id, current_qty + quantity)
+        try:
+            db.increment_offer_quantity_atomic(offer_id, int(quantity or 0))
+        except Exception as e:
+            logger.error(f"Failed to increment offer quantity for offer {offer_id}: {e}")
 
         await callback.answer(get_text(lang, "booking_cancelled"), show_alert=True)
         # Optionally edit the confirmation message

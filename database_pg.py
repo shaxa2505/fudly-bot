@@ -1486,6 +1486,29 @@ class Database:
                 current_qty = row['quantity'] if row['quantity'] is not None else 0
                 new_qty = current_qty + amount
                 self.update_offer_quantity(offer_id, new_qty)
+
+    def increment_offer_quantity_atomic(self, offer_id: int, amount: int = 1) -> int:
+        """Atomically increment offer quantity by `amount` and return the new quantity.
+
+        This uses a single UPDATE statement to avoid race conditions when multiple
+        cancellations or inventory updates happen concurrently.
+        """
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute('''
+                UPDATE offers
+                SET quantity = COALESCE(quantity, 0) + %s,
+                    status = CASE WHEN COALESCE(quantity, 0) + %s > 0 THEN 'active' ELSE 'inactive' END
+                WHERE offer_id = %s
+                RETURNING quantity
+            ''', (amount, amount, offer_id))
+            row = cursor.fetchone()
+            if row:
+                try:
+                    return int(row[0])
+                except Exception:
+                    return 0
+            return 0
     
     def update_offer_expiry(self, offer_id: int, new_expiry: str):
         """Обновить срок годности товара"""
