@@ -326,6 +326,8 @@ async def book_offer_quantity(message: types.Message, state: FSMContext) -> None
                 )
                 
                 await message.answer(delivery_msg, parse_mode="HTML", reply_markup=delivery_kb)
+                # Wait for the user's reply (delivery or pickup). Do not proceed to booking yet.
+                return
             else:
                 # Order total is below minimum for delivery — show inline confirmation for pickup
                 # (better UX than free-text). We'll set delivery_option to pickup and wait
@@ -357,6 +359,8 @@ async def book_offer_quantity(message: types.Message, state: FSMContext) -> None
                 # Force pickup in state now; create_booking_final will be called when user confirms
                 await state.update_data(delivery_option=0, delivery_cost=0)
                 await message.answer(msg, parse_mode="HTML", reply_markup=confirm_kb.as_markup())
+                # Wait for the inline confirmation callback before creating the booking
+                return
         else:
             # No delivery available, proceed directly to booking creation
             await create_booking_final(message, state)
@@ -367,13 +371,7 @@ async def book_offer_quantity(message: types.Message, state: FSMContext) -> None
         logger.error(f"Error in book_offer_quantity: {e}")
         await message.answer("❌ Произошла ошибка. Попробуйте позже." if lang == "ru" else "❌ Xatolik yuz berdi. Keyinroq urinib ko'ring.")
 
-
-
-    else:
-        # Pickup selected
-        data = await state.get_data()
-        await state.update_data(delivery_option=0, delivery_cost=0, delivery_address="")
-        await create_booking_final(message, state)
+    # No implicit pickup fallback here — user must explicitly choose pickup or delivery address.
 
 
 @router.message(BookOffer.delivery_address)
