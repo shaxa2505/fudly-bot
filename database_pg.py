@@ -78,7 +78,14 @@ def hybrid_row_factory(cursor):
 # Database connection configuration
 DATABASE_URL = os.environ.get('DATABASE_URL', '')
 MIN_CONNECTIONS = int(os.environ.get('DB_MIN_CONN', '1'))
-MAX_CONNECTIONS = int(os.environ.get('DB_MAX_CONN', '10'))
+# Default max connections reduced to 5 to avoid exhausting hosted DB connection quotas during bursts
+MAX_CONNECTIONS = int(os.environ.get('DB_MAX_CONN', '5'))
+# How long (seconds) a caller should wait for a connection from the pool before timing out
+POOL_WAIT_TIMEOUT = int(os.environ.get('DB_POOL_WAIT_TIMEOUT', '60'))
+# Booking configuration
+BOOKING_DURATION_HOURS = int(os.environ.get('BOOKING_DURATION_HOURS', '2'))
+MAX_ACTIVE_BOOKINGS_PER_USER = int(os.environ.get('MAX_ACTIVE_BOOKINGS_PER_USER', '3'))
+BOOKING_EXPIRY_CHECK_MINUTES = int(os.environ.get('BOOKING_EXPIRY_CHECK_MINUTES', '30'))
 
 def fix_railway_database_url(url: str) -> str:
     """
@@ -128,13 +135,32 @@ class Database:
         
         # Initialize connection pool
         try:
-            self.pool = ConnectionPool(
-                conninfo=self.database_url,
-                min_size=MIN_CONNECTIONS,
-                max_size=MAX_CONNECTIONS,
-                kwargs={"row_factory": hybrid_row_factory}
-            )
-            logger.info(f"✅ PostgreSQL connection pool created (min={MIN_CONNECTIONS}, max={MAX_CONNECTIONS})")
+            # Try to create a pool with conservative client-side limits to avoid
+            # overwhelming hosted Postgres instances (e.g., Railway free tiers).
+            # We set a larger wait timeout so callers wait a bit longer for a free
+            # connection before raising a PoolTimeout.
+            try:
+                self.pool = ConnectionPool(
+                    conninfo=self.database_url,
+                    min_size=MIN_CONNECTIONS,
+                    max_size=MAX_CONNECTIONS,
+                    # allow a reasonable number of waiters; the pool will block callers
+                    # until a connection becomes available or `max_waiting_timeout` expires
+                    max_waiting=50,
+                    max_waiting_timeout=POOL_WAIT_TIMEOUT,
+                    kwargs={"row_factory": hybrid_row_factory}
+                )
+            except TypeError:
+                # Older psycopg_pool versions might not accept max_waiting* params;
+                # fall back to simpler constructor.
+                self.pool = ConnectionPool(
+                    conninfo=self.database_url,
+                    min_size=MIN_CONNECTIONS,
+                    max_size=MAX_CONNECTIONS,
+                    kwargs={"row_factory": hybrid_row_factory}
+                )
+
+            logger.info(f"✅ PostgreSQL connection pool created (min={MIN_CONNECTIONS}, max={MAX_CONNECTIONS}, wait_timeout={POOL_WAIT_TIMEOUT}s)")
         except Exception as e:
             logger.error(f"❌ Failed to create PostgreSQL connection pool: {e}")
             raise
@@ -466,6 +492,13 @@ class Database:
                     cursor.execute("ALTER TABLE bookings ADD COLUMN IF NOT EXISTS delivery_address TEXT")
                     cursor.execute("ALTER TABLE bookings ADD COLUMN IF NOT EXISTS delivery_cost INTEGER DEFAULT 0")
                     logger.info("✅ Delivery fields added to bookings table")
+                # Add expiry_time column for bookings (for auto-cancel)
+                try:
+                    cursor.execute("ALTER TABLE bookings ADD COLUMN IF NOT EXISTS expiry_time TIMESTAMP")
+                    cursor.execute("ALTER TABLE bookings ADD COLUMN IF NOT EXISTS reminder_sent INTEGER DEFAULT 0")
+                    logger.info("✅ Added expiry_time and reminder_sent to bookings table")
+                except Exception as e:
+                    logger.warning(f"Could not add expiry/reminder columns to bookings: {e}")
             except Exception as e:
                 logger.error(f"Error adding delivery fields to stores: {e}")
             
@@ -1043,6 +1076,18 @@ class Database:
             
             logger.info(f"🔵 Checking offer status...")
             
+            # Enforce per-user active booking limit
+            try:
+                cursor.execute("SELECT COUNT(*) FROM bookings WHERE user_id = %s AND status IN ('active','pending','confirmed')", (user_id,))
+                active_count = cursor.fetchone()[0] or 0
+            except Exception:
+                active_count = 0
+
+            if active_count >= MAX_ACTIVE_BOOKINGS_PER_USER:
+                conn.rollback()
+                logger.warning(f"🔵 User {user_id} has {active_count} active bookings (limit {MAX_ACTIVE_BOOKINGS_PER_USER})")
+                return (False, None, None)
+
             # Check and reserve product atomically
             cursor.execute('''
                 SELECT quantity, status FROM offers 
@@ -1083,12 +1128,12 @@ class Database:
             
             logger.info(f"🔵 Creating booking with code={booking_code}")
             
-            # Create booking
+            # Create booking and set expiry_time
             cursor.execute('''
-                INSERT INTO bookings (offer_id, user_id, booking_code, status, quantity)
-                VALUES (%s, %s, %s, 'pending', %s)
+                INSERT INTO bookings (offer_id, user_id, booking_code, status, quantity, expiry_time)
+                VALUES (%s, %s, %s, 'pending', %s, now() + (%s * INTERVAL '1 hour'))
                 RETURNING booking_id
-            ''', (offer_id, user_id, booking_code, quantity))
+            ''', (offer_id, user_id, booking_code, quantity, BOOKING_DURATION_HOURS))
             booking_id = cursor.fetchone()[0]
             
             logger.info(f"🔵 Booking created: booking_id={booking_id}")

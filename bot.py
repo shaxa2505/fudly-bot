@@ -688,6 +688,14 @@ async def on_startup():
 async def on_shutdown():
     """Действия при остановке бота"""
     await bot.session.close()
+    # Close DB pool if available to avoid thread warnings
+    try:
+        if db and hasattr(db, 'close'):
+            db.close()
+            logger.info("Database pool closed on shutdown")
+    except Exception as e:
+        logger.warning(f"Failed to close database on shutdown: {e}")
+
     print("👋 Бот остановлен")
 
 # ============== HANDLER REGISTRATION ==============
@@ -784,6 +792,13 @@ async def main():
     
     # Запускаем фоновую задачу очистки
     cleanup_task = asyncio.create_task(cleanup_expired_offers())
+    # Start booking expiry/reminder worker
+    try:
+        from tasks.booking_expiry_worker import start_booking_expiry_worker
+        booking_worker_task = asyncio.create_task(start_booking_expiry_worker(db, bot))
+        logger.info("✅ Booking expiry worker started")
+    except Exception as e:
+        logger.warning(f"Could not start booking expiry worker: {e}")
     
     if USE_WEBHOOK:
         # Webhook режим (для production на Railway)

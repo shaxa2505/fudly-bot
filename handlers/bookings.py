@@ -490,7 +490,38 @@ async def create_booking_final(message: types.Message, state: FSMContext) -> Non
     
     # Create booking atomically
     logger.info(f"📦 BOOKING: Calling create_booking_atomic - offer_id={offer_id}, user_id={message.from_user.id}, quantity={quantity}")
-    
+    # Check per-user active booking limit before attempting atomic create
+    try:
+        active_bookings = db.get_user_bookings(message.from_user.id) or []
+        active_count = 0
+        if isinstance(active_bookings, list):
+            if len(active_bookings) > 0 and isinstance(active_bookings[0], dict):
+                active_count = sum(1 for b in active_bookings if b.get('status') in ['active', 'pending', 'confirmed'])
+            else:
+                # tuple format: status at index 7 (fallback)
+                active_count = sum(1 for b in active_bookings if (len(b) > 7 and b[7] in ['active', 'pending', 'confirmed']))
+        else:
+            active_count = 0
+    except Exception:
+        active_count = 0
+
+    try:
+        import os
+        max_allowed = int(os.environ.get('MAX_ACTIVE_BOOKINGS_PER_USER', '3'))
+    except Exception:
+        max_allowed = 3
+
+    if active_count >= max_allowed:
+        # Localized message
+        if lang == 'uz':
+            await message.answer(
+                f"❌ Sizda allaqachon {active_count} faol bron mavjud (maksimum {max_allowed}). Iltimos, avvalgi bronlarni bekor qiling yoki kuting.")
+        else:
+            await message.answer(
+                f"❌ У вас уже {active_count} активных бронирований (максимум {max_allowed}). Пожалуйста, отмените предыдущие брони или подождите.")
+        await state.clear()
+        return
+
     ok, booking_id, code = db.create_booking_atomic(
         offer_id, message.from_user.id, quantity
     )

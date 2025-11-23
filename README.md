@@ -220,6 +220,49 @@ def update_offer_quantity(self, offer_id: int, new_quantity: int):
         # Реактивация при возврате
         cursor.execute('UPDATE offers SET quantity = ?, status = ? WHERE offer_id = ?', 
                       (new_quantity, 'active', offer_id))
+## 🛠️ Standalone booking expiry worker
+
+Для надёжной работы напоминаний и авто-отмен (вне процесса бота) можно запускать отдельный worker process.
+
+1) Запуск (локально или в контейнере):
+
+```powershell
+$env:TELEGRAM_BOT_TOKEN = '<your_token>'
+# Для Postgres в staging/production
+$env:DATABASE_URL = 'postgresql://user:pass@host:port/dbname'
+python scripts/run_booking_worker.py
+```
+
+2) systemd unit (пример):
+
+```ini
+[Unit]
+Description=Fudly Booking Expiry Worker
+After=network.target
+
+[Service]
+User=www-data
+WorkingDirectory=/opt/fudly-bot
+Environment=TELEGRAM_BOT_TOKEN=your_token
+Environment=DATABASE_URL=postgresql://...    
+ExecStart=/opt/fudly-bot/.venv/bin/python /opt/fudly-bot/scripts/run_booking_worker.py
+Restart=always
+
+[Install]
+WantedBy=multi-user.target
+```
+
+3) Heroku / Procfile example:
+
+```
+worker: .venv/bin/python scripts/run_booking_worker.py
+```
+
+4) Notes:
+- Скрипт использует `TELEGRAM_BOT_TOKEN` для отправки напоминаний; без токена worker не стартует.
+- Для Postgres укажите `DATABASE_URL`; иначе используется локальная SQLite (как fallback).
+- Скрипт корректно закрывает DB-пул и сессию бота при остановке.
+
 ```
 
 ### Bot.py
@@ -255,3 +298,24 @@ python bot.py
 **Последнее обновление**: 31 октября 2025
 **Версия**: 3.0 (Финальная)
 **Статус**: ✅ Полностью рабочий
+
+---
+
+## 📣 Booking expiry worker (standalone)
+
+We provide a standalone worker to run reminders and auto-cancel expired bookings outside the bot process. This is recommended for production to isolate background work.
+
+Usage (Windows PowerShell):
+
+```powershell
+$env:TELEGRAM_BOT_TOKEN = '<your_token>'
+$env:DATABASE_URL = '<your_database_url>'
+python .\scripts\booking_expiry_worker.py
+```
+
+Behavior:
+- Sends a localized reminder (RU/UZ) 1 hour before booking expiry, marks `reminder_sent` to avoid duplicates.
+- Cancels bookings past `expiry_time` and returns reserved quantity to the offer atomically.
+
+Notes:
+- The bot still starts an internal worker by default, but running the standalone script is safer and recommended on production hosts.
