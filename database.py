@@ -1480,6 +1480,54 @@ class Database:
                 conn.close()
             except Exception:
                 pass
+
+    def set_booking_payment_proof(self, booking_id: int, file_id: str) -> bool:
+        """Store payment proof file_id for a booking."""
+        conn = None
+        try:
+            conn = self.get_connection()
+            cursor = conn.cursor()
+            cursor.execute('UPDATE bookings SET payment_proof_photo_id = ? WHERE booking_id = ?', (file_id, booking_id))
+            conn.commit()
+            return True
+        except Exception as e:
+            logger.error(f"Failed to set payment_proof for booking {booking_id}: {e}")
+            try:
+                if conn:
+                    conn.rollback()
+            except Exception:
+                pass
+            return False
+        finally:
+            try:
+                if conn:
+                    conn.close()
+            except Exception:
+                pass
+
+    def mark_reminder_sent(self, booking_id: int) -> bool:
+        """Mark a booking's reminder_sent flag to avoid duplicate reminders."""
+        conn = None
+        try:
+            conn = self.get_connection()
+            cursor = conn.cursor()
+            cursor.execute('UPDATE bookings SET reminder_sent = 1 WHERE booking_id = ?', (booking_id,))
+            conn.commit()
+            return True
+        except Exception as e:
+            logger.error(f"Failed to mark reminder_sent for booking {booking_id}: {e}")
+            try:
+                if conn:
+                    conn.rollback()
+            except Exception:
+                pass
+            return False
+        finally:
+            try:
+                if conn:
+                    conn.close()
+            except Exception:
+                pass
     
     def update_booking_status(self, booking_id: int, status: str):
         conn = self.get_connection()

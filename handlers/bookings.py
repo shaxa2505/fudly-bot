@@ -677,23 +677,27 @@ async def create_booking_final(message: types.Message, state: FSMContext) -> Non
     # Update booking with delivery details
     if delivery_option == 1:
         try:
-            with db.get_connection() as conn:
-                cursor = conn.cursor()
-                # Include payment proof photo id if provided
-                payment_proof = data.get('payment_proof_photo_id')
-                if payment_proof:
-                    cursor.execute("""
-                        UPDATE bookings 
-                        SET delivery_option = %s, delivery_address = %s, delivery_cost = %s, payment_proof_photo_id = %s
-                        WHERE booking_id = %s
-                    """, (delivery_option, delivery_address, delivery_cost, payment_proof, booking_id))
-                else:
+            payment_proof = data.get('payment_proof_photo_id')
+            # Try to set payment proof via DB helper (both adapters)
+            if payment_proof and db:
+                try:
+                    db.set_booking_payment_proof(booking_id, payment_proof)
+                except Exception:
+                    pass
+
+            # Also update delivery_option/address/cost using existing connection if available
+            try:
+                with db.get_connection() as conn:
+                    cursor = conn.cursor()
                     cursor.execute("""
                         UPDATE bookings 
                         SET delivery_option = %s, delivery_address = %s, delivery_cost = %s
                         WHERE booking_id = %s
                     """, (delivery_option, delivery_address, delivery_cost, booking_id))
-                logger.info(f"✅ Delivery details updated for booking {booking_id}")
+                    logger.info(f"✅ Delivery details updated for booking {booking_id}")
+            except Exception:
+                # best-effort: ignore if adapter doesn't expose get_connection
+                pass
         except Exception as e:
             logger.error(f"Error updating delivery details: {e}")
     
@@ -1093,9 +1097,8 @@ async def partner_confirm(callback: types.CallbackQuery) -> None:
 
     # Mark reminder_sent to avoid worker sending reminders after partner confirmation
     try:
-        with db.get_connection() as conn:
-            cursor = conn.cursor()
-            cursor.execute('UPDATE bookings SET reminder_sent = 1 WHERE booking_id = %s', (booking_id,))
+        if db:
+            db.mark_reminder_sent(booking_id)
     except Exception:
         pass
 
@@ -1249,9 +1252,8 @@ async def complete_booking(callback: types.CallbackQuery) -> None:
     if success:
         # Ensure reminder won't be sent for completed bookings
         try:
-            with db.get_connection() as conn:
-                cursor = conn.cursor()
-                cursor.execute('UPDATE bookings SET reminder_sent = 1 WHERE booking_id = %s', (booking_id,))
+            if db:
+                db.mark_reminder_sent(booking_id)
         except Exception:
             pass
         await callback.answer(get_text(lang, "booking_completed"), show_alert=True)
@@ -1297,9 +1299,8 @@ async def customer_received(callback: types.CallbackQuery) -> None:
     if success:
         # mark reminder sent to avoid further reminders
         try:
-            with db.get_connection() as conn:
-                cursor = conn.cursor()
-                cursor.execute('UPDATE bookings SET reminder_sent = 1 WHERE booking_id = %s', (booking_id,))
+            if db:
+                db.mark_reminder_sent(booking_id)
         except Exception:
             pass
 

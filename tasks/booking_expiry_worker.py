@@ -56,7 +56,8 @@ async def start_booking_expiry_worker(db: Any, bot: Any) -> None:
                                 if current_status not in (None, 'pending'):
                                     # Skip sending reminder for non-pending bookings
                                     try:
-                                        cursor.execute('UPDATE bookings SET reminder_sent = 1 WHERE booking_id = %s', (booking_id,))
+                                        if db:
+                                            db.mark_reminder_sent(booking_id)
                                     except Exception:
                                         pass
                                     continue
@@ -91,7 +92,8 @@ async def start_booking_expiry_worker(db: Any, bot: Any) -> None:
 
                             # mark reminder_sent
                             try:
-                                cursor.execute('UPDATE bookings SET reminder_sent = 1 WHERE booking_id = %s', (booking_id,))
+                                if db:
+                                    db.mark_reminder_sent(booking_id)
                             except Exception as e:
                                 logger.error(f"Failed to mark reminder_sent for booking {booking_id}: {e}")
                         except Exception as e:
