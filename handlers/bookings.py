@@ -52,6 +52,18 @@ def setup_dependencies(
     METRICS = metrics
 
 
+# Import shim modules to provide a clear separation of booking flow vs
+# notification handlers while preserving the existing implementations in this
+# file. These shims re-export handlers and make it easier to split code later.
+try:
+    from handlers import bookings_flow  # type: ignore
+    from handlers import bookings_notify  # type: ignore
+except Exception:
+    # Best-effort import; if shims are not yet present during early import,
+    # we continue without failing the module import.
+    pass
+
+
 @router.callback_query(F.data.startswith("book_"))
 async def book_offer_start(callback: types.CallbackQuery, state: FSMContext) -> None:
     """Start booking - ask for quantity."""
@@ -332,248 +344,66 @@ async def book_offer_quantity(message: types.Message, state: FSMContext) -> None
 
 @router.message(BookOffer.delivery_address)
 async def book_offer_delivery_address(message: types.Message, state: FSMContext) -> None:
-    """Process delivery address and create booking."""
-    if not db:
-        await message.answer("System error")
-        return
-    assert message.from_user is not None
-    lang = db.get_user_language(message.from_user.id)
-    
-    # Check for cancellation
-    if message.text in ["❌ Отмена", "❌ Bekor qilish", "/cancel"]:
-        await state.clear()
-        await message.answer(
-            get_text(lang, "action_cancelled"),
-            reply_markup=main_menu_customer(lang)
-        )
-        return
-    
-    raw_addr = message.text or ""
-    address = raw_addr.strip()
-    
-    if len(address) < 10:
-        await message.answer(
-            "❌ Пожалуйста, укажите полный адрес (минимум 10 символов)" if lang == "ru"
-            else "❌ Iltimos, to'liq manzilni kiriting (kamida 10 ta belgi)"
-        )
-        return
-    
-    # Move user into the OrderDelivery flow (use `orders` handlers) instead of
-    # creating a booking in `bookings` table. We preserve quantity and offer_id
-    # already stored in the state and set the order address + move to payment_proof.
+    """Compatibility wrapper: forward BookOffer address into OrderDelivery flow.
+
+    To avoid duplicating delivery logic in `bookings`, we convert the incoming
+    address message into the `OrderDelivery` state and delegate processing to
+    the `orders` handlers (which implement delivery behavior).
+    """
     try:
-        data = await state.get_data()
-        delivery_price = data.get("delivery_price", 0)
-        offer_id = data.get("offer_id")
-        quantity = data.get("quantity")
-
-        # Ensure we have required fields
-        if not offer_id or not quantity:
-            await message.answer(get_text(lang, "error"))
-            await state.clear()
-            return
-
-        store_id = None
-        offer = db.get_offer(offer_id)
-        if offer:
-            store_id = get_offer_field(offer, "store_id")
-
-        # Prepare state data for OrderDelivery handlers
+        from handlers.orders import order_delivery_address
         from handlers.common_states.states import OrderDelivery as _OrderDelivery
+    except Exception:
+        # Fallback: inform user that delivery is handled via orders
+        lang = 'ru'
+        try:
+            lang = db.get_user_language(message.from_user.id) if db else 'ru'
+        except Exception:
+            pass
+        await message.answer(get_text(lang, 'error') or ("Произошла ошибка" if lang == 'ru' else "Xatolik"))
+        return
 
-        await state.update_data(
-            offer_id=offer_id,
-            store_id=store_id,
-            quantity=quantity,
-            address=address,
-            delivery_price=delivery_price,
-        )
-        # Move to order payment proof step (orders handler will create order on photo)
-        await state.set_state(_OrderDelivery.payment_proof)
-
-        if lang == 'ru':
-            prompt = (
-                "📸 Пожалуйста, отправьте фото чека или подтверждение оплаты для доставки\n\n"
-                "Если вы оплатили картой/онлайн, пришлите фото квитанции."
-            )
-        else:
-            prompt = (
-                "📸 Iltimos, yetkazib berish uchun to'lov kvitansiyasi yoki chek rasmini yuboring\n\n"
-                "Agar onlayn to'lov qilgan bo'lsangiz, kvitansiya rasmini yuboring."
-            )
-
-        await message.answer(prompt, reply_markup=cancel_keyboard(lang))
-    except Exception as e:
-        logger.error(f"Error switching to OrderDelivery flow: {e}")
-        await message.answer(get_text(lang, "error"))
-        await state.clear()
+    # Move the address into OrderDelivery state and call the orders handler
+    await state.update_data(address=(message.text or '').strip())
+    await state.set_state(_OrderDelivery.address)
+    # Delegate to orders handler (pass db and bot globals)
+    await order_delivery_address(message, state, db, bot)
 
 
 @router.message(BookOffer.delivery_receipt, F.photo)
 async def book_offer_delivery_receipt_photo(message: types.Message, state: FSMContext) -> None:
-    """Receive photo for delivery payment proof and create booking."""
-    if not db:
-        await message.answer("System error")
-        return
-    assert message.from_user is not None
-    lang = db.get_user_language(message.from_user.id)
-
-    # Get the highest-quality photo file_id
-    photo = None
-    if message.photo:
-        photo = message.photo[-1].file_id
-    elif message.document and message.document.mime_type and message.document.mime_type.startswith('image/'):
-        photo = message.document.file_id
-
-    if not photo:
-        await message.answer(
-            "❌ Пожалуйста, отправьте фото (фото/документ с изображением)" if lang == 'ru' else "❌ Iltimos, rasm yuboring"
-        )
-        return
-
-    logger.info(f"📷 Received delivery payment proof from user {message.from_user.id}: file_id={photo}")
-
-    # Create an `orders` record (use orders flow) instead of a booking in `bookings`.
+    """Compatibility wrapper: forward payment photo into orders flow."""
     try:
-        data = await state.get_data()
-        offer_id = data.get("offer_id")
-        quantity = data.get("quantity")
-        address = data.get("delivery_address") or data.get("address")
-
-        if not offer_id or not quantity or not address:
-            await message.answer(get_text(lang, "error"))
-            await state.clear()
-            return
-
-        offer = db.get_offer(offer_id)
-        store_id = get_offer_field(offer, "store_id") if offer else None
-        store = db.get_store(store_id) if store_id else None
-        delivery_price = get_store_field(store, "delivery_price", 0)
-
-        # Create order
-        order_id = db.create_order(
-            user_id=message.from_user.id,
-            store_id=store_id,
-            offer_id=offer_id,
-            quantity=quantity,
-            order_type="delivery",
-            delivery_address=address,
-            delivery_price=delivery_price,
-            payment_method="card",
-        )
-
-        if not order_id:
-            await message.answer(
-                "❌ " + ("Ошибка создания заказа" if lang == "ru" else "Buyurtma yaratishda xatolik")
-            )
-            await state.clear()
-            return
-
-        # Update payment status with the photo id
+        from handlers.orders import order_payment_proof
+        from handlers.common_states.states import OrderDelivery as _OrderDelivery
+    except Exception:
+        lang = 'ru'
         try:
-            db.update_payment_status(order_id, "pending", photo)
+            lang = db.get_user_language(message.from_user.id) if db else 'ru'
         except Exception:
             pass
+        await message.answer(get_text(lang, 'error') or ("Произошла ошибка" if lang == 'ru' else "Xatolik"))
+        return
 
-        # Decrement offer quantity atomically
-        try:
-            db.increment_offer_quantity_atomic(offer_id, -int(quantity))
-        except Exception as e:
-            logger.error(f"Failed to decrement offer {offer_id} by {quantity}: {e}")
-
-        customer = get_user_safe(db, message.from_user.id)
-        customer_phone = getattr(customer, 'phone', None) or "Не указан"
-
-        currency_ru = "сум"
-        currency_uz = "so'm"
-        unit_ru = "шт"
-        unit_uz = "dona"
-
-        notification_kb = InlineKeyboardBuilder()
-        notification_kb.button(
-            text="✅ " + ("Подтвердить оплату" if lang == "ru" else "To'lovni tasdiqlash"),
-            callback_data=f"confirm_payment_{order_id}",
-        )
-        notification_kb.button(
-            text="❌ " + ("Отклонить" if lang == "ru" else "Rad etish"),
-            callback_data=f"reject_payment_{order_id}",
-        )
-        notification_kb.adjust(2)
-
-        # Send photo + notification to owner
-        owner_id = get_store_field(store, "owner_id") if store else None
-        store_name = get_store_field(store, "name", "Магазин") if store else "Магазин"
-        offer_title = get_offer_field(offer, "title", "") if offer else ""
-
-        try:
-            if owner_id:
-                # Build caption safely to avoid nested-quote f-string issues
-                caption_lines = []
-                caption_lines.append(
-                    f"🔔 <b>{'Новый заказ с доставкой!' if lang == 'ru' else 'Yangi buyurtma yetkazib berish bilan!'}</b>"
-                )
-                caption_lines.append("")
-                caption_lines.append(f"🏪 {store_name}")
-                caption_lines.append(f"🍽 {offer_title}")
-                caption_lines.append(f"📦 {'Количество' if lang == 'ru' else 'Miqdor'}: {quantity} {unit_ru if lang == 'ru' else unit_uz}")
-                caption_lines.append(f"👤 {message.from_user.first_name}")
-                caption_lines.append(f"📱 {'Телефон' if lang == 'ru' else 'Telefon'}: <code>{customer_phone}</code>")
-                caption_lines.append(f"📍 {'Адрес' if lang == 'ru' else 'Manzil'}: {address}")
-                caption_lines.append(
-                    f"💰 {'Итого' if lang == 'ru' else 'Jami'}: {(get_offer_field(offer, 'discount_price', 0) * int(quantity)) + delivery_price:,} {currency_ru if lang == 'ru' else currency_uz}"
-                )
-                caption_lines.append("")
-                caption_lines.append(
-                    "📸 " + ("Скриншот оплаты выше" if lang == 'ru' else "To'lov skrinsho yuqorida")
-                )
-                caption_text = "\n".join(caption_lines)
-
-                await bot.send_photo(
-                    chat_id=owner_id,
-                    photo=photo,
-                    caption=caption_text,
-                    parse_mode="HTML",
-                    reply_markup=notification_kb.as_markup(),
-                )
-        except Exception as e:
-            logger.error(f"Failed to notify owner about order {order_id}: {e}")
-
-        # Inform customer
-        total_amount = (get_offer_field(offer, "discount_price", 0) * int(quantity)) + delivery_price
-        confirm_text = 'Ожидайте подтверждения оплаты от магазина' if lang == 'ru' else "Do'kon dan to'lovni tasdiqlashni kuting"
-
-        await message.answer(
-            f"✅ <b>{'Заказ оформлен!' if lang == 'ru' else 'Buyurtma qabul qilindi!'}</b>\n\n"
-            f"📦 {'Заказ' if lang == 'ru' else 'Buyurtma'} #{order_id}\n"
-            f"🍽 {offer_title}\n"
-            f"📦 {'Количество' if lang == 'ru' else 'Miqdor'}: {quantity} {unit_ru if lang == 'ru' else unit_uz}\n"
-            f"📍 {'Адрес доставки' if lang == 'ru' else 'Yetkazib berish manzili'}: {address}\n"
-            f"💵 {'Итого' if lang == 'ru' else 'Jami'}: <b>{total_amount:,} {currency_ru if lang == 'ru' else currency_uz}</b>\n\n"
-            f"{confirm_text}",
-            parse_mode="HTML",
-        )
-
-        await state.clear()
-
-    except Exception as e:
-        logger.error(f"Error creating order from delivery receipt: {e}")
-        await message.answer(get_text(lang, "error"))
-        await state.clear()
+    # Move to OrderDelivery.payment_proof state and delegate handling
+    await state.set_state(_OrderDelivery.payment_proof)
+    await order_payment_proof(message, state, db, bot)
 
 @router.message(BookOffer.delivery_receipt)
 async def book_offer_delivery_receipt_fallback(message: types.Message, state: FSMContext) -> None:
-    """Fallback when user sends non-photo during receipt step."""
-    assert message.from_user is not None
-    lang = 'ru'
+    """Fallback wrapper: delegate non-photo receipt messages to orders handler."""
     try:
-        lang = db.get_user_language(message.from_user.id)
+        from handlers.orders import order_payment_proof_invalid
     except Exception:
-        pass
+        lang = 'ru'
+        try:
+            lang = db.get_user_language(message.from_user.id) if db else 'ru'
+        except Exception:
+            pass
+        await message.answer(get_text(lang, 'error') or ("Произошла ошибка" if lang == 'ru' else "Xatolik"))
+        return
 
-    await message.answer(
-        "❗ Пожалуйста, отправьте фото чека или нажмите ❌ Отмена" if lang == 'ru' else "❗ Iltimos, kvitansiya rasmini yuboring yoki ❌ Bekor qilish tugmasini bosing",
-        reply_markup=cancel_keyboard(lang)
-    )
+    await order_payment_proof_invalid(message, state, db)
 
 
 @router.callback_query(F.data == "confirm_pickup_yes")
@@ -691,6 +521,136 @@ async def create_booking_final(message: types.Message, state: FSMContext) -> Non
     if not offer_address:
         offer_address = "Manzil ko'rsatilmagan" if lang == "uz" else "Адрес не указан"
     
+    # If this is a delivery, delegate to orders: create an order instead of a booking
+    if delivery_option == 1:
+        try:
+            # Prepare order fields
+            store = db.get_store(store_id) if store_id else None
+            delivery_price = get_store_field(store, "delivery_price", 0) if store else 0
+            photo_id = data.get('payment_proof_photo_id')
+
+            order_id = db.create_order(
+                user_id=message.from_user.id,
+                store_id=store_id if store_id else 0,
+                offer_id=offer_id,
+                quantity=quantity,
+                order_type="delivery",
+                delivery_address=delivery_address,
+                delivery_price=delivery_price,
+                payment_method="card",
+            )
+
+            if not order_id:
+                await message.answer(
+                    "❌ " + ("Ошибка создания заказа" if lang == "ru" else "Buyurtma yaratishda xatolik")
+                )
+                await state.clear()
+                return
+
+            # Persist payment proof if exists
+            if photo_id:
+                try:
+                    db.update_payment_status(order_id, "pending", photo_id)
+                except Exception:
+                    # best-effort
+                    pass
+
+            # Decrement offer quantity atomically
+            try:
+                db.increment_offer_quantity_atomic(offer_id, -int(quantity))
+            except Exception as e:
+                logger.error(f"Failed to decrement offer {offer_id} by {quantity}: {e}")
+
+            # Notify owner (reuse same notification format as orders)
+            owner_id = get_store_field(store, "owner_id") if store else None
+            if owner_id:
+                partner_lang = db.get_user_language(owner_id)
+                customer = get_user_safe(db, message.from_user.id)
+                customer_phone = getattr(customer, 'phone', None) or "Не указан"
+
+                notification_kb = InlineKeyboardBuilder()
+                notification_kb.button(
+                    text="✅ " + ("Подтвердить оплату" if partner_lang == "ru" else "To'lovni tasdiqlash"),
+                    callback_data=f"confirm_payment_{order_id}",
+                )
+                notification_kb.button(
+                    text="❌ " + ("Отклонить" if partner_lang == "ru" else "Rad etish"),
+                    callback_data=f"reject_payment_{order_id}",
+                )
+                notification_kb.adjust(2)
+
+                offer_title = get_offer_field(offer, "title", "")
+                offer_price = get_offer_field(offer, "discount_price", 0)
+                currency_ru = "сум"
+                currency_uz = "so'm"
+                unit_ru = "шт"
+                unit_uz = "dona"
+
+                payment_ru = "Оплата"
+                payment_uz = "To'lov"
+                payment_method_ru = "Перевод на карту"
+                payment_method_uz = "Kartaga o'tkazma"
+                screenshot_ru = "Скриншот оплаты выше"
+                screenshot_uz = "To'lov skrinsho yuqorida"
+
+                try:
+                    if photo_id and isinstance(photo_id, str):
+                        try:
+                            await bot.send_photo(
+                                chat_id=owner_id,
+                                photo=photo_id,
+                                caption=(
+                                    f"🔔 <b>{'Новый заказ с доставкой!' if partner_lang == 'ru' else 'Yangi buyurtma yetkazib berish bilan!'}</b>\n\n"
+                                    f"🏪 {get_store_field(store, 'name', 'Магазин')}\n"
+                                    f"🍽 {offer_title}\n"
+                                    f"📦 {'Количество' if partner_lang == 'ru' else 'Miqdor'}: {quantity} {unit_ru if partner_lang == 'ru' else unit_uz}\n"
+                                    f"👤 {message.from_user.first_name}\n"
+                                    f"📱 {'Телефон' if partner_lang == 'ru' else 'Telefon'}: <code>{customer_phone}</code>\n"
+                                    f"📍 {'Адрес' if partner_lang == 'ru' else 'Manzil'}: {delivery_address}\n"
+                                    f"💰 {payment_ru if partner_lang == 'ru' else payment_uz}: {payment_method_ru if partner_lang == 'ru' else payment_method_uz}\n"
+                                    f"💵 {'Сумма' if partner_lang == 'ru' else 'Summa'}: {(offer_price * quantity) + delivery_price:,} {currency_ru if partner_lang == 'ru' else currency_uz}\n\n"
+                                    f"📸 {screenshot_ru if partner_lang == 'ru' else screenshot_uz}"
+                                ),
+                                parse_mode="HTML",
+                                reply_markup=notification_kb.as_markup(),
+                            )
+                        except Exception:
+                            await _safe_answer_or_send(None, owner_id, "Новый заказ", reply_markup=notification_kb.as_markup())
+                    else:
+                        await _safe_answer_or_send(None, owner_id, "Новый заказ", reply_markup=notification_kb.as_markup())
+                except Exception as e:
+                    logger.error(f"Failed to notify owner about order {order_id}: {e}")
+
+            # Inform customer
+            from app.keyboards.user import main_menu_customer, main_menu_seller
+            user = db.get_user_model(message.from_user.id)
+            user_role = user.role if user else "customer"
+            menu = main_menu_seller(lang) if user_role == "seller" else main_menu_customer(lang)
+
+            waiting_msg_ru = "Ожидайте подтверждения оплаты от магазина"
+            waiting_msg_uz = "Do'kon dan to'lovni tasdiqlashni kuting"
+
+            await message.answer(
+                f"✅ <b>{'Заказ оформлен!' if lang == 'ru' else 'Buyurtma qabul qilindi!'}</b>\n\n"
+                f"📦 {'Заказ' if lang == 'ru' else 'Buyurtma'} #{order_id}\n"
+                f"🍽 {offer_title}\n"
+                f"📦 {'Количество' if lang == 'ru' else 'Miqdor'}: {quantity} {unit_ru if lang == 'ru' else unit_uz}\n"
+                f"📍 {'Адрес доставки' if lang == 'ru' else 'Yetkazib berish manzili'}: {delivery_address}\n"
+                f"💰 {payment_ru if lang == 'ru' else payment_uz}: {payment_method_ru if lang == 'ru' else payment_method_uz}\n"
+                f"💵 {'Итого' if lang == 'ru' else 'Jami'}: <b>{(offer_price * quantity) + delivery_price:,} {currency_ru if lang == 'ru' else currency_uz}</b>\n\n"
+                f"{waiting_msg_ru if lang == 'ru' else waiting_msg_uz}",
+                parse_mode="HTML",
+            )
+
+            await message.answer("✅ " + ("Готово!" if lang == "ru" else "Tayyor!"), reply_markup=menu)
+            await state.clear()
+            return
+        except Exception as e:
+            logger.error(f"Error creating order from booking flow: {e}")
+            await message.answer(get_text(lang, "error"))
+            await state.clear()
+            return
+
     # Create booking atomically
     logger.info(f"📦 BOOKING: Calling create_booking_atomic - offer_id={offer_id}, user_id={message.from_user.id}, quantity={quantity}")
     # Check per-user active booking limit before attempting atomic create

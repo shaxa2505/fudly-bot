@@ -21,9 +21,10 @@ async def start_booking_expiry_worker(db: Any, bot: Any) -> None:
                     cursor.execute("""
                         SELECT booking_id, user_id, booking_code, status
                         FROM bookings
-                        WHERE reminder_sent = 0
+                                                WHERE reminder_sent = 0
                           AND expiry_time IS NOT NULL
-                          AND status IN ('pending')
+                                                    AND status IN ('pending')
+                                                    AND delivery_option = 0
                           AND expiry_time > now()
                           AND expiry_time <= now() + INTERVAL '1 hour'
                     """)
@@ -108,7 +109,8 @@ async def start_booking_expiry_worker(db: Any, bot: Any) -> None:
                     cursor.execute("""
                         SELECT booking_id, user_id, offer_id, quantity
                         FROM bookings
-                        WHERE status IN ('pending','active')
+                                                WHERE status IN ('pending','active')
+                                                    AND delivery_option = 0
                           AND expiry_time IS NOT NULL
                           AND expiry_time <= now()
                     """)
