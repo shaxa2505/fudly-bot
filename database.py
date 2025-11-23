@@ -1261,16 +1261,24 @@ class Database:
         return deleted_count
     
     # Методы для бронирований
-    def create_booking(self, offer_id: int, user_id: int, booking_code: str, quantity: int = 1) -> int:
+    def create_booking(
+        self,
+        offer_id: int,
+        user_id: int,
+        booking_code: str,
+        quantity: int = 1,
+        pickup_time: Optional[str] = None,
+        pickup_address: Optional[str] = None,
+    ) -> int:
         """Создать бронирование (не атомарное - используйте create_booking_atomic для предотвращения race conditions)"""
         conn = self.get_connection()
         try:
             cursor = conn.cursor()
             # Set expiry_time using SQLite datetime() and default reminder_sent=0
             cursor.execute(f'''
-                INSERT INTO bookings (offer_id, user_id, booking_code, status, quantity, expiry_time, reminder_sent)
-                VALUES (?, ?, ?, 'pending', ?, datetime('now', '+{BOOKING_DURATION_HOURS} hours'), 0)
-            ''', (offer_id, user_id, booking_code, quantity))
+                INSERT INTO bookings (offer_id, user_id, booking_code, status, quantity, pickup_time, pickup_address, expiry_time, reminder_sent)
+                VALUES (?, ?, ?, 'pending', ?, ?, ?, datetime('now', '+{BOOKING_DURATION_HOURS} hours'), 0)
+            ''', (offer_id, user_id, booking_code, quantity, pickup_time, pickup_address))
             booking_id = cursor.lastrowid
             conn.commit()
             return booking_id
@@ -1280,7 +1288,14 @@ class Database:
             except Exception:
                 pass
     
-    def create_booking_atomic(self, offer_id: int, user_id: int, quantity: int = 1) -> Tuple[bool, Optional[int], Optional[str]]:
+    def create_booking_atomic(
+        self,
+        offer_id: int,
+        user_id: int,
+        quantity: int = 1,
+        pickup_time: Optional[str] = None,
+        pickup_address: Optional[str] = None,
+    ) -> Tuple[bool, Optional[int], Optional[str]]:
         """Атомарно резервирует товар и создает бронирование внутри одной транзакции.
         
         Args:
@@ -1308,9 +1323,9 @@ class Database:
             # Начинаем транзакцию IMMEDIATE для предотвращения race conditions
             cursor.execute('BEGIN IMMEDIATE')
             
-            # Проверяем и резервируем товар атомарно
+            # Проверяем и резервируем товар атомарно (берём также store_id для слотов)
             cursor.execute('''
-                SELECT quantity, status FROM offers 
+                SELECT quantity, status, store_id FROM offers 
                 WHERE offer_id = ? AND status = 'active'
             ''', (offer_id,))
             offer = cursor.fetchone()
@@ -1320,6 +1335,7 @@ class Database:
                 return (False, None, None)
             
             current_quantity = offer[0]
+            store_id = offer[2] if len(offer) > 2 else None
             new_quantity = current_quantity - quantity
             
             # Обновляем quantity атомарно
@@ -1336,12 +1352,53 @@ class Database:
             
             # Генерируем уникальный код бронирования
             booking_code = ''.join(random.choices(string.ascii_uppercase + string.digits, k=6))
+            # Если указан pickup_time, резервируем слот (create-if-not-exists)
+            if pickup_time and store_id is not None:
+                try:
+                    # default capacity from env
+                    DEFAULT_SLOT_CAPACITY = int(os.environ.get('PICKUP_SLOT_CAPACITY', '5'))
+                except Exception:
+                    DEFAULT_SLOT_CAPACITY = 5
+
+                # Ensure slot row exists
+                slot_table_ok = True
+                try:
+                    cursor.execute('''
+                        INSERT OR IGNORE INTO pickup_slots (store_id, slot_ts, capacity, reserved, created_at)
+                        VALUES (?, ?, ?, 0, datetime('now'))
+                    ''', (store_id, pickup_time, DEFAULT_SLOT_CAPACITY))
+                except Exception:
+                    # If table doesn't exist or other failure, skip slot reservation
+                    logger.debug('pickup_slots table missing or insert failed; skipping slot reservation')
+                    slot_table_ok = False
+
+                # Try to reserve only if slot table operations succeeded
+                slot_row = None
+                if slot_table_ok:
+                    cursor.execute('SELECT reserved, capacity FROM pickup_slots WHERE store_id = ? AND slot_ts = ?', (store_id, pickup_time))
+                    slot_row = cursor.fetchone()
+                if not slot_row:
+                    # If we couldn't access slot info, treat as no capacity available
+                    conn.rollback()
+                    return (False, None, None)
+
+                cur_reserved, cur_capacity = slot_row[0] or 0, slot_row[1] or 0
+                if cur_reserved + quantity > cur_capacity:
+                    # no capacity
+                    conn.rollback()
+                    return (False, None, None)
+
+                # update reserved
+                cursor.execute('UPDATE pickup_slots SET reserved = reserved + ? WHERE store_id = ? AND slot_ts = ? AND reserved = ?', (quantity, store_id, pickup_time, cur_reserved))
+                if cursor.rowcount == 0:
+                    conn.rollback()
+                    return (False, None, None)
             
             # Создаем бронирование и устанавливаем expiry_time (SQLite)
             cursor.execute(f'''
-                INSERT INTO bookings (offer_id, user_id, booking_code, status, quantity, expiry_time, reminder_sent)
-                VALUES (?, ?, ?, 'pending', ?, datetime('now', '+{BOOKING_DURATION_HOURS} hours'), 0)
-            ''', (offer_id, user_id, booking_code, quantity))
+                INSERT INTO bookings (offer_id, user_id, booking_code, status, quantity, pickup_time, pickup_address, expiry_time, reminder_sent)
+                VALUES (?, ?, ?, 'pending', ?, ?, ?, datetime('now', '+{BOOKING_DURATION_HOURS} hours'), 0)
+            ''', (offer_id, user_id, booking_code, quantity, pickup_time, pickup_address))
             booking_id = cursor.lastrowid
             
             # Коммитим транзакцию

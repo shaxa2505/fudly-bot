@@ -95,6 +95,7 @@ class BookOffer(StatesGroup):
     delivery_choice = State()  # Choose pickup or delivery
     delivery_address = State()  # Enter delivery address if delivery chosen
     delivery_receipt = State()  # Upload payment/receipt photo for delivery
+    pickup_time = State()  # Chosen pickup time slot
 
 
 class BrowseOffers(StatesGroup):

@@ -126,11 +126,22 @@ class DatabaseProtocol(Protocol):
 
     # ========== BOOKING METHODS ==========
     def create_booking(
-        self, offer_id: int, user_id: int, booking_code: str, quantity: int = 1
+        self,
+        offer_id: int,
+        user_id: int,
+        booking_code: str,
+        quantity: int = 1,
+        pickup_time: Optional[str] = None,
+        pickup_address: Optional[str] = None,
     ) -> int: ...
 
     def create_booking_atomic(
-        self, offer_id: int, user_id: int, quantity: int = 1
+        self,
+        offer_id: int,
+        user_id: int,
+        quantity: int = 1,
+        pickup_time: Optional[str] = None,
+        pickup_address: Optional[str] = None,
     ) -> Tuple[bool, Optional[int], Optional[str]]: ...
 
     def get_user_bookings(self, user_id: int) -> List[Tuple[Any, ...]]: ...

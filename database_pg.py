@@ -1067,7 +1067,9 @@ class Database:
             ''', (city, limit))
             return [dict(row) for row in cursor.fetchall()]
     
-    def create_booking_atomic(self, offer_id: int, user_id: int, quantity: int = 1):
+    def create_booking_atomic(self, offer_id: int, user_id: int, quantity: int = 1,
+                              pickup_time: Optional[str] = None,
+                              pickup_address: Optional[str] = None):
         """Atomically reserve product and create booking in one transaction
         
         Returns: Tuple[bool, Optional[int], Optional[str]]
@@ -1107,9 +1109,9 @@ class Database:
                 logger.warning(f"🔵 User {user_id} has {active_count} active bookings (limit {MAX_ACTIVE_BOOKINGS_PER_USER})")
                 return (False, None, None)
 
-            # Check and reserve product atomically
+            # Check and reserve product atomically (also fetch store_id for slot reservation)
             cursor.execute('''
-                SELECT quantity, status FROM offers 
+                SELECT quantity, status, store_id FROM offers 
                 WHERE offer_id = %s AND status = 'active'
                 FOR UPDATE
             ''', (offer_id,))
@@ -1123,6 +1125,7 @@ class Database:
                 return (False, None, None)
             
             current_quantity = offer[0]
+            store_id = offer[2] if len(offer) > 2 else None
             new_quantity = current_quantity - quantity
             
             logger.info(f"🔵 Updating quantity: {current_quantity} -> {new_quantity}")
@@ -1147,12 +1150,54 @@ class Database:
             
             logger.info(f"🔵 Creating booking with code={booking_code}")
             
+            # If pickup_time provided, reserve slot capacity atomically
+            if pickup_time and store_id is not None:
+                try:
+                    DEFAULT_SLOT_CAPACITY = int(os.environ.get('PICKUP_SLOT_CAPACITY', '5'))
+                except Exception:
+                    DEFAULT_SLOT_CAPACITY = 5
+
+                # Ensure slot row exists (create-if-not-exists)
+                slot_table_ok = True
+                try:
+                    cursor.execute('''
+                        INSERT INTO pickup_slots (store_id, slot_ts, capacity, reserved, created_at)
+                        VALUES (%s, %s, %s, 0, now())
+                        ON CONFLICT (store_id, slot_ts) DO NOTHING
+                    ''', (store_id, pickup_time, DEFAULT_SLOT_CAPACITY))
+                except Exception:
+                    logger.debug('pickup_slots table missing or insert failed; skipping slot reservation')
+                    slot_table_ok = False
+
+                # Lock the slot row only if table accessible
+                slot = None
+                if slot_table_ok:
+                    cursor.execute('SELECT reserved, capacity FROM pickup_slots WHERE store_id = %s AND slot_ts = %s FOR UPDATE', (store_id, pickup_time))
+                    slot = cursor.fetchone()
+                if not slot:
+                    conn.rollback()
+                    logger.warning('No pickup slot found for requested time')
+                    return (False, None, None)
+
+                cur_reserved, cur_capacity = slot[0] or 0, slot[1] or 0
+                if cur_reserved + quantity > cur_capacity:
+                    conn.rollback()
+                    logger.warning('Pickup slot capacity exceeded')
+                    return (False, None, None)
+
+                # update reserved
+                cursor.execute('UPDATE pickup_slots SET reserved = reserved + %s WHERE store_id = %s AND slot_ts = %s AND reserved = %s', (quantity, store_id, pickup_time, cur_reserved))
+                if cursor.rowcount == 0:
+                    conn.rollback()
+                    logger.warning('Failed to update pickup slot reserved count')
+                    return (False, None, None)
+
             # Create booking and set expiry_time
             cursor.execute('''
-                INSERT INTO bookings (offer_id, user_id, booking_code, status, quantity, expiry_time)
-                VALUES (%s, %s, %s, 'pending', %s, now() + (%s * INTERVAL '1 hour'))
+                INSERT INTO bookings (offer_id, user_id, booking_code, status, quantity, pickup_time, pickup_address, expiry_time)
+                VALUES (%s, %s, %s, 'pending', %s, %s, %s, now() + (%s * INTERVAL '1 hour'))
                 RETURNING booking_id
-            ''', (offer_id, user_id, booking_code, quantity, BOOKING_DURATION_HOURS))
+            ''', (offer_id, user_id, booking_code, quantity, pickup_time, pickup_address, BOOKING_DURATION_HOURS))
             booking_id = cursor.fetchone()[0]
             
             logger.info(f"🔵 Booking created: booking_id={booking_id}")

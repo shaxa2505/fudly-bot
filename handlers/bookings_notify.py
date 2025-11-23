@@ -1,26 +1,20 @@
 """Booking notification shim: re-export partner/notification handlers.
 
-This module groups the partner confirmation/rejection and booking lifecycle
-callbacks so notification logic appears in a separate module.
+This module now re-exports handlers from `handlers.bookings_flow` to keep
+backwards compatibility for imports that expect `handlers.bookings_notify`.
 """
-from handlers.bookings import (
+from handlers.bookings_flow import (
     partner_confirm,
     partner_reject,
-    complete_booking,
-    customer_received,
-    rate_booking,
-    save_booking_rating,
     cancel_booking_confirm,
     do_cancel_booking,
+    booking_details,
 )
 
 __all__ = [
     "partner_confirm",
     "partner_reject",
-    "complete_booking",
-    "customer_received",
-    "rate_booking",
-    "save_booking_rating",
     "cancel_booking_confirm",
     "do_cancel_booking",
+    "booking_details",
 ]
