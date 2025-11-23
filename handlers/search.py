@@ -266,6 +266,16 @@ def setup(
                 kb.button(text=("Смотреть товары" if lang == 'ru' else "Mahsulotlarni ko'rish"), callback_data=f"show_store_products_{sid}")
                 kb.adjust(1)
 
+                # If store record contains a photo (photo or photo_id), send as photo with caption
+                photo = store.get('photo') or store.get('photo_id')
+                if photo:
+                    try:
+                        await message.answer_photo(photo=photo, caption=stores_card, parse_mode="HTML", reply_markup=kb.as_markup())
+                        continue
+                    except Exception:
+                        # Fall back to text if sending photo fails
+                        pass
+
                 await message.answer(stores_card, parse_mode="HTML", reply_markup=kb.as_markup())
 
             # If user likely searched store name, do not flood with all offers — stop here

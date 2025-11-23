@@ -911,6 +911,22 @@ def setup(
     async def _send_offer_card(message: types.Message, offer: OfferListItem, lang: str) -> None:
         text = offer_templates.render_offer_card(lang, offer)
         keyboard = offer_keyboards.offer_quick_keyboard(lang, offer.id, offer.store_id, offer.delivery_enabled)
+
+        # If offer has a photo, send it as a photo message with caption to be consistent
+        # with search and seller flows. Fallback to text if sending photo fails.
+        if getattr(offer, "photo", None):
+            try:
+                await message.answer_photo(
+                    photo=offer.photo,
+                    caption=text,
+                    parse_mode="HTML",
+                    reply_markup=keyboard,
+                )
+                return
+            except Exception:
+                # Fall back to text-only message on any failure
+                pass
+
         await message.answer(text, parse_mode="HTML", reply_markup=keyboard)
 
     async def _show_offers_catalog(
