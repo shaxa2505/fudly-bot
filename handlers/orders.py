@@ -119,6 +119,9 @@ def get_appropriate_menu(user_id: int, lang: str) -> Any:
 @router.callback_query(F.data.startswith("order_delivery_"))
 async def order_delivery_start(callback: types.CallbackQuery, state: FSMContext, db: DatabaseProtocol) -> None:
     """Start delivery order - request quantity."""
+    assert callback.from_user is not None
+    # callback.message may be an InaccessibleMessage in some contexts; keep a local safe reference
+    msg = callback.message if isinstance(callback.message, types.Message) else None
     lang = db.get_user_language(callback.from_user.id)
 
     if not can_proceed(callback.from_user.id, "order_start"):
@@ -170,20 +173,25 @@ async def order_delivery_start(callback: types.CallbackQuery, state: FSMContext,
     discount_price = get_offer_field(offer, "discount_price", 0)
     title = get_offer_field(offer, "title", "")
 
-    await callback.message.answer(
+    if msg:
+        await msg.answer(
         f"🍽 <b>{title}</b>\n\n"
         f"📦 {'Доступно' if lang == 'ru' else 'Mavjud'}: {quantity_available} {unit_ru if lang == 'ru' else unit_uz}\n"
         f"💰 {'Цена за 1 шт' if lang == 'ru' else '1 dona narxi'}: {int(discount_price):,} {currency_ru if lang == 'ru' else currency_uz}\n\n"
         f"{'Сколько вы хотите заказать?' if lang == 'ru' else 'Nechta buyurtma qilasiz?'} (1-{quantity_available})",
         parse_mode="HTML",
         reply_markup=cancel_keyboard(lang),
-    )
+        )
+    else:
+        # Fallback to a short alert if the full message cannot be posted to the callback message
+        await callback.answer(get_text(lang, "please_open_chat" ) if hasattr(get_text, '__call__') else "Please open the chat to continue", show_alert=True)
     await callback.answer()
 
 
 @router.message(OrderDelivery.quantity)
 async def order_delivery_quantity(message: types.Message, state: FSMContext, db: DatabaseProtocol) -> None:
     """Process quantity and request delivery address."""
+    assert message.from_user is not None
     lang = db.get_user_language(message.from_user.id)
 
     # Check for cancellation
@@ -255,6 +263,7 @@ async def order_delivery_quantity(message: types.Message, state: FSMContext, db:
 @router.message(OrderDelivery.address)
 async def order_delivery_address(message: types.Message, state: FSMContext, db: DatabaseProtocol, bot: Any) -> None:
     """Process delivery address and request payment."""
+    assert message.from_user is not None
     lang = db.get_user_language(message.from_user.id)
 
     address = message.text.strip()
@@ -326,6 +335,7 @@ async def order_delivery_address(message: types.Message, state: FSMContext, db: 
 @router.message(OrderDelivery.payment_proof, F.photo)
 async def order_payment_proof(message: types.Message, state: FSMContext, db: DatabaseProtocol, bot: Any) -> None:
     """Process payment screenshot and create order."""
+    assert message.from_user is not None
     logger.info(f"📸 Payment screenshot received from user {message.from_user.id}")
 
     lang = db.get_user_language(message.from_user.id)
@@ -371,6 +381,7 @@ async def order_payment_proof(message: types.Message, state: FSMContext, db: Dat
     offer_price = get_offer_field(offer, "discount_price", 0)
     offer_quantity = get_offer_field(offer, "quantity", 0)
 
+    # Extract highest-resolution photo id
     photo_id = message.photo[-1].file_id
 
     order_id = db.create_order(

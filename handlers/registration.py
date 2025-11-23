@@ -2,6 +2,28 @@
 User registration handlers (phone and city collection)
 """
 from aiogram import Router, types, F
+from aiogram import types as _ai_types
+
+
+async def _safe_edit_reply_markup(msg_like, **kwargs) -> None:
+    """Edit reply markup if message is accessible (Message), otherwise ignore."""
+    if isinstance(msg_like, _ai_types.Message):
+        try:
+            await msg_like.edit_reply_markup(**kwargs)
+        except Exception:
+            pass
+
+
+async def _safe_answer_or_send(msg_like, user_id: int, text: str, **kwargs) -> None:
+    """Try to answer via message.answer, fallback to bot.send_message."""
+    if isinstance(msg_like, _ai_types.Message):
+        try:
+            await msg_like.answer(text, **kwargs)
+            return
+        except Exception:
+            pass
+    # If message is not accessible, caller should handle fallback (e.g., callback.answer)
+    return
 from aiogram.fsm.context import FSMContext
 
 from handlers.common import Registration
@@ -94,17 +116,8 @@ async def registration_city_callback(callback: types.CallbackQuery, state: FSMCo
         pass
 
     await state.clear()
-    from aiogram import types as _ai_types
     try:
-        if isinstance(callback.message, _ai_types.Message):
-            await callback.message.answer(
-                get_text(lang, "registration_complete"),
-                parse_mode="HTML",
-                reply_markup=main_menu_customer(lang),
-            )
-        else:
-            # Fallback to short alert if message is inaccessible
-            await callback.answer(get_text(lang, "registration_complete"), show_alert=True)
+        await _safe_answer_or_send(callback.message, callback.from_user.id, get_text(lang, "registration_complete"), parse_mode="HTML", reply_markup=main_menu_customer(lang))
     except Exception:
         try:
             await callback.answer(get_text(lang, "registration_complete"), show_alert=True)

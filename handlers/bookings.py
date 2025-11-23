@@ -511,7 +511,7 @@ async def confirm_pickup_yes(callback: types.CallbackQuery, state: FSMContext) -
     if not db:
         await callback.answer("System error", show_alert=True)
         return
-
+    assert callback.from_user is not None
     await callback.answer()
     try:
         # Remove inline keyboard so buttons disappear (safe)
@@ -524,8 +524,13 @@ async def confirm_pickup_yes(callback: types.CallbackQuery, state: FSMContext) -
         else:
             # Fallback: send a new message to the user and use it for replies
             try:
-                new_msg = await bot.send_message(callback.from_user.id, "Продолжаю обработку брони...")
-                await create_booking_final(new_msg, state)
+                if bot:
+                    new_msg = await bot.send_message(callback.from_user.id, "Продолжаю обработку брони...")
+                    await create_booking_final(new_msg, state)
+                else:
+                    # As a last resort, inform via callback answer
+                    await callback.answer("Продолжаю обработку брони...", show_alert=True)
+                    return
             except Exception:
                 raise
     except Exception as e:
@@ -750,12 +755,7 @@ async def create_booking_final(message: types.Message, state: FSMContext) -> Non
                     )
                 
                 try:
-                    await bot.send_message(
-                        owner_id,
-                        notif_text,
-                        parse_mode="HTML",
-                        reply_markup=notification_kb.as_markup(),
-                    )
+                    await _safe_answer_or_send(None, owner_id, notif_text, parse_mode="HTML", reply_markup=notification_kb.as_markup())
                 except Exception as e:
                     logger.error(f"Failed to notify partner: {e}")
     
@@ -920,15 +920,8 @@ async def filter_bookings(callback: types.CallbackQuery) -> None:
             f"📅 {created_at}\n\n"
         )
     
-    from aiogram import types as _ai_types
-    if isinstance(callback.message, _ai_types.Message):
-        await callback.message.edit_text(text, parse_mode="HTML")
-    else:
-        # Fallback to bot-level send
-        try:
-            await bot.send_message(callback.from_user.id, text, parse_mode="HTML")
-        except Exception:
-            pass
+    # Use safe helper to edit existing message or send a new one
+    await _safe_answer_or_send(callback.message, callback.from_user.id, text, parse_mode="HTML")
     await callback.answer()
 
 
@@ -1095,15 +1088,11 @@ async def partner_confirm(callback: types.CallbackQuery) -> None:
         kb.button(text=("✓ Выдано" if lang == 'ru' else "🎉 Berildi"), callback_data=f"complete_booking_{booking_id}")
         kb.button(text=("× Отменить" if lang == 'ru' else "× Bekor qilish"), callback_data=f"cancel_booking_{booking_id}")
         kb.adjust(2)
-        from aiogram import types as _ai_types
-        if isinstance(callback.message, _ai_types.Message):
-            text_src = callback.message.text or ''
-            await callback.message.edit_text(text_src + "\n\n✅ Подтвержена", parse_mode='HTML', reply_markup=kb.as_markup())
-        else:
-            try:
-                await bot.send_message(callback.from_user.id, "✅ Подтвержена", parse_mode='HTML', reply_markup=kb.as_markup())
-            except Exception:
-                pass
+        try:
+            text_src = getattr(callback.message, 'text', '') or ''
+            await _safe_answer_or_send(callback.message, callback.from_user.id, text_src + "\n\n✅ Подтвержена", parse_mode='HTML', reply_markup=kb.as_markup())
+        except Exception:
+            pass
     except Exception:
         pass
 
@@ -1146,15 +1135,8 @@ async def partner_reject(callback: types.CallbackQuery) -> None:
             logger.error(f"Failed to notify customer about rejection: {e}")
 
         try:
-            from aiogram import types as _ai_types
-            if isinstance(callback.message, _ai_types.Message):
-                text_src = callback.message.text or ''
-                await callback.message.edit_text(text_src + "\n\n❌ Отклонена", parse_mode='HTML')
-            else:
-                try:
-                    await bot.send_message(callback.from_user.id, "❌ Отклонена", parse_mode='HTML')
-                except Exception:
-                    pass
+            text_src = getattr(callback.message, 'text', '') or ''
+            await _safe_answer_or_send(callback.message, callback.from_user.id, text_src + "\n\n❌ Отклонена", parse_mode='HTML')
         except Exception:
             pass
 
@@ -1191,16 +1173,12 @@ async def complete_booking(callback: types.CallbackQuery) -> None:
     success = db.complete_booking(booking_id)
     if success:
         await callback.answer(get_text(lang, "booking_completed"), show_alert=True)
-        # Edit message to show completed status
-        from aiogram import types as _ai_types
-        if isinstance(callback.message, _ai_types.Message):
-            text_src = callback.message.text or ''
-            await callback.message.edit_text(text_src + "\n\n✅ <b>Выполнено</b>", parse_mode="HTML")
-        else:
-            try:
-                await bot.send_message(callback.from_user.id, "✅ <b>Выполнено</b>", parse_mode="HTML")
-            except Exception:
-                pass
+        # Edit/send message to show completed status using safe helper
+        try:
+            text_src = getattr(callback.message, 'text', '') or ''
+            await _safe_answer_or_send(callback.message, callback.from_user.id, text_src + "\n\n✅ <b>Выполнено</b>", parse_mode="HTML")
+        except Exception:
+            pass
     else:
         await callback.answer(get_text(lang, "error"), show_alert=True)
 
@@ -1256,15 +1234,11 @@ async def save_booking_rating(callback: types.CallbackQuery) -> None:
     success = db.save_booking_rating(booking_id, rating)
     if success:
         await callback.answer(get_text(lang, "rating_saved"), show_alert=True)
-        from aiogram import types as _ai_types
-        if isinstance(callback.message, _ai_types.Message):
-            text_src = callback.message.text or ''
-            await callback.message.edit_text(text_src + f"\n\n✅ Оценка: {'⭐' * rating}")
-        else:
-            try:
-                await bot.send_message(callback.from_user.id, f"✅ Оценка: {'⭐' * rating}")
-            except Exception:
-                pass
+        try:
+            text_src = getattr(callback.message, 'text', '') or ''
+            await _safe_answer_or_send(callback.message, callback.from_user.id, text_src + f"\n\n✅ Оценка: {'⭐' * rating}")
+        except Exception:
+            pass
     else:
         await callback.answer(get_text(lang, "error"), show_alert=True)
 

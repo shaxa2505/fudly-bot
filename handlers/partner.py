@@ -22,6 +22,33 @@ from app.keyboards import (
 from localization import get_categories, get_cities, get_text
 from logging_config import logger
 
+from aiogram import types as _ai_types
+
+
+async def _safe_edit_reply_markup(msg_like, **kwargs) -> None:
+    """Edit reply markup if message is accessible (Message), otherwise ignore."""
+    if isinstance(msg_like, _ai_types.Message):
+        try:
+            await msg_like.edit_reply_markup(**kwargs)
+        except Exception:
+            pass
+
+
+async def _safe_answer_or_send(msg_like, user_id: int, text: str, **kwargs) -> None:
+    """Try to answer via message.answer, fallback to bot.send_message."""
+    if isinstance(msg_like, _ai_types.Message):
+        try:
+            await msg_like.answer(text, **kwargs)
+            return
+        except Exception:
+            pass
+    # Fallback to bot-level send
+    if bot:
+        try:
+            await bot.send_message(user_id, text, **kwargs)
+        except Exception:
+            pass
+
 
 def get_appropriate_menu(user_id: int, lang: str) -> Any:
     """Get appropriate menu based on user view mode."""
@@ -101,6 +128,7 @@ async def become_partner(message: types.Message, state: FSMContext) -> None:
     except Exception:
         pass  # Если стикер не найден, продолжаем без него
     
+    assert message.from_user is not None
     lang = db.get_user_language(message.from_user.id)
     user = db.get_user_model(message.from_user.id)
     
@@ -178,6 +206,7 @@ async def register_store_city(message: types.Message, state: FSMContext) -> None
         # Not in city selection state, ignore
         return
     
+    assert message.from_user is not None
     lang = db.get_user_language(message.from_user.id)
     cities = get_cities(lang)
     raw_text = message.text or ""
@@ -225,28 +254,15 @@ async def register_store_city_cb(callback: types.CallbackQuery, state: FSMContex
 
     normalized_city = normalize_city(city)
     await state.update_data(city=normalized_city)
-    # Send category selection inline (safe send)
-    from aiogram import types as _ai_types
+    # Send category selection inline (use safe helper)
     text = get_text(lang, "store_category")
     try:
-        if isinstance(callback.message, _ai_types.Message):
-            try:
-                await callback.message.answer(text, reply_markup=category_inline_keyboard(lang))
-            except Exception:
-                try:
-                    await callback.message.answer(text, reply_markup=category_keyboard(lang))
-                except Exception:
-                    pass
-        else:
-            try:
-                await bot.send_message(callback.from_user.id, text, reply_markup=category_inline_keyboard(lang))
-            except Exception:
-                try:
-                    await bot.send_message(callback.from_user.id, text, reply_markup=category_keyboard(lang))
-                except Exception:
-                    pass
+        await _safe_answer_or_send(callback.message, callback.from_user.id, text, reply_markup=category_inline_keyboard(lang))
     except Exception:
-        pass
+        try:
+            await _safe_answer_or_send(callback.message, callback.from_user.id, text, reply_markup=category_keyboard(lang))
+        except Exception:
+            pass
     await state.set_state(RegisterStore.category)
     await callback.answer()
 
@@ -264,6 +280,7 @@ async def register_store_category(message: types.Message, state: FSMContext) -> 
         # Not in category selection state, ignore
         return
     
+    assert message.from_user is not None
     lang = db.get_user_language(message.from_user.id)
     categories = get_categories(lang)
     raw_text = message.text or ""
@@ -316,26 +333,13 @@ async def register_store_category_cb(callback: types.CallbackQuery, state: FSMCo
     normalized_category = cat_name_map.get(cat_id, cat_id)
     await state.update_data(category=normalized_category)
     name_prompt = get_text(lang, "store_name")
-    from aiogram import types as _ai_types
     try:
-        if isinstance(callback.message, _ai_types.Message):
-            try:
-                await callback.message.answer(name_prompt, reply_markup=cancel_keyboard(lang))
-            except Exception:
-                try:
-                    await callback.message.answer(name_prompt)
-                except Exception:
-                    pass
-        else:
-            try:
-                await bot.send_message(callback.from_user.id, name_prompt, reply_markup=cancel_keyboard(lang))
-            except Exception:
-                try:
-                    await bot.send_message(callback.from_user.id, name_prompt)
-                except Exception:
-                    pass
+        await _safe_answer_or_send(callback.message, callback.from_user.id, name_prompt, reply_markup=cancel_keyboard(lang))
     except Exception:
-        pass
+        try:
+            await _safe_answer_or_send(callback.message, callback.from_user.id, name_prompt)
+        except Exception:
+            pass
     await state.set_state(RegisterStore.name)
     await callback.answer()
 
@@ -347,6 +351,7 @@ async def register_store_name(message: types.Message, state: FSMContext) -> None
         await message.answer("System error")
         return
     
+    assert message.from_user is not None
     lang = db.get_user_language(message.from_user.id)
     await state.update_data(name=message.text)
     await message.answer(get_text(lang, "store_address"))
@@ -360,6 +365,7 @@ async def register_store_address(message: types.Message, state: FSMContext) -> N
         await message.answer("System error")
         return
     
+    assert message.from_user is not None
     lang = db.get_user_language(message.from_user.id)
     logger.info(
         f"Handler register_store_address called, user {message.from_user.id}, address: {message.text}"
@@ -378,6 +384,7 @@ async def register_store_description(message: types.Message, state: FSMContext) 
         await message.answer("System error")
         return
     
+    assert message.from_user is not None
     lang = db.get_user_language(message.from_user.id)
     await state.update_data(description=message.text)
     
@@ -405,13 +412,26 @@ async def register_store_photo(message: types.Message, state: FSMContext) -> Non
     if not db or not bot:
         await message.answer("System error")
         return
-    
+    assert message.from_user is not None
     lang = db.get_user_language(message.from_user.id)
-    
-    # Get the largest photo
-    photo = message.photo[-1]
-    photo_id = photo.file_id
-    
+
+    # Get the largest photo if present (defensive)
+    photo_id = None
+    if getattr(message, 'photo', None):
+        try:
+            photo_id = message.photo[-1].file_id
+        except Exception:
+            photo_id = None
+    elif getattr(message, 'document', None) and getattr(message.document, 'mime_type', None) and message.document.mime_type.startswith('image/'):
+        try:
+            photo_id = message.document.file_id
+        except Exception:
+            photo_id = None
+
+    if not photo_id:
+        await message.answer(get_text(lang, "please_send_photo") if lang == 'ru' else "Iltimos, fotosurat yuboring")
+        return
+
     await state.update_data(photo=photo_id)
     await create_store_from_data(message, state)
 
@@ -422,9 +442,9 @@ async def register_store_photo_text(message: types.Message, state: FSMContext) -
     if not db or not bot:
         await message.answer("System error")
         return
-    
+    assert message.from_user is not None
     lang = db.get_user_language(message.from_user.id)
-    text = message.text.lower().strip()
+    text = (message.text or "").lower().strip()
     
     # Check for skip command
     if text in ["/skip", "пропустить", "o'tkazib yuborish", "skip"]:
@@ -476,7 +496,7 @@ async def register_store_photo_invalid(message: types.Message, state: FSMContext
     if not db:
         await message.answer("System error")
         return
-    
+    assert message.from_user is not None
     lang = db.get_user_language(message.from_user.id)
     
     # Show error and auto-skip
@@ -561,9 +581,15 @@ async def create_store_from_data(message: types.Message, state: FSMContext) -> N
                     )
                 except Exception:
                     # Fallback to text if photo fails
-                    await bot.send_message(admin[0], admin_text, parse_mode="HTML")
+                    try:
+                        await _safe_answer_or_send(None, admin[0], admin_text, parse_mode="HTML")
+                    except Exception:
+                        pass
             else:
-                await bot.send_message(admin[0], admin_text, parse_mode="HTML")
+                try:
+                    await _safe_answer_or_send(None, admin[0], admin_text, parse_mode="HTML")
+                except Exception:
+                    pass
         except Exception:
             pass
 
@@ -571,17 +597,19 @@ async def create_store_from_data(message: types.Message, state: FSMContext) -> N
 @router.callback_query(F.data == "become_partner_cb")
 async def become_partner_cb(callback: types.CallbackQuery, state: FSMContext) -> None:
     """Start partner registration from profile (inline)."""
-    if not db or not bot:
+    if not db:
         await callback.answer("System error")
         return
-    
+
+    assert callback.from_user is not None
     lang = db.get_user_language(callback.from_user.id)
     user = db.get_user_model(callback.from_user.id)
-    
+
     if not user:
-        await callback.message.answer(
-            get_text(lang, "choose_language"), reply_markup=language_keyboard()
-        )
+        try:
+            await _safe_answer_or_send(callback.message, callback.from_user.id, get_text(lang, "choose_language"), reply_markup=language_keyboard())
+        except Exception:
+            pass
         await callback.answer()
         return
     
@@ -596,15 +624,9 @@ async def become_partner_cb(callback: types.CallbackQuery, state: FSMContext) ->
             if user_view_mode is not None:
                 user_view_mode[callback.from_user.id] = "seller"
             try:
-                await callback.message.edit_text(
-                    get_text(lang, "switched_to_seller"),
-                    reply_markup=get_appropriate_menu(callback.from_user.id, lang),
-                )
+                await _safe_answer_or_send(callback.message, callback.from_user.id, get_text(lang, "switched_to_seller"), reply_markup=get_appropriate_menu(callback.from_user.id, lang))
             except Exception:
-                await callback.message.answer(
-                    get_text(lang, "switched_to_seller"),
-                    reply_markup=get_appropriate_menu(callback.from_user.id, lang),
-                )
+                pass
             await callback.answer()
             return
         elif stores:
@@ -625,19 +647,10 @@ async def become_partner_cb(callback: types.CallbackQuery, state: FSMContext) ->
     
     # Start partner registration
     try:
-        await callback.message.edit_text(
-            get_text(lang, "become_partner_text"),
-            parse_mode="HTML",
-            reply_markup=city_inline_keyboard(lang),
-        )
+        await _safe_answer_or_send(callback.message, callback.from_user.id, get_text(lang, "become_partner_text"), parse_mode="HTML", reply_markup=city_inline_keyboard(lang))
     except Exception:
-        from aiogram import types as _ai_types
-        text = get_text(lang, "become_partner_text")
         try:
-            if isinstance(callback.message, _ai_types.Message):
-                await callback.message.answer(text, parse_mode="HTML", reply_markup=city_keyboard(lang))
-            else:
-                await bot.send_message(callback.from_user.id, text, parse_mode="HTML", reply_markup=city_keyboard(lang))
+            await _safe_answer_or_send(callback.message, callback.from_user.id, get_text(lang, "become_partner_text"), parse_mode="HTML", reply_markup=city_keyboard(lang))
         except Exception:
             pass
     await state.set_state(RegisterStore.city)
@@ -662,20 +675,19 @@ async def register_store_city_callback(callback: types.CallbackQuery, state: FSM
     from aiogram import types as _ai_types
     text = get_text(lang, "store_category")
     try:
-        if isinstance(callback.message, _ai_types.Message):
+        try:
+            await _safe_answer_or_send(callback.message, callback.from_user.id, text, reply_markup=category_inline_keyboard(lang))
+        except Exception:
             try:
-                await callback.message.edit_text(text, reply_markup=category_inline_keyboard(lang))
+                await _safe_answer_or_send(callback.message, callback.from_user.id, text, reply_markup=category_keyboard(lang))
             except Exception:
-                try:
-                    await callback.message.answer(text, reply_markup=category_keyboard(lang))
-                except Exception:
-                    pass
+                pass
         else:
             try:
-                await bot.send_message(callback.from_user.id, text, reply_markup=category_inline_keyboard(lang))
+                await _safe_answer_or_send(callback.message, callback.from_user.id, text, reply_markup=category_inline_keyboard(lang))
             except Exception:
                 try:
-                    await bot.send_message(callback.from_user.id, text, reply_markup=category_keyboard(lang))
+                    await _safe_answer_or_send(callback.message, callback.from_user.id, text, reply_markup=category_keyboard(lang))
                 except Exception:
                     pass
     except Exception:
@@ -712,17 +724,11 @@ async def register_store_category_callback(callback: types.CallbackQuery, state:
     name_prompt = get_text(lang, "store_name")
     from aiogram import types as _ai_types
     try:
-        if isinstance(callback.message, _ai_types.Message):
+        try:
+            await _safe_answer_or_send(callback.message, callback.from_user.id, name_prompt, reply_markup=None)
+        except Exception:
             try:
-                await callback.message.edit_text(name_prompt, reply_markup=None)
-            except Exception:
-                try:
-                    await callback.message.answer(name_prompt)
-                except Exception:
-                    pass
-        else:
-            try:
-                await bot.send_message(callback.from_user.id, name_prompt)
+                await _safe_answer_or_send(callback.message, callback.from_user.id, name_prompt)
             except Exception:
                 pass
     except Exception:
@@ -746,19 +752,10 @@ async def register_cancel_callback(callback: types.CallbackQuery, state: FSMCont
     cancel_text = get_text(lang, "cancelled")
     from aiogram import types as _ai_types
     try:
-        if isinstance(callback.message, _ai_types.Message):
-            try:
-                await callback.message.edit_text(cancel_text)
-            except Exception:
-                try:
-                    await callback.message.answer(cancel_text)
-                except Exception:
-                    pass
-        else:
-            try:
-                await bot.send_message(callback.from_user.id, cancel_text)
-            except Exception:
-                pass
+        try:
+            await _safe_answer_or_send(callback.message, callback.from_user.id, cancel_text)
+        except Exception:
+            pass
     except Exception:
         pass
 

@@ -363,9 +363,9 @@ def setup(
             reply_markup=offers_category_filter(lang),
         )
         
-        # Отправляем карточки товаров через callback.message
+        # Отправляем карточки товаров через исходное сообщение (msg)
         for offer in offers[:10]:
-            await _send_offer_card(callback.message, offer, lang)
+            await _send_offer_card(msg, offer, lang)
             await asyncio.sleep(0.1)
 
     @dp.callback_query(F.data.startswith("filter_store_"))

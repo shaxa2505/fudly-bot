@@ -94,6 +94,7 @@ def setup(
     @dp.message(F.text.in_(["🔍 Поиск", "🔍 Qidirish"]))
     async def start_search(message: types.Message, state: FSMContext):
         """Start search flow."""
+        assert message.from_user is not None
         lang = db.get_user_language(message.from_user.id)
         
         await state.set_state(Search.query)
@@ -105,18 +106,20 @@ def setup(
     @dp.message(Search.query)
     async def process_search_query(message: types.Message, state: FSMContext):
         """Process search query with improved search."""
+        assert message.from_user is not None
         lang = db.get_user_language(message.from_user.id)
         
-        # Handle cancellation
-        if message.text in ["Отмена", "Bekor qilish", "❌ Отмена", "❌ Bekor qilish"]:
+        # Safely read incoming text and handle cancellation
+        raw_text = message.text or ""
+        if raw_text in ["Отмена", "Bekor qilish", "❌ Отмена", "❌ Bekor qilish"]:
             await state.clear()
             await message.answer(
                 get_text(lang, "action_cancelled"),
                 reply_markup=main_menu_customer(lang)
             )
             return
-            
-        query = message.text.strip()
+
+        query = raw_text.strip()
         if len(query) < 2:
             await message.answer(
                 "Введите минимум 2 символа" if lang == "ru" else "Kamida 2 ta belgi kiriting"
@@ -317,7 +320,10 @@ def setup(
         if not db:
             await callback.answer("System error", show_alert=True)
             return
-
+        assert callback.from_user is not None
+        # Ensure callback.message is accessible
+        from aiogram import types as _ai_types
+        msg = callback.message if isinstance(callback.message, _ai_types.Message) else None
         lang = db.get_user_language(callback.from_user.id)
         try:
             store_id = int(callback.data.rsplit("_", 1)[-1])
@@ -354,14 +360,20 @@ def setup(
                     "Ularni ko'rishingiz mumkin, lekin ba'zi mahsulotlar sotib yuborilgan bo'lishi mumkin."
                 )
 
-            await callback.message.answer(info_text, parse_mode="HTML")
+            if msg:
+                await msg.answer(info_text, parse_mode="HTML")
+            else:
+                await callback.answer(info_text, show_alert=True)
             offers = store_offers
 
         # Header
         header = (
             f"📦 <b>Товары магазина</b>\n" if lang == 'ru' else f"📦 <b>Do'kon mahsulotlari</b>\n"
         )
-        await callback.message.answer(header, parse_mode="HTML")
+        if msg:
+            await msg.answer(header, parse_mode="HTML")
+        else:
+            await callback.answer(header, show_alert=True)
 
         # Send up to 20 offers from the store
         for offer in offers[:20]:
@@ -370,22 +382,32 @@ def setup(
 
             if getattr(offer, 'photo', None):
                 try:
-                    await callback.message.answer_photo(
-                        photo=offer.photo,
-                        caption=caption,
-                        parse_mode="HTML",
-                        reply_markup=keyboard
-                    )
+                    if msg:
+                        await msg.answer_photo(
+                            photo=offer.photo,
+                            caption=caption,
+                            parse_mode="HTML",
+                            reply_markup=keyboard
+                        )
+                    else:
+                        await callback.answer(caption, show_alert=True)
                 except Exception:
-                    await callback.message.answer(caption, parse_mode="HTML", reply_markup=keyboard)
+                    if msg:
+                        await msg.answer(caption, parse_mode="HTML", reply_markup=keyboard)
+                    else:
+                        await callback.answer(caption, show_alert=True)
             else:
-                await callback.message.answer(caption, parse_mode="HTML", reply_markup=keyboard)
+                if msg:
+                    await msg.answer(caption, parse_mode="HTML", reply_markup=keyboard)
+                else:
+                    await callback.answer(caption, show_alert=True)
 
         await callback.answer()
 
     @dp.message(F.text.in_(["🎯 Горячее", "🎯 Issiq"]))
     async def show_hot_offers(message: types.Message):
         """Show popular/hot offers."""
+        assert message.from_user is not None
         lang = db.get_user_language(message.from_user.id)
         
         # Use get_user instead of get_user_model
