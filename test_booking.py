@@ -2,8 +2,13 @@ import os
 import psycopg2
 from psycopg2.extras import RealDictCursor
 
-# Railway database
-DATABASE_URL = os.getenv('DATABASE_URL', 'postgresql://postgres:cZIUQKWevXsvZJEIFnNdlYnTADTmHVWD@interchange.proxy.rlwy.net:43976/railway')
+# Railway database (must be provided via environment variable for safety)
+DATABASE_URL = os.getenv('DATABASE_URL')
+
+if not DATABASE_URL:
+    print("\n❌ ERROR: Please set the DATABASE_URL environment variable before running this test.")
+    print("   Example: export DATABASE_URL=postgresql://user:pass@host:port/dbname\n")
+    raise SystemExit(1)
 
 try:
     conn = psycopg2.connect(DATABASE_URL)
