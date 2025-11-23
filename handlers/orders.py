@@ -444,6 +444,7 @@ async def order_payment_proof(message: types.Message, state: FSMContext, db: Dat
     screenshot_uz = "To'lov skrinsho yuqorida"
 
     try:
+        logger.info(f"NOTIFY_ORDER_OWNER: order={order_id} owner={owner_id} photo_present={bool(photo_id)}")
         await bot.send_photo(
             chat_id=owner_id,
             photo=photo_id,
@@ -460,9 +461,9 @@ async def order_payment_proof(message: types.Message, state: FSMContext, db: Dat
             parse_mode="HTML",
             reply_markup=notification_kb.as_markup(),
         )
-        logger.info(f"✅ Order notification sent to owner {owner_id}")
+        logger.info(f"NOTIFY_ORDER_OWNER: sent photo to owner={owner_id} for order={order_id}")
     except Exception as e:
-        logger.error(f"❌ Error sending order notification to {owner_id}: {e}")
+        logger.error(f"NOTIFY_ORDER_OWNER: failed to send to owner={owner_id} order={order_id} error={e}")
 
     total_amount = (offer_price * quantity) + delivery_price
     user = db.get_user_model(message.from_user.id)
