@@ -615,9 +615,17 @@ async def create_booking_final(message: types.Message, state: FSMContext) -> Non
                                 reply_markup=notification_kb.as_markup(),
                             )
                         except Exception:
-                            await _safe_answer_or_send(None, owner_id, "Новый заказ", reply_markup=notification_kb.as_markup())
+                            try:
+                                await bot.send_message(owner_id, "Новый заказ", reply_markup=notification_kb.as_markup())
+                                logger.info(f"NOTIFY_OWNER: sent text fallback to owner={owner_id} for booking={booking_id}")
+                            except Exception as e_fb:
+                                logger.error(f"NOTIFY_OWNER: fallback send failed owner={owner_id} booking={booking_id} error={e_fb}")
                     else:
-                        await _safe_answer_or_send(None, owner_id, "Новый заказ", reply_markup=notification_kb.as_markup())
+                        try:
+                            await bot.send_message(owner_id, "Новый заказ", reply_markup=notification_kb.as_markup())
+                            logger.info(f"NOTIFY_OWNER: sent text fallback to owner={owner_id} for booking={booking_id}")
+                        except Exception as e_fb:
+                            logger.error(f"NOTIFY_OWNER: fallback send failed owner={owner_id} booking={booking_id} error={e_fb}")
                 except Exception as e:
                     logger.error(f"Failed to notify owner about order {order_id}: {e}")
 
@@ -812,13 +820,21 @@ async def create_booking_final(message: types.Message, state: FSMContext) -> Non
                             logger.error(f"NOTIFY_OWNER: send_photo failed owner={owner_id} booking={booking_id} error={e_send}")
                             # Fallback to text if send_photo fails
                             try:
-                                await _safe_answer_or_send(None, owner_id, notif_text, parse_mode="HTML", reply_markup=notification_kb.as_markup())
+                                try:
+                                    await bot.send_message(owner_id, notif_text, parse_mode="HTML", reply_markup=notification_kb.as_markup())
+                                    logger.info(f"NOTIFY_OWNER: sent text to owner={owner_id} for booking={booking_id}")
+                                except Exception as e_text:
+                                    logger.error(f"NOTIFY_OWNER: send text failed owner={owner_id} booking={booking_id} error={e_text}")
                                 logger.info(f"NOTIFY_OWNER: sent text fallback to owner={owner_id} for booking={booking_id}")
                             except Exception as e_fb:
                                 logger.error(f"NOTIFY_OWNER: fallback send failed owner={owner_id} booking={booking_id} error={e_fb}")
                     else:
                         try:
-                            await _safe_answer_or_send(None, owner_id, notif_text, parse_mode="HTML", reply_markup=notification_kb.as_markup())
+                            try:
+                                await bot.send_message(owner_id, notif_text, parse_mode="HTML", reply_markup=notification_kb.as_markup())
+                                logger.info(f"NOTIFY_OWNER: sent text to owner={owner_id} for booking={booking_id}")
+                            except Exception as e_text:
+                                logger.error(f"NOTIFY_OWNER: send text failed owner={owner_id} booking={booking_id} error={e_text}")
                             logger.info(f"NOTIFY_OWNER: sent text to owner={owner_id} for booking={booking_id}")
                         except Exception as e_text:
                             logger.error(f"NOTIFY_OWNER: send text failed owner={owner_id} booking={booking_id} error={e_text}")
