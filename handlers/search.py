@@ -10,7 +10,8 @@ from app.keyboards import main_menu_customer, search_cancel_keyboard, offer_quic
 from app.services.offer_service import OfferService
 from app.templates.offers import render_offer_card
 from database_protocol import DatabaseProtocol
-from handlers.common_states.states import Search
+from handlers.common_states.states import Search, BrowseOffers
+from aiogram.fsm.context import FSMContext
 from localization import get_text
 
 router = Router()
@@ -315,7 +316,7 @@ def setup(
                     await message.answer(caption, parse_mode="HTML", reply_markup=keyboard)
 
     @dp.callback_query(F.data.startswith("show_store_products_"))
-    async def show_store_products(callback: types.CallbackQuery) -> None:
+    async def show_store_products(callback: types.CallbackQuery, state: FSMContext) -> None:
         """Show products for a specific store when user taps 'Смотреть товары'."""
         if not db:
             await callback.answer("System error", show_alert=True)
@@ -339,39 +340,179 @@ def setup(
 
         # If no active offers found, try a fallback to list all store offers
         # (including inactive / out-of-stock) so users can at least see what's offered.
-        if not offers:
-            try:
-                store_offers = offer_service.list_store_offers(store_id)
-            except Exception:
-                store_offers = []
+        # Store offer ids in FSM so we can paginate and let user pick by inline numbers
+        await state.set_state(BrowseOffers.offer_list)
+        await state.update_data(offer_list=[o.id for o in offers])
 
-            if not store_offers:
-                await callback.answer(get_text(lang, "no_offers"), show_alert=True)
-                return
-
-            # Inform the user these items may be unavailable but allow browsing
-            info_text = (
-                "⚠️ Эти товары есть в магазине, но сейчас недоступны.\n"
-                "Вы можете просмотреть их, но некоторые позиции могут быть распроданы."
-            )
-            if lang != 'ru':
-                info_text = (
-                    "⚠️ Bu do'konda mahsulotlar mavjud, lekin hozirda mavjud emas.\n"
-                    "Ularni ko'rishingiz mumkin, lekin ba'zi mahsulotlar sotib yuborilgan bo'lishi mumkin."
-                )
-
-            if msg:
-                await msg.answer(info_text, parse_mode="HTML")
-            else:
-                await callback.answer(info_text, show_alert=True)
-            offers = store_offers
-
-        # Header
+        # Header + compact paginated view (first page)
         header = (
             f"📦 <b>Товары магазина</b>\n" if lang == 'ru' else f"📦 <b>Do'kon mahsulotlari</b>\n"
         )
+        page_offset = 0
+        per_page = 10
+        page_offers = offers[page_offset: page_offset + per_page]
+
+        # Build compact lines for page
+        page_lines = []
+        for idx, off in enumerate(page_offers, start=1):
+            title = getattr(off, 'title', 'Товар')
+            price = getattr(off, 'discount_price', getattr(off, 'price', 0))
+            qty = getattr(off, 'quantity', 0)
+            page_lines.append(f"{idx}. <b>{title}</b> — {int(price):,} — {qty} шт")
+
+        page_text = header + ("\n".join(page_lines) if page_lines else ("(Нет доступных товаров)" if lang == 'ru' else "(Mavjud mahsulotlar yo'q)"))
+
+        # Pagination & choose keyboard
+        from aiogram.utils.keyboard import InlineKeyboardBuilder
+        kb = InlineKeyboardBuilder()
+        kb.button(text=("⬅️ Назад" if lang == 'ru' else "⬅️ Orqaga"), callback_data=f"store_page_{store_id}_{max(0, page_offset - per_page)}")
+        kb.button(text=("🛒 Выбрать товар" if lang == 'ru' else "🛒 Mahsulotni tanlash"), callback_data=f"store_choose_page_{store_id}_{page_offset}")
+        if page_offset + per_page < len(offers):
+            kb.button(text=("Вперёд ➡️" if lang == 'ru' else "Oldinga ➡️"), callback_data=f"store_page_{store_id}_{page_offset + per_page}")
+        kb.adjust(2, 1)
+
         if msg:
-            await msg.answer(header, parse_mode="HTML")
+            await msg.answer(page_text, parse_mode="HTML", reply_markup=kb.as_markup())
+        else:
+            await callback.answer(page_text, show_alert=True)
+
+    @dp.callback_query(F.data.startswith("store_page_"))
+    async def store_page(callback: types.CallbackQuery, state: FSMContext) -> None:
+        """Show a different page of store offers."""
+        if not callback.from_user:
+            await callback.answer()
+            return
+        from aiogram import types as _ai_types
+        msg = callback.message if isinstance(callback.message, _ai_types.Message) else None
+        try:
+            parts = (callback.data or "").split("_")
+            store_id = int(parts[2])
+            offset = int(parts[3])
+        except Exception:
+            await callback.answer(get_text(db.get_user_language(callback.from_user.id), "error"), show_alert=True)
+            return
+
+        try:
+            offers = offer_service.list_active_offers_by_store(store_id)
+        except Exception:
+            offers = []
+
+        per_page = 10
+        page_offers = offers[offset: offset + per_page]
+        lang = db.get_user_language(callback.from_user.id)
+
+        # Build compact lines
+        page_lines = []
+        for idx, off in enumerate(page_offers, start=1):
+            title = getattr(off, 'title', 'Товар')
+            price = getattr(off, 'discount_price', getattr(off, 'price', 0))
+            qty = getattr(off, 'quantity', 0)
+            page_lines.append(f"{idx}. <b>{title}</b> — {int(price):,} — {qty} шт")
+
+        page_text = ("\n".join(page_lines) if page_lines else ("(Нет доступных товаров)" if lang == 'ru' else "(Mavjud mahsulotlar yo'q)"))
+
+        # KB
+        from aiogram.utils.keyboard import InlineKeyboardBuilder
+        kb = InlineKeyboardBuilder()
+        kb.button(text=("⬅️ Назад" if lang == 'ru' else "⬅️ Orqaga"), callback_data=f"store_page_{store_id}_{max(0, offset - per_page)}")
+        kb.button(text=("🛒 Выбрать товар" if lang == 'ru' else "🛒 Mahsulotni tanlash"), callback_data=f"store_choose_page_{store_id}_{offset}")
+        if offset + per_page < len(offers):
+            kb.button(text=("Вперёд ➡️" if lang == 'ru' else "Oldinga ➡️"), callback_data=f"store_page_{store_id}_{offset + per_page}")
+        kb.adjust(2, 1)
+
+        if msg:
+            await msg.answer(page_text, parse_mode="HTML", reply_markup=kb.as_markup())
+        else:
+            await callback.answer(page_text, show_alert=True)
+        await callback.answer()
+
+    @dp.callback_query(F.data.startswith("store_choose_page_"))
+    async def store_choose_page(callback: types.CallbackQuery, state: FSMContext) -> None:
+        """Open inline numbered selector for offers on the given page."""
+        if not callback.from_user:
+            await callback.answer()
+            return
+        lang = db.get_user_language(callback.from_user.id)
+        try:
+            parts = (callback.data or "").split("_")
+            store_id = int(parts[2])
+            offset = int(parts[3])
+        except Exception:
+            await callback.answer(get_text(lang, "error"), show_alert=True)
+            return
+
+        data = await state.get_data()
+        offer_list = data.get("offer_list", [])
+        per_page = 10
+        page_ids = offer_list[offset: offset + per_page]
+        if not page_ids:
+            await callback.answer(get_text(lang, "no_offers"), show_alert=True)
+            return
+
+        from aiogram.utils.keyboard import InlineKeyboardBuilder
+        kb = InlineKeyboardBuilder()
+        for idx in range(1, len(page_ids) + 1):
+            kb.button(text=str(idx), callback_data=f"store_choose_item_{store_id}_{offset}_{idx}")
+        kb.adjust(len(page_ids))
+
+        # Send selection keyboard as a new message
+        from aiogram import types as _ai_types
+        msg = callback.message if isinstance(callback.message, _ai_types.Message) else None
+        if msg:
+            await msg.answer(("Выберите товар на этой странице:" if lang == 'ru' else "Sahifadagi mahsulotni tanlang:"), reply_markup=kb.as_markup())
+        else:
+            await callback.answer(("Выберите товар на этой странице:" if lang == 'ru' else "Sahifadagi mahsulotni tanlang:"), show_alert=True)
+        await callback.answer()
+
+    @dp.callback_query(F.data.startswith("store_choose_item_"))
+    async def store_choose_item(callback: types.CallbackQuery, state: FSMContext) -> None:
+        """User chose a numbered item — show offer details."""
+        if not callback.from_user:
+            await callback.answer()
+            return
+        lang = db.get_user_language(callback.from_user.id)
+        try:
+            parts = (callback.data or "").split("_")
+            store_id = int(parts[2])
+            offset = int(parts[3])
+            idx = int(parts[4])
+        except Exception:
+            await callback.answer(get_text(lang, "error"), show_alert=True)
+            return
+
+        data = await state.get_data()
+        offer_list = data.get("offer_list", [])
+        global_index = offset + (idx - 1)
+        if global_index < 0 or global_index >= len(offer_list):
+            await callback.answer(get_text(lang, "error"), show_alert=True)
+            return
+
+        offer_id = offer_list[global_index]
+        # Fetch details and send
+        try:
+            details = offer_service.get_offer_details(offer_id)
+            from aiogram import types as _ai_types
+            msg = callback.message if isinstance(callback.message, _ai_types.Message) else None
+            if msg and details:
+                # Render a reasonable detail card and send with quick keyboard
+                caption = render_offer_card(lang, details)
+                try:
+                    keyboard = offer_quick_keyboard(lang, details.id, details.store_id, getattr(details, 'delivery_enabled', False))
+                except Exception:
+                    keyboard = None
+                if getattr(details, 'photo', None):
+                    try:
+                        await msg.answer_photo(photo=details.photo, caption=caption, parse_mode='HTML', reply_markup=keyboard)
+                    except Exception:
+                        await msg.answer(caption, parse_mode='HTML', reply_markup=keyboard)
+                else:
+                    await msg.answer(caption, parse_mode='HTML', reply_markup=keyboard)
+            else:
+                await callback.answer(get_text(lang, "open_chat_to_view") or "Open chat to view the offer", show_alert=True)
+        except Exception as e:
+            logger.error(f"Failed to send offer details for {offer_id}: {e}")
+            await callback.answer(get_text(lang, "error"), show_alert=True)
+        await callback.answer()
         else:
             await callback.answer(header, show_alert=True)
 

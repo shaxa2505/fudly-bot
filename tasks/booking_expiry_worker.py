@@ -19,10 +19,11 @@ async def start_booking_expiry_worker(db: Any, bot: Any) -> None:
                 with db.get_connection() as conn:
                     cursor = conn.cursor(row_factory=None)
                     cursor.execute("""
-                        SELECT booking_id, user_id
+                        SELECT booking_id, user_id, booking_code, status
                         FROM bookings
                         WHERE reminder_sent = 0
                           AND expiry_time IS NOT NULL
+                          AND status IN ('pending')
                           AND expiry_time > now()
                           AND expiry_time <= now() + INTERVAL '1 hour'
                     """)
@@ -33,9 +34,35 @@ async def start_booking_expiry_worker(db: Any, bot: Any) -> None:
                             if hasattr(row, 'get'):
                                 booking_id = row.get('booking_id')
                                 user_id = row.get('user_id')
+                                booking_code = row.get('booking_code')
+                                status = row.get('status')
                             else:
                                 booking_id = row[0]
                                 user_id = row[1]
+                                booking_code = row[2] if len(row) > 2 else None
+                                status = row[3] if len(row) > 3 else None
+
+                            # Re-check booking status to avoid sending reminder for already-confirmed/completed bookings
+                            try:
+                                cursor.execute('SELECT status FROM bookings WHERE booking_id = %s', (booking_id,))
+                                cur_row = cursor.fetchone()
+                                current_status = None
+                                if cur_row:
+                                    # row may be tuple or dict-like depending on driver
+                                    if hasattr(cur_row, 'get'):
+                                        current_status = cur_row.get('status')
+                                    else:
+                                        current_status = cur_row[0] if len(cur_row) > 0 else None
+                                if current_status not in (None, 'pending'):
+                                    # Skip sending reminder for non-pending bookings
+                                    try:
+                                        cursor.execute('UPDATE bookings SET reminder_sent = 1 WHERE booking_id = %s', (booking_id,))
+                                    except Exception:
+                                        pass
+                                    continue
+                            except Exception:
+                                # If re-check fails, proceed cautiously with sending the reminder
+                                pass
 
                             # localized reminder
                             try:
@@ -45,15 +72,17 @@ async def start_booking_expiry_worker(db: Any, bot: Any) -> None:
                                 except Exception:
                                     pass
 
+                                # Include booking code if available
+                                code_part = f" (код: {booking_code})" if booking_code else ""
                                 if lang == 'uz':
                                     text = (
                                         "⏰ Esingizga solamiz: bron avtomatik bekor qilinishidan 1 soat qoldi. "
-                                        "Iltimos, buyurtmangizni oling yoki kerak bo'lsa uzaytiring."
+                                        f"Iltimos, buyurtmangizni oling yoki kerak bo'lsa uzaytiring.{code_part}"
                                     )
                                 else:
                                     text = (
                                         "⏰ Напоминание: у вас осталось 1 час до автоматической отмены брони. "
-                                        "Пожалуйста, заберите заказ или продлите его, если нужно."
+                                        f"Пожалуйста, заберите заказ или продлите его, если нужно.{code_part}"
                                     )
 
                                 await bot.send_message(user_id, text)

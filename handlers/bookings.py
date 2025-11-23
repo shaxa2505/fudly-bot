@@ -88,6 +88,10 @@ def get_offer_field(offer: Any, field: str, default: Any = None) -> Any:
 def get_booking_field(booking: Any, field: str, default: Any = None) -> Any:
     """Extract field from booking tuple/dict."""
     if isinstance(booking, dict):
+        # Support common aliases returned by different DB layers
+        if field == 'code':
+            return booking.get('code') or booking.get('booking_code') or booking.get('bookingCode') or default
+        # Fallback to direct get for other fields
         return booking.get(field, default)
     if isinstance(booking, (tuple, list)):
         field_map = {
@@ -730,6 +734,8 @@ async def create_booking_final(message: types.Message, state: FSMContext) -> Non
                 total_amount = int(offer_price * quantity)
                 if delivery_option == 1:
                     total_amount += delivery_cost
+                # Safe booking code display to avoid showing 'None'
+                code_display = code if code else str(booking_id)
                 
                 if partner_lang == "uz":
                     notif_text = (
@@ -739,7 +745,7 @@ async def create_booking_final(message: types.Message, state: FSMContext) -> Non
                         f"{delivery_info_partner}\n"
                         f"👤 {message.from_user.first_name}\n"
                         f"📱 <code>{customer_phone}</code>\n"
-                        f"🎫 <code>{code}</code>\n"
+                        f"🎫 <code>{code_display}</code>\n"
                         f"💰 {total_amount:,} so'm"
                     )
                 else:
@@ -750,7 +756,7 @@ async def create_booking_final(message: types.Message, state: FSMContext) -> Non
                         f"{delivery_info_partner}\n"
                         f"👤 {message.from_user.first_name}\n"
                         f"📱 <code>{customer_phone}</code>\n"
-                        f"🎫 <code>{code}</code>\n"
+                        f"🎫 <code>{code_display}</code>\n"
                         f"💰 {total_amount:,} сум"
                     )
                 
@@ -902,6 +908,7 @@ async def filter_bookings(callback: types.CallbackQuery) -> None:
         offer_id = booking.get('offer_id') if isinstance(booking, dict) else (booking[1] if len(booking) > 1 else 0)
         status_val = booking.get('status') if isinstance(booking, dict) else (booking[3] if len(booking) > 3 else '')
         booking_code = booking.get('code') if isinstance(booking, dict) else (booking[4] if len(booking) > 4 else '')
+        booking_code_display = booking_code if booking_code else ''
         pickup_time = booking.get('pickup_time') if isinstance(booking, dict) else (booking[5] if len(booking) > 5 else '')
         quantity = booking.get('quantity') if isinstance(booking, dict) else (booking[6] if len(booking) > 6 else 1)
         created_at = booking.get('created_at') if isinstance(booking, dict) else (booking[7] if len(booking) > 7 else '')
@@ -916,7 +923,7 @@ async def filter_bookings(callback: types.CallbackQuery) -> None:
         text += (
             f"🍽 <b>{offer_title}</b>\n"
             f"📦 {quantity} шт. × {int(offer_price):,} = {total:,} сум\n"
-            f"🎫 <code>{booking_code}</code>\n"
+            f"🎫 <code>{booking_code_display}</code>\n"
             f"📅 {created_at}\n\n"
         )
     
@@ -1069,14 +1076,23 @@ async def partner_confirm(callback: types.CallbackQuery) -> None:
         await callback.answer(get_text(lang, "error"), show_alert=True)
         return
 
+    # Re-fetch booking to ensure we have the booking_code generated/stored by DB
+    try:
+        booking = db.get_booking(booking_id) or booking
+    except Exception:
+        # fallback to previously-read booking if re-fetch fails
+        pass
+
     # Notify customer that partner confirmed
     user_id = get_booking_field(booking, 'user_id')
     code = get_booking_field(booking, 'code')
+    # Fallback display for missing code: use a placeholder to avoid 'None' in messages
+    code_display = code if code else str(booking_id)
     try:
         customer_lang = db.get_user_language(user_id) if user_id and db else 'ru'
         confirm_text = (
-            f"✅ Ваша бронь <code>{code}</code> подтверждена продавцом. Пожалуйста, заберите заказ в течение {int(__import__('os').environ.get('BOOKING_DURATION_HOURS','2'))} часов. Код бронирования: <code>{code}</code>." if customer_lang == 'ru'
-            else f"✅ Sizning broningiz <code>{code}</code> tasdiqlandi. Iltimos, buyurtmani {int(__import__('os').environ.get('BOOKING_DURATION_HOURS','2'))} soat ichida oling. Bron kodi: <code>{code}</code>."
+            f"✅ Ваша бронь <code>{code_display}</code> подтверждена продавцом. Пожалуйста, заберите заказ в течение {int(__import__('os').environ.get('BOOKING_DURATION_HOURS','2'))} часов. Код бронирования: <code>{code_display}</code>." if customer_lang == 'ru'
+            else f"✅ Sizning broningiz <code>{code_display}</code> tasdiqlandi. Iltimos, buyurtmani {int(__import__('os').environ.get('BOOKING_DURATION_HOURS','2'))} soat ichida oling. Bron kodi: <code>{code_display}</code>."
         )
         await bot.send_message(user_id, confirm_text, parse_mode='HTML')
     except Exception as e:
@@ -1384,6 +1400,8 @@ async def booking_details(callback: types.CallbackQuery) -> None:
     offer_id = get_booking_field(booking, "offer_id")
     quantity = get_booking_field(booking, "quantity", 1)
     code = get_booking_field(booking, "code", "")
+    # Avoid showing literal 'None' if code is missing
+    code_display = code if code else str(booking_id)
     created_at = get_booking_field(booking, "created_at", "")
     delivery_option = get_booking_field(booking, "delivery_option", 0)
     delivery_address = get_booking_field(booking, "delivery_address", "")
@@ -1439,7 +1457,7 @@ async def booking_details(callback: types.CallbackQuery) -> None:
         + f"💵 <b>Цена за ед.:</b> {int(offer_price):,} {currency}\n"
         + f"💰 <b>Сумма:</b> {total:,} {currency}\n\n"
         + pickup_block
-        + f"🎫 <code>{code}</code>\n"
+        + f"🎫 <code>{code_display}</code>\n"
         + f"📅 {created_at}"
     )
 
