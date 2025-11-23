@@ -588,9 +588,10 @@ async def create_booking_final(message: types.Message, state: FSMContext) -> Non
                 customer = db.get_user_model(message.from_user.id)
                 customer_phone = customer.phone if customer else "Не указан"
                 
+                # Partner should confirm the booking first. Offer Confirm / Reject buttons.
                 notification_kb = InlineKeyboardBuilder()
-                notification_kb.button(text="✓ Выдано", callback_data=f"complete_booking_{booking_id}")
-                notification_kb.button(text="× Отменить", callback_data=f"cancel_booking_{booking_id}")
+                notification_kb.button(text=("Подтвердить" if partner_lang == 'ru' else "Tasdiqlash"), callback_data=f"partner_confirm_{booking_id}")
+                notification_kb.button(text=("Отклонить" if partner_lang == 'ru' else "Rad etish"), callback_data=f"partner_reject_{booking_id}")
                 notification_kb.adjust(2)
                 
                 store_name = get_store_field(store, "name", "Магазин")
@@ -845,6 +846,103 @@ async def cancel_booking(callback: types.CallbackQuery) -> None:
         await callback.answer(get_text(lang, "booking_cancelled"), show_alert=True)
         # Refresh message
         await filter_bookings(callback)
+    else:
+        await callback.answer(get_text(lang, "error"), show_alert=True)
+
+
+@router.callback_query(F.data.startswith("partner_confirm_"))
+async def partner_confirm(callback: types.CallbackQuery) -> None:
+    """Partner confirms a pending booking; set status to 'confirmed' and notify customer."""
+    if not db:
+        await callback.answer("System error", show_alert=True)
+        return
+
+    lang = db.get_user_language(callback.from_user.id)
+    try:
+        booking_id = int(callback.data.rsplit("_", 1)[-1])
+    except (ValueError, IndexError) as e:
+        logger.error(f"Invalid booking_id in callback data: {callback.data}, error: {e}")
+        await callback.answer(get_text(lang, "error"), show_alert=True)
+        return
+
+    booking = db.get_booking(booking_id)
+    if not booking:
+        await callback.answer(get_text(lang, "booking_not_found"), show_alert=True)
+        return
+
+    try:
+        db.update_booking_status(booking_id, 'confirmed')
+    except Exception as e:
+        logger.error(f"Failed to update booking status to confirmed: {e}")
+        await callback.answer(get_text(lang, "error"), show_alert=True)
+        return
+
+    # Notify customer that partner confirmed
+    user_id = get_booking_field(booking, 'user_id')
+    code = get_booking_field(booking, 'code')
+    try:
+        customer_lang = db.get_user_language(user_id) if user_id and db else 'ru'
+        confirm_text = (
+            f"✅ Ваша бронь <code>{code}</code> подтверждена продавцом. Пожалуйста, заберите заказ в течение {int(__import__('os').environ.get('BOOKING_DURATION_HOURS','2'))} часов." if customer_lang == 'ru'
+            else f"✅ Sizning broningiz <code>{code}</code> tasdiqlandi. Iltimos, buyurtmani {int(__import__('os').environ.get('BOOKING_DURATION_HOURS','2'))} soat ichida oling."
+        )
+        await bot.send_message(user_id, confirm_text, parse_mode='HTML')
+    except Exception as e:
+        logger.error(f"Failed to notify customer about confirmation: {e}")
+
+    # Edit partner message to show confirmed state and show complete/cancel buttons
+    try:
+        kb = InlineKeyboardBuilder()
+        kb.button(text=("✓ Выдано" if lang == 'ru' else "🎉 Berildi"), callback_data=f"complete_booking_{booking_id}")
+        kb.button(text=("× Отменить" if lang == 'ru' else "× Bekor qilish"), callback_data=f"cancel_booking_{booking_id}")
+        kb.adjust(2)
+        await callback.message.edit_text((callback.message.text or '') + "\n\n✅ Подтвержена", parse_mode='HTML', reply_markup=kb.as_markup())
+    except Exception:
+        pass
+
+    await callback.answer(get_text(lang, "booking_confirmed") or ("Бронь подтверждена" if lang == 'ru' else "Bron tasdiqlandi"), show_alert=True)
+
+
+@router.callback_query(F.data.startswith("partner_reject_"))
+async def partner_reject(callback: types.CallbackQuery) -> None:
+    """Partner rejects a pending booking; cancel it and notify customer."""
+    if not db:
+        await callback.answer("System error", show_alert=True)
+        return
+
+    lang = db.get_user_language(callback.from_user.id)
+    try:
+        booking_id = int(callback.data.rsplit("_", 1)[-1])
+    except (ValueError, IndexError) as e:
+        logger.error(f"Invalid booking_id in callback data: {callback.data}, error: {e}")
+        await callback.answer(get_text(lang, "error"), show_alert=True)
+        return
+
+    booking = db.get_booking(booking_id)
+    if not booking:
+        await callback.answer(get_text(lang, "booking_not_found"), show_alert=True)
+        return
+
+    # Cancel the booking (this will restore quantity)
+    success = db.cancel_booking(booking_id)
+    if success:
+        user_id = get_booking_field(booking, 'user_id')
+        try:
+            customer_lang = db.get_user_language(user_id) if user_id and db else 'ru'
+            cancel_text = (
+                f"❌ Ваша бронь <code>{get_booking_field(booking,'code')}</code> отклонена продавцом. Средства/резерв возвращены." if customer_lang == 'ru'
+                else f"❌ Sizning broningiz <code>{get_booking_field(booking,'code')}</code> sotuvchi tomonidan rad etildi. Rezerv bekor qilindi."
+            )
+            await bot.send_message(user_id, cancel_text, parse_mode='HTML')
+        except Exception as e:
+            logger.error(f"Failed to notify customer about rejection: {e}")
+
+        try:
+            await callback.message.edit_text((callback.message.text or '') + "\n\n❌ Отклонена", parse_mode='HTML')
+        except Exception:
+            pass
+
+        await callback.answer(get_text(lang, "booking_rejected") or ("Бронь отклонена" if lang == 'ru' else "Bron rad etildi"), show_alert=True)
     else:
         await callback.answer(get_text(lang, "error"), show_alert=True)
 
