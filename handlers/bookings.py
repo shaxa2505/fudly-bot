@@ -1058,10 +1058,37 @@ async def choose_delivery(callback: types.CallbackQuery, state: FSMContext) -> N
             )
             return
 
-        # Initialize order state: store offer_id and store_id and move to OrderDelivery.quantity
+        # Initialize order state: store offer_id and store_id
         from handlers.common_states.states import OrderDelivery as _OrderDelivery
 
+        # Preserve existing quantity if user already provided it in BookOffer.quantity
+        data = await state.get_data()
+        existing_quantity = data.get("quantity")
+
         await state.update_data(offer_id=offer_id, store_id=store_id)
+
+        # If quantity already provided, skip asking for it again and ask for address
+        if existing_quantity:
+            await state.update_data(quantity=existing_quantity)
+            await state.set_state(_OrderDelivery.address)
+
+            if lang == 'ru':
+                addr_prompt = (
+                    "📍 Укажите адрес доставки:\n\nПример: ул. Амиры Темура 15, квартира 25"
+                )
+            else:
+                addr_prompt = (
+                    "📍 Yetkazib berish manzilini ko'rsating:\n\nMasalan: Amir Temur ko'chasi 15, kvartira 25"
+                )
+
+            from aiogram import types as _ai_types
+            if isinstance(callback.message, _ai_types.Message):
+                await callback.message.answer(addr_prompt, reply_markup=cancel_keyboard(lang))
+            else:
+                await callback.answer(get_text(lang, "please_open_chat") if hasattr(get_text, '__call__') else "Please open the chat to continue", show_alert=True)
+            return
+
+        # No existing quantity — proceed to ask quantity (order flow)
         await state.set_state(_OrderDelivery.quantity)
 
         # Send quantity prompt similar to orders.order_delivery_start

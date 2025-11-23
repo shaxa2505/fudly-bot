@@ -197,3 +197,25 @@ class DatabaseProtocol(Protocol):
     def set_booking_payment_proof(self, booking_id: int, file_id: str) -> bool: ...
 
     def mark_reminder_sent(self, booking_id: int) -> bool: ...
+
+    # ======= ORDERS / DELIVERY =======
+    def create_order(
+        self,
+        user_id: int,
+        store_id: int,
+        offer_id: int,
+        quantity: int,
+        order_type: str,
+        delivery_address: Optional[str] = None,
+        delivery_price: int = 0,
+        payment_method: Optional[str] = None,
+    ) -> Optional[int]: ...
+
+    def update_payment_status(self, order_id: int, status: str, photo_id: Optional[str] = None) -> bool: ...
+
+    def get_order(self, order_id: int) -> Optional[Tuple[Any, ...]]: ...
+
+    # ======= UTILITIES =======
+    def get_user_model(self, user_id: int) -> Optional[Any]: ...
+
+    def get_connection(self) -> Any: ...
