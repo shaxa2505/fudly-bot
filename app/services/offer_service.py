@@ -168,7 +168,12 @@ class OfferService:
         )
 
     def list_store_offers(self, store_id: int) -> List[OfferListItem]:
-        raw = self._offer_repo.get_offers_by_store(store_id) or []
+        # Prefer DB-level `get_store_offers` which returns all offers for a store
+        # (including inactive / out-of-stock) so callers can choose how to display them.
+        if hasattr(self._db, 'get_store_offers'):
+            raw = self._db.get_store_offers(store_id) or []
+        else:
+            raw = self._offer_repo.get_offers_by_store(store_id) or []
         return [self._to_offer_list_item(row) for row in raw]
 
     def list_active_offers_by_store(self, store_id: int) -> List[OfferListItem]:

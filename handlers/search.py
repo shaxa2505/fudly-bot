@@ -321,9 +321,31 @@ def setup(
         except Exception:
             offers = []
 
+        # If no active offers found, try a fallback to list all store offers
+        # (including inactive / out-of-stock) so users can at least see what's offered.
         if not offers:
-            await callback.answer(get_text(lang, "no_offers"), show_alert=True)
-            return
+            try:
+                store_offers = offer_service.list_store_offers(store_id)
+            except Exception:
+                store_offers = []
+
+            if not store_offers:
+                await callback.answer(get_text(lang, "no_offers"), show_alert=True)
+                return
+
+            # Inform the user these items may be unavailable but allow browsing
+            info_text = (
+                "⚠️ Эти товары есть в магазине, но сейчас недоступны.\n"
+                "Вы можете просмотреть их, но некоторые позиции могут быть распроданы."
+            )
+            if lang != 'ru':
+                info_text = (
+                    "⚠️ Bu do'konda mahsulotlar mavjud, lekin hozirda mavjud emas.\n"
+                    "Ularni ko'rishingiz mumkin, lekin ba'zi mahsulotlar sotib yuborilgan bo'lishi mumkin."
+                )
+
+            await callback.message.answer(info_text, parse_mode="HTML")
+            offers = store_offers
 
         # Header
         header = (
