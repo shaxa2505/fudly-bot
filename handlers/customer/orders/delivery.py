@@ -405,14 +405,18 @@ async def order_payment_proof(
     screenshot_ru = "Скриншот оплаты выше"
     screenshot_uz = "To'lov skrinsho yuqorida"
 
-    try:
-        logger.info(
-            f"NOTIFY_ORDER_OWNER: order={order_id} owner={owner_id} photo_present={bool(photo_id)}"
-        )
-        await bot.send_photo(
-            chat_id=owner_id,
-            photo=photo_id,
-            caption=f"🔔 <b>{'Новый заказ с доставкой!' if lang == 'ru' else 'Yangi buyurtma yetkazib berish bilan!'}</b>\n\n"
+    # Notify store owner
+    if not owner_id:
+        logger.error(f"NOTIFY_ORDER_OWNER: owner_id is None for store_id={store_id}, order={order_id}")
+    else:
+        try:
+            logger.info(
+                f"NOTIFY_ORDER_OWNER: order={order_id} owner={owner_id} photo_present={bool(photo_id)}"
+            )
+            await bot.send_photo(
+                chat_id=owner_id,
+                photo=photo_id,
+                caption=f"🔔 <b>{'Новый заказ с доставкой!' if lang == 'ru' else 'Yangi buyurtma yetkazib berish bilan!'}</b>\n\n"
             f"🏪 {store_name}\n"
             f"🍽 {offer_title}\n"
             f"📦 {'Количество' if lang == 'ru' else 'Miqdor'}: {quantity} {unit_ru if lang == 'ru' else unit_uz}\n"

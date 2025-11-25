@@ -15,7 +15,7 @@ from .utils import get_db, get_store_field, send_order_card
 router = Router()
 
 
-@router.message(F.text.contains("🎫 Заказы продавца") | F.text.contains("Zakazlar (sotuvchi)"))
+@router.message(F.text.contains("🎫 Заказы продавца") | F.text.contains("Buyurtmalar (sotuvchi)"))
 async def seller_orders(message: types.Message) -> Any:
     """Display seller's orders and bookings from all stores. Only for sellers WITH stores."""
     db = get_db()
@@ -140,18 +140,26 @@ async def filter_orders_pending(callback: types.CallbackQuery) -> None:
     lang = db.get_user_language(callback.from_user.id)
     stores = db.get_user_stores(callback.from_user.id)
 
-    pending_items = []
+    pending_bookings = []
+    pending_orders = []
     for store in stores:
         store_id = get_store_field(store, "store_id")
+        # Bookings (pickups)
         bookings = db.get_store_bookings(store_id) or []
         for b in bookings:
             status = b.get("status") if isinstance(b, dict) else (b[3] if len(b) > 3 else None)
             if status == "pending":
-                pending_items.append(b)
+                pending_bookings.append(b)
+        # Delivery orders
+        orders = db.get_store_orders(store_id) or []
+        for o in orders:
+            status = o.get("order_status") if isinstance(o, dict) else (o[10] if len(o) > 10 else None)
+            if status in ["pending", "preparing"]:
+                pending_orders.append(o)
 
     await callback.answer()
 
-    if not pending_items:
+    if not pending_bookings and not pending_orders:
         await callback.message.edit_text(
             f"⏳ {'Новых заказов нет' if lang == 'ru' else 'Yangi buyurtmalar yo`q'}",
             parse_mode="HTML",
@@ -159,12 +167,20 @@ async def filter_orders_pending(callback: types.CallbackQuery) -> None:
         return
 
     await callback.message.edit_text(
-        f"⏳ {'Новые заказы' if lang == 'ru' else 'Yangi buyurtmalar'}: <b>{len(pending_items)}</b>",
+        f"⏳ {'Новые заказы' if lang == 'ru' else 'Yangi buyurtmalar'}:\n"
+        f"📋 {'Самовывоз' if lang == 'ru' else 'Olib ketish'}: <b>{len(pending_bookings)}</b>\n"
+        f"🚚 {'Доставка' if lang == 'ru' else 'Yetkazib berish'}: <b>{len(pending_orders)}</b>",
         parse_mode="HTML",
     )
 
-    for item in pending_items[:10]:
+    # Show bookings first
+    for item in pending_bookings[:5]:
         await send_order_card(callback.message, item, lang, is_booking=True)
+        await asyncio.sleep(0.1)
+    
+    # Then show delivery orders
+    for item in pending_orders[:5]:
+        await send_order_card(callback.message, item, lang, is_booking=False)
         await asyncio.sleep(0.1)
 
 
@@ -175,18 +191,26 @@ async def filter_orders_active(callback: types.CallbackQuery) -> None:
     lang = db.get_user_language(callback.from_user.id)
     stores = db.get_user_stores(callback.from_user.id)
 
-    active_items = []
+    active_bookings = []
+    active_orders = []
     for store in stores:
         store_id = get_store_field(store, "store_id")
+        # Bookings (pickups)
         bookings = db.get_store_bookings(store_id) or []
         for b in bookings:
             status = b.get("status") if isinstance(b, dict) else (b[3] if len(b) > 3 else None)
             if status == "confirmed":
-                active_items.append(b)
+                active_bookings.append(b)
+        # Delivery orders
+        orders = db.get_store_orders(store_id) or []
+        for o in orders:
+            status = o.get("order_status") if isinstance(o, dict) else (o[10] if len(o) > 10 else None)
+            if status in ["confirmed", "delivering"]:
+                active_orders.append(o)
 
     await callback.answer()
 
-    if not active_items:
+    if not active_bookings and not active_orders:
         await callback.message.edit_text(
             f"✅ {'Активных заказов нет' if lang == 'ru' else 'Faol buyurtmalar yo`q'}",
             parse_mode="HTML",
@@ -194,12 +218,18 @@ async def filter_orders_active(callback: types.CallbackQuery) -> None:
         return
 
     await callback.message.edit_text(
-        f"✅ {'Активные заказы' if lang == 'ru' else 'Faol buyurtmalar'}: <b>{len(active_items)}</b>",
+        f"✅ {'Активные заказы' if lang == 'ru' else 'Faol buyurtmalar'}:\n"
+        f"📋 {'Самовывоз' if lang == 'ru' else 'Olib ketish'}: <b>{len(active_bookings)}</b>\n"
+        f"🚚 {'Доставка' if lang == 'ru' else 'Yetkazib berish'}: <b>{len(active_orders)}</b>",
         parse_mode="HTML",
     )
 
-    for item in active_items[:10]:
+    for item in active_bookings[:5]:
         await send_order_card(callback.message, item, lang, is_booking=True)
+        await asyncio.sleep(0.1)
+    
+    for item in active_orders[:5]:
+        await send_order_card(callback.message, item, lang, is_booking=False)
         await asyncio.sleep(0.1)
 
 

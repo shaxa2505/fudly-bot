@@ -231,6 +231,9 @@ TEXTS = {
 
 ⚠️ Покажите этот код при получении заказа!""",
         "my_bookings_empty": "У вас пока нет заказов.\n\nПопробуйте раздел Горячее!",
+        "no_active_bookings": "Нет активных бронирований",
+        "no_completed_bookings": "Нет завершённых бронирований",
+        "no_cancelled_bookings": "Нет отменённых бронирований",
         "active_bookings": "<b>Ваши активные заказы</b>\n\nВсего: {count}",
         "cancel_booking": "Отменить заказ",
         "booking_cancelled": "Заказ отменён",
@@ -647,6 +650,9 @@ Tahrirlash yoki o'chirish mumkin
 
 ⚠️ Buyurtmani olishda bu kodni ko'rsating!""",
         "my_bookings_empty": "📋 Sizda hali buyurtmalar yo'q.\n\nTakliflar ro'yxatidan tanlang! 🍽",
+        "no_active_bookings": "Faol buyurtmalar yo'q",
+        "no_completed_bookings": "Yakunlangan buyurtmalar yo'q",
+        "no_cancelled_bookings": "Bekor qilingan buyurtmalar yo'q",
         "active_bookings": "📋 <b>Sizning faol buyurtmalaringiz:</b>\n\nJami: {count}",
         "cancel_booking": "❌ Buyurtmani bekor qilish",
         "booking_cancelled": "✅ Buyurtma bekor qilindi",
