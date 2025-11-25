@@ -948,3 +948,36 @@ async def admin_bookings_stats_callback(callback: types.CallbackQuery):
             text += f"├ {name or 'Без имени'}: {cnt}\n"
 
     await bot.send_message(callback.message.chat.id, text, parse_mode="HTML")
+
+
+@router.callback_query(F.data == "admin_payment_settings")
+async def admin_payment_settings(callback: types.CallbackQuery):
+    """Show platform payment settings."""
+    if not db.is_admin(callback.from_user.id):
+        await callback.answer("❌ Доступ запрещён", show_alert=True)
+        return
+
+    payment_card = db.get_platform_payment_card()
+    
+    text = "💳 <b>Платёжные реквизиты платформы</b>\n\n"
+    
+    if payment_card:
+        if isinstance(payment_card, dict):
+            card_number = payment_card.get("card_number", "Не указан")
+            card_holder = payment_card.get("card_holder", "Не указан")
+        else:
+            card_number = str(payment_card)
+            card_holder = "FUDLY PLATFORM"
+        text += f"💳 Карта: <code>{card_number}</code>\n"
+        text += f"👤 Владелец: {card_holder}\n"
+    else:
+        text += "❌ <b>Карта не настроена!</b>\n"
+        text += "\nДля настройки добавьте запись в базу:\n"
+        text += "<code>INSERT INTO platform_settings (key, value) VALUES ('payment_card', 'НОМЕР_КАРТЫ');</code>\n"
+        text += "<code>INSERT INTO platform_settings (key, value) VALUES ('payment_card_holder', 'ИМЯ_ВЛАДЕЛЬЦА');</code>\n"
+    
+    kb = InlineKeyboardBuilder()
+    kb.button(text="◀️ Назад", callback_data="admin_back_to_main")
+    
+    await callback.message.edit_text(text, parse_mode="HTML", reply_markup=kb.as_markup())
+    await callback.answer()

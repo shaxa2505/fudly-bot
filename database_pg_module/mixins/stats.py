@@ -75,15 +75,23 @@ class StatsMixin:
             return cursor.fetchone()[0]
 
     def get_platform_payment_card(self):
-        """Get platform payment card."""
+        """Get platform payment card from platform_settings table."""
         with self.get_connection() as conn:
             cursor = conn.cursor()
+            # Read from platform_settings table (key-value storage)
             cursor.execute("SELECT value FROM platform_settings WHERE key = 'payment_card'")
-            result = cursor.fetchone()
-            return result[0] if result else None
+            card_result = cursor.fetchone()
+            cursor.execute("SELECT value FROM platform_settings WHERE key = 'payment_card_holder'")
+            holder_result = cursor.fetchone()
+            
+            if card_result:
+                card_number = card_result[0]
+                card_holder = holder_result[0] if holder_result else "FUDLY PLATFORM"
+                return {"card_number": card_number, "card_holder": card_holder}
+            return None
 
-    def set_platform_payment_card(self, card_number: str) -> None:
-        """Set platform payment card."""
+    def set_platform_payment_card(self, card_number: str, card_holder: str = "FUDLY PLATFORM") -> None:
+        """Set platform payment card in platform_settings table."""
         with self.get_connection() as conn:
             cursor = conn.cursor()
             cursor.execute(
@@ -92,4 +100,11 @@ class StatsMixin:
                 ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value
             """,
                 (card_number,),
+            )
+            cursor.execute(
+                """
+                INSERT INTO platform_settings (key, value) VALUES ('payment_card_holder', %s)
+                ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value
+            """,
+                (card_holder,),
             )
