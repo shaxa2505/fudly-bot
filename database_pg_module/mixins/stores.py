@@ -140,7 +140,7 @@ class StoreMixin:
             return [dict(row) for row in cursor.fetchall()]
 
     def get_stores_by_business_type(self, business_type: str, city: str = None):
-        """Get stores by business type."""
+        """Get stores by business type with offers count."""
         with self.get_connection() as conn:
             cursor = conn.cursor(row_factory=dict_row)
             if city:
@@ -148,7 +148,10 @@ class StoreMixin:
                     """
                     SELECT s.*,
                            COALESCE(AVG(r.rating), 0) as avg_rating,
-                           COUNT(r.rating_id) as ratings_count
+                           COUNT(DISTINCT r.rating_id) as ratings_count,
+                           (SELECT COUNT(*) FROM offers o 
+                            WHERE o.store_id = s.store_id 
+                            AND o.status = 'active') as offers_count
                     FROM stores s
                     LEFT JOIN ratings r ON s.store_id = r.store_id
                     WHERE s.business_type = %s
@@ -164,7 +167,10 @@ class StoreMixin:
                     """
                     SELECT s.*,
                            COALESCE(AVG(r.rating), 0) as avg_rating,
-                           COUNT(r.rating_id) as ratings_count
+                           COUNT(DISTINCT r.rating_id) as ratings_count,
+                           (SELECT COUNT(*) FROM offers o 
+                            WHERE o.store_id = s.store_id 
+                            AND o.status = 'active') as offers_count
                     FROM stores s
                     LEFT JOIN ratings r ON s.store_id = r.store_id
                     WHERE s.business_type = %s

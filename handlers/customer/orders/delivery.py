@@ -247,13 +247,20 @@ async def order_delivery_address(
         await state.clear()
         return
 
-    # Dict-compatible access for PostgreSQL
-    card_number = (
-        payment_card.get("card_number") if isinstance(payment_card, dict) else payment_card[1]
-    )
-    card_holder = (
-        payment_card.get("card_holder") if isinstance(payment_card, dict) else payment_card[2]
-    )
+    # Handle different payment_card formats:
+    # - dict: {"card_number": "...", "card_holder": "..."}
+    # - tuple: (id, card_number, card_holder, ...)
+    # - str: just the card number
+    if isinstance(payment_card, dict):
+        card_number = payment_card.get("card_number", "")
+        card_holder = payment_card.get("card_holder", "—")
+    elif isinstance(payment_card, (tuple, list)) and len(payment_card) > 1:
+        card_number = payment_card[1] if len(payment_card) > 1 else payment_card[0]
+        card_holder = payment_card[2] if len(payment_card) > 2 else "—"
+    else:
+        # String format - just the card number
+        card_number = str(payment_card)
+        card_holder = "—"
 
     data = await state.get_data()
     store = db.get_store(data["store_id"])

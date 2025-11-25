@@ -426,7 +426,7 @@ def setup(
 
     @dp.callback_query(F.data.startswith("store_info_"))
     async def show_store_info(callback: types.CallbackQuery):
-        """Show store categories directly instead of store card."""
+        """Show full store information card with photo."""
         if not callback.from_user or not callback.data:
             await callback.answer()
             return
@@ -442,14 +442,9 @@ def setup(
             logger.error(f"Invalid store_id in callback data: {callback.data}, error: {e}")
             await callback.answer(get_text(lang, "error"), show_alert=True)
             return
-        # Use offer_service for structured store details and db.get_store for raw fields (photo)
+        
+        # Use offer_service for structured store details
         store = offer_service.get_store(store_id)
-        raw_store = None
-        try:
-            raw_store = db.get_store(store_id) if db else None
-        except Exception:
-            raw_store = None
-
         if not store:
             await callback.answer(
                 "Магазин не найден" if lang == "ru" else "Do'kon topilmadi",
@@ -457,22 +452,22 @@ def setup(
             )
             return
 
-        # Show category selection text
-        text = (
-            f"🏪 <b>{store.name}</b>\n\n" f"📂 Выберите категорию товаров:"
-            if lang == "ru"
-            else f"🏪 <b>{store.name}</b>\n\n" f"📂 Mahsulot toifasini tanlang:"
+        # Render full store card with all details
+        text = offer_templates.render_store_card(lang, store)
+        keyboard = offer_keyboards.store_card_keyboard(
+            lang, store_id, store.offers_count, store.ratings_count
         )
 
-        from app.keyboards import offers_category_filter
-
-        keyboard = offers_category_filter(lang, store_id=store_id)
-
-        # If we have a photo in raw_store, send a photo message with caption and keyboard
+        # Try to get photo from raw store data
         photo = None
-        if isinstance(raw_store, dict):
-            photo = raw_store.get("photo") or raw_store.get("photo_id")
+        try:
+            raw_store = db.get_store(store_id) if db else None
+            if isinstance(raw_store, dict):
+                photo = raw_store.get("photo") or raw_store.get("photo_id")
+        except Exception:
+            photo = None
 
+        # Send with photo if available
         if photo:
             try:
                 await msg.answer_photo(
@@ -481,10 +476,14 @@ def setup(
                 await callback.answer()
                 return
             except Exception:
-                # Fall back to editing text if photo fails
+                # Fall back to text if photo fails
                 pass
 
-        await msg.edit_text(text, parse_mode="HTML", reply_markup=keyboard)
+        # Try to edit existing message or send new one
+        try:
+            await msg.edit_text(text, parse_mode="HTML", reply_markup=keyboard)
+        except Exception:
+            await msg.answer(text, parse_mode="HTML", reply_markup=keyboard)
         await callback.answer()
 
     @dp.callback_query(F.data == "back_to_hot")
