@@ -977,7 +977,62 @@ async def admin_payment_settings(callback: types.CallbackQuery):
         text += "<code>INSERT INTO platform_settings (key, value) VALUES ('payment_card_holder', 'ИМЯ_ВЛАДЕЛЬЦА');</code>\n"
     
     kb = InlineKeyboardBuilder()
-    kb.button(text="◀️ Назад", callback_data="admin_back_to_main")
+    kb.button(text="◀️ Назад", callback_data="admin_back_to_settings")
+    
+    await callback.message.edit_text(text, parse_mode="HTML", reply_markup=kb.as_markup())
+    await callback.answer()
+
+
+@router.callback_query(F.data == "admin_notifications_settings")
+async def admin_notifications_settings(callback: types.CallbackQuery):
+    """Notifications settings placeholder."""
+    if not db.is_admin(callback.from_user.id):
+        await callback.answer("❌ Доступ запрещён", show_alert=True)
+        return
+    
+    kb = InlineKeyboardBuilder()
+    kb.button(text="◀️ Назад", callback_data="admin_back_to_settings")
+    
+    await callback.message.edit_text(
+        "🔔 <b>Настройки уведомлений</b>\n\nВ разработке...",
+        parse_mode="HTML",
+        reply_markup=kb.as_markup()
+    )
+    await callback.answer()
+
+
+@router.callback_query(F.data == "admin_limits_settings")
+async def admin_limits_settings(callback: types.CallbackQuery):
+    """Limits settings placeholder."""
+    if not db.is_admin(callback.from_user.id):
+        await callback.answer("❌ Доступ запрещён", show_alert=True)
+        return
+    
+    kb = InlineKeyboardBuilder()
+    kb.button(text="◀️ Назад", callback_data="admin_back_to_settings")
+    
+    await callback.message.edit_text(
+        "📊 <b>Настройки лимитов</b>\n\nВ разработке...",
+        parse_mode="HTML",
+        reply_markup=kb.as_markup()
+    )
+    await callback.answer()
+
+
+@router.callback_query(F.data == "admin_back_to_settings")
+async def admin_back_to_settings(callback: types.CallbackQuery):
+    """Return to settings menu."""
+    if not db.is_admin(callback.from_user.id):
+        await callback.answer("❌ Доступ запрещён", show_alert=True)
+        return
+    
+    kb = InlineKeyboardBuilder()
+    kb.button(text="💳 Платёжные реквизиты", callback_data="admin_payment_settings")
+    kb.button(text="🔔 Уведомления", callback_data="admin_notifications_settings")
+    kb.button(text="📊 Лимиты", callback_data="admin_limits_settings")
+    kb.adjust(1)
+    
+    text = "⚙️ <b>Настройки платформы</b>\n\nВыберите раздел для настройки:"
     
     await callback.message.edit_text(text, parse_mode="HTML", reply_markup=kb.as_markup())
     await callback.answer()
