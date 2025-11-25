@@ -74,13 +74,29 @@ def setup(
         active_bookings = [b for b in bookings if get_field(b, 'status', 3) in ["pending", "confirmed", "active"]]
         active_orders = [o for o in orders if get_field(o, 'order_status', 10) in ["pending", "confirmed", "preparing", "delivering"]]
         
-        logger.info(f"Cart: active_bookings={len(active_bookings)}, active_orders={len(active_orders)}")
+        # Recent completed (last 3)
+        recent_completed = [b for b in bookings if get_field(b, 'status', 3) in ["completed"]][:3]
+        
+        logger.info(f"Cart: active_bookings={len(active_bookings)}, active_orders={len(active_orders)}, recent_completed={len(recent_completed)}")
 
         if not active_bookings and not active_orders:
+            # Show empty cart but with recent history if exists
             empty_text = "🛒 Корзина пуста" if lang == "ru" else "🛒 Savat bo'sh"
             hint_ru = "Выберите товар и нажмите «Забронировать» или «Заказать доставку»"
             hint_uz = "Mahsulotni tanlang va «Buyurtma berish» tugmasini bosing"
-            await message.answer(f"{empty_text}\n\n{hint_ru if lang == 'ru' else hint_uz}")
+            
+            text = f"{empty_text}\n\n{hint_ru if lang == 'ru' else hint_uz}"
+            
+            # Show recent completed bookings
+            if recent_completed:
+                text += f"\n\n📜 <b>{'Недавние заказы' if lang == 'ru' else 'Oxirgi buyurtmalar'}:</b>\n"
+                for b in recent_completed:
+                    title = get_field(b, 'title', 8, 'Товар')
+                    status = get_field(b, 'status', 3, 'completed')
+                    emoji = "✔️" if status == "completed" else "❌"
+                    text += f"{emoji} {title}\n"
+            
+            await message.answer(text, parse_mode="HTML")
             return
 
         # Build detailed cart view
