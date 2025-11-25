@@ -607,6 +607,10 @@ async def cancel_order_customer(
 
     lang = db.get_user_language(callback.from_user.id)
 
+    # Helper for dict/tuple - defined first before usage
+    def get_order_field(o, field, index=0):
+        return o.get(field) if isinstance(o, dict) else (o[index] if len(o) > index else None)
+
     try:
         order_id = int(callback.data.split("_")[3])
     except (ValueError, IndexError) as e:
@@ -622,18 +626,14 @@ async def cancel_order_customer(
         )
         return
 
-    if get_order_field(order, "user_id") != callback.from_user.id:
+    if get_order_field(order, "user_id", 1) != callback.from_user.id:
         await callback.answer(
             "❌ " + ("Это не ваш заказ" if lang == "ru" else "Bu sizning buyurtmangiz emas"),
             show_alert=True,
         )
         return
 
-    # Helper for dict/tuple
-    def get_order_field(o, field, index):
-        return o.get(field) if isinstance(o, dict) else (o[index] if len(o) > index else None)
-
-    order_status = get_order_field(order, "order_status")
+    order_status = get_order_field(order, "status", 3)
     if order_status not in ["pending", "confirmed"]:
         await callback.answer(
             "❌ "
@@ -644,8 +644,8 @@ async def cancel_order_customer(
 
     db.update_order_status(order_id, "cancelled")
 
-    offer_id = get_order_field(order, "offer_id")
-    quantity = get_order_field(order, "quantity")
+    offer_id = get_order_field(order, "offer_id", 2)
+    quantity = get_order_field(order, "quantity", 4)
     offer = db.get_offer(offer_id)
     if offer:
         try:

@@ -67,7 +67,6 @@ TEXTS = {
         "today_stats": "📊 Сегодня",
         "bulk_import": "📥 Массовый импорт",
         "back_to_customer": "🛒 Режим покупателя",
-        "profile": "👤 Профиль",
         # Старые ключи (для совместимости)
         "add_offer": "➕ Добавить",
         "my_offers": "📋 Мои товары",
@@ -316,7 +315,6 @@ TEXTS = {
 
 Вы можете подать новую заявку с исправленными данными.""",
         # Создание предложения
-        "choose_store": "Выберите магазин:",
         "choose_product_category": "🏷 Выберите категорию продукта:",
         "choose_unit": "📏 Выберите единицу измерения:",
         "offer_title": "Введите название предложения:",
@@ -410,7 +408,6 @@ TEXTS = {
         "removed_from_favorites": "💔 Удалено из избранного",
         # Аналитика
         "not_seller": "❌ Эта функция доступна только партнёрам",
-        "no_stores": "😔 У вас пока нет магазинов",
         "select_store_for_analytics": "📊 Выберите магазин для просмотра аналитики:",
         # Прочее
         "duplicate": "📋 Дублировать",
@@ -454,8 +451,6 @@ TEXTS = {
         # Валидация/лимиты
         "invalid_city": "Пожалуйста, выберите город из списка.",
         "rate_limit_exceeded": "Слишком много запросов. Попробуйте позже.",
-        "my_city": "Мой город",
-        "your_city": "Ваш город",
     },
     "uz": {
         # Salomlashish
@@ -539,8 +534,7 @@ Boshlash uchun /start bosing""",
         "role_customer": "Xaridor",
         "switched_to_customer": "🔄 Xaridor rejimiga ogirildi",
         "switched_to_seller": "🔄 Hamkor rejimiga ogirildi",
-        # Shaharlar
-        "your_city": "📍 Sizning shahringiz",
+        # Shaharlar - your_city defined earlier at line 501
         "choose_city": "🌆 <b>Shahringizni tanlang:</b>",
         "city_changed": "✅ Shahar {city}ga o'zgartirildi",
         # Takliflar
@@ -736,8 +730,7 @@ Muvaffaqiyatli savdo tilaymiz!""",
 Afsuski, arizangiz tasdiqlanmadi.
 
 Tuzatilgan ma'lumotlar bilan yangi ariza topshirishingiz mumkin.""",
-        # Takлиф yaratиш
-        "choose_store": "Do'konni tanlang:",
+        # Taklif yaratish - choose_store defined earlier at line 562
         "offer_title": "Taklif nomini kiriting:",
         "offer_description": "📝 Taklif ta'rifini kiriting:",
         "original_price": "💰 Oddiy narxni kiriting (so'mda):",
@@ -827,9 +820,8 @@ Mijoz do'koningizni baholash uchun xabar oladi.""",
         "already_in_favorites": "❤️ Allaqachon sevimlilarda!",
         "added_to_favorites": "✅ Sevimlilarga qo'shildi!",
         "removed_from_favorites": "💔 Sevimlilardan o'chirildi",
-        # Analitika
+        # Analitika - no_stores defined earlier at line 802
         "not_seller": "❌ Bu funksiya faqat hamkorlar uchun",
-        "no_stores": "😔 Sizda hali dokonlar yoq",
         "select_store_for_analytics": "📊 Analitika uchun dokonni tanlang:",
         # Boshqa
         "duplicate": "📋 Nusxalash",

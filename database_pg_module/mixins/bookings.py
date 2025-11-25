@@ -6,6 +6,7 @@ from __future__ import annotations
 import os
 import random
 import string
+from typing import Any
 
 from psycopg.rows import dict_row
 
@@ -242,7 +243,7 @@ class BookingMixin:
             result = cursor.fetchone()
             return dict(result) if result else None
 
-    def get_booking_model(self, booking_id: int) -> Booking | None:
+    def get_booking_model(self, booking_id: int) -> Any | None:
         """Get booking as Pydantic model."""
         try:
             from app.domain import Booking

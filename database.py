@@ -151,7 +151,7 @@ class Database:
         try:
             cursor.execute("ALTER TABLE bookings ADD COLUMN quantity INTEGER DEFAULT 1")
             conn.commit()
-        except:
+        except Exception:
             pass  # Поле уже существует
 
         # Добавляем поле expiry_time и reminder_sent если их нет (для старых БД)
@@ -324,14 +324,14 @@ class Database:
         try:
             cursor.execute("ALTER TABLE users ADD COLUMN bonus_balance REAL DEFAULT 0")
             conn.commit()
-        except:
+        except Exception:
             pass
 
         # Добавляем поле referral_code в users если его нет
         try:
             cursor.execute("ALTER TABLE users ADD COLUMN referral_code TEXT UNIQUE")
             conn.commit()
-        except:
+        except Exception:
             pass
 
         # ==================== ТАБЛИЦЫ ДЛЯ ДОСТАВКИ ====================
@@ -387,19 +387,19 @@ class Database:
         try:
             cursor.execute("ALTER TABLE stores ADD COLUMN delivery_enabled INTEGER DEFAULT 0")
             conn.commit()
-        except:
+        except Exception:
             pass
 
         try:
             cursor.execute("ALTER TABLE stores ADD COLUMN delivery_price INTEGER DEFAULT 10000")
             conn.commit()
-        except:
+        except Exception:
             pass
 
         try:
             cursor.execute("ALTER TABLE stores ADD COLUMN min_order_amount INTEGER DEFAULT 20000")
             conn.commit()
-        except:
+        except Exception:
             pass
 
         # Создаём индексы для таблицы orders
@@ -408,7 +408,7 @@ class Database:
             cursor.execute("CREATE INDEX IF NOT EXISTS idx_orders_store ON orders(store_id)")
             cursor.execute("CREATE INDEX IF NOT EXISTS idx_orders_status ON orders(status)")
             conn.commit()
-        except:
+        except Exception:
             pass
 
         try:
@@ -1092,7 +1092,7 @@ class Database:
                     # Если срок годности не истёк
                     if expiry_date >= datetime.now():
                         valid_offers.append(offer_dict)
-                except:
+                except Exception:
                     valid_offers.append(offer_dict)  # Ошибка парсинга - показываем
             else:
                 valid_offers.append(offer_dict)  # Нет срока годности - показываем
@@ -2060,7 +2060,7 @@ class Database:
         try:
             cache.delete(f"store:{store_id}")
             cache.delete(f"user:{owner_id}")
-        except:
+        except Exception:
             pass
 
         logger.info(
@@ -2266,43 +2266,7 @@ class Database:
         conn.close()
         return stats
 
-    # Duplicate add_rating() removed - using the one at line 1560
-
-    def get_store_ratings(self, store_id: int) -> list[tuple]:
-        """Получить все рейтинги магазина"""
-        conn = self.get_connection()
-        cursor = conn.cursor()
-        cursor.execute(
-            """
-            SELECT r.*, u.first_name
-            FROM ratings r
-            JOIN users u ON r.user_id = u.user_id
-            WHERE r.store_id = ?
-            ORDER BY r.created_at DESC
-        """,
-            (store_id,),
-        )
-        ratings = cursor.fetchall()
-        conn.close()
-        return ratings
-
-    def get_store_average_rating(self, store_id: int) -> float:
-        """Получить средний рейтинг магазина"""
-        conn = self.get_connection()
-        cursor = conn.cursor()
-        cursor.execute("SELECT AVG(rating) FROM ratings WHERE store_id = ?", (store_id,))
-        result = cursor.fetchone()
-        conn.close()
-        return result[0] if result[0] else 0.0
-
-    def has_rated_booking(self, booking_id: int) -> bool:
-        """Проверить, оценил ли пользователь бронирование"""
-        conn = self.get_connection()
-        cursor = conn.cursor()
-        cursor.execute("SELECT COUNT(*) FROM ratings WHERE booking_id = ?", (booking_id,))
-        count = cursor.fetchone()[0]
-        conn.close()
-        return count > 0
+    # Duplicate rating methods removed - using the ones at lines 2189, 2206, 2225
 
     # Методы для управления пользователями
     def delete_user(self, user_id: int):
@@ -2359,7 +2323,7 @@ class Database:
                 "INSERT INTO favorites (user_id, store_id) VALUES (?, ?)", (user_id, store_id)
             )
             conn.commit()
-        except:
+        except Exception:
             pass  # Уже в избранном
         conn.close()
 
@@ -2992,18 +2956,7 @@ class Database:
         finally:
             conn.close()
 
-    def is_favorite(self, user_id: int, store_id: int) -> bool:
-        """Проверить, в избранном ли магазин"""
-        conn = self.get_connection()
-        cursor = conn.cursor()
-        try:
-            cursor.execute(
-                "SELECT COUNT(*) FROM favorites WHERE user_id = ? AND store_id = ?",
-                (user_id, store_id),
-            )
-            return cursor.fetchone()[0] > 0
-        finally:
-            conn.close()
+    # is_favorite duplicate removed - using the one at line 2391
 
     def get_favorites(self, user_id: int) -> list[tuple]:
         """Получить избранные магазины пользователя"""
@@ -3165,7 +3118,7 @@ class Database:
             try:
                 cache.delete(f"user_orders:{user_id}")
                 cache.delete(f"store_orders:{store_id}")
-            except:
+            except Exception:
                 pass
 
             return order_id
@@ -3342,7 +3295,7 @@ class Database:
 
             try:
                 cache.delete(f"store:{store_id}")
-            except:
+            except Exception:
                 pass
 
             return True

@@ -225,7 +225,7 @@ def render_offer_details(lang: str, offer: OfferDetails, store: StoreDetails | N
 
             dt = datetime.strptime(expiry_str, "%Y-%m-%d")
             expiry_str = dt.strftime("%d.%m.%Y")
-        except:
+        except Exception:
             pass
         lines.append(f"⏰ {expiry_label}: {expiry_str}")
 
@@ -329,7 +329,7 @@ def render_offer_card(lang: str, offer: OfferListItem) -> str:
 
             dt = datetime.strptime(expiry_str, "%Y-%m-%d")
             expiry_str = dt.strftime("%d.%m.%Y")
-        except:
+        except Exception:
             pass
         stock_lines.append(f"{expiry_label}: {expiry_str}")
 

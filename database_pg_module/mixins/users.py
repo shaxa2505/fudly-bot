@@ -76,7 +76,7 @@ class UserMixin:
         user = self.get_user(user_id)
         return user["language"] if user else "ru"
 
-    def get_user_model(self, user_id: int) -> User | None:
+    def get_user_model(self, user_id: int) -> Any | None:
         """Return user as Pydantic model."""
         try:
             from app.domain import User

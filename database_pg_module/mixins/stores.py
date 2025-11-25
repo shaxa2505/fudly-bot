@@ -3,6 +3,8 @@ Store-related database operations.
 """
 from __future__ import annotations
 
+from typing import Any
+
 from psycopg.rows import dict_row
 
 try:
@@ -61,7 +63,7 @@ class StoreMixin:
             result = cursor.fetchone()
             return dict(result) if result else None
 
-    def get_store_model(self, store_id: int) -> Store | None:
+    def get_store_model(self, store_id: int) -> Any | None:
         """Get store as Pydantic model."""
         try:
             from app.domain import Store

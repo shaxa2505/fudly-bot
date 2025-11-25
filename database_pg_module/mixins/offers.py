@@ -86,7 +86,7 @@ class OfferMixin:
             result = cursor.fetchone()
             return dict(result) if result else None
 
-    def get_offer_model(self, offer_id: int) -> Offer | None:
+    def get_offer_model(self, offer_id: int) -> Any | None:
         """Get offer as Pydantic model."""
         try:
             from app.domain import Offer

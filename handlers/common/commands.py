@@ -159,7 +159,7 @@ async def change_city(
         stats_text = (
             f"\n\n📊 В вашем городе:\n🏪 Магазинов: {stores_count}\n🍽 Предложений: {offers_count}"
         )
-    except:
+    except Exception:
         pass
 
     builder = InlineKeyboardBuilder()
@@ -520,7 +520,7 @@ async def force_cancel_booking(callback: types.CallbackQuery, db: DatabaseProtoc
         if callback.message:
             try:
                 await callback.message.delete()
-            except:
+            except Exception:
                 pass
 
         # Get updated bookings count
