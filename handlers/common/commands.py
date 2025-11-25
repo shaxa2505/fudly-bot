@@ -13,7 +13,119 @@ from app.keyboards import city_keyboard, main_menu_seller, main_menu_customer, l
 from handlers.common.utils import user_view_mode, has_approved_store
 from handlers.common.states import Registration
 
+try:
+    from logging_config import logger
+except ImportError:
+    import logging
+    logger = logging.getLogger(__name__)
+
 router = Router(name='commands')
+
+
+async def handle_qr_pickup(message: types.Message, db: DatabaseProtocol, booking_code: str):
+    """Handle QR code scan for pickup confirmation."""
+    user_id = message.from_user.id
+    lang = db.get_user_language(user_id)
+    
+    # Find booking by code
+    booking = db.get_booking_by_code(booking_code)
+    
+    if not booking:
+        # Try numeric ID
+        try:
+            booking_id = int(booking_code)
+            booking = db.get_booking(booking_id)
+        except ValueError:
+            pass
+    
+    if not booking:
+        await message.answer(
+            "❌ Бронирование не найдено" if lang == "ru" else "❌ Bron topilmadi"
+        )
+        return
+    
+    # Get booking details
+    if isinstance(booking, dict):
+        booking_id = booking.get('booking_id')
+        status = booking.get('status')
+        offer_id = booking.get('offer_id')
+        customer_id = booking.get('user_id')
+    else:
+        booking_id = booking[0] if len(booking) > 0 else None
+        status = booking[3] if len(booking) > 3 else None
+        offer_id = booking[1] if len(booking) > 1 else None
+        customer_id = booking[2] if len(booking) > 2 else None
+    
+    # Check if user is the store owner
+    offer = db.get_offer(offer_id) if offer_id else None
+    store_id = None
+    if isinstance(offer, dict):
+        store_id = offer.get('store_id')
+    elif offer and len(offer) > 1:
+        store_id = offer[1]
+    
+    store = db.get_store(store_id) if store_id else None
+    owner_id = None
+    if isinstance(store, dict):
+        owner_id = store.get('owner_id')
+    elif store and len(store) > 1:
+        owner_id = store[1]
+    
+    # Check permissions
+    is_owner = user_id == owner_id
+    is_customer = user_id == customer_id
+    
+    if status == 'completed':
+        await message.answer(
+            "✅ Этот заказ уже выдан" if lang == "ru" else "✅ Bu buyurtma allaqachon berilgan"
+        )
+        return
+    
+    if status == 'cancelled':
+        await message.answer(
+            "❌ Этот заказ отменён" if lang == "ru" else "❌ Bu buyurtma bekor qilingan"
+        )
+        return
+    
+    if is_owner:
+        # Owner scanned - show complete button
+        kb = InlineKeyboardBuilder()
+        kb.button(
+            text="✅ Подтвердить выдачу" if lang == "ru" else "✅ Berilganini tasdiqlash",
+            callback_data=f"complete_booking_{booking_id}"
+        )
+        kb.adjust(1)
+        
+        await message.answer(
+            f"📦 <b>Бронь #{booking_id}</b>\n\n"
+            f"Статус: {status}\n"
+            f"Нажмите кнопку чтобы подтвердить выдачу."
+            if lang == "ru" else
+            f"📦 <b>Bron #{booking_id}</b>\n\n"
+            f"Holat: {status}\n"
+            f"Berilganini tasdiqlash uchun tugmani bosing.",
+            parse_mode="HTML",
+            reply_markup=kb.as_markup()
+        )
+    elif is_customer:
+        # Customer scanned their own QR - just show status
+        await message.answer(
+            f"📦 <b>Ваша бронь #{booking_id}</b>\n\n"
+            f"Статус: {status}\n\n"
+            f"Покажите этот QR-код продавцу для получения."
+            if lang == "ru" else
+            f"📦 <b>Sizning broningiz #{booking_id}</b>\n\n"
+            f"Holat: {status}\n\n"
+            f"Olish uchun bu QR kodni sotuvchiga ko'rsating.",
+            parse_mode="HTML"
+        )
+    else:
+        # Someone else scanned
+        await message.answer(
+            "⚠️ Вы не являетесь владельцем этого заказа или магазина"
+            if lang == "ru" else
+            "⚠️ Siz bu buyurtma yoki do'kon egasi emassiz"
+        )
 
 
 @router.message(F.text.in_([get_text('ru', 'my_city'), get_text('uz', 'my_city')]))
@@ -110,6 +222,16 @@ async def change_city_text(message: types.Message, state: Optional[FSMContext] =
 
 @router.message(Command("start"))
 async def cmd_start(message: types.Message, state: FSMContext, db: DatabaseProtocol):
+    # Check for deep link arguments (e.g., /start pickup_CODE)
+    args = message.text.split(maxsplit=1)
+    if len(args) > 1:
+        deep_link = args[1]
+        if deep_link.startswith("pickup_"):
+            # QR code scan - redirect to pickup confirmation
+            booking_code = deep_link.replace("pickup_", "")
+            await handle_qr_pickup(message, db, booking_code)
+            return
+    
     user = db.get_user_model(message.from_user.id)
     
     if not user:

@@ -5,6 +5,7 @@ import html
 from typing import Any
 
 from aiogram import F, Router, types
+from aiogram.types import BufferedInputFile
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
 from localization import get_text
@@ -18,6 +19,14 @@ from .utils import (
     get_booking_field,
     format_booking_code,
 )
+
+# QR code generator
+try:
+    from app.core.qr_generator import generate_booking_qr
+    QR_ENABLED = True
+except ImportError:
+    QR_ENABLED = False
+    generate_booking_qr = None
 
 router = Router()
 
@@ -105,8 +114,7 @@ async def partner_confirm_booking(callback: types.CallbackQuery) -> None:
                 f"🎫 <b>Bron kodi:</b>\n"
                 f"<code>{code_display}</code>\n"
                 f"━━━━━━━━━━━━━━━━━━\n\n"
-                f"📱 QR kod uchun: <code>{qr_text}</code>\n\n"
-                f"⚠️ Ushbu kodni sotuvchiga ko'rsating."
+                f"⚠️ Ushbu kodni yoki QR kodni sotuvchiga ko'rsating."
             )
         else:
             customer_msg = (
@@ -117,14 +125,35 @@ async def partner_confirm_booking(callback: types.CallbackQuery) -> None:
                 f"🎫 <b>Код бронирования:</b>\n"
                 f"<code>{code_display}</code>\n"
                 f"━━━━━━━━━━━━━━━━━━\n\n"
-                f"📱 Для QR кода: <code>{qr_text}</code>\n\n"
-                f"⚠️ Покажите этот код продавцу при получении."
+                f"⚠️ Покажите этот код или QR-код продавцу при получении."
             )
         
         try:
-            # Send notification to customer
-            logger.info(f"Sending confirmation to customer {customer_id}")
-            await bot.send_message(customer_id, customer_msg, parse_mode="HTML")
+            # Try to send with QR code
+            qr_sent = False
+            if QR_ENABLED and generate_booking_qr:
+                qr_image = generate_booking_qr(code or str(booking_id), booking_id)
+                if qr_image:
+                    try:
+                        qr_file = BufferedInputFile(
+                            qr_image.read(),
+                            filename=f"booking_{booking_id}_qr.png"
+                        )
+                        await bot.send_photo(
+                            customer_id, 
+                            qr_file,
+                            caption=customer_msg,
+                            parse_mode="HTML"
+                        )
+                        qr_sent = True
+                        logger.info(f"Sent QR code to customer {customer_id}")
+                    except Exception as qr_e:
+                        logger.warning(f"Failed to send QR: {qr_e}")
+            
+            # Fallback to text message if QR failed
+            if not qr_sent:
+                await bot.send_message(customer_id, customer_msg, parse_mode="HTML")
+            
             logger.info(f"Successfully sent confirmation to customer {customer_id}")
         except Exception as e:
             error_msg = str(e).lower()
