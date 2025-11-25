@@ -263,3 +263,101 @@ async def cancel_offer_callback(callback: types.CallbackQuery, state: FSMContext
     )
     
     await callback.answer()
+
+
+@router.message(Command("mybookings"))
+async def my_bookings_command(message: types.Message, db: DatabaseProtocol = None):
+    """Show ALL user bookings with cancel buttons - for debugging stuck bookings."""
+    if not db:
+        return
+    
+    user_id = message.from_user.id
+    lang = db.get_user_language(user_id)
+    
+    # Get ALL bookings (not just active)
+    bookings = db.get_user_bookings(user_id) or []
+    
+    if not bookings:
+        await message.answer(
+            "📋 У вас нет бронирований.\n\n/mybookings - проверить брони"
+            if lang == "ru" else
+            "📋 Sizda bronlar yo'q.\n\n/mybookings - bronlarni tekshirish"
+        )
+        return
+    
+    # Count by status
+    status_counts = {}
+    for b in bookings:
+        status = b.get('status') if isinstance(b, dict) else 'unknown'
+        status_counts[status] = status_counts.get(status, 0) + 1
+    
+    text = f"📋 <b>Все ваши бронирования ({len(bookings)})</b>\n\n"
+    text += f"Статусы: {status_counts}\n\n"
+    
+    builder = InlineKeyboardBuilder()
+    
+    for b in bookings[:10]:  # Max 10
+        if isinstance(b, dict):
+            booking_id = b.get('booking_id')
+            status = b.get('status', 'unknown')
+            title = b.get('title', 'Товар')[:20]
+            
+            status_emoji = {
+                'pending': '⏳',
+                'confirmed': '✅', 
+                'active': '🔵',
+                'completed': '✔️',
+                'cancelled': '❌'
+            }.get(status, '❓')
+            
+            text += f"{status_emoji} #{booking_id} | {status} | {title}\n"
+            
+            # Add cancel button for non-completed/cancelled bookings
+            if status not in ['completed', 'cancelled']:
+                builder.button(
+                    text=f"❌ Отменить #{booking_id}",
+                    callback_data=f"force_cancel_{booking_id}"
+                )
+    
+    builder.adjust(1)
+    
+    await message.answer(text, parse_mode="HTML", reply_markup=builder.as_markup())
+
+
+@router.callback_query(F.data.startswith("force_cancel_"))
+async def force_cancel_booking(callback: types.CallbackQuery, db: DatabaseProtocol = None):
+    """Force cancel any booking."""
+    if not db:
+        await callback.answer("Ошибка", show_alert=True)
+        return
+    
+    user_id = callback.from_user.id
+    lang = db.get_user_language(user_id)
+    
+    try:
+        booking_id = int(callback.data.split("_")[-1])
+    except ValueError:
+        await callback.answer("Ошибка ID", show_alert=True)
+        return
+    
+    # Verify ownership
+    booking = db.get_booking(booking_id)
+    if not booking:
+        await callback.answer("Бронь не найдена", show_alert=True)
+        return
+    
+    booking_user_id = booking.get('user_id') if isinstance(booking, dict) else booking[2]
+    if booking_user_id != user_id:
+        await callback.answer("Это не ваша бронь", show_alert=True)
+        return
+    
+    # Cancel booking
+    try:
+        db.cancel_booking(booking_id)
+        await callback.answer(f"✅ Бронь #{booking_id} отменена!", show_alert=True)
+        
+        # Refresh the list
+        await callback.message.delete()
+        await my_bookings_command(callback.message, db)
+    except Exception as e:
+        await callback.answer(f"Ошибка: {e}", show_alert=True)
