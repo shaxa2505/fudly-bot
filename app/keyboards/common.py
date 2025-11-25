@@ -19,14 +19,14 @@ def language_keyboard() -> InlineKeyboardMarkup:
 def cancel_keyboard(lang: str = "ru") -> ReplyKeyboardMarkup:
     """Cancel keyboard."""
     builder = ReplyKeyboardBuilder()
-    builder.button(text=f"❌ {get_text(lang, 'cancel')}")
+    builder.button(text=get_text(lang, "cancel"))
     return builder.as_markup(resize_keyboard=True)
 
 
 def phone_request_keyboard(lang: str = "ru") -> ReplyKeyboardMarkup:
     """Phone number request keyboard."""
     builder = ReplyKeyboardBuilder()
-    builder.button(text=f"📱 {get_text(lang, 'share_phone')}", request_contact=True)
+    builder.button(text=get_text(lang, "share_phone"), request_contact=True)
     return builder.as_markup(resize_keyboard=True, one_time_keyboard=True)
 
 
@@ -45,7 +45,7 @@ def city_keyboard(lang: str = "ru", allow_cancel: bool = True) -> ReplyKeyboardM
         builder.button(text=f"📍 {city}")
 
     if allow_cancel:
-        builder.button(text=f"❌ {get_text(lang, 'cancel')}")
+        builder.button(text=get_text(lang, "cancel"))
         builder.adjust(2, 2, 2, 2, 1)
     else:
         builder.adjust(2, 2, 2, 2)
@@ -61,7 +61,7 @@ def city_inline_keyboard(lang: str = "ru") -> InlineKeyboardMarkup:
     builder = InlineKeyboardBuilder()
     for city in cities:
         builder.button(text=f"📍 {city}", callback_data=f"reg_city_{city}")
-    builder.button(text=f"❌ {get_text(lang, 'cancel')}", callback_data="reg_cancel")
+    builder.button(text=get_text(lang, "cancel"), callback_data="reg_cancel")
     builder.adjust(1)
     return builder.as_markup()
 
@@ -104,7 +104,7 @@ def category_inline_keyboard(lang: str = "ru") -> InlineKeyboardMarkup:
     for cat in categories:
         cat_id = category_ids.get(cat, cat.lower())
         builder.button(text=f"▫️ {cat}", callback_data=f"reg_cat_{cat_id}")
-    builder.button(text=f"❌ {get_text(lang, 'cancel')}", callback_data="reg_cancel")
+    builder.button(text=get_text(lang, "cancel"), callback_data="reg_cancel")
     builder.adjust(2)
     return builder.as_markup()
 
@@ -138,6 +138,6 @@ def product_categories_keyboard(lang: str = "ru") -> InlineKeyboardMarkup:
     for cat_id, cat_name in categories.items():
         builder.button(text=cat_name, callback_data=f"product_cat_{cat_id}")
 
-    builder.button(text=f"❌ {get_text(lang, 'cancel')}", callback_data="create_cancel")
+    builder.button(text=get_text(lang, "cancel"), callback_data="create_cancel")
     builder.adjust(2)  # 2 buttons per row
     return builder.as_markup()

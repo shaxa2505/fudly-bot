@@ -3,6 +3,7 @@ User registration handlers (phone and city collection).
 """
 from aiogram import F, Router, types
 from aiogram import types as _ai_types
+from aiogram.filters import StateFilter
 from aiogram.fsm.context import FSMContext
 
 from app.core.security import logger, rate_limiter, secure_user_input, validator
@@ -72,7 +73,7 @@ async def process_phone(message: types.Message, state: FSMContext, db: DatabaseP
         )
 
 
-@router.callback_query(F.data.startswith("reg_city_"))
+@router.callback_query(F.data.startswith("reg_city_"), StateFilter(Registration.city, None))
 async def registration_city_callback(
     callback: types.CallbackQuery, state: FSMContext, db: DatabaseProtocol
 ):
@@ -85,12 +86,6 @@ async def registration_city_callback(
     logger.info(
         f"City callback: user={callback.from_user.id}, state={current_state}, data={callback.data}"
     )
-
-    # Accept if in Registration.city state OR if no state (fresh registration)
-    if current_state and current_state != "Registration:city":
-        logger.warning(f"Wrong state for city selection: {current_state}")
-        await callback.answer()
-        return
 
     lang = db.get_user_language(callback.from_user.id)
     try:

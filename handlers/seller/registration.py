@@ -5,6 +5,7 @@ from typing import Any
 
 from aiogram import F, Router, types
 from aiogram import types as _ai_types
+from aiogram.filters import StateFilter
 from aiogram.fsm.context import FSMContext
 
 from app.keyboards import (
@@ -224,16 +225,11 @@ async def register_store_city(message: types.Message, state: FSMContext) -> None
         await state.set_state(RegisterStore.category)
 
 
-@router.callback_query(F.data.startswith("reg_city_"))
+@router.callback_query(F.data.startswith("reg_city_"), StateFilter(RegisterStore.city))
 async def register_store_city_cb(callback: types.CallbackQuery, state: FSMContext) -> None:
     """Handle inline city selection for partner registration."""
     if not callback.message:
         await callback.answer("System error", show_alert=True)
-        return
-    # Only proceed if user is in the RegisterStore.city state
-    current_state = await state.get_state()
-    if current_state != RegisterStore.city:
-        await callback.answer()
         return
 
     assert callback.from_user is not None
@@ -515,7 +511,7 @@ async def create_store_from_data(message: types.Message, state: FSMContext) -> N
     owner_phone = user.phone if user else None
 
     # Create store application (status: pending)
-    store_id = db.add_store(
+    db.add_store(
         owner_id=message.from_user.id,
         name=data["name"],
         city=data["city"],
@@ -668,65 +664,6 @@ async def become_partner_cb(callback: types.CallbackQuery, state: FSMContext) ->
     await callback.answer()
 
 
-@router.callback_query(F.data.startswith("reg_city_"))
-async def register_store_city_callback(callback: types.CallbackQuery, state: FSMContext) -> None:
-    """City selected for store registration via inline button."""
-    if not db:
-        await callback.answer("System error", show_alert=True)
-        return
-    assert callback.from_user is not None
-    lang = db.get_user_language(callback.from_user.id)
-    city_text = (callback.data or "").replace("reg_city_", "")
-
-    # Normalize city to Russian for DB consistency
-    normalized_city = normalize_city(city_text)
-    await state.update_data(city=normalized_city)
-
-    # Safe edit/answer with fallback to bot.send_message
-    text = get_text(lang, "store_category")
-    try:
-        try:
-            await _safe_answer_or_send(
-                callback.message,
-                callback.from_user.id,
-                text,
-                reply_markup=category_inline_keyboard(lang),
-            )
-        except Exception:
-            try:
-                await _safe_answer_or_send(
-                    callback.message,
-                    callback.from_user.id,
-                    text,
-                    reply_markup=category_keyboard(lang),
-                )
-            except Exception:
-                pass
-        else:
-            try:
-                await _safe_answer_or_send(
-                    callback.message,
-                    callback.from_user.id,
-                    text,
-                    reply_markup=category_inline_keyboard(lang),
-                )
-            except Exception:
-                try:
-                    await _safe_answer_or_send(
-                        callback.message,
-                        callback.from_user.id,
-                        text,
-                        reply_markup=category_keyboard(lang),
-                    )
-                except Exception:
-                    pass
-    except Exception:
-        pass
-
-    await state.set_state(RegisterStore.category)
-    await callback.answer()
-
-
 @router.callback_query(F.data.startswith("reg_cat_"))
 async def register_store_category_callback(
     callback: types.CallbackQuery, state: FSMContext
@@ -782,12 +719,20 @@ async def register_cancel_callback(callback: types.CallbackQuery, state: FSMCont
     lang = db.get_user_language(callback.from_user.id)
     await state.clear()
 
-    cancel_text = get_text(lang, "cancelled")
+    cancel_text = get_text(lang, "operation_cancelled")
+
+    # Delete the inline keyboard message
     try:
-        try:
-            await _safe_answer_or_send(callback.message, callback.from_user.id, cancel_text)
-        except Exception:
-            pass
+        await callback.message.delete()
+    except Exception:
+        pass
+
+    # Send cancel confirmation with customer menu
+    try:
+        await callback.message.answer(
+            cancel_text,
+            reply_markup=main_menu_customer(lang),
+        )
     except Exception:
         pass
 

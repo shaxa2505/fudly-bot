@@ -4,7 +4,9 @@ from __future__ import annotations
 from typing import Any
 
 from aiogram import F, Router, types
+from aiogram.filters import StateFilter
 from aiogram.fsm.context import FSMContext
+from aiogram.types import ReplyKeyboardRemove
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
 from app.core.utils import get_store_field
@@ -18,6 +20,7 @@ from app.keyboards import (
 )
 from database_protocol import DatabaseProtocol
 from handlers.common.states import ChangeCity
+from handlers.common.utils import has_approved_store
 from localization import get_text
 from logging_config import logger
 
@@ -87,7 +90,7 @@ async def profile(message: types.Message) -> None:
         def get_field(item, field, index):
             if isinstance(item, dict):
                 return item.get(field)
-            return item[index] if isinstance(item, (list, tuple)) and len(item) > index else None
+            return item[index] if isinstance(item, list | tuple) and len(item) > index else None
 
         active_bookings = len(
             [b for b in bookings if get_field(b, "status", 3) in ["pending", "confirmed"]]
@@ -128,7 +131,7 @@ async def profile(message: types.Message) -> None:
 
             for store in stores:
                 store_id = get_store_field(store, "store_id")
-                if not store_id and isinstance(store, (tuple, list)) and len(store) > 0:
+                if not store_id and isinstance(store, tuple | list) and len(store) > 0:
                     store_id = store[0]  # Fallback for tuple format
                 store_bookings = db.get_store_bookings(store_id)
 
@@ -209,23 +212,13 @@ async def profile_change_city(callback: types.CallbackQuery, state: FSMContext) 
     await callback.answer()
 
 
-@router.callback_query(F.data.startswith("reg_city_"))
+@router.callback_query(F.data.startswith("reg_city_"), StateFilter(ChangeCity.city))
 async def profile_change_city_cb(callback: types.CallbackQuery, state: FSMContext) -> None:
     """Handle inline city selection from profile change flow."""
     if not db or not callback.message:
         await callback.answer("System error", show_alert=True)
         return
 
-    # Only handle when user is in ChangeCity.city state
-    current_state = await state.get_state()
-    if current_state != ChangeCity.city:
-        # Not in the profile-change state; ignore to avoid cross-handling
-        await callback.answer()
-        return
-
-    if not db:
-        await callback.answer("System error", show_alert=True)
-        return
     assert callback.from_user is not None
     lang = db.get_user_language(callback.from_user.id)
     try:
@@ -286,12 +279,18 @@ async def switch_to_seller_cb(callback: types.CallbackQuery) -> None:
         lang = db.get_user_language(callback.from_user.id)
         user = db.get_user_model(callback.from_user.id)
 
-        # Check if user is actually a seller
-        if not user or user.role != "seller":
+        # Check if user is a seller (role is "seller" or "store_owner") AND has approved store
+        user_role = user.role if user else "customer"
+        if user_role == "store_owner":
+            user_role = "seller"
+
+        is_seller = user_role == "seller" and has_approved_store(callback.from_user.id, db)
+
+        if not user or not is_seller:
             await callback.answer(
-                "Только партнеры могут использовать этот режим"
+                "Только партнеры с одобренным магазином могут использовать этот режим"
                 if lang == "ru"
-                else "Faqat hamkorlar bu rejimdan foydalanishlari mumkin",
+                else "Faqat tasdiqlangan do'konga ega hamkorlar bu rejimdan foydalanishlari mumkin",
                 show_alert=True,
             )
             return
@@ -412,15 +411,24 @@ async def confirm_delete_yes(callback: types.CallbackQuery) -> None:
         await callback.answer(get_text(lang, "error"), show_alert=True)
         return
 
+    # Remove Reply keyboard first
+    try:
+        await callback.message.answer(
+            get_text(lang, "account_deleted"),
+            reply_markup=ReplyKeyboardRemove(),
+        )
+    except Exception:
+        pass
+
     try:
         await callback.message.edit_text(
-            get_text(lang, "account_deleted") + "\n\n" + get_text(lang, "choose_language"),
+            get_text(lang, "choose_language"),
             parse_mode="HTML",
             reply_markup=language_keyboard(),
         )
     except Exception:
         await callback.message.answer(
-            get_text(lang, "account_deleted") + "\n\n" + get_text(lang, "choose_language"),
+            get_text(lang, "choose_language"),
             parse_mode="HTML",
             reply_markup=language_keyboard(),
         )
@@ -443,7 +451,6 @@ async def confirm_delete_no(callback: types.CallbackQuery) -> None:
         await callback.answer()
         return
 
-    role = user.role
     current_mode = (
         user_view_mode.get(callback.from_user.id, "customer") if user_view_mode else "customer"
     )
@@ -480,12 +487,9 @@ async def switch_to_customer(message: types.Message) -> None:
         return
 
     lang = db.get_user_language(message.from_user.id)
-    user = db.get_user_model(message.from_user.id)
     user_view_mode[message.from_user.id] = "customer"
-
-    # Check if user is seller to show switch button
-    is_seller = user and user.role == "seller"
 
     await message.answer(
         get_text(lang, "switched_to_customer"), reply_markup=main_menu_customer(lang)
     )
+
