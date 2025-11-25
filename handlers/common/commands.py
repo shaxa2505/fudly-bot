@@ -379,53 +379,98 @@ async def cancel_all_bookings(message: types.Message, db: DatabaseProtocol = Non
     
     user_id = message.from_user.id
     
-    # First show what's in DB
-    bookings = db.get_user_bookings(user_id) or []
-    
-    # Debug info
-    status_info = {}
-    for b in bookings:
-        if isinstance(b, dict):
-            st = b.get('status', 'unknown')
-            status_info[st] = status_info.get(st, 0) + 1
-    
-    active = [b for b in bookings if isinstance(b, dict) and b.get('status') in ('pending', 'confirmed', 'active')]
-    
-    text = f"📊 Ваши бронирования:\n"
-    text += f"Всего: {len(bookings)}\n"
-    text += f"По статусам: {status_info}\n"
-    text += f"Активных: {len(active)}\n\n"
-    
-    if not active:
-        # Try direct SQL cancel as fallback
-        try:
-            with db.get_connection() as conn:
-                cursor = conn.cursor()
-                cursor.execute(
-                    "UPDATE bookings SET status = 'cancelled' WHERE user_id = %s AND status IN ('active', 'pending', 'confirmed') RETURNING booking_id",
-                    (user_id,)
-                )
-                cancelled_ids = cursor.fetchall()
-                if cancelled_ids:
-                    text += f"🔧 Принудительно отменено через SQL: {len(cancelled_ids)} бронирований"
-                else:
-                    text += "✅ Нет активных бронирований для отмены"
-        except Exception as e:
-            text += f"Ошибка SQL: {e}"
+    try:
+        with db.get_connection() as conn:
+            cursor = conn.cursor()
+            
+            # First check what's in the DB
+            cursor.execute(
+                "SELECT booking_id, status FROM bookings WHERE user_id = %s ORDER BY booking_id",
+                (user_id,)
+            )
+            all_bookings = cursor.fetchall()
+            
+            text = f"📊 <b>Ваши бронирования (user_id: {user_id})</b>\n\n"
+            
+            if all_bookings:
+                for b in all_bookings:
+                    bid, status = b[0], b[1]
+                    emoji = {'pending': '⏳', 'confirmed': '✅', 'active': '🔵', 
+                             'completed': '✔️', 'cancelled': '❌'}.get(status, '❓')
+                    text += f"{emoji} #{bid} - <code>{status}</code>\n"
+            else:
+                text += "📭 Нет бронирований\n"
+            
+            # Now cancel all active ones
+            cursor.execute(
+                "UPDATE bookings SET status = 'cancelled' WHERE user_id = %s AND status IN ('active', 'pending', 'confirmed') RETURNING booking_id",
+                (user_id,)
+            )
+            cancelled = cursor.fetchall()
+            
+            text += f"\n🔧 <b>Отменено: {len(cancelled)} бронирований</b>"
+            if cancelled:
+                text += f"\nID: {[c[0] for c in cancelled]}"
+            
+            text += "\n\n✅ Теперь можете создавать новые брони!"
+            
+        await message.answer(text, parse_mode="HTML")
         
-        await message.answer(text)
+    except Exception as e:
+        await message.answer(f"❌ Ошибка: {e}")
+
+
+@router.message(Command("checkdb"))
+async def check_db_command(message: types.Message, db: DatabaseProtocol = None):
+    """Direct database check for debugging."""
+    if not db:
+        await message.answer("❌ База данных недоступна")
         return
     
-    # Cancel via normal method
-    cancelled = 0
-    for b in active:
-        bid = b.get('booking_id')
-        if bid:
-            try:
-                db.cancel_booking(bid)
-                cancelled += 1
-            except Exception as e:
-                text += f"Ошибка отмены #{bid}: {e}\n"
+    user_id = message.from_user.id
     
-    text += f"✅ Отменено {cancelled} бронирований!"
-    await message.answer(text)
+    try:
+        with db.get_connection() as conn:
+            cursor = conn.cursor()
+            
+            # Get ALL bookings for this user with raw data
+            cursor.execute("""
+                SELECT booking_id, status, offer_id, quantity, created_at 
+                FROM bookings 
+                WHERE user_id = %s 
+                ORDER BY booking_id DESC
+            """, (user_id,))
+            all_bookings = cursor.fetchall()
+            
+            # Count active bookings
+            cursor.execute("""
+                SELECT COUNT(*) 
+                FROM bookings 
+                WHERE user_id = %s AND status IN ('active', 'pending', 'confirmed')
+            """, (user_id,))
+            active_count = cursor.fetchone()[0]
+            
+            text = f"🔍 <b>Диагностика базы данных</b>\n\n"
+            text += f"👤 User ID: <code>{user_id}</code>\n"
+            text += f"📊 Всего бронирований: {len(all_bookings)}\n"
+            text += f"⚡ Активных (pending/confirmed/active): <b>{active_count}</b>\n\n"
+            
+            if all_bookings:
+                text += "<b>Все брони:</b>\n"
+                for b in all_bookings[:15]:  # Max 15
+                    bid, status, offer_id, qty, created = b
+                    emoji = {'pending': '⏳', 'confirmed': '✅', 'active': '🔵', 
+                             'completed': '✔️', 'cancelled': '❌'}.get(status, '❓')
+                    text += f"{emoji} #{bid} | <code>{status}</code> | offer:{offer_id}\n"
+            else:
+                text += "📭 Нет бронирований в базе\n"
+            
+            text += f"\n💡 Лимит: {active_count}/3"
+            if active_count >= 3:
+                text += " (⚠️ ДОСТИГНУТ)"
+            
+        await message.answer(text, parse_mode="HTML")
+        
+    except Exception as e:
+        await message.answer(f"❌ Ошибка: {e}")
+
