@@ -66,6 +66,7 @@ from .offers import (
     hot_offers_pagination_keyboard,
     offer_details_keyboard,
     offer_quick_keyboard,
+    search_results_compact_keyboard,
     store_card_keyboard,
     store_list_keyboard,
     store_offers_keyboard,
@@ -128,6 +129,7 @@ __all__ = [
     # Offers
     "hot_offers_compact_keyboard",
     "hot_offers_pagination_keyboard",
+    "search_results_compact_keyboard",
     "store_card_keyboard",
     "store_list_keyboard",
     "offer_details_keyboard",

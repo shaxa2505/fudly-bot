@@ -8,7 +8,12 @@ from aiogram import F, Router, types
 from aiogram.fsm.context import FSMContext
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
-from app.keyboards import main_menu_customer, offer_quick_keyboard, search_cancel_keyboard
+from app.keyboards import (
+    main_menu_customer,
+    offer_quick_keyboard,
+    search_cancel_keyboard,
+    search_results_compact_keyboard,
+)
 from app.services.offer_service import OfferService
 from app.templates.offers import render_offer_card
 from database_protocol import DatabaseProtocol
@@ -21,10 +26,44 @@ router = Router()
 # Словарь синонимов и переводов для поиска
 SEARCH_KEYWORDS = {
     "ru": {
-        "чай": ["чай", "choy", "чой", "ахмад", "акбар", "бернар", "tea", "ahmad", "akbar"],
-        "кофе": ["кофе", "qahva", "кахва", "нескафе", "nescafe", "coffee"],
-        "молоко": ["молоко", "sut", "сут", "кефир", "йогурт", "yogurt", "yoghurt", "milk"],
-        "хлеб": ["хлеб", "non", "нон", "булка", "лепешка", "bread"],
+        "чай": [
+            "чай",
+            "choy",
+            "чой",
+            "ахмад",
+            "акбар",
+            "бернар",
+            "tea",
+            "ahmad",
+            "akbar",
+            "зеленый чай",
+            "черный чай",
+        ],
+        "кофе": [
+            "кофе",
+            "qahva",
+            "кахва",
+            "нескафе",
+            "nescafe",
+            "coffee",
+            "эспрессо",
+            "капучино",
+            "латте",
+        ],
+        "молоко": [
+            "молоко",
+            "sut",
+            "сут",
+            "кефир",
+            "йогурт",
+            "yogurt",
+            "yoghurt",
+            "milk",
+            "сливки",
+            "творог",
+            "сметана",
+        ],
+        "хлеб": ["хлеб", "non", "нон", "булка", "лепешка", "bread", "батон", "багет", "лаваш"],
         "мясо": [
             "мясо",
             "go'sht",
@@ -35,6 +74,12 @@ SEARCH_KEYWORDS = {
             "meat",
             "chicken",
             "beef",
+            "баранина",
+            "фарш",
+            "стейк",
+            "филе",
+            "крылья",
+            "ножки",
         ],
         "фрукты": [
             "фрукты",
@@ -46,21 +91,104 @@ SEARCH_KEYWORDS = {
             "fruits",
             "apple",
             "banana",
+            "груша",
+            "виноград",
+            "мандарин",
+            "лимон",
+            "персик",
+            "абрикос",
+            "слива",
+            "арбуз",
+            "дыня",
         ],
-        "овощи": ["овощи", "sabzavot", "сабзавот", "помидор", "огурец", "картошка", "vegetables"],
-        "вода": ["вода", "suv", "сув", "минералка", "газировка", "water"],
-        "сок": ["сок", "sharbat", "шарбат", "напиток", "juice"],
-        "сыр": ["сыр", "pishloq", "пишлок", "брынза", "cheese"],
-        "колбаса": ["колбаса", "kolbasa", "колбаса", "сосиски", "sausage"],
-        "шоколад": ["шоколад", "shokolad", "шоколат", "chocolate", "schoko"],
+        "овощи": [
+            "овощи",
+            "sabzavot",
+            "сабзавот",
+            "помидор",
+            "огурец",
+            "картошка",
+            "vegetables",
+            "морковь",
+            "лук",
+            "чеснок",
+            "перец",
+            "капуста",
+            "баклажан",
+            "кабачок",
+            "свекла",
+        ],
+        "вода": ["вода", "suv", "сув", "минералка", "газировка", "water", "бонаква", "nestle"],
+        "сок": ["сок", "sharbat", "шарбат", "напиток", "juice", "компот", "морс", "нектар"],
+        "сыр": ["сыр", "pishloq", "пишлок", "брынза", "cheese", "моцарелла", "пармезан", "фета"],
+        "колбаса": ["колбаса", "kolbasa", "сосиски", "sausage", "ветчина", "бекон", "салями"],
+        "шоколад": ["шоколад", "shokolad", "шоколат", "chocolate", "schoko", "конфеты", "сладости"],
+        "рыба": [
+            "рыба",
+            "baliq",
+            "балык",
+            "fish",
+            "лосось",
+            "семга",
+            "форель",
+            "тунец",
+            "креветки",
+        ],
+        "масло": ["масло", "yog", "ёг", "oil", "подсолнечное", "оливковое", "сливочное"],
+        "рис": ["рис", "guruch", "гуруч", "rice", "плов", "девзира"],
+        "макароны": ["макароны", "makaron", "pasta", "спагетти", "лапша", "вермишель"],
+        "яйца": ["яйца", "tuxum", "тухум", "eggs", "яйцо"],
+        "сахар": ["сахар", "shakar", "шакар", "sugar"],
+        "соль": ["соль", "tuz", "туз", "salt"],
+        "мука": ["мука", "un", "ун", "flour"],
     },
     "uz": {
-        "choy": ["choy", "чай", "чой", "ahmad", "akbar", "bernard", "tea"],
-        "qahva": ["qahva", "кофе", "кахва", "nescafe", "нескафе", "coffee"],
-        "sut": ["sut", "молоко", "сут", "kefir", "yogurt", "йогурт", "milk"],
-        "non": ["non", "хлеб", "нон", "bulka", "lepeshka", "bread"],
-        "go'sht": ["go'sht", "мясо", "гушт", "tovuq", "mol", "cho'chqa", "meat", "chicken"],
-        "meva": ["meva", "фрукты", "мева", "olma", "banan", "apelsin", "fruits"],
+        "choy": [
+            "choy",
+            "чай",
+            "чой",
+            "ahmad",
+            "akbar",
+            "bernard",
+            "tea",
+            "yashil choy",
+            "qora choy",
+        ],
+        "qahva": [
+            "qahva",
+            "кофе",
+            "кахва",
+            "nescafe",
+            "нескафе",
+            "coffee",
+            "espresso",
+            "cappuccino",
+        ],
+        "sut": ["sut", "молоко", "сут", "kefir", "yogurt", "йогурт", "milk", "qaymoq", "tvorog"],
+        "non": ["non", "хлеб", "нон", "bulka", "lepeshka", "bread", "baton", "lavash"],
+        "go'sht": [
+            "go'sht",
+            "мясо",
+            "гушт",
+            "tovuq",
+            "mol",
+            "cho'chqa",
+            "meat",
+            "chicken",
+            "qo'y go'shti",
+        ],
+        "meva": [
+            "meva",
+            "фрукты",
+            "мева",
+            "olma",
+            "banan",
+            "apelsin",
+            "fruits",
+            "nok",
+            "uzum",
+            "mandarin",
+        ],
         "sabzavot": [
             "sabzavot",
             "овощи",
@@ -69,12 +197,24 @@ SEARCH_KEYWORDS = {
             "bodring",
             "kartoshka",
             "vegetables",
+            "sabzi",
+            "piyoz",
+            "sarimsoq",
+            "qalampir",
         ],
-        "suv": ["suv", "вода", "сув", "mineral", "gazlangan", "water"],
-        "sharbat": ["sharbat", "сок", "шарбат", "ichimlik", "juice"],
+        "suv": ["suv", "вода", "сув", "mineral", "gazlangan", "water", "bonaqua"],
+        "sharbat": ["sharbat", "сок", "шарбат", "ichimlik", "juice", "kompot"],
         "pishloq": ["pishloq", "сыр", "пишлок", "brynza", "cheese"],
-        "kolbasa": ["kolbasa", "колбаса", "колбаса", "sosiska", "sausage"],
-        "shokolad": ["shokolad", "шоколад", "шоколат", "chocolate", "schoko"],
+        "kolbasa": ["kolbasa", "колбаса", "sosiska", "sausage", "vetçhina"],
+        "shokolad": ["shokolad", "шоколад", "шоколат", "chocolate", "schoko", "konfet"],
+        "baliq": ["baliq", "рыба", "fish", "losos", "forel"],
+        "yog": ["yog", "масло", "oil", "sariyog", "zaytun yog'i"],
+        "guruch": ["guruch", "рис", "rice", "palov", "devzira"],
+        "makaron": ["makaron", "макароны", "pasta", "spagetti", "lapsha"],
+        "tuxum": ["tuxum", "яйца", "eggs"],
+        "shakar": ["shakar", "сахар", "sugar"],
+        "tuz": ["tuz", "соль", "salt"],
+        "un": ["un", "мука", "flour"],
     },
 }
 
@@ -144,17 +284,20 @@ def setup(
 
         # Safely read incoming text and handle cancellation
         raw_text = (message.text or "").strip()
-        
+
         # Skip commands - let them be handled by command handlers
         if raw_text.startswith("/"):
             await state.clear()  # Exit search state
             return  # Let command handlers process this
-        
+
         # Check for all possible cancel button variants
         cancel_texts = [
-            "Отмена", "Bekor qilish",
-            "❌ Отмена", "❌ Bekor qilish",
-            "❌ ❌ Отмена", "❌ ❌ Bekor qilish",  # Legacy double-emoji
+            "Отмена",
+            "Bekor qilish",
+            "❌ Отмена",
+            "❌ Bekor qilish",
+            "❌ ❌ Отмена",
+            "❌ ❌ Bekor qilish",  # Legacy double-emoji
             get_text(lang, "cancel"),  # Current localized cancel text
         ]
         if raw_text in cancel_texts or "отмена" in raw_text.lower() or "bekor" in raw_text.lower():
@@ -273,9 +416,9 @@ def setup(
 
         # Show results summary
         result_msg = (
-            f"🔍 <b>Результаты поиска:</b> {total_results}\n"
+            f"🔍 <b>Результаты поиска «{query}»:</b>\n"
             if lang == "ru"
-            else f"🔍 <b>Qidiruv natijalari:</b> {total_results}\n"
+            else f"🔍 <b>«{query}» qidiruv natijalari:</b>\n"
         )
         if store_results:
             result_msg += (
@@ -291,7 +434,12 @@ def setup(
             )
 
         await message.answer(result_msg, parse_mode="HTML", reply_markup=main_menu_customer(lang))
-        await state.clear()
+
+        # Save search results to FSM for pagination
+        await state.update_data(
+            search_results=[o.id for o in all_results],
+            search_query=query,
+        )
 
         # Show store results first - present each store as a card with a button to view its products
         if store_results:
@@ -346,37 +494,179 @@ def setup(
 
             # If user likely searched store name, do not flood with all offers — stop here
             if is_store_query:
+                await state.clear()
                 return
 
-        # Show offer results (grouped in media group if possible)
+        # Show offer results as compact list with inline buttons
         if all_results:
-            offers_count = min(10, len(all_results))
-            offers_text = (
-                f"\n📦 <b>Найденные товары ({offers_count}):</b>\n"
+            await _send_search_results_page(message, all_results, query, lang, page=0)
+        else:
+            await state.clear()
+
+    async def _send_search_results_page(
+        target: types.Message | types.CallbackQuery,
+        all_results: list,
+        query: str,
+        lang: str,
+        page: int = 0,
+        edit: bool = False,
+    ) -> None:
+        """Send compact search results with pagination."""
+        ITEMS_PER_PAGE = 5
+        total_count = len(all_results)
+        total_pages = max(1, (total_count + ITEMS_PER_PAGE - 1) // ITEMS_PER_PAGE)
+
+        start_idx = page * ITEMS_PER_PAGE
+        end_idx = min(start_idx + ITEMS_PER_PAGE, total_count)
+        page_offers = all_results[start_idx:end_idx]
+
+        # Build compact list text
+        lines = []
+        for idx, offer in enumerate(page_offers, start=1):
+            title = offer.title if hasattr(offer, "title") else offer.get("title", "Товар")
+            price = getattr(offer, "discount_price", 0) or getattr(offer, "price", 0)
+            quantity = getattr(offer, "quantity", 0)
+
+            # Format price with spaces
+            price_str = f"{int(price):,}".replace(",", " ")
+            qty_text = f"({quantity} шт)" if quantity > 0 else "(нет)" if lang == "ru" else "(yo'q)"
+
+            lines.append(f"<b>{idx}.</b> {title}\n   💰 {price_str} сум {qty_text}")
+
+        # Header
+        header = (
+            f"📦 <b>Товары по запросу «{query}»</b>\n"
+            f"Показано {start_idx + 1}-{end_idx} из {total_count}\n\n"
+            if lang == "ru"
+            else f"📦 <b>«{query}» bo'yicha mahsulotlar</b>\n"
+            f"{start_idx + 1}-{end_idx} / {total_count} ko'rsatilmoqda\n\n"
+        )
+
+        text = header + "\n".join(lines)
+
+        # Create keyboard with inline buttons
+        keyboard = search_results_compact_keyboard(lang, page_offers, page, total_pages, query)
+
+        if edit and isinstance(target, types.CallbackQuery) and target.message:
+            try:
+                await target.message.edit_text(text, parse_mode="HTML", reply_markup=keyboard)
+            except Exception:
+                await target.message.answer(text, parse_mode="HTML", reply_markup=keyboard)
+        elif isinstance(target, types.Message):
+            await target.answer(text, parse_mode="HTML", reply_markup=keyboard)
+        elif isinstance(target, types.CallbackQuery) and target.message:
+            await target.message.answer(text, parse_mode="HTML", reply_markup=keyboard)
+
+    @dp.callback_query(F.data.startswith("search_page_"))
+    async def search_page_handler(callback: types.CallbackQuery, state: FSMContext) -> None:
+        """Handle search results pagination."""
+        if not callback.from_user:
+            await callback.answer()
+            return
+
+        lang = db.get_user_language(callback.from_user.id)
+
+        try:
+            page = int((callback.data or "").split("_")[-1])
+        except (ValueError, IndexError):
+            await callback.answer(get_text(lang, "error"), show_alert=True)
+            return
+
+        # Get search results from FSM
+        data = await state.get_data()
+        offer_ids = data.get("search_results", [])
+        query = data.get("search_query", "")
+
+        if not offer_ids:
+            await callback.answer(
+                "Результаты поиска устарели. Повторите поиск."
                 if lang == "ru"
-                else f"\n📦 <b>Topilgan mahsulotlar ({offers_count}):</b>\n"
+                else "Qidiruv natijalari eskirgan. Qayta qidiring.",
+                show_alert=True,
             )
-            await message.answer(offers_text, parse_mode="HTML")
+            return
 
-            for offer in all_results[:10]:  # Show top 10 offers
-                caption = render_offer_card(lang, offer)
+        # Fetch offer objects
+        all_results = []
+        for offer_id in offer_ids:
+            try:
+                offer = offer_service.get_offer_details(offer_id)
+                if offer:
+                    all_results.append(offer)
+            except Exception:
+                pass
 
-                keyboard = offer_quick_keyboard(
-                    lang, offer.id, offer.store_id, offer.delivery_enabled
+        await _send_search_results_page(callback, all_results, query, lang, page=page, edit=True)
+        await callback.answer()
+
+    @dp.callback_query(F.data.startswith("search_select_"))
+    async def search_select_handler(callback: types.CallbackQuery, state: FSMContext) -> None:
+        """Handle search result selection - show full offer details."""
+        if not callback.from_user or not callback.message:
+            await callback.answer()
+            return
+
+        lang = db.get_user_language(callback.from_user.id)
+
+        try:
+            offer_id = int((callback.data or "").split("_")[-1])
+        except (ValueError, IndexError):
+            await callback.answer(get_text(lang, "error"), show_alert=True)
+            return
+
+        # Fetch offer details
+        try:
+            offer = offer_service.get_offer_details(offer_id)
+            if not offer:
+                await callback.answer(
+                    "Товар не найден" if lang == "ru" else "Mahsulot topilmadi", show_alert=True
                 )
+                return
 
-                if offer.photo:
-                    try:
-                        await message.answer_photo(
-                            photo=offer.photo,
-                            caption=caption,
-                            parse_mode="HTML",
-                            reply_markup=keyboard,
-                        )
-                    except Exception:
-                        await message.answer(caption, parse_mode="HTML", reply_markup=keyboard)
-                else:
-                    await message.answer(caption, parse_mode="HTML", reply_markup=keyboard)
+            # Send full offer card
+            caption = render_offer_card(lang, offer)
+            keyboard = offer_quick_keyboard(
+                lang, offer.id, offer.store_id, getattr(offer, "delivery_enabled", False)
+            )
+
+            if getattr(offer, "photo", None):
+                try:
+                    await callback.message.answer_photo(
+                        photo=offer.photo,
+                        caption=caption,
+                        parse_mode="HTML",
+                        reply_markup=keyboard,
+                    )
+                except Exception:
+                    await callback.message.answer(caption, parse_mode="HTML", reply_markup=keyboard)
+            else:
+                await callback.message.answer(caption, parse_mode="HTML", reply_markup=keyboard)
+
+        except Exception as e:
+            logger.error(f"Failed to show offer {offer_id}: {e}")
+            await callback.answer(get_text(lang, "error"), show_alert=True)
+
+        await callback.answer()
+
+    @dp.callback_query(F.data == "search_new")
+    async def search_new_handler(callback: types.CallbackQuery, state: FSMContext) -> None:
+        """Start new search."""
+        if not callback.from_user or not callback.message:
+            await callback.answer()
+            return
+
+        lang = db.get_user_language(callback.from_user.id)
+        await state.clear()
+        await state.set_state(Search.query)
+        await callback.message.answer(
+            get_text(lang, "enter_search_query"), reply_markup=search_cancel_keyboard(lang)
+        )
+        await callback.answer()
+
+    @dp.callback_query(F.data == "search_noop")
+    async def search_noop_handler(callback: types.CallbackQuery) -> None:
+        """Handle no-op callback for page indicator."""
+        await callback.answer()
 
     @dp.callback_query(F.data.startswith("show_store_products_"))
     async def show_store_products(callback: types.CallbackQuery, state: FSMContext) -> None:
