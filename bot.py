@@ -312,15 +312,13 @@ dp.include_router(admin_legacy.router)  # Admin legacy
 
 # ============== REGISTRATION & COMMANDS (AFTER SPECIFIC ROUTERS) ==============
 from handlers.customer.offers import browse as offers
-from handlers.common import registration, commands as user_commands, help as help_handler
+from handlers.common.router import router as common_router
 from handlers.admin import panel as admin_panel, stats as admin_stats
 
-# Include routers for refactored modules
-dp.include_router(registration.router)
-dp.include_router(user_commands.router)
+# Include common router (contains registration, commands, help)
+dp.include_router(common_router)
 dp.include_router(admin_panel.router)  # Admin panel from new location
 dp.include_router(admin_stats.router)  # Admin stats from new location
-dp.include_router(help_handler.router)
 
 # Setup offer browsing handlers (AFTER specific handlers to avoid catching their messages)
 offers.setup(dp, db, offer_service, logger)
