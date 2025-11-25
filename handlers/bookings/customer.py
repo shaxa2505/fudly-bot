@@ -409,11 +409,13 @@ async def notify_partner_new_booking(
     
     partner_lang = db.get_user_language(owner_id)
     customer = get_user_safe(db, customer_id)
-    customer_phone = getattr(customer, 'phone', None) or "Не указан"
+    
+    # Use get_user_field for dict/model compatible access
+    from .utils import get_user_field
+    customer_phone = get_user_field(customer, 'phone') or "Не указан"
+    customer_username = get_user_field(customer, 'username')
     
     # Build notification (pickup - no delivery info)
-    # Get customer username for contact
-    customer_username = getattr(customer, 'username', None)
     contact_info = f"@{customer_username}" if customer_username else customer_phone
     
     if partner_lang == "uz":

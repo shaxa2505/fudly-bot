@@ -122,20 +122,16 @@ async def partner_confirm_booking(callback: types.CallbackQuery) -> None:
             )
         
         try:
-            # Check if customer is a bot (bots can't receive messages from bots)
-            try:
-                chat = await bot.get_chat(customer_id)
-                if chat.type != "private":
-                    logger.warning(f"Customer {customer_id} is not a private chat, skipping notification")
-                else:
-                    await bot.send_message(customer_id, customer_msg, parse_mode="HTML")
-            except Exception as chat_err:
-                if "bot" in str(chat_err).lower():
-                    logger.warning(f"Customer {customer_id} appears to be a bot, skipping notification")
-                else:
-                    await bot.send_message(customer_id, customer_msg, parse_mode="HTML")
+            # Send notification to customer
+            logger.info(f"Sending confirmation to customer {customer_id}")
+            await bot.send_message(customer_id, customer_msg, parse_mode="HTML")
+            logger.info(f"Successfully sent confirmation to customer {customer_id}")
         except Exception as e:
-            logger.error(f"Failed to notify customer {customer_id}: {e}")
+            error_msg = str(e).lower()
+            if "bot" in error_msg or "blocked" in error_msg or "deactivated" in error_msg:
+                logger.warning(f"Cannot notify customer {customer_id}: {e}")
+            else:
+                logger.error(f"Failed to notify customer {customer_id}: {e}")
     
     # Update partner's message
     await safe_edit_reply_markup(callback.message)

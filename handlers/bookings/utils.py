@@ -19,6 +19,7 @@ __all__ = [
     'get_offer_field',
     'get_booking_field',
     'get_user_safe',
+    'get_user_field',
     'format_booking_code',
     'calculate_total',
 ]
@@ -62,12 +63,32 @@ def can_proceed(user_id: int, operation: str) -> bool:
 # from app.core.utils - removed duplicate definitions
 
 
-def get_user_safe(db: Any, user_id: int) -> Any:
-    """Safely get user model from database."""
+def get_user_safe(db: Any, user_id: int) -> Optional[dict]:
+    """Safely get user dict from database."""
     try:
-        return db.get_user_model(user_id)
-    except Exception:
+        # Try get_user first (returns dict)
+        user = db.get_user(user_id)
+        if user:
+            return user
+        # Fallback to get_user_model
+        model = db.get_user_model(user_id)
+        if model and hasattr(model, 'model_dump'):
+            return model.model_dump()
+        elif model and hasattr(model, '__dict__'):
+            return model.__dict__
         return None
+    except Exception as e:
+        logger.debug(f"get_user_safe failed for {user_id}: {e}")
+        return None
+
+
+def get_user_field(user: Any, field: str, default: Any = None) -> Any:
+    """Get field from user (dict or model)."""
+    if user is None:
+        return default
+    if isinstance(user, dict):
+        return user.get(field, default)
+    return getattr(user, field, default)
 
 
 def format_booking_code(code: Optional[str], booking_id: Optional[int] = None) -> str:
