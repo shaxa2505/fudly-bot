@@ -76,7 +76,11 @@ async def registration_city_callback(callback: types.CallbackQuery, state: FSMCo
         return
 
     current_state = await state.get_state()
-    if current_state != Registration.city:
+    logger.info(f"City callback: user={callback.from_user.id}, state={current_state}, data={callback.data}")
+    
+    # Accept if in Registration.city state OR if no state (fresh registration)
+    if current_state and current_state != "Registration:city":
+        logger.warning(f"Wrong state for city selection: {current_state}")
         await callback.answer()
         return
 
@@ -87,29 +91,39 @@ async def registration_city_callback(callback: types.CallbackQuery, state: FSMCo
         city = parts[2] if len(parts) > 2 else ""
         if not city:
             raise ValueError("empty city")
-    except Exception:
+        logger.info(f"Selected city: {city}")
+    except Exception as e:
+        logger.error(f"City parse error: {e}")
         await callback.answer(get_text(lang, "error"), show_alert=True)
         return
 
     try:
         db.update_user_city(callback.from_user.id, city)
-    except Exception:
-        pass
+        logger.info(f"City updated for user {callback.from_user.id}: {city}")
+    except Exception as e:
+        logger.error(f"Failed to update city: {e}")
 
     await state.clear()
+    
+    # Delete old message and send new menu
     try:
-        await _safe_answer_or_send(
-            callback.message, 
-            callback.from_user.id, 
+        await callback.message.delete()
+    except Exception:
+        pass
+    
+    try:
+        await callback.message.answer(
             get_text(lang, "registration_complete"), 
             parse_mode="HTML", 
             reply_markup=main_menu_customer(lang)
         )
-    except Exception:
+    except Exception as e:
+        logger.error(f"Failed to send completion message: {e}")
         try:
             await callback.answer(get_text(lang, "registration_complete"), show_alert=True)
         except Exception:
             pass
+    
     await callback.answer()
 
 

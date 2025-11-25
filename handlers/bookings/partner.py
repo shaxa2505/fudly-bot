@@ -33,11 +33,12 @@ router = Router()
 # Module dependencies
 db: Any = None
 bot: Any = None
+bot_username: str = "FudlyUzBot"  # Will be updated on setup
 
 
 def setup_dependencies(database: Any, bot_instance: Any):
     """Setup module dependencies."""
-    global db, bot
+    global db, bot, bot_username
     db = database
     bot = bot_instance
 
@@ -132,7 +133,18 @@ async def partner_confirm_booking(callback: types.CallbackQuery) -> None:
             # Try to send with QR code
             qr_sent = False
             if QR_ENABLED and generate_booking_qr:
-                qr_image = generate_booking_qr(code or str(booking_id), booking_id)
+                # Get bot username dynamically
+                try:
+                    bot_info = await bot.get_me()
+                    current_bot_username = bot_info.username or bot_username
+                except Exception:
+                    current_bot_username = bot_username
+                
+                qr_image = generate_booking_qr(
+                    code or str(booking_id), 
+                    booking_id,
+                    bot_username=current_bot_username
+                )
                 if qr_image:
                     try:
                         qr_file = BufferedInputFile(

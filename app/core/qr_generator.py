@@ -23,11 +23,15 @@ except ImportError:
     logger = logging.getLogger(__name__)
 
 
-# Bot username for deep links
-BOT_USERNAME = os.environ.get("BOT_USERNAME", "FudlyBot")
+# Bot username for deep links - can be overridden via parameter
+DEFAULT_BOT_USERNAME = os.environ.get("BOT_USERNAME", "FudlyUzBot")
 
 
-def generate_booking_qr(booking_code: str, booking_id: int) -> Optional[io.BytesIO]:
+def generate_booking_qr(
+    booking_code: str, 
+    booking_id: int,
+    bot_username: Optional[str] = None
+) -> Optional[io.BytesIO]:
     """
     Generate QR code for a booking.
     
@@ -37,6 +41,7 @@ def generate_booking_qr(booking_code: str, booking_id: int) -> Optional[io.Bytes
     Args:
         booking_code: The booking code (e.g., "SYNO0M")
         booking_id: The booking ID for reference
+        bot_username: Bot username for deep link (without @). If None, uses DEFAULT_BOT_USERNAME
         
     Returns:
         BytesIO with PNG image data, or None if QR generation fails
@@ -45,10 +50,12 @@ def generate_booking_qr(booking_code: str, booking_id: int) -> Optional[io.Bytes
         logger.warning("QR code generation not available - qrcode package not installed")
         return None
     
+    username = bot_username or DEFAULT_BOT_USERNAME
+    
     try:
         # Create deep link for Telegram bot
         # Format: t.me/BotName?start=pickup_CODE
-        deep_link = f"https://t.me/{BOT_USERNAME}?start=pickup_{booking_code}"
+        deep_link = f"https://t.me/{username}?start=pickup_{booking_code}"
         
         # Create QR code with nice styling
         qr = qrcode.QRCode(
