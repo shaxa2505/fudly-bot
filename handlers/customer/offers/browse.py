@@ -214,7 +214,66 @@ def setup(
         await state.set_state(BrowseOffers.store_list)
         await state.update_data(store_list=[store.id for store in stores])
         text = offer_templates.render_business_type_store_list(lang, business_type, city, stores)
-        await msg.edit_text(text, parse_mode="HTML")
+        # Add inline keyboard for store selection
+        keyboard = offer_keyboards.store_list_keyboard(lang, stores)
+        await msg.edit_text(text, parse_mode="HTML", reply_markup=keyboard)
+        await callback.answer()
+
+    @dp.callback_query(F.data.startswith("select_store_"))
+    async def select_store_callback(callback: types.CallbackQuery, state: FSMContext):
+        """Select store by inline button - show store info."""
+        if not callback.from_user or not callback.data:
+            await callback.answer()
+            return
+        msg = _callback_message(callback)
+        if not msg:
+            await callback.answer()
+            return
+        lang = db.get_user_language(callback.from_user.id)
+        
+        try:
+            store_id = int(callback.data.split("_")[-1])
+        except (ValueError, IndexError):
+            await callback.answer(get_text(lang, "error"), show_alert=True)
+            return
+        
+        await state.clear()
+        
+        # Get store info and show full card
+        store = offer_service.get_store(store_id)
+        if not store:
+            await callback.answer(
+                "Магазин не найден" if lang == "ru" else "Do'kon topilmadi",
+                show_alert=True,
+            )
+            return
+        
+        # Render full store card
+        text = offer_templates.render_store_card(lang, store)
+        keyboard = offer_keyboards.store_card_keyboard(
+            lang, store_id, store.offers_count, store.ratings_count
+        )
+        
+        # Try to get photo from raw store data
+        photo = None
+        try:
+            raw_store = db.get_store(store_id) if db else None
+            if isinstance(raw_store, dict):
+                photo = raw_store.get("photo") or raw_store.get("photo_id")
+        except Exception:
+            photo = None
+        
+        if photo:
+            try:
+                await msg.answer_photo(
+                    photo=photo, caption=text, parse_mode="HTML", reply_markup=keyboard
+                )
+                await callback.answer()
+                return
+            except Exception:
+                pass
+        
+        await msg.edit_text(text, parse_mode="HTML", reply_markup=keyboard)
         await callback.answer()
 
     @dp.message(BrowseOffers.store_list, F.text.regexp(r"^\d+$"))

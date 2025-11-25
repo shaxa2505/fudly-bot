@@ -73,8 +73,9 @@ async def profile(message: types.Message) -> None:
 
     # Determine current mode for settings keyboard
     # If user is seller, check their current mode, otherwise always customer
-    if user.role == "seller" and user_view_mode:
-        current_mode = user_view_mode.get(message.from_user.id, "customer")
+    if user.role == "seller":
+        # Default to seller mode for sellers if not explicitly set to customer
+        current_mode = user_view_mode.get(message.from_user.id, "seller") if user_view_mode else "seller"
     else:
         current_mode = "customer"
 

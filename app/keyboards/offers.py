@@ -85,6 +85,25 @@ def store_offers_keyboard(
     return builder.as_markup()
 
 
+def store_list_keyboard(
+    lang: str,
+    stores: list,
+) -> InlineKeyboardMarkup:
+    """Keyboard with inline buttons for store selection."""
+    builder = InlineKeyboardBuilder()
+    for idx, store in enumerate(stores, 1):
+        # store can be StoreSummary object or dict
+        store_id = store.id if hasattr(store, 'id') else store.get('store_id', idx)
+        store_name = store.name if hasattr(store, 'name') else store.get('name', f'Store {idx}')
+        # Truncate long names
+        display_name = store_name[:25] + "..." if len(store_name) > 25 else store_name
+        builder.button(text=f"{idx}. {display_name}", callback_data=f"select_store_{store_id}")
+    back = "◀️ Назад" if lang == "ru" else "◀️ Orqaga"
+    builder.button(text=back, callback_data="back_to_places")
+    builder.adjust(1)
+    return builder.as_markup()
+
+
 def store_reviews_keyboard(lang: str, store_id: int) -> InlineKeyboardMarkup:
     builder = InlineKeyboardBuilder()
     back = "◀️ К магазину" if lang == "ru" else "◀️ Do'konga qaytish"
