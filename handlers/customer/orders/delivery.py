@@ -84,6 +84,18 @@ async def order_delivery_start(callback: types.CallbackQuery, state: FSMContext,
         )
         return
 
+    # Check min_order_amount upfront for single item
+    min_order_amount = get_store_field(store, "min_order_amount", 0)
+    discount_price = get_offer_field(offer, "discount_price", 0)
+    
+    if min_order_amount > 0 and discount_price < min_order_amount:
+        currency = "сум" if lang == "ru" else "so'm"
+        await callback.answer(
+            f"❌ {'Минимальный заказ для доставки' if lang == 'ru' else 'Yetkazib berish uchun minimal buyurtma'}: {min_order_amount:,} {currency}",
+            show_alert=True,
+        )
+        return
+
     await state.update_data(
         offer_id=offer_id, store_id=store_id
     )

@@ -239,10 +239,15 @@ class BookingMixin:
             cursor.execute('''
                 SELECT b.booking_id, b.offer_id, b.user_id, b.status, b.booking_code,
                        b.pickup_time, COALESCE(b.quantity, 1) as quantity, b.created_at,
-                       o.title, o.discount_price, o.available_until, s.name, s.address, s.city
+                       COALESCE(o.title, 'Удалённый товар') as title, 
+                       COALESCE(o.discount_price, 0) as discount_price, 
+                       o.available_until, 
+                       COALESCE(s.name, 'Магазин') as name, 
+                       COALESCE(s.address, '') as address, 
+                       s.city
                 FROM bookings b
-                JOIN offers o ON b.offer_id = o.offer_id
-                JOIN stores s ON o.store_id = s.store_id
+                LEFT JOIN offers o ON b.offer_id = o.offer_id
+                LEFT JOIN stores s ON o.store_id = s.store_id
                 WHERE b.user_id = %s
                 ORDER BY b.created_at DESC
             ''', (user_id,))
@@ -274,10 +279,15 @@ class BookingMixin:
             cursor.execute('''
                 SELECT b.booking_id, b.offer_id, b.user_id, b.status, b.booking_code,
                        b.pickup_time, COALESCE(b.quantity, 1) as quantity, b.created_at,
-                       o.title, o.discount_price, o.available_until, s.name, s.address, s.city
+                       COALESCE(o.title, 'Удалённый товар') as title, 
+                       COALESCE(o.discount_price, 0) as discount_price, 
+                       o.available_until, 
+                       COALESCE(s.name, 'Магазин') as name, 
+                       COALESCE(s.address, '') as address, 
+                       s.city
                 FROM bookings b
-                JOIN offers o ON b.offer_id = o.offer_id
-                JOIN stores s ON o.store_id = s.store_id
+                LEFT JOIN offers o ON b.offer_id = o.offer_id
+                LEFT JOIN stores s ON o.store_id = s.store_id
                 WHERE b.user_id = %s AND b.status = ANY(%s)
                 ORDER BY b.created_at DESC
             ''', (user_id, list(status_values)))

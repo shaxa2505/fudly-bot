@@ -1,0 +1,6 @@
+Region;Revenue_USD_bn;Share_pct
+U.S.;172;=B2/SUM($B$2:$B$5)
+EMEA;102;=B3/SUM($B$2:$B$5)
+APAC;56;=B4/SUM($B$2:$B$5)
+Other Americas;21;=B5/SUM($B$2:$B$5)
+Notes;"Source: Alphabet Form 10-K 2024/2025 (MD&A). Build a Pie or Bar chart from Region + Revenue."

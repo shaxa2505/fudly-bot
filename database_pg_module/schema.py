@@ -236,6 +236,28 @@ class SchemaMixin:
                 )
             ''')
             
+            # Platform settings table (for payment card, etc)
+            cursor.execute('''
+                CREATE TABLE IF NOT EXISTS platform_settings (
+                    key TEXT PRIMARY KEY,
+                    value TEXT,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            ''')
+            
+            # Pickup slots table
+            cursor.execute('''
+                CREATE TABLE IF NOT EXISTS pickup_slots (
+                    store_id INTEGER,
+                    slot_ts TEXT,
+                    capacity INTEGER DEFAULT 5,
+                    reserved INTEGER DEFAULT 0,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    PRIMARY KEY (store_id, slot_ts),
+                    FOREIGN KEY (store_id) REFERENCES stores(store_id)
+                )
+            ''')
+            
             # Create indexes
             self._create_indexes(cursor)
             

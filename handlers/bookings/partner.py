@@ -93,20 +93,31 @@ async def partner_confirm_booking(callback: types.CallbackQuery) -> None:
         store_name = get_store_field(store, 'name', 'Магазин')
         store_address = get_store_field(store, 'address', '')
         
+        # Generate QR code text for the booking
+        qr_text = f"FUDLY-{code_display}"
+        
         if customer_lang == "uz":
             customer_msg = (
                 f"✅ <b>Broningiz tasdiqlandi!</b>\n\n"
                 f"🏪 {_esc(store_name)}\n"
-                f"📍 Manzil: {_esc(store_address)}\n"
-                f"🎫 Bron kodi: <code>{code_display}</code>\n\n"
+                f"📍 Manzil: {_esc(store_address)}\n\n"
+                f"━━━━━━━━━━━━━━━━━━\n"
+                f"🎫 <b>Bron kodi:</b>\n"
+                f"<code>{code_display}</code>\n"
+                f"━━━━━━━━━━━━━━━━━━\n\n"
+                f"📱 QR kod uchun: <code>{qr_text}</code>\n\n"
                 f"⚠️ Ushbu kodni sotuvchiga ko'rsating."
             )
         else:
             customer_msg = (
                 f"✅ <b>Ваша бронь подтверждена!</b>\n\n"
                 f"🏪 {_esc(store_name)}\n"
-                f"📍 Адрес: {_esc(store_address)}\n"
-                f"🎫 Код бронирования: <code>{code_display}</code>\n\n"
+                f"📍 Адрес: {_esc(store_address)}\n\n"
+                f"━━━━━━━━━━━━━━━━━━\n"
+                f"🎫 <b>Код бронирования:</b>\n"
+                f"<code>{code_display}</code>\n"
+                f"━━━━━━━━━━━━━━━━━━\n\n"
+                f"📱 Для QR кода: <code>{qr_text}</code>\n\n"
                 f"⚠️ Покажите этот код продавцу при получении."
             )
         

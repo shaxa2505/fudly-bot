@@ -389,13 +389,18 @@ async def notify_partner_new_booking(
     customer_phone = getattr(customer, 'phone', None) or "Не указан"
     
     # Build notification (pickup - no delivery info)
+    # Get customer username for contact
+    customer_username = getattr(customer, 'username', None)
+    contact_info = f"@{customer_username}" if customer_username else customer_phone
+    
     if partner_lang == "uz":
         text = (
             f"🔔 <b>Yangi bron!</b>\n\n"
             f"📦 {_esc(offer_title)} × {quantity}\n"
             f"💰 {total:,} so'm\n"
             f"👤 {_esc(customer_name)}\n"
-            f"📱 <code>{_esc(customer_phone)}</code>\n"
+            f"📱 Tel: <code>{_esc(customer_phone)}</code>\n"
+            f"💬 Kontakt: {_esc(contact_info)}\n"
             f"🏪 O'zi olib ketadi"
         )
         confirm_text = "✅ Tasdiqlash"
@@ -406,7 +411,8 @@ async def notify_partner_new_booking(
             f"📦 {_esc(offer_title)} × {quantity}\n"
             f"💰 {total:,} сум\n"
             f"👤 {_esc(customer_name)}\n"
-            f"📱 <code>{_esc(customer_phone)}</code>\n"
+            f"📱 Тел: <code>{_esc(customer_phone)}</code>\n"
+            f"💬 Контакт: {_esc(contact_info)}\n"
             f"🏪 Самовывоз"
         )
         confirm_text = "✅ Подтвердить"
