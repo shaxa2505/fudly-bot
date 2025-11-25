@@ -92,8 +92,10 @@ class BookingMixin:
                 return (False, None, None, f"offer_inactive:{offer[1]}")
             
             current_quantity = offer[0]
-            store_id = offer[2] if len(offer) > 2 else None
+            store_id = offer[2]  # store_id from offers table
             new_quantity = current_quantity - quantity
+            
+            logger.info(f"🔍 Offer {offer_id}: qty={current_quantity}, store_id={store_id}")
             
             # Update quantity atomically
             cursor.execute('''
@@ -120,10 +122,10 @@ class BookingMixin:
 
             # Create booking with expiry
             cursor.execute('''
-                INSERT INTO bookings (offer_id, user_id, booking_code, status, quantity, pickup_time, pickup_address, expiry_time)
-                VALUES (%s, %s, %s, 'pending', %s, %s, %s, now() + (%s * INTERVAL '1 hour'))
+                INSERT INTO bookings (offer_id, user_id, store_id, booking_code, status, quantity, pickup_time, pickup_address, expiry_time)
+                VALUES (%s, %s, %s, %s, 'pending', %s, %s, %s, now() + (%s * INTERVAL '1 hour'))
                 RETURNING booking_id
-            ''', (offer_id, user_id, booking_code, quantity, pickup_time, pickup_address, BOOKING_DURATION_HOURS))
+            ''', (offer_id, user_id, store_id, booking_code, quantity, pickup_time, pickup_address, BOOKING_DURATION_HOURS))
             booking_id = cursor.fetchone()[0]
             
             conn.commit()
