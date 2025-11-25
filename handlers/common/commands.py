@@ -249,6 +249,9 @@ async def cmd_start(message: types.Message, state: FSMContext, db: DatabaseProto
     if not message.from_user:
         return
 
+    # Clear any active state (search, booking, etc.)
+    await state.clear()
+
     # Check for deep link arguments (e.g., /start pickup_CODE)
     if message.text:
         args = message.text.split(maxsplit=1)

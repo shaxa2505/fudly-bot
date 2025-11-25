@@ -144,6 +144,12 @@ def setup(
 
         # Safely read incoming text and handle cancellation
         raw_text = (message.text or "").strip()
+        
+        # Skip commands - let them be handled by command handlers
+        if raw_text.startswith("/"):
+            await state.clear()  # Exit search state
+            return  # Let command handlers process this
+        
         # Check for all possible cancel button variants
         cancel_texts = [
             "Отмена", "Bekor qilish",
