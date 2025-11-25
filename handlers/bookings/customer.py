@@ -179,9 +179,10 @@ async def book_offer_quantity(message: types.Message, state: FSMContext) -> None
 @router.callback_query(F.data == "pickup_choice")
 async def pickup_choice(callback: types.CallbackQuery, state: FSMContext) -> None:
     """User chose pickup."""
+    user_id = callback.from_user.id  # Real user ID from callback
     await state.update_data(delivery_option=0, delivery_cost=0)
     await safe_edit_reply_markup(callback.message)
-    await create_booking(callback.message, state)
+    await create_booking(callback.message, state, real_user_id=user_id)
     await callback.answer()
 
 
@@ -267,13 +268,15 @@ async def cancel_booking_flow(callback: types.CallbackQuery, state: FSMContext) 
     await callback.answer()
 
 
-async def create_booking(message: types.Message, state: FSMContext) -> None:
+async def create_booking(message: types.Message, state: FSMContext, real_user_id: Optional[int] = None) -> None:
     """Create the final booking."""
     if not db or not bot:
         await message.answer("System error")
         return
     
-    user_id = message.from_user.id
+    # Use provided user_id or fallback to message.from_user.id
+    # Important: when called from callback, message.from_user is the BOT, not the user!
+    user_id = real_user_id if real_user_id else message.from_user.id
     lang = db.get_user_language(user_id)
     data = await state.get_data()
     
