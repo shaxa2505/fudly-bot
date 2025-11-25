@@ -128,18 +128,12 @@ async def start_booking_expiry_worker(db: Any, bot: Any) -> None:
                                 offer_id = row[2]
                                 quantity = int(row[3] or 0)
 
-                            # Cancel booking in DB
+                            # Cancel booking in DB (cancel_booking already returns quantity atomically)
                             try:
                                 db.cancel_booking(booking_id)
+                                logger.info(f"Auto-cancelled expired booking {booking_id}, returned {quantity} to offer {offer_id}")
                             except Exception as e:
                                 logger.error(f"Failed to cancel booking {booking_id}: {e}")
-
-                            # Return quantity atomically
-                            try:
-                                if offer_id and quantity > 0:
-                                    db.increment_offer_quantity_atomic(offer_id, quantity)
-                            except Exception as e:
-                                logger.error(f"Failed to increment offer {offer_id} by {quantity}: {e}")
 
                             # Notify user about auto-cancel (localized)
                             try:

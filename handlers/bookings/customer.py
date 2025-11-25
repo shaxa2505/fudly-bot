@@ -200,6 +200,29 @@ async def delivery_choice(callback: types.CallbackQuery, state: FSMContext) -> N
     offer_id = data.get("offer_id")
     quantity = data.get("quantity", 1)
     store_id = data.get("store_id")
+    offer_price = data.get("offer_price", 0)
+    
+    # CHECK MIN_ORDER_AMOUNT before allowing delivery
+    store = db.get_store(store_id) if store_id else None
+    min_order_amount = get_store_field(store, "min_order_amount", 0)
+    order_total = offer_price * quantity
+    
+    if min_order_amount > 0 and order_total < min_order_amount:
+        currency = "сум" if lang == "ru" else "so'm"
+        if lang == "uz":
+            msg = (
+                f"❌ Yetkazib berish uchun minimal buyurtma: {min_order_amount:,} {currency}\n"
+                f"Sizning buyurtmangiz: {order_total:,} {currency}\n\n"
+                f"Iltimos, miqdorni oshiring yoki olib ketishni tanlang."
+            )
+        else:
+            msg = (
+                f"❌ Минимальная сумма для доставки: {min_order_amount:,} {currency}\n"
+                f"Ваш заказ: {order_total:,} {currency}\n\n"
+                f"Пожалуйста, увеличьте количество или выберите самовывоз."
+            )
+        await callback.answer(msg, show_alert=True)
+        return
     
     # Transfer to OrderDelivery state (orders.py handles delivery with payment)
     await state.clear()

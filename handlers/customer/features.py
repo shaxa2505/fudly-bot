@@ -42,12 +42,20 @@ def setup(
             orders = []
 
         # Helper to safely get field from dict or tuple
-        def get_field(item, field, index, default=None):
+        def get_field(item, field, index=None, default=None):
+            """Get field from dict (PostgreSQL) or tuple (SQLite)."""
+            if item is None:
+                return default
             if isinstance(item, dict):
                 return item.get(field, default)
-            if isinstance(item, (list, tuple)) and len(item) > index:
+            if isinstance(item, (list, tuple)) and index is not None and len(item) > index:
                 return item[index]
             return default
+
+        # Debug: log what we got
+        logger.info(f"Cart: user={user_id}, bookings={len(bookings)}, orders={len(orders)}")
+        if bookings:
+            logger.info(f"First booking type: {type(bookings[0])}, keys: {bookings[0].keys() if isinstance(bookings[0], dict) else 'tuple'}")
 
         # Filter active items only
         active_bookings = [b for b in bookings if get_field(b, 'status', 3) in ["pending", "confirmed"]]
