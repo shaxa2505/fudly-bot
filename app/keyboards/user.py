@@ -28,7 +28,8 @@ def main_menu_customer(lang: str = "ru") -> ReplyKeyboardMarkup:
 def search_cancel_keyboard(lang: str = "ru") -> ReplyKeyboardMarkup:
     """Keyboard for cancelling search."""
     builder = ReplyKeyboardBuilder()
-    builder.button(text=f"❌ {get_text(lang, 'cancel')}")
+    # get_text already returns "❌ Отмена" / "❌ Bekor qilish", no need to add emoji
+    builder.button(text=get_text(lang, "cancel"))
     builder.adjust(1)
     return builder.as_markup(resize_keyboard=True)
 

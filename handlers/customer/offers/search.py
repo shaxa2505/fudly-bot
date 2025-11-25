@@ -143,8 +143,15 @@ def setup(
         lang = db.get_user_language(message.from_user.id)
 
         # Safely read incoming text and handle cancellation
-        raw_text = message.text or ""
-        if raw_text in ["Отмена", "Bekor qilish", "❌ Отмена", "❌ Bekor qilish"]:
+        raw_text = (message.text or "").strip()
+        # Check for all possible cancel button variants
+        cancel_texts = [
+            "Отмена", "Bekor qilish",
+            "❌ Отмена", "❌ Bekor qilish",
+            "❌ ❌ Отмена", "❌ ❌ Bekor qilish",  # Legacy double-emoji
+            get_text(lang, "cancel"),  # Current localized cancel text
+        ]
+        if raw_text in cancel_texts or "отмена" in raw_text.lower() or "bekor" in raw_text.lower():
             await state.clear()
             await message.answer(
                 get_text(lang, "action_cancelled"), reply_markup=main_menu_customer(lang)
