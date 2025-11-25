@@ -136,13 +136,17 @@ def setup(
                 
                 # Status-specific messages
                 if status == "pending":
-                    text_parts.append(f"   ⏳ {'Ожидает подтверждения продавца' if lang == 'ru' else 'Sotuvchi tasdig\\'ini kutmoqda'}")
+                    pending_text = "Ожидает подтверждения продавца" if lang == "ru" else "Sotuvchi tasdigini kutmoqda"
+                    text_parts.append(f"   ⏳ {pending_text}")
                 elif status == "confirmed" and code:
-                    text_parts.append(f"   ✅ {'Подтверждено' if lang == 'ru' else 'Tasdiqlangan'}")
+                    confirmed_text = "Подтверждено" if lang == "ru" else "Tasdiqlangan"
+                    hint_text = "Покажите код продавцу" if lang == "ru" else "Kodni sotuvchiga korsating"
+                    text_parts.append(f"   ✅ {confirmed_text}")
                     text_parts.append(f"   🎫 <b>Код:</b> <code>{code}</code>")
-                    text_parts.append(f"   💡 {'Покажите код продавцу' if lang == 'ru' else 'Kodni sotuvchiga ko\\'rsating'}")
+                    text_parts.append(f"   💡 {hint_text}")
                 elif status == "active":
-                    text_parts.append(f"   🔵 {'Активно' if lang == 'ru' else 'Faol'}")
+                    active_text = "Активно" if lang == "ru" else "Faol"
+                    text_parts.append(f"   🔵 {active_text}")
                 
                 text_parts.append("")
 
@@ -382,6 +386,18 @@ def setup(
             await callback.message.edit_text(
                 get_text(lang, "account_deleted"), parse_mode="HTML"
             )
+            
+            # Show welcome message for re-registration
+            from app.keyboards import language_keyboard
+            await callback.message.answer(
+                get_text('ru', 'welcome'),
+                parse_mode="HTML"
+            )
+            await callback.message.answer(
+                get_text('ru', 'choose_language'),
+                reply_markup=language_keyboard()
+            )
+            
             await callback.answer()
         except Exception as e:
             await callback.answer(
