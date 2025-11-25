@@ -72,6 +72,7 @@ class EditOffer(StatesGroup):
     value = State()
     available_from = State()
     available_until = State()
+    search_query = State()  # For seller's offer search
 
 
 class ConfirmOrder(StatesGroup):

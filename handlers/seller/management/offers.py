@@ -62,12 +62,13 @@ async def my_offers(message: types.Message) -> None:
 
     # Filter menu
     filter_kb = InlineKeyboardBuilder()
-    filter_kb.button(text=f"✅ Активные ({active_count})", callback_data="filter_offers_active")
+    filter_kb.button(text=f"✅ Активные ({active_count})", callback_data="filter_offers_active_0")
     filter_kb.button(
-        text=f"❌ Неактивные ({inactive_count})", callback_data="filter_offers_inactive"
+        text=f"❌ Неактивные ({inactive_count})", callback_data="filter_offers_inactive_0"
     )
-    filter_kb.button(text=f"📋 Все ({len(all_offers)})", callback_data="filter_offers_all")
-    filter_kb.adjust(2, 1)
+    filter_kb.button(text=f"📋 Все ({len(all_offers)})", callback_data="filter_offers_all_0")
+    filter_kb.button(text="🔍 Поиск", callback_data="search_my_offers")
+    filter_kb.adjust(2, 1, 1)
 
     await message.answer(
         "┌─────────────────────────┐\n"
@@ -75,34 +76,30 @@ async def my_offers(message: types.Message) -> None:
         "└─────────────────────────┘\n\n"
         f"✅ Активных: <b>{active_count}</b>\n"
         f"❌ Неактивных: <b>{inactive_count}</b>\n"
-        f"📊 Всего: <b>{len(all_offers)}</b>",
+        f"📊 Всего: <b>{len(all_offers)}</b>\n\n"
+        f"{'Выберите категорию для просмотра:' if lang == 'ru' else 'Kategoriyani tanlang:'}",
         parse_mode="HTML",
         reply_markup=filter_kb.as_markup(),
     )
 
-    # Show first 10 offers
-    for offer in all_offers[:10]:
-        await send_offer_card(message, offer, lang)
-        await asyncio.sleep(0.1)
-
-    if len(all_offers) > 10:
-        await message.answer(
-            f"ℹ️ {'Показано первые 10 товаров из' if lang == 'ru' else 'Birinchi 10 ta mahsulot'} {len(all_offers)}\n"
-            f"{'Используйте фильтры выше для поиска' if lang == 'ru' else 'Qidirish uchun filtrlardan foydalaning'}"
-        )
-
 
 @router.callback_query(F.data.startswith("filter_offers_"))
 async def filter_offers(callback: types.CallbackQuery) -> None:
-    """Filter offers by status."""
+    """Filter offers by status with pagination."""
     db = get_db()
-    filter_type = callback.data.split("_")[-1]  # active, inactive, all
     lang = db.get_user_language(callback.from_user.id)
     stores = db.get_user_stores(callback.from_user.id)
 
     if not stores:
         await callback.answer(get_text(lang, "no_stores"), show_alert=True)
         return
+
+    # Parse filter type and page: filter_offers_active_0
+    parts = callback.data.split("_")
+    filter_type = parts[2] if len(parts) > 2 else "all"  # active, inactive, all
+    page = int(parts[3]) if len(parts) > 3 and parts[3].isdigit() else 0
+    
+    ITEMS_PER_PAGE = 5
 
     all_offers = []
     for store in stores:
@@ -113,13 +110,13 @@ async def filter_offers(callback: types.CallbackQuery) -> None:
     # Apply filter
     if filter_type == "active":
         filtered = [o for o in all_offers if get_offer_field(o, "status") == "active"]
-        title = "✅ Активные товары"
+        title = "✅ Активные" if lang == "ru" else "✅ Faol"
     elif filter_type == "inactive":
         filtered = [o for o in all_offers if get_offer_field(o, "status") != "active"]
-        title = "❌ Неактивные товары"
+        title = "❌ Неактивные" if lang == "ru" else "❌ Nofaol"
     else:
         filtered = all_offers
-        title = "📋 Все товары"
+        title = "📋 Все" if lang == "ru" else "📋 Hammasi"
 
     if not filtered:
         await callback.answer(
@@ -128,21 +125,194 @@ async def filter_offers(callback: types.CallbackQuery) -> None:
         )
         return
 
+    # Pagination
+    total_pages = (len(filtered) + ITEMS_PER_PAGE - 1) // ITEMS_PER_PAGE
+    page = min(page, total_pages - 1)
+    start_idx = page * ITEMS_PER_PAGE
+    end_idx = start_idx + ITEMS_PER_PAGE
+    page_offers = filtered[start_idx:end_idx]
+
+    # Build compact list
+    text = f"<b>{title}</b> ({len(filtered)})\n"
+    text += f"{'Страница' if lang == 'ru' else 'Sahifa'} {page + 1}/{total_pages}\n\n"
+
+    for i, offer in enumerate(page_offers, start=start_idx + 1):
+        offer_id = get_offer_field(offer, "offer_id")
+        offer_title = get_offer_field(offer, "title", "Товар")[:25]
+        price = get_offer_field(offer, "discount_price", 0)
+        qty = get_offer_field(offer, "quantity", 0)
+        status = get_offer_field(offer, "status", "active")
+        
+        status_icon = "✅" if status == "active" else "❌"
+        qty_icon = "🟢" if qty > 0 else "🔴"
+        
+        text += f"{i}. {status_icon} <b>{offer_title}</b>\n"
+        text += f"   💰 {price:,} | {qty_icon} {qty} шт\n"
+
+    # Navigation buttons
+    nav_kb = InlineKeyboardBuilder()
+    
+    # Add item buttons for quick access
+    for offer in page_offers:
+        offer_id = get_offer_field(offer, "offer_id")
+        offer_title = get_offer_field(offer, "title", "Товар")[:15]
+        nav_kb.button(text=f"📝 {offer_title}", callback_data=f"edit_offer_{offer_id}")
+    
+    nav_kb.adjust(2)  # 2 buttons per row for items
+    
+    # Pagination row
+    pagination_buttons = []
+    if page > 0:
+        pagination_buttons.append(("◀️", f"filter_offers_{filter_type}_{page - 1}"))
+    pagination_buttons.append((f"{page + 1}/{total_pages}", "noop"))
+    if page < total_pages - 1:
+        pagination_buttons.append(("▶️", f"filter_offers_{filter_type}_{page + 1}"))
+    
+    for btn_text, btn_data in pagination_buttons:
+        nav_kb.button(text=btn_text, callback_data=btn_data)
+    
+    # Back button
+    nav_kb.button(text="🔙 Назад" if lang == "ru" else "🔙 Orqaga", callback_data="back_to_offers_menu")
+    
+    # Adjust: items (2 per row), then pagination (3), then back (1)
+    nav_kb.adjust(2, 2, len(pagination_buttons), 1)
+
+    await callback.answer()
+    
+    try:
+        await callback.message.edit_text(text, parse_mode="HTML", reply_markup=nav_kb.as_markup())
+    except Exception:
+        await callback.message.answer(text, parse_mode="HTML", reply_markup=nav_kb.as_markup())
+
+
+@router.callback_query(F.data == "back_to_offers_menu")
+async def back_to_offers_menu(callback: types.CallbackQuery) -> None:
+    """Return to main offers menu."""
+    db = get_db()
+    lang = db.get_user_language(callback.from_user.id)
+    stores = db.get_user_stores(callback.from_user.id)
+
+    all_offers = []
+    for store in stores:
+        store_id = get_store_field(store, "store_id")
+        offers = db.get_store_offers(store_id)
+        all_offers.extend(offers)
+
+    active_count = sum(1 for o in all_offers if get_offer_field(o, "status") == "active")
+    inactive_count = len(all_offers) - active_count
+
+    filter_kb = InlineKeyboardBuilder()
+    filter_kb.button(text=f"✅ Активные ({active_count})", callback_data="filter_offers_active_0")
+    filter_kb.button(
+        text=f"❌ Неактивные ({inactive_count})", callback_data="filter_offers_inactive_0"
+    )
+    filter_kb.button(text=f"📋 Все ({len(all_offers)})", callback_data="filter_offers_all_0")
+    filter_kb.button(text="🔍 Поиск", callback_data="search_my_offers")
+    filter_kb.adjust(2, 1, 1)
+
+    await callback.answer()
+    await callback.message.edit_text(
+        "┌─────────────────────────┐\n"
+        f"│  📦 <b>{'ВАШИ ТОВАРЫ' if lang == 'ru' else 'MAHSULOTLARINGIZ'}</b>  │\n"
+        "└─────────────────────────┘\n\n"
+        f"✅ Активных: <b>{active_count}</b>\n"
+        f"❌ Неактивных: <b>{inactive_count}</b>\n"
+        f"📊 Всего: <b>{len(all_offers)}</b>\n\n"
+        f"{'Выберите категорию для просмотра:' if lang == 'ru' else 'Kategoriyani tanlang:'}",
+        parse_mode="HTML",
+        reply_markup=filter_kb.as_markup(),
+    )
+
+
+@router.callback_query(F.data == "noop")
+async def noop_handler(callback: types.CallbackQuery) -> None:
+    """Handle noop button press (pagination indicator)."""
     await callback.answer()
 
+
+@router.callback_query(F.data == "search_my_offers")
+async def search_my_offers_start(callback: types.CallbackQuery, state: FSMContext) -> None:
+    """Start search for seller's offers."""
+    db = get_db()
+    lang = db.get_user_language(callback.from_user.id)
+    
+    await state.set_state(EditOffer.search_query)
+    await callback.answer()
     await callback.message.answer(
-        f"<b>{title}</b>\n\n" f"{'Найдено' if lang == 'ru' else 'Topildi'}: <b>{len(filtered)}</b>",
+        f"🔍 {'Введите название товара для поиска:' if lang == 'ru' else 'Qidiruv uchun mahsulot nomini kiriting:'}",
         parse_mode="HTML",
     )
 
-    for offer in filtered[:10]:
-        await send_offer_card(callback.message, offer, lang)
-        await asyncio.sleep(0.1)
 
-    if len(filtered) > 10:
-        await callback.message.answer(
-            f"ℹ️ {'Показано первые 10 из' if lang == 'ru' else 'Birinchi 10 ta'} {len(filtered)}"
+@router.message(EditOffer.search_query)
+async def search_my_offers_process(message: types.Message, state: FSMContext) -> None:
+    """Process search query for seller's offers."""
+    db = get_db()
+    lang = db.get_user_language(message.from_user.id)
+    query = (message.text or "").strip().lower()
+    
+    # Check for cancel
+    if "отмена" in query or "bekor" in query or query.startswith("/"):
+        await state.clear()
+        await message.answer(
+            "❌ " + ("Поиск отменён" if lang == "ru" else "Qidiruv bekor qilindi"),
+            reply_markup=main_menu_seller(lang),
         )
+        return
+    
+    if len(query) < 2:
+        await message.answer(
+            "❌ " + ("Минимум 2 символа" if lang == "ru" else "Kamida 2 ta belgi")
+        )
+        return
+    
+    await state.clear()
+    
+    stores = db.get_user_stores(message.from_user.id)
+    all_offers = []
+    for store in stores:
+        store_id = get_store_field(store, "store_id")
+        offers = db.get_store_offers(store_id)
+        all_offers.extend(offers)
+    
+    # Search
+    results = []
+    for offer in all_offers:
+        title = get_offer_field(offer, "title", "").lower()
+        if query in title:
+            results.append(offer)
+    
+    if not results:
+        await message.answer(
+            f"🔍 {'Ничего не найдено по запросу' if lang == 'ru' else 'Topilmadi'}: <b>{query}</b>",
+            parse_mode="HTML",
+        )
+        return
+    
+    # Show results
+    text = f"🔍 {'Результаты поиска' if lang == 'ru' else 'Qidiruv natijalari'}: <b>{query}</b>\n"
+    text += f"{'Найдено' if lang == 'ru' else 'Topildi'}: {len(results)}\n\n"
+    
+    nav_kb = InlineKeyboardBuilder()
+    
+    for offer in results[:10]:
+        offer_id = get_offer_field(offer, "offer_id")
+        offer_title = get_offer_field(offer, "title", "Товар")[:25]
+        price = get_offer_field(offer, "discount_price", 0)
+        qty = get_offer_field(offer, "quantity", 0)
+        status = get_offer_field(offer, "status", "active")
+        
+        status_icon = "✅" if status == "active" else "❌"
+        
+        text += f"{status_icon} <b>{offer_title}</b>\n"
+        text += f"   💰 {price:,} | 📦 {qty} шт\n"
+        
+        nav_kb.button(text=f"📝 {offer_title[:15]}", callback_data=f"edit_offer_{offer_id}")
+    
+    nav_kb.button(text="🔙 Назад" if lang == "ru" else "🔙 Orqaga", callback_data="back_to_offers_menu")
+    nav_kb.adjust(2, 1)
+    
+    await message.answer(text, parse_mode="HTML", reply_markup=nav_kb.as_markup())
 
 
 @router.callback_query(F.data.startswith("qty_add_"))
