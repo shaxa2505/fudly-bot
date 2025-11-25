@@ -10,8 +10,9 @@ from aiogram.fsm.context import FSMContext
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
 from database_protocol import DatabaseProtocol
-from handlers.common_states.states import CreateOffer
+from handlers.common.states import CreateOffer
 from app.keyboards import cancel_keyboard, main_menu_seller
+from app.core.utils import get_store_field
 from localization import get_text
 from logging_config import logger
 
@@ -27,19 +28,6 @@ def setup_dependencies(database: DatabaseProtocol, bot_instance: Any) -> None:
     global db, bot
     db = database
     bot = bot_instance
-
-
-def get_store_field(store: Any, field: str, default: Any = None) -> Any:
-    """Extract field from store tuple/dict."""
-    if isinstance(store, dict):
-        return store.get(field, default)
-    # For tuple, need index mapping
-    if isinstance(store, (tuple, list)):
-        field_map = {"store_id": 0, "owner_id": 1, "name": 2, "city": 4, "status": 6}
-        idx = field_map.get(field)
-        if idx is not None and idx < len(store):
-            return store[idx]
-    return default
 
 
 def detect_category(title: str) -> str:

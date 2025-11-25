@@ -8,7 +8,7 @@ from aiogram.fsm.context import FSMContext
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
 from database_protocol import DatabaseProtocol
-from handlers.common_states.states import ChangeCity, RegisterStore
+from handlers.common.states import ChangeCity, RegisterStore
 from app.keyboards import (
     city_keyboard,
     city_inline_keyboard,
@@ -17,6 +17,7 @@ from app.keyboards import (
     main_menu_seller,
     settings_keyboard,
 )
+from app.core.utils import get_store_field
 from localization import get_text
 from logging_config import logger
 
@@ -36,24 +37,6 @@ def setup_dependencies(
     db = database
     bot = bot_instance
     user_view_mode = view_mode_dict
-
-
-def get_store_field(store: Any, field: str, default: Any = None) -> Any:
-    """Extract field from store tuple/dict."""
-    if isinstance(store, dict):
-        return store.get(field, default)
-    field_map = {
-        "store_id": 0,
-        "user_id": 1,
-        "name": 2,
-        "city": 3,
-        "address": 4,
-        "status": 5,
-    }
-    idx = field_map.get(field)
-    if idx is not None and isinstance(store, (tuple, list)) and idx < len(store):
-        return store[idx]
-    return default
 
 
 def get_appropriate_menu(user_id: int, lang: str) -> Any:

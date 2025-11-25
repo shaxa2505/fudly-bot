@@ -42,8 +42,8 @@ from app.services.admin_service import AdminService
 from app.services.offer_service import OfferService
 from app.middlewares.db_middleware import DbSessionMiddleware
 
-# Import states from handlers.common_states package
-from handlers.common_states import (
+# Import states from handlers.common.states
+from handlers.common.states import (
     BookOffer,
     BrowseOffers,
     BulkCreate,
@@ -105,7 +105,7 @@ offer_service = OfferService(db, cache)
 admin_service = AdminService(db, bool(DATABASE_URL))
 
 # Import search handler
-from handlers import search as search_handler
+from handlers.customer.offers import search as search_handler
 search_handler.setup(dp, db, offer_service)
 
 # Initialize metrics dictionary
@@ -272,10 +272,10 @@ async def catch_all_callbacks(callback: types.CallbackQuery):
 # Register modular handlers from handlers package
 # ============== PHASE 3: EXTRACTED HANDLERS INTEGRATION ==============
 # Import extracted handler modules (FIRST - for router registration priority)
-from handlers import bookings, orders, partner, common_user
-from handlers import user_features
-from handlers.seller import create_offer, management, analytics, order_management, bulk_import
-from handlers.user import profile, favorites
+from handlers import bookings
+from handlers.customer import menu as customer_menu, features as user_features, profile, favorites
+from handlers.customer.orders import delivery as orders
+from handlers.seller import create_offer, management, analytics, order_management, bulk_import, registration as partner
 from handlers.admin import dashboard as admin_dashboard, legacy as admin_legacy
 
 # Setup dependencies for extracted handlers
@@ -289,7 +289,7 @@ bulk_import.setup_dependencies(db, bot)  # Bulk import dependencies
 profile.setup_dependencies(db, bot, user_view_mode)
 favorites.setup_dependencies(db, bot, user_view_mode)
 order_management.setup(bot, db)
-common_user.setup(bot, db, user_view_mode, get_text, main_menu_customer, booking_filters_keyboard, main_menu_seller)
+customer_menu.setup(bot, db, user_view_mode, get_text, main_menu_customer, booking_filters_keyboard, main_menu_seller)
 # Setup user feature handlers (cart, favorites, settings)
 user_features.setup(dp, db, get_text, booking_filters_keyboard, settings_keyboard)
 admin_dashboard.setup(bot, db, get_text, moderation_keyboard, get_uzb_time)
@@ -300,10 +300,10 @@ dp.include_router(bulk_import.router)  # Seller: 📦 Массовый импо�
 dp.include_router(profile.router)  # User profile
 dp.include_router(favorites.router)  # User favorites
 dp.include_router(create_offer.router)  # Seller: ➕ Добавить
-dp.include_router(management.router)  # Seller: 📦 Мои товары (BEFORE common_user to catch seller orders first)
+dp.include_router(management.router)  # Seller: 📦 Мои товары (BEFORE customer_menu to catch seller orders first)
 dp.include_router(analytics.router)  # Seller: 📊 Аналитика
 dp.include_router(order_management.router)  # Seller: order operations
-dp.include_router(common_user.router)  # Common user operations (AFTER management so sellers are handled first)
+dp.include_router(customer_menu.router)  # Customer menu operations (AFTER management so sellers are handled first)
 dp.include_router(orders.router)  # Orders: 🎫 Заказы
 dp.include_router(bookings.router)  # Bookings and ratings
 dp.include_router(partner.router)  # Partner registration
@@ -311,19 +311,22 @@ dp.include_router(admin_dashboard.router)  # Admin dashboard
 dp.include_router(admin_legacy.router)  # Admin legacy
 
 # ============== REGISTRATION & COMMANDS (AFTER SPECIFIC ROUTERS) ==============
-from handlers import registration, user_commands, admin_panel, admin_stats, offers, help as help_handler
+from handlers.customer.offers import browse as offers
+from handlers.common import registration, commands as user_commands, help as help_handler
+from handlers.admin import panel as admin_panel, stats as admin_stats
 
 # Include routers for refactored modules
 dp.include_router(registration.router)
 dp.include_router(user_commands.router)
-dp.include_router(admin_panel.router)
+dp.include_router(admin_panel.router)  # Admin panel from new location
+dp.include_router(admin_stats.router)  # Admin stats from new location
 dp.include_router(help_handler.router)
 
 # Setup offer browsing handlers (AFTER specific handlers to avoid catching their messages)
 offers.setup(dp, db, offer_service, logger)
 
-# Setup admin statistics handlers
-admin_stats.setup(dp, admin_service, logger)
+# Setup admin statistics dependencies
+admin_stats.setup(admin_service, logger)
 
 # Register middlewares
 # 1. Rate limiting (FIRST - before any processing)

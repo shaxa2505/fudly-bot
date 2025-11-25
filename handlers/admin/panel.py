@@ -1,5 +1,6 @@
 """
-Admin panel handlers
+Admin panel handlers - main admin interface.
+
 Note: This module contains the main admin handlers. Additional admin handlers  
 remain in bot.py and can be migrated here incrementally.
 """
@@ -12,14 +13,9 @@ from localization import get_text
 from app.keyboards import admin_menu
 from handlers.common import get_uzb_time
 
-router = Router()
+router = Router(name='admin_panel')
 
 
-def setup(dp_or_router, db, get_text, admin_menu):
-    """Setup admin handlers with dependencies"""
-    # Kept for backward compatibility
-    pass
-    
 @router.message(Command("admin"))
 async def cmd_admin(message: types.Message, db: DatabaseProtocol):
     lang = db.get_user_language(message.from_user.id)
@@ -35,9 +31,10 @@ async def cmd_admin(message: types.Message, db: DatabaseProtocol):
         reply_markup=admin_menu()
     )
 
+
 @router.message(F.text == "📊 Dashboard")
 async def admin_dashboard(message: types.Message, db: DatabaseProtocol):
-    """Main panel with general statistics and quick actions"""
+    """Main panel with general statistics and quick actions."""
     if not db.is_admin(message.from_user.id):
         return
     
@@ -131,9 +128,10 @@ async def admin_dashboard(message: types.Message, db: DatabaseProtocol):
     
     await message.answer(text, parse_mode="HTML", reply_markup=kb.as_markup())
 
+
 @router.message(F.text == "🔙 Выход")
 async def admin_exit(message: types.Message, db: DatabaseProtocol):
-    """Exit admin panel"""
+    """Exit admin panel."""
     if not db.is_admin(message.from_user.id):
         return
     
@@ -155,7 +153,7 @@ async def admin_exit(message: types.Message, db: DatabaseProtocol):
 
 @router.message(Command("load_test_data"))
 async def load_test_data(message: types.Message, db: DatabaseProtocol):
-    """Load test products into database"""
+    """Load test products into database."""
     if not db.is_admin(message.from_user.id):
         await message.answer("⛔ Доступ запрещен")
         return
@@ -165,7 +163,7 @@ async def load_test_data(message: types.Message, db: DatabaseProtocol):
     from datetime import datetime, timedelta
     import random
     
-    # Sample product data (subset for faster loading)
+    # Sample product data
     PRODUCTS = [
         # Bakery
         ("Хлеб белый", "Свежий белый хлеб", 5000, 4000, "bakery", "шт"),
@@ -237,7 +235,6 @@ async def load_test_data(message: types.Message, db: DatabaseProtocol):
         try:
             quantity = random.randint(10, 50)
             days_ahead = random.randint(3, 7)
-            # Use YYYY-MM-DD format for PostgreSQL compatibility
             expiry_date = (today + timedelta(days=days_ahead)).strftime("%Y-%m-%d")
             
             offer_id = db.add_offer(

@@ -143,6 +143,75 @@ def get_offer_field(offer: Any, field_name: str, default: Any = None) -> Any:
     return default
 
 
+def get_booking_field(booking: Any, field_name: str, default: Any = None) -> Any:
+    """Safely extract field from booking (dict or tuple)."""
+    if not booking:
+        return default
+    
+    # Try dict-like access first
+    try:
+        return booking[field_name]
+    except (KeyError, TypeError, IndexError):
+        pass
+    
+    if isinstance(booking, Mapping):
+        return booking.get(field_name, default)
+    
+    field_map = {
+        "booking_id": 0,
+        "offer_id": 1,
+        "user_id": 2,
+        "store_id": 3,
+        "pickup_address": 4,
+        "status": 5,
+        "quantity": 6,
+        "total_price": 7,
+        "code": 8,
+        "booking_code": 8,
+        "created_at": 9,
+        "completed_at": 10,
+        "cancelled_at": 11,
+    }
+    idx = field_map.get(field_name)
+    if idx is not None and isinstance(booking, (tuple, list)) and len(booking) > idx:
+        return booking[idx]
+    return default
+
+
+def get_order_field(order: Any, field_name: str, default: Any = None) -> Any:
+    """Safely extract field from order (dict or tuple)."""
+    if not order:
+        return default
+    
+    # Try dict-like access first
+    try:
+        return order[field_name]
+    except (KeyError, TypeError, IndexError):
+        pass
+    
+    if isinstance(order, Mapping):
+        return order.get(field_name, default)
+    
+    field_map = {
+        "order_id": 0,
+        "user_id": 1,
+        "store_id": 2,
+        "offer_id": 3,
+        "quantity": 4,
+        "total_price": 5,
+        "order_type": 6,
+        "delivery_address": 7,
+        "delivery_price": 8,
+        "payment_method": 9,
+        "order_status": 10,
+        "payment_status": 11,
+        "created_at": 12,
+    }
+    idx = field_map.get(field_name)
+    if idx is not None and isinstance(order, (tuple, list)) and len(order) > idx:
+        return order[idx]
+    return default
+
 
 def normalize_city(city: str) -> str:
     """Convert Uzbek city name to Russian representation used in DB."""

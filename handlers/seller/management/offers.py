@@ -10,7 +10,7 @@ from aiogram import F, Router, types
 from aiogram.fsm.context import FSMContext
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
-from handlers.common_states.states import EditOffer
+from handlers.common.states import EditOffer
 from app.keyboards import main_menu_seller
 from localization import get_text
 from logging_config import logger

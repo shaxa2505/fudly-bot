@@ -1,50 +1,33 @@
 """
-User command handlers (start, language selection, city selection, cancel actions)
+User command handlers (start, language selection, city selection, cancel actions).
 """
 from typing import Optional, Any, Callable
-from database_protocol import DatabaseProtocol
 from aiogram import types, Router, F
 from aiogram.filters import Command
 from aiogram.fsm.context import FSMContext
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
+from database_protocol import DatabaseProtocol
 from localization import get_text, get_cities
 from app.keyboards import city_keyboard, main_menu_seller, main_menu_customer, language_keyboard, phone_request_keyboard
-from handlers.common import user_view_mode, has_approved_store
-from handlers.common_states.states import Registration
+from handlers.common.utils import user_view_mode, has_approved_store
+from handlers.common.states import Registration
 
-router = Router()
+router = Router(name='commands')
 
 
-def setup(
-    dp_or_router: Any,
-    db: DatabaseProtocol,
-    get_text: Callable[..., str],
-    get_cities: Callable[[str], Any],
-    city_keyboard: Callable[[str], Any],
-    language_keyboard: Callable[[], Any],
-    phone_request_keyboard: Callable[[str], Any],
-    main_menu_seller: Callable[[str], Any],
-    main_menu_customer: Callable[[str], Any]
-) -> None:
-    """Setup user command handlers with dependencies"""
-    # Kept for backward compatibility
-    pass
-    
 @router.message(F.text.in_([get_text('ru', 'my_city'), get_text('uz', 'my_city')]))
 async def change_city(message: types.Message, state: Optional[FSMContext] = None, db: DatabaseProtocol = None):
-    # db is injected via middleware, but we type hint it as optional to satisfy linter if needed, 
-    # though middleware guarantees it.
-    if not db: return # Should not happen with middleware
+    if not db:
+        return
     
-    user_id = message.from_user.id  # type: ignore[union-attr]  # type: ignore[union-attr]
+    user_id = message.from_user.id
     lang = db.get_user_language(user_id)
     user = db.get_user_model(user_id)
     current_city = user.city if user else get_cities(lang)[0]
     if not current_city:
         current_city = get_cities(lang)[0]
     
-    # Get city statistics
     stats_text = ""
     try:
         stores_count = len(db.get_stores_by_city(current_city))
@@ -53,7 +36,6 @@ async def change_city(message: types.Message, state: Optional[FSMContext] = None
     except:
         pass
     
-    # Create inline keyboard with buttons
     builder = InlineKeyboardBuilder()
     builder.button(
         text="✏️ Изменить город" if lang == 'ru' else "✏️ Shaharni o'zgartirish",
@@ -71,54 +53,51 @@ async def change_city(message: types.Message, state: Optional[FSMContext] = None
         parse_mode="HTML"
     )
 
+
 @router.callback_query(F.data == "change_city")
 async def show_city_selection(callback: types.CallbackQuery, state: FSMContext, db: DatabaseProtocol):
-    """Show list of cities for selection"""
+    """Show list of cities for selection."""
     lang = db.get_user_language(callback.from_user.id)
-    await callback.message.edit_text(  # type: ignore[union-attr]
+    await callback.message.edit_text(
         get_text(lang, 'choose_city'),
         reply_markup=city_keyboard(lang)
     )
 
+
 @router.callback_query(F.data == "back_to_menu")
 async def back_to_main_menu(callback: types.CallbackQuery, db: DatabaseProtocol):
-    """Return to main menu"""
+    """Return to main menu."""
     lang = db.get_user_language(callback.from_user.id)
     user = db.get_user_model(callback.from_user.id)
     user_role = user.role if user else 'customer'
     
-    # Initialize user_view_mode for sellers
     if user_view_mode is not None and user_role == 'seller':
-        # If not set, default to seller mode for sellers
         if callback.from_user.id not in user_view_mode:
             user_view_mode[callback.from_user.id] = 'seller'
     
     menu = main_menu_seller(lang) if user_role == "seller" else main_menu_customer(lang)
     
-    await callback.message.delete()  # type: ignore[union-attr]
-    await callback.message.answer(  # type: ignore[union-attr]
+    await callback.message.delete()
+    await callback.message.answer(
         get_text(lang, 'main_menu') if 'main_menu' in dir() else "Главное меню",
         reply_markup=menu
     )
     await callback.answer()
 
+
 @router.message(F.text.in_(get_cities('ru') + get_cities('uz')))
 async def change_city_text(message: types.Message, state: Optional[FSMContext] = None, db: DatabaseProtocol = None):
-    """Quick city change handler (without FSM state)"""
-    if not db: return
+    """Quick city change handler (without FSM state)."""
+    if not db:
+        return
     
     user_id = message.from_user.id
     lang = db.get_user_language(user_id)
     user = db.get_user_model(user_id)
-    
-    # Determine if text is a valid city
     new_city = message.text
-    # Normalize if needed (simple check here)
     
-    # Update city
     db.update_user_city(user_id, new_city)
     
-    # Show confirmation and menu
     user_role = user.role or 'customer' if user else 'customer'
     menu = main_menu_seller(lang) if user_role == "seller" else main_menu_customer(lang)
     
@@ -128,12 +107,12 @@ async def change_city_text(message: types.Message, state: Optional[FSMContext] =
         reply_markup=menu
     )
 
+
 @router.message(Command("start"))
 async def cmd_start(message: types.Message, state: FSMContext, db: DatabaseProtocol):
-    user = db.get_user_model(message.from_user.id)  # type: ignore[union-attr]
+    user = db.get_user_model(message.from_user.id)
     
     if not user:
-        # New user - show welcome message + language selection
         await message.answer(
             get_text('ru', 'welcome'),
             parse_mode="HTML"
@@ -145,14 +124,10 @@ async def cmd_start(message: types.Message, state: FSMContext, db: DatabaseProto
         return
     
     lang = db.get_user_language(message.from_user.id)
-    
-    # Both backends now return dict
-    # Extract user data to check if already registered
     user_phone = user.phone
     user_city = user.city
     user_role = user.role or 'customer'
     
-    # Check phone (city will be set automatically with phone)
     if not user_phone:
         await message.answer(
             get_text(lang, 'welcome_phone_step'),
@@ -162,35 +137,27 @@ async def cmd_start(message: types.Message, state: FSMContext, db: DatabaseProto
         await state.set_state(Registration.phone)
         return
     
-    # Initialize user_view_mode based on user role
-    # This is handled in bot.py - user_view_mode dict is shared
-    # Set default mode based on role
     if user_view_mode is not None and user_role == 'seller':
-        # If user is seller, default to seller mode
         user_view_mode[message.from_user.id] = 'seller'
     
-    # Welcome message
     menu = main_menu_seller(lang) if user_role == "seller" else main_menu_customer(lang)
     await message.answer(
-        get_text(lang, 'welcome_back', name=message.from_user.first_name, city=user_city or 'Ташкент'),  # type: ignore[union-attr]
+        get_text(lang, 'welcome_back', name=message.from_user.first_name, city=user_city or 'Ташкент'),
         parse_mode="HTML",
         reply_markup=menu
     )
 
+
 @router.callback_query(F.data.startswith("lang_"))
 async def choose_language(callback: types.CallbackQuery, state: FSMContext, db: DatabaseProtocol):
-    lang = callback.data.split("_")[1]  # type: ignore[union-attr]
-    
-    # Show menu after language selection
+    lang = callback.data.split("_")[1]
     user = db.get_user_model(callback.from_user.id)
     
-    # CHECK: if user is not in DB (new user)
     if not user:
-        # Create new user WITH selected language
         db.add_user(callback.from_user.id, callback.from_user.username, callback.from_user.first_name)
         db.update_user_language(callback.from_user.id, lang)
-        await callback.message.edit_text(get_text(lang, 'language_changed'))  # type: ignore[union-attr]
-        await callback.message.answer(  # type: ignore[union-attr]
+        await callback.message.edit_text(get_text(lang, 'language_changed'))
+        await callback.message.answer(
             get_text(lang, 'welcome_phone_step'),
             parse_mode="HTML",
             reply_markup=phone_request_keyboard(lang)
@@ -198,15 +165,12 @@ async def choose_language(callback: types.CallbackQuery, state: FSMContext, db: 
         await state.set_state(Registration.phone)
         return
     
-    # If user already exists — just update language
     db.update_user_language(callback.from_user.id, lang)
     await callback.message.edit_text(get_text(lang, 'language_changed'))
     
-    # Extract user data
     user_phone = user.phone
     user_city = user.city
     
-    # If no phone - request it (city will be set automatically)
     if not user_phone:
         await callback.message.answer(
             get_text(lang, 'welcome_phone_step'),
@@ -216,8 +180,7 @@ async def choose_language(callback: types.CallbackQuery, state: FSMContext, db: 
         await state.set_state(Registration.phone)
         return
     
-    # Show main menu
-    user_role = user.role or 'customer' if user else 'customer'
+    user_role = user.role or 'customer'
     menu = main_menu_seller(lang) if user_role == "seller" else main_menu_customer(lang)
     await callback.message.answer(
         get_text(lang, 'welcome_back', name=callback.from_user.first_name, city=user_city or 'Ташкент'),
@@ -225,15 +188,14 @@ async def choose_language(callback: types.CallbackQuery, state: FSMContext, db: 
         reply_markup=menu
     )
 
+
 @router.message(F.text.contains("Отмена") | F.text.contains("Bekor qilish"))
 async def cancel_action(message: types.Message, state: FSMContext, db: DatabaseProtocol):
     lang = db.get_user_language(message.from_user.id)
     current_state = await state.get_state()
     
-    # BLOCK cancellation of mandatory registration
     if current_state in ['Registration:phone', 'Registration:city']:
-        user = db.get_user_model(message.from_user.id)  # type: ignore[union-attr]
-        # If no phone number — registration is mandatory, cancellation prohibited
+        user = db.get_user_model(message.from_user.id)
         user_phone = user.phone if user else None
         if not user or not user_phone:
             await message.answer(
@@ -243,10 +205,8 @@ async def cancel_action(message: types.Message, state: FSMContext, db: DatabaseP
             )
             return
     
-    # For all other states — allow cancellation
     await state.clear()
 
-    # Map state group to preferred menu context
     seller_groups = {"RegisterStore", "CreateOffer", "BulkCreate", "ConfirmOrder"}
     customer_groups = {"Registration", "BookOffer", "ChangeCity"}
 
@@ -264,25 +224,18 @@ async def cancel_action(message: types.Message, state: FSMContext, db: DatabaseP
     user = db.get_user_model(message.from_user.id)
     role = user.role if user else 'customer'
     
-    # CRITICAL: When cancelling RegisterStore ALWAYS return to customer menu
-    # because user does NOT YET have an approved store
     if current_state and str(current_state).startswith("RegisterStore"):
-        # Cancel store registration - return to customer menu
         await message.answer(
             get_text(lang, 'operation_cancelled'),
             reply_markup=main_menu_customer(lang)
         )
         return
     
-    # IMPORTANT: Check for approved store for partners
     if role == "seller":
-        # Use ready function has_approved_store for checking
         if not has_approved_store(message.from_user.id, db):
-            # No approved store — show customer menu
             role = "customer"
             preferred_menu = "customer"
     
-    # View mode override has priority if set
     view_override = user_view_mode.get(message.from_user.id)
     target = preferred_menu or view_override or ("seller" if role == "seller" else "customer")
     menu = main_menu_seller(lang) if target == "seller" else main_menu_customer(lang)
@@ -292,9 +245,10 @@ async def cancel_action(message: types.Message, state: FSMContext, db: DatabaseP
         reply_markup=menu
     )
 
+
 @router.callback_query(F.data == "cancel_offer")
 async def cancel_offer_callback(callback: types.CallbackQuery, state: FSMContext, db: DatabaseProtocol):
-    """Handler for offer creation cancel button"""
+    """Handler for offer creation cancel button."""
     lang = db.get_user_language(callback.from_user.id)
     await state.clear()
     

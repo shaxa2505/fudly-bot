@@ -10,7 +10,7 @@ from app.keyboards import main_menu_customer, search_cancel_keyboard, offer_quic
 from app.services.offer_service import OfferService
 from app.templates.offers import render_offer_card
 from database_protocol import DatabaseProtocol
-from handlers.common_states.states import Search, BrowseOffers
+from handlers.common.states import Search, BrowseOffers
 from aiogram.fsm.context import FSMContext
 from localization import get_text
 

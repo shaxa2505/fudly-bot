@@ -12,7 +12,7 @@ from aiogram.utils.keyboard import InlineKeyboardBuilder
 from app.keyboards import cancel_keyboard, main_menu_customer
 from localization import get_text
 from logging_config import logger
-from handlers.common_states.states import BookOffer, OrderDelivery
+from handlers.common.states import BookOffer, OrderDelivery
 
 from .utils import (
     safe_answer_or_send,

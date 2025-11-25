@@ -8,21 +8,13 @@ from aiogram.fsm.context import FSMContext
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
 from database_protocol import DatabaseProtocol
-from handlers.common_states.states import OrderDelivery
+from handlers.common.states import OrderDelivery
 from app.keyboards import cancel_keyboard, main_menu_customer, main_menu_seller
+from app.core.utils import get_store_field, get_offer_field, get_order_field
 from localization import get_text
 from logging_config import logger
 
 router = Router()
-
-
-def get_order_field(order, field: str, index: int):
-    """Helper to get field from order dict or tuple."""
-    if isinstance(order, dict):
-        return order.get(field)
-    if isinstance(order, (list, tuple)) and len(order) > index:
-        return order[index]
-    return None
 
 
 def setup_dependencies(
@@ -40,76 +32,8 @@ def can_proceed(user_id: int, action: str) -> bool:
     return True
 
 
-def get_store_field(store: Any, field: str, default: Any = None) -> Any:
-    """Extract field from store tuple/dict."""
-    if not store:
-        return default
-        
-    # Try dict-like access first (works for dict and HybridRow)
-    try:
-        return store[field]
-    except (KeyError, TypeError, IndexError):
-        pass
-
-    if isinstance(store, dict):
-        return store.get(field, default)
-    field_map = {
-        "store_id": 0,
-        "owner_id": 1,
-        "name": 2,
-        "city": 3,
-        "address": 4,
-        "description": 5,
-        "status": 6,
-        "category": 7,
-        "phone": 8,
-        "rating": 9,
-        "delivery_enabled": 10,
-        "delivery_price": 11,
-        "min_order_amount": 12,
-    }
-    idx = field_map.get(field)
-    if idx is not None and isinstance(store, (tuple, list)) and idx < len(store):
-        return store[idx]
-    return default
-
-
-def get_offer_field(offer: Any, field: str, default: Any = None) -> Any:
-    """Extract field from offer tuple/dict."""
-    if not offer:
-        return default
-        
-    # Try dict-like access first (works for dict and HybridRow)
-    try:
-        return offer[field]
-    except (KeyError, TypeError, IndexError):
-        pass
-
-    if isinstance(offer, dict):
-        return offer.get(field, default)
-    field_map = {
-        "offer_id": 0,
-        "store_id": 1,
-        "title": 2,
-        "description": 3,
-        "original_price": 4,
-        "discount_price": 5,
-        "quantity": 6,
-        "available_from": 7,
-        "available_until": 8,
-        "expiry_date": 9,
-        "status": 10,
-        "photo": 11,
-    }
-    idx = field_map.get(field)
-    if idx is not None and isinstance(offer, (tuple, list)) and idx < len(offer):
-        return offer[idx]
-    return default
-
-
 def get_appropriate_menu(user_id: int, lang: str) -> Any:
     """Get appropriate menu based on user view mode."""
-    # TODO: Inject user_view_mode properly
     from handlers.common import user_view_mode
     if user_view_mode and user_view_mode.get(user_id) == "seller":
         return main_menu_seller(lang)
@@ -547,21 +471,21 @@ async def confirm_payment(callback: types.CallbackQuery, db: DatabaseProtocol, b
         caption=callback.message.caption + f"\n\n✅ {payment_confirmed_text}"
     )
 
-    customer_lang = db.get_user_language(get_order_field(order, 'user_id', 1))
+    customer_lang = db.get_user_language(get_order_field(order, 'user_id'))
     confirmed_ru = "Оплата подтверждена!"
     confirmed_uz = "To'lov tasdiqlandi!"
     prep_ru = "Магазин начинает подготовку вашего заказа"
     prep_uz = "Do'kon buyurtmangizni tayyorlaydi"
     try:
         await bot.send_message(
-            get_order_field(order, 'user_id', 1),
+            get_order_field(order, 'user_id'),
             f"✅ <b>{confirmed_ru if customer_lang == 'ru' else confirmed_uz}</b>\n\n"
             f"📦 {'Заказ' if customer_lang == 'ru' else 'Buyurtma'} #{order_id}\n"
             f"{prep_ru if customer_lang == 'ru' else prep_uz}",
             parse_mode="HTML",
         )
     except Exception as e:
-        logger.error(f"Failed to notify customer {get_order_field(order, 'user_id', 1)}: {e}")
+        logger.error(f"Failed to notify customer {get_order_field(order, 'user_id')}: {e}")
 
     await callback.answer()
 
@@ -597,16 +521,16 @@ async def reject_payment(callback: types.CallbackQuery, db: DatabaseProtocol, bo
     def get_order_field(o, field, index):
         return o.get(field) if isinstance(o, dict) else (o[index] if len(o) > index else None)
     
-    offer_id = get_order_field(order, 'offer_id', 3)
-    quantity = get_order_field(order, 'quantity', 4)
+    offer_id = get_order_field(order, 'offer_id')
+    quantity = get_order_field(order, 'quantity')
     offer = db.get_offer(offer_id)
     if offer:
         try:
             db.increment_offer_quantity_atomic(offer_id, int(quantity))
         except Exception as e:
             logger.error(f"Failed to restore quantity for offer {offer_id}: {e}")
-    offer_id = get_order_field(order, 'offer_id', 3)
-    quantity = get_order_field(order, 'quantity', 4)
+    offer_id = get_order_field(order, 'offer_id')
+    quantity = get_order_field(order, 'quantity')
     offer = db.get_offer(offer_id)
     if offer:
         try:
@@ -623,7 +547,7 @@ async def reject_payment(callback: types.CallbackQuery, db: DatabaseProtocol, bo
         caption=callback.message.caption + f"\n\n❌ {payment_rejected_text}"
     )
 
-    customer_lang = db.get_user_language(get_order_field(order, 'user_id', 1))
+    customer_lang = db.get_user_language(get_order_field(order, 'user_id'))
     reject_title_ru = "Оплата не подтверждена"
     reject_title_uz = "To'lov tasdiqlanmadi"
     reject_msg_ru = "Магазин не смог подтвердить вашу оплату. Заказ отменён."
@@ -632,7 +556,7 @@ async def reject_payment(callback: types.CallbackQuery, db: DatabaseProtocol, bo
     reject_note_uz = "Iltimos, o'tkazma to'g'riligini tekshiring yoki do'kon bilan bog'laning"
     try:
         await bot.send_message(
-            get_order_field(order, 'user_id', 1),
+            get_order_field(order, 'user_id'),
             f"❌ <b>{reject_title_ru if customer_lang == 'ru' else reject_title_uz}</b>\n\n"
             f"📦 {'Заказ' if customer_lang == 'ru' else 'Buyurtma'} #{order_id}\n"
             f"{reject_msg_ru if customer_lang == 'ru' else reject_msg_uz}\n"
@@ -640,116 +564,14 @@ async def reject_payment(callback: types.CallbackQuery, db: DatabaseProtocol, bo
             parse_mode="HTML",
         )
     except Exception as e:
-        logger.error(f"Failed to notify customer {get_order_field(order, 'user_id', 1)}: {e}")
+        logger.error(f"Failed to notify customer {get_order_field(order, 'user_id')}: {e}")
 
     await callback.answer()
 
 
-@router.callback_query(F.data.startswith("confirm_order_"))
-async def confirm_order(callback: types.CallbackQuery, db: DatabaseProtocol, bot: Any) -> None:
-    """Confirm order by seller."""
-    if not db or not bot:
-        await callback.answer("System error")
-        return
-
-    lang = db.get_user_language(callback.from_user.id)
-    
-    try:
-        order_id = int(callback.data.split("_")[2])
-    except (ValueError, IndexError) as e:
-        logger.error(f"Invalid order_id in callback data: {callback.data}, error: {e}")
-        await callback.answer(get_text(lang, "error"), show_alert=True)
-        return
-
-    order = db.get_order(order_id)
-    if not order:
-        await callback.answer(
-            "❌ " + ("Заказ не найден" if lang == "ru" else "Buyurtma topilmadi"),
-            show_alert=True,
-        )
-        return
-
-    db.update_order_status(order_id, "confirmed")
-
-    await callback.message.edit_text(
-        callback.message.text
-        + f"\n\n✅ {'Заказ подтверждён!' if lang == 'ru' else 'Buyurtma tasdiqlandi!'}"
-    )
-
-    customer_lang = db.get_user_language(get_order_field(order, 'user_id', 1))
-    order_confirmed_ru = "Заказ подтверждён!"
-    order_confirmed_uz = "Buyurtma tasdiqlandi!"
-    prep_msg_ru = "Магазин начинает подготовку вашего заказа"
-    prep_msg_uz = "Do'kon buyurtmangizni tayyorlaydi"
-    try:
-        await bot.send_message(
-            get_order_field(order, 'user_id', 1),
-            f"✅ <b>{order_confirmed_ru if customer_lang == 'ru' else order_confirmed_uz}</b>\n\n"
-            f"📦 {'Заказ' if customer_lang == 'ru' else 'Buyurtma'} #{order_id}\n"
-            f"{prep_msg_ru if customer_lang == 'ru' else prep_msg_uz}",
-            parse_mode="HTML",
-        )
-    except Exception as e:
-        logger.error(f"Failed to notify customer {get_order_field(order, 'user_id', 1)}: {e}")
-
-    await callback.answer()
-
-
-@router.callback_query(F.data.startswith("cancel_order_"))
-async def cancel_order(callback: types.CallbackQuery, db: DatabaseProtocol, bot: Any) -> None:
-    """Cancel order by seller."""
-    if not db or not bot:
-        await callback.answer("System error")
-        return
-
-    lang = db.get_user_language(callback.from_user.id)
-    
-    try:
-        order_id = int(callback.data.split("_")[2])
-    except (ValueError, IndexError) as e:
-        logger.error(f"Invalid order_id in callback data: {callback.data}, error: {e}")
-        await callback.answer(get_text(lang, "error"), show_alert=True)
-        return
-
-    order = db.get_order(order_id)
-    if not order:
-        await callback.answer(
-            "❌ " + ("Заказ не найден" if lang == "ru" else "Buyurtma topilmadi"),
-            show_alert=True,
-        )
-        return
-
-    db.update_order_status(order_id, "cancelled")
-
-    offer = db.get_offer(order[3])
-    if offer:
-        try:
-            db.increment_offer_quantity_atomic(order[3], int(order[4]))
-        except Exception as e:
-            logger.error(f"Failed to restore quantity for offer {order[3]}: {e}")
-
-    await callback.message.edit_text(
-        callback.message.text
-        + f"\n\n❌ {'Заказ отменён' if lang == 'ru' else 'Buyurtma bekor qilindi'}"
-    )
-
-    customer_lang = db.get_user_language(get_order_field(order, 'user_id', 1))
-    cancel_ru = "Заказ отменён"
-    cancel_uz = "Buyurtma bekor qilindi"
-    cancel_msg_ru = "К сожалению, магазин отменил ваш заказ"
-    cancel_msg_uz = "Afsuski, do'kon buyurtmangizni bekor qildi"
-    try:
-        await bot.send_message(
-            get_order_field(order, 'user_id', 1),
-            f"❌ <b>{cancel_ru if customer_lang == 'ru' else cancel_uz}</b>\n\n"
-            f"📦 {'Заказ' if customer_lang == 'ru' else 'Buyurtma'} #{order_id}\n"
-            f"{cancel_msg_ru if customer_lang == 'ru' else cancel_msg_uz}",
-            parse_mode="HTML",
-        )
-    except Exception as e:
-        logger.error(f"Failed to notify customer {get_order_field(order, 'user_id', 1)}: {e}")
-
-    await callback.answer()
+# NOTE: confirm_order_ and cancel_order_ handlers removed - they are handled by
+# handlers/seller/order_management.py which is registered before this router.
+# Only cancel_order_customer_ (for customers) remains here.
 
 
 @router.callback_query(F.data.startswith("cancel_order_customer_"))
@@ -776,7 +598,7 @@ async def cancel_order_customer(callback: types.CallbackQuery, db: DatabaseProto
         )
         return
 
-    if get_order_field(order, 'user_id', 1) != callback.from_user.id:
+    if get_order_field(order, 'user_id') != callback.from_user.id:
         await callback.answer(
             "❌ "
             + (
@@ -792,7 +614,7 @@ async def cancel_order_customer(callback: types.CallbackQuery, db: DatabaseProto
     def get_order_field(o, field, index):
         return o.get(field) if isinstance(o, dict) else (o[index] if len(o) > index else None)
     
-    order_status = get_order_field(order, 'order_status', 10)
+    order_status = get_order_field(order, 'order_status')
     if order_status not in ["pending", "confirmed"]:
         await callback.answer(
             "❌ "
@@ -807,8 +629,8 @@ async def cancel_order_customer(callback: types.CallbackQuery, db: DatabaseProto
 
     db.update_order_status(order_id, "cancelled")
 
-    offer_id = get_order_field(order, 'offer_id', 3)
-    quantity = get_order_field(order, 'quantity', 4)
+    offer_id = get_order_field(order, 'offer_id')
+    quantity = get_order_field(order, 'quantity')
     offer = db.get_offer(offer_id)
     if offer:
         try:

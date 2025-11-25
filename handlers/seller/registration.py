@@ -8,7 +8,7 @@ from aiogram import F, Router, types
 from aiogram.fsm.context import FSMContext
 
 from database_protocol import DatabaseProtocol
-from handlers.common_states.states import RegisterStore
+from handlers.common.states import RegisterStore
 from app.keyboards import (
     cancel_keyboard,
     category_keyboard,

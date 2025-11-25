@@ -3,36 +3,44 @@ Handlers package - modular bot handlers using aiogram Router
 
 This package contains modular handlers organized by functionality:
 
-bookings/           - Booking management (modular structure)
-  ├── __init__.py   - Exports router and setup_dependencies
+NEW STRUCTURE (in progress):
+common/             - Common utilities, registration, commands
+  ├── __init__.py   - Exports common_router
   ├── router.py     - Main router combining sub-routers
-  ├── customer.py   - Customer actions (create, view, cancel booking)
-  ├── partner.py    - Partner actions (confirm, reject, complete)
-  └── utils.py      - Shared utilities
+  ├── states.py     - All FSM states (from common_states/)
+  ├── utils.py      - Utilities and middleware (from common.py)
+  ├── registration.py - Registration handlers
+  ├── commands.py   - User commands (/start, language, etc.)
+  └── help.py       - Help handler
 
-orders              - Delivery order management (payment, confirmation)
-partner             - Partner registration and store management
+customer/           - Customer functionality
+  ├── offers/       - Browse, search, favorites
+  ├── bookings/     - Customer bookings
+  ├── orders/       - Delivery orders
+  └── menu.py       - Mode switching
 
 seller/             - Seller functionality
+  ├── bookings/     - Seller booking confirmation
+  ├── management/   - Manage offers
   ├── create_offer  - Create new offers
-  ├── management    - Manage existing offers
   ├── analytics     - Sales analytics
   └── bulk_import   - Mass import offers
-
-user/               - User functionality
-  ├── profile       - User profile management
-  └── favorites     - Favorite stores
 
 admin/              - Admin functionality
   ├── dashboard     - Admin dashboard
   └── legacy        - Legacy admin commands
 
-registration        - User registration (phone, city)
-user_commands       - Basic commands (/start, language, city selection)
+LEGACY STRUCTURE (still in use):
+bookings/           - Booking management (modular)
+orders              - Delivery order management
+partner             - Partner registration
+user/               - User profile, favorites
+registration        - User registration
+user_commands       - Basic commands
 common_user         - Common user operations
 user_features       - User cart, settings
-
-Routers are registered directly in bot.py, not through this package.
 """
 
-# No automatic router registration - each module is imported and registered separately in bot.py
+# Backward compatibility imports from common.py -> common/utils.py
+# This allows existing code to continue using `from handlers import common`
+# or `from handlers.common import user_view_mode`

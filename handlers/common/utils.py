@@ -1,13 +1,17 @@
 """
-Common utilities, state classes, and middleware
+Common utilities, constants and middleware.
 """
-from aiogram import BaseMiddleware
 from datetime import datetime, timedelta, timezone
 from typing import Any, Awaitable, Callable, Dict
 import logging
 
+from aiogram import BaseMiddleware
 from database_protocol import DatabaseProtocol
-from handlers.common_states.states import (
+
+logger = logging.getLogger('fudly')
+
+# Re-export states for backward compatibility
+from handlers.common.states import (
     BookOffer,
     BrowseOffers,
     BulkCreate,
@@ -18,12 +22,12 @@ from handlers.common_states.states import (
     OrderDelivery,
     Registration,
     RegisterStore,
+    Search,
+    Browse,
 )
 
-logger = logging.getLogger('fudly')
-
-# Export states for backward compatibility
 __all__ = [
+    # States
     "Registration",
     "RegisterStore",
     "CreateOffer",
@@ -34,16 +38,21 @@ __all__ = [
     "BookOffer",
     "BrowseOffers",
     "OrderDelivery",
+    "Search",
+    "Browse",
+    # Utils
     "user_view_mode",
     "normalize_city",
     "get_uzb_time",
     "has_approved_store",
     "get_appropriate_menu",
     "RegistrationCheckMiddleware",
+    "UZB_TZ",
+    "CITY_UZ_TO_RU",
 ]
 
 # In-memory per-session view mode override: {'seller'|'customer'}
-user_view_mode = {}
+user_view_mode: Dict[int, str] = {}
 
 # Uzbek city names mapping to Russian
 CITY_UZ_TO_RU = {
@@ -57,24 +66,23 @@ CITY_UZ_TO_RU = {
     "Nukus": "Нукус"
 }
 
-# Uzbek timezone (UTC+5)
+# Uzbekistan timezone (UTC+5)
 UZB_TZ = timezone(timedelta(hours=5))
 
 
 def normalize_city(city: str) -> str:
-    """Convert city name to Russian format for database search"""
+    """Convert city name to Russian format for database search."""
     return CITY_UZ_TO_RU.get(city, city)
 
 
-def get_uzb_time():
-    """Get current time in Uzbek timezone (UTC+5)"""
+def get_uzb_time() -> datetime:
+    """Get current time in Uzbekistan timezone (UTC+5)."""
     return datetime.now(UZB_TZ)
 
 
 def has_approved_store(user_id: int, db: DatabaseProtocol) -> bool:
-    """Check if user has an approved store"""
+    """Check if user has an approved store."""
     stores = db.get_user_stores(user_id)
-    # stores: now unified dict format
     return any(store.get('status') == "active" for store in stores)
 
 
@@ -85,41 +93,31 @@ def get_appropriate_menu(
     main_menu_seller: Callable[[str], Any],
     main_menu_customer: Callable[[str], Any]
 ) -> Any:
-    """Return appropriate menu for user based on their store approval status and current mode"""
+    """Return appropriate menu for user based on their store approval status and current mode."""
     user = db.get_user_model(user_id)
     if not user:
         return main_menu_customer(lang)
     
-    # Both backends now return dict
     role = user.role
-    
-    # Unify roles: store_owner -> seller
     if role == 'store_owner':
         role = 'seller'
     
-    # Check current view mode
     current_mode = user_view_mode.get(user_id, 'customer')
     
-    # If partner - check for approved store
     if role == "seller":
         if has_approved_store(user_id, db):
-            # Seller with approved store
             if current_mode == 'seller':
                 return main_menu_seller(lang)
             else:
-                # In customer mode - show customer menu
                 return main_menu_customer(lang)
         else:
-            # No approved store - show customer menu
             return main_menu_customer(lang)
     
     return main_menu_customer(lang)
 
 
-# ============== MIDDLEWARE: REGISTRATION CHECK ==============
-
 class RegistrationCheckMiddleware(BaseMiddleware):
-    """Check that user is registered (has phone number) before any action"""
+    """Check that user is registered (has phone number) before any action."""
     
     def __init__(
         self,
@@ -138,7 +136,6 @@ class RegistrationCheckMiddleware(BaseMiddleware):
         event: Any,
         data: Dict[str, Any]
     ) -> Any:
-        # Robust attribute access (aiogram runtime object shape)
         msg = getattr(event, 'message', None)
         cb = getattr(event, 'callback_query', None)
         user_id = None
@@ -162,7 +159,6 @@ class RegistrationCheckMiddleware(BaseMiddleware):
 
         allowed_commands = ['/start', '/help']
         allowed_callbacks = ['lang_ru', 'lang_uz']
-        # Allow callback patterns for core functionality (booking, orders, store info)
         allowed_callback_patterns = [
             'book_',
             'order_delivery_',
@@ -183,10 +179,8 @@ class RegistrationCheckMiddleware(BaseMiddleware):
                 return await handler(event, data)
 
         if cb and cb.data:
-            # Allow specific callbacks or callback patterns
             if cb.data in allowed_callbacks:
                 return await handler(event, data)
-            # Allow callback patterns (booking, store info, etc.) even without registration
             if any(cb.data.startswith(pattern) for pattern in allowed_callback_patterns):
                 return await handler(event, data)
 
@@ -197,7 +191,6 @@ class RegistrationCheckMiddleware(BaseMiddleware):
                 return await handler(event, data)
 
         user = self.db.get_user_model(user_id)
-        # Both backends now return dict
         user_phone = user.phone if user else None
         if not user or not user_phone:
             lang = self.db.get_user_language(user_id) if user else 'ru'

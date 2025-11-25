@@ -8,7 +8,7 @@ from aiogram.fsm.context import FSMContext
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
 from database_protocol import DatabaseProtocol
-from handlers.common_states.states import ChangeCity
+from handlers.common.states import ChangeCity
 from app.keyboards import city_keyboard, main_menu_customer, main_menu_seller
 from localization import get_cities, get_text
 from logging_config import logger

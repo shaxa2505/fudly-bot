@@ -8,6 +8,7 @@ from aiogram import F, Router, types
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
 from database_protocol import DatabaseProtocol
+from app.core.utils import get_store_field
 from localization import get_text
 from logging_config import logger
 
@@ -23,23 +24,6 @@ def setup_dependencies(database: DatabaseProtocol, bot_instance: Any) -> None:
     global db, bot
     db = database
     bot = bot_instance
-
-
-def get_store_field(store: Any, field: str, default: Any = None) -> Any:
-    """Extract field from store tuple/dict."""
-    if isinstance(store, dict):
-        return store.get(field, default)
-    field_map = {
-        "store_id": 0,
-        "user_id": 1,
-        "name": 2,
-        "category": 3,
-        "status": 4,
-    }
-    idx = field_map.get(field)
-    if idx is not None and isinstance(store, (tuple, list)) and idx < len(store):
-        return store[idx]
-    return default
 
 
 @router.message(F.text.in_(["📊 Аналитика", "📊 Analitika"]))

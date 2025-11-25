@@ -1,17 +1,13 @@
 """
-Common User Handlers
-Shared functionality like mode switching
+Mode switching handlers - customer/seller mode toggle.
 """
-
 from typing import Any
 from aiogram import Router, F, types
-from aiogram.types import ReplyKeyboardMarkup, KeyboardButton
 import logging
 
 logger = logging.getLogger(__name__)
 
-# Router for common user handlers
-router = Router(name='common_user')
+router = Router(name='mode_switch')
 
 # Module-level dependencies
 db: Any = None
@@ -23,9 +19,29 @@ main_menu_seller: Any = None
 booking_filters_keyboard: Any = None
 
 
+def setup(
+    bot_instance: Any,
+    db_instance: Any,
+    user_view_mode_dict: Any,
+    get_text_func: Any,
+    main_menu_func: Any,
+    booking_filters_kb: Any = None,
+    main_menu_seller_func: Any = None,
+) -> None:
+    """Initialize module with bot and database instances."""
+    global bot, db, user_view_mode, get_text, main_menu_customer, main_menu_seller, booking_filters_keyboard
+    bot = bot_instance
+    db = db_instance
+    user_view_mode = user_view_mode_dict
+    get_text = get_text_func
+    main_menu_customer = main_menu_func
+    main_menu_seller = main_menu_seller_func
+    booking_filters_keyboard = booking_filters_kb
+
+
 @router.message(F.text.contains("📦") | F.text.contains("Заказы") | F.text.contains("Buyurtmalar"))
 async def my_orders_handler(message: types.Message) -> None:
-    """Handler for Orders button - show user's bookings and orders (customers and sellers without stores)."""
+    """Handler for Orders button - show user's bookings and orders."""
     if not db or not booking_filters_keyboard:
         await message.answer("System error")
         return
@@ -33,10 +49,8 @@ async def my_orders_handler(message: types.Message) -> None:
     user_id = message.from_user.id
     lang = db.get_user_language(user_id)
     
-    # Get user bookings
     bookings = db.get_user_bookings(user_id)
     
-    # Get delivery orders
     try:
         orders = db.get_user_orders(user_id)
     except Exception:
@@ -49,7 +63,6 @@ async def my_orders_handler(message: types.Message) -> None:
         await message.answer(text, parse_mode="HTML")
         return
     
-    # Helper to safely get field from dict or tuple
     def get_field(item, field, index, default=None):
         if isinstance(item, dict):
             return item.get(field, default)
@@ -57,12 +70,10 @@ async def my_orders_handler(message: types.Message) -> None:
             return item[index]
         return default
     
-    # Group bookings by status
     active_bookings = [b for b in bookings if get_field(b, 'status', 3) in ("pending", "confirmed")]
     completed_bookings = [b for b in bookings if get_field(b, 'status', 3) == "completed"]
     cancelled_bookings = [b for b in bookings if get_field(b, 'status', 3) == "cancelled"]
     
-    # Group orders by status
     active_orders = [o for o in orders if get_field(o, 'order_status', 10) in ["pending", "confirmed", "preparing", "delivering"]]
     completed_orders = [o for o in orders if get_field(o, 'order_status', 10) == "completed"]
     cancelled_orders = [o for o in orders if get_field(o, 'order_status', 10) == "cancelled"]
@@ -93,29 +104,9 @@ async def my_orders_handler(message: types.Message) -> None:
     )
 
 
-def setup(
-    bot_instance: Any,
-    db_instance: Any,
-    user_view_mode_dict: Any,
-    get_text_func: Any,
-    main_menu_func: Any,
-    booking_filters_kb: Any = None,
-    main_menu_seller_func: Any = None,
-) -> None:
-    """Initialize module with bot and database instances"""
-    global bot, db, user_view_mode, get_text, main_menu_customer, main_menu_seller, booking_filters_keyboard
-    bot = bot_instance
-    db = db_instance
-    user_view_mode = user_view_mode_dict
-    get_text = get_text_func
-    main_menu_customer = main_menu_func
-    main_menu_seller = main_menu_seller_func
-    booking_filters_keyboard = booking_filters_kb
-
-
 @router.message(F.text.contains("Режим покупателя") | F.text.contains("Xaridor rejimi"))
 async def switch_to_customer(message: types.Message):
-    """Switch user to customer mode"""
+    """Switch user to customer mode."""
     if not db or not get_text or not main_menu_customer or user_view_mode is None:
         logger.error("❌ switch_to_customer: dependencies not initialized!")
         await message.answer("System error: dependencies not initialized")
@@ -126,7 +117,6 @@ async def switch_to_customer(message: types.Message):
     
     logger.info(f"🔄 User {user_id} switching to customer mode")
     
-    # Remember that the user prefers customer view until changed
     user_view_mode[user_id] = 'customer'
     
     await message.answer(
@@ -139,7 +129,7 @@ async def switch_to_customer(message: types.Message):
 
 @router.message(F.text.contains("Режим партнера") | F.text.contains("Hamkor rejimi"))
 async def switch_to_seller(message: types.Message):
-    """Switch user to seller mode"""
+    """Switch user to seller mode."""
     if not db or not get_text or not main_menu_seller or user_view_mode is None:
         logger.error("❌ switch_to_seller: dependencies not initialized!")
         await message.answer("System error: dependencies not initialized")
@@ -148,7 +138,6 @@ async def switch_to_seller(message: types.Message):
     user_id = message.from_user.id
     lang = db.get_user_language(user_id)
     
-    # Check if user is a seller
     user = db.get_user_model(user_id)
     if not user or user.role != "seller":
         await message.answer(
@@ -158,7 +147,6 @@ async def switch_to_seller(message: types.Message):
     
     logger.info(f"🔄 User {user_id} switching to seller mode")
     
-    # Remember that the user prefers seller view until changed
     user_view_mode[user_id] = 'seller'
     
     await message.answer(
