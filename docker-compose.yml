@@ -1,29 +1,56 @@
-version: '3.8'
+# Fudly Bot - Docker Compose Configuration
+# Usage: docker-compose up -d
 
 services:
   bot:
-    build: .
+    build:
+      context: .
+      dockerfile: Dockerfile
     container_name: fudly-bot
     restart: unless-stopped
     environment:
       - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
       - ADMIN_ID=${ADMIN_ID}
-      - DATABASE_URL=${DATABASE_URL}
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-fudly}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-fudly}
       - USE_WEBHOOK=${USE_WEBHOOK:-false}
       - WEBHOOK_URL=${WEBHOOK_URL}
       - WEBHOOK_PATH=${WEBHOOK_PATH:-/webhook}
       - PORT=${PORT:-8080}
       - SECRET_TOKEN=${SECRET_TOKEN}
       - LOG_LEVEL=${LOG_LEVEL:-INFO}
-      - REDIS_URL=${REDIS_URL}
+      - REDIS_URL=redis://redis:6379/0
+      - SENTRY_DSN=${SENTRY_DSN:-}
     volumes:
       - ./data:/app/data
       - ./logs:/app/logs
+    ports:
+      - "${PORT:-8080}:8080"
     depends_on:
-      - postgres
-      - redis
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
     networks:
       - fudly-network
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 512M
+        reservations:
+          cpus: '0.25'
+          memory: 128M
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      start_period: 40s
+      retries: 3
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
 
   postgres:
     image: postgres:15-alpine
@@ -33,6 +60,7 @@ services:
       - POSTGRES_DB=${POSTGRES_DB:-fudly}
       - POSTGRES_USER=${POSTGRES_USER:-fudly}
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - PGDATA=/var/lib/postgresql/data/pgdata
     volumes:
       - postgres-data:/var/lib/postgresql/data
     ports:
@@ -40,10 +68,16 @@ services:
     networks:
       - fudly-network
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-fudly}"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-fudly} -d ${POSTGRES_DB:-fudly}"]
       interval: 10s
       timeout: 5s
       retries: 5
+      start_period: 10s
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 256M
 
   redis:
     image: redis:7-alpine
@@ -55,16 +89,24 @@ services:
       - redis-data:/data
     networks:
       - fudly-network
-    command: redis-server --appendonly yes
+    command: redis-server --appendonly yes --maxmemory 100mb --maxmemory-policy allkeys-lru
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 10s
       timeout: 3s
       retries: 3
+      start_period: 5s
+    deploy:
+      resources:
+        limits:
+          cpus: '0.25'
+          memory: 128M
 
 volumes:
   postgres-data:
+    driver: local
   redis-data:
+    driver: local
 
 networks:
   fudly-network:

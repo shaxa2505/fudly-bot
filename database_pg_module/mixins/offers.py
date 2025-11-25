@@ -3,7 +3,7 @@ Offer-related database operations.
 """
 from __future__ import annotations
 
-from typing import Any, List, Optional
+from typing import Any
 
 from psycopg.rows import dict_row
 
@@ -11,38 +11,66 @@ try:
     from logging_config import logger
 except ImportError:
     import logging
+
     logger = logging.getLogger(__name__)
 
 
 class OfferMixin:
     """Mixin for offer-related database operations."""
 
-    def add_offer(self, store_id: int, title: str, description: str = None,
-                  original_price: float = None, discount_price: float = None,
-                  quantity: int = 1, available_from: str = None, available_until: str = None,
-                  photo_id: str = None, expiry_date: str = None, unit: str = 'шт', category: str = 'other',
-                  photo: str = None):
+    def add_offer(
+        self,
+        store_id: int,
+        title: str,
+        description: str = None,
+        original_price: float = None,
+        discount_price: float = None,
+        quantity: int = 1,
+        available_from: str = None,
+        available_until: str = None,
+        photo_id: str = None,
+        expiry_date: str = None,
+        unit: str = "шт",
+        category: str = "other",
+        photo: str = None,
+    ):
         """Add new offer."""
         actual_photo_id = photo if photo is not None else photo_id
-        
+
         # Normalize expiry_date format
-        if expiry_date and '.' in expiry_date:
+        if expiry_date and "." in expiry_date:
             try:
                 from datetime import datetime
-                dt = datetime.strptime(expiry_date, '%d.%m.%Y')
-                expiry_date = dt.strftime('%Y-%m-%d')
+
+                dt = datetime.strptime(expiry_date, "%d.%m.%Y")
+                expiry_date = dt.strftime("%Y-%m-%d")
             except ValueError:
                 pass
-        
+
         with self.get_connection() as conn:
             cursor = conn.cursor()
-            cursor.execute('''
+            cursor.execute(
+                """
                 INSERT INTO offers (store_id, title, description, original_price, discount_price,
                                   quantity, available_from, available_until, expiry_date, photo_id, unit, category)
                 VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                 RETURNING offer_id
-            ''', (store_id, title, description, original_price, discount_price,
-                  quantity, available_from, available_until, expiry_date, actual_photo_id, unit, category))
+            """,
+                (
+                    store_id,
+                    title,
+                    description,
+                    original_price,
+                    discount_price,
+                    quantity,
+                    available_from,
+                    available_until,
+                    expiry_date,
+                    actual_photo_id,
+                    unit,
+                    category,
+                ),
+            )
             result = cursor.fetchone()
             if not result:
                 raise ValueError("Failed to create offer")
@@ -54,98 +82,107 @@ class OfferMixin:
         """Get offer by ID."""
         with self.get_connection() as conn:
             cursor = conn.cursor(row_factory=dict_row)
-            cursor.execute('SELECT * FROM offers WHERE offer_id = %s', (offer_id,))
+            cursor.execute("SELECT * FROM offers WHERE offer_id = %s", (offer_id,))
             result = cursor.fetchone()
             return dict(result) if result else None
 
-    def get_offer_model(self, offer_id: int) -> Optional['Offer']:
+    def get_offer_model(self, offer_id: int) -> Offer | None:
         """Get offer as Pydantic model."""
         try:
             from app.domain import Offer
         except ImportError:
             logger.error("Domain models not available. Install pydantic.")
             return None
-        
+
         offer_tuple = self.get_offer(offer_id)
         if not offer_tuple:
             return None
-        
+
         try:
             return Offer.from_db_row(offer_tuple)
         except Exception as e:
             logger.error(f"Failed to convert offer {offer_id} to model: {e}")
             return None
 
-    def get_store_offers(self, store_id: int, status: str = 'active'):
+    def get_store_offers(self, store_id: int, status: str = "active"):
         """Get all offers for a store (excluding expired)."""
         with self.get_connection() as conn:
             cursor = conn.cursor(row_factory=dict_row)
-            cursor.execute('''
-                SELECT * FROM offers 
-                WHERE store_id = %s 
+            cursor.execute(
+                """
+                SELECT * FROM offers
+                WHERE store_id = %s
                 AND status = %s
-                AND (expiry_date IS NULL 
+                AND (expiry_date IS NULL
                      OR expiry_date !~ '[.]'
                      OR (expiry_date ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}' AND expiry_date::date >= CURRENT_DATE))
                 ORDER BY created_at DESC
-            ''', (store_id, status))
+            """,
+                (store_id, status),
+            )
             return [dict(row) for row in cursor.fetchall()]
 
-    def get_active_offers(self, city: Optional[str] = None, store_id: Optional[int] = None) -> List[dict[str, Any]]:
+    def get_active_offers(
+        self, city: str | None = None, store_id: int | None = None
+    ) -> list[dict[str, Any]]:
         """Return active offers, optionally filtered by city or store."""
         with self.get_connection() as conn:
             cursor = conn.cursor(row_factory=dict_row)
-            base = ["SELECT o.*, s.city FROM offers o JOIN stores s ON o.store_id = s.store_id WHERE o.status = 'active'"]
+            base = [
+                "SELECT o.*, s.city FROM offers o JOIN stores s ON o.store_id = s.store_id WHERE o.status = 'active'"
+            ]
             params = []
             if city:
-                base.append('AND s.city = %s')
+                base.append("AND s.city = %s")
                 params.append(city)
             if store_id:
-                base.append('AND o.store_id = %s')
+                base.append("AND o.store_id = %s")
                 params.append(store_id)
-            base.append('ORDER BY o.created_at DESC')
-            query = ' '.join(base)
+            base.append("ORDER BY o.created_at DESC")
+            query = " ".join(base)
             cursor.execute(query, tuple(params))
             return list(cursor.fetchall())
 
-    def get_hot_offers(self, city: str = None, limit: int = 20, offset: int = 0, business_type: str = None):
+    def get_hot_offers(
+        self, city: str = None, limit: int = 20, offset: int = 0, business_type: str = None
+    ):
         """Get hot offers (top by discount and expiry date)."""
         with self.get_connection() as conn:
             cursor = conn.cursor(row_factory=dict_row)
-            
-            query = '''
+
+            query = """
                 SELECT o.*, s.name as store_name, s.address, s.city, s.category as store_category,
                        s.delivery_enabled, s.delivery_price, s.min_order_amount,
                        CAST((1.0 - o.discount_price::float / o.original_price::float) * 100 AS INTEGER) as discount_percent
                 FROM offers o
                 JOIN stores s ON o.store_id = s.store_id
-                WHERE o.status = 'active' 
+                WHERE o.status = 'active'
                 AND o.quantity > 0
                 AND (s.status = 'approved' OR s.status = 'active')
-                AND (o.available_until IS NULL OR LENGTH(o.available_until) < 6 OR 
+                AND (o.available_until IS NULL OR LENGTH(o.available_until) < 6 OR
                      (LENGTH(o.available_until) > 10 AND o.available_until::timestamp >= NOW()))
-                AND (o.expiry_date IS NULL 
+                AND (o.expiry_date IS NULL
                      OR o.expiry_date !~ '[.]'
                      OR (o.expiry_date ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}' AND o.expiry_date::date >= CURRENT_DATE))
-            '''
-            
+            """
+
             params = []
             if city:
-                query += ' AND s.city ILIKE %s'
-                params.append(f'%{city}%')
-            
+                query += " AND s.city ILIKE %s"
+                params.append(f"%{city}%")
+
             if business_type:
-                query += ' AND s.category = %s'
+                query += " AND s.category = %s"
                 params.append(business_type)
-            
-            query += '''
-                ORDER BY discount_percent DESC, 
+
+            query += """
+                ORDER BY discount_percent DESC,
                          COALESCE(o.expiry_date, '9999-12-31') ASC,
                          o.created_at DESC
                 LIMIT %s OFFSET %s
-            '''
+            """
             params.extend([limit, offset])
-            
+
             cursor.execute(query, params)
             return [dict(row) for row in cursor.fetchall()]
 
@@ -153,27 +190,27 @@ class OfferMixin:
         """Count hot offers without loading data."""
         with self.get_connection() as conn:
             cursor = conn.cursor()
-            
-            query = '''
+
+            query = """
                 SELECT COUNT(*)
                 FROM offers o
                 JOIN stores s ON o.store_id = s.store_id
                 WHERE o.status = 'active'
                   AND o.quantity > 0
                   AND s.status = 'active'
-                  AND (o.available_until IS NULL OR LENGTH(o.available_until) < 6 OR 
+                  AND (o.available_until IS NULL OR LENGTH(o.available_until) < 6 OR
                        (LENGTH(o.available_until) > 10 AND o.available_until::timestamp >= NOW()))
-            '''
+            """
             params = []
-            
+
             if city:
-                query += ' AND s.city = %s'
+                query += " AND s.city = %s"
                 params.append(city)
-            
+
             if business_type:
-                query += ' AND s.business_type = %s'
+                query += " AND s.business_type = %s"
                 params.append(business_type)
-            
+
             cursor.execute(query, params)
             return cursor.fetchone()[0]
 
@@ -181,79 +218,97 @@ class OfferMixin:
         """Get active offers for store with store info."""
         with self.get_connection() as conn:
             cursor = conn.cursor(row_factory=dict_row)
-            cursor.execute('''
+            cursor.execute(
+                """
                 SELECT o.*, s.name, s.address, s.city, s.category as store_category, o.category as category
                 FROM offers o
                 JOIN stores s ON o.store_id = s.store_id
-                WHERE o.store_id = %s AND o.quantity > 0 
-                AND (o.expiry_date IS NULL 
+                WHERE o.store_id = %s AND o.quantity > 0
+                AND (o.expiry_date IS NULL
                      OR o.expiry_date !~ '[.]'
                      OR (o.expiry_date ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}' AND o.expiry_date::date >= CURRENT_DATE))
                 ORDER BY o.created_at DESC
-            ''', (store_id,))
+            """,
+                (store_id,),
+            )
             return [dict(row) for row in cursor.fetchall()]
 
     def get_top_offers_by_city(self, city: str, limit: int = 10):
         """Get top offers in city (by discount)."""
         with self.get_connection() as conn:
             cursor = conn.cursor(row_factory=dict_row)
-            cursor.execute('''
+            cursor.execute(
+                """
                 SELECT o.*, s.name, s.address, s.city, s.category,
                        CAST((o.original_price - o.discount_price)::float / o.original_price * 100 AS INTEGER) as discount_percent
                 FROM offers o
                 JOIN stores s ON o.store_id = s.store_id
-                WHERE s.city = %s AND s.status = 'active' 
-                      AND o.status = 'active' AND o.quantity > 0 
-                      AND (o.expiry_date IS NULL 
+                WHERE s.city = %s AND s.status = 'active'
+                      AND o.status = 'active' AND o.quantity > 0
+                      AND (o.expiry_date IS NULL
                            OR o.expiry_date !~ '[.]'
                            OR (o.expiry_date ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}' AND o.expiry_date::date >= CURRENT_DATE))
                 ORDER BY discount_percent DESC, o.created_at DESC
                 LIMIT %s
-            ''', (city, limit))
+            """,
+                (city, limit),
+            )
             return [dict(row) for row in cursor.fetchall()]
 
-    def get_offers_by_city_and_category(self, city: str, category: str, limit: int = 20) -> List[dict]:
+    def get_offers_by_city_and_category(
+        self, city: str, category: str, limit: int = 20
+    ) -> list[dict]:
         """Get offers by city and category."""
         with self.get_connection() as conn:
             cursor = conn.cursor(row_factory=dict_row)
-            cursor.execute('''
+            cursor.execute(
+                """
                 SELECT o.*, s.name as store_name, s.address
                 FROM offers o
                 JOIN stores s ON o.store_id = s.store_id
                 WHERE s.city = %s AND o.category = %s AND o.status = 'active'
                 ORDER BY o.created_at DESC
                 LIMIT %s
-            ''', (city, category, limit))
+            """,
+                (city, category, limit),
+            )
             return [dict(row) for row in cursor.fetchall()]
 
     def update_offer_quantity(self, offer_id: int, quantity: int):
         """Update offer quantity."""
         with self.get_connection() as conn:
             cursor = conn.cursor()
-            cursor.execute('UPDATE offers SET quantity = %s WHERE offer_id = %s', 
-                         (quantity, offer_id))
+            cursor.execute(
+                "UPDATE offers SET quantity = %s WHERE offer_id = %s", (quantity, offer_id)
+            )
 
     def increment_offer_quantity(self, offer_id: int, amount: int = 1):
         """Increment offer quantity."""
         with self.get_connection() as conn:
             cursor = conn.cursor()
-            cursor.execute('''
-                UPDATE offers 
-                SET quantity = quantity + %s 
+            cursor.execute(
+                """
+                UPDATE offers
+                SET quantity = quantity + %s
                 WHERE offer_id = %s
-            ''', (amount, offer_id))
+            """,
+                (amount, offer_id),
+            )
             logger.info(f"Offer {offer_id} quantity increased by {amount}")
 
     def increment_offer_quantity_atomic(self, offer_id: int, amount: int = 1) -> int:
         """Atomically increment and return new quantity."""
         with self.get_connection() as conn:
             cursor = conn.cursor()
-            cursor.execute('''
-                UPDATE offers 
-                SET quantity = quantity + %s 
+            cursor.execute(
+                """
+                UPDATE offers
+                SET quantity = quantity + %s
                 WHERE offer_id = %s
                 RETURNING quantity
-            ''', (amount, offer_id))
+            """,
+                (amount, offer_id),
+            )
             result = cursor.fetchone()
             new_qty = result[0] if result else 0
             logger.info(f"Offer {offer_id} quantity atomically increased to {new_qty}")
@@ -275,30 +330,33 @@ class OfferMixin:
         """Delete offer."""
         with self.get_connection() as conn:
             cursor = conn.cursor()
-            cursor.execute('DELETE FROM bookings WHERE offer_id = %s', (offer_id,))
-            cursor.execute('DELETE FROM offers WHERE offer_id = %s', (offer_id,))
+            cursor.execute("DELETE FROM bookings WHERE offer_id = %s", (offer_id,))
+            cursor.execute("DELETE FROM offers WHERE offer_id = %s", (offer_id,))
             logger.info(f"Offer {offer_id} deleted")
 
     def update_offer_expiry(self, offer_id: int, new_expiry: str):
         """Update offer expiry date."""
         with self.get_connection() as conn:
             cursor = conn.cursor()
-            cursor.execute('UPDATE offers SET expiry_date = %s WHERE offer_id = %s', 
-                         (new_expiry, offer_id))
+            cursor.execute(
+                "UPDATE offers SET expiry_date = %s WHERE offer_id = %s", (new_expiry, offer_id)
+            )
 
     def delete_expired_offers(self):
         """Delete expired offers."""
         with self.get_connection() as conn:
             cursor = conn.cursor()
-            cursor.execute('''
-                UPDATE offers 
-                SET status = 'expired' 
-                WHERE status = 'active' 
-                AND expiry_date IS NOT NULL 
+            cursor.execute(
+                """
+                UPDATE offers
+                SET status = 'expired'
+                WHERE status = 'active'
+                AND expiry_date IS NOT NULL
                 AND expiry_date ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}'
                 AND expiry_date::date < CURRENT_DATE
                 RETURNING offer_id
-            ''')
+            """
+            )
             expired = cursor.fetchall()
             if expired:
                 logger.info(f"Marked {len(expired)} offers as expired")

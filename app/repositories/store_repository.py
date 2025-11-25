@@ -1,9 +1,9 @@
 """Store repository for store-related database operations."""
 from __future__ import annotations
 
-from typing import Any, Optional
+from typing import Any
 
-from app.core.exceptions import DatabaseException, StoreNotFoundException
+from app.core.exceptions import StoreNotFoundException
 
 from .base import BaseRepository
 
@@ -11,7 +11,7 @@ from .base import BaseRepository
 class StoreRepository(BaseRepository):
     """Repository for store-related database operations."""
 
-    def get_store(self, store_id: int) -> Optional[dict[str, Any]]:
+    def get_store(self, store_id: int) -> dict[str, Any] | None:
         """Get store by ID.
 
         Args:
@@ -46,7 +46,7 @@ class StoreRepository(BaseRepository):
             raise StoreNotFoundException(store_id)
         return store
 
-    def get_store_by_owner(self, owner_id: int) -> Optional[dict[str, Any]]:
+    def get_store_by_owner(self, owner_id: int) -> dict[str, Any] | None:
         """Get store by owner ID.
 
         Args:
@@ -68,10 +68,10 @@ class StoreRepository(BaseRepository):
         owner_id: int,
         name: str,
         city: str,
-        address: Optional[str] = None,
-        description: Optional[str] = None,
-        category: Optional[str] = None,
-        phone: Optional[str] = None,
+        address: str | None = None,
+        description: str | None = None,
+        category: str | None = None,
+        phone: str | None = None,
         business_type: str = "individual",
     ) -> int:
         """Add new store.
@@ -103,12 +103,12 @@ class StoreRepository(BaseRepository):
     def update_store(
         self,
         store_id: int,
-        name: Optional[str] = None,
-        city: Optional[str] = None,
-        address: Optional[str] = None,
-        description: Optional[str] = None,
-        category: Optional[str] = None,
-        phone: Optional[str] = None,
+        name: str | None = None,
+        city: str | None = None,
+        address: str | None = None,
+        description: str | None = None,
+        category: str | None = None,
+        phone: str | None = None,
     ) -> None:
         """Update store data.
 
@@ -130,7 +130,7 @@ class StoreRepository(BaseRepository):
             self._handle_db_error("update_store", e)
 
     def set_store_status(
-        self, store_id: int, status: str, rejection_reason: Optional[str] = None
+        self, store_id: int, status: str, rejection_reason: str | None = None
     ) -> None:
         """Set store status.
 
@@ -216,8 +216,8 @@ class StoreRepository(BaseRepository):
         self,
         store_id: int,
         delivery_enabled: bool,
-        delivery_price: Optional[float] = None,
-        min_order_amount: Optional[float] = None,
+        delivery_price: float | None = None,
+        min_order_amount: float | None = None,
     ) -> None:
         """Set store delivery settings.
 

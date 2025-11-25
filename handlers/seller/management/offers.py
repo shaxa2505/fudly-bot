@@ -4,27 +4,22 @@ from __future__ import annotations
 import asyncio
 import re
 from datetime import datetime, timedelta
-from typing import Any
 
 from aiogram import F, Router, types
 from aiogram.fsm.context import FSMContext
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
-from handlers.common.states import EditOffer
 from app.keyboards import main_menu_seller
+from handlers.common.states import EditOffer
 from localization import get_text
 from logging_config import logger
-from .utils import (
-    get_db, get_offer_field, get_store_field,
-    send_offer_card, update_offer_message
-)
+
+from .utils import get_db, get_offer_field, get_store_field, send_offer_card, update_offer_message
 
 router = Router()
 
 
-@router.message(
-    F.text.contains("Мои товары") | F.text.contains("Mening mahsulotlarim")
-)
+@router.message(F.text.contains("Мои товары") | F.text.contains("Mening mahsulotlarim"))
 async def my_offers(message: types.Message) -> None:
     """Display seller's offers with management buttons."""
     db = get_db()
@@ -49,21 +44,28 @@ async def my_offers(message: types.Message) -> None:
 
     if not all_offers:
         await message.answer(
-            "📦 <b>" + ("Ваши товары" if lang == 'ru' else "Sizning mahsulotlaringiz") + "</b>\n\n"
+            "📦 <b>" + ("Ваши товары" if lang == "ru" else "Sizning mahsulotlaringiz") + "</b>\n\n"
             "❌ " + get_text(lang, "no_offers_yet") + "\n\n"
-            "💡 " + ("Нажмите ➕ Добавить чтобы создать первый товар" if lang == 'ru' else "➕ Qo'shish tugmasini bosing"),
-            parse_mode="HTML"
+            "💡 "
+            + (
+                "Нажмите ➕ Добавить чтобы создать первый товар"
+                if lang == "ru"
+                else "➕ Qo'shish tugmasini bosing"
+            ),
+            parse_mode="HTML",
         )
         return
 
     # Count active and inactive
-    active_count = sum(1 for o in all_offers if get_offer_field(o, 'status') == 'active')
+    active_count = sum(1 for o in all_offers if get_offer_field(o, "status") == "active")
     inactive_count = len(all_offers) - active_count
 
     # Filter menu
     filter_kb = InlineKeyboardBuilder()
     filter_kb.button(text=f"✅ Активные ({active_count})", callback_data="filter_offers_active")
-    filter_kb.button(text=f"❌ Неактивные ({inactive_count})", callback_data="filter_offers_inactive")
+    filter_kb.button(
+        text=f"❌ Неактивные ({inactive_count})", callback_data="filter_offers_inactive"
+    )
     filter_kb.button(text=f"📋 Все ({len(all_offers)})", callback_data="filter_offers_all")
     filter_kb.adjust(2, 1)
 
@@ -75,7 +77,7 @@ async def my_offers(message: types.Message) -> None:
         f"❌ Неактивных: <b>{inactive_count}</b>\n"
         f"📊 Всего: <b>{len(all_offers)}</b>",
         parse_mode="HTML",
-        reply_markup=filter_kb.as_markup()
+        reply_markup=filter_kb.as_markup(),
     )
 
     # Show first 10 offers
@@ -110,25 +112,27 @@ async def filter_offers(callback: types.CallbackQuery) -> None:
 
     # Apply filter
     if filter_type == "active":
-        filtered = [o for o in all_offers if get_offer_field(o, 'status') == 'active']
+        filtered = [o for o in all_offers if get_offer_field(o, "status") == "active"]
         title = "✅ Активные товары"
     elif filter_type == "inactive":
-        filtered = [o for o in all_offers if get_offer_field(o, 'status') != 'active']
+        filtered = [o for o in all_offers if get_offer_field(o, "status") != "active"]
         title = "❌ Неактивные товары"
     else:
         filtered = all_offers
         title = "📋 Все товары"
 
     if not filtered:
-        await callback.answer(f"{'Нет товаров в этой категории' if lang == 'ru' else 'Bu kategoriyada mahsulot yo`q'}", show_alert=True)
+        await callback.answer(
+            f"{'Нет товаров в этой категории' if lang == 'ru' else 'Bu kategoriyada mahsulot yo`q'}",
+            show_alert=True,
+        )
         return
 
     await callback.answer()
-    
+
     await callback.message.answer(
-        f"<b>{title}</b>\n\n"
-        f"{'Найдено' if lang == 'ru' else 'Topildi'}: <b>{len(filtered)}</b>",
-        parse_mode="HTML"
+        f"<b>{title}</b>\n\n" f"{'Найдено' if lang == 'ru' else 'Topildi'}: <b>{len(filtered)}</b>",
+        parse_mode="HTML",
     )
 
     for offer in filtered[:10]:
@@ -146,7 +150,7 @@ async def quantity_add(callback: types.CallbackQuery) -> None:
     """Increase offer quantity by 1."""
     db = get_db()
     lang = db.get_user_language(callback.from_user.id)
-    
+
     try:
         offer_id = int(callback.data.rsplit("_", 1)[-1])
     except (ValueError, IndexError) as e:
@@ -159,7 +163,7 @@ async def quantity_add(callback: types.CallbackQuery) -> None:
         await callback.answer(get_text(lang, "offer_not_found"), show_alert=True)
         return
 
-    offer_store_id = get_offer_field(offer, 'store_id')
+    offer_store_id = get_offer_field(offer, "store_id")
     user_stores = db.get_user_stores(callback.from_user.id)
     if not any(get_store_field(store, "store_id") == offer_store_id for store in user_stores):
         await callback.answer(get_text(lang, "not_your_offer"), show_alert=True)
@@ -194,7 +198,7 @@ async def quantity_subtract(callback: types.CallbackQuery) -> None:
         await callback.answer(get_text(lang, "offer_not_found"), show_alert=True)
         return
 
-    offer_store_id = get_offer_field(offer, 'store_id')
+    offer_store_id = get_offer_field(offer, "store_id")
     user_stores = db.get_user_stores(callback.from_user.id)
     if not any(get_store_field(store, "store_id") == offer_store_id for store in user_stores):
         await callback.answer(get_text(lang, "not_your_offer"), show_alert=True)
@@ -220,7 +224,7 @@ async def extend_offer(callback: types.CallbackQuery) -> None:
     """Extend offer expiry date."""
     db = get_db()
     lang = db.get_user_language(callback.from_user.id)
-    
+
     try:
         offer_id = int(callback.data.rsplit("_", 1)[-1])
     except (ValueError, IndexError) as e:
@@ -243,10 +247,22 @@ async def extend_offer(callback: types.CallbackQuery) -> None:
 
     builder = InlineKeyboardBuilder()
     builder.button(text=f"Сегодня {today.strftime('%d.%m')}", callback_data=f"setexp_{offer_id}_0")
-    builder.button(text=f"Завтра {(today + timedelta(days=1)).strftime('%d.%m')}", callback_data=f"setexp_{offer_id}_1")
-    builder.button(text=f"+2 дня {(today + timedelta(days=2)).strftime('%d.%m')}", callback_data=f"setexp_{offer_id}_2")
-    builder.button(text=f"+3 дня {(today + timedelta(days=3)).strftime('%d.%m')}", callback_data=f"setexp_{offer_id}_3")
-    builder.button(text=f"Неделя {(today + timedelta(days=7)).strftime('%d.%m')}", callback_data=f"setexp_{offer_id}_7")
+    builder.button(
+        text=f"Завтра {(today + timedelta(days=1)).strftime('%d.%m')}",
+        callback_data=f"setexp_{offer_id}_1",
+    )
+    builder.button(
+        text=f"+2 дня {(today + timedelta(days=2)).strftime('%d.%m')}",
+        callback_data=f"setexp_{offer_id}_2",
+    )
+    builder.button(
+        text=f"+3 дня {(today + timedelta(days=3)).strftime('%d.%m')}",
+        callback_data=f"setexp_{offer_id}_3",
+    )
+    builder.button(
+        text=f"Неделя {(today + timedelta(days=7)).strftime('%d.%m')}",
+        callback_data=f"setexp_{offer_id}_7",
+    )
     builder.button(text="❌ Отмена", callback_data="cancel_extend")
     builder.adjust(2, 2, 1, 1)
 
@@ -282,7 +298,7 @@ async def deactivate_offer(callback: types.CallbackQuery) -> None:
     """Deactivate offer."""
     db = get_db()
     lang = db.get_user_language(callback.from_user.id)
-    
+
     try:
         offer_id = int(callback.data.split("_")[2])
     except (ValueError, IndexError) as e:
@@ -311,7 +327,7 @@ async def activate_offer(callback: types.CallbackQuery) -> None:
     """Activate offer."""
     db = get_db()
     lang = db.get_user_language(callback.from_user.id)
-    
+
     try:
         offer_id = int(callback.data.split("_")[2])
     except (ValueError, IndexError) as e:
@@ -340,7 +356,7 @@ async def delete_offer(callback: types.CallbackQuery) -> None:
     """Delete offer."""
     db = get_db()
     lang = db.get_user_language(callback.from_user.id)
-    
+
     try:
         offer_id = int(callback.data.split("_")[2])
     except (ValueError, IndexError) as e:
@@ -369,7 +385,7 @@ async def edit_offer(callback: types.CallbackQuery) -> None:
     """Show offer edit menu."""
     db = get_db()
     lang = db.get_user_language(callback.from_user.id)
-    
+
     try:
         offer_id = int(callback.data.split("_")[2])
     except (ValueError, IndexError) as e:
@@ -389,11 +405,25 @@ async def edit_offer(callback: types.CallbackQuery) -> None:
         return
 
     kb = InlineKeyboardBuilder()
-    kb.button(text="💰 Изменить цену" if lang == "ru" else "💰 Narxni o'zgartirish", callback_data=f"edit_price_{offer_id}")
-    kb.button(text="📦 Изменить количество" if lang == "ru" else "📦 Sonini o'zgartirish", callback_data=f"edit_quantity_{offer_id}")
-    kb.button(text="🕐 Изменить время" if lang == "ru" else "🕐 Vaqtni o'zgartirish", callback_data=f"edit_time_{offer_id}")
-    kb.button(text="📝 Изменить описание" if lang == "ru" else "📝 Tavsifni o'zgartirish", callback_data=f"edit_description_{offer_id}")
-    kb.button(text="🔙 Назад" if lang == "ru" else "🔙 Orqaga", callback_data=f"back_to_offer_{offer_id}")
+    kb.button(
+        text="💰 Изменить цену" if lang == "ru" else "💰 Narxni o'zgartirish",
+        callback_data=f"edit_price_{offer_id}",
+    )
+    kb.button(
+        text="📦 Изменить количество" if lang == "ru" else "📦 Sonini o'zgartirish",
+        callback_data=f"edit_quantity_{offer_id}",
+    )
+    kb.button(
+        text="🕐 Изменить время" if lang == "ru" else "🕐 Vaqtni o'zgartirish",
+        callback_data=f"edit_time_{offer_id}",
+    )
+    kb.button(
+        text="📝 Изменить описание" if lang == "ru" else "📝 Tavsifni o'zgartirish",
+        callback_data=f"edit_description_{offer_id}",
+    )
+    kb.button(
+        text="🔙 Назад" if lang == "ru" else "🔙 Orqaga", callback_data=f"back_to_offer_{offer_id}"
+    )
     kb.adjust(1)
 
     try:
@@ -415,7 +445,7 @@ async def back_to_offer(callback: types.CallbackQuery) -> None:
         logger.error(f"Invalid offer_id in callback data: {callback.data}, error: {e}")
         await callback.answer(get_text(lang, "error"), show_alert=True)
         return
-    
+
     await update_offer_message(callback, offer_id, lang)
     await callback.answer()
 
@@ -425,7 +455,7 @@ async def edit_time_start(callback: types.CallbackQuery, state: FSMContext) -> N
     """Start editing pickup time."""
     db = get_db()
     lang = db.get_user_language(callback.from_user.id)
-    
+
     try:
         offer_id = int(callback.data.split("_")[2])
     except (ValueError, IndexError) as e:
@@ -447,8 +477,8 @@ async def edit_time_start(callback: types.CallbackQuery, state: FSMContext) -> N
     await state.update_data(offer_id=offer_id)
     await state.set_state(EditOffer.available_from)
 
-    available_from = get_offer_field(offer, 'available_from', '')
-    available_until = get_offer_field(offer, 'available_until', '')
+    available_from = get_offer_field(offer, "available_from", "")
+    available_until = get_offer_field(offer, "available_until", "")
 
     await callback.message.answer(
         f"🕐 <b>Изменение времени забора</b>\n\n"

@@ -2,28 +2,27 @@
 from __future__ import annotations
 
 import html
-from typing import Any, Optional
-from datetime import datetime, timedelta, timezone
+from typing import Any
 
 from aiogram import F, Router, types
 from aiogram.fsm.context import FSMContext
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
 from app.keyboards import cancel_keyboard, main_menu_customer
+from handlers.common.states import BookOffer, OrderDelivery
 from localization import get_text
 from logging_config import logger
-from handlers.common.states import BookOffer, OrderDelivery
 
 from .utils import (
+    calculate_total,
+    can_proceed,
+    format_booking_code,
+    get_booking_field,
+    get_offer_field,
+    get_store_field,
+    get_user_safe,
     safe_answer_or_send,
     safe_edit_reply_markup,
-    can_proceed,
-    get_store_field,
-    get_offer_field,
-    get_booking_field,
-    get_user_safe,
-    format_booking_code,
-    calculate_total,
 )
 
 router = Router()
@@ -35,7 +34,9 @@ cache: Any = None
 METRICS: dict = {}
 
 
-def setup_dependencies(database: Any, bot_instance: Any, cache_manager: Any = None, metrics: dict = None):
+def setup_dependencies(
+    database: Any, bot_instance: Any, cache_manager: Any = None, metrics: dict = None
+):
     """Setup module dependencies."""
     global db, bot, cache, METRICS
     db = database
@@ -53,39 +54,40 @@ def _esc(val: Any) -> str:
 
 # ===================== BOOKING CREATION =====================
 
+
 @router.callback_query(F.data.startswith("book_"))
 async def book_offer_start(callback: types.CallbackQuery, state: FSMContext) -> None:
     """Start booking flow - ask for quantity."""
     if not db or not callback.message:
         await callback.answer("System error", show_alert=True)
         return
-    
+
     user_id = callback.from_user.id
     lang = db.get_user_language(user_id)
-    
+
     # Rate limit check
     if not can_proceed(user_id, "book_start"):
         await callback.answer(get_text(lang, "too_many_requests"), show_alert=True)
         return
-    
+
     # Parse offer_id
     try:
         offer_id = int(callback.data.split("_")[1])
     except (ValueError, IndexError):
         await callback.answer(get_text(lang, "error"), show_alert=True)
         return
-    
+
     offer = db.get_offer(offer_id)
     if not offer:
         await callback.answer(get_text(lang, "offer_not_found"), show_alert=True)
         return
-    
+
     # Check availability
     quantity = get_offer_field(offer, "quantity", 0)
     if quantity <= 0:
         await callback.answer(get_text(lang, "no_offers"), show_alert=True)
         return
-    
+
     # Save to state
     await state.update_data(
         offer_id=offer_id,
@@ -95,13 +97,13 @@ async def book_offer_start(callback: types.CallbackQuery, state: FSMContext) -> 
         store_id=get_offer_field(offer, "store_id"),
     )
     await state.set_state(BookOffer.quantity)
-    
+
     # Ask for quantity
     if lang == "uz":
         text = f"📦 Nechta buyurtma qilmoqchisiz? (1-{quantity})"
     else:
         text = f"📦 Сколько хотите забронировать? (1-{quantity})"
-    
+
     await callback.message.answer(text, reply_markup=cancel_keyboard(lang))
     await callback.answer()
 
@@ -112,24 +114,23 @@ async def book_offer_quantity(message: types.Message, state: FSMContext) -> None
     if not db:
         await message.answer("System error")
         return
-    
+
     user_id = message.from_user.id
     lang = db.get_user_language(user_id)
     text = (message.text or "").strip()
-    
+
     # Check cancel
     if text in ["❌ Отмена", "❌ Bekor qilish", "/cancel"]:
         await state.clear()
         await message.answer(
-            get_text(lang, "action_cancelled"),
-            reply_markup=main_menu_customer(lang)
+            get_text(lang, "action_cancelled"), reply_markup=main_menu_customer(lang)
         )
         return
-    
+
     # Validate quantity
     data = await state.get_data()
     max_qty = data.get("max_quantity", 1)
-    
+
     try:
         quantity = int(text)
         if quantity < 1 or quantity > max_qty:
@@ -140,35 +141,41 @@ async def book_offer_quantity(message: types.Message, state: FSMContext) -> None
         else:
             await message.answer(f"❌ Введите число от 1 до {max_qty}")
         return
-    
+
     await state.update_data(quantity=quantity)
-    
+
     # Check if store has delivery
     store_id = data.get("store_id")
     store = db.get_store(store_id) if store_id else None
     delivery_enabled = get_store_field(store, "delivery_enabled", 0) == 1
-    
+
     if delivery_enabled:
         # Ask for delivery choice
         await state.set_state(BookOffer.delivery_choice)
-        
+
         delivery_price = get_store_field(store, "delivery_price", 0)
-        
+
         kb = InlineKeyboardBuilder()
         if lang == "uz":
             kb.button(text="🏪 O'zim olib ketaman", callback_data="pickup_choice")
-            kb.button(text=f"🚚 Yetkazib berish ({delivery_price:,} so'm)", callback_data="delivery_choice")
+            kb.button(
+                text=f"🚚 Yetkazib berish ({delivery_price:,} so'm)",
+                callback_data="delivery_choice",
+            )
         else:
             kb.button(text="🏪 Самовывоз", callback_data="pickup_choice")
             kb.button(text=f"🚚 Доставка ({delivery_price:,} сум)", callback_data="delivery_choice")
-        kb.button(text="❌ " + ("Bekor qilish" if lang == "uz" else "Отмена"), callback_data="cancel_booking_flow")
+        kb.button(
+            text="❌ " + ("Bekor qilish" if lang == "uz" else "Отмена"),
+            callback_data="cancel_booking_flow",
+        )
         kb.adjust(2, 1)
-        
+
         if lang == "uz":
             text = "📦 Yetkazib berish usulini tanlang:"
         else:
             text = "📦 Выберите способ получения:"
-        
+
         await message.answer(text, reply_markup=kb.as_markup())
     else:
         # No delivery - go straight to booking
@@ -192,22 +199,22 @@ async def delivery_choice(callback: types.CallbackQuery, state: FSMContext) -> N
     if not db:
         await callback.answer("System error", show_alert=True)
         return
-    
+
     user_id = callback.from_user.id
     lang = db.get_user_language(user_id)
-    
+
     # Get data from BookOffer state
     data = await state.get_data()
     offer_id = data.get("offer_id")
     quantity = data.get("quantity", 1)
     store_id = data.get("store_id")
     offer_price = data.get("offer_price", 0)
-    
+
     # CHECK MIN_ORDER_AMOUNT before allowing delivery
     store = db.get_store(store_id) if store_id else None
     min_order_amount = get_store_field(store, "min_order_amount", 0)
     order_total = offer_price * quantity
-    
+
     if min_order_amount > 0 and order_total < min_order_amount:
         currency = "сум" if lang == "ru" else "so'm"
         if lang == "uz":
@@ -224,7 +231,7 @@ async def delivery_choice(callback: types.CallbackQuery, state: FSMContext) -> N
             )
         await callback.answer(msg, show_alert=True)
         return
-    
+
     # Transfer to OrderDelivery state (orders.py handles delivery with payment)
     await state.clear()
     await state.update_data(
@@ -233,14 +240,14 @@ async def delivery_choice(callback: types.CallbackQuery, state: FSMContext) -> N
         quantity=quantity,
     )
     await state.set_state(OrderDelivery.address)
-    
+
     await safe_edit_reply_markup(callback.message)
-    
+
     if lang == "uz":
         text = "📍 Yetkazib berish manzilini kiriting:\n\nMasalan: Chilanzar tumani, 5-mavze, 10-uy"
     else:
         text = "📍 Введите адрес доставки:\n\nНапример: Чиланзарский район, 5-массив, дом 10"
-    
+
     await callback.message.answer(text, reply_markup=cancel_keyboard(lang))
     await callback.answer()
 
@@ -255,52 +262,53 @@ async def cancel_booking_flow(callback: types.CallbackQuery, state: FSMContext) 
     if not db:
         await callback.answer("System error", show_alert=True)
         return
-    
+
     user_id = callback.from_user.id
     lang = db.get_user_language(user_id)
-    
+
     await state.clear()
     await safe_edit_reply_markup(callback.message)
     await callback.message.answer(
-        get_text(lang, "action_cancelled"),
-        reply_markup=main_menu_customer(lang)
+        get_text(lang, "action_cancelled"), reply_markup=main_menu_customer(lang)
     )
     await callback.answer()
 
 
-async def create_booking(message: types.Message, state: FSMContext, real_user_id: Optional[int] = None) -> None:
+async def create_booking(
+    message: types.Message, state: FSMContext, real_user_id: int | None = None
+) -> None:
     """Create the final booking."""
     if not db or not bot:
         await message.answer("System error")
         return
-    
+
     # Use provided user_id or fallback to message.from_user.id
     # Important: when called from callback, message.from_user is the BOT, not the user!
     user_id = real_user_id if real_user_id else message.from_user.id
     lang = db.get_user_language(user_id)
     data = await state.get_data()
-    
+
     offer_id = data.get("offer_id")
     quantity = data.get("quantity", 1)
     offer_price = data.get("offer_price", 0)
     offer_title = data.get("offer_title", "Товар")
     store_id = data.get("store_id")
-    
+
     if not offer_id:
         await message.answer(get_text(lang, "error"))
         await state.clear()
         return
-    
+
     # Pre-check: verify offer still available before atomic booking
     offer = db.get_offer(offer_id)
     if not offer:
         await message.answer(get_text(lang, "offer_not_found") or "❌ Предложение не найдено")
         await state.clear()
         return
-    
+
     offer_status = get_offer_field(offer, "status", "inactive")
     offer_qty = get_offer_field(offer, "quantity", 0)
-    
+
     if offer_status != "active":
         if lang == "uz":
             await message.answer("❌ Bu taklif hozirda mavjud emas. Boshqa taklif tanlang.")
@@ -308,7 +316,7 @@ async def create_booking(message: types.Message, state: FSMContext, real_user_id
             await message.answer("❌ Это предложение сейчас недоступно. Выберите другое.")
         await state.clear()
         return
-    
+
     if offer_qty < quantity:
         if lang == "uz":
             await message.answer(f"❌ Faqat {offer_qty} dona qolgan. Miqdorni kamaytiring.")
@@ -316,7 +324,7 @@ async def create_booking(message: types.Message, state: FSMContext, real_user_id
             await message.answer(f"❌ Осталось только {offer_qty} шт. Уменьшите количество.")
         await state.clear()
         return
-    
+
     # Create booking atomically
     error_reason = None
     try:
@@ -329,11 +337,13 @@ async def create_booking(message: types.Message, state: FSMContext, real_user_id
     except Exception as e:
         logger.error(f"Booking creation failed: {e}")
         ok, booking_id, code, error_reason = False, None, None, f"exception:{e}"
-    
+
     if not ok or not booking_id:
         # Log for debugging with reason
-        logger.warning(f"create_booking_atomic returned False: offer_id={offer_id}, user_id={user_id}, qty={quantity}, reason={error_reason}")
-        
+        logger.warning(
+            f"create_booking_atomic returned False: offer_id={offer_id}, user_id={user_id}, qty={quantity}, reason={error_reason}"
+        )
+
         # Show specific error message based on reason
         if error_reason and error_reason.startswith("booking_limit:"):
             count = error_reason.split(":")[1]
@@ -365,32 +375,32 @@ async def create_booking(message: types.Message, state: FSMContext, real_user_id
                 "• У вас уже есть 3 активных бронирования\n"
                 "• Товар уже забронирован другим покупателем"
             )
-        
+
         if lang == "uz":
             await message.answer(error_msg_uz)
         else:
             await message.answer(error_msg_ru)
         await state.clear()
         return
-    
+
     # Update metrics
     if METRICS:
         METRICS["bookings_created"] = METRICS.get("bookings_created", 0) + 1
-    
+
     logger.info(f"✅ Booking created: id={booking_id}, code={code}, user={user_id}")
-    
+
     await state.clear()
-    
+
     # Get store info
     store = db.get_store(store_id) if store_id else None
     store_name = get_store_field(store, "name", "Магазин")
     store_address = get_store_field(store, "address", "")
     owner_id = get_store_field(store, "owner_id")
-    
+
     # Calculate total (no delivery cost for pickup)
     total = calculate_total(offer_price, quantity, 0)
     code_display = format_booking_code(code, booking_id)
-    
+
     # Notify customer (pickup only - delivery handled by orders.py)
     if lang == "uz":
         customer_msg = (
@@ -416,9 +426,9 @@ async def create_booking(message: types.Message, state: FSMContext, real_user_id
             f"━━━━━━━━━━━━━━━━━━\n\n"
             f"💡 После подтверждения вы получите код бронирования и QR-код."
         )
-    
+
     await message.answer(customer_msg, parse_mode="HTML", reply_markup=main_menu_customer(lang))
-    
+
     # Notify partner
     if owner_id:
         await notify_partner_new_booking(
@@ -444,18 +454,19 @@ async def notify_partner_new_booking(
     """Send new booking notification to partner (pickup only)."""
     if not db or not bot:
         return
-    
+
     partner_lang = db.get_user_language(owner_id)
     customer = get_user_safe(db, customer_id)
-    
+
     # Use get_user_field for dict/model compatible access
     from .utils import get_user_field
-    customer_phone = get_user_field(customer, 'phone') or "Не указан"
-    customer_username = get_user_field(customer, 'username')
-    
+
+    customer_phone = get_user_field(customer, "phone") or "Не указан"
+    customer_username = get_user_field(customer, "username")
+
     # Build notification (pickup - no delivery info)
     contact_info = f"@{customer_username}" if customer_username else customer_phone
-    
+
     if partner_lang == "uz":
         text = (
             f"🔔 <b>Yangi bron!</b>\n\n"
@@ -480,12 +491,12 @@ async def notify_partner_new_booking(
         )
         confirm_text = "✅ Подтвердить"
         reject_text = "❌ Отклонить"
-    
+
     kb = InlineKeyboardBuilder()
     kb.button(text=confirm_text, callback_data=f"partner_confirm_{booking_id}")
     kb.button(text=reject_text, callback_data=f"partner_reject_{booking_id}")
     kb.adjust(2)
-    
+
     try:
         await bot.send_message(owner_id, text, parse_mode="HTML", reply_markup=kb.as_markup())
     except Exception as e:
@@ -494,63 +505,66 @@ async def notify_partner_new_booking(
 
 # ===================== VIEW BOOKINGS =====================
 
+
 @router.callback_query(F.data.in_(["bookings_active", "bookings_completed", "bookings_cancelled"]))
 async def filter_bookings(callback: types.CallbackQuery) -> None:
     """Show filtered bookings list."""
     if not db:
         await callback.answer("System error", show_alert=True)
         return
-    
+
     user_id = callback.from_user.id
     lang = db.get_user_language(user_id)
-    
+
     status_map = {
         "bookings_active": "active",
         "bookings_completed": "completed",
         "bookings_cancelled": "cancelled",
     }
     status = status_map.get(callback.data, "active")
-    
+
     bookings = db.get_user_bookings_by_status(user_id, status)
-    
+
     if not bookings:
         await callback.answer(
-            get_text(lang, f"no_{status}_bookings") or "Нет бронирований",
-            show_alert=True
+            get_text(lang, f"no_{status}_bookings") or "Нет бронирований", show_alert=True
         )
         return
-    
+
     # Build list
     if lang == "uz":
         text = f"📋 <b>Bronlar ({status})</b>\n\n"
     else:
         text = f"📋 <b>Бронирования ({status})</b>\n\n"
-    
+
     for booking in bookings[:10]:
-        b_id = get_booking_field(booking, 'booking_id')
-        code = get_booking_field(booking, 'code')
-        qty = get_booking_field(booking, 'quantity', 1)
-        created = get_booking_field(booking, 'created_at', '')
-        
+        b_id = get_booking_field(booking, "booking_id")
+        code = get_booking_field(booking, "code")
+        qty = get_booking_field(booking, "quantity", 1)
+        created = get_booking_field(booking, "created_at", "")
+
         # Get joined offer info (usually at positions 8+)
-        offer_title = booking[8] if isinstance(booking, (list, tuple)) and len(booking) > 8 else "Товар"
+        offer_title = (
+            booking[8] if isinstance(booking, (list, tuple)) and len(booking) > 8 else "Товар"
+        )
         offer_price = booking[9] if isinstance(booking, (list, tuple)) and len(booking) > 9 else 0
-        
+
         total = int(offer_price * qty)
         code_display = format_booking_code(code, b_id)
-        
+
         text += (
             f"🍽 <b>{_esc(offer_title)}</b>\n"
             f"📦 {qty} × {int(offer_price):,} = {total:,}\n"
             f"🎫 <code>{code_display}</code>\n"
             f"📅 {created}\n\n"
         )
-    
+
     await safe_answer_or_send(callback.message, user_id, text, bot=bot, parse_mode="HTML")
     await callback.answer()
 
 
 # ===================== CANCEL BOOKING =====================
+
 
 @router.callback_query(F.data.regexp(r"^cancel_booking_\d+$"))
 async def cancel_booking_confirm(callback: types.CallbackQuery) -> None:
@@ -558,26 +572,26 @@ async def cancel_booking_confirm(callback: types.CallbackQuery) -> None:
     if not db:
         await callback.answer("System error", show_alert=True)
         return
-    
+
     user_id = callback.from_user.id
     lang = db.get_user_language(user_id)
-    
+
     try:
         booking_id = int(callback.data.split("_")[-1])
     except ValueError:
         await callback.answer(get_text(lang, "error"), show_alert=True)
         return
-    
+
     booking = db.get_booking(booking_id)
     if not booking:
         await callback.answer(get_text(lang, "booking_not_found"), show_alert=True)
         return
-    
+
     # Check ownership
-    if get_booking_field(booking, 'user_id') != user_id:
+    if get_booking_field(booking, "user_id") != user_id:
         await callback.answer(get_text(lang, "error"), show_alert=True)
         return
-    
+
     kb = InlineKeyboardBuilder()
     if lang == "uz":
         kb.button(text="✅ Ha, bekor qilish", callback_data=f"confirm_cancel_{booking_id}")
@@ -588,7 +602,7 @@ async def cancel_booking_confirm(callback: types.CallbackQuery) -> None:
         kb.button(text="❌ Нет", callback_data="noop")
         text = "❓ Вы уверены, что хотите отменить бронирование?"
     kb.adjust(2)
-    
+
     await safe_answer_or_send(callback.message, user_id, text, bot=bot, reply_markup=kb.as_markup())
     await callback.answer()
 
@@ -599,40 +613,39 @@ async def confirm_cancel_booking(callback: types.CallbackQuery) -> None:
     if not db:
         await callback.answer("System error", show_alert=True)
         return
-    
+
     user_id = callback.from_user.id
     lang = db.get_user_language(user_id)
-    
+
     try:
         booking_id = int(callback.data.split("_")[-1])
     except ValueError:
         await callback.answer(get_text(lang, "error"), show_alert=True)
         return
-    
+
     booking = db.get_booking(booking_id)
     if not booking:
         await callback.answer(get_text(lang, "booking_not_found"), show_alert=True)
         return
-    
+
     # Check ownership
-    if get_booking_field(booking, 'user_id') != user_id:
+    if get_booking_field(booking, "user_id") != user_id:
         await callback.answer(get_text(lang, "error"), show_alert=True)
         return
-    
+
     # Cancel and restore quantity
     success = db.cancel_booking(booking_id)
     if success:
         # Restore offer quantity
-        offer_id = get_booking_field(booking, 'offer_id')
-        qty = get_booking_field(booking, 'quantity', 1)
+        offer_id = get_booking_field(booking, "offer_id")
+        qty = get_booking_field(booking, "quantity", 1)
         try:
             db.increment_offer_quantity_atomic(offer_id, int(qty))
         except Exception as e:
             logger.error(f"Failed to restore quantity: {e}")
-        
+
         await callback.answer(
-            get_text(lang, "booking_cancelled") or "Бронирование отменено",
-            show_alert=True
+            get_text(lang, "booking_cancelled") or "Бронирование отменено", show_alert=True
         )
         await safe_edit_reply_markup(callback.message)
     else:

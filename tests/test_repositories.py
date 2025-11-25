@@ -1,8 +1,8 @@
 """Tests for repository layer."""
 from __future__ import annotations
 
-from typing import Any, Optional
-from unittest.mock import MagicMock, Mock
+from typing import Any
+from unittest.mock import Mock
 
 import pytest
 
@@ -31,7 +31,7 @@ class MockDatabase:
         self.offers = {}
         self.bookings = {}
 
-    def get_user(self, user_id: int) -> Optional[dict[str, Any]]:
+    def get_user(self, user_id: int) -> dict[str, Any] | None:
         """Get user by ID."""
         return self.users.get(user_id)
 
@@ -39,9 +39,9 @@ class MockDatabase:
         self,
         user_id: int,
         language: str = "ru",
-        first_name: Optional[str] = None,
-        phone: Optional[str] = None,
-        city: Optional[str] = None,
+        first_name: str | None = None,
+        phone: str | None = None,
+        city: str | None = None,
     ) -> None:
         """Add user."""
         self.users[user_id] = {
@@ -52,7 +52,7 @@ class MockDatabase:
             "city": city,
         }
 
-    def get_store(self, store_id: int) -> Optional[dict[str, Any]]:
+    def get_store(self, store_id: int) -> dict[str, Any] | None:
         """Get store by ID."""
         return self.stores.get(store_id)
 
@@ -61,10 +61,10 @@ class MockDatabase:
         owner_id: int,
         name: str,
         city: str,
-        address: Optional[str] = None,
-        description: Optional[str] = None,
-        category: Optional[str] = None,
-        phone: Optional[str] = None,
+        address: str | None = None,
+        description: str | None = None,
+        category: str | None = None,
+        phone: str | None = None,
         business_type: str = "individual",
     ) -> int:
         """Add store."""
@@ -82,11 +82,11 @@ class MockDatabase:
         }
         return store_id
 
-    def get_offer(self, offer_id: int) -> Optional[dict[str, Any]]:
+    def get_offer(self, offer_id: int) -> dict[str, Any] | None:
         """Get offer by ID."""
         return self.offers.get(offer_id)
 
-    def get_booking(self, booking_id: int) -> Optional[dict[str, Any]]:
+    def get_booking(self, booking_id: int) -> dict[str, Any] | None:
         """Get booking by ID."""
         return self.bookings.get(booking_id)
 

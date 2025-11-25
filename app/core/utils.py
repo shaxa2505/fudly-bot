@@ -1,8 +1,9 @@
 """Shared helper utilities reused across handlers and services."""
 from __future__ import annotations
 
+from collections.abc import Mapping, Sequence
 from datetime import datetime, timedelta, timezone
-from typing import Any, Dict, Mapping, MutableMapping, Sequence
+from typing import Any
 
 # Узбекская временная зона (UTC+5)
 UZB_TZ = timezone(timedelta(hours=5))
@@ -29,16 +30,16 @@ def get_user_field(user: Any, field_name: str, default: Any = None) -> Any:
     """Safely extract field from user (dict or tuple)."""
     if not user:
         return default
-    
+
     # Try dict-like access first (works for dict and HybridRow)
     try:
         return user[field_name]
     except (KeyError, TypeError, IndexError):
         pass
-        
+
     if isinstance(user, Mapping):
         return user.get(field_name, default)
-        
+
     # Tuple indexing: 0=id, 1=lang, 2=name, 3=phone, 4=city, 5=created_at, 6=role, 7=store_id, 8=notif
     field_map = {
         "id": 0,
@@ -147,16 +148,16 @@ def get_booking_field(booking: Any, field_name: str, default: Any = None) -> Any
     """Safely extract field from booking (dict or tuple)."""
     if not booking:
         return default
-    
+
     # Try dict-like access first
     try:
         return booking[field_name]
     except (KeyError, TypeError, IndexError):
         pass
-    
+
     if isinstance(booking, Mapping):
         return booking.get(field_name, default)
-    
+
     field_map = {
         "booking_id": 0,
         "offer_id": 1,
@@ -182,16 +183,16 @@ def get_order_field(order: Any, field_name: str, default: Any = None) -> Any:
     """Safely extract field from order (dict or tuple)."""
     if not order:
         return default
-    
+
     # Try dict-like access first
     try:
         return order[field_name]
     except (KeyError, TypeError, IndexError):
         pass
-    
+
     if isinstance(order, Mapping):
         return order.get(field_name, default)
-    
+
     field_map = {
         "order_id": 0,
         "user_id": 1,

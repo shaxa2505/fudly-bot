@@ -1,9 +1,9 @@
 """Offer repository for offer-related database operations."""
 from __future__ import annotations
 
-from typing import Any, Optional
+from typing import Any
 
-from app.core.exceptions import DatabaseException, OfferNotFoundException
+from app.core.exceptions import OfferNotFoundException
 
 from .base import BaseRepository
 
@@ -11,7 +11,7 @@ from .base import BaseRepository
 class OfferRepository(BaseRepository):
     """Repository for offer-related database operations."""
 
-    def get_offer(self, offer_id: int) -> Optional[dict[str, Any]]:
+    def get_offer(self, offer_id: int) -> dict[str, Any] | None:
         """Get offer by ID.
 
         Args:
@@ -50,16 +50,16 @@ class OfferRepository(BaseRepository):
         self,
         store_id: int,
         title: str,
-        description: Optional[str] = None,
-        original_price: Optional[float] = None,
-        discount_price: Optional[float] = None,
+        description: str | None = None,
+        original_price: float | None = None,
+        discount_price: float | None = None,
         quantity: int = 1,
-        available_from: Optional[str] = None,
-        available_until: Optional[str] = None,
-        expiry_date: Optional[str] = None,
-        photo: Optional[str] = None,
+        available_from: str | None = None,
+        available_until: str | None = None,
+        expiry_date: str | None = None,
+        photo: str | None = None,
         unit: str = "шт",
-        category: Optional[str] = None,
+        category: str | None = None,
     ) -> int:
         """Add new offer.
 
@@ -105,17 +105,17 @@ class OfferRepository(BaseRepository):
     def update_offer(
         self,
         offer_id: int,
-        title: Optional[str] = None,
-        description: Optional[str] = None,
-        original_price: Optional[float] = None,
-        discount_price: Optional[float] = None,
-        quantity: Optional[int] = None,
-        available_from: Optional[str] = None,
-        available_until: Optional[str] = None,
-        expiry_date: Optional[str] = None,
-        photo: Optional[str] = None,
-        unit: Optional[str] = None,
-        category: Optional[str] = None,
+        title: str | None = None,
+        description: str | None = None,
+        original_price: float | None = None,
+        discount_price: float | None = None,
+        quantity: int | None = None,
+        available_from: str | None = None,
+        available_until: str | None = None,
+        expiry_date: str | None = None,
+        photo: str | None = None,
+        unit: str | None = None,
+        category: str | None = None,
     ) -> None:
         """Update offer data.
 
@@ -170,7 +170,7 @@ class OfferRepository(BaseRepository):
             self._handle_db_error("set_offer_status", e)
 
     def get_active_offers(
-        self, city: Optional[str] = None, category: Optional[str] = None, limit: Optional[int] = None
+        self, city: str | None = None, category: str | None = None, limit: int | None = None
     ) -> list[dict[str, Any]]:
         """Get active offers.
 

@@ -3,14 +3,15 @@ from __future__ import annotations
 
 from aiogram import F, Router, types
 
-from logging_config import logger
 from handlers.bookings.utils import safe_answer_or_send as _safe_answer_or_send
+from logging_config import logger
+
 from .utils import get_db, get_store_field
 
 router = Router()
 
 
-@router.message(F.text.startswith('/pickup '))
+@router.message(F.text.startswith("/pickup "))
 async def seller_check_pickup_code(message: types.Message) -> None:
     """Seller command to verify pickup code and mark booking as completed.
 
@@ -46,7 +47,11 @@ async def seller_check_pickup_code(message: types.Message) -> None:
         return
 
     # Validate that seller owns the store for this booking
-    store_id = booking.get('store_id') if isinstance(booking, dict) else (booking[1] if len(booking) > 1 else None)
+    store_id = (
+        booking.get("store_id")
+        if isinstance(booking, dict)
+        else (booking[1] if len(booking) > 1 else None)
+    )
     owner_ok = False
     for s in stores:
         sid = get_store_field(s, "store_id")
@@ -59,7 +64,11 @@ async def seller_check_pickup_code(message: types.Message) -> None:
         return
 
     try:
-        booking_id = booking.get('booking_id') if isinstance(booking, dict) else (booking[0] if len(booking) > 0 else None)
+        booking_id = (
+            booking.get("booking_id")
+            if isinstance(booking, dict)
+            else (booking[0] if len(booking) > 0 else None)
+        )
         if booking_id is None:
             await message.answer("❌ Invalid booking record")
             return
@@ -67,9 +76,15 @@ async def seller_check_pickup_code(message: types.Message) -> None:
         await message.answer(f"✅ Booking {booking_id} marked as completed")
         # Notify customer optionally
         try:
-            user_id = booking.get('user_id') if isinstance(booking, dict) else (booking[2] if len(booking) > 2 else None)
+            user_id = (
+                booking.get("user_id")
+                if isinstance(booking, dict)
+                else (booking[2] if len(booking) > 2 else None)
+            )
             if user_id:
-                await _safe_answer_or_send(None, user_id, f"🎉 Ваш заказ {booking_id} выдан. Спасибо!")
+                await _safe_answer_or_send(
+                    None, user_id, f"🎉 Ваш заказ {booking_id} выдан. Спасибо!"
+                )
         except Exception:
             pass
     except Exception as e:

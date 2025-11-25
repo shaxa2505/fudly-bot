@@ -1,0 +1,359 @@
+openapi: 3.1.0
+info:
+  title: Fudly Bot API
+  description: |
+    API documentation for Fudly Telegram Bot.
+
+    Fudly is a food rescue platform connecting stores with customers
+    to reduce food waste by selling surplus food at discounted prices.
+
+    ## Endpoints
+    - **Webhook** - Telegram bot webhook endpoint
+    - **Health** - Service health check
+    - **Metrics** - Prometheus-compatible metrics
+    - **WebSocket** - Real-time notifications
+
+  version: 2.0.0
+  contact:
+    name: Fudly Support
+    email: support@fudly.uz
+  license:
+    name: MIT
+    url: https://opensource.org/licenses/MIT
+
+servers:
+  - url: https://fudly-bot-production.up.railway.app
+    description: Production server (Railway)
+  - url: http://localhost:8080
+    description: Local development server
+
+tags:
+  - name: health
+    description: Health check endpoints
+  - name: metrics
+    description: Monitoring and metrics
+  - name: webhook
+    description: Telegram webhook
+  - name: websocket
+    description: Real-time notifications
+
+paths:
+  /health:
+    get:
+      tags:
+        - health
+      summary: Health check
+      description: Returns service health status and uptime information
+      operationId: healthCheck
+      responses:
+        '200':
+          description: Service is healthy
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthResponse'
+              example:
+                status: ok
+                timestamp: "2025-11-26T12:00:00Z"
+                uptime: 3600.5
+                version: "2.0.0"
+                database: connected
+                redis: connected
+
+  /metrics:
+    get:
+      tags:
+        - metrics
+      summary: Prometheus metrics
+      description: |
+        Returns metrics in Prometheus text format.
+
+        Available metrics:
+        - `fudly_requests_total` - Total HTTP requests
+        - `fudly_request_duration_seconds` - Request latency histogram
+        - `fudly_active_users` - Active users gauge
+        - `fudly_bookings_total` - Total bookings counter
+        - `fudly_offers_active` - Active offers gauge
+        - `fudly_uptime_seconds` - Bot uptime
+      operationId: getMetrics
+      responses:
+        '200':
+          description: Prometheus metrics
+          content:
+            text/plain:
+              schema:
+                type: string
+              example: |
+                # HELP fudly_uptime_seconds Bot uptime in seconds
+                # TYPE fudly_uptime_seconds gauge
+                fudly_uptime_seconds 3600.00
+
+                # HELP fudly_requests_total Total number of requests
+                # TYPE fudly_requests_total counter
+                fudly_requests_total{handler="start",status="success"} 150
+
+  /webhook:
+    post:
+      tags:
+        - webhook
+      summary: Telegram webhook
+      description: |
+        Receives updates from Telegram Bot API.
+        This endpoint is called by Telegram servers when users interact with the bot.
+
+        **Security**: The endpoint validates the request comes from Telegram
+        by checking the bot token in the URL path.
+      operationId: telegramWebhook
+      security:
+        - botToken: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TelegramUpdate'
+      responses:
+        '200':
+          description: Update processed successfully
+        '401':
+          description: Invalid bot token
+        '500':
+          description: Internal server error
+
+  /ws/notifications/{user_id}:
+    get:
+      tags:
+        - websocket
+      summary: WebSocket notifications
+      description: |
+        WebSocket endpoint for real-time notifications.
+
+        Clients connect to receive instant updates about:
+        - New bookings
+        - Booking status changes
+        - New offers in favorite stores
+        - Order confirmations
+
+        **Protocol**: WebSocket (ws:// or wss://)
+      operationId: websocketNotifications
+      parameters:
+        - name: user_id
+          in: path
+          required: true
+          description: Telegram user ID
+          schema:
+            type: integer
+            format: int64
+            example: 123456789
+      responses:
+        '101':
+          description: WebSocket connection established
+        '400':
+          description: Invalid user ID
+
+  /api/v1/offers:
+    get:
+      tags:
+        - offers
+      summary: List active offers
+      description: Returns list of active offers with optional filtering
+      operationId: listOffers
+      parameters:
+        - name: city
+          in: query
+          description: Filter by city
+          schema:
+            type: string
+            example: Tashkent
+        - name: category
+          in: query
+          description: Filter by product category
+          schema:
+            type: string
+            enum:
+              - bakery
+              - dairy
+              - meat
+              - vegetables
+              - fruits
+              - beverages
+              - ready_meals
+              - other
+        - name: limit
+          in: query
+          description: Maximum number of results
+          schema:
+            type: integer
+            default: 20
+            maximum: 100
+        - name: offset
+          in: query
+          description: Pagination offset
+          schema:
+            type: integer
+            default: 0
+      responses:
+        '200':
+          description: List of offers
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  offers:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Offer'
+                  total:
+                    type: integer
+                  has_more:
+                    type: boolean
+
+  /api/v1/search:
+    get:
+      tags:
+        - search
+      summary: Full-text search
+      description: |
+        Search offers and stores using PostgreSQL full-text search.
+        Supports Russian and Uzbek languages with synonym expansion.
+      operationId: search
+      parameters:
+        - name: q
+          in: query
+          required: true
+          description: Search query
+          schema:
+            type: string
+            minLength: 2
+            example: "хлеб"
+        - name: city
+          in: query
+          description: Filter by city
+          schema:
+            type: string
+        - name: type
+          in: query
+          description: Search type
+          schema:
+            type: string
+            enum: [offers, stores, all]
+            default: all
+      responses:
+        '200':
+          description: Search results
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SearchResults'
+
+components:
+  securitySchemes:
+    botToken:
+      type: apiKey
+      in: path
+      name: token
+      description: Telegram Bot Token embedded in webhook URL
+
+  schemas:
+    HealthResponse:
+      type: object
+      required:
+        - status
+        - timestamp
+      properties:
+        status:
+          type: string
+          enum: [ok, degraded, error]
+        timestamp:
+          type: string
+          format: date-time
+        uptime:
+          type: number
+          description: Uptime in seconds
+        version:
+          type: string
+        database:
+          type: string
+          enum: [connected, disconnected]
+        redis:
+          type: string
+          enum: [connected, disconnected, disabled]
+
+    TelegramUpdate:
+      type: object
+      description: Telegram Update object
+      properties:
+        update_id:
+          type: integer
+          format: int64
+        message:
+          type: object
+        callback_query:
+          type: object
+        inline_query:
+          type: object
+
+    Offer:
+      type: object
+      properties:
+        offer_id:
+          type: integer
+        title:
+          type: string
+          example: "Свежий хлеб"
+        description:
+          type: string
+        original_price:
+          type: number
+          example: 15000
+        discount_price:
+          type: number
+          example: 7500
+        quantity:
+          type: integer
+        unit:
+          type: string
+          enum: [шт, кг, л, уп]
+        category:
+          type: string
+        store_id:
+          type: integer
+        store_name:
+          type: string
+        city:
+          type: string
+        expiry_date:
+          type: string
+          format: date
+        photo:
+          type: string
+          description: Telegram file_id for photo
+        created_at:
+          type: string
+          format: date-time
+
+    SearchResults:
+      type: object
+      properties:
+        query:
+          type: string
+        total:
+          type: integer
+        offers:
+          type: array
+          items:
+            $ref: '#/components/schemas/Offer'
+        stores:
+          type: array
+          items:
+            type: object
+            properties:
+              store_id:
+                type: integer
+              name:
+                type: string
+              city:
+                type: string
+              rating:
+                type: number

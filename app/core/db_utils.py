@@ -1,21 +1,21 @@
 """Utility functions for working with database results (dict or tuple format)."""
-from typing import Any, Union
+from typing import Any
 
 
-def safe_get(data: Union[dict, tuple, list], key: Union[str, int], default: Any = None) -> Any:
+def safe_get(data: dict | tuple | list, key: str | int, default: Any = None) -> Any:
     """
     Safely get value from dict (by key) or tuple/list (by index).
-    
+
     Works with both PostgreSQL (dict) and SQLite (tuple) formats.
-    
+
     Args:
         data: Dictionary or tuple/list
         key: String key for dict, integer index for tuple/list
         default: Default value if key/index not found
-        
+
     Returns:
         Value from data or default
-        
+
     Examples:
         >>> safe_get({'name': 'Test'}, 'name')
         'Test'

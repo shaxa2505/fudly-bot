@@ -1,35 +1,47 @@
 """
 User command handlers (start, language selection, city selection, cancel actions).
 """
-from typing import Optional, Any, Callable
-from aiogram import types, Router, F
+from typing import Any
+
+from aiogram import F, Router, types
 from aiogram.filters import Command
 from aiogram.fsm.context import FSMContext
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
 from database_protocol import DatabaseProtocol
-from localization import get_text, get_cities
-from app.keyboards import city_keyboard, main_menu_seller, main_menu_customer, language_keyboard, phone_request_keyboard
-from handlers.common.utils import user_view_mode, has_approved_store
+
+# Type alias for booking/offer dict
+RowDict = dict[str, Any]
+from app.keyboards import (
+    language_keyboard,
+    main_menu_customer,
+    main_menu_seller,
+    phone_request_keyboard,
+)
 from handlers.common.states import Registration
+from handlers.common.utils import has_approved_store, user_view_mode
+from localization import get_cities, get_text
 
 try:
     from logging_config import logger
 except ImportError:
     import logging
+
     logger = logging.getLogger(__name__)
 
-router = Router(name='commands')
+router = Router(name="commands")
 
 
 async def handle_qr_pickup(message: types.Message, db: DatabaseProtocol, booking_code: str):
     """Handle QR code scan for pickup confirmation."""
+    if not message.from_user:
+        return
     user_id = message.from_user.id
     lang = db.get_user_language(user_id)
-    
+
     # Find booking by code
     booking = db.get_booking_by_code(booking_code)
-    
+
     if not booking:
         # Try numeric ID
         try:
@@ -37,75 +49,73 @@ async def handle_qr_pickup(message: types.Message, db: DatabaseProtocol, booking
             booking = db.get_booking(booking_id)
         except ValueError:
             pass
-    
+
     if not booking:
-        await message.answer(
-            "❌ Бронирование не найдено" if lang == "ru" else "❌ Bron topilmadi"
-        )
+        await message.answer("❌ Бронирование не найдено" if lang == "ru" else "❌ Bron topilmadi")
         return
-    
+
     # Get booking details
     if isinstance(booking, dict):
-        booking_id = booking.get('booking_id')
-        status = booking.get('status')
-        offer_id = booking.get('offer_id')
-        customer_id = booking.get('user_id')
+        booking_id = booking.get("booking_id")
+        status = booking.get("status")
+        offer_id = booking.get("offer_id")
+        customer_id = booking.get("user_id")
     else:
         booking_id = booking[0] if len(booking) > 0 else None
         status = booking[3] if len(booking) > 3 else None
         offer_id = booking[1] if len(booking) > 1 else None
         customer_id = booking[2] if len(booking) > 2 else None
-    
+
     # Check if user is the store owner
     offer = db.get_offer(offer_id) if offer_id else None
     store_id = None
     if isinstance(offer, dict):
-        store_id = offer.get('store_id')
+        store_id = offer.get("store_id")
     elif offer and len(offer) > 1:
         store_id = offer[1]
-    
+
     store = db.get_store(store_id) if store_id else None
     owner_id = None
     if isinstance(store, dict):
-        owner_id = store.get('owner_id')
+        owner_id = store.get("owner_id")
     elif store and len(store) > 1:
         owner_id = store[1]
-    
+
     # Check permissions
     is_owner = user_id == owner_id
     is_customer = user_id == customer_id
-    
-    if status == 'completed':
+
+    if status == "completed":
         await message.answer(
             "✅ Этот заказ уже выдан" if lang == "ru" else "✅ Bu buyurtma allaqachon berilgan"
         )
         return
-    
-    if status == 'cancelled':
+
+    if status == "cancelled":
         await message.answer(
             "❌ Этот заказ отменён" if lang == "ru" else "❌ Bu buyurtma bekor qilingan"
         )
         return
-    
+
     if is_owner:
         # Owner scanned - show complete button
         kb = InlineKeyboardBuilder()
         kb.button(
             text="✅ Подтвердить выдачу" if lang == "ru" else "✅ Berilganini tasdiqlash",
-            callback_data=f"complete_booking_{booking_id}"
+            callback_data=f"complete_booking_{booking_id}",
         )
         kb.adjust(1)
-        
+
         await message.answer(
             f"📦 <b>Бронь #{booking_id}</b>\n\n"
             f"Статус: {status}\n"
             f"Нажмите кнопку чтобы подтвердить выдачу."
-            if lang == "ru" else
-            f"📦 <b>Bron #{booking_id}</b>\n\n"
+            if lang == "ru"
+            else f"📦 <b>Bron #{booking_id}</b>\n\n"
             f"Holat: {status}\n"
             f"Berilganini tasdiqlash uchun tugmani bosing.",
             parse_mode="HTML",
-            reply_markup=kb.as_markup()
+            reply_markup=kb.as_markup(),
         )
     elif is_customer:
         # Customer scanned their own QR - just show status
@@ -113,67 +123,76 @@ async def handle_qr_pickup(message: types.Message, db: DatabaseProtocol, booking
             f"📦 <b>Ваша бронь #{booking_id}</b>\n\n"
             f"Статус: {status}\n\n"
             f"Покажите этот QR-код продавцу для получения."
-            if lang == "ru" else
-            f"📦 <b>Sizning broningiz #{booking_id}</b>\n\n"
+            if lang == "ru"
+            else f"📦 <b>Sizning broningiz #{booking_id}</b>\n\n"
             f"Holat: {status}\n\n"
             f"Olish uchun bu QR kodni sotuvchiga ko'rsating.",
-            parse_mode="HTML"
+            parse_mode="HTML",
         )
     else:
         # Someone else scanned
         await message.answer(
             "⚠️ Вы не являетесь владельцем этого заказа или магазина"
-            if lang == "ru" else
-            "⚠️ Siz bu buyurtma yoki do'kon egasi emassiz"
+            if lang == "ru"
+            else "⚠️ Siz bu buyurtma yoki do'kon egasi emassiz"
         )
 
 
-@router.message(F.text.in_([get_text('ru', 'my_city'), get_text('uz', 'my_city')]))
-async def change_city(message: types.Message, state: Optional[FSMContext] = None, db: DatabaseProtocol = None):
-    if not db:
+@router.message(F.text.in_([get_text("ru", "my_city"), get_text("uz", "my_city")]))
+async def change_city(
+    message: types.Message, state: FSMContext | None = None, db: DatabaseProtocol | None = None
+):
+    if not db or not message.from_user:
         return
-    
+
     user_id = message.from_user.id
     lang = db.get_user_language(user_id)
     user = db.get_user_model(user_id)
     current_city = user.city if user else get_cities(lang)[0]
     if not current_city:
         current_city = get_cities(lang)[0]
-    
+
     stats_text = ""
     try:
         stores_count = len(db.get_stores_by_city(current_city))
         offers_count = len(db.get_active_offers(city=current_city))
-        stats_text = f"\n\n📊 В вашем городе:\n🏪 Магазинов: {stores_count}\n🍽 Предложений: {offers_count}"
+        stats_text = (
+            f"\n\n📊 В вашем городе:\n🏪 Магазинов: {stores_count}\n🍽 Предложений: {offers_count}"
+        )
     except:
         pass
-    
+
     builder = InlineKeyboardBuilder()
     builder.button(
-        text="✏️ Изменить город" if lang == 'ru' else "✏️ Shaharni o'zgartirish",
-        callback_data="change_city"
+        text="✏️ Изменить город" if lang == "ru" else "✏️ Shaharni o'zgartirish",
+        callback_data="change_city",
     )
-    builder.button(
-        text="◀️ Назад" if lang == 'ru' else "◀️ Orqaga",
-        callback_data="back_to_menu"
-    )
+    builder.button(text="◀️ Назад" if lang == "ru" else "◀️ Orqaga", callback_data="back_to_menu")
     builder.adjust(1)
-    
+
     await message.answer(
         f"{get_text(lang, 'your_city')}: {current_city}{stats_text}",
         reply_markup=builder.as_markup(),
-        parse_mode="HTML"
+        parse_mode="HTML",
     )
 
 
 @router.callback_query(F.data == "change_city")
-async def show_city_selection(callback: types.CallbackQuery, state: FSMContext, db: DatabaseProtocol):
+async def show_city_selection(
+    callback: types.CallbackQuery, state: FSMContext, db: DatabaseProtocol
+):
     """Show list of cities for selection."""
     lang = db.get_user_language(callback.from_user.id)
-    await callback.message.edit_text(
-        get_text(lang, 'choose_city'),
-        reply_markup=city_keyboard(lang)
-    )
+    if callback.message and hasattr(callback.message, "edit_text"):
+        # For inline keyboard, send new message instead of editing with reply keyboard
+        cities = get_cities(lang)
+        builder = InlineKeyboardBuilder()
+        for city in cities:
+            builder.button(text=city, callback_data=f"select_city:{city}")
+        builder.adjust(2)
+        await callback.message.edit_text(
+            get_text(lang, "choose_city"), reply_markup=builder.as_markup()
+        )
 
 
 @router.callback_query(F.data == "back_to_menu")
@@ -181,152 +200,175 @@ async def back_to_main_menu(callback: types.CallbackQuery, db: DatabaseProtocol)
     """Return to main menu."""
     lang = db.get_user_language(callback.from_user.id)
     user = db.get_user_model(callback.from_user.id)
-    user_role = user.role if user else 'customer'
-    
-    if user_view_mode is not None and user_role == 'seller':
+    user_role = user.role if user else "customer"
+
+    if user_view_mode and user_role == "seller":
         if callback.from_user.id not in user_view_mode:
-            user_view_mode[callback.from_user.id] = 'seller'
-    
+            user_view_mode[callback.from_user.id] = "seller"
+
     menu = main_menu_seller(lang) if user_role == "seller" else main_menu_customer(lang)
-    
-    await callback.message.delete()
-    await callback.message.answer(
-        get_text(lang, 'main_menu') if 'main_menu' in dir() else "Главное меню",
-        reply_markup=menu
-    )
+
+    if callback.message:
+        try:
+            await callback.message.delete()
+        except Exception:
+            pass
+        await callback.message.answer(get_text(lang, "main_menu"), reply_markup=menu)
     await callback.answer()
 
 
-@router.message(F.text.in_(get_cities('ru') + get_cities('uz')))
-async def change_city_text(message: types.Message, state: Optional[FSMContext] = None, db: DatabaseProtocol = None):
+@router.message(F.text.in_(get_cities("ru") + get_cities("uz")))
+async def change_city_text(
+    message: types.Message, state: FSMContext | None = None, db: DatabaseProtocol | None = None
+):
     """Quick city change handler (without FSM state)."""
-    if not db:
+    if not db or not message.from_user or not message.text:
         return
-    
+
     user_id = message.from_user.id
     lang = db.get_user_language(user_id)
     user = db.get_user_model(user_id)
     new_city = message.text
-    
+
     db.update_user_city(user_id, new_city)
-    
-    user_role = user.role or 'customer' if user else 'customer'
+
+    user_role = user.role or "customer" if user else "customer"
     menu = main_menu_seller(lang) if user_role == "seller" else main_menu_customer(lang)
-    
+
     await message.answer(
-        f"✅ Город изменён на <b>{new_city}</b>" if lang == 'ru' else f"✅ Shahar <b>{new_city}</b>ga o'zgartirildi",
+        f"✅ Город изменён на <b>{new_city}</b>"
+        if lang == "ru"
+        else f"✅ Shahar <b>{new_city}</b>ga o'zgartirildi",
         parse_mode="HTML",
-        reply_markup=menu
+        reply_markup=menu,
     )
 
 
 @router.message(Command("start"))
 async def cmd_start(message: types.Message, state: FSMContext, db: DatabaseProtocol):
-    # Check for deep link arguments (e.g., /start pickup_CODE)
-    args = message.text.split(maxsplit=1)
-    if len(args) > 1:
-        deep_link = args[1]
-        if deep_link.startswith("pickup_"):
-            # QR code scan - redirect to pickup confirmation
-            booking_code = deep_link.replace("pickup_", "")
-            await handle_qr_pickup(message, db, booking_code)
-            return
-    
-    user = db.get_user_model(message.from_user.id)
-    
-    if not user:
-        await message.answer(
-            get_text('ru', 'welcome'),
-            parse_mode="HTML"
-        )
-        await message.answer(
-            get_text('ru', 'choose_language'),
-            reply_markup=language_keyboard()
-        )
+    if not message.from_user:
         return
-    
+
+    # Check for deep link arguments (e.g., /start pickup_CODE)
+    if message.text:
+        args = message.text.split(maxsplit=1)
+        if len(args) > 1:
+            deep_link = args[1]
+            if deep_link.startswith("pickup_"):
+                # QR code scan - redirect to pickup confirmation
+                booking_code = deep_link.replace("pickup_", "")
+                await handle_qr_pickup(message, db, booking_code)
+                return
+
+    user = db.get_user_model(message.from_user.id)
+
+    if not user:
+        await message.answer(get_text("ru", "welcome"), parse_mode="HTML")
+        await message.answer(get_text("ru", "choose_language"), reply_markup=language_keyboard())
+        return
+
     lang = db.get_user_language(message.from_user.id)
     user_phone = user.phone
     user_city = user.city
-    user_role = user.role or 'customer'
-    
+    user_role = user.role or "customer"
+
     if not user_phone:
         await message.answer(
-            get_text(lang, 'welcome_phone_step'),
+            get_text(lang, "welcome_phone_step"),
             parse_mode="HTML",
-            reply_markup=phone_request_keyboard(lang)
+            reply_markup=phone_request_keyboard(lang),
         )
         await state.set_state(Registration.phone)
         return
-    
-    if user_view_mode is not None and user_role == 'seller':
-        user_view_mode[message.from_user.id] = 'seller'
-    
+
+    if user_view_mode and user_role == "seller":
+        user_view_mode[message.from_user.id] = "seller"
+
     menu = main_menu_seller(lang) if user_role == "seller" else main_menu_customer(lang)
     await message.answer(
-        get_text(lang, 'welcome_back', name=message.from_user.first_name, city=user_city or 'Ташкент'),
+        get_text(
+            lang, "welcome_back", name=message.from_user.first_name, city=user_city or "Ташкент"
+        ),
         parse_mode="HTML",
-        reply_markup=menu
+        reply_markup=menu,
     )
 
 
 @router.callback_query(F.data.startswith("lang_"))
 async def choose_language(callback: types.CallbackQuery, state: FSMContext, db: DatabaseProtocol):
+    if not callback.data or not callback.message:
+        await callback.answer()
+        return
+
     lang = callback.data.split("_")[1]
     user = db.get_user_model(callback.from_user.id)
-    
+
     if not user:
-        db.add_user(callback.from_user.id, callback.from_user.username, callback.from_user.first_name)
-        db.update_user_language(callback.from_user.id, lang)
-        await callback.message.edit_text(get_text(lang, 'language_changed'))
-        await callback.message.answer(
-            get_text(lang, 'welcome_phone_step'),
-            parse_mode="HTML",
-            reply_markup=phone_request_keyboard(lang)
+        db.add_user(
+            callback.from_user.id, callback.from_user.username, callback.from_user.first_name
         )
+        db.update_user_language(callback.from_user.id, lang)
+        if hasattr(callback.message, "edit_text"):
+            await callback.message.edit_text(get_text(lang, "language_changed"))
+            await callback.message.answer(
+                get_text(lang, "welcome_phone_step"),
+                parse_mode="HTML",
+                reply_markup=phone_request_keyboard(lang),
+            )
         await state.set_state(Registration.phone)
         return
-    
+
     db.update_user_language(callback.from_user.id, lang)
-    await callback.message.edit_text(get_text(lang, 'language_changed'))
-    
+    if hasattr(callback.message, "edit_text"):
+        await callback.message.edit_text(get_text(lang, "language_changed"))
+
     user_phone = user.phone
     user_city = user.city
-    
+
     if not user_phone:
-        await callback.message.answer(
-            get_text(lang, 'welcome_phone_step'),
-            parse_mode="HTML",
-            reply_markup=phone_request_keyboard(lang)
-        )
+        if hasattr(callback.message, "answer"):
+            await callback.message.answer(
+                get_text(lang, "welcome_phone_step"),
+                parse_mode="HTML",
+                reply_markup=phone_request_keyboard(lang),
+            )
         await state.set_state(Registration.phone)
         return
-    
-    user_role = user.role or 'customer'
+
+    user_role = user.role or "customer"
     menu = main_menu_seller(lang) if user_role == "seller" else main_menu_customer(lang)
-    await callback.message.answer(
-        get_text(lang, 'welcome_back', name=callback.from_user.first_name, city=user_city or 'Ташкент'),
-        parse_mode="HTML",
-        reply_markup=menu
-    )
+    if hasattr(callback.message, "answer"):
+        await callback.message.answer(
+            get_text(
+                lang,
+                "welcome_back",
+                name=callback.from_user.first_name,
+                city=user_city or "Ташкент",
+            ),
+            parse_mode="HTML",
+            reply_markup=menu,
+        )
 
 
 @router.message(F.text.contains("Отмена") | F.text.contains("Bekor qilish"))
 async def cancel_action(message: types.Message, state: FSMContext, db: DatabaseProtocol):
+    if not message.from_user:
+        return
+
     lang = db.get_user_language(message.from_user.id)
     current_state = await state.get_state()
-    
-    if current_state in ['Registration:phone', 'Registration:city']:
+
+    if current_state in ["Registration:phone", "Registration:city"]:
         user = db.get_user_model(message.from_user.id)
         user_phone = user.phone if user else None
         if not user or not user_phone:
             await message.answer(
                 "❌ Регистрация обязательна для использования бота.\n\n"
                 "📱 Пожалуйста, поделитесь номером телефона.",
-                reply_markup=phone_request_keyboard(lang)
+                reply_markup=phone_request_keyboard(lang),
             )
             return
-    
+
     await state.clear()
 
     seller_groups = {"RegisterStore", "CreateOffer", "BulkCreate", "ConfirmOrder"}
@@ -344,105 +386,101 @@ async def cancel_action(message: types.Message, state: FSMContext, db: DatabaseP
             preferred_menu = None
 
     user = db.get_user_model(message.from_user.id)
-    role = user.role if user else 'customer'
-    
+    role = user.role if user else "customer"
+
     if current_state and str(current_state).startswith("RegisterStore"):
         await message.answer(
-            get_text(lang, 'operation_cancelled'),
-            reply_markup=main_menu_customer(lang)
+            get_text(lang, "operation_cancelled"), reply_markup=main_menu_customer(lang)
         )
         return
-    
+
     if role == "seller":
         if not has_approved_store(message.from_user.id, db):
             role = "customer"
             preferred_menu = "customer"
-    
+
     view_override = user_view_mode.get(message.from_user.id)
     target = preferred_menu or view_override or ("seller" if role == "seller" else "customer")
     menu = main_menu_seller(lang) if target == "seller" else main_menu_customer(lang)
 
-    await message.answer(
-        get_text(lang, 'operation_cancelled'),
-        reply_markup=menu
-    )
+    await message.answer(get_text(lang, "operation_cancelled"), reply_markup=menu)
 
 
 @router.callback_query(F.data == "cancel_offer")
-async def cancel_offer_callback(callback: types.CallbackQuery, state: FSMContext, db: DatabaseProtocol):
+async def cancel_offer_callback(
+    callback: types.CallbackQuery, state: FSMContext, db: DatabaseProtocol
+):
     """Handler for offer creation cancel button."""
     lang = db.get_user_language(callback.from_user.id)
     await state.clear()
-    
-    await callback.message.edit_text(
-        f"❌ {'Создание товара отменено' if lang == 'ru' else 'Mahsulot yaratish bekor qilindi'}",
-        parse_mode="HTML"
-    )
-    
-    await callback.message.answer(
-        get_text(lang, 'operation_cancelled'),
-        reply_markup=main_menu_seller(lang)
-    )
-    
+
+    if callback.message and hasattr(callback.message, "edit_text"):
+        await callback.message.edit_text(
+            f"❌ {'Создание товара отменено' if lang == 'ru' else 'Mahsulot yaratish bekor qilindi'}",
+            parse_mode="HTML",
+        )
+        await callback.message.answer(
+            get_text(lang, "operation_cancelled"), reply_markup=main_menu_seller(lang)
+        )
+
     await callback.answer()
 
 
 @router.message(Command("mybookings"))
-async def my_bookings_command(message: types.Message, db: DatabaseProtocol = None):
+async def my_bookings_command(message: types.Message, db: DatabaseProtocol | None = None):
     """Show ALL user bookings with cancel buttons - for debugging stuck bookings."""
-    if not db:
+    if not db or not message.from_user:
         return
-    
+
     user_id = message.from_user.id
     lang = db.get_user_language(user_id)
-    
+
     # Get ALL bookings (not just active)
     bookings = db.get_user_bookings(user_id) or []
-    
+
     if not bookings:
         await message.answer(
             "📋 У вас нет бронирований.\n\n/mybookings - проверить брони"
-            if lang == "ru" else
-            "📋 Sizda bronlar yo'q.\n\n/mybookings - bronlarni tekshirish"
+            if lang == "ru"
+            else "📋 Sizda bronlar yo'q.\n\n/mybookings - bronlarni tekshirish"
         )
         return
-    
+
     # Count by status
     status_counts = {}
     for b in bookings:
-        status = b.get('status') if isinstance(b, dict) else 'unknown'
+        status = b.get("status") if isinstance(b, dict) else "unknown"
         status_counts[status] = status_counts.get(status, 0) + 1
-    
+
     text = f"📋 <b>Все ваши бронирования ({len(bookings)})</b>\n\n"
     text += f"Статусы: {status_counts}\n\n"
-    
+
     builder = InlineKeyboardBuilder()
-    
+
     for b in bookings[:10]:  # Max 10
         if isinstance(b, dict):
-            booking_id = b.get('booking_id')
-            status = b.get('status', 'unknown')
-            title = b.get('title', 'Товар')[:20]
-            
+            booking_id = b.get("booking_id")
+            status = b.get("status", "unknown")
+            title = b.get("title", "Товар")[:20]
+
             status_emoji = {
-                'pending': '⏳',
-                'confirmed': '✅', 
-                'active': '🔵',
-                'completed': '✔️',
-                'cancelled': '❌'
-            }.get(status, '❓')
-            
+                "pending": "⏳",
+                "confirmed": "✅",
+                "active": "🔵",
+                "completed": "✔️",
+                "cancelled": "❌",
+            }.get(status, "❓")
+
             text += f"{status_emoji} #{booking_id} | {status} | {title}\n"
-            
+
             # Add cancel button for non-completed/cancelled bookings
-            if status not in ['completed', 'cancelled']:
+            if status not in ["completed", "cancelled"]:
                 builder.button(
-                    text=f"❌ Отменить #{booking_id}",
-                    callback_data=f"force_cancel_{booking_id}"
+                    text=f"❌ Отменить #{booking_id}", callback_data=f"force_cancel_{booking_id}"
                 )
-    
+
     builder.adjust(1)
-    
+
     await message.answer(text, parse_mode="HTML", reply_markup=builder.as_markup())
 
 
@@ -452,43 +490,49 @@ async def force_cancel_booking(callback: types.CallbackQuery, db: DatabaseProtoc
     if not db:
         await callback.answer("Ошибка", show_alert=True)
         return
-    
+
     user_id = callback.from_user.id
     lang = db.get_user_language(user_id)
-    
+
     try:
         booking_id = int(callback.data.split("_")[-1])
     except ValueError:
         await callback.answer("Ошибка ID", show_alert=True)
         return
-    
+
     # Verify ownership
     booking = db.get_booking(booking_id)
     if not booking:
         await callback.answer("Бронь не найдена", show_alert=True)
         return
-    
-    booking_user_id = booking.get('user_id') if isinstance(booking, dict) else booking[2]
+
+    booking_user_id = booking.get("user_id") if isinstance(booking, dict) else booking[2]
     if booking_user_id != user_id:
         await callback.answer("Это не ваша бронь", show_alert=True)
         return
-    
+
     # Cancel booking
     try:
         db.cancel_booking(booking_id)
         await callback.answer(f"✅ Бронь #{booking_id} отменена!", show_alert=True)
-        
+
         # Send new message with updated list
         if callback.message:
             try:
                 await callback.message.delete()
             except:
                 pass
-        
+
         # Get updated bookings count
         bookings = db.get_user_bookings(user_id) or []
-        active = [b for b in bookings if isinstance(b, dict) and b.get('status') in ('pending', 'confirmed', 'active')]
-        await callback.message.answer(f"✅ Отменено! Активных броней: {len(active)}\n\n/mybookings - посмотреть все")
+        active = [
+            b
+            for b in bookings
+            if isinstance(b, dict) and b.get("status") in ("pending", "confirmed", "active")
+        ]
+        await callback.message.answer(
+            f"✅ Отменено! Активных броней: {len(active)}\n\n/mybookings - посмотреть все"
+        )
     except Exception as e:
         await callback.answer(f"Ошибка: {e}", show_alert=True)
 
@@ -498,46 +542,51 @@ async def cancel_all_bookings(message: types.Message, db: DatabaseProtocol = Non
     """Cancel ALL active bookings for user - with direct SQL."""
     if not db:
         return
-    
+
     user_id = message.from_user.id
-    
+
     try:
         with db.get_connection() as conn:
             cursor = conn.cursor()
-            
+
             # First check what's in the DB
             cursor.execute(
                 "SELECT booking_id, status FROM bookings WHERE user_id = %s ORDER BY booking_id",
-                (user_id,)
+                (user_id,),
             )
             all_bookings = cursor.fetchall()
-            
+
             text = f"📊 <b>Ваши бронирования (user_id: {user_id})</b>\n\n"
-            
+
             if all_bookings:
                 for b in all_bookings:
                     bid, status = b[0], b[1]
-                    emoji = {'pending': '⏳', 'confirmed': '✅', 'active': '🔵', 
-                             'completed': '✔️', 'cancelled': '❌'}.get(status, '❓')
+                    emoji = {
+                        "pending": "⏳",
+                        "confirmed": "✅",
+                        "active": "🔵",
+                        "completed": "✔️",
+                        "cancelled": "❌",
+                    }.get(status, "❓")
                     text += f"{emoji} #{bid} - <code>{status}</code>\n"
             else:
                 text += "📭 Нет бронирований\n"
-            
+
             # Now cancel all active ones
             cursor.execute(
                 "UPDATE bookings SET status = 'cancelled' WHERE user_id = %s AND status IN ('active', 'pending', 'confirmed') RETURNING booking_id",
-                (user_id,)
+                (user_id,),
             )
             cancelled = cursor.fetchall()
-            
+
             text += f"\n🔧 <b>Отменено: {len(cancelled)} бронирований</b>"
             if cancelled:
                 text += f"\nID: {[c[0] for c in cancelled]}"
-            
+
             text += "\n\n✅ Теперь можете создавать новые брони!"
-            
+
         await message.answer(text, parse_mode="HTML")
-        
+
     except Exception as e:
         await message.answer(f"❌ Ошибка: {e}")
 
@@ -548,51 +597,61 @@ async def check_db_command(message: types.Message, db: DatabaseProtocol = None):
     if not db:
         await message.answer("❌ База данных недоступна")
         return
-    
+
     user_id = message.from_user.id
-    
+
     try:
         with db.get_connection() as conn:
             cursor = conn.cursor()
-            
+
             # Get ALL bookings for this user with raw data
-            cursor.execute("""
-                SELECT booking_id, status, offer_id, quantity, created_at 
-                FROM bookings 
-                WHERE user_id = %s 
+            cursor.execute(
+                """
+                SELECT booking_id, status, offer_id, quantity, created_at
+                FROM bookings
+                WHERE user_id = %s
                 ORDER BY booking_id DESC
-            """, (user_id,))
+            """,
+                (user_id,),
+            )
             all_bookings = cursor.fetchall()
-            
+
             # Count active bookings
-            cursor.execute("""
-                SELECT COUNT(*) 
-                FROM bookings 
+            cursor.execute(
+                """
+                SELECT COUNT(*)
+                FROM bookings
                 WHERE user_id = %s AND status IN ('active', 'pending', 'confirmed')
-            """, (user_id,))
+            """,
+                (user_id,),
+            )
             active_count = cursor.fetchone()[0]
-            
-            text = f"🔍 <b>Диагностика базы данных</b>\n\n"
+
+            text = "🔍 <b>Диагностика базы данных</b>\n\n"
             text += f"👤 User ID: <code>{user_id}</code>\n"
             text += f"📊 Всего бронирований: {len(all_bookings)}\n"
             text += f"⚡ Активных (pending/confirmed/active): <b>{active_count}</b>\n\n"
-            
+
             if all_bookings:
                 text += "<b>Все брони:</b>\n"
                 for b in all_bookings[:15]:  # Max 15
                     bid, status, offer_id, qty, created = b
-                    emoji = {'pending': '⏳', 'confirmed': '✅', 'active': '🔵', 
-                             'completed': '✔️', 'cancelled': '❌'}.get(status, '❓')
+                    emoji = {
+                        "pending": "⏳",
+                        "confirmed": "✅",
+                        "active": "🔵",
+                        "completed": "✔️",
+                        "cancelled": "❌",
+                    }.get(status, "❓")
                     text += f"{emoji} #{bid} | <code>{status}</code> | offer:{offer_id}\n"
             else:
                 text += "📭 Нет бронирований в базе\n"
-            
+
             text += f"\n💡 Лимит: {active_count}/3"
             if active_count >= 3:
                 text += " (⚠️ ДОСТИГНУТ)"
-            
+
         await message.answer(text, parse_mode="HTML")
-        
+
     except Exception as e:
         await message.answer(f"❌ Ошибка: {e}")
-

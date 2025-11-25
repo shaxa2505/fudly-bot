@@ -7,8 +7,8 @@ from typing import Any
 from aiogram import F, Router, types
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
-from database_protocol import DatabaseProtocol
 from app.core.utils import get_store_field
+from database_protocol import DatabaseProtocol
 from localization import get_text
 from logging_config import logger
 
@@ -49,8 +49,8 @@ async def show_analytics(message: types.Message) -> None:
     keyboard = InlineKeyboardBuilder()
     for store in stores:
         # Dict-compatible access
-        store_id = store.get('store_id') if isinstance(store, dict) else store[0]
-        store_name = store.get('name') if isinstance(store, dict) else store[2]
+        store_id = store.get("store_id") if isinstance(store, dict) else store[0]
+        store_name = store.get("name") if isinstance(store, dict) else store[2]
         keyboard.button(text=f"📊 {store_name}", callback_data=f"analytics_{store_id}")
     keyboard.adjust(1)
 
@@ -67,7 +67,7 @@ async def show_store_analytics(callback: types.CallbackQuery) -> None:
         return
 
     lang = db.get_user_language(callback.from_user.id)
-    
+
     try:
         store_id = int(callback.data.split("_")[1])
     except (ValueError, IndexError) as e:
@@ -77,9 +77,9 @@ async def show_store_analytics(callback: types.CallbackQuery) -> None:
 
     analytics = db.get_store_analytics(store_id)
     store = db.get_store(store_id)
-    
+
     # Dict-compatible access
-    store_name = store.get('name') if isinstance(store, dict) else store[2]
+    store_name = store.get("name") if isinstance(store, dict) else store[2]
 
     text = f"📊 <b>Аналитика магазина {store_name}</b>\n\n"
 
@@ -116,58 +116,58 @@ async def partner_today_stats(message: types.Message) -> None:
     if not db:
         await message.answer("System error")
         return
-    
+
     lang = db.get_user_language(message.from_user.id)
     user = db.get_user_model(message.from_user.id)
-    
+
     # Проверяем, что это партнёр
-    if not user or user.role != 'seller':
-        await message.answer(get_text(lang, 'access_denied'))
+    if not user or user.role != "seller":
+        await message.answer(get_text(lang, "access_denied"))
         return
-    
+
     stores = db.get_user_stores(message.from_user.id)
     if not stores:
-        await message.answer(get_text(lang, 'no_stores'))
+        await message.answer(get_text(lang, "no_stores"))
         return
-    
+
     with db.get_connection() as conn:
         cursor = conn.cursor()
-        
+
         # Собираем ID всех магазинов партнёра
-        store_ids = [get_store_field(store, 'store_id') for store in stores]
-        placeholders = ','.join(['%s'] * len(store_ids))
-        
+        store_ids = [get_store_field(store, "store_id") for store in stores]
+        placeholders = ",".join(["%s"] * len(store_ids))
+
         # Статистика за сегодня
-        today = datetime.now().strftime('%Y-%m-%d')
-        
+        today = datetime.now().strftime("%Y-%m-%d")
+
         # Заказы за сегодня
-        query1 = f'''
+        query1 = f"""
             SELECT COUNT(*), SUM(b.quantity), SUM(o.discount_price * b.quantity)
             FROM bookings b
             JOIN offers o ON b.offer_id = o.offer_id
             WHERE o.store_id IN ({placeholders})
             AND DATE(b.created_at) = %s
             AND b.status != 'cancelled'
-        '''
+        """
         cursor.execute(query1, (*store_ids, today))
-        
+
         orders_count, items_sold, revenue = cursor.fetchone()
         orders_count = orders_count or 0
         items_sold = int(items_sold or 0)
         revenue = int(revenue or 0)
-        
+
         # Активные товары
-        query2 = f'''
+        query2 = f"""
             SELECT COUNT(*)
             FROM offers
             WHERE store_id IN ({placeholders})
             AND status = 'active'
-        '''
+        """
         cursor.execute(query2, tuple(store_ids))
         active_offers = cursor.fetchone()[0]
-        
+
         # ТОП товар
-        query3 = f'''
+        query3 = f"""
             SELECT o.title, COUNT(*) as cnt
             FROM bookings b
             JOIN offers o ON b.offer_id = o.offer_id
@@ -177,12 +177,12 @@ async def partner_today_stats(message: types.Message) -> None:
             GROUP BY o.title
             ORDER BY cnt DESC
             LIMIT 1
-        '''
+        """
         cursor.execute(query3, (*store_ids, today))
-        
+
         top_item = cursor.fetchone()
         top_item_text = f"\n🏆 ТОП товар: {top_item[0]} ({top_item[1]} заказов)" if top_item else ""
-    
+
     text = f"""📊 <b>СТАТИСТИКА СЕГОДНЯ</b>
 
 💰 Выручка: {revenue:,} сум
@@ -192,5 +192,5 @@ async def partner_today_stats(message: types.Message) -> None:
 
 Обновлено: {datetime.now().strftime('%H:%M')}
 """
-    
+
     await message.answer(text, parse_mode="HTML")

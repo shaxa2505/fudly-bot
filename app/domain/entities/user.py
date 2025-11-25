@@ -2,62 +2,64 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Optional
 
 from pydantic import BaseModel, Field, field_validator
 
-from app.domain.value_objects import Language, City, UserRole
+from app.domain.value_objects import Language, UserRole
 
 
 class User(BaseModel):
     """User entity with type-safe fields."""
-    
+
     user_id: int = Field(..., description="Telegram user ID")
-    username: Optional[str] = Field(None, description="Telegram username")
+    username: str | None = Field(None, description="Telegram username")
     first_name: str = Field(..., description="User's first name")
-    phone: Optional[str] = Field(None, description="Phone number")
+    phone: str | None = Field(None, description="Phone number")
     city: str = Field(..., description="User's city")
     language: Language = Field(Language.RUSSIAN, description="Interface language")
     role: UserRole = Field(UserRole.CUSTOMER, description="User role")
     notifications_enabled: bool = Field(True, description="Push notifications enabled")
-    created_at: Optional[datetime] = Field(None, description="Registration timestamp")
-    
+    created_at: datetime | None = Field(None, description="Registration timestamp")
+
     class Config:
         """Pydantic config."""
+
         from_attributes = True
         use_enum_values = True
-    
-    @field_validator('phone')
+
+    @field_validator("phone")
     @classmethod
-    def validate_phone(cls, v: Optional[str]) -> Optional[str]:
+    def validate_phone(cls, v: str | None) -> str | None:
         """Validate phone number format."""
         if v is None:
             return v
         # Remove common formatting
-        phone = v.replace("+", "").replace("-", "").replace(" ", "").replace("(", "").replace(")", "")
+        phone = (
+            v.replace("+", "").replace("-", "").replace(" ", "").replace("(", "").replace(")", "")
+        )
         if not phone.isdigit():
             raise ValueError("Phone must contain only digits")
         if len(phone) < 9 or len(phone) > 15:
             raise ValueError("Phone must be between 9 and 15 digits")
         return v
-    
+
     @property
     def is_seller(self) -> bool:
         """Check if user is a seller."""
         return self.role == UserRole.SELLER
-    
+
     @property
     def is_admin(self) -> bool:
         """Check if user is an admin."""
         return self.role == UserRole.ADMIN
-    
+
     @property
     def display_name(self) -> str:
         """Get user's display name."""
         if self.username:
             return f"@{self.username}"
         return self.first_name
-    
+
     def to_dict(self) -> dict:
         """Convert to dictionary for database storage."""
         return {
@@ -66,25 +68,27 @@ class User(BaseModel):
             "first_name": self.first_name,
             "phone": self.phone,
             "city": self.city,
-            "language": self.language.value if isinstance(self.language, Language) else self.language,
+            "language": self.language.value
+            if isinstance(self.language, Language)
+            else self.language,
             "role": self.role.value if isinstance(self.role, UserRole) else self.role,
             "notifications_enabled": self.notifications_enabled,
             "created_at": self.created_at.isoformat() if self.created_at else None,
         }
-    
+
     @classmethod
     def from_db_row(cls, row: tuple | dict) -> User:
         """Create User from database row.
-        
+
         Args:
             row: Database row as tuple or dict
-            
+
         Returns:
             User instance
         """
         if isinstance(row, dict):
             return cls(**row)
-        
+
         # Tuple format: (user_id, username, first_name, phone, city, language, role, notifications_enabled, created_at)
         return cls(
             user_id=row[0],

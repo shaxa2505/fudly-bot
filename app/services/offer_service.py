@@ -1,8 +1,9 @@
 """Offer-related domain services and data transfer objects."""
 from __future__ import annotations
 
+from collections.abc import Sequence
 from dataclasses import dataclass
-from typing import Any, List, Sequence
+from typing import Any
 
 from app.core.cache import CacheManager
 from app.core.utils import get_field, get_offer_field, get_store_field
@@ -66,7 +67,7 @@ class StoreDetails(StoreSummary):
 
 @dataclass(slots=True)
 class OfferListResult:
-    items: List[OfferListItem]
+    items: list[OfferListItem]
     total: int
 
 
@@ -74,8 +75,8 @@ class OfferService:
     """Aggregate offer/stores data for handlers."""
 
     def __init__(
-        self, 
-        db: Any, 
+        self,
+        db: Any,
         cache: CacheManager | None = None,
         offer_repo: OfferRepository | None = None,
         store_repo: StoreRepository | None = None,
@@ -103,27 +104,30 @@ class OfferService:
     # ------------------------------------------------------------------
     # Stores filtering
     # ------------------------------------------------------------------
-    def list_stores_by_type(self, city: str, business_type: str) -> List[StoreSummary]:
+    def list_stores_by_type(self, city: str, business_type: str) -> list[StoreSummary]:
         """Return stores for a business type with cached fallback."""
         normalized = self._map_business_type(business_type)
-        
+
         from logging import getLogger
+
         logger = getLogger(__name__)
-        logger.info(f"🏪 list_stores_by_type: city={city}, business_type={business_type}, normalized={normalized}")
-        
+        logger.info(
+            f"🏪 list_stores_by_type: city={city}, business_type={business_type}, normalized={normalized}"
+        )
+
         if business_type == "delivery":
             raw_stores = self._fetch_delivery_enabled_stores(city, normalized)
         elif self._cache:
             raw_stores = self._cache.get_stores_by_type(city, normalized)
         else:
             raw_stores = self._db.get_stores_by_business_type(normalized, city)
-        
+
         logger.info(f"🏪 Found {len(raw_stores)} raw stores")
-        
+
         return [self._to_store_summary(store) for store in raw_stores]
 
-    def _fetch_delivery_enabled_stores(self, city: str, normalized: str) -> List[Any]:
-        stores: List[Any] = []
+    def _fetch_delivery_enabled_stores(self, city: str, normalized: str) -> list[Any]:
+        stores: list[Any] = []
         if hasattr(self._db, "get_stores_with_delivery"):
             stores = self._db.get_stores_with_delivery(city) or []
         if not stores:
@@ -167,24 +171,26 @@ class OfferService:
             min_order_amount=float(get_store_field(store, "min_order_amount", 0) or 0),
         )
 
-    def list_store_offers(self, store_id: int) -> List[OfferListItem]:
+    def list_store_offers(self, store_id: int) -> list[OfferListItem]:
         # Prefer DB-level `get_store_offers` which returns all offers for a store
         # (including inactive / out-of-stock) so callers can choose how to display them.
-        if hasattr(self._db, 'get_store_offers'):
+        if hasattr(self._db, "get_store_offers"):
             raw = self._db.get_store_offers(store_id) or []
         else:
             raw = self._offer_repo.get_offers_by_store(store_id) or []
         return [self._to_offer_list_item(row) for row in raw]
 
-    def list_active_offers_by_store(self, store_id: int) -> List[OfferListItem]:
+    def list_active_offers_by_store(self, store_id: int) -> list[OfferListItem]:
         raw = self._db.get_active_offers(store_id=store_id) or []
         return [self._to_offer_list_item(row) for row in raw]
 
-    def list_offers_by_category(self, city: str, category: str, limit: int = 20) -> List[OfferListItem]:
+    def list_offers_by_category(
+        self, city: str, category: str, limit: int = 20
+    ) -> list[OfferListItem]:
         raw = self._db.get_offers_by_city_and_category(city, category, limit=limit) or []
         return [self._to_offer_list_item(row) for row in raw]
 
-    def list_top_offers(self, city: str, limit: int = 20) -> List[OfferListItem]:
+    def list_top_offers(self, city: str, limit: int = 20) -> list[OfferListItem]:
         raw = self._db.get_top_offers_by_city(city, limit=limit) or []
         return [self._to_offer_list_item(row) for row in raw]
 
@@ -214,9 +220,15 @@ class OfferService:
             store_city=get_store_field(store, "city", "") if store else None,
             store_description=get_store_field(store, "description", "") if store else None,
             store_phone=get_store_field(store, "phone", "") if store else None,
-            delivery_enabled=bool(get_store_field(store, "delivery_enabled", 0)) if store else False,
-            delivery_price=float(get_store_field(store, "delivery_price", 0) or 0) if store else 0.0,
-            min_order_amount=float(get_store_field(store, "min_order_amount", 0) or 0) if store else 0.0,
+            delivery_enabled=bool(get_store_field(store, "delivery_enabled", 0))
+            if store
+            else False,
+            delivery_price=float(get_store_field(store, "delivery_price", 0) or 0)
+            if store
+            else 0.0,
+            min_order_amount=float(get_store_field(store, "min_order_amount", 0) or 0)
+            if store
+            else 0.0,
         )
 
     def get_store_reviews(self, store_id: int) -> tuple[float, Sequence[Any]]:
@@ -238,8 +250,12 @@ class OfferService:
         offer_id = int(get_offer_field(data, "offer_id", get_field(data, 0, 0)) or 0)
         store_id = int(get_offer_field(data, "store_id", get_field(data, 1, 0)) or 0)
         title = str(get_offer_field(data, "title", get_field(data, 2, "Товар")))
-        original_price = self._safe_float(get_offer_field(data, "original_price", get_field(data, 4, 0)))
-        discount_price = self._safe_float(get_offer_field(data, "discount_price", get_field(data, 5, 0)))
+        original_price = self._safe_float(
+            get_offer_field(data, "original_price", get_field(data, 4, 0))
+        )
+        discount_price = self._safe_float(
+            get_offer_field(data, "discount_price", get_field(data, 5, 0))
+        )
         quantity = get_offer_field(data, "quantity", get_field(data, 6, 0))
         expiry_date = get_offer_field(data, "expiry_date", get_field(data, 9, ""))
         store_name = str(get_field(data, "store_name", get_field(data, 14, "Магазин")))
@@ -250,12 +266,16 @@ class OfferService:
         discount_percent = self._safe_float(discount_percent_src, 0.0)
         if not discount_percent and original_price:
             discount_percent = max(0.0, round((1 - (discount_price / original_price)) * 100, 1))
-        
+
         # Extract delivery info from joined store fields (indices 19, 20, 21)
         delivery_enabled = bool(get_field(data, "delivery_enabled", get_field(data, 19, 0)))
-        delivery_price = self._safe_float(get_field(data, "delivery_price", get_field(data, 20, 0)), 0.0)
-        min_order_amount = self._safe_float(get_field(data, "min_order_amount", get_field(data, 21, 0)), 0.0)
-        
+        delivery_price = self._safe_float(
+            get_field(data, "delivery_price", get_field(data, 20, 0)), 0.0
+        )
+        min_order_amount = self._safe_float(
+            get_field(data, "min_order_amount", get_field(data, 21, 0)), 0.0
+        )
+
         # Try to get photo from 'photo' or 'photo_id'
         photo = get_offer_field(data, "photo")
         if not photo:
@@ -263,10 +283,10 @@ class OfferService:
         # Fallback to index 8 if neither found (legacy tuple support)
         if not photo:
             photo = get_field(data, 8, None)
-        
+
         # Get category field (index 12 in offers table)
         category = str(get_offer_field(data, "category", get_field(data, 12, "other")))
-        
+
         return OfferListItem(
             id=offer_id,
             store_id=store_id,
@@ -318,29 +338,31 @@ class OfferService:
         except (TypeError, ValueError):
             return 0
 
-    def search_offers(self, query: str, city: str | None = None) -> List[OfferListItem]:
+    def search_offers(self, query: str, city: str | None = None) -> list[OfferListItem]:
         """Search active offers by title or store name."""
         # This is a simplified search. Ideally, this should be done in the repository/DB layer.
         # For now, we'll fetch all active offers and filter in Python.
         # Optimization: Add search method to repository later.
-        
+
         # Use a default city if None, or handle it in list_hot_offers
-        search_city = city or "Ташкент" 
-        
+        search_city = city or "Ташкент"
+
         # Fetch active offers directly from DB if possible, otherwise fallback to hot offers
         if hasattr(self._db, "search_offers"):
-             raw_offers = self._db.search_offers(query, search_city)
-             return [self._to_offer_list_item(row) for row in raw_offers]
+            raw_offers = self._db.search_offers(query, search_city)
+            return [self._to_offer_list_item(row) for row in raw_offers]
 
-        result = self.list_hot_offers(city=search_city, limit=1000) # Fetch a reasonable amount
+        result = self.list_hot_offers(city=search_city, limit=1000)  # Fetch a reasonable amount
         all_offers = result.items
         query = query.lower()
-        
+
         results = []
         for offer in all_offers:
-            if (query in offer.title.lower() or 
-                query in offer.store_name.lower() or 
-                (offer.store_category and query in offer.store_category.lower())):
+            if (
+                query in offer.title.lower()
+                or query in offer.store_name.lower()
+                or (offer.store_category and query in offer.store_category.lower())
+            ):
                 results.append(offer)
-                
+
         return results

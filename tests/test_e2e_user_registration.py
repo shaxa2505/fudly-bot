@@ -7,33 +7,26 @@ Covers:
 """
 from __future__ import annotations
 
-import asyncio
 import os
 import tempfile
 from datetime import datetime
 
 import pytest
-from aiogram import Dispatcher, Router
+from aiogram import Bot, Dispatcher
 from aiogram.fsm.storage.memory import MemoryStorage
 from aiogram.types import (
     CallbackQuery,
     Chat,
     Message,
     Update,
+)
+from aiogram.types import (
     User as TgUser,
 )
-from aiogram import Bot
 
 from database import Database
 from handlers.common import commands as user_commands
-from localization import get_text, get_cities
-from app.keyboards import (
-    language_keyboard,
-    phone_request_keyboard,
-    city_keyboard,
-    main_menu_seller,
-    main_menu_customer,
-)
+from localization import get_text
 
 
 class SentEvent:
@@ -62,11 +55,12 @@ async def test_registration_language_flow(temp_db: Database, monkeypatch: pytest
     # Prepare dispatcher and router with handlers wired
     storage = MemoryStorage()
     dp = Dispatcher(storage=storage)
-    
+
     # Inject DB middleware
     from app.middlewares.db_middleware import DbSessionMiddleware
+
     dp.update.middleware(DbSessionMiddleware(temp_db))
-    
+
     # Include router - skip if already attached (happens when running all tests)
     try:
         dp.include_router(user_commands.router)
@@ -77,9 +71,11 @@ async def test_registration_language_flow(temp_db: Database, monkeypatch: pytest
 
     # Create a bot and monkeypatch network methods to avoid real API calls
     bot = Bot(token="42:TEST")
+
     # Prevent network calls by stubbing get_me and Bot.__call__
     async def fake_get_me(self):
         return TgUser(id=42, is_bot=True, first_name="FudlyBot")
+
     monkeypatch.setattr(Bot, "get_me", fake_get_me, raising=True)
     sent: list[SentEvent] = []
 
@@ -109,16 +105,20 @@ async def test_registration_language_flow(temp_db: Database, monkeypatch: pytest
         return True
 
     # Intercept all Bot calls (SendMessage/EditMessageText/AnswerCallbackQuery)
-    from aiogram.methods import SendMessage, EditMessageText, AnswerCallbackQuery
+    from aiogram.methods import AnswerCallbackQuery, EditMessageText, SendMessage
+
     async def fake_bot_call(self, method):
         if isinstance(method, SendMessage):
             return await fake_send_message(self, method.chat_id, method.text)
         if isinstance(method, EditMessageText):
-            return await fake_edit_message_text(self, method.text, chat_id=method.chat_id, message_id=method.message_id)
+            return await fake_edit_message_text(
+                self, method.text, chat_id=method.chat_id, message_id=method.message_id
+            )
         if isinstance(method, AnswerCallbackQuery):
             return await fake_answer_callback_query(method.callback_query_id)
         # Default: pretend success by returning True
         return True
+
     monkeypatch.setattr(Bot, "__call__", fake_bot_call, raising=True)
 
     # Compose /start update

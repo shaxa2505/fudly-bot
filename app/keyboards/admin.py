@@ -1,11 +1,11 @@
 """Admin-specific keyboards."""
 from __future__ import annotations
 
-from aiogram.types import ReplyKeyboardMarkup, InlineKeyboardMarkup
-from aiogram.utils.keyboard import ReplyKeyboardBuilder, InlineKeyboardBuilder
+from aiogram.types import InlineKeyboardMarkup, ReplyKeyboardMarkup
+from aiogram.utils.keyboard import InlineKeyboardBuilder, ReplyKeyboardBuilder
 
 
-def admin_menu(lang: str = 'ru') -> ReplyKeyboardMarkup:
+def admin_menu(lang: str = "ru") -> ReplyKeyboardMarkup:
     """Compact admin menu with improved grouping."""
     builder = ReplyKeyboardBuilder()
     builder.button(text="📊 Dashboard")

@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 import json
-from typing import Any, Dict, Optional
+from typing import Any
 
 from aiogram.fsm.storage.base import BaseStorage, StateType, StorageKey
 
@@ -14,13 +14,11 @@ class PostgreSQLStorage(BaseStorage):
         """Initialize with database instance."""
         self.db = db
 
-    async def set_state(
-        self, key: StorageKey, state: StateType = None
-    ) -> None:
+    async def set_state(self, key: StorageKey, state: StateType = None) -> None:
         """Set state for user."""
         user_id = key.user_id
         state_str = state.state if state else None
-        
+
         with self.db.get_connection() as conn:
             cursor = conn.cursor()
             cursor.execute(
@@ -30,28 +28,25 @@ class PostgreSQLStorage(BaseStorage):
                 ON CONFLICT (user_id)
                 DO UPDATE SET state = EXCLUDED.state, updated_at = CURRENT_TIMESTAMP
                 """,
-                (user_id, state_str)
+                (user_id, state_str),
             )
 
-    async def get_state(self, key: StorageKey) -> Optional[str]:
+    async def get_state(self, key: StorageKey) -> str | None:
         """Get state for user."""
         user_id = key.user_id
-        
+
         with self.db.get_connection() as conn:
             cursor = conn.cursor()
-            cursor.execute(
-                "SELECT state FROM fsm_states WHERE user_id = %s",
-                (user_id,)
-            )
+            cursor.execute("SELECT state FROM fsm_states WHERE user_id = %s", (user_id,))
             result = cursor.fetchone()
             return result[0] if result else None
 
-    async def set_data(self, key: StorageKey, data: Dict[str, Any]) -> None:
+    async def set_data(self, key: StorageKey, data: dict[str, Any]) -> None:
         """Set data for user."""
         user_id = key.user_id
         # PostgreSQL JSONB column needs JSON string, not dict
         data_json = json.dumps(data)
-        
+
         with self.db.get_connection() as conn:
             cursor = conn.cursor()
             cursor.execute(
@@ -61,19 +56,16 @@ class PostgreSQLStorage(BaseStorage):
                 ON CONFLICT (user_id)
                 DO UPDATE SET data = EXCLUDED.data, updated_at = CURRENT_TIMESTAMP
                 """,
-                (user_id, data_json)
+                (user_id, data_json),
             )
 
-    async def get_data(self, key: StorageKey) -> Dict[str, Any]:
+    async def get_data(self, key: StorageKey) -> dict[str, Any]:
         """Get data for user."""
         user_id = key.user_id
-        
+
         with self.db.get_connection() as conn:
             cursor = conn.cursor()
-            cursor.execute(
-                "SELECT data FROM fsm_states WHERE user_id = %s",
-                (user_id,)
-            )
+            cursor.execute("SELECT data FROM fsm_states WHERE user_id = %s", (user_id,))
             result = cursor.fetchone()
             if result and result[0]:
                 # PostgreSQL JSONB returns dict directly, not string

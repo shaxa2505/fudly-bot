@@ -1,12 +1,10 @@
 """Database factory - PostgreSQL only."""
 from __future__ import annotations
 
-from typing import Optional
-
 from .security import logger
 
 
-def create_database(database_url: Optional[str]):
+def create_database(database_url: str | None):
     """Return PostgreSQL Database implementation."""
     if not database_url:
         raise ValueError(
@@ -15,7 +13,7 @@ def create_database(database_url: Optional[str]):
             "For local development, set up PostgreSQL locally or use Docker:\n"
             "  docker run -d -p 5432:5432 -e POSTGRES_PASSWORD=password postgres"
         )
-    
+
     from database_pg import Database as PostgresDatabase
 
     logger.info("Using PostgreSQL database")

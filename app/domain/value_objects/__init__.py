@@ -7,12 +7,14 @@ from typing import Literal
 
 class Language(str, Enum):
     """Supported languages."""
+
     RUSSIAN = "ru"
     UZBEK = "uz"
 
 
 class City(str, Enum):
     """Cities in Uzbekistan."""
+
     TASHKENT_RU = "Ташкент"
     SAMARKAND_RU = "Самарканд"
     BUKHARA_RU = "Бухара"
@@ -21,7 +23,7 @@ class City(str, Enum):
     FERGANA_RU = "Фергана"
     KHIVA_RU = "Хива"
     NUKUS_RU = "Нукус"
-    
+
     TASHKENT_UZ = "Toshkent"
     SAMARKAND_UZ = "Samarqand"
     BUKHARA_UZ = "Buxoro"
@@ -30,7 +32,7 @@ class City(str, Enum):
     FERGANA_UZ = "Farg'ona"
     KHIVA_UZ = "Xiva"
     NUKUS_UZ = "Nukus"
-    
+
     @classmethod
     def normalize(cls, city: str) -> str:
         """Normalize city name to standard form."""
@@ -44,6 +46,7 @@ class City(str, Enum):
 
 class UserRole(str, Enum):
     """User roles."""
+
     CUSTOMER = "customer"
     SELLER = "seller"
     ADMIN = "admin"
@@ -51,6 +54,7 @@ class UserRole(str, Enum):
 
 class StoreStatus(str, Enum):
     """Store approval status."""
+
     PENDING = "pending"
     ACTIVE = "active"
     REJECTED = "rejected"
@@ -58,6 +62,7 @@ class StoreStatus(str, Enum):
 
 class BookingStatus(str, Enum):
     """Booking status."""
+
     PENDING = "pending"
     CONFIRMED = "confirmed"
     COMPLETED = "completed"
@@ -66,6 +71,7 @@ class BookingStatus(str, Enum):
 
 class OrderStatus(str, Enum):
     """Order status."""
+
     PENDING = "pending"
     PAID = "paid"
     CONFIRMED = "confirmed"
@@ -76,6 +82,7 @@ class OrderStatus(str, Enum):
 
 class BusinessCategory(str, Enum):
     """Business categories."""
+
     RESTAURANT = "restaurant"
     CAFE = "cafe"
     BAKERY = "bakery"

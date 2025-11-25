@@ -2,20 +2,22 @@
 from __future__ import annotations
 
 import asyncio
-from typing import Any, Callable, List
+from collections.abc import Callable
+from typing import Any
 
 from aiogram import Dispatcher, F, types
 from aiogram.fsm.context import FSMContext
 
 from app.core.utils import normalize_city
+from app.keyboards import business_type_keyboard, offers_category_filter
 from app.keyboards import offers as offer_keyboards
 from app.services.offer_service import OfferDetails, OfferListItem, OfferService
 from app.templates import offers as offer_templates
 from handlers.common import BrowseOffers
-from localization import get_categories, get_product_categories, get_text, normalize_category
-from app.keyboards import business_type_keyboard, offers_category_filter
+from localization import get_product_categories, get_text, normalize_category
 
-FetchOffersFn = Callable[[str, int], List[OfferListItem]]
+FetchOffersFn = Callable[[str, int], list[OfferListItem]]
+
 
 def setup(
     dp: Dispatcher,
@@ -53,10 +55,12 @@ def setup(
         if not message.from_user:
             return
         lang = db.get_user_language(message.from_user.id)
-        
+
         await message.answer(
-            get_text(lang, "choose_category"), # Reusing key or need new one? "choose_category" might be for product category
-            reply_markup=business_type_keyboard(lang)
+            get_text(
+                lang, "choose_category"
+            ),  # Reusing key or need new one? "choose_category" might be for product category
+            reply_markup=business_type_keyboard(lang),
         )
 
     @dp.message(F.text.contains("Категории") | F.text.contains("Kategoriyalar"))
@@ -70,19 +74,19 @@ def setup(
             await message.answer(get_text(lang, "error"))
             return
         city = user.city or "Ташкент"
-        
-        select_text = 'Выберите категорию для просмотра актуальных предложений' if lang == 'ru' else 'Tegishli takliflarni korish uchun toifani tanlang'
+
+        select_text = (
+            "Выберите категорию для просмотра актуальных предложений"
+            if lang == "ru"
+            else "Tegishli takliflarni korish uchun toifani tanlang"
+        )
         text = (
             f"🗂 <b>{'Категории товаров' if lang == 'ru' else 'Mahsulot turlari'}</b>\n\n"
             f"📍 {city}\n\n"
             f"{select_text}:"
         )
-        
-        await message.answer(
-            text,
-            parse_mode="HTML",
-            reply_markup=offers_category_filter(lang)
-        )
+
+        await message.answer(text, parse_mode="HTML", reply_markup=offers_category_filter(lang))
 
     @dp.callback_query(F.data == "hot_offers_refresh")
     async def refresh_hot_offers_handler(callback: types.CallbackQuery, state: FSMContext) -> None:
@@ -127,14 +131,14 @@ def setup(
                 return
             city = user.city or "Ташкент"
             search_city = normalize_city(city)
-            
+
             try:
                 offset = int(callback.data.split("_")[-1])
             except (ValueError, IndexError) as e:
                 logger.error(f"Invalid offset in callback data: {callback.data}, error: {e}")
                 await callback.answer(get_text(lang, "error"), show_alert=True)
                 return
-            
+
             msg = _callback_message(callback)
             if not msg:
                 await callback.answer()
@@ -157,17 +161,13 @@ def setup(
                 offset=offset,
             )
             has_more = offset + len(result.items) < result.total
-            keyboard = offer_keyboards.hot_offers_pagination_keyboard(
-                lang, has_more, offset + 20
-            )
+            keyboard = offer_keyboards.hot_offers_pagination_keyboard(lang, has_more, offset + 20)
             await msg.answer(text, parse_mode="HTML", reply_markup=keyboard)
             await callback.answer()
         except Exception as exc:  # pragma: no cover - defensive logging
             logger.error("hot_offers_pagination error: %s", exc)
             lang = db.get_user_language(callback.from_user.id)
-            await callback.answer(
-                "Ошибка" if lang == "ru" else "Xato", show_alert=True
-            )
+            await callback.answer("Ошибка" if lang == "ru" else "Xato", show_alert=True)
 
     @dp.message(F.text.in_(["🏪 Заведения", "🏪 Muassasalar", "🏪 Места", "🏪 Joylar"]))
     async def browse_places_handler(message: types.Message) -> None:
@@ -198,13 +198,15 @@ def setup(
         business_type = data.replace("biztype_", "")
         city = user.city or "Ташкент"
         search_city = normalize_city(city)
-        
-        logger.info(f"🏪 Browse stores: business_type={business_type}, user_city={city}, search_city={search_city}")
-        
+
+        logger.info(
+            f"🏪 Browse stores: business_type={business_type}, user_city={city}, search_city={search_city}"
+        )
+
         stores = offer_service.list_stores_by_type(search_city, business_type)
-        
+
         logger.info(f"🏪 Found {len(stores)} stores for {business_type} in {search_city}")
-        
+
         if not stores:
             await msg.edit_text(_no_stores_text(lang, business_type))
             await callback.answer()
@@ -222,7 +224,7 @@ def setup(
             return
         lang = db.get_user_language(message.from_user.id)
         data = await state.get_data()
-        store_list: List[int] = data.get("store_list", [])
+        store_list: list[int] = data.get("store_list", [])
         if not store_list:
             await message.answer(get_text(lang, "error"))
             await state.clear()
@@ -240,27 +242,24 @@ def setup(
             return
         store_id = store_list[number - 1]
         await state.clear()
-        
+
         # Get store info
         store = offer_service.get_store(store_id)
         if not store:
-            await message.answer(
-                "Магазин не найден" if lang == "ru" else "Do'kon topilmadi"
-            )
+            await message.answer("Магазин не найден" if lang == "ru" else "Do'kon topilmadi")
             return
-        
+
         # Show category selection directly
         text = (
-            f"🏪 <b>{store.name}</b>\n\n"
-            f"📂 Выберите категорию товаров:"
-            if lang == "ru" else
-            f"🏪 <b>{store.name}</b>\n\n"
-            f"📂 Mahsulot toifasini tanlang:"
+            f"🏪 <b>{store.name}</b>\n\n" f"📂 Выберите категорию товаров:"
+            if lang == "ru"
+            else f"🏪 <b>{store.name}</b>\n\n" f"📂 Mahsulot toifasini tanlang:"
         )
-        
+
         from app.keyboards import offers_category_filter
+
         keyboard = offers_category_filter(lang, store_id=store_id)
-        
+
         await message.answer(text, parse_mode="HTML", reply_markup=keyboard)
 
     @dp.message(BrowseOffers.offer_list, F.text.regexp(r"^\d+$"))
@@ -269,7 +268,7 @@ def setup(
             return
         lang = db.get_user_language(message.from_user.id)
         data = await state.get_data()
-        offer_list: List[int] = data.get("offer_list", [])
+        offer_list: list[int] = data.get("offer_list", [])
         if not offer_list:
             await message.answer(get_text(lang, "error"))
             await state.clear()
@@ -314,42 +313,44 @@ def setup(
             return
         city = user.city or "Ташкент"
         categories = get_product_categories(lang)  # Используем категории товаров
-        
+
         try:
             cat_index = int(callback.data.split("_")[-1])
         except (ValueError, IndexError) as e:
             logger.error(f"Invalid cat_index in callback data: {callback.data}, error: {e}")
             await callback.answer(get_text(lang, "error"), show_alert=True)
             return
-        
+
         if cat_index >= len(categories):
             await callback.answer("Ошибка", show_alert=True)
             return
         category = categories[cat_index]
         normalized = normalize_category(category)
-        
+
         # Check if we are viewing a specific store
         state_data = await state.get_data()
         viewing_store_id = state_data.get("viewing_store_id")
-        
+
         if viewing_store_id:
             # Filter by store AND category
             offers = offer_service.list_active_offers_by_store(viewing_store_id)
             # Filter in memory for now as list_active_offers_by_store returns all
             # Ideally should have list_store_offers_by_category
-            offers = [o for o in offers if o.store_category == normalized or o.store_category == category]
+            offers = [
+                o for o in offers if o.store_category == normalized or o.store_category == category
+            ]
         else:
             # Global category filter
             offers = offer_service.list_offers_by_category(city, normalized, limit=20)
-            
+
         if not offers:
             no_offers_msg = f"😔 {'В категории' if lang == 'ru' else 'Toifada'} {category} {'нет предложений' if lang == 'ru' else 'takliflar yoq'}"
             await callback.answer(no_offers_msg, show_alert=True)
             return
         await callback.answer()
-        
+
         # Улучшенный заголовок с информацией
-        select_msg = 'Выберите товар для бронирования' if lang == 'ru' else 'Mahsulotni tanlang'
+        select_msg = "Выберите товар для бронирования" if lang == "ru" else "Mahsulotni tanlang"
         header = (
             f"📂 <b>{category.upper()}</b>\n"
             f"📍 {city}\n"
@@ -362,7 +363,7 @@ def setup(
             parse_mode="HTML",
             reply_markup=offers_category_filter(lang),
         )
-        
+
         # Отправляем карточки товаров через исходное сообщение (msg)
         for offer in offers[:10]:
             await _send_offer_card(msg, offer, lang)
@@ -378,47 +379,46 @@ def setup(
             await callback.answer()
             return
         lang = db.get_user_language(callback.from_user.id)
-        
+
         try:
             store_id = int(callback.data.split("_")[-1])
         except (ValueError, IndexError) as e:
             logger.error(f"Invalid store_id in callback data: {callback.data}, error: {e}")
             await callback.answer(get_text(lang, "error"), show_alert=True)
             return
-        
+
         store = offer_service.get_store(store_id)
         if not store:
             await callback.answer("× Магазин не найден", show_alert=True)
             return
-            
+
         # Save store_id to state so we can filter by category later
         await state.update_data(viewing_store_id=store_id)
-        
+
         # Show categories for this store instead of all offers
         # We need a keyboard with categories available in this store
         # For now, let's show the generic category filter but maybe we should filter it?
         # Or just show the store card with "All products" and "Categories"
-        
+
         # The user requested: "choice of establishment, then categories"
         # So when clicking a store, we should ask "Select category"
-        
+
         header = (
             f"<b>{store.name}</b>\n"
             f"{store.address or ''}\n\n"
             f"{get_text(lang, 'select_category_in_store')}"
         )
-        
+
         # We reuse offers_category_filter but ideally it should be filtered by what the store has.
         # For MVP, showing all categories is acceptable, or we can check what categories the store has.
         # Let's stick to the requested flow: Store -> Category -> Offers
-        
+
         await msg.edit_text(
             header,
             parse_mode="HTML",
             reply_markup=offers_category_filter(lang),
         )
         # Do NOT show offers list immediately
-
 
     @dp.callback_query(F.data == "filter_all")
     async def show_all_offers_filter(callback: types.CallbackQuery):
@@ -435,7 +435,7 @@ def setup(
             await callback.answer()
             return
         lang = db.get_user_language(callback.from_user.id)
-        
+
         try:
             store_id = int(callback.data.split("_")[-1])
         except (ValueError, IndexError) as e:
@@ -459,24 +459,25 @@ def setup(
 
         # Show category selection text
         text = (
-            f"🏪 <b>{store.name}</b>\n\n"
-            f"📂 Выберите категорию товаров:"
-            if lang == "ru" else
-            f"🏪 <b>{store.name}</b>\n\n"
-            f"📂 Mahsulot toifasini tanlang:"
+            f"🏪 <b>{store.name}</b>\n\n" f"📂 Выберите категорию товаров:"
+            if lang == "ru"
+            else f"🏪 <b>{store.name}</b>\n\n" f"📂 Mahsulot toifasini tanlang:"
         )
 
         from app.keyboards import offers_category_filter
+
         keyboard = offers_category_filter(lang, store_id=store_id)
 
         # If we have a photo in raw_store, send a photo message with caption and keyboard
         photo = None
         if isinstance(raw_store, dict):
-            photo = raw_store.get('photo') or raw_store.get('photo_id')
+            photo = raw_store.get("photo") or raw_store.get("photo_id")
 
         if photo:
             try:
-                await msg.answer_photo(photo=photo, caption=text, parse_mode="HTML", reply_markup=keyboard)
+                await msg.answer_photo(
+                    photo=photo, caption=text, parse_mode="HTML", reply_markup=keyboard
+                )
                 await callback.answer()
                 return
             except Exception:
@@ -524,14 +525,14 @@ def setup(
             await callback.answer()
             return
         lang = db.get_user_language(callback.from_user.id)
-        
+
         try:
             store_id = int(callback.data.split("_")[-1])
         except (ValueError, IndexError) as e:
             logger.error(f"Invalid store_id in callback data: {callback.data}, error: {e}")
             await callback.answer(get_text(lang, "error"), show_alert=True)
             return
-        
+
         store = offer_service.get_store(store_id)
         if not store:
             await callback.answer(
@@ -539,23 +540,22 @@ def setup(
                 show_alert=True,
             )
             return
-        
+
         # Show category selection for store
         text = (
-            f"🏪 <b>{store.name}</b>\n\n"
-            f"📂 Выберите категорию товаров:"
-            if lang == "ru" else
-            f"🏪 <b>{store.name}</b>\n\n"
-            f"📂 Mahsulot toifasini tanlang:"
+            f"🏪 <b>{store.name}</b>\n\n" f"📂 Выберите категорию товаров:"
+            if lang == "ru"
+            else f"🏪 <b>{store.name}</b>\n\n" f"📂 Mahsulot toifasini tanlang:"
         )
-        
+
         # Import category keyboard
         from app.keyboards import offers_category_filter
+
         keyboard = offers_category_filter(lang, store_id=store_id)
-        
+
         await msg.edit_text(text, parse_mode="HTML", reply_markup=keyboard)
         await callback.answer()
-    
+
     @dp.callback_query(F.data.startswith("store_cat_"))
     async def show_store_offers_by_category(callback: types.CallbackQuery, state: FSMContext):
         """Show store offers filtered by category."""
@@ -567,7 +567,7 @@ def setup(
             await callback.answer()
             return
         lang = db.get_user_language(callback.from_user.id)
-        
+
         try:
             # Parse: store_cat_{store_id}_{category}
             parts = callback.data.split("_", 3)  # Split into max 4 parts
@@ -577,7 +577,7 @@ def setup(
             logger.error(f"Invalid callback data: {callback.data}, error: {e}")
             await callback.answer(get_text(lang, "error"), show_alert=True)
             return
-        
+
         store = offer_service.get_store(store_id)
         if not store:
             await callback.answer(
@@ -585,10 +585,10 @@ def setup(
                 show_alert=True,
             )
             return
-        
+
         # Get all offers for the store
         all_offers = offer_service.list_store_offers(store_id)
-        
+
         # Filter by category if not "all"
         if category != "all":
             # Map display category to database category value
@@ -603,7 +603,7 @@ def setup(
                 "frozen": "frozen",
             }
             db_category = category_map.get(category, category)
-            
+
             # Filter offers by their category field
             offers = []
             for offer in all_offers:
@@ -611,7 +611,7 @@ def setup(
                     offers.append(offer)
         else:
             offers = all_offers
-        
+
         if not offers:
             await callback.answer(
                 "В этой категории пока нет товаров"
@@ -620,12 +620,14 @@ def setup(
                 show_alert=True,
             )
             return
-        
+
         await _set_offer_state(state, offers)
         page = offers[:20]
-        
-        category_title = category.replace("_", " ").title() if category != "all" else (
-            "Все категории" if lang == "ru" else "Barcha toifalar"
+
+        category_title = (
+            category.replace("_", " ").title()
+            if category != "all"
+            else ("Все категории" if lang == "ru" else "Barcha toifalar")
         )
         products_word = "Mahsulotlar" if lang == "uz" else "Товаров"
         text = (
@@ -640,7 +642,7 @@ def setup(
             offset=0,
             total=len(offers),
         )
-        
+
         keyboard = offer_keyboards.store_offers_keyboard(
             lang,
             store_id,
@@ -660,7 +662,7 @@ def setup(
             await callback.answer()
             return
         lang = db.get_user_language(callback.from_user.id)
-        
+
         try:
             parts = callback.data.split("_")
             store_id = int(parts[3])
@@ -669,7 +671,7 @@ def setup(
             logger.error(f"Invalid pagination data in callback: {callback.data}, error: {e}")
             await callback.answer(get_text(lang, "error"), show_alert=True)
             return
-        
+
         store = offer_service.get_store(store_id)
         if not store:
             await callback.answer("Магазин не найден", show_alert=True)
@@ -710,14 +712,14 @@ def setup(
             await callback.answer()
             return
         lang = db.get_user_language(callback.from_user.id)
-        
+
         try:
             store_id = int(callback.data.split("_")[-1])
         except (ValueError, IndexError) as e:
             logger.error(f"Invalid store_id in callback data: {callback.data}, error: {e}")
             await callback.answer(get_text(lang, "error"), show_alert=True)
             return
-        
+
         store = offer_service.get_store(store_id)
         if not store:
             await callback.answer("Магазин не найден", show_alert=True)
@@ -739,36 +741,34 @@ def setup(
             await callback.answer()
             return
         lang = db.get_user_language(callback.from_user.id)
-        
+
         try:
             store_id = int(callback.data.split("_")[-1])
         except (ValueError, IndexError) as e:
             logger.error(f"Invalid store_id in callback data: {callback.data}, error: {e}")
             await callback.answer(get_text(lang, "error"), show_alert=True)
             return
-        
+
         # Get store and show categories
         store = offer_service.get_store(store_id)
         if not store:
             logger.warning(f"Store {store_id} not found in back_to_store_card")
             await callback.answer(
-                "Магазин не найден" if lang == "ru" else "Do'kon topilmadi",
-                show_alert=True
+                "Магазин не найден" if lang == "ru" else "Do'kon topilmadi", show_alert=True
             )
             return
-        
+
         # Show category selection
         text = (
-            f"🏪 <b>{store.name}</b>\n\n"
-            f"📂 Выберите категорию товаров:"
-            if lang == "ru" else
-            f"🏪 <b>{store.name}</b>\n\n"
-            f"📂 Mahsulot toifasini tanlang:"
+            f"🏪 <b>{store.name}</b>\n\n" f"📂 Выберите категорию товаров:"
+            if lang == "ru"
+            else f"🏪 <b>{store.name}</b>\n\n" f"📂 Mahsulot toifasini tanlang:"
         )
-        
+
         from app.keyboards import offers_category_filter
+
         keyboard = offers_category_filter(lang, store_id=store_id)
-        
+
         await msg.edit_text(text, parse_mode="HTML", reply_markup=keyboard)
         await callback.answer()
 
@@ -828,7 +828,9 @@ def setup(
         try:
             result = service.list_hot_offers(search_city, limit=20, offset=0)
             if not result.items:
-                await target.answer(offer_templates.render_hot_offers_empty(lang), parse_mode="HTML")
+                await target.answer(
+                    offer_templates.render_hot_offers_empty(lang), parse_mode="HTML"
+                )
                 return
             await state.set_state(BrowseOffers.offer_list)
             await state.update_data(offer_list=[offer.id for offer in result.items])
@@ -855,9 +857,7 @@ def setup(
     async def _send_store_card(message: types.Message, store_id: int, lang: str) -> None:
         store = offer_service.get_store(store_id)
         if not store:
-            await message.answer(
-                "Магазин не найден" if lang == "ru" else "Do'kon topilmadi"
-            )
+            await message.answer("Магазин не найден" if lang == "ru" else "Do'kon topilmadi")
             return
         text = offer_templates.render_store_card(lang, store)
         keyboard = offer_keyboards.store_card_keyboard(
@@ -869,7 +869,7 @@ def setup(
         try:
             raw_store = db.get_store(store_id) if db else None
             if isinstance(raw_store, dict):
-                photo = raw_store.get('photo') or raw_store.get('photo_id')
+                photo = raw_store.get("photo") or raw_store.get("photo_id")
         except Exception:
             photo = None
 
@@ -877,10 +877,7 @@ def setup(
         if photo:
             try:
                 await message.answer_photo(
-                    photo=photo,
-                    caption=text,
-                    parse_mode="HTML",
-                    reply_markup=keyboard
+                    photo=photo, caption=text, parse_mode="HTML", reply_markup=keyboard
                 )
                 return
             except Exception:
@@ -910,7 +907,9 @@ def setup(
 
     async def _send_offer_card(message: types.Message, offer: OfferListItem, lang: str) -> None:
         text = offer_templates.render_offer_card(lang, offer)
-        keyboard = offer_keyboards.offer_quick_keyboard(lang, offer.id, offer.store_id, offer.delivery_enabled)
+        keyboard = offer_keyboards.offer_quick_keyboard(
+            lang, offer.id, offer.store_id, offer.delivery_enabled
+        )
 
         # If offer has a photo, send it as a photo message with caption to be consistent
         # with search and seller flows. Fallback to text if sending photo fails.
@@ -947,7 +946,7 @@ def setup(
             await callback.answer(get_text(lang, "error"), show_alert=True)
             return
         city = user.city or "Ташкент"
-        offers: List[OfferListItem] = fetcher(city, 20)
+        offers: list[OfferListItem] = fetcher(city, 20)
         if not offers:
             await callback.answer("😔 Нет доступных предложений", show_alert=True)
             return
@@ -966,13 +965,13 @@ def setup(
             await _send_offer_card(msg, offer, lang)
             await asyncio.sleep(0.1)
 
-    async def _set_offer_state(state: FSMContext, offers: List[OfferListItem]) -> None:
+    async def _set_offer_state(state: FSMContext, offers: list[OfferListItem]) -> None:
         await state.set_state(BrowseOffers.offer_list)
         await state.update_data(offer_list=[offer.id for offer in offers])
 
-    async def _append_offer_ids(state: FSMContext, offers: List[OfferListItem]) -> None:
+    async def _append_offer_ids(state: FSMContext, offers: list[OfferListItem]) -> None:
         data = await state.get_data()
-        existing: List[int] = data.get("offer_list", [])
+        existing: list[int] = data.get("offer_list", [])
         for offer in offers:
             if offer.id not in existing:
                 existing.append(offer.id)
@@ -1000,7 +999,11 @@ def setup(
         return f"😔 {names.get(business_type, business_type)}\n\n{no_stores}"
 
     def _invalid_number_text(lang: str, subject: str) -> str:
-        base = "Пожалуйста, введите корректный номер" if lang == "ru" else "Iltimos, to'g'ri raqam kiriting"
+        base = (
+            "Пожалуйста, введите корректный номер"
+            if lang == "ru"
+            else "Iltimos, to'g'ri raqam kiriting"
+        )
         return f"× {base}"
 
     def _range_text(lang: str, max_value: int, subject: str) -> str:

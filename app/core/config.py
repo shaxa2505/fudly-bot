@@ -3,7 +3,6 @@ from __future__ import annotations
 
 import os
 from dataclasses import dataclass
-from typing import Optional
 
 from dotenv import load_dotenv
 
@@ -27,8 +26,8 @@ class WebhookConfig:
 class Settings:
     bot_token: str
     admin_id: int
-    database_url: Optional[str]
-    redis_url: Optional[str]
+    database_url: str | None
+    redis_url: str | None
     webhook: WebhookConfig
 
 
@@ -47,11 +46,11 @@ def load_settings() -> Settings:
     # Smart webhook detection: auto-enable on Railway/Heroku if URL provided
     use_webhook = _str_to_bool(os.getenv("USE_WEBHOOK", "false"))
     webhook_url = os.getenv("WEBHOOK_URL", "")
-    
+
     # Auto-enable webhook if WEBHOOK_URL is set and USE_WEBHOOK not explicitly disabled
     if webhook_url and not os.getenv("USE_WEBHOOK"):
         use_webhook = True
-    
+
     # Disable webhook if URL is missing even if USE_WEBHOOK=true
     if use_webhook and not webhook_url:
         print("⚠️ USE_WEBHOOK=true but WEBHOOK_URL is empty, falling back to polling")

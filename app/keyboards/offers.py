@@ -5,13 +5,15 @@ from aiogram.types import InlineKeyboardMarkup
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
 
-def hot_offers_pagination_keyboard(lang: str, has_more: bool, next_offset: int) -> InlineKeyboardMarkup | None:
+def hot_offers_pagination_keyboard(
+    lang: str, has_more: bool, next_offset: int
+) -> InlineKeyboardMarkup | None:
     builder = InlineKeyboardBuilder()
-    
+
     # Кнопка "Обновить" всегда слева
     refresh_text = "🔄 Обновить" if lang == "ru" else "🔄 Yangilash"
     builder.button(text=refresh_text, callback_data="hot_offers_refresh")
-    
+
     # Кнопка "Далее" справа (если есть ещё товары)
     if has_more:
         next_text = "Далее ➡️" if lang == "ru" else "Keyingi ➡️"
@@ -19,28 +21,32 @@ def hot_offers_pagination_keyboard(lang: str, has_more: bool, next_offset: int) 
         builder.adjust(2)  # Две кнопки в ряд
     else:
         builder.adjust(1)  # Только "Обновить"
-    
+
     return builder.as_markup() if builder.export() else None
 
 
-def store_card_keyboard(lang: str, store_id: int, offers_count: int, ratings_count: int) -> InlineKeyboardMarkup:
+def store_card_keyboard(
+    lang: str, store_id: int, offers_count: int, ratings_count: int
+) -> InlineKeyboardMarkup:
     builder = InlineKeyboardBuilder()
     products = "🛍 Посмотреть товары" if lang == "ru" else "🛍 Mahsulotlarni ko'rish"
     back = "◀️ Назад" if lang == "ru" else "◀️ Orqaga"
-    
+
     # Показывать количество только если товары есть
     if offers_count > 0:
         button_text = f"{products} ({offers_count})"
     else:
         button_text = products
-    
+
     builder.button(text=button_text, callback_data=f"store_offers_{store_id}")
     builder.button(text=back, callback_data="back_to_places")
     builder.adjust(1)
     return builder.as_markup()
 
 
-def offer_details_keyboard(lang: str, offer_id: int, store_id: int, delivery_enabled: bool) -> InlineKeyboardMarkup:
+def offer_details_keyboard(
+    lang: str, offer_id: int, store_id: int, delivery_enabled: bool
+) -> InlineKeyboardMarkup:
     builder = InlineKeyboardBuilder()
     # Inline buttons: Заказать и О магазине (menu keeps delivery/pickup choice)
     pickup = "✅ Заказать" if lang == "ru" else "✅ Buyurtma"
@@ -51,7 +57,9 @@ def offer_details_keyboard(lang: str, offer_id: int, store_id: int, delivery_ena
     return builder.as_markup()
 
 
-def offer_quick_keyboard(lang: str, offer_id: int, store_id: int, delivery_enabled: bool = False) -> InlineKeyboardMarkup:
+def offer_quick_keyboard(
+    lang: str, offer_id: int, store_id: int, delivery_enabled: bool = False
+) -> InlineKeyboardMarkup:
     builder = InlineKeyboardBuilder()
     pickup = "✅ Заказать" if lang == "ru" else "✅ Buyurtma"
     builder.button(text=pickup, callback_data=f"book_{offer_id}")

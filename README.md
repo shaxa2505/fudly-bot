@@ -92,7 +92,9 @@ python bot.py
 
 - **Python 3.11** - современный, быстрый
 - **aiogram 3.x** - асинхронный Telegram Bot framework
-- **SQLite** - встроенная БД с connection pooling
+- **PostgreSQL** - надёжная СУБД с Full-Text Search
+- **Redis** - кэширование и real-time уведомления
+- **Docker** - контейнеризация для деплоя
 - **Railway** - простой деплой и хостинг
 - **Webhook** - мгновенная доставка сообщений
 
@@ -102,6 +104,133 @@ python bot.py
 - 🔄 **Webhook вместо polling** в production
 - 🛡️ **Валидация данных** и защита от SQL injection
 - 📊 **Health check endpoints** для мониторинга
+- 🔄 **Alembic миграции** для версионирования БД
+- 📈 **Prometheus-style метрики** для мониторинга
+- 🔍 **Full-Text Search** для поиска на русском и узбекском
+- 💾 **Redis кэширование** для ускорения запросов
+
+---
+
+## 🐳 Docker
+
+### Быстрый запуск (production):
+
+```bash
+# Скопируйте .env.example в .env и заполните переменные
+cp .env.example .env
+
+# Запустите все сервисы
+docker-compose up -d
+
+# Посмотреть логи
+docker-compose logs -f bot
+
+# Остановить
+docker-compose down
+```
+
+### Разработка (только БД и Redis):
+
+```bash
+# Запустите только базы данных
+docker-compose -f docker-compose.dev.yml up -d
+
+# Запустите бот локально
+python bot.py
+
+# Доступ к инструментам:
+# - Adminer (DB): http://localhost:8081
+# - Redis Commander: http://localhost:8082
+```
+
+### Полезные команды:
+
+```bash
+# Пересборка образа
+docker-compose build --no-cache
+
+# Посмотреть статус
+docker-compose ps
+
+# Проверить health
+curl http://localhost:8080/health
+
+# Войти в контейнер
+docker-compose exec bot bash
+
+# Очистить всё
+docker-compose down -v --rmi all
+```
+
+### Переменные окружения:
+
+| Переменная | Описание | Обязательно |
+|------------|----------|-------------|
+| `TELEGRAM_BOT_TOKEN` | Токен от @BotFather | ✅ |
+| `ADMIN_ID` | Telegram ID администратора | ✅ |
+| `POSTGRES_PASSWORD` | Пароль PostgreSQL | ✅ |
+| `USE_WEBHOOK` | Режим webhook (true/false) | ❌ |
+| `WEBHOOK_URL` | URL для webhook | ❌ |
+| `LOG_LEVEL` | Уровень логов (DEBUG/INFO/WARNING) | ❌ |
+| `SENTRY_DSN` | DSN для Sentry мониторинга | ❌ |
+
+---
+
+## 🗄️ Миграции базы данных (Alembic)
+
+Проект использует Alembic для версионирования схемы БД.
+
+### Быстрые команды:
+
+```bash
+# Применить все миграции
+python scripts/migrate.py upgrade
+
+# Откатить последнюю миграцию
+python scripts/migrate.py downgrade
+
+# Показать текущую версию
+python scripts/migrate.py current
+
+# Показать историю миграций
+python scripts/migrate.py history
+
+# Создать новую миграцию
+python scripts/migrate.py new "Add new_column to users"
+
+# Пометить БД как актуальную (для существующих БД)
+python scripts/migrate.py stamp head
+```
+
+### Для существующих баз данных:
+
+Если у вас уже есть база данных, просто выполните:
+```bash
+python scripts/migrate.py stamp head
+```
+
+Это пометит БД как актуальную без выполнения миграций.
+
+### Создание новой миграции:
+
+```bash
+# Вручную
+python scripts/migrate.py new "Add delivery_address to orders"
+
+# С автогенерацией из моделей (если модели изменились)
+python scripts/migrate.py new "Auto migration" --autogenerate
+```
+
+### Структура миграций:
+
+```
+alembic/
+├── versions/           # Файлы миграций
+│   └── 001_initial_schema.py
+├── models.py           # SQLAlchemy модели
+├── env.py              # Конфигурация Alembic
+└── script.py.mako      # Шаблон миграций
+```
 
 ---
 
@@ -214,11 +343,11 @@ fudly-bot/
 def update_offer_quantity(self, offer_id: int, new_quantity: int):
     if new_quantity <= 0:
         # Деактивация при окончании
-        cursor.execute('UPDATE offers SET quantity = 0, status = ? WHERE offer_id = ?', 
+        cursor.execute('UPDATE offers SET quantity = 0, status = ? WHERE offer_id = ?',
                       ('inactive', offer_id))
     else:
         # Реактивация при возврате
-        cursor.execute('UPDATE offers SET quantity = ?, status = ? WHERE offer_id = ?', 
+        cursor.execute('UPDATE offers SET quantity = ?, status = ? WHERE offer_id = ?',
                       (new_quantity, 'active', offer_id))
 ## 🛠️ Standalone booking expiry worker
 
@@ -244,7 +373,7 @@ After=network.target
 User=www-data
 WorkingDirectory=/opt/fudly-bot
 Environment=TELEGRAM_BOT_TOKEN=your_token
-Environment=DATABASE_URL=postgresql://...    
+Environment=DATABASE_URL=postgresql://...
 ExecStart=/opt/fudly-bot/.venv/bin/python /opt/fudly-bot/scripts/run_booking_worker.py
 Restart=always
 

@@ -1,13 +1,15 @@
 """Admin statistics handlers delegating to services."""
 from __future__ import annotations
 
-from aiogram import Router, F, types
+from aiogram import F, Router, types
+from aiogram.filters import Command
 
+from app.core.metrics import metrics
+from app.keyboards import admin as admin_keyboards
 from app.services.admin_service import AdminService
 from app.templates import admin as admin_templates
-from app.keyboards import admin as admin_keyboards
 
-router = Router(name='admin_stats')
+router = Router(name="admin_stats")
 
 # Module-level dependencies
 admin_service: AdminService | None = None
@@ -22,6 +24,81 @@ def setup(
     global admin_service, logger
     admin_service = admin_svc
     logger = log
+
+
+@router.message(Command("stats"))
+async def admin_stats_command(message: types.Message):
+    """Full statistics dashboard for admin."""
+    if not admin_service or not message.from_user:
+        return
+    if not admin_service.is_admin(message.from_user.id):
+        await message.answer("⛔ Доступ запрещён")
+        return
+
+    try:
+        # Get metrics summary
+        summary = metrics.get_summary()
+
+        # Get business stats
+        user_stats = admin_service.get_user_stats()
+        store_stats = admin_service.get_store_stats()
+        offer_stats = admin_service.get_offer_stats()
+        booking_stats = admin_service.get_booking_stats()
+
+        # Calculate totals
+        stores_total = store_stats.active + store_stats.pending + store_stats.rejected
+        offers_total = offer_stats.active + offer_stats.inactive + offer_stats.deleted
+
+        # Format dashboard
+        text = f"""
+📊 <b>Дашборд Fudly Bot</b>
+
+⏱ <b>Система:</b>
+├ Uptime: {summary['uptime_hours']} ч
+├ Запросов: {summary['total_requests']}
+├ Ошибок: {summary['total_errors']}
+├ Avg время: {summary['avg_request_duration_ms']} мс
+└ P95 время: {summary['p95_request_duration_ms']} мс
+
+👥 <b>Пользователи:</b>
+├ Всего: {user_stats.total}
+├ Покупатели: {user_stats.customers}
+├ Продавцы: {user_stats.sellers}
+├ За неделю: {user_stats.week_users}
+└ Сегодня: {user_stats.today_users}
+
+🏪 <b>Магазины:</b>
+├ Всего: {stores_total}
+├ Активных: {store_stats.active}
+├ На модерации: {store_stats.pending}
+└ Отклонённых: {store_stats.rejected}
+
+📦 <b>Товары:</b>
+├ Всего: {offers_total}
+├ Активных: {offer_stats.active}
+├ Неактивных: {offer_stats.inactive}
+└ Удалённых: {offer_stats.deleted}
+
+📋 <b>Бронирования:</b>
+├ Всего: {booking_stats.total}
+├ Ожидающих: {booking_stats.pending}
+├ Завершённых: {booking_stats.completed}
+├ Отменённых: {booking_stats.cancelled}
+├ Сегодня: {booking_stats.today_bookings}
+└ Выручка сегодня: {booking_stats.today_revenue:,.0f} сум
+
+🔗 <b>API Endpoints:</b>
+├ /health - проверка здоровья
+├ /metrics - Prometheus метрики
+└ /metrics/json - JSON метрики
+"""
+
+        await message.answer(text.strip(), parse_mode="HTML")
+
+    except Exception as exc:
+        if logger:
+            logger.error("Admin stats command error: %s", exc)
+        await message.answer("❌ Ошибка получения статистики")
 
 
 @router.message(F.text == "👥 Пользователи")

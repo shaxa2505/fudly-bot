@@ -1,9 +1,9 @@
 """Redis cache implementation for distributed caching."""
 from __future__ import annotations
 
-import json
-from typing import Any, Optional
 import importlib.util
+import json
+from typing import Any
 
 # Determine availability once to avoid reassigning constants
 REDIS_AVAILABLE: bool = importlib.util.find_spec("redis") is not None
@@ -12,16 +12,20 @@ REDIS_AVAILABLE: bool = importlib.util.find_spec("redis") is not None
 if REDIS_AVAILABLE:
     import redis as redis  # type: ignore
 else:
+
     class _DummyRedisModule:  # minimal stub so tests can patch `redis.Redis`
         class Redis:  # type: ignore
             pass
+
     redis = _DummyRedisModule()  # type: ignore
 
 
 class RedisCache:
     """Redis-based cache implementation."""
 
-    def __init__(self, host: str = "localhost", port: int = 6379, db: int = 0, password: Optional[str] = None):
+    def __init__(
+        self, host: str = "localhost", port: int = 6379, db: int = 0, password: str | None = None
+    ):
         """Initialize Redis connection.
 
         Args:
@@ -37,7 +41,7 @@ class RedisCache:
         # Require a usable `redis.Redis` constructor (tests may patch this)
         if not hasattr(redis, "Redis"):
             raise ImportError("redis package not installed. Install with: pip install redis")
-        
+
         # Use Any for client type to avoid runtime/type issues if redis is patched in tests
         self._client: Any = redis.Redis(
             host=host,
@@ -67,7 +71,7 @@ class RedisCache:
         except Exception:
             return None
 
-    def set(self, key: str, value: Any, ttl: Optional[int] = None) -> bool:
+    def set(self, key: str, value: Any, ttl: int | None = None) -> bool:
         """Set value in cache.
 
         Args:
@@ -125,7 +129,7 @@ class RedisCache:
         except Exception:
             return False
 
-    def increment(self, key: str, amount: int = 1) -> Optional[int]:
+    def increment(self, key: str, amount: int = 1) -> int | None:
         """Increment counter.
 
         Args:
@@ -159,7 +163,7 @@ class RedisCache:
         except Exception:
             return {}
 
-    def set_many(self, mapping: dict[str, Any], ttl: Optional[int] = None) -> bool:
+    def set_many(self, mapping: dict[str, Any], ttl: int | None = None) -> bool:
         """Set multiple values at once.
 
         Args:

@@ -6,26 +6,26 @@ E2E booking flow using bookings router:
 """
 from __future__ import annotations
 
+import importlib
 import os
 import tempfile
 from datetime import datetime
 
 import pytest
-from aiogram import Dispatcher
+from aiogram import Bot, Dispatcher
 from aiogram.fsm.storage.memory import MemoryStorage
 from aiogram.types import (
     CallbackQuery,
     Chat,
     Message,
     Update,
+)
+from aiogram.types import (
     User as TgUser,
 )
-from aiogram import Bot
-import importlib
 
-from database import Database
 from app.core.cache import CacheManager
-from handlers import bookings
+from database import Database
 
 
 class SentEvent:
@@ -86,6 +86,7 @@ async def test_book_offer_quantity_flow(temp_db: Database, monkeypatch: pytest.M
 
     # Reload module to get a fresh router each test
     import handlers.bookings as bookings_mod
+
     importlib.reload(bookings_mod)
 
     # Dispatcher with bookings router
@@ -114,17 +115,25 @@ async def test_book_offer_quantity_flow(temp_db: Database, monkeypatch: pytest.M
     # Avoid network calls: stub get_me and Bot.__call__
     async def fake_get_me(self):
         return TgUser(id=42, is_bot=True, first_name="FudlyBot")
+
     monkeypatch.setattr(Bot, "get_me", fake_get_me, raising=True)
-    from aiogram.methods import SendMessage, EditMessageText, AnswerCallbackQuery
+    from aiogram.methods import AnswerCallbackQuery, EditMessageText, SendMessage
+
     async def fake_bot_call(self, method, request_timeout=None):
         if isinstance(method, SendMessage):
             return await fake_send_message(self, method.chat_id, method.text)
         if isinstance(method, EditMessageText):
             # Not used here but keep for completeness
-            return Message(message_id=99, date=datetime.now(), chat=Chat(id=method.chat_id or 0, type="private"), text=method.text)
+            return Message(
+                message_id=99,
+                date=datetime.now(),
+                chat=Chat(id=method.chat_id or 0, type="private"),
+                text=method.text,
+            )
         if isinstance(method, AnswerCallbackQuery):
             return await fake_answer_callback_query(method.callback_query_id)
         return True
+
     monkeypatch.setattr(Bot, "__call__", fake_bot_call, raising=True)
 
     # Wire bookings module dependencies
@@ -173,13 +182,15 @@ async def test_book_offer_quantity_flow(temp_db: Database, monkeypatch: pytest.M
     # Messages may include: booking code, waiting for partner confirmation, or success
     sent_texts = [e.text for e in sent if e.text]
     # bookings_list[0] is a tuple from DB, pickup_code is at index 9
-    pickup_code = str(bookings_list[0][9]) if len(bookings_list[0]) > 9 and bookings_list[0][9] else ''
+    pickup_code = (
+        str(bookings_list[0][9]) if len(bookings_list[0]) > 9 and bookings_list[0][9] else ""
+    )
     assert any(
-        "Заказ успешно создан" in text or 
-        "ожидает подтверждения" in text or
-        "Бронирование" in text or
-        "Бронь отправлена" in text or  # New pending booking message
-        (pickup_code and pickup_code in text)
+        "Заказ успешно создан" in text
+        or "ожидает подтверждения" in text
+        or "Бронирование" in text
+        or "Бронь отправлена" in text  # New pending booking message
+        or (pickup_code and pickup_code in text)
         for text in sent_texts
     ), f"Expected booking confirmation message, got: {sent_texts}"
 

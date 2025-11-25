@@ -7,9 +7,9 @@ from aiogram import F, Router, types
 from aiogram.fsm.context import FSMContext
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
+from app.keyboards import city_keyboard, main_menu_customer, main_menu_seller
 from database_protocol import DatabaseProtocol
 from handlers.common.states import ChangeCity
-from app.keyboards import city_keyboard, main_menu_customer, main_menu_seller
 from localization import get_cities, get_text
 from logging_config import logger
 from security import secure_user_input, validator
@@ -98,26 +98,24 @@ async def show_favorites(message: types.Message) -> None:
         await message.answer(get_text(lang, "no_favorites"))
         return
 
-    await message.answer(
-        f"❤️ <b>Ваши избранные магазины ({len(favorites)})</b>", parse_mode="HTML"
-    )
+    await message.answer(f"❤️ <b>Ваши избранные магазины ({len(favorites)})</b>", parse_mode="HTML")
 
     for store in favorites:
         # Support both dict (PostgreSQL) and tuple (SQLite) formats
         if isinstance(store, dict):
-            store_id = store['store_id']
-            store_name = store['name']
-            category = store.get('category', 'Магазин')
-            address = store.get('address', '')
-            description = store.get('description', '')
+            store_id = store["store_id"]
+            store_name = store["name"]
+            category = store.get("category", "Магазин")
+            address = store.get("address", "")
+            description = store.get("description", "")
         else:
             # PostgreSQL now returns dict, but keep as fallback
             store_id = store[0] if len(store) > 0 else 0
-            store_name = store[2] if len(store) > 2 else 'Без названия'
-            category = store[6] if len(store) > 6 else 'Магазин'
-            address = store[4] if len(store) > 4 else ''
-            description = store[5] if len(store) > 5 else ''
-            
+            store_name = store[2] if len(store) > 2 else "Без названия"
+            category = store[6] if len(store) > 6 else "Магазин"
+            address = store[4] if len(store) > 4 else ""
+            description = store[5] if len(store) > 5 else ""
+
         avg_rating = db.get_store_average_rating(store_id)
         ratings = db.get_store_ratings(store_id)
 
@@ -128,12 +126,8 @@ async def show_favorites(message: types.Message) -> None:
 ⭐ Рейтинг: {avg_rating:.1f}/5 ({len(ratings)} отзывов)"""
 
         keyboard = InlineKeyboardBuilder()
-        keyboard.button(
-            text="🛍 Товары магазина", callback_data=f"store_offers_{store_id}"
-        )
-        keyboard.button(
-            text="💔 Удалить из избранного", callback_data=f"unfavorite_{store_id}"
-        )
+        keyboard.button(text="🛍 Товары магазина", callback_data=f"store_offers_{store_id}")
+        keyboard.button(text="💔 Удалить из избранного", callback_data=f"unfavorite_{store_id}")
         keyboard.adjust(1)
 
         await message.answer(text, parse_mode="HTML", reply_markup=keyboard.as_markup())
@@ -148,7 +142,7 @@ async def toggle_favorite(callback: types.CallbackQuery) -> None:
 
     user_id = callback.from_user.id
     lang = db.get_user_language(user_id)
-    
+
     try:
         store_id = int(callback.data.split("_")[1])
     except (ValueError, IndexError) as e:
@@ -172,7 +166,7 @@ async def remove_favorite(callback: types.CallbackQuery) -> None:
 
     user_id = callback.from_user.id
     lang = db.get_user_language(user_id)
-    
+
     try:
         store_id = int(callback.data.split("_")[1])
     except (ValueError, IndexError) as e:

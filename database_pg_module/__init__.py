@@ -6,12 +6,12 @@ Modular database implementation with mixins for clean separation of concerns.
 Usage:
     from database_pg_module import Database
     db = Database()  # Uses DATABASE_URL env var
-    
+
     # Or with explicit URL
     db = Database("postgresql://user:pass@host:5432/dbname")
 
 The Database class combines functionality through mixins:
-- UserMixin: User CRUD operations  
+- UserMixin: User CRUD operations
 - StoreMixin: Store management
 - OfferMixin: Offer management with expiry handling
 - BookingMixin: Atomic booking operations
@@ -29,8 +29,8 @@ from .core import (
     DATABASE_URL,
     DatabaseCore,
     HybridRow,
-    hybrid_row_factory,
     fix_railway_database_url,
+    hybrid_row_factory,
 )
 from .database import Database
 from .schema import SchemaMixin

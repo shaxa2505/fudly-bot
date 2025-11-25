@@ -1,17 +1,22 @@
 """
 User registration handlers (phone and city collection).
 """
-from aiogram import Router, types, F
+from aiogram import F, Router, types
 from aiogram import types as _ai_types
 from aiogram.fsm.context import FSMContext
 
-from handlers.common.states import Registration
+from app.core.security import logger, rate_limiter, secure_user_input, validator
+from app.keyboards import (
+    city_inline_keyboard,
+    city_keyboard,
+    main_menu_customer,
+    phone_request_keyboard,
+)
 from database_protocol import DatabaseProtocol
-from localization import get_text, get_cities
-from app.keyboards import city_keyboard, city_inline_keyboard, phone_request_keyboard, main_menu_customer
-from app.core.security import validator, rate_limiter, secure_user_input, logger
+from handlers.common.states import Registration
+from localization import get_cities, get_text
 
-router = Router(name='registration')
+router = Router(name="registration")
 
 
 async def _safe_edit_reply_markup(msg_like, **kwargs) -> None:
@@ -39,45 +44,48 @@ async def process_phone(message: types.Message, state: FSMContext, db: DatabaseP
     if not db:
         await message.answer("System error")
         return
-    
+
     lang = db.get_user_language(message.from_user.id)
     phone = message.contact.phone_number
-    
+
     if not validator.validate_phone(phone):
         await message.answer(
-            "❌ Неверный формат номера. Используйте кнопку ниже." if lang == 'ru' 
+            "❌ Неверный формат номера. Используйте кнопку ниже."
+            if lang == "ru"
             else "❌ Telefon raqami noto'g'ri. Quyidagi tugmadan foydalaning.",
-            reply_markup=phone_request_keyboard(lang)
+            reply_markup=phone_request_keyboard(lang),
         )
         return
-    
+
     db.update_user_phone(message.from_user.id, phone)
-    
+
     await state.set_state(Registration.city)
     try:
         await message.answer(
             get_text(lang, "welcome_city_step"),
             parse_mode="HTML",
-            reply_markup=city_inline_keyboard(lang)
+            reply_markup=city_inline_keyboard(lang),
         )
     except Exception:
         await message.answer(
-            get_text(lang, "welcome_city_step"),
-            parse_mode="HTML",
-            reply_markup=city_keyboard(lang)
+            get_text(lang, "welcome_city_step"), parse_mode="HTML", reply_markup=city_keyboard(lang)
         )
 
 
 @router.callback_query(F.data.startswith("reg_city_"))
-async def registration_city_callback(callback: types.CallbackQuery, state: FSMContext, db: DatabaseProtocol):
+async def registration_city_callback(
+    callback: types.CallbackQuery, state: FSMContext, db: DatabaseProtocol
+):
     """Handle city selection from inline keyboard during registration."""
     if not db or not callback.message:
         await callback.answer("System error", show_alert=True)
         return
 
     current_state = await state.get_state()
-    logger.info(f"City callback: user={callback.from_user.id}, state={current_state}, data={callback.data}")
-    
+    logger.info(
+        f"City callback: user={callback.from_user.id}, state={current_state}, data={callback.data}"
+    )
+
     # Accept if in Registration.city state OR if no state (fresh registration)
     if current_state and current_state != "Registration:city":
         logger.warning(f"Wrong state for city selection: {current_state}")
@@ -104,18 +112,18 @@ async def registration_city_callback(callback: types.CallbackQuery, state: FSMCo
         logger.error(f"Failed to update city: {e}")
 
     await state.clear()
-    
+
     # Delete old message and send new menu
     try:
         await callback.message.delete()
     except Exception:
         pass
-    
+
     try:
         await callback.message.answer(
-            get_text(lang, "registration_complete"), 
-            parse_mode="HTML", 
-            reply_markup=main_menu_customer(lang)
+            get_text(lang, "registration_complete"),
+            parse_mode="HTML",
+            reply_markup=main_menu_customer(lang),
         )
     except Exception as e:
         logger.error(f"Failed to send completion message: {e}")
@@ -123,7 +131,7 @@ async def registration_city_callback(callback: types.CallbackQuery, state: FSMCo
             await callback.answer(get_text(lang, "registration_complete"), show_alert=True)
         except Exception:
             pass
-    
+
     await callback.answer()
 
 
@@ -134,30 +142,32 @@ async def process_city(message: types.Message, state: FSMContext, db: DatabasePr
     if not db:
         await message.answer("System error")
         return
-    
+
     lang = db.get_user_language(message.from_user.id)
-    
+
     try:
-        if not rate_limiter.is_allowed(message.from_user.id, 'city_selection', max_requests=5, window_seconds=60):
-            await message.answer(get_text(lang, 'rate_limit_exceeded'))
+        if not rate_limiter.is_allowed(
+            message.from_user.id, "city_selection", max_requests=5, window_seconds=60
+        ):
+            await message.answer(get_text(lang, "rate_limit_exceeded"))
             return
     except Exception as e:
         logger.warning(f"Rate limiter error: {e}")
-    
+
     cities = get_cities(lang)
     raw_text = message.text or ""
     city_text = validator.sanitize_text(raw_text.replace("📍 ", "").strip())
-    
+
     if not validator.validate_city(city_text):
-        await message.answer(get_text(lang, 'invalid_city'))
+        await message.answer(get_text(lang, "invalid_city"))
         return
-    
+
     if city_text in cities:
         db.update_user_city(message.from_user.id, city_text)
         await state.clear()
-        
+
         await message.answer(
             get_text(lang, "registration_complete"),
             parse_mode="HTML",
-            reply_markup=main_menu_customer(lang)
+            reply_markup=main_menu_customer(lang),
         )

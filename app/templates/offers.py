@@ -1,7 +1,8 @@
 """Text templates for offer-related handlers."""
 from __future__ import annotations
 
-from typing import Any, Iterable, Sequence
+from collections.abc import Iterable, Sequence
+from typing import Any
 
 from app.services.offer_service import OfferDetails, OfferListItem, StoreDetails, StoreSummary
 
@@ -25,7 +26,7 @@ def render_hot_offers_list(
     # Category emoji mapping
     category_emoji = {
         "bakery": "🍞",
-        "dairy": "🥛", 
+        "dairy": "🥛",
         "meat": "🥩",
         "fish": "🐟",
         "vegetables": "🥬",
@@ -33,20 +34,20 @@ def render_hot_offers_list(
         "cheese": "🧀",
         "beverages": "🥤",
         "ready_food": "🍱",
-        "other": "🏪"
+        "other": "🏪",
     }
 
     for idx, offer in enumerate(offers, offset + 1):
         name = _trim_title(offer.title)
         price_line = _format_price_line(offer, lang)
-        
+
         # Get category emoji
         category = offer.store_category or "other"
         emoji = category_emoji.get(category, "🏪")
-        
+
         # Format store line with emoji
         store_line = f"   {emoji} {offer.store_name}"
-        
+
         lines.append(f"{idx}. <b>{name}</b>")
         lines.append(store_line)
         lines.append(f"   {price_line}")
@@ -104,9 +105,7 @@ def render_business_type_store_list(
         lines.append("")
 
     prompt = (
-        "💬 Введите номер магазина для просмотра"
-        if lang == "ru"
-        else "💬 Do'kon raqamini kiriting"
+        "💬 Введите номер магазина для просмотра" if lang == "ru" else "💬 Do'kon raqamini kiriting"
     )
     lines.append(prompt)
     return "\n".join(lines)
@@ -131,44 +130,44 @@ def render_store_card(lang: str, store: StoreDetails) -> str:
     type_name = type_names.get(store.business_type, store.business_type)
 
     lines = []
-    
+
     # Заголовок с названием и типом
     lines.append(f"{emoji} <b>{store.name}</b>")
     lines.append(f"<i>{type_name}</i>")
     lines.append("")
-    
+
     # Основная информация
     lines.append("━━━━━━━━━━━━━━━━")
-    
+
     # Адрес и контакты
     if store.city:
         city_label = "🏙 Город" if lang == "ru" else "🏙 Shahar"
         lines.append(f"{city_label}: {store.city}")
-    
+
     if store.address:
         address_label = "📍 Адрес" if lang == "ru" else "📍 Manzil"
         lines.append(f"{address_label}: {store.address}")
-    
+
     if store.phone:
         phone_label = "📞 Телефон" if lang == "ru" else "📞 Telefon"
         lines.append(f"{phone_label}: {store.phone}")
-    
+
     lines.append("")
-    
+
     # Описание
     if store.description:
         lines.append(f"📝 {store.description}")
         lines.append("")
-    
+
     # Статистика
     lines.append("━━━━━━━━━━━━━━━━")
-    
+
     reviews_text = "отзывов" if lang == "ru" else "sharh"
     lines.append(f"⭐ Рейтинг: <b>{store.rating:.1f}/5</b> ({store.ratings_count} {reviews_text})")
-    
+
     offers_label = "Доступно товаров" if lang == "ru" else "Mavjud mahsulotlar"
     lines.append(f"🔥 {offers_label}: <b>{store.offers_count}</b>")
-    
+
     # Информация о доставке
     if store.delivery_enabled:
         delivery_label = "🚚 Доставка" if lang == "ru" else "🚚 Yetkazib berish"
@@ -180,49 +179,50 @@ def render_store_card(lang: str, store: StoreDetails) -> str:
         if store.min_order_amount > 0:
             min_order = "Минимальный заказ" if lang == "ru" else "Minimal buyurtma"
             lines.append(f"   {min_order}: {store.min_order_amount:,.0f} сум")
-    
+
     return "\n".join(lines)
 
 
 def render_offer_details(lang: str, offer: OfferDetails, store: StoreDetails | None = None) -> str:
     lines = []
-    
+
     # Title with emoji
     lines.append(f"🎉 <b>{offer.title}</b>")
     lines.append("")
-    
+
     # Description
     if offer.description:
         lines.append(f"📝 {offer.description}")
         lines.append("")
-    
+
     # Price section with box
     lines.append("┌────────────────────────")
     price_line = _format_price_line(offer, lang)
     lines.append(f"│ {price_line}")
     lines.append("└────────────────────────")
     lines.append("")
-    
+
     # Store info
     store_name = store.name if store else offer.store_name
     store_address = store.address if store else offer.store_address
     store_city = store.city if store else offer.store_city
-    
+
     lines.append(f"🏪 <b>{store_name}</b>")
     if store_address or store_city:
         location = " · ".join(filter(None, [store_address, store_city]))
         lines.append(f"📍 {location}")
     lines.append("")
-    
+
     # Stock and expiry
     stock_label = "Доступно" if lang == "ru" else "Mavjud"
     lines.append(f"📦 {stock_label}: <b>{offer.quantity} {offer.unit}</b>")
-    
+
     if offer.expiry_date:
         expiry_label = "Годен до" if lang == "ru" else "Yaroqlilik"
         expiry_str = str(offer.expiry_date)[:10]
         try:
             from datetime import datetime
+
             dt = datetime.strptime(expiry_str, "%Y-%m-%d")
             expiry_str = dt.strftime("%d.%m.%Y")
         except:
@@ -238,7 +238,7 @@ def render_offer_details(lang: str, offer: OfferDetails, store: StoreDetails | N
         if store.min_order_amount:
             min_label = "Мин. заказ" if lang == "ru" else "Min. buyurtma"
             lines.append(f"   {min_label}: {store.min_order_amount:,.0f} {currency}")
-    
+
     return "\n".join(lines)
 
 
@@ -264,9 +264,7 @@ def render_store_offers_list(
         lines.append("")
 
     prompt = (
-        "💬 Введите номер товара для просмотра"
-        if lang == "ru"
-        else "💬 Mahsulot raqamini kiriting"
+        "💬 Введите номер товара для просмотра" if lang == "ru" else "💬 Mahsulot raqamini kiriting"
     )
     lines.append(prompt)
     return "\n".join(lines)
@@ -305,38 +303,39 @@ def render_store_reviews(
 def render_offer_card(lang: str, offer: OfferListItem) -> str:
     """Render offer card with full details and delivery info."""
     lines = [f"<b>{offer.title}</b>"]
-    
+
     # Price line with discount
     lines.append(_format_price_line(offer, lang))
     lines.append("")
-    
+
     # Store location
     lines.append(f"🏪 {offer.store_name}")
     if offer.store_address:
         lines.append(f"📍 {offer.store_address}")
     lines.append("")
-    
+
     # Stock and expiry
     stock_lines = []
     if offer.quantity is not None:
         stock_label = "Доступно" if lang == "ru" else "Mavjud"
         unit = offer.unit or ""
         stock_lines.append(f"{stock_label}: <b>{offer.quantity} {unit}</b>".strip())
-    
+
     if offer.expiry_date:
         expiry_label = "Годен до" if lang == "ru" else "Yaroqlilik"
         expiry_str = str(offer.expiry_date)[:10]
         try:
             from datetime import datetime
+
             dt = datetime.strptime(expiry_str, "%Y-%m-%d")
             expiry_str = dt.strftime("%d.%m.%Y")
         except:
             pass
         stock_lines.append(f"{expiry_label}: {expiry_str}")
-    
+
     if stock_lines:
         lines.extend(stock_lines)
-    
+
     # Delivery info
     if offer.delivery_enabled:
         lines.append("")
@@ -346,7 +345,7 @@ def render_offer_card(lang: str, offer: OfferListItem) -> str:
         if offer.min_order_amount:
             min_label = "Мин. заказ" if lang == "ru" else "Min. buyurtma"
             lines.append(f"   {min_label}: {offer.min_order_amount:,.0f} {currency}")
-    
+
     return "\n".join(lines)
 
 
@@ -354,20 +353,19 @@ def render_offer_card(lang: str, offer: OfferListItem) -> str:
 # Helpers
 # ---------------------------------------------------------------------------
 
+
 def _format_price_line(offer: OfferListItem, lang: str) -> str:
     discount = f"-{offer.discount_percent:.0f}%"
     currency = "сум" if lang == "ru" else "so'm"
-    
+
     # Добавляем огонь только для ТОП скидок (элегантно)
     fire = ""
     if offer.discount_percent >= 70:
         fire = " 🔥🔥"
     elif offer.discount_percent >= 60:
         fire = " 🔥"
-    
-    return (
-        f"<s>{offer.original_price:,.0f}</s> → <b>{offer.discount_price:,.0f} {currency}</b> ({discount}{fire})"
-    )
+
+    return f"<s>{offer.original_price:,.0f}</s> → <b>{offer.discount_price:,.0f} {currency}</b> ({discount}{fire})"
 
 
 def _trim_title(title: str, limit: int = 30) -> str:

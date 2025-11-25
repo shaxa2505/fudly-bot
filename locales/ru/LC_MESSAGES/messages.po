@@ -1,0 +1,154 @@
+# Russian translations for Fudly Bot
+# Copyright (C) 2025 Fudly Team
+# This file is distributed under the MIT license.
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: Fudly Bot 2.0.0\n"
+"Report-Msgid-Bugs-To: support@fudly.uz\n"
+"POT-Creation-Date: 2025-11-26 12:00+0000\n"
+"PO-Revision-Date: 2025-11-26 12:00+0000\n"
+"Last-Translator: Fudly Team <support@fudly.uz>\n"
+"Language-Team: Russian\n"
+"Language: ru\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=3; plural=(n%10==1 && n%100!=11 ? 0 : n%10>=2 && n%10<=4 && (n%100<10 || n%100>=20) ? 1 : 2);\n"
+
+#: Common messages
+msgid "welcome"
+msgstr "👋 Добро пожаловать в Fudly!\n\n🍽 Спасайте еду, экономьте деньги!"
+
+msgid "main_menu"
+msgstr "📱 Главное меню"
+
+msgid "back"
+msgstr "◀️ Назад"
+
+msgid "cancel"
+msgstr "❌ Отмена"
+
+msgid "confirm"
+msgstr "✅ Подтвердить"
+
+msgid "error"
+msgstr "❌ Произошла ошибка. Попробуйте позже."
+
+msgid "success"
+msgstr "✅ Успешно!"
+
+#: Navigation
+msgid "next"
+msgstr "Вперёд ➡️"
+
+msgid "previous"
+msgstr "⬅️ Назад"
+
+msgid "page_info"
+msgstr "📄 Страница {page} из {total}"
+
+#: User actions
+msgid "choose_language"
+msgstr "🌐 Выберите язык:"
+
+msgid "language_changed"
+msgstr "✅ Язык изменён на русский"
+
+msgid "choose_city"
+msgstr "🏙 Выберите город:"
+
+msgid "city_changed"
+msgstr "✅ Город изменён: {city}"
+
+#: Offers
+msgid "offers"
+msgstr "🍽 Предложения"
+
+msgid "no_offers"
+msgstr "😔 Пока нет доступных предложений"
+
+msgid "offer_details"
+msgstr "📦 Детали предложения"
+
+msgid "book_offer"
+msgstr "🛒 Забронировать"
+
+msgid "offer_booked"
+msgstr "✅ Предложение забронировано!\n\n🔑 Ваш код: {code}"
+
+#: Bookings
+msgid "my_bookings"
+msgstr "📋 Мои бронирования"
+
+msgid "no_bookings"
+msgstr "📭 У вас пока нет бронирований"
+
+msgid "booking_code"
+msgstr "🔑 Код бронирования: {code}"
+
+msgid "booking_confirmed"
+msgstr "✅ Бронирование подтверждено!"
+
+msgid "booking_cancelled"
+msgstr "❌ Бронирование отменено"
+
+#: Stores
+msgid "stores"
+msgstr "🏪 Магазины"
+
+msgid "no_stores"
+msgstr "😔 Магазины не найдены"
+
+msgid "store_details"
+msgstr "🏪 Информация о магазине"
+
+msgid "favorites"
+msgstr "⭐️ Избранное"
+
+#: Seller
+msgid "seller_menu"
+msgstr "👨‍💼 Меню продавца"
+
+msgid "create_offer"
+msgstr "➕ Создать предложение"
+
+msgid "my_offers"
+msgstr "📦 Мои предложения"
+
+msgid "my_orders"
+msgstr "📋 Мои заказы"
+
+msgid "analytics"
+msgstr "📊 Аналитика"
+
+#: Admin
+msgid "admin_menu"
+msgstr "👑 Панель администратора"
+
+msgid "pending_stores"
+msgstr "⏳ Заявки на модерации"
+
+msgid "statistics"
+msgstr "📈 Статистика"
+
+#: Plural forms - items
+msgid "item"
+msgid_plural "items"
+msgstr[0] "{n} товар"
+msgstr[1] "{n} товара"
+msgstr[2] "{n} товаров"
+
+#: Plural forms - bookings
+msgid "booking"
+msgid_plural "bookings"
+msgstr[0] "{n} бронирование"
+msgstr[1] "{n} бронирования"
+msgstr[2] "{n} бронирований"
+
+#: Plural forms - offers
+msgid "offer"
+msgid_plural "offers"
+msgstr[0] "{n} предложение"
+msgstr[1] "{n} предложения"
+msgstr[2] "{n} предложений"

@@ -4,7 +4,6 @@ Main Database class combining all mixins.
 from __future__ import annotations
 
 from .core import DatabaseCore
-from .schema import SchemaMixin
 from .mixins import (
     BookingMixin,
     FavoritesMixin,
@@ -18,11 +17,13 @@ from .mixins import (
     StoreMixin,
     UserMixin,
 )
+from .schema import SchemaMixin
 
 try:
     from logging_config import logger
 except ImportError:
     import logging
+
     logger = logging.getLogger(__name__)
 
 
@@ -43,7 +44,7 @@ class Database(
 ):
     """
     PostgreSQL Database for Fudly Bot.
-    
+
     Combines all database functionality through mixins:
     - UserMixin: User CRUD operations
     - StoreMixin: Store management

@@ -9,19 +9,20 @@ This script:
 
 Run with the project's venv Python.
 """
-from concurrent.futures import ThreadPoolExecutor, as_completed
 import os
 import random
-import time
 
 # Ensure project root is on sys.path when running from load_tests/
 import sys
+import time
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
+
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from database import Database
 
-DB_PATH = 'load_test.db'
+DB_PATH = "load_test.db"
 
 
 def setup_db(path: str):
@@ -55,12 +56,22 @@ def run_load_test(concurrent_workers=50, decrements=200, increments=50, initial_
     db = setup_db(DB_PATH)
 
     # Create store and activate it
-    store_id = db.add_store(owner_id=1, name='LoadTestStore', city='Ташкент', address='Addr')
-    db.update_store_status(store_id, 'active')
+    store_id = db.add_store(owner_id=1, name="LoadTestStore", city="Ташкент", address="Addr")
+    db.update_store_status(store_id, "active")
 
     # Create offer
-    offer_id = db.add_offer(store_id=store_id, title='LoadTestOffer', description='Load test', original_price=100.0,
-                             discount_price=50.0, quantity=initial_qty, available_from='', available_until='', photo=None, expiry_date=None)
+    offer_id = db.add_offer(
+        store_id=store_id,
+        title="LoadTestOffer",
+        description="Load test",
+        original_price=100.0,
+        discount_price=50.0,
+        quantity=initial_qty,
+        available_from="",
+        available_until="",
+        photo=None,
+        expiry_date=None,
+    )
 
     print(f"Created store={store_id}, offer={offer_id} with qty={initial_qty}")
 
@@ -88,36 +99,36 @@ def run_load_test(concurrent_workers=50, decrements=200, increments=50, initial_
     db_final = Database(db_name=DB_PATH)
     conn = db_final.get_connection()
     cur = conn.cursor()
-    cur.execute('SELECT quantity FROM offers WHERE offer_id = ?', (offer_id,))
+    cur.execute("SELECT quantity FROM offers WHERE offer_id = ?", (offer_id,))
     row = cur.fetchone()
     final_qty = row[0] if row else None
     conn.close()
 
-    print('Final quantity:', final_qty)
+    print("Final quantity:", final_qty)
 
     # Compute expected final quantity
     expected = initial_qty - decrements + increments
-    print('Expected final quantity:', expected)
+    print("Expected final quantity:", expected)
 
     # Check for negative quantities produced as intermediate results
     negatives = [r for r in results if isinstance(r, int) and r < 0]
-    errs = [r for r in results if isinstance(r, str) and r.startswith('err:')]
-    print('Errors:', len(errs))
-    print('Negative intermediate qtys:', len(negatives))
+    errs = [r for r in results if isinstance(r, str) and r.startswith("err:")]
+    print("Errors:", len(errs))
+    print("Negative intermediate qtys:", len(negatives))
 
     ok = (final_qty == expected) and (len(negatives) == 0) and (len(errs) == 0)
     return {
-        'final_qty': final_qty,
-        'expected': expected,
-        'duration': duration,
-        'errors': errs,
-        'negatives': negatives,
-        'ok': ok,
+        "final_qty": final_qty,
+        "expected": expected,
+        "duration": duration,
+        "errors": errs,
+        "negatives": negatives,
+        "ok": ok,
     }
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     summary = run_load_test(concurrent_workers=50, decrements=300, increments=100, initial_qty=500)
-    print('\nSummary:')
+    print("\nSummary:")
     for k, v in summary.items():
         print(f"{k}: {v}")

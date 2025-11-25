@@ -1,9 +1,9 @@
 """Booking repository for booking-related database operations."""
 from __future__ import annotations
 
-from typing import Any, Optional
+from typing import Any
 
-from app.core.exceptions import BookingNotFoundException, DatabaseException
+from app.core.exceptions import BookingNotFoundException
 
 from .base import BaseRepository
 
@@ -11,7 +11,7 @@ from .base import BaseRepository
 class BookingRepository(BaseRepository):
     """Repository for booking-related database operations."""
 
-    def get_booking(self, booking_id: int) -> Optional[dict[str, Any]]:
+    def get_booking(self, booking_id: int) -> dict[str, Any] | None:
         """Get booking by ID.
 
         Args:
@@ -51,7 +51,7 @@ class BookingRepository(BaseRepository):
         offer_id: int,
         user_id: int,
         quantity: int = 1,
-        delivery_address: Optional[str] = None,
+        delivery_address: str | None = None,
     ) -> int:
         """Add new booking.
 

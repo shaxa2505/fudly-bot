@@ -7,17 +7,17 @@ from aiogram import F, Router, types
 from aiogram.fsm.context import FSMContext
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
-from database_protocol import DatabaseProtocol
-from handlers.common.states import ChangeCity, RegisterStore
+from app.core.utils import get_store_field
 from app.keyboards import (
-    city_keyboard,
     city_inline_keyboard,
+    city_keyboard,
     language_keyboard,
     main_menu_customer,
     main_menu_seller,
     settings_keyboard,
 )
-from app.core.utils import get_store_field
+from database_protocol import DatabaseProtocol
+from handlers.common.states import ChangeCity
 from localization import get_text
 from logging_config import logger
 
@@ -57,9 +57,7 @@ async def profile(message: types.Message) -> None:
     user = db.get_user_model(message.from_user.id)
 
     if not user:
-        await message.answer(
-            get_text(lang, "choose_language"), reply_markup=language_keyboard()
-        )
+        await message.answer(get_text(lang, "choose_language"), reply_markup=language_keyboard())
         return
 
     lang_text = "Русский" if lang == "ru" else "Ozbekcha"
@@ -76,7 +74,7 @@ async def profile(message: types.Message) -> None:
         current_mode = user_view_mode.get(message.from_user.id, "customer")
     else:
         current_mode = "customer"
-    
+
     # Customer statistics - show when in customer mode
     if current_mode == "customer":
         bookings = db.get_user_bookings(message.from_user.id)
@@ -91,23 +89,30 @@ async def profile(message: types.Message) -> None:
                 return item.get(field)
             return item[index] if isinstance(item, (list, tuple)) and len(item) > index else None
 
-        active_bookings = len([b for b in bookings if get_field(b, 'status', 3) in ["pending", "confirmed"]])
-        completed_bookings = len([b for b in bookings if get_field(b, 'status', 3) == "completed"])
+        active_bookings = len(
+            [b for b in bookings if get_field(b, "status", 3) in ["pending", "confirmed"]]
+        )
+        completed_bookings = len([b for b in bookings if get_field(b, "status", 3) == "completed"])
 
         active_orders = len(
             [
                 o
                 for o in orders
-                if get_field(o, 'order_status', 10) in ["pending", "confirmed", "preparing", "delivering"]
+                if get_field(o, "order_status", 10)
+                in ["pending", "confirmed", "preparing", "delivering"]
             ]
         )
-        completed_orders = len([o for o in orders if get_field(o, 'order_status', 10) == "completed"])
+        completed_orders = len(
+            [o for o in orders if get_field(o, "order_status", 10) == "completed"]
+        )
 
         total_active = active_bookings + active_orders
         total_completed = completed_bookings + completed_orders
 
         if total_active > 0 or total_completed > 0:
-            text += f"\n📊 <b>{'Статистика покупок' if lang == 'ru' else 'Xaridlar statistikasi'}</b>\n"
+            text += (
+                f"\n📊 <b>{'Статистика покупок' if lang == 'ru' else 'Xaridlar statistikasi'}</b>\n"
+            )
             text += f"🟢 {'Активных' if lang == 'ru' else 'Faol'}: {total_active} "
             text += f"({'из них доставок' if lang == 'ru' else 'shulardan yetkazish'}: {active_orders})\n"
             text += f"✅ {'Завершено' if lang == 'ru' else 'Yakunlangan'}: {total_completed} "
@@ -130,20 +135,28 @@ async def profile(message: types.Message) -> None:
                 # Filter completed bookings - handle dict format from PostgreSQL
                 completed_bookings = []
                 for b in store_bookings:
-                    status = b.get('status') if isinstance(b, dict) else (b[3] if len(b) > 3 else None)
+                    status = (
+                        b.get("status") if isinstance(b, dict) else (b[3] if len(b) > 3 else None)
+                    )
                     if status == "completed":
                         completed_bookings.append(b)
-                
+
                 total_bookings += len(completed_bookings)
 
                 for booking in completed_bookings:
                     try:
                         if isinstance(booking, dict):
-                            quantity = int(booking.get('quantity', 1))
+                            quantity = int(booking.get("quantity", 1))
                             # Calculate price from offer
-                            offer = db.get_offer(booking.get('offer_id'))
+                            offer = db.get_offer(booking.get("offer_id"))
                             if offer:
-                                price = float(offer.get('discount_price', 0)) if isinstance(offer, dict) else float(offer[5]) if len(offer) > 5 else 0
+                                price = (
+                                    float(offer.get("discount_price", 0))
+                                    if isinstance(offer, dict)
+                                    else float(offer[5])
+                                    if len(offer) > 5
+                                    else 0
+                                )
                                 total_revenue += int(quantity * price)
                         else:
                             quantity = int(booking[6]) if len(booking) > 6 else 1
@@ -164,7 +177,7 @@ async def profile(message: types.Message) -> None:
         text,
         parse_mode="HTML",
         reply_markup=settings_keyboard(
-            user.notifications_enabled if hasattr(user, 'notifications_enabled') else True,
+            user.notifications_enabled if hasattr(user, "notifications_enabled") else True,
             lang,
             role=user.role or "customer",
             current_mode=current_mode,
@@ -227,7 +240,9 @@ async def profile_change_city_cb(callback: types.CallbackQuery, state: FSMContex
 
     db.update_user_city(callback.from_user.id, city)
     await state.clear()
-    await callback.message.answer(get_text(lang, "action_complete"), reply_markup=main_menu_customer(lang))
+    await callback.message.answer(
+        get_text(lang, "action_complete"), reply_markup=main_menu_customer(lang)
+    )
     await callback.answer()
 
 
@@ -235,7 +250,9 @@ async def profile_change_city_cb(callback: types.CallbackQuery, state: FSMContex
 async def switch_to_customer_cb(callback: types.CallbackQuery) -> None:
     """Switch to customer mode from profile."""
     if not db or user_view_mode is None:
-        logger.error(f"❌ switch_to_customer_cb: db={db is not None}, user_view_mode={user_view_mode is not None}")
+        logger.error(
+            f"❌ switch_to_customer_cb: db={db is not None}, user_view_mode={user_view_mode is not None}"
+        )
         await callback.answer("System error", show_alert=True)
         return
 
@@ -243,7 +260,7 @@ async def switch_to_customer_cb(callback: types.CallbackQuery) -> None:
         lang = db.get_user_language(callback.from_user.id)
         user_view_mode[callback.from_user.id] = "customer"
         logger.info(f"✅ User {callback.from_user.id} switched to customer mode")
-        
+
         # Send new message with ReplyKeyboard (cannot use edit_text with ReplyKeyboard)
         await callback.message.answer(
             get_text(lang, "switched_to_customer"),
@@ -259,25 +276,29 @@ async def switch_to_customer_cb(callback: types.CallbackQuery) -> None:
 async def switch_to_seller_cb(callback: types.CallbackQuery) -> None:
     """Switch to seller mode from profile."""
     if not db or user_view_mode is None:
-        logger.error(f"❌ switch_to_seller_cb: db={db is not None}, user_view_mode={user_view_mode is not None}")
+        logger.error(
+            f"❌ switch_to_seller_cb: db={db is not None}, user_view_mode={user_view_mode is not None}"
+        )
         await callback.answer("System error", show_alert=True)
         return
 
     try:
         lang = db.get_user_language(callback.from_user.id)
         user = db.get_user_model(callback.from_user.id)
-        
+
         # Check if user is actually a seller
         if not user or user.role != "seller":
             await callback.answer(
-                "Только партнеры могут использовать этот режим" if lang == "ru" else "Faqat hamkorlar bu rejimdan foydalanishlari mumkin",
-                show_alert=True
+                "Только партнеры могут использовать этот режим"
+                if lang == "ru"
+                else "Faqat hamkorlar bu rejimdan foydalanishlari mumkin",
+                show_alert=True,
             )
             return
-        
+
         user_view_mode[callback.from_user.id] = "seller"
         logger.info(f"✅ User {callback.from_user.id} switched to seller mode")
-        
+
         # Send new message with ReplyKeyboard
         await callback.message.answer(
             "Переключено в режим партнера" if lang == "ru" else "Hamkor rejimiga o'tkazildi",
@@ -324,7 +345,9 @@ async def toggle_notifications_callback(callback: types.CallbackQuery) -> None:
     )
     user = db.get_user_model(callback.from_user.id)
     role = user.role if user else "customer"
-    current_mode = user_view_mode.get(callback.from_user.id, "customer") if user_view_mode else "customer"
+    current_mode = (
+        user_view_mode.get(callback.from_user.id, "customer") if user_view_mode else "customer"
+    )
 
     try:
         await callback.message.edit_text(
@@ -334,7 +357,8 @@ async def toggle_notifications_callback(callback: types.CallbackQuery) -> None:
         )
     except Exception:
         await callback.message.answer(
-            text, reply_markup=settings_keyboard(new_enabled, lang, role=role, current_mode=current_mode)
+            text,
+            reply_markup=settings_keyboard(new_enabled, lang, role=role, current_mode=current_mode),
         )
 
     await callback.answer()
@@ -350,9 +374,7 @@ async def delete_account_prompt(callback: types.CallbackQuery) -> None:
     lang = db.get_user_language(callback.from_user.id)
 
     builder = InlineKeyboardBuilder()
-    builder.button(
-        text=get_text(lang, "yes_delete"), callback_data="confirm_delete_yes"
-    )
+    builder.button(text=get_text(lang, "yes_delete"), callback_data="confirm_delete_yes")
     builder.button(text=get_text(lang, "no_cancel"), callback_data="confirm_delete_no")
     builder.adjust(2)
 
@@ -392,17 +414,13 @@ async def confirm_delete_yes(callback: types.CallbackQuery) -> None:
 
     try:
         await callback.message.edit_text(
-            get_text(lang, "account_deleted")
-            + "\n\n"
-            + get_text(lang, "choose_language"),
+            get_text(lang, "account_deleted") + "\n\n" + get_text(lang, "choose_language"),
             parse_mode="HTML",
             reply_markup=language_keyboard(),
         )
     except Exception:
         await callback.message.answer(
-            get_text(lang, "account_deleted")
-            + "\n\n"
-            + get_text(lang, "choose_language"),
+            get_text(lang, "account_deleted") + "\n\n" + get_text(lang, "choose_language"),
             parse_mode="HTML",
             reply_markup=language_keyboard(),
         )
@@ -426,7 +444,9 @@ async def confirm_delete_no(callback: types.CallbackQuery) -> None:
         return
 
     role = user.role
-    current_mode = user_view_mode.get(callback.from_user.id, "customer") if user_view_mode else "customer"
+    current_mode = (
+        user_view_mode.get(callback.from_user.id, "customer") if user_view_mode else "customer"
+    )
 
     try:
         await callback.message.edit_text(
@@ -462,11 +482,10 @@ async def switch_to_customer(message: types.Message) -> None:
     lang = db.get_user_language(message.from_user.id)
     user = db.get_user_model(message.from_user.id)
     user_view_mode[message.from_user.id] = "customer"
-    
+
     # Check if user is seller to show switch button
     is_seller = user and user.role == "seller"
-    
+
     await message.answer(
-        get_text(lang, "switched_to_customer"), 
-        reply_markup=main_menu_customer(lang)
+        get_text(lang, "switched_to_customer"), reply_markup=main_menu_customer(lang)
     )

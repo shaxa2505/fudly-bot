@@ -33,3 +33,11 @@ qrcode>=7.4.0                    # For generating QR codes
 
 # AI Integration
 google-generativeai>=0.3.0       # For Google Gemini API
+
+# i18n / Localization
+babel>=2.14.0                    # For translations compilation
+
+# Development Tools
+ruff>=0.1.7                      # Fast Python linter
+pre-commit>=3.6.0                # Git hooks for code quality
+pyyaml>=6.0                      # For OpenAPI spec validation

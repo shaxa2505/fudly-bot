@@ -1,7 +1,7 @@
 """Base repository with common database operations."""
 from __future__ import annotations
 
-from typing import Any, Optional, Protocol
+from typing import Any, Protocol
 
 from app.core.exceptions import DatabaseException
 
@@ -35,13 +35,9 @@ class BaseRepository:
         Raises:
             DatabaseException: Wrapped database error
         """
-        raise DatabaseException(
-            f"Database operation '{operation}' failed: {str(error)}"
-        ) from error
+        raise DatabaseException(f"Database operation '{operation}' failed: {str(error)}") from error
 
-    def _get_field(
-        self, obj: Any, field_name: str, default: Any = None
-    ) -> Any:
+    def _get_field(self, obj: Any, field_name: str, default: Any = None) -> Any:
         """Safely extract field from object (dict or tuple).
 
         Args:

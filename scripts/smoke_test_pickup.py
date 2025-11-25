@@ -7,12 +7,10 @@ This script will:
 """
 from __future__ import annotations
 
-import time
-from datetime import datetime, timedelta
-from pprint import pprint
-
 import sys
+from datetime import datetime, timedelta
 from pathlib import Path
+from pprint import pprint
 
 # Ensure project root is on sys.path so imports like `database` work when script runs from scripts/
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
@@ -24,7 +22,7 @@ from database import Database
 
 def iso_future(minutes: int = 30) -> str:
     dt = datetime.now() + timedelta(minutes=minutes)
-    return dt.strftime('%Y-%m-%d %H:%M')
+    return dt.strftime("%Y-%m-%d %H:%M")
 
 
 def main():
@@ -32,52 +30,69 @@ def main():
 
     # create test user
     user_id = 999999
-    db.add_user(user_id, username='smoke_tester', first_name='Smoke')
+    db.add_user(user_id, username="smoke_tester", first_name="Smoke")
 
     # create store
     owner_id = 888888
-    db.add_user(owner_id, username='owner', first_name='Owner')
-    store_id = db.add_store(owner_id, 'Smoke Store', 'Tashkent', 'Test address')
+    db.add_user(owner_id, username="owner", first_name="Owner")
+    store_id = db.add_store(owner_id, "Smoke Store", "Tashkent", "Test address")
 
     # create offer with quantity 5
-    offer_id = db.add_offer(store_id, 'Smoke Offer', 'Test', 10000.0, 5000.0, quantity=5, available_from='00:00', available_until='23:59')
+    offer_id = db.add_offer(
+        store_id,
+        "Smoke Offer",
+        "Test",
+        10000.0,
+        5000.0,
+        quantity=5,
+        available_from="00:00",
+        available_until="23:59",
+    )
 
     pickup_time = iso_future(20)
-    print('Using pickup_time:', pickup_time)
+    print("Using pickup_time:", pickup_time)
 
     # Debug: show current offer row
     offer_row = db.get_offer(offer_id)
-    print('Offer row before booking:')
+    print("Offer row before booking:")
     pprint(offer_row)
 
     # Debug: show any existing pickup_slots for this store
     conn = db.get_connection()
     cur = conn.cursor()
-    cur.execute('SELECT slot_id, store_id, slot_ts, capacity, reserved FROM pickup_slots WHERE store_id = ?', (store_id,))
-    print('Existing pickup_slots for store:')
+    cur.execute(
+        "SELECT slot_id, store_id, slot_ts, capacity, reserved FROM pickup_slots WHERE store_id = ?",
+        (store_id,),
+    )
+    print("Existing pickup_slots for store:")
     for r in cur.fetchall():
         print(r)
     conn.close()
 
-    ok, booking_id, code = db.create_booking_atomic(offer_id, user_id, quantity=1, pickup_time=pickup_time, pickup_address='Test address')
+    ok, booking_id, code = db.create_booking_atomic(
+        offer_id, user_id, quantity=1, pickup_time=pickup_time, pickup_address="Test address"
+    )
 
-    print('create_booking_atomic ->', ok, booking_id, code)
+    print("create_booking_atomic ->", ok, booking_id, code)
 
     if ok and booking_id:
         booking = db.get_booking(booking_id)
-        print('Booking row:')
+        print("Booking row:")
         pprint(booking)
 
         # check pickup_slots
         conn = db.get_connection()
         cur = conn.cursor()
-        cur.execute('SELECT slot_id, store_id, slot_ts, capacity, reserved FROM pickup_slots WHERE store_id = ? AND slot_ts = ?', (store_id, pickup_time))
+        cur.execute(
+            "SELECT slot_id, store_id, slot_ts, capacity, reserved FROM pickup_slots WHERE store_id = ? AND slot_ts = ?",
+            (store_id, pickup_time),
+        )
         slot = cur.fetchone()
         conn.close()
-        print('Slot row:', slot)
+        print("Slot row:", slot)
     else:
-        print('Booking failed; inspect DB or logs for details')
+        print("Booking failed; inspect DB or logs for details")
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

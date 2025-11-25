@@ -8,10 +8,10 @@ import tempfile
 from datetime import datetime
 
 import pytest
-from aiogram import Dispatcher
+from aiogram import Bot, Dispatcher
 from aiogram.fsm.storage.memory import MemoryStorage
-from aiogram.types import CallbackQuery, Chat, Message, Update, User as TgUser
-from aiogram import Bot
+from aiogram.types import CallbackQuery, Chat, Message, Update
+from aiogram.types import User as TgUser
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
 from database import Database
@@ -87,17 +87,25 @@ async def test_admin_approve_and_reject_store(temp_db: Database, monkeypatch: py
 
     async def fake_get_me(self):
         return TgUser(id=42, is_bot=True, first_name="FudlyBot")
+
     monkeypatch.setattr(Bot, "get_me", fake_get_me, raising=True)
-    from aiogram.methods import SendMessage, EditMessageText, AnswerCallbackQuery
+    from aiogram.methods import AnswerCallbackQuery, EditMessageText, SendMessage
+
     async def fake_bot_call(self, method):
         if isinstance(method, SendMessage):
             return await fake_send_message(self, method.chat_id, method.text)
         if isinstance(method, EditMessageText):
             # Return edited message-like object
-            return Message(message_id=method.message_id or 1, date=datetime.now(), chat=Chat(id=method.chat_id or admin_id, type="private"), text=method.text)
+            return Message(
+                message_id=method.message_id or 1,
+                date=datetime.now(),
+                chat=Chat(id=method.chat_id or admin_id, type="private"),
+                text=method.text,
+            )
         if isinstance(method, AnswerCallbackQuery):
             return await fake_answer_callback_query(method.callback_query_id)
         return True
+
     monkeypatch.setattr(Bot, "__call__", fake_bot_call, raising=True)
 
     # Wire admin legacy dependencies

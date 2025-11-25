@@ -15,6 +15,7 @@ import asyncio
 import logging
 import os
 import sys
+
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -23,11 +24,13 @@ logger = logging.getLogger(__name__)
 
 # Initialize DB
 try:
-    if os.environ.get('DATABASE_URL'):
+    if os.environ.get("DATABASE_URL"):
         from database_pg import Database as PgDatabase
-        db = PgDatabase(os.environ.get('DATABASE_URL'))
+
+        db = PgDatabase(os.environ.get("DATABASE_URL"))
     else:
         from database import Database as SqliteDatabase
+
         # sqlite DB path defaults to project file (database.py handles default)
         db = SqliteDatabase()
 except Exception as e:
@@ -37,7 +40,8 @@ except Exception as e:
 # Initialize Bot
 try:
     from aiogram import Bot
-    BOT_TOKEN = os.environ.get('TELEGRAM_BOT_TOKEN')
+
+    BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN")
     if not BOT_TOKEN:
         logger.error("TELEGRAM_BOT_TOKEN env var is missing")
         sys.exit(1)
@@ -45,6 +49,7 @@ try:
 except Exception as e:
     logger.error(f"Failed to initialize Bot: {e}")
     sys.exit(1)
+
 
 async def main():
     try:
@@ -61,10 +66,11 @@ async def main():
         except Exception:
             pass
         try:
-            if hasattr(db, 'close'):
+            if hasattr(db, "close"):
                 db.close()
         except Exception:
             pass
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     asyncio.run(main())

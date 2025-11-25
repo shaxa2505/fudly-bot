@@ -3,41 +3,53 @@ Store-related database operations.
 """
 from __future__ import annotations
 
-from typing import Any, List, Optional
-
 from psycopg.rows import dict_row
 
 try:
     from logging_config import logger
 except ImportError:
     import logging
+
     logger = logging.getLogger(__name__)
 
 
 class StoreMixin:
     """Mixin for store-related database operations."""
 
-    def add_store(self, owner_id: int, name: str, city: str, address: Optional[str] = None,
-                  description: Optional[str] = None, category: str = 'Ресторан', 
-                  phone: Optional[str] = None, business_type: str = 'supermarket',
-                  photo: Optional[str] = None) -> int:
+    def add_store(
+        self,
+        owner_id: int,
+        name: str,
+        city: str,
+        address: str | None = None,
+        description: str | None = None,
+        category: str = "Ресторан",
+        phone: str | None = None,
+        business_type: str = "supermarket",
+        photo: str | None = None,
+    ) -> int:
         """Add new store."""
         with self.get_connection() as conn:
             cursor = conn.cursor()
-            cursor.execute('''
+            cursor.execute(
+                """
                 INSERT INTO stores (owner_id, name, city, address, description, category, phone, business_type, photo)
                 VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
                 RETURNING store_id
-            ''', (owner_id, name, city, address, description, category, phone, business_type, photo))
+            """,
+                (owner_id, name, city, address, description, category, phone, business_type, photo),
+            )
             store_id = cursor.fetchone()[0]
-            logger.info(f"Store {store_id} added by user {owner_id}" + (f" with photo" if photo else ""))
+            logger.info(
+                f"Store {store_id} added by user {owner_id}" + (" with photo" if photo else "")
+            )
             return store_id
 
     def get_store(self, store_id: int):
         """Get store by ID."""
         with self.get_connection() as conn:
             cursor = conn.cursor(row_factory=dict_row)
-            cursor.execute('SELECT * FROM stores WHERE store_id = %s', (store_id,))
+            cursor.execute("SELECT * FROM stores WHERE store_id = %s", (store_id,))
             result = cursor.fetchone()
             return dict(result) if result else None
 
@@ -45,22 +57,22 @@ class StoreMixin:
         """Get store by owner ID."""
         with self.get_connection() as conn:
             cursor = conn.cursor(row_factory=dict_row)
-            cursor.execute('SELECT * FROM stores WHERE owner_id = %s', (owner_id,))
+            cursor.execute("SELECT * FROM stores WHERE owner_id = %s", (owner_id,))
             result = cursor.fetchone()
             return dict(result) if result else None
 
-    def get_store_model(self, store_id: int) -> Optional['Store']:
+    def get_store_model(self, store_id: int) -> Store | None:
         """Get store as Pydantic model."""
         try:
             from app.domain import Store
         except ImportError:
             logger.error("Domain models not available. Install pydantic.")
             return None
-        
+
         store_dict = self.get_store(store_id)
         if not store_dict:
             return None
-        
+
         try:
             return Store.from_db_row(store_dict)
         except Exception as e:
@@ -71,25 +83,31 @@ class StoreMixin:
         """Get ALL stores for user (any status)."""
         with self.get_connection() as conn:
             cursor = conn.cursor(row_factory=dict_row)
-            cursor.execute('''
-                SELECT s.*, u.first_name, u.username 
+            cursor.execute(
+                """
+                SELECT s.*, u.first_name, u.username
                 FROM stores s
                 LEFT JOIN users u ON s.owner_id = u.user_id
                 WHERE s.owner_id = %s
                 ORDER BY s.created_at DESC
-            ''', (owner_id,))
+            """,
+                (owner_id,),
+            )
             return [dict(row) for row in cursor.fetchall()]
 
     def get_stores_by_city(self, city: str):
         """Return active stores for a given city."""
         with self.get_connection() as conn:
             cursor = conn.cursor(row_factory=dict_row)
-            cursor.execute("""
+            cursor.execute(
+                """
                 SELECT store_id, name, address, category, city
                 FROM stores
                 WHERE city = %s AND status = 'active'
                 ORDER BY created_at DESC
-            """, (city,))
+            """,
+                (city,),
+            )
             return list(cursor.fetchall())
 
     def get_approved_stores(self, city: str = None):
@@ -97,23 +115,26 @@ class StoreMixin:
         with self.get_connection() as conn:
             cursor = conn.cursor(row_factory=dict_row)
             if city:
-                cursor.execute('SELECT * FROM stores WHERE status = %s AND city = %s', 
-                             ('approved', city))
+                cursor.execute(
+                    "SELECT * FROM stores WHERE status = %s AND city = %s", ("approved", city)
+                )
             else:
-                cursor.execute('SELECT * FROM stores WHERE status = %s', ('approved',))
+                cursor.execute("SELECT * FROM stores WHERE status = %s", ("approved",))
             return [dict(row) for row in cursor.fetchall()]
 
     def get_pending_stores(self):
         """Get stores awaiting approval."""
         with self.get_connection() as conn:
             cursor = conn.cursor(row_factory=dict_row)
-            cursor.execute('''
+            cursor.execute(
+                """
                 SELECT s.*, u.first_name, u.username, u.phone as user_phone
                 FROM stores s
                 LEFT JOIN users u ON s.owner_id = u.user_id
                 WHERE s.status = 'pending'
                 ORDER BY s.created_at DESC
-            ''')
+            """
+            )
             return [dict(row) for row in cursor.fetchall()]
 
     def get_stores_by_business_type(self, business_type: str, city: str = None):
@@ -121,70 +142,86 @@ class StoreMixin:
         with self.get_connection() as conn:
             cursor = conn.cursor(row_factory=dict_row)
             if city:
-                cursor.execute('''
-                    SELECT s.*, 
+                cursor.execute(
+                    """
+                    SELECT s.*,
                            COALESCE(AVG(r.rating), 0) as avg_rating,
                            COUNT(r.rating_id) as ratings_count
                     FROM stores s
                     LEFT JOIN ratings r ON s.store_id = r.store_id
-                    WHERE s.business_type = %s 
-                    AND s.city = %s 
+                    WHERE s.business_type = %s
+                    AND s.city = %s
                     AND (s.status = 'active' OR s.status = 'approved')
                     GROUP BY s.store_id
                     ORDER BY avg_rating DESC, s.created_at DESC
-                ''', (business_type, city))
+                """,
+                    (business_type, city),
+                )
             else:
-                cursor.execute('''
-                    SELECT s.*, 
+                cursor.execute(
+                    """
+                    SELECT s.*,
                            COALESCE(AVG(r.rating), 0) as avg_rating,
                            COUNT(r.rating_id) as ratings_count
                     FROM stores s
                     LEFT JOIN ratings r ON s.store_id = r.store_id
-                    WHERE s.business_type = %s 
+                    WHERE s.business_type = %s
                     AND (s.status = 'active' OR s.status = 'approved')
                     GROUP BY s.store_id
                     ORDER BY avg_rating DESC, s.created_at DESC
-                ''', (business_type,))
+                """,
+                    (business_type,),
+                )
             return [dict(row) for row in cursor.fetchall()]
 
-    def get_stores_by_category(self, category: str, city: str = None) -> List[dict]:
+    def get_stores_by_category(self, category: str, city: str = None) -> list[dict]:
         """Get stores by category."""
         with self.get_connection() as conn:
             cursor = conn.cursor(row_factory=dict_row)
             if city:
-                cursor.execute('''
-                    SELECT * FROM stores 
-                    WHERE category = %s AND city = %s 
+                cursor.execute(
+                    """
+                    SELECT * FROM stores
+                    WHERE category = %s AND city = %s
                     AND (status = 'active' OR status = 'approved')
                     ORDER BY created_at DESC
-                ''', (category, city))
+                """,
+                    (category, city),
+                )
             else:
-                cursor.execute('''
-                    SELECT * FROM stores 
-                    WHERE category = %s 
+                cursor.execute(
+                    """
+                    SELECT * FROM stores
+                    WHERE category = %s
                     AND (status = 'active' OR status = 'approved')
                     ORDER BY created_at DESC
-                ''', (category,))
+                """,
+                    (category,),
+                )
             return [dict(row) for row in cursor.fetchall()]
 
     def get_stores_count_by_category(self, city: str) -> dict:
         """Get store counts grouped by category."""
         with self.get_connection() as conn:
             cursor = conn.cursor()
-            cursor.execute('''
+            cursor.execute(
+                """
                 SELECT category, COUNT(*) as count
                 FROM stores
                 WHERE city = %s AND (status = 'active' OR status = 'approved')
                 GROUP BY category
-            ''', (city,))
+            """,
+                (city,),
+            )
             return dict(cursor.fetchall())
 
-    def get_top_stores_by_city(self, city: str, limit: int = 10) -> List[dict]:
+    def get_top_stores_by_city(self, city: str, limit: int = 10) -> list[dict]:
         """Get top rated stores in city."""
         with self.get_connection() as conn:
             cursor = conn.cursor(row_factory=dict_row)
-            cursor.execute('''
-                SELECT s.*, 
+            cursor.execute(
+                """
+                SELECT s.*,
                        COALESCE(AVG(r.rating), 0) as avg_rating,
                        COUNT(r.rating_id) as ratings_count
                 FROM stores s
@@ -193,17 +230,22 @@ class StoreMixin:
                 GROUP BY s.store_id
                 ORDER BY avg_rating DESC, ratings_count DESC
                 LIMIT %s
-            ''', (city, limit))
+            """,
+                (city, limit),
+            )
             return cursor.fetchall()
 
     def update_store_status(self, store_id: int, status: str, rejection_reason: str = None):
         """Update store status."""
         with self.get_connection() as conn:
             cursor = conn.cursor()
-            cursor.execute('''
-                UPDATE stores SET status = %s, rejection_reason = %s 
+            cursor.execute(
+                """
+                UPDATE stores SET status = %s, rejection_reason = %s
                 WHERE store_id = %s
-            ''', (status, rejection_reason, store_id))
+            """,
+                (status, rejection_reason, store_id),
+            )
 
     def approve_store(self, store_id: int):
         """Approve a store."""
@@ -211,14 +253,14 @@ class StoreMixin:
             cursor = conn.cursor()
             cursor.execute("UPDATE stores SET status = 'active' WHERE store_id = %s", (store_id,))
             # Get store owner for notification
-            cursor.execute('SELECT owner_id FROM stores WHERE store_id = %s', (store_id,))
+            cursor.execute("SELECT owner_id FROM stores WHERE store_id = %s", (store_id,))
             result = cursor.fetchone()
             owner_id = result[0] if result else None
-            
+
             if owner_id:
                 # Update user role
                 cursor.execute("UPDATE users SET role = 'seller' WHERE user_id = %s", (owner_id,))
-            
+
             logger.info(f"Store {store_id} approved")
             return owner_id
 
@@ -226,27 +268,30 @@ class StoreMixin:
         """Reject a store with reason."""
         with self.get_connection() as conn:
             cursor = conn.cursor()
-            cursor.execute('''
+            cursor.execute(
+                """
                 UPDATE stores SET status = 'rejected', rejection_reason = %s
                 WHERE store_id = %s
-            ''', (reason, store_id))
+            """,
+                (reason, store_id),
+            )
             logger.info(f"Store {store_id} rejected: {reason}")
 
     def delete_store(self, store_id: int):
         """Delete store and related data."""
         with self.get_connection() as conn:
             cursor = conn.cursor()
-            cursor.execute('DELETE FROM offers WHERE store_id = %s', (store_id,))
-            cursor.execute('DELETE FROM payment_settings WHERE store_id = %s', (store_id,))
-            cursor.execute('DELETE FROM favorites WHERE store_id = %s', (store_id,))
-            cursor.execute('DELETE FROM stores WHERE store_id = %s', (store_id,))
+            cursor.execute("DELETE FROM offers WHERE store_id = %s", (store_id,))
+            cursor.execute("DELETE FROM payment_settings WHERE store_id = %s", (store_id,))
+            cursor.execute("DELETE FROM favorites WHERE store_id = %s", (store_id,))
+            cursor.execute("DELETE FROM stores WHERE store_id = %s", (store_id,))
             logger.info(f"Store {store_id} deleted")
 
     def get_store_owner(self, store_id: int):
         """Get store owner user_id."""
         with self.get_connection() as conn:
             cursor = conn.cursor()
-            cursor.execute('SELECT owner_id FROM stores WHERE store_id = %s', (store_id,))
+            cursor.execute("SELECT owner_id FROM stores WHERE store_id = %s", (store_id,))
             result = cursor.fetchone()
             return result[0] if result else None
 
@@ -254,34 +299,41 @@ class StoreMixin:
         """Get store analytics."""
         with self.get_connection() as conn:
             cursor = conn.cursor()
-            
+
             # Total stats
-            cursor.execute('''
-                SELECT 
+            cursor.execute(
+                """
+                SELECT
                     COUNT(*) as total_bookings,
                     SUM(CASE WHEN status = 'completed' THEN 1 ELSE 0 END) as completed,
                     SUM(CASE WHEN status = 'cancelled' THEN 1 ELSE 0 END) as cancelled
                 FROM bookings b
                 JOIN offers o ON b.offer_id = o.offer_id
                 WHERE o.store_id = %s
-            ''', (store_id,))
+            """,
+                (store_id,),
+            )
             stats = cursor.fetchone()
-            
+
             # Sales by day of week
-            cursor.execute('''
-                SELECT 
+            cursor.execute(
+                """
+                SELECT
                     EXTRACT(DOW FROM b.created_at)::INTEGER as day_of_week,
                     COUNT(*) as count
                 FROM bookings b
                 JOIN offers o ON b.offer_id = o.offer_id
                 WHERE o.store_id = %s AND b.status = 'completed'
                 GROUP BY day_of_week
-            ''', (store_id,))
+            """,
+                (store_id,),
+            )
             days = cursor.fetchall()
-            
+
             # Popular categories
-            cursor.execute('''
-                SELECT 
+            cursor.execute(
+                """
+                SELECT
                     o.category,
                     COUNT(*) as count
                 FROM bookings b
@@ -290,24 +342,29 @@ class StoreMixin:
                 GROUP BY o.category
                 ORDER BY count DESC
                 LIMIT 5
-            ''', (store_id,))
+            """,
+                (store_id,),
+            )
             categories = cursor.fetchall()
-            
+
             # Average rating
-            cursor.execute('''
+            cursor.execute(
+                """
                 SELECT AVG(rating) as avg_rating, COUNT(*) as rating_count
                 FROM ratings
                 WHERE store_id = %s
-            ''', (store_id,))
+            """,
+                (store_id,),
+            )
             rating = cursor.fetchone()
-            
+
             return {
-                'total_bookings': stats[0] or 0,
-                'completed': stats[1] or 0,
-                'cancelled': stats[2] or 0,
-                'conversion_rate': (stats[1] / stats[0] * 100) if stats[0] > 0 else 0,
-                'days_of_week': dict(days) if days else {},
-                'popular_categories': categories or [],
-                'avg_rating': rating[0] or 0,
-                'rating_count': rating[1] or 0
+                "total_bookings": stats[0] or 0,
+                "completed": stats[1] or 0,
+                "cancelled": stats[2] or 0,
+                "conversion_rate": (stats[1] / stats[0] * 100) if stats[0] > 0 else 0,
+                "days_of_week": dict(days) if days else {},
+                "popular_categories": categories or [],
+                "avg_rating": rating[0] or 0,
+                "rating_count": rating[1] or 0,
             }

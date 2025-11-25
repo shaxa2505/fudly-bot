@@ -1,10 +1,6 @@
 """Tests for app.core modules."""
 from __future__ import annotations
 
-from typing import Any
-
-import pytest
-
 from app.core.exceptions import (
     BookingNotFoundException,
     DatabaseException,
@@ -123,8 +119,23 @@ class TestUtils:
     def test_get_store_field_tuple(self):
         """Test get_store_field with tuple input."""
         # Tuple format from database
-        store = (1, 123, "Test Store", "Ташкент", "Address", "Desc", "Ресторан", 
-                "+998", "active", None, "2025-01-01", "restaurant", 1, 15000, 30000)
+        store = (
+            1,
+            123,
+            "Test Store",
+            "Ташкент",
+            "Address",
+            "Desc",
+            "Ресторан",
+            "+998",
+            "active",
+            None,
+            "2025-01-01",
+            "restaurant",
+            1,
+            15000,
+            30000,
+        )
         assert get_store_field(store, "store_id") == 1
         assert get_store_field(store, "owner_id") == 123
         assert get_store_field(store, "name") == "Test Store"

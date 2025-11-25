@@ -6,16 +6,8 @@ All new code should import from handlers.common.utils and handlers.common.states
 """
 
 # Re-export from utils for backward compatibility
-from handlers.common.utils import (
-    user_view_mode,
-    normalize_city,
-    get_uzb_time,
-    has_approved_store,
-    get_appropriate_menu,
-    RegistrationCheckMiddleware,
-    UZB_TZ,
-    CITY_UZ_TO_RU,
-)
+# Export router
+from handlers.common.router import router as common_router
 
 # Re-export states for backward compatibility
 from handlers.common.states import (
@@ -28,13 +20,20 @@ from handlers.common.states import (
     CreateOffer,
     EditOffer,
     OrderDelivery,
-    Registration,
     RegisterStore,
+    Registration,
     Search,
 )
-
-# Export router
-from handlers.common.router import router as common_router
+from handlers.common.utils import (
+    CITY_UZ_TO_RU,
+    UZB_TZ,
+    RegistrationCheckMiddleware,
+    get_appropriate_menu,
+    get_uzb_time,
+    has_approved_store,
+    normalize_city,
+    user_view_mode,
+)
 
 __all__ = [
     # Router

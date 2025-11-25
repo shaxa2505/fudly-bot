@@ -1,10 +1,9 @@
 """User repository for user-related database operations."""
 from __future__ import annotations
 
-from typing import Any, Optional
+from typing import Any
 
-from app.core.exceptions import DatabaseException, UserNotFoundException
-from app.core.utils import get_user_field
+from app.core.exceptions import UserNotFoundException
 
 from .base import BaseRepository
 
@@ -12,7 +11,7 @@ from .base import BaseRepository
 class UserRepository(BaseRepository):
     """Repository for user-related database operations."""
 
-    def get_user(self, user_id: int) -> Optional[dict[str, Any]]:
+    def get_user(self, user_id: int) -> dict[str, Any] | None:
         """Get user by ID.
 
         Args:
@@ -51,9 +50,9 @@ class UserRepository(BaseRepository):
         self,
         user_id: int,
         language: str = "ru",
-        first_name: Optional[str] = None,
-        phone: Optional[str] = None,
-        city: Optional[str] = None,
+        first_name: str | None = None,
+        phone: str | None = None,
+        city: str | None = None,
     ) -> None:
         """Add new user.
 
@@ -75,10 +74,10 @@ class UserRepository(BaseRepository):
     def update_user(
         self,
         user_id: int,
-        first_name: Optional[str] = None,
-        phone: Optional[str] = None,
-        city: Optional[str] = None,
-        language: Optional[str] = None,
+        first_name: str | None = None,
+        phone: str | None = None,
+        city: str | None = None,
+        language: str | None = None,
     ) -> None:
         """Update user data.
 

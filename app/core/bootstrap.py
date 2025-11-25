@@ -15,7 +15,7 @@ def build_application(settings: Settings):
     """Create bot runtime components from configuration."""
     bot = Bot(token=settings.bot_token)
     db = create_database(settings.database_url)
-    
+
     # Priority 1: Redis (Best for production)
     if settings.redis_url:
         try:
@@ -28,9 +28,10 @@ def build_application(settings: Settings):
             logger.warning("Failed to initialize Redis storage, using MemoryStorage")
 
     # Priority 2: PostgreSQL (Good fallback)
-    elif settings.database_url and 'postgresql' in settings.database_url:
+    elif settings.database_url and "postgresql" in settings.database_url:
         try:
             from fsm_storage_pg import PostgreSQLStorage
+
             storage = PostgreSQLStorage(db)
             print("💾 Using PostgreSQL database with PostgreSQLStorage")
             print("✅ FSM states PERSIST across restarts in database")
@@ -40,14 +41,14 @@ def build_application(settings: Settings):
             print("💾 Falling back to MemoryStorage (states will be lost on restart)")
             storage = MemoryStorage()
             logger.warning("Failed to initialize PostgreSQL storage, using MemoryStorage")
-    
+
     # Priority 3: Memory (Local dev)
     else:
         storage = MemoryStorage()
         print("💾 Using SQLite database with MemoryStorage")
         print("⚠️ FSM states will be LOST on restart")
         logger.info("Using SQLite for local development with MemoryStorage")
-    
+
     dispatcher = Dispatcher(storage=storage)
     cache = CacheManager(db)
 

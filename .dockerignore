@@ -1,0 +1,90 @@
+# Docker ignore file - exclude unnecessary files from build context
+# This reduces build time and image size
+
+# Git
+.git
+.gitignore
+.gitattributes
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Virtual environments
+.venv/
+venv/
+ENV/
+env/
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+.nox/
+coverage.xml
+*.cover
+.hypothesis/
+tests/
+
+# Documentation (keep docs/openapi.yaml)
+*.md
+!README.md
+
+# Development files
+.env
+.env.*
+!.env.example
+*.log
+logs/
+
+# Load testing
+load_tests/
+
+# Scripts (not needed in production)
+scripts/
+
+# Pre-commit
+.pre-commit-config.yaml
+
+# Local data
+data/
+*.db
+*.sqlite3
+
+# Alembic migrations (keep for reference but not strictly needed)
+# migrations_alembic/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Temporary files
+*.tmp
+*.temp
+*.bak

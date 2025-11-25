@@ -1,18 +1,21 @@
 """
 Common utilities, constants and middleware.
 """
-from datetime import datetime, timedelta, timezone
-from typing import Any, Awaitable, Callable, Dict
 import logging
+from collections.abc import Awaitable, Callable
+from datetime import datetime, timedelta, timezone
+from typing import Any
 
 from aiogram import BaseMiddleware
+
 from database_protocol import DatabaseProtocol
 
-logger = logging.getLogger('fudly')
+logger = logging.getLogger("fudly")
 
 # Re-export states for backward compatibility
 from handlers.common.states import (
     BookOffer,
+    Browse,
     BrowseOffers,
     BulkCreate,
     ChangeCity,
@@ -20,10 +23,9 @@ from handlers.common.states import (
     CreateOffer,
     EditOffer,
     OrderDelivery,
-    Registration,
     RegisterStore,
+    Registration,
     Search,
-    Browse,
 )
 
 __all__ = [
@@ -52,7 +54,7 @@ __all__ = [
 ]
 
 # In-memory per-session view mode override: {'seller'|'customer'}
-user_view_mode: Dict[int, str] = {}
+user_view_mode: dict[int, str] = {}
 
 # Uzbek city names mapping to Russian
 CITY_UZ_TO_RU = {
@@ -63,7 +65,7 @@ CITY_UZ_TO_RU = {
     "Namangan": "Наманган",
     "Farg'ona": "Фергана",
     "Xiva": "Хива",
-    "Nukus": "Нукус"
+    "Nukus": "Нукус",
 }
 
 # Uzbekistan timezone (UTC+5)
@@ -83,7 +85,7 @@ def get_uzb_time() -> datetime:
 def has_approved_store(user_id: int, db: DatabaseProtocol) -> bool:
     """Check if user has an approved store."""
     stores = db.get_user_stores(user_id)
-    return any(store.get('status') == "active" for store in stores)
+    return any(store.get("status") == "active" for store in stores)
 
 
 def get_appropriate_menu(
@@ -91,57 +93,57 @@ def get_appropriate_menu(
     lang: str,
     db: DatabaseProtocol,
     main_menu_seller: Callable[[str], Any],
-    main_menu_customer: Callable[[str], Any]
+    main_menu_customer: Callable[[str], Any],
 ) -> Any:
     """Return appropriate menu for user based on their store approval status and current mode."""
     user = db.get_user_model(user_id)
     if not user:
         return main_menu_customer(lang)
-    
+
     role = user.role
-    if role == 'store_owner':
-        role = 'seller'
-    
-    current_mode = user_view_mode.get(user_id, 'customer')
-    
+    if role == "store_owner":
+        role = "seller"
+
+    current_mode = user_view_mode.get(user_id, "customer")
+
     if role == "seller":
         if has_approved_store(user_id, db):
-            if current_mode == 'seller':
+            if current_mode == "seller":
                 return main_menu_seller(lang)
             else:
                 return main_menu_customer(lang)
         else:
             return main_menu_customer(lang)
-    
+
     return main_menu_customer(lang)
 
 
 class RegistrationCheckMiddleware(BaseMiddleware):
     """Check that user is registered (has phone number) before any action."""
-    
+
     def __init__(
         self,
         db: DatabaseProtocol,
         get_text_func: Callable[[str, str], str] | Callable[..., str],
-        phone_request_keyboard_func: Callable[[str], Any]
+        phone_request_keyboard_func: Callable[[str], Any],
     ):
         self.db = db
         self.get_text = get_text_func
         self.phone_request_keyboard = phone_request_keyboard_func
         super().__init__()
-    
+
     async def __call__(
         self,
-        handler: Callable[[Any, Dict[str, Any]], Awaitable[Any]],
+        handler: Callable[[Any, dict[str, Any]], Awaitable[Any]],
         event: Any,
-        data: Dict[str, Any]
+        data: dict[str, Any],
     ) -> Any:
-        msg = getattr(event, 'message', None)
-        cb = getattr(event, 'callback_query', None)
+        msg = getattr(event, "message", None)
+        cb = getattr(event, "callback_query", None)
         user_id = None
-        if msg and getattr(msg, 'from_user', None):
+        if msg and getattr(msg, "from_user", None):
             user_id = msg.from_user.id
-        elif cb and getattr(cb, 'from_user', None):
+        elif cb and getattr(cb, "from_user", None):
             user_id = cb.from_user.id
 
         if not user_id:
@@ -157,17 +159,17 @@ class RegistrationCheckMiddleware(BaseMiddleware):
                 content_type = "contact"
         logger.debug(f"[Middleware] User {user_id}, type: {content_type}")
 
-        allowed_commands = ['/start', '/help']
-        allowed_callbacks = ['lang_ru', 'lang_uz']
+        allowed_commands = ["/start", "/help"]
+        allowed_callbacks = ["lang_ru", "lang_uz"]
         allowed_callback_patterns = [
-            'book_',
-            'order_delivery_',
-            'store_info_',
-            'store_offers_',
-            'store_reviews_',
-            'back_to_store_',
-            'hot_offers_',
-            'filter_',
+            "book_",
+            "order_delivery_",
+            "store_info_",
+            "store_offers_",
+            "store_reviews_",
+            "back_to_store_",
+            "hot_offers_",
+            "filter_",
         ]
 
         if msg:
@@ -184,7 +186,7 @@ class RegistrationCheckMiddleware(BaseMiddleware):
             if any(cb.data.startswith(pattern) for pattern in allowed_callback_patterns):
                 return await handler(event, data)
 
-        state = data.get('state')
+        state = data.get("state")
         if state:
             current_state = await state.get_state()
             if current_state:
@@ -193,18 +195,15 @@ class RegistrationCheckMiddleware(BaseMiddleware):
         user = self.db.get_user_model(user_id)
         user_phone = user.phone if user else None
         if not user or not user_phone:
-            lang = self.db.get_user_language(user_id) if user else 'ru'
+            lang = self.db.get_user_language(user_id) if user else "ru"
             if msg:
                 await msg.answer(
-                    self.get_text(lang, 'registration_required'),
+                    self.get_text(lang, "registration_required"),
                     parse_mode="HTML",
-                    reply_markup=self.phone_request_keyboard(lang)
+                    reply_markup=self.phone_request_keyboard(lang),
                 )
             elif cb:
-                await cb.answer(
-                    self.get_text(lang, 'registration_required'),
-                    show_alert=True
-                )
+                await cb.answer(self.get_text(lang, "registration_required"), show_alert=True)
             return
 
         return await handler(event, data)

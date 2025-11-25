@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "fudly-bot"
-version = "1.0.0"
+version = "2.0.0"
 description = "Telegram bot for selling discounted food (Too Good To Go alternative for Uzbekistan)"
 authors = ["shaxa2505"]
 license = "MIT"
@@ -15,6 +15,15 @@ requests = ">=2.31.0"
 psycopg = {extras = ["binary"], version = ">=3.2"}
 psycopg-pool = ">=3.2"
 python-json-logger = ">=2.0.0"
+cachetools = ">=5.3.0"
+redis = ">=5.0.0"
+sentry-sdk = ">=1.40.0"
+Pillow = ">=10.0.0"
+qrcode = ">=7.4.0"
+google-generativeai = ">=0.3.0"
+pydantic = ">=2.0.0"
+alembic = ">=1.13.0"
+sqlalchemy = ">=2.0.0"
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^7.4.0"

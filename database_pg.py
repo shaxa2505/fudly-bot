@@ -11,7 +11,7 @@ separation into mixins:
 - database_pg_module/core.py - Connection pool, HybridRow
 - database_pg_module/schema.py - Schema initialization
 - database_pg_module/mixins/users.py - User operations
-- database_pg_module/mixins/stores.py - Store operations  
+- database_pg_module/mixins/stores.py - Store operations
 - database_pg_module/mixins/offers.py - Offer operations
 - database_pg_module/mixins/bookings.py - Booking operations (atomic)
 - database_pg_module/mixins/orders.py - Order operations
@@ -26,27 +26,27 @@ from __future__ import annotations
 
 # Re-export everything from the modular database package
 from database_pg_module import (
+    DATABASE_URL,
     Database,
     DatabaseCore,
-    DATABASE_URL,
     HybridRow,
-    hybrid_row_factory,
     fix_railway_database_url,
+    hybrid_row_factory,
 )
 
 # For backwards compatibility, also expose individual constants
 from database_pg_module.core import (
     BOOKING_DURATION_HOURS,
-    MAX_ACTIVE_BOOKINGS_PER_USER,
     BOOKING_EXPIRY_CHECK_MINUTES,
-    MIN_CONNECTIONS,
+    MAX_ACTIVE_BOOKINGS_PER_USER,
     MAX_CONNECTIONS,
+    MIN_CONNECTIONS,
     POOL_WAIT_TIMEOUT,
 )
 
 __all__ = [
     "Database",
-    "DatabaseCore", 
+    "DatabaseCore",
     "DATABASE_URL",
     "HybridRow",
     "hybrid_row_factory",
@@ -58,5 +58,3 @@ __all__ = [
     "MAX_CONNECTIONS",
     "POOL_WAIT_TIMEOUT",
 ]
-
-

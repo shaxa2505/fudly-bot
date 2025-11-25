@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, List, Tuple
+from typing import Any
 
 from app.repositories import BookingRepository, OfferRepository, StoreRepository, UserRepository
 
@@ -28,7 +28,7 @@ class OfferStats:
     active: int
     inactive: int
     deleted: int
-    top_categories: List[Tuple[str, int]]
+    top_categories: list[tuple[str, int]]
 
 
 @dataclass(slots=True)
@@ -45,8 +45,8 @@ class AdminService:
     """Provide aggregated information for admin dashboards."""
 
     def __init__(
-        self, 
-        db: Any, 
+        self,
+        db: Any,
         use_postgres: bool,
         user_repo: UserRepository | None = None,
         store_repo: StoreRepository | None = None,
@@ -69,7 +69,7 @@ class AdminService:
         return self._db.is_admin(user_id)
 
     @staticmethod
-    def _fetch_value(row: Tuple[Any, ...] | None) -> int:
+    def _fetch_value(row: tuple[Any, ...] | None) -> int:
         if not row:
             return 0
         value = row[0]
@@ -91,7 +91,9 @@ class AdminService:
             customers = self._fetch_value(cursor.fetchone())
 
             if self._use_postgres:
-                cursor.execute("SELECT COUNT(*) FROM users WHERE created_at >= CURRENT_DATE - INTERVAL '7 days'")
+                cursor.execute(
+                    "SELECT COUNT(*) FROM users WHERE created_at >= CURRENT_DATE - INTERVAL '7 days'"
+                )
                 week_users = self._fetch_value(cursor.fetchone())
                 cursor.execute("SELECT COUNT(*) FROM users WHERE DATE(created_at) = %s", (today,))
                 today_users = self._fetch_value(cursor.fetchone())
@@ -146,11 +148,15 @@ class AdminService:
                 LIMIT 5
                 """
             )
-            rows: List[Tuple[Any, Any]] = cursor.fetchall() or []
-            top_categories: List[Tuple[str, int]] = [
-                (str(row[0]), int(row[1])) for row in rows if row and row[0] is not None and row[1] is not None
+            rows: list[tuple[Any, Any]] = cursor.fetchall() or []
+            top_categories: list[tuple[str, int]] = [
+                (str(row[0]), int(row[1]))
+                for row in rows
+                if row and row[0] is not None and row[1] is not None
             ]
-        return OfferStats(active=active, inactive=inactive, deleted=deleted, top_categories=top_categories)
+        return OfferStats(
+            active=active, inactive=inactive, deleted=deleted, top_categories=top_categories
+        )
 
     def get_booking_stats(self) -> BookingStats:
         from datetime import datetime
@@ -169,7 +175,11 @@ class AdminService:
             cursor.execute(status_query, ("cancelled",))
             cancelled = self._fetch_value(cursor.fetchone())
 
-            date_query = "SELECT COUNT(*) FROM bookings WHERE DATE(created_at) = %s" if self._use_postgres else "SELECT COUNT(*) FROM bookings WHERE DATE(created_at) = ?"
+            date_query = (
+                "SELECT COUNT(*) FROM bookings WHERE DATE(created_at) = %s"
+                if self._use_postgres
+                else "SELECT COUNT(*) FROM bookings WHERE DATE(created_at) = ?"
+            )
             cursor.execute(date_query, (today,))
             today_bookings = self._fetch_value(cursor.fetchone())
 
@@ -181,8 +191,7 @@ class AdminService:
                 WHERE DATE(b.created_at) = %s AND b.status != 'cancelled'
                 """
                 if self._use_postgres
-                else
-                """
+                else """
                 SELECT SUM(o.discount_price * b.quantity)
                 FROM bookings b
                 JOIN offers o ON b.offer_id = o.offer_id

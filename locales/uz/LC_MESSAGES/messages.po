@@ -1,0 +1,151 @@
+# Uzbek translations for Fudly Bot
+# Copyright (C) 2025 Fudly Team
+# This file is distributed under the MIT license.
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: Fudly Bot 2.0.0\n"
+"Report-Msgid-Bugs-To: support@fudly.uz\n"
+"POT-Creation-Date: 2025-11-26 12:00+0000\n"
+"PO-Revision-Date: 2025-11-26 12:00+0000\n"
+"Last-Translator: Fudly Team <support@fudly.uz>\n"
+"Language-Team: Uzbek\n"
+"Language: uz\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+
+#: Common messages
+msgid "welcome"
+msgstr "👋 Fudly'ga xush kelibsiz!\n\n🍽 Oziq-ovqatni tejang, pulni tejang!"
+
+msgid "main_menu"
+msgstr "📱 Asosiy menyu"
+
+msgid "back"
+msgstr "◀️ Ortga"
+
+msgid "cancel"
+msgstr "❌ Bekor qilish"
+
+msgid "confirm"
+msgstr "✅ Tasdiqlash"
+
+msgid "error"
+msgstr "❌ Xatolik yuz berdi. Keyinroq urinib ko'ring."
+
+msgid "success"
+msgstr "✅ Muvaffaqiyatli!"
+
+#: Navigation
+msgid "next"
+msgstr "Oldinga ➡️"
+
+msgid "previous"
+msgstr "⬅️ Ortga"
+
+msgid "page_info"
+msgstr "📄 {page}-sahifa, jami: {total}"
+
+#: User actions
+msgid "choose_language"
+msgstr "🌐 Tilni tanlang:"
+
+msgid "language_changed"
+msgstr "✅ Til o'zbekchaga o'zgartirildi"
+
+msgid "choose_city"
+msgstr "🏙 Shahringizni tanlang:"
+
+msgid "city_changed"
+msgstr "✅ Shahar o'zgartirildi: {city}"
+
+#: Offers
+msgid "offers"
+msgstr "🍽 Takliflar"
+
+msgid "no_offers"
+msgstr "😔 Hozircha takliflar yo'q"
+
+msgid "offer_details"
+msgstr "📦 Taklif tafsilotlari"
+
+msgid "book_offer"
+msgstr "🛒 Bron qilish"
+
+msgid "offer_booked"
+msgstr "✅ Taklif bron qilindi!\n\n🔑 Sizning kodingiz: {code}"
+
+#: Bookings
+msgid "my_bookings"
+msgstr "📋 Mening bronlarim"
+
+msgid "no_bookings"
+msgstr "📭 Sizda hali bronlar yo'q"
+
+msgid "booking_code"
+msgstr "🔑 Bron kodi: {code}"
+
+msgid "booking_confirmed"
+msgstr "✅ Bron tasdiqlandi!"
+
+msgid "booking_cancelled"
+msgstr "❌ Bron bekor qilindi"
+
+#: Stores
+msgid "stores"
+msgstr "🏪 Do'konlar"
+
+msgid "no_stores"
+msgstr "😔 Do'konlar topilmadi"
+
+msgid "store_details"
+msgstr "🏪 Do'kon haqida"
+
+msgid "favorites"
+msgstr "⭐️ Sevimlilar"
+
+#: Seller
+msgid "seller_menu"
+msgstr "👨‍💼 Sotuvchi menyusi"
+
+msgid "create_offer"
+msgstr "➕ Taklif yaratish"
+
+msgid "my_offers"
+msgstr "📦 Mening takliflarim"
+
+msgid "my_orders"
+msgstr "📋 Mening buyurtmalarim"
+
+msgid "analytics"
+msgstr "📊 Analitika"
+
+#: Admin
+msgid "admin_menu"
+msgstr "👑 Administrator paneli"
+
+msgid "pending_stores"
+msgstr "⏳ Kutilayotgan arizalar"
+
+msgid "statistics"
+msgstr "📈 Statistika"
+
+#: Plural forms - items
+msgid "item"
+msgid_plural "items"
+msgstr[0] "{n} ta mahsulot"
+msgstr[1] "{n} ta mahsulot"
+
+#: Plural forms - bookings
+msgid "booking"
+msgid_plural "bookings"
+msgstr[0] "{n} ta bron"
+msgstr[1] "{n} ta bron"
+
+#: Plural forms - offers
+msgid "offer"
+msgid_plural "offers"
+msgstr[0] "{n} ta taklif"
+msgstr[1] "{n} ta taklif"

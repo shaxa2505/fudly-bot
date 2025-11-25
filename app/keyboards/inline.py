@@ -7,33 +7,31 @@ from aiogram.utils.keyboard import InlineKeyboardBuilder
 from localization import get_text
 
 
-def offer_keyboard(offer_id: int, lang: str = 'ru') -> InlineKeyboardMarkup:
+def offer_keyboard(offer_id: int, lang: str = "ru") -> InlineKeyboardMarkup:
     """Basic offer keyboard."""
     builder = InlineKeyboardBuilder()
-    builder.button(text=get_text(lang, 'book'), callback_data=f"book_{offer_id}")
-    builder.button(text=get_text(lang, 'details'), callback_data=f"details_{offer_id}")
+    builder.button(text=get_text(lang, "book"), callback_data=f"book_{offer_id}")
+    builder.button(text=get_text(lang, "details"), callback_data=f"details_{offer_id}")
     builder.adjust(1)
     return builder.as_markup()
 
 
-def filters_keyboard(lang: str = 'ru') -> InlineKeyboardMarkup:
+def filters_keyboard(lang: str = "ru") -> InlineKeyboardMarkup:
     """Filters keyboard."""
     builder = InlineKeyboardBuilder()
     builder.button(
-        text="💰 По цене" if lang == 'ru' else "💰 Narx bo'yicha", 
-        callback_data="filter_price"
+        text="💰 По цене" if lang == "ru" else "💰 Narx bo'yicha", callback_data="filter_price"
     )
     builder.button(
-        text="📂 По категории" if lang == 'ru' else "📂 Kategoriya bo'yicha", 
-        callback_data="filter_category"
+        text="📂 По категории" if lang == "ru" else "📂 Kategoriya bo'yicha",
+        callback_data="filter_category",
     )
     builder.button(
-        text="⭐ По рейтингу" if lang == 'ru' else "⭐ Reyting bo'yicha", 
-        callback_data="filter_rating"
+        text="⭐ По рейтингу" if lang == "ru" else "⭐ Reyting bo'yicha",
+        callback_data="filter_rating",
     )
     builder.button(
-        text="❌ Сбросить" if lang == 'ru' else "❌ Tozalash", 
-        callback_data="filter_reset"
+        text="❌ Сбросить" if lang == "ru" else "❌ Tozalash", callback_data="filter_reset"
     )
     builder.adjust(1)
     return builder.as_markup()

@@ -6,15 +6,15 @@ embedding business rules directly as refactor proceeds.
 """
 from __future__ import annotations
 
-from typing import Any, Optional, Tuple
-from logging_config import logger
+from typing import Any
 
 from database_protocol import DatabaseProtocol
 from handlers.bookings.utils import (
+    get_booking_field,
     get_offer_field,
     get_store_field,
-    get_booking_field,
 )
+from logging_config import logger
 
 
 class BookingService:
@@ -24,9 +24,9 @@ class BookingService:
         self.db = db
 
     # -------------------- Retrieval helpers --------------------
-    def fetch_offer_and_store(self, offer_id: int) -> Tuple[Any, Any]:
+    def fetch_offer_and_store(self, offer_id: int) -> tuple[Any, Any]:
         offer = self.db.get_offer(offer_id)
-        store_id = get_offer_field(offer, 'store_id') if offer else None
+        store_id = get_offer_field(offer, "store_id") if offer else None
         store = self.db.get_store(store_id) if store_id else None
         return offer, store
 
@@ -34,7 +34,9 @@ class BookingService:
         return self.db.get_booking(booking_id)
 
     # -------------------- Creation --------------------
-    def create_atomic_booking(self, offer_id: int, user_id: int, quantity: int) -> tuple[bool, Optional[int], Optional[str]]:
+    def create_atomic_booking(
+        self, offer_id: int, user_id: int, quantity: int
+    ) -> tuple[bool, int | None, str | None]:
         """Atomically create a booking and decrement quantity.
 
         Returns (ok, booking_id, booking_code).
@@ -48,7 +50,7 @@ class BookingService:
     # -------------------- Status transitions --------------------
     def confirm(self, booking_id: int) -> bool:
         try:
-            self.db.update_booking_status(booking_id, 'confirmed')
+            self.db.update_booking_status(booking_id, "confirmed")
             return True
         except Exception as e:
             logger.error(f"Failed to confirm booking {booking_id}: {e}")
@@ -82,9 +84,9 @@ class BookingService:
         DB adapter may already restore quantity; this ensures restoration when
         not handled internally. Safe best-effort increment.
         """
-        booking_id = get_booking_field(booking, 'booking_id')
-        offer_id = get_booking_field(booking, 'offer_id')
-        quantity = int(get_booking_field(booking, 'quantity', 1) or 1)
+        booking_id = get_booking_field(booking, "booking_id")
+        offer_id = get_booking_field(booking, "offer_id")
+        quantity = int(get_booking_field(booking, "quantity", 1) or 1)
         if not booking_id:
             return False
         ok = self.cancel(booking_id)
@@ -111,18 +113,18 @@ class BookingService:
 
     # -------------------- Permission helpers --------------------
     def is_store_owner(self, booking: Any, user_id: int) -> bool:
-        store_id = get_booking_field(booking, 'store_id')
+        store_id = get_booking_field(booking, "store_id")
         if not store_id:
             return False
         try:
             store = self.db.get_store(store_id)
-            owner_id = get_store_field(store, 'owner_id') if store else None
+            owner_id = get_store_field(store, "owner_id") if store else None
             return owner_id == user_id
         except Exception:
             return False
 
     def is_booking_user(self, booking: Any, user_id: int) -> bool:
-        return get_booking_field(booking, 'user_id') == user_id
+        return get_booking_field(booking, "user_id") == user_id
 
     def can_modify_booking(self, booking: Any, user_id: int) -> bool:
         return self.is_booking_user(booking, user_id) or self.is_store_owner(booking, user_id)
@@ -135,8 +137,8 @@ class BookingService:
             return 0
         count = 0
         for b in bookings:
-            status_val = get_booking_field(b, 'status')
-            if status_val in ('active', 'pending', 'confirmed'):
+            status_val = get_booking_field(b, "status")
+            if status_val in ("active", "pending", "confirmed"):
                 count += 1
         return count
 
@@ -144,19 +146,28 @@ class BookingService:
         return self.active_booking_count(user_id) < max_allowed
 
     # -------------------- High-level creation wrapper --------------------
-    def create_booking_with_limit(self, offer_id: int, user_id: int, quantity: int, max_allowed: int) -> tuple[bool, Optional[int], Optional[str], str]:
+    def create_booking_with_limit(
+        self, offer_id: int, user_id: int, quantity: int, max_allowed: int
+    ) -> tuple[bool, int | None, str | None, str]:
         """Check user active limit then atomically create booking.
 
         Returns: (ok, booking_id, code, reason)
         reason: '' if ok else error message key.
         """
         if not self.below_active_limit(user_id, max_allowed):
-            return False, None, None, 'limit_exceeded'
+            return False, None, None, "limit_exceeded"
         ok, booking_id, code = self.create_atomic_booking(offer_id, user_id, quantity)
-        return ok, booking_id, code, '' if ok else 'atomic_failed'
+        return ok, booking_id, code, "" if ok else "atomic_failed"
 
     # -------------------- Delivery update --------------------
-    def update_delivery_details(self, booking_id: int, delivery_option: int, address: str, cost: int, payment_proof: Optional[str] = None) -> None:
+    def update_delivery_details(
+        self,
+        booking_id: int,
+        delivery_option: int,
+        address: str,
+        cost: int,
+        payment_proof: str | None = None,
+    ) -> None:
         """Persist delivery info & optional payment proof for a booking."""
         try:
             if payment_proof:
@@ -192,15 +203,19 @@ class BookingService:
         delivery_option: int,
         delivery_address: str,
         delivery_cost: int,
-        payment_proof: Optional[str] = None,
-    ) -> tuple[bool, Optional[int], Optional[str], str]:
+        payment_proof: str | None = None,
+    ) -> tuple[bool, int | None, str | None, str]:
         """Create booking with limit + attach delivery details.
 
         Returns (ok, booking_id, code, reason) where reason is error key or ''.
         """
-        ok, booking_id, code, reason = self.create_booking_with_limit(offer_id, user_id, quantity, max_allowed)
+        ok, booking_id, code, reason = self.create_booking_with_limit(
+            offer_id, user_id, quantity, max_allowed
+        )
         if not ok or not booking_id:
             return ok, booking_id, code, reason
         if delivery_option == 1:
-            self.update_delivery_details(booking_id, delivery_option, delivery_address, delivery_cost, payment_proof)
-        return ok, booking_id, code, ''
+            self.update_delivery_details(
+                booking_id, delivery_option, delivery_address, delivery_cost, payment_proof
+            )
+        return ok, booking_id, code, ""
