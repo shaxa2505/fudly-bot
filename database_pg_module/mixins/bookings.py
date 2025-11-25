@@ -50,9 +50,16 @@ class BookingMixin:
 
             # Enforce per-user active booking limit
             try:
+                # Log all bookings for this user for debugging
+                cursor.execute("SELECT booking_id, status FROM bookings WHERE user_id = %s", (user_id,))
+                all_bookings = cursor.fetchall()
+                logger.info(f"🔍 User {user_id} all bookings: {all_bookings}")
+                
                 cursor.execute("SELECT COUNT(*) FROM bookings WHERE user_id = %s AND status IN ('active','pending','confirmed')", (user_id,))
                 active_count = cursor.fetchone()[0] or 0
-            except Exception:
+                logger.info(f"🔍 User {user_id} active count: {active_count}")
+            except Exception as e:
+                logger.error(f"Error checking booking limit: {e}")
                 active_count = 0
 
             if active_count >= MAX_ACTIVE_BOOKINGS_PER_USER:

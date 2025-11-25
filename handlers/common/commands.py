@@ -373,18 +373,50 @@ async def force_cancel_booking(callback: types.CallbackQuery, db: DatabaseProtoc
 
 @router.message(Command("cancelall"))
 async def cancel_all_bookings(message: types.Message, db: DatabaseProtocol = None):
-    """Cancel ALL active bookings for user."""
+    """Cancel ALL active bookings for user - with direct SQL."""
     if not db:
         return
     
     user_id = message.from_user.id
+    
+    # First show what's in DB
     bookings = db.get_user_bookings(user_id) or []
+    
+    # Debug info
+    status_info = {}
+    for b in bookings:
+        if isinstance(b, dict):
+            st = b.get('status', 'unknown')
+            status_info[st] = status_info.get(st, 0) + 1
+    
     active = [b for b in bookings if isinstance(b, dict) and b.get('status') in ('pending', 'confirmed', 'active')]
     
+    text = f"📊 Ваши бронирования:\n"
+    text += f"Всего: {len(bookings)}\n"
+    text += f"По статусам: {status_info}\n"
+    text += f"Активных: {len(active)}\n\n"
+    
     if not active:
-        await message.answer("✅ У вас нет активных бронирований!")
+        # Try direct SQL cancel as fallback
+        try:
+            with db.get_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute(
+                    "UPDATE bookings SET status = 'cancelled' WHERE user_id = %s AND status IN ('active', 'pending', 'confirmed') RETURNING booking_id",
+                    (user_id,)
+                )
+                cancelled_ids = cursor.fetchall()
+                if cancelled_ids:
+                    text += f"🔧 Принудительно отменено через SQL: {len(cancelled_ids)} бронирований"
+                else:
+                    text += "✅ Нет активных бронирований для отмены"
+        except Exception as e:
+            text += f"Ошибка SQL: {e}"
+        
+        await message.answer(text)
         return
     
+    # Cancel via normal method
     cancelled = 0
     for b in active:
         bid = b.get('booking_id')
@@ -392,7 +424,8 @@ async def cancel_all_bookings(message: types.Message, db: DatabaseProtocol = Non
             try:
                 db.cancel_booking(bid)
                 cancelled += 1
-            except:
-                pass
+            except Exception as e:
+                text += f"Ошибка отмены #{bid}: {e}\n"
     
-    await message.answer(f"✅ Отменено {cancelled} бронирований!\n\nТеперь можете делать новые заказы.")
+    text += f"✅ Отменено {cancelled} бронирований!"
+    await message.answer(text)
