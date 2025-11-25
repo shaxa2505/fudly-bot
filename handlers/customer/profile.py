@@ -71,9 +71,22 @@ async def profile(message: types.Message) -> None:
     text += f"📍 {get_text(lang, 'city')}: <b>{user.city or 'N/A'}</b>\n"
     text += f"🌍 {get_text(lang, 'language')}: {lang_text}\n"
 
+    # Determine user role - check both DB role and if has approved store
+    # This handles case where role wasn't updated but store was approved
+    effective_role = user.role or "customer"
+    if effective_role != "seller" and has_approved_store(message.from_user.id, db):
+        effective_role = "seller"
+        # Also fix the role in DB for future
+        try:
+            with db.get_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute("UPDATE users SET role = 'seller' WHERE user_id = %s", (message.from_user.id,))
+        except Exception:
+            pass
+
     # Determine current mode for settings keyboard
     # If user is seller, check their current mode, otherwise always customer
-    if user.role == "seller":
+    if effective_role == "seller":
         # Default to seller mode for sellers if not explicitly set to customer
         current_mode = user_view_mode.get(message.from_user.id, "seller") if user_view_mode else "seller"
     else:
@@ -183,7 +196,7 @@ async def profile(message: types.Message) -> None:
         reply_markup=settings_keyboard(
             user.notifications_enabled if hasattr(user, "notifications_enabled") else True,
             lang,
-            role=user.role or "customer",
+            role=effective_role,
             current_mode=current_mode,
         ),
     )

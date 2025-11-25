@@ -659,9 +659,9 @@ async def admin_rejected_stores_callback(callback: types.CallbackQuery):
     for store_id, name, city, owner_name, username, created_at in stores:
         text += f"🏪 {name}\n"
         text += f"├ 📍 {city}\n"
-        text += f"├ 👤 {owner_name}"
+        text += f"├ 👤 {owner_name} "
         if username:
-            text += f" (@{username})"
+            text += f"(@{username})"
         text += f"\n└ ID: <code>{store_id}</code>\n\n"
 
     await bot.send_message(callback.message.chat.id, text, parse_mode="HTML")
@@ -975,6 +975,9 @@ async def admin_payment_settings(callback: types.CallbackQuery):
         text += "\nДля настройки добавьте запись в базу:\n"
         text += "<code>INSERT INTO platform_settings (key, value) VALUES ('payment_card', 'НОМЕР_КАРТЫ');</code>\n"
         text += "<code>INSERT INTO platform_settings (key, value) VALUES ('payment_card_holder', 'ИМЯ_ВЛАДЕЛЬЦА');</code>\n"
+        text += "\nПример:\n"
+        text += "<code>INSERT INTO platform_settings (key, value) VALUES ('payment_card', '8600 0000 0000 0000')</code>\n"
+        text += "<code>INSERT INTO platform_settings (key, value) VALUES ('payment_card_holder', 'FUDLY PLATFORM')</code>"
     
     kb = InlineKeyboardBuilder()
     kb.button(text="◀️ Назад", callback_data="admin_back_to_settings")
