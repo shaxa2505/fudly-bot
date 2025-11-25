@@ -46,9 +46,13 @@ from .common import (
     category_keyboard,
     city_inline_keyboard,
     city_keyboard,
+    discount_keyboard,
+    expiry_keyboard,
     language_keyboard,
     phone_request_keyboard,
+    photo_keyboard,
     product_categories_keyboard,
+    quantity_keyboard,
     units_keyboard,
 )
 

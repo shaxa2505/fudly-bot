@@ -592,6 +592,10 @@ async def edit_offer(callback: types.CallbackQuery) -> None:
         callback_data=f"edit_description_{offer_id}",
     )
     kb.button(
+        text="🔄 Копировать" if lang == "ru" else "🔄 Nusxalash",
+        callback_data=f"copy_offer_{offer_id}",
+    )
+    kb.button(
         text="🔙 Назад" if lang == "ru" else "🔙 Orqaga", callback_data=f"back_to_offer_{offer_id}"
     )
     kb.adjust(1)

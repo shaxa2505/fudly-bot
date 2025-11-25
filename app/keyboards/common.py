@@ -141,3 +141,74 @@ def product_categories_keyboard(lang: str = "ru") -> InlineKeyboardMarkup:
     builder.button(text=get_text(lang, "cancel"), callback_data="create_cancel")
     builder.adjust(2)  # 2 buttons per row
     return builder.as_markup()
+
+
+def discount_keyboard(lang: str = "ru") -> InlineKeyboardMarkup:
+    """Quick discount selection keyboard."""
+    builder = InlineKeyboardBuilder()
+    discounts = [10, 20, 30, 40, 50, 60, 70]
+    for d in discounts:
+        builder.button(text=f"{d}%", callback_data=f"discount_{d}")
+    builder.button(
+        text="✏️ Своя" if lang == "ru" else "✏️ Boshqa",
+        callback_data="discount_custom"
+    )
+    builder.button(text="❌ Отмена" if lang == "ru" else "❌ Bekor", callback_data="create_cancel")
+    builder.adjust(4, 3, 2)
+    return builder.as_markup()
+
+
+def quantity_keyboard(lang: str = "ru") -> InlineKeyboardMarkup:
+    """Quick quantity selection keyboard."""
+    builder = InlineKeyboardBuilder()
+    quantities = [5, 10, 20, 50, 100, 200]
+    for q in quantities:
+        builder.button(text=str(q), callback_data=f"quantity_{q}")
+    builder.button(
+        text="✏️ Своё" if lang == "ru" else "✏️ Boshqa",
+        callback_data="quantity_custom"
+    )
+    builder.button(text="◀️ Назад" if lang == "ru" else "◀️ Orqaga", callback_data="create_back_discount")
+    builder.adjust(3, 3, 2)
+    return builder.as_markup()
+
+
+def expiry_keyboard(lang: str = "ru") -> InlineKeyboardMarkup:
+    """Quick expiry date selection keyboard."""
+    from datetime import datetime, timedelta
+
+    builder = InlineKeyboardBuilder()
+    today = datetime.now()
+
+    dates = [
+        ("Сегодня" if lang == "ru" else "Bugun", 0),
+        ("Завтра" if lang == "ru" else "Ertaga", 1),
+        ("+3 дня" if lang == "ru" else "+3 kun", 3),
+        ("+7 дней" if lang == "ru" else "+7 kun", 7),
+        ("+14 дней" if lang == "ru" else "+14 kun", 14),
+        ("+30 дней" if lang == "ru" else "+30 kun", 30),
+    ]
+
+    for label, days in dates:
+        date = (today + timedelta(days=days)).strftime("%d.%m")
+        builder.button(text=f"{label} ({date})", callback_data=f"expiry_{days}")
+
+    builder.button(
+        text="✏️ Своя дата" if lang == "ru" else "✏️ Boshqa sana",
+        callback_data="expiry_custom"
+    )
+    builder.button(text="◀️ Назад" if lang == "ru" else "◀️ Orqaga", callback_data="create_back_quantity")
+    builder.adjust(2, 2, 2, 2)
+    return builder.as_markup()
+
+
+def photo_keyboard(lang: str = "ru") -> InlineKeyboardMarkup:
+    """Photo upload or skip keyboard."""
+    builder = InlineKeyboardBuilder()
+    builder.button(
+        text="➡️ Без фото" if lang == "ru" else "➡️ Rasmsiz",
+        callback_data="create_skip_photo"
+    )
+    builder.button(text="◀️ Назад" if lang == "ru" else "◀️ Orqaga", callback_data="create_back_expiry")
+    builder.adjust(1)
+    return builder.as_markup()
