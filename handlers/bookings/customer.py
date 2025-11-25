@@ -119,8 +119,12 @@ async def book_offer_quantity(message: types.Message, state: FSMContext) -> None
     lang = db.get_user_language(user_id)
     text = (message.text or "").strip()
 
-    # Check cancel
-    if text in ["❌ Отмена", "❌ Bekor qilish", "/cancel"]:
+    # Check cancel - accept all variants
+    if (
+        text in ["❌ Отмена", "❌ Bekor qilish", "/cancel", "Отмена", "Bekor qilish"]
+        or "отмена" in text.lower()
+        or "bekor" in text.lower()
+    ):
         await state.clear()
         await message.answer(
             get_text(lang, "action_cancelled"), reply_markup=main_menu_customer(lang)
