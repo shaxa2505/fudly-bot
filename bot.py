@@ -279,7 +279,7 @@ from handlers.user import profile, favorites
 from handlers.admin import dashboard as admin_dashboard, legacy as admin_legacy
 
 # Setup dependencies for extracted handlers
-bookings.setup_dependencies(db, cache, bot, METRICS)
+bookings.setup_dependencies(db, bot, cache, METRICS)
 orders.setup_dependencies(db, bot, user_view_mode)
 partner.setup_dependencies(db, bot, user_view_mode)
 create_offer.setup_dependencies(db, bot)
