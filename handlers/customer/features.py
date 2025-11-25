@@ -55,12 +55,12 @@ def setup(
                 return item[index]
             return default
 
-        # Split bookings by status
-        active_bookings = [b for b in bookings if get_field(b, 'status', 3) in ["pending", "confirmed"]]
+        # Split bookings by status (works with both dict and tuple)
+        active_bookings = [b for b in bookings if get_field(b, 'status', 3) in ["pending", "confirmed", "active"]]
         completed_bookings = [b for b in bookings if get_field(b, 'status', 3) == "completed"]
         cancelled_bookings = [b for b in bookings if get_field(b, 'status', 3) == "cancelled"]
 
-        # Split orders by status
+        # Split orders by status (works with both dict and tuple)
         active_orders = [
             o for o in orders if get_field(o, 'order_status', 10) in ["pending", "confirmed", "preparing", "delivering"]
         ]

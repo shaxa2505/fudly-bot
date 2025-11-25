@@ -236,8 +236,51 @@ class BookingMixin:
         """Get all user bookings (not just active)."""
         with self.get_connection() as conn:
             cursor = conn.cursor(row_factory=dict_row)
-            cursor.execute('SELECT * FROM bookings WHERE user_id = %s ORDER BY created_at DESC', 
-                         (user_id,))
+            cursor.execute('''
+                SELECT b.booking_id, b.offer_id, b.user_id, b.status, b.booking_code,
+                       b.pickup_time, COALESCE(b.quantity, 1) as quantity, b.created_at,
+                       o.title, o.discount_price, o.available_until, s.name, s.address, s.city
+                FROM bookings b
+                JOIN offers o ON b.offer_id = o.offer_id
+                JOIN stores s ON o.store_id = s.store_id
+                WHERE b.user_id = %s
+                ORDER BY b.created_at DESC
+            ''', (user_id,))
+            return [dict(row) for row in cursor.fetchall()]
+
+    def get_user_bookings_by_status(self, user_id: int, status: str):
+        """Get user bookings filtered by status.
+        
+        Args:
+            user_id: User ID
+            status: 'active', 'completed', or 'cancelled'
+        
+        Returns:
+            List of booking dicts
+        """
+        with self.get_connection() as conn:
+            cursor = conn.cursor(row_factory=dict_row)
+            
+            # Map status to database values
+            if status == "active":
+                status_values = ('pending', 'confirmed')
+            elif status == "completed":
+                status_values = ('completed',)
+            elif status == "cancelled":
+                status_values = ('cancelled',)
+            else:
+                status_values = ('pending', 'confirmed')
+            
+            cursor.execute('''
+                SELECT b.booking_id, b.offer_id, b.user_id, b.status, b.booking_code,
+                       b.pickup_time, COALESCE(b.quantity, 1) as quantity, b.created_at,
+                       o.title, o.discount_price, o.available_until, s.name, s.address, s.city
+                FROM bookings b
+                JOIN offers o ON b.offer_id = o.offer_id
+                JOIN stores s ON o.store_id = s.store_id
+                WHERE b.user_id = %s AND b.status = ANY(%s)
+                ORDER BY b.created_at DESC
+            ''', (user_id, list(status_values)))
             return [dict(row) for row in cursor.fetchall()]
 
     def update_booking_status(self, booking_id: int, status: str):

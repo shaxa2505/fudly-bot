@@ -265,6 +265,32 @@ async def create_booking(message: types.Message, state: FSMContext) -> None:
         await state.clear()
         return
     
+    # Pre-check: verify offer still available before atomic booking
+    offer = db.get_offer(offer_id)
+    if not offer:
+        await message.answer(get_text(lang, "offer_not_found") or "❌ Предложение не найдено")
+        await state.clear()
+        return
+    
+    offer_status = get_offer_field(offer, "status", "inactive")
+    offer_qty = get_offer_field(offer, "quantity", 0)
+    
+    if offer_status != "active":
+        if lang == "uz":
+            await message.answer("❌ Bu taklif hozirda mavjud emas. Boshqa taklif tanlang.")
+        else:
+            await message.answer("❌ Это предложение сейчас недоступно. Выберите другое.")
+        await state.clear()
+        return
+    
+    if offer_qty < quantity:
+        if lang == "uz":
+            await message.answer(f"❌ Faqat {offer_qty} dona qolgan. Miqdorni kamaytiring.")
+        else:
+            await message.answer(f"❌ Осталось только {offer_qty} шт. Уменьшите количество.")
+        await state.clear()
+        return
+    
     # Create booking atomically
     try:
         ok, booking_id, code = db.create_booking_atomic(offer_id, user_id, quantity)
@@ -273,10 +299,22 @@ async def create_booking(message: types.Message, state: FSMContext) -> None:
         ok, booking_id, code = False, None, None
     
     if not ok or not booking_id:
+        # Log for debugging
+        logger.warning(f"create_booking_atomic returned False: offer_id={offer_id}, user_id={user_id}, qty={quantity}")
         if lang == "uz":
-            await message.answer("❌ Afsuski, tanlangan miqdor mavjud emas.")
+            await message.answer(
+                "❌ Bronlash amalga oshmadi.\n\n"
+                "Mumkin sabablar:\n"
+                "• Sizda allaqachon 3 ta faol bron bor\n"
+                "• Mahsulot allaqachon sotib olingan"
+            )
         else:
-            await message.answer("❌ К сожалению, выбранное количество уже недоступно.")
+            await message.answer(
+                "❌ Не удалось создать бронь.\n\n"
+                "Возможные причины:\n"
+                "• У вас уже есть 3 активных бронирования\n"
+                "• Товар уже забронирован другим покупателем"
+            )
         await state.clear()
         return
     
