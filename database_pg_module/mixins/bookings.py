@@ -29,10 +29,11 @@ class BookingMixin:
                               pickup_address: Optional[str] = None):
         """Atomically reserve product and create booking in one transaction.
         
-        Returns: Tuple[bool, Optional[int], Optional[str]]
+        Returns: Tuple[bool, Optional[int], Optional[str], Optional[str]]
             - ok: True if booking created successfully
             - booking_id: ID of created booking or None on error
             - booking_code: Booking code or None on error
+            - error_reason: Reason for failure or None on success
         """
         logger.info(f"🔵 create_booking_atomic START: offer_id={offer_id}, user_id={user_id}, quantity={quantity}")
         
@@ -65,7 +66,7 @@ class BookingMixin:
             if active_count >= MAX_ACTIVE_BOOKINGS_PER_USER:
                 conn.rollback()
                 logger.warning(f"🔵 User {user_id} has {active_count} active bookings (limit {MAX_ACTIVE_BOOKINGS_PER_USER})")
-                return (False, None, None)
+                return (False, None, None, f"booking_limit:{active_count}")
 
             # Check and reserve product atomically
             cursor.execute('''
@@ -75,10 +76,20 @@ class BookingMixin:
             ''', (offer_id,))
             offer = cursor.fetchone()
             
-            if not offer or offer[0] is None or offer[0] < quantity or offer[1] != 'active':
+            if not offer:
                 conn.rollback()
-                logger.warning(f"🔵 Offer check FAILED: not available")
-                return (False, None, None)
+                logger.warning(f"🔵 Offer {offer_id} not found or not active")
+                return (False, None, None, "offer_not_found")
+            
+            if offer[0] is None or offer[0] < quantity:
+                conn.rollback()
+                logger.warning(f"🔵 Offer {offer_id} insufficient quantity: {offer[0]} < {quantity}")
+                return (False, None, None, f"insufficient_qty:{offer[0]}")
+            
+            if offer[1] != 'active':
+                conn.rollback()
+                logger.warning(f"🔵 Offer {offer_id} status is '{offer[1]}', not active")
+                return (False, None, None, f"offer_inactive:{offer[1]}")
             
             current_quantity = offer[0]
             store_id = offer[2] if len(offer) > 2 else None
@@ -94,7 +105,8 @@ class BookingMixin:
             
             if cursor.rowcount == 0:
                 conn.rollback()
-                return (False, None, None)
+                logger.warning(f"🔵 Offer {offer_id} concurrent update detected")
+                return (False, None, None, "concurrent_update")
             
             # Generate unique booking code
             booking_code = ''.join(random.choices(string.ascii_uppercase + string.digits, k=6))
@@ -103,7 +115,8 @@ class BookingMixin:
             if pickup_time and store_id is not None:
                 if not self._reserve_pickup_slot(cursor, store_id, pickup_time, quantity):
                     conn.rollback()
-                    return (False, None, None)
+                    logger.warning(f"🔵 Failed to reserve pickup slot for store {store_id}")
+                    return (False, None, None, "pickup_slot_full")
 
             # Create booking with expiry
             cursor.execute('''
@@ -115,7 +128,7 @@ class BookingMixin:
             
             conn.commit()
             logger.info(f"✅ create_booking_atomic SUCCESS: booking_id={booking_id}, code={booking_code}")
-            return (True, booking_id, booking_code)
+            return (True, booking_id, booking_code, None)
             
         except Exception as e:
             if conn:
@@ -126,7 +139,7 @@ class BookingMixin:
             logger.error(f"❌ Error creating booking atomically: {type(e).__name__}: {e}")
             import traceback
             traceback.print_exc()
-            return (False, None, None)
+            return (False, None, None, f"exception:{type(e).__name__}:{str(e)[:100]}")
         finally:
             if conn:
                 conn.autocommit = True

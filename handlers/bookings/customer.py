@@ -315,29 +315,58 @@ async def create_booking(message: types.Message, state: FSMContext) -> None:
         return
     
     # Create booking atomically
+    error_reason = None
     try:
-        ok, booking_id, code = db.create_booking_atomic(offer_id, user_id, quantity)
+        result = db.create_booking_atomic(offer_id, user_id, quantity)
+        # Handle both 3-tuple and 4-tuple returns for backward compatibility
+        if len(result) == 4:
+            ok, booking_id, code, error_reason = result
+        else:
+            ok, booking_id, code = result
     except Exception as e:
         logger.error(f"Booking creation failed: {e}")
-        ok, booking_id, code = False, None, None
+        ok, booking_id, code, error_reason = False, None, None, f"exception:{e}"
     
     if not ok or not booking_id:
-        # Log for debugging
-        logger.warning(f"create_booking_atomic returned False: offer_id={offer_id}, user_id={user_id}, qty={quantity}")
-        if lang == "uz":
-            await message.answer(
+        # Log for debugging with reason
+        logger.warning(f"create_booking_atomic returned False: offer_id={offer_id}, user_id={user_id}, qty={quantity}, reason={error_reason}")
+        
+        # Show specific error message based on reason
+        if error_reason and error_reason.startswith("booking_limit:"):
+            count = error_reason.split(":")[1]
+            error_msg_uz = f"❌ Sizda allaqachon {count} ta faol bron bor (limit: 3)"
+            error_msg_ru = f"❌ У вас уже {count} активных бронирований (лимит: 3)"
+        elif error_reason and error_reason.startswith("offer_not_found"):
+            error_msg_uz = "❌ Taklif topilmadi yoki faol emas"
+            error_msg_ru = "❌ Предложение не найдено или неактивно"
+        elif error_reason and error_reason.startswith("insufficient_qty:"):
+            qty = error_reason.split(":")[1]
+            error_msg_uz = f"❌ Yetarli miqdor yo'q. Qolgan: {qty} dona"
+            error_msg_ru = f"❌ Недостаточно товара. Осталось: {qty} шт"
+        elif error_reason and error_reason.startswith("offer_inactive:"):
+            error_msg_uz = "❌ Taklif hozirda faol emas"
+            error_msg_ru = "❌ Предложение сейчас неактивно"
+        elif error_reason and error_reason.startswith("exception:"):
+            error_msg_uz = f"❌ Xatolik yuz berdi: {error_reason}"
+            error_msg_ru = f"❌ Произошла ошибка: {error_reason}"
+        else:
+            error_msg_uz = (
                 "❌ Bronlash amalga oshmadi.\n\n"
                 "Mumkin sabablar:\n"
                 "• Sizda allaqachon 3 ta faol bron bor\n"
                 "• Mahsulot allaqachon sotib olingan"
             )
-        else:
-            await message.answer(
+            error_msg_ru = (
                 "❌ Не удалось создать бронь.\n\n"
                 "Возможные причины:\n"
                 "• У вас уже есть 3 активных бронирования\n"
                 "• Товар уже забронирован другим покупателем"
             )
+        
+        if lang == "uz":
+            await message.answer(error_msg_uz)
+        else:
+            await message.answer(error_msg_ru)
         await state.clear()
         return
     
