@@ -35,10 +35,16 @@ def setup(
         lang = db.get_user_language(user_id)
 
         # Get bookings and orders
-        bookings = db.get_user_bookings(user_id)
         try:
-            orders = db.get_user_orders(user_id)
-        except Exception:
+            bookings = db.get_user_bookings(user_id) or []
+        except Exception as e:
+            logger.error(f"Failed to get bookings for user {user_id}: {e}")
+            bookings = []
+            
+        try:
+            orders = db.get_user_orders(user_id) or []
+        except Exception as e:
+            logger.error(f"Failed to get orders for user {user_id}: {e}")
             orders = []
 
         # Helper to safely get field from dict or tuple
@@ -53,13 +59,19 @@ def setup(
             return default
 
         # Debug: log what we got
-        logger.info(f"Cart: user={user_id}, bookings={len(bookings)}, orders={len(orders)}")
+        logger.info(f"Cart: user={user_id}, bookings_count={len(bookings)}, orders_count={len(orders)}")
         if bookings:
-            logger.info(f"First booking type: {type(bookings[0])}, keys: {bookings[0].keys() if isinstance(bookings[0], dict) else 'tuple'}")
+            first = bookings[0]
+            if isinstance(first, dict):
+                logger.info(f"First booking: status={first.get('status')}, title={first.get('title')}")
+            else:
+                logger.info(f"First booking is tuple: {first}")
 
-        # Filter active items only
+        # Filter active items only  
         active_bookings = [b for b in bookings if get_field(b, 'status', 3) in ["pending", "confirmed"]]
         active_orders = [o for o in orders if get_field(o, 'order_status', 10) in ["pending", "confirmed", "preparing", "delivering"]]
+        
+        logger.info(f"Cart: active_bookings={len(active_bookings)}, active_orders={len(active_orders)}")
 
         if not active_bookings and not active_orders:
             empty_text = "🛒 Корзина пуста" if lang == "ru" else "🛒 Savat bo'sh"
@@ -147,11 +159,23 @@ def setup(
         text_parts.append(f"━━━━━━━━━━━━━━━━━━")
         text_parts.append(f"{'Всего активных заказов' if lang == 'ru' else 'Jami faol buyurtmalar'}: <b>{total_items}</b>")
 
-        # Build keyboard with actions
+        # Build keyboard with cancel buttons for each booking
         kb = InlineKeyboardBuilder()
+        
+        # Build keyboard with cancel buttons for each booking
+        kb = InlineKeyboardBuilder()
+        
+        # Add cancel button for each active booking (max 3)
+        for b in active_bookings[:3]:
+            booking_id = get_field(b, 'booking_id', 0)
+            title = get_field(b, 'title', 8, 'Товар')[:15]
+            cancel_text = f"❌ {title}"
+            kb.button(text=cancel_text, callback_data=f"cancel_booking_{booking_id}")
+        
+        # Add navigation buttons on new row
         if active_bookings:
             kb.button(
-                text=f"🏪 {'Самовывоз' if lang == 'ru' else 'Olib ketish'} ({len(active_bookings)})", 
+                text=f"🏪 {'Подробнее' if lang == 'ru' else 'Batafsil'}", 
                 callback_data="bookings_active"
             )
         if active_orders:
@@ -163,7 +187,11 @@ def setup(
             text=f"📜 {'История' if lang == 'ru' else 'Tarix'}", 
             callback_data="bookings_completed"
         )
-        kb.adjust(2, 1)
+        
+        # Layout: cancel buttons (1 per row), then nav buttons (2-3 in a row)
+        rows = [1] * len(active_bookings[:3])  # One cancel button per row
+        rows.append(min(3, 1 + (1 if active_orders else 0) + 1))  # nav buttons in one row
+        kb.adjust(*rows)
 
         await message.answer(
             "\n".join(text_parts),
