@@ -12,7 +12,7 @@ from aiogram.utils.keyboard import InlineKeyboardBuilder
 from app.keyboards import cancel_keyboard, main_menu_customer
 from localization import get_text
 from logging_config import logger
-from handlers.common_states.states import BookOffer
+from handlers.common_states.states import BookOffer, OrderDelivery
 
 from .utils import (
     safe_answer_or_send,
@@ -187,7 +187,7 @@ async def pickup_choice(callback: types.CallbackQuery, state: FSMContext) -> Non
 
 @router.callback_query(F.data == "delivery_choice")
 async def delivery_choice(callback: types.CallbackQuery, state: FSMContext) -> None:
-    """User chose delivery - ask for address."""
+    """User chose delivery - redirect to OrderDelivery flow."""
     if not db:
         await callback.answer("System error", show_alert=True)
         return
@@ -195,13 +195,20 @@ async def delivery_choice(callback: types.CallbackQuery, state: FSMContext) -> N
     user_id = callback.from_user.id
     lang = db.get_user_language(user_id)
     
+    # Get data from BookOffer state
     data = await state.get_data()
+    offer_id = data.get("offer_id")
+    quantity = data.get("quantity", 1)
     store_id = data.get("store_id")
-    store = db.get_store(store_id) if store_id else None
-    delivery_price = get_store_field(store, "delivery_price", 0)
     
-    await state.update_data(delivery_option=1, delivery_cost=delivery_price)
-    await state.set_state(BookOffer.delivery_address)
+    # Transfer to OrderDelivery state (orders.py handles delivery with payment)
+    await state.clear()
+    await state.update_data(
+        offer_id=offer_id,
+        store_id=store_id,
+        quantity=quantity,
+    )
+    await state.set_state(OrderDelivery.address)
     
     await safe_edit_reply_markup(callback.message)
     
@@ -214,35 +221,8 @@ async def delivery_choice(callback: types.CallbackQuery, state: FSMContext) -> N
     await callback.answer()
 
 
-@router.message(BookOffer.delivery_address)
-async def book_delivery_address(message: types.Message, state: FSMContext) -> None:
-    """Process delivery address."""
-    if not db:
-        await message.answer("System error")
-        return
-    
-    user_id = message.from_user.id
-    lang = db.get_user_language(user_id)
-    text = (message.text or "").strip()
-    
-    # Check cancel
-    if text in ["❌ Отмена", "❌ Bekor qilish", "/cancel"]:
-        await state.clear()
-        await message.answer(
-            get_text(lang, "action_cancelled"),
-            reply_markup=main_menu_customer(lang)
-        )
-        return
-    
-    if len(text) < 10:
-        if lang == "uz":
-            await message.answer("❌ Iltimos, to'liq manzilni kiriting (kamida 10 ta belgi)")
-        else:
-            await message.answer("❌ Укажите полный адрес (минимум 10 символов)")
-        return
-    
-    await state.update_data(delivery_address=text)
-    await create_booking(message, state)
+# NOTE: BookOffer.delivery_address handler removed - delivery now uses OrderDelivery flow
+# from handlers/orders.py which handles address -> payment -> order creation
 
 
 @router.callback_query(F.data == "cancel_booking_flow")
@@ -276,9 +256,6 @@ async def create_booking(message: types.Message, state: FSMContext) -> None:
     
     offer_id = data.get("offer_id")
     quantity = data.get("quantity", 1)
-    delivery_option = data.get("delivery_option", 0)
-    delivery_address = data.get("delivery_address", "")
-    delivery_cost = data.get("delivery_cost", 0)
     offer_price = data.get("offer_price", 0)
     offer_title = data.get("offer_title", "Товар")
     store_id = data.get("store_id")
@@ -317,49 +294,29 @@ async def create_booking(message: types.Message, state: FSMContext) -> None:
     store_address = get_store_field(store, "address", "")
     owner_id = get_store_field(store, "owner_id")
     
-    # Calculate total
-    total = calculate_total(offer_price, quantity, delivery_cost if delivery_option == 1 else 0)
+    # Calculate total (no delivery cost for pickup)
+    total = calculate_total(offer_price, quantity, 0)
     code_display = format_booking_code(code, booking_id)
     
-    # Notify customer
-    if delivery_option == 1:
-        if lang == "uz":
-            customer_msg = (
-                f"⏳ <b>Buyurtma yuborildi!</b>\n\n"
-                f"🏪 {_esc(store_name)}\n"
-                f"📦 {_esc(offer_title)} × {quantity}\n"
-                f"🚚 Yetkazib berish: {_esc(delivery_address)}\n"
-                f"💰 Jami: {total:,} so'm\n\n"
-                f"⚠️ Sotuvchi tasdiqlagandan so'ng sizga xabar beramiz."
-            )
-        else:
-            customer_msg = (
-                f"⏳ <b>Заказ отправлен!</b>\n\n"
-                f"🏪 {_esc(store_name)}\n"
-                f"📦 {_esc(offer_title)} × {quantity}\n"
-                f"🚚 Доставка: {_esc(delivery_address)}\n"
-                f"💰 Итого: {total:,} сум\n\n"
-                f"⚠️ Мы сообщим, когда продавец подтвердит заказ."
-            )
+    # Notify customer (pickup only - delivery handled by orders.py)
+    if lang == "uz":
+        customer_msg = (
+            f"⏳ <b>Bron yuborildi!</b>\n\n"
+            f"🏪 {_esc(store_name)}\n"
+            f"📦 {_esc(offer_title)} × {quantity}\n"
+            f"📍 Manzil: {_esc(store_address)}\n"
+            f"💰 Jami: {total:,} so'm\n\n"
+            f"⚠️ Sotuvchi tasdiqlagandan so'ng bron kodi yuboriladi."
+        )
     else:
-        if lang == "uz":
-            customer_msg = (
-                f"⏳ <b>Bron yuborildi!</b>\n\n"
-                f"🏪 {_esc(store_name)}\n"
-                f"📦 {_esc(offer_title)} × {quantity}\n"
-                f"📍 Manzil: {_esc(store_address)}\n"
-                f"💰 Jami: {total:,} so'm\n\n"
-                f"⚠️ Sotuvchi tasdiqlagandan so'ng bron kodi yuboriladi."
-            )
-        else:
-            customer_msg = (
-                f"⏳ <b>Бронь отправлена!</b>\n\n"
-                f"🏪 {_esc(store_name)}\n"
-                f"📦 {_esc(offer_title)} × {quantity}\n"
-                f"📍 Адрес: {_esc(store_address)}\n"
-                f"💰 Итого: {total:,} сум\n\n"
-                f"⚠️ Код бронирования будет отправлен после подтверждения продавцом."
-            )
+        customer_msg = (
+            f"⏳ <b>Бронь отправлена!</b>\n\n"
+            f"🏪 {_esc(store_name)}\n"
+            f"📦 {_esc(offer_title)} × {quantity}\n"
+            f"📍 Адрес: {_esc(store_address)}\n"
+            f"💰 Итого: {total:,} сум\n\n"
+            f"⚠️ Код бронирования будет отправлен после подтверждения продавцом."
+        )
     
     await message.answer(customer_msg, parse_mode="HTML", reply_markup=main_menu_customer(lang))
     
@@ -373,8 +330,6 @@ async def create_booking(message: types.Message, state: FSMContext) -> None:
             total=total,
             customer_id=user_id,
             customer_name=message.from_user.first_name,
-            delivery_option=delivery_option,
-            delivery_address=delivery_address,
         )
 
 
@@ -386,10 +341,8 @@ async def notify_partner_new_booking(
     total: int,
     customer_id: int,
     customer_name: str,
-    delivery_option: int = 0,
-    delivery_address: str = "",
 ) -> None:
-    """Send new booking notification to partner."""
+    """Send new booking notification to partner (pickup only)."""
     if not db or not bot:
         return
     
@@ -397,33 +350,26 @@ async def notify_partner_new_booking(
     customer = get_user_safe(db, customer_id)
     customer_phone = getattr(customer, 'phone', None) or "Не указан"
     
-    # Build notification
-    delivery_info = ""
-    if delivery_option == 1:
-        if partner_lang == "uz":
-            delivery_info = f"\n🚚 <b>Yetkazib berish:</b> {_esc(delivery_address)}"
-        else:
-            delivery_info = f"\n🚚 <b>Доставка:</b> {_esc(delivery_address)}"
-    
+    # Build notification (pickup - no delivery info)
     if partner_lang == "uz":
         text = (
-            f"🔔 <b>Yangi buyurtma!</b>\n\n"
+            f"🔔 <b>Yangi bron!</b>\n\n"
             f"📦 {_esc(offer_title)} × {quantity}\n"
             f"💰 {total:,} so'm\n"
             f"👤 {_esc(customer_name)}\n"
-            f"📱 <code>{_esc(customer_phone)}</code>"
-            f"{delivery_info}"
+            f"📱 <code>{_esc(customer_phone)}</code>\n"
+            f"🏪 O'zi olib ketadi"
         )
         confirm_text = "✅ Tasdiqlash"
         reject_text = "❌ Rad etish"
     else:
         text = (
-            f"🔔 <b>Новый заказ!</b>\n\n"
+            f"🔔 <b>Новая бронь!</b>\n\n"
             f"📦 {_esc(offer_title)} × {quantity}\n"
             f"💰 {total:,} сум\n"
             f"👤 {_esc(customer_name)}\n"
-            f"📱 <code>{_esc(customer_phone)}</code>"
-            f"{delivery_info}"
+            f"📱 <code>{_esc(customer_phone)}</code>\n"
+            f"🏪 Самовывоз"
         )
         confirm_text = "✅ Подтвердить"
         reject_text = "❌ Отклонить"
