@@ -26,26 +26,20 @@ def setup(
 ) -> None:
     """Setup user handlers with dependencies"""
 
-    # ============== МОИ БРОНИРОВАНИЯ ==============
+    # ============== МОЯ КОРЗИНА ==============
 
     @dp_or_router.message(F.text.in_(["🛒 Корзина", "🛒 Savat"]))
-    async def my_bookings(message: types.Message):
-        """Show user bookings and orders"""
-        lang = db.get_user_language(message.from_user.id)
+    async def my_cart(message: types.Message):
+        """Show user's cart with active bookings and orders"""
+        user_id = message.from_user.id
+        lang = db.get_user_language(user_id)
 
         # Get bookings and orders
-        bookings = db.get_user_bookings(message.from_user.id)
+        bookings = db.get_user_bookings(user_id)
         try:
-            orders = db.get_user_orders(message.from_user.id)
+            orders = db.get_user_orders(user_id)
         except Exception:
-            orders = []  # Table orders not yet created
-
-        if not bookings and not orders:
-            empty_text = "Корзина пуста" if lang == "ru" else "Savat bo'sh"
-            desc_ru = "Здесь будут ваши бронирования и заказы с доставкой"
-            desc_uz = "Bu yerda sizning bronlaringiz va buyurtmalaringiz bo'ladi"
-            await message.answer(f"🛒 {empty_text}\n\n{desc_ru if lang == 'ru' else desc_uz}")
-            return
+            orders = []
 
         # Helper to safely get field from dict or tuple
         def get_field(item, field, index, default=None):
@@ -55,34 +49,118 @@ def setup(
                 return item[index]
             return default
 
-        # Split bookings by status (works with both dict and tuple)
-        active_bookings = [b for b in bookings if get_field(b, 'status', 3) in ["pending", "confirmed", "active"]]
-        completed_bookings = [b for b in bookings if get_field(b, 'status', 3) == "completed"]
-        cancelled_bookings = [b for b in bookings if get_field(b, 'status', 3) == "cancelled"]
+        # Filter active items only
+        active_bookings = [b for b in bookings if get_field(b, 'status', 3) in ["pending", "confirmed"]]
+        active_orders = [o for o in orders if get_field(o, 'order_status', 10) in ["pending", "confirmed", "preparing", "delivering"]]
 
-        # Split orders by status (works with both dict and tuple)
-        active_orders = [
-            o for o in orders if get_field(o, 'order_status', 10) in ["pending", "confirmed", "preparing", "delivering"]
-        ]
-        completed_orders = [o for o in orders if get_field(o, 'order_status', 10) == "completed"]
-        cancelled_orders = [o for o in orders if get_field(o, 'order_status', 10) == "cancelled"]
+        if not active_bookings and not active_orders:
+            empty_text = "🛒 Корзина пуста" if lang == "ru" else "🛒 Savat bo'sh"
+            hint_ru = "Выберите товар и нажмите «Забронировать» или «Заказать доставку»"
+            hint_uz = "Mahsulotni tanlang va «Buyurtma berish» tugmasini bosing"
+            await message.answer(f"{empty_text}\n\n{hint_ru if lang == 'ru' else hint_uz}")
+            return
 
-        total_text = f"<b>{'Мои заказы' if lang == 'ru' else 'Mening buyurtmalarim'}</b>\n\n"
-        total_text += f"<b>{'Самовывоз' if lang == 'ru' else 'Olib ketish'}</b>\n"
-        total_text += f"• {'Активные' if lang == 'ru' else 'Faol'} ({len(active_bookings)})\n"
-        total_text += f"• {'Завершенные' if lang == 'ru' else 'Yakunlangan'} ({len(completed_bookings)})\n"
-        total_text += f"• {'Отмененные' if lang == 'ru' else 'Bekor qilingan'} ({len(cancelled_bookings)})\n\n"
-        total_text += f"<b>{'Доставка' if lang == 'ru' else 'Yetkazib berish'}</b>\n"
-        total_text += f"• {'Активные' if lang == 'ru' else 'Faol'} ({len(active_orders)})\n"
-        total_text += f"• {'Завершенные' if lang == 'ru' else 'Yakunlangan'} ({len(completed_orders)})\n"
-        total_text += f"• {'Отмененные' if lang == 'ru' else 'Bekor qilingan'} ({len(cancelled_orders)})"
+        # Build detailed cart view
+        text_parts = []
+        text_parts.append(f"🛒 <b>{'Моя корзина' if lang == 'ru' else 'Mening savatim'}</b>\n")
+
+        # === ACTIVE BOOKINGS (Pickup) ===
+        if active_bookings:
+            text_parts.append(f"\n🏪 <b>{'Самовывоз' if lang == 'ru' else 'Olib ketish'}</b> ({len(active_bookings)})\n")
+            text_parts.append("━━━━━━━━━━━━━━━━━━")
+            
+            for b in active_bookings[:5]:  # Limit to 5
+                booking_id = get_field(b, 'booking_id', 0)
+                status = get_field(b, 'status', 3, 'pending')
+                code = get_field(b, 'booking_code', 4, '')
+                quantity = get_field(b, 'quantity', 6, 1)
+                title = get_field(b, 'title', 8, 'Товар')
+                price = get_field(b, 'discount_price', 9, 0)
+                store_name = get_field(b, 'name', 11, 'Магазин')
+                address = get_field(b, 'address', 12, '')
+                
+                total = int(price * quantity)
+                currency = "сум" if lang == "ru" else "so'm"
+                
+                # Status emoji
+                status_emoji = "⏳" if status == "pending" else "✅"
+                status_text = {
+                    "pending": "Ожидает подтверждения" if lang == "ru" else "Tasdiq kutilmoqda",
+                    "confirmed": "Подтверждено" if lang == "ru" else "Tasdiqlangan"
+                }.get(status, status)
+                
+                text_parts.append(f"\n{status_emoji} <b>{title}</b>")
+                text_parts.append(f"   📦 {quantity} × {int(price):,} = <b>{total:,}</b> {currency}")
+                text_parts.append(f"   🏪 {store_name}")
+                if address:
+                    text_parts.append(f"   📍 {address}")
+                text_parts.append(f"   📊 {status_text}")
+                
+                if status == "confirmed" and code:
+                    text_parts.append(f"   🎫 <b>Код:</b> <code>{code}</code>")
+                
+                text_parts.append("")
+
+        # === ACTIVE ORDERS (Delivery) ===
+        if active_orders:
+            text_parts.append(f"\n🚚 <b>{'Доставка' if lang == 'ru' else 'Yetkazib berish'}</b> ({len(active_orders)})\n")
+            text_parts.append("━━━━━━━━━━━━━━━━━━")
+            
+            for o in active_orders[:5]:  # Limit to 5
+                order_id = get_field(o, 'order_id', 0)
+                status = get_field(o, 'order_status', 10, 'pending')
+                quantity = get_field(o, 'quantity', 9, 1)
+                total_price = get_field(o, 'total_price', 11, 0)
+                delivery_address = get_field(o, 'delivery_address', 4, '')
+                
+                # Get offer title (may need separate query)
+                offer_id = get_field(o, 'offer_id', 2)
+                offer = db.get_offer(offer_id) if offer_id else None
+                title = get_field(offer, 'title', 2, 'Товар') if offer else 'Товар'
+                
+                status_emoji = {"pending": "⏳", "confirmed": "✅", "preparing": "👨‍🍳", "delivering": "🚗"}.get(status, "📦")
+                status_text = {
+                    "pending": "Ожидает подтверждения" if lang == "ru" else "Tasdiq kutilmoqda",
+                    "confirmed": "Подтверждён" if lang == "ru" else "Tasdiqlangan",
+                    "preparing": "Готовится" if lang == "ru" else "Tayyorlanmoqda",
+                    "delivering": "В пути" if lang == "ru" else "Yo'lda"
+                }.get(status, status)
+                
+                currency = "сум" if lang == "ru" else "so'm"
+                text_parts.append(f"\n{status_emoji} <b>{title}</b>")
+                text_parts.append(f"   💰 <b>{int(total_price):,}</b> {currency}")
+                if delivery_address:
+                    text_parts.append(f"   📍 {delivery_address[:50]}...")
+                text_parts.append(f"   📊 {status_text}")
+                text_parts.append("")
+
+        # Summary
+        total_items = len(active_bookings) + len(active_orders)
+        text_parts.append(f"━━━━━━━━━━━━━━━━━━")
+        text_parts.append(f"{'Всего активных заказов' if lang == 'ru' else 'Jami faol buyurtmalar'}: <b>{total_items}</b>")
+
+        # Build keyboard with actions
+        kb = InlineKeyboardBuilder()
+        if active_bookings:
+            kb.button(
+                text=f"🏪 {'Самовывоз' if lang == 'ru' else 'Olib ketish'} ({len(active_bookings)})", 
+                callback_data="bookings_active"
+            )
+        if active_orders:
+            kb.button(
+                text=f"🚚 {'Доставка' if lang == 'ru' else 'Yetkazib'} ({len(active_orders)})", 
+                callback_data="orders_active"
+            )
+        kb.button(
+            text=f"📜 {'История' if lang == 'ru' else 'Tarix'}", 
+            callback_data="bookings_completed"
+        )
+        kb.adjust(2, 1)
 
         await message.answer(
-            total_text,
+            "\n".join(text_parts),
             parse_mode="HTML",
-            reply_markup=booking_filters_keyboard(
-                lang, len(active_bookings), len(completed_bookings), len(cancelled_bookings)
-            ),
+            reply_markup=kb.as_markup(),
         )
 
     # ============== ИЗБРАННОЕ ==============
