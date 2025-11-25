@@ -395,20 +395,26 @@ async def create_booking(message: types.Message, state: FSMContext, real_user_id
     if lang == "uz":
         customer_msg = (
             f"⏳ <b>Bron yuborildi!</b>\n\n"
-            f"🏪 {_esc(store_name)}\n"
             f"📦 {_esc(offer_title)} × {quantity}\n"
-            f"📍 Manzil: {_esc(store_address)}\n"
             f"💰 Jami: {total:,} so'm\n\n"
-            f"⚠️ Sotuvchi tasdiqlagandan so'ng bron kodi yuboriladi."
+            f"🏪 {_esc(store_name)}\n"
+            f"📍 {_esc(store_address)}\n\n"
+            f"━━━━━━━━━━━━━━━━━━\n"
+            f"⏳ Sotuvchi tasdig'ini kutmoqda...\n"
+            f"━━━━━━━━━━━━━━━━━━\n\n"
+            f"💡 Tasdiqlangandan so'ng sizga bron kodi va QR kod yuboriladi."
         )
     else:
         customer_msg = (
             f"⏳ <b>Бронь отправлена!</b>\n\n"
-            f"🏪 {_esc(store_name)}\n"
             f"📦 {_esc(offer_title)} × {quantity}\n"
-            f"📍 Адрес: {_esc(store_address)}\n"
             f"💰 Итого: {total:,} сум\n\n"
-            f"⚠️ Код бронирования будет отправлен после подтверждения продавцом."
+            f"🏪 {_esc(store_name)}\n"
+            f"📍 {_esc(store_address)}\n\n"
+            f"━━━━━━━━━━━━━━━━━━\n"
+            f"⏳ Ожидаем подтверждения продавца...\n"
+            f"━━━━━━━━━━━━━━━━━━\n\n"
+            f"💡 После подтверждения вы получите код бронирования и QR-код."
         )
     
     await message.answer(customer_msg, parse_mode="HTML", reply_markup=main_menu_customer(lang))

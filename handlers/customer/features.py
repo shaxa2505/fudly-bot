@@ -133,10 +133,16 @@ def setup(
                 text_parts.append(f"   🏪 {store_name}")
                 if address:
                     text_parts.append(f"   📍 {address}")
-                text_parts.append(f"   📊 {status_text}")
                 
-                if status == "confirmed" and code:
+                # Status-specific messages
+                if status == "pending":
+                    text_parts.append(f"   ⏳ {'Ожидает подтверждения продавца' if lang == 'ru' else 'Sotuvchi tasdig\\'ini kutmoqda'}")
+                elif status == "confirmed" and code:
+                    text_parts.append(f"   ✅ {'Подтверждено' if lang == 'ru' else 'Tasdiqlangan'}")
                     text_parts.append(f"   🎫 <b>Код:</b> <code>{code}</code>")
+                    text_parts.append(f"   💡 {'Покажите код продавцу' if lang == 'ru' else 'Kodni sotuvchiga ko\\'rsating'}")
+                elif status == "active":
+                    text_parts.append(f"   🔵 {'Активно' if lang == 'ru' else 'Faol'}")
                 
                 text_parts.append("")
 
