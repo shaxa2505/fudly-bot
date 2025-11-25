@@ -356,8 +356,43 @@ async def force_cancel_booking(callback: types.CallbackQuery, db: DatabaseProtoc
         db.cancel_booking(booking_id)
         await callback.answer(f"✅ Бронь #{booking_id} отменена!", show_alert=True)
         
-        # Refresh the list
-        await callback.message.delete()
-        await my_bookings_command(callback.message, db)
+        # Send new message with updated list
+        if callback.message:
+            try:
+                await callback.message.delete()
+            except:
+                pass
+        
+        # Get updated bookings count
+        bookings = db.get_user_bookings(user_id) or []
+        active = [b for b in bookings if isinstance(b, dict) and b.get('status') in ('pending', 'confirmed', 'active')]
+        await callback.message.answer(f"✅ Отменено! Активных броней: {len(active)}\n\n/mybookings - посмотреть все")
     except Exception as e:
         await callback.answer(f"Ошибка: {e}", show_alert=True)
+
+
+@router.message(Command("cancelall"))
+async def cancel_all_bookings(message: types.Message, db: DatabaseProtocol = None):
+    """Cancel ALL active bookings for user."""
+    if not db:
+        return
+    
+    user_id = message.from_user.id
+    bookings = db.get_user_bookings(user_id) or []
+    active = [b for b in bookings if isinstance(b, dict) and b.get('status') in ('pending', 'confirmed', 'active')]
+    
+    if not active:
+        await message.answer("✅ У вас нет активных бронирований!")
+        return
+    
+    cancelled = 0
+    for b in active:
+        bid = b.get('booking_id')
+        if bid:
+            try:
+                db.cancel_booking(bid)
+                cancelled += 1
+            except:
+                pass
+    
+    await message.answer(f"✅ Отменено {cancelled} бронирований!\n\nТеперь можете делать новые заказы.")
