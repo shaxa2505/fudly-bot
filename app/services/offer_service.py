@@ -327,16 +327,27 @@ class OfferService:
             ratings_count=len(ratings),
         )
 
-    @staticmethod
-    def _extract_offers_count(store: Any) -> int:
+    def _extract_offers_count(self, store: Any) -> int:
+        """Extract offers count, falling back to DB query if needed."""
+        # First, try to get from the store object
         if isinstance(store, dict):
             value = store.get("offers_count", 0)
         else:
             value = store[-1] if isinstance(store, Sequence) and len(store) > 12 else 0
+        
         try:
-            return int(value or 0)
+            count = int(value or 0)
         except (TypeError, ValueError):
-            return 0
+            count = 0
+        
+        # If no count in store object, query DB for actual count
+        if count == 0:
+            store_id = int(get_store_field(store, "store_id", get_field(store, 0, 0)) or 0)
+            if store_id and hasattr(self._db, "get_store_offers"):
+                offers = self._db.get_store_offers(store_id) or []
+                count = len(offers)
+        
+        return count
 
     def search_offers(self, query: str, city: str | None = None) -> list[OfferListItem]:
         """Search active offers by title or store name."""

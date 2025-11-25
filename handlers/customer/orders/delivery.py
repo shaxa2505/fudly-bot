@@ -8,7 +8,7 @@ from aiogram.fsm.context import FSMContext
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
 from app.core.utils import get_offer_field, get_order_field, get_store_field
-from app.keyboards import cancel_keyboard, main_menu_customer, main_menu_seller
+from app.keyboards import cancel_keyboard, main_menu, main_menu_customer, main_menu_seller
 from database_protocol import DatabaseProtocol
 from handlers.common.states import OrderDelivery
 from localization import get_text
@@ -138,18 +138,15 @@ async def order_delivery_quantity(
     assert message.from_user is not None
     lang = db.get_user_language(message.from_user.id)
 
+    text = (message.text or "").strip().lower()
+    
     # Check for cancellation
-    if message.text in [
-        f"❌ {get_text('ru', 'cancel')}",
-        f"❌ {get_text('uz', 'cancel')}",
-        "Отмена",
-        "Bekor qilish",
-        "/cancel",
-    ]:
+    cancel_texts = ["отмена", "bekor", "❌"]
+    if any(c in text for c in cancel_texts) or text.startswith("/"):
         await state.clear()
-        await message.answer(
-            get_text(lang, "operation_cancelled"), reply_markup=main_menu_customer(lang)
-        )
+        menu = main_menu(lang, "customer")
+        cancelled_text = "❌ Операция отменена" if lang == "ru" else "❌ Bekor qilindi"
+        await message.answer(cancelled_text, reply_markup=menu)
         return
 
     try:
@@ -215,7 +212,19 @@ async def order_delivery_address(
     assert message.from_user is not None
     lang = db.get_user_language(message.from_user.id)
 
-    address = message.text.strip()
+    text = (message.text or "").strip()
+    text_lower = text.lower()
+    
+    # Check for cancel
+    cancel_texts = ["отмена", "bekor", "❌"]
+    if any(c in text_lower for c in cancel_texts) or text_lower.startswith("/"):
+        await state.clear()
+        menu = main_menu(lang, "customer")
+        cancelled_text = "❌ Операция отменена" if lang == "ru" else "❌ Bekor qilindi"
+        await message.answer(cancelled_text, reply_markup=menu)
+        return
+
+    address = text
     if len(address) < 10:
         await message.answer(
             "❌ "
@@ -455,6 +464,17 @@ async def order_payment_proof_invalid(
         return
 
     lang = db.get_user_language(message.from_user.id)
+    text = (message.text or "").strip().lower()
+    
+    # Check for cancel
+    cancel_texts = ["отмена", "bekor", "❌"]
+    if any(c in text for c in cancel_texts) or text.startswith("/"):
+        await state.clear()
+        menu = main_menu(lang, "customer")
+        cancelled_text = "❌ Операция отменена" if lang == "ru" else "❌ Bekor qilindi"
+        await message.answer(cancelled_text, reply_markup=menu)
+        return
+
     logger.warning(f"❌ User {message.from_user.id} sent {message.content_type} instead of photo")
 
     await message.answer(
