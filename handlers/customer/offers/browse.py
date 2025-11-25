@@ -114,8 +114,86 @@ def setup(
             search_city,
             offer_service,
             logger,
+            page=0,
+            edit_message=True,
         )
-        await callback.answer("✓" if lang == "ru" else "✓", show_alert=False)
+        await callback.answer("✓", show_alert=False)
+
+    @dp.callback_query(F.data.startswith("hot_page_"))
+    async def hot_offers_page_handler(callback: types.CallbackQuery, state: FSMContext) -> None:
+        """Handle hot offers pagination."""
+        if not callback.from_user or not callback.data:
+            await callback.answer()
+            return
+        msg = _callback_message(callback)
+        if not msg:
+            await callback.answer()
+            return
+        
+        user_id = callback.from_user.id
+        lang = db.get_user_language(user_id)
+        user = db.get_user_model(user_id)
+        if not user:
+            await callback.answer(get_text(lang, "error"), show_alert=True)
+            return
+        
+        try:
+            page = int(callback.data.split("_")[-1])
+        except (ValueError, IndexError):
+            await callback.answer(get_text(lang, "error"), show_alert=True)
+            return
+        
+        city = user.city or "Ташкент"
+        search_city = normalize_city(city)
+        
+        await _send_hot_offers_list(
+            msg,
+            state,
+            lang,
+            city,
+            search_city,
+            offer_service,
+            logger,
+            page=page,
+            edit_message=True,
+        )
+        await callback.answer()
+
+    @dp.callback_query(F.data.startswith("hot_offer_"))
+    async def hot_offer_selected_handler(callback: types.CallbackQuery, state: FSMContext) -> None:
+        """Handle hot offer selection by inline button."""
+        if not callback.from_user or not callback.data:
+            await callback.answer()
+            return
+        msg = _callback_message(callback)
+        if not msg:
+            await callback.answer()
+            return
+        
+        user_id = callback.from_user.id
+        lang = db.get_user_language(user_id)
+        
+        try:
+            offer_id = int(callback.data.split("_")[-1])
+        except (ValueError, IndexError):
+            await callback.answer(get_text(lang, "error"), show_alert=True)
+            return
+        
+        offer = offer_service.get_offer_details(offer_id)
+        if not offer:
+            await callback.answer(
+                "Товар не найден" if lang == "ru" else "Mahsulot topilmadi",
+                show_alert=True,
+            )
+            return
+        
+        await _send_offer_details(msg, offer, lang)
+        await callback.answer()
+
+    @dp.callback_query(F.data == "hot_noop")
+    async def hot_noop_handler(callback: types.CallbackQuery) -> None:
+        """Handle noop button (page indicator)."""
+        await callback.answer()
 
     @dp.callback_query(F.data.startswith("hot_offers_next_"))
     async def hot_offers_pagination(callback: types.CallbackQuery, state: FSMContext) -> None:
@@ -882,32 +960,66 @@ def setup(
         search_city: str,
         service: OfferService,
         log: Any,
+        page: int = 0,
+        edit_message: bool = False,
     ) -> None:
+        """Send hot offers with compact list and inline buttons."""
+        ITEMS_PER_PAGE = 5
         try:
-            result = service.list_hot_offers(search_city, limit=20, offset=0)
-            if not result.items:
+            offset = page * ITEMS_PER_PAGE
+            result = service.list_hot_offers(search_city, limit=ITEMS_PER_PAGE, offset=offset)
+            if not result.items and page == 0:
                 await target.answer(
                     offer_templates.render_hot_offers_empty(lang), parse_mode="HTML"
                 )
                 return
+            
             await state.set_state(BrowseOffers.offer_list)
-            await state.update_data(offer_list=[offer.id for offer in result.items])
-            select_hint = get_text(lang, "select_by_number")
-            text = offer_templates.render_hot_offers_list(
-                lang,
-                city,
-                result.items,
-                result.total,
-                select_hint,
-                offset=0,
+            await state.update_data(
+                offer_list=[offer.id for offer in result.items],
+                hot_offers_page=page,
             )
-            has_more = len(result.items) < result.total
-            keyboard = offer_keyboards.hot_offers_pagination_keyboard(
-                lang,
-                has_more,
-                next_offset=20,
+            
+            total_pages = (result.total + ITEMS_PER_PAGE - 1) // ITEMS_PER_PAGE
+            
+            # Build compact text
+            text = f"🔥 <b>{'ГОРЯЧЕЕ' if lang == 'ru' else 'ISSIQ'}</b> | 📍 {city}\n"
+            text += f"{'Стр.' if lang == 'ru' else 'Sah.'} {page + 1}/{total_pages} ({result.total} {'товаров' if lang == 'ru' else 'mahsulot'})\n\n"
+            
+            # Category emoji mapping
+            category_emoji = {
+                "bakery": "🍞", "dairy": "🥛", "meat": "🥩", "fish": "🐟",
+                "vegetables": "🥬", "fruits": "🍎", "cheese": "🧀",
+                "beverages": "🥤", "ready_food": "🍱", "other": "🏪",
+            }
+            
+            for idx, offer in enumerate(result.items, start=1):
+                cat = offer.store_category or "other"
+                emoji = category_emoji.get(cat, "🏪")
+                title = offer.title[:20] + "..." if len(offer.title) > 20 else offer.title
+                discount_pct = 0
+                if offer.original_price and offer.discount_price and offer.original_price > 0:
+                    discount_pct = int((1 - offer.discount_price / offer.original_price) * 100)
+                
+                text += f"{idx}. {emoji} <b>{title}</b>\n"
+                text += f"   💰 {int(offer.discount_price):,}"
+                if discount_pct > 0:
+                    text += f" <s>{int(offer.original_price):,}</s> (-{discount_pct}%)"
+                text += "\n"
+            
+            # Build keyboard with offer buttons
+            keyboard = offer_keyboards.hot_offers_compact_keyboard(
+                lang, result.items, page, total_pages
             )
-            await target.answer(text, parse_mode="HTML", reply_markup=keyboard)
+            
+            if edit_message:
+                try:
+                    await target.edit_text(text, parse_mode="HTML", reply_markup=keyboard)
+                except Exception:
+                    await target.answer(text, parse_mode="HTML", reply_markup=keyboard)
+            else:
+                await target.answer(text, parse_mode="HTML", reply_markup=keyboard)
+                
         except Exception as exc:  # pragma: no cover
             log.error("Failed to send hot offers: %s", exc)
             await target.answer(f"😔 {get_text(lang, 'error')}")

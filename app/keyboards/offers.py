@@ -1,8 +1,61 @@
 """Inline keyboards for offer browsing flows."""
 from __future__ import annotations
 
+from typing import Sequence, Any
+
 from aiogram.types import InlineKeyboardMarkup
 from aiogram.utils.keyboard import InlineKeyboardBuilder
+
+
+def hot_offers_compact_keyboard(
+    lang: str, offers: Sequence[Any], page: int, total_pages: int
+) -> InlineKeyboardMarkup:
+    """Compact keyboard for hot offers with item buttons and pagination."""
+    builder = InlineKeyboardBuilder()
+    
+    # Add buttons for each offer (max 5)
+    for idx, offer in enumerate(offers[:5], start=1):
+        offer_id = offer.id if hasattr(offer, 'id') else offer.get('offer_id', 0)
+        title = offer.title if hasattr(offer, 'title') else offer.get('title', 'Товар')
+        short_title = title[:12] + ".." if len(title) > 12 else title
+        builder.button(text=f"{idx}. {short_title}", callback_data=f"hot_offer_{offer_id}")
+    
+    # Adjust offer buttons: 2 per row for 5 items = 2+2+1
+    if len(offers) == 5:
+        builder.adjust(2, 2, 1)
+    elif len(offers) == 4:
+        builder.adjust(2, 2)
+    elif len(offers) == 3:
+        builder.adjust(2, 1)
+    elif len(offers) == 2:
+        builder.adjust(2)
+    else:
+        builder.adjust(1)
+    
+    # Pagination row
+    nav_builder = InlineKeyboardBuilder()
+    if page > 0:
+        nav_builder.button(text="◀️", callback_data=f"hot_page_{page - 1}")
+    nav_builder.button(text=f"{page + 1}/{total_pages}", callback_data="hot_noop")
+    if page < total_pages - 1:
+        nav_builder.button(text="▶️", callback_data=f"hot_page_{page + 1}")
+    
+    # Refresh button
+    refresh_text = "🔄" if lang == "ru" else "🔄"
+    nav_builder.button(text=refresh_text, callback_data="hot_offers_refresh")
+    
+    # Adjust nav: pagination buttons + refresh
+    if page > 0 and page < total_pages - 1:
+        nav_builder.adjust(3, 1)  # ◀️ 1/5 ▶️ then 🔄
+    elif page > 0 or page < total_pages - 1:
+        nav_builder.adjust(2, 1)  # ◀️ 1/5 or 1/5 ▶️ then 🔄
+    else:
+        nav_builder.adjust(1, 1)  # Just 1/1 then 🔄
+    
+    # Combine keyboards
+    builder.attach(nav_builder)
+    
+    return builder.as_markup()
 
 
 def hot_offers_pagination_keyboard(
