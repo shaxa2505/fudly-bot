@@ -63,12 +63,15 @@ def setup(
         if bookings:
             first = bookings[0]
             if isinstance(first, dict):
-                logger.info(f"First booking: status={first.get('status')}, title={first.get('title')}")
+                logger.info(f"First booking: status='{first.get('status')}', title='{first.get('title')}'")
+                # Log all statuses to debug
+                all_statuses = [b.get('status') for b in bookings if isinstance(b, dict)]
+                logger.info(f"All booking statuses: {all_statuses}")
             else:
                 logger.info(f"First booking is tuple: {first}")
 
         # Filter active items only  
-        active_bookings = [b for b in bookings if get_field(b, 'status', 3) in ["pending", "confirmed"]]
+        active_bookings = [b for b in bookings if get_field(b, 'status', 3) in ["pending", "confirmed", "active"]]
         active_orders = [o for o in orders if get_field(o, 'order_status', 10) in ["pending", "confirmed", "preparing", "delivering"]]
         
         logger.info(f"Cart: active_bookings={len(active_bookings)}, active_orders={len(active_orders)}")
