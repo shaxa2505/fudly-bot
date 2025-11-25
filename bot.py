@@ -809,162 +809,20 @@ async def main():
     
     if USE_WEBHOOK:
         # Webhook режим (для production на Railway)
-        from aiohttp import web
+        from app.core.webhook_server import create_webhook_app, run_webhook_server
         
         await on_startup()
         
-        app = web.Application()
+        app = await create_webhook_app(
+            bot=bot,
+            dp=dp,
+            webhook_path=WEBHOOK_PATH,
+            secret_token=SECRET_TOKEN,
+            metrics=METRICS,
+            db=db,
+        )
         
-        # Webhook endpoint
-        async def webhook_handler(request):
-            import time
-            start_ts = time.time()
-            # Разрешаем только POST запросы Telegram
-            if request.method != 'POST':
-                return web.Response(status=405, text='Method Not Allowed')
-            try:
-                logger.info(f"Webhook request received from {request.remote}")
-
-                # Проверяем секретный токен (если настроен)
-                if SECRET_TOKEN:
-                    hdr = request.headers.get("X-Telegram-Bot-Api-Secret-Token")
-                    if hdr != SECRET_TOKEN:
-                        logger.warning("Invalid secret token")
-                        METRICS["updates_errors"] += 1
-                        return web.Response(status=403, text="Forbidden")
-
-                # Парсинг JSON
-                try:
-                    update_data = await request.json()
-                except Exception as json_e:
-                    logger.error(f"Webhook JSON parse error: {repr(json_e)}")
-                    METRICS["webhook_json_errors"] += 1
-                    # Возвращаем 200 чтобы Telegram не ретраил бесконечно
-                    return web.Response(status=200, text="OK")
-
-                logger.debug(f"Raw update: {update_data}")
-
-                # Валидация структуры Update
-                try:
-                    telegram_update = types.Update.model_validate(update_data)
-                except Exception as validate_e:
-                    logger.error(f"Webhook validation error: {repr(validate_e)}")
-                    METRICS["webhook_validation_errors"] += 1
-                    return web.Response(status=200, text="OK")
-
-                # Обработка апдейта
-                await dp.feed_update(bot, telegram_update)
-                METRICS["updates_received"] += 1
-                proc_ms = int((time.time() - start_ts) * 1000)
-                logger.info(f"Update processed successfully ({proc_ms}ms)")
-                return web.Response(status=200, text="OK")
-            except Exception as e:
-                logger.error(f"Webhook unexpected error: {repr(e)}", exc_info=True)
-                METRICS["webhook_unexpected_errors"] += 1
-                METRICS["updates_errors"] += 1
-                return web.Response(status=200, text="OK")
-        
-        # Health check endpoint with DB status
-        async def health_check(request):
-            """Comprehensive health check endpoint."""
-            try:
-                # Check database connection
-                db_healthy = True
-                db_error = None
-                try:
-                    with db.get_connection() as conn:
-                        cursor = conn.cursor()
-                        cursor.execute("SELECT 1")
-                        cursor.fetchone()
-                except Exception as e:
-                    db_healthy = False
-                    db_error = str(e)
-                
-                status = {
-                    "status": "healthy" if db_healthy else "degraded",
-                    "bot": "Fudly",
-                    "timestamp": datetime.now().isoformat(),
-                    "components": {
-                        "database": {
-                            "status": "healthy" if db_healthy else "unhealthy",
-                            "error": db_error
-                        },
-                        "bot": {"status": "healthy"}
-                    }
-                }
-                
-                # Add metrics
-                status["metrics"] = {
-                    "updates_received": METRICS.get("updates_received", 0),
-                    "updates_errors": METRICS.get("updates_errors", 0),
-                    "error_rate": round(
-                        METRICS.get("updates_errors", 0) / max(METRICS.get("updates_received", 1), 1) * 100, 2
-                    )
-                }
-                
-                http_status = 200 if db_healthy else 503
-                return web.json_response(status, status=http_status)
-            except Exception as e:
-                logger.error(f"Health check failed: {e}")
-                return web.json_response({
-                    "status": "error",
-                    "error": str(e)
-                }, status=500)
-        
-        async def version_info(request):
-            return web.json_response({
-                "app": "Fudly",
-                "mode": "webhook",
-                "port": PORT,
-                "use_webhook": USE_WEBHOOK,
-                "ts": datetime.now().isoformat(timespec='seconds')
-            })
-        # Prometheus-style metrics (text/plain) and JSON variant
-        def _prometheus_metrics_text():
-            help_map = {
-                "updates_received": "Total updates received",
-                "updates_errors": "Total webhook errors",
-                "bookings_created": "Total bookings created",
-                "bookings_cancelled": "Total bookings cancelled",
-            }
-            lines = []
-            for key, val in METRICS.items():
-                metric = f"fudly_{key}"
-                lines.append(f"# HELP {metric} {help_map.get(key, key)}")
-                lines.append(f"# TYPE {metric} counter")
-                try:
-                    v = int(val)
-                except Exception:
-                    v = 0
-                lines.append(f"{metric} {v}")
-            return "\n".join(lines) + "\n"
-
-        async def metrics_prom(request):
-            text = _prometheus_metrics_text()
-            return web.Response(text=text, content_type='text/plain; version=0.0.4; charset=utf-8')
-
-        async def metrics_json(request):
-            return web.json_response(METRICS)
-        
-        # Webhook endpoints (POST + GET for sanity) — register both with and without trailing slash
-        path_main = WEBHOOK_PATH if WEBHOOK_PATH.startswith('/') else f'/{WEBHOOK_PATH}'
-        path_alt = path_main.rstrip('/') + '/'
-        app.router.add_post(path_main, webhook_handler)
-        app.router.add_post(path_alt, webhook_handler)
-        async def webhook_get(_request):
-            return web.Response(text="OK", status=200)
-        app.router.add_get(path_main, webhook_get)
-        app.router.add_get(path_alt, webhook_get)
-        app.router.add_get("/health", health_check)
-        app.router.add_get("/version", version_info)
-        app.router.add_get("/metrics", metrics_prom)
-        app.router.add_get("/metrics.json", metrics_json)
-        app.router.add_get("/", health_check)  # Railway health check
-        
-        runner = web.AppRunner(app)
-        await runner.setup()
-        site = web.TCPSite(runner, '0.0.0.0', PORT)
-        await site.start()
+        runner = await run_webhook_server(app, PORT)
         
         print(f"🌐 Webhook сервер запущен на порту {PORT}")
         

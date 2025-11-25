@@ -1926,7 +1926,18 @@ class Database:
         result = cursor.fetchone()
         conn.close()
         return round(result[0], 1) if result[0] else 0.0
-    
+
+    def get_store_rating_summary(self, store_id: int) -> Tuple[float, int]:
+        """Get store rating summary (average, count)."""
+        conn = self.get_connection()
+        cursor = conn.cursor()
+        cursor.execute('SELECT AVG(rating), COUNT(*) FROM ratings WHERE store_id = ?', (store_id,))
+        result = cursor.fetchone()
+        conn.close()
+        avg_rating = round(result[0], 1) if result[0] else 0.0
+        count = result[1] if result[1] else 0
+        return (avg_rating, count)
+
     def has_rated_booking(self, booking_id: int) -> bool:
         conn = self.get_connection()
         cursor = conn.cursor()
@@ -2846,7 +2857,20 @@ class Database:
             return cursor.fetchone()
         finally:
             conn.close()
-    
+
+    def set_platform_payment_card(self, card_number: str) -> None:
+        """Установить карту платформы для оплаты"""
+        conn = self.get_connection()
+        cursor = conn.cursor()
+        try:
+            # Сначала удаляем старые записи
+            cursor.execute('DELETE FROM payment_settings')
+            # Добавляем новую карту
+            cursor.execute('INSERT INTO payment_settings (card_number) VALUES (?)', (card_number,))
+            conn.commit()
+        finally:
+            conn.close()
+
     def update_store_delivery_settings(self, store_id: int, enabled: bool, price: int, min_amount: int) -> bool:
         """Обновить настройки доставки магазина"""
         conn = self.get_connection()

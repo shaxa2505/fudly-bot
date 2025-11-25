@@ -1,9 +1,14 @@
 """Protocol for database interface - ensures SQLite and PostgreSQL compatibility."""
 from __future__ import annotations
 
-from typing import Any, List, Optional, Protocol, Tuple
+from typing import Any, Dict, List, Optional, Protocol, Tuple, Union
 
 from database_types import OfferDict, StoreDict, UserDict
+
+# Flexible types for compatibility
+UserType = Union[UserDict, Dict[str, Any]]
+StoreType = Union[StoreDict, Dict[str, Any]]
+OfferType = Union[OfferDict, Dict[str, Any]]
 
 
 class DatabaseProtocol(Protocol):
@@ -24,7 +29,7 @@ class DatabaseProtocol(Protocol):
         city: Optional[str] = None,
     ) -> None: ...
 
-    def get_user(self, user_id: int) -> Optional[UserDict]: ...
+    def get_user(self, user_id: int) -> Optional[UserType]: ...
 
     def update_user_phone(self, user_id: int, phone: str) -> None: ...
 
@@ -51,13 +56,13 @@ class DatabaseProtocol(Protocol):
         business_type: str = "supermarket",
     ) -> int: ...
 
-    def get_user_stores(self, owner_id: int) -> List[StoreDict]: ...
+    def get_user_stores(self, owner_id: int) -> List[StoreType]: ...
 
-    def get_approved_stores(self, owner_id: int) -> List[StoreDict]: ...
+    def get_approved_stores(self, owner_id: int) -> List[StoreType]: ...
 
-    def get_store(self, store_id: int) -> Optional[StoreDict]: ...
+    def get_store(self, store_id: int) -> Optional[StoreType]: ...
 
-    def get_stores_by_city(self, city: str) -> List[StoreDict]: ...
+    def get_stores_by_city(self, city: str) -> List[StoreType]: ...
 
     def get_stores_by_business_type(
         self, business_type: str, city: Optional[str] = None
@@ -90,7 +95,7 @@ class DatabaseProtocol(Protocol):
 
     def get_active_offers(
         self, city: Optional[str] = None, store_id: Optional[int] = None
-    ) -> List[OfferDict]: ...
+    ) -> List[OfferType]: ...
 
     def get_hot_offers(
         self,

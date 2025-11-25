@@ -785,7 +785,16 @@ class Database:
             cursor.execute('SELECT card_number, card_holder FROM payment_settings ORDER BY created_at ASC LIMIT 1')
             row = cursor.fetchone()
             return dict(row) if row else None
-    
+
+    def set_platform_payment_card(self, card_number: str) -> None:
+        """Set platform payment card"""
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            # Delete old records
+            cursor.execute('DELETE FROM payment_settings')
+            # Insert new card
+            cursor.execute('INSERT INTO payment_settings (card_number) VALUES (%s)', (card_number,))
+
     def set_admin(self, user_id: int):
         """Set user as admin"""
         with self.get_connection() as conn:
@@ -1778,7 +1787,17 @@ class Database:
             cursor.execute('SELECT AVG(rating) FROM ratings WHERE store_id = %s', (store_id,))
             result = cursor.fetchone()
             return round(result[0], 1) if result and result[0] else 0.0
-    
+
+    def get_store_rating_summary(self, store_id: int) -> Tuple[float, int]:
+        """Get store rating summary (average, count)."""
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute('SELECT AVG(rating), COUNT(*) FROM ratings WHERE store_id = %s', (store_id,))
+            result = cursor.fetchone()
+            avg_rating = round(result[0], 1) if result and result[0] else 0.0
+            count = result[1] if result and result[1] else 0
+            return (avg_rating, count)
+
     def has_rated_booking(self, booking_id: int) -> bool:
         """Проверить, оценил ли пользователь бронирование"""
         with self.get_connection() as conn:
