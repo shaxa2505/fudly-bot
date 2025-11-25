@@ -15,7 +15,7 @@ from handlers.common_states.states import EditOffer
 from app.keyboards import main_menu_seller
 from localization import get_text
 from logging_config import logger
-from handlers.bookings_utils import _safe_answer_or_send
+from handlers.bookings.utils import safe_answer_or_send as _safe_answer_or_send
 
 # Module-level dependencies
 db: DatabaseProtocol | None = None

@@ -155,6 +155,20 @@ class Database:
             conn.commit()
         except Exception:
             pass
+
+        # Добавляем поле pickup_address если его нет (для старых БД)
+        try:
+            cursor.execute("ALTER TABLE bookings ADD COLUMN pickup_address TEXT")
+            conn.commit()
+        except Exception:
+            pass
+
+        # На всякий случай добавим booking_code, если по какой-то причине его нет
+        try:
+            cursor.execute("ALTER TABLE bookings ADD COLUMN booking_code TEXT")
+            conn.commit()
+        except Exception:
+            pass
         
         # Добавляем поле expiry_date если его нет (для старых БД)
         try:
