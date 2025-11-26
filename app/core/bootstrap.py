@@ -27,15 +27,15 @@ def build_application(settings: Settings):
             storage = MemoryStorage()
             logger.warning("Failed to initialize Redis storage, using MemoryStorage")
 
-    # Priority 2: PostgreSQL (Good fallback)
+    # Priority 2: PostgreSQL with Enhanced Storage (Good fallback)
     elif settings.database_url and "postgresql" in settings.database_url:
         try:
-            from fsm_storage_pg import PostgreSQLStorage
+            from app.core.fsm_storage import EnhancedPostgreSQLStorage
 
-            storage = PostgreSQLStorage(db)
-            print("💾 Using PostgreSQL database with PostgreSQLStorage")
-            print("✅ FSM states PERSIST across restarts in database")
-            logger.info("Using PostgreSQL with FSM state persistence in database")
+            storage = EnhancedPostgreSQLStorage(db, ttl_hours=24)
+            print("💾 Using PostgreSQL database with EnhancedPostgreSQLStorage")
+            print("✅ FSM states PERSIST across restarts with TTL support")
+            logger.info("Using PostgreSQL with enhanced FSM storage (TTL=24h)")
         except Exception as e:
             print(f"⚠️ Failed to initialize PostgreSQL storage: {e}")
             print("💾 Falling back to MemoryStorage (states will be lost on restart)")

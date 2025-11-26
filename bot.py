@@ -361,6 +361,23 @@ async def cleanup_expired_offers() -> None:
             logger.error(f"Error cleaning expired offers: {e}")
 
 
+async def cleanup_expired_fsm_states() -> None:
+    """Background task to cleanup expired FSM states."""
+    while True:
+        try:
+            await asyncio.sleep(3600)  # Every hour
+            # Check if storage supports cleanup
+            storage = dp.storage
+            if hasattr(storage, "cleanup_expired"):
+                deleted = await storage.cleanup_expired()
+                if deleted > 0:
+                    logger.info(f"🧹 Cleaned up {deleted} expired FSM states")
+        except asyncio.CancelledError:
+            break
+        except Exception as e:
+            logger.error(f"Error cleaning expired FSM states: {e}")
+
+
 async def start_booking_worker() -> asyncio.Task | None:
     """Start the booking expiry worker if available."""
     try:
@@ -463,6 +480,7 @@ async def main() -> None:
 
     # Start background tasks
     cleanup_task = asyncio.create_task(cleanup_expired_offers())
+    fsm_cleanup_task = asyncio.create_task(cleanup_expired_fsm_states())
     booking_task = await start_booking_worker()
 
     if PRODUCTION_FEATURES:
@@ -491,6 +509,7 @@ async def main() -> None:
             await shutdown_event.wait()
         finally:
             cleanup_task.cancel()
+            fsm_cleanup_task.cancel()
             if booking_task:
                 booking_task.cancel()
             await runner.cleanup()
