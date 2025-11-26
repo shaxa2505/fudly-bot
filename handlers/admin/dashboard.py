@@ -958,9 +958,9 @@ async def admin_payment_settings(callback: types.CallbackQuery):
         return
 
     payment_card = db.get_platform_payment_card()
-    
+
     text = "💳 <b>Платёжные реквизиты платформы</b>\n\n"
-    
+
     if payment_card:
         if isinstance(payment_card, dict):
             card_number = payment_card.get("card_number", "Не указан")
@@ -978,10 +978,10 @@ async def admin_payment_settings(callback: types.CallbackQuery):
         text += "\nПример:\n"
         text += "<code>INSERT INTO platform_settings (key, value) VALUES ('payment_card', '8600 0000 0000 0000')</code>\n"
         text += "<code>INSERT INTO platform_settings (key, value) VALUES ('payment_card_holder', 'FUDLY PLATFORM')</code>"
-    
+
     kb = InlineKeyboardBuilder()
     kb.button(text="◀️ Назад", callback_data="admin_back_to_settings")
-    
+
     await callback.message.edit_text(text, parse_mode="HTML", reply_markup=kb.as_markup())
     await callback.answer()
 
@@ -992,14 +992,14 @@ async def admin_notifications_settings(callback: types.CallbackQuery):
     if not db.is_admin(callback.from_user.id):
         await callback.answer("❌ Доступ запрещён", show_alert=True)
         return
-    
+
     kb = InlineKeyboardBuilder()
     kb.button(text="◀️ Назад", callback_data="admin_back_to_settings")
-    
+
     await callback.message.edit_text(
         "🔔 <b>Настройки уведомлений</b>\n\nВ разработке...",
         parse_mode="HTML",
-        reply_markup=kb.as_markup()
+        reply_markup=kb.as_markup(),
     )
     await callback.answer()
 
@@ -1010,14 +1010,14 @@ async def admin_limits_settings(callback: types.CallbackQuery):
     if not db.is_admin(callback.from_user.id):
         await callback.answer("❌ Доступ запрещён", show_alert=True)
         return
-    
+
     kb = InlineKeyboardBuilder()
     kb.button(text="◀️ Назад", callback_data="admin_back_to_settings")
-    
+
     await callback.message.edit_text(
         "📊 <b>Настройки лимитов</b>\n\nВ разработке...",
         parse_mode="HTML",
-        reply_markup=kb.as_markup()
+        reply_markup=kb.as_markup(),
     )
     await callback.answer()
 
@@ -1028,14 +1028,224 @@ async def admin_back_to_settings(callback: types.CallbackQuery):
     if not db.is_admin(callback.from_user.id):
         await callback.answer("❌ Доступ запрещён", show_alert=True)
         return
-    
+
     kb = InlineKeyboardBuilder()
     kb.button(text="💳 Платёжные реквизиты", callback_data="admin_payment_settings")
+    kb.button(text="🏪 Карты магазинов", callback_data="admin_store_cards")
     kb.button(text="🔔 Уведомления", callback_data="admin_notifications_settings")
     kb.button(text="📊 Лимиты", callback_data="admin_limits_settings")
     kb.adjust(1)
-    
+
     text = "⚙️ <b>Настройки платформы</b>\n\nВыберите раздел для настройки:"
-    
+
     await callback.message.edit_text(text, parse_mode="HTML", reply_markup=kb.as_markup())
     await callback.answer()
+
+
+# ============== STORE CARD MANAGEMENT ==============
+
+
+@router.callback_query(F.data == "admin_store_cards")
+async def admin_store_cards(callback: types.CallbackQuery):
+    """Show list of stores for card management."""
+    if not db.is_admin(callback.from_user.id):
+        await callback.answer("❌ Доступ запрещён", show_alert=True)
+        return
+
+    with db.get_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute(
+            """
+            SELECT s.store_id, s.name, s.city, ps.card_number
+            FROM stores s
+            LEFT JOIN payment_settings ps ON s.store_id = ps.store_id
+            WHERE s.status = 'active'
+            ORDER BY s.name
+            LIMIT 20
+        """
+        )
+        stores = cursor.fetchall()
+
+    if not stores:
+        await callback.message.edit_text("🏪 <b>Нет активных магазинов</b>", parse_mode="HTML")
+        await callback.answer()
+        return
+
+    text = "💳 <b>Управление картами магазинов</b>\n\n"
+
+    kb = InlineKeyboardBuilder()
+
+    for store_id, name, city, card_number in stores:
+        card_status = "✅" if card_number else "❌"
+        text += f"{card_status} <b>{name}</b> ({city})\n"
+        if card_number:
+            text += f"   └ 💳 {card_number[:4]}****{card_number[-4:] if len(card_number) >= 8 else card_number}\n"
+        else:
+            text += "   └ ❌ Карта не установлена\n"
+        text += "\n"
+
+        btn_text = f"{'✏️' if card_number else '➕'} {name[:20]}"
+        kb.button(text=btn_text, callback_data=f"admin_edit_store_card_{store_id}")
+
+    kb.button(text="◀️ Назад", callback_data="admin_back_to_settings")
+    kb.adjust(1)
+
+    await callback.message.edit_text(text, parse_mode="HTML", reply_markup=kb.as_markup())
+    await callback.answer()
+
+
+@router.callback_query(F.data.startswith("admin_edit_store_card_"))
+async def admin_edit_store_card(callback: types.CallbackQuery):
+    """Show store card editing interface."""
+    if not db.is_admin(callback.from_user.id):
+        await callback.answer("❌ Доступ запрещён", show_alert=True)
+        return
+
+    try:
+        store_id = int(callback.data.split("_")[-1])
+    except (ValueError, IndexError):
+        await callback.answer("❌ Неверный запрос", show_alert=True)
+        return
+
+    with db.get_connection() as conn:
+        cursor = conn.cursor()
+
+        # Get store info
+        cursor.execute("SELECT name, city FROM stores WHERE store_id = %s", (store_id,))
+        store = cursor.fetchone()
+
+        if not store:
+            await callback.answer("❌ Магазин не найден", show_alert=True)
+            return
+
+        # Get payment settings
+        cursor.execute(
+            """
+            SELECT card_number, card_holder, payment_instructions
+            FROM payment_settings
+            WHERE store_id = %s
+        """,
+            (store_id,),
+        )
+        payment = cursor.fetchone()
+
+    name, city = store
+
+    text = "💳 <b>Карта магазина</b>\n\n"
+    text += f"🏪 <b>{name}</b> ({city})\n"
+    text += f"ID: <code>{store_id}</code>\n\n"
+
+    if payment:
+        card_number, card_holder, instructions = payment
+        text += f"💳 Номер карты: <code>{card_number or 'не указан'}</code>\n"
+        text += f"👤 Владелец: {card_holder or 'не указан'}\n"
+        text += f"📝 Инструкция: {instructions or 'не указана'}\n"
+    else:
+        text += "❌ Платёжные реквизиты не настроены\n"
+
+    text += "\n<i>Для изменения отправьте данные в формате:</i>\n"
+    text += "<code>card:STORE_ID:НОМЕР_КАРТЫ:ВЛАДЕЛЕЦ:ИНСТРУКЦИЯ</code>\n\n"
+    text += "<i>Пример:</i>\n"
+    text += f"<code>card:{store_id}:8600123456789012:Иванов Иван:Переведите на карту Uzcard</code>"
+
+    kb = InlineKeyboardBuilder()
+    if payment:
+        kb.button(text="🗑 Удалить карту", callback_data=f"admin_delete_store_card_{store_id}")
+    kb.button(text="◀️ Назад к магазинам", callback_data="admin_store_cards")
+    kb.adjust(1)
+
+    await callback.message.edit_text(text, parse_mode="HTML", reply_markup=kb.as_markup())
+    await callback.answer()
+
+
+@router.callback_query(F.data.startswith("admin_delete_store_card_"))
+async def admin_delete_store_card(callback: types.CallbackQuery):
+    """Delete store payment card."""
+    if not db.is_admin(callback.from_user.id):
+        await callback.answer("❌ Доступ запрещён", show_alert=True)
+        return
+
+    try:
+        store_id = int(callback.data.split("_")[-1])
+    except (ValueError, IndexError):
+        await callback.answer("❌ Неверный запрос", show_alert=True)
+        return
+
+    with db.get_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute("DELETE FROM payment_settings WHERE store_id = %s", (store_id,))
+
+    await callback.answer("✅ Карта удалена", show_alert=True)
+
+    # Return to store list
+    await admin_store_cards(callback)
+
+
+@router.message(F.text.startswith("card:"))
+async def admin_set_store_card(message: types.Message):
+    """Set store payment card via text command."""
+    if not db.is_admin(message.from_user.id):
+        return
+
+    try:
+        # Parse: card:STORE_ID:CARD_NUMBER:CARD_HOLDER:INSTRUCTIONS
+        parts = message.text.split(":", 4)
+        if len(parts) < 3:
+            await message.answer(
+                "❌ Неверный формат. Используйте:\n"
+                "<code>card:STORE_ID:НОМЕР_КАРТЫ:ВЛАДЕЛЕЦ:ИНСТРУКЦИЯ</code>",
+                parse_mode="HTML",
+            )
+            return
+
+        store_id = int(parts[1])
+        card_number = parts[2].replace(" ", "")  # Remove spaces
+        card_holder = parts[3] if len(parts) > 3 else None
+        instructions = parts[4] if len(parts) > 4 else None
+
+        # Validate card number
+        if not card_number.isdigit() or len(card_number) < 12:
+            await message.answer("❌ Неверный номер карты. Должен содержать минимум 12 цифр.")
+            return
+
+        # Check store exists
+        with db.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT name FROM stores WHERE store_id = %s", (store_id,))
+            store = cursor.fetchone()
+
+            if not store:
+                await message.answer(f"❌ Магазин с ID {store_id} не найден")
+                return
+
+            # Upsert payment settings
+            cursor.execute(
+                """
+                INSERT INTO payment_settings (store_id, card_number, card_holder, payment_instructions)
+                VALUES (%s, %s, %s, %s)
+                ON CONFLICT (store_id)
+                DO UPDATE SET
+                    card_number = EXCLUDED.card_number,
+                    card_holder = EXCLUDED.card_holder,
+                    payment_instructions = EXCLUDED.payment_instructions
+            """,
+                (store_id, card_number, card_holder, instructions),
+            )
+
+        store_name = store[0]
+
+        text = "✅ <b>Карта установлена!</b>\n\n"
+        text += f"🏪 Магазин: {store_name}\n"
+        text += f"💳 Номер: <code>{card_number}</code>\n"
+        if card_holder:
+            text += f"👤 Владелец: {card_holder}\n"
+        if instructions:
+            text += f"📝 Инструкция: {instructions}\n"
+
+        await message.answer(text, parse_mode="HTML")
+
+    except ValueError:
+        await message.answer("❌ Неверный ID магазина")
+    except Exception as e:
+        logger.error(f"Error setting store card: {e}")
+        await message.answer(f"❌ Ошибка: {e}")

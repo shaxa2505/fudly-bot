@@ -51,7 +51,43 @@ __all__ = [
     "RegistrationCheckMiddleware",
     "UZB_TZ",
     "CITY_UZ_TO_RU",
+    "is_main_menu_button",
 ]
+
+# Main menu button texts (Russian and Uzbek)
+MAIN_MENU_BUTTONS = {
+    # Customer menu
+    "🔥 Горячее",
+    "🔥 Issiq",
+    "🔍 Поиск",
+    "🔍 Qidirish",
+    "🛒 Корзина",
+    "🛒 Savat",
+    "❤️ Избранное",
+    "❤️ Sevimlilar",
+    "👤 Профиль",
+    "👤 Profil",
+    # Seller menu
+    "📦 Мои товары",
+    "📦 Mening tovarlarim",
+    "➕ Добавить товар",
+    "➕ Tovar qo'shish",
+    "📊 Статистика",
+    "📊 Statistika",
+    "🏪 Мой магазин",
+    "🏪 Mening do'konim",
+    # Common
+    "❌ Отмена",
+    "❌ Bekor qilish",
+}
+
+
+def is_main_menu_button(text: str | None) -> bool:
+    """Check if text is a main menu button (should exit FSM and handle separately)."""
+    if not text:
+        return False
+    return text.strip() in MAIN_MENU_BUTTONS
+
 
 # In-memory per-session view mode override: {'seller'|'customer'}
 user_view_mode: dict[int, str] = {}

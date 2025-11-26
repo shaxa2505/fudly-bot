@@ -320,7 +320,17 @@ async def send_order_card(
     else:
         # Order fields (delivery)
         order_id = order.get("order_id") if isinstance(order, dict) else order[0]
-        user_name = order.get("user_name", "Клиент") if isinstance(order, dict) else "Клиент"
+        user_id = (
+            order.get("user_id")
+            if isinstance(order, dict)
+            else (order[1] if len(order) > 1 else None)
+        )
+
+        # Get user name from DB
+        user_model = database.get_user_model(user_id) if user_id else None
+        user_name = user_model.first_name if user_model and user_model.first_name else "Клиент"
+        user_phone = user_model.phone if user_model and user_model.phone else "Не указан"
+
         quantity = (
             order.get("quantity", 1)
             if isinstance(order, dict)
@@ -336,6 +346,22 @@ async def send_order_card(
             if isinstance(order, dict)
             else (order[10] if len(order) > 10 else "pending")
         )
+        payment_status = (
+            order.get("payment_status", "pending")
+            if isinstance(order, dict)
+            else (order[11] if len(order) > 11 else "pending")
+        )
+
+        # Get offer info
+        offer_id = (
+            order.get("offer_id")
+            if isinstance(order, dict)
+            else (order[2] if len(order) > 2 else None)
+        )
+        offer = database.get_offer(offer_id) if offer_id else None
+        offer_title = get_offer_field(offer, "title", "Товар") if offer else "Товар"
+        offer_price = int(get_offer_field(offer, "discount_price", 0)) if offer else 0
+        total_price = offer_price * int(quantity)
 
         status_emoji = {
             "pending": "⏳",
@@ -346,23 +372,50 @@ async def send_order_card(
             "cancelled": "❌",
         }.get(status, "📦")
 
+        payment_emoji = "✅" if payment_status == "confirmed" else "⏳"
+        payment_text = "Оплачено" if payment_status == "confirmed" else "Ожидает подтверждения"
+        if lang != "ru":
+            payment_text = "To'langan" if payment_status == "confirmed" else "Tasdiqlash kutilmoqda"
+
         text = f"{status_emoji} <b>{'ДОСТАВКА' if lang == 'ru' else 'YETKAZIB BERISH'}</b>\n\n"
         text += f"📦 {'Заказ' if lang == 'ru' else 'Buyurtma'} #{order_id}\n"
-        text += f"🔢 {quantity} {'шт' if lang == 'ru' else 'dona'}\n\n"
-        text += f"👤 {user_name}\n"
-        text += f"📍 {address}\n"
+        text += f"🍽 {offer_title}\n"
+        text += f"🔢 {quantity} {'шт' if lang == 'ru' else 'dona'}\n"
+        if total_price > 0:
+            text += f"💰 {'Сумма' if lang == 'ru' else 'Summa'}: {total_price:,} {'сум' if lang == 'ru' else 'so`m'}\n"
+        text += f"\n👤 {user_name}\n"
+        text += f"📱 <code>{user_phone}</code>\n"
+        text += f"📍 {address}\n\n"
+        text += f"💳 {payment_emoji} {payment_text}\n"
 
         builder = InlineKeyboardBuilder()
-        if status == "pending":
+
+        # Buttons depend on status
+        if status == "pending" and payment_status == "pending":
+            # Waiting for payment confirmation
             builder.button(
-                text="✅ Принять" if lang == "ru" else "✅ Qabul qilish",
-                callback_data=f"confirm_order_{order_id}",
+                text="✅ Подтвердить оплату" if lang == "ru" else "✅ To'lovni tasdiqlash",
+                callback_data=f"confirm_payment_{order_id}",
             )
             builder.button(
-                text="❌ Отменить" if lang == "ru" else "❌ Bekor qilish",
-                callback_data=f"cancel_order_{order_id}",
+                text="❌ Отклонить" if lang == "ru" else "❌ Rad etish",
+                callback_data=f"reject_payment_{order_id}",
             )
             builder.adjust(2)
+        elif status == "preparing":
+            # Payment confirmed, preparing order
+            builder.button(
+                text="🚕 Передать курьеру" if lang == "ru" else "🚕 Kuryerga topshirish",
+                callback_data=f"handover_courier_{order_id}",
+            )
+            builder.adjust(1)
+        elif status == "delivering":
+            # Order is being delivered - no actions needed
+            builder.button(
+                text="📍 В пути" if lang == "ru" else "📍 Yo'lda",
+                callback_data="noop",
+            )
+            builder.adjust(1)
 
     await message.answer(text, parse_mode="HTML", reply_markup=builder.as_markup())
 

@@ -10,6 +10,7 @@ from aiogram.utils.keyboard import InlineKeyboardBuilder
 
 from app.keyboards import cancel_keyboard, main_menu_customer
 from handlers.common.states import BookOffer, OrderDelivery
+from handlers.common.utils import is_main_menu_button
 from localization import get_text
 from logging_config import logger
 
@@ -55,7 +56,7 @@ def _esc(val: Any) -> str:
 # ===================== BOOKING CREATION =====================
 
 
-@router.callback_query(F.data.startswith("book_"))
+@router.callback_query(F.data.regexp(r"^book_\d+$"))
 async def book_offer_start(callback: types.CallbackQuery, state: FSMContext) -> None:
     """Start booking flow - ask for quantity."""
     if not db or not callback.message:
@@ -98,13 +99,153 @@ async def book_offer_start(callback: types.CallbackQuery, state: FSMContext) -> 
     )
     await state.set_state(BookOffer.quantity)
 
-    # Ask for quantity
+    # Ask for quantity with quick buttons
     if lang == "uz":
-        text = f"📦 Nechta buyurtma qilmoqchisiz? (1-{quantity})"
+        text = "📦 Nechta buyurtma qilmoqchisiz?"
     else:
-        text = f"📦 Сколько хотите забронировать? (1-{quantity})"
+        text = "📦 Сколько хотите забронировать?"
 
-    await callback.message.answer(text, reply_markup=cancel_keyboard(lang))
+    # Create inline keyboard with quantity options
+    kb = InlineKeyboardBuilder()
+
+    # Show buttons for 1 to min(max_quantity, 4)
+    max_buttons = min(quantity, 4)
+    for i in range(1, max_buttons + 1):
+        kb.button(text=str(i), callback_data=f"book_qty_{offer_id}_{i}")
+
+    # If max is more than 4, add "Max" button
+    if quantity > 4:
+        kb.button(text=f"📦 {quantity}", callback_data=f"book_qty_{offer_id}_{quantity}")
+
+    # Add cancel button
+    cancel_text = "❌ Bekor qilish" if lang == "uz" else "❌ Отмена"
+    kb.button(text=cancel_text, callback_data="book_cancel")
+
+    # Layout: quantity buttons in first row, cancel in second
+    if quantity > 4:
+        kb.adjust(max_buttons, 1, 1)
+    else:
+        kb.adjust(max_buttons, 1)
+
+    await callback.message.answer(text, reply_markup=kb.as_markup())
+    await callback.answer()
+
+
+@router.callback_query(F.data.startswith("book_qty_"))
+async def book_offer_quantity_callback(callback: types.CallbackQuery, state: FSMContext) -> None:
+    """Process quantity selection via inline button."""
+    if not db or not callback.message:
+        await callback.answer("System error", show_alert=True)
+        return
+
+    user_id = callback.from_user.id
+    lang = db.get_user_language(user_id)
+
+    try:
+        # Parse: book_qty_{offer_id}_{quantity}
+        parts = callback.data.split("_")
+        offer_id = int(parts[2])
+        quantity = int(parts[3])
+    except (ValueError, IndexError):
+        await callback.answer(get_text(lang, "error"), show_alert=True)
+        return
+
+    # Verify state - if empty, reload from offer
+    data = await state.get_data()
+    max_qty = data.get("max_quantity")
+
+    # If state was cleared (e.g., after /start), reload offer data
+    if not max_qty or not data.get("offer_id"):
+        offer = db.get_offer(offer_id)
+        if not offer:
+            await callback.answer(get_text(lang, "offer_not_found"), show_alert=True)
+            return
+
+        max_qty = get_offer_field(offer, "quantity", 0)
+        if max_qty <= 0:
+            await callback.answer(get_text(lang, "no_offers"), show_alert=True)
+            return
+
+        # Restore state
+        await state.update_data(
+            offer_id=offer_id,
+            max_quantity=max_qty,
+            offer_price=get_offer_field(offer, "discount_price", 0),
+            offer_title=get_offer_field(offer, "title", "Товар"),
+            store_id=get_offer_field(offer, "store_id"),
+        )
+        await state.set_state(BookOffer.quantity)
+        data = await state.get_data()
+
+    if quantity < 1 or quantity > max_qty:
+        await callback.answer(
+            f"❌ {'Выберите от 1 до' if lang == 'ru' else '1 dan'} {max_qty} {'шт' if lang == 'ru' else 'gacha tanlang'}",
+            show_alert=True,
+        )
+        return
+
+    await state.update_data(quantity=quantity)
+
+    # Remove the selection message
+    try:
+        await callback.message.delete()
+    except Exception:
+        pass
+
+    # Check if store has delivery
+    store_id = data.get("store_id")
+    store = db.get_store(store_id) if store_id else None
+    delivery_enabled = get_store_field(store, "delivery_enabled", 0) == 1
+
+    if delivery_enabled:
+        # Ask for delivery choice
+        await state.set_state(BookOffer.delivery_choice)
+
+        delivery_price = get_store_field(store, "delivery_price", 0)
+
+        kb = InlineKeyboardBuilder()
+        if lang == "uz":
+            kb.button(text="🏪 O'zim olib ketaman", callback_data="pickup_choice")
+            kb.button(
+                text=f"🚚 Yetkazib berish (+{delivery_price:,} so'm)",
+                callback_data="delivery_choice",
+            )
+            text = "🚚 Qanday olishni xohlaysiz?"
+        else:
+            kb.button(text="🏪 Самовывоз", callback_data="pickup_choice")
+            kb.button(
+                text=f"🚚 Доставка (+{delivery_price:,} сум)", callback_data="delivery_choice"
+            )
+            text = "🚚 Как хотите получить заказ?"
+        kb.adjust(1)
+
+        await callback.message.answer(text, reply_markup=kb.as_markup())
+    else:
+        # No delivery - go directly to booking
+        await state.update_data(delivery_option=0, delivery_cost=0)
+        await create_booking(callback.message, state, real_user_id=callback.from_user.id)
+
+    await callback.answer()
+
+
+@router.callback_query(F.data == "book_cancel")
+async def book_cancel_callback(callback: types.CallbackQuery, state: FSMContext) -> None:
+    """Cancel booking via inline button."""
+    if not db:
+        await callback.answer()
+        return
+
+    lang = db.get_user_language(callback.from_user.id)
+    await state.clear()
+
+    try:
+        await callback.message.delete()
+    except Exception:
+        pass
+
+    await callback.message.answer(
+        get_text(lang, "action_cancelled"), reply_markup=main_menu_customer(lang)
+    )
     await callback.answer()
 
 
@@ -118,6 +259,11 @@ async def book_offer_quantity(message: types.Message, state: FSMContext) -> None
     user_id = message.from_user.id
     lang = db.get_user_language(user_id)
     text = (message.text or "").strip()
+
+    # Check if user pressed main menu button - clear state and let other handlers process
+    if is_main_menu_button(text):
+        await state.clear()
+        return
 
     # Check cancel - accept all variants
     if (

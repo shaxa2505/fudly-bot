@@ -18,7 +18,7 @@ from app.keyboards import (
     main_menu_seller,
     phone_request_keyboard,
 )
-from handlers.common.states import Registration
+from handlers.common.states import ConfirmOrder, Registration
 from handlers.common.utils import has_approved_store, user_view_mode
 from localization import get_cities, get_text
 
@@ -60,75 +60,131 @@ async def handle_qr_pickup(message: types.Message, db: DatabaseProtocol, booking
         status = booking.get("status")
         offer_id = booking.get("offer_id")
         customer_id = booking.get("user_id")
+        quantity = booking.get("quantity", 1)
+        code = booking.get("code", "")
     else:
         booking_id = booking[0] if len(booking) > 0 else None
         status = booking[3] if len(booking) > 3 else None
         offer_id = booking[1] if len(booking) > 1 else None
         customer_id = booking[2] if len(booking) > 2 else None
+        quantity = booking[4] if len(booking) > 4 else 1
+        code = booking[9] if len(booking) > 9 else ""
 
     # Check if user is the store owner
     offer = db.get_offer(offer_id) if offer_id else None
     store_id = None
+    offer_title = "Товар"
     if isinstance(offer, dict):
         store_id = offer.get("store_id")
+        offer_title = offer.get("title", "Товар")
     elif offer and len(offer) > 1:
         store_id = offer[1]
+        offer_title = offer[2] if len(offer) > 2 else "Товар"
 
     store = db.get_store(store_id) if store_id else None
     owner_id = None
+    store_name = "Магазин"
     if isinstance(store, dict):
         owner_id = store.get("owner_id")
+        store_name = store.get("name", "Магазин")
     elif store and len(store) > 1:
         owner_id = store[1]
+        store_name = store[2] if len(store) > 2 else "Магазин"
+
+    # Get customer info
+    customer = db.get_user_model(customer_id) if customer_id else None
+    customer_name = "Клиент"
+    customer_phone = ""
+    if customer:
+        customer_name = customer.name or "Клиент"
+        customer_phone = customer.phone or ""
 
     # Check permissions
     is_owner = user_id == owner_id
     is_customer = user_id == customer_id
 
+    # Status emoji and text
+    status_info = {
+        "pending": ("⏳", "Ожидает подтверждения" if lang == "ru" else "Tasdiqlash kutilmoqda"),
+        "confirmed": ("✅", "Подтверждён" if lang == "ru" else "Tasdiqlangan"),
+        "completed": ("🎉", "Выдан" if lang == "ru" else "Berilgan"),
+        "cancelled": ("❌", "Отменён" if lang == "ru" else "Bekor qilingan"),
+    }
+    status_emoji, status_text = status_info.get(status, ("📦", status))
+
     if status == "completed":
         await message.answer(
-            "✅ Этот заказ уже выдан" if lang == "ru" else "✅ Bu buyurtma allaqachon berilgan"
+            f"✅ {'Этот заказ уже выдан' if lang == 'ru' else 'Bu buyurtma allaqachon berilgan'}"
         )
         return
 
     if status == "cancelled":
         await message.answer(
-            "❌ Этот заказ отменён" if lang == "ru" else "❌ Bu buyurtma bekor qilingan"
+            f"❌ {'Этот заказ отменён' if lang == 'ru' else 'Bu buyurtma bekor qilingan'}"
         )
         return
 
     if is_owner:
-        # Owner scanned - show complete button
+        # Owner scanned - show order details and complete button
         kb = InlineKeyboardBuilder()
         kb.button(
-            text="✅ Подтвердить выдачу" if lang == "ru" else "✅ Berilganini tasdiqlash",
+            text="✅ Выдать заказ" if lang == "ru" else "✅ Buyurtmani berish",
             callback_data=f"complete_booking_{booking_id}",
         )
         kb.adjust(1)
 
-        await message.answer(
-            f"📦 <b>Бронь #{booking_id}</b>\n\n"
-            f"Статус: {status}\n"
-            f"Нажмите кнопку чтобы подтвердить выдачу."
-            if lang == "ru"
-            else f"📦 <b>Bron #{booking_id}</b>\n\n"
-            f"Holat: {status}\n"
-            f"Berilganini tasdiqlash uchun tugmani bosing.",
-            parse_mode="HTML",
-            reply_markup=kb.as_markup(),
-        )
+        if lang == "ru":
+            text = (
+                f"📦 <b>СКАНИРОВАНИЕ QR-КОДА</b>\n"
+                f"━━━━━━━━━━━━━━━━━━\n\n"
+                f"🎫 Бронь: <b>#{booking_id}</b>\n"
+                f"📝 Код: <code>{code or booking_code}</code>\n"
+                f"{status_emoji} Статус: <b>{status_text}</b>\n\n"
+                f"📦 Товар: <b>{offer_title}</b>\n"
+                f"🔢 Количество: <b>{quantity} шт.</b>\n\n"
+                f"👤 Клиент: {customer_name}\n"
+            )
+            if customer_phone:
+                text += f"📱 Телефон: <code>{customer_phone}</code>\n"
+            text += "\n━━━━━━━━━━━━━━━━━━\n"
+            text += "👆 Нажмите кнопку для подтверждения выдачи"
+        else:
+            text = (
+                f"📦 <b>QR-KOD SKANERLASH</b>\n"
+                f"━━━━━━━━━━━━━━━━━━\n\n"
+                f"🎫 Bron: <b>#{booking_id}</b>\n"
+                f"📝 Kod: <code>{code or booking_code}</code>\n"
+                f"{status_emoji} Holat: <b>{status_text}</b>\n\n"
+                f"📦 Mahsulot: <b>{offer_title}</b>\n"
+                f"🔢 Miqdor: <b>{quantity} dona</b>\n\n"
+                f"👤 Mijoz: {customer_name}\n"
+            )
+            if customer_phone:
+                text += f"📱 Telefon: <code>{customer_phone}</code>\n"
+            text += "\n━━━━━━━━━━━━━━━━━━\n"
+            text += "👆 Berilganini tasdiqlash uchun tugmani bosing"
+
+        await message.answer(text, parse_mode="HTML", reply_markup=kb.as_markup())
+
     elif is_customer:
         # Customer scanned their own QR - just show status
-        await message.answer(
-            f"📦 <b>Ваша бронь #{booking_id}</b>\n\n"
-            f"Статус: {status}\n\n"
-            f"Покажите этот QR-код продавцу для получения."
-            if lang == "ru"
-            else f"📦 <b>Sizning broningiz #{booking_id}</b>\n\n"
-            f"Holat: {status}\n\n"
-            f"Olish uchun bu QR kodni sotuvchiga ko'rsating.",
-            parse_mode="HTML",
-        )
+        if lang == "ru":
+            text = (
+                f"📦 <b>Ваша бронь #{booking_id}</b>\n\n"
+                f"{status_emoji} Статус: <b>{status_text}</b>\n"
+                f"📦 Товар: {offer_title}\n"
+                f"🏪 Магазин: {store_name}\n\n"
+                f"💡 Покажите этот QR-код продавцу для получения заказа."
+            )
+        else:
+            text = (
+                f"📦 <b>Sizning broningiz #{booking_id}</b>\n\n"
+                f"{status_emoji} Holat: <b>{status_text}</b>\n"
+                f"📦 Mahsulot: {offer_title}\n"
+                f"🏪 Do'kon: {store_name}\n\n"
+                f"💡 Buyurtmani olish uchun bu QR kodni sotuvchiga ko'rsating."
+            )
+        await message.answer(text, parse_mode="HTML")
     else:
         # Someone else scanned
         await message.answer(
@@ -195,6 +251,52 @@ async def show_city_selection(
         )
 
 
+@router.message(Command("code"))
+async def cmd_code(message: types.Message, state: FSMContext, db: DatabaseProtocol):
+    """Handle /code command for manual booking code entry by partner."""
+    if not message.from_user:
+        return
+
+    lang = db.get_user_language(message.from_user.id)
+
+    # Check if code is provided with command (e.g., /code ABC123)
+    if message.text:
+        args = message.text.split(maxsplit=1)
+        if len(args) > 1:
+            booking_code = args[1].strip().upper()
+            logger.info(f"📝 Partner {message.from_user.id} entered code manually: {booking_code}")
+            await handle_qr_pickup(message, db, booking_code)
+            return
+
+    # No code provided - ask for it
+    await state.set_state(ConfirmOrder.booking_code)
+
+    prompt_ru = "📝 Введите код бронирования клиента:"
+    prompt_uz = "📝 Mijozning bron kodini kiriting:"
+
+    await message.answer(prompt_ru if lang == "ru" else prompt_uz)
+
+
+@router.message(ConfirmOrder.booking_code)
+async def process_booking_code_input(
+    message: types.Message, state: FSMContext, db: DatabaseProtocol
+):
+    """Process manually entered booking code."""
+    if not message.from_user or not message.text:
+        return
+
+    await state.clear()
+
+    booking_code = message.text.strip().upper()
+
+    # Remove common prefixes if present
+    if booking_code.startswith("FUDLY-"):
+        booking_code = booking_code.replace("FUDLY-", "")
+
+    logger.info(f"📝 Processing booking code from user {message.from_user.id}: {booking_code}")
+    await handle_qr_pickup(message, db, booking_code)
+
+
 @router.callback_query(F.data == "back_to_menu")
 async def back_to_main_menu(callback: types.CallbackQuery, db: DatabaseProtocol):
     """Return to main menu."""
@@ -255,11 +357,16 @@ async def cmd_start(message: types.Message, state: FSMContext, db: DatabaseProto
     # Check for deep link arguments (e.g., /start pickup_CODE)
     if message.text:
         args = message.text.split(maxsplit=1)
+        logger.info(
+            f"🔗 /start command from user {message.from_user.id}: '{message.text}' args={args}"
+        )
         if len(args) > 1:
             deep_link = args[1]
+            logger.info(f"🔗 Deep link detected: '{deep_link}'")
             if deep_link.startswith("pickup_"):
                 # QR code scan - redirect to pickup confirmation
                 booking_code = deep_link.replace("pickup_", "")
+                logger.info(f"🔗 Pickup QR scan: code='{booking_code}'")
                 await handle_qr_pickup(message, db, booking_code)
                 return
 

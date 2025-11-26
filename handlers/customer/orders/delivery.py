@@ -7,10 +7,11 @@ from aiogram import F, Router, types
 from aiogram.fsm.context import FSMContext
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
-from app.core.utils import get_offer_field, get_order_field, get_store_field
-from app.keyboards import cancel_keyboard, main_menu, main_menu_customer, main_menu_seller
+from app.core.utils import get_offer_field, get_store_field
+from app.keyboards import cancel_keyboard, main_menu_customer, main_menu_seller
 from database_protocol import DatabaseProtocol
 from handlers.common.states import OrderDelivery
+from handlers.common.utils import is_main_menu_button
 from localization import get_text
 from logging_config import logger
 
@@ -138,15 +139,20 @@ async def order_delivery_quantity(
     assert message.from_user is not None
     lang = db.get_user_language(message.from_user.id)
 
-    text = (message.text or "").strip().lower()
-    
+    text = (message.text or "").strip()
+    text_lower = text.lower()
+
+    # Check if user pressed main menu button - clear state and let other handlers process
+    if is_main_menu_button(text):
+        await state.clear()
+        return
+
     # Check for cancellation
     cancel_texts = ["отмена", "bekor", "❌"]
-    if any(c in text for c in cancel_texts) or text.startswith("/"):
+    if any(c in text_lower for c in cancel_texts) or text_lower.startswith("/"):
         await state.clear()
-        menu = main_menu(lang, "customer")
         cancelled_text = "❌ Операция отменена" if lang == "ru" else "❌ Bekor qilindi"
-        await message.answer(cancelled_text, reply_markup=menu)
+        await message.answer(cancelled_text, reply_markup=main_menu_customer(lang))
         return
 
     try:
@@ -214,14 +220,19 @@ async def order_delivery_address(
 
     text = (message.text or "").strip()
     text_lower = text.lower()
-    
+
+    # Check if user pressed main menu button - clear state and let other handlers process
+    if is_main_menu_button(text):
+        await state.clear()
+        # Don't respond - let the main menu handler process this
+        return
+
     # Check for cancel
     cancel_texts = ["отмена", "bekor", "❌"]
     if any(c in text_lower for c in cancel_texts) or text_lower.startswith("/"):
         await state.clear()
-        menu = main_menu(lang, "customer")
         cancelled_text = "❌ Операция отменена" if lang == "ru" else "❌ Bekor qilindi"
-        await message.answer(cancelled_text, reply_markup=menu)
+        await message.answer(cancelled_text, reply_markup=main_menu_customer(lang))
         return
 
     address = text
@@ -241,7 +252,31 @@ async def order_delivery_address(
     await state.set_state(OrderDelivery.payment_proof)
     logger.info(f"💳 Waiting for payment screenshot from user {message.from_user.id}")
 
-    payment_card = db.get_platform_payment_card()
+    data = await state.get_data()
+    store_id = data.get("store_id")
+
+    # First try to get store-specific payment card
+    payment_card = None
+    payment_instructions = None
+
+    if store_id:
+        try:
+            store_payment = db.get_payment_card(store_id)
+            if store_payment:
+                payment_card = store_payment
+                payment_instructions = (
+                    store_payment.get("payment_instructions")
+                    if isinstance(store_payment, dict)
+                    else None
+                )
+                logger.info(f"💳 Using store {store_id} payment card")
+        except Exception as e:
+            logger.warning(f"Failed to get store payment card: {e}")
+
+    # Fallback to platform payment card
+    if not payment_card:
+        payment_card = db.get_platform_payment_card()
+        logger.info("💳 Using platform payment card")
 
     if not payment_card:
         await message.answer(
@@ -257,12 +292,14 @@ async def order_delivery_address(
         return
 
     # Handle different payment_card formats:
-    # - dict: {"card_number": "...", "card_holder": "..."}
+    # - dict: {"card_number": "...", "card_holder": "...", "payment_instructions": "..."}
     # - tuple: (id, card_number, card_holder, ...)
     # - str: just the card number
     if isinstance(payment_card, dict):
         card_number = payment_card.get("card_number", "")
         card_holder = payment_card.get("card_holder", "—")
+        if not payment_instructions:
+            payment_instructions = payment_card.get("payment_instructions")
     elif isinstance(payment_card, (tuple, list)) and len(payment_card) > 1:
         card_number = payment_card[1] if len(payment_card) > 1 else payment_card[0]
         card_holder = payment_card[2] if len(payment_card) > 2 else "—"
@@ -271,8 +308,7 @@ async def order_delivery_address(
         card_number = str(payment_card)
         card_holder = "—"
 
-    data = await state.get_data()
-    store = db.get_store(data["store_id"])
+    store = db.get_store(store_id)
     delivery_price = get_store_field(store, "delivery_price", 10000)
     offer = db.get_offer(data["offer_id"])
     quantity = data["quantity"]
@@ -286,17 +322,23 @@ async def order_delivery_address(
     screenshot_ru = "После перевода отправьте скриншот чека"
     screenshot_uz = "O'tkazmadan keyin chek skrinshotini yuboring"
 
-    await message.answer(
+    # Build payment message
+    msg = (
         f"💳 {transfer_ru if lang == 'ru' else transfer_uz}:\n\n"
         f"💰 {'Сумма' if lang == 'ru' else 'Summa'}: <b>{total_amount:,} {currency_ru if lang == 'ru' else currency_uz}</b>\n"
         f"💳 {'Номер карты' if lang == 'ru' else 'Karta raqami'}: <code>{card_number}</code>\n"
         f"👤 {'Получатель' if lang == 'ru' else 'Qabul qiluvchi'}: {card_holder}\n\n"
         f"📝 {'Стоимость товаров' if lang == 'ru' else 'Mahsulotlar narxi'}: {discount_price * quantity:,} {currency_ru if lang == 'ru' else currency_uz}\n"
-        f"🚚 {'Доставка' if lang == 'ru' else 'Yetkazib berish'}: {delivery_price:,} {currency_ru if lang == 'ru' else currency_uz}\n\n"
-        f"{screenshot_ru if lang == 'ru' else screenshot_uz}",
-        parse_mode="HTML",
-        reply_markup=cancel_keyboard(lang),
+        f"🚚 {'Доставка' if lang == 'ru' else 'Yetkazib berish'}: {delivery_price:,} {currency_ru if lang == 'ru' else currency_uz}\n"
     )
+
+    # Add payment instructions if available
+    if payment_instructions:
+        msg += f"\n📋 <i>{payment_instructions}</i>\n"
+
+    msg += f"\n{screenshot_ru if lang == 'ru' else screenshot_uz}"
+
+    await message.answer(msg, parse_mode="HTML", reply_markup=cancel_keyboard(lang))
 
 
 @router.message(OrderDelivery.payment_proof, F.photo)
@@ -407,7 +449,9 @@ async def order_payment_proof(
 
     # Notify store owner
     if not owner_id:
-        logger.error(f"NOTIFY_ORDER_OWNER: owner_id is None for store_id={store_id}, order={order_id}")
+        logger.error(
+            f"NOTIFY_ORDER_OWNER: owner_id is None for store_id={store_id}, order={order_id}"
+        )
     else:
         try:
             logger.info(
@@ -417,23 +461,23 @@ async def order_payment_proof(
                 chat_id=owner_id,
                 photo=photo_id,
                 caption=f"🔔 <b>{'Новый заказ с доставкой!' if lang == 'ru' else 'Yangi buyurtma yetkazib berish bilan!'}</b>\n\n"
-            f"🏪 {store_name}\n"
-            f"🍽 {offer_title}\n"
-            f"📦 {'Количество' if lang == 'ru' else 'Miqdor'}: {quantity} {unit_ru if lang == 'ru' else unit_uz}\n"
-            f"👤 {message.from_user.first_name}\n"
-            f"📱 {'Телефон' if lang == 'ru' else 'Telefon'}: <code>{customer_phone}</code>\n"
-            f"📍 {'Адрес' if lang == 'ru' else 'Manzil'}: {address}\n"
-            f"💰 {payment_ru if lang == 'ru' else payment_uz}: {payment_method_ru if lang == 'ru' else payment_method_uz}\n"
-            f"💵 {'Сумма' if lang == 'ru' else 'Summa'}: {(offer_price * quantity) + delivery_price:,} {currency_ru if lang == 'ru' else currency_uz}\n\n"
-            f"📸 {screenshot_ru if lang == 'ru' else screenshot_uz}",
-            parse_mode="HTML",
-            reply_markup=notification_kb.as_markup(),
-        )
-        logger.info(f"NOTIFY_ORDER_OWNER: sent photo to owner={owner_id} for order={order_id}")
-    except Exception as e:
-        logger.error(
-            f"NOTIFY_ORDER_OWNER: failed to send to owner={owner_id} order={order_id} error={e}"
-        )
+                f"🏪 {store_name}\n"
+                f"🍽 {offer_title}\n"
+                f"📦 {'Количество' if lang == 'ru' else 'Miqdor'}: {quantity} {unit_ru if lang == 'ru' else unit_uz}\n"
+                f"👤 {message.from_user.first_name}\n"
+                f"📱 {'Телефон' if lang == 'ru' else 'Telefon'}: <code>{customer_phone}</code>\n"
+                f"📍 {'Адрес' if lang == 'ru' else 'Manzil'}: {address}\n"
+                f"💰 {payment_ru if lang == 'ru' else payment_uz}: {payment_method_ru if lang == 'ru' else payment_method_uz}\n"
+                f"💵 {'Сумма' if lang == 'ru' else 'Summa'}: {(offer_price * quantity) + delivery_price:,} {currency_ru if lang == 'ru' else currency_uz}\n\n"
+                f"📸 {screenshot_ru if lang == 'ru' else screenshot_uz}",
+                parse_mode="HTML",
+                reply_markup=notification_kb.as_markup(),
+            )
+            logger.info(f"NOTIFY_ORDER_OWNER: sent photo to owner={owner_id} for order={order_id}")
+        except Exception as e:
+            logger.error(
+                f"NOTIFY_ORDER_OWNER: failed to send to owner={owner_id} order={order_id} error={e}"
+            )
 
     total_amount = (offer_price * quantity) + delivery_price
     user = db.get_user_model(message.from_user.id)
@@ -468,15 +512,20 @@ async def order_payment_proof_invalid(
         return
 
     lang = db.get_user_language(message.from_user.id)
-    text = (message.text or "").strip().lower()
-    
+    text = (message.text or "").strip()
+    text_lower = text.lower()
+
+    # Check if user pressed main menu button - clear state and let other handlers process
+    if is_main_menu_button(text):
+        await state.clear()
+        return
+
     # Check for cancel
     cancel_texts = ["отмена", "bekor", "❌"]
-    if any(c in text for c in cancel_texts) or text.startswith("/"):
+    if any(c in text_lower for c in cancel_texts) or text_lower.startswith("/"):
         await state.clear()
-        menu = main_menu(lang, "customer")
         cancelled_text = "❌ Операция отменена" if lang == "ru" else "❌ Bekor qilindi"
-        await message.answer(cancelled_text, reply_markup=menu)
+        await message.answer(cancelled_text, reply_markup=main_menu_customer(lang))
         return
 
     logger.warning(f"❌ User {message.from_user.id} sent {message.content_type} instead of photo")
@@ -490,136 +539,6 @@ async def order_payment_proof_invalid(
         ),
         reply_markup=cancel_keyboard(lang),
     )
-
-
-@router.callback_query(F.data.startswith("confirm_payment_"))
-async def confirm_payment(callback: types.CallbackQuery, db: DatabaseProtocol, bot: Any) -> None:
-    """Confirm payment by seller."""
-    if not db or not bot:
-        await callback.answer("System error")
-        return
-
-    lang = db.get_user_language(callback.from_user.id)
-
-    try:
-        order_id = int(callback.data.split("_")[2])
-    except (ValueError, IndexError) as e:
-        logger.error(f"Invalid order_id in callback data: {callback.data}, error: {e}")
-        await callback.answer(get_text(lang, "error"), show_alert=True)
-        return
-
-    order = db.get_order(order_id)
-    if not order:
-        await callback.answer(
-            "❌ " + ("Заказ не найден" if lang == "ru" else "Buyurtma topilmadi"),
-            show_alert=True,
-        )
-        return
-
-    db.update_payment_status(order_id, "confirmed")
-    db.update_order_status(order_id, "confirmed")
-
-    payment_confirmed_text = "Оплата подтверждена!" if lang == "ru" else "To'lov tasdiqlandi!"
-    await callback.message.edit_caption(
-        caption=callback.message.caption + f"\n\n✅ {payment_confirmed_text}"
-    )
-
-    customer_lang = db.get_user_language(get_order_field(order, "user_id"))
-    confirmed_ru = "Оплата подтверждена!"
-    confirmed_uz = "To'lov tasdiqlandi!"
-    prep_ru = "Магазин начинает подготовку вашего заказа"
-    prep_uz = "Do'kon buyurtmangizni tayyorlaydi"
-    try:
-        await bot.send_message(
-            get_order_field(order, "user_id"),
-            f"✅ <b>{confirmed_ru if customer_lang == 'ru' else confirmed_uz}</b>\n\n"
-            f"📦 {'Заказ' if customer_lang == 'ru' else 'Buyurtma'} #{order_id}\n"
-            f"{prep_ru if customer_lang == 'ru' else prep_uz}",
-            parse_mode="HTML",
-        )
-    except Exception as e:
-        logger.error(f"Failed to notify customer {get_order_field(order, 'user_id')}: {e}")
-
-    await callback.answer()
-
-
-@router.callback_query(F.data.startswith("reject_payment_"))
-async def reject_payment(callback: types.CallbackQuery, db: DatabaseProtocol, bot: Any) -> None:
-    """Reject payment by seller."""
-    if not db or not bot:
-        await callback.answer("System error")
-        return
-
-    lang = db.get_user_language(callback.from_user.id)
-
-    try:
-        order_id = int(callback.data.split("_")[2])
-    except (ValueError, IndexError) as e:
-        logger.error(f"Invalid order_id in callback data: {callback.data}, error: {e}")
-        await callback.answer(get_text(lang, "error"), show_alert=True)
-        return
-
-    order = db.get_order(order_id)
-    if not order:
-        await callback.answer(
-            "❌ " + ("Заказ не найден" if lang == "ru" else "Buyurtma topilmadi"),
-            show_alert=True,
-        )
-        return
-
-    db.update_payment_status(order_id, "confirmed")
-    db.update_order_status(order_id, "confirmed")
-
-    # Helper for dict/tuple
-    def get_order_field(o, field, index):
-        return o.get(field) if isinstance(o, dict) else (o[index] if len(o) > index else None)
-
-    offer_id = get_order_field(order, "offer_id")
-    quantity = get_order_field(order, "quantity")
-    offer = db.get_offer(offer_id)
-    if offer:
-        try:
-            db.increment_offer_quantity_atomic(offer_id, int(quantity))
-        except Exception as e:
-            logger.error(f"Failed to restore quantity for offer {offer_id}: {e}")
-    offer_id = get_order_field(order, "offer_id")
-    quantity = get_order_field(order, "quantity")
-    offer = db.get_offer(offer_id)
-    if offer:
-        try:
-            db.increment_offer_quantity_atomic(offer_id, int(quantity))
-        except Exception as e:
-            logger.error(f"Failed to restore quantity for offer {offer_id}: {e}")
-
-    payment_rejected_text = (
-        "Оплата отклонена, заказ отменён"
-        if lang == "ru"
-        else "To'lov rad etildi, buyurtma bekor qilindi"
-    )
-    await callback.message.edit_caption(
-        caption=callback.message.caption + f"\n\n❌ {payment_rejected_text}"
-    )
-
-    customer_lang = db.get_user_language(get_order_field(order, "user_id"))
-    reject_title_ru = "Оплата не подтверждена"
-    reject_title_uz = "To'lov tasdiqlanmadi"
-    reject_msg_ru = "Магазин не смог подтвердить вашу оплату. Заказ отменён."
-    reject_msg_uz = "Do'kon to'lovingizni tasdiqlay olmadi. Buyurtma bekor qilindi."
-    reject_note_ru = "Пожалуйста, проверьте правильность перевода или свяжитесь с магазином"
-    reject_note_uz = "Iltimos, o'tkazma to'g'riligini tekshiring yoki do'kon bilan bog'laning"
-    try:
-        await bot.send_message(
-            get_order_field(order, "user_id"),
-            f"❌ <b>{reject_title_ru if customer_lang == 'ru' else reject_title_uz}</b>\n\n"
-            f"📦 {'Заказ' if customer_lang == 'ru' else 'Buyurtma'} #{order_id}\n"
-            f"{reject_msg_ru if customer_lang == 'ru' else reject_msg_uz}\n"
-            f"{reject_note_ru if customer_lang == 'ru' else reject_note_uz}",
-            parse_mode="HTML",
-        )
-    except Exception as e:
-        logger.error(f"Failed to notify customer {get_order_field(order, 'user_id')}: {e}")
-
-    await callback.answer()
 
 
 # NOTE: confirm_order_ and cancel_order_ handlers removed - they are handled by

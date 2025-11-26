@@ -6,12 +6,14 @@ from aiogram.fsm.state import State, StatesGroup
 
 class Registration(StatesGroup):
     """User registration flow states."""
+
     phone = State()
     city = State()
 
 
 class RegisterStore(StatesGroup):
     """Store registration flow states."""
+
     city = State()
     category = State()
     name = State()
@@ -23,6 +25,7 @@ class RegisterStore(StatesGroup):
 
 class CreateOffer(StatesGroup):
     """Offer creation flow states."""
+
     store = State()
     title = State()
     photo = State()
@@ -39,6 +42,7 @@ class CreateOffer(StatesGroup):
 
 class BulkCreate(StatesGroup):
     """Bulk offer creation flow states."""
+
     store = State()
     count = State()
     titles = State()
@@ -61,12 +65,14 @@ class BulkCreate(StatesGroup):
 
 class ChangeCity(StatesGroup):
     """City change flow states."""
+
     new_city = State()
     city = State()
 
 
 class EditOffer(StatesGroup):
     """Offer editing flow states."""
+
     offer_id = State()
     field = State()
     value = State()
@@ -77,6 +83,7 @@ class EditOffer(StatesGroup):
 
 class ConfirmOrder(StatesGroup):
     """Order confirmation flow states."""
+
     offer_id = State()
     booking_code = State()
     confirmation = State()
@@ -84,6 +91,7 @@ class ConfirmOrder(StatesGroup):
 
 class BookOffer(StatesGroup):
     """Offer booking flow states."""
+
     quantity = State()
     delivery_choice = State()
     delivery_address = State()
@@ -93,6 +101,7 @@ class BookOffer(StatesGroup):
 
 class BrowseOffers(StatesGroup):
     """States for browsing numbered offer lists."""
+
     offer_list = State()
     store_list = State()
     business_type = State()
@@ -102,6 +111,7 @@ class BrowseOffers(StatesGroup):
 
 class OrderDelivery(StatesGroup):
     """Delivery order flow states."""
+
     offer_id = State()
     quantity = State()
     address = State()
@@ -109,12 +119,22 @@ class OrderDelivery(StatesGroup):
     payment_proof = State()
 
 
+class CourierHandover(StatesGroup):
+    """Courier handover flow states (seller to taxi/courier)."""
+
+    order_id = State()
+    courier_name = State()
+    courier_phone = State()
+
+
 class Search(StatesGroup):
     """Search flow states."""
+
     query = State()
 
 
 class Browse(StatesGroup):
     """Browsing flow states."""
+
     viewing_store = State()
     viewing_category = State()

@@ -30,8 +30,11 @@ def setup(
     # ============== МОЯ КОРЗИНА ==============
 
     @dp_or_router.message(F.text.in_(["🛒 Корзина", "🛒 Savat"]))
-    async def my_cart(message: types.Message):
+    async def my_cart(message: types.Message, state: FSMContext):
         """Show user's cart with active bookings and orders"""
+        # Clear any active FSM state when returning to main menu
+        await state.clear()
+
         user_id = message.from_user.id
         lang = db.get_user_language(user_id)
 
@@ -263,8 +266,11 @@ def setup(
     # ============== ИЗБРАННОЕ ==============
 
     @dp_or_router.message(F.text.in_(["❤️ Избранное", "❤️ Sevimlilar"]))
-    async def show_favorites(message: types.Message):
+    async def show_favorites(message: types.Message, state: FSMContext):
         """Show favorite stores"""
+        # Clear any active FSM state when returning to main menu
+        await state.clear()
+
         lang = db.get_user_language(message.from_user.id)
         user_id = message.from_user.id
 
@@ -430,6 +436,15 @@ def setup(
             # Delete user data
             db.delete_user(user_id)
             await state.clear()
+
+            # Clear user view mode cache
+            try:
+                from handlers.common.utils import user_view_mode
+
+                if user_view_mode and user_id in user_view_mode:
+                    del user_view_mode[user_id]
+            except Exception:
+                pass
 
             await callback.message.edit_text(get_text(lang, "account_deleted"), parse_mode="HTML")
 

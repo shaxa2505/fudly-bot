@@ -31,6 +31,9 @@ def setup(
     async def hot_offers_handler(message: types.Message, state: FSMContext) -> None:
         if not message.from_user:
             return
+        # Clear any active FSM state when returning to main menu
+        await state.clear()
+
         user_id = message.from_user.id
         lang = db.get_user_language(user_id)
         user = db.get_user_model(user_id)
@@ -129,23 +132,23 @@ def setup(
         if not msg:
             await callback.answer()
             return
-        
+
         user_id = callback.from_user.id
         lang = db.get_user_language(user_id)
         user = db.get_user_model(user_id)
         if not user:
             await callback.answer(get_text(lang, "error"), show_alert=True)
             return
-        
+
         try:
             page = int(callback.data.split("_")[-1])
         except (ValueError, IndexError):
             await callback.answer(get_text(lang, "error"), show_alert=True)
             return
-        
+
         city = user.city or "Ташкент"
         search_city = normalize_city(city)
-        
+
         await _send_hot_offers_list(
             msg,
             state,
@@ -169,16 +172,16 @@ def setup(
         if not msg:
             await callback.answer()
             return
-        
+
         user_id = callback.from_user.id
         lang = db.get_user_language(user_id)
-        
+
         try:
             offer_id = int(callback.data.split("_")[-1])
         except (ValueError, IndexError):
             await callback.answer(get_text(lang, "error"), show_alert=True)
             return
-        
+
         offer = offer_service.get_offer_details(offer_id)
         if not offer:
             await callback.answer(
@@ -186,7 +189,7 @@ def setup(
                 show_alert=True,
             )
             return
-        
+
         await _send_offer_details(msg, offer, lang)
         await callback.answer()
 
@@ -308,15 +311,15 @@ def setup(
             await callback.answer()
             return
         lang = db.get_user_language(callback.from_user.id)
-        
+
         try:
             store_id = int(callback.data.split("_")[-1])
         except (ValueError, IndexError):
             await callback.answer(get_text(lang, "error"), show_alert=True)
             return
-        
+
         await state.clear()
-        
+
         # Get store info and show full card
         store = offer_service.get_store(store_id)
         if not store:
@@ -325,13 +328,13 @@ def setup(
                 show_alert=True,
             )
             return
-        
+
         # Render full store card
         text = offer_templates.render_store_card(lang, store)
         keyboard = offer_keyboards.store_card_keyboard(
             lang, store_id, store.offers_count, store.ratings_count
         )
-        
+
         # Try to get photo from raw store data
         photo = None
         try:
@@ -340,7 +343,7 @@ def setup(
                 photo = raw_store.get("photo") or raw_store.get("photo_id")
         except Exception:
             photo = None
-        
+
         if photo:
             try:
                 await msg.answer_photo(
@@ -350,7 +353,7 @@ def setup(
                 return
             except Exception:
                 pass
-        
+
         await msg.edit_text(text, parse_mode="HTML", reply_markup=keyboard)
         await callback.answer()
 
@@ -579,7 +582,7 @@ def setup(
             logger.error(f"Invalid store_id in callback data: {callback.data}, error: {e}")
             await callback.answer(get_text(lang, "error"), show_alert=True)
             return
-        
+
         # Use offer_service for structured store details
         store = offer_service.get_store(store_id)
         if not store:
@@ -689,7 +692,19 @@ def setup(
 
         keyboard = offers_category_filter(lang, store_id=store_id)
 
-        await msg.edit_text(text, parse_mode="HTML", reply_markup=keyboard)
+        # Try edit_text first, fallback to edit_caption for photo messages
+        try:
+            await msg.edit_text(text, parse_mode="HTML", reply_markup=keyboard)
+        except Exception:
+            try:
+                await msg.edit_caption(caption=text, parse_mode="HTML", reply_markup=keyboard)
+            except Exception:
+                # If both fail, delete old message and send new one
+                try:
+                    await msg.delete()
+                except Exception:
+                    pass
+                await callback.message.answer(text, parse_mode="HTML", reply_markup=keyboard)
         await callback.answer()
 
     @dp.callback_query(F.data.startswith("store_cat_"))
@@ -785,7 +800,14 @@ def setup(
             has_more=len(offers) > 20,
             next_offset=20 if len(offers) > 20 else None,
         )
-        await msg.edit_text(text, parse_mode="HTML", reply_markup=keyboard)
+        try:
+            await msg.edit_text(text, parse_mode="HTML", reply_markup=keyboard)
+        except Exception:
+            try:
+                await msg.edit_caption(caption=text, parse_mode="HTML", reply_markup=keyboard)
+            except Exception:
+                await msg.delete()
+                await callback.message.answer(text, parse_mode="HTML", reply_markup=keyboard)
         await callback.answer()
 
     @dp.callback_query(F.data.startswith("store_offers_next_"))
@@ -973,26 +995,33 @@ def setup(
                     offer_templates.render_hot_offers_empty(lang), parse_mode="HTML"
                 )
                 return
-            
+
             await state.set_state(BrowseOffers.offer_list)
             await state.update_data(
                 offer_list=[offer.id for offer in result.items],
                 hot_offers_page=page,
             )
-            
+
             total_pages = (result.total + ITEMS_PER_PAGE - 1) // ITEMS_PER_PAGE
-            
+
             # Build compact text
             text = f"🔥 <b>{'ГОРЯЧЕЕ' if lang == 'ru' else 'ISSIQ'}</b> | 📍 {city}\n"
             text += f"{'Стр.' if lang == 'ru' else 'Sah.'} {page + 1}/{total_pages} ({result.total} {'товаров' if lang == 'ru' else 'mahsulot'})\n\n"
-            
+
             # Category emoji mapping
             category_emoji = {
-                "bakery": "🍞", "dairy": "🥛", "meat": "🥩", "fish": "🐟",
-                "vegetables": "🥬", "fruits": "🍎", "cheese": "🧀",
-                "beverages": "🥤", "ready_food": "🍱", "other": "🏪",
+                "bakery": "🍞",
+                "dairy": "🥛",
+                "meat": "🥩",
+                "fish": "🐟",
+                "vegetables": "🥬",
+                "fruits": "🍎",
+                "cheese": "🧀",
+                "beverages": "🥤",
+                "ready_food": "🍱",
+                "other": "🏪",
             }
-            
+
             for idx, offer in enumerate(result.items, start=1):
                 cat = offer.store_category or "other"
                 emoji = category_emoji.get(cat, "🏪")
@@ -1000,18 +1029,18 @@ def setup(
                 discount_pct = 0
                 if offer.original_price and offer.discount_price and offer.original_price > 0:
                     discount_pct = int((1 - offer.discount_price / offer.original_price) * 100)
-                
+
                 text += f"{idx}. {emoji} <b>{title}</b>\n"
                 text += f"   💰 {int(offer.discount_price):,}"
                 if discount_pct > 0:
                     text += f" <s>{int(offer.original_price):,}</s> (-{discount_pct}%)"
                 text += "\n"
-            
+
             # Build keyboard with offer buttons
             keyboard = offer_keyboards.hot_offers_compact_keyboard(
                 lang, result.items, page, total_pages
             )
-            
+
             if edit_message:
                 try:
                     await target.edit_text(text, parse_mode="HTML", reply_markup=keyboard)
@@ -1019,7 +1048,7 @@ def setup(
                     await target.answer(text, parse_mode="HTML", reply_markup=keyboard)
             else:
                 await target.answer(text, parse_mode="HTML", reply_markup=keyboard)
-                
+
         except Exception as exc:  # pragma: no cover
             log.error("Failed to send hot offers: %s", exc)
             await target.answer(f"😔 {get_text(lang, 'error')}")

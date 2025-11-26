@@ -10,15 +10,15 @@ from aiogram.utils.keyboard import InlineKeyboardBuilder
 
 from app.core.utils import get_store_field
 from app.keyboards import (
-    main_menu_seller,
-    product_categories_keyboard,
     discount_keyboard,
-    quantity_keyboard,
     expiry_keyboard,
     photo_keyboard,
+    product_categories_keyboard,
+    quantity_keyboard,
 )
 from database_protocol import DatabaseProtocol
 from handlers.common.states import CreateOffer
+from handlers.common.utils import is_main_menu_button
 from localization import get_text
 from logging_config import logger
 
@@ -79,7 +79,7 @@ def build_progress_text(data: dict, lang: str, current_step: int) -> str:
         ("Срок", "Muddat", data.get("expiry_date")),
         ("Фото", "Rasm", data.get("photo")),
     ]
-    
+
     lines = []
     for i, (ru_name, uz_name, value) in enumerate(steps, 1):
         name = ru_name if lang == "ru" else uz_name
@@ -104,11 +104,12 @@ def build_progress_text(data: dict, lang: str, current_step: int) -> str:
         else:
             # Future step
             lines.append(f"⬜ {name}")
-    
+
     return "\n".join(lines)
 
 
 # ============ STEP 1: Start & Category ============
+
 
 @router.message(F.text.contains("Добавить") | F.text.contains("Qo'shish"))
 async def add_offer_start(message: types.Message, state: FSMContext) -> None:
@@ -139,7 +140,7 @@ async def add_offer_start(message: types.Message, state: FSMContext) -> None:
         f"🏪 <b>{store_name}</b>\n\n"
         f"➕ <b>{'ДОБАВИТЬ ТОВАР' if lang == 'ru' else 'MAHSULOT QO`SHISH'}</b>\n\n"
     )
-    
+
     step_text = (
         "📂 <b>Шаг 1/7:</b> Выберите категорию"
         if lang == "ru"
@@ -163,19 +164,16 @@ async def category_selected(callback: types.CallbackQuery, state: FSMContext) ->
 
     lang = db.get_user_language(callback.from_user.id)
     category = callback.data.replace("product_cat_", "")
-    
+
     await state.update_data(category=category)
     data = await state.get_data()
-    
+
     # Build cancel keyboard
     builder = InlineKeyboardBuilder()
-    builder.button(
-        text="❌ Отмена" if lang == "ru" else "❌ Bekor",
-        callback_data="create_cancel"
-    )
+    builder.button(text="❌ Отмена" if lang == "ru" else "❌ Bekor", callback_data="create_cancel")
 
     progress = build_progress_text({**data, "category": category}, lang, 2)
-    
+
     text = (
         f"🏪 <b>{data.get('store_name', 'Магазин')}</b>\n\n"
         f"{progress}\n\n"
@@ -190,11 +188,17 @@ async def category_selected(callback: types.CallbackQuery, state: FSMContext) ->
 
 # ============ STEP 2: Title ============
 
+
 @router.message(CreateOffer.title, F.text)
 async def title_entered(message: types.Message, state: FSMContext) -> None:
     """Title entered - ask for price."""
     if not db:
         await message.answer("System error")
+        return
+
+    # Check if user pressed main menu button - clear state and let other handlers process
+    if is_main_menu_button(message.text):
+        await state.clear()
         return
 
     lang = db.get_user_language(message.from_user.id)
@@ -208,7 +212,12 @@ async def title_entered(message: types.Message, state: FSMContext) -> None:
 
     if len(title) > 100:
         await message.answer(
-            "❌ " + ("Название слишком длинное (макс 100 символов)" if lang == "ru" else "Nom juda uzun (maks 100 belgi)")
+            "❌ "
+            + (
+                "Название слишком длинное (макс 100 символов)"
+                if lang == "ru"
+                else "Nom juda uzun (maks 100 belgi)"
+            )
         )
         return
 
@@ -217,7 +226,9 @@ async def title_entered(message: types.Message, state: FSMContext) -> None:
 
     # Build back/cancel keyboard
     builder = InlineKeyboardBuilder()
-    builder.button(text="◀️ Назад" if lang == "ru" else "◀️ Orqaga", callback_data="create_back_category")
+    builder.button(
+        text="◀️ Назад" if lang == "ru" else "◀️ Orqaga", callback_data="create_back_category"
+    )
     builder.button(text="❌ Отмена" if lang == "ru" else "❌ Bekor", callback_data="create_cancel")
     builder.adjust(2)
 
@@ -236,6 +247,7 @@ async def title_entered(message: types.Message, state: FSMContext) -> None:
 
 # ============ STEP 3: Price ============
 
+
 @router.message(CreateOffer.original_price, F.text)
 async def price_entered(message: types.Message, state: FSMContext) -> None:
     """Price entered - ask for discount."""
@@ -243,8 +255,13 @@ async def price_entered(message: types.Message, state: FSMContext) -> None:
         await message.answer("System error")
         return
 
+    # Check if user pressed main menu button - clear state and let other handlers process
+    if is_main_menu_button(message.text):
+        await state.clear()
+        return
+
     lang = db.get_user_language(message.from_user.id)
-    
+
     # Parse price
     try:
         price_text = message.text.strip().replace(" ", "").replace(",", "")
@@ -253,7 +270,8 @@ async def price_entered(message: types.Message, state: FSMContext) -> None:
             raise ValueError("Price must be positive")
     except ValueError:
         await message.answer(
-            "❌ " + ("Введите число. Пример: 50000" if lang == "ru" else "Raqam kiriting. Misol: 50000")
+            "❌ "
+            + ("Введите число. Пример: 50000" if lang == "ru" else "Raqam kiriting. Misol: 50000")
         )
         return
 
@@ -281,17 +299,21 @@ async def discount_selected(callback: types.CallbackQuery, state: FSMContext) ->
 
     lang = db.get_user_language(callback.from_user.id)
     discount_data = callback.data.replace("discount_", "")
-    
+
     if discount_data == "custom":
         # Ask for custom discount
         builder = InlineKeyboardBuilder()
-        builder.button(text="◀️ Назад" if lang == "ru" else "◀️ Orqaga", callback_data="create_back_price")
-        
+        builder.button(
+            text="◀️ Назад" if lang == "ru" else "◀️ Orqaga", callback_data="create_back_price"
+        )
+
         await callback.message.edit_text(
-            "🏷️ <b>" + ("Введите скидку (%):" if lang == "ru" else "Chegirmani kiriting (%):") + "</b>\n\n" +
-            ("Пример: 35" if lang == "ru" else "Misol: 35"),
+            "🏷️ <b>"
+            + ("Введите скидку (%):" if lang == "ru" else "Chegirmani kiriting (%):")
+            + "</b>\n\n"
+            + ("Пример: 35" if lang == "ru" else "Misol: 35"),
             parse_mode="HTML",
-            reply_markup=builder.as_markup()
+            reply_markup=builder.as_markup(),
         )
         await callback.answer()
         return
@@ -308,27 +330,35 @@ async def discount_entered(message: types.Message, state: FSMContext) -> None:
         await message.answer("System error")
         return
 
+    # Check if user pressed main menu button - clear state and let other handlers process
+    if is_main_menu_button(message.text):
+        await state.clear()
+        return
+
     lang = db.get_user_language(message.from_user.id)
-    
+
     try:
         discount_percent = int(message.text.strip().replace("%", ""))
         if discount_percent < 0 or discount_percent > 99:
             raise ValueError("Invalid discount")
     except ValueError:
         await message.answer(
-            "❌ " + ("Введите число от 0 до 99" if lang == "ru" else "0 dan 99 gacha raqam kiriting")
+            "❌ "
+            + ("Введите число от 0 до 99" if lang == "ru" else "0 dan 99 gacha raqam kiriting")
         )
         return
 
     await _process_discount(message, state, lang, discount_percent)
 
 
-async def _process_discount(target: types.Message, state: FSMContext, lang: str, discount_percent: int) -> None:
+async def _process_discount(
+    target: types.Message, state: FSMContext, lang: str, discount_percent: int
+) -> None:
     """Process discount and move to quantity step."""
     data = await state.get_data()
     original_price = data.get("original_price", 0)
     discount_price = original_price * (1 - discount_percent / 100)
-    
+
     await state.update_data(discount_percent=discount_percent, discount_price=discount_price)
     data = await state.get_data()
 
@@ -347,6 +377,7 @@ async def _process_discount(target: types.Message, state: FSMContext, lang: str,
 
 # ============ STEP 4: Quantity ============
 
+
 @router.callback_query(CreateOffer.quantity, F.data.startswith("quantity_"))
 async def quantity_selected(callback: types.CallbackQuery, state: FSMContext) -> None:
     """Quantity selected via button."""
@@ -356,17 +387,21 @@ async def quantity_selected(callback: types.CallbackQuery, state: FSMContext) ->
 
     lang = db.get_user_language(callback.from_user.id)
     qty_data = callback.data.replace("quantity_", "")
-    
+
     if qty_data == "custom":
         # Ask for custom quantity
         builder = InlineKeyboardBuilder()
-        builder.button(text="◀️ Назад" if lang == "ru" else "◀️ Orqaga", callback_data="create_back_discount")
-        
+        builder.button(
+            text="◀️ Назад" if lang == "ru" else "◀️ Orqaga", callback_data="create_back_discount"
+        )
+
         await callback.message.edit_text(
-            "📊 <b>" + ("Введите количество:" if lang == "ru" else "Miqdorni kiriting:") + "</b>\n\n" +
-            ("Пример: 25" if lang == "ru" else "Misol: 25"),
+            "📊 <b>"
+            + ("Введите количество:" if lang == "ru" else "Miqdorni kiriting:")
+            + "</b>\n\n"
+            + ("Пример: 25" if lang == "ru" else "Misol: 25"),
             parse_mode="HTML",
-            reply_markup=builder.as_markup()
+            reply_markup=builder.as_markup(),
         )
         await callback.answer()
         return
@@ -383,8 +418,13 @@ async def quantity_entered(message: types.Message, state: FSMContext) -> None:
         await message.answer("System error")
         return
 
+    # Check if user pressed main menu button - clear state and let other handlers process
+    if is_main_menu_button(message.text):
+        await state.clear()
+        return
+
     lang = db.get_user_language(message.from_user.id)
-    
+
     try:
         quantity = int(message.text.strip())
         if quantity <= 0:
@@ -398,7 +438,9 @@ async def quantity_entered(message: types.Message, state: FSMContext) -> None:
     await _process_quantity(message, state, lang, quantity)
 
 
-async def _process_quantity(target: types.Message, state: FSMContext, lang: str, quantity: int) -> None:
+async def _process_quantity(
+    target: types.Message, state: FSMContext, lang: str, quantity: int
+) -> None:
     """Process quantity and move to expiry step."""
     await state.update_data(quantity=quantity)
     data = await state.get_data()
@@ -417,6 +459,7 @@ async def _process_quantity(target: types.Message, state: FSMContext, lang: str,
 
 # ============ STEP 5: Expiry Date ============
 
+
 @router.callback_query(CreateOffer.expiry_date, F.data.startswith("expiry_"))
 async def expiry_selected(callback: types.CallbackQuery, state: FSMContext) -> None:
     """Expiry date selected via button."""
@@ -426,17 +469,21 @@ async def expiry_selected(callback: types.CallbackQuery, state: FSMContext) -> N
 
     lang = db.get_user_language(callback.from_user.id)
     expiry_data = callback.data.replace("expiry_", "")
-    
+
     if expiry_data == "custom":
         # Ask for custom date
         builder = InlineKeyboardBuilder()
-        builder.button(text="◀️ Назад" if lang == "ru" else "◀️ Orqaga", callback_data="create_back_quantity")
-        
+        builder.button(
+            text="◀️ Назад" if lang == "ru" else "◀️ Orqaga", callback_data="create_back_quantity"
+        )
+
         await callback.message.edit_text(
-            "📅 <b>" + ("Введите дату (ДД.ММ):" if lang == "ru" else "Sanani kiriting (KK.OO):") + "</b>\n\n" +
-            ("Пример: 25.12" if lang == "ru" else "Misol: 25.12"),
+            "📅 <b>"
+            + ("Введите дату (ДД.ММ):" if lang == "ru" else "Sanani kiriting (KK.OO):")
+            + "</b>\n\n"
+            + ("Пример: 25.12" if lang == "ru" else "Misol: 25.12"),
             parse_mode="HTML",
-            reply_markup=builder.as_markup()
+            reply_markup=builder.as_markup(),
         )
         await callback.answer()
         return
@@ -454,8 +501,13 @@ async def expiry_entered(message: types.Message, state: FSMContext) -> None:
         await message.answer("System error")
         return
 
+    # Check if user pressed main menu button - clear state and let other handlers process
+    if is_main_menu_button(message.text):
+        await state.clear()
+        return
+
     lang = db.get_user_language(message.from_user.id)
-    
+
     try:
         date_str = message.text.strip().replace("/", ".").replace("-", ".")
         today = datetime.now()
@@ -472,14 +524,21 @@ async def expiry_entered(message: types.Message, state: FSMContext) -> None:
         expiry_date = date_obj.strftime("%Y-%m-%d")
     except ValueError:
         await message.answer(
-            "❌ " + ("Формат: ДД.ММ (например 25.12)" if lang == "ru" else "Format: KK.OO (masalan 25.12)")
+            "❌ "
+            + (
+                "Формат: ДД.ММ (например 25.12)"
+                if lang == "ru"
+                else "Format: KK.OO (masalan 25.12)"
+            )
         )
         return
 
     await _process_expiry(message, state, lang, expiry_date)
 
 
-async def _process_expiry(target: types.Message, state: FSMContext, lang: str, expiry_date: str) -> None:
+async def _process_expiry(
+    target: types.Message, state: FSMContext, lang: str, expiry_date: str
+) -> None:
     """Process expiry date and move to photo step."""
     await state.update_data(expiry_date=expiry_date)
     data = await state.get_data()
@@ -497,6 +556,7 @@ async def _process_expiry(target: types.Message, state: FSMContext, lang: str, e
 
 
 # ============ STEP 6: Photo ============
+
 
 @router.message(CreateOffer.photo, F.photo)
 async def photo_received(message: types.Message, state: FSMContext) -> None:
@@ -561,15 +621,15 @@ async def _finalize_offer(target: types.Message, state: FSMContext, lang: str) -
         builder = InlineKeyboardBuilder()
         builder.button(
             text="➕ Ещё товар" if lang == "ru" else "➕ Yana mahsulot",
-            callback_data="create_another"
+            callback_data="create_another",
         )
         builder.button(
             text="🔄 Копировать" if lang == "ru" else "🔄 Nusxalash",
-            callback_data=f"copy_offer_{offer_id}"
+            callback_data=f"copy_offer_{offer_id}",
         )
         builder.button(
             text="📦 Мои товары" if lang == "ru" else "📦 Mahsulotlarim",
-            callback_data="go_my_offers"
+            callback_data="go_my_offers",
         )
         builder.adjust(2, 1)
 
@@ -578,13 +638,19 @@ async def _finalize_offer(target: types.Message, state: FSMContext, lang: str) -
     except Exception as e:
         logger.error(f"Error creating offer: {e}")
         await target.answer(
-            "❌ " + ("Ошибка при сохранении. Попробуйте снова." if lang == "ru" else "Saqlashda xatolik. Qayta urinib ko'ring.")
+            "❌ "
+            + (
+                "Ошибка при сохранении. Попробуйте снова."
+                if lang == "ru"
+                else "Saqlashda xatolik. Qayta urinib ko'ring."
+            )
         )
     finally:
         await state.clear()
 
 
 # ============ Navigation Callbacks ============
+
 
 @router.callback_query(F.data == "create_back_category")
 async def back_to_category(callback: types.CallbackQuery, state: FSMContext) -> None:
@@ -626,7 +692,9 @@ async def back_to_price(callback: types.CallbackQuery, state: FSMContext) -> Non
     data = await state.get_data()
 
     builder = InlineKeyboardBuilder()
-    builder.button(text="◀️ Назад" if lang == "ru" else "◀️ Orqaga", callback_data="create_back_category")
+    builder.button(
+        text="◀️ Назад" if lang == "ru" else "◀️ Orqaga", callback_data="create_back_category"
+    )
     builder.button(text="❌ Отмена" if lang == "ru" else "❌ Bekor", callback_data="create_cancel")
     builder.adjust(2)
 
@@ -724,7 +792,8 @@ async def cancel_creation(callback: types.CallbackQuery, state: FSMContext) -> N
 
     if callback.message:
         await callback.message.edit_text(
-            "❌ " + ("Создание товара отменено" if lang == "ru" else "Mahsulot yaratish bekor qilindi"),
+            "❌ "
+            + ("Создание товара отменено" if lang == "ru" else "Mahsulot yaratish bekor qilindi"),
             parse_mode="HTML",
         )
     await callback.answer()
@@ -739,7 +808,7 @@ async def create_another(callback: types.CallbackQuery, state: FSMContext) -> No
 
     # Simulate pressing "Добавить" button
     lang = db.get_user_language(callback.from_user.id)
-    
+
     stores = [
         s
         for s in db.get_user_stores(callback.from_user.id)
@@ -775,6 +844,7 @@ async def create_another(callback: types.CallbackQuery, state: FSMContext) -> No
 
 # ============ Copy Offer ============
 
+
 @router.callback_query(F.data.startswith("copy_offer_"))
 async def copy_offer_start(callback: types.CallbackQuery, state: FSMContext) -> None:
     """Start copying an offer - pre-fill data from existing offer."""
@@ -783,12 +853,14 @@ async def copy_offer_start(callback: types.CallbackQuery, state: FSMContext) -> 
         return
 
     lang = db.get_user_language(callback.from_user.id)
-    
+
     try:
         offer_id = int(callback.data.replace("copy_offer_", ""))
         offer = db.get_offer(offer_id)
         if not offer:
-            await callback.answer("Товар не найден" if lang == "ru" else "Mahsulot topilmadi", show_alert=True)
+            await callback.answer(
+                "Товар не найден" if lang == "ru" else "Mahsulot topilmadi", show_alert=True
+            )
             return
     except (ValueError, AttributeError):
         await callback.answer("Error", show_alert=True)
@@ -845,8 +917,14 @@ async def copy_offer_start(callback: types.CallbackQuery, state: FSMContext) -> 
 
     # Ask to confirm or edit title
     builder = InlineKeyboardBuilder()
-    builder.button(text="✅ Сохранить как есть" if lang == "ru" else "✅ Shunday saqlash", callback_data="copy_save_as_is")
-    builder.button(text="✏️ Изменить название" if lang == "ru" else "✏️ Nomni o'zgartirish", callback_data="copy_edit_title")
+    builder.button(
+        text="✅ Сохранить как есть" if lang == "ru" else "✅ Shunday saqlash",
+        callback_data="copy_save_as_is",
+    )
+    builder.button(
+        text="✏️ Изменить название" if lang == "ru" else "✏️ Nomni o'zgartirish",
+        callback_data="copy_edit_title",
+    )
     builder.button(text="❌ Отмена" if lang == "ru" else "❌ Bekor", callback_data="create_cancel")
     builder.adjust(1)
 

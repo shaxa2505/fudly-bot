@@ -153,7 +153,9 @@ async def filter_orders_pending(callback: types.CallbackQuery) -> None:
         # Delivery orders
         orders = db.get_store_orders(store_id) or []
         for o in orders:
-            status = o.get("order_status") if isinstance(o, dict) else (o[10] if len(o) > 10 else None)
+            status = (
+                o.get("order_status") if isinstance(o, dict) else (o[10] if len(o) > 10 else None)
+            )
             if status in ["pending", "preparing"]:
                 pending_orders.append(o)
 
@@ -177,7 +179,7 @@ async def filter_orders_pending(callback: types.CallbackQuery) -> None:
     for item in pending_bookings[:5]:
         await send_order_card(callback.message, item, lang, is_booking=True)
         await asyncio.sleep(0.1)
-    
+
     # Then show delivery orders
     for item in pending_orders[:5]:
         await send_order_card(callback.message, item, lang, is_booking=False)
@@ -204,7 +206,9 @@ async def filter_orders_active(callback: types.CallbackQuery) -> None:
         # Delivery orders
         orders = db.get_store_orders(store_id) or []
         for o in orders:
-            status = o.get("order_status") if isinstance(o, dict) else (o[10] if len(o) > 10 else None)
+            status = (
+                o.get("order_status") if isinstance(o, dict) else (o[10] if len(o) > 10 else None)
+            )
             if status in ["confirmed", "delivering"]:
                 active_orders.append(o)
 
@@ -227,7 +231,7 @@ async def filter_orders_active(callback: types.CallbackQuery) -> None:
     for item in active_bookings[:5]:
         await send_order_card(callback.message, item, lang, is_booking=True)
         await asyncio.sleep(0.1)
-    
+
     for item in active_orders[:5]:
         await send_order_card(callback.message, item, lang, is_booking=False)
         await asyncio.sleep(0.1)
@@ -392,8 +396,10 @@ async def contact_customer(callback: types.CallbackQuery) -> None:
         kb.button(text="✉️ Написать", url=f"tg://user?id={user_id}")
 
     await callback.answer()
-    if kb.rows:
-        await callback.message.answer(text, reply_markup=kb.as_markup())
+    # Check if we have any buttons by building the markup
+    markup = kb.as_markup()
+    if markup.inline_keyboard:
+        await callback.message.answer(text, reply_markup=markup)
     else:
         await callback.message.answer(text)
 
@@ -437,32 +443,8 @@ async def confirm_booking_handler(callback: types.CallbackQuery) -> None:
         await callback.answer(f"❌ {'Ошибка' if lang == 'ru' else 'Xatolik'}", show_alert=True)
 
 
-@router.callback_query(F.data.startswith("complete_booking_"))
-async def complete_booking_handler(callback: types.CallbackQuery) -> None:
-    """Mark booking as completed."""
-    db = get_db()
-    lang = db.get_user_language(callback.from_user.id)
-
-    try:
-        booking_id = int(callback.data.rsplit("_", 1)[-1])
-    except (ValueError, IndexError) as e:
-        logger.error(f"Invalid booking_id in callback data: {callback.data}, error: {e}")
-        await callback.answer(get_text(lang, "error"), show_alert=True)
-        return
-
-    try:
-        db.complete_booking(booking_id)
-        await callback.answer(
-            f"🎉 {'Заказ выполнен!' if lang == 'ru' else 'Buyurtma bajarildi!'}", show_alert=True
-        )
-
-        if callback.message and callback.message.text:
-            new_text = callback.message.text.replace("✅", "🎉").replace("⏳", "🎉")
-            new_text += f"\n\n<b>{'✅ ВЫДАНО' if lang == 'ru' else '✅ BERILDI'}</b>"
-            await callback.message.edit_text(new_text, parse_mode="HTML")
-    except Exception as e:
-        logger.error(f"Error completing booking: {e}")
-        await callback.answer(f"❌ {'Ошибка' if lang == 'ru' else 'Xatolik'}", show_alert=True)
+# NOTE: complete_booking_ handler is in handlers/bookings/partner.py
+# It handles ownership verification and customer notifications
 
 
 @router.callback_query(F.data.startswith("cancel_booking_"))

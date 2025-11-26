@@ -50,8 +50,11 @@ def get_appropriate_menu(user_id: int, lang: str) -> Any:
 
 
 @router.message(F.text.contains("Профиль") | F.text.contains("Profil"))
-async def profile(message: types.Message) -> None:
+async def profile(message: types.Message, state: FSMContext) -> None:
     """Display user profile with statistics."""
+    # Clear any active FSM state when returning to main menu
+    await state.clear()
+
     if not db:
         await message.answer("System error")
         return
@@ -80,7 +83,9 @@ async def profile(message: types.Message) -> None:
         try:
             with db.get_connection() as conn:
                 cursor = conn.cursor()
-                cursor.execute("UPDATE users SET role = 'seller' WHERE user_id = %s", (message.from_user.id,))
+                cursor.execute(
+                    "UPDATE users SET role = 'seller' WHERE user_id = %s", (message.from_user.id,)
+                )
         except Exception:
             pass
 
@@ -88,7 +93,9 @@ async def profile(message: types.Message) -> None:
     # If user is seller, check their current mode, otherwise always customer
     if effective_role == "seller":
         # Default to seller mode for sellers if not explicitly set to customer
-        current_mode = user_view_mode.get(message.from_user.id, "seller") if user_view_mode else "seller"
+        current_mode = (
+            user_view_mode.get(message.from_user.id, "seller") if user_view_mode else "seller"
+        )
     else:
         current_mode = "customer"
 
@@ -247,8 +254,15 @@ async def profile_change_city_cb(callback: types.CallbackQuery, state: FSMContex
 
     db.update_user_city(callback.from_user.id, city)
     await state.clear()
+
+    # Use city_changed text with proper formatting
+    city_msg = (
+        f"✅ Город изменён на <b>{city}</b>"
+        if lang == "ru"
+        else f"✅ Shahar <b>{city}</b>ga o'zgartirildi"
+    )
     await callback.message.answer(
-        get_text(lang, "action_complete"), reply_markup=main_menu_customer(lang)
+        city_msg, parse_mode="HTML", reply_markup=main_menu_customer(lang)
     )
     await callback.answer()
 
@@ -506,4 +520,3 @@ async def switch_to_customer(message: types.Message) -> None:
     await message.answer(
         get_text(lang, "switched_to_customer"), reply_markup=main_menu_customer(lang)
     )
-

@@ -10,6 +10,7 @@ from aiogram.utils.keyboard import InlineKeyboardBuilder
 from app.keyboards import city_keyboard, main_menu_customer, main_menu_seller
 from database_protocol import DatabaseProtocol
 from handlers.common.states import ChangeCity
+from handlers.common.utils import is_main_menu_button
 from localization import get_cities, get_text
 from logging_config import logger
 from security import secure_user_input, validator
@@ -63,6 +64,11 @@ async def change_city_process(message: types.Message, state: FSMContext) -> None
     """Process city change."""
     if not db:
         await message.answer("System error")
+        return
+
+    # Check if user pressed main menu button - clear state and let other handlers process
+    if is_main_menu_button(message.text):
+        await state.clear()
         return
 
     lang = db.get_user_language(message.from_user.id)

@@ -94,6 +94,12 @@ class SchemaMixin:
             except Exception as e:
                 logger.warning(f"Migration for offers table: {e}")
 
+            # Migration: Add photo column to stores table if it doesn't exist
+            try:
+                cursor.execute("ALTER TABLE stores ADD COLUMN IF NOT EXISTS photo TEXT")
+            except Exception as e:
+                logger.warning(f"Migration for stores photo column: {e}")
+
             # Orders table
             cursor.execute(
                 """
@@ -430,5 +436,6 @@ class SchemaMixin:
             cursor.execute(
                 "ALTER TABLE bookings ADD COLUMN IF NOT EXISTS payment_proof_photo_id TEXT"
             )
+            cursor.execute("ALTER TABLE bookings ADD COLUMN IF NOT EXISTS pickup_address TEXT")
         except Exception as e:
             logger.warning(f"Could not add columns to bookings: {e}")

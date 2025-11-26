@@ -18,6 +18,7 @@ from app.services.offer_service import OfferService
 from app.templates.offers import render_offer_card
 from database_protocol import DatabaseProtocol
 from handlers.common.states import BrowseOffers, Search
+from handlers.common.utils import is_main_menu_button
 from localization import get_text
 
 logger = logging.getLogger(__name__)
@@ -269,6 +270,9 @@ def setup(
     async def start_search(message: types.Message, state: FSMContext):
         """Start search flow."""
         assert message.from_user is not None
+        # Clear any previous FSM state before starting search
+        await state.clear()
+
         lang = db.get_user_language(message.from_user.id)
 
         await state.set_state(Search.query)
@@ -284,6 +288,11 @@ def setup(
 
         # Safely read incoming text and handle cancellation
         raw_text = (message.text or "").strip()
+
+        # Check if user pressed main menu button - clear state and let other handlers process
+        if is_main_menu_button(raw_text):
+            await state.clear()
+            return
 
         # Skip commands - let them be handled by command handlers
         if raw_text.startswith("/"):
