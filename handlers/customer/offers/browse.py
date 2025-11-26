@@ -406,9 +406,11 @@ def setup(
     async def select_offer_by_number(message: types.Message, state: FSMContext):
         if not message.from_user:
             return
+        logger.info(f"📥 select_offer_by_number triggered: user={message.from_user.id}, text={message.text}")
         lang = db.get_user_language(message.from_user.id)
         data = await state.get_data()
         offer_list: list[int] = data.get("offer_list", [])
+        logger.info(f"📥 FSM data: offer_list={offer_list}, state={await state.get_state()}")
         if not offer_list:
             await message.answer(get_text(lang, "error"))
             await state.clear()
@@ -1165,8 +1167,14 @@ def setup(
             await asyncio.sleep(0.1)
 
     async def _set_offer_state(state: FSMContext, offers: list[OfferListItem]) -> None:
+        offer_ids = [offer.id for offer in offers]
+        logger.info(f"📝 Setting FSM state BrowseOffers.offer_list with {len(offer_ids)} offers: {offer_ids[:5]}...")
         await state.set_state(BrowseOffers.offer_list)
-        await state.update_data(offer_list=[offer.id for offer in offers])
+        await state.update_data(offer_list=offer_ids)
+        # Verify state was set
+        current_state = await state.get_state()
+        current_data = await state.get_data()
+        logger.info(f"📝 FSM state after set: state={current_state}, data_keys={list(current_data.keys())}")
 
     async def _append_offer_ids(state: FSMContext, offers: list[OfferListItem]) -> None:
         data = await state.get_data()

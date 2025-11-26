@@ -324,7 +324,7 @@ async def approve_store(callback: types.CallbackQuery):
         # Отправляем уведомление владельцу
         lang = _db.get_user_language(store["owner_id"])
 
-        notification = _get_text("store_approved", lang).format(store_name=store["name"])
+        notification = _get_text(lang, "store_approved")
 
         try:
             await _bot.send_message(store["owner_id"], notification)
@@ -364,7 +364,7 @@ async def reject_store(callback: types.CallbackQuery):
 
         # Уведомляем владельца
         lang = _db.get_user_language(store["owner_id"])
-        notification = _get_text("store_rejected", lang).format(store_name=store["name"])
+        notification = _get_text(lang, "store_rejected")
 
         try:
             await _bot.send_message(store["owner_id"], notification)
