@@ -17,14 +17,14 @@ async def start_booking_expiry_worker(db: Any, bot: Any) -> None:
             # 1) Reminders: bookings with expiry_time within next 1 hour and reminder_sent = 0
             try:
                 with db.get_connection() as conn:
-                    cursor = conn.cursor(row_factory=None)
+                    cursor = conn.cursor()
                     cursor.execute("""
                         SELECT booking_id, user_id, booking_code, status
                         FROM bookings
-                                                WHERE reminder_sent = 0
+                        WHERE reminder_sent = 0
                           AND expiry_time IS NOT NULL
-                                                    AND status IN ('pending')
-                                                    AND delivery_option = 0
+                          AND status IN ('pending')
+                          AND delivery_option = 0
                           AND expiry_time > now()
                           AND expiry_time <= now() + INTERVAL '1 hour'
                     """)
@@ -105,12 +105,12 @@ async def start_booking_expiry_worker(db: Any, bot: Any) -> None:
             # 2) Expired bookings: cancel and return quantity
             try:
                 with db.get_connection() as conn:
-                    cursor = conn.cursor(row_factory=None)
+                    cursor = conn.cursor()
                     cursor.execute("""
                         SELECT booking_id, user_id, offer_id, quantity
                         FROM bookings
-                                                WHERE status IN ('pending','active')
-                                                    AND delivery_option = 0
+                        WHERE status IN ('pending','active')
+                          AND delivery_option = 0
                           AND expiry_time IS NOT NULL
                           AND expiry_time <= now()
                     """)
