@@ -419,6 +419,172 @@ async def create_webhook_app(
             logger.error(f"API stores error: {e}")
             return add_cors_headers(web.json_response({"error": str(e)}, status=500))
 
+    async def api_create_order(request: web.Request) -> web.Response:
+        """POST /api/v1/orders - Create order from Mini App cart."""
+        try:
+            data = await request.json()
+            logger.info(f"API /orders request: {data}")
+
+            # Extract order data
+            items = data.get("items", [])
+            user_id = data.get("user_id")
+            delivery_type = data.get("delivery_type", "pickup")  # pickup or delivery
+            phone = data.get("phone", "")
+            address = data.get("address", "")
+            notes = data.get("notes", "")
+
+            if not items:
+                return add_cors_headers(
+                    web.json_response({"error": "No items in order"}, status=400)
+                )
+
+            if not user_id:
+                return add_cors_headers(
+                    web.json_response({"error": "User ID required"}, status=400)
+                )
+
+            # Process each item in cart
+            created_bookings = []
+            failed_items = []
+
+            for item in items:
+                offer_id = item.get("id") or item.get("offer_id")
+                quantity = item.get("quantity", 1)
+
+                if not offer_id:
+                    failed_items.append({"item": item, "error": "Missing offer_id"})
+                    continue
+
+                try:
+                    # Create booking atomically
+                    result = db.create_booking_atomic(
+                        offer_id=int(offer_id),
+                        user_id=int(user_id),
+                        quantity=int(quantity),
+                        pickup_time=None,
+                        pickup_address=address if delivery_type == "pickup" else None,
+                    )
+
+                    # Handle result (3 or 4 tuple)
+                    if len(result) == 4:
+                        ok, booking_id, booking_code, error_reason = result
+                    else:
+                        ok, booking_id, booking_code = result
+                        error_reason = None
+
+                    if ok and booking_id:
+                        created_bookings.append(
+                            {
+                                "booking_id": booking_id,
+                                "booking_code": booking_code,
+                                "offer_id": offer_id,
+                                "quantity": quantity,
+                            }
+                        )
+
+                        # Send notification to seller
+                        try:
+                            offer = (
+                                db.get_offer(int(offer_id)) if hasattr(db, "get_offer") else None
+                            )
+                            if offer:
+                                store_id = get_offer_value(offer, "store_id")
+                                if store_id and hasattr(db, "get_store"):
+                                    store = db.get_store(store_id)
+                                    if store:
+                                        seller_id = get_offer_value(
+                                            store, "owner_id"
+                                        ) or get_offer_value(store, "user_id")
+                                        if seller_id:
+                                            title = get_offer_value(offer, "title", "Товар")
+                                            price = get_offer_value(offer, "discount_price", 0)
+
+                                            # Format notification message
+                                            msg = (
+                                                f"🛒 <b>Новый заказ из Mini App!</b>\n\n"
+                                                f"📦 Товар: {title}\n"
+                                                f"🔢 Количество: {quantity}\n"
+                                                f"💰 Сумма: {int(price * quantity):,} сум\n"
+                                                f"🎫 Код: <code>{booking_code}</code>\n\n"
+                                                f"📱 Телефон: {phone or 'не указан'}\n"
+                                                f"🚚 Тип: {'Самовывоз' if delivery_type == 'pickup' else 'Доставка'}\n"
+                                            )
+                                            if address:
+                                                msg += f"📍 Адрес: {address}\n"
+                                            if notes:
+                                                msg += f"📝 Примечание: {notes}\n"
+
+                                            # Send via bot
+                                            await bot.send_message(
+                                                chat_id=int(seller_id), text=msg, parse_mode="HTML"
+                                            )
+                                            logger.info(f"Notification sent to seller {seller_id}")
+                        except Exception as notify_err:
+                            logger.warning(f"Failed to notify seller: {notify_err}")
+
+                    else:
+                        failed_items.append(
+                            {"offer_id": offer_id, "error": error_reason or "Booking failed"}
+                        )
+
+                except Exception as item_err:
+                    logger.error(f"Error processing item {offer_id}: {item_err}")
+                    failed_items.append({"offer_id": offer_id, "error": str(item_err)})
+
+            # Return result
+            response = {
+                "success": len(created_bookings) > 0,
+                "bookings": created_bookings,
+                "failed": failed_items,
+                "message": f"Создано {len(created_bookings)} бронирований"
+                if created_bookings
+                else "Не удалось создать заказ",
+            }
+
+            status_code = 201 if created_bookings else 400
+            return add_cors_headers(web.json_response(response, status=status_code))
+
+        except Exception as e:
+            logger.error(f"API create order error: {e}", exc_info=True)
+            return add_cors_headers(
+                web.json_response({"error": str(e), "success": False}, status=500)
+            )
+
+    async def api_user_orders(request: web.Request) -> web.Response:
+        """GET /api/v1/orders - Get user's orders/bookings."""
+        try:
+            user_id = request.query.get("user_id")
+            if not user_id:
+                return add_cors_headers(
+                    web.json_response({"error": "user_id required"}, status=400)
+                )
+
+            bookings = []
+            if hasattr(db, "get_user_bookings"):
+                raw_bookings = db.get_user_bookings(int(user_id)) or []
+                for b in raw_bookings:
+                    # Convert tuple to dict
+                    if isinstance(b, tuple):
+                        bookings.append(
+                            {
+                                "booking_id": b[0] if len(b) > 0 else None,
+                                "offer_id": b[1] if len(b) > 1 else None,
+                                "user_id": b[2] if len(b) > 2 else None,
+                                "quantity": b[3] if len(b) > 3 else 1,
+                                "status": b[4] if len(b) > 4 else "pending",
+                                "booking_code": b[5] if len(b) > 5 else None,
+                                "created_at": str(b[6]) if len(b) > 6 else None,
+                            }
+                        )
+                    elif isinstance(b, dict):
+                        bookings.append(b)
+
+            return add_cors_headers(web.json_response({"orders": bookings}))
+
+        except Exception as e:
+            logger.error(f"API user orders error: {e}")
+            return add_cors_headers(web.json_response({"error": str(e)}, status=500))
+
     async def api_health(request: web.Request) -> web.Response:
         """GET /api/v1/health - API health check."""
         return add_cors_headers(
@@ -456,6 +622,9 @@ async def create_webhook_app(
     app.router.add_get("/api/v1/offers/{offer_id}", api_offer_detail)
     app.router.add_options("/api/v1/stores", cors_preflight)
     app.router.add_get("/api/v1/stores", api_stores)
+    app.router.add_options("/api/v1/orders", cors_preflight)
+    app.router.add_post("/api/v1/orders", api_create_order)
+    app.router.add_get("/api/v1/orders", api_user_orders)
     app.router.add_get("/api/v1/health", api_health)
     app.router.add_get("/api/v1/debug", api_debug)
 
