@@ -24,13 +24,37 @@ def get_offer_value(obj: Any, key: str, default: Any = None) -> Any:
     return getattr(obj, key, default)
 
 
-def offer_to_dict(offer: Any) -> dict:
+# Cache for photo URLs (file_id -> URL)
+_photo_url_cache: dict[str, str] = {}
+
+
+async def get_photo_url(bot: Bot, file_id: str | None) -> str | None:
+    """Convert Telegram file_id to photo URL."""
+    if not file_id:
+        return None
+    
+    # Check cache
+    if file_id in _photo_url_cache:
+        return _photo_url_cache[file_id]
+    
+    try:
+        file = await bot.get_file(file_id)
+        if file and file.file_path:
+            url = f"https://api.telegram.org/file/bot{bot.token}/{file.file_path}"
+            _photo_url_cache[file_id] = url
+            return url
+    except Exception:
+        pass
+    return None
+
+
+def offer_to_dict(offer: Any, photo_url: str | None = None) -> dict:
     """Convert offer to API response dict."""
     # Try offer_id first (PostgreSQL), then id (SQLite)
     offer_id = get_offer_value(offer, "offer_id", 0) or get_offer_value(offer, "id", 0)
     
-    # Get photo - try photo_id first (Telegram file_id), then photo (URL)
-    photo = get_offer_value(offer, "photo_id") or get_offer_value(offer, "photo")
+    # Use provided photo_url, or fallback to photo field
+    photo = photo_url or get_offer_value(offer, "photo")
     
     return {
         "id": offer_id,
@@ -345,7 +369,13 @@ async def create_webhook_app(
                 else:
                     logger.warning("db has no get_hot_offers method!")
 
-            offers = [offer_to_dict(o) for o in raw_offers]
+            # Convert offers with photo URLs
+            offers = []
+            for o in raw_offers:
+                photo_id = get_offer_value(o, "photo_id")
+                photo_url = await get_photo_url(bot, photo_id) if photo_id else None
+                offers.append(offer_to_dict(o, photo_url))
+            
             logger.info(f"Returning {len(offers)} offers")
             return add_cors_headers(web.json_response(offers))
 
@@ -405,7 +435,11 @@ async def create_webhook_app(
             if not offer:
                 return add_cors_headers(web.json_response({"error": "Not found"}, status=404))
 
-            return add_cors_headers(web.json_response(offer_to_dict(offer)))
+            # Convert photo_id to URL
+            photo_id = get_offer_value(offer, "photo_id")
+            photo_url = await get_photo_url(bot, photo_id) if photo_id else None
+            
+            return add_cors_headers(web.json_response(offer_to_dict(offer, photo_url)))
 
         except Exception as e:
             logger.error(f"API offer detail error: {e}")
