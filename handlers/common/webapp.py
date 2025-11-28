@@ -14,7 +14,7 @@ router = Router(name="webapp")
 # URL вашего Mini App
 # Для разработки: http://172.20.10.3:5173/reactjs-template/
 # Для продакшена: https://your-domain.com/
-WEBAPP_URL = "https://fudly-webapp.vercel.app"  # Замените на ваш URL после деплоя
+WEBAPP_URL = "https://fudly-webapp-29s4jk13c-shaxbozs-projects-d385e345.vercel.app"
 
 
 def webapp_keyboard(lang: str = "ru") -> InlineKeyboardMarkup:
