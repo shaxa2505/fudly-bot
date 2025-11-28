@@ -312,27 +312,64 @@ async def create_webhook_app(
         limit = int(request.query.get("limit", "50"))
         offset = int(request.query.get("offset", "0"))
 
+        logger.info(f"API /offers request: city={city}, category={category}, limit={limit}")
+
         try:
             raw_offers: list[Any] = []
 
             if store_id:
                 if hasattr(db, "get_store_offers"):
                     raw_offers = db.get_store_offers(int(store_id)) or []
+                    logger.info(f"get_store_offers({store_id}) returned {len(raw_offers)} items")
             elif search:
                 if hasattr(db, "search_offers"):
                     raw_offers = db.search_offers(search, city) or []
+                    logger.info(f"search_offers returned {len(raw_offers)} items")
             elif category and category != "all":
                 if hasattr(db, "get_offers_by_category"):
                     raw_offers = db.get_offers_by_category(category, city) or []
+                    logger.info(f"get_offers_by_category({category}) returned {len(raw_offers)} items")
             else:
                 if hasattr(db, "get_hot_offers"):
                     raw_offers = db.get_hot_offers(city, limit=limit, offset=offset) or []
+                    logger.info(f"get_hot_offers({city}) returned {len(raw_offers)} items")
+                else:
+                    logger.warning("db has no get_hot_offers method!")
 
             offers = [offer_to_dict(o) for o in raw_offers]
+            logger.info(f"Returning {len(offers)} offers")
             return add_cors_headers(web.json_response(offers))
 
         except Exception as e:
-            logger.error(f"API offers error: {e}")
+            logger.error(f"API offers error: {e}", exc_info=True)
+            return add_cors_headers(web.json_response({"error": str(e)}, status=500))
+
+    async def api_debug(request: web.Request) -> web.Response:
+        """GET /api/v1/debug - Debug database info."""
+        try:
+            info = {
+                "db_type": type(db).__name__,
+                "has_get_hot_offers": hasattr(db, "get_hot_offers"),
+                "has_get_store_offers": hasattr(db, "get_store_offers"),
+            }
+
+            # Try to count offers directly
+            try:
+                with db.get_connection() as conn:
+                    cursor = conn.cursor()
+                    cursor.execute("SELECT COUNT(*) FROM offers")
+                    info["total_offers"] = cursor.fetchone()[0]
+                    cursor.execute("SELECT COUNT(*) FROM offers WHERE status = 'active'")
+                    info["active_offers"] = cursor.fetchone()[0]
+                    cursor.execute("SELECT COUNT(*) FROM stores")
+                    info["total_stores"] = cursor.fetchone()[0]
+                    cursor.execute("SELECT COUNT(*) FROM stores WHERE status = 'active' OR status = 'approved'")
+                    info["active_stores"] = cursor.fetchone()[0]
+            except Exception as e:
+                info["db_error"] = str(e)
+
+            return add_cors_headers(web.json_response(info))
+        except Exception as e:
             return add_cors_headers(web.json_response({"error": str(e)}, status=500))
 
     async def api_offer_detail(request: web.Request) -> web.Response:
@@ -413,6 +450,7 @@ async def create_webhook_app(
     app.router.add_options("/api/v1/stores", cors_preflight)
     app.router.add_get("/api/v1/stores", api_stores)
     app.router.add_get("/api/v1/health", api_health)
+    app.router.add_get("/api/v1/debug", api_debug)
 
     # Setup WebSocket routes for real-time notifications
     setup_websocket_routes(app)
