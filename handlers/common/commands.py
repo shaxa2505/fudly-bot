@@ -486,7 +486,7 @@ async def choose_language(callback: types.CallbackQuery, state: FSMContext, db: 
     await callback.answer()
 
 
-@router.message(F.text.contains("Отмена") | F.text.contains("Bekor qilish"))
+@router.message(F.text.in_(["❌ Отмена", "❌ Bekor qilish"]))
 async def cancel_action(message: types.Message, state: FSMContext, db: DatabaseProtocol):
     if not message.from_user:
         return
