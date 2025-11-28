@@ -27,9 +27,15 @@
   padding: 8px;
   background: none;
   border: none;
-  color: #00866e;
+  color: #2c473a;
   font-size: 14px;
   font-weight: 500;
+  transition: opacity 0.2s ease;
+}
+
+.back-btn:active,
+.clear-btn:active {
+  opacity: 0.6;
 }
 
 .empty-state {
@@ -58,13 +64,20 @@
 }
 
 .primary-btn {
-  padding: 12px 24px;
+  padding: 14px 28px;
   border: none;
   border-radius: 12px;
-  background: #00866e;
+  background: #2c473a;
   color: white;
   font-size: 16px;
   font-weight: 600;
+  transition: all 0.2s ease;
+  box-shadow: 0 2px 8px rgba(44, 71, 58, 0.2);
+}
+
+.primary-btn:active {
+  background: #1f3329;
+  transform: scale(0.98);
 }
 
 .cart-content {
@@ -110,7 +123,7 @@
 .item-price {
   font-size: 14px;
   font-weight: 700;
-  color: #00866e;
+  color: #2c473a;
   margin: 0;
 }
 
@@ -124,17 +137,24 @@
 }
 
 .qty-btn {
-  width: 28px;
-  height: 28px;
+  width: 30px;
+  height: 30px;
   border: none;
   background: white;
-  border-radius: 6px;
+  border-radius: 8px;
   font-size: 18px;
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #00866e;
+  color: #2c473a;
   font-weight: 600;
+  transition: all 0.2s ease;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.qty-btn:active {
+  transform: scale(0.95);
+  background: #f8f9fa;
 }
 
 .qty {
@@ -179,12 +199,20 @@
   padding: 16px;
   border: none;
   border-radius: 12px;
-  background: #00866e;
+  background: #2c473a;
   color: white;
   font-size: 16px;
   font-weight: 600;
+  transition: all 0.2s ease;
+  box-shadow: 0 2px 12px rgba(44, 71, 58, 0.25);
+}
+
+.checkout-btn:active {
+  background: #1f3329;
+  transform: scale(0.99);
 }
 
 .checkout-btn:disabled {
   opacity: 0.5;
+  transform: none;
 }
