@@ -39,7 +39,8 @@ def offer_to_dict(offer: Any) -> dict:
         "category": get_offer_value(offer, "category", "other") or "other",
         "store_id": int(get_offer_value(offer, "store_id", 0) or 0),
         "store_name": get_offer_value(offer, "store_name", "") or "",
-        "store_address": get_offer_value(offer, "store_address") or get_offer_value(offer, "address"),
+        "store_address": get_offer_value(offer, "store_address")
+        or get_offer_value(offer, "address"),
         "photo": get_offer_value(offer, "photo"),
         "expiry_date": str(get_offer_value(offer, "expiry_date", ""))
         if get_offer_value(offer, "expiry_date")
@@ -307,7 +308,7 @@ async def create_webhook_app(
 
     async def api_offers(request: web.Request) -> web.Response:
         """GET /api/v1/offers - List offers."""
-        city = request.query.get("city", "Ташкент")
+        city = request.query.get("city", "")  # Empty = all cities
         category = request.query.get("category", "all")
         store_id = request.query.get("store_id")
         search = request.query.get("search")
@@ -330,7 +331,9 @@ async def create_webhook_app(
             elif category and category != "all":
                 if hasattr(db, "get_offers_by_category"):
                     raw_offers = db.get_offers_by_category(category, city) or []
-                    logger.info(f"get_offers_by_category({category}) returned {len(raw_offers)} items")
+                    logger.info(
+                        f"get_offers_by_category({category}) returned {len(raw_offers)} items"
+                    )
             else:
                 if hasattr(db, "get_hot_offers"):
                     raw_offers = db.get_hot_offers(city, limit=limit, offset=offset) or []
@@ -365,7 +368,9 @@ async def create_webhook_app(
                     info["active_offers"] = cursor.fetchone()[0]
                     cursor.execute("SELECT COUNT(*) FROM stores")
                     info["total_stores"] = cursor.fetchone()[0]
-                    cursor.execute("SELECT COUNT(*) FROM stores WHERE status = 'active' OR status = 'approved'")
+                    cursor.execute(
+                        "SELECT COUNT(*) FROM stores WHERE status = 'active' OR status = 'approved'"
+                    )
                     info["active_stores"] = cursor.fetchone()[0]
             except Exception as e:
                 info["db_error"] = str(e)
