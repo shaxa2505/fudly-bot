@@ -106,6 +106,7 @@ class EditOffer(StatesGroup):
     value = State()  # New value
     available_from = State()  # Edit availability start
     available_until = State()  # Edit availability end
+    photo = State()  # Edit photo
 
 
 class BulkCreate(StatesGroup):

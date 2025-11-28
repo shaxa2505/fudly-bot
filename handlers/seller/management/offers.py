@@ -592,6 +592,10 @@ async def edit_offer(callback: types.CallbackQuery) -> None:
         callback_data=f"edit_description_{offer_id}",
     )
     kb.button(
+        text="📷 Изменить фото" if lang == "ru" else "📷 Rasmni o'zgartirish",
+        callback_data=f"edit_photo_{offer_id}",
+    )
+    kb.button(
         text="🔄 Копировать" if lang == "ru" else "🔄 Nusxalash",
         callback_data=f"copy_offer_{offer_id}",
     )
@@ -734,6 +738,87 @@ async def edit_time_until(message: types.Message, state: FSMContext) -> None:
     await message.answer(
         f"✅ {'Время забора обновлено!' if lang == 'ru' else 'Olib ketish vaqti yangilandi!'}\n\n"
         f"🕐 {available_from} - {available_until}",
+        reply_markup=main_menu_seller(lang),
+    )
+    await state.clear()
+
+
+@router.callback_query(F.data.startswith("edit_photo_"))
+async def edit_photo_start(callback: types.CallbackQuery, state: FSMContext) -> None:
+    """Start editing offer photo."""
+    db = get_db()
+    lang = db.get_user_language(callback.from_user.id)
+    try:
+        offer_id = int(callback.data.split("_")[2])
+    except (ValueError, IndexError):
+        await callback.answer(get_text(lang, "error"), show_alert=True)
+        return
+
+    await state.update_data(offer_id=offer_id)
+    await state.set_state(EditOffer.photo)
+
+    kb = InlineKeyboardBuilder()
+    kb.button(
+        text="🗑 Удалить фото" if lang == "ru" else "🗑 Rasmni o'chirish",
+        callback_data=f"remove_photo_{offer_id}",
+    )
+    kb.button(
+        text="❌ Отмена" if lang == "ru" else "❌ Bekor qilish",
+        callback_data="back_to_offers_menu",
+    )
+    kb.adjust(1)
+
+    await callback.message.answer(
+        f"📷 {'Отправьте новое фото товара:' if lang == 'ru' else 'Mahsulotning yangi rasmini yuboring:'}",
+        reply_markup=kb.as_markup(),
+    )
+    await callback.answer()
+
+
+@router.callback_query(F.data.startswith("remove_photo_"))
+async def remove_photo(callback: types.CallbackQuery, state: FSMContext) -> None:
+    """Remove photo from offer."""
+    db = get_db()
+    lang = db.get_user_language(callback.from_user.id)
+    try:
+        offer_id = int(callback.data.split("_")[2])
+    except (ValueError, IndexError):
+        await callback.answer(get_text(lang, "error"), show_alert=True)
+        return
+
+    with db.get_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute("UPDATE offers SET photo_id = NULL WHERE offer_id = %s", (offer_id,))
+
+    await state.clear()
+    await callback.message.edit_text(
+        f"✅ {'Фото удалено!' if lang == 'ru' else 'Rasm o`chirildi!'}",
+    )
+    await callback.answer()
+
+
+@router.message(EditOffer.photo, F.photo)
+async def edit_photo_receive(message: types.Message, state: FSMContext) -> None:
+    """Receive new photo for offer."""
+    db = get_db()
+    lang = db.get_user_language(message.from_user.id)
+
+    data = await state.get_data()
+    offer_id = data.get("offer_id")
+
+    if not offer_id:
+        await message.answer("❌ Error: offer not found")
+        await state.clear()
+        return
+
+    photo_id = message.photo[-1].file_id
+
+    with db.get_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute("UPDATE offers SET photo_id = %s WHERE offer_id = %s", (photo_id, offer_id))
+
+    await message.answer(
+        f"✅ {'Фото обновлено!' if lang == 'ru' else 'Rasm yangilandi!'}",
         reply_markup=main_menu_seller(lang),
     )
     await state.clear()
