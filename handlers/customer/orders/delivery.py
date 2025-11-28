@@ -679,6 +679,7 @@ async def admin_confirm_payment(
     quantity = _get_order_field(order, "quantity", 4)
     address = _get_order_field(order, "delivery_address", 7)
     customer_id = _get_order_field(order, "user_id", 1)
+    payment_photo_id = _get_order_field(order, "payment_proof_photo_id", 10)
 
     store = db.get_store(store_id)
     offer = db.get_offer(offer_id)
@@ -705,28 +706,40 @@ async def admin_confirm_payment(
     except Exception:
         pass
 
-    # Notify store owner about confirmed payment
+    # Notify store owner about confirmed payment WITH photo
     if owner_id:
         seller_lang = db.get_user_language(owner_id)
+        
+        order_caption = (
+            f"🔔 <b>{'Новый оплаченный заказ!' if seller_lang == 'ru' else 'Yangi tolangan buyurtma!'}</b>\n\n"
+            f"📦 {'Заказ' if seller_lang == 'ru' else 'Buyurtma'} #{order_id}\n"
+            f"✅ <b>{'Оплата подтверждена' if seller_lang == 'ru' else 'Tolov tasdiqlandi'}</b>\n"
+            f"━━━━━━━━━━━━━━━━━━━━\n"
+            f"🍽 {offer_title}\n"
+            f"📦 {'Количество' if seller_lang == 'ru' else 'Miqdor'}: {quantity} {'шт' if seller_lang == 'ru' else 'dona'}\n"
+            f"💵 {'Сумма' if seller_lang == 'ru' else 'Summa'}: <b>{total_amount:,} {'сум' if seller_lang == 'ru' else 'som'}</b>\n"
+            f"━━━━━━━━━━━━━━━━━━━━\n"
+            f"👤 {'Клиент' if seller_lang == 'ru' else 'Mijoz'}: {customer_name}\n"
+            f"📱 {'Телефон' if seller_lang == 'ru' else 'Telefon'}: <code>{customer_phone}</code>\n"
+            f"📍 {'Адрес доставки' if seller_lang == 'ru' else 'Yetkazib berish manzili'}: {address}\n\n"
+            f"🚚 {'Пожалуйста, организуйте доставку!' if seller_lang == 'ru' else 'Iltimos, yetkazib berishni tashkil qiling!'}"
+        )
+        
         try:
-            await bot.send_message(
-                chat_id=owner_id,
-                text=(
-                    f"🔔 <b>{'Новый оплаченный заказ!' if seller_lang == 'ru' else 'Yangi to`langan buyurtma!'}</b>\n\n"
-                    f"📦 {'Заказ' if seller_lang == 'ru' else 'Buyurtma'} #{order_id}\n"
-                    f"✅ <b>{'Оплата подтверждена администратором' if seller_lang == 'ru' else 'To`lov administrator tomonidan tasdiqlandi'}</b>\n"
-                    f"━━━━━━━━━━━━━━━━━━━━\n"
-                    f"🍽 {offer_title}\n"
-                    f"📦 {'Количество' if seller_lang == 'ru' else 'Miqdor'}: {quantity} {'шт' if seller_lang == 'ru' else 'dona'}\n"
-                    f"💵 {'Сумма' if seller_lang == 'ru' else 'Summa'}: {total_amount:,} {'сум' if seller_lang == 'ru' else 'so`m'}\n"
-                    f"━━━━━━━━━━━━━━━━━━━━\n"
-                    f"👤 {customer_name}\n"
-                    f"📱 {'Телефон' if seller_lang == 'ru' else 'Telefon'}: <code>{customer_phone}</code>\n"
-                    f"📍 {'Адрес доставки' if seller_lang == 'ru' else 'Yetkazib berish manzili'}: {address}\n\n"
-                    f"🚚 {'Пожалуйста, организуйте доставку!' if seller_lang == 'ru' else 'Iltimos, yetkazib berishni tashkil qiling!'}"
-                ),
-                parse_mode="HTML",
-            )
+            # Send with payment proof photo if available
+            if payment_photo_id:
+                await bot.send_photo(
+                    chat_id=owner_id,
+                    photo=payment_photo_id,
+                    caption=order_caption,
+                    parse_mode="HTML",
+                )
+            else:
+                await bot.send_message(
+                    chat_id=owner_id,
+                    text=order_caption,
+                    parse_mode="HTML",
+                )
             logger.info(f"Notified seller {owner_id} about confirmed payment for order {order_id}")
         except Exception as e:
             logger.error(f"Failed to notify seller {owner_id}: {e}")
