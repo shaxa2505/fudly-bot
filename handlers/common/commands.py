@@ -34,13 +34,16 @@ router = Router(name="commands")
 
 async def handle_qr_pickup(message: types.Message, db: DatabaseProtocol, booking_code: str):
     """Handle QR code scan for pickup confirmation."""
+    logger.info(f"🔗 handle_qr_pickup called: booking_code='{booking_code}'")
     if not message.from_user:
         return
     user_id = message.from_user.id
     lang = db.get_user_language(user_id)
+    logger.info(f"🔗 handle_qr_pickup: user={user_id}, lang={lang}")
 
     # Find booking by code
     booking = db.get_booking_by_code(booking_code)
+    logger.info(f"🔗 handle_qr_pickup: get_booking_by_code result: {booking}")
 
     if not booking:
         # Try numeric ID

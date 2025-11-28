@@ -75,6 +75,18 @@ async def start_bulk_import(message: types.Message, state: FSMContext):
         text="📄 CSV + ZIP (100+)" if lang == "ru" else "📄 CSV + ZIP (100+)",
         callback_data="import_method_csv",
     )
+    kb.button(
+        text="⚡ Авто-скидки по сроку" if lang == "ru" else "⚡ Muddatli avtoskidka",
+        callback_data="import_products",
+    )
+    kb.button(
+        text="🔗 Интеграция с 1С" if lang == "ru" else "🔗 1C integratsiyasi",
+        callback_data="setup_1c_integration",
+    )
+    kb.button(
+        text="⚙️ Настройки скидок" if lang == "ru" else "⚙️ Chegirma sozlamalari",
+        callback_data="auto_discount_settings",
+    )
     kb.adjust(1)
 
     instructions = """📦 <b>Массовый импорт товаров</b>
@@ -96,6 +108,13 @@ async def start_bulk_import(message: types.Message, state: FSMContext):
 ┃ ⏱ ~5 минут на 100 товаров
 ┗━━━━━━━━━━━━━━━━━━━━━━━━┛
 
+┏━━━━━━━━━━━━━━━━━━━━━━━━┓
+┃ <b>⚡ Авто-скидки по сроку</b>
+┃ ✅ Импорт из Excel/CSV
+┃ ✅ Автоматический расчёт скидок
+┃ ✅ По дате срока годности
+┗━━━━━━━━━━━━━━━━━━━━━━━━┛
+
 💡 <i>Новичкам рекомендуем Альбом фото</i>"""
 
     if lang != "ru":
@@ -113,6 +132,13 @@ Import usulini tanlang:
 ┃ <b>📄 CSV + ZIP</b>
 ┃ ✅ Istalgan miqdor
 ┃ ✅ 100+ mahsulotlar uchun
+┗━━━━━━━━━━━━━━━━━━━━━━━━┛
+
+┏━━━━━━━━━━━━━━━━━━━━━━━━┓
+┃ <b>⚡ Muddatli avtoskidka</b>
+┃ ✅ Excel/CSV dan import
+┃ ✅ Avtomatik chegirma hisoblash
+┃ ✅ Yaroqlilik muddatiga qarab
 ┗━━━━━━━━━━━━━━━━━━━━━━━━┛"""
 
     await message.answer(instructions, parse_mode="HTML", reply_markup=kb.as_markup())

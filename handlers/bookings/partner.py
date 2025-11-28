@@ -34,7 +34,7 @@ router = Router()
 # Module dependencies
 db: Any = None
 bot: Any = None
-bot_username: str = "FudlyUzBot"  # Will be updated on setup
+bot_username: str = "fudly_bot"  # Default, will be updated from bot.get_me()
 
 
 def setup_dependencies(database: Any, bot_instance: Any):
@@ -42,6 +42,8 @@ def setup_dependencies(database: Any, bot_instance: Any):
     global db, bot, bot_username
     db = database
     bot = bot_instance
+    # Bot username will be fetched dynamically when generating QR
+    logger.info(f"Partner module initialized, default bot_username: {bot_username}")
 
 
 def _esc(val: Any) -> str:
@@ -105,9 +107,6 @@ async def partner_confirm_booking(callback: types.CallbackQuery) -> None:
         store_name = get_store_field(store, "name", "Магазин")
         store_address = get_store_field(store, "address", "")
 
-        # Generate QR code text for the booking
-        qr_text = f"FUDLY-{code_display}"
-
         if customer_lang == "uz":
             customer_msg = (
                 f"✅ <b>Broningiz tasdiqlandi!</b>\n\n"
@@ -139,8 +138,14 @@ async def partner_confirm_booking(callback: types.CallbackQuery) -> None:
                 try:
                     bot_info = await bot.get_me()
                     current_bot_username = bot_info.username or bot_username
-                except Exception:
+                    logger.info(
+                        f"🔗 QR: Using bot username from get_me(): '{current_bot_username}'"
+                    )
+                except Exception as e:
                     current_bot_username = bot_username
+                    logger.warning(
+                        f"🔗 QR: Failed to get bot username, using default: '{current_bot_username}', error: {e}"
+                    )
 
                 qr_image = generate_booking_qr(
                     code or str(booking_id), booking_id, bot_username=current_bot_username

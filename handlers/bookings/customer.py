@@ -549,7 +549,6 @@ async def create_booking(
 
     # Calculate total (no delivery cost for pickup)
     total = calculate_total(offer_price, quantity, 0)
-    code_display = format_booking_code(code, booking_id)
 
     # Notify customer (pickup only - delivery handled by orders.py)
     if lang == "uz":
@@ -581,6 +580,8 @@ async def create_booking(
 
     # Notify partner
     if owner_id:
+        # Get offer photo for notification
+        offer_photo = get_offer_field(offer, "photo") if offer else None
         await notify_partner_new_booking(
             owner_id=owner_id,
             booking_id=booking_id,
@@ -589,6 +590,7 @@ async def create_booking(
             total=total,
             customer_id=user_id,
             customer_name=message.from_user.first_name,
+            offer_photo=offer_photo,
         )
 
 
@@ -600,6 +602,7 @@ async def notify_partner_new_booking(
     total: int,
     customer_id: int,
     customer_name: str,
+    offer_photo: str | None = None,
 ) -> None:
     """Send new booking notification to partner (pickup only)."""
     if not db or not bot:
@@ -648,6 +651,21 @@ async def notify_partner_new_booking(
     kb.adjust(2)
 
     try:
+        # Try to send with photo first
+        if offer_photo:
+            try:
+                await bot.send_photo(
+                    owner_id,
+                    photo=offer_photo,
+                    caption=text,
+                    parse_mode="HTML",
+                    reply_markup=kb.as_markup(),
+                )
+                return
+            except Exception as photo_err:
+                logger.warning(f"Failed to send photo to partner: {photo_err}")
+
+        # Fallback to text only
         await bot.send_message(owner_id, text, parse_mode="HTML", reply_markup=kb.as_markup())
     except Exception as e:
         logger.error(f"Failed to notify partner {owner_id}: {e}")

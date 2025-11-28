@@ -25,7 +25,7 @@ except ImportError:
 
 
 # Bot username for deep links - can be overridden via parameter
-DEFAULT_BOT_USERNAME = os.environ.get("BOT_USERNAME", "Fudly_Bot")
+DEFAULT_BOT_USERNAME = os.environ.get("BOT_USERNAME", "fudly_bot")
 
 
 def generate_booking_qr(
@@ -50,11 +50,15 @@ def generate_booking_qr(
         return None
 
     username = bot_username or DEFAULT_BOT_USERNAME
+    logger.info(
+        f"🔗 QR generating for booking {booking_code} with bot_username: '{username}' (passed: '{bot_username}', default: '{DEFAULT_BOT_USERNAME}')"
+    )
 
     try:
         # Create deep link for Telegram bot
         # Format: t.me/BotName?start=pickup_CODE
         deep_link = f"https://t.me/{username}?start=pickup_{booking_code}"
+        logger.info(f"🔗 QR deep link: {deep_link}")
 
         # Create QR code with nice styling
         qr = qrcode.QRCode(

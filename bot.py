@@ -295,6 +295,7 @@ def _register_handlers() -> None:
         analytics,
         bulk_import,
         create_offer,
+        import_products,
         management,
         order_management,
     )
@@ -310,6 +311,7 @@ def _register_handlers() -> None:
     management.setup_dependencies(db, bot)
     analytics.setup_dependencies(db, bot)
     bulk_import.setup_dependencies(db, bot)
+    import_products.setup_dependencies(db, bot)
     profile.setup_dependencies(db, bot, user_view_mode)
     favorites.setup_dependencies(db, bot, user_view_mode)
     order_management.setup(bot, db)
@@ -333,6 +335,7 @@ def _register_handlers() -> None:
     # Register routers in PRIORITY order (most specific first)
     # 1. Seller-specific routers
     dp.include_router(bulk_import.router)
+    dp.include_router(import_products.router)
     dp.include_router(create_offer.router)
     dp.include_router(management.router)
     dp.include_router(analytics.router)
