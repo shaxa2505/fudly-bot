@@ -19,7 +19,6 @@ function HomePage({ onNavigate, tg }) {
   const [loading, setLoading] = useState(false)
   const [selectedCategory, setSelectedCategory] = useState('all')
   const [searchQuery, setSearchQuery] = useState('')
-  const [favorites, setFavorites] = useState(new Set())
   const [cart, setCart] = useState(() => {
     const saved = localStorage.getItem('fudly_cart')
     return saved ? new Map(Object.entries(JSON.parse(saved))) : new Map()
@@ -59,19 +58,6 @@ function HomePage({ onNavigate, tg }) {
     }
   }, [selectedCategory, searchQuery, offset, loading, tg])
 
-  // Load favorites
-  useEffect(() => {
-    const loadFavorites = async () => {
-      try {
-        const data = await api.getFavorites()
-        setFavorites(new Set(data.map(o => o.id)))
-      } catch (error) {
-        console.error('Error loading favorites:', error)
-      }
-    }
-    loadFavorites()
-  }, [])
-
   // Initial load
   useEffect(() => {
     loadOffers(true)
@@ -99,25 +85,6 @@ function HomePage({ onNavigate, tg }) {
   useEffect(() => {
     localStorage.setItem('fudly_cart', JSON.stringify(Object.fromEntries(cart)))
   }, [cart])
-
-  const toggleFavorite = async (offerId) => {
-    try {
-      if (favorites.has(offerId)) {
-        await api.removeFavorite(offerId)
-        setFavorites(prev => {
-          const next = new Set(prev)
-          next.delete(offerId)
-          return next
-        })
-      } else {
-        await api.addFavorite(offerId)
-        setFavorites(prev => new Set(prev).add(offerId))
-        tg?.HapticFeedback?.impactOccurred?.('light')
-      }
-    } catch (error) {
-      console.error('Error toggling favorite:', error)
-    }
-  }
 
   const addToCart = (offer) => {
     setCart(prev => {
@@ -209,8 +176,6 @@ function HomePage({ onNavigate, tg }) {
             <OfferCard
               key={offer.id}
               offer={offer}
-              isFavorite={favorites.has(offer.id)}
-              onToggleFavorite={() => toggleFavorite(offer.id)}
               onAddToCart={() => addToCart(offer)}
             />
           ))
@@ -229,7 +194,6 @@ function HomePage({ onNavigate, tg }) {
         currentPage="home"
         onNavigate={onNavigate}
         cartCount={cartCount}
-        favoritesCount={favorites.size}
       />
     </div>
   )

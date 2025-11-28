@@ -1,17 +1,17 @@
 .offer-card {
   background: white;
-  border-radius: 20px;
+  border-radius: 24px;
   overflow: hidden;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.06);
-  transition: transform 0.2s, box-shadow 0.2s;
+  box-shadow: 0 2px 16px rgba(0, 0, 0, 0.06), 0 0 1px rgba(0, 0, 0, 0.04);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   display: flex;
   flex-direction: column;
-  border: 1px solid rgba(0, 0, 0, 0.04);
+  border: 0.5px solid rgba(0, 0, 0, 0.06);
 }
 
 .offer-card:active {
-  transform: scale(0.98);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  transform: scale(0.97);
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.08);
 }
 
 /* Image */
@@ -34,15 +34,16 @@
 
 .discount-badge {
   position: absolute;
-  top: 8px;
-  left: 8px;
-  background: #FF3B30;
+  top: 12px;
+  left: 12px;
+  background: linear-gradient(135deg, #FF3B30 0%, #FF6B58 100%);
   color: white;
-  padding: 4px 8px;
-  border-radius: 8px;
-  font-size: 12px;
+  padding: 6px 12px;
+  border-radius: 12px;
+  font-size: 13px;
   font-weight: 700;
-  box-shadow: 0 2px 4px rgba(255, 59, 48, 0.3);
+  box-shadow: 0 4px 12px rgba(255, 59, 48, 0.3);
+  letter-spacing: -0.3px;
 }
 
 .favorite-btn {
@@ -64,7 +65,7 @@
 
 /* Content */
 .card-content {
-  padding: 12px;
+  padding: 16px;
   display: flex;
   flex-direction: column;
   flex: 1;
@@ -72,10 +73,10 @@
 
 .store-badge {
   font-size: 11px;
-  color: #999;
+  color: #8E8E93;
   text-transform: uppercase;
-  letter-spacing: 0.3px;
-  margin-bottom: 4px;
+  letter-spacing: 0.5px;
+  margin-bottom: 6px;
   font-weight: 600;
 }
 
@@ -125,17 +126,20 @@
 
 .add-to-cart-btn {
   width: 100%;
-  padding: 10px;
+  padding: 12px;
   border: none;
-  border-radius: 10px;
-  background: #00866e;
+  border-radius: 14px;
+  background: linear-gradient(135deg, #00866e 0%, #00a589 100%);
   color: white;
   font-size: 14px;
   font-weight: 600;
-  transition: background 0.2s;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   margin-top: auto;
+  box-shadow: 0 4px 12px rgba(0, 134, 110, 0.25);
 }
 
 .add-to-cart-btn:active {
-  background: #006b58;
+  background: linear-gradient(135deg, #006b58 0%, #008972 100%);
+  transform: scale(0.97);
+  box-shadow: 0 2px 8px rgba(0, 134, 110, 0.3);
 }

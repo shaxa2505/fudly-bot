@@ -11,15 +11,6 @@ function OfferCard({ offer, isFavorite, onToggleFavorite, onAddToCart }) {
           loading="lazy"
         />
         <div className="discount-badge">-{Math.round(offer.discount_percent)}%</div>
-        <button
-          className="favorite-btn"
-          onClick={(e) => {
-            e.stopPropagation()
-            onToggleFavorite()
-          }}
-        >
-          {isFavorite ? '❤️' : '🤍'}
-        </button>
       </div>
 
       <div className="card-content">

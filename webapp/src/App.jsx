@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react'
 import HomePage from './pages/HomePage'
 import CartPage from './pages/CartPage'
-import FavoritesPage from './pages/FavoritesPage'
 import './App.css'
 
 function App() {
@@ -29,8 +28,10 @@ function App() {
     switch (currentPage) {
       case 'cart':
         return <CartPage onNavigate={setCurrentPage} />
-      case 'favorites':
-        return <FavoritesPage onNavigate={setCurrentPage} />
+      case 'profile':
+        return <HomePage onNavigate={setCurrentPage} tg={tg} />
+      case 'stores':
+        return <HomePage onNavigate={setCurrentPage} tg={tg} />
       default:
         return <HomePage onNavigate={setCurrentPage} tg={tg} />
     }
