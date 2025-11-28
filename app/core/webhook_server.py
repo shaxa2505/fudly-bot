@@ -12,6 +12,66 @@ from app.core.notifications import get_notification_service
 from app.core.websocket import get_websocket_manager, setup_websocket_routes
 from logging_config import logger
 
+# =============================================================================
+# Mini App API Helpers
+# =============================================================================
+
+
+def get_offer_value(obj: Any, key: str, default: Any = None) -> Any:
+    """Get value from dict or object."""
+    if isinstance(obj, dict):
+        return obj.get(key, default)
+    return getattr(obj, key, default)
+
+
+def offer_to_dict(offer: Any) -> dict:
+    """Convert offer to API response dict."""
+    return {
+        "id": get_offer_value(offer, "id", 0),
+        "title": get_offer_value(offer, "title", ""),
+        "description": get_offer_value(offer, "description"),
+        "original_price": float(get_offer_value(offer, "original_price", 0) or 0),
+        "discount_price": float(get_offer_value(offer, "discount_price", 0) or 0),
+        "discount_percent": float(get_offer_value(offer, "discount_percent", 0) or 0),
+        "quantity": int(get_offer_value(offer, "quantity", 0) or 0),
+        "category": get_offer_value(offer, "category", "other") or "other",
+        "store_id": int(get_offer_value(offer, "store_id", 0) or 0),
+        "store_name": get_offer_value(offer, "store_name", "") or "",
+        "store_address": get_offer_value(offer, "store_address"),
+        "photo": get_offer_value(offer, "photo"),
+        "expiry_date": str(get_offer_value(offer, "expiry_date", ""))
+        if get_offer_value(offer, "expiry_date")
+        else None,
+    }
+
+
+def store_to_dict(store: Any) -> dict:
+    """Convert store to API response dict."""
+    return {
+        "id": get_offer_value(store, "id", 0),
+        "name": get_offer_value(store, "name", ""),
+        "address": get_offer_value(store, "address"),
+        "city": get_offer_value(store, "city"),
+        "business_type": get_offer_value(store, "business_type", "supermarket"),
+        "rating": float(get_offer_value(store, "rating", 0) or 0),
+        "offers_count": int(get_offer_value(store, "offers_count", 0) or 0),
+    }
+
+
+# Categories list
+API_CATEGORIES = [
+    {"id": "all", "name": "Все", "emoji": "🔥"},
+    {"id": "dairy", "name": "Молочные", "emoji": "🥛"},
+    {"id": "bakery", "name": "Выпечка", "emoji": "🍞"},
+    {"id": "meat", "name": "Мясо", "emoji": "🥩"},
+    {"id": "fruits", "name": "Фрукты", "emoji": "🍎"},
+    {"id": "vegetables", "name": "Овощи", "emoji": "🥕"},
+    {"id": "drinks", "name": "Напитки", "emoji": "🥤"},
+    {"id": "sweets", "name": "Сладости", "emoji": "🍰"},
+    {"id": "frozen", "name": "Заморозка", "emoji": "🧊"},
+    {"id": "other", "name": "Другое", "emoji": "📦"},
+]
+
 
 async def create_webhook_app(
     bot: Bot,
@@ -188,6 +248,145 @@ async def create_webhook_app(
         except FileNotFoundError:
             return web.Response(text="OpenAPI spec not found", status=404)
 
+    # =========================================================================
+    # Mini App API Endpoints
+    # =========================================================================
+
+    async def cors_preflight(request: web.Request) -> web.Response:
+        """Handle CORS preflight requests."""
+        return web.Response(
+            status=200,
+            headers={
+                "Access-Control-Allow-Origin": "*",
+                "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+                "Access-Control-Allow-Headers": "Content-Type, X-Telegram-Init-Data",
+                "Access-Control-Max-Age": "86400",
+            },
+        )
+
+    def add_cors_headers(response: web.Response) -> web.Response:
+        """Add CORS headers to response."""
+        response.headers["Access-Control-Allow-Origin"] = "*"
+        response.headers["Access-Control-Allow-Methods"] = "GET, POST, OPTIONS"
+        response.headers["Access-Control-Allow-Headers"] = "Content-Type, X-Telegram-Init-Data"
+        return response
+
+    async def api_categories(request: web.Request) -> web.Response:
+        """GET /api/v1/categories - List categories."""
+        city = request.query.get("city", "Ташкент")
+        result = []
+
+        for cat in API_CATEGORIES:
+            count = 0
+            if cat["id"] != "all":
+                try:
+                    if hasattr(db, "get_offers_by_category"):
+                        offers = db.get_offers_by_category(cat["id"], city) or []
+                        count = len(offers)
+                except Exception:
+                    pass
+            else:
+                try:
+                    if hasattr(db, "count_hot_offers"):
+                        count = db.count_hot_offers(city) or 0
+                except Exception:
+                    pass
+
+            result.append(
+                {
+                    "id": cat["id"],
+                    "name": cat["name"],
+                    "emoji": cat["emoji"],
+                    "count": count,
+                }
+            )
+
+        return add_cors_headers(web.json_response(result))
+
+    async def api_offers(request: web.Request) -> web.Response:
+        """GET /api/v1/offers - List offers."""
+        city = request.query.get("city", "Ташкент")
+        category = request.query.get("category", "all")
+        store_id = request.query.get("store_id")
+        search = request.query.get("search")
+        limit = int(request.query.get("limit", "50"))
+        offset = int(request.query.get("offset", "0"))
+
+        try:
+            raw_offers: list[Any] = []
+
+            if store_id:
+                if hasattr(db, "get_store_offers"):
+                    raw_offers = db.get_store_offers(int(store_id)) or []
+            elif search:
+                if hasattr(db, "search_offers"):
+                    raw_offers = db.search_offers(search, city) or []
+            elif category and category != "all":
+                if hasattr(db, "get_offers_by_category"):
+                    raw_offers = db.get_offers_by_category(category, city) or []
+            else:
+                if hasattr(db, "get_hot_offers"):
+                    raw_offers = db.get_hot_offers(city, limit=limit, offset=offset) or []
+
+            offers = [offer_to_dict(o) for o in raw_offers]
+            return add_cors_headers(web.json_response(offers))
+
+        except Exception as e:
+            logger.error(f"API offers error: {e}")
+            return add_cors_headers(web.json_response({"error": str(e)}, status=500))
+
+    async def api_offer_detail(request: web.Request) -> web.Response:
+        """GET /api/v1/offers/{offer_id} - Get single offer."""
+        offer_id = int(request.match_info["offer_id"])
+
+        try:
+            offer = None
+            if hasattr(db, "get_offer"):
+                offer = db.get_offer(offer_id)
+
+            if not offer:
+                return add_cors_headers(web.json_response({"error": "Not found"}, status=404))
+
+            return add_cors_headers(web.json_response(offer_to_dict(offer)))
+
+        except Exception as e:
+            logger.error(f"API offer detail error: {e}")
+            return add_cors_headers(web.json_response({"error": str(e)}, status=500))
+
+    async def api_stores(request: web.Request) -> web.Response:
+        """GET /api/v1/stores - List stores."""
+        city = request.query.get("city", "Ташкент")
+        business_type = request.query.get("business_type")
+
+        try:
+            raw_stores: list[Any] = []
+
+            if business_type:
+                if hasattr(db, "get_stores_by_business_type"):
+                    raw_stores = db.get_stores_by_business_type(business_type, city) or []
+            else:
+                if hasattr(db, "get_all_stores"):
+                    raw_stores = db.get_all_stores(city) or []
+
+            stores = [store_to_dict(s) for s in raw_stores]
+            return add_cors_headers(web.json_response(stores))
+
+        except Exception as e:
+            logger.error(f"API stores error: {e}")
+            return add_cors_headers(web.json_response({"error": str(e)}, status=500))
+
+    async def api_health(request: web.Request) -> web.Response:
+        """GET /api/v1/health - API health check."""
+        return add_cors_headers(
+            web.json_response(
+                {
+                    "status": "ok",
+                    "service": "fudly-webapp-api",
+                    "timestamp": datetime.now().isoformat(),
+                }
+            )
+        )
+
     # Register routes
     path_main = webhook_path if webhook_path.startswith("/") else f"/{webhook_path}"
     path_alt = path_main.rstrip("/") + "/"
@@ -203,6 +402,17 @@ async def create_webhook_app(
     app.router.add_get("/docs", docs_handler)
     app.router.add_get("/openapi.yaml", openapi_spec_handler)
     app.router.add_get("/", health_check)  # Railway health check
+
+    # Mini App API routes
+    app.router.add_options("/api/v1/categories", cors_preflight)
+    app.router.add_get("/api/v1/categories", api_categories)
+    app.router.add_options("/api/v1/offers", cors_preflight)
+    app.router.add_get("/api/v1/offers", api_offers)
+    app.router.add_options("/api/v1/offers/{offer_id}", cors_preflight)
+    app.router.add_get("/api/v1/offers/{offer_id}", api_offer_detail)
+    app.router.add_options("/api/v1/stores", cors_preflight)
+    app.router.add_get("/api/v1/stores", api_stores)
+    app.router.add_get("/api/v1/health", api_health)
 
     # Setup WebSocket routes for real-time notifications
     setup_websocket_routes(app)
