@@ -272,6 +272,32 @@ class Database:
         """
         )
 
+        # Таблица избранных товаров (офферов) для мини-приложения
+        cursor.execute(
+            """
+            CREATE TABLE IF NOT EXISTS offer_favorites (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER NOT NULL,
+                offer_id INTEGER NOT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (user_id) REFERENCES users(user_id),
+                FOREIGN KEY (offer_id) REFERENCES offers(offer_id) ON DELETE CASCADE,
+                UNIQUE(user_id, offer_id)
+            )
+        """
+        )
+
+        # Индекс для быстрого поиска избранных офферов
+        try:
+            cursor.execute(
+                "CREATE INDEX IF NOT EXISTS idx_offer_favorites_user ON offer_favorites(user_id)"
+            )
+            cursor.execute(
+                "CREATE INDEX IF NOT EXISTS idx_offer_favorites_offer ON offer_favorites(offer_id)"
+            )
+        except Exception:
+            pass
+
         # Таблица промокодов
         cursor.execute(
             """
@@ -2361,6 +2387,80 @@ class Database:
         result = cursor.fetchone() is not None
         conn.close()
         return result
+
+    # ==================== ИЗБРАННЫЕ ОФФЕРЫ (для мини-приложения) ====================
+
+    def add_user_favorite(self, user_id: int, offer_id: int) -> bool:
+        """Add offer to user's favorites."""
+        conn = self.get_connection()
+        cursor = conn.cursor()
+        try:
+            cursor.execute(
+                "INSERT INTO offer_favorites (user_id, offer_id) VALUES (?, ?)", (user_id, offer_id)
+            )
+            conn.commit()
+            logger.info(f"Added offer {offer_id} to favorites for user {user_id}")
+            return True
+        except sqlite3.IntegrityError:
+            logger.debug(f"Offer {offer_id} already in favorites for user {user_id}")
+            return False
+        except Exception as e:
+            logger.error(f"Error adding favorite: {e}")
+            return False
+        finally:
+            conn.close()
+
+    def remove_user_favorite(self, user_id: int, offer_id: int) -> bool:
+        """Remove offer from user's favorites."""
+        conn = self.get_connection()
+        cursor = conn.cursor()
+        try:
+            cursor.execute(
+                "DELETE FROM offer_favorites WHERE user_id = ? AND offer_id = ?",
+                (user_id, offer_id),
+            )
+            conn.commit()
+            logger.info(f"Removed offer {offer_id} from favorites for user {user_id}")
+            return True
+        except Exception as e:
+            logger.error(f"Error removing favorite: {e}")
+            return False
+        finally:
+            conn.close()
+
+    def get_user_favorite_offers(self, user_id: int) -> list[int]:
+        """Get list of favorite offer IDs for user."""
+        conn = self.get_connection()
+        cursor = conn.cursor()
+        try:
+            cursor.execute(
+                "SELECT offer_id FROM offer_favorites WHERE user_id = ? ORDER BY created_at DESC",
+                (user_id,),
+            )
+            favorites = [row[0] for row in cursor.fetchall()]
+            return favorites
+        except Exception as e:
+            logger.error(f"Error getting favorite offers: {e}")
+            return []
+        finally:
+            conn.close()
+
+    def is_offer_favorite(self, user_id: int, offer_id: int) -> bool:
+        """Check if offer is in user's favorites."""
+        conn = self.get_connection()
+        cursor = conn.cursor()
+        try:
+            cursor.execute(
+                "SELECT 1 FROM offer_favorites WHERE user_id = ? AND offer_id = ?",
+                (user_id, offer_id),
+            )
+            result = cursor.fetchone() is not None
+            return result
+        except Exception as e:
+            logger.error(f"Error checking favorite: {e}")
+            return False
+        finally:
+            conn.close()
 
     # История бронирований
     def get_booking_history(self, user_id: int, status: str = None) -> list[tuple]:

@@ -86,6 +86,37 @@ class OrderResponse(BaseModel):
     items_count: int
 
 
+class FavoriteRequest(BaseModel):
+    offer_id: int
+
+
+class CartItem(BaseModel):
+    offer_id: int
+    quantity: int
+    title: str
+    price: float
+    photo: str | None = None
+
+
+class CartResponse(BaseModel):
+    items: list[CartItem]
+    total: float
+    items_count: int
+
+
+class FilterParams(BaseModel):
+    min_price: float | None = None
+    max_price: float | None = None
+    min_discount: float | None = None
+    max_distance: float | None = None  # km
+    sort_by: str = "discount"  # discount, price_asc, price_desc, new
+
+
+class LocationRequest(BaseModel):
+    latitude: float
+    longitude: float
+
+
 # =============================================================================
 # Telegram Init Data Validation
 # =============================================================================
@@ -241,12 +272,16 @@ async def get_offers(
     category: str = Query("all", description="Category filter"),
     store_id: int | None = Query(None, description="Store ID filter"),
     search: str | None = Query(None, description="Search query"),
+    min_price: float | None = Query(None, description="Minimum price filter"),
+    max_price: float | None = Query(None, description="Maximum price filter"),
+    min_discount: float | None = Query(None, description="Minimum discount percent"),
+    sort_by: str = Query("discount", description="Sort by: discount, price_asc, price_desc, new"),
     limit: int = Query(50, ge=1, le=100),
     offset: int = Query(0, ge=0),
     db=Depends(get_db),
     user: dict = Depends(get_current_user),
 ):
-    """Get list of offers with filters."""
+    """Get list of offers with advanced filters and sorting."""
     try:
         offers = []
 
@@ -302,6 +337,27 @@ async def get_offers(
             except Exception as e:
                 logger.warning(f"Error parsing offer: {e}")
                 continue
+
+        # Apply filters
+        if min_price is not None:
+            offers = [o for o in offers if o.discount_price >= min_price]
+        if max_price is not None:
+            offers = [o for o in offers if o.discount_price <= max_price]
+        if min_discount is not None:
+            offers = [o for o in offers if o.discount_percent >= min_discount]
+
+        # Apply sorting
+        if sort_by == "discount":
+            offers.sort(key=lambda x: x.discount_percent, reverse=True)
+        elif sort_by == "price_asc":
+            offers.sort(key=lambda x: x.discount_price)
+        elif sort_by == "price_desc":
+            offers.sort(key=lambda x: x.discount_price, reverse=True)
+        elif sort_by == "new":
+            offers.sort(key=lambda x: x.id, reverse=True)
+
+        # Apply pagination after filtering
+        offers = offers[offset : offset + limit]
 
         return offers
 
@@ -467,7 +523,326 @@ async def create_order(
 # =============================================================================
 
 
+# =============================================================================
+# Favorites
+# =============================================================================
+
+
+@router.get("/favorites", response_model=list[OfferResponse])
+async def get_favorites(db=Depends(get_db), user: dict = Depends(get_current_user)):
+    """Get user's favorite offers."""
+    try:
+        user_id = user.get("id", 0)
+        if user_id == 0:
+            return []
+
+        # Get favorites from database
+        if hasattr(db, "get_user_favorite_offers"):
+            favorite_ids = db.get_user_favorite_offers(user_id)
+        else:
+            favorite_ids = []
+
+        offers = []
+        for offer_id in favorite_ids:
+            try:
+                offer = db.get_offer(offer_id) if hasattr(db, "get_offer") else None
+                if offer:
+
+                    def get_val(obj, key, default=None):
+                        if isinstance(obj, dict):
+                            return obj.get(key, default)
+                        return getattr(obj, key, default)
+
+                    offers.append(
+                        OfferResponse(
+                            id=get_val(offer, "id", 0),
+                            title=get_val(offer, "title", "Без названия"),
+                            description=get_val(offer, "description"),
+                            original_price=float(get_val(offer, "original_price", 0) or 0),
+                            discount_price=float(get_val(offer, "discount_price", 0) or 0),
+                            discount_percent=float(get_val(offer, "discount_percent", 0) or 0),
+                            quantity=int(get_val(offer, "quantity", 0) or 0),
+                            category=get_val(offer, "category", "other") or "other",
+                            store_id=int(get_val(offer, "store_id", 0) or 0),
+                            store_name=get_val(offer, "store_name", "") or "",
+                            store_address=get_val(offer, "store_address"),
+                            photo=get_val(offer, "photo"),
+                            expiry_date=str(get_val(offer, "expiry_date", ""))
+                            if get_val(offer, "expiry_date")
+                            else None,
+                        )
+                    )
+            except Exception as e:
+                logger.warning(f"Error loading favorite offer {offer_id}: {e}")
+                continue
+
+        return offers
+
+    except Exception as e:
+        logger.error(f"Error getting favorites: {e}")
+        return []
+
+
+@router.post("/favorites/add")
+async def add_favorite(
+    request: FavoriteRequest, db=Depends(get_db), user: dict = Depends(get_current_user)
+):
+    """Add offer to favorites."""
+    try:
+        user_id = user.get("id", 0)
+        if user_id == 0:
+            raise HTTPException(status_code=401, detail="Authentication required")
+
+        # Add to database
+        if hasattr(db, "add_user_favorite"):
+            db.add_user_favorite(user_id, request.offer_id)
+
+        return {"status": "ok", "offer_id": request.offer_id}
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error adding favorite: {e}")
+        raise HTTPException(status_code=500, detail=str(e)) from e
+
+
+@router.post("/favorites/remove")
+async def remove_favorite(
+    request: FavoriteRequest, db=Depends(get_db), user: dict = Depends(get_current_user)
+):
+    """Remove offer from favorites."""
+    try:
+        user_id = user.get("id", 0)
+        if user_id == 0:
+            raise HTTPException(status_code=401, detail="Authentication required")
+
+        # Remove from database
+        if hasattr(db, "remove_user_favorite"):
+            db.remove_user_favorite(user_id, request.offer_id)
+
+        return {"status": "ok", "offer_id": request.offer_id}
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error removing favorite: {e}")
+        raise HTTPException(status_code=500, detail=str(e)) from e
+
+
+# =============================================================================
+# Cart (Session-based, stored in localStorage on client)
+# =============================================================================
+
+
+@router.get("/cart/calculate")
+async def calculate_cart(
+    offer_ids: str = Query(
+        ..., description="Comma-separated offer IDs with quantities (id:qty,id:qty)"
+    ),
+    db=Depends(get_db),
+):
+    """Calculate cart total and get current prices."""
+    try:
+        items = []
+        total = 0.0
+        items_count = 0
+
+        # Parse offer_ids string: "1:2,3:1,5:3" -> [(1,2), (3,1), (5,3)]
+        for item_str in offer_ids.split(","):
+            if ":" not in item_str:
+                continue
+            offer_id_str, qty_str = item_str.split(":")
+            offer_id = int(offer_id_str)
+            quantity = int(qty_str)
+
+            offer = db.get_offer(offer_id) if hasattr(db, "get_offer") else None
+            if offer:
+
+                def get_val(obj, key, default=None):
+                    if isinstance(obj, dict):
+                        return obj.get(key, default)
+                    return getattr(obj, key, default)
+
+                price = float(get_val(offer, "discount_price", 0) or 0)
+                items.append(
+                    CartItem(
+                        offer_id=offer_id,
+                        quantity=quantity,
+                        title=get_val(offer, "title", ""),
+                        price=price,
+                        photo=get_val(offer, "photo"),
+                    )
+                )
+                total += price * quantity
+                items_count += quantity
+
+        return CartResponse(items=items, total=total, items_count=items_count)
+
+    except Exception as e:
+        logger.error(f"Error calculating cart: {e}")
+        raise HTTPException(status_code=500, detail=str(e)) from e
+
+
+# =============================================================================
+# Location & Distance
+# =============================================================================
+
+
+@router.post("/stores/nearby")
+async def get_nearby_stores(
+    location: LocationRequest,
+    radius_km: float = Query(5.0, description="Search radius in kilometers"),
+    db=Depends(get_db),
+):
+    """Get stores near user's location."""
+    try:
+        # Get all stores
+        raw_stores = db.get_all_stores() if hasattr(db, "get_all_stores") else []
+
+        if not raw_stores:
+            return []
+
+        # Calculate distances (simplified - real implementation would use PostGIS or similar)
+        stores_with_distance = []
+
+        for store in raw_stores:
+
+            def get_val(obj, key, default=None):
+                if isinstance(obj, dict):
+                    return obj.get(key, default)
+                return getattr(obj, key, default)
+
+            # Mock distance calculation - replace with real geospatial query
+            # For now, random distance for demo
+            import random
+
+            distance = random.uniform(0.5, 10.0)
+
+            if distance <= radius_km:
+                store_data = StoreResponse(
+                    id=get_val(store, "id", 0),
+                    name=get_val(store, "name", ""),
+                    address=get_val(store, "address"),
+                    city=get_val(store, "city"),
+                    business_type=get_val(store, "business_type", "supermarket"),
+                    rating=float(get_val(store, "rating", 0) or 0),
+                    offers_count=int(get_val(store, "offers_count", 0) or 0),
+                )
+                stores_with_distance.append(
+                    {"store": store_data, "distance_km": round(distance, 2)}
+                )
+
+        # Sort by distance
+        stores_with_distance.sort(key=lambda x: x["distance_km"])
+
+        return stores_with_distance
+
+    except Exception as e:
+        logger.error(f"Error getting nearby stores: {e}")
+        raise HTTPException(status_code=500, detail=str(e)) from e
+
+
+# =============================================================================
+# Search with suggestions
+# =============================================================================
+
+
+@router.get("/search/suggestions")
+async def get_search_suggestions(
+    query: str = Query(..., min_length=2, description="Search query"),
+    limit: int = Query(5, ge=1, le=10),
+    db=Depends(get_db),
+):
+    """Get search suggestions for autocomplete."""
+    try:
+        if not query or len(query) < 2:
+            return []
+
+        # Get recent popular searches or product titles
+        suggestions = []
+
+        # Search in offer titles
+        if hasattr(db, "search_offers"):
+            offers = db.search_offers(query, limit=limit * 2)
+            if offers:
+                titles = list(
+                    {
+                        o.get("title", "") if isinstance(o, dict) else getattr(o, "title", "")
+                        for o in offers
+                    }
+                )
+                suggestions.extend(titles[:limit])
+
+        return suggestions[:limit]
+
+    except Exception as e:
+        logger.error(f"Error getting search suggestions: {e}")
+        return []
+
+
+# =============================================================================
+# Statistics
+# =============================================================================
+
+
+@router.get("/stats/hot-deals")
+async def get_hot_deals_stats(city: str = Query("Ташкент"), db=Depends(get_db)):
+    """Get statistics about hot deals."""
+    try:
+        stats = {
+            "total_offers": 0,
+            "total_stores": 0,
+            "avg_discount": 0.0,
+            "max_discount": 0.0,
+            "categories_count": len(CATEGORIES) - 1,  # exclude "all"
+        }
+
+        # Get offers
+        if hasattr(db, "get_hot_offers"):
+            offers = db.get_hot_offers(city, limit=1000)
+            if offers:
+                stats["total_offers"] = len(offers)
+
+                discounts = []
+                for offer in offers:
+
+                    def get_val(obj, key, default=None):
+                        if isinstance(obj, dict):
+                            return obj.get(key, default)
+                        return getattr(obj, key, default)
+
+                    discount = float(get_val(offer, "discount_percent", 0) or 0)
+                    discounts.append(discount)
+
+                if discounts:
+                    stats["avg_discount"] = round(sum(discounts) / len(discounts), 1)
+                    stats["max_discount"] = round(max(discounts), 1)
+
+        # Get stores count
+        if hasattr(db, "get_all_stores"):
+            stores = db.get_all_stores(city)
+            if stores:
+                stats["total_stores"] = len(stores)
+
+        return stats
+
+    except Exception as e:
+        logger.error(f"Error getting stats: {e}")
+        return {
+            "total_offers": 0,
+            "total_stores": 0,
+            "avg_discount": 0.0,
+            "max_discount": 0.0,
+            "categories_count": len(CATEGORIES) - 1,
+        }
+
+
+# =============================================================================
+# Health check
+# =============================================================================
+
+
 @router.get("/health")
 async def health_check():
     """Health check endpoint."""
-    return {"status": "ok", "service": "fudly-webapp-api"}
+    return {"status": "ok", "service": "fudly-webapp-api", "version": "2.0"}
