@@ -391,10 +391,21 @@ async def cmd_start(message: types.Message, state: FSMContext, db: DatabaseProto
         await state.set_state(Registration.phone)
         return
 
-    if user_view_mode and user_role == "seller":
-        user_view_mode[message.from_user.id] = "seller"
-
-    menu = main_menu_seller(lang) if user_role == "seller" else main_menu_customer(lang)
+    if user_view_mode:
+        # Preserve existing mode or default to customer
+        # After bot restart, user_view_mode is empty, so default to customer menu
+        current_mode = user_view_mode.get(message.from_user.id)
+        if current_mode is None:
+            # No mode set - use customer mode by default (safer, works for all users)
+            user_view_mode[message.from_user.id] = "customer"
+            menu = main_menu_customer(lang)
+        elif current_mode == "seller" and user_role == "seller":
+            menu = main_menu_seller(lang)
+        else:
+            menu = main_menu_customer(lang)
+    else:
+        # Fallback if user_view_mode not initialized
+        menu = main_menu_customer(lang)
     await message.answer(
         get_text(
             lang, "welcome_back", name=message.from_user.first_name, city=user_city or "Ташкент"

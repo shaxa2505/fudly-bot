@@ -91,10 +91,10 @@ async def profile(message: types.Message, state: FSMContext) -> None:
 
     # Determine current mode for settings keyboard
     # If user is seller, check their current mode, otherwise always customer
+    # Default to customer mode if not explicitly set (safer - matches the menu they see after /start)
     if effective_role == "seller":
-        # Default to seller mode for sellers if not explicitly set to customer
         current_mode = (
-            user_view_mode.get(message.from_user.id, "seller") if user_view_mode else "seller"
+            user_view_mode.get(message.from_user.id, "customer") if user_view_mode else "customer"
         )
     else:
         current_mode = "customer"
