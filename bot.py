@@ -366,14 +366,20 @@ def _register_middlewares() -> None:
     """Register middlewares in correct order."""
     from app.middlewares.db_middleware import DbSessionMiddleware
     from app.middlewares.rate_limit import RateLimitMiddleware
+    from app.middlewares.user_cache_middleware import UserCacheMiddleware
 
     # 1. Database session middleware
     dp.update.middleware(DbSessionMiddleware(db))
 
-    # 2. Rate limiting (prevent abuse)
+    # 2. User cache middleware (pre-fetches user data once per request)
+    if cache:
+        dp.message.outer_middleware(UserCacheMiddleware(cache))
+        dp.callback_query.outer_middleware(UserCacheMiddleware(cache))
+
+    # 3. Rate limiting (prevent abuse)
     dp.update.middleware(RateLimitMiddleware(rate_limit=30, burst_limit=20))
 
-    # 3. Registration check (ensure users are registered)
+    # 4. Registration check (ensure users are registered)
     dp.update.middleware(RegistrationCheckMiddleware(db, get_text, phone_request_keyboard))
 
 

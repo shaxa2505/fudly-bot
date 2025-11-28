@@ -27,7 +27,7 @@ def setup(
 ) -> None:
     """Register offer-related handlers on dispatcher."""
 
-    @dp.message(F.text.in_(["🔥 Горячее", "🔥 Issiq"]))
+    @dp.message(F.text.in_(["🔥 Горячее", "🔥 Issiq takliflar"]))
     async def hot_offers_handler(message: types.Message, state: FSMContext) -> None:
         if not message.from_user:
             return

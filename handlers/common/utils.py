@@ -58,7 +58,9 @@ __all__ = [
 MAIN_MENU_BUTTONS = {
     # Customer menu
     "🔥 Горячее",
-    "🔥 Issiq",
+    "🔥 Issiq takliflar",
+    "🏪 Заведения",
+    "🏪 Do'konlar",
     "🔍 Поиск",
     "🔍 Qidirish",
     "🛒 Корзина",
