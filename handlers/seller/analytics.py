@@ -118,13 +118,8 @@ async def partner_today_stats(message: types.Message) -> None:
         return
 
     lang = db.get_user_language(message.from_user.id)
-    user = db.get_user_model(message.from_user.id)
 
-    # Проверяем, что это партнёр
-    if not user or user.role != "seller":
-        await message.answer(get_text(lang, "access_denied"))
-        return
-
+    # Проверяем наличие магазинов (это главный критерий партнёра)
     stores = db.get_user_stores(message.from_user.id)
     if not stores:
         await message.answer(get_text(lang, "no_stores"))
