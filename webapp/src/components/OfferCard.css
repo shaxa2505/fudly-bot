@@ -103,7 +103,7 @@
 .current-price {
   font-size: 16px;
   font-weight: 700;
-  color: #2D5F3F;
+  color: #00866e;
 }
 
 .currency {
@@ -126,7 +126,7 @@
   padding: 10px;
   border: none;
   border-radius: 10px;
-  background: #2D5F3F;
+  background: #00866e;
   color: white;
   font-size: 14px;
   font-weight: 600;
@@ -135,5 +135,5 @@
 }
 
 .add-to-cart-btn:active {
-  background: #234d32;
+  background: #006b58;
 }

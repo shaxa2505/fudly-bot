@@ -6,7 +6,6 @@ function BottomNav({ currentPage, onNavigate, cartCount, favoritesCount }) {
     { id: 'stores', icon: '🏪', label: "Do'konlar" },
     { id: 'favorites', icon: '❤️', label: 'Saqlangan', badge: favoritesCount },
     { id: 'cart', icon: '🛒', label: 'Savat', badge: cartCount },
-    { id: 'profile', icon: '👤', label: 'Profil' },
   ]
 
   return (

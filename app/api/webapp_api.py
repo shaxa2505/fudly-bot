@@ -466,7 +466,11 @@ async def get_stores(
 async def create_order(
     order: CreateOrderRequest, db=Depends(get_db), user: dict = Depends(get_current_user)
 ):
-    """Create a new order from Mini App."""
+    """Create a new order from Mini App and notify partner."""
+    from aiogram import Bot
+    from aiogram.utils.keyboard import InlineKeyboardBuilder
+    import html
+
     try:
         # Use user_id from request or from Telegram auth
         user_id = order.user_id or user.get("id", 0)
@@ -474,41 +478,87 @@ async def create_order(
         if user_id == 0:
             raise HTTPException(status_code=400, detail="User ID required")
 
-        # Calculate total
-        total = 0.0
-        items_count = 0
+        # Get bot instance from global settings
+        bot_instance = None
+        try:
+            bot_instance = Bot(token=settings.bot_token)
+        except Exception as e:
+            logger.warning(f"Could not create bot instance: {e}")
+
+        # Process each offer separately (create booking per offer)
+        created_bookings = []
 
         for item in order.items:
             offer = db.get_offer(item.offer_id) if hasattr(db, "get_offer") else None
-            if offer:
+            if not offer:
+                continue
 
-                def get_val(obj, key, default=None):
-                    if isinstance(obj, dict):
-                        return obj.get(key, default)
-                    return getattr(obj, key, default)
+            def get_val(obj, key, default=None):
+                if isinstance(obj, dict):
+                    return obj.get(key, default)
+                return getattr(obj, key, default)
 
-                price = float(get_val(offer, "discount_price", 0) or 0)
-                total += price * item.quantity
-                items_count += item.quantity
+            price = float(get_val(offer, "discount_price", 0) or 0)
+            total = price * item.quantity
+            store_id = get_val(offer, "store_id")
+            offer_title = get_val(offer, "title", "Товар")
 
-        # Create booking in database
-        # This depends on your booking system
-        order_id = 0
-        if hasattr(db, "create_booking"):
-            booking = db.create_booking(
-                user_id=user_id,
-                items=[(item.offer_id, item.quantity) for item in order.items],
-                total=total,
-                delivery_address=order.delivery_address,
-                phone=order.phone,
-                comment=order.comment,
-            )
-            order_id = (
-                booking.get("id", 0) if isinstance(booking, dict) else getattr(booking, "id", 0)
-            )
+            # Create booking using create_booking method
+            try:
+                if hasattr(db, "create_booking"):
+                    booking_id = db.create_booking(
+                        user_id=user_id,
+                        offer_id=item.offer_id,
+                        quantity=item.quantity,
+                        pickup_date="2024-01-01 00:00",  # Will be updated by partner
+                        comment=order.comment or "",
+                    )
+
+                    created_bookings.append({
+                        "booking_id": booking_id,
+                        "offer_id": item.offer_id,
+                        "quantity": item.quantity,
+                        "total": total,
+                        "offer_title": offer_title,
+                    })
+
+                    # Notify partner about new booking
+                    if bot_instance and store_id:
+                        store = db.get_store(store_id) if hasattr(db, "get_store") else None
+                        if store:
+                            owner_id = get_val(store, "owner_id")
+                            if owner_id:
+                                await notify_partner_webapp_order(
+                                    bot=bot_instance,
+                                    db=db,
+                                    owner_id=owner_id,
+                                    booking_id=booking_id,
+                                    offer_title=offer_title,
+                                    quantity=item.quantity,
+                                    total=total,
+                                    user_id=user_id,
+                                    delivery_address=order.delivery_address,
+                                    phone=order.phone,
+                                    photo=get_val(offer, "photo"),
+                                )
+
+            except Exception as e:
+                logger.error(f"Error creating booking for offer {item.offer_id}: {e}")
+                continue
+
+        if bot_instance:
+            await bot_instance.session.close()
+
+        # Return first booking as order_id (or 0 if none created)
+        order_id = created_bookings[0]["booking_id"] if created_bookings else 0
+        total_amount = sum(b["total"] for b in created_bookings)
+        total_items = sum(b["quantity"] for b in created_bookings)
 
         return OrderResponse(
-            order_id=order_id, status="pending", total=total, items_count=items_count
+            order_id=order_id,
+            status="pending",
+            total=total_amount,
+            items_count=total_items
         )
 
     except HTTPException:
@@ -516,6 +566,87 @@ async def create_order(
     except Exception as e:
         logger.error(f"Error creating order: {e}")
         raise HTTPException(status_code=500, detail=str(e)) from e
+
+
+async def notify_partner_webapp_order(
+    bot, db, owner_id: int, booking_id: int, offer_title: str,
+    quantity: int, total: float, user_id: int, delivery_address: str | None,
+    phone: str | None, photo: str | None
+):
+    """Send notification to partner about new webapp order."""
+    from aiogram.utils.keyboard import InlineKeyboardBuilder
+    import html
+
+    partner_lang = db.get_user_language(owner_id) if hasattr(db, "get_user_language") else "uz"
+    user = db.get_user(user_id) if hasattr(db, "get_user") else None
+
+    def get_user_val(obj, key, default=None):
+        if isinstance(obj, dict):
+            return obj.get(key, default)
+        return getattr(obj, key, default) if obj else default
+
+    customer_name = get_user_val(user, "first_name", "Клиент")
+    customer_phone = phone or get_user_val(user, "phone", "Не указан")
+
+    def _esc(val):
+        return html.escape(str(val)) if val else ""
+
+    if partner_lang == "uz":
+        text = (
+            f"🔔 <b>Yangi buyurtma (Mini App)!</b>\n\n"
+            f"📦 {_esc(offer_title)} × {quantity}\n"
+            f"💰 {int(total):,} so'm\n"
+            f"👤 {_esc(customer_name)}\n"
+            f"📱 Tel: <code>{_esc(customer_phone)}</code>\n"
+        )
+        if delivery_address:
+            text += f"🏠 Manzil: {_esc(delivery_address)}\n"
+        else:
+            text += "🏪 O'zi olib ketadi\n"
+        confirm_text = "✅ Tasdiqlash"
+        reject_text = "❌ Rad etish"
+    else:
+        text = (
+            f"🔔 <b>Новый заказ (Mini App)!</b>\n\n"
+            f"📦 {_esc(offer_title)} × {quantity}\n"
+            f"💰 {int(total):,} сум\n"
+            f"👤 {_esc(customer_name)}\n"
+            f"📱 Тел: <code>{_esc(customer_phone)}</code>\n"
+        )
+        if delivery_address:
+            text += f"🏠 Адрес: {_esc(delivery_address)}\n"
+        else:
+            text += "🏪 Самовывоз\n"
+        confirm_text = "✅ Подтвердить"
+        reject_text = "❌ Отклонить"
+
+    kb = InlineKeyboardBuilder()
+    kb.button(text=confirm_text, callback_data=f"partner_confirm_{booking_id}")
+    kb.button(text=reject_text, callback_data=f"partner_reject_{booking_id}")
+    kb.adjust(2)
+
+    try:
+        if photo:
+            try:
+                await bot.send_photo(
+                    owner_id,
+                    photo=photo,
+                    caption=text,
+                    parse_mode="HTML",
+                    reply_markup=kb.as_markup(),
+                )
+                return
+            except Exception:
+                pass
+
+        await bot.send_message(
+            owner_id,
+            text,
+            parse_mode="HTML",
+            reply_markup=kb.as_markup()
+        )
+    except Exception as e:
+        logger.error(f"Failed to notify partner {owner_id}: {e}")
 
 
 # =============================================================================

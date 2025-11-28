@@ -62,7 +62,7 @@ def create_api_app(db: Any = None, offer_service: Any = None) -> FastAPI:
         CORSMiddleware,
         allow_origins=[
             "https://fudly-webapp.vercel.app",
-            "https://webapp-mxweb19x3-shaxbozs-projects-d385e345.vercel.app",
+            "https://webapp-6ehbl6gzc-shaxbozs-projects-d385e345.vercel.app",
             "https://web.telegram.org",
             "https://telegram.org",
             "http://localhost:5173",  # Vite dev server

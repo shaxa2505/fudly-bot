@@ -9,7 +9,7 @@
   position: sticky;
   top: 0;
   z-index: 100;
-  background: #2D5F3F;
+  background: #00866e;
   padding: 16px 16px 12px;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
 }
@@ -93,8 +93,8 @@
 }
 
 .category-btn.active {
-  border-color: #2D5F3F;
-  background: #2D5F3F;
+  border-color: #00866e;
+  background: #00866e;
   color: white;
 }
 
@@ -262,7 +262,7 @@
   width: 32px;
   height: 32px;
   border: 3px solid #f0f0f0;
-  border-top-color: #2D5F3F;
+  border-top-color: #00866e;
   border-radius: 50%;
   animation: spin 0.8s linear infinite;
   margin: 0 auto;

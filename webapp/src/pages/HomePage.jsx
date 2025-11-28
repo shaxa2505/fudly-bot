@@ -5,13 +5,13 @@ import BottomNav from '../components/BottomNav'
 import './HomePage.css'
 
 const CATEGORIES = [
-  { id: 'all', name: 'Barchasi', emoji: '🔥' },
-  { id: 'dairy', name: 'Sut', emoji: '🥛' },
-  { id: 'bakery', name: 'Non', emoji: '🍞' },
-  { id: 'meat', name: "Go'sht", emoji: '🥩' },
-  { id: 'sweets', name: 'Shirinliklar', emoji: '🍰' },
-  { id: 'drinks', name: 'Ichimliklar', emoji: '🥤' },
-  { id: 'frozen', name: 'Muzlatilgan', emoji: '🧊' },
+  { id: 'all', name: 'Barchasi' },
+  { id: 'dairy', name: 'Sut' },
+  { id: 'bakery', name: 'Non' },
+  { id: 'meat', name: "Go'sht" },
+  { id: 'sweets', name: 'Shirinliklar' },
+  { id: 'drinks', name: 'Ichimliklar' },
+  { id: 'frozen', name: 'Muzlatilgan' },
 ]
 
 function HomePage({ onNavigate, tg }) {
@@ -166,7 +166,6 @@ function HomePage({ onNavigate, tg }) {
               className={`category-btn ${selectedCategory === cat.id ? 'active' : ''}`}
               onClick={() => setSelectedCategory(cat.id)}
             >
-              <span className="category-emoji">{cat.emoji}</span>
               <span className="category-name">{cat.name}</span>
             </button>
           ))}
@@ -181,15 +180,6 @@ function HomePage({ onNavigate, tg }) {
             <span className="location-label">Manzilni belgilang</span>
             <span className="location-value">Yarim soatda yetkazamiz</span>
           </div>
-        </div>
-      </div>
-
-      {/* Promo Banner */}
-      <div className="promo-banner">
-        <div className="promo-content">
-          <span className="promo-badge">YANGILIK</span>
-          <h2 className="promo-title">70% gacha chegirma</h2>
-          <p className="promo-text">Oziq-ovqatni tejang!</p>
         </div>
       </div>
 

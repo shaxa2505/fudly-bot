@@ -27,7 +27,7 @@
   padding: 8px;
   background: none;
   border: none;
-  color: #2D5F3F;
+  color: #00866e;
   font-size: 14px;
   font-weight: 500;
 }
@@ -61,7 +61,7 @@
   padding: 12px 24px;
   border: none;
   border-radius: 12px;
-  background: #2D5F3F;
+  background: #00866e;
   color: white;
   font-size: 16px;
   font-weight: 600;
@@ -110,7 +110,7 @@
 .item-price {
   font-size: 14px;
   font-weight: 700;
-  color: #2D5F3F;
+  color: #00866e;
   margin: 0;
 }
 
@@ -133,7 +133,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #2D5F3F;
+  color: #00866e;
   font-weight: 600;
 }
 
@@ -179,7 +179,7 @@
   padding: 16px;
   border: none;
   border-radius: 12px;
-  background: #2D5F3F;
+  background: #00866e;
   color: white;
   font-size: 16px;
   font-weight: 600;
