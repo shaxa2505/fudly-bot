@@ -42,6 +42,7 @@ class CacheManager:
         self._db = db
         self._user_cache: dict[int, dict[str, Any]] = {}
         self._offers_cache: dict[tuple[str, str, int], dict[str, Any]] = {}
+        self._single_offer_cache: dict[int, dict[str, Any]] = {}
         self._stores_cache: dict[tuple[str, str], dict[str, Any]] = {}
 
         # Try to initialize Redis cache if connection details provided
@@ -179,3 +180,45 @@ class CacheManager:
             # Note: This is a simple implementation. For production,
             # you might want to track keys or use Redis SCAN
             pass
+
+    def get_offer(self, offer_id: int) -> Any | None:
+        """Get a single offer from cache or database.
+
+        Offers are frequently accessed during booking flow,
+        so caching them reduces DB load significantly.
+        """
+        now = time.time()
+
+        # Try Redis first if available
+        if self._redis:
+            redis_key = self._make_redis_key("offer", offer_id)
+            cached = self._redis.get(redis_key)
+            if cached:
+                return cached
+
+        # Check in-memory cache
+        cached_dict = self._single_offer_cache.get(offer_id)
+        if cached_dict and (now - cached_dict["ts"]) < OFFERS_CACHE_TTL:
+            return cached_dict.get("offer")
+
+        # Fetch from database
+        if hasattr(self._db, "get_offer"):
+            offer = self._db.get_offer(offer_id)
+            if offer:
+                self._single_offer_cache[offer_id] = {"offer": offer, "ts": now}
+
+                # Store in Redis if available
+                if self._redis:
+                    redis_key = self._make_redis_key("offer", offer_id)
+                    self._redis.set(redis_key, offer, ttl=OFFERS_CACHE_TTL)
+
+                return offer
+
+        return None
+
+    def invalidate_offer(self, offer_id: int) -> None:
+        """Invalidate cache for a specific offer."""
+        self._single_offer_cache.pop(offer_id, None)
+        if self._redis:
+            redis_key = self._make_redis_key("offer", offer_id)
+            self._redis.delete(redis_key)
