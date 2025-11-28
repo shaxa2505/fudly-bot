@@ -192,10 +192,10 @@ function CartPage({ onNavigate }) {
 
           <button
             className="checkout-btn"
-            onClick={placeOrder}
+            onClick={() => onNavigate('checkout')}
             disabled={loading}
           >
-            {loading ? 'Yuborilmoqda...' : 'Buyurtma berish'}
+            Buyurtma berish
           </button>
         </div>
       </div>

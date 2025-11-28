@@ -2,11 +2,14 @@ import { useState, useEffect } from 'react'
 import HomePage from './pages/HomePage'
 import CartPage from './pages/CartPage'
 import ProfilePage from './pages/ProfilePage'
+import OrderTrackingPage from './pages/OrderTrackingPage'
+import CheckoutPage from './pages/CheckoutPage'
 import { initializeTelegramAuth, isAuthenticated } from './utils/auth'
 import './App.css'
 
 function App() {
   const [currentPage, setCurrentPage] = useState('home')
+  const [pageParams, setPageParams] = useState({})
   const [tg, setTg] = useState(null)
   const [user, setUser] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -55,15 +58,24 @@ function App() {
       )
     }
 
+    const navigate = (page, params = {}) => {
+      setCurrentPage(page)
+      setPageParams(params)
+    }
+
     switch (currentPage) {
       case 'cart':
-        return <CartPage onNavigate={setCurrentPage} user={user} />
+        return <CartPage onNavigate={navigate} user={user} />
       case 'profile':
-        return <ProfilePage onNavigate={setCurrentPage} user={user} />
+        return <ProfilePage onNavigate={navigate} user={user} />
+      case 'checkout':
+        return <CheckoutPage onNavigate={navigate} user={user} />
+      case 'order-tracking':
+        return <OrderTrackingPage onNavigate={navigate} user={user} bookingId={pageParams.bookingId} />
       case 'stores':
-        return <HomePage onNavigate={setCurrentPage} tg={tg} user={user} />
+        return <HomePage onNavigate={navigate} tg={tg} user={user} />
       default:
-        return <HomePage onNavigate={setCurrentPage} tg={tg} user={user} />
+        return <HomePage onNavigate={navigate} tg={tg} user={user} />
     }
   }
 

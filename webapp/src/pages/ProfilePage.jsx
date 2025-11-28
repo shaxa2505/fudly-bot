@@ -183,7 +183,12 @@ function ProfilePage({ onNavigate }) {
         ) : (
           <div className="orders-list">
             {orders.map((order) => (
-              <div key={order.booking_id} className="order-card">
+              <div 
+                key={order.booking_id} 
+                className="order-card"
+                onClick={() => onNavigate('order-tracking', { bookingId: order.booking_id })}
+                style={{ cursor: 'pointer' }}
+              >
                 <div className="order-content">
                   {order.offer_photo && (
                     <img

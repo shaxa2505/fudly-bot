@@ -83,6 +83,28 @@ const api = {
     const { data } = await client.post('/orders', orderData)
     return data
   },
+
+  // Order tracking endpoints (Week 2)
+  async getOrderStatus(bookingId) {
+    const { data } = await client.get(`/orders/${bookingId}/status`)
+    return data
+  },
+
+  async getOrderTimeline(bookingId) {
+    const { data } = await client.get(`/orders/${bookingId}/timeline`)
+    return data
+  },
+
+  async getOrderQR(bookingId) {
+    const { data } = await client.get(`/orders/${bookingId}/qr`)
+    return data
+  },
+
+  async calculateDelivery(deliveryData) {
+    const { data } = await client.post('/orders/calculate-delivery', deliveryData)
+    return data
+  },
 }
 
 export default api
+export const API_BASE_URL = API_BASE

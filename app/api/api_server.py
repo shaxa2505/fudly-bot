@@ -17,6 +17,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.api.webapp_api import router as webapp_router
 from app.api.webapp_api import set_db_instance
 from app.api.auth import router as auth_router, set_auth_db
+from app.api.orders import router as orders_router, set_orders_db
 
 logger = logging.getLogger(__name__)
 
@@ -44,6 +45,7 @@ def create_api_app(db: Any = None, offer_service: Any = None) -> FastAPI:
         if _app_db:
             set_db_instance(_app_db, _app_offer_service)
             set_auth_db(_app_db)
+            set_orders_db(_app_db)
             logger.info("✅ Database connected to API")
         yield
         # Shutdown
@@ -77,6 +79,7 @@ def create_api_app(db: Any = None, offer_service: Any = None) -> FastAPI:
 
     # Include routers
     app.include_router(auth_router)
+    app.include_router(orders_router)
     app.include_router(webapp_router)
 
     @app.get("/")
