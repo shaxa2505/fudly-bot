@@ -2,7 +2,7 @@ import './BottomNav.css'
 
 function BottomNav({ currentPage, onNavigate, cartCount }) {
   const getIcon = (id, isActive) => {
-    const color = isActive ? '#2c473a' : '#6C757D'
+    const color = isActive ? '#184B36' : '#8E8E93'
     
     switch(id) {
       case 'home':

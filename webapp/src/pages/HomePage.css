@@ -1,7 +1,7 @@
 .home-page {
   min-height: 100vh;
   padding-bottom: 80px;
-  background: #f5f5f5;
+  background: #FAFAFA;
 }
 
 /* Header */
@@ -9,9 +9,9 @@
   position: sticky;
   top: 0;
   z-index: 100;
-  background: linear-gradient(135deg, #2c473a 0%, #3d5c4d 100%);
-  padding: 20px 20px 18px;
-  box-shadow: 0 2px 12px rgba(44, 71, 58, 0.12);
+  background: white;
+  padding: 16px 20px 14px;
+  box-shadow: 0 1px 0 rgba(0, 0, 0, 0.05);
 }
 
 .header-content {
@@ -20,12 +20,14 @@
 }
 
 .logo {
-  color: white;
-  font-size: 32px;
-  font-weight: 800;
-  margin: 0 0 16px 0;
-  letter-spacing: -1.2px;
-  text-shadow: 0 2px 12px rgba(0, 0, 0, 0.15);
+  font-size: 28px;
+  font-weight: 900;
+  background: linear-gradient(135deg, #FF6B35 0%, #FF8C42 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  margin: 0 0 14px 0;
+  letter-spacing: -1px;
 }
 
 .search-container {
@@ -34,18 +36,24 @@
 
 .search-input {
   width: 100%;
-  padding: 14px 44px 14px 20px;
-  border: none;
-  border-radius: 16px;
+  padding: 13px 44px 13px 20px;
+  border: 1px solid #E5E5E5;
+  border-radius: 12px;
   font-size: 15px;
-  background: rgba(255, 255, 255, 1);
-  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
-  transition: all 0.3s;
+  background: #F5F5F7;
+  transition: all 0.2s ease;
+  color: #1A1A1A;
+}
+
+.search-input::placeholder {
+  color: #999;
 }
 
 .search-input:focus {
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.12);
-  transform: translateY(-1px);
+  outline: none;
+  background: white;
+  border-color: #FF6B35;
+  box-shadow: 0 0 0 3px rgba(255, 107, 53, 0.1);
 }
 
 .search-clear {
@@ -93,36 +101,39 @@
   display: flex;
   align-items: center;
   gap: 6px;
-  padding: 12px 24px;
-  border: 1px solid rgba(0, 0, 0, 0.08);
-  border-radius: 20px;
-  background: #f8f9fa;
+  padding: 10px 20px;
+  border: 1.5px solid #E5E5E5;
+  border-radius: 24px;
+  background: white;
   white-space: nowrap;
-  transition: all 0.25s ease;
+  transition: all 0.2s ease;
   font-size: 14px;
-  font-weight: 600;
-  color: #495057;
+  font-weight: 500;
+  color: #666;
 }
 
 .category-btn.active {
-  border-color: #2c473a;
-  background: #2c473a;
+  border-color: #FF6B35;
+  background: #FF6B35;
   color: white;
-  box-shadow: 0 3px 10px rgba(44, 71, 58, 0.2);
+  box-shadow: 0 4px 12px rgba(255, 107, 53, 0.25);
+  font-weight: 600;
   transform: translateY(-1px);
 }
 
 .category-btn:hover {
-  background: #e9ecef;
+  border-color: #FFE0D6;
+  background: #FFF5F0;
 }
 
-/* Location Banner */
+/* Location Banner - minimal */
 .location-banner {
-  background: linear-gradient(135deg, #2c473a 0%, #3d5c4d 100%);
-  padding: 16px 20px;
-  margin: 20px 20px 0;
-  border-radius: 14px;
-  box-shadow: 0 2px 12px rgba(44, 71, 58, 0.12);
+  background: white;
+  padding: 12px 16px;
+  margin: 12px 20px 0;
+  border-radius: 12px;
+  box-shadow: none;
+  border: 1px solid #F0F0F0;
 }
 
 .location-content {
@@ -134,12 +145,13 @@
 .location-icon {
   width: 36px;
   height: 36px;
-  background: rgba(255, 255, 255, 0.15);
+  background: linear-gradient(135deg, #FF6B35 0%, #FF8C42 100%);
   border-radius: 10px;
   display: flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
+  box-shadow: 0 2px 8px rgba(255, 107, 53, 0.2);
 }
 
 .location-icon svg {
@@ -155,15 +167,15 @@
 }
 
 .location-label {
-  font-size: 12px;
-  color: rgba(255, 255, 255, 0.9);
+  font-size: 11px;
+  color: #6C757D;
   font-weight: 500;
 }
 
 .location-value {
-  font-size: 15px;
+  font-size: 14px;
   font-weight: 600;
-  color: white;
+  color: #212529;
 }
 
 /* Promo Banner */
@@ -239,12 +251,13 @@
   font-weight: 500;
 }
 
-/* Offers Grid */
+/* Offers Grid - EVOS style */
 .offers-grid {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
-  gap: 20px;
-  padding: 0 20px 32px;
+  gap: 16px;
+  padding: 0 16px 100px;
+  background: #FAFAFA;
 }
 
 /* Skeleton */
