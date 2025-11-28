@@ -156,7 +156,7 @@ async def filter_offers(callback: types.CallbackQuery) -> None:
     for offer in page_offers:
         offer_id = get_offer_field(offer, "offer_id")
         offer_title = get_offer_field(offer, "title", "Товар")[:15]
-        nav_kb.button(text=f"📝 {offer_title}", callback_data=f"edit_offer_{offer_id}")
+        nav_kb.button(text=f"📦 {offer_title}", callback_data=f"view_offer_{offer_id}")
     
     nav_kb.adjust(2)  # 2 buttons per row for items
     
@@ -596,7 +596,7 @@ async def edit_offer(callback: types.CallbackQuery) -> None:
         callback_data=f"copy_offer_{offer_id}",
     )
     kb.button(
-        text="🔙 Назад" if lang == "ru" else "🔙 Orqaga", callback_data=f"back_to_offer_{offer_id}"
+        text="🔙 Назад" if lang == "ru" else "🔙 Orqaga", callback_data="back_to_offers_menu"
     )
     kb.adjust(1)
 
@@ -605,6 +605,22 @@ async def edit_offer(callback: types.CallbackQuery) -> None:
     except Exception:
         await callback.answer(get_text(lang, "edit_unavailable"), show_alert=True)
 
+    await callback.answer()
+
+
+@router.callback_query(F.data.startswith("view_offer_"))
+async def view_offer(callback: types.CallbackQuery) -> None:
+    """View offer details with management buttons."""
+    db = get_db()
+    lang = db.get_user_language(callback.from_user.id)
+    try:
+        offer_id = int(callback.data.rsplit("_", 1)[-1])
+    except (ValueError, IndexError) as e:
+        logger.error(f"Invalid offer_id in callback data: {callback.data}, error: {e}")
+        await callback.answer(get_text(lang, "error"), show_alert=True)
+        return
+
+    await update_offer_message(callback, offer_id, lang)
     await callback.answer()
 
 

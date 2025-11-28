@@ -169,7 +169,11 @@ async def send_offer_card(message: types.Message, offer: Any, lang: str) -> None
             text="❌ Снять" if lang == "ru" else "❌ O'chirish",
             callback_data=f"deactivate_offer_{offer_id}",
         )
-        builder.adjust(2, 2, 1)
+        builder.button(
+            text="🔙 Назад" if lang == "ru" else "🔙 Orqaga",
+            callback_data="back_to_offers_menu",
+        )
+        builder.adjust(2, 2, 1, 1)
     else:
         builder.button(
             text="✅ Активировать" if lang == "ru" else "✅ Faollashtirish",
@@ -179,7 +183,11 @@ async def send_offer_card(message: types.Message, offer: Any, lang: str) -> None
             text="🗑 Удалить" if lang == "ru" else "🗑 O'chirish",
             callback_data=f"delete_offer_{offer_id}",
         )
-        builder.adjust(2)
+        builder.button(
+            text="🔙 Назад" if lang == "ru" else "🔙 Orqaga",
+            callback_data="back_to_offers_menu",
+        )
+        builder.adjust(2, 1)
 
     if photo:
         try:
@@ -481,7 +489,11 @@ async def update_offer_message(callback: types.CallbackQuery, offer_id: int, lan
             text="❌ Снять" if lang == "ru" else "❌ O'chirish",
             callback_data=f"deactivate_offer_{offer_id}",
         )
-        builder.adjust(2, 2, 1)
+        builder.button(
+            text="🔙 Назад" if lang == "ru" else "🔙 Orqaga",
+            callback_data="back_to_offers_menu",
+        )
+        builder.adjust(2, 2, 1, 1)
     else:
         builder.button(
             text="✅ Активировать" if lang == "ru" else "✅ Faollashtirish",
@@ -491,7 +503,11 @@ async def update_offer_message(callback: types.CallbackQuery, offer_id: int, lan
             text="🗑 Удалить" if lang == "ru" else "🗑 O'chirish",
             callback_data=f"delete_offer_{offer_id}",
         )
-        builder.adjust(2)
+        builder.button(
+            text="🔙 Назад" if lang == "ru" else "🔙 Orqaga",
+            callback_data="back_to_offers_menu",
+        )
+        builder.adjust(2, 1)
 
     try:
         await callback.message.edit_caption(
