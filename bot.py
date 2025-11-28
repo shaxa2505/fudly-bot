@@ -278,6 +278,7 @@ def _register_handlers() -> None:
     from handlers.admin import panel as admin_panel
     from handlers.admin import stats as admin_stats
     from handlers.common.router import router as common_router
+    from handlers.common import webapp as webapp_handler
     from handlers.customer import (
         favorites,
         profile,
@@ -356,6 +357,7 @@ def _register_handlers() -> None:
     dp.include_router(admin_stats.router)
 
     # 4. Common handlers (registration, commands, help)
+    dp.include_router(webapp_handler.router)
     dp.include_router(common_router)
 
     # 5. Offer browsing (generic patterns, lower priority)
