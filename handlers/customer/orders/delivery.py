@@ -1,6 +1,7 @@
 """Order and delivery handlers."""
 from __future__ import annotations
 
+import os
 from typing import Any
 
 from aiogram import F, Router, types
@@ -16,6 +17,9 @@ from localization import get_text
 from logging_config import logger
 
 router = Router()
+
+# Get admin ID from environment
+ADMIN_ID = int(os.getenv("ADMIN_ID", "0"))
 
 
 def setup_dependencies(
@@ -430,12 +434,12 @@ async def order_payment_proof(
 
     notification_kb = InlineKeyboardBuilder()
     notification_kb.button(
-        text="✅ " + ("Подтвердить оплату" if lang == "ru" else "To'lovni tasdiqlash"),
-        callback_data=f"confirm_payment_{order_id}",
+        text="✅ Подтвердить оплату",
+        callback_data=f"admin_confirm_payment_{order_id}",
     )
     notification_kb.button(
-        text="❌ " + ("Отклонить" if lang == "ru" else "Rad etish"),
-        callback_data=f"reject_payment_{order_id}",
+        text="❌ Отклонить",
+        callback_data=f"admin_reject_payment_{order_id}",
     )
     notification_kb.adjust(2)
 
@@ -447,46 +451,52 @@ async def order_payment_proof(
     screenshot_ru = "Скриншот оплаты выше"
     screenshot_uz = "To'lov skrinsho yuqorida"
 
-    # Notify store owner
-    if not owner_id:
-        logger.error(
-            f"NOTIFY_ORDER_OWNER: owner_id is None for store_id={store_id}, order={order_id}"
-        )
-    else:
-        try:
-            logger.info(
-                f"NOTIFY_ORDER_OWNER: order={order_id} owner={owner_id} photo_present={bool(photo_id)}"
-            )
-            await bot.send_photo(
-                chat_id=owner_id,
-                photo=photo_id,
-                caption=f"🔔 <b>{'Новый заказ с доставкой!' if lang == 'ru' else 'Yangi buyurtma yetkazib berish bilan!'}</b>\n\n"
-                f"🏪 {store_name}\n"
-                f"🍽 {offer_title}\n"
-                f"📦 {'Количество' if lang == 'ru' else 'Miqdor'}: {quantity} {unit_ru if lang == 'ru' else unit_uz}\n"
-                f"👤 {message.from_user.first_name}\n"
-                f"📱 {'Телефон' if lang == 'ru' else 'Telefon'}: <code>{customer_phone}</code>\n"
-                f"📍 {'Адрес' if lang == 'ru' else 'Manzil'}: {address}\n"
-                f"💰 {payment_ru if lang == 'ru' else payment_uz}: {payment_method_ru if lang == 'ru' else payment_method_uz}\n"
-                f"💵 {'Сумма' if lang == 'ru' else 'Summa'}: {(offer_price * quantity) + delivery_price:,} {currency_ru if lang == 'ru' else currency_uz}\n\n"
-                f"📸 {screenshot_ru if lang == 'ru' else screenshot_uz}",
-                parse_mode="HTML",
-                reply_markup=notification_kb.as_markup(),
-            )
-            logger.info(f"NOTIFY_ORDER_OWNER: sent photo to owner={owner_id} for order={order_id}")
-        except Exception as e:
-            logger.error(
-                f"NOTIFY_ORDER_OWNER: failed to send to owner={owner_id} order={order_id} error={e}"
-            )
-
     total_amount = (offer_price * quantity) + delivery_price
+
+    # Send payment confirmation request to ADMIN instead of store owner
+    if ADMIN_ID <= 0:
+        logger.error(f"ADMIN_ID not configured! Cannot process payment for order {order_id}")
+        await message.answer(
+            "❌ Системная ошибка. Обратитесь к администратору.",
+            reply_markup=get_appropriate_menu(message.from_user.id, lang),
+        )
+        await state.clear()
+        return
+
+    try:
+        logger.info(f"NOTIFY_ADMIN: order={order_id} admin={ADMIN_ID} photo_present={bool(photo_id)}")
+        await bot.send_photo(
+            chat_id=ADMIN_ID,
+            photo=photo_id,
+            caption=(
+                f"💳 <b>Новый чек на подтверждение!</b>\n\n"
+                f"📦 Заказ #{order_id}\n"
+                f"🏪 Магазин: {store_name}\n"
+                f"👤 Владелец магазина ID: <code>{owner_id}</code>\n"
+                f"━━━━━━━━━━━━━━━━━━━━\n"
+                f"🍽 {offer_title}\n"
+                f"📦 Количество: {quantity} шт\n"
+                f"💵 Сумма: <b>{total_amount:,} сум</b>\n"
+                f"━━━━━━━━━━━━━━━━━━━━\n"
+                f"👤 Клиент: {message.from_user.first_name}\n"
+                f"📱 Телефон: <code>{customer_phone}</code>\n"
+                f"📍 Адрес: {address}\n\n"
+                f"📸 Скриншот оплаты выше ☝️"
+            ),
+            parse_mode="HTML",
+            reply_markup=notification_kb.as_markup(),
+        )
+        logger.info(f"NOTIFY_ADMIN: sent payment confirmation request to admin for order={order_id}")
+    except Exception as e:
+        logger.error(f"NOTIFY_ADMIN: failed to send to admin={ADMIN_ID} order={order_id} error={e}")
+
     user = db.get_user_model(message.from_user.id)
     user_role = user.role if user else "customer"
     menu = main_menu_seller(lang) if user_role == "seller" else main_menu_customer(lang)
 
-    # Uzbek text without apostrophes in f-string
-    waiting_msg_ru = "Ожидайте подтверждения оплаты от магазина"
-    waiting_msg_uz = "Do'kon dan to'lovni tasdiqlashni kuting"
+    # Updated waiting message - now waiting for admin confirmation
+    waiting_msg_ru = "⏳ Ожидайте подтверждения оплаты администратором"
+    waiting_msg_uz = "⏳ Administrator tomonidan to'lovni tasdiqlashni kuting"
 
     await message.answer(
         f"✅ <b>{'Заказ оформлен!' if lang == 'ru' else 'Buyurtma qabul qilindi!'}</b>\n\n"
@@ -624,3 +634,186 @@ async def cancel_order_customer(
             logger.error(f"Failed to notify seller {get_store_field(store, 'owner_id')}: {e}")
 
     await callback.answer()
+
+
+# =============================================================================
+# ADMIN PAYMENT CONFIRMATION HANDLERS
+# =============================================================================
+
+
+def _get_order_field(order: Any, field: str, index: int = 0) -> Any:
+    """Helper to get field from order dict or tuple."""
+    if isinstance(order, dict):
+        return order.get(field)
+    return order[index] if len(order) > index else None
+
+
+@router.callback_query(F.data.startswith("admin_confirm_payment_"))
+async def admin_confirm_payment(
+    callback: types.CallbackQuery, db: DatabaseProtocol, bot: Any
+) -> None:
+    """Admin confirms payment - notify seller about new paid order."""
+    if callback.from_user.id != ADMIN_ID:
+        await callback.answer("❌ Только для администратора", show_alert=True)
+        return
+
+    try:
+        order_id = int(callback.data.split("_")[3])
+    except (ValueError, IndexError) as e:
+        logger.error(f"Invalid order_id in callback: {callback.data}, error: {e}")
+        await callback.answer("❌ Ошибка", show_alert=True)
+        return
+
+    order = db.get_order(order_id)
+    if not order:
+        await callback.answer("❌ Заказ не найден", show_alert=True)
+        return
+
+    # Update payment status to confirmed
+    db.update_payment_status(order_id, "confirmed")
+    db.update_order_status(order_id, "confirmed")
+
+    # Get order details
+    store_id = _get_order_field(order, "store_id", 2)
+    offer_id = _get_order_field(order, "offer_id", 3)
+    quantity = _get_order_field(order, "quantity", 4)
+    address = _get_order_field(order, "delivery_address", 7)
+    customer_id = _get_order_field(order, "user_id", 1)
+
+    store = db.get_store(store_id)
+    offer = db.get_offer(offer_id)
+    customer = db.get_user_model(customer_id)
+
+    owner_id = get_store_field(store, "owner_id") if store else None
+    store_name = get_store_field(store, "name", "Магазин") if store else "Магазин"
+    delivery_price = get_store_field(store, "delivery_price", 0) if store else 0
+
+    offer_title = get_offer_field(offer, "title", "Товар") if offer else "Товар"
+    offer_price = get_offer_field(offer, "discount_price", 0) if offer else 0
+
+    customer_name = customer.first_name if customer else "Клиент"
+    customer_phone = customer.phone if customer else "Не указан"
+
+    total_amount = (offer_price * quantity) + delivery_price
+
+    # Update admin message
+    try:
+        await callback.message.edit_caption(
+            caption=callback.message.caption + "\n\n✅ <b>ОПЛАТА ПОДТВЕРЖДЕНА</b>",
+            parse_mode="HTML",
+        )
+    except Exception:
+        pass
+
+    # Notify store owner about confirmed payment
+    if owner_id:
+        seller_lang = db.get_user_language(owner_id)
+        try:
+            await bot.send_message(
+                chat_id=owner_id,
+                text=(
+                    f"🔔 <b>{'Новый оплаченный заказ!' if seller_lang == 'ru' else 'Yangi to`langan buyurtma!'}</b>\n\n"
+                    f"📦 {'Заказ' if seller_lang == 'ru' else 'Buyurtma'} #{order_id}\n"
+                    f"✅ <b>{'Оплата подтверждена администратором' if seller_lang == 'ru' else 'To`lov administrator tomonidan tasdiqlandi'}</b>\n"
+                    f"━━━━━━━━━━━━━━━━━━━━\n"
+                    f"🍽 {offer_title}\n"
+                    f"📦 {'Количество' if seller_lang == 'ru' else 'Miqdor'}: {quantity} {'шт' if seller_lang == 'ru' else 'dona'}\n"
+                    f"💵 {'Сумма' if seller_lang == 'ru' else 'Summa'}: {total_amount:,} {'сум' if seller_lang == 'ru' else 'so`m'}\n"
+                    f"━━━━━━━━━━━━━━━━━━━━\n"
+                    f"👤 {customer_name}\n"
+                    f"📱 {'Телефон' if seller_lang == 'ru' else 'Telefon'}: <code>{customer_phone}</code>\n"
+                    f"📍 {'Адрес доставки' if seller_lang == 'ru' else 'Yetkazib berish manzili'}: {address}\n\n"
+                    f"🚚 {'Пожалуйста, организуйте доставку!' if seller_lang == 'ru' else 'Iltimos, yetkazib berishni tashkil qiling!'}"
+                ),
+                parse_mode="HTML",
+            )
+            logger.info(f"Notified seller {owner_id} about confirmed payment for order {order_id}")
+        except Exception as e:
+            logger.error(f"Failed to notify seller {owner_id}: {e}")
+
+    # Notify customer
+    if customer_id:
+        customer_lang = db.get_user_language(customer_id)
+        try:
+            await bot.send_message(
+                chat_id=customer_id,
+                text=(
+                    f"✅ <b>{'Оплата подтверждена!' if customer_lang == 'ru' else 'To`lov tasdiqlandi!'}</b>\n\n"
+                    f"📦 {'Заказ' if customer_lang == 'ru' else 'Buyurtma'} #{order_id}\n"
+                    f"🍽 {offer_title}\n"
+                    f"💵 {'Сумма' if customer_lang == 'ru' else 'Summa'}: {total_amount:,} {'сум' if customer_lang == 'ru' else 'so`m'}\n\n"
+                    f"🚚 {'Магазин начал обработку вашего заказа. Ожидайте доставку!' if customer_lang == 'ru' else 'Do`kon buyurtmangizni qayta ishlashni boshladi. Yetkazib berishni kuting!'}"
+                ),
+                parse_mode="HTML",
+            )
+        except Exception as e:
+            logger.error(f"Failed to notify customer {customer_id}: {e}")
+
+    await callback.answer("✅ Оплата подтверждена!", show_alert=True)
+
+
+@router.callback_query(F.data.startswith("admin_reject_payment_"))
+async def admin_reject_payment(
+    callback: types.CallbackQuery, db: DatabaseProtocol, bot: Any
+) -> None:
+    """Admin rejects payment - cancel order and notify customer."""
+    if callback.from_user.id != ADMIN_ID:
+        await callback.answer("❌ Только для администратора", show_alert=True)
+        return
+
+    try:
+        order_id = int(callback.data.split("_")[3])
+    except (ValueError, IndexError) as e:
+        logger.error(f"Invalid order_id in callback: {callback.data}, error: {e}")
+        await callback.answer("❌ Ошибка", show_alert=True)
+        return
+
+    order = db.get_order(order_id)
+    if not order:
+        await callback.answer("❌ Заказ не найден", show_alert=True)
+        return
+
+    # Update statuses
+    db.update_payment_status(order_id, "rejected")
+    db.update_order_status(order_id, "cancelled")
+
+    # Restore offer quantity
+    offer_id = _get_order_field(order, "offer_id", 3)
+    quantity = _get_order_field(order, "quantity", 4)
+    customer_id = _get_order_field(order, "user_id", 1)
+
+    offer = db.get_offer(offer_id)
+    if offer:
+        try:
+            db.increment_offer_quantity_atomic(offer_id, int(quantity))
+        except Exception as e:
+            logger.error(f"Failed to restore quantity for offer {offer_id}: {e}")
+
+    # Update admin message
+    try:
+        await callback.message.edit_caption(
+            caption=callback.message.caption + "\n\n❌ <b>ОПЛАТА ОТКЛОНЕНА</b>",
+            parse_mode="HTML",
+        )
+    except Exception:
+        pass
+
+    # Notify customer about rejected payment
+    if customer_id:
+        customer_lang = db.get_user_language(customer_id)
+        offer_title = get_offer_field(offer, "title", "Товар") if offer else "Товар"
+        try:
+            await bot.send_message(
+                chat_id=customer_id,
+                text=(
+                    f"❌ <b>{'Оплата не подтверждена' if customer_lang == 'ru' else 'To`lov tasdiqlanmadi'}</b>\n\n"
+                    f"📦 {'Заказ' if customer_lang == 'ru' else 'Buyurtma'} #{order_id}\n"
+                    f"🍽 {offer_title}\n\n"
+                    f"{'Пожалуйста, проверьте правильность оплаты и попробуйте снова.' if customer_lang == 'ru' else 'Iltimos, to`lov to`g`riligini tekshiring va qayta urinib ko`ring.'}"
+                ),
+                parse_mode="HTML",
+            )
+        except Exception as e:
+            logger.error(f"Failed to notify customer {customer_id}: {e}")
+
+    await callback.answer("❌ Оплата отклонена", show_alert=True)
