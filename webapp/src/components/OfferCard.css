@@ -1,15 +1,17 @@
 .offer-card {
   background: white;
-  border-radius: 16px;
+  border-radius: 20px;
   overflow: hidden;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.06);
   transition: transform 0.2s, box-shadow 0.2s;
   display: flex;
   flex-direction: column;
+  border: 1px solid rgba(0, 0, 0, 0.04);
 }
 
 .offer-card:active {
   transform: scale(0.98);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
 }
 
 /* Image */

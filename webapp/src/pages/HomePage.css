@@ -98,16 +98,13 @@
   color: white;
 }
 
-.category-emoji {
-  font-size: 18px;
-}
-
 /* Location Banner */
 .location-banner {
-  background: linear-gradient(135deg, #FF6B6B 0%, #FF8E53 100%);
+  background: linear-gradient(135deg, #00866e 0%, #00a589 100%);
   padding: 16px;
   margin: 12px 16px;
-  border-radius: 12px;
+  border-radius: 16px;
+  box-shadow: 0 4px 12px rgba(0, 134, 110, 0.2);
 }
 
 .location-content {
@@ -117,18 +114,32 @@
 }
 
 .location-icon {
-  font-size: 24px;
+  width: 40px;
+  height: 40px;
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.location-icon svg {
+  width: 24px;
+  height: 24px;
 }
 
 .location-text {
   display: flex;
   flex-direction: column;
   gap: 2px;
+  flex: 1;
 }
 
 .location-label {
   font-size: 12px;
   color: rgba(255, 255, 255, 0.9);
+  font-weight: 500;
 }
 
 .location-value {

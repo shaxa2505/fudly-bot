@@ -15,7 +15,7 @@ logger = logging.getLogger(__name__)
 router = Router(name="webapp")
 
 # URL вашего Mini App (постоянный домен Vercel)
-WEBAPP_URL = "https://webapp-6ehbl6gzc-shaxbozs-projects-d385e345.vercel.app"
+WEBAPP_URL = "https://fudly-webapp.vercel.app"
 
 
 def webapp_keyboard(lang: str = "ru") -> InlineKeyboardMarkup:

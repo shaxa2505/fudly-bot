@@ -175,7 +175,12 @@ function HomePage({ onNavigate, tg }) {
       {/* Location */}
       <div className="location-banner">
         <div className="location-content">
-          <span className="location-icon">📍</span>
+          <div className="location-icon">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+              <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+              <circle cx="12" cy="10" r="3" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
+          </div>
           <div className="location-text">
             <span className="location-label">Manzilni belgilang</span>
             <span className="location-value">Yarim soatda yetkazamiz</span>
