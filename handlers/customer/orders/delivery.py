@@ -115,14 +115,33 @@ async def order_delivery_start(
     discount_price = get_offer_field(offer, "discount_price", 0)
     title = get_offer_field(offer, "title", "")
 
+    # Build quantity selection keyboard
+    qty_kb = InlineKeyboardBuilder()
+
+    # Generate smart quantity buttons based on available quantity
+    qty_buttons = _generate_quantity_buttons(quantity_available)
+
+    for qty in qty_buttons:
+        qty_kb.button(text=str(qty), callback_data=f"order_qty_{offer_id}_{qty}")
+
+    # Add custom input button
+    custom_text = "✏️ Ввести вручную" if lang == "ru" else "✏️ Qo'lda kiritish"
+    qty_kb.button(text=custom_text, callback_data=f"order_qty_custom_{offer_id}")
+
+    # Arrange buttons: up to 5 per row, custom button on separate row
+    if len(qty_buttons) <= 5:
+        qty_kb.adjust(len(qty_buttons), 1)
+    else:
+        qty_kb.adjust(5, len(qty_buttons) - 5, 1)
+
     if msg:
         await msg.answer(
             f"🍽 <b>{title}</b>\n\n"
             f"📦 {'Доступно' if lang == 'ru' else 'Mavjud'}: {quantity_available} {unit_ru if lang == 'ru' else unit_uz}\n"
             f"💰 {'Цена за 1 шт' if lang == 'ru' else '1 dona narxi'}: {int(discount_price):,} {currency_ru if lang == 'ru' else currency_uz}\n\n"
-            f"{'Сколько вы хотите заказать?' if lang == 'ru' else 'Nechta buyurtma qilasiz?'} (1-{quantity_available})",
+            f"{'Выберите количество:' if lang == 'ru' else 'Miqdorni tanlang:'}",
             parse_mode="HTML",
-            reply_markup=cancel_keyboard(lang),
+            reply_markup=qty_kb.as_markup(),
         )
     else:
         # Fallback to a short alert if the full message cannot be posted to the callback message
@@ -132,6 +151,135 @@ async def order_delivery_start(
             else "Please open the chat to continue",
             show_alert=True,
         )
+    await callback.answer()
+
+
+def _generate_quantity_buttons(max_qty: int) -> list[int]:
+    """Generate smart quantity button values based on available quantity."""
+    if max_qty <= 0:
+        return [1]
+
+    if max_qty <= 5:
+        # Show all: 1, 2, 3, 4, 5
+        return list(range(1, max_qty + 1))
+    elif max_qty <= 10:
+        # Show: 1, 2, 3, 5, max
+        buttons = [1, 2, 3, 5]
+        if max_qty not in buttons:
+            buttons.append(max_qty)
+        return [b for b in buttons if b <= max_qty]
+    elif max_qty <= 20:
+        # Show: 1, 2, 3, 5, 10, max
+        buttons = [1, 2, 3, 5, 10]
+        if max_qty not in buttons:
+            buttons.append(max_qty)
+        return [b for b in buttons if b <= max_qty]
+    elif max_qty <= 50:
+        # Show: 1, 2, 5, 10, 20, max
+        buttons = [1, 2, 5, 10, 20]
+        if max_qty not in buttons:
+            buttons.append(max_qty)
+        return [b for b in buttons if b <= max_qty]
+    else:
+        # Show: 1, 5, 10, 20, 50, max
+        buttons = [1, 5, 10, 20, 50]
+        if max_qty not in buttons:
+            buttons.append(max_qty)
+        return [b for b in buttons if b <= max_qty]
+
+
+@router.callback_query(F.data.startswith("order_qty_custom_"))
+async def order_qty_custom(
+    callback: types.CallbackQuery, state: FSMContext, db: DatabaseProtocol
+) -> None:
+    """Handle custom quantity input request."""
+    if not callback.from_user or not callback.data:
+        await callback.answer()
+        return
+
+    lang = db.get_user_language(callback.from_user.id)
+
+    try:
+        offer_id = int(callback.data.split("_")[3])
+    except (ValueError, IndexError):
+        await callback.answer("❌ Ошибка", show_alert=True)
+        return
+
+    offer = db.get_offer(offer_id)
+    quantity_available = get_offer_field(offer, "quantity", 0) if offer else 0
+
+    await state.set_state(OrderDelivery.quantity)
+
+    if callback.message and hasattr(callback.message, "edit_text"):
+        await callback.message.edit_text(
+            f"{'Введите количество вручную' if lang == 'ru' else 'Miqdorni qo`lda kiriting'} (1-{quantity_available}):",
+            parse_mode="HTML",
+        )
+
+    await callback.answer()
+
+
+@router.callback_query(F.data.startswith("order_qty_"))
+async def order_qty_selected(
+    callback: types.CallbackQuery, state: FSMContext, db: DatabaseProtocol
+) -> None:
+    """Handle quantity button selection."""
+    if not callback.from_user or not callback.data:
+        await callback.answer()
+        return
+
+    # Skip if it's custom input
+    if "custom" in callback.data:
+        return
+
+    lang = db.get_user_language(callback.from_user.id)
+
+    try:
+        parts = callback.data.split("_")
+        offer_id = int(parts[2])
+        quantity = int(parts[3])
+    except (ValueError, IndexError) as e:
+        logger.error(f"Invalid order_qty callback: {callback.data}, error: {e}")
+        await callback.answer("❌ Ошибка", show_alert=True)
+        return
+
+    # Validate quantity
+    data = await state.get_data()
+    store_id = data.get("store_id")
+
+    offer = db.get_offer(offer_id)
+    if not offer:
+        await callback.answer("❌ Товар не найден", show_alert=True)
+        return
+
+    offer_quantity = get_offer_field(offer, "quantity", 0)
+    if quantity > offer_quantity:
+        await callback.answer(
+            f"❌ {'Доступно только' if lang == 'ru' else 'Faqat mavjud'}: {offer_quantity}",
+            show_alert=True,
+        )
+        return
+
+    # Save quantity and proceed to address
+    await state.update_data(quantity=quantity, offer_id=offer_id, store_id=store_id)
+    await state.set_state(OrderDelivery.address)
+
+    msg = callback.message
+    if msg and hasattr(msg, "edit_text"):
+        await msg.edit_text(
+            f"✅ {'Количество' if lang == 'ru' else 'Miqdor'}: {quantity}",
+            parse_mode="HTML",
+        )
+
+        example_ru = "Пример: ул. Амира Темура 15, квартира 25"
+        example_uz = "Misol: Amir Temur ko'chasi 15, xonadon 25"
+
+        await msg.answer(
+            f"📍 {'Укажите адрес доставки' if lang == 'ru' else 'Yetkazib berish manzilini kiriting'}:\n\n"
+            f"{example_ru if lang == 'ru' else example_uz}",
+            reply_markup=cancel_keyboard(lang),
+        )
+
     await callback.answer()
 
 
@@ -160,7 +308,10 @@ async def order_delivery_quantity(
         return
 
     try:
-        quantity = int(message.text)
+        if not message.text:
+            await message.answer("❌ " + ("Введите число!" if lang == "ru" else "Raqam kiriting!"))
+            return
+        quantity = int(message.text.strip())
         if quantity < 1:
             await message.answer(
                 "❌ "
@@ -464,7 +615,9 @@ async def order_payment_proof(
         return
 
     try:
-        logger.info(f"NOTIFY_ADMIN: order={order_id} admin={ADMIN_ID} photo_present={bool(photo_id)}")
+        logger.info(
+            f"NOTIFY_ADMIN: order={order_id} admin={ADMIN_ID} photo_present={bool(photo_id)}"
+        )
         await bot.send_photo(
             chat_id=ADMIN_ID,
             photo=photo_id,
@@ -486,7 +639,9 @@ async def order_payment_proof(
             parse_mode="HTML",
             reply_markup=notification_kb.as_markup(),
         )
-        logger.info(f"NOTIFY_ADMIN: sent payment confirmation request to admin for order={order_id}")
+        logger.info(
+            f"NOTIFY_ADMIN: sent payment confirmation request to admin for order={order_id}"
+        )
     except Exception as e:
         logger.error(f"NOTIFY_ADMIN: failed to send to admin={ADMIN_ID} order={order_id} error={e}")
 
@@ -709,7 +864,7 @@ async def admin_confirm_payment(
     # Notify store owner about confirmed payment WITH photo
     if owner_id:
         seller_lang = db.get_user_language(owner_id)
-        
+
         order_caption = (
             f"🔔 <b>{'Новый оплаченный заказ!' if seller_lang == 'ru' else 'Yangi tolangan buyurtma!'}</b>\n\n"
             f"📦 {'Заказ' if seller_lang == 'ru' else 'Buyurtma'} #{order_id}\n"
@@ -724,7 +879,7 @@ async def admin_confirm_payment(
             f"📍 {'Адрес доставки' if seller_lang == 'ru' else 'Yetkazib berish manzili'}: {address}\n\n"
             f"🚚 {'Пожалуйста, организуйте доставку!' if seller_lang == 'ru' else 'Iltimos, yetkazib berishni tashkil qiling!'}"
         )
-        
+
         try:
             # Send with payment proof photo if available
             if payment_photo_id:
