@@ -479,11 +479,11 @@ Yaqin atrofdagi do'konlarni ko'rsatamiz
         "registration_complete": """🎉 <b>Tayyor! Xush kelibsiz!</b>
 
 Endi siz:
-🔥 <b>Issiq</b> — kunning eng yaxshi chegirmalari
+🔥 <b>Issiq takliflar</b> — kunning eng yaxshi chegirmalari
 🏪 <b>Do'konlar</b> — shahardagi barcha do'konlar
 🔍 <b>Qidirish</b> — kerakli mahsulotni topish
 
-💡 Maslahat: har kuni "Issiq" bo'limini tekshiring!""",
+💡 Maslahat: har kuni "Issiq takliflar" bo'limini tekshiring!""",
         "welcome_back": """👋 <b>Salom, {name}!</b>
 
 📍 Shahar: {city}""",
@@ -493,23 +493,24 @@ Boshlash uchun /start bosing""",
         # Tugmalar
         "share_phone": "📱 Raqamni ulashish",
         "cancel": "❌ Bekor qilish",
-        "hot_offers": "🔥 Issiq",
+        "hot_offers": "🔥 Issiq takliflar",
         "browse_places": "🏪 Joylar",
         "my_cart": "🛒 Savat",
         "available_offers": "🍽 Mavjud takliflar",
         "my_bookings": "📋 Mening buyurtmalarim",
-        "stores": "🏪 Barcha dokonlar",
+        "stores": "🏪 Barcha do'konlar",
         "favorites": "❤️ Sevimlilar",
         "my_city": "Mening shahrim",
         "your_city": "Sizning shahringiz",
         "profile": "👤 Profil",
-        "become_partner": "🏪 Hamkor bolish",
+        "become_partner": "🏪 Hamkor bo'lish",
         "establishments": "🏪 Do'konlar",
         "search": "🔍 Qidirish",
         "help": "❓ Qanday ishlaydi",
         "enter_search_query": "Mahsulot yoki do'kon nomini kiriting:",
         "search_results": "Qidiruv natijalari:",
         "no_results": "Hech narsa topilmadi",
+        "action_cancelled": "❌ Amal bekor qilindi",
         "select_category_in_store": "Ushbu muassasada toifani tanlang:",
         # Hamkor - yangi qisqa nomlar
         "add_item": "➕ Qo'shish",
@@ -535,14 +536,14 @@ Boshlash uchun /start bosing""",
         "role": "👔 Rol",
         "role_seller": "Hamkor",
         "role_customer": "Xaridor",
-        "switched_to_customer": "🔄 Xaridor rejimiga ogirildi",
-        "switched_to_seller": "🔄 Hamkor rejimiga ogirildi",
+        "switched_to_customer": "🔄 Xaridor rejimiga o'girildi",
+        "switched_to_seller": "🔄 Hamkor rejimiga o'girildi",
         # Shaharlar - your_city defined earlier at line 501
         "choose_city": "🌆 <b>Shahringizni tanlang:</b>",
         "city_changed": "✅ Shahar {city}ga o'zgartirildi",
         # Takliflar
         "no_offers": "😔 Hozircha sizning shahringizda takliflar yo'q",
-        "no_offers_in_store": "😔 Bu dokonda hali takliflar yo'q",
+        "no_offers_in_store": "😔 Bu do'konda hali takliflar yo'q",
         "offers_in_city": "🍽 <b>{city} shahridagi mavjud takliflar</b>\n\nJami: {count}",
         "offers_found": "🍽 <b>Mavjud takliflar</b>\n\nTopildi: {count}",
         "hot_offers_title": "🔥 <b>ISSIQ TAKLIFLAR</b>",
@@ -557,7 +558,7 @@ Boshlash uchun /start bosing""",
         "all_offers": "Barcha takliflar",
         "no_active_offers": "Faol takliflar yo'q",
         "choose_category": "🏪 Kategoriyani tanlang:",
-        "choose_store": "🏪 Dokonni tanlang:",
+        "choose_store": "🏪 Do'konni tanlang:",
         "choose_offer": "🍽 Taklifni tanlang:",
         "back": "🔙 Orqaga",
         "book": "✅ Buyurtma qilish",
@@ -663,6 +664,39 @@ Tahrirlash yoki o'chirish mumkin
         "error_discount_less_than_original": "❌ Chegirma narxi oddiy narxdan kichik bo‘lishi kerak",
         "warn_discount_low": "⚠️ Diqqat: chegirma 10% dan kichik. Mijozlarni jalb qilish uchun 30% va undan yuqori tavsiya etamiz.",
         "booking_how_many": "Nechta buyurtma qilmoqchisiz? (1-{max_qty})",
+        "booking_step_quantity": """┏━━━━━━━━━━━━━━━━━━━━━┓
+┃   BUYURTMA BERISH     ┃
+┗━━━━━━━━━━━━━━━━━━━━━┛
+
+📦 <b>{title}</b>
+🏪 {store_name}
+
+💰 Narx: <b>{price:,} so'm</b> 1 {unit} uchun
+📋 Mavjud: <b>{quantity}</b> {unit}
+
+💡 1 dan {quantity} gacha son kiriting
+
+<i>Masalan: 2</i>""",
+        "booking_confirm": """┏━━━━━━━━━━━━━━━━━━━━━┓
+┃   TASDIQLASH          ┃
+┗━━━━━━━━━━━━━━━━━━━━━┛
+
+📦 <b>{title}</b>
+🏪 {store_name}
+📍 {address}
+
+━━━━━━━━━━━━━━━━━━━━━
+📊 Miqdor: <b>{quantity}</b> {unit}
+💰 To'lov: <b>{total:,} so'm</b>
+━━━━━━━━━━━━━━━━━━━━━
+
+<b>Qadam 2/2: Buyurtmani tasdiqlang</b>
+
+✓ Mahsulotni siz uchun band qilamiz
+✓ Olish uchun kod olasiz
+✓ To'lov olishda
+
+<i>Quyidagi "Tasdiqlash" tugmasini bosing</i> 👇""",
         # Hamkor
         "become_partner_text": """🏪 <b>Fudly hamkori bo'ling</b>
 
@@ -805,30 +839,30 @@ Mijoz do'koningizni baholash uchun xabar oladi.""",
         # Xatolar
         "error_invalid_number": "❌ Iltimos, to'g'ri raqam kiriting",
         "error_invalid_time": "❌ Noto'g'ri vaqt formati. HH:MM formatidan foydalaning (masalan: 18:00)",
-        "no_stores": "❌ Sizda tasdiqlangan dokonlar yoq!",
-        "no_approved_stores": "❌ Sizda tasdiqlangan dokonlar yoq!\n\n⏳ Administrator tomonidan arizangizni tasdiqlanishini kuting.",
+        "no_stores": "❌ Sizda tasdiqlangan do'konlar yo'q!",
+        "no_approved_stores": "❌ Sizda tasdiqlangan do'konlar yo'q!\n\n⏳ Administrator tomonidan arizangizni tasdiqlanishini kuting.",
         "operation_cancelled": "❌ Operatsiya bekor qilindi",
-        "no_admin_access": "❌ Sizda admin paneliga kirish huquqi yoq",
+        "no_admin_access": "❌ Sizda admin paneliga kirish huquqi yo'q",
         "send_photo": '📸 Taom rasmini yuboring (yoki "otkazib yuborish" deb yozing)',
         "invalid_range": "❌ 1 dan 100 gacha",
-        "no_offers_yet": "📊 Hali takliflar yoq",
+        "no_offers_yet": "📊 Hali takliflar yo'q",
         "your_offers": "📊 Sizning takliflaringiz ({count}):",
-        "no_stores_in_city": "😔 {city} shahrida hali dokonlar yoq",
-        "stores_in_city": "🏪 <b>{city} shahridagi dokonlar</b>\n\nJami: {count}",
-        "your_stores": "🏪 Sizning dokonlaringiz ({count}):",
+        "no_stores_in_city": "😔 {city} shahrida hali do'konlar yo'q",
+        "stores_in_city": "🏪 <b>{city} shahridagi do'konlar</b>\n\nJami: {count}",
+        "your_stores": "🏪 Sizning do'konlaringiz ({count}):",
         "access_denied": "❌ Kirish taqiqlangan",
-        "no_pending_stores": "✅ Moderatsiyada arizalar yoq",
+        "no_pending_stores": "✅ Moderatsiyada arizalar yo'q",
         "pending_stores_count": "⏳ Moderatsiyadagi arizalar: {count}",
-        "store_approved_admin": "✅ Dokon tasdiqlandi!",
-        "store_rejected_admin": "✅ Dokon rad etildi!",
+        "store_approved_admin": "✅ Do'kon tasdiqlandi!",
+        "store_rejected_admin": "✅ Do'kon rad etildi!",
         # Sevimlilar
-        "no_favorites": "😔 Sizda hali sevimli dokonlar yoq\n\nDokonlarni sevimlilarga qo'shing, tez topish uchun!",
+        "no_favorites": "😔 Sizda hali sevimli do'konlar yo'q\n\nDo'konlarni sevimlilarga qo'shing, tez topish uchun!",
         "already_in_favorites": "❤️ Allaqachon sevimlilarda!",
         "added_to_favorites": "✅ Sevimlilarga qo'shildi!",
         "removed_from_favorites": "💔 Sevimlilardan o'chirildi",
         # Analitika - no_stores defined earlier at line 802
         "not_seller": "❌ Bu funksiya faqat hamkorlar uchun",
-        "select_store_for_analytics": "📊 Analitika uchun dokonni tanlang:",
+        "select_store_for_analytics": "📊 Analitika uchun do'konni tanlang:",
         # Boshqa
         "duplicate": "📋 Nusxalash",
         "delete": "❌ O'chirish",
@@ -845,7 +879,7 @@ Akkauntingizni o\'chirishni xohlaysizmi?
 
 O\'chiriladi:
 • Barcha ma\'lumotlaringiz
-• Dokonlaringiz
+• Do'konlaringiz
 • Barcha takliflar
 • Buyurtmalar tarixi
 
@@ -853,7 +887,7 @@ Bu harakatni qaytarib bo\'lmaydi!""",
         "account_deleted": "✅ Akkauntingiz muvaffaqiyatli o'chirildi",
         "yes_delete": "✅ Ha, o'chirish",
         "no_cancel": "❌ Yo'q, bekor qilish",
-        "store_deleted": "✅ Dokon muvaffaqiyatli o'chirildi",
+        "store_deleted": "✅ Do'kon muvaffaqiyatli o'chirildi",
         "error_general": "❌ Xatolik yuz berdi. Keyinroq urinib ko'ring.",
         # Qo'shimcha tarjimalar (xardkod-tekstlar)
         "offer_not_found": "❌ Mahsulot topilmadi",

@@ -418,19 +418,29 @@ async def choose_language(callback: types.CallbackQuery, state: FSMContext, db: 
             callback.from_user.id, callback.from_user.username, callback.from_user.first_name
         )
         db.update_user_language(callback.from_user.id, lang)
+        # Редактируем предыдущее сообщение (если возможно)
         if hasattr(callback.message, "edit_text"):
-            await callback.message.edit_text(get_text(lang, "language_changed"))
+            try:
+                await callback.message.edit_text(get_text(lang, "language_changed"))
+            except Exception:
+                pass
+        # ВСЕГДА отправляем запрос телефона
+        if hasattr(callback.message, "answer"):
             await callback.message.answer(
                 get_text(lang, "welcome_phone_step"),
                 parse_mode="HTML",
                 reply_markup=phone_request_keyboard(lang),
             )
         await state.set_state(Registration.phone)
+        await callback.answer()
         return
 
     db.update_user_language(callback.from_user.id, lang)
     if hasattr(callback.message, "edit_text"):
-        await callback.message.edit_text(get_text(lang, "language_changed"))
+        try:
+            await callback.message.edit_text(get_text(lang, "language_changed"))
+        except Exception:
+            pass
 
     user_phone = user.phone
     user_city = user.city
@@ -443,6 +453,7 @@ async def choose_language(callback: types.CallbackQuery, state: FSMContext, db: 
                 reply_markup=phone_request_keyboard(lang),
             )
         await state.set_state(Registration.phone)
+        await callback.answer()
         return
 
     user_role = user.role or "customer"
@@ -458,6 +469,7 @@ async def choose_language(callback: types.CallbackQuery, state: FSMContext, db: 
             parse_mode="HTML",
             reply_markup=menu,
         )
+    await callback.answer()
 
 
 @router.message(F.text.contains("Отмена") | F.text.contains("Bekor qilish"))
@@ -602,7 +614,8 @@ async def force_cancel_booking(callback: types.CallbackQuery, db: DatabaseProtoc
         return
 
     user_id = callback.from_user.id
-    lang = db.get_user_language(user_id)
+    # lang используется ниже для локализации, но сейчас хардкодим русский
+    _ = db.get_user_language(user_id)  # noqa: F841
 
     try:
         booking_id = int(callback.data.split("_")[-1])

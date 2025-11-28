@@ -175,20 +175,33 @@ async def fallback_photo_handler(message: types.Message, state: FSMContext) -> N
     lang = db.get_user_language(user_id)
     current_state = await state.get_state()
 
-    logger.warning(f"Unexpected photo from user {user_id} (state: {current_state})")
+    logger.debug(f"Unexpected photo from user {user_id} (state: {current_state})")
 
-    error_text = (
-        "⚠️ Произошла ошибка: данные заказа потеряны.\n\n"
-        "Это может произойти если:\n"
-        "• Прошло много времени между шагами\n"
-        "• Сервер был перезапущен\n\n"
-        "Пожалуйста, начните заново через 🔥 Горячее"
-        if lang == "ru"
-        else "⚠️ Xatolik: buyurtma ma'lumotlari yo'qoldi.\n\n"
-        "Iltimos, 🔥 Issiq orqali qaytadan boshlang"
-    )
-
-    await message.answer(error_text, reply_markup=get_appropriate_menu(user_id, lang))
+    # Если пользователь в процессе заказа/бронирования - показать ошибку
+    if current_state and any(
+        s in str(current_state) for s in ["BookOffer", "OrderDelivery", "CreateOffer", "BulkCreate"]
+    ):
+        error_text = (
+            "⚠️ Произошла ошибка: данные заказа потеряны.\n\n"
+            "Это может произойти если:\n"
+            "• Прошло много времени между шагами\n"
+            "• Сервер был перезапущен\n\n"
+            "Пожалуйста, начните заново через 🔥 Горячее"
+            if lang == "ru"
+            else "⚠️ Xatolik: buyurtma ma'lumotlari yo'qoldi.\n\n"
+            "Iltimos, 🔥 Issiq takliflar orqali qaytadan boshlang"
+        )
+        await state.clear()
+        await message.answer(error_text, reply_markup=get_appropriate_menu(user_id, lang))
+    # Иначе - просто игнорировать или показать подсказку
+    else:
+        hint = (
+            "📷 Фото получено, но я не знаю что с ним делать.\n" "Используйте меню для навигации."
+            if lang == "ru"
+            else "📷 Rasm qabul qilindi, lekin nima qilishni bilmayman.\n"
+            "Navigatsiya uchun menyudan foydalaning."
+        )
+        await message.answer(hint, reply_markup=get_appropriate_menu(user_id, lang))
 
 
 @fallback_router.message(F.text)
@@ -204,14 +217,36 @@ async def fallback_text_handler(message: types.Message, state: FSMContext) -> No
 
     logger.debug(f"Unknown message from {user_id}: '{text[:50]}...' (state: {current_state})")
 
+    # Если пользователь в процессе заказа/бронирования - показать ошибку
+    if current_state and any(
+        s in str(current_state) for s in ["BookOffer", "OrderDelivery", "CreateOffer", "BulkCreate"]
+    ):
+        error_text = (
+            "⚠️ Произошла ошибка: данные заказа потеряны.\n\n"
+            "Это может произойти если:\n"
+            "• Прошло много времени между шагами\n"
+            "• Сервер был перезапущен\n\n"
+            "Пожалуйста, начните заново через 🔥 Горячее"
+            if lang == "ru"
+            else "⚠️ Xatolik: buyurtma ma'lumotlari yo'qoldi.\n\n"
+            "Iltimos, 🔥 Issiq takliflar orqali qaytadan boshlang"
+        )
+        await state.clear()
+        await message.answer(error_text, reply_markup=get_appropriate_menu(user_id, lang))
+        return
+
     # Help users who type numbers without context
     if text.isdigit():
         hint = (
             "Чтобы выбрать товар по номеру, сначала откройте 🔥 Горячее"
             if lang == "ru"
-            else "Mahsulotni tanlash uchun avval 🔥 Issiq ni oching"
+            else "Mahsulotni tanlash uchun avval 🔥 Issiq takliflar ni oching"
         )
         await message.answer(hint)
+        return
+
+    # Для обычного текста - просто подсказка что использовать меню
+    # Не отвечаем на каждое сообщение, чтобы не спамить
 
 
 @fallback_router.callback_query()
