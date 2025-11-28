@@ -26,8 +26,10 @@ def get_offer_value(obj: Any, key: str, default: Any = None) -> Any:
 
 def offer_to_dict(offer: Any) -> dict:
     """Convert offer to API response dict."""
+    # Try offer_id first (PostgreSQL), then id (SQLite)
+    offer_id = get_offer_value(offer, "offer_id", 0) or get_offer_value(offer, "id", 0)
     return {
-        "id": get_offer_value(offer, "id", 0),
+        "id": offer_id,
         "title": get_offer_value(offer, "title", ""),
         "description": get_offer_value(offer, "description"),
         "original_price": float(get_offer_value(offer, "original_price", 0) or 0),
@@ -37,7 +39,7 @@ def offer_to_dict(offer: Any) -> dict:
         "category": get_offer_value(offer, "category", "other") or "other",
         "store_id": int(get_offer_value(offer, "store_id", 0) or 0),
         "store_name": get_offer_value(offer, "store_name", "") or "",
-        "store_address": get_offer_value(offer, "store_address"),
+        "store_address": get_offer_value(offer, "store_address") or get_offer_value(offer, "address"),
         "photo": get_offer_value(offer, "photo"),
         "expiry_date": str(get_offer_value(offer, "expiry_date", ""))
         if get_offer_value(offer, "expiry_date")
