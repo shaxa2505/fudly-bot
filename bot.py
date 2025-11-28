@@ -29,6 +29,7 @@ from app.core.security import (
     logger,
     start_background_tasks,
 )
+from database_protocol import DatabaseProtocol
 
 # Load typed settings
 settings = load_settings()
@@ -255,7 +256,7 @@ async def fallback_text_handler(message: types.Message, state: FSMContext) -> No
 
 
 @fallback_router.callback_query(F.data.startswith("order_accept:"))
-async def handle_order_accept(callback: types.CallbackQuery) -> None:
+async def handle_order_accept(callback: types.CallbackQuery, db: DatabaseProtocol = None) -> None:
     """Handle seller accepting Mini App order."""
     try:
         parts = callback.data.split(":")
@@ -264,6 +265,15 @@ async def handle_order_accept(callback: types.CallbackQuery) -> None:
             return
         
         _, booking_code, customer_id = parts
+        
+        # Update booking status in database
+        if db and hasattr(db, "get_booking_by_code"):
+            booking = db.get_booking_by_code(booking_code)
+            if booking:
+                booking_id = booking.get("booking_id") or booking[0] if isinstance(booking, tuple) else None
+                if booking_id and hasattr(db, "update_booking_status"):
+                    db.update_booking_status(booking_id, "confirmed")
+                    logger.info(f"Booking {booking_id} ({booking_code}) confirmed by seller")
         
         # Update message to show accepted
         await callback.message.edit_text(
@@ -291,7 +301,7 @@ async def handle_order_accept(callback: types.CallbackQuery) -> None:
 
 
 @fallback_router.callback_query(F.data.startswith("order_reject:"))
-async def handle_order_reject(callback: types.CallbackQuery) -> None:
+async def handle_order_reject(callback: types.CallbackQuery, db: DatabaseProtocol = None) -> None:
     """Handle seller rejecting Mini App order."""
     try:
         parts = callback.data.split(":")
@@ -300,6 +310,15 @@ async def handle_order_reject(callback: types.CallbackQuery) -> None:
             return
         
         _, booking_code, customer_id = parts
+        
+        # Update booking status in database
+        if db and hasattr(db, "get_booking_by_code"):
+            booking = db.get_booking_by_code(booking_code)
+            if booking:
+                booking_id = booking.get("booking_id") or booking[0] if isinstance(booking, tuple) else None
+                if booking_id and hasattr(db, "update_booking_status"):
+                    db.update_booking_status(booking_id, "cancelled")
+                    logger.info(f"Booking {booking_id} ({booking_code}) rejected by seller")
         
         # Update message to show rejected
         await callback.message.edit_text(
