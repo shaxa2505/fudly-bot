@@ -379,6 +379,16 @@ async def create_webhook_app(
             except Exception as e:
                 info["db_error"] = str(e)
 
+            # Check photo_id in offers
+            try:
+                with db.get_connection() as conn:
+                    cursor = conn.cursor()
+                    cursor.execute("SELECT offer_id, title, photo_id FROM offers WHERE photo_id IS NOT NULL LIMIT 5")
+                    rows = cursor.fetchall()
+                    info["offers_with_photos"] = [{"id": r[0], "title": r[1], "photo_id": r[2]} for r in rows]
+            except Exception as e:
+                info["photo_check_error"] = str(e)
+
             return add_cors_headers(web.json_response(info))
         except Exception as e:
             return add_cors_headers(web.json_response({"error": str(e)}, status=500))
