@@ -28,6 +28,25 @@ client.interceptors.response.use(
 )
 
 const api = {
+  // Auth endpoints
+  async validateAuth(initData) {
+    const { data } = await client.post('/auth/validate', { init_data: initData })
+    return data
+  },
+
+  async getProfile(userId) {
+    const { data } = await client.get('/user/profile', { params: { user_id: userId } })
+    return data
+  },
+
+  async getUserOrders(userId, status = null) {
+    const params = { user_id: userId }
+    if (status) params.status = status
+    const { data } = await client.get('/user/orders', { params })
+    return data
+  },
+
+  // Offers endpoints
   async getOffers(params) {
     const { data } = await client.get('/offers', { params })
     return data

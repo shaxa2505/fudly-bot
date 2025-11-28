@@ -5,6 +5,7 @@ Validates initData from Telegram WebApp and returns user profile
 import hashlib
 import hmac
 import json
+from datetime import datetime
 from typing import Any
 from urllib.parse import parse_qsl
 
@@ -12,10 +13,25 @@ from fastapi import APIRouter, Depends, HTTPException, Header
 from pydantic import BaseModel
 
 from app.core.config import load_settings
-from database_protocol import DatabaseProtocol
 
-router = APIRouter()
+router = APIRouter(prefix="/api/v1", tags=["auth"])
 settings = load_settings()
+
+# Global database instance (set by api_server.py)
+_db_instance = None
+
+
+def get_db():
+    """Dependency to get database instance."""
+    if _db_instance is None:
+        raise HTTPException(status_code=503, detail="Database not available")
+    return _db_instance
+
+
+def set_auth_db(db):
+    """Set database instance for auth module."""
+    global _db_instance
+    _db_instance = db
 
 
 class AuthRequest(BaseModel):
@@ -94,7 +110,7 @@ def validate_telegram_webapp_data(init_data: str, bot_token: str) -> dict[str, A
 @router.post("/auth/validate", response_model=UserProfile)
 async def validate_auth(
     request: AuthRequest,
-    db: DatabaseProtocol = Depends(lambda: None)  # Replace with your DB dependency
+    db = Depends(get_db)
 ) -> UserProfile:
     """
     Validate Telegram WebApp authentication and return user profile.
@@ -155,7 +171,7 @@ async def validate_auth(
 @router.get("/user/profile", response_model=UserProfile)
 async def get_profile(
     user_id: int,
-    db: DatabaseProtocol = Depends(lambda: None)
+    db = Depends(get_db)
 ) -> UserProfile:
     """Get user profile by ID."""
     user = db.get_user_model(user_id)
@@ -174,3 +190,149 @@ async def get_profile(
         registered=bool(user.phone),
         notifications_enabled=getattr(user, 'notifications_enabled', True)
     )
+
+
+# =============================================================================
+# USER ORDERS / BOOKINGS
+# =============================================================================
+
+class BookingItem(BaseModel):
+    """Single booking/order item."""
+    booking_id: int
+    offer_id: int
+    offer_title: str
+    offer_photo: str | None
+    quantity: int
+    total_price: int
+    status: str
+    store_name: str
+    store_address: str | None
+    booking_code: str | None
+    created_at: str
+    pickup_time: str | None
+
+
+class OrdersHistoryResponse(BaseModel):
+    """User's orders history."""
+    orders: list[BookingItem]
+    total_count: int
+    active_count: int
+    completed_count: int
+
+
+@router.get("/user/orders", response_model=OrdersHistoryResponse)
+async def get_user_orders(
+    user_id: int,
+    status: str | None = None,
+    limit: int = 50,
+    db = Depends(get_db)
+) -> OrdersHistoryResponse:
+    """
+    Get user's order history.
+    
+    Args:
+        user_id: Telegram user ID
+        status: Filter by status (pending, confirmed, completed, cancelled)
+        limit: Maximum number of orders to return
+    """
+    try:
+        # Get all bookings
+        if status:
+            bookings = db.get_user_bookings_by_status(user_id, status)
+        else:
+            bookings = db.get_user_bookings(user_id)
+        
+        if not bookings:
+            return OrdersHistoryResponse(
+                orders=[],
+                total_count=0,
+                active_count=0,
+                completed_count=0
+            )
+        
+        # Convert to response format
+        orders_list = []
+        active_count = 0
+        completed_count = 0
+        
+        for booking in bookings[:limit]:
+            # Handle both dict and tuple formats
+            if isinstance(booking, dict):
+                booking_id = booking.get('booking_id')
+                offer_id = booking.get('offer_id')
+                quantity = booking.get('quantity', 1)
+                total_price = booking.get('total_price', 0)
+                booking_status = booking.get('status', 'pending')
+                booking_code = booking.get('booking_code')
+                created_at = booking.get('created_at')
+            else:
+                # Tuple format: (booking_id, user_id, offer_id, status, quantity, total_price, code, created_at, ...)
+                booking_id = booking[0]
+                offer_id = booking[2]
+                booking_status = booking[3]
+                quantity = booking[4]
+                total_price = booking[5]
+                booking_code = booking[6] if len(booking) > 6 else None
+                created_at = booking[7] if len(booking) > 7 else None
+            
+            # Get offer details
+            offer = db.get_offer(offer_id)
+            if not offer:
+                continue
+                
+            if isinstance(offer, dict):
+                offer_title = offer.get('title', 'Товар')
+                offer_photo = offer.get('photo')
+                store_id = offer.get('store_id')
+            else:
+                offer_title = offer[1] if len(offer) > 1 else 'Товар'
+                offer_photo = offer[7] if len(offer) > 7 else None
+                store_id = offer[10] if len(offer) > 10 else None
+            
+            # Get store details
+            store = db.get_store(store_id) if store_id else None
+            if store:
+                if isinstance(store, dict):
+                    store_name = store.get('name', 'Магазин')
+                    store_address = store.get('address')
+                else:
+                    store_name = store[1] if len(store) > 1 else 'Магазин'
+                    store_address = store[2] if len(store) > 2 else None
+            else:
+                store_name = 'Магазин'
+                store_address = None
+            
+            # Count statuses
+            if booking_status in ('pending', 'confirmed'):
+                active_count += 1
+            elif booking_status == 'completed':
+                completed_count += 1
+            
+            # Format created_at
+            created_at_str = str(created_at) if created_at else None
+            
+            orders_list.append(BookingItem(
+                booking_id=booking_id,
+                offer_id=offer_id,
+                offer_title=offer_title,
+                offer_photo=offer_photo,
+                quantity=quantity,
+                total_price=int(total_price),
+                status=booking_status,
+                store_name=store_name,
+                store_address=store_address,
+                booking_code=booking_code,
+                created_at=created_at_str,
+                pickup_time=None  # TODO: Add pickup time if needed
+            ))
+        
+        return OrdersHistoryResponse(
+            orders=orders_list,
+            total_count=len(bookings),
+            active_count=active_count,
+            completed_count=completed_count
+        )
+        
+    except Exception as e:
+        logger.error(f"Error getting user orders: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to get orders: {str(e)}")
