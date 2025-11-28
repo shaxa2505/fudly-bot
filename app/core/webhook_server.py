@@ -573,11 +573,18 @@ async def create_webhook_app(
                                 "quantity": b[3] if len(b) > 3 else 1,
                                 "status": b[4] if len(b) > 4 else "pending",
                                 "booking_code": b[5] if len(b) > 5 else None,
-                                "created_at": str(b[6]) if len(b) > 6 else None,
+                                "created_at": str(b[6]) if len(b) > 6 and b[6] else None,
                             }
                         )
                     elif isinstance(b, dict):
-                        bookings.append(b)
+                        # Serialize datetime fields
+                        booking = {}
+                        for key, value in b.items():
+                            if hasattr(value, "isoformat"):
+                                booking[key] = value.isoformat()
+                            else:
+                                booking[key] = value
+                        bookings.append(booking)
 
             return add_cors_headers(web.json_response({"orders": bookings}))
 
