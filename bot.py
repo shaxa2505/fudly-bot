@@ -249,6 +249,83 @@ async def fallback_text_handler(message: types.Message, state: FSMContext) -> No
     # Не отвечаем на каждое сообщение, чтобы не спамить
 
 
+# =============================================================================
+# MINI APP ORDER CALLBACKS
+# =============================================================================
+
+
+@fallback_router.callback_query(F.data.startswith("order_accept:"))
+async def handle_order_accept(callback: types.CallbackQuery) -> None:
+    """Handle seller accepting Mini App order."""
+    try:
+        parts = callback.data.split(":")
+        if len(parts) != 3:
+            await callback.answer("Ошибка данных", show_alert=True)
+            return
+        
+        _, booking_code, customer_id = parts
+        
+        # Update message to show accepted
+        await callback.message.edit_text(
+            callback.message.text + "\n\n✅ <b>Заказ принят!</b>",
+            parse_mode="HTML"
+        )
+        
+        # Notify customer
+        try:
+            await callback.bot.send_message(
+                chat_id=int(customer_id),
+                text=f"🎉 <b>Ваш заказ принят!</b>\n\n"
+                     f"🎫 Код бронирования: <code>{booking_code}</code>\n\n"
+                     f"Продавец подтвердил ваш заказ. Ожидайте дальнейших инструкций!",
+                parse_mode="HTML"
+            )
+        except Exception as e:
+            logger.warning(f"Failed to notify customer {customer_id}: {e}")
+        
+        await callback.answer("Заказ принят! Покупатель уведомлен.", show_alert=True)
+        
+    except Exception as e:
+        logger.error(f"Error accepting order: {e}")
+        await callback.answer("Ошибка при обработке", show_alert=True)
+
+
+@fallback_router.callback_query(F.data.startswith("order_reject:"))
+async def handle_order_reject(callback: types.CallbackQuery) -> None:
+    """Handle seller rejecting Mini App order."""
+    try:
+        parts = callback.data.split(":")
+        if len(parts) != 3:
+            await callback.answer("Ошибка данных", show_alert=True)
+            return
+        
+        _, booking_code, customer_id = parts
+        
+        # Update message to show rejected
+        await callback.message.edit_text(
+            callback.message.text + "\n\n❌ <b>Заказ отклонён</b>",
+            parse_mode="HTML"
+        )
+        
+        # Notify customer
+        try:
+            await callback.bot.send_message(
+                chat_id=int(customer_id),
+                text=f"😔 <b>К сожалению, ваш заказ отклонён</b>\n\n"
+                     f"🎫 Код: <code>{booking_code}</code>\n\n"
+                     f"Продавец не может выполнить ваш заказ. Попробуйте выбрать другой товар.",
+                parse_mode="HTML"
+            )
+        except Exception as e:
+            logger.warning(f"Failed to notify customer {customer_id}: {e}")
+        
+        await callback.answer("Заказ отклонён. Покупатель уведомлен.", show_alert=True)
+        
+    except Exception as e:
+        logger.error(f"Error rejecting order: {e}")
+        await callback.answer("Ошибка при обработке", show_alert=True)
+
+
 @fallback_router.callback_query()
 async def fallback_callback_handler(callback: types.CallbackQuery) -> None:
     """Handle unhandled callback queries."""

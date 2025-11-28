@@ -5,6 +5,7 @@ from datetime import datetime
 from typing import Any
 
 from aiogram import Bot, Dispatcher, types
+from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 from aiohttp import web
 
 from app.core.metrics import metrics as app_metrics
@@ -562,9 +563,26 @@ async def create_webhook_app(
                                             if notes:
                                                 msg += f"📝 Примечание: {notes}\n"
 
-                                            # Send via bot
+                                            # Create inline keyboard for seller actions
+                                            keyboard = InlineKeyboardMarkup(inline_keyboard=[
+                                                [
+                                                    InlineKeyboardButton(
+                                                        text="✅ Принять",
+                                                        callback_data=f"order_accept:{booking_code}:{user_id}"
+                                                    ),
+                                                    InlineKeyboardButton(
+                                                        text="❌ Отклонить",
+                                                        callback_data=f"order_reject:{booking_code}:{user_id}"
+                                                    )
+                                                ]
+                                            ])
+
+                                            # Send via bot with keyboard
                                             await bot.send_message(
-                                                chat_id=int(seller_id), text=msg, parse_mode="HTML"
+                                                chat_id=int(seller_id), 
+                                                text=msg, 
+                                                parse_mode="HTML",
+                                                reply_markup=keyboard
                                             )
                                             logger.info(f"Notification sent to seller {seller_id}")
                         except Exception as notify_err:
