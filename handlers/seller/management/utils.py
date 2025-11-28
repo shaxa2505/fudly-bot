@@ -509,11 +509,30 @@ async def update_offer_message(callback: types.CallbackQuery, offer_id: int, lan
         )
         builder.adjust(2, 1)
 
+    # Get offer photo
+    photo = get_offer_field(database.get_offer(offer_id), "photo")
+
     try:
-        await callback.message.edit_caption(
-            caption=text, parse_mode="HTML", reply_markup=builder.as_markup()
-        )
+        if photo:
+            # Offer has photo - send as photo message
+            await callback.message.answer_photo(
+                photo=photo,
+                caption=text,
+                parse_mode="HTML",
+                reply_markup=builder.as_markup(),
+            )
+        else:
+            # No photo - send as text
+            await callback.message.answer(
+                text, parse_mode="HTML", reply_markup=builder.as_markup()
+            )
+        # Try to delete the list message
+        try:
+            await callback.message.delete()
+        except Exception:
+            pass
     except Exception:
+        # Fallback: try to edit current message
         try:
             await callback.message.edit_text(
                 text, parse_mode="HTML", reply_markup=builder.as_markup()
