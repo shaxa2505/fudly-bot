@@ -578,10 +578,12 @@ async def skip_photo(callback: types.CallbackQuery, state: FSMContext) -> None:
         await callback.answer("System error", show_alert=True)
         return
 
+    # Answer callback first to remove "loading" indicator
+    await callback.answer()
+
     lang = db.get_user_language(callback.from_user.id)
     await state.update_data(photo=None)
     await _finalize_offer(callback.message, state, lang)
-    await callback.answer()
 
 
 async def _finalize_offer(target: types.Message, state: FSMContext, lang: str) -> None:
