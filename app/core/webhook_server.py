@@ -28,6 +28,10 @@ def offer_to_dict(offer: Any) -> dict:
     """Convert offer to API response dict."""
     # Try offer_id first (PostgreSQL), then id (SQLite)
     offer_id = get_offer_value(offer, "offer_id", 0) or get_offer_value(offer, "id", 0)
+    
+    # Get photo - try photo_id first (Telegram file_id), then photo (URL)
+    photo = get_offer_value(offer, "photo_id") or get_offer_value(offer, "photo")
+    
     return {
         "id": offer_id,
         "title": get_offer_value(offer, "title", ""),
@@ -41,7 +45,7 @@ def offer_to_dict(offer: Any) -> dict:
         "store_name": get_offer_value(offer, "store_name", "") or "",
         "store_address": get_offer_value(offer, "store_address")
         or get_offer_value(offer, "address"),
-        "photo": get_offer_value(offer, "photo"),
+        "photo": photo,
         "expiry_date": str(get_offer_value(offer, "expiry_date", ""))
         if get_offer_value(offer, "expiry_date")
         else None,
@@ -592,6 +596,25 @@ async def create_webhook_app(
             logger.error(f"API user orders error: {e}")
             return add_cors_headers(web.json_response({"error": str(e)}, status=500))
 
+    async def api_get_photo(request: web.Request) -> web.Response:
+        """GET /api/v1/photo/{file_id} - Get photo URL from Telegram file_id."""
+        file_id = request.match_info.get("file_id")
+        if not file_id:
+            return add_cors_headers(web.json_response({"error": "file_id required"}, status=400))
+
+        try:
+            # Get file info from Telegram
+            file = await bot.get_file(file_id)
+            if file and file.file_path:
+                # Construct URL
+                photo_url = f"https://api.telegram.org/file/bot{bot.token}/{file.file_path}"
+                return add_cors_headers(web.json_response({"url": photo_url}))
+            else:
+                return add_cors_headers(web.json_response({"error": "File not found"}, status=404))
+        except Exception as e:
+            logger.error(f"API get photo error: {e}")
+            return add_cors_headers(web.json_response({"error": str(e)}, status=500))
+
     async def api_health(request: web.Request) -> web.Response:
         """GET /api/v1/health - API health check."""
         return add_cors_headers(
@@ -632,6 +655,8 @@ async def create_webhook_app(
     app.router.add_options("/api/v1/orders", cors_preflight)
     app.router.add_post("/api/v1/orders", api_create_order)
     app.router.add_get("/api/v1/orders", api_user_orders)
+    app.router.add_options("/api/v1/photo/{file_id}", cors_preflight)
+    app.router.add_get("/api/v1/photo/{file_id}", api_get_photo)
     app.router.add_get("/api/v1/health", api_health)
     app.router.add_get("/api/v1/debug", api_debug)
 
