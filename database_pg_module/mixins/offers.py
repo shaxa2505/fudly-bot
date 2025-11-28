@@ -261,17 +261,31 @@ class OfferMixin:
         """Get offers by city and category."""
         with self.get_connection() as conn:
             cursor = conn.cursor(row_factory=dict_row)
-            cursor.execute(
-                """
-                SELECT o.*, s.name as store_name, s.address
-                FROM offers o
-                JOIN stores s ON o.store_id = s.store_id
-                WHERE s.city = %s AND o.category = %s AND o.status = 'active'
-                ORDER BY o.created_at DESC
-                LIMIT %s
-            """,
-                (city, category, limit),
-            )
+            if city:
+                cursor.execute(
+                    """
+                    SELECT o.*, s.name as store_name, s.address
+                    FROM offers o
+                    JOIN stores s ON o.store_id = s.store_id
+                    WHERE s.city = %s AND o.category = %s AND o.status = 'active'
+                    ORDER BY o.created_at DESC
+                    LIMIT %s
+                """,
+                    (city, category, limit),
+                )
+            else:
+                # No city filter - return all categories
+                cursor.execute(
+                    """
+                    SELECT o.*, s.name as store_name, s.address
+                    FROM offers o
+                    JOIN stores s ON o.store_id = s.store_id
+                    WHERE o.category = %s AND o.status = 'active'
+                    ORDER BY o.created_at DESC
+                    LIMIT %s
+                """,
+                    (category, limit),
+                )
             return [dict(row) for row in cursor.fetchall()]
 
     def update_offer_quantity(self, offer_id: int, quantity: int):

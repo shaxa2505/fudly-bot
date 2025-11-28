@@ -79,14 +79,19 @@ def offer_to_dict(offer: Any, photo_url: str | None = None) -> dict:
 
 def store_to_dict(store: Any) -> dict:
     """Convert store to API response dict."""
+    store_id = get_offer_value(store, "store_id", 0) or get_offer_value(store, "id", 0)
     return {
-        "id": get_offer_value(store, "id", 0),
+        "id": store_id,
         "name": get_offer_value(store, "name", ""),
         "address": get_offer_value(store, "address"),
         "city": get_offer_value(store, "city"),
         "business_type": get_offer_value(store, "business_type", "supermarket"),
         "rating": float(get_offer_value(store, "rating", 0) or 0),
         "offers_count": int(get_offer_value(store, "offers_count", 0) or 0),
+        # Delivery settings
+        "delivery_enabled": get_offer_value(store, "delivery_enabled", 1) == 1,
+        "delivery_price": int(get_offer_value(store, "delivery_price", 15000) or 15000),
+        "min_order_amount": int(get_offer_value(store, "min_order_amount", 30000) or 30000),
     }
 
 
@@ -96,8 +101,7 @@ API_CATEGORIES = [
     {"id": "dairy", "name": "Молочные", "emoji": "🥛"},
     {"id": "bakery", "name": "Выпечка", "emoji": "🍞"},
     {"id": "meat", "name": "Мясо", "emoji": "🥩"},
-    {"id": "fruits", "name": "Фрукты", "emoji": "🍎"},
-    {"id": "vegetables", "name": "Овощи", "emoji": "🥕"},
+    {"id": "snacks", "name": "Снеки", "emoji": "🍿"},
     {"id": "drinks", "name": "Напитки", "emoji": "🥤"},
     {"id": "sweets", "name": "Сладости", "emoji": "🍰"},
     {"id": "frozen", "name": "Заморозка", "emoji": "🧊"},
@@ -358,11 +362,16 @@ async def create_webhook_app(
                     raw_offers = db.search_offers(search, city) or []
                     logger.info(f"search_offers returned {len(raw_offers)} items")
             elif category and category != "all":
-                if hasattr(db, "get_offers_by_category"):
-                    raw_offers = db.get_offers_by_category(category, city) or []
+                if hasattr(db, "get_offers_by_city_and_category"):
+                    raw_offers = db.get_offers_by_city_and_category(city, category, limit) or []
                     logger.info(
-                        f"get_offers_by_category({category}) returned {len(raw_offers)} items"
+                        f"get_offers_by_city_and_category({city}, {category}) returned {len(raw_offers)} items"
                     )
+                elif hasattr(db, "get_hot_offers"):
+                    # Fallback: filter hot offers by category
+                    all_offers = db.get_hot_offers(city, limit=100) or []
+                    raw_offers = [o for o in all_offers if get_offer_value(o, "category") == category][:limit]
+                    logger.info(f"Filtered hot_offers by {category}: {len(raw_offers)} items")
             else:
                 if hasattr(db, "get_hot_offers"):
                     raw_offers = db.get_hot_offers(city, limit=limit, offset=offset) or []
@@ -448,20 +457,30 @@ async def create_webhook_app(
 
     async def api_stores(request: web.Request) -> web.Response:
         """GET /api/v1/stores - List stores."""
-        city = request.query.get("city", "Ташкент")
+        city = request.query.get("city", "")  # Empty = all cities
         business_type = request.query.get("business_type")
 
         try:
             raw_stores: list[Any] = []
 
-            if business_type:
-                if hasattr(db, "get_stores_by_business_type"):
-                    raw_stores = db.get_stores_by_business_type(business_type, city) or []
-            else:
-                if hasattr(db, "get_all_stores"):
-                    raw_stores = db.get_all_stores(city) or []
+            # Get stores from database
+            if hasattr(db, "get_connection"):
+                with db.get_connection() as conn:
+                    cursor = conn.cursor()
+                    if city:
+                        cursor.execute(
+                            "SELECT * FROM stores WHERE (status = 'active' OR status = 'approved') AND city = %s",
+                            (city,)
+                        )
+                    else:
+                        cursor.execute(
+                            "SELECT * FROM stores WHERE status = 'active' OR status = 'approved'"
+                        )
+                    columns = [desc[0] for desc in cursor.description]
+                    raw_stores = [dict(zip(columns, row)) for row in cursor.fetchall()]
 
             stores = [store_to_dict(s) for s in raw_stores]
+            logger.info(f"API /stores: returning {len(stores)} stores")
             return add_cors_headers(web.json_response(stores))
 
         except Exception as e:
