@@ -2,7 +2,7 @@ import { memo } from 'react'
 import './OfferCard.css'
 
 const OfferCard = memo(function OfferCard({ offer, cartQuantity = 0, onAddToCart, onRemoveFromCart, onNavigate }) {
-  
+
   const handleCardClick = () => {
     if (onNavigate) {
       onNavigate('product-detail', { offer, onAddToCart })
@@ -19,12 +19,12 @@ const OfferCard = memo(function OfferCard({ offer, cartQuantity = 0, onAddToCart
     onRemoveFromCart?.(offer)
   }
 
-  const discountPercent = Math.round(offer.discount_percent || 
+  const discountPercent = Math.round(offer.discount_percent ||
     ((offer.original_price - offer.discount_price) / offer.original_price * 100))
 
   // Определяем ярлыки
   const isHit = discountPercent >= 25
-  
+
   // Форматирование срока годности
   const formatExpiry = (date) => {
     if (!date) return null
@@ -36,7 +36,7 @@ const OfferCard = memo(function OfferCard({ offer, cartQuantity = 0, onAddToCart
     if (diffDays <= 7) return `${diffDays} kun`
     return null
   }
-  
+
   const expiryText = formatExpiry(offer.expiry_date)
 
   return (
@@ -78,7 +78,7 @@ const OfferCard = memo(function OfferCard({ offer, cartQuantity = 0, onAddToCart
               </span>
             )}
           </div>
-          
+
           {cartQuantity > 0 ? (
             <div className="quantity-controls">
               <button className="qty-btn minus" onClick={handleRemoveClick}>

@@ -451,8 +451,12 @@ async def get_stores(
                     rating=float(get_val(store, "rating", 0) or 0),
                     offers_count=int(get_val(store, "offers_count", 0) or 0),
                     delivery_enabled=bool(get_val(store, "delivery_enabled", False)),
-                    delivery_price=float(get_val(store, "delivery_price", 0) or 0) if get_val(store, "delivery_price") else None,
-                    min_order_amount=float(get_val(store, "min_order_amount", 0) or 0) if get_val(store, "min_order_amount") else None,
+                    delivery_price=float(get_val(store, "delivery_price", 0) or 0)
+                    if get_val(store, "delivery_price")
+                    else None,
+                    min_order_amount=float(get_val(store, "min_order_amount", 0) or 0)
+                    if get_val(store, "min_order_amount")
+                    else None,
                 )
             )
 
@@ -473,9 +477,8 @@ async def create_order(
     order: CreateOrderRequest, db=Depends(get_db), user: dict = Depends(get_current_user)
 ):
     """Create a new order from Mini App and notify partner."""
+
     from aiogram import Bot
-    from aiogram.utils.keyboard import InlineKeyboardBuilder
-    import html
 
     try:
         # Use user_id from request or from Telegram auth
@@ -520,13 +523,15 @@ async def create_order(
                         comment=order.comment or "",
                     )
 
-                    created_bookings.append({
-                        "booking_id": booking_id,
-                        "offer_id": item.offer_id,
-                        "quantity": item.quantity,
-                        "total": total,
-                        "offer_title": offer_title,
-                    })
+                    created_bookings.append(
+                        {
+                            "booking_id": booking_id,
+                            "offer_id": item.offer_id,
+                            "quantity": item.quantity,
+                            "total": total,
+                            "offer_title": offer_title,
+                        }
+                    )
 
                     # Notify partner about new booking
                     if bot_instance and store_id:
@@ -561,10 +566,7 @@ async def create_order(
         total_items = sum(b["quantity"] for b in created_bookings)
 
         return OrderResponse(
-            order_id=order_id,
-            status="pending",
-            total=total_amount,
-            items_count=total_items
+            order_id=order_id, status="pending", total=total_amount, items_count=total_items
         )
 
     except HTTPException:
@@ -575,13 +577,22 @@ async def create_order(
 
 
 async def notify_partner_webapp_order(
-    bot, db, owner_id: int, booking_id: int, offer_title: str,
-    quantity: int, total: float, user_id: int, delivery_address: str | None,
-    phone: str | None, photo: str | None
+    bot,
+    db,
+    owner_id: int,
+    booking_id: int,
+    offer_title: str,
+    quantity: int,
+    total: float,
+    user_id: int,
+    delivery_address: str | None,
+    phone: str | None,
+    photo: str | None,
 ):
     """Send notification to partner about new webapp order."""
-    from aiogram.utils.keyboard import InlineKeyboardBuilder
     import html
+
+    from aiogram.utils.keyboard import InlineKeyboardBuilder
 
     partner_lang = db.get_user_language(owner_id) if hasattr(db, "get_user_language") else "uz"
     user = db.get_user(user_id) if hasattr(db, "get_user") else None
@@ -645,12 +656,7 @@ async def notify_partner_webapp_order(
             except Exception:
                 pass
 
-        await bot.send_message(
-            owner_id,
-            text,
-            parse_mode="HTML",
-            reply_markup=kb.as_markup()
-        )
+        await bot.send_message(owner_id, text, parse_mode="HTML", reply_markup=kb.as_markup())
     except Exception as e:
         logger.error(f"Failed to notify partner {owner_id}: {e}")
 

@@ -14,7 +14,7 @@ function CartPage({ onNavigate, user }) {
     }
   })
   const [orderLoading, setOrderLoading] = useState(false)
-  
+
   // Checkout form
   const [showCheckout, setShowCheckout] = useState(false)
   const [phone, setPhone] = useState(() => localStorage.getItem('fudly_phone') || '')
@@ -25,13 +25,13 @@ function CartPage({ onNavigate, user }) {
     } catch { return '' }
   })
   const [comment, setComment] = useState('')
-  
+
   // Delivery type: 'pickup' or 'delivery'
   const [orderType, setOrderType] = useState('pickup')
   const [deliveryFee, setDeliveryFee] = useState(0)
   const [minOrderAmount, setMinOrderAmount] = useState(0)
   const [storeDeliveryEnabled, setStoreDeliveryEnabled] = useState(false)
-  
+
   // Success/Error modals
   const [orderResult, setOrderResult] = useState(null)
 
@@ -45,14 +45,14 @@ function CartPage({ onNavigate, user }) {
     const checkDeliveryAvailability = async () => {
       // Get unique store IDs from cart
       const storeIds = [...new Set(Object.values(cart).map(item => item.offer?.store_id).filter(Boolean))]
-      
+
       if (storeIds.length === 0) return
-      
+
       try {
         // Check first store for simplicity
         const stores = await api.getStores({})
         const cartStore = stores.find(s => storeIds.includes(s.id))
-        
+
         if (cartStore) {
           setStoreDeliveryEnabled(cartStore.delivery_enabled || false)
           setDeliveryFee(cartStore.delivery_price || 15000)
@@ -66,7 +66,7 @@ function CartPage({ onNavigate, user }) {
         setMinOrderAmount(30000)
       }
     }
-    
+
     checkDeliveryAvailability()
   }, [cart])
 
@@ -75,7 +75,7 @@ function CartPage({ onNavigate, user }) {
   const subtotal = cartItems.reduce((sum, item) => sum + (item.offer.discount_price * item.quantity), 0)
   const total = orderType === 'delivery' ? subtotal + deliveryFee : subtotal
   const itemsCount = cartItems.reduce((sum, item) => sum + item.quantity, 0)
-  
+
   // Check if minimum order met for delivery
   const canDelivery = subtotal >= minOrderAmount
 
@@ -84,7 +84,7 @@ function CartPage({ onNavigate, user }) {
       const key = String(offerId)
       const existing = prev[key]
       if (!existing) return prev
-      
+
       const newQty = existing.quantity + delta
       if (newQty <= 0) {
         const { [key]: _, ...rest } = prev
@@ -119,14 +119,14 @@ function CartPage({ onNavigate, user }) {
       alert('Telefon raqamingizni kiriting')
       return
     }
-    
+
     if (orderType === 'delivery' && !address.trim()) {
       alert('Yetkazib berish manzilini kiriting')
       return
     }
 
     setOrderLoading(true)
-    
+
     try {
       const userId = window.Telegram?.WebApp?.initDataUnsafe?.user?.id || user?.id || 1
 
@@ -146,11 +146,11 @@ function CartPage({ onNavigate, user }) {
       localStorage.setItem('fudly_phone', phone.trim())
 
       const result = await api.createOrder(orderData)
-      
+
       clearCart()
       setShowCheckout(false)
-      setOrderResult({ 
-        success: true, 
+      setOrderResult({
+        success: true,
         orderId: result.order_id,
         orderType: orderType,
         total: total
@@ -167,7 +167,7 @@ function CartPage({ onNavigate, user }) {
           order_type: orderType,
         }))
       }
-      
+
     } catch (error) {
       console.error('Error placing order:', error)
       setOrderResult({ success: false })
@@ -228,15 +228,15 @@ function CartPage({ onNavigate, user }) {
             </div>
             <div className="cart-item-controls">
               <div className="qty-controls">
-                <button 
-                  className="qty-btn" 
+                <button
+                  className="qty-btn"
                   onClick={() => updateQuantity(item.offer.id, -1)}
                 >
                   −
                 </button>
                 <span className="qty-value">{item.quantity}</span>
-                <button 
-                  className="qty-btn plus" 
+                <button
+                  className="qty-btn plus"
                   onClick={() => updateQuantity(item.offer.id, 1)}
                 >
                   +
@@ -245,7 +245,7 @@ function CartPage({ onNavigate, user }) {
               <p className="cart-item-total">
                 {Math.round(item.offer.discount_price * item.quantity).toLocaleString()} so'm
               </p>
-              <button 
+              <button
                 className="remove-btn"
                 onClick={() => removeItem(item.offer.id)}
               >
@@ -293,7 +293,7 @@ function CartPage({ onNavigate, user }) {
               <div className="order-type-section">
                 <p className="section-label">Buyurtma turi:</p>
                 <div className="order-type-options">
-                  <button 
+                  <button
                     className={`order-type-btn ${orderType === 'pickup' ? 'active' : ''}`}
                     onClick={() => setOrderType('pickup')}
                   >
@@ -301,8 +301,8 @@ function CartPage({ onNavigate, user }) {
                     <span className="order-type-text">O'zi olib ketadi</span>
                     <span className="order-type-desc">Bepul</span>
                   </button>
-                  
-                  <button 
+
+                  <button
                     className={`order-type-btn ${orderType === 'delivery' ? 'active' : ''} ${!storeDeliveryEnabled || !canDelivery ? 'disabled' : ''}`}
                     onClick={() => storeDeliveryEnabled && canDelivery && setOrderType('delivery')}
                     disabled={!storeDeliveryEnabled || !canDelivery}
@@ -310,16 +310,16 @@ function CartPage({ onNavigate, user }) {
                     <span className="order-type-icon">🚚</span>
                     <span className="order-type-text">Yetkazib berish</span>
                     <span className="order-type-desc">
-                      {!storeDeliveryEnabled 
-                        ? 'Mavjud emas' 
-                        : !canDelivery 
+                      {!storeDeliveryEnabled
+                        ? 'Mavjud emas'
+                        : !canDelivery
                           ? `Min: ${Math.round(minOrderAmount).toLocaleString()} so'm`
                           : `${Math.round(deliveryFee).toLocaleString()} so'm`
                       }
                     </span>
                   </button>
                 </div>
-                
+
                 {!canDelivery && storeDeliveryEnabled && (
                   <p className="delivery-hint">
                     💡 Yetkazib berish uchun minimum {Math.round(minOrderAmount).toLocaleString()} so'm buyurtma qiling
@@ -379,14 +379,14 @@ function CartPage({ onNavigate, user }) {
             </div>
 
             <div className="modal-footer">
-              <button 
-                className="cancel-btn" 
+              <button
+                className="cancel-btn"
                 onClick={() => setShowCheckout(false)}
                 disabled={orderLoading}
               >
                 Bekor qilish
               </button>
-              <button 
+              <button
                 className="confirm-btn"
                 onClick={placeOrder}
                 disabled={orderLoading || !phone.trim() || (orderType === 'delivery' && !address.trim())}
@@ -408,8 +408,8 @@ function CartPage({ onNavigate, user }) {
                 <h2>Buyurtma qabul qilindi!</h2>
                 <p>Buyurtma raqami: #{orderResult.orderId}</p>
                 <p className="order-type-result">
-                  {orderResult.orderType === 'pickup' 
-                    ? '🏪 O\'zi olib ketish' 
+                  {orderResult.orderType === 'pickup'
+                    ? '🏪 O\'zi olib ketish'
                     : '🚚 Yetkazib berish'
                   }
                 </p>

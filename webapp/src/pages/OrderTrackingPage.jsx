@@ -177,7 +177,7 @@ function OrderTrackingPage({ user, bookingId, onNavigate }) {
             {timeline.timeline.map((item, index) => {
               const isActive = STATUS_STEPS[item.status]?.order <= currentStatusOrder;
               const isCurrent = item.status === order.status;
-              
+
               return (
                 <div key={index} className={`timeline-item ${isActive ? 'active' : ''} ${isCurrent ? 'current' : ''}`}>
                   <div className="timeline-marker">

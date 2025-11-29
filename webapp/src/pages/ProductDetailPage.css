@@ -419,19 +419,19 @@
   .product-image-section {
     min-height: 280px;
   }
-  
+
   .product-main-image {
     height: 220px;
   }
-  
+
   .product-name {
     font-size: 20px;
   }
-  
+
   .current-price {
     font-size: 22px;
   }
-  
+
   .discount-badge-large {
     font-size: 15px;
     padding: 8px 12px;

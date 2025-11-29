@@ -19,12 +19,12 @@ function App() {
   useEffect(() => {
     // Initialize Telegram WebApp
     const tg = window.Telegram?.WebApp
-    
+
     if (tg) {
       // Expand to full height
       tg.expand()
       tg.ready()
-      
+
       // Get user from Telegram
       const tgUser = tg.initDataUnsafe?.user
       if (tgUser) {
@@ -37,12 +37,12 @@ function App() {
           language_code: tgUser.language_code || 'uz',
         })
       }
-      
+
       // Theme colors
       document.documentElement.style.setProperty('--tg-theme-bg-color', tg.themeParams.bg_color || '#ffffff')
       document.documentElement.style.setProperty('--tg-theme-text-color', tg.themeParams.text_color || '#000000')
       document.documentElement.style.setProperty('--tg-theme-button-color', tg.themeParams.button_color || '#53B175')
-      
+
       // Handle back button
       tg.BackButton.onClick(() => {
         if (currentPage !== 'home') {
@@ -52,7 +52,7 @@ function App() {
         }
       })
     }
-    
+
     setLoading(false)
   }, [currentPage])
 

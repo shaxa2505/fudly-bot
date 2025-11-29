@@ -84,7 +84,7 @@ const ProfilePage = ({ onNavigate, user }) => {
     <div className="profile-page">
       <div className="profile-user-section">
         <div className="profile-user-avatar">
-          <img 
+          <img
             src={avatarUrl}
             alt={userName}
           />

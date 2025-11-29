@@ -208,7 +208,7 @@ WEBAPP_URL = "https://your-domain.vercel.app"
 from aiogram.types import WebAppInfo, InlineKeyboardButton, InlineKeyboardMarkup
 
 webapp_button = InlineKeyboardButton(
-    text="🛒 Ochish", 
+    text="🛒 Ochish",
     web_app=WebAppInfo(url=WEBAPP_URL)
 )
 keyboard = InlineKeyboardMarkup(inline_keyboard=[[webapp_button]])

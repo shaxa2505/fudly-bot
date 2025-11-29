@@ -32,7 +32,7 @@ function StoresPage({ onNavigate }) {
     'Olmaliq': 'Алмалык',
     'Angren': 'Ангрен'
   }
-  
+
   const location = (() => {
     try {
       return JSON.parse(localStorage.getItem('fudly_location') || '{}')
@@ -70,13 +70,13 @@ function StoresPage({ onNavigate }) {
         params.business_type = selectedType
       }
       let data = await api.getStores(params)
-      
+
       // If no stores found with city filter, try without city
       if ((!data || data.length === 0) && cityRaw) {
         const paramsNoCity = selectedType !== 'all' ? { business_type: selectedType } : {}
         data = await api.getStores(paramsNoCity)
       }
-      
+
       setStores(data || [])
     } catch (error) {
       console.error('Error loading stores:', error)
@@ -119,7 +119,7 @@ function StoresPage({ onNavigate }) {
     const stars = []
     const fullStars = Math.floor(rating)
     const hasHalf = rating % 1 >= 0.5
-    
+
     for (let i = 0; i < 5; i++) {
       if (i < fullStars) {
         stars.push(<span key={i} className="star filled">★</span>)
@@ -140,7 +140,7 @@ function StoresPage({ onNavigate }) {
           <h1 className="page-title">Do'konlar</h1>
           <span className="city-badge">📍 {cityLatin}</span>
         </div>
-        
+
         {/* Search */}
         <div className="search-box">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" className="search-icon">
@@ -209,13 +209,13 @@ function StoresPage({ onNavigate }) {
                     <span className="offers-badge">{store.offers_count} ta taklif</span>
                   )}
                 </div>
-                
+
                 <h3 className="store-name">{store.name}</h3>
-                
+
                 {store.address && (
                   <p className="store-address">📍 {store.address}</p>
                 )}
-                
+
                 <div className="store-footer">
                   <div className="store-rating">
                     {renderStars(store.rating || 0)}
@@ -264,8 +264,8 @@ function StoresPage({ onNavigate }) {
                   <h3 className="offers-title">Mavjud takliflar</h3>
                   <div className="offers-list">
                     {storeOffers.map(offer => (
-                      <div 
-                        key={offer.id} 
+                      <div
+                        key={offer.id}
                         className="offer-item"
                         onClick={() => {
                           closeStoreModal()
@@ -293,7 +293,7 @@ function StoresPage({ onNavigate }) {
             </div>
 
             <div className="modal-footer">
-              <button 
+              <button
                 className="view-all-btn"
                 onClick={() => {
                   closeStoreModal()

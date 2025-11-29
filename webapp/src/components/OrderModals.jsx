@@ -131,8 +131,8 @@ export function CheckoutModal({ onClose, onPlaceOrder, totalCost, loading }) {
             <button className="terms-link">Shartlar</button> va{' '}
             <button className="terms-link">Qoidalar</button>ga rozilik bildirasiz
           </p>
-          <button 
-            className="place-order-btn" 
+          <button
+            className="place-order-btn"
             onClick={onPlaceOrder}
             disabled={loading}
             style={{ opacity: loading ? 0.7 : 1, cursor: loading ? 'wait' : 'pointer' }}

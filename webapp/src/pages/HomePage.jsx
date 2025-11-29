@@ -161,12 +161,12 @@ function HomePage({ onNavigate }) {
       )
       if (!response.ok) throw new Error('Geo lookup failed')
       const data = await response.json()
-      
+
       const city = data.address?.city || data.address?.town || data.address?.village || ''
       const state = data.address?.state || ''
       const primaryCity = city || state || 'Toshkent'
       const normalizedCity = primaryCity.includes("O'zbekiston") ? primaryCity : `${primaryCity}, O'zbekiston`
-      
+
       setLocation({
         city: normalizedCity,
         address: data.display_name || '',
@@ -194,17 +194,17 @@ function HomePage({ onNavigate }) {
         limit: 20,
         offset: currentOffset,
       }
-      
+
       // Добавляем категорию только если выбрана конкретная (не "all")
       if (selectedCategory && selectedCategory !== 'all') {
         params.category = selectedCategory
       }
-      
+
       // Добавляем поиск только если есть запрос
       if (searchQuery.trim()) {
         params.search = searchQuery.trim()
       }
-      
+
       const data = await api.getOffers(params)
 
       if (reset) {
@@ -228,7 +228,7 @@ function HomePage({ onNavigate }) {
     const timer = setTimeout(() => {
       loadOffers(true)
     }, searchQuery ? 500 : 0)
-    
+
     return () => clearTimeout(timer)
   }, [selectedCategory, searchQuery, cityForApi])
 
@@ -271,12 +271,12 @@ function HomePage({ onNavigate }) {
       )
       if (!response.ok) throw new Error('Geo lookup failed')
       const data = await response.json()
-      
+
       const city = data.address?.city || data.address?.town || data.address?.village || ''
       const state = data.address?.state || ''
       const primaryCity = city || state || 'Toshkent'
       const normalizedCity = primaryCity.includes("O'zbekiston") ? primaryCity : `${primaryCity}, O'zbekiston`
-      
+
       setLocation({
         city: normalizedCity,
         address: data.display_name || '',
@@ -445,8 +445,8 @@ function HomePage({ onNavigate }) {
         </div>
         <div className="banner-dots">
           {[0, 1, 2].map(i => (
-            <button 
-              key={i} 
+            <button
+              key={i}
               className={`dot ${bannerIndex === i ? 'active' : ''}`}
               onClick={() => setBannerIndex(i)}
               aria-label={`Slide ${i + 1}`}
@@ -534,8 +534,8 @@ function HomePage({ onNavigate }) {
             </div>
 
             {/* Кнопка автоопределения */}
-            <button 
-              className="address-detect-btn" 
+            <button
+              className="address-detect-btn"
               onClick={handleDetectLocation}
               disabled={isLocating}
             >

@@ -179,7 +179,7 @@ button:active:not(:disabled) {
   button:hover:not(:disabled) {
     opacity: 0.9;
   }
-  
+
   .offer-card:hover {
     transform: translateY(-4px);
     box-shadow: 0 8px 16px rgba(0, 0, 0, 0.1);
@@ -188,8 +188,8 @@ button:active:not(:disabled) {
 
 /* Smooth transitions - but only for specific properties */
 a, button, input {
-  transition: background-color 0.2s ease, 
-              border-color 0.2s ease, 
+  transition: background-color 0.2s ease,
+              border-color 0.2s ease,
               box-shadow 0.2s ease,
               color 0.2s ease;
 }

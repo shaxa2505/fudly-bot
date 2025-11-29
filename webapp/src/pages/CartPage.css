@@ -551,13 +551,13 @@
     margin-left: auto;
     margin-right: auto;
   }
-  
+
   .checkout-btn {
     max-width: 600px;
     left: 50%;
     transform: translateX(-50%);
   }
-  
+
   .checkout-btn:active {
     transform: translateX(-50%) scale(0.98);
   }

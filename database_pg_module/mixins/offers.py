@@ -17,44 +17,44 @@ except ImportError:
 # Маппинг городов: латиница <-> кириллица
 CITY_TRANSLITERATION = {
     # Основные города
-    'toshkent': ['ташкент', 'tashkent'],
-    'samarqand': ['самарканд', 'samarkand'],
-    'buxoro': ['бухара', 'bukhara'],
-    "farg'ona": ['фергана', 'fergana'],
-    'andijon': ['андижан', 'andijan'],
-    'namangan': ['наманган'],
-    'navoiy': ['навои', 'navoi'],
-    'qarshi': ['карши', 'karshi'],
-    'nukus': ['нукус'],
-    'urganch': ['ургенч', 'urgench'],
-    'jizzax': ['джизак', 'jizzakh'],
-    'termiz': ['термез', 'termez'],
-    'guliston': ['гулистан', 'gulistan'],
-    "chirchiq": ['чирчик', 'chirchik'],
-    "kattaqo'rg'on": ['каттакурган', 'kattakurgan', 'kattaqurgan'],
-    'olmaliq': ['алмалык', 'almalyk'],
-    'angren': ['ангрен'],
-    'bekobod': ['бекабад', 'bekabad'],
-    'shahrisabz': ['шахрисабз'],
-    "marg'ilon": ['маргилан', 'margilan'],
-    "qo'qon": ['коканд', 'kokand'],
-    'xiva': ['хива', 'khiva'],
+    "toshkent": ["ташкент", "tashkent"],
+    "samarqand": ["самарканд", "samarkand"],
+    "buxoro": ["бухара", "bukhara"],
+    "farg'ona": ["фергана", "fergana"],
+    "andijon": ["андижан", "andijan"],
+    "namangan": ["наманган"],
+    "navoiy": ["навои", "navoi"],
+    "qarshi": ["карши", "karshi"],
+    "nukus": ["нукус"],
+    "urganch": ["ургенч", "urgench"],
+    "jizzax": ["джизак", "jizzakh"],
+    "termiz": ["термез", "termez"],
+    "guliston": ["гулистан", "gulistan"],
+    "chirchiq": ["чирчик", "chirchik"],
+    "kattaqo'rg'on": ["каттакурган", "kattakurgan", "kattaqurgan"],
+    "olmaliq": ["алмалык", "almalyk"],
+    "angren": ["ангрен"],
+    "bekobod": ["бекабад", "bekabad"],
+    "shahrisabz": ["шахрисабз"],
+    "marg'ilon": ["маргилан", "margilan"],
+    "qo'qon": ["коканд", "kokand"],
+    "xiva": ["хива", "khiva"],
     # Кириллица -> латиница
-    'ташкент': ['toshkent', 'tashkent'],
-    'самарканд': ['samarqand', 'samarkand'],
-    'бухара': ['buxoro', 'bukhara'],
-    'фергана': ["farg'ona", 'fergana'],
-    'андижан': ['andijon', 'andijan'],
-    'наманган': ['namangan'],
-    'навои': ['navoiy', 'navoi'],
-    'карши': ['qarshi', 'karshi'],
-    'нукус': ['nukus'],
-    'ургенч': ['urganch', 'urgench'],
-    'джизак': ['jizzax', 'jizzakh'],
-    'термез': ['termiz', 'termez'],
-    'гулистан': ['guliston', 'gulistan'],
-    'чирчик': ['chirchiq', 'chirchik'],
-    'каттакурган': ["kattaqo'rg'on", 'kattakurgan', 'kattaqurgan'],
+    "ташкент": ["toshkent", "tashkent"],
+    "самарканд": ["samarqand", "samarkand"],
+    "бухара": ["buxoro", "bukhara"],
+    "фергана": ["farg'ona", "fergana"],
+    "андижан": ["andijon", "andijan"],
+    "наманган": ["namangan"],
+    "навои": ["navoiy", "navoi"],
+    "карши": ["qarshi", "karshi"],
+    "нукус": ["nukus"],
+    "ургенч": ["urganch", "urgench"],
+    "джизак": ["jizzax", "jizzakh"],
+    "термез": ["termiz", "termez"],
+    "гулистан": ["guliston", "gulistan"],
+    "чирчик": ["chirchiq", "chirchik"],
+    "каттакурган": ["kattaqo'rg'on", "kattakurgan", "kattaqurgan"],
 }
 
 
@@ -65,17 +65,17 @@ class OfferMixin:
         """Get all variants of city name (transliteration)."""
         city_lower = city.lower().strip()
         variants = {city_lower}
-        
+
         # Добавляем варианты из маппинга
         if city_lower in CITY_TRANSLITERATION:
             variants.update(CITY_TRANSLITERATION[city_lower])
-        
+
         # Проверяем обратный маппинг
         for key, values in CITY_TRANSLITERATION.items():
             if city_lower in [v.lower() for v in values]:
                 variants.add(key)
                 variants.update(values)
-        
+
         return list(variants)
 
     def add_offer(

@@ -19,7 +19,7 @@ function YanaPage({ onNavigate }) {
     } catch { return {} }
   })
   const [notifications, setNotifications] = useState(true)
-  
+
   // Get cart for badge
   const cart = (() => {
     try {
@@ -43,7 +43,7 @@ function YanaPage({ onNavigate }) {
 
       // Try to get bookings/orders
       const bookings = await api.getUserBookings(userId)
-      
+
       // Filter based on selection
       let filtered = bookings
       if (orderFilter === 'active') {
@@ -51,7 +51,7 @@ function YanaPage({ onNavigate }) {
       } else if (orderFilter === 'completed') {
         filtered = bookings.filter(o => ['completed', 'cancelled'].includes(o.status))
       }
-      
+
       setOrders(filtered)
     } catch (error) {
       console.error('Error loading orders:', error)
@@ -83,11 +83,11 @@ function YanaPage({ onNavigate }) {
       const date = new Date(dateStr)
       const now = new Date()
       const diffDays = Math.floor((now - date) / (1000 * 60 * 60 * 24))
-      
+
       if (diffDays === 0) return 'Bugun'
       if (diffDays === 1) return 'Kecha'
       if (diffDays < 7) return `${diffDays} kun oldin`
-      
+
       return date.toLocaleDateString('uz-UZ', {
         day: 'numeric',
         month: 'short'
@@ -162,8 +162,8 @@ function YanaPage({ onNavigate }) {
               {orders.map((order, idx) => {
                 const statusInfo = getStatusInfo(order.status)
                 return (
-                  <div 
-                    key={order.booking_id || idx} 
+                  <div
+                    key={order.booking_id || idx}
                     className="order-card"
                     onClick={() => onNavigate('order-tracking', { bookingId: order.booking_id })}
                     style={{ animationDelay: `${idx * 0.05}s` }}
@@ -172,7 +172,7 @@ function YanaPage({ onNavigate }) {
                       <span className="order-id">#{order.booking_id}</span>
                       <span className="order-date">{formatDate(order.created_at)}</span>
                     </div>
-                    
+
                     <div className="order-content">
                       {order.offer_photo && (
                         <img
@@ -192,9 +192,9 @@ function YanaPage({ onNavigate }) {
                     </div>
 
                     <div className="order-footer">
-                      <span 
+                      <span
                         className="order-status"
-                        style={{ 
+                        style={{
                           color: statusInfo.color,
                           background: statusInfo.bg
                         }}
@@ -218,7 +218,7 @@ function YanaPage({ onNavigate }) {
         <div className="yana-section settings-section">
           <div className="settings-group">
             <h3 className="group-title">👤 Shaxsiy ma'lumotlar</h3>
-            
+
             <label className="setting-item">
               <span className="setting-label">📱 Telefon raqam</span>
               <input
@@ -248,10 +248,10 @@ function YanaPage({ onNavigate }) {
 
           <div className="settings-group">
             <h3 className="group-title">🔔 Bildirishnomalar</h3>
-            
+
             <div className="setting-item toggle-item">
               <span className="setting-label">Yangi takliflar</span>
-              <button 
+              <button
                 className={`toggle ${notifications ? 'on' : ''}`}
                 onClick={() => setNotifications(!notifications)}
               >
@@ -262,8 +262,8 @@ function YanaPage({ onNavigate }) {
 
           <div className="settings-group">
             <h3 className="group-title">🗑️ Ma'lumotlarni tozalash</h3>
-            
-            <button 
+
+            <button
               className="danger-btn"
               onClick={() => {
                 if (confirm('Savatni tozalashni xohlaysizmi?')) {

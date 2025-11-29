@@ -27,7 +27,7 @@ function ProductDetailPage({ offer, onNavigate, onAddToCart }) {
     const distance = touchStart - touchEnd
     const isLeftSwipe = distance > minSwipeDistance
     const isRightSwipe = distance < -minSwipeDistance
-    
+
     if (isLeftSwipe && currentImageIndex < images.length - 1) {
       setCurrentImageIndex(prev => prev + 1)
     }
@@ -48,7 +48,7 @@ function ProductDetailPage({ offer, onNavigate, onAddToCart }) {
         onAddToCart(offer)
       }
     }
-    
+
     setAddedToCart(true)
     setTimeout(() => setAddedToCart(false), 2000)
     window.Telegram?.WebApp?.HapticFeedback?.impactOccurred?.('medium')
@@ -56,7 +56,7 @@ function ProductDetailPage({ offer, onNavigate, onAddToCart }) {
 
   const handleShare = () => {
     const shareText = `${offer.title}\n💰 ${Math.round(offer.discount_price).toLocaleString()} so'm (-${Math.round(offer.discount_percent)}%)\n🏪 ${offer.store_name || ''}`
-    
+
     if (navigator.share) {
       navigator.share({
         title: offer.title,
@@ -71,13 +71,13 @@ function ProductDetailPage({ offer, onNavigate, onAddToCart }) {
   // Calculate days until expiry
   const getExpiryInfo = () => {
     if (!offer?.expiry_date) return null
-    
+
     try {
       const expiry = new Date(offer.expiry_date)
       const now = new Date()
       const diffTime = expiry - now
       const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
-      
+
       if (diffDays < 0) return { text: "Muddati o'tgan", urgent: true }
       if (diffDays === 0) return { text: "Bugun tugaydi!", urgent: true }
       if (diffDays === 1) return { text: "Ertaga tugaydi", urgent: true }
@@ -115,7 +115,7 @@ function ProductDetailPage({ offer, onNavigate, onAddToCart }) {
       </div>
 
       {/* Image Section */}
-      <div 
+      <div
         className="product-image-section"
         onTouchStart={onTouchStart}
         onTouchMove={onTouchMove}
@@ -127,7 +127,7 @@ function ProductDetailPage({ offer, onNavigate, onAddToCart }) {
             -{Math.round(offer.discount_percent)}%
           </div>
         )}
-        
+
         {/* Expiry Warning */}
         {expiryInfo && (
           <div className={`expiry-badge ${expiryInfo.urgent ? 'urgent' : ''}`}>
@@ -141,7 +141,7 @@ function ProductDetailPage({ offer, onNavigate, onAddToCart }) {
           className="product-main-image"
           onError={(e) => { e.target.src = 'https://placehold.co/400x400/F5F5F5/999999?text=📷' }}
         />
-        
+
         {images.length > 1 && (
           <div className="image-indicators">
             {images.map((_, idx) => (
@@ -184,7 +184,7 @@ function ProductDetailPage({ offer, onNavigate, onAddToCart }) {
               <span className="stock-badge">📦 {offer.quantity} dona</span>
             )}
           </div>
-          
+
           {savings > 0 && (
             <div className="savings-info">
               💰 {quantity > 1 ? `Jami ${Math.round(savings).toLocaleString()} so'm tejaysiz` : `${Math.round(savings).toLocaleString()} so'm tejaysiz`}
@@ -196,7 +196,7 @@ function ProductDetailPage({ offer, onNavigate, onAddToCart }) {
         <div className="quantity-section">
           <div className="quantity-label">Miqdor:</div>
           <div className="quantity-controls">
-            <button 
+            <button
               className="qty-btn minus"
               onClick={() => handleQuantityChange(-1)}
               disabled={quantity <= 1}
@@ -206,7 +206,7 @@ function ProductDetailPage({ offer, onNavigate, onAddToCart }) {
               </svg>
             </button>
             <span className="quantity-value">{quantity}</span>
-            <button 
+            <button
               className="qty-btn plus"
               onClick={() => handleQuantityChange(1)}
               disabled={quantity >= (offer.quantity || 99)}
@@ -225,15 +225,15 @@ function ProductDetailPage({ offer, onNavigate, onAddToCart }) {
         {/* Description */}
         {offer.description && (
           <div className="description-section">
-            <button 
+            <button
               className="section-header"
               onClick={() => setShowDetails(!showDetails)}
             >
               <span className="section-title">📝 Tavsif</span>
-              <svg 
-                width="20" 
-                height="20" 
-                viewBox="0 0 24 24" 
+              <svg
+                width="20"
+                height="20"
+                viewBox="0 0 24 24"
                 fill="none"
                 className={`chevron ${showDetails ? 'open' : ''}`}
               >
@@ -263,8 +263,8 @@ function ProductDetailPage({ offer, onNavigate, onAddToCart }) {
         </div>
 
         {/* Add to Cart Button */}
-        <button 
-          className={`add-to-cart-btn ${addedToCart ? 'added' : ''}`} 
+        <button
+          className={`add-to-cart-btn ${addedToCart ? 'added' : ''}`}
           onClick={handleAddToBasket}
           disabled={addedToCart}
         >

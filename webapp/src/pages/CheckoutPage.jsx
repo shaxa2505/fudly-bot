@@ -141,7 +141,7 @@ function CheckoutPage({ user, onNavigate }) {
       // Clear cart and navigate to profile
       setCart(new Map())
       localStorage.setItem('fudly_cart', JSON.stringify({}))
-      
+
       // Show success message
       if (window.Telegram?.WebApp) {
         window.Telegram.WebApp.showAlert(
@@ -159,10 +159,10 @@ function CheckoutPage({ user, onNavigate }) {
     }
   };
 
-  const itemsTotal = cartData?.total 
+  const itemsTotal = cartData?.total
     ?? cartItems.reduce((sum, item) => sum + (item.price * item.quantity), 0);
-  const deliveryCost = (deliveryType === DELIVERY_TYPE.DELIVERY && deliveryInfo?.delivery_cost) 
-    ? deliveryInfo.delivery_cost 
+  const deliveryCost = (deliveryType === DELIVERY_TYPE.DELIVERY && deliveryInfo?.delivery_cost)
+    ? deliveryInfo.delivery_cost
     : 0;
   const total = itemsTotal + deliveryCost;
 
@@ -233,7 +233,7 @@ function CheckoutPage({ user, onNavigate }) {
                 {deliveryInfo.can_deliver ? (
                   <>
                     <p className="delivery-cost-label">
-                      {t('Стоимость доставки', 'Yetkazib berish narxi')}: 
+                      {t('Стоимость доставки', 'Yetkazib berish narxi')}:
                       <span className="delivery-cost-value">
                         {deliveryInfo.delivery_cost.toLocaleString()} {t('сум', 'so\'m')}
                       </span>
