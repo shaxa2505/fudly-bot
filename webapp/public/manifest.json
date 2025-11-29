@@ -1,0 +1,22 @@
+{
+  "name": "Fudly",
+  "short_name": "Fudly",
+  "description": "Yaqin atrofdagi do'konlardan mahsulotlar buyurtma qiling",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#FFFFFF",
+  "theme_color": "#53B175",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}

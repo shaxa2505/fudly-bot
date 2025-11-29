@@ -14,13 +14,31 @@ except ImportError:
 
     logger = logging.getLogger(__name__)
 
+# Импортируем маппинг транслитерации из offers
+from database_pg_module.mixins.offers import CITY_TRANSLITERATION
+
 
 class SearchMixin:
     """Mixin for search-related database operations."""
 
-    def search_offers(self, query: str, city: str) -> list[Any]:
+    def _get_city_variants_search(self, city: str) -> list[str]:
+        """Get all variants of city name (transliteration)."""
+        city_lower = city.lower().strip()
+        variants = {city_lower}
+        
+        if city_lower in CITY_TRANSLITERATION:
+            variants.update(CITY_TRANSLITERATION[city_lower])
+        
+        for key, values in CITY_TRANSLITERATION.items():
+            if city_lower in [v.lower() for v in values]:
+                variants.add(key)
+                variants.update(values)
+        
+        return list(variants)
+
+    def search_offers(self, query: str, city: str = None) -> list[Any]:
         """Search offers by title or store name using advanced PostgreSQL full-text search."""
-        sql = """
+        base_sql = """
             SELECT
                 o.offer_id, o.store_id, o.title, o.description,
                 o.original_price, o.discount_price, o.quantity,
@@ -43,7 +61,18 @@ class SearchMixin:
             WHERE o.status = 'active'
             AND o.quantity > 0
             AND (s.status = 'approved' OR s.status = 'active')
-            AND s.city ILIKE %s
+        """
+        
+        params = [query, query, query, query, query]
+        
+        # Добавляем фильтр по городу с транслитерацией
+        if city:
+            city_variants = self._get_city_variants_search(city)
+            city_conditions = " OR ".join(["s.city ILIKE %s" for _ in city_variants])
+            base_sql += f" AND ({city_conditions})"
+            params.extend([f"%{v}%" for v in city_variants])
+        
+        base_sql += """
             AND (o.expiry_date IS NULL
                  OR o.expiry_date !~ '[.]'
                  OR (o.expiry_date ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}' AND o.expiry_date::date >= CURRENT_DATE))
@@ -56,16 +85,16 @@ class SearchMixin:
             ORDER BY relevance DESC, o.created_at DESC
             LIMIT 50
         """
+        params.extend([query, query, query, query])
+        
         with self.get_connection() as conn:
             cursor = conn.cursor(row_factory=dict_row)
-            cursor.execute(
-                sql, (query, query, query, query, query, city, query, query, query, query)
-            )
+            cursor.execute(base_sql, tuple(params))
             return [dict(row) for row in cursor.fetchall()]
 
-    def search_stores(self, query: str, city: str) -> list[Any]:
+    def search_stores(self, query: str, city: str = None) -> list[Any]:
         """Search stores by name with transliteration support."""
-        sql = """
+        base_sql = """
             SELECT
                 store_id, name, address, category, description, city, phone,
                 delivery_enabled, delivery_price, min_order_amount,
@@ -81,7 +110,18 @@ class SearchMixin:
                 ) as relevance
             FROM stores
             WHERE (status = 'approved' OR status = 'active')
-            AND city ILIKE %s
+        """
+        
+        params = [query, query, query, query, query, query]
+        
+        # Добавляем фильтр по городу с транслитерацией
+        if city:
+            city_variants = self._get_city_variants_search(city)
+            city_conditions = " OR ".join(["city ILIKE %s" for _ in city_variants])
+            base_sql += f" AND ({city_conditions})"
+            params.extend([f"%{v}%" for v in city_variants])
+        
+        base_sql += """
             AND (
                 LOWER(name) LIKE '%%' || LOWER(%s) || '%%' OR
                 LOWER(category) LIKE '%%' || LOWER(%s) || '%%' OR
@@ -91,9 +131,9 @@ class SearchMixin:
             ORDER BY relevance DESC
             LIMIT 20
         """
+        params.extend([query, query, query, query])
+        
         with self.get_connection() as conn:
             cursor = conn.cursor(row_factory=dict_row)
-            cursor.execute(
-                sql, (query, query, query, query, query, query, city, query, query, query, query)
-            )
+            cursor.execute(base_sql, tuple(params))
             return [dict(row) for row in cursor.fetchall()]

@@ -1,0 +1,41 @@
+# Fudly WebApp Deploy Script (PowerShell)
+# Быстрый деплой на Vercel
+
+Write-Host "🚀 Fudly WebApp Deploy Script" -ForegroundColor Green
+Write-Host "================================" -ForegroundColor Green
+
+# Проверка директории
+if (-not (Test-Path "package.json")) {
+    Write-Host "❌ Ошибка: Запустите скрипт из папки webapp/" -ForegroundColor Red
+    exit 1
+}
+
+# Установка зависимостей
+Write-Host "`n📦 Установка зависимостей..." -ForegroundColor Cyan
+npm install
+
+# Сборка
+Write-Host "`n🔨 Сборка production build..." -ForegroundColor Cyan
+npm run build
+
+if ($LASTEXITCODE -ne 0) {
+    Write-Host "❌ Ошибка сборки!" -ForegroundColor Red
+    exit 1
+}
+
+# Проверка размера
+Write-Host "`n📊 Размер build:" -ForegroundColor Cyan
+$size = (Get-ChildItem dist -Recurse | Measure-Object -Property Length -Sum).Sum / 1MB
+Write-Host "$([math]::Round($size, 2)) MB"
+
+# Деплой на Vercel
+Write-Host "`n🚀 Деплой на Vercel..." -ForegroundColor Cyan
+vercel deploy --prod
+
+if ($LASTEXITCODE -eq 0) {
+    Write-Host "`n✅ Деплой успешен!" -ForegroundColor Green
+    Write-Host "🎉 Приложение опубликовано!" -ForegroundColor Green
+} else {
+    Write-Host "`n❌ Ошибка деплоя!" -ForegroundColor Red
+    exit 1
+}

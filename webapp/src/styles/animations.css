@@ -1,0 +1,200 @@
+/* Global Animations */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes fadeInUp {
+  from {
+    transform: translateY(20px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+@keyframes slideUp {
+  from {
+    transform: translateY(20px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+@keyframes slideDown {
+  from {
+    transform: translateY(-20px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+@keyframes scaleIn {
+  from {
+    transform: scale(0.9);
+    opacity: 0;
+  }
+  to {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+@keyframes pulse {
+  0%, 100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.05);
+  }
+}
+
+@keyframes bounce {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-8px);
+  }
+}
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes shake {
+  0%, 100% {
+    transform: translateX(0);
+  }
+  25% {
+    transform: translateX(-4px);
+  }
+  75% {
+    transform: translateX(4px);
+  }
+}
+
+@keyframes pop {
+  0% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.15);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+/* Smooth scroll for all pages */
+html {
+  scroll-behavior: smooth;
+}
+
+/* Page transitions */
+.page-enter {
+  animation: fadeIn 0.3s ease;
+}
+
+.card-enter {
+  animation: slideUp 0.3s ease;
+}
+
+/* Loading spinner */
+.spinner {
+  width: 40px;
+  height: 40px;
+  border: 4px solid #E2E2E2;
+  border-top-color: #53B175;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+/* Button press effect */
+button:active:not(:disabled) {
+  transform: scale(0.96);
+  transition: transform 0.1s ease;
+}
+
+/* Skeleton loading */
+@keyframes shimmer {
+  0% {
+    background-position: -468px 0;
+  }
+  100% {
+    background-position: 468px 0;
+  }
+}
+
+.skeleton {
+  animation: shimmer 1.2s ease-in-out infinite;
+  background: linear-gradient(
+    to right,
+    #f0f0f0 0%,
+    #f8f8f8 20%,
+    #f0f0f0 40%,
+    #f0f0f0 100%
+  );
+  background-size: 800px 104px;
+}
+
+/* Add to cart animation */
+.add-to-cart-anim {
+  animation: pop 0.3s ease;
+}
+
+/* Pull to refresh indicator */
+.pull-indicator {
+  display: flex;
+  justify-content: center;
+  padding: 16px;
+  animation: fadeIn 0.2s ease;
+}
+
+.pull-indicator .spinner {
+  width: 24px;
+  height: 24px;
+  border-width: 3px;
+}
+
+/* Hover effects for desktop */
+@media (hover: hover) {
+  button:hover:not(:disabled) {
+    opacity: 0.9;
+  }
+  
+  .offer-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 8px 16px rgba(0, 0, 0, 0.1);
+  }
+}
+
+/* Smooth transitions - but only for specific properties */
+a, button, input {
+  transition: background-color 0.2s ease, 
+              border-color 0.2s ease, 
+              box-shadow 0.2s ease,
+              color 0.2s ease;
+}
+
+/* Disable transitions on page load */
+.preload * {
+  transition: none !important;
+}

@@ -57,6 +57,9 @@ class StoreResponse(BaseModel):
     business_type: str
     rating: float = 0.0
     offers_count: int = 0
+    delivery_enabled: bool = False
+    delivery_price: float | None = None
+    min_order_amount: float | None = None
 
 
 class CategoryResponse(BaseModel):
@@ -447,6 +450,9 @@ async def get_stores(
                     business_type=get_val(store, "business_type", "supermarket"),
                     rating=float(get_val(store, "rating", 0) or 0),
                     offers_count=int(get_val(store, "offers_count", 0) or 0),
+                    delivery_enabled=bool(get_val(store, "delivery_enabled", False)),
+                    delivery_price=float(get_val(store, "delivery_price", 0) or 0) if get_val(store, "delivery_price") else None,
+                    min_order_amount=float(get_val(store, "min_order_amount", 0) or 0) if get_val(store, "min_order_amount") else None,
                 )
             )
 

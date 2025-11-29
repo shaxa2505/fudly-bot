@@ -8,16 +8,13 @@ from aiogram.filters import Command
 from aiogram.fsm.context import FSMContext
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
-from database_protocol import DatabaseProtocol
-
-# Type alias for booking/offer dict
-RowDict = dict[str, Any]
 from app.keyboards import (
     language_keyboard,
     main_menu_customer,
     main_menu_seller,
     phone_request_keyboard,
 )
+from database_protocol import DatabaseProtocol
 from handlers.common.states import ConfirmOrder, Registration
 from handlers.common.utils import has_approved_store, user_view_mode
 from localization import get_cities, get_text
@@ -28,6 +25,9 @@ except ImportError:
     import logging
 
     logger = logging.getLogger(__name__)
+
+# Type alias for booking/offer dict
+RowDict = dict[str, Any]
 
 router = Router(name="commands")
 

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
+import api from '../api/client';
 import { getCurrentUser, getUserCity } from '../utils/auth';
-import { API_BASE_URL } from '../api/client';
 import BottomNav from '../components/BottomNav';
 import './CheckoutPage.css';
 
@@ -14,7 +14,8 @@ function CheckoutPage({ user, onNavigate }) {
     const saved = localStorage.getItem('fudly_cart')
     return saved ? new Map(Object.entries(JSON.parse(saved))) : new Map()
   })
-  const [cartData, setCartData] = useState([]);
+  const [cartData, setCartData] = useState(null);
+  const [cartSummaryLoading, setCartSummaryLoading] = useState(true);
   const [deliveryType, setDeliveryType] = useState(DELIVERY_TYPE.PICKUP);
   const [address, setAddress] = useState('');
   const [deliveryInfo, setDeliveryInfo] = useState(null);
@@ -29,19 +30,28 @@ function CheckoutPage({ user, onNavigate }) {
   useEffect(() => {
     if (cart.size === 0) {
       onNavigate('cart');
-    } else {
-      // Convert cart Map to array with mock data for now
-      const items = Array.from(cart.entries()).map(([id, qty]) => ({
-        id: parseInt(id),
-        title: `Товар ${id}`,
-        price: 50000,
-        quantity: qty,
-        storeId: 1,
-        storeAddress: 'Адрес магазина'
-      }))
-      setCartData(items)
+      return;
     }
-  }, [cart, onNavigate]);
+
+    const loadCartSummary = async () => {
+      setCartSummaryLoading(true);
+      try {
+        const items = Array.from(cart.entries()).map(([id, qty]) => ({
+          offerId: parseInt(id, 10),
+          quantity: qty,
+        }));
+        const summary = await api.calculateCart(items);
+        setCartData(summary);
+      } catch (err) {
+        console.error('Error loading cart summary:', err);
+        setError(t('Не удалось загрузить корзину', 'Savatni yuklab bo\'lmadi'));
+      } finally {
+        setCartSummaryLoading(false);
+      }
+    };
+
+    loadCartSummary();
+  }, [cart, onNavigate, t]);
 
   useEffect(() => {
     if (deliveryType === DELIVERY_TYPE.DELIVERY && address.length > 5) {
@@ -50,34 +60,30 @@ function CheckoutPage({ user, onNavigate }) {
       }, 500);
       return () => clearTimeout(timer);
     }
-  }, [address, deliveryType]);
+  }, [address, deliveryType, cartData]);
+
+  const cartItems = cartData?.items || [];
 
   const calculateDelivery = async () => {
-    if (!address || address.length < 5) return;
+    if (!address || address.length < 5 || cartItems.length === 0) return;
 
     setCalculatingDelivery(true);
     setError(null);
 
     try {
-      const currentUser = getCurrentUser();
-      const storeId = cart[0]?.storeId || 1; // Use first item's store
-
-      const response = await fetch(`${API_BASE_URL}/api/v1/orders/calculate-delivery`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          user_id: currentUser.user_id,
-          city,
-          address,
-          store_id: storeId
-        })
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to calculate delivery');
+      const currentUser = getCurrentUser() || user;
+      if (!currentUser) {
+        throw new Error(t('Пользователь не найден', 'Foydalanuvchi topilmadi'));
       }
 
-      const data = await response.json();
+      const storeId = cartItems[0]?.store_id || cartItems[0]?.storeId || 1;
+
+      const data = await api.calculateDelivery({
+        user_id: currentUser.user_id || currentUser.id,
+        city,
+        address,
+        store_id: storeId,
+      });
       setDeliveryInfo(data);
 
       if (!data.can_deliver) {
@@ -89,14 +95,6 @@ function CheckoutPage({ user, onNavigate }) {
     } finally {
       setCalculatingDelivery(false);
     }
-  };
-
-  const calculateTotal = () => {
-    const itemsTotal = cartData.reduce((sum, item) => sum + (item.price * item.quantity), 0);
-    const deliveryCost = (deliveryType === DELIVERY_TYPE.DELIVERY && deliveryInfo?.delivery_cost) 
-      ? deliveryInfo.delivery_cost 
-      : 0;
-    return itemsTotal + deliveryCost;
   };
 
   const handlePlaceOrder = async () => {
@@ -111,32 +109,34 @@ function CheckoutPage({ user, onNavigate }) {
       }
     }
 
+    if (!cartItems.length) {
+      setError(t('Корзина пуста', 'Savat bo\'sh'));
+      return;
+    }
+
     setLoading(true);
     setError(null);
 
     try {
-      const currentUser = getCurrentUser();
-
-      // Create bookings for each cart item
-      for (const item of cartData) {
-        const bookingData = {
-          offer_id: item.id,
-          user_id: currentUser.user_id,
-          quantity: item.quantity,
-          delivery_address: deliveryType === DELIVERY_TYPE.DELIVERY ? address : null,
-          pickup_address: deliveryType === DELIVERY_TYPE.PICKUP ? item.storeAddress : null
-        };
-
-        const response = await fetch(`${API_BASE_URL}/api/v1/bookings`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(bookingData)
-        });
-
-        if (!response.ok) {
-          throw new Error('Failed to create booking');
-        }
+      const currentUser = getCurrentUser() || user;
+      if (!currentUser) {
+        throw new Error(t('Пользователь не найден', 'Foydalanuvchi topilmadi'));
       }
+
+      const orderPayload = {
+        user_id: currentUser.user_id || currentUser.id,
+        items: cartItems.map(item => ({
+          offer_id: item.offer_id || item.id,
+          quantity: item.quantity,
+        })),
+        delivery_type: deliveryType,
+        delivery_address: deliveryType === DELIVERY_TYPE.DELIVERY ? address : null,
+        pickup_address: deliveryType === DELIVERY_TYPE.PICKUP
+          ? (cartItems[0]?.store_address || cartItems[0]?.storeAddress || null)
+          : null,
+      };
+
+      await api.createOrder(orderPayload);
 
       // Clear cart and navigate to profile
       setCart(new Map())
@@ -154,16 +154,17 @@ function CheckoutPage({ user, onNavigate }) {
       }
     } catch (err) {
       console.error('Error placing order:', err);
-      setError(t('Ошибка при оформлении заказа', 'Buyurtma qabul qilishda xato'));
+      setError(err.message || t('Ошибка при оформлении заказа', 'Buyurtma qabul qilishda xato'));
       setLoading(false);
     }
   };
 
-  const total = calculateTotal();
-  const itemsTotal = cartData.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+  const itemsTotal = cartData?.total 
+    ?? cartItems.reduce((sum, item) => sum + (item.price * item.quantity), 0);
   const deliveryCost = (deliveryType === DELIVERY_TYPE.DELIVERY && deliveryInfo?.delivery_cost) 
     ? deliveryInfo.delivery_cost 
     : 0;
+  const total = itemsTotal + deliveryCost;
 
   return (
     <div className="checkout-page">
@@ -258,13 +259,20 @@ function CheckoutPage({ user, onNavigate }) {
         <div className="order-summary">
           <h2>{t('Ваш заказ', 'Sizning buyurtmangiz')}</h2>
           <div className="summary-items">
-            {cartData.map((item, index) => (
+            {cartSummaryLoading && (
+              <div className="summary-item">
+                <div className="item-info">
+                  <p className="item-title">{t('Загрузка...', 'Yuklanmoqda...')}</p>
+                </div>
+              </div>
+            )}
+            {!cartSummaryLoading && cartItems.map((item, index) => (
               <div key={index} className="summary-item">
                 <div className="item-info">
                   <p className="item-title">{item.title}</p>
                   <p className="item-quantity">{item.quantity} {t('шт', 'dona')}</p>
                 </div>
-                <p className="item-price">{(item.price * item.quantity).toLocaleString()}</p>
+                <p className="item-price">{Math.round(item.price * item.quantity).toLocaleString()}</p>
               </div>
             ))}
           </div>

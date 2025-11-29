@@ -2,7 +2,7 @@ import './BottomNav.css'
 
 function BottomNav({ currentPage, onNavigate, cartCount }) {
   const getIcon = (id, isActive) => {
-    const color = isActive ? '#184B36' : '#8E8E93'
+    const color = isActive ? '#53B175' : '#181725'
     
     switch(id) {
       case 'home':
@@ -40,7 +40,7 @@ function BottomNav({ currentPage, onNavigate, cartCount }) {
   }
 
   const menuItems = [
-    { id: 'home', label: 'Menyu' },
+    { id: 'home', label: 'Bosh sahifa' },
     { id: 'stores', label: "Do'konlar" },
     { id: 'cart', label: 'Savat', badge: cartCount },
     { id: 'profile', label: 'Yana' },

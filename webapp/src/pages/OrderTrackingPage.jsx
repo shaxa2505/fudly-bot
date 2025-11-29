@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { API_BASE_URL } from '../api/client';
+import api from '../api/client';
 import { getCurrentUser } from '../utils/auth';
 import BottomNav from '../components/BottomNav';
 import './OrderTrackingPage.css';
@@ -28,13 +28,23 @@ function OrderTrackingPage({ user, bookingId, onNavigate }) {
   const t = (ru, uz) => (lang === 'uz' ? uz : ru);
 
   useEffect(() => {
-    loadOrderData();
+    loadOrderData(true);
     // Refresh every 30 seconds for real-time updates
-    const interval = setInterval(loadOrderData, 30000);
+    const interval = setInterval(() => loadOrderData(false), 30000);
     return () => clearInterval(interval);
   }, [bookingId]);
 
-  const loadOrderData = async () => {
+  const loadOrderData = async (withSpinner = false) => {
+    if (!bookingId) {
+      setError(t('Некорректный идентификатор заказа', 'Buyurtma identifikatori noto\'g\'ri'));
+      setLoading(false);
+      return;
+    }
+
+    if (withSpinner) {
+      setLoading(true);
+    }
+
     try {
       const currentUser = getCurrentUser();
       if (!currentUser) {
@@ -43,25 +53,24 @@ function OrderTrackingPage({ user, bookingId, onNavigate }) {
       }
 
       // Load order status
-      const statusRes = await fetch(`${API_BASE_URL}/api/v1/orders/${bookingId}/status`);
-      if (!statusRes.ok) {
-        throw new Error('Failed to load order');
-      }
-      const statusData = await statusRes.json();
+      const statusData = await api.getOrderStatus(bookingId);
       setOrder(statusData);
 
       // Load timeline
-      const timelineRes = await fetch(`${API_BASE_URL}/api/v1/orders/${bookingId}/timeline`);
-      if (timelineRes.ok) {
-        const timelineData = await timelineRes.json();
+      try {
+        const timelineData = await api.getOrderTimeline(bookingId);
         setTimeline(timelineData);
+      } catch (timelineError) {
+        console.warn('Timeline load failed', timelineError);
+        setTimeline(null);
       }
-
-      setLoading(false);
     } catch (err) {
       console.error('Error loading order:', err);
       setError(err.message);
-      setLoading(false);
+    } finally {
+      if (withSpinner) {
+        setLoading(false);
+      }
     }
   };
 

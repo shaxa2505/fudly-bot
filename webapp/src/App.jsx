@@ -1,50 +1,72 @@
 import { useState, useEffect } from 'react'
 import HomePage from './pages/HomePage'
 import CartPage from './pages/CartPage'
-import ProfilePage from './pages/ProfilePage'
+import YanaPage from './pages/YanaPage'
 import OrderTrackingPage from './pages/OrderTrackingPage'
 import CheckoutPage from './pages/CheckoutPage'
-import { initializeTelegramAuth, isAuthenticated } from './utils/auth'
+import ProductDetailPage from './pages/ProductDetailPage'
+import StoresPage from './pages/StoresPage'
+import CategoryProductsPage from './pages/CategoryProductsPage'
 import './App.css'
+import './styles/animations.css'
 
 function App() {
   const [currentPage, setCurrentPage] = useState('home')
   const [pageParams, setPageParams] = useState({})
-  const [tg, setTg] = useState(null)
-  const [user, setUser] = useState(null)
+  const [user, setUser] = useState({ id: 1, first_name: 'Guest', username: 'guest' })
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    // Initialize Telegram WebApp and Auth
-    const initApp = async () => {
-      if (window.Telegram?.WebApp) {
-        const webapp = window.Telegram.WebApp
-        webapp.ready()
-        webapp.expand()
-        setTg(webapp)
-
-        // Set theme colors
-        document.documentElement.style.setProperty('--tg-theme-bg-color', webapp.themeParams.bg_color || '#ffffff')
-        document.documentElement.style.setProperty('--tg-theme-text-color', webapp.themeParams.text_color || '#000000')
-        document.documentElement.style.setProperty('--tg-theme-hint-color', webapp.themeParams.hint_color || '#999999')
-        document.documentElement.style.setProperty('--tg-theme-button-color', webapp.themeParams.button_color || '#2D5F3F')
-        document.documentElement.style.setProperty('--tg-theme-button-text-color', webapp.themeParams.button_text_color || '#ffffff')
-
-        // Validate auth
-        try {
-          const profile = await initializeTelegramAuth()
-          if (profile) {
-            setUser(profile)
-          }
-        } catch (error) {
-          console.error('Auth failed:', error)
-        }
+    // Initialize Telegram WebApp
+    const tg = window.Telegram?.WebApp
+    
+    if (tg) {
+      // Expand to full height
+      tg.expand()
+      tg.ready()
+      
+      // Get user from Telegram
+      const tgUser = tg.initDataUnsafe?.user
+      if (tgUser) {
+        setUser({
+          id: tgUser.id,
+          first_name: tgUser.first_name || 'User',
+          last_name: tgUser.last_name || '',
+          username: tgUser.username || '',
+          photo_url: tgUser.photo_url,
+          language_code: tgUser.language_code || 'uz',
+        })
       }
-      setLoading(false)
+      
+      // Theme colors
+      document.documentElement.style.setProperty('--tg-theme-bg-color', tg.themeParams.bg_color || '#ffffff')
+      document.documentElement.style.setProperty('--tg-theme-text-color', tg.themeParams.text_color || '#000000')
+      document.documentElement.style.setProperty('--tg-theme-button-color', tg.themeParams.button_color || '#53B175')
+      
+      // Handle back button
+      tg.BackButton.onClick(() => {
+        if (currentPage !== 'home') {
+          setCurrentPage('home')
+        } else {
+          tg.close()
+        }
+      })
     }
+    
+    setLoading(false)
+  }, [currentPage])
 
-    initApp()
-  }, [])
+  // Update Telegram back button visibility
+  useEffect(() => {
+    const tg = window.Telegram?.WebApp
+    if (tg) {
+      if (currentPage === 'home') {
+        tg.BackButton.hide()
+      } else {
+        tg.BackButton.show()
+      }
+    }
+  }, [currentPage])
 
   const renderPage = () => {
     if (loading) {
@@ -67,15 +89,19 @@ function App() {
       case 'cart':
         return <CartPage onNavigate={navigate} user={user} />
       case 'profile':
-        return <ProfilePage onNavigate={navigate} user={user} />
+        return <YanaPage onNavigate={navigate} user={user} />
       case 'checkout':
         return <CheckoutPage onNavigate={navigate} user={user} />
       case 'order-tracking':
         return <OrderTrackingPage onNavigate={navigate} user={user} bookingId={pageParams.bookingId} />
+      case 'product-detail':
+        return <ProductDetailPage onNavigate={navigate} offer={pageParams.offer} onAddToCart={pageParams.onAddToCart} />
+      case 'category-products':
+        return <CategoryProductsPage categoryId={pageParams.categoryId} categoryName={pageParams.categoryName} onNavigate={navigate} onBack={() => navigate('stores')} />
       case 'stores':
-        return <HomePage onNavigate={navigate} tg={tg} user={user} />
+        return <StoresPage onNavigate={navigate} user={user} />
       default:
-        return <HomePage onNavigate={navigate} tg={tg} user={user} />
+        return <HomePage onNavigate={navigate} user={user} />
     }
   }
 

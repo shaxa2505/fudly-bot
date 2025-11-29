@@ -46,6 +46,33 @@ const api = {
     return data
   },
 
+  async getUserBookings(userId, status = null) {
+    try {
+      const params = { user_id: userId }
+      if (status) params.status = status
+      const { data } = await client.get('/user/bookings', { params })
+      return data.bookings || data || []
+    } catch (error) {
+      console.warn('getUserBookings not available:', error)
+      return []
+    }
+  },
+
+  async getStores(params = {}) {
+    const { data } = await client.get('/stores', { params })
+    return data || []
+  },
+
+  async getStore(storeId) {
+    const { data } = await client.get(`/stores/${storeId}`)
+    return data
+  },
+
+  async getStoreOffers(storeId) {
+    const { data } = await client.get('/offers', { params: { store_id: storeId } })
+    return data || []
+  },
+
   // Offers endpoints
   async getOffers(params) {
     const { data } = await client.get('/offers', { params })
