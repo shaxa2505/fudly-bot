@@ -192,9 +192,9 @@
   position: relative;
   width: 100%;
   background: #ffffff;
-  padding: 6px 6px 6px 0;
-  border-radius: 18px;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
+  padding: 4px;
+  border-radius: 16px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
 }
 
 .search-icon {
@@ -204,28 +204,30 @@
   transform: translateY(-50%);
   width: 20px;
   height: 20px;
+  color: #53B175;
 }
 
 .search-input {
   width: 100%;
   padding: 14px 16px 14px 48px;
-  border: 1px solid rgba(83, 177, 117, 0.2);
-  border-radius: 15px;
-  font-size: 14px;
+  border: 2px solid transparent;
+  border-radius: 14px;
+  font-size: 15px;
+  font-weight: 500;
   background: #F7FAF7;
   transition: all 0.2s ease;
   color: #181725;
 }
 
 .search-input::placeholder {
-  color: #7C7C7C;
+  color: #9E9E9E;
 }
 
 .search-input:focus {
   outline: none;
   background: white;
-  border-color: #FF6B35;
-  box-shadow: 0 0 0 3px rgba(255, 107, 53, 0.1);
+  border-color: #53B175;
+  box-shadow: 0 0 0 4px rgba(83, 177, 117, 0.15);
 }
 
 .search-clear {
@@ -254,93 +256,103 @@
 
 /* Banner Slider */
 .banner-slider {
-  margin: 16px 20px;
-  border-radius: 20px;
+  margin: 12px 16px;
+  border-radius: 16px;
   overflow: hidden;
   position: relative;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
 }
 
 .banner-track {
   display: flex;
-  transition: transform 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .banner-slide {
   min-width: 100%;
-  padding: 28px 24px;
-  text-align: center;
+  padding: 16px 20px;
   position: relative;
 }
 
+.banner-content {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.banner-left {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+}
+
 .banner-slide.gradient-green {
-  background: linear-gradient(135deg, #43A047 0%, #66BB6A 50%, #81C784 100%);
+  background: linear-gradient(135deg, #43A047 0%, #66BB6A 100%);
 }
 
 .banner-slide.gradient-orange {
-  background: linear-gradient(135deg, #FF7043 0%, #FF8A65 50%, #FFAB91 100%);
+  background: linear-gradient(135deg, #FF7043 0%, #FF8A65 100%);
 }
 
 .banner-slide.gradient-purple {
-  background: linear-gradient(135deg, #7E57C2 0%, #9575CD 50%, #B39DDB 100%);
+  background: linear-gradient(135deg, #7E57C2 0%, #9575CD 100%);
 }
 
 .banner-badge {
   display: inline-block;
   background: rgba(255, 255, 255, 0.25);
   backdrop-filter: blur(10px);
-  padding: 6px 14px;
-  border-radius: 20px;
-  font-size: 12px;
+  padding: 4px 10px;
+  border-radius: 12px;
+  font-size: 11px;
   font-weight: 600;
   color: white;
-  margin-bottom: 12px;
+  margin-bottom: 6px;
 }
 
 .banner-emoji {
-  font-size: 44px;
-  margin-bottom: 12px;
+  font-size: 40px;
   display: flex;
-  gap: 8px;
-  justify-content: center;
+  gap: 4px;
   filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.15));
+  flex-shrink: 0;
 }
 
 .banner-slide .banner-title {
-  font-size: 22px;
+  font-size: 18px;
   font-weight: 700;
   color: white;
-  margin: 0 0 6px 0;
-  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  margin: 0 0 2px 0;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.15);
 }
 
 .banner-subtitle {
-  font-size: 14px;
+  font-size: 13px;
   color: rgba(255, 255, 255, 0.9);
-  margin: 0 0 16px 0;
+  margin: 0 0 10px 0;
   font-weight: 500;
 }
 
 .banner-btn {
   background: white;
   border: none;
-  padding: 10px 24px;
-  border-radius: 25px;
-  font-size: 14px;
+  padding: 8px 18px;
+  border-radius: 20px;
+  font-size: 13px;
   font-weight: 600;
   color: #333;
   cursor: pointer;
-  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.15);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
   transition: transform 0.2s, box-shadow 0.2s;
 }
 
 .banner-btn:hover {
   transform: translateY(-2px);
-  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.2);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.2);
 }
 
 .banner-btn:active {
-  transform: translateY(0);
+  transform: scale(0.96);
 }
 
 .banner-dots {
@@ -379,12 +391,15 @@
 .categories-section {
   padding: 0;
   background: white;
+  position: relative;
+  border-bottom: 1px solid #f0f0f0;
 }
 
 .categories-scroll {
   display: flex;
   gap: 8px;
-  padding: 10px 16px;
+  padding: 12px 16px;
+  padding-right: 40px;
   overflow-x: auto;
   scroll-behavior: smooth;
   -webkit-overflow-scrolling: touch;
@@ -396,12 +411,22 @@
   display: none;
 }
 
+.categories-fade {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 1px;
+  width: 50px;
+  background: linear-gradient(90deg, transparent 0%, white 70%);
+  pointer-events: none;
+}
+
 .category-chip {
   display: flex;
   align-items: center;
   gap: 6px;
-  padding: 8px 14px;
-  border-radius: 20px;
+  padding: 10px 16px;
+  border-radius: 24px;
   border: 1.5px solid #E8E8E8;
   background: #FAFAFA;
   font-size: 13px;
@@ -414,13 +439,14 @@
 }
 
 .category-chip:active {
-  transform: scale(0.96);
+  transform: scale(0.95);
 }
 
 .category-chip.active {
   background: #53B175;
   border-color: #53B175;
   color: white;
+  box-shadow: 0 4px 12px rgba(83, 177, 117, 0.3);
 }
 
 .category-icon {
@@ -448,19 +474,45 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 16px 20px 12px;
+  padding: 16px 20px 8px;
+  background: #FAFAFA;
+  border-top: 1px solid #f0f0f0;
 }
 
 .section-title {
-  font-size: 20px;
+  font-size: 18px;
   font-weight: 700;
   color: #181725;
   margin: 0;
 }
 
 .offers-count {
-  font-size: 14px;
+  font-size: 13px;
   color: #7C7C7C;
+  font-weight: 500;
+  background: #E8F5E9;
+  padding: 4px 10px;
+  border-radius: 12px;
+}
+
+/* All cities banner */
+.all-cities-banner {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 16px 12px;
+  padding: 10px 14px;
+  background: linear-gradient(135deg, #FFF3E0 0%, #FFE0B2 100%);
+  border-radius: 12px;
+  font-size: 13px;
+  color: #E65100;
+}
+
+.all-cities-icon {
+  font-size: 18px;
+}
+
+.all-cities-text {
   font-weight: 500;
 }
 
@@ -477,9 +529,9 @@
 .offers-grid {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
-  gap: 15px;
-  padding: 0 20px 100px;
-  background: #FFFFFF;
+  gap: 12px;
+  padding: 12px 16px 100px;
+  background: #FAFAFA;
 }
 
 /* Skeleton */

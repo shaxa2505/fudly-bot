@@ -4,17 +4,17 @@
   left: 0;
   right: 0;
   background: #FFFFFF;
-  border-top: 1px solid #EAEAEA;
+  border-top: none;
   z-index: 1000;
   padding-bottom: env(safe-area-inset-bottom, 0);
-  box-shadow: none;
+  box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.08);
 }
 
 .bottom-nav-content {
   display: flex;
   justify-content: space-around;
   align-items: center;
-  padding: 8px 8px 6px;
+  padding: 10px 8px 8px;
   max-width: 600px;
   margin: 0 auto;
 }
@@ -23,21 +23,22 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 2px;
+  gap: 4px;
   background: none;
   border: none;
-  padding: 6px 8px;
+  padding: 8px 12px;
   min-width: 64px;
   transition: all 0.2s ease;
-  border-radius: 8px;
+  border-radius: 12px;
 }
 
 .nav-item:active {
-  transform: scale(0.96);
+  transform: scale(0.92);
+  background: rgba(83, 177, 117, 0.1);
 }
 
 .nav-item.active {
-  background: none;
+  background: rgba(83, 177, 117, 0.08);
 }
 
 .nav-icon-container {
@@ -82,16 +83,16 @@
 }
 
 .nav-label {
-  font-size: 13px;
+  font-size: 11px;
   font-weight: 600;
-  color: #181725;
+  color: #7C7C7C;
   transition: all 0.2s ease;
   white-space: nowrap;
 }
 
 .nav-item.active .nav-label {
   color: #53B175;
-  font-weight: 600;
+  font-weight: 700;
 }
 
 /* Fix for very small screens */

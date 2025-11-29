@@ -182,17 +182,23 @@ function HomePage({ onNavigate }) {
     }
   }
 
-  // Load offers - только по выбранному городу (как в Яндекс Еда)
-  const loadOffers = useCallback(async (reset = false) => {
+  const [showingAllCities, setShowingAllCities] = useState(false)
+
+  // Load offers - сначала по городу, если пусто - из всех городов
+  const loadOffers = useCallback(async (reset = false, forceAllCities = false) => {
     if (loading) return
 
     setLoading(true)
     try {
       const currentOffset = reset ? 0 : offset
       const params = {
-        city: cityForApi,
         limit: 20,
         offset: currentOffset,
+      }
+
+      // Если не forceAllCities - фильтруем по городу
+      if (!forceAllCities && !showingAllCities) {
+        params.city = cityForApi
       }
 
       // Добавляем категорию только если выбрана конкретная (не "all")
@@ -207,9 +213,17 @@ function HomePage({ onNavigate }) {
 
       const data = await api.getOffers(params)
 
+      // Если город пустой и это первая загрузка - загружаем из всех городов
+      if (reset && (!data || data.length === 0) && !forceAllCities && !showingAllCities) {
+        setShowingAllCities(true)
+        setLoading(false)
+        return loadOffers(true, true)
+      }
+
       if (reset) {
         setOffers(data || [])
         setOffset(20)
+        if (forceAllCities) setShowingAllCities(true)
       } else {
         setOffers(prev => [...prev, ...(data || [])])
         setOffset(prev => prev + 20)
@@ -221,10 +235,11 @@ function HomePage({ onNavigate }) {
     } finally {
       setLoading(false)
     }
-  }, [selectedCategory, searchQuery, offset, loading, cityForApi])
+  }, [selectedCategory, searchQuery, offset, loading, cityForApi, showingAllCities])
 
   // Initial load and search with debounce
   useEffect(() => {
+    setShowingAllCities(false) // Сбрасываем при смене города/фильтров
     const timer = setTimeout(() => {
       loadOffers(true)
     }, searchQuery ? 500 : 0)
@@ -422,25 +437,37 @@ function HomePage({ onNavigate }) {
       <div className="banner-slider">
         <div className="banner-track" style={{ transform: `translateX(-${bannerIndex * 100}%)` }}>
           <div className="banner-slide gradient-green">
-            <div className="banner-badge">🔥 Chegirma</div>
-            <div className="banner-emoji">🥬🥕🍅</div>
-            <h2 className="banner-title">Yangi Mahsulotlar</h2>
-            <p className="banner-subtitle">40% gacha chegirma</p>
-            <button className="banner-btn">Ko'rish →</button>
+            <div className="banner-content">
+              <div className="banner-left">
+                <div className="banner-badge">🔥 Chegirma</div>
+                <h2 className="banner-title">Yangi Takliflar</h2>
+                <p className="banner-subtitle">40% gacha</p>
+                <button className="banner-btn">Ko'rish</button>
+              </div>
+              <div className="banner-emoji">🥬🥕🍅</div>
+            </div>
           </div>
           <div className="banner-slide gradient-orange">
-            <div className="banner-badge">⚡ Tezkor</div>
-            <div className="banner-emoji">🍞🥛🧀</div>
-            <h2 className="banner-title">Kunlik Mahsulotlar</h2>
-            <p className="banner-subtitle">Eng yaqin do'kondan</p>
-            <button className="banner-btn">Buyurtma →</button>
+            <div className="banner-content">
+              <div className="banner-left">
+                <div className="banner-badge">⚡ Tezkor</div>
+                <h2 className="banner-title">Kunlik Mahsulot</h2>
+                <p className="banner-subtitle">Yaqin do'kondan</p>
+                <button className="banner-btn">Buyurtma</button>
+              </div>
+              <div className="banner-emoji">🍞🥛🧀</div>
+            </div>
           </div>
           <div className="banner-slide gradient-purple">
-            <div className="banner-badge">🎁 Bonus</div>
-            <div className="banner-emoji">🍎🍊🍋</div>
-            <h2 className="banner-title">Mevalar va Sabzavotlar</h2>
-            <p className="banner-subtitle">Har kuni yangi</p>
-            <button className="banner-btn">Tanlash →</button>
+            <div className="banner-content">
+              <div className="banner-left">
+                <div className="banner-badge">🎁 Bonus</div>
+                <h2 className="banner-title">Meva & Sabzavot</h2>
+                <p className="banner-subtitle">Har kuni yangi</p>
+                <button className="banner-btn">Tanlash</button>
+              </div>
+              <div className="banner-emoji">🍎🍊🍋</div>
+            </div>
           </div>
         </div>
         <div className="banner-dots">
@@ -469,6 +496,7 @@ function HomePage({ onNavigate }) {
             </button>
           ))}
         </div>
+        <div className="categories-fade" />
       </div>
 
       {/* Section Title */}
@@ -478,6 +506,16 @@ function HomePage({ onNavigate }) {
         </h2>
         <span className="offers-count">{offers.length} ta</span>
       </div>
+
+      {/* Info banner if showing all cities */}
+      {showingAllCities && offers.length > 0 && (
+        <div className="all-cities-banner">
+          <span className="all-cities-icon">🌍</span>
+          <span className="all-cities-text">
+            {cityRaw} da mahsulot yo'q. Barcha shaharlardan ko'rsatilmoqda
+          </span>
+        </div>
+      )}
 
       {/* Offers Grid */}
       <div className="offers-grid">
