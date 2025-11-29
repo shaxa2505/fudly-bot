@@ -1,10 +1,13 @@
 import { useState, useEffect } from 'react'
+import { useNavigate } from 'react-router-dom'
 import api from '../api/client'
+import { useCart } from '../context/CartContext'
 import BottomNav from '../components/BottomNav'
 import { getUserId, getUserLanguage } from '../utils/auth'
 import './YanaPage.css'
 
-function YanaPage({ onNavigate }) {
+function YanaPage() {
+  const navigate = useNavigate()
   const [activeSection, setActiveSection] = useState('orders') // orders, settings, about
   const [orders, setOrders] = useState([])
   const [loading, setLoading] = useState(true)
@@ -20,13 +23,8 @@ function YanaPage({ onNavigate }) {
   })
   const [notifications, setNotifications] = useState(true)
 
-  // Get cart for badge
-  const cart = (() => {
-    try {
-      return JSON.parse(localStorage.getItem('fudly_cart_v2') || '{}')
-    } catch { return {} }
-  })()
-  const cartCount = Object.values(cart).reduce((sum, item) => sum + (item?.quantity || 0), 0)
+  // Get cart count from context
+  const { cartCount, clearCart } = useCart()
 
   useEffect(() => {
     loadOrders()
@@ -153,7 +151,7 @@ function YanaPage({ onNavigate }) {
               <div className="empty-icon">📦</div>
               <h3>Buyurtmalar yo'q</h3>
               <p>Birinchi buyurtmangizni bering!</p>
-              <button className="cta-btn" onClick={() => onNavigate('home')}>
+              <button className="cta-btn" onClick={() => navigate('/')}>
                 🛒 Xarid qilish
               </button>
             </div>
@@ -165,7 +163,7 @@ function YanaPage({ onNavigate }) {
                   <div
                     key={order.booking_id || idx}
                     className="order-card"
-                    onClick={() => onNavigate('order-tracking', { bookingId: order.booking_id })}
+                    onClick={() => navigate(`/order/${order.booking_id}`)}
                     style={{ animationDelay: `${idx * 0.05}s` }}
                   >
                     <div className="order-header">
@@ -267,7 +265,7 @@ function YanaPage({ onNavigate }) {
               className="danger-btn"
               onClick={() => {
                 if (confirm('Savatni tozalashni xohlaysizmi?')) {
-                  localStorage.removeItem('fudly_cart_v2')
+                  clearCart()
                   window.Telegram?.WebApp?.showAlert?.('Savat tozalandi')
                 }
               }}
@@ -333,7 +331,7 @@ function YanaPage({ onNavigate }) {
         </div>
       )}
 
-      <BottomNav currentPage="profile" onNavigate={onNavigate} cartCount={cartCount} />
+      <BottomNav currentPage="profile" cartCount={cartCount} />
     </div>
   )
 }

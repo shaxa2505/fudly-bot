@@ -4,6 +4,7 @@ Mini App (WebApp) handlers for Telegram.
 from __future__ import annotations
 
 import logging
+import os
 from typing import Any
 
 from aiogram import F, Router, types
@@ -14,8 +15,8 @@ logger = logging.getLogger(__name__)
 
 router = Router(name="webapp")
 
-# URL вашего Mini App (постоянный домен Vercel)
-WEBAPP_URL = "https://webapp-ar1tb80lb-shaxbozs-projects-d385e345.vercel.app"
+# URL вашего Mini App (из переменных окружения или дефолтный)
+WEBAPP_URL = os.getenv("WEBAPP_URL", "https://fudly-webapp.vercel.app")
 
 
 def webapp_keyboard(lang: str = "ru") -> InlineKeyboardMarkup:

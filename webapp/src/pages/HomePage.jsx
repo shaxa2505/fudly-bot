@@ -1,5 +1,8 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
+import { useNavigate } from 'react-router-dom'
 import api from '../api/client'
+import { useCart } from '../context/CartContext'
+import { transliterateCity, getSavedLocation, saveLocation, DEFAULT_LOCATION } from '../utils/cityUtils'
 import OfferCard from '../components/OfferCard'
 import BottomNav from '../components/BottomNav'
 import fudlyLogo from '../assets/fudly-logo.svg'
@@ -17,87 +20,22 @@ const CATEGORIES = [
   { id: 'other', name: 'Boshqa', icon: '📦' },
 ]
 
-// Транслитерация городов: латиница -> кириллица (для API)
-const CITY_TO_CYRILLIC = {
-  'toshkent': 'Ташкент',
-  'tashkent': 'Ташкент',
-  'samarqand': 'Самарканд',
-  'samarkand': 'Самарканд',
-  'buxoro': 'Бухара',
-  'bukhara': 'Бухара',
-  "farg'ona": 'Фергана',
-  'fergana': 'Фергана',
-  'andijon': 'Андижан',
-  'andijan': 'Андижан',
-  'namangan': 'Наманган',
-  'navoiy': 'Навои',
-  'navoi': 'Навои',
-  'qarshi': 'Карши',
-  'karshi': 'Карши',
-  'nukus': 'Нукус',
-  'urganch': 'Ургенч',
-  'urgench': 'Ургенч',
-  'jizzax': 'Джизак',
-  'jizzakh': 'Джизак',
-  'termiz': 'Термез',
-  'termez': 'Термез',
-  'guliston': 'Гулистан',
-  'gulistan': 'Гулистан',
-  'chirchiq': 'Чирчик',
-  'chirchik': 'Чирчик',
-  "kattaqo'rg'on": 'Каттакурган',
-  'kattakurgan': 'Каттакурган',
-  'kattaqurgan': 'Каттакурган',
-  'olmaliq': 'Алмалык',
-  'angren': 'Ангрен',
-  'bekobod': 'Бекабад',
-  'shahrisabz': 'Шахрисабз',
-  "marg'ilon": 'Маргилан',
-  "qo'qon": 'Коканд',
-  'xiva': 'Хива',
-  'khiva': 'Хива',
-}
-
-// Функция для транслитерации города в кириллицу
-const transliterateCity = (city) => {
-  if (!city) return city
-  const cityLower = city.toLowerCase().trim()
-  return CITY_TO_CYRILLIC[cityLower] || city
-}
-
-const DEFAULT_LOCATION = {
-  city: "Toshkent, O'zbekiston",
-  address: '',
-  coordinates: null,
-}
-
-function HomePage({ onNavigate }) {
+function HomePage() {
+  const navigate = useNavigate()
   const [offers, setOffers] = useState([])
   const [loading, setLoading] = useState(false)
   const [selectedCategory, setSelectedCategory] = useState('all')
   const [searchQuery, setSearchQuery] = useState('')
-  const [location, setLocation] = useState(() => {
-    try {
-      const saved = localStorage.getItem('fudly_location')
-      return saved ? JSON.parse(saved) : DEFAULT_LOCATION
-    } catch {
-      return DEFAULT_LOCATION
-    }
-  })
+  const [location, setLocation] = useState(getSavedLocation)
   const [isLocating, setIsLocating] = useState(false)
   const [locationError, setLocationError] = useState('')
   const [showAddressModal, setShowAddressModal] = useState(false)
   const [manualCity, setManualCity] = useState(location.city)
   const [manualAddress, setManualAddress] = useState(location.address)
-  // Cart хранит: { offerId: { offer, quantity } }
-  const [cart, setCart] = useState(() => {
-    try {
-      const saved = localStorage.getItem('fudly_cart_v2')
-      return saved ? JSON.parse(saved) : {}
-    } catch {
-      return {}
-    }
-  })
+
+  // Use cart from context instead of local state
+  const { addToCart, removeFromCart, getQuantity, cartCount } = useCart()
+
   const [hasMore, setHasMore] = useState(true)
   const [offset, setOffset] = useState(0)
   const [bannerIndex, setBannerIndex] = useState(0)
@@ -111,7 +49,7 @@ function HomePage({ onNavigate }) {
     : ''
   const hasPreciseLocation = Boolean(location.coordinates || location.address)
   const observerTarget = useRef(null)
-  const autoLocationAttempted = useRef(false)
+  const autoLocationAttempted = useRef(null)
 
   // Извлекаем название города для API (без страны) и транслитерируем в кириллицу
   const cityRaw = location.city
@@ -120,7 +58,7 @@ function HomePage({ onNavigate }) {
   const cityForApi = transliterateCity(cityRaw)
 
   useEffect(() => {
-    localStorage.setItem('fudly_location', JSON.stringify(location))
+    saveLocation(location)
   }, [location])
 
   // Автоопределение локации при первом запуске
@@ -265,10 +203,7 @@ function HomePage({ onNavigate }) {
     return () => observer.disconnect()
   }, [hasMore, loading, loadOffers])
 
-  // Save cart to localStorage
-  useEffect(() => {
-    localStorage.setItem('fudly_cart_v2', JSON.stringify(cart))
-  }, [cart])
+  // Cart is now saved automatically via CartContext
 
   // Banner auto-slide
   useEffect(() => {
@@ -353,47 +288,7 @@ function HomePage({ onNavigate }) {
     setLocationError('')
   }
 
-  const addToCart = (offer) => {
-    setCart(prev => {
-      const key = String(offer.id)
-      const existing = prev[key]
-      return {
-        ...prev,
-        [key]: {
-          offer: {
-            id: offer.id,
-            title: offer.title,
-            photo: offer.photo,
-            discount_price: offer.discount_price,
-            original_price: offer.original_price,
-            store_name: offer.store_name,
-          },
-          quantity: (existing?.quantity || 0) + 1
-        }
-      }
-    })
-  }
-
-  const removeFromCart = (offer) => {
-    setCart(prev => {
-      const key = String(offer.id)
-      const existing = prev[key]
-      if (!existing || existing.quantity <= 1) {
-        const { [key]: _, ...rest } = prev
-        return rest
-      }
-      return {
-        ...prev,
-        [key]: { ...existing, quantity: existing.quantity - 1 }
-      }
-    })
-  }
-
-  const getCartQuantity = (offerId) => {
-    return cart[String(offerId)]?.quantity || 0
-  }
-
-  const cartCount = Object.values(cart).reduce((sum, item) => sum + item.quantity, 0)
+  // Cart functions now come from useCart() hook
 
   return (
     <div className="home-page">
@@ -538,10 +433,9 @@ function HomePage({ onNavigate }) {
             <OfferCard
               key={offer.id}
               offer={offer}
-              cartQuantity={getCartQuantity(offer.id)}
+              cartQuantity={getQuantity(offer.id)}
               onAddToCart={addToCart}
               onRemoveFromCart={removeFromCart}
-              onNavigate={onNavigate}
             />
           ))
         )}
@@ -557,7 +451,6 @@ function HomePage({ onNavigate }) {
       {/* Bottom Navigation */}
       <BottomNav
         currentPage="home"
-        onNavigate={onNavigate}
         cartCount={cartCount}
       />
 

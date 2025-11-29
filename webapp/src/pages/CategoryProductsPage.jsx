@@ -1,10 +1,21 @@
 import { useState, useEffect, useMemo, useCallback } from 'react'
+import { useNavigate, useParams, useLocation } from 'react-router-dom'
 import api from '../api/client'
+import { useCart } from '../context/CartContext'
 import OfferCard from '../components/OfferCard'
 import FilterPanel, { FILTER_CATEGORY_OPTIONS, FILTER_BRAND_OPTIONS } from '../components/FilterPanel'
 import './CategoryProductsPage.css'
 
-function CategoryProductsPage({ categoryId, categoryName, onNavigate, onBack }) {
+function CategoryProductsPage() {
+  const navigate = useNavigate()
+  const params = useParams()
+  const location = useLocation()
+  const { addToCart, removeFromCart, getQuantity } = useCart()
+
+  // Get categoryId and categoryName from params or state
+  const categoryId = params.categoryId || location.state?.categoryId
+  const categoryName = location.state?.categoryName || categoryId
+
   const [offers, setOffers] = useState([])
   const [loading, setLoading] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
@@ -12,10 +23,6 @@ function CategoryProductsPage({ categoryId, categoryName, onNavigate, onBack }) 
   const [selectedFilters, setSelectedFilters] = useState({
     categories: [],
     brands: []
-  })
-  const [cart, setCart] = useState(() => {
-    const saved = localStorage.getItem('fudly_cart')
-    return saved ? new Map(Object.entries(JSON.parse(saved))) : new Map()
   })
 
   const categoryDictionary = useMemo(
@@ -62,16 +69,6 @@ function CategoryProductsPage({ categoryId, categoryName, onNavigate, onBack }) 
     if (e.key === 'Enter') {
       handleSearch()
     }
-  }
-
-  const addToCart = (offer) => {
-    setCart(prev => {
-      const next = new Map(prev)
-      const current = next.get(offer.id) || 0
-      next.set(offer.id, current + 1)
-      localStorage.setItem('fudly_cart', JSON.stringify(Object.fromEntries(next)))
-      return next
-    })
   }
 
   const handleApplyFilters = (filters) => {
@@ -152,7 +149,7 @@ function CategoryProductsPage({ categoryId, categoryName, onNavigate, onBack }) 
     <div className="category-products-page">
       {/* Header */}
       <header className="category-header">
-        <button className="back-btn" onClick={onBack}>
+        <button className="back-btn" onClick={() => navigate(-1)}>
           <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
             <path d="M15 18l-6-6 6-6" stroke="#181725" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
           </svg>
@@ -235,8 +232,9 @@ function CategoryProductsPage({ categoryId, categoryName, onNavigate, onBack }) 
             <OfferCard
               key={offer.id}
               offer={offer}
-              onAddToCart={() => addToCart(offer)}
-              onNavigate={onNavigate}
+              cartQuantity={getQuantity(offer.id)}
+              onAddToCart={addToCart}
+              onRemoveFromCart={removeFromCart}
             />
           ))
         )}

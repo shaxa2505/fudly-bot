@@ -2,9 +2,23 @@ import axios from 'axios'
 
 const API_BASE = import.meta.env.VITE_API_URL || 'https://fudly-bot-production.up.railway.app/api/v1'
 
+// Retry configuration
+const RETRY_CONFIG = {
+  retries: 3,
+  retryDelay: 1000, // 1 second
+  retryCondition: (error) => {
+    // Retry on network errors or 5xx server errors
+    return !error.response || (error.response.status >= 500 && error.response.status <= 599)
+  },
+}
+
+// Helper function to delay
+const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms))
+
+// Create axios instance
 const client = axios.create({
   baseURL: API_BASE,
-  timeout: 10000,
+  timeout: 15000, // Increased timeout to 15s
 })
 
 // Add auth header
@@ -12,17 +26,44 @@ client.interceptors.request.use((config) => {
   if (window.Telegram?.WebApp?.initData) {
     config.headers['X-Telegram-Init-Data'] = window.Telegram.WebApp.initData
   }
+  // Add retry count to config
+  config.__retryCount = config.__retryCount || 0
   return config
 })
 
-// Handle errors
+// Handle errors with retry logic
 client.interceptors.response.use(
   (response) => response,
-  (error) => {
+  async (error) => {
+    const config = error.config
+
+    // Check if we should retry
+    if (
+      config &&
+      config.__retryCount < RETRY_CONFIG.retries &&
+      RETRY_CONFIG.retryCondition(error)
+    ) {
+      config.__retryCount += 1
+
+      // Calculate delay with exponential backoff
+      const backoffDelay = RETRY_CONFIG.retryDelay * Math.pow(2, config.__retryCount - 1)
+
+      console.log(`Retrying request (${config.__retryCount}/${RETRY_CONFIG.retries}) after ${backoffDelay}ms...`)
+
+      await delay(backoffDelay)
+      return client(config)
+    }
+
+    // Log error
     console.error('API Error:', error)
+
+    // Show user-friendly error for server errors
     if (error.response?.status >= 500) {
       window.Telegram?.WebApp?.showAlert?.('Serverda xatolik. Keyinroq urinib ko\'ring.')
+    } else if (!error.response) {
+      window.Telegram?.WebApp?.showAlert?.('Internet aloqasi yo\'q. Tarmoqni tekshiring.')
     }
+
     return Promise.reject(error)
   }
 )

@@ -1,0 +1,146 @@
+/* Banner Slider Styles */
+.banner-slider {
+  position: relative;
+  width: 100%;
+  overflow: hidden;
+  border-radius: 16px;
+  margin: 16px 0;
+}
+
+.banner-track {
+  display: flex;
+  transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.banner-slide {
+  min-width: 100%;
+  padding: 20px;
+  border-radius: 16px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.banner-slide.gradient-green {
+  background: linear-gradient(135deg, #53B175 0%, #7BC77E 100%);
+}
+
+.banner-slide.gradient-orange {
+  background: linear-gradient(135deg, #FF6B35 0%, #FF9F1C 100%);
+}
+
+.banner-slide.gradient-purple {
+  background: linear-gradient(135deg, #6B5DD3 0%, #9D8DF1 100%);
+}
+
+.banner-content {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  color: white;
+  min-height: 120px;
+}
+
+.banner-left {
+  flex: 1;
+}
+
+.banner-badge {
+  display: inline-block;
+  padding: 4px 10px;
+  background: rgba(255, 255, 255, 0.25);
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 600;
+  margin-bottom: 8px;
+  backdrop-filter: blur(4px);
+}
+
+.banner-title {
+  font-size: 22px;
+  font-weight: 700;
+  margin: 0 0 4px;
+  line-height: 1.2;
+}
+
+.banner-subtitle {
+  font-size: 14px;
+  opacity: 0.9;
+  margin: 0 0 12px;
+}
+
+.banner-btn {
+  display: inline-block;
+  padding: 8px 20px;
+  background: white;
+  color: #181725;
+  border: none;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.banner-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.banner-btn:active {
+  transform: translateY(0);
+}
+
+.banner-emoji {
+  font-size: 48px;
+  line-height: 1;
+  margin-left: 16px;
+  animation: float 3s ease-in-out infinite;
+}
+
+@keyframes float {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-8px);
+  }
+}
+
+.banner-dots {
+  display: flex;
+  justify-content: center;
+  gap: 8px;
+  padding: 12px 0 4px;
+}
+
+.banner-dots .dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.2);
+  border: none;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  padding: 0;
+}
+
+.banner-dots .dot.active {
+  width: 24px;
+  border-radius: 4px;
+  background: #53B175;
+}
+
+/* Touch swipe indicator */
+@media (hover: none) {
+  .banner-slide::after {
+    content: '';
+    position: absolute;
+    bottom: 8px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 40px;
+    height: 4px;
+    background: rgba(255, 255, 255, 0.3);
+    border-radius: 2px;
+  }
+}

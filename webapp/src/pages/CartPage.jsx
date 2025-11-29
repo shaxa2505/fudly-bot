@@ -1,18 +1,23 @@
 import { useState, useEffect } from 'react'
+import { useNavigate } from 'react-router-dom'
 import api from '../api/client'
+import { useCart } from '../context/CartContext'
 import BottomNav from '../components/BottomNav'
 import './CartPage.css'
 
-function CartPage({ onNavigate, user }) {
-  // Cart format: { offerId: { offer, quantity } }
-  const [cart, setCart] = useState(() => {
-    try {
-      const saved = localStorage.getItem('fudly_cart_v2')
-      return saved ? JSON.parse(saved) : {}
-    } catch {
-      return {}
-    }
-  })
+function CartPage({ user }) {
+  const navigate = useNavigate()
+  // Use cart from context
+  const {
+    cartItems,
+    cartCount,
+    cartTotal,
+    isEmpty,
+    updateQuantity,
+    removeItem,
+    clearCart
+  } = useCart()
+
   const [orderLoading, setOrderLoading] = useState(false)
 
   // Checkout form
@@ -35,16 +40,11 @@ function CartPage({ onNavigate, user }) {
   // Success/Error modals
   const [orderResult, setOrderResult] = useState(null)
 
-  // Sync cart to localStorage
-  useEffect(() => {
-    localStorage.setItem('fudly_cart_v2', JSON.stringify(cart))
-  }, [cart])
-
   // Check if stores in cart support delivery
   useEffect(() => {
     const checkDeliveryAvailability = async () => {
       // Get unique store IDs from cart
-      const storeIds = [...new Set(Object.values(cart).map(item => item.offer?.store_id).filter(Boolean))]
+      const storeIds = [...new Set(cartItems.map(item => item.offer?.store_id).filter(Boolean))]
 
       if (storeIds.length === 0) return
 
@@ -68,58 +68,40 @@ function CartPage({ onNavigate, user }) {
     }
 
     checkDeliveryAvailability()
-  }, [cart])
+  }, [cartItems])
 
-  // Convert cart object to array
-  const cartItems = Object.values(cart)
-  const subtotal = cartItems.reduce((sum, item) => sum + (item.offer.discount_price * item.quantity), 0)
+  // Calculate totals using context values
+  const subtotal = cartTotal
   const total = orderType === 'delivery' ? subtotal + deliveryFee : subtotal
-  const itemsCount = cartItems.reduce((sum, item) => sum + item.quantity, 0)
+  const itemsCount = cartCount
 
   // Check if minimum order met for delivery
   const canDelivery = subtotal >= minOrderAmount
 
-  const updateQuantity = (offerId, delta) => {
-    setCart(prev => {
-      const key = String(offerId)
-      const existing = prev[key]
-      if (!existing) return prev
-
-      const newQty = existing.quantity + delta
+  // Handle quantity change with delta (+1 or -1)
+  const handleQuantityChange = (offerId, delta) => {
+    const item = cartItems.find(i => i.offer.id === offerId)
+    if (item) {
+      const newQty = item.quantity + delta
       if (newQty <= 0) {
-        const { [key]: _, ...rest } = prev
-        return rest
+        removeItem(offerId)
+      } else {
+        updateQuantity(offerId, newQty)
       }
-      return {
-        ...prev,
-        [key]: { ...existing, quantity: newQty }
-      }
-    })
-  }
-
-  const removeItem = (offerId) => {
-    setCart(prev => {
-      const { [String(offerId)]: _, ...rest } = prev
-      return rest
-    })
-  }
-
-  const clearCart = () => {
-    setCart({})
+    }
   }
 
   const handleCheckout = () => {
-    if (cartItems.length === 0) return
+    if (isEmpty) return
     setShowCheckout(true)
   }
 
   const placeOrder = async () => {
-    if (cartItems.length === 0) return
+    if (isEmpty) return
     if (!phone.trim()) {
       alert('Telefon raqamingizni kiriting')
       return
     }
-
     if (orderType === 'delivery' && !address.trim()) {
       alert('Yetkazib berish manzilini kiriting')
       return
@@ -178,7 +160,7 @@ function CartPage({ onNavigate, user }) {
   }
 
   // Empty cart
-  if (cartItems.length === 0) {
+  if (isEmpty) {
     return (
       <div className="cart-page">
         <header className="cart-header">
@@ -189,12 +171,12 @@ function CartPage({ onNavigate, user }) {
           <div className="empty-icon">🛒</div>
           <h2>Savatingiz bo'sh</h2>
           <p>Mahsulotlar qo'shish uchun bosh sahifaga o'ting</p>
-          <button className="primary-btn" onClick={() => onNavigate('home')}>
+          <button className="primary-btn" onClick={() => navigate('/')}>
             🏠 Bosh sahifa
           </button>
         </div>
 
-        <BottomNav currentPage="cart" onNavigate={onNavigate} cartCount={0} />
+        <BottomNav currentPage="cart" cartCount={0} />
       </div>
     )
   }
@@ -230,14 +212,14 @@ function CartPage({ onNavigate, user }) {
               <div className="qty-controls">
                 <button
                   className="qty-btn"
-                  onClick={() => updateQuantity(item.offer.id, -1)}
+                  onClick={() => handleQuantityChange(item.offer.id, -1)}
                 >
                   −
                 </button>
                 <span className="qty-value">{item.quantity}</span>
                 <button
                   className="qty-btn plus"
-                  onClick={() => updateQuantity(item.offer.id, 1)}
+                  onClick={() => handleQuantityChange(item.offer.id, 1)}
                 >
                   +
                 </button>
@@ -277,7 +259,7 @@ function CartPage({ onNavigate, user }) {
         Buyurtma berish →
       </button>
 
-      <BottomNav currentPage="cart" onNavigate={onNavigate} cartCount={itemsCount} />
+      <BottomNav currentPage="cart" cartCount={itemsCount} />
 
       {/* Checkout Modal */}
       {showCheckout && (
@@ -419,7 +401,7 @@ function CartPage({ onNavigate, user }) {
                 <p className="order-note">Tez orada siz bilan bog'lanamiz</p>
                 <button className="primary-btn" onClick={() => {
                   setOrderResult(null)
-                  onNavigate('home')
+                  navigate('/')
                 }}>
                   🏠 Bosh sahifaga
                 </button>

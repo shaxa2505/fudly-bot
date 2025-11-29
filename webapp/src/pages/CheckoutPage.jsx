@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import api from '../api/client';
 import { getCurrentUser, getUserCity } from '../utils/auth';
 import BottomNav from '../components/BottomNav';
@@ -9,13 +10,21 @@ const DELIVERY_TYPE = {
   DELIVERY: 'delivery'
 };
 
-function CheckoutPage({ user, onNavigate }) {
-  const [cart, setCart] = useState(() => {
-    const saved = localStorage.getItem('fudly_cart')
-    return saved ? new Map(Object.entries(JSON.parse(saved))) : new Map()
-  })
-  const [cartData, setCartData] = useState(null);
-  const [cartSummaryLoading, setCartSummaryLoading] = useState(true);
+// Helper to read cart from localStorage (new format: { offerId: { offer, quantity } })
+const getCartFromStorage = () => {
+  try {
+    const saved = localStorage.getItem('fudly_cart_v2');
+    return saved ? JSON.parse(saved) : {};
+  } catch {
+    return {};
+  }
+};
+
+function CheckoutPage({ user }) {
+  const navigate = useNavigate();
+  // New cart format: { offerId: { offer: {...}, quantity: number } }
+  const [cart, setCart] = useState(getCartFromStorage);
+  const [cartSummaryLoading, setCartSummaryLoading] = useState(false);
   const [deliveryType, setDeliveryType] = useState(DELIVERY_TYPE.PICKUP);
   const [address, setAddress] = useState('');
   const [deliveryInfo, setDeliveryInfo] = useState(null);
@@ -23,35 +32,34 @@ function CheckoutPage({ user, onNavigate }) {
   const [calculatingDelivery, setCalculatingDelivery] = useState(false);
   const [error, setError] = useState(null);
 
-  const lang = user?.language || 'ru';
+  const lang = user?.language || 'uz';
   const t = (ru, uz) => (lang === 'uz' ? uz : ru);
-  const city = getUserCity() || 'Ташкент';
+  const city = getUserCity() || 'Toshkent';
+
+  // Convert cart object to items array
+  const cartItems = useMemo(() => {
+    return Object.values(cart).map(item => ({
+      offer_id: item.offer.id,
+      title: item.offer.title,
+      price: item.offer.discount_price,
+      quantity: item.quantity,
+      store_id: item.offer.store_id,
+      store_name: item.offer.store_name,
+      store_address: item.offer.store_address,
+      photo: item.offer.photo,
+    }));
+  }, [cart]);
+
+  const cartCount = useMemo(() => {
+    return Object.values(cart).reduce((sum, item) => sum + item.quantity, 0);
+  }, [cart]);
 
   useEffect(() => {
-    if (cart.size === 0) {
-      onNavigate('cart');
+    if (Object.keys(cart).length === 0) {
+      navigate('/cart');
       return;
     }
-
-    const loadCartSummary = async () => {
-      setCartSummaryLoading(true);
-      try {
-        const items = Array.from(cart.entries()).map(([id, qty]) => ({
-          offerId: parseInt(id, 10),
-          quantity: qty,
-        }));
-        const summary = await api.calculateCart(items);
-        setCartData(summary);
-      } catch (err) {
-        console.error('Error loading cart summary:', err);
-        setError(t('Не удалось загрузить корзину', 'Savatni yuklab bo\'lmadi'));
-      } finally {
-        setCartSummaryLoading(false);
-      }
-    };
-
-    loadCartSummary();
-  }, [cart, onNavigate, t]);
+  }, [cart, navigate]);
 
   useEffect(() => {
     if (deliveryType === DELIVERY_TYPE.DELIVERY && address.length > 5) {
@@ -60,9 +68,7 @@ function CheckoutPage({ user, onNavigate }) {
       }, 500);
       return () => clearTimeout(timer);
     }
-  }, [address, deliveryType, cartData]);
-
-  const cartItems = cartData?.items || [];
+  }, [address, deliveryType, cartItems]);
 
   const calculateDelivery = async () => {
     if (!address || address.length < 5 || cartItems.length === 0) return;
@@ -138,19 +144,19 @@ function CheckoutPage({ user, onNavigate }) {
 
       await api.createOrder(orderPayload);
 
-      // Clear cart and navigate to profile
-      setCart(new Map())
-      localStorage.setItem('fudly_cart', JSON.stringify({}))
+      // Clear cart and navigate to profile (use new format key)
+      setCart({});
+      localStorage.setItem('fudly_cart_v2', JSON.stringify({}));
 
       // Show success message
       if (window.Telegram?.WebApp) {
         window.Telegram.WebApp.showAlert(
           t('Заказ успешно оформлен!', 'Buyurtma muvaffaqiyatli qabul qilindi!'),
-          () => onNavigate('profile')
+          () => navigate('/profile')
         );
       } else {
         alert(t('Заказ успешно оформлен!', 'Buyurtma muvaffaqiyatli qabul qilindi!'));
-        onNavigate('profile');
+        navigate('/profile');
       }
     } catch (err) {
       console.error('Error placing order:', err);
@@ -159,8 +165,8 @@ function CheckoutPage({ user, onNavigate }) {
     }
   };
 
-  const itemsTotal = cartData?.total
-    ?? cartItems.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+  // Calculate totals from cartItems (already computed from cart)
+  const itemsTotal = cartItems.reduce((sum, item) => sum + (item.price * item.quantity), 0);
   const deliveryCost = (deliveryType === DELIVERY_TYPE.DELIVERY && deliveryInfo?.delivery_cost)
     ? deliveryInfo.delivery_cost
     : 0;
@@ -169,7 +175,7 @@ function CheckoutPage({ user, onNavigate }) {
   return (
     <div className="checkout-page">
       <div className="checkout-header">
-        <button onClick={() => onNavigate('cart')} className="back-button">
+        <button onClick={() => navigate('/cart')} className="back-button">
           ← {t('Назад', 'Orqaga')}
         </button>
         <h1>{t('Оформление заказа', 'Buyurtmani rasmiylashtirish')}</h1>
@@ -321,7 +327,7 @@ function CheckoutPage({ user, onNavigate }) {
         </button>
       </div>
 
-      <BottomNav currentPage="cart" onNavigate={onNavigate} cartCount={cart.size} />
+      <BottomNav currentPage="cart" cartCount={cartCount} />
     </div>
   );
 }

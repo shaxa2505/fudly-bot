@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { MemoryRouter, Routes, Route, useNavigate, useLocation } from 'react-router-dom'
 import HomePage from './pages/HomePage'
 import CartPage from './pages/CartPage'
 import YanaPage from './pages/YanaPage'
@@ -10,9 +11,22 @@ import CategoryProductsPage from './pages/CategoryProductsPage'
 import './App.css'
 import './styles/animations.css'
 
-function App() {
-  const [currentPage, setCurrentPage] = useState('home')
-  const [pageParams, setPageParams] = useState({})
+// Loading screen component
+function LoadingScreen() {
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh' }}>
+      <div style={{ textAlign: 'center' }}>
+        <div style={{ fontSize: '32px', marginBottom: '16px' }}>🍽️</div>
+        <div style={{ color: '#999' }}>Yuklanmoqda...</div>
+      </div>
+    </div>
+  )
+}
+
+// Main app content with routing
+function AppContent() {
+  const navigate = useNavigate()
+  const location = useLocation()
   const [user, setUser] = useState({ id: 1, first_name: 'Guest', username: 'guest' })
   const [loading, setLoading] = useState(true)
 
@@ -42,73 +56,90 @@ function App() {
       document.documentElement.style.setProperty('--tg-theme-bg-color', tg.themeParams.bg_color || '#ffffff')
       document.documentElement.style.setProperty('--tg-theme-text-color', tg.themeParams.text_color || '#000000')
       document.documentElement.style.setProperty('--tg-theme-button-color', tg.themeParams.button_color || '#53B175')
-
-      // Handle back button
-      tg.BackButton.onClick(() => {
-        if (currentPage !== 'home') {
-          setCurrentPage('home')
-        } else {
-          tg.close()
-        }
-      })
     }
 
     setLoading(false)
-  }, [currentPage])
+  }, [])
 
-  // Update Telegram back button visibility
+  // Handle Telegram back button
   useEffect(() => {
     const tg = window.Telegram?.WebApp
-    if (tg) {
-      if (currentPage === 'home') {
-        tg.BackButton.hide()
+    if (!tg) return
+
+    const isHome = location.pathname === '/'
+
+    if (isHome) {
+      tg.BackButton.hide()
+    } else {
+      tg.BackButton.show()
+    }
+
+    const handleBack = () => {
+      if (!isHome) {
+        navigate(-1)
       } else {
-        tg.BackButton.show()
+        tg.close()
       }
     }
-  }, [currentPage])
 
-  const renderPage = () => {
-    if (loading) {
-      return (
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh' }}>
-          <div style={{ textAlign: 'center' }}>
-            <div style={{ fontSize: '32px', marginBottom: '16px' }}>🍽️</div>
-            <div style={{ color: '#999' }}>Yuklanmoqda...</div>
-          </div>
-        </div>
-      )
-    }
+    tg.BackButton.onClick(handleBack)
 
-    const navigate = (page, params = {}) => {
-      setCurrentPage(page)
-      setPageParams(params)
+    return () => {
+      tg.BackButton.offClick(handleBack)
     }
+  }, [location.pathname, navigate])
 
-    switch (currentPage) {
-      case 'cart':
-        return <CartPage onNavigate={navigate} user={user} />
-      case 'profile':
-        return <YanaPage onNavigate={navigate} user={user} />
-      case 'checkout':
-        return <CheckoutPage onNavigate={navigate} user={user} />
-      case 'order-tracking':
-        return <OrderTrackingPage onNavigate={navigate} user={user} bookingId={pageParams.bookingId} />
-      case 'product-detail':
-        return <ProductDetailPage onNavigate={navigate} offer={pageParams.offer} onAddToCart={pageParams.onAddToCart} />
-      case 'category-products':
-        return <CategoryProductsPage categoryId={pageParams.categoryId} categoryName={pageParams.categoryName} onNavigate={navigate} onBack={() => navigate('stores')} />
-      case 'stores':
-        return <StoresPage onNavigate={navigate} user={user} />
-      default:
-        return <HomePage onNavigate={navigate} user={user} />
-    }
+  if (loading) {
+    return <LoadingScreen />
   }
 
   return (
     <div className="app">
-      {renderPage()}
+      <Routes>
+        <Route
+          path="/"
+          element={<HomePage user={user} />}
+        />
+        <Route
+          path="/cart"
+          element={<CartPage user={user} />}
+        />
+        <Route
+          path="/profile"
+          element={<YanaPage user={user} />}
+        />
+        <Route
+          path="/checkout"
+          element={<CheckoutPage user={user} />}
+        />
+        <Route
+          path="/stores"
+          element={<StoresPage user={user} />}
+        />
+        <Route
+          path="/order/:bookingId"
+          element={<OrderTrackingPage user={user} />}
+        />
+        <Route
+          path="/product"
+          element={<ProductDetailPage />}
+        />
+        <Route
+          path="/category/:categoryId"
+          element={<CategoryProductsPage />}
+        />
+        {/* Fallback to home */}
+        <Route path="*" element={<HomePage user={user} />} />
+      </Routes>
     </div>
+  )
+}
+
+function App() {
+  return (
+    <MemoryRouter>
+      <AppContent />
+    </MemoryRouter>
   )
 }
 

@@ -1,12 +1,12 @@
 import { memo } from 'react'
+import { useNavigate } from 'react-router-dom'
 import './OfferCard.css'
 
-const OfferCard = memo(function OfferCard({ offer, cartQuantity = 0, onAddToCart, onRemoveFromCart, onNavigate }) {
+const OfferCard = memo(function OfferCard({ offer, cartQuantity = 0, onAddToCart, onRemoveFromCart }) {
+  const navigate = useNavigate()
 
   const handleCardClick = () => {
-    if (onNavigate) {
-      onNavigate('product-detail', { offer, onAddToCart })
-    }
+    navigate('/product', { state: { offer } })
   }
 
   const handleAddClick = (e) => {

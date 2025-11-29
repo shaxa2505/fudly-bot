@@ -1,6 +1,27 @@
+import { useNavigate, useLocation } from 'react-router-dom'
 import './BottomNav.css'
 
-function BottomNav({ currentPage, onNavigate, cartCount }) {
+// Map page IDs to routes
+const PAGE_ROUTES = {
+  'home': '/',
+  'stores': '/stores',
+  'cart': '/cart',
+  'profile': '/profile',
+}
+
+function BottomNav({ currentPage, cartCount }) {
+  const navigate = useNavigate()
+  const location = useLocation()
+
+  // Determine current page from route if not explicitly passed
+  const activePage = currentPage || (() => {
+    const path = location.pathname
+    if (path === '/') return 'home'
+    if (path === '/stores') return 'stores'
+    if (path === '/cart') return 'cart'
+    if (path === '/profile' || path === '/yana') return 'profile'
+    return 'home'
+  })()
   const getIcon = (id, isActive) => {
     const color = isActive ? '#53B175' : '#7C7C7C'
     const strokeW = isActive ? '2.5' : '2'
@@ -47,17 +68,22 @@ function BottomNav({ currentPage, onNavigate, cartCount }) {
     { id: 'profile', label: 'Yana' },
   ]
 
+  const handleNavigate = (pageId) => {
+    const route = PAGE_ROUTES[pageId] || '/'
+    navigate(route)
+  }
+
   return (
     <nav className="bottom-nav">
       <div className="bottom-nav-content">
         {menuItems.map(item => (
           <button
             key={item.id}
-            className={`nav-item ${currentPage === item.id ? 'active' : ''}`}
-            onClick={() => onNavigate(item.id)}
+            className={`nav-item ${activePage === item.id ? 'active' : ''}`}
+            onClick={() => handleNavigate(item.id)}
           >
             <div className="nav-icon-container">
-              <span className="nav-icon">{getIcon(item.id, currentPage === item.id)}</span>
+              <span className="nav-icon">{getIcon(item.id, activePage === item.id)}</span>
               {item.badge > 0 && (
                 <span className="nav-badge">{item.badge > 99 ? '99+' : item.badge}</span>
               )}

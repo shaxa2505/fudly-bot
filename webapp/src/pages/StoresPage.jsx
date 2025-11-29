@@ -1,9 +1,15 @@
 import { useState, useEffect } from 'react'
+import { useNavigate } from 'react-router-dom'
 import api from '../api/client'
+import { useCart } from '../context/CartContext'
+import { getSavedLocation, getLatinCity, getCyrillicCity } from '../utils/cityUtils'
 import BottomNav from '../components/BottomNav'
 import './StoresPage.css'
 
-function StoresPage({ onNavigate }) {
+function StoresPage() {
+  const navigate = useNavigate()
+  const { cartCount } = useCart()
+
   const [stores, setStores] = useState([])
   const [loading, setLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState('')
@@ -12,42 +18,10 @@ function StoresPage({ onNavigate }) {
   const [storeOffers, setStoreOffers] = useState([])
   const [loadingOffers, setLoadingOffers] = useState(false)
 
-  // Get current city - translate Latin to Cyrillic for API
-  const CITY_TRANSLATIONS = {
-    'Toshkent': 'Ташкент',
-    'Samarqand': 'Самарканд',
-    'Buxoro': 'Бухара',
-    'Namangan': 'Наманган',
-    'Andijon': 'Андижан',
-    'Farg\'ona': 'Фергана',
-    'Nukus': 'Нукус',
-    'Qarshi': 'Карши',
-    'Jizzax': 'Джизак',
-    'Urganch': 'Ургенч',
-    'Navoiy': 'Навои',
-    'Termiz': 'Термез',
-    'Qo\'qon': 'Коканд',
-    'Marg\'ilon': 'Маргилан',
-    'Chirchiq': 'Чирчик',
-    'Olmaliq': 'Алмалык',
-    'Angren': 'Ангрен'
-  }
-
-  const location = (() => {
-    try {
-      return JSON.parse(localStorage.getItem('fudly_location') || '{}')
-    } catch { return {} }
-  })()
-  const cityLatin = location.city?.split(',')[0]?.trim() || 'Toshkent'
-  const cityRaw = CITY_TRANSLATIONS[cityLatin] || cityLatin
-
-  // Get cart for badge
-  const cart = (() => {
-    try {
-      return JSON.parse(localStorage.getItem('fudly_cart_v2') || '{}')
-    } catch { return {} }
-  })()
-  const cartCount = Object.values(cart).reduce((sum, item) => sum + (item?.quantity || 0), 0)
+  // Get current city using shared utils
+  const location = getSavedLocation()
+  const cityLatin = getLatinCity(location)
+  const cityRaw = getCyrillicCity(location.city)
 
   const BUSINESS_TYPES = [
     { id: 'all', label: 'Barchasi', icon: '🏪' },
@@ -269,7 +243,7 @@ function StoresPage({ onNavigate }) {
                         className="offer-item"
                         onClick={() => {
                           closeStoreModal()
-                          onNavigate('product', { offerId: offer.id })
+                          navigate('/product', { state: { offerId: offer.id } })
                         }}
                       >
                         <img
@@ -297,7 +271,7 @@ function StoresPage({ onNavigate }) {
                 className="view-all-btn"
                 onClick={() => {
                   closeStoreModal()
-                  onNavigate('home', { storeId: selectedStore.id })
+                  navigate('/', { state: { storeId: selectedStore.id } })
                 }}
               >
                 Barcha mahsulotlarni ko'rish →
@@ -307,7 +281,7 @@ function StoresPage({ onNavigate }) {
         </div>
       )}
 
-      <BottomNav currentPage="stores" onNavigate={onNavigate} cartCount={cartCount} />
+      <BottomNav currentPage="stores" cartCount={cartCount} />
     </div>
   )
 }

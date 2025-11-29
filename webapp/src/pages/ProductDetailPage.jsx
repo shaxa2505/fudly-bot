@@ -1,7 +1,16 @@
 import { useState } from 'react'
+import { useNavigate, useLocation } from 'react-router-dom'
+import { useCart } from '../context/CartContext'
 import './ProductDetailPage.css'
 
-function ProductDetailPage({ offer, onNavigate, onAddToCart }) {
+function ProductDetailPage() {
+  const navigate = useNavigate()
+  const location = useLocation()
+  const { addToCart } = useCart()
+
+  // Get offer from route state
+  const offer = location.state?.offer
+
   const [quantity, setQuantity] = useState(1)
   const [currentImageIndex, setCurrentImageIndex] = useState(0)
   const [showDetails, setShowDetails] = useState(true)
@@ -43,10 +52,8 @@ function ProductDetailPage({ offer, onNavigate, onAddToCart }) {
   }
 
   const handleAddToBasket = () => {
-    if (onAddToCart) {
-      for (let i = 0; i < quantity; i++) {
-        onAddToCart(offer)
-      }
+    for (let i = 0; i < quantity; i++) {
+      addToCart(offer)
     }
 
     setAddedToCart(true)
@@ -100,7 +107,7 @@ function ProductDetailPage({ offer, onNavigate, onAddToCart }) {
     <div className="product-detail-page">
       {/* Header */}
       <div className="detail-header">
-        <button className="back-btn" onClick={() => onNavigate?.('home')}>
+        <button className="back-btn" onClick={() => navigate(-1)}>
           <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
             <path d="M15 18l-6-6 6-6" stroke="#181725" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
           </svg>

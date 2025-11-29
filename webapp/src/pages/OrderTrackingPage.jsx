@@ -1,5 +1,7 @@
 import React, { useEffect, useState } from 'react';
+import { useNavigate, useLocation, useParams } from 'react-router-dom';
 import api from '../api/client';
+import { useCart } from '../context/CartContext';
 import { getCurrentUser } from '../utils/auth';
 import BottomNav from '../components/BottomNav';
 import './OrderTrackingPage.css';
@@ -12,12 +14,15 @@ const STATUS_STEPS = {
   'cancelled': { order: -1, label: { ru: 'Отменен', uz: 'Bekor qilindi' } }
 };
 
-function OrderTrackingPage({ user, bookingId, onNavigate }) {
-  const [cartCount, setCartCount] = useState(() => {
-    const saved = localStorage.getItem('fudly_cart')
-    const cart = saved ? JSON.parse(saved) : {}
-    return Object.keys(cart).length
-  });
+function OrderTrackingPage({ user }) {
+  const navigate = useNavigate();
+  const location = useLocation();
+  const params = useParams();
+  const { cartCount } = useCart();
+
+  // Get bookingId from URL params or route state
+  const bookingId = params.bookingId || location.state?.bookingId;
+
   const [order, setOrder] = useState(null);
   const [timeline, setTimeline] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -48,7 +53,7 @@ function OrderTrackingPage({ user, bookingId, onNavigate }) {
     try {
       const currentUser = getCurrentUser();
       if (!currentUser) {
-        onNavigate('home');
+        navigate('/');
         return;
       }
 
@@ -121,7 +126,7 @@ function OrderTrackingPage({ user, bookingId, onNavigate }) {
         <div className="error-container">
           <p className="error-icon">⚠️</p>
           <p className="error-message">{error || t('Заказ не найден', 'Buyurtma topilmadi')}</p>
-          <button onClick={() => onNavigate('profile')} className="back-btn">
+          <button onClick={() => navigate('/profile')} className="back-btn">
             {t('Вернуться', 'Qaytish')}
           </button>
         </div>
@@ -136,7 +141,7 @@ function OrderTrackingPage({ user, bookingId, onNavigate }) {
   return (
     <div className="order-tracking-page">
       <div className="tracking-header">
-        <button onClick={() => onNavigate('profile')} className="back-button">
+        <button onClick={() => navigate('/profile')} className="back-button">
           ← {t('Назад', 'Orqaga')}
         </button>
         <h1>{t('Заказ', 'Buyurtma')} #{order.booking_code}</h1>
@@ -255,7 +260,7 @@ function OrderTrackingPage({ user, bookingId, onNavigate }) {
         </div>
       )}
 
-      <BottomNav currentPage="profile" onNavigate={onNavigate} cartCount={cartCount} />
+      <BottomNav currentPage="profile" cartCount={cartCount} />
     </div>
   );
 }
