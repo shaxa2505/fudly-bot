@@ -403,84 +403,99 @@ async def order_delivery_address(
         return
 
     await state.update_data(address=address)
-    
+
     # Show payment method selection
     from aiogram.utils.keyboard import InlineKeyboardBuilder
-    
+
     payment_kb = InlineKeyboardBuilder()
     payment_kb.button(
         text="💳 Click orqali to'lash" if lang == "uz" else "💳 Оплата через Click",
-        callback_data="pay_method_click"
+        callback_data="pay_method_click",
     )
     payment_kb.button(
         text="🏦 Karta orqali o'tkazma" if lang == "uz" else "🏦 Перевод на карту",
-        callback_data="pay_method_card"
+        callback_data="pay_method_card",
     )
     payment_kb.adjust(1)
-    
+
     await state.set_state(OrderDelivery.payment_method_select)
-    
+
     await message.answer(
-        "💰 " + (
-            "To'lov usulini tanlang:" if lang == "uz" else "Выберите способ оплаты:"
-        ),
-        reply_markup=payment_kb.as_markup()
+        "💰 " + ("To'lov usulini tanlang:" if lang == "uz" else "Выберите способ оплаты:"),
+        reply_markup=payment_kb.as_markup(),
     )
 
 
 @router.callback_query(F.data == "pay_method_click", OrderDelivery.payment_method_select)
-async def handle_click_payment(callback: types.CallbackQuery, state: FSMContext, db: DatabaseProtocol) -> None:
+async def handle_click_payment(
+    callback: types.CallbackQuery, state: FSMContext, db: DatabaseProtocol
+) -> None:
     """Handle Click payment selection - send Telegram invoice."""
     await callback.answer()
-    
+
     data = await state.get_data()
     lang = db.get_user_language(callback.from_user.id) or "uz"
-    
+
     # Get order details
     offer_id = data.get("offer_id")
     quantity = data.get("quantity", 1)
     store_id = data.get("store_id")
-    
+
     offer = db.get_offer(offer_id)
     if not offer:
         await callback.message.edit_text("❌ Mahsulot topilmadi")
         await state.clear()
         return
-    
+
     # Get prices
     discount_price = int(get_offer_field(offer, "discount_price", 0))
     title = get_offer_field(offer, "title", "Товар")
-    
+
     store = db.get_store(store_id)
     delivery_price = int(get_store_field(store, "delivery_price", 15000)) if store else 15000
-    
-    total_amount = (discount_price * quantity) + delivery_price
-    
-    # Create booking first
-    booking_code = f"D{callback.from_user.id % 10000:04d}{offer_id % 1000:03d}"
-    
+
+    # total_amount calculated on demand: (discount_price * quantity) + delivery_price
+
+    # Create booking first using atomic method
+    booking_id = None
+    booking_code = None
+
     try:
-        booking_id = db.create_booking(
-            user_id=callback.from_user.id,
-            offer_id=offer_id,
-            quantity=quantity,
-            booking_code=booking_code,
-            status="pending",
-            payment_method="click",
-            delivery_address=data.get("address"),
-            delivery_cost=delivery_price,
-        )
+        if hasattr(db, "create_booking_atomic"):
+            ok, booking_id, booking_code, error_reason = db.create_booking_atomic(
+                offer_id=offer_id,
+                user_id=callback.from_user.id,
+                quantity=quantity,
+            )
+            if not ok:
+                logger.warning(
+                    f"create_booking_atomic returned False for offer {offer_id}: {error_reason}"
+                )
+                booking_id = None
+
+        # Fallback if atomic method doesn't exist or failed
+        if not booking_id and hasattr(db, "add_booking"):
+            booking_code = f"D{callback.from_user.id % 10000:04d}{offer_id % 1000:03d}"
+            booking_id = db.add_booking(
+                user_id=callback.from_user.id,
+                offer_id=offer_id,
+                quantity=quantity,
+                booking_code=booking_code,
+            )
     except Exception as e:
         logger.error(f"Failed to create booking: {e}")
-        # Try simpler version
-        booking_id = offer_id  # Use offer_id as fallback
-    
+
+    # Use offer_id as fallback if booking creation failed
+    if not booking_id:
+        booking_id = offer_id
+        booking_code = f"TMP{offer_id}"
+
     # Send Telegram invoice
     from handlers.customer.payments import send_payment_invoice_for_booking
-    
+
     try:
         await callback.message.delete()
-        
+
         invoice_msg = await send_payment_invoice_for_booking(
             user_id=callback.from_user.id,
             booking_id=booking_id,
@@ -489,7 +504,7 @@ async def handle_click_payment(callback: types.CallbackQuery, state: FSMContext,
             unit_price=discount_price,
             delivery_cost=delivery_price,
         )
-        
+
         if invoice_msg:
             logger.info(f"✅ Click invoice sent for order {booking_id}")
             await state.clear()
@@ -501,32 +516,36 @@ async def handle_click_payment(callback: types.CallbackQuery, state: FSMContext,
             await state.update_data(payment_method="card")
             await state.set_state(OrderDelivery.payment_proof)
             await _show_card_payment(callback.message, state, lang, db)
-            
+
     except Exception as e:
         logger.error(f"Error sending Click invoice: {e}")
         await callback.message.answer(
             "❌ Xatolik. Karta orqali to'lashga o'ting.",
         )
-        await state.update_data(payment_method="card") 
+        await state.update_data(payment_method="card")
         await state.set_state(OrderDelivery.payment_proof)
         await _show_card_payment(callback.message, state, lang, db)
 
 
 @router.callback_query(F.data == "pay_method_card", OrderDelivery.payment_method_select)
-async def handle_card_payment(callback: types.CallbackQuery, state: FSMContext, db: DatabaseProtocol) -> None:
+async def handle_card_payment(
+    callback: types.CallbackQuery, state: FSMContext, db: DatabaseProtocol
+) -> None:
     """Handle card payment selection - show card details."""
     await callback.answer()
-    
+
     lang = db.get_user_language(callback.from_user.id) or "uz"
-    
+
     await state.update_data(payment_method="card")
     await state.set_state(OrderDelivery.payment_proof)
-    
+
     await callback.message.delete()
     await _show_card_payment(callback.message, state, lang, db)
 
 
-async def _show_card_payment(message: types.Message, state: FSMContext, lang: str, db: DatabaseProtocol) -> None:
+async def _show_card_payment(
+    message: types.Message, state: FSMContext, lang: str, db: DatabaseProtocol
+) -> None:
     """Show card payment details."""
     data = await state.get_data()
     store_id = data.get("store_id")
@@ -572,7 +591,7 @@ async def _show_card_payment(message: types.Message, state: FSMContext, lang: st
         card_holder = payment_card.get("card_holder", "—")
         if not payment_instructions:
             payment_instructions = payment_card.get("payment_instructions")
-    elif isinstance(payment_card, (tuple, list)) and len(payment_card) > 1:
+    elif isinstance(payment_card, tuple | list) and len(payment_card) > 1:
         card_number = payment_card[1] if len(payment_card) > 1 else payment_card[0]
         card_holder = payment_card[2] if len(payment_card) > 2 else "—"
     else:
@@ -660,7 +679,7 @@ async def order_payment_proof(
 
     offer_title = get_offer_field(offer, "title", "")
     offer_price = get_offer_field(offer, "discount_price", 0)
-    offer_quantity = get_offer_field(offer, "quantity", 0)
+    # offer_quantity available via get_offer_field if needed
 
     # Extract highest-resolution photo id
     photo_id = message.photo[-1].file_id
@@ -716,8 +735,7 @@ async def order_payment_proof(
     payment_uz = "To'lov"
     payment_method_ru = "Перевод на карту"
     payment_method_uz = "Kartaga o'tkazma"
-    screenshot_ru = "Скриншот оплаты выше"
-    screenshot_uz = "To'lov skrinsho yuqorida"
+    # screenshot labels used inline in caption
 
     total_amount = (offer_price * quantity) + delivery_price
 
@@ -958,7 +976,7 @@ async def admin_confirm_payment(
     customer = db.get_user_model(customer_id)
 
     owner_id = get_store_field(store, "owner_id") if store else None
-    store_name = get_store_field(store, "name", "Магазин") if store else "Магазин"
+    # store_name = get_store_field(store, "name", "Магазин") if store else "Магазин"
     delivery_price = get_store_field(store, "delivery_price", 0) if store else 0
 
     offer_title = get_offer_field(offer, "title", "Товар") if offer else "Товар"
