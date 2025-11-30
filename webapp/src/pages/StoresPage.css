@@ -122,6 +122,83 @@
   transform: scale(0.95);
 }
 
+/* View Controls */
+.sp-view-controls {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0 20px 16px;
+  gap: 12px;
+}
+
+.sp-view-toggle {
+  display: flex;
+  background: white;
+  border-radius: 12px;
+  padding: 4px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+}
+
+.sp-view-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  border: none;
+  background: transparent;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 500;
+  color: #666;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.sp-view-btn.active {
+  background: #53B175;
+  color: white;
+}
+
+.sp-view-btn svg {
+  width: 16px;
+  height: 16px;
+}
+
+.sp-location-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  border: 1.5px solid #e0e0e0;
+  background: white;
+  border-radius: 12px;
+  font-size: 13px;
+  font-weight: 500;
+  color: #666;
+  cursor: pointer;
+  transition: all 0.2s;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+}
+
+.sp-location-btn.active {
+  border-color: #53B175;
+  color: #53B175;
+}
+
+.sp-location-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.sp-location-spinner {
+  width: 16px;
+  height: 16px;
+  border: 2px solid rgba(83, 177, 117, 0.3);
+  border-top-color: #53B175;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
 /* Content */
 .sp-content {
   padding: 0 16px;
@@ -239,6 +316,15 @@
   font-weight: 600;
   color: #F59E0B;
   background: #FEF3C7;
+  padding: 3px 6px;
+  border-radius: 6px;
+}
+
+.sp-card-distance {
+  font-size: 11px;
+  font-weight: 600;
+  color: #FF6B35;
+  background: rgba(255, 107, 53, 0.1);
   padding: 3px 6px;
   border-radius: 6px;
 }
