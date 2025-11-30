@@ -10,6 +10,13 @@ const DELIVERY_TYPE = {
   DELIVERY: 'delivery'
 };
 
+const PAYMENT_METHOD = {
+  CASH: 'cash',
+  CARD_TRANSFER: 'card_transfer',
+  CLICK: 'click',
+  PAYME: 'payme'
+};
+
 // Helper to read cart from localStorage (new format: { offerId: { offer, quantity } })
 const getCartFromStorage = () => {
   try {
@@ -26,11 +33,13 @@ function CheckoutPage({ user }) {
   const [cart, setCart] = useState(getCartFromStorage);
   const [cartSummaryLoading, setCartSummaryLoading] = useState(false);
   const [deliveryType, setDeliveryType] = useState(DELIVERY_TYPE.PICKUP);
+  const [paymentMethod, setPaymentMethod] = useState(PAYMENT_METHOD.CASH);
   const [address, setAddress] = useState('');
   const [deliveryInfo, setDeliveryInfo] = useState(null);
   const [loading, setLoading] = useState(false);
   const [calculatingDelivery, setCalculatingDelivery] = useState(false);
   const [error, setError] = useState(null);
+  const [paymentProviders, setPaymentProviders] = useState([]);
 
   const lang = user?.language || 'uz';
   const t = (ru, uz) => (lang === 'uz' ? uz : ru);
@@ -59,7 +68,18 @@ function CheckoutPage({ user }) {
       navigate('/cart');
       return;
     }
+    // Load available payment providers
+    loadPaymentProviders();
   }, [cart, navigate]);
+
+  const loadPaymentProviders = async () => {
+    try {
+      const providers = await api.getPaymentProviders();
+      setPaymentProviders(providers);
+    } catch (err) {
+      console.warn('Failed to load payment providers:', err);
+    }
+  };
 
   useEffect(() => {
     if (deliveryType === DELIVERY_TYPE.DELIVERY && address.length > 5) {
@@ -140,15 +160,49 @@ function CheckoutPage({ user }) {
         pickup_address: deliveryType === DELIVERY_TYPE.PICKUP
           ? (cartItems[0]?.store_address || cartItems[0]?.storeAddress || null)
           : null,
+        payment_method: paymentMethod,
       };
 
-      await api.createOrder(orderPayload);
+      const orderResult = await api.createOrder(orderPayload);
 
-      // Clear cart and navigate to profile (use new format key)
+      // Clear cart
       setCart({});
       localStorage.setItem('fudly_cart_v2', JSON.stringify({}));
 
-      // Show success message
+      // Handle online payment if selected
+      if (paymentMethod === PAYMENT_METHOD.CLICK || paymentMethod === PAYMENT_METHOD.PAYME) {
+        try {
+          const returnUrl = window.location.origin + '/profile';
+          const paymentData = await api.createPaymentLink(
+            orderResult.booking_id || orderResult.id,
+            paymentMethod,
+            returnUrl
+          );
+
+          if (paymentData.payment_url) {
+            // Redirect to payment page
+            if (window.Telegram?.WebApp) {
+              window.Telegram.WebApp.openLink(paymentData.payment_url);
+            } else {
+              window.location.href = paymentData.payment_url;
+            }
+            return;
+          }
+        } catch (payErr) {
+          console.error('Payment link creation failed:', payErr);
+          // Order is created, but payment link failed - show message and continue
+          if (window.Telegram?.WebApp) {
+            window.Telegram.WebApp.showAlert(
+              t('Заказ создан, но ошибка создания ссылки на оплату. Оплатите позже в профиле.',
+                'Buyurtma yaratildi, lekin to\'lov havolasida xato. Keyinroq profildan to\'lang.'),
+              () => navigate('/profile')
+            );
+          }
+          return;
+        }
+      }
+
+      // Show success message for cash/card transfer
       if (window.Telegram?.WebApp) {
         window.Telegram.WebApp.showAlert(
           t('Заказ успешно оформлен!', 'Buyurtma muvaffaqiyatli qabul qilindi!'),
@@ -298,6 +352,68 @@ function CheckoutPage({ user }) {
               <span>{t('Итого', 'Jami')}:</span>
               <span>{total.toLocaleString()} {t('сум', 'so\'m')}</span>
             </div>
+          </div>
+        </div>
+
+        {/* Payment Method Selection */}
+        <div className="payment-method-section">
+          <h2>{t('Способ оплаты', 'To\'lov usuli')}</h2>
+          <div className="payment-options">
+            <button
+              className={`payment-option ${paymentMethod === PAYMENT_METHOD.CASH ? 'active' : ''}`}
+              onClick={() => setPaymentMethod(PAYMENT_METHOD.CASH)}
+            >
+              <span className="option-icon">💵</span>
+              <div className="option-content">
+                <h3>{t('Наличные', 'Naqd pul')}</h3>
+                <p>{t('Оплата при получении', 'Olishda to\'lash')}</p>
+              </div>
+              {paymentMethod === PAYMENT_METHOD.CASH && <span className="check-mark">✓</span>}
+            </button>
+
+            <button
+              className={`payment-option ${paymentMethod === PAYMENT_METHOD.CARD_TRANSFER ? 'active' : ''}`}
+              onClick={() => setPaymentMethod(PAYMENT_METHOD.CARD_TRANSFER)}
+            >
+              <span className="option-icon">💳</span>
+              <div className="option-content">
+                <h3>{t('Перевод на карту', 'Kartaga o\'tkazish')}</h3>
+                <p>{t('Отправьте скриншот оплаты', 'To\'lov skrinshotini yuboring')}</p>
+              </div>
+              {paymentMethod === PAYMENT_METHOD.CARD_TRANSFER && <span className="check-mark">✓</span>}
+            </button>
+
+            {paymentProviders.includes('click') && (
+              <button
+                className={`payment-option payment-online ${paymentMethod === PAYMENT_METHOD.CLICK ? 'active' : ''}`}
+                onClick={() => setPaymentMethod(PAYMENT_METHOD.CLICK)}
+              >
+                <span className="option-icon">
+                  <img src="https://click.uz/favicon.ico" alt="Click" className="payment-logo" onError={(e) => e.target.style.display = 'none'} />
+                </span>
+                <div className="option-content">
+                  <h3>Click</h3>
+                  <p>{t('Онлайн оплата через Click', 'Click orqali onlayn to\'lov')}</p>
+                </div>
+                {paymentMethod === PAYMENT_METHOD.CLICK && <span className="check-mark">✓</span>}
+              </button>
+            )}
+
+            {paymentProviders.includes('payme') && (
+              <button
+                className={`payment-option payment-online ${paymentMethod === PAYMENT_METHOD.PAYME ? 'active' : ''}`}
+                onClick={() => setPaymentMethod(PAYMENT_METHOD.PAYME)}
+              >
+                <span className="option-icon">
+                  <img src="https://payme.uz/favicon.ico" alt="Payme" className="payment-logo" onError={(e) => e.target.style.display = 'none'} />
+                </span>
+                <div className="option-content">
+                  <h3>Payme</h3>
+                  <p>{t('Онлайн оплата через Payme', 'Payme orqali onlayn to\'lov')}</p>
+                </div>
+                {paymentMethod === PAYMENT_METHOD.PAYME && <span className="check-mark">✓</span>}
+              </button>
+            )}
           </div>
         </div>
 

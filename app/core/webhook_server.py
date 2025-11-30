@@ -12,6 +12,7 @@ from aiohttp import web
 from app.core.metrics import metrics as app_metrics
 from app.core.notifications import get_notification_service
 from app.core.websocket import get_websocket_manager, setup_websocket_routes
+from app.integrations.payment_service import get_payment_service
 from logging_config import logger
 
 # =============================================================================
@@ -1009,27 +1010,184 @@ async def create_webhook_app(
             if hasattr(db, "get_store_ratings"):
                 raw_reviews = db.get_store_ratings(int(store_id))
                 for r in raw_reviews:
-                    reviews.append({
-                        "id": r.get("id") or r.get("rating_id"),
-                        "user_name": r.get("first_name", "Пользователь"),
-                        "rating": r.get("rating", 5),
-                        "comment": r.get("comment", ""),
-                        "created_at": str(r.get("created_at", "")),
-                    })
+                    reviews.append(
+                        {
+                            "id": r.get("id") or r.get("rating_id"),
+                            "user_name": r.get("first_name", "Пользователь"),
+                            "rating": r.get("rating", 5),
+                            "comment": r.get("comment", ""),
+                            "created_at": str(r.get("created_at", "")),
+                        }
+                    )
 
             if hasattr(db, "get_store_rating_summary"):
                 avg_rating, total_reviews = db.get_store_rating_summary(int(store_id))
 
             return add_cors_headers(
-                web.json_response({
-                    "reviews": reviews,
-                    "average_rating": avg_rating,
-                    "total_reviews": total_reviews,
-                })
+                web.json_response(
+                    {
+                        "reviews": reviews,
+                        "average_rating": avg_rating,
+                        "total_reviews": total_reviews,
+                    }
+                )
             )
         except Exception as e:
             logger.error(f"API get store reviews error: {e}")
             return add_cors_headers(web.json_response({"error": str(e)}, status=500))
+
+    async def api_get_payment_providers(request: web.Request) -> web.Response:
+        """GET /api/v1/payment/providers - Get available payment providers."""
+        try:
+            payment_service = get_payment_service()
+            providers = payment_service.get_available_providers()
+
+            # Return provider info
+            result = []
+            for provider in providers:
+                if provider == "click":
+                    result.append({"id": "click", "name": "Click", "icon": "💳", "enabled": True})
+                elif provider == "payme":
+                    result.append({"id": "payme", "name": "Payme", "icon": "💳", "enabled": True})
+                elif provider == "card":
+                    result.append(
+                        {
+                            "id": "card",
+                            "name": "Karta orqali",
+                            "icon": "💳",
+                            "enabled": True,
+                            "description": "Karta raqamiga pul o'tkazish",
+                        }
+                    )
+
+            return add_cors_headers(web.json_response({"providers": result}))
+        except Exception as e:
+            logger.error(f"API get payment providers error: {e}")
+            return add_cors_headers(web.json_response({"error": str(e)}, status=500))
+
+    async def api_create_payment(request: web.Request) -> web.Response:
+        """POST /api/v1/payment/create - Create payment URL for order."""
+        try:
+            data = await request.json()
+            order_id = data.get("order_id")
+            amount = data.get("amount")
+            provider = data.get("provider", "card")
+            user_id = data.get("user_id")
+            return_url = data.get("return_url")
+
+            if not order_id or not amount:
+                return add_cors_headers(
+                    web.json_response({"error": "order_id and amount required"}, status=400)
+                )
+
+            payment_service = get_payment_service()
+
+            if provider == "click":
+                if not payment_service.click_enabled:
+                    return add_cors_headers(
+                        web.json_response({"error": "Click not configured"}, status=400)
+                    )
+                payment_url = payment_service.generate_click_url(
+                    order_id=int(order_id),
+                    amount=int(amount),
+                    return_url=return_url,
+                    user_id=int(user_id) if user_id else None,
+                )
+                return add_cors_headers(
+                    web.json_response({"payment_url": payment_url, "provider": "click"})
+                )
+
+            elif provider == "payme":
+                if not payment_service.payme_enabled:
+                    return add_cors_headers(
+                        web.json_response({"error": "Payme not configured"}, status=400)
+                    )
+                payment_url = payment_service.generate_payme_url(
+                    order_id=int(order_id), amount=int(amount), return_url=return_url
+                )
+                return add_cors_headers(
+                    web.json_response({"payment_url": payment_url, "provider": "payme"})
+                )
+
+            else:
+                # Card payment - return card info
+                return add_cors_headers(
+                    web.json_response(
+                        {
+                            "provider": "card",
+                            "message": "Use /api/v1/payment-card/{store_id} to get card details",
+                        }
+                    )
+                )
+
+        except Exception as e:
+            logger.error(f"API create payment error: {e}")
+            return add_cors_headers(web.json_response({"error": str(e)}, status=500))
+
+    async def api_click_callback(request: web.Request) -> web.Response:
+        """POST /api/v1/payment/click/callback - Click payment callback."""
+        try:
+            data = await request.post()
+
+            payment_service = get_payment_service()
+
+            click_trans_id = data.get("click_trans_id", "")
+            service_id = data.get("service_id", "")
+            merchant_trans_id = data.get("merchant_trans_id", "")
+            amount = float(data.get("amount", 0))
+            action = data.get("action", "")
+            sign_time = data.get("sign_time", "")
+            sign_string = data.get("sign_string", "")
+            error = int(data.get("error", 0))
+
+            if action == "0":  # Prepare
+                result = await payment_service.process_click_prepare(
+                    click_trans_id=click_trans_id,
+                    merchant_trans_id=merchant_trans_id,
+                    amount=amount,
+                    action=action,
+                    sign_time=sign_time,
+                    sign_string=sign_string,
+                )
+            else:  # Complete
+                result = await payment_service.process_click_complete(
+                    click_trans_id=click_trans_id,
+                    merchant_trans_id=merchant_trans_id,
+                    merchant_prepare_id=data.get("merchant_prepare_id", ""),
+                    amount=amount,
+                    action=action,
+                    sign_time=sign_time,
+                    sign_string=sign_string,
+                    error=error,
+                )
+
+            return web.json_response(result)
+        except Exception as e:
+            logger.error(f"Click callback error: {e}")
+            return web.json_response({"error": -1, "error_note": str(e)})
+
+    async def api_payme_callback(request: web.Request) -> web.Response:
+        """POST /api/v1/payment/payme/callback - Payme JSON-RPC callback."""
+        try:
+            # Verify authorization
+            payment_service = get_payment_service()
+            auth_header = request.headers.get("Authorization", "")
+
+            if not payment_service.verify_payme_signature(auth_header):
+                return web.json_response(
+                    {"error": {"code": -32504, "message": "Unauthorized"}, "id": None}, status=401
+                )
+
+            data = await request.json()
+            method = data.get("method", "")
+            params = data.get("params", {})
+            request_id = data.get("id")
+
+            result = await payment_service.process_payme_request(method, params, request_id)
+            return web.json_response(result)
+        except Exception as e:
+            logger.error(f"Payme callback error: {e}")
+            return web.json_response({"error": {"code": -32400, "message": str(e)}, "id": None})
 
     # Register routes
     path_main = webhook_path if webhook_path.startswith("/") else f"/{webhook_path}"
@@ -1083,6 +1241,14 @@ async def create_webhook_app(
     # Store reviews routes
     app.router.add_options("/api/v1/stores/{store_id}/reviews", cors_preflight)
     app.router.add_get("/api/v1/stores/{store_id}/reviews", api_get_store_reviews)
+
+    # Payment routes
+    app.router.add_options("/api/v1/payment/providers", cors_preflight)
+    app.router.add_get("/api/v1/payment/providers", api_get_payment_providers)
+    app.router.add_options("/api/v1/payment/create", cors_preflight)
+    app.router.add_post("/api/v1/payment/create", api_create_payment)
+    app.router.add_post("/api/v1/payment/click/callback", api_click_callback)
+    app.router.add_post("/api/v1/payment/payme/callback", api_payme_callback)
 
     # Setup WebSocket routes for real-time notifications
     setup_websocket_routes(app)

@@ -260,6 +260,31 @@ const api = {
       return null
     }
   },
+
+  // Online payment endpoints
+  async getPaymentProviders() {
+    try {
+      const { data } = await client.get('/payment/providers')
+      return data.providers || []
+    } catch (error) {
+      console.warn('getPaymentProviders error:', error)
+      return []
+    }
+  },
+
+  async createPaymentLink(bookingId, provider, returnUrl = null) {
+    try {
+      const { data } = await client.post('/payment/create', {
+        booking_id: bookingId,
+        provider: provider,
+        return_url: returnUrl,
+      })
+      return data
+    } catch (error) {
+      console.warn('createPaymentLink error:', error)
+      throw error
+    }
+  },
 }
 
 export default api
