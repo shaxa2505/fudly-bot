@@ -43,7 +43,6 @@ function CartPage({ user }) {
   const [paymentProof, setPaymentProof] = useState(null)
   const [paymentProofPreview, setPaymentProofPreview] = useState(null)
   const [createdOrderId, setCreatedOrderId] = useState(null)
-  const fileInputRef = useRef(null)
 
   // Success/Error modals
   const [orderResult, setOrderResult] = useState(null)
@@ -484,14 +483,6 @@ function CartPage({ user }) {
                   <div className="upload-section">
                     <p className="upload-label">📸 O'tkazma chekini yuklang:</p>
 
-                    <input
-                      type="file"
-                      ref={fileInputRef}
-                      accept="image/*"
-                      onChange={handleFileSelect}
-                      style={{ display: 'none' }}
-                    />
-
                     {paymentProofPreview ? (
                       <div className="proof-preview">
                         <img src={paymentProofPreview} alt="Chek" />
@@ -506,12 +497,26 @@ function CartPage({ user }) {
                         </button>
                       </div>
                     ) : (
-                      <button
-                        className="upload-btn"
-                        onClick={() => fileInputRef.current?.click()}
-                      >
-                        📷 Rasm tanlash
-                      </button>
+                      <div className="upload-area">
+                        <input
+                          type="file"
+                          id="payment-proof-input"
+                          accept="image/*"
+                          onChange={(e) => {
+                            e.stopPropagation()
+                            handleFileSelect(e)
+                          }}
+                          onClick={(e) => e.stopPropagation()}
+                          style={{ display: 'none' }}
+                        />
+                        <label
+                          htmlFor="payment-proof-input"
+                          className="upload-btn"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          📷 Rasm tanlash
+                        </label>
+                      </div>
                     )}
                   </div>
                 </div>

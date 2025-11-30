@@ -35,20 +35,13 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  background: transparent;
+  background: #F0F0F0;
   border: none;
   border-radius: var(--radius-full);
-  color: #333;
   cursor: pointer;
   transition: all var(--transition-normal);
-}
-
-.favorites-header .back-btn svg {
-  width: 28px;
-  height: 28px;
-  stroke-width: 2.5;
-  display: block;
-  color: var(--color-text-primary, #333);
+  font-size: 20px;
+  color: #333;
 }
 
 .favorites-header .back-btn:active {

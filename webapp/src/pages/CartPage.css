@@ -676,6 +676,49 @@
   cursor: pointer;
 }
 
+/* Hidden file input - accessible but invisible */
+.file-input-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* Upload area container */
+.upload-area {
+  width: 100%;
+}
+
+/* Upload button as label */
+.upload-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--spacing-sm);
+  width: 100%;
+  padding: var(--spacing-xl);
+  background: var(--color-bg-tertiary);
+  border: 2px dashed var(--color-border);
+  border-radius: var(--radius-xl);
+  font-size: var(--font-lg);
+  font-weight: var(--font-medium);
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  transition: all var(--transition-normal);
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+}
+
+.upload-btn:active {
+  background: var(--color-border-light);
+  border-color: var(--color-primary);
+}
+
 /* Responsive */
 @media (min-width: 768px) {
   .cart-items,
