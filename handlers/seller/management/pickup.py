@@ -21,7 +21,7 @@ async def seller_check_pickup_code(message: types.Message) -> None:
 
     # Ensure user is a seller with stores
     try:
-        stores = db.get_user_stores(message.from_user.id) or []
+        stores = db.get_user_accessible_stores(message.from_user.id) or []
         if not stores:
             await message.answer("⚠️ This command is for sellers only")
             return

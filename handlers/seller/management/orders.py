@@ -22,7 +22,7 @@ async def seller_orders(message: types.Message) -> Any:
 
     # Check if user has stores - if not, don't handle this message
     try:
-        stores = db.get_user_stores(message.from_user.id)
+        stores = db.get_user_accessible_stores(message.from_user.id)
         if not stores:
             raise ValueError("No stores")
     except Exception as e:
@@ -138,7 +138,7 @@ async def filter_orders_pending(callback: types.CallbackQuery) -> None:
     """Show pending orders/bookings."""
     db = get_db()
     lang = db.get_user_language(callback.from_user.id)
-    stores = db.get_user_stores(callback.from_user.id)
+    stores = db.get_user_accessible_stores(callback.from_user.id)
 
     pending_bookings = []
     pending_orders = []
@@ -191,7 +191,7 @@ async def filter_orders_active(callback: types.CallbackQuery) -> None:
     """Show active orders/bookings."""
     db = get_db()
     lang = db.get_user_language(callback.from_user.id)
-    stores = db.get_user_stores(callback.from_user.id)
+    stores = db.get_user_accessible_stores(callback.from_user.id)
 
     active_bookings = []
     active_orders = []
@@ -242,7 +242,7 @@ async def filter_orders_completed(callback: types.CallbackQuery) -> None:
     """Show completed orders/bookings."""
     db = get_db()
     lang = db.get_user_language(callback.from_user.id)
-    stores = db.get_user_stores(callback.from_user.id)
+    stores = db.get_user_accessible_stores(callback.from_user.id)
 
     completed_items = []
     for store in stores:

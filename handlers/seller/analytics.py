@@ -40,7 +40,7 @@ async def show_analytics(message: types.Message) -> None:
         await message.answer(get_text(lang, "not_seller"))
         return
 
-    stores = db.get_user_stores(message.from_user.id)
+    stores = db.get_user_accessible_stores(message.from_user.id)
 
     if not stores:
         await message.answer(get_text(lang, "no_stores"))
@@ -120,7 +120,7 @@ async def partner_today_stats(message: types.Message) -> None:
     lang = db.get_user_language(message.from_user.id)
 
     # Проверяем наличие магазинов (это главный критерий партнёра)
-    stores = db.get_user_stores(message.from_user.id)
+    stores = db.get_user_accessible_stores(message.from_user.id)
     if not stores:
         await message.answer(get_text(lang, "no_stores"))
         return

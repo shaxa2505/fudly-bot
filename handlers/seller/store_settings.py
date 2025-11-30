@@ -282,7 +282,7 @@ async def cancel_photo_upload(callback: types.CallbackQuery, state: FSMContext) 
     lang = db.get_user_language(callback.from_user.id)
 
     # Return to store settings
-    stores = db.get_user_stores(callback.from_user.id)
+    stores = db.get_user_accessible_stores(callback.from_user.id)
     active_stores = [s for s in stores if s.get("status") in ("active", "approved")]
 
     if active_stores:
@@ -332,7 +332,7 @@ async def remove_store_photo(callback: types.CallbackQuery) -> None:
         db.update_store_photo(store_id, None)
 
         # Show updated settings
-        stores = db.get_user_stores(callback.from_user.id)
+        stores = db.get_user_accessible_stores(callback.from_user.id)
         active_stores = [s for s in stores if s.get("status") in ("active", "approved")]
 
         if active_stores:
@@ -523,7 +523,7 @@ async def cancel_location_setup(callback: types.CallbackQuery, state: FSMContext
     lang = db.get_user_language(callback.from_user.id)
 
     # Return to store settings
-    stores = db.get_user_stores(callback.from_user.id)
+    stores = db.get_user_accessible_stores(callback.from_user.id)
     active_stores = [s for s in stores if s.get("status") in ("active", "approved")]
 
     if active_stores:
@@ -1199,7 +1199,7 @@ async def show_store_admins(callback: types.CallbackQuery) -> None:
     store_id = int(callback.data.replace("store_admins_", ""))
 
     # Check if user is owner
-    stores = db.get_user_stores(callback.from_user.id)
+    stores = db.get_user_accessible_stores(callback.from_user.id)
     if not any(s.get("store_id") == store_id for s in stores):
         await callback.answer("Доступ запрещён" if lang == "ru" else "Ruxsat yo'q", show_alert=True)
         return
@@ -1351,7 +1351,7 @@ async def process_admin_contact(message: types.Message, state: FSMContext) -> No
 
                 # Notify the new admin
                 try:
-                    stores = db.get_user_stores(message.from_user.id)
+                    stores = db.get_user_accessible_stores(message.from_user.id)
                     store = next((s for s in stores if s.get("store_id") == store_id), None)
                     store_name = store.get("name", "Магазин") if store else "Магазин"
 
@@ -1415,7 +1415,7 @@ async def remove_admin(callback: types.CallbackQuery) -> None:
     admin_user_id = int(parts[3])
 
     # Check if user is owner
-    stores = db.get_user_stores(callback.from_user.id)
+    stores = db.get_user_accessible_stores(callback.from_user.id)
     if not any(s.get("store_id") == store_id for s in stores):
         await callback.answer("Доступ запрещён" if lang == "ru" else "Ruxsat yo'q", show_alert=True)
         return

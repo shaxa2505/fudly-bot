@@ -73,14 +73,14 @@ def setup_dependencies(database: DatabaseProtocol, bot_instance: Any, view_mode_
 
 
 def has_approved_store(user_id: int) -> bool:
-    """Check if user has an approved store."""
+    """Check if user has an approved store (owned or admin access)."""
     if not db:
         return False
-    stores = db.get_user_stores(user_id)
+    stores = db.get_user_accessible_stores(user_id)
     for store in stores:
-        # Store tuple: [0]id, ..., [8]status
-        status = store[6] if len(store) > 6 else "pending"
-        if status == "active":
+        # Store dict with status field
+        status = store.get("status", "pending")
+        if status in ("active", "approved"):
             return True
     return False
 
@@ -150,10 +150,10 @@ async def become_partner(message: types.Message, state: FSMContext) -> None:
             return
         else:
             # No approved store - show status
-            stores = db.get_user_stores(message.from_user.id)
+            stores = db.get_user_accessible_stores(message.from_user.id)
             if stores:
                 # Has store(s) but not approved
-                status = stores[0][6] if len(stores[0]) > 6 else "pending"
+                status = stores[0].get("status", "pending")
                 if status == "pending":
                     await message.answer(
                         get_text(lang, "no_approved_stores"),

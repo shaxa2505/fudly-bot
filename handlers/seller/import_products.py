@@ -58,7 +58,7 @@ async def start_import(callback: types.CallbackQuery, state: FSMContext) -> None
     lang = db.get_user_language(user_id)
 
     # Check if user has a store
-    stores = db.get_user_stores(user_id)
+    stores = db.get_user_accessible_stores(user_id)
     if not stores:
         await callback.answer(
             "❌ У вас нет магазина" if lang == "ru" else "❌ Sizda do'kon yo'q",
@@ -275,7 +275,7 @@ async def update_discounts_now(callback: types.CallbackQuery) -> None:
     lang = db.get_user_language(user_id)
 
     # Get user's store
-    stores = db.get_user_stores(user_id)
+    stores = db.get_user_accessible_stores(user_id)
     if not stores:
         await callback.answer("❌ У вас нет магазина", show_alert=True)
         return
@@ -337,7 +337,7 @@ async def start_1c_setup(callback: types.CallbackQuery, state: FSMContext) -> No
     lang = db.get_user_language(user_id)
 
     # Check if user has a store
-    stores = db.get_user_stores(user_id)
+    stores = db.get_user_accessible_stores(user_id)
     if not stores:
         await callback.answer("❌ У вас нет магазина", show_alert=True)
         return
@@ -592,7 +592,7 @@ async def sync_from_1c(callback: types.CallbackQuery) -> None:
     integration = onec_instances[user_id]
 
     # Get store
-    stores = db.get_user_stores(user_id)
+    stores = db.get_user_accessible_stores(user_id)
     if not stores:
         await callback.answer("❌ У вас нет магазина", show_alert=True)
         return

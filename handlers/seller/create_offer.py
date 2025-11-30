@@ -120,11 +120,11 @@ async def add_offer_start(message: types.Message, state: FSMContext) -> None:
 
     lang = db.get_user_language(message.from_user.id)
 
-    # Get only APPROVED stores
+    # Get only APPROVED stores (owned + admin access)
     stores = [
         s
-        for s in db.get_user_stores(message.from_user.id)
-        if get_store_field(s, "status") == "active"
+        for s in db.get_user_accessible_stores(message.from_user.id)
+        if get_store_field(s, "status") in ("active", "approved")
     ]
 
     if not stores:
@@ -813,8 +813,8 @@ async def create_another(callback: types.CallbackQuery, state: FSMContext) -> No
 
     stores = [
         s
-        for s in db.get_user_stores(callback.from_user.id)
-        if get_store_field(s, "status") == "active"
+        for s in db.get_user_accessible_stores(callback.from_user.id)
+        if get_store_field(s, "status") in ("active", "approved")
     ]
 
     if not stores:

@@ -24,7 +24,7 @@ async def my_offers(message: types.Message) -> None:
     """Display seller's offers with management buttons."""
     db = get_db()
     lang = db.get_user_language(message.from_user.id)
-    stores = db.get_user_stores(message.from_user.id)
+    stores = db.get_user_accessible_stores(message.from_user.id)
 
     logger.info(f"my_offers: user {message.from_user.id}, stores count: {len(stores)}")
 
@@ -88,7 +88,7 @@ async def filter_offers(callback: types.CallbackQuery) -> None:
     """Filter offers by status with pagination."""
     db = get_db()
     lang = db.get_user_language(callback.from_user.id)
-    stores = db.get_user_stores(callback.from_user.id)
+    stores = db.get_user_accessible_stores(callback.from_user.id)
 
     if not stores:
         await callback.answer(get_text(lang, "no_stores"), show_alert=True)
@@ -190,7 +190,7 @@ async def back_to_offers_menu(callback: types.CallbackQuery) -> None:
     """Return to main offers menu."""
     db = get_db()
     lang = db.get_user_language(callback.from_user.id)
-    stores = db.get_user_stores(callback.from_user.id)
+    stores = db.get_user_accessible_stores(callback.from_user.id)
 
     all_offers = []
     for store in stores:
@@ -268,7 +268,7 @@ async def search_my_offers_process(message: types.Message, state: FSMContext) ->
     
     await state.clear()
     
-    stores = db.get_user_stores(message.from_user.id)
+    stores = db.get_user_accessible_stores(message.from_user.id)
     all_offers = []
     for store in stores:
         store_id = get_store_field(store, "store_id")
@@ -334,7 +334,7 @@ async def quantity_add(callback: types.CallbackQuery) -> None:
         return
 
     offer_store_id = get_offer_field(offer, "store_id")
-    user_stores = db.get_user_stores(callback.from_user.id)
+    user_stores = db.get_user_accessible_stores(callback.from_user.id)
     if not any(get_store_field(store, "store_id") == offer_store_id for store in user_stores):
         await callback.answer(get_text(lang, "not_your_offer"), show_alert=True)
         return
@@ -369,7 +369,7 @@ async def quantity_subtract(callback: types.CallbackQuery) -> None:
         return
 
     offer_store_id = get_offer_field(offer, "store_id")
-    user_stores = db.get_user_stores(callback.from_user.id)
+    user_stores = db.get_user_accessible_stores(callback.from_user.id)
     if not any(get_store_field(store, "store_id") == offer_store_id for store in user_stores):
         await callback.answer(get_text(lang, "not_your_offer"), show_alert=True)
         return
@@ -407,7 +407,7 @@ async def extend_offer(callback: types.CallbackQuery) -> None:
         await callback.answer(get_text(lang, "offer_not_found"), show_alert=True)
         return
 
-    user_stores = db.get_user_stores(callback.from_user.id)
+    user_stores = db.get_user_accessible_stores(callback.from_user.id)
     offer_store_id = get_offer_field(offer, "store_id")
     if not any(get_store_field(store, "store_id") == offer_store_id for store in user_stores):
         await callback.answer(get_text(lang, "not_your_offer"), show_alert=True)
@@ -481,7 +481,7 @@ async def deactivate_offer(callback: types.CallbackQuery) -> None:
         await callback.answer(get_text(lang, "offer_not_found"), show_alert=True)
         return
 
-    user_stores = db.get_user_stores(callback.from_user.id)
+    user_stores = db.get_user_accessible_stores(callback.from_user.id)
     offer_store_id = get_offer_field(offer, "store_id")
     if not any(get_store_field(store, "store_id") == offer_store_id for store in user_stores):
         await callback.answer(get_text(lang, "not_your_offer"), show_alert=True)
@@ -510,7 +510,7 @@ async def activate_offer(callback: types.CallbackQuery) -> None:
         await callback.answer(get_text(lang, "offer_not_found"), show_alert=True)
         return
 
-    user_stores = db.get_user_stores(callback.from_user.id)
+    user_stores = db.get_user_accessible_stores(callback.from_user.id)
     offer_store_id = get_offer_field(offer, "store_id")
     if not any(get_store_field(store, "store_id") == offer_store_id for store in user_stores):
         await callback.answer(get_text(lang, "not_your_offer"), show_alert=True)
@@ -539,7 +539,7 @@ async def delete_offer(callback: types.CallbackQuery) -> None:
         await callback.answer(get_text(lang, "offer_not_found"), show_alert=True)
         return
 
-    user_stores = db.get_user_stores(callback.from_user.id)
+    user_stores = db.get_user_accessible_stores(callback.from_user.id)
     offer_store_id = get_offer_field(offer, "store_id")
     if not any(get_store_field(store, "store_id") == offer_store_id for store in user_stores):
         await callback.answer(get_text(lang, "not_your_offer"), show_alert=True)
@@ -568,7 +568,7 @@ async def edit_offer(callback: types.CallbackQuery) -> None:
         await callback.answer(get_text(lang, "offer_not_found"), show_alert=True)
         return
 
-    user_stores = db.get_user_stores(callback.from_user.id)
+    user_stores = db.get_user_accessible_stores(callback.from_user.id)
     offer_store_id = get_offer_field(offer, "store_id")
     if not any(get_store_field(store, "store_id") == offer_store_id for store in user_stores):
         await callback.answer(get_text(lang, "not_your_offer"), show_alert=True)
@@ -662,7 +662,7 @@ async def edit_time_start(callback: types.CallbackQuery, state: FSMContext) -> N
         await callback.answer(get_text(lang, "offer_not_found"), show_alert=True)
         return
 
-    user_stores = db.get_user_stores(callback.from_user.id)
+    user_stores = db.get_user_accessible_stores(callback.from_user.id)
     offer_store_id = get_offer_field(offer, "store_id")
     if not any(get_store_field(store, "store_id") == offer_store_id for store in user_stores):
         await callback.answer(get_text(lang, "not_your_offer"), show_alert=True)
