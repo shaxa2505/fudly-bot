@@ -1,18 +1,20 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, lazy, Suspense } from 'react'
 import { MemoryRouter, Routes, Route, useNavigate, useLocation } from 'react-router-dom'
 import { FavoritesProvider } from './context/FavoritesContext'
 import api from './api/client'
 import HomePage from './pages/HomePage'
-import CartPage from './pages/CartPage'
-import YanaPage from './pages/YanaPage'
-import OrderTrackingPage from './pages/OrderTrackingPage'
-import CheckoutPage from './pages/CheckoutPage'
-import ProductDetailPage from './pages/ProductDetailPage'
-import StoresPage from './pages/StoresPage'
-import CategoryProductsPage from './pages/CategoryProductsPage'
-import FavoritesPage from './pages/FavoritesPage'
 import './App.css'
 import './styles/animations.css'
+
+// Lazy load pages for better initial load
+const CartPage = lazy(() => import('./pages/CartPage'))
+const YanaPage = lazy(() => import('./pages/YanaPage'))
+const OrderTrackingPage = lazy(() => import('./pages/OrderTrackingPage'))
+const CheckoutPage = lazy(() => import('./pages/CheckoutPage'))
+const ProductDetailPage = lazy(() => import('./pages/ProductDetailPage'))
+const StoresPage = lazy(() => import('./pages/StoresPage'))
+const CategoryProductsPage = lazy(() => import('./pages/CategoryProductsPage'))
+const FavoritesPage = lazy(() => import('./pages/FavoritesPage'))
 
 // Loading screen component
 function LoadingScreen() {
@@ -22,6 +24,15 @@ function LoadingScreen() {
         <div style={{ fontSize: '32px', marginBottom: '16px' }}>🍽️</div>
         <div style={{ color: '#999' }}>Yuklanmoqda...</div>
       </div>
+    </div>
+  )
+}
+
+// Page loading fallback (smaller)
+function PageLoader() {
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '50vh' }}>
+      <div className="spinner" style={{ width: '32px', height: '32px', border: '3px solid #f0f0f0', borderTopColor: '#53B175', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
     </div>
   )
 }
@@ -38,13 +49,18 @@ function AppContent() {
   }, [])
 
   const initializeApp = async () => {
-    // Initialize Telegram WebApp
+    // Initialize Telegram WebApp immediately
     const tg = window.Telegram?.WebApp
 
     if (tg) {
-      // Expand to full height
+      // Expand to full height - do this FIRST for perceived speed
       tg.expand()
       tg.ready()
+
+      // Set theme colors immediately
+      document.documentElement.style.setProperty('--tg-theme-bg-color', tg.themeParams.bg_color || '#ffffff')
+      document.documentElement.style.setProperty('--tg-theme-text-color', tg.themeParams.text_color || '#000000')
+      document.documentElement.style.setProperty('--tg-theme-button-color', tg.themeParams.button_color || '#53B175')
 
       // Get user from Telegram
       const tgUser = tg.initDataUnsafe?.user
@@ -59,9 +75,11 @@ function AppContent() {
         }
         setUser(userData)
 
-        // Sync with backend to get full profile (phone, city from bot registration)
-        try {
-          const profile = await api.getProfile(tgUser.id)
+        // Show UI immediately, load profile in background
+        setLoading(false)
+
+        // Sync with backend in background (non-blocking)
+        api.getProfile(tgUser.id).then(profile => {
           if (profile) {
             const fullUser = {
               ...userData,
@@ -71,25 +89,15 @@ function AppContent() {
               registered: profile.registered,
             }
             setUser(fullUser)
-            // Save to localStorage for other components
             localStorage.setItem('fudly_user', JSON.stringify(fullUser))
-            if (profile.phone) {
-              localStorage.setItem('fudly_phone', profile.phone)
-            }
-            if (profile.city) {
-              localStorage.setItem('fudly_location', JSON.stringify({ city: profile.city }))
-            }
+            if (profile.phone) localStorage.setItem('fudly_phone', profile.phone)
+            if (profile.city) localStorage.setItem('fudly_location', JSON.stringify({ city: profile.city }))
           }
-        } catch (error) {
-          console.log('Profile sync:', error.message)
-          // User not registered yet - that's ok
-        }
+        }).catch(() => {
+          // User not registered - that's ok
+        })
+        return
       }
-
-      // Theme colors
-      document.documentElement.style.setProperty('--tg-theme-bg-color', tg.themeParams.bg_color || '#ffffff')
-      document.documentElement.style.setProperty('--tg-theme-text-color', tg.themeParams.text_color || '#000000')
-      document.documentElement.style.setProperty('--tg-theme-button-color', tg.themeParams.button_color || '#53B175')
     }
 
     setLoading(false)
@@ -129,46 +137,48 @@ function AppContent() {
 
   return (
     <div className="app">
-      <Routes>
-        <Route
-          path="/"
-          element={<HomePage user={user} />}
-        />
-        <Route
-          path="/cart"
-          element={<CartPage user={user} />}
-        />
-        <Route
-          path="/profile"
-          element={<YanaPage user={user} />}
-        />
-        <Route
-          path="/checkout"
-          element={<CheckoutPage user={user} />}
-        />
-        <Route
-          path="/stores"
-          element={<StoresPage user={user} />}
-        />
-        <Route
-          path="/favorites"
-          element={<FavoritesPage />}
-        />
-        <Route
-          path="/order/:bookingId"
-          element={<OrderTrackingPage user={user} />}
-        />
-        <Route
-          path="/product"
-          element={<ProductDetailPage />}
-        />
-        <Route
-          path="/category/:categoryId"
-          element={<CategoryProductsPage />}
-        />
-        {/* Fallback to home */}
-        <Route path="*" element={<HomePage user={user} />} />
-      </Routes>
+      <Suspense fallback={<PageLoader />}>
+        <Routes>
+          <Route
+            path="/"
+            element={<HomePage user={user} />}
+          />
+          <Route
+            path="/cart"
+            element={<CartPage user={user} />}
+          />
+          <Route
+            path="/profile"
+            element={<YanaPage user={user} />}
+          />
+          <Route
+            path="/checkout"
+            element={<CheckoutPage user={user} />}
+          />
+          <Route
+            path="/stores"
+            element={<StoresPage user={user} />}
+          />
+          <Route
+            path="/favorites"
+            element={<FavoritesPage />}
+          />
+          <Route
+            path="/order/:bookingId"
+            element={<OrderTrackingPage user={user} />}
+          />
+          <Route
+            path="/product"
+            element={<ProductDetailPage />}
+          />
+          <Route
+            path="/category/:categoryId"
+            element={<CategoryProductsPage />}
+          />
+          {/* Fallback to home */}
+          <Route path="*" element={<HomePage user={user} />} />
+        </Routes>
+      </Suspense>
     </div>
   )
 }

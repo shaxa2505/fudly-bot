@@ -1,32 +1,30 @@
 // Service Worker для кэширования и оффлайн режима
-const CACHE_NAME = 'fudly-v2'
-const STATIC_CACHE = 'fudly-static-v2'
-const DYNAMIC_CACHE = 'fudly-dynamic-v2'
-const API_CACHE = 'fudly-api-v2'
+const CACHE_VERSION = 'v3'
+const CACHE_NAME = `fudly-${CACHE_VERSION}`
+const STATIC_CACHE = `fudly-static-${CACHE_VERSION}`
+const DYNAMIC_CACHE = `fudly-dynamic-${CACHE_VERSION}`
+const API_CACHE = `fudly-api-${CACHE_VERSION}`
 
 // Статические ресурсы для предзагрузки
 const STATIC_ASSETS = [
   '/',
   '/index.html',
   '/manifest.json',
-  '/offline.html'
 ]
 
 // Паттерны для кэширования
 const CACHE_STRATEGIES = {
-  static: /\.(js|css|png|jpg|jpeg|gif|svg|woff2|woff|ttf|ico)$/,
+  static: /\.(js|css|woff2|woff|ttf)$/,
+  images: /\.(png|jpg|jpeg|gif|svg|webp|ico)$/,
   api: /\/api\//,
-  images: /\.(png|jpg|jpeg|gif|svg|webp)$/
+  telegram: /api\.telegram\.org/,
 }
 
 // Install - предзагрузка статических ресурсов
 self.addEventListener('install', (event) => {
   event.waitUntil(
     caches.open(STATIC_CACHE)
-      .then((cache) => {
-        console.log('[SW] Кэширование статических ресурсов')
-        return cache.addAll(STATIC_ASSETS)
-      })
+      .then((cache) => cache.addAll(STATIC_ASSETS))
       .then(() => self.skipWaiting())
   )
 })
@@ -38,12 +36,8 @@ self.addEventListener('activate', (event) => {
       .then((cacheNames) => {
         return Promise.all(
           cacheNames
-            .filter(name => name.startsWith('fudly-') &&
-                          !name.includes('-v2'))
-            .map(name => {
-              console.log('[SW] Удаление старого кэша:', name)
-              return caches.delete(name)
-            })
+            .filter(name => name.startsWith('fudly-') && !name.includes(CACHE_VERSION))
+            .map(name => caches.delete(name))
         )
       })
       .then(() => self.clients.claim())
@@ -61,38 +55,66 @@ self.addEventListener('fetch', (event) => {
   // Пропускаем chrome-extension и других внешних
   if (!url.protocol.startsWith('http')) return
 
-  // Стратегия для API запросов: Network First
-  if (CACHE_STRATEGIES.api.test(url.pathname)) {
-    event.respondWith(networkFirst(request, API_CACHE))
+  // Telegram API images - кэшируем агрессивно
+  if (CACHE_STRATEGIES.telegram.test(url.href)) {
+    event.respondWith(cacheFirst(request, DYNAMIC_CACHE, 86400000)) // 24 hours
     return
   }
 
-  // Стратегия для статических ресурсов: Cache First
+  // API запросы: Stale-While-Revalidate (быстро из кэша, обновляем в фоне)
+  if (CACHE_STRATEGIES.api.test(url.pathname)) {
+    event.respondWith(staleWhileRevalidate(request, API_CACHE))
+    return
+  }
+
+  // Статические ресурсы: Cache First
   if (CACHE_STRATEGIES.static.test(url.pathname)) {
     event.respondWith(cacheFirst(request, STATIC_CACHE))
     return
   }
 
-  // Стратегия для изображений: Stale While Revalidate
+  // Изображения: Stale While Revalidate
   if (CACHE_STRATEGIES.images.test(url.pathname)) {
     event.respondWith(staleWhileRevalidate(request, DYNAMIC_CACHE))
     return
   }
 
-  // По умолчанию: Network First с фолбэком на кэш
+  // По умолчанию: Network First
   event.respondWith(networkFirst(request, DYNAMIC_CACHE))
 })
 
-// Cache First - сначала кэш, потом сеть
-async function cacheFirst(request, cacheName) {
+// Cache First - сначала кэш, потом сеть (с опциональным TTL)
+async function cacheFirst(request, cacheName, maxAge = null) {
   const cached = await caches.match(request)
-  if (cached) return cached
+  if (cached) {
+    // Check cache freshness if maxAge specified
+    if (maxAge) {
+      const cachedDate = cached.headers.get('sw-cached-at')
+      if (cachedDate && Date.now() - parseInt(cachedDate) > maxAge) {
+        // Cache expired, fetch new
+        return fetchAndCache(request, cacheName)
+      }
+    }
+    return cached
+  }
+  return fetchAndCache(request, cacheName)
+}
 
+async function fetchAndCache(request, cacheName) {
   try {
     const response = await fetch(request)
     if (response.ok) {
       const cache = await caches.open(cacheName)
-      cache.put(request, response.clone())
+      // Clone and add timestamp header
+      const clonedResponse = response.clone()
+      const headers = new Headers(clonedResponse.headers)
+      headers.set('sw-cached-at', Date.now().toString())
+      const cachedResponse = new Response(await clonedResponse.blob(), {
+        status: clonedResponse.status,
+        statusText: clonedResponse.statusText,
+        headers
+      })
+      cache.put(request, cachedResponse)
     }
     return response
   } catch {

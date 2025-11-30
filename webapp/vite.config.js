@@ -1,8 +1,23 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
+import compression from 'vite-plugin-compression'
 
 export default defineConfig({
-  plugins: [react()],
+  plugins: [
+    react(),
+    // Gzip compression
+    compression({
+      algorithm: 'gzip',
+      ext: '.gz',
+      threshold: 1024, // Only compress files > 1KB
+    }),
+    // Brotli compression (better than gzip)
+    compression({
+      algorithm: 'brotliCompress',
+      ext: '.br',
+      threshold: 1024,
+    }),
+  ],
   server: {
     port: 3000,
     host: true
@@ -12,23 +27,42 @@ export default defineConfig({
     assetsDir: 'assets',
     sourcemap: false,
     minify: 'terser',
+    cssMinify: true,
     terserOptions: {
       compress: {
         drop_console: true,
-        drop_debugger: true
-      }
+        drop_debugger: true,
+        pure_funcs: ['console.log', 'console.info'],
+      },
+      mangle: {
+        safari10: true,
+      },
     },
     rollupOptions: {
       output: {
         manualChunks: {
           'react-vendor': ['react', 'react-dom'],
-          'utils': ['./src/utils/auth.js', './src/utils/helpers.js']
-        }
-      }
+          'router': ['react-router-dom'],
+          'api': ['axios'],
+        },
+        // Optimize chunk naming
+        chunkFileNames: 'assets/[name]-[hash].js',
+        entryFileNames: 'assets/[name]-[hash].js',
+        assetFileNames: 'assets/[name]-[hash].[ext]',
+      },
     },
-    chunkSizeWarningLimit: 1000
+    chunkSizeWarningLimit: 500,
+    // Target modern browsers
+    target: 'es2020',
+    // CSS code splitting
+    cssCodeSplit: true,
   },
   optimizeDeps: {
-    include: ['react', 'react-dom']
-  }
+    include: ['react', 'react-dom', 'react-router-dom', 'axios'],
+  },
+  // Enable esbuild for faster builds
+  esbuild: {
+    legalComments: 'none',
+    treeShaking: true,
+  },
 })

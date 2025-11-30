@@ -2,12 +2,15 @@ import axios from 'axios'
 
 const API_BASE = import.meta.env.VITE_API_URL || 'https://fudly-bot-production.up.railway.app/api/v1'
 
+// In-memory cache for GET requests
+const requestCache = new Map()
+const CACHE_TTL = 30000 // 30 seconds cache
+
 // Retry configuration
 const RETRY_CONFIG = {
-  retries: 3,
-  retryDelay: 1000, // 1 second
+  retries: 2,
+  retryDelay: 500,
   retryCondition: (error) => {
-    // Retry on network errors or 5xx server errors
     return !error.response || (error.response.status >= 500 && error.response.status <= 599)
   },
 }
@@ -18,7 +21,7 @@ const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms))
 // Create axios instance
 const client = axios.create({
   baseURL: API_BASE,
-  timeout: 15000, // Increased timeout to 15s
+  timeout: 10000, // 10s timeout
 })
 
 // Add auth header
@@ -26,7 +29,6 @@ client.interceptors.request.use((config) => {
   if (window.Telegram?.WebApp?.initData) {
     config.headers['X-Telegram-Init-Data'] = window.Telegram.WebApp.initData
   }
-  // Add retry count to config
   config.__retryCount = config.__retryCount || 0
   return config
 })
@@ -37,43 +39,41 @@ client.interceptors.response.use(
   async (error) => {
     const config = error.config
 
-    // Check if we should retry
     if (
       config &&
       config.__retryCount < RETRY_CONFIG.retries &&
       RETRY_CONFIG.retryCondition(error)
     ) {
       config.__retryCount += 1
-
-      // Calculate delay with exponential backoff
       const backoffDelay = RETRY_CONFIG.retryDelay * Math.pow(2, config.__retryCount - 1)
-
-      console.log(`Retrying request (${config.__retryCount}/${RETRY_CONFIG.retries}) after ${backoffDelay}ms...`)
-
       await delay(backoffDelay)
       return client(config)
-    }
-
-    // Log error details for debugging
-    console.error('API Error:', {
-      url: config?.url,
-      method: config?.method,
-      status: error.response?.status,
-      statusText: error.response?.statusText,
-      data: error.response?.data,
-      message: error.message,
-      code: error.code,
-    })
-
-    // Don't show alert for every error - let components handle it
-    // Only show critical network errors after all retries failed
-    if (!error.response && error.code === 'ERR_NETWORK') {
-      console.error('Network error - server may be down or CORS issue')
     }
 
     return Promise.reject(error)
   }
 )
+
+// Cached GET request helper
+const cachedGet = async (url, params = {}, ttl = CACHE_TTL) => {
+  const cacheKey = `${url}?${JSON.stringify(params)}`
+  const cached = requestCache.get(cacheKey)
+
+  if (cached && Date.now() - cached.timestamp < ttl) {
+    return cached.data
+  }
+
+  const { data } = await client.get(url, { params })
+  requestCache.set(cacheKey, { data, timestamp: Date.now() })
+
+  // Clean old cache entries
+  if (requestCache.size > 100) {
+    const oldestKey = requestCache.keys().next().value
+    requestCache.delete(oldestKey)
+  }
+
+  return data
+}
 
 const api = {
   // Auth endpoints
@@ -83,60 +83,49 @@ const api = {
   },
 
   async getProfile(userId) {
-    const { data } = await client.get('/user/profile', { params: { user_id: userId } })
-    return data
+    return cachedGet('/user/profile', { user_id: userId }, 60000) // 1 min cache
   },
 
   async getUserOrders(userId, status = null) {
     const params = { user_id: userId }
     if (status) params.status = status
-    const { data } = await client.get('/user/orders', { params })
-    return data
+    return cachedGet('/user/orders', params, 10000) // 10s cache
   },
 
   async getUserBookings(userId, status = null) {
     try {
       const params = { user_id: userId }
       if (status) params.status = status
-      // Use /orders endpoint which returns user's bookings
-      const { data } = await client.get('/orders', { params })
-      // API returns { bookings: [...] }
+      const data = await cachedGet('/orders', params, 10000)
       return data.bookings || data.orders || data || []
     } catch (error) {
-      console.warn('getUserBookings error:', error)
       return []
     }
   },
 
   async getStores(params = {}) {
-    const { data } = await client.get('/stores', { params })
-    return data || []
+    return cachedGet('/stores', params, 60000) || [] // 1 min cache
   },
 
   async getStore(storeId) {
-    const { data } = await client.get(`/stores/${storeId}`)
-    return data
+    return cachedGet(`/stores/${storeId}`, {}, 60000)
   },
 
   async getStoreOffers(storeId) {
-    const { data } = await client.get('/offers', { params: { store_id: storeId } })
-    return data || []
+    return cachedGet('/offers', { store_id: storeId }, 30000) || []
   },
 
   async getStoreReviews(storeId) {
     try {
-      const { data } = await client.get(`/stores/${storeId}/reviews`)
-      return data
+      return await cachedGet(`/stores/${storeId}/reviews`, {}, 120000)
     } catch (error) {
-      console.warn('getStoreReviews error:', error)
       return { reviews: [], average_rating: 0, total_reviews: 0 }
     }
   },
 
-  // Offers endpoints
+  // Offers endpoints - shorter cache for freshness
   async getOffers(params) {
-    const { data } = await client.get('/offers', { params })
-    return data
+    return cachedGet('/offers', params, 20000) // 20s cache
   },
 
   async getFavorites() {
