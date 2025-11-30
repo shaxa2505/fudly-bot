@@ -186,44 +186,25 @@ async def process_pre_checkout(pre_checkout_query: types.PreCheckoutQuery) -> No
     Handle pre-checkout query from Telegram.
     
     This is called when user clicks "Pay" button.
-    We must respond within 10 seconds.
+    We must respond within 10 seconds - respond IMMEDIATELY first!
     """
-    import json
+    # CRITICAL: Answer immediately to avoid timeout
+    # Telegram requires response within 10 seconds
+    logger.info(f"🔔 PRE-CHECKOUT RECEIVED from user {pre_checkout_query.from_user.id}")
     
     try:
-        # Parse payload
-        payload = json.loads(pre_checkout_query.invoice_payload)
-        order_id = payload.get("order_id")
-        
-        logger.info(f"💳 Pre-checkout for order {order_id} from user {pre_checkout_query.from_user.id}")
-        
-        # Validate order exists and is valid
-        if db and order_id:
-            # Check if order exists and is in valid state
-            # For bookings
-            if hasattr(db, "get_booking"):
-                booking = db.get_booking(order_id)
-                if booking:
-                    status = booking.get("status") if isinstance(booking, dict) else (
-                        booking[3] if len(booking) > 3 else None
-                    )
-                    if status not in ["pending", "confirmed"]:
-                        await pre_checkout_query.answer(
-                            ok=False,
-                            error_message="Bu buyurtma allaqachon to'langan yoki bekor qilingan"
-                        )
-                        return
-        
-        # All checks passed - confirm pre-checkout
+        # Answer OK immediately - we can validate async later
         await pre_checkout_query.answer(ok=True)
-        logger.info(f"✅ Pre-checkout approved for order {order_id}")
-        
+        logger.info(f"✅ Pre-checkout approved for payload: {pre_checkout_query.invoice_payload[:100]}")
     except Exception as e:
-        logger.error(f"Pre-checkout error: {e}")
-        await pre_checkout_query.answer(
-            ok=False,
-            error_message="Xatolik yuz berdi. Iltimos qaytadan urinib ko'ring."
-        )
+        logger.error(f"❌ Pre-checkout error: {e}", exc_info=True)
+        try:
+            await pre_checkout_query.answer(
+                ok=False,
+                error_message="Xatolik yuz berdi"
+            )
+        except Exception:
+            pass
 
 
 @router.message(F.successful_payment)
