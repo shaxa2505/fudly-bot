@@ -882,6 +882,9 @@ async def create_webhook_app(
     app.router.add_options("/api/v1/orders", cors_preflight)
     app.router.add_post("/api/v1/orders", api_create_order)
     app.router.add_get("/api/v1/orders", api_user_orders)
+    # Alias for compatibility
+    app.router.add_options("/api/v1/user/bookings", cors_preflight)
+    app.router.add_get("/api/v1/user/bookings", api_user_orders)
     app.router.add_options("/api/v1/photo/{file_id}", cors_preflight)
     app.router.add_get("/api/v1/photo/{file_id}", api_get_photo)
     app.router.add_options("/api/v1/payment-card/{store_id}", cors_preflight)

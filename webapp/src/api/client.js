@@ -91,11 +91,12 @@ const api = {
     try {
       const params = { user_id: userId }
       if (status) params.status = status
-      const { data } = await client.get('/user/bookings', { params })
+      // Use /orders endpoint which returns user's bookings
+      const { data } = await client.get('/orders', { params })
       // API returns { bookings: [...] }
       return data.bookings || data.orders || data || []
     } catch (error) {
-      console.warn('getUserBookings not available:', error)
+      console.warn('getUserBookings error:', error)
       return []
     }
   },
