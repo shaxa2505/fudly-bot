@@ -168,14 +168,14 @@ class OrderDelivery(StatesGroup):
     """
     Delivery order flow.
 
-    Flow: Order Delivery → quantity → address → payment → upload receipt → done
+    Flow: Order Delivery → quantity → address → payment method → payment → upload receipt → done
     """
 
     offer_id = State()  # Selected offer
     quantity = State()  # Step 1: Enter quantity
     address = State()  # Step 2: Enter delivery address
-    payment_method = State()  # Step 3: Select payment method
-    payment_proof = State()  # Step 4: Upload payment screenshot
+    payment_method_select = State()  # Step 3: Select payment method (click/card)
+    payment_proof = State()  # Step 4: Upload payment screenshot (for card)
 
 
 class ConfirmOrder(StatesGroup):

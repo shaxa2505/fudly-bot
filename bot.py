@@ -395,6 +395,7 @@ def _register_handlers() -> None:
     from handlers.customer import (
         menu as customer_menu,
     )
+    from handlers.customer import payments as telegram_payments
     from handlers.customer.offers import browse as offers_browse
     from handlers.customer.offers import search as offers_search
     from handlers.customer.orders import delivery as orders
@@ -424,6 +425,7 @@ def _register_handlers() -> None:
     profile.setup_dependencies(db, bot, user_view_mode)
     favorites.setup_dependencies(db, bot, user_view_mode)
     order_management.setup(bot, db)
+    telegram_payments.setup(db, bot, get_text)
     customer_menu.setup(
         bot,
         db,
@@ -452,6 +454,7 @@ def _register_handlers() -> None:
     dp.include_router(store_settings.router)
 
     # 2. Customer routers
+    dp.include_router(telegram_payments.router)  # Payments must be high priority
     dp.include_router(profile.router)
     dp.include_router(favorites.router)
     dp.include_router(customer_menu.router)

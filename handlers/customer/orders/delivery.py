@@ -403,10 +403,131 @@ async def order_delivery_address(
         return
 
     await state.update_data(address=address)
+    
+    # Show payment method selection
+    from aiogram.utils.keyboard import InlineKeyboardBuilder
+    
+    payment_kb = InlineKeyboardBuilder()
+    payment_kb.button(
+        text="💳 Click orqali to'lash" if lang == "uz" else "💳 Оплата через Click",
+        callback_data="pay_method_click"
+    )
+    payment_kb.button(
+        text="🏦 Karta orqali o'tkazma" if lang == "uz" else "🏦 Перевод на карту",
+        callback_data="pay_method_card"
+    )
+    payment_kb.adjust(1)
+    
+    await state.set_state(OrderDelivery.payment_method_select)
+    
+    await message.answer(
+        "💰 " + (
+            "To'lov usulini tanlang:" if lang == "uz" else "Выберите способ оплаты:"
+        ),
+        reply_markup=payment_kb.as_markup()
+    )
+
+
+@router.callback_query(F.data == "pay_method_click", OrderDelivery.payment_method_select)
+async def handle_click_payment(callback: types.CallbackQuery, state: FSMContext) -> None:
+    """Handle Click payment selection - send Telegram invoice."""
+    await callback.answer()
+    
+    data = await state.get_data()
+    lang = db.get_user_language(callback.from_user.id) or "uz"
+    
+    # Get order details
+    offer_id = data.get("offer_id")
+    quantity = data.get("quantity", 1)
+    store_id = data.get("store_id")
+    
+    offer = db.get_offer(offer_id)
+    if not offer:
+        await callback.message.edit_text("❌ Mahsulot topilmadi")
+        await state.clear()
+        return
+    
+    # Get prices
+    discount_price = int(get_offer_field(offer, "discount_price", 0))
+    title = get_offer_field(offer, "title", "Товар")
+    
+    store = db.get_store(store_id)
+    delivery_price = int(get_store_field(store, "delivery_price", 15000)) if store else 15000
+    
+    total_amount = (discount_price * quantity) + delivery_price
+    
+    # Create booking first
+    booking_code = f"D{callback.from_user.id % 10000:04d}{offer_id % 1000:03d}"
+    
+    try:
+        booking_id = db.create_booking(
+            user_id=callback.from_user.id,
+            offer_id=offer_id,
+            quantity=quantity,
+            booking_code=booking_code,
+            status="pending",
+            payment_method="click",
+            delivery_address=data.get("address"),
+            delivery_cost=delivery_price,
+        )
+    except Exception as e:
+        logger.error(f"Failed to create booking: {e}")
+        # Try simpler version
+        booking_id = offer_id  # Use offer_id as fallback
+    
+    # Send Telegram invoice
+    from handlers.customer.payments import send_payment_invoice_for_booking
+    
+    try:
+        await callback.message.delete()
+        
+        invoice_msg = await send_payment_invoice_for_booking(
+            user_id=callback.from_user.id,
+            booking_id=booking_id,
+            offer_title=title,
+            quantity=quantity,
+            unit_price=discount_price,
+            delivery_cost=delivery_price,
+        )
+        
+        if invoice_msg:
+            logger.info(f"✅ Click invoice sent for order {booking_id}")
+            await state.clear()
+        else:
+            # Fallback to card payment
+            await callback.message.answer(
+                "⚠️ Click to'lovi vaqtincha ishlamayapti. Karta orqali to'lang.",
+            )
+            await state.update_data(payment_method="card")
+            await state.set_state(OrderDelivery.payment_proof)
+            await _show_card_payment(callback.message, state, lang)
+            
+    except Exception as e:
+        logger.error(f"Error sending Click invoice: {e}")
+        await callback.message.answer(
+            "❌ Xatolik. Karta orqali to'lashga o'ting.",
+        )
+        await state.update_data(payment_method="card") 
+        await state.set_state(OrderDelivery.payment_proof)
+        await _show_card_payment(callback.message, state, lang)
+
+
+@router.callback_query(F.data == "pay_method_card", OrderDelivery.payment_method_select)
+async def handle_card_payment(callback: types.CallbackQuery, state: FSMContext) -> None:
+    """Handle card payment selection - show card details."""
+    await callback.answer()
+    
+    lang = db.get_user_language(callback.from_user.id) or "uz"
+    
     await state.update_data(payment_method="card")
     await state.set_state(OrderDelivery.payment_proof)
-    logger.info(f"💳 Waiting for payment screenshot from user {message.from_user.id}")
+    
+    await callback.message.delete()
+    await _show_card_payment(callback.message, state, lang)
 
+
+async def _show_card_payment(message: types.Message, state: FSMContext, lang: str) -> None:
+    """Show card payment details."""
     data = await state.get_data()
     store_id = data.get("store_id")
 
