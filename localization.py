@@ -66,6 +66,7 @@ TEXTS = {
         "orders": "🎫 Заказы продавца",
         "today_stats": "📊 Сегодня",
         "bulk_import": "📥 Массовый импорт",
+        "store_settings": "⚙️ Настройки",
         "back_to_customer": "🛒 Режим покупателя",
         # Старые ключи (для совместимости)
         "add_offer": "➕ Добавить",
@@ -518,6 +519,7 @@ Boshlash uchun /start bosing""",
         "orders": "🎫 Buyurtmalar (sotuvchi)",
         "today_stats": "📊 Bugun",
         "bulk_import": "📦 Ommaviy import",
+        "store_settings": "⚙️ Sozlamalar",
         "back_to_customer": "🔙 Xaridor rejimi",
         # Eski kalitlar (muvofiqligi uchun)
         "add_offer": "➕ Qo'shish",

@@ -60,6 +60,7 @@ class StoreResponse(BaseModel):
     delivery_enabled: bool = False
     delivery_price: float | None = None
     min_order_amount: float | None = None
+    photo_url: str | None = None
 
 
 class CategoryResponse(BaseModel):
@@ -457,6 +458,9 @@ async def get_stores(
                     min_order_amount=float(get_val(store, "min_order_amount", 0) or 0)
                     if get_val(store, "min_order_amount")
                     else None,
+                    photo_url=get_val(
+                        store, "photo"
+                    ),  # Telegram file_id stored, will be None for now
                 )
             )
 

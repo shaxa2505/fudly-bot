@@ -19,7 +19,7 @@ except ImportError:
 
 # Configuration
 BOOKING_DURATION_HOURS = int(os.environ.get("BOOKING_DURATION_HOURS", "2"))
-MAX_ACTIVE_BOOKINGS_PER_USER = int(os.environ.get("MAX_ACTIVE_BOOKINGS_PER_USER", "3"))
+MAX_ACTIVE_BOOKINGS_PER_USER = int(os.environ.get("MAX_ACTIVE_BOOKINGS_PER_USER", "20"))
 
 
 class BookingMixin:

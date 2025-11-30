@@ -53,7 +53,12 @@ def settings_keyboard(
     # For seller show mode switch based on current mode
     if role == "seller":
         if current_mode == "seller":
-            # Currently in seller mode - show switch to customer
+            # Currently in seller mode - show store settings button
+            builder.button(
+                text="⚙️ Настройки магазина" if lang == "ru" else "⚙️ Do'kon sozlamalari",
+                callback_data="my_store_settings",
+            )
+            # Show switch to customer mode
             builder.button(
                 text="🛒 Режим покупателя" if lang == "ru" else "🛒 Xaridor rejimi",
                 callback_data="switch_to_customer",

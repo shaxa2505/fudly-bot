@@ -78,7 +78,7 @@ def offer_to_dict(offer: Any, photo_url: str | None = None) -> dict:
     }
 
 
-def store_to_dict(store: Any) -> dict:
+def store_to_dict(store: Any, photo_url: str | None = None) -> dict:
     """Convert store to API response dict."""
     store_id = get_offer_value(store, "store_id", 0) or get_offer_value(store, "id", 0)
     return {
@@ -93,6 +93,8 @@ def store_to_dict(store: Any) -> dict:
         "delivery_enabled": get_offer_value(store, "delivery_enabled", 1) == 1,
         "delivery_price": int(get_offer_value(store, "delivery_price", 15000) or 15000),
         "min_order_amount": int(get_offer_value(store, "min_order_amount", 30000) or 30000),
+        # Photo
+        "photo_url": photo_url,
     }
 
 
@@ -486,7 +488,13 @@ async def create_webhook_app(
                     columns = [desc[0] for desc in cursor.description]
                     raw_stores = [dict(zip(columns, row)) for row in cursor.fetchall()]
 
-            stores = [store_to_dict(s) for s in raw_stores]
+            # Convert stores with photo URLs
+            stores = []
+            for s in raw_stores:
+                photo_id = get_offer_value(s, "photo")
+                photo_url = await get_photo_url(bot, photo_id) if photo_id else None
+                stores.append(store_to_dict(s, photo_url))
+
             logger.info(f"API /stores: returning {len(stores)} stores")
             return add_cors_headers(web.json_response(stores))
 
@@ -760,7 +768,7 @@ async def create_webhook_app(
                 payment_card = {
                     "card_number": "8600 1234 5678 9012",
                     "card_holder": "FUDLY",
-                    "payment_instructions": "Chekni yuklashni unutmang!"
+                    "payment_instructions": "Chekni yuklashni unutmang!",
                 }
 
             # Normalize payment card format

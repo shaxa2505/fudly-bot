@@ -399,6 +399,7 @@ def _register_handlers() -> None:
         import_products,
         management,
         order_management,
+        store_settings,
     )
     from handlers.seller import (
         registration as partner,
@@ -413,6 +414,7 @@ def _register_handlers() -> None:
     analytics.setup_dependencies(db, bot)
     bulk_import.setup_dependencies(db, bot)
     import_products.setup_dependencies(db, bot)
+    store_settings.setup_dependencies(db, bot)
     profile.setup_dependencies(db, bot, user_view_mode)
     favorites.setup_dependencies(db, bot, user_view_mode)
     order_management.setup(bot, db)
@@ -441,6 +443,7 @@ def _register_handlers() -> None:
     dp.include_router(management.router)
     dp.include_router(analytics.router)
     dp.include_router(order_management.router)
+    dp.include_router(store_settings.router)
 
     # 2. Customer routers
     dp.include_router(profile.router)

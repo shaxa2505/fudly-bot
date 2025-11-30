@@ -114,6 +114,10 @@ class DatabaseProtocol(Protocol):
     def get_store_owner(self, store_id: int) -> int | None:
         ...
 
+    def update_store_photo(self, store_id: int, photo: str | None) -> bool:
+        """Update store photo."""
+        ...
+
     # ========== OFFER METHODS ==========
     def add_offer(
         self,

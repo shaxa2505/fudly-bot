@@ -149,8 +149,8 @@ class StoreMixin:
                     SELECT s.*,
                            COALESCE(AVG(r.rating), 0) as avg_rating,
                            COUNT(DISTINCT r.rating_id) as ratings_count,
-                           (SELECT COUNT(*) FROM offers o 
-                            WHERE o.store_id = s.store_id 
+                           (SELECT COUNT(*) FROM offers o
+                            WHERE o.store_id = s.store_id
                             AND o.status = 'active') as offers_count
                     FROM stores s
                     LEFT JOIN ratings r ON s.store_id = r.store_id
@@ -168,8 +168,8 @@ class StoreMixin:
                     SELECT s.*,
                            COALESCE(AVG(r.rating), 0) as avg_rating,
                            COUNT(DISTINCT r.rating_id) as ratings_count,
-                           (SELECT COUNT(*) FROM offers o 
-                            WHERE o.store_id = s.store_id 
+                           (SELECT COUNT(*) FROM offers o
+                            WHERE o.store_id = s.store_id
                             AND o.status = 'active') as offers_count
                     FROM stores s
                     LEFT JOIN ratings r ON s.store_id = r.store_id
@@ -302,6 +302,17 @@ class StoreMixin:
             cursor.execute("SELECT owner_id FROM stores WHERE store_id = %s", (store_id,))
             result = cursor.fetchone()
             return result[0] if result else None
+
+    def update_store_photo(self, store_id: int, photo: str | None) -> bool:
+        """Update store photo."""
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                "UPDATE stores SET photo = %s WHERE store_id = %s",
+                (photo, store_id),
+            )
+            logger.info(f"Store {store_id} photo updated")
+            return True
 
     def get_store_analytics(self, store_id: int) -> dict:
         """Get store analytics."""
