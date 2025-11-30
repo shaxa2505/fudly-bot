@@ -172,6 +172,24 @@ const api = {
     const { data } = await client.post('/orders/calculate-delivery', deliveryData)
     return data
   },
+
+  // Payment endpoints
+  async getPaymentCard(storeId) {
+    const { data } = await client.get(`/payment-card/${storeId}`)
+    return data
+  },
+
+  async uploadPaymentProof(orderId, photoFile) {
+    const formData = new FormData()
+    formData.append('photo', photoFile)
+
+    const { data } = await client.post(`/orders/${orderId}/payment-proof`, formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    })
+    return data
+  },
 }
 
 export default api

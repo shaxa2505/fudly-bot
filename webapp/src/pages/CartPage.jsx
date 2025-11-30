@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import api from '../api/client'
 import { useCart } from '../context/CartContext'
@@ -36,6 +36,14 @@ function CartPage({ user }) {
   const [deliveryFee, setDeliveryFee] = useState(0)
   const [minOrderAmount, setMinOrderAmount] = useState(0)
   const [storeDeliveryEnabled, setStoreDeliveryEnabled] = useState(false)
+
+  // Payment step for delivery
+  const [checkoutStep, setCheckoutStep] = useState('details') // 'details' | 'payment' | 'upload'
+  const [paymentCard, setPaymentCard] = useState(null)
+  const [paymentProof, setPaymentProof] = useState(null)
+  const [paymentProofPreview, setPaymentProofPreview] = useState(null)
+  const [createdOrderId, setCreatedOrderId] = useState(null)
+  const fileInputRef = useRef(null)
 
   // Success/Error modals
   const [orderResult, setOrderResult] = useState(null)
@@ -93,11 +101,25 @@ function CartPage({ user }) {
 
   const handleCheckout = () => {
     if (isEmpty) return
+    setCheckoutStep('details')
     setShowCheckout(true)
   }
 
-  const placeOrder = async () => {
-    if (isEmpty) return
+  // Handle file selection for payment proof
+  const handleFileSelect = (e) => {
+    const file = e.target.files?.[0]
+    if (file) {
+      setPaymentProof(file)
+      const reader = new FileReader()
+      reader.onloadend = () => {
+        setPaymentProofPreview(reader.result)
+      }
+      reader.readAsDataURL(file)
+    }
+  }
+
+  // Proceed to payment step (for delivery)
+  const proceedToPayment = async () => {
     if (!phone.trim()) {
       alert('Telefon raqamingizni kiriting')
       return
@@ -106,6 +128,31 @@ function CartPage({ user }) {
       alert('Yetkazib berish manzilini kiriting')
       return
     }
+
+    // If pickup - place order directly
+    if (orderType === 'pickup') {
+      await placeOrder()
+      return
+    }
+
+    // If delivery - fetch payment card and show payment step
+    setOrderLoading(true)
+    try {
+      const storeId = cartItems[0]?.offer?.store_id || 0
+      const cardData = await api.getPaymentCard(storeId)
+      setPaymentCard(cardData)
+      setCheckoutStep('payment')
+    } catch (error) {
+      console.error('Error fetching payment card:', error)
+      alert('To\'lov rekvizitlarini olishda xatolik')
+    } finally {
+      setOrderLoading(false)
+    }
+  }
+
+  // Place order (for pickup or after payment upload)
+  const placeOrder = async () => {
+    if (isEmpty) return
 
     setOrderLoading(true)
 
@@ -129,8 +176,21 @@ function CartPage({ user }) {
 
       const result = await api.createOrder(orderData)
 
+      // If delivery and we have payment proof - upload it
+      if (orderType === 'delivery' && paymentProof && result.order_id) {
+        try {
+          await api.uploadPaymentProof(result.order_id, paymentProof)
+        } catch (e) {
+          console.warn('Could not upload payment proof:', e)
+        }
+      }
+
       clearCart()
       setShowCheckout(false)
+      setCheckoutStep('details')
+      setPaymentProof(null)
+      setPaymentProofPreview(null)
+      setPaymentCard(null)
       setOrderResult({
         success: true,
         orderId: result.order_id,
@@ -263,118 +323,231 @@ function CartPage({ user }) {
 
       {/* Checkout Modal */}
       {showCheckout && (
-        <div className="modal-overlay" onClick={() => setShowCheckout(false)}>
+        <div className="modal-overlay" onClick={() => !orderLoading && setShowCheckout(false)}>
           <div className="modal checkout-modal" onClick={e => e.stopPropagation()}>
             <div className="modal-header">
-              <h2>Buyurtmani tasdiqlash</h2>
-              <button className="modal-close" onClick={() => setShowCheckout(false)}>✕</button>
+              <h2>
+                {checkoutStep === 'details' && 'Buyurtmani tasdiqlash'}
+                {checkoutStep === 'payment' && '💳 To\'lov'}
+              </h2>
+              <button
+                className="modal-close"
+                onClick={() => !orderLoading && setShowCheckout(false)}
+              >✕</button>
             </div>
 
             <div className="modal-body">
-              {/* Order Type Selection */}
-              <div className="order-type-section">
-                <p className="section-label">Buyurtma turi:</p>
-                <div className="order-type-options">
-                  <button
-                    className={`order-type-btn ${orderType === 'pickup' ? 'active' : ''}`}
-                    onClick={() => setOrderType('pickup')}
-                  >
-                    <span className="order-type-icon">🏪</span>
-                    <span className="order-type-text">O'zi olib ketadi</span>
-                    <span className="order-type-desc">Bepul</span>
-                  </button>
+              {/* Step 1: Order Details */}
+              {checkoutStep === 'details' && (
+                <>
+                  {/* Order Type Selection */}
+                  <div className="order-type-section">
+                    <p className="section-label">Buyurtma turi:</p>
+                    <div className="order-type-options">
+                      <button
+                        className={`order-type-btn ${orderType === 'pickup' ? 'active' : ''}`}
+                        onClick={() => setOrderType('pickup')}
+                      >
+                        <span className="order-type-icon">🏪</span>
+                        <span className="order-type-text">O'zi olib ketadi</span>
+                        <span className="order-type-desc">Bepul</span>
+                      </button>
 
-                  <button
-                    className={`order-type-btn ${orderType === 'delivery' ? 'active' : ''} ${!storeDeliveryEnabled || !canDelivery ? 'disabled' : ''}`}
-                    onClick={() => storeDeliveryEnabled && canDelivery && setOrderType('delivery')}
-                    disabled={!storeDeliveryEnabled || !canDelivery}
-                  >
-                    <span className="order-type-icon">🚚</span>
-                    <span className="order-type-text">Yetkazib berish</span>
-                    <span className="order-type-desc">
-                      {!storeDeliveryEnabled
-                        ? 'Mavjud emas'
-                        : !canDelivery
-                          ? `Min: ${Math.round(minOrderAmount).toLocaleString()} so'm`
-                          : `${Math.round(deliveryFee).toLocaleString()} so'm`
-                      }
-                    </span>
-                  </button>
-                </div>
+                      <button
+                        className={`order-type-btn ${orderType === 'delivery' ? 'active' : ''} ${!storeDeliveryEnabled || !canDelivery ? 'disabled' : ''}`}
+                        onClick={() => storeDeliveryEnabled && canDelivery && setOrderType('delivery')}
+                        disabled={!storeDeliveryEnabled || !canDelivery}
+                      >
+                        <span className="order-type-icon">🚚</span>
+                        <span className="order-type-text">Yetkazib berish</span>
+                        <span className="order-type-desc">
+                          {!storeDeliveryEnabled
+                            ? 'Mavjud emas'
+                            : !canDelivery
+                              ? `Min: ${Math.round(minOrderAmount).toLocaleString()} so'm`
+                              : `${Math.round(deliveryFee).toLocaleString()} so'm`
+                          }
+                        </span>
+                      </button>
+                    </div>
 
-                {!canDelivery && storeDeliveryEnabled && (
-                  <p className="delivery-hint">
-                    💡 Yetkazib berish uchun minimum {Math.round(minOrderAmount).toLocaleString()} so'm buyurtma qiling
-                  </p>
-                )}
-              </div>
+                    {!canDelivery && storeDeliveryEnabled && (
+                      <p className="delivery-hint">
+                        💡 Yetkazib berish uchun minimum {Math.round(minOrderAmount).toLocaleString()} so'm buyurtma qiling
+                      </p>
+                    )}
+                  </div>
 
-              <label className="form-label">
-                📱 Telefon raqam *
-                <input
-                  type="tel"
-                  className="form-input"
-                  placeholder="+998 90 123 45 67"
-                  value={phone}
-                  onChange={e => setPhone(e.target.value)}
-                />
-              </label>
+                  <label className="form-label">
+                    📱 Telefon raqam *
+                    <input
+                      type="tel"
+                      className="form-input"
+                      placeholder="+998 90 123 45 67"
+                      value={phone}
+                      onChange={e => setPhone(e.target.value)}
+                    />
+                  </label>
 
-              {orderType === 'delivery' && (
-                <label className="form-label">
-                  📍 Yetkazib berish manzili *
-                  <textarea
-                    className="form-textarea"
-                    placeholder="Shahar, ko'cha, uy raqami, mo'ljal..."
-                    value={address}
-                    onChange={e => setAddress(e.target.value)}
-                  />
-                </label>
+                  {orderType === 'delivery' && (
+                    <label className="form-label">
+                      📍 Yetkazib berish manzili *
+                      <textarea
+                        className="form-textarea"
+                        placeholder="Shahar, ko'cha, uy raqami, mo'ljal..."
+                        value={address}
+                        onChange={e => setAddress(e.target.value)}
+                      />
+                    </label>
+                  )}
+
+                  <label className="form-label">
+                    💬 Izoh
+                    <textarea
+                      className="form-textarea"
+                      placeholder="Qo'shimcha ma'lumot..."
+                      value={comment}
+                      onChange={e => setComment(e.target.value)}
+                    />
+                  </label>
+
+                  <div className="order-summary">
+                    <div className="summary-line">
+                      <span>Mahsulotlar:</span>
+                      <span>{Math.round(subtotal).toLocaleString()} so'm</span>
+                    </div>
+                    {orderType === 'delivery' && (
+                      <div className="summary-line">
+                        <span>Yetkazib berish:</span>
+                        <span>{Math.round(deliveryFee).toLocaleString()} so'm</span>
+                      </div>
+                    )}
+                    <div className="summary-line total">
+                      <span><strong>Jami:</strong></span>
+                      <span><strong>{Math.round(total).toLocaleString()} so'm</strong></span>
+                    </div>
+                  </div>
+                </>
               )}
 
-              <label className="form-label">
-                💬 Izoh
-                <textarea
-                  className="form-textarea"
-                  placeholder="Qo'shimcha ma'lumot..."
-                  value={comment}
-                  onChange={e => setComment(e.target.value)}
-                />
-              </label>
+              {/* Step 2: Payment (for delivery) */}
+              {checkoutStep === 'payment' && paymentCard && (
+                <div className="payment-step">
+                  <div className="payment-info">
+                    <p className="payment-instruction">
+                      💳 Quyidagi kartaga {Math.round(total).toLocaleString()} so'm o'tkazing:
+                    </p>
 
-              <div className="order-summary">
-                <div className="summary-line">
-                  <span>Mahsulotlar:</span>
-                  <span>{Math.round(subtotal).toLocaleString()} so'm</span>
-                </div>
-                {orderType === 'delivery' && (
-                  <div className="summary-line">
-                    <span>Yetkazib berish:</span>
-                    <span>{Math.round(deliveryFee).toLocaleString()} so'm</span>
+                    <div className="payment-card">
+                      <div className="card-number">
+                        <span className="card-label">Karta raqami:</span>
+                        <span
+                          className="card-value"
+                          onClick={() => {
+                            navigator.clipboard.writeText(paymentCard.card_number)
+                            window.Telegram?.WebApp?.HapticFeedback?.notificationOccurred?.('success')
+                            alert('Karta raqami nusxalandi!')
+                          }}
+                        >
+                          {paymentCard.card_number} 📋
+                        </span>
+                      </div>
+                      {paymentCard.card_holder && (
+                        <div className="card-holder">
+                          <span className="card-label">Egasi:</span>
+                          <span className="card-value">{paymentCard.card_holder}</span>
+                        </div>
+                      )}
+                    </div>
+
+                    {paymentCard.payment_instructions && (
+                      <p className="payment-instructions">
+                        📋 {paymentCard.payment_instructions}
+                      </p>
+                    )}
+
+                    <div className="payment-amount">
+                      <span>To'lov summasi:</span>
+                      <strong>{Math.round(total).toLocaleString()} so'm</strong>
+                    </div>
                   </div>
-                )}
-                <div className="summary-line total">
-                  <span><strong>Jami:</strong></span>
-                  <span><strong>{Math.round(total).toLocaleString()} so'm</strong></span>
+
+                  <div className="upload-section">
+                    <p className="upload-label">📸 O'tkazma chekini yuklang:</p>
+
+                    <input
+                      type="file"
+                      ref={fileInputRef}
+                      accept="image/*"
+                      capture="environment"
+                      onChange={handleFileSelect}
+                      style={{ display: 'none' }}
+                    />
+
+                    {paymentProofPreview ? (
+                      <div className="proof-preview">
+                        <img src={paymentProofPreview} alt="Chek" />
+                        <button
+                          className="remove-proof"
+                          onClick={() => {
+                            setPaymentProof(null)
+                            setPaymentProofPreview(null)
+                          }}
+                        >
+                          ✕ O'chirish
+                        </button>
+                      </div>
+                    ) : (
+                      <button
+                        className="upload-btn"
+                        onClick={() => fileInputRef.current?.click()}
+                      >
+                        📷 Rasm tanlash
+                      </button>
+                    )}
+                  </div>
                 </div>
-              </div>
+              )}
             </div>
 
             <div className="modal-footer">
-              <button
-                className="cancel-btn"
-                onClick={() => setShowCheckout(false)}
-                disabled={orderLoading}
-              >
-                Bekor qilish
-              </button>
-              <button
-                className="confirm-btn"
-                onClick={placeOrder}
-                disabled={orderLoading || !phone.trim() || (orderType === 'delivery' && !address.trim())}
-              >
-                {orderLoading ? '⏳ Yuborilmoqda...' : '✅ Tasdiqlash'}
-              </button>
+              {checkoutStep === 'details' && (
+                <>
+                  <button
+                    className="cancel-btn"
+                    onClick={() => setShowCheckout(false)}
+                    disabled={orderLoading}
+                  >
+                    Bekor qilish
+                  </button>
+                  <button
+                    className="confirm-btn"
+                    onClick={proceedToPayment}
+                    disabled={orderLoading || !phone.trim() || (orderType === 'delivery' && !address.trim())}
+                  >
+                    {orderLoading ? '⏳ ...' : orderType === 'delivery' ? '💳 To\'lovga o\'tish' : '✅ Tasdiqlash'}
+                  </button>
+                </>
+              )}
+
+              {checkoutStep === 'payment' && (
+                <>
+                  <button
+                    className="cancel-btn"
+                    onClick={() => setCheckoutStep('details')}
+                    disabled={orderLoading}
+                  >
+                    ← Orqaga
+                  </button>
+                  <button
+                    className="confirm-btn"
+                    onClick={placeOrder}
+                    disabled={orderLoading || !paymentProof}
+                  >
+                    {orderLoading ? '⏳ Yuborilmoqda...' : '✅ Buyurtma berish'}
+                  </button>
+                </>
+              )}
             </div>
           </div>
         </div>

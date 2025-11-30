@@ -1,6 +1,7 @@
 """Webhook server for production deployment."""
 from __future__ import annotations
 
+import os
 from datetime import datetime
 from typing import Any
 
@@ -706,6 +707,112 @@ async def create_webhook_app(
             logger.error(f"API get photo error: {e}")
             return add_cors_headers(web.json_response({"error": str(e)}, status=500))
 
+    async def api_get_payment_card(request: web.Request) -> web.Response:
+        """GET /api/v1/payment-card/{store_id} - Get payment card for store."""
+        store_id = request.match_info.get("store_id")
+        try:
+            payment_card = None
+            payment_instructions = None
+
+            # Try store-specific payment card first
+            if store_id and hasattr(db, "get_payment_card"):
+                try:
+                    store_payment = db.get_payment_card(int(store_id))
+                    if store_payment:
+                        payment_card = store_payment
+                        if isinstance(store_payment, dict):
+                            payment_instructions = store_payment.get("payment_instructions")
+                except Exception as e:
+                    logger.warning(f"Failed to get store payment card: {e}")
+
+            # Fallback to platform payment card
+            if not payment_card and hasattr(db, "get_platform_payment_card"):
+                payment_card = db.get_platform_payment_card()
+
+            if not payment_card:
+                return add_cors_headers(
+                    web.json_response({"error": "Payment card not available"}, status=404)
+                )
+
+            # Normalize payment card format
+            if isinstance(payment_card, dict):
+                card_number = payment_card.get("card_number", "")
+                card_holder = payment_card.get("card_holder", "")
+                if not payment_instructions:
+                    payment_instructions = payment_card.get("payment_instructions")
+            elif isinstance(payment_card, (tuple, list)) and len(payment_card) > 1:
+                card_number = payment_card[1] if len(payment_card) > 1 else str(payment_card[0])
+                card_holder = payment_card[2] if len(payment_card) > 2 else ""
+            else:
+                card_number = str(payment_card)
+                card_holder = ""
+
+            return add_cors_headers(
+                web.json_response(
+                    {
+                        "card_number": card_number,
+                        "card_holder": card_holder,
+                        "payment_instructions": payment_instructions,
+                    }
+                )
+            )
+        except Exception as e:
+            logger.error(f"API get payment card error: {e}")
+            return add_cors_headers(web.json_response({"error": str(e)}, status=500))
+
+    async def api_upload_payment_proof(request: web.Request) -> web.Response:
+        """POST /api/v1/orders/{order_id}/payment-proof - Upload payment screenshot."""
+        order_id = request.match_info.get("order_id")
+        try:
+            # Parse multipart form data
+            reader = await request.multipart()
+            photo_data = None
+            filename = None
+
+            async for part in reader:
+                if part.name == "photo":
+                    photo_data = await part.read()
+                    filename = part.filename or "payment_proof.jpg"
+
+            if not photo_data:
+                return add_cors_headers(
+                    web.json_response({"error": "No photo provided"}, status=400)
+                )
+
+            # Upload photo to Telegram and get file_id
+            from aiogram.types import BufferedInputFile
+
+            photo_file = BufferedInputFile(photo_data, filename=filename)
+            # Send to admin/bot to get file_id
+            admin_id = int(os.getenv("ADMIN_ID", "0"))
+            if admin_id:
+                sent_msg = await bot.send_photo(
+                    admin_id, photo_file, caption=f"📸 Чек для заказа #{order_id} (Mini App)"
+                )
+                file_id = sent_msg.photo[-1].file_id
+
+                # Update order with payment proof
+                if hasattr(db, "update_payment_status"):
+                    db.update_payment_status(int(order_id), "pending", file_id)
+
+                return add_cors_headers(
+                    web.json_response(
+                        {
+                            "success": True,
+                            "message": "Payment proof uploaded",
+                            "file_id": file_id,
+                        }
+                    )
+                )
+            else:
+                return add_cors_headers(
+                    web.json_response({"error": "Admin not configured"}, status=500)
+                )
+
+        except Exception as e:
+            logger.error(f"API upload payment proof error: {e}")
+            return add_cors_headers(web.json_response({"error": str(e)}, status=500))
+
     async def api_health(request: web.Request) -> web.Response:
         """GET /api/v1/health - API health check."""
         return add_cors_headers(
@@ -748,6 +855,10 @@ async def create_webhook_app(
     app.router.add_get("/api/v1/orders", api_user_orders)
     app.router.add_options("/api/v1/photo/{file_id}", cors_preflight)
     app.router.add_get("/api/v1/photo/{file_id}", api_get_photo)
+    app.router.add_options("/api/v1/payment-card/{store_id}", cors_preflight)
+    app.router.add_get("/api/v1/payment-card/{store_id}", api_get_payment_card)
+    app.router.add_options("/api/v1/orders/{order_id}/payment-proof", cors_preflight)
+    app.router.add_post("/api/v1/orders/{order_id}/payment-proof", api_upload_payment_proof)
     app.router.add_get("/api/v1/health", api_health)
     app.router.add_get("/api/v1/debug", api_debug)
 
