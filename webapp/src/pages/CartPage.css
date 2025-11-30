@@ -147,6 +147,13 @@
   margin: var(--spacing-xs) 0 0 0;
 }
 
+.cart-item-stock-warning {
+  font-size: 11px;
+  color: var(--color-warning, #FF9500);
+  margin: var(--spacing-xs) 0 0 0;
+  font-weight: 500;
+}
+
 .cart-item-controls {
   display: flex;
   flex-direction: column;

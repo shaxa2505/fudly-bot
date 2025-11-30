@@ -143,6 +143,13 @@ function CheckoutPage({ user }) {
     setLoading(true);
     setError(null);
 
+    // Calculate totals early for payment link
+    const itemsTotalCalc = cartItems.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+    const deliveryCostCalc = (deliveryType === DELIVERY_TYPE.DELIVERY && deliveryInfo?.delivery_cost)
+      ? deliveryInfo.delivery_cost
+      : 0;
+    const totalCalc = itemsTotalCalc + deliveryCostCalc;
+
     try {
       const currentUser = getCurrentUser() || user;
       if (!currentUser) {
@@ -173,10 +180,16 @@ function CheckoutPage({ user }) {
       if (paymentMethod === PAYMENT_METHOD.CLICK || paymentMethod === PAYMENT_METHOD.PAYME) {
         try {
           const returnUrl = window.location.origin + '/profile';
+          // Get store_id from cart items (assuming single store checkout)
+          const storeId = cartItems[0]?.store_id || null;
+
           const paymentData = await api.createPaymentLink(
             orderResult.booking_id || orderResult.id,
             paymentMethod,
-            returnUrl
+            returnUrl,
+            storeId,
+            totalCalc,
+            currentUser.user_id || currentUser.id
           );
 
           if (paymentData.payment_url) {

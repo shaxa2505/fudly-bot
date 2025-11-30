@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import api from '../api/client'
 import { useCart } from '../context/CartContext'
 import BottomNav from '../components/BottomNav'
-import { getUserId, getUserLanguage } from '../utils/auth'
+import { getUserId, getUserLanguage, getCurrentUser } from '../utils/auth'
 import './YanaPage.css'
 
 function YanaPage() {
@@ -14,10 +14,19 @@ function YanaPage() {
   const [orderFilter, setOrderFilter] = useState('all') // all, active, completed
   const lang = getUserLanguage()
 
-  // Settings state
-  const [phone, setPhone] = useState(() => localStorage.getItem('fudly_phone') || '')
+  // Settings state - load from user profile first, then localStorage
+  const [phone, setPhone] = useState(() => {
+    const user = getCurrentUser()
+    if (user?.phone) return user.phone
+    // Try Telegram WebApp contact
+    const tgPhone = window.Telegram?.WebApp?.initDataUnsafe?.user?.phone_number
+    if (tgPhone) return tgPhone
+    return localStorage.getItem('fudly_phone') || ''
+  })
   const [location, setLocation] = useState(() => {
     try {
+      const user = getCurrentUser()
+      if (user?.city) return { city: user.city }
       return JSON.parse(localStorage.getItem('fudly_location') || '{}')
     } catch { return {} }
   })
@@ -46,9 +55,9 @@ function YanaPage() {
       let filtered = bookings
       if (orderFilter === 'active') {
         // Active = pending, confirmed, ready (waiting for completion)
-        filtered = bookings.filter(o => 
-          o.status === 'pending' || 
-          o.status === 'confirmed' || 
+        filtered = bookings.filter(o =>
+          o.status === 'pending' ||
+          o.status === 'confirmed' ||
           o.status === 'ready' ||
           !o.status // treat undefined as pending
         )
@@ -184,7 +193,7 @@ function YanaPage() {
                             src={order.offer_photo}
                             alt={order.offer_title}
                             className="order-image"
-                            onError={(e) => { 
+                            onError={(e) => {
                               e.target.style.display = 'none'
                               e.target.parentElement.classList.add('no-image')
                             }}
@@ -198,13 +207,13 @@ function YanaPage() {
                         <p className="order-store">🏪 {order.store_name || 'Do\'kon'}</p>
                         <div className="order-meta">
                           <span>
-                            {order.quantity || 1} × {order.total_price && order.quantity 
-                              ? Math.round(order.total_price / order.quantity).toLocaleString() 
+                            {order.quantity || 1} × {order.total_price && order.quantity
+                              ? Math.round(order.total_price / order.quantity).toLocaleString()
                               : '—'} so'm
                           </span>
                           <span className="order-total">
-                            {order.total_price 
-                              ? Math.round(order.total_price).toLocaleString() 
+                            {order.total_price
+                              ? Math.round(order.total_price).toLocaleString()
                               : '—'} so'm
                           </span>
                         </div>

@@ -268,12 +268,15 @@ const api = {
     }
   },
 
-  async createPaymentLink(bookingId, provider, returnUrl = null) {
+  async createPaymentLink(orderId, provider, returnUrl = null, storeId = null, amount = null, userId = null) {
     try {
       const { data } = await client.post('/payment/create', {
-        booking_id: bookingId,
+        order_id: orderId,
         provider: provider,
         return_url: returnUrl,
+        store_id: storeId,
+        amount: amount,
+        user_id: userId,
       })
       return data
     } catch (error) {

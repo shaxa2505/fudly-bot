@@ -275,6 +275,9 @@ function CartPage({ user }) {
               {item.offer.store_name && (
                 <p className="cart-item-store">🏪 {item.offer.store_name}</p>
               )}
+              {item.offer.stock && item.quantity >= item.offer.stock && (
+                <p className="cart-item-stock-warning">⚠️ Maksimum: {item.offer.stock} dona</p>
+              )}
             </div>
             <div className="cart-item-controls">
               <div className="qty-controls">
@@ -288,6 +291,7 @@ function CartPage({ user }) {
                 <button
                   className="qty-btn plus"
                   onClick={() => handleQuantityChange(item.offer.id, 1)}
+                  disabled={item.quantity >= (item.offer.stock || 99)}
                 >
                   +
                 </button>
