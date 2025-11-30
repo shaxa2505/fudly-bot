@@ -176,10 +176,18 @@ function CartPage({ user }) {
 
       const result = await api.createOrder(orderData)
 
+      // Check if order was successful
+      if (!result.success && !result.bookings?.length) {
+        throw new Error(result.message || result.error || 'Order failed')
+      }
+
+      // Get order ID from response
+      const orderId = result.order_id || result.bookings?.[0]?.booking_id
+
       // If delivery and we have payment proof - upload it
-      if (orderType === 'delivery' && paymentProof && result.order_id) {
+      if (orderType === 'delivery' && paymentProof && orderId) {
         try {
-          await api.uploadPaymentProof(result.order_id, paymentProof)
+          await api.uploadPaymentProof(orderId, paymentProof)
         } catch (e) {
           console.warn('Could not upload payment proof:', e)
         }
@@ -193,7 +201,8 @@ function CartPage({ user }) {
       setPaymentCard(null)
       setOrderResult({
         success: true,
-        orderId: result.order_id,
+        orderId: orderId,
+        bookingCode: result.bookings?.[0]?.booking_code,
         orderType: orderType,
         total: total
       })
@@ -204,7 +213,7 @@ function CartPage({ user }) {
       if (window.Telegram?.WebApp) {
         window.Telegram.WebApp.sendData(JSON.stringify({
           action: 'order_placed',
-          order_id: result.order_id,
+          order_id: orderId,
           total: total,
           order_type: orderType,
         }))
@@ -212,7 +221,7 @@ function CartPage({ user }) {
 
     } catch (error) {
       console.error('Error placing order:', error)
-      setOrderResult({ success: false })
+      setOrderResult({ success: false, error: error.message })
       window.Telegram?.WebApp?.HapticFeedback?.notificationOccurred?.('error')
     } finally {
       setOrderLoading(false)
@@ -561,7 +570,11 @@ function CartPage({ user }) {
               <>
                 <div className="result-icon success">✅</div>
                 <h2>Buyurtma qabul qilindi!</h2>
-                <p>Buyurtma raqami: #{orderResult.orderId}</p>
+                {orderResult.bookingCode && (
+                  <p className="booking-code-display">
+                    🎫 Kod: <strong>{orderResult.bookingCode}</strong>
+                  </p>
+                )}
                 <p className="order-type-result">
                   {orderResult.orderType === 'pickup'
                     ? '🏪 O\'zi olib ketish'
@@ -583,7 +596,7 @@ function CartPage({ user }) {
               <>
                 <div className="result-icon error">❌</div>
                 <h2>Xatolik yuz berdi</h2>
-                <p>Iltimos, qaytadan urinib ko'ring</p>
+                <p>{orderResult.error || 'Iltimos, qaytadan urinib ko\'ring'}</p>
                 <button className="primary-btn" onClick={() => setOrderResult(null)}>
                   Yopish
                 </button>
