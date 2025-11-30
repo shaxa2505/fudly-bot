@@ -149,8 +149,14 @@ const api = {
   },
 
   async createOrder(orderData) {
-    const { data } = await client.post('/orders', orderData)
-    return data
+    try {
+      const { data } = await client.post('/orders', orderData)
+      return data
+    } catch (error) {
+      // Extract error message from response
+      const errorMsg = error.response?.data?.error || error.response?.data?.message || error.message
+      throw new Error(errorMsg || 'Order creation failed')
+    }
   },
 
   // Order tracking endpoints (Week 2)
