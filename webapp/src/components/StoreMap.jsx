@@ -190,6 +190,9 @@ function StoreMap({ stores = [], userLocation = null, onStoreSelect, lang = 'uz'
     });
   }, [stores]);
 
+  // Count stores with coordinates
+  const storesWithCoords = stores.filter(s => s.latitude && s.longitude);
+
   if (error) {
     return (
       <div className="store-map-error">
@@ -207,6 +210,14 @@ function StoreMap({ stores = [], userLocation = null, onStoreSelect, lang = 'uz'
         </div>
       )}
       <div ref={mapRef} className="store-map" style={{ opacity: mapLoaded ? 1 : 0 }} />
+
+      {/* No stores with coordinates message */}
+      {mapLoaded && storesWithCoords.length === 0 && stores.length > 0 && (
+        <div className="store-map-no-coords">
+          <p>📍 {t('Магазины не указали координаты', 'Do\'konlar koordinatalarini ko\'rsatmagan')}</p>
+          <p className="store-map-hint">{t('Используйте список для просмотра', 'Ro\'yxatdan foydalaning')}</p>
+        </div>
+      )}
 
       {/* Store list overlay */}
       {stores.length > 0 && (

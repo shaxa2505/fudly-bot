@@ -61,6 +61,32 @@
   color: var(--color-text-secondary);
 }
 
+/* No coordinates message */
+.store-map-no-coords {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  text-align: center;
+  background: rgba(255, 255, 255, 0.95);
+  padding: 20px 30px;
+  border-radius: var(--radius-lg);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  z-index: 50;
+}
+
+.store-map-no-coords p {
+  font-size: var(--font-base);
+  color: var(--color-text-primary);
+  margin: 0;
+}
+
+.store-map-no-coords .store-map-hint {
+  font-size: var(--font-sm);
+  color: var(--color-text-secondary);
+  margin-top: 8px;
+}
+
 /* Custom Markers */
 .user-marker {
   background: none;
