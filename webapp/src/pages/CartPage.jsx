@@ -488,7 +488,6 @@ function CartPage({ user }) {
                       type="file"
                       ref={fileInputRef}
                       accept="image/*"
-                      capture="environment"
                       onChange={handleFileSelect}
                       style={{ display: 'none' }}
                     />

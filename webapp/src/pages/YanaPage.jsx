@@ -45,9 +45,15 @@ function YanaPage() {
       // Filter based on selection
       let filtered = bookings
       if (orderFilter === 'active') {
-        filtered = bookings.filter(o => ['pending', 'confirmed', 'ready'].includes(o.status))
+        // Active = pending, confirmed, ready (waiting for completion)
+        filtered = bookings.filter(o => 
+          o.status === 'pending' || 
+          o.status === 'confirmed' || 
+          o.status === 'ready' ||
+          !o.status // treat undefined as pending
+        )
       } else if (orderFilter === 'completed') {
-        filtered = bookings.filter(o => ['completed', 'cancelled'].includes(o.status))
+        filtered = bookings.filter(o => o.status === 'completed' || o.status === 'cancelled')
       }
 
       setOrders(filtered)
@@ -172,19 +178,35 @@ function YanaPage() {
                     </div>
 
                     <div className="order-content">
-                      {order.offer_photo && (
-                        <img
-                          src={order.offer_photo}
-                          alt={order.offer_title}
-                          className="order-image"
-                        />
-                      )}
+                      <div className="order-image-wrapper">
+                        {order.offer_photo ? (
+                          <img
+                            src={order.offer_photo}
+                            alt={order.offer_title}
+                            className="order-image"
+                            onError={(e) => { 
+                              e.target.style.display = 'none'
+                              e.target.parentElement.classList.add('no-image')
+                            }}
+                          />
+                        ) : (
+                          <div className="order-placeholder">📦</div>
+                        )}
+                      </div>
                       <div className="order-info">
-                        <h3 className="order-title">{order.offer_title}</h3>
-                        <p className="order-store">🏪 {order.store_name}</p>
+                        <h3 className="order-title">{order.offer_title || 'Buyurtma'}</h3>
+                        <p className="order-store">🏪 {order.store_name || 'Do\'kon'}</p>
                         <div className="order-meta">
-                          <span>{order.quantity} × {Math.round(order.total_price / order.quantity).toLocaleString()} so'm</span>
-                          <span className="order-total">{Math.round(order.total_price).toLocaleString()} so'm</span>
+                          <span>
+                            {order.quantity || 1} × {order.total_price && order.quantity 
+                              ? Math.round(order.total_price / order.quantity).toLocaleString() 
+                              : '—'} so'm
+                          </span>
+                          <span className="order-total">
+                            {order.total_price 
+                              ? Math.round(order.total_price).toLocaleString() 
+                              : '—'} so'm
+                          </span>
                         </div>
                       </div>
                     </div>
