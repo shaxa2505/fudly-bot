@@ -10,6 +10,7 @@ from aiogram.types import ReplyKeyboardRemove
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
 from app.core.utils import get_store_field
+from app.integrations.sentry_integration import capture_exception
 from app.keyboards import (
     city_inline_keyboard,
     city_keyboard,
@@ -436,6 +437,7 @@ async def confirm_delete_yes(callback: types.CallbackQuery) -> None:
         logger.info(f"User {callback.from_user.id} deleted their account successfully")
     except Exception as e:
         logger.error(f"Error deleting user {callback.from_user.id}: {e}")
+        capture_exception(e, user_id=callback.from_user.id, action="delete_account")
         await callback.answer(get_text(lang, "error"), show_alert=True)
         return
 
