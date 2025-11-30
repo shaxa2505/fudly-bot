@@ -481,19 +481,26 @@ async def create_webhook_app(
         try:
             raw_stores: list[Any] = []
 
-            # Get stores from database
+            # Get stores from database with offers count
             if hasattr(db, "get_connection"):
                 with db.get_connection() as conn:
                     cursor = conn.cursor()
+                    # Join with offers to get count
+                    base_query = """
+                        SELECT s.*, COALESCE(oc.offer_count, 0) as offers_count
+                        FROM stores s
+                        LEFT JOIN (
+                            SELECT store_id, COUNT(*) as offer_count
+                            FROM offers
+                            WHERE status = 'active'
+                            GROUP BY store_id
+                        ) oc ON s.store_id = oc.store_id
+                        WHERE (s.status = 'active' OR s.status = 'approved')
+                    """
                     if city:
-                        cursor.execute(
-                            "SELECT * FROM stores WHERE (status = 'active' OR status = 'approved') AND city = %s",
-                            (city,),
-                        )
+                        cursor.execute(base_query + " AND s.city = %s", (city,))
                     else:
-                        cursor.execute(
-                            "SELECT * FROM stores WHERE status = 'active' OR status = 'approved'"
-                        )
+                        cursor.execute(base_query)
                     columns = [desc[0] for desc in cursor.description]
                     raw_stores = [dict(zip(columns, row)) for row in cursor.fetchall()]
 
