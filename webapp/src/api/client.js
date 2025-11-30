@@ -54,14 +54,21 @@ client.interceptors.response.use(
       return client(config)
     }
 
-    // Log error
-    console.error('API Error:', error)
+    // Log error details for debugging
+    console.error('API Error:', {
+      url: config?.url,
+      method: config?.method,
+      status: error.response?.status,
+      statusText: error.response?.statusText,
+      data: error.response?.data,
+      message: error.message,
+      code: error.code,
+    })
 
-    // Show user-friendly error for server errors
-    if (error.response?.status >= 500) {
-      window.Telegram?.WebApp?.showAlert?.('Serverda xatolik. Keyinroq urinib ko\'ring.')
-    } else if (!error.response) {
-      window.Telegram?.WebApp?.showAlert?.('Internet aloqasi yo\'q. Tarmoqni tekshiring.')
+    // Don't show alert for every error - let components handle it
+    // Only show critical network errors after all retries failed
+    if (!error.response && error.code === 'ERR_NETWORK') {
+      console.error('Network error - server may be down or CORS issue')
     }
 
     return Promise.reject(error)

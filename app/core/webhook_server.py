@@ -82,6 +82,11 @@ def offer_to_dict(offer: Any, photo_url: str | None = None) -> dict:
 def store_to_dict(store: Any, photo_url: str | None = None) -> dict:
     """Convert store to API response dict."""
     store_id = get_offer_value(store, "store_id", 0) or get_offer_value(store, "id", 0)
+
+    # Get latitude/longitude safely
+    lat = get_offer_value(store, "latitude")
+    lng = get_offer_value(store, "longitude")
+
     return {
         "id": store_id,
         "name": get_offer_value(store, "name", ""),
@@ -96,6 +101,9 @@ def store_to_dict(store: Any, photo_url: str | None = None) -> dict:
         "min_order_amount": int(get_offer_value(store, "min_order_amount", 30000) or 30000),
         # Photo
         "photo_url": photo_url,
+        # Geolocation for map
+        "latitude": float(lat) if lat else None,
+        "longitude": float(lng) if lng else None,
     }
 
 

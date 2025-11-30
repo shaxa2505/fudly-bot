@@ -447,6 +447,11 @@ class SchemaMixin:
                     "UPDATE stores SET delivery_enabled = 1 WHERE delivery_enabled IS NULL"
                 )
                 logger.info("✅ Delivery fields added to stores table")
+
+            # Add geolocation fields
+            cursor.execute("ALTER TABLE stores ADD COLUMN IF NOT EXISTS latitude REAL")
+            cursor.execute("ALTER TABLE stores ADD COLUMN IF NOT EXISTS longitude REAL")
+            cursor.execute("ALTER TABLE stores ADD COLUMN IF NOT EXISTS rating REAL DEFAULT 0")
         except Exception as e:
             logger.error(f"Error adding delivery fields to stores: {e}")
 
