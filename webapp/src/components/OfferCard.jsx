@@ -31,17 +31,13 @@ const OfferCard = memo(function OfferCard({ offer, cartQuantity = 0, onAddToCart
   const discountPercent = Math.round(offer.discount_percent ||
     ((offer.original_price - offer.discount_price) / offer.original_price * 100))
 
-  // Определяем ярлыки
-  const isHit = discountPercent >= 25
-
-  // Форматирование срока годности
   const formatExpiry = (date) => {
     if (!date) return null
     const d = new Date(date)
     const now = new Date()
     const diffDays = Math.ceil((d - now) / (1000 * 60 * 60 * 24))
     if (diffDays <= 0) return null
-    if (diffDays <= 3) return `⚠️ ${diffDays} kun`
+    if (diffDays <= 3) return `${diffDays} kun`
     if (diffDays <= 7) return `${diffDays} kun`
     return null
   }
@@ -49,78 +45,77 @@ const OfferCard = memo(function OfferCard({ offer, cartQuantity = 0, onAddToCart
   const expiryText = formatExpiry(offer.expiry_date)
 
   return (
-    <div className="offer-card" onClick={handleCardClick}>
+    <div className={`offer-card ${cartQuantity > 0 ? 'in-cart' : ''}`} onClick={handleCardClick}>
+      {/* Image Section */}
       <div className="card-image-container">
-        <div className="card-badges">
-          {discountPercent > 0 && (
-            <span className="badge discount-badge">-{discountPercent}%</span>
-          )}
-          {isHit && <span className="badge hit-badge">🔥</span>}
-        </div>
+        {/* Discount Badge */}
+        {discountPercent > 0 && (
+          <div className="discount-badge">-{discountPercent}%</div>
+        )}
 
-        {/* Favorite button */}
+        {/* Favorite Button */}
         <button
           className={`favorite-btn ${isInFavorites ? 'active' : ''}`}
           onClick={handleFavoriteClick}
           aria-label={isInFavorites ? "Sevimlilardan o'chirish" : "Sevimlilarga qo'shish"}
         >
-          <svg width="18" height="18" viewBox="0 0 24 24" fill={isInFavorites ? "#E53935" : "none"}>
-            <path
-              d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"
-              stroke={isInFavorites ? "#E53935" : "#7C7C7C"}
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            />
-          </svg>
+          {isInFavorites ? (
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="#E53935">
+              <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/>
+            </svg>
+          ) : (
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#999" strokeWidth="2">
+              <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/>
+            </svg>
+          )}
         </button>
 
+        {/* Expiry Badge */}
         {expiryText && (
-          <span className="expiry-badge">{expiryText}</span>
+          <div className="expiry-badge">⏰ {expiryText}</div>
         )}
+
         <img
-          src={offer.photo || 'https://placehold.co/300x300/F5F5F5/CCCCCC?text=📷'}
+          src={offer.photo || 'https://placehold.co/300x300/F8F8F8/CCCCCC?text=📷'}
           alt={offer.title}
           className="card-image"
           loading="lazy"
           onError={(e) => {
-            e.target.src = 'https://placehold.co/300x300/F5F5F5/CCCCCC?text=📷'
+            e.target.src = 'https://placehold.co/300x300/F8F8F8/CCCCCC?text=📷'
           }}
         />
       </div>
 
+      {/* Content Section */}
       <div className="card-content">
-        <div className="store-name">{offer.store_name}</div>
+        <span className="store-name">{offer.store_name}</span>
         <h3 className="offer-title">{offer.title}</h3>
 
-        <div className="price-row">
-          <div className="prices">
-            <span className="current-price">
-              {Math.round(offer.discount_price).toLocaleString()}
-              <span className="currency">so'm</span>
-            </span>
-            {offer.original_price > offer.discount_price && (
-              <span className="original-price">
-                {Math.round(offer.original_price).toLocaleString()}
-              </span>
-            )}
+        {/* Prices */}
+        <div className="price-section">
+          <div className="price-main">
+            {Math.round(offer.discount_price).toLocaleString('ru-RU')}
+            <span className="currency"> so'm</span>
           </div>
+          {offer.original_price > offer.discount_price && (
+            <div className="price-original">
+              {Math.round(offer.original_price).toLocaleString('ru-RU')}
+            </div>
+          )}
+        </div>
 
+        {/* Add to Cart Button */}
+        <div className="cart-action">
           {cartQuantity > 0 ? (
-            <div className="quantity-controls">
-              <button className="qty-btn minus" onClick={handleRemoveClick}>
-                −
-              </button>
-              <span className="qty-value">{cartQuantity}</span>
-              <button className="qty-btn plus" onClick={handleAddClick}>
-                +
-              </button>
+            <div className="quantity-control">
+              <button className="qty-btn" onClick={handleRemoveClick}>−</button>
+              <span className="qty-num">{cartQuantity}</span>
+              <button className="qty-btn qty-plus" onClick={handleAddClick}>+</button>
             </div>
           ) : (
-            <button className="add-btn" onClick={handleAddClick}>
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
-                <line x1="12" y1="5" x2="12" y2="19" stroke="white" strokeWidth="2.5" strokeLinecap="round"/>
-                <line x1="5" y1="12" x2="19" y2="12" stroke="white" strokeWidth="2.5" strokeLinecap="round"/>
+            <button className="add-to-cart-btn" onClick={handleAddClick}>
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+                <path d="M12 5v14M5 12h14" stroke="white" strokeWidth="2.5" strokeLinecap="round"/>
               </svg>
             </button>
           )}

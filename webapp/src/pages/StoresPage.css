@@ -138,14 +138,13 @@
 .sp-card {
   background: white;
   border-radius: 16px;
-  padding: 16px;
+  overflow: hidden;
   cursor: pointer;
   transition: all 0.2s;
   animation: fadeUp 0.3s ease backwards;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+  box-shadow: 0 2px 12px rgba(0,0,0,0.08);
   display: flex;
   flex-direction: column;
-  min-height: 160px;
 }
 
 .sp-card:active {
@@ -157,53 +156,71 @@
   to { opacity: 1; transform: translateY(0); }
 }
 
-.sp-card-top {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  margin-bottom: 12px;
+/* Card Image */
+.sp-card-image {
+  position: relative;
+  width: 100%;
+  height: 100px;
+  background: linear-gradient(145deg, #F5F5F5 0%, #EBEBEB 100%);
+  overflow: hidden;
 }
 
-.sp-card-icon {
-  font-size: 32px;
+.sp-card-image img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 }
 
-.sp-card-badge {
-  font-size: 11px;
-  font-weight: 700;
-  color: white;
-  background: #FF6B35;
-  min-width: 22px;
-  height: 22px;
-  padding: 0 6px;
-  border-radius: 11px;
+.sp-card-placeholder {
+  width: 100%;
+  height: 100%;
   display: flex;
   align-items: center;
   justify-content: center;
+  font-size: 40px;
+}
+
+.sp-card-badge {
+  position: absolute;
+  bottom: 8px;
+  right: 8px;
+  font-size: 11px;
+  font-weight: 700;
+  color: white;
+  background: linear-gradient(135deg, #FF6B35 0%, #F7931E 100%);
+  padding: 4px 10px;
+  border-radius: 8px;
+  box-shadow: 0 2px 6px rgba(255, 107, 53, 0.3);
+}
+
+/* Card Body */
+.sp-card-body {
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  flex: 1;
 }
 
 .sp-card-name {
-  font-size: 15px;
+  font-size: 14px;
   font-weight: 600;
   color: #1a1a2e;
-  margin: 0 0 6px;
+  margin: 0 0 4px;
   line-height: 1.3;
   display: -webkit-box;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
-  min-height: 40px;
 }
 
 .sp-card-addr {
-  font-size: 12px;
+  font-size: 11px;
   color: #888;
   margin: 0;
   display: -webkit-box;
   -webkit-line-clamp: 1;
   -webkit-box-orient: vertical;
   overflow: hidden;
-  min-height: 18px;
 }
 
 .sp-card-footer {
@@ -211,15 +228,15 @@
   flex-wrap: wrap;
   gap: 6px;
   margin-top: auto;
-  padding-top: 10px;
+  padding-top: 8px;
 }
 
 .sp-card-rating {
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 600;
   color: #F59E0B;
   background: #FEF3C7;
-  padding: 4px 8px;
+  padding: 3px 6px;
   border-radius: 6px;
 }
 
@@ -228,7 +245,7 @@
   font-weight: 500;
   color: #53B175;
   background: #E8F5E9;
-  padding: 4px 8px;
+  padding: 3px 6px;
   border-radius: 6px;
 }
 

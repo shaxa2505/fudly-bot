@@ -158,28 +158,43 @@ function StoresPage() {
                 onClick={() => loadStoreOffers(store)}
                 style={{ animationDelay: `${idx * 0.05}s` }}
               >
-                <div className="sp-card-top">
-                  <span className="sp-card-icon">{getTypeIcon(store.business_type)}</span>
+                {/* Store Image */}
+                <div className="sp-card-image">
+                  {store.photo_url ? (
+                    <img
+                      src={store.photo_url}
+                      alt={store.name}
+                      onError={(e) => {
+                        e.target.style.display = 'none'
+                        e.target.nextSibling.style.display = 'flex'
+                      }}
+                    />
+                  ) : null}
+                  <div className="sp-card-placeholder" style={{ display: store.photo_url ? 'none' : 'flex' }}>
+                    <span>{getTypeIcon(store.business_type)}</span>
+                  </div>
                   {store.offers_count > 0 && (
-                    <span className="sp-card-badge">{store.offers_count}</span>
+                    <span className="sp-card-badge">{store.offers_count} ta</span>
                   )}
                 </div>
 
-                <h3 className="sp-card-name">{store.name}</h3>
+                <div className="sp-card-body">
+                  <h3 className="sp-card-name">{store.name}</h3>
 
-                {store.address && (
-                  <p className="sp-card-addr">📍 {store.address}</p>
-                )}
-
-                <div className="sp-card-footer">
-                  {store.rating > 0 ? (
-                    <span className="sp-card-rating">
-                      ⭐ {store.rating.toFixed(1)}
-                    </span>
-                  ) : null}
-                  {store.delivery_enabled && (
-                    <span className="sp-card-delivery">🚚 Yetkazish</span>
+                  {store.address && (
+                    <p className="sp-card-addr">📍 {store.address}</p>
                   )}
+
+                  <div className="sp-card-footer">
+                    {store.rating > 0 && (
+                      <span className="sp-card-rating">
+                        ⭐ {store.rating.toFixed(1)}
+                      </span>
+                    )}
+                    {store.delivery_enabled && (
+                      <span className="sp-card-delivery">🚚</span>
+                    )}
+                  </div>
                 </div>
               </div>
             ))}
