@@ -919,25 +919,42 @@ async def create_webhook_app(
                 )
 
             if hasattr(db, "get_recently_viewed"):
-                offers = db.get_recently_viewed(int(user_id), limit=limit)
-                # Format offers like api_offers does
+                offer_ids = db.get_recently_viewed(int(user_id), limit=limit)
+                # Get full offer data for each ID
                 formatted_offers = []
-                for offer in offers:
-                    formatted_offers.append(
-                        {
-                            "id": offer.get("id"),
-                            "name": offer.get("name", ""),
-                            "description": offer.get("description", ""),
-                            "old_price": float(offer.get("old_price", 0)),
-                            "price": float(offer.get("price", 0)),
-                            "category_id": offer.get("category_id"),
-                            "store_id": offer.get("store_id"),
-                            "photo": offer.get("photo"),
-                            "photo_id": offer.get("photo_id"),
-                            "available": offer.get("available", True),
-                            "viewed_at": offer.get("viewed_at", ""),
-                        }
-                    )
+                for offer_id in offer_ids:
+                    if hasattr(db, "get_offer"):
+                        offer = db.get_offer(offer_id)
+                        if offer and isinstance(offer, dict):
+                            formatted_offers.append(
+                                {
+                                    "id": offer.get("id") or offer.get("offer_id"),
+                                    "name": offer.get("name") or offer.get("title", ""),
+                                    "title": offer.get("title") or offer.get("name", ""),
+                                    "description": offer.get("description", ""),
+                                    "old_price": float(
+                                        offer.get("old_price") or offer.get("original_price") or 0
+                                    ),
+                                    "price": float(
+                                        offer.get("price") or offer.get("discount_price") or 0
+                                    ),
+                                    "original_price": float(
+                                        offer.get("original_price") or offer.get("old_price") or 0
+                                    ),
+                                    "discount_price": float(
+                                        offer.get("discount_price") or offer.get("price") or 0
+                                    ),
+                                    "category_id": offer.get("category_id"),
+                                    "store_id": offer.get("store_id"),
+                                    "store_name": offer.get("store_name", ""),
+                                    "photo": offer.get("photo"),
+                                    "photo_id": offer.get("photo_id"),
+                                    "quantity": offer.get("quantity", 0),
+                                    "available": offer.get("status") == "active"
+                                    if offer.get("status")
+                                    else True,
+                                }
+                            )
                 return add_cors_headers(web.json_response({"offers": formatted_offers}))
             else:
                 return add_cors_headers(web.json_response({"offers": []}))

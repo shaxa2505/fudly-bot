@@ -1,6 +1,7 @@
 """Shared utilities for seller management handlers."""
 from __future__ import annotations
 
+import logging
 from typing import TYPE_CHECKING, Any
 
 from aiogram import types
@@ -8,6 +9,11 @@ from aiogram.utils.keyboard import InlineKeyboardBuilder
 
 if TYPE_CHECKING:
     from database_protocol import DatabaseProtocol
+
+logger = logging.getLogger(__name__)
+
+# Telegram message limit
+TELEGRAM_MESSAGE_LIMIT = 4096
 
 # Module-level dependencies (set by setup_dependencies)
 db: DatabaseProtocol | None = None
@@ -31,6 +37,81 @@ def get_db() -> DatabaseProtocol:
 def get_bot() -> Any:
     """Get bot instance."""
     return bot
+
+
+def truncate_text(text: str, max_length: int = TELEGRAM_MESSAGE_LIMIT, suffix: str = "...") -> str:
+    """
+    Truncate text to fit Telegram's message limit.
+    Tries to preserve HTML tags if present.
+    """
+    if len(text) <= max_length:
+        return text
+
+    # Leave room for suffix
+    truncate_at = max_length - len(suffix)
+
+    # Try to find a good break point (newline or space)
+    break_point = text.rfind("\n", 0, truncate_at)
+    if break_point < truncate_at * 0.5:  # If newline is too early, try space
+        break_point = text.rfind(" ", 0, truncate_at)
+    if break_point < truncate_at * 0.5:  # If space is too early, just cut
+        break_point = truncate_at
+
+    return text[:break_point] + suffix
+
+
+async def safe_send_message(
+    message: types.Message, text: str, parse_mode: str = "HTML", reply_markup: Any = None, **kwargs
+) -> types.Message | None:
+    """
+    Safely send a message, truncating if too long.
+    Returns the sent message or None if failed.
+    """
+    try:
+        safe_text = truncate_text(text)
+        return await message.answer(
+            safe_text, parse_mode=parse_mode, reply_markup=reply_markup, **kwargs
+        )
+    except Exception as e:
+        if "MESSAGE_TOO_LONG" in str(e):
+            # Emergency truncation
+            safe_text = truncate_text(text, 3500)  # More aggressive
+            try:
+                return await message.answer(
+                    safe_text, parse_mode=parse_mode, reply_markup=reply_markup, **kwargs
+                )
+            except Exception as e2:
+                logger.error(f"Failed to send even truncated message: {e2}")
+        else:
+            logger.error(f"Failed to send message: {e}")
+        return None
+
+
+async def safe_edit_message(
+    message: types.Message, text: str, parse_mode: str = "HTML", reply_markup: Any = None, **kwargs
+) -> types.Message | None:
+    """
+    Safely edit a message, truncating if too long.
+    Returns the edited message or None if failed.
+    """
+    try:
+        safe_text = truncate_text(text)
+        return await message.edit_text(
+            safe_text, parse_mode=parse_mode, reply_markup=reply_markup, **kwargs
+        )
+    except Exception as e:
+        if "MESSAGE_TOO_LONG" in str(e):
+            # Emergency truncation
+            safe_text = truncate_text(text, 3500)
+            try:
+                return await message.edit_text(
+                    safe_text, parse_mode=parse_mode, reply_markup=reply_markup, **kwargs
+                )
+            except Exception as e2:
+                logger.error(f"Failed to edit even truncated message: {e2}")
+        else:
+            logger.error(f"Failed to edit message: {e}")
+        return None
 
 
 def get_offer_field(offer: Any, field: str, default: Any = None) -> Any:
@@ -523,9 +604,7 @@ async def update_offer_message(callback: types.CallbackQuery, offer_id: int, lan
             )
         else:
             # No photo - send as text
-            await callback.message.answer(
-                text, parse_mode="HTML", reply_markup=builder.as_markup()
-            )
+            await callback.message.answer(text, parse_mode="HTML", reply_markup=builder.as_markup())
         # Try to delete the list message
         try:
             await callback.message.delete()

@@ -1,7 +1,6 @@
 """Seller offer management handlers - CRUD operations for offers."""
 from __future__ import annotations
 
-import asyncio
 import re
 from datetime import datetime, timedelta
 
@@ -14,7 +13,7 @@ from handlers.common.states import EditOffer
 from localization import get_text
 from logging_config import logger
 
-from .utils import get_db, get_offer_field, get_store_field, send_offer_card, update_offer_message
+from .utils import get_db, get_offer_field, get_store_field, update_offer_message
 
 router = Router()
 
@@ -98,7 +97,7 @@ async def filter_offers(callback: types.CallbackQuery) -> None:
     parts = callback.data.split("_")
     filter_type = parts[2] if len(parts) > 2 else "all"  # active, inactive, all
     page = int(parts[3]) if len(parts) > 3 and parts[3].isdigit() else 0
-    
+
     ITEMS_PER_PAGE = 5
 
     all_offers = []
@@ -142,24 +141,24 @@ async def filter_offers(callback: types.CallbackQuery) -> None:
         price = get_offer_field(offer, "discount_price", 0)
         qty = get_offer_field(offer, "quantity", 0)
         status = get_offer_field(offer, "status", "active")
-        
+
         status_icon = "✅" if status == "active" else "❌"
         qty_icon = "🟢" if qty > 0 else "🔴"
-        
+
         text += f"{i}. {status_icon} <b>{offer_title}</b>\n"
         text += f"   💰 {price:,} | {qty_icon} {qty} шт\n"
 
     # Navigation buttons
     nav_kb = InlineKeyboardBuilder()
-    
+
     # Add item buttons for quick access
     for offer in page_offers:
         offer_id = get_offer_field(offer, "offer_id")
         offer_title = get_offer_field(offer, "title", "Товар")[:15]
         nav_kb.button(text=f"📦 {offer_title}", callback_data=f"view_offer_{offer_id}")
-    
+
     nav_kb.adjust(2)  # 2 buttons per row for items
-    
+
     # Pagination row
     pagination_buttons = []
     if page > 0:
@@ -167,18 +166,20 @@ async def filter_offers(callback: types.CallbackQuery) -> None:
     pagination_buttons.append((f"{page + 1}/{total_pages}", "noop"))
     if page < total_pages - 1:
         pagination_buttons.append(("▶️", f"filter_offers_{filter_type}_{page + 1}"))
-    
+
     for btn_text, btn_data in pagination_buttons:
         nav_kb.button(text=btn_text, callback_data=btn_data)
-    
+
     # Back button
-    nav_kb.button(text="🔙 Назад" if lang == "ru" else "🔙 Orqaga", callback_data="back_to_offers_menu")
-    
+    nav_kb.button(
+        text="🔙 Назад" if lang == "ru" else "🔙 Orqaga", callback_data="back_to_offers_menu"
+    )
+
     # Adjust: items (2 per row), then pagination (3), then back (1)
     nav_kb.adjust(2, 2, len(pagination_buttons), 1)
 
     await callback.answer()
-    
+
     try:
         await callback.message.edit_text(text, parse_mode="HTML", reply_markup=nav_kb.as_markup())
     except Exception:
@@ -235,7 +236,7 @@ async def search_my_offers_start(callback: types.CallbackQuery, state: FSMContex
     """Start search for seller's offers."""
     db = get_db()
     lang = db.get_user_language(callback.from_user.id)
-    
+
     await state.set_state(EditOffer.search_query)
     await callback.answer()
     await callback.message.answer(
@@ -250,7 +251,7 @@ async def search_my_offers_process(message: types.Message, state: FSMContext) ->
     db = get_db()
     lang = db.get_user_language(message.from_user.id)
     query = (message.text or "").strip().lower()
-    
+
     # Check for cancel
     if "отмена" in query or "bekor" in query or query.startswith("/"):
         await state.clear()
@@ -259,59 +260,59 @@ async def search_my_offers_process(message: types.Message, state: FSMContext) ->
             reply_markup=main_menu_seller(lang),
         )
         return
-    
+
     if len(query) < 2:
-        await message.answer(
-            "❌ " + ("Минимум 2 символа" if lang == "ru" else "Kamida 2 ta belgi")
-        )
+        await message.answer("❌ " + ("Минимум 2 символа" if lang == "ru" else "Kamida 2 ta belgi"))
         return
-    
+
     await state.clear()
-    
+
     stores = db.get_user_accessible_stores(message.from_user.id)
     all_offers = []
     for store in stores:
         store_id = get_store_field(store, "store_id")
         offers = db.get_store_offers(store_id)
         all_offers.extend(offers)
-    
+
     # Search
     results = []
     for offer in all_offers:
         title = get_offer_field(offer, "title", "").lower()
         if query in title:
             results.append(offer)
-    
+
     if not results:
         await message.answer(
             f"🔍 {'Ничего не найдено по запросу' if lang == 'ru' else 'Topilmadi'}: <b>{query}</b>",
             parse_mode="HTML",
         )
         return
-    
+
     # Show results
     text = f"🔍 {'Результаты поиска' if lang == 'ru' else 'Qidiruv natijalari'}: <b>{query}</b>\n"
     text += f"{'Найдено' if lang == 'ru' else 'Topildi'}: {len(results)}\n\n"
-    
+
     nav_kb = InlineKeyboardBuilder()
-    
+
     for offer in results[:10]:
         offer_id = get_offer_field(offer, "offer_id")
         offer_title = get_offer_field(offer, "title", "Товар")[:25]
         price = get_offer_field(offer, "discount_price", 0)
         qty = get_offer_field(offer, "quantity", 0)
         status = get_offer_field(offer, "status", "active")
-        
+
         status_icon = "✅" if status == "active" else "❌"
-        
+
         text += f"{status_icon} <b>{offer_title}</b>\n"
         text += f"   💰 {price:,} | 📦 {qty} шт\n"
-        
+
         nav_kb.button(text=f"📝 {offer_title[:15]}", callback_data=f"edit_offer_{offer_id}")
-    
-    nav_kb.button(text="🔙 Назад" if lang == "ru" else "🔙 Orqaga", callback_data="back_to_offers_menu")
+
+    nav_kb.button(
+        text="🔙 Назад" if lang == "ru" else "🔙 Orqaga", callback_data="back_to_offers_menu"
+    )
     nav_kb.adjust(2, 1)
-    
+
     await message.answer(text, parse_mode="HTML", reply_markup=nav_kb.as_markup())
 
 
@@ -545,9 +546,21 @@ async def delete_offer(callback: types.CallbackQuery) -> None:
         await callback.answer(get_text(lang, "not_your_offer"), show_alert=True)
         return
 
-    db.delete_offer(offer_id)
-    await callback.message.delete()
-    await callback.answer("🗑 Товар удалён")
+    try:
+        db.delete_offer(offer_id)
+        await callback.message.delete()
+        await callback.answer("🗑 Товар удалён")
+    except Exception as e:
+        error_msg = str(e).lower()
+        if "foreign key" in error_msg or "constraint" in error_msg or "bookings" in error_msg:
+            # There are active bookings for this offer
+            logger.warning(f"Cannot delete offer {offer_id}: has active bookings - {e}")
+            await callback.answer(
+                "❌ Невозможно удалить товар: есть активные бронирования", show_alert=True
+            )
+        else:
+            logger.error(f"Error deleting offer {offer_id}: {e}")
+            await callback.answer(get_text(lang, "error"), show_alert=True)
 
 
 @router.callback_query(F.data.startswith("edit_offer_"))
@@ -599,9 +612,7 @@ async def edit_offer(callback: types.CallbackQuery) -> None:
         text="🔄 Копировать" if lang == "ru" else "🔄 Nusxalash",
         callback_data=f"copy_offer_{offer_id}",
     )
-    kb.button(
-        text="🔙 Назад" if lang == "ru" else "🔙 Orqaga", callback_data="back_to_offers_menu"
-    )
+    kb.button(text="🔙 Назад" if lang == "ru" else "🔙 Orqaga", callback_data="back_to_offers_menu")
     kb.adjust(1)
 
     try:
