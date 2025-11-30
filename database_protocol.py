@@ -118,6 +118,10 @@ class DatabaseProtocol(Protocol):
         """Update store photo."""
         ...
 
+    def update_store_location(self, store_id: int, latitude: float, longitude: float) -> bool:
+        """Update store geolocation coordinates."""
+        ...
+
     # ========== OFFER METHODS ==========
     def add_offer(
         self,

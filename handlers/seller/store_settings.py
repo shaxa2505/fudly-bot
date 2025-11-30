@@ -22,6 +22,7 @@ class StoreSettingsStates(StatesGroup):
     """States for store settings."""
 
     waiting_photo = State()
+    waiting_location = State()
     waiting_click_merchant_id = State()
     waiting_click_service_id = State()
     waiting_click_secret_key = State()
@@ -37,7 +38,7 @@ def setup_dependencies(database: DatabaseProtocol, bot_instance: Any) -> None:
 
 
 def store_settings_keyboard(
-    store_id: int, lang: str = "ru", has_photo: bool = False
+    store_id: int, lang: str = "ru", has_photo: bool = False, has_location: bool = False
 ) -> types.InlineKeyboardMarkup:
     """Store settings keyboard."""
     builder = InlineKeyboardBuilder()
@@ -50,6 +51,13 @@ def store_settings_keyboard(
     else:
         photo_text = "📸 Добавить фото" if lang == "ru" else "📸 Rasm qo'shish"
         builder.button(text=photo_text, callback_data=f"store_change_photo_{store_id}")
+
+    # Geolocation
+    if has_location:
+        location_text = "📍 Изменить локацию" if lang == "ru" else "📍 Joylashuvni o'zgartirish"
+    else:
+        location_text = "📍 Добавить локацию" if lang == "ru" else "📍 Joylashuv qo'shish"
+    builder.button(text=location_text, callback_data=f"store_set_location_{store_id}")
 
     # Payment integrations
     payment_text = "💳 Онлайн оплата" if lang == "ru" else "💳 Onlayn to'lov"
@@ -87,15 +95,18 @@ async def show_store_settings(callback: types.CallbackQuery) -> None:
     store_id = store.get("store_id")
     store_name = store.get("name", "Магазин")
     has_photo = bool(store.get("photo"))
+    has_location = bool(store.get("latitude") and store.get("longitude"))
 
     text = (
         f"⚙️ <b>Настройки магазина</b>\n\n"
         f"🏪 <b>{store_name}</b>\n\n"
-        f"📸 Фото: {'✅ Загружено' if has_photo else '❌ Не загружено'}"
+        f"📸 Фото: {'✅ Загружено' if has_photo else '❌ Не загружено'}\n"
+        f"📍 Геолокация: {'✅ Установлена' if has_location else '❌ Не установлена'}"
         if lang == "ru"
         else f"⚙️ <b>Do'kon sozlamalari</b>\n\n"
         f"🏪 <b>{store_name}</b>\n\n"
-        f"📸 Rasm: {'✅ Yuklangan' if has_photo else '❌ Yuklanmagan'}"
+        f"📸 Rasm: {'✅ Yuklangan' if has_photo else '❌ Yuklanmagan'}\n"
+        f"📍 Geolokatsiya: {'✅ O\'rnatilgan' if has_location else '❌ O\'rnatilmagan'}"
     )
 
     # Show current photo if exists
@@ -110,27 +121,27 @@ async def show_store_settings(callback: types.CallbackQuery) -> None:
                 photo=store.get("photo"),
                 caption=text,
                 parse_mode="HTML",
-                reply_markup=store_settings_keyboard(store_id, lang, has_photo),
+                reply_markup=store_settings_keyboard(store_id, lang, has_photo, has_location),
             )
         except Exception:
             await bot.send_message(
                 callback.from_user.id,
                 text,
                 parse_mode="HTML",
-                reply_markup=store_settings_keyboard(store_id, lang, has_photo),
+                reply_markup=store_settings_keyboard(store_id, lang, has_photo, has_location),
             )
     else:
         try:
             await callback.message.edit_text(
                 text,
                 parse_mode="HTML",
-                reply_markup=store_settings_keyboard(store_id, lang, has_photo),
+                reply_markup=store_settings_keyboard(store_id, lang, has_photo, has_location),
             )
         except Exception:
             await callback.message.answer(
                 text,
                 parse_mode="HTML",
-                reply_markup=store_settings_keyboard(store_id, lang, has_photo),
+                reply_markup=store_settings_keyboard(store_id, lang, has_photo, has_location),
             )
 
     await callback.answer()
@@ -253,22 +264,25 @@ async def cancel_photo_upload(callback: types.CallbackQuery, state: FSMContext) 
         store_id = store.get("store_id")
         store_name = store.get("name", "Магазин")
         has_photo = bool(store.get("photo"))
+        has_location = bool(store.get("latitude") and store.get("longitude"))
 
         text = (
             f"⚙️ <b>Настройки магазина</b>\n\n"
             f"🏪 <b>{store_name}</b>\n\n"
-            f"📸 Фото: {'✅ Загружено' if has_photo else '❌ Не загружено'}"
+            f"📸 Фото: {'✅ Загружено' if has_photo else '❌ Не загружено'}\n"
+            f"📍 Геолокация: {'✅ Установлена' if has_location else '❌ Не установлена'}"
             if lang == "ru"
             else f"⚙️ <b>Do'kon sozlamalari</b>\n\n"
             f"🏪 <b>{store_name}</b>\n\n"
-            f"📸 Rasm: {'✅ Yuklangan' if has_photo else '❌ Yuklanmagan'}"
+            f"📸 Rasm: {'✅ Yuklangan' if has_photo else '❌ Yuklanmagan'}\n"
+            f"📍 Geolokatsiya: {'✅ Ornatilgan' if has_location else '❌ Ornatilmagan'}"
         )
 
         try:
             await callback.message.edit_text(
                 text,
                 parse_mode="HTML",
-                reply_markup=store_settings_keyboard(store_id, lang, has_photo),
+                reply_markup=store_settings_keyboard(store_id, lang, has_photo, has_location),
             )
         except Exception:
             pass
@@ -298,16 +312,19 @@ async def remove_store_photo(callback: types.CallbackQuery) -> None:
         if active_stores:
             store = active_stores[0]
             store_name = store.get("name", "Магазин")
+            has_location = bool(store.get("latitude") and store.get("longitude"))
 
             text = (
                 f"⚙️ <b>Настройки магазина</b>\n\n"
                 f"🏪 <b>{store_name}</b>\n\n"
-                f"📸 Фото: ❌ Не загружено\n\n"
+                f"📸 Фото: ❌ Не загружено\n"
+                f"📍 Геолокация: {'✅ Установлена' if has_location else '❌ Не установлена'}\n\n"
                 f"✅ Фото удалено"
                 if lang == "ru"
                 else f"⚙️ <b>Do'kon sozlamalari</b>\n\n"
                 f"🏪 <b>{store_name}</b>\n\n"
-                f"📸 Rasm: ❌ Yuklanmagan\n\n"
+                f"📸 Rasm: ❌ Yuklanmagan\n"
+                f"📍 Geolokatsiya: {'✅ Ornatilgan' if has_location else '❌ Ornatilmagan'}\n\n"
                 f"✅ Rasm o'chirildi"
             )
 
@@ -320,7 +337,7 @@ async def remove_store_photo(callback: types.CallbackQuery) -> None:
                 callback.from_user.id,
                 text,
                 parse_mode="HTML",
-                reply_markup=store_settings_keyboard(store_id, lang, False),
+                reply_markup=store_settings_keyboard(store_id, lang, False, has_location),
             )
 
         await callback.answer("✅ Фото удалено" if lang == "ru" else "✅ Rasm o'chirildi")
@@ -353,6 +370,157 @@ async def back_from_settings(callback: types.CallbackQuery) -> None:
         "🏠 Главное меню" if lang == "ru" else "🏠 Asosiy menyu",
         reply_markup=main_menu_seller(lang),
     )
+
+    await callback.answer()
+
+
+# ===================== GEOLOCATION SETTINGS =====================
+
+
+@router.callback_query(F.data.startswith("store_location_setup_"))
+async def setup_store_location(callback: types.CallbackQuery, state: FSMContext) -> None:
+    """Start store location setup - request user to send location."""
+    if not db:
+        await callback.answer("System error", show_alert=True)
+        return
+
+    assert callback.from_user is not None
+    assert callback.data is not None
+    lang = db.get_user_language(callback.from_user.id)
+
+    store_id = int(callback.data.replace("store_location_setup_", ""))
+
+    # Save store_id to state
+    await state.update_data(store_id=store_id)
+    await state.set_state(StoreSettingsStates.waiting_location)
+
+    text = (
+        "📍 <b>Установка геолокации магазина</b>\n\n"
+        "Отправьте геолокацию вашего магазина.\n\n"
+        "Вы можете:\n"
+        "• Отправить свою текущую геолокацию (кнопка 📎 → Геолокация)\n"
+        "• Выбрать точку на карте"
+        if lang == "ru"
+        else "📍 <b>Do'kon geolokatsiyasini o'rnatish</b>\n\n"
+        "Do'koningiz joylashuvini yuboring.\n\n"
+        "Siz:\n"
+        "• Hozirgi joylashuvingizni yuborishingiz mumkin (📎 → Joylashuv)\n"
+        "• Xaritadan nuqta tanlashingiz mumkin"
+    )
+
+    cancel_kb = InlineKeyboardBuilder()
+    cancel_kb.button(
+        text="❌ Отмена" if lang == "ru" else "❌ Bekor qilish",
+        callback_data="store_location_cancel",
+    )
+
+    try:
+        await callback.message.edit_text(text, parse_mode="HTML", reply_markup=cancel_kb.as_markup())
+    except Exception:
+        await callback.message.answer(text, parse_mode="HTML", reply_markup=cancel_kb.as_markup())
+
+    await callback.answer()
+
+
+@router.message(StoreSettingsStates.waiting_location, F.location)
+async def handle_store_location(message: types.Message, state: FSMContext) -> None:
+    """Handle store location message."""
+    if not db:
+        await message.answer("System error")
+        return
+
+    assert message.from_user is not None
+    assert message.location is not None
+    lang = db.get_user_language(message.from_user.id)
+
+    data = await state.get_data()
+    store_id = data.get("store_id")
+
+    if not store_id:
+        await state.clear()
+        await message.answer("Error: store not found")
+        return
+
+    latitude = message.location.latitude
+    longitude = message.location.longitude
+
+    # Update store location
+    try:
+        db.update_store_location(store_id, latitude, longitude)
+
+        await state.clear()
+
+        success_text = (
+            f"✅ <b>Геолокация магазина установлена!</b>\n\n"
+            f"📍 Координаты: {latitude:.6f}, {longitude:.6f}\n\n"
+            f"Теперь ваш магазин будет отображаться на карте."
+            if lang == "ru"
+            else f"✅ <b>Do'kon geolokatsiyasi o'rnatildi!</b>\n\n"
+            f"📍 Koordinatalar: {latitude:.6f}, {longitude:.6f}\n\n"
+            f"Endi do'koningiz xaritada ko'rinadi."
+        )
+
+        # Show back button
+        back_kb = InlineKeyboardBuilder()
+        back_kb.button(
+            text="⚙️ Настройки магазина" if lang == "ru" else "⚙️ Do'kon sozlamalari",
+            callback_data="my_store_settings",
+        )
+
+        await message.answer(success_text, parse_mode="HTML", reply_markup=back_kb.as_markup())
+
+        logger.info(f"Store {store_id} location updated to ({latitude}, {longitude}) by user {message.from_user.id}")
+
+    except Exception as e:
+        logger.error(f"Failed to update store location: {e}")
+        await message.answer(
+            "❌ Ошибка при сохранении геолокации" if lang == "ru" else "❌ Geolokatsiyani saqlashda xatolik"
+        )
+
+
+@router.callback_query(F.data == "store_location_cancel")
+async def cancel_location_setup(callback: types.CallbackQuery, state: FSMContext) -> None:
+    """Cancel location setup."""
+    await state.clear()
+
+    if not db:
+        await callback.answer("Cancelled")
+        return
+
+    assert callback.from_user is not None
+    lang = db.get_user_language(callback.from_user.id)
+
+    # Return to store settings
+    stores = db.get_user_stores(callback.from_user.id)
+    active_stores = [s for s in stores if s.get("status") in ("active", "approved")]
+
+    if active_stores:
+        store = active_stores[0]
+        store_id = store.get("store_id")
+        store_name = store.get("name", "Магазин")
+        has_photo = bool(store.get("photo"))
+        has_location = bool(store.get("latitude") and store.get("longitude"))
+
+        text = (
+            f"⚙️ <b>Настройки магазина</b>\n\n"
+            f"🏪 <b>{store_name}</b>\n\n"
+            f"📸 Фото: {'✅ Загружено' if has_photo else '❌ Не загружено'}\n"
+            f"📍 Геолокация: {'✅ Установлена' if has_location else '❌ Не установлена'}"
+            if lang == "ru"
+            else f"⚙️ <b>Do'kon sozlamalari</b>\n\n"
+            f"🏪 <b>{store_name}</b>\n\n"
+            f"📸 Rasm: {'✅ Yuklangan' if has_photo else '❌ Yuklanmagan'}\n"
+            f"📍 Geolokatsiya: {'✅ Ornatilgan' if has_location else '❌ Ornatilmagan'}"
+        )
+
+        try:
+            await callback.message.edit_text(
+                text,
+                parse_mode="HTML",
+                reply_markup=store_settings_keyboard(store_id, lang, has_photo, has_location),
+            )
+        except Exception:
+            pass
 
     await callback.answer()
 

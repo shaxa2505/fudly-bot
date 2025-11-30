@@ -314,6 +314,17 @@ class StoreMixin:
             logger.info(f"Store {store_id} photo updated")
             return True
 
+    def update_store_location(self, store_id: int, latitude: float, longitude: float) -> bool:
+        """Update store geolocation coordinates."""
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                "UPDATE stores SET latitude = %s, longitude = %s WHERE store_id = %s",
+                (latitude, longitude, store_id),
+            )
+            logger.info(f"Store {store_id} location updated to ({latitude}, {longitude})")
+            return True
+
     def get_store_analytics(self, store_id: int) -> dict:
         """Get store analytics."""
         with self.get_connection() as conn:
