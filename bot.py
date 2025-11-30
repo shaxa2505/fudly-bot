@@ -559,12 +559,24 @@ async def on_startup() -> None:
     if USE_WEBHOOK:
         webhook_url = f"{WEBHOOK_URL}{WEBHOOK_PATH}"
         try:
+            # Include all update types we handle, especially pre_checkout_query for payments
+            allowed_updates = [
+                "message",
+                "edited_message",
+                "callback_query",
+                "inline_query",
+                "chosen_inline_result",
+                "pre_checkout_query",  # Critical for Telegram Payments!
+                "successful_payment",
+                "shipping_query",
+            ]
             await bot.set_webhook(
                 url=webhook_url,
                 drop_pending_updates=True,
                 secret_token=SECRET_TOKEN or None,
+                allowed_updates=allowed_updates,
             )
-            logger.info(f"✅ Webhook set: {webhook_url}")
+            logger.info(f"✅ Webhook set: {webhook_url} (allowed_updates: {allowed_updates})")
         except Exception as e:
             logger.error(f"Failed to set webhook: {e}")
     else:
