@@ -429,7 +429,7 @@ async def order_delivery_address(
 
 
 @router.callback_query(F.data == "pay_method_click", OrderDelivery.payment_method_select)
-async def handle_click_payment(callback: types.CallbackQuery, state: FSMContext) -> None:
+async def handle_click_payment(callback: types.CallbackQuery, state: FSMContext, db: DatabaseProtocol) -> None:
     """Handle Click payment selection - send Telegram invoice."""
     await callback.answer()
     
@@ -500,7 +500,7 @@ async def handle_click_payment(callback: types.CallbackQuery, state: FSMContext)
             )
             await state.update_data(payment_method="card")
             await state.set_state(OrderDelivery.payment_proof)
-            await _show_card_payment(callback.message, state, lang)
+            await _show_card_payment(callback.message, state, lang, db)
             
     except Exception as e:
         logger.error(f"Error sending Click invoice: {e}")
@@ -509,11 +509,11 @@ async def handle_click_payment(callback: types.CallbackQuery, state: FSMContext)
         )
         await state.update_data(payment_method="card") 
         await state.set_state(OrderDelivery.payment_proof)
-        await _show_card_payment(callback.message, state, lang)
+        await _show_card_payment(callback.message, state, lang, db)
 
 
 @router.callback_query(F.data == "pay_method_card", OrderDelivery.payment_method_select)
-async def handle_card_payment(callback: types.CallbackQuery, state: FSMContext) -> None:
+async def handle_card_payment(callback: types.CallbackQuery, state: FSMContext, db: DatabaseProtocol) -> None:
     """Handle card payment selection - show card details."""
     await callback.answer()
     
@@ -523,10 +523,10 @@ async def handle_card_payment(callback: types.CallbackQuery, state: FSMContext) 
     await state.set_state(OrderDelivery.payment_proof)
     
     await callback.message.delete()
-    await _show_card_payment(callback.message, state, lang)
+    await _show_card_payment(callback.message, state, lang, db)
 
 
-async def _show_card_payment(message: types.Message, state: FSMContext, lang: str) -> None:
+async def _show_card_payment(message: types.Message, state: FSMContext, lang: str, db: DatabaseProtocol) -> None:
     """Show card payment details."""
     data = await state.get_data()
     store_id = data.get("store_id")
