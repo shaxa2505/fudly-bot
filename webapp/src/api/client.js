@@ -116,6 +116,16 @@ const api = {
     return data || []
   },
 
+  async getStoreReviews(storeId) {
+    try {
+      const { data } = await client.get(`/stores/${storeId}/reviews`)
+      return data
+    } catch (error) {
+      console.warn('getStoreReviews error:', error)
+      return { reviews: [], average_rating: 0, total_reviews: 0 }
+    }
+  },
+
   // Offers endpoints
   async getOffers(params) {
     const { data } = await client.get('/offers', { params })

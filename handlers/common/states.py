@@ -190,6 +190,18 @@ class ConfirmOrder(StatesGroup):
     confirmation = State()  # Confirm completion
 
 
+class RateBooking(StatesGroup):
+    """
+    Booking rating flow.
+
+    Flow: Rate (1-5 stars) → [optional text review] → done
+    """
+
+    booking_id = State()  # Booking being rated
+    rating = State()  # Star rating (1-5)
+    review_text = State()  # Optional text review
+
+
 class CourierHandover(StatesGroup):
     """
     Courier handover flow (seller → courier).

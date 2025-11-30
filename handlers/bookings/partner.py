@@ -5,9 +5,11 @@ import html
 from typing import Any
 
 from aiogram import F, Router, types
+from aiogram.fsm.context import FSMContext
 from aiogram.types import BufferedInputFile
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
+from handlers.common.states import RateBooking
 from localization import get_text
 from logging_config import logger
 
@@ -420,8 +422,8 @@ async def partner_cancel_booking(callback: types.CallbackQuery) -> None:
 
 
 @router.callback_query(F.data.regexp(r"^rate_booking_\d+_\d+$"))
-async def rate_booking(callback: types.CallbackQuery) -> None:
-    """Customer rates a completed booking."""
+async def rate_booking(callback: types.CallbackQuery, state: FSMContext) -> None:
+    """Customer rates a completed booking - ask for optional text review."""
     if not db:
         await callback.answer("System error", show_alert=True)
         return
@@ -451,7 +453,117 @@ async def rate_booking(callback: types.CallbackQuery) -> None:
         await callback.answer(get_text(lang, "error"), show_alert=True)
         return
 
-    # Save rating
+    # Save rating and ask for text review
+    await state.update_data(booking_id=booking_id, rating=rating)
+    await state.set_state(RateBooking.review_text)
+
+    await safe_edit_reply_markup(callback.message)
+
+    # Ask for optional text review
+    stars = "⭐" * rating
+    kb = InlineKeyboardBuilder()
+    if lang == "uz":
+        kb.button(text="⏭ O'tkazib yuborish", callback_data=f"skip_review_{booking_id}")
+        text = (
+            f"{stars}\n\n"
+            f"📝 Sharh qoldiring (ixtiyoriy):\n"
+            f"Mahsulot yoki xizmat haqida fikringizni yozing."
+        )
+    else:
+        kb.button(text="⏭ Пропустить", callback_data=f"skip_review_{booking_id}")
+        text = (
+            f"{stars}\n\n"
+            f"📝 Оставьте отзыв (необязательно):\n"
+            f"Напишите своё мнение о товаре или обслуживании."
+        )
+    kb.adjust(1)
+
+    await safe_answer_or_send(callback.message, user_id, text, bot=bot, reply_markup=kb.as_markup())
+    await callback.answer()
+
+
+@router.message(RateBooking.review_text)
+async def process_review_text(message: types.Message, state: FSMContext) -> None:
+    """Process the text review from customer."""
+    if not db or not bot:
+        await message.answer("System error")
+        return
+
+    user_id = message.from_user.id
+    lang = db.get_user_language(user_id)
+    review_text = (message.text or "").strip()
+
+    # Get saved data
+    data = await state.get_data()
+    booking_id = data.get("booking_id")
+    rating = data.get("rating")
+
+    if not booking_id or not rating:
+        await state.clear()
+        await message.answer(get_text(lang, "error"))
+        return
+
+    # Limit review length
+    if len(review_text) > 500:
+        review_text = review_text[:500]
+
+    # Save rating with comment
+    booking = db.get_booking(booking_id)
+    if not booking:
+        await state.clear()
+        await message.answer(get_text(lang, "booking_not_found"))
+        return
+
+    offer_id = get_booking_field(booking, "offer_id")
+    offer = db.get_offer(offer_id) if offer_id else None
+    store_id = get_offer_field(offer, "store_id") if offer else None
+
+    try:
+        db.add_rating(booking_id, user_id, store_id, rating, review_text)
+    except Exception as e:
+        logger.error(f"Failed to save rating with review: {e}")
+        await state.clear()
+        await message.answer(get_text(lang, "error"))
+        return
+
+    await state.clear()
+
+    if lang == "uz":
+        text = f"⭐ Rahmat! Siz {rating} ball va sharh qoldiringiz."
+    else:
+        text = f"⭐ Спасибо! Вы оставили {rating} {'звезду' if rating == 1 else 'звезды' if rating < 5 else 'звёзд'} и отзыв."
+
+    from app.keyboards import main_menu_customer
+    await message.answer(text, reply_markup=main_menu_customer(lang))
+
+
+@router.callback_query(F.data.regexp(r"^skip_review_\d+$"))
+async def skip_review(callback: types.CallbackQuery, state: FSMContext) -> None:
+    """Skip text review and save rating only."""
+    if not db or not bot:
+        await callback.answer("System error", show_alert=True)
+        return
+
+    user_id = callback.from_user.id
+    lang = db.get_user_language(user_id)
+
+    # Get saved data
+    data = await state.get_data()
+    booking_id = data.get("booking_id")
+    rating = data.get("rating")
+
+    if not booking_id or not rating:
+        await state.clear()
+        await callback.answer(get_text(lang, "error"), show_alert=True)
+        return
+
+    # Save rating without comment
+    booking = db.get_booking(booking_id)
+    if not booking:
+        await state.clear()
+        await callback.answer(get_text(lang, "booking_not_found"), show_alert=True)
+        return
+
     offer_id = get_booking_field(booking, "offer_id")
     offer = db.get_offer(offer_id) if offer_id else None
     store_id = get_offer_field(offer, "store_id") if offer else None
@@ -460,9 +572,11 @@ async def rate_booking(callback: types.CallbackQuery) -> None:
         db.add_rating(booking_id, user_id, store_id, rating)
     except Exception as e:
         logger.error(f"Failed to save rating: {e}")
+        await state.clear()
         await callback.answer(get_text(lang, "error"), show_alert=True)
         return
 
+    await state.clear()
     await safe_edit_reply_markup(callback.message)
 
     if lang == "uz":

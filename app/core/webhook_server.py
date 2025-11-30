@@ -993,6 +993,44 @@ async def create_webhook_app(
             logger.error(f"API clear search history error: {e}")
             return add_cors_headers(web.json_response({"error": str(e)}, status=500))
 
+    async def api_get_store_reviews(request: web.Request) -> web.Response:
+        """GET /api/v1/stores/{store_id}/reviews - Get store reviews."""
+        store_id = request.match_info.get("store_id")
+        try:
+            if not store_id:
+                return add_cors_headers(
+                    web.json_response({"error": "store_id required"}, status=400)
+                )
+
+            reviews = []
+            avg_rating = 0.0
+            total_reviews = 0
+
+            if hasattr(db, "get_store_ratings"):
+                raw_reviews = db.get_store_ratings(int(store_id))
+                for r in raw_reviews:
+                    reviews.append({
+                        "id": r.get("id") or r.get("rating_id"),
+                        "user_name": r.get("first_name", "Пользователь"),
+                        "rating": r.get("rating", 5),
+                        "comment": r.get("comment", ""),
+                        "created_at": str(r.get("created_at", "")),
+                    })
+
+            if hasattr(db, "get_store_rating_summary"):
+                avg_rating, total_reviews = db.get_store_rating_summary(int(store_id))
+
+            return add_cors_headers(
+                web.json_response({
+                    "reviews": reviews,
+                    "average_rating": avg_rating,
+                    "total_reviews": total_reviews,
+                })
+            )
+        except Exception as e:
+            logger.error(f"API get store reviews error: {e}")
+            return add_cors_headers(web.json_response({"error": str(e)}, status=500))
+
     # Register routes
     path_main = webhook_path if webhook_path.startswith("/") else f"/{webhook_path}"
     path_alt = path_main.rstrip("/") + "/"
@@ -1041,6 +1079,10 @@ async def create_webhook_app(
     app.router.add_post("/api/v1/user/search-history", api_add_search_history)
     app.router.add_get("/api/v1/user/search-history", api_get_search_history)
     app.router.add_delete("/api/v1/user/search-history", api_clear_search_history)
+
+    # Store reviews routes
+    app.router.add_options("/api/v1/stores/{store_id}/reviews", cors_preflight)
+    app.router.add_get("/api/v1/stores/{store_id}/reviews", api_get_store_reviews)
 
     # Setup WebSocket routes for real-time notifications
     setup_websocket_routes(app)

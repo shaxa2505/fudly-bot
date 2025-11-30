@@ -25,7 +25,9 @@ function StoresPage() {
   const [selectedType, setSelectedType] = useState('all')
   const [selectedStore, setSelectedStore] = useState(null)
   const [storeOffers, setStoreOffers] = useState([])
+  const [storeReviews, setStoreReviews] = useState({ reviews: [], average_rating: 0, total_reviews: 0 })
   const [loadingOffers, setLoadingOffers] = useState(false)
+  const [activeTab, setActiveTab] = useState('offers') // 'offers' or 'reviews'
 
   const location = getSavedLocation()
   const cityLatin = getLatinCity(location)
@@ -61,12 +63,18 @@ function StoresPage() {
   const loadStoreOffers = async (store) => {
     setSelectedStore(store)
     setLoadingOffers(true)
+    setActiveTab('offers')
     try {
-      const offers = await api.getStoreOffers(store.id)
+      const [offers, reviews] = await Promise.all([
+        api.getStoreOffers(store.id),
+        api.getStoreReviews(store.id)
+      ])
       setStoreOffers(offers || [])
+      setStoreReviews(reviews || { reviews: [], average_rating: 0, total_reviews: 0 })
     } catch (error) {
-      console.error('Error loading store offers:', error)
+      console.error('Error loading store data:', error)
       setStoreOffers([])
+      setStoreReviews({ reviews: [], average_rating: 0, total_reviews: 0 })
     } finally {
       setLoadingOffers(false)
     }
@@ -75,6 +83,8 @@ function StoresPage() {
   const closeModal = () => {
     setSelectedStore(null)
     setStoreOffers([])
+    setStoreReviews({ reviews: [], average_rating: 0, total_reviews: 0 })
+    setActiveTab('offers')
   }
 
   const filteredStores = stores.filter(store =>
@@ -219,8 +229,13 @@ function StoresPage() {
                 <div>
                   <h2>{selectedStore.name}</h2>
                   {selectedStore.address && <p>📍 {selectedStore.address}</p>}
-                  {selectedStore.rating > 0 && (
-                    <span className="sp-sheet-rating">⭐ {selectedStore.rating.toFixed(1)}</span>
+                  {(storeReviews.average_rating > 0 || selectedStore.rating > 0) && (
+                    <span className="sp-sheet-rating">
+                      ⭐ {(storeReviews.average_rating || selectedStore.rating).toFixed(1)}
+                      {storeReviews.total_reviews > 0 && (
+                        <span className="sp-sheet-reviews-count"> ({storeReviews.total_reviews})</span>
+                      )}
+                    </span>
                   )}
                 </div>
               </div>
@@ -231,6 +246,22 @@ function StoresPage() {
               </button>
             </div>
 
+            {/* Tabs */}
+            <div className="sp-sheet-tabs">
+              <button 
+                className={`sp-sheet-tab ${activeTab === 'offers' ? 'active' : ''}`}
+                onClick={() => setActiveTab('offers')}
+              >
+                📦 Takliflar ({storeOffers.length})
+              </button>
+              <button 
+                className={`sp-sheet-tab ${activeTab === 'reviews' ? 'active' : ''}`}
+                onClick={() => setActiveTab('reviews')}
+              >
+                ⭐ Sharhlar ({storeReviews.total_reviews})
+              </button>
+            </div>
+
             {/* Body */}
             <div className="sp-sheet-body">
               {loadingOffers ? (
@@ -238,35 +269,36 @@ function StoresPage() {
                   <div className="sp-spinner"></div>
                   <p>Yuklanmoqda...</p>
                 </div>
-              ) : storeOffers.length === 0 ? (
-                <div className="sp-sheet-empty">
-                  <span>📦</span>
-                  <p>Hozirda takliflar yo'q</p>
-                </div>
-              ) : (
-                <>
-                  <h3 className="sp-sheet-title">
-                    Mavjud takliflar
-                    <span>({storeOffers.length})</span>
-                  </h3>
-                  <div className="sp-offers">
-                    {storeOffers.map(offer => {
-                      const imgUrl = offer.image_url || offer.photo || ''
-                      // Calculate discount percent if not provided
-                      let discountPercent = 0
-                      if (offer.discount_percent) {
-                        discountPercent = Math.round(offer.discount_percent)
-                      } else if (offer.original_price && offer.discount_price && offer.original_price > offer.discount_price) {
-                        discountPercent = Math.round((1 - offer.discount_price / offer.original_price) * 100)
-                      }
+              ) : activeTab === 'offers' ? (
+                storeOffers.length === 0 ? (
+                  <div className="sp-sheet-empty">
+                    <span>📦</span>
+                    <p>Hozirda takliflar yo'q</p>
+                  </div>
+                ) : (
+                  <>
+                    <h3 className="sp-sheet-title">
+                      Mavjud takliflar
+                      <span>({storeOffers.length})</span>
+                    </h3>
+                    <div className="sp-offers">
+                      {storeOffers.map(offer => {
+                        const imgUrl = offer.image_url || offer.photo || ''
+                        // Calculate discount percent if not provided
+                        let discountPercent = 0
+                        if (offer.discount_percent) {
+                          discountPercent = Math.round(offer.discount_percent)
+                        } else if (offer.original_price && offer.discount_price && offer.original_price > offer.discount_price) {
+                          discountPercent = Math.round((1 - offer.discount_price / offer.original_price) * 100)
+                        }
 
-                      return (
-                        <div
-                          key={offer.id}
-                          className="sp-offer"
-                          onClick={() => handleOfferClick(offer)}
-                        >
-                          <div className="sp-offer-img">
+                        return (
+                          <div
+                            key={offer.id}
+                            className="sp-offer"
+                            onClick={() => handleOfferClick(offer)}
+                          >
+                            <div className="sp-offer-img">
                             {imgUrl ? (
                               <img
                                 src={imgUrl}
@@ -309,6 +341,36 @@ function StoresPage() {
                     })}
                   </div>
                 </>
+                )
+              ) : (
+                // Reviews tab
+                storeReviews.reviews.length === 0 ? (
+                  <div className="sp-sheet-empty">
+                    <span>⭐</span>
+                    <p>Hali sharhlar yo'q</p>
+                  </div>
+                ) : (
+                  <div className="sp-reviews">
+                    {storeReviews.reviews.map((review, idx) => (
+                      <div key={idx} className="sp-review">
+                        <div className="sp-review-header">
+                          <span className="sp-review-name">{review.user_name || 'Foydalanuvchi'}</span>
+                          <span className="sp-review-stars">
+                            {'⭐'.repeat(review.rating)}
+                          </span>
+                        </div>
+                        {review.comment && (
+                          <p className="sp-review-text">{review.comment}</p>
+                        )}
+                        {review.created_at && (
+                          <span className="sp-review-date">
+                            {new Date(review.created_at).toLocaleDateString('uz-UZ')}
+                          </span>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )
               )}
             </div>
 
