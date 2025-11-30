@@ -81,7 +81,7 @@ export const transliterateCity = (city) => {
  * @returns {string} Cyrillic city name for API
  */
 export const getCyrillicCity = (cityString) => {
-  if (!cityString) return 'Ташкент'
+  if (!cityString) return ''  // Empty = all cities
   const cityLatin = cityString.split(',')[0]?.trim()
   return CITY_TRANSLATIONS[cityLatin] || transliterateCity(cityLatin) || cityLatin
 }

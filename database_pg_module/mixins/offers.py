@@ -406,12 +406,15 @@ class OfferMixin:
             cursor.execute("UPDATE offers SET status = 'inactive' WHERE offer_id = %s", (offer_id,))
 
     def delete_offer(self, offer_id: int):
-        """Delete offer."""
+        """Delete offer and all related records."""
         with self.get_connection() as conn:
             cursor = conn.cursor()
+            # Delete from all tables that reference this offer
+            cursor.execute("DELETE FROM orders WHERE offer_id = %s", (offer_id,))
             cursor.execute("DELETE FROM bookings WHERE offer_id = %s", (offer_id,))
+            cursor.execute("DELETE FROM favorites WHERE offer_id = %s", (offer_id,))
             cursor.execute("DELETE FROM offers WHERE offer_id = %s", (offer_id,))
-            logger.info(f"Offer {offer_id} deleted")
+            logger.info(f"Offer {offer_id} and related records deleted")
 
     def update_offer_expiry(self, offer_id: int, new_expiry: str):
         """Update offer expiry date."""

@@ -415,7 +415,9 @@ async def setup_store_location(callback: types.CallbackQuery, state: FSMContext)
     )
 
     try:
-        await callback.message.edit_text(text, parse_mode="HTML", reply_markup=cancel_kb.as_markup())
+        await callback.message.edit_text(
+            text, parse_mode="HTML", reply_markup=cancel_kb.as_markup()
+        )
     except Exception:
         await callback.message.answer(text, parse_mode="HTML", reply_markup=cancel_kb.as_markup())
 
@@ -469,12 +471,16 @@ async def handle_store_location(message: types.Message, state: FSMContext) -> No
 
         await message.answer(success_text, parse_mode="HTML", reply_markup=back_kb.as_markup())
 
-        logger.info(f"Store {store_id} location updated to ({latitude}, {longitude}) by user {message.from_user.id}")
+        logger.info(
+            f"Store {store_id} location updated to ({latitude}, {longitude}) by user {message.from_user.id}"
+        )
 
     except Exception as e:
         logger.error(f"Failed to update store location: {e}")
         await message.answer(
-            "❌ Ошибка при сохранении геолокации" if lang == "ru" else "❌ Geolokatsiyani saqlashda xatolik"
+            "❌ Ошибка при сохранении геолокации"
+            if lang == "ru"
+            else "❌ Geolokatsiyani saqlashda xatolik"
         )
 
 

@@ -58,7 +58,7 @@ const transliterateCity = (city) => {
  * @param {number} options.limit - Items per page
  */
 export function useOffers({
-  city = 'Toshkent',
+  city = '',  // Empty = all cities by default for better UX
   category = 'all',
   searchQuery = '',
   limit = 20,

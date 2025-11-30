@@ -1,6 +1,7 @@
 """Webhook server for production deployment."""
 from __future__ import annotations
 
+import asyncio
 import os
 from datetime import datetime
 from typing import Any
@@ -393,12 +394,13 @@ async def create_webhook_app(
                 else:
                     logger.warning("db has no get_hot_offers method!")
 
-            # Convert offers with photo URLs
-            offers = []
-            for o in raw_offers:
+            # Convert offers with photo URLs (parallel loading)
+            async def load_offer_with_photo(o: Any) -> dict:
                 photo_id = get_offer_value(o, "photo_id")
                 photo_url = await get_photo_url(bot, photo_id) if photo_id else None
-                offers.append(offer_to_dict(o, photo_url))
+                return offer_to_dict(o, photo_url)
+
+            offers = await asyncio.gather(*[load_offer_with_photo(o) for o in raw_offers])
 
             logger.info(f"Returning {len(offers)} offers")
             return add_cors_headers(web.json_response(offers))
@@ -504,12 +506,13 @@ async def create_webhook_app(
                     columns = [desc[0] for desc in cursor.description]
                     raw_stores = [dict(zip(columns, row)) for row in cursor.fetchall()]
 
-            # Convert stores with photo URLs
-            stores = []
-            for s in raw_stores:
+            # Convert stores with photo URLs (parallel loading)
+            async def load_store_with_photo(s: Any) -> dict:
                 photo_id = get_offer_value(s, "photo")
                 photo_url = await get_photo_url(bot, photo_id) if photo_id else None
-                stores.append(store_to_dict(s, photo_url))
+                return store_to_dict(s, photo_url)
+
+            stores = await asyncio.gather(*[load_store_with_photo(s) for s in raw_stores])
 
             logger.info(f"API /stores: returning {len(stores)} stores")
             return add_cors_headers(web.json_response(stores))
