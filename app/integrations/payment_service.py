@@ -5,7 +5,11 @@ Supports:
 - Click (https://click.uz)
 - Payme (https://payme.uz)
 
-To enable payments, set environment variables:
+Supports both:
+- Platform-level credentials (env vars)
+- Per-store credentials (database)
+
+To enable platform payments, set environment variables:
 - CLICK_MERCHANT_ID
 - CLICK_SERVICE_ID
 - CLICK_SECRET_KEY
@@ -48,16 +52,32 @@ class PaymentStatus(Enum):
     REFUNDED = "refunded"
 
 
+class StorePaymentCredentials:
+    """Payment credentials for a specific store."""
+
+    def __init__(
+        self,
+        provider: str,
+        merchant_id: str,
+        secret_key: str,
+        service_id: str | None = None,
+    ):
+        self.provider = provider
+        self.merchant_id = merchant_id
+        self.secret_key = secret_key
+        self.service_id = service_id  # Only for Click
+
+
 class PaymentService:
     """Service for handling online payments."""
 
     def __init__(self):
-        # Click credentials
+        # Platform-level Click credentials (fallback)
         self.click_merchant_id = os.getenv("CLICK_MERCHANT_ID")
         self.click_service_id = os.getenv("CLICK_SERVICE_ID")
         self.click_secret_key = os.getenv("CLICK_SECRET_KEY")
 
-        # Payme credentials
+        # Platform-level Payme credentials (fallback)
         self.payme_merchant_id = os.getenv("PAYME_MERCHANT_ID")
         self.payme_secret_key = os.getenv("PAYME_SECRET_KEY")
 
@@ -65,29 +85,107 @@ class PaymentService:
         self.click_api_url = "https://api.click.uz/v2/merchant"
         self.payme_checkout_url = "https://checkout.paycom.uz"
 
+        # Database reference (set later)
+        self._db = None
+
+    def set_database(self, db):
+        """Set database reference for store-level credentials."""
+        self._db = db
+
     @property
     def click_enabled(self) -> bool:
-        """Check if Click integration is configured."""
+        """Check if platform-level Click integration is configured."""
         return all([self.click_merchant_id, self.click_service_id, self.click_secret_key])
 
     @property
     def payme_enabled(self) -> bool:
-        """Check if Payme integration is configured."""
+        """Check if platform-level Payme integration is configured."""
         return all([self.payme_merchant_id, self.payme_secret_key])
 
-    def get_available_providers(self) -> list[str]:
+    def get_store_credentials(
+        self, store_id: int | None, provider: str
+    ) -> StorePaymentCredentials | None:
+        """Get payment credentials for a specific store."""
+        if not self._db or not store_id:
+            return None
+
+        try:
+            integration = self._db.get_store_payment_integration(store_id, provider)
+            if integration:
+                return StorePaymentCredentials(
+                    provider=integration["provider"],
+                    merchant_id=integration["merchant_id"],
+                    secret_key=integration["secret_key"],
+                    service_id=integration.get("service_id"),
+                )
+        except Exception as e:
+            logger.error(f"Error getting store credentials: {e}")
+
+        return None
+
+    def get_available_providers(self, store_id: int = None) -> list[str]:
         """Get list of available payment providers."""
         providers = ["card"]  # Card is always available
-        if self.click_enabled:
+
+        # Check store-specific providers first
+        if store_id and self._db:
+            try:
+                integrations = self._db.get_store_payment_integrations(store_id)
+                for integration in integrations:
+                    if integration["provider"] not in providers:
+                        providers.append(integration["provider"])
+            except Exception as e:
+                logger.error(f"Error checking store providers: {e}")
+
+        # Fallback to platform providers
+        if self.click_enabled and "click" not in providers:
             providers.append("click")
-        if self.payme_enabled:
+        if self.payme_enabled and "payme" not in providers:
             providers.append("payme")
+
         return providers
+
+    def get_available_providers_for_store(self, store_id: int) -> list[dict]:
+        """Get detailed info about available providers for a store."""
+        result = [{"provider": "card", "name": "Karta orqali", "is_store_level": False}]
+
+        if self._db:
+            try:
+                integrations = self._db.get_store_payment_integrations(store_id)
+                for integration in integrations:
+                    result.append(
+                        {
+                            "provider": integration["provider"],
+                            "name": "Click" if integration["provider"] == "click" else "Payme",
+                            "is_store_level": True,
+                            "merchant_id": integration["merchant_id"][:8] + "...",  # Masked
+                        }
+                    )
+            except Exception as e:
+                logger.error(f"Error checking store providers: {e}")
+
+        # Add platform providers if store doesn't have own
+        store_providers = [p["provider"] for p in result]
+        if self.click_enabled and "click" not in store_providers:
+            result.append(
+                {"provider": "click", "name": "Click (platform)", "is_store_level": False}
+            )
+        if self.payme_enabled and "payme" not in store_providers:
+            result.append(
+                {"provider": "payme", "name": "Payme (platform)", "is_store_level": False}
+            )
+
+        return result
 
     # ===================== CLICK INTEGRATION =====================
 
     def generate_click_url(
-        self, order_id: int, amount: int, return_url: str = None, user_id: int = None
+        self,
+        order_id: int,
+        amount: int,
+        return_url: str | None = None,
+        user_id: int | None = None,
+        store_id: int | None = None,
     ) -> str:
         """
         Generate Click payment URL.
@@ -97,16 +195,25 @@ class PaymentService:
             amount: Amount in UZS (tiyins will be added)
             return_url: URL to redirect after payment
             user_id: Telegram user ID for tracking
+            store_id: Store ID to use store-specific credentials
 
         Returns:
             Click payment URL
         """
-        if not self.click_enabled:
+        # Try store credentials first
+        creds = None
+        if store_id:
+            creds = self.get_store_credentials(store_id, "click")
+
+        merchant_id = creds.merchant_id if creds else self.click_merchant_id
+        service_id = creds.service_id if creds else self.click_service_id
+
+        if not merchant_id or not service_id:
             raise ValueError("Click integration not configured")
 
         params = {
-            "merchant_id": self.click_merchant_id,
-            "service_id": self.click_service_id,
+            "merchant_id": merchant_id,
+            "service_id": service_id,
             "amount": str(amount),
             "transaction_param": str(order_id),
         }
@@ -128,17 +235,28 @@ class PaymentService:
         action: str,
         sign_time: str,
         sign_string: str,
+        store_id: int = None,
     ) -> bool:
         """
         Verify Click callback signature.
 
         Returns True if signature is valid.
         """
-        if not self.click_enabled:
+        # Try store credentials first
+        secret_key = None
+        if store_id:
+            creds = self.get_store_credentials(store_id, "click")
+            if creds:
+                secret_key = creds.secret_key
+
+        if not secret_key:
+            secret_key = self.click_secret_key
+
+        if not secret_key:
             return False
 
         # Generate expected signature
-        data = f"{click_trans_id}{service_id}{self.click_secret_key}{merchant_trans_id}{amount}{action}{sign_time}"
+        data = f"{click_trans_id}{service_id}{secret_key}{merchant_trans_id}{amount}{action}{sign_time}"
         expected_sign = hashlib.md5(data.encode()).hexdigest()
 
         return expected_sign == sign_string
@@ -231,7 +349,13 @@ class PaymentService:
 
     # ===================== PAYME INTEGRATION =====================
 
-    def generate_payme_url(self, order_id: int, amount: int, return_url: str = None) -> str:
+    def generate_payme_url(
+        self,
+        order_id: int,
+        amount: int,
+        return_url: str | None = None,
+        store_id: int | None = None,
+    ) -> str:
         """
         Generate Payme checkout URL.
 
@@ -239,23 +363,28 @@ class PaymentService:
             order_id: Unique order/booking ID
             amount: Amount in UZS (will be converted to tiyins)
             return_url: URL to redirect after payment
+            store_id: Store ID to use store-specific credentials
 
         Returns:
             Payme checkout URL
         """
-        if not self.payme_enabled:
-            raise ValueError("Payme integration not configured")
-
         import base64
+
+        # Try store credentials first
+        creds = None
+        if store_id:
+            creds = self.get_store_credentials(store_id, "payme")
+
+        merchant_id = creds.merchant_id if creds else self.payme_merchant_id
+
+        if not merchant_id:
+            raise ValueError("Payme integration not configured")
 
         # Payme requires amount in tiyins (1 UZS = 100 tiyin)
         amount_tiyin = amount * 100
 
-        # Create account object
-        account = {"order_id": str(order_id)}
-
         # Build params
-        params = f"m={self.payme_merchant_id};ac.order_id={order_id};a={amount_tiyin}"
+        params = f"m={merchant_id};ac.order_id={order_id};a={amount_tiyin}"
 
         if return_url:
             params += f";c={return_url}"
@@ -265,13 +394,13 @@ class PaymentService:
 
         return f"{self.payme_checkout_url}/{encoded}"
 
-    def verify_payme_signature(self, auth_header: str) -> bool:
+    def verify_payme_signature(self, auth_header: str, store_id: int = None) -> bool:
         """
         Verify Payme Authorization header.
 
         Returns True if signature is valid.
         """
-        if not self.payme_enabled or not auth_header:
+        if not auth_header:
             return False
 
         import base64
@@ -285,6 +414,13 @@ class PaymentService:
             decoded = base64.b64decode(encoded).decode()
             merchant_id, secret_key = decoded.split(":")
 
+            # Try store credentials first
+            if store_id:
+                creds = self.get_store_credentials(store_id, "payme")
+                if creds:
+                    return merchant_id == creds.merchant_id and secret_key == creds.secret_key
+
+            # Fallback to platform credentials
             return merchant_id == self.payme_merchant_id and secret_key == self.payme_secret_key
         except Exception:
             return False
@@ -329,7 +465,9 @@ class PaymentService:
         amount = params.get("amount", 0)
 
         # Here you would create transaction in database
-        logger.info(f"Payme transaction created: {transaction_id} for order {order_id}, amount: {amount}")
+        logger.info(
+            f"Payme transaction created: {transaction_id} for order {order_id}, amount: {amount}"
+        )
 
         return {
             "result": {

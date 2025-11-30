@@ -387,3 +387,92 @@ class StoreMixin:
                 "avg_rating": rating[0] or 0,
                 "rating_count": rating[1] or 0,
             }
+
+    # Payment integration methods
+    def get_store_payment_integrations(self, store_id: int) -> list[dict]:
+        """Get all payment integrations for a store."""
+        with self.get_connection() as conn:
+            cursor = conn.cursor(row_factory=dict_row)
+            cursor.execute(
+                """
+                SELECT * FROM store_payment_integrations
+                WHERE store_id = %s AND is_active = 1
+                ORDER BY provider
+            """,
+                (store_id,),
+            )
+            return [dict(row) for row in cursor.fetchall()]
+
+    def get_store_payment_integration(self, store_id: int, provider: str) -> dict | None:
+        """Get specific payment integration for a store."""
+        with self.get_connection() as conn:
+            cursor = conn.cursor(row_factory=dict_row)
+            cursor.execute(
+                """
+                SELECT * FROM store_payment_integrations
+                WHERE store_id = %s AND provider = %s AND is_active = 1
+            """,
+                (store_id, provider),
+            )
+            result = cursor.fetchone()
+            return dict(result) if result else None
+
+    def set_store_payment_integration(
+        self,
+        store_id: int,
+        provider: str,
+        merchant_id: str,
+        secret_key: str,
+        service_id: str | None = None,
+    ) -> bool:
+        """Set or update payment integration for a store."""
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                """
+                INSERT INTO store_payment_integrations
+                    (store_id, provider, merchant_id, service_id, secret_key, is_active, updated_at)
+                VALUES (%s, %s, %s, %s, %s, 1, CURRENT_TIMESTAMP)
+                ON CONFLICT (store_id, provider)
+                DO UPDATE SET
+                    merchant_id = EXCLUDED.merchant_id,
+                    service_id = EXCLUDED.service_id,
+                    secret_key = EXCLUDED.secret_key,
+                    is_active = 1,
+                    updated_at = CURRENT_TIMESTAMP
+            """,
+                (store_id, provider, merchant_id, service_id, secret_key),
+            )
+            logger.info(f"Payment integration {provider} set for store {store_id}")
+            return True
+
+    def disable_store_payment_integration(self, store_id: int, provider: str) -> bool:
+        """Disable payment integration for a store."""
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                """
+                UPDATE store_payment_integrations
+                SET is_active = 0, updated_at = CURRENT_TIMESTAMP
+                WHERE store_id = %s AND provider = %s
+            """,
+                (store_id, provider),
+            )
+            logger.info(f"Payment integration {provider} disabled for store {store_id}")
+            return True
+
+    def get_stores_with_payment_provider(self, provider: str) -> list[dict]:
+        """Get all stores that have a specific payment provider enabled."""
+        with self.get_connection() as conn:
+            cursor = conn.cursor(row_factory=dict_row)
+            cursor.execute(
+                """
+                SELECT s.*, spi.merchant_id, spi.service_id
+                FROM stores s
+                JOIN store_payment_integrations spi ON s.store_id = spi.store_id
+                WHERE spi.provider = %s AND spi.is_active = 1
+                AND (s.status = 'active' OR s.status = 'approved')
+            """,
+                (provider,),
+            )
+            return [dict(row) for row in cursor.fetchall()]

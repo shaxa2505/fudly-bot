@@ -22,6 +22,11 @@ class StoreSettingsStates(StatesGroup):
     """States for store settings."""
 
     waiting_photo = State()
+    waiting_click_merchant_id = State()
+    waiting_click_service_id = State()
+    waiting_click_secret_key = State()
+    waiting_payme_merchant_id = State()
+    waiting_payme_secret_key = State()
 
 
 def setup_dependencies(database: DatabaseProtocol, bot_instance: Any) -> None:
@@ -45,6 +50,10 @@ def store_settings_keyboard(
     else:
         photo_text = "📸 Добавить фото" if lang == "ru" else "📸 Rasm qo'shish"
         builder.button(text=photo_text, callback_data=f"store_change_photo_{store_id}")
+
+    # Payment integrations
+    payment_text = "💳 Онлайн оплата" if lang == "ru" else "💳 Onlayn to'lov"
+    builder.button(text=payment_text, callback_data=f"store_payment_settings_{store_id}")
 
     back_text = "◀️ Назад" if lang == "ru" else "◀️ Orqaga"
     builder.button(text=back_text, callback_data="store_settings_back")
@@ -346,3 +355,601 @@ async def back_from_settings(callback: types.CallbackQuery) -> None:
     )
 
     await callback.answer()
+
+
+# ===================== PAYMENT INTEGRATION SETTINGS =====================
+
+
+def payment_settings_keyboard(
+    store_id: int, lang: str = "ru", integrations: list = None
+) -> types.InlineKeyboardMarkup:
+    """Payment settings keyboard."""
+    builder = InlineKeyboardBuilder()
+    integrations = integrations or []
+
+    # Check which integrations are configured
+    click_configured = any(i.get("provider") == "click" for i in integrations)
+    payme_configured = any(i.get("provider") == "payme" for i in integrations)
+
+    if click_configured:
+        click_text = "✅ Click (настроен)" if lang == "ru" else "✅ Click (sozlangan)"
+        builder.button(text=click_text, callback_data=f"store_click_view_{store_id}")
+    else:
+        click_text = "➕ Подключить Click" if lang == "ru" else "➕ Click ulash"
+        builder.button(text=click_text, callback_data=f"store_click_setup_{store_id}")
+
+    if payme_configured:
+        payme_text = "✅ Payme (настроен)" if lang == "ru" else "✅ Payme (sozlangan)"
+        builder.button(text=payme_text, callback_data=f"store_payme_view_{store_id}")
+    else:
+        payme_text = "➕ Подключить Payme" if lang == "ru" else "➕ Payme ulash"
+        builder.button(text=payme_text, callback_data=f"store_payme_setup_{store_id}")
+
+    back_text = "◀️ Назад" if lang == "ru" else "◀️ Orqaga"
+    builder.button(text=back_text, callback_data="my_store_settings")
+
+    builder.adjust(1)
+    return builder.as_markup()
+
+
+@router.callback_query(F.data.startswith("store_payment_settings_"))
+async def show_payment_settings(callback: types.CallbackQuery) -> None:
+    """Show payment integration settings."""
+    if not db:
+        await callback.answer("System error", show_alert=True)
+        return
+
+    assert callback.from_user is not None
+    lang = db.get_user_language(callback.from_user.id)
+
+    store_id = int(callback.data.replace("store_payment_settings_", ""))
+
+    # Get current integrations
+    try:
+        integrations = db.get_store_payment_integrations(store_id)
+    except Exception:
+        integrations = []
+
+    text = (
+        "💳 <b>Настройки онлайн оплаты</b>\n\n"
+        "Подключите Click или Payme чтобы покупатели могли "
+        "оплачивать заказы онлайн. Деньги поступят напрямую на ваш счёт!\n\n"
+        "📌 <b>Как подключить:</b>\n"
+        "1. Зарегистрируйтесь как мерчант в Click/Payme\n"
+        "2. Получите API ключи в личном кабинете\n"
+        "3. Введите их здесь"
+        if lang == "ru"
+        else "💳 <b>Onlayn to'lov sozlamalari</b>\n\n"
+        "Click yoki Payme-ni ulang, shunda xaridorlar buyurtmalarni "
+        "onlayn to'lashi mumkin. Pul to'g'ridan-to'g'ri hisobingizga tushadi!\n\n"
+        "📌 <b>Qanday ulash mumkin:</b>\n"
+        "1. Click/Payme-da merchant sifatida ro'yxatdan o'ting\n"
+        "2. Shaxsiy kabinetdan API kalitlarini oling\n"
+        "3. Ularni shu yerga kiriting"
+    )
+
+    try:
+        await callback.message.edit_text(
+            text,
+            parse_mode="HTML",
+            reply_markup=payment_settings_keyboard(store_id, lang, integrations),
+        )
+    except Exception:
+        pass
+
+    await callback.answer()
+
+
+@router.callback_query(F.data.startswith("store_click_setup_"))
+async def setup_click_start(callback: types.CallbackQuery, state: FSMContext) -> None:
+    """Start Click setup."""
+    if not db:
+        await callback.answer("System error", show_alert=True)
+        return
+
+    assert callback.from_user is not None
+    lang = db.get_user_language(callback.from_user.id)
+
+    store_id = int(callback.data.replace("store_click_setup_", ""))
+    await state.update_data(store_id=store_id, provider="click")
+    await state.set_state(StoreSettingsStates.waiting_click_merchant_id)
+
+    cancel_kb = InlineKeyboardBuilder()
+    cancel_kb.button(
+        text="❌ Отмена" if lang == "ru" else "❌ Bekor qilish",
+        callback_data=f"store_payment_settings_{store_id}",
+    )
+
+    text = (
+        "🔗 <b>Подключение Click</b>\n\n"
+        "Шаг 1/3: Введите ваш <b>Merchant ID</b>\n\n"
+        "Его можно найти в личном кабинете Click Merchant:\n"
+        "merchant.click.uz → Настройки → API"
+        if lang == "ru"
+        else "🔗 <b>Click ulash</b>\n\n"
+        "1-qadam: <b>Merchant ID</b>-ni kiriting\n\n"
+        "Uni Click Merchant shaxsiy kabinetida topish mumkin:\n"
+        "merchant.click.uz → Sozlamalar → API"
+    )
+
+    try:
+        await callback.message.edit_text(
+            text, parse_mode="HTML", reply_markup=cancel_kb.as_markup()
+        )
+    except Exception:
+        pass
+
+    await callback.answer()
+
+
+@router.message(StoreSettingsStates.waiting_click_merchant_id)
+async def handle_click_merchant_id(message: types.Message, state: FSMContext) -> None:
+    """Handle Click merchant ID input."""
+    if not db:
+        await message.answer("System error")
+        return
+
+    assert message.from_user is not None
+    lang = db.get_user_language(message.from_user.id)
+
+    merchant_id = message.text.strip() if message.text else ""
+
+    if not merchant_id or len(merchant_id) < 3:
+        await message.answer(
+            "❌ Введите корректный Merchant ID"
+            if lang == "ru"
+            else "❌ To'g'ri Merchant ID kiriting"
+        )
+        return
+
+    await state.update_data(click_merchant_id=merchant_id)
+    await state.set_state(StoreSettingsStates.waiting_click_service_id)
+
+    data = await state.get_data()
+    store_id = data.get("store_id")
+
+    cancel_kb = InlineKeyboardBuilder()
+    cancel_kb.button(
+        text="❌ Отмена" if lang == "ru" else "❌ Bekor qilish",
+        callback_data=f"store_payment_settings_{store_id}",
+    )
+
+    text = (
+        "✅ Merchant ID сохранён\n\n" "Шаг 2/3: Введите ваш <b>Service ID</b>"
+        if lang == "ru"
+        else "✅ Merchant ID saqlandi\n\n" "2-qadam: <b>Service ID</b>-ni kiriting"
+    )
+
+    await message.answer(text, parse_mode="HTML", reply_markup=cancel_kb.as_markup())
+
+
+@router.message(StoreSettingsStates.waiting_click_service_id)
+async def handle_click_service_id(message: types.Message, state: FSMContext) -> None:
+    """Handle Click service ID input."""
+    if not db:
+        await message.answer("System error")
+        return
+
+    assert message.from_user is not None
+    lang = db.get_user_language(message.from_user.id)
+
+    service_id = message.text.strip() if message.text else ""
+
+    if not service_id or len(service_id) < 3:
+        await message.answer(
+            "❌ Введите корректный Service ID" if lang == "ru" else "❌ To'g'ri Service ID kiriting"
+        )
+        return
+
+    await state.update_data(click_service_id=service_id)
+    await state.set_state(StoreSettingsStates.waiting_click_secret_key)
+
+    data = await state.get_data()
+    store_id = data.get("store_id")
+
+    cancel_kb = InlineKeyboardBuilder()
+    cancel_kb.button(
+        text="❌ Отмена" if lang == "ru" else "❌ Bekor qilish",
+        callback_data=f"store_payment_settings_{store_id}",
+    )
+
+    text = (
+        "✅ Service ID сохранён\n\n"
+        "Шаг 3/3: Введите ваш <b>Secret Key</b>\n\n"
+        "⚠️ Храните ключ в секрете!"
+        if lang == "ru"
+        else "✅ Service ID saqlandi\n\n"
+        "3-qadam: <b>Secret Key</b>-ni kiriting\n\n"
+        "⚠️ Kalitni sir saqlang!"
+    )
+
+    await message.answer(text, parse_mode="HTML", reply_markup=cancel_kb.as_markup())
+
+
+@router.message(StoreSettingsStates.waiting_click_secret_key)
+async def handle_click_secret_key(message: types.Message, state: FSMContext) -> None:
+    """Handle Click secret key input and save."""
+    if not db:
+        await message.answer("System error")
+        return
+
+    assert message.from_user is not None
+    lang = db.get_user_language(message.from_user.id)
+
+    secret_key = message.text.strip() if message.text else ""
+
+    if not secret_key or len(secret_key) < 5:
+        await message.answer(
+            "❌ Введите корректный Secret Key" if lang == "ru" else "❌ To'g'ri Secret Key kiriting"
+        )
+        return
+
+    data = await state.get_data()
+    store_id = data.get("store_id")
+    merchant_id = data.get("click_merchant_id")
+    service_id = data.get("click_service_id")
+
+    # Save integration
+    try:
+        db.set_store_payment_integration(
+            store_id=store_id,
+            provider="click",
+            merchant_id=merchant_id,
+            secret_key=secret_key,
+            service_id=service_id,
+        )
+
+        await state.clear()
+
+        # Delete message with secret key for security
+        try:
+            await message.delete()
+        except Exception:
+            pass
+
+        text = (
+            "✅ <b>Click успешно подключён!</b>\n\n"
+            "Теперь покупатели могут оплачивать заказы через Click, "
+            "и деньги будут поступать на ваш счёт."
+            if lang == "ru"
+            else "✅ <b>Click muvaffaqiyatli ulandi!</b>\n\n"
+            "Endi xaridorlar Click orqali to'lashi mumkin, "
+            "pul sizning hisobingizga tushadi."
+        )
+
+        back_kb = InlineKeyboardBuilder()
+        back_kb.button(
+            text="◀️ Назад" if lang == "ru" else "◀️ Orqaga",
+            callback_data=f"store_payment_settings_{store_id}",
+        )
+
+        await message.answer(text, parse_mode="HTML", reply_markup=back_kb.as_markup())
+        logger.info(f"Click integration configured for store {store_id}")
+
+    except Exception as e:
+        logger.error(f"Failed to save Click integration: {e}")
+        await message.answer("❌ Ошибка сохранения" if lang == "ru" else "❌ Saqlashda xatolik")
+
+
+@router.callback_query(F.data.startswith("store_payme_setup_"))
+async def setup_payme_start(callback: types.CallbackQuery, state: FSMContext) -> None:
+    """Start Payme setup."""
+    if not db:
+        await callback.answer("System error", show_alert=True)
+        return
+
+    assert callback.from_user is not None
+    lang = db.get_user_language(callback.from_user.id)
+
+    store_id = int(callback.data.replace("store_payme_setup_", ""))
+    await state.update_data(store_id=store_id, provider="payme")
+    await state.set_state(StoreSettingsStates.waiting_payme_merchant_id)
+
+    cancel_kb = InlineKeyboardBuilder()
+    cancel_kb.button(
+        text="❌ Отмена" if lang == "ru" else "❌ Bekor qilish",
+        callback_data=f"store_payment_settings_{store_id}",
+    )
+
+    text = (
+        "🔗 <b>Подключение Payme</b>\n\n"
+        "Шаг 1/2: Введите ваш <b>Merchant ID</b>\n\n"
+        "Его можно найти в кабинете Payme Merchant:\n"
+        "merchant.payme.uz → Настройки"
+        if lang == "ru"
+        else "🔗 <b>Payme ulash</b>\n\n"
+        "1-qadam: <b>Merchant ID</b>-ni kiriting\n\n"
+        "Uni Payme Merchant kabinetida topish mumkin:\n"
+        "merchant.payme.uz → Sozlamalar"
+    )
+
+    try:
+        await callback.message.edit_text(
+            text, parse_mode="HTML", reply_markup=cancel_kb.as_markup()
+        )
+    except Exception:
+        pass
+
+    await callback.answer()
+
+
+@router.message(StoreSettingsStates.waiting_payme_merchant_id)
+async def handle_payme_merchant_id(message: types.Message, state: FSMContext) -> None:
+    """Handle Payme merchant ID input."""
+    if not db:
+        await message.answer("System error")
+        return
+
+    assert message.from_user is not None
+    lang = db.get_user_language(message.from_user.id)
+
+    merchant_id = message.text.strip() if message.text else ""
+
+    if not merchant_id or len(merchant_id) < 3:
+        await message.answer(
+            "❌ Введите корректный Merchant ID"
+            if lang == "ru"
+            else "❌ To'g'ri Merchant ID kiriting"
+        )
+        return
+
+    await state.update_data(payme_merchant_id=merchant_id)
+    await state.set_state(StoreSettingsStates.waiting_payme_secret_key)
+
+    data = await state.get_data()
+    store_id = data.get("store_id")
+
+    cancel_kb = InlineKeyboardBuilder()
+    cancel_kb.button(
+        text="❌ Отмена" if lang == "ru" else "❌ Bekor qilish",
+        callback_data=f"store_payment_settings_{store_id}",
+    )
+
+    text = (
+        "✅ Merchant ID сохранён\n\n"
+        "Шаг 2/2: Введите ваш <b>Secret Key</b>\n\n"
+        "⚠️ Храните ключ в секрете!"
+        if lang == "ru"
+        else "✅ Merchant ID saqlandi\n\n"
+        "2-qadam: <b>Secret Key</b>-ni kiriting\n\n"
+        "⚠️ Kalitni sir saqlang!"
+    )
+
+    await message.answer(text, parse_mode="HTML", reply_markup=cancel_kb.as_markup())
+
+
+@router.message(StoreSettingsStates.waiting_payme_secret_key)
+async def handle_payme_secret_key(message: types.Message, state: FSMContext) -> None:
+    """Handle Payme secret key input and save."""
+    if not db:
+        await message.answer("System error")
+        return
+
+    assert message.from_user is not None
+    lang = db.get_user_language(message.from_user.id)
+
+    secret_key = message.text.strip() if message.text else ""
+
+    if not secret_key or len(secret_key) < 5:
+        await message.answer(
+            "❌ Введите корректный Secret Key" if lang == "ru" else "❌ To'g'ri Secret Key kiriting"
+        )
+        return
+
+    data = await state.get_data()
+    store_id = data.get("store_id")
+    merchant_id = data.get("payme_merchant_id")
+
+    # Save integration
+    try:
+        db.set_store_payment_integration(
+            store_id=store_id,
+            provider="payme",
+            merchant_id=merchant_id,
+            secret_key=secret_key,
+        )
+
+        await state.clear()
+
+        # Delete message with secret key for security
+        try:
+            await message.delete()
+        except Exception:
+            pass
+
+        text = (
+            "✅ <b>Payme успешно подключён!</b>\n\n"
+            "Теперь покупатели могут оплачивать заказы через Payme, "
+            "и деньги будут поступать на ваш счёт."
+            if lang == "ru"
+            else "✅ <b>Payme muvaffaqiyatli ulandi!</b>\n\n"
+            "Endi xaridorlar Payme orqali to'lashi mumkin, "
+            "pul sizning hisobingizga tushadi."
+        )
+
+        back_kb = InlineKeyboardBuilder()
+        back_kb.button(
+            text="◀️ Назад" if lang == "ru" else "◀️ Orqaga",
+            callback_data=f"store_payment_settings_{store_id}",
+        )
+
+        await message.answer(text, parse_mode="HTML", reply_markup=back_kb.as_markup())
+        logger.info(f"Payme integration configured for store {store_id}")
+
+    except Exception as e:
+        logger.error(f"Failed to save Payme integration: {e}")
+        await message.answer("❌ Ошибка сохранения" if lang == "ru" else "❌ Saqlashda xatolik")
+
+
+@router.callback_query(F.data.startswith("store_click_view_"))
+async def view_click_integration(callback: types.CallbackQuery) -> None:
+    """View Click integration details."""
+    if not db:
+        await callback.answer("System error", show_alert=True)
+        return
+
+    assert callback.from_user is not None
+    lang = db.get_user_language(callback.from_user.id)
+
+    store_id = int(callback.data.replace("store_click_view_", ""))
+
+    try:
+        integration = db.get_store_payment_integration(store_id, "click")
+        if not integration:
+            await callback.answer("Integration not found", show_alert=True)
+            return
+
+        merchant_id = integration.get("merchant_id", "")
+        masked_merchant = (
+            merchant_id[:4] + "****" + merchant_id[-2:] if len(merchant_id) > 6 else "****"
+        )
+
+        text = (
+            f"✅ <b>Click подключён</b>\n\n"
+            f"Merchant ID: <code>{masked_merchant}</code>\n"
+            f"Service ID: настроен\n\n"
+            f"Покупатели могут оплачивать через Click."
+            if lang == "ru"
+            else f"✅ <b>Click ulangan</b>\n\n"
+            f"Merchant ID: <code>{masked_merchant}</code>\n"
+            f"Service ID: sozlangan\n\n"
+            f"Xaridorlar Click orqali to'lashi mumkin."
+        )
+
+        builder = InlineKeyboardBuilder()
+        builder.button(
+            text="🗑 Отключить" if lang == "ru" else "🗑 O'chirish",
+            callback_data=f"store_click_disable_{store_id}",
+        )
+        builder.button(
+            text="◀️ Назад" if lang == "ru" else "◀️ Orqaga",
+            callback_data=f"store_payment_settings_{store_id}",
+        )
+        builder.adjust(1)
+
+        await callback.message.edit_text(text, parse_mode="HTML", reply_markup=builder.as_markup())
+    except Exception as e:
+        logger.error(f"Error viewing Click integration: {e}")
+
+    await callback.answer()
+
+
+@router.callback_query(F.data.startswith("store_payme_view_"))
+async def view_payme_integration(callback: types.CallbackQuery) -> None:
+    """View Payme integration details."""
+    if not db:
+        await callback.answer("System error", show_alert=True)
+        return
+
+    assert callback.from_user is not None
+    lang = db.get_user_language(callback.from_user.id)
+
+    store_id = int(callback.data.replace("store_payme_view_", ""))
+
+    try:
+        integration = db.get_store_payment_integration(store_id, "payme")
+        if not integration:
+            await callback.answer("Integration not found", show_alert=True)
+            return
+
+        merchant_id = integration.get("merchant_id", "")
+        masked_merchant = (
+            merchant_id[:4] + "****" + merchant_id[-2:] if len(merchant_id) > 6 else "****"
+        )
+
+        text = (
+            f"✅ <b>Payme подключён</b>\n\n"
+            f"Merchant ID: <code>{masked_merchant}</code>\n\n"
+            f"Покупатели могут оплачивать через Payme."
+            if lang == "ru"
+            else f"✅ <b>Payme ulangan</b>\n\n"
+            f"Merchant ID: <code>{masked_merchant}</code>\n\n"
+            f"Xaridorlar Payme orqali to'lashi mumkin."
+        )
+
+        builder = InlineKeyboardBuilder()
+        builder.button(
+            text="🗑 Отключить" if lang == "ru" else "🗑 O'chirish",
+            callback_data=f"store_payme_disable_{store_id}",
+        )
+        builder.button(
+            text="◀️ Назад" if lang == "ru" else "◀️ Orqaga",
+            callback_data=f"store_payment_settings_{store_id}",
+        )
+        builder.adjust(1)
+
+        await callback.message.edit_text(text, parse_mode="HTML", reply_markup=builder.as_markup())
+    except Exception as e:
+        logger.error(f"Error viewing Payme integration: {e}")
+
+    await callback.answer()
+
+
+@router.callback_query(F.data.startswith("store_click_disable_"))
+async def disable_click_integration(callback: types.CallbackQuery) -> None:
+    """Disable Click integration."""
+    if not db:
+        await callback.answer("System error", show_alert=True)
+        return
+
+    assert callback.from_user is not None
+    lang = db.get_user_language(callback.from_user.id)
+
+    store_id = int(callback.data.replace("store_click_disable_", ""))
+
+    try:
+        db.disable_store_payment_integration(store_id, "click")
+        await callback.answer("✅ Click отключён" if lang == "ru" else "✅ Click o'chirildi")
+
+        # Return to payment settings
+        integrations = db.get_store_payment_integrations(store_id)
+        text = (
+            "💳 <b>Настройки онлайн оплаты</b>\n\n" "Click был отключён."
+            if lang == "ru"
+            else "💳 <b>Onlayn to'lov sozlamalari</b>\n\n" "Click o'chirildi."
+        )
+
+        await callback.message.edit_text(
+            text,
+            parse_mode="HTML",
+            reply_markup=payment_settings_keyboard(store_id, lang, integrations),
+        )
+        logger.info(f"Click integration disabled for store {store_id}")
+    except Exception as e:
+        logger.error(f"Error disabling Click: {e}")
+        await callback.answer("Error", show_alert=True)
+
+
+@router.callback_query(F.data.startswith("store_payme_disable_"))
+async def disable_payme_integration(callback: types.CallbackQuery) -> None:
+    """Disable Payme integration."""
+    if not db:
+        await callback.answer("System error", show_alert=True)
+        return
+
+    assert callback.from_user is not None
+    lang = db.get_user_language(callback.from_user.id)
+
+    store_id = int(callback.data.replace("store_payme_disable_", ""))
+
+    try:
+        db.disable_store_payment_integration(store_id, "payme")
+        await callback.answer("✅ Payme отключён" if lang == "ru" else "✅ Payme o'chirildi")
+
+        # Return to payment settings
+        integrations = db.get_store_payment_integrations(store_id)
+        text = (
+            "💳 <b>Настройки онлайн оплаты</b>\n\n" "Payme был отключён."
+            if lang == "ru"
+            else "💳 <b>Onlayn to'lov sozlamalari</b>\n\n" "Payme o'chirildi."
+        )
+
+        await callback.message.edit_text(
+            text,
+            parse_mode="HTML",
+            reply_markup=payment_settings_keyboard(store_id, lang, integrations),
+        )
+        logger.info(f"Payme integration disabled for store {store_id}")
+    except Exception as e:
+        logger.error(f"Error disabling Payme: {e}")
+        await callback.answer("Error", show_alert=True)

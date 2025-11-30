@@ -319,3 +319,24 @@ class DatabaseProtocol(Protocol):
 
     def search_stores(self, query: str, city: str | None = None) -> RowList:
         ...
+
+    # ======= STORE PAYMENT INTEGRATIONS =======
+    def get_store_payment_integrations(self, store_id: int) -> RowList:
+        ...
+
+    def get_store_payment_integration(self, store_id: int, provider: str) -> RowType | None:
+        ...
+
+    def set_store_payment_integration(
+        self,
+        store_id: int,
+        provider: str,
+        merchant_id: str,
+        service_id: str | None = None,
+        secret_key: str | None = None,
+        is_active: bool = True,
+    ) -> bool:
+        ...
+
+    def disable_store_payment_integration(self, store_id: int, provider: str) -> bool:
+        ...

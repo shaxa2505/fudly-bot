@@ -1074,6 +1074,7 @@ async def create_webhook_app(
             provider = data.get("provider", "card")
             user_id = data.get("user_id")
             return_url = data.get("return_url")
+            store_id = data.get("store_id")  # For per-store credentials
 
             if not order_id or not amount:
                 return add_cors_headers(
@@ -1083,27 +1084,51 @@ async def create_webhook_app(
             payment_service = get_payment_service()
 
             if provider == "click":
-                if not payment_service.click_enabled:
+                # Check for store-specific or platform-wide Click credentials
+                credentials = (
+                    payment_service.get_store_credentials(
+                        store_id=int(store_id) if store_id else 0, provider="click"
+                    )
+                    if store_id
+                    else None
+                )
+                if not credentials and not payment_service.click_enabled:
                     return add_cors_headers(
-                        web.json_response({"error": "Click not configured"}, status=400)
+                        web.json_response(
+                            {"error": "Click not configured for this store"}, status=400
+                        )
                     )
                 payment_url = payment_service.generate_click_url(
                     order_id=int(order_id),
                     amount=int(amount),
                     return_url=return_url,
-                    user_id=int(user_id) if user_id else None,
+                    user_id=int(user_id) if user_id else 0,
+                    store_id=int(store_id) if store_id else 0,
                 )
                 return add_cors_headers(
                     web.json_response({"payment_url": payment_url, "provider": "click"})
                 )
 
             elif provider == "payme":
-                if not payment_service.payme_enabled:
+                # Check for store-specific or platform-wide Payme credentials
+                credentials = (
+                    payment_service.get_store_credentials(
+                        store_id=int(store_id) if store_id else 0, provider="payme"
+                    )
+                    if store_id
+                    else None
+                )
+                if not credentials and not payment_service.payme_enabled:
                     return add_cors_headers(
-                        web.json_response({"error": "Payme not configured"}, status=400)
+                        web.json_response(
+                            {"error": "Payme not configured for this store"}, status=400
+                        )
                     )
                 payment_url = payment_service.generate_payme_url(
-                    order_id=int(order_id), amount=int(amount), return_url=return_url
+                    order_id=int(order_id),
+                    amount=int(amount),
+                    return_url=return_url,
+                    store_id=int(store_id) if store_id else 0,
                 )
                 return add_cors_headers(
                     web.json_response({"payment_url": payment_url, "provider": "payme"})

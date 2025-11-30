@@ -158,6 +158,25 @@ class SchemaMixin:
             """
             )
 
+            # Store payment integrations table (Click/Payme per store)
+            cursor.execute(
+                """
+                CREATE TABLE IF NOT EXISTS store_payment_integrations (
+                    id SERIAL PRIMARY KEY,
+                    store_id INTEGER NOT NULL,
+                    provider TEXT NOT NULL,
+                    merchant_id TEXT,
+                    service_id TEXT,
+                    secret_key TEXT,
+                    is_active INTEGER DEFAULT 1,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    FOREIGN KEY (store_id) REFERENCES stores(store_id),
+                    UNIQUE(store_id, provider)
+                )
+            """
+            )
+
             # Notifications table
             cursor.execute(
                 """
