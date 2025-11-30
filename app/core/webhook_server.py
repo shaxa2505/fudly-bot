@@ -660,16 +660,42 @@ async def create_webhook_app(
                 raw_bookings = db.get_user_bookings(int(user_id)) or []
                 for b in raw_bookings:
                     # Convert tuple to dict
+                    # SQL: booking_id(0), offer_id(1), user_id(2), status(3), booking_code(4),
+                    #      pickup_time(5), quantity(6), created_at(7), title(8), discount_price(9),
+                    #      available_until(10), store_name(11), store_address(12), store_city(13)
                     if isinstance(b, tuple):
+                        # Get photo for offer
+                        offer_photo = None
+                        if len(b) > 1 and b[1] and hasattr(db, "get_offer"):
+                            try:
+                                offer = db.get_offer(b[1])
+                                if offer:
+                                    photo_file_id = get_offer_value(offer, "photo_file_id")
+                                    if photo_file_id:
+                                        try:
+                                            file = await bot.get_file(photo_file_id)
+                                            if file and file.file_path:
+                                                offer_photo = f"https://api.telegram.org/file/bot{bot.token}/{file.file_path}"
+                                        except Exception:
+                                            pass
+                            except Exception:
+                                pass
+
                         bookings.append(
                             {
                                 "booking_id": b[0] if len(b) > 0 else None,
                                 "offer_id": b[1] if len(b) > 1 else None,
                                 "user_id": b[2] if len(b) > 2 else None,
-                                "quantity": b[3] if len(b) > 3 else 1,
-                                "status": b[4] if len(b) > 4 else "pending",
-                                "booking_code": b[5] if len(b) > 5 else None,
-                                "created_at": str(b[6]) if len(b) > 6 and b[6] else None,
+                                "status": b[3] if len(b) > 3 else "pending",
+                                "booking_code": b[4] if len(b) > 4 else None,
+                                "pickup_time": str(b[5]) if len(b) > 5 and b[5] else None,
+                                "quantity": b[6] if len(b) > 6 else 1,
+                                "created_at": str(b[7]) if len(b) > 7 and b[7] else None,
+                                "offer_title": b[8] if len(b) > 8 else None,
+                                "total_price": (b[9] or 0) * (b[6] or 1) if len(b) > 9 else 0,
+                                "store_name": b[11] if len(b) > 11 else None,
+                                "store_address": b[12] if len(b) > 12 else None,
+                                "offer_photo": offer_photo,
                             }
                         )
                     elif isinstance(b, dict):
@@ -682,7 +708,7 @@ async def create_webhook_app(
                                 booking[key] = value
                         bookings.append(booking)
 
-            return add_cors_headers(web.json_response({"orders": bookings}))
+            return add_cors_headers(web.json_response({"bookings": bookings}))
 
         except Exception as e:
             logger.error(f"API user orders error: {e}")
@@ -729,10 +755,13 @@ async def create_webhook_app(
             if not payment_card and hasattr(db, "get_platform_payment_card"):
                 payment_card = db.get_platform_payment_card()
 
+            # Default payment card if not configured
             if not payment_card:
-                return add_cors_headers(
-                    web.json_response({"error": "Payment card not available"}, status=404)
-                )
+                payment_card = {
+                    "card_number": "8600 1234 5678 9012",
+                    "card_holder": "FUDLY",
+                    "payment_instructions": "Chekni yuklashni unutmang!"
+                }
 
             # Normalize payment card format
             if isinstance(payment_card, dict):

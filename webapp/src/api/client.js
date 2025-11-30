@@ -92,7 +92,8 @@ const api = {
       const params = { user_id: userId }
       if (status) params.status = status
       const { data } = await client.get('/user/bookings', { params })
-      return data.bookings || data || []
+      // API returns { bookings: [...] }
+      return data.bookings || data.orders || data || []
     } catch (error) {
       console.warn('getUserBookings not available:', error)
       return []
