@@ -177,6 +177,24 @@ class SchemaMixin:
             """
             )
 
+            # Store admins table (multiple admins per store)
+            cursor.execute(
+                """
+                CREATE TABLE IF NOT EXISTS store_admins (
+                    id SERIAL PRIMARY KEY,
+                    store_id INTEGER NOT NULL,
+                    user_id BIGINT NOT NULL,
+                    role TEXT DEFAULT 'admin',
+                    added_by BIGINT,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    FOREIGN KEY (store_id) REFERENCES stores(store_id),
+                    FOREIGN KEY (user_id) REFERENCES users(user_id),
+                    FOREIGN KEY (added_by) REFERENCES users(user_id),
+                    UNIQUE(store_id, user_id)
+                )
+            """
+            )
+
             # Notifications table
             cursor.execute(
                 """

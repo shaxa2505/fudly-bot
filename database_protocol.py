@@ -88,6 +88,10 @@ class DatabaseProtocol(Protocol):
     def get_user_stores(self, owner_id: int) -> RowList:
         ...
 
+    def get_user_accessible_stores(self, user_id: int) -> RowList:
+        """Get all stores accessible to user (owned + admin)."""
+        ...
+
     def get_approved_stores(self, owner_id: int) -> RowList:
         ...
 
@@ -120,6 +124,29 @@ class DatabaseProtocol(Protocol):
 
     def update_store_location(self, store_id: int, latitude: float, longitude: float) -> bool:
         """Update store geolocation coordinates."""
+        ...
+
+    # ========== STORE ADMINS ==========
+    def add_store_admin(
+        self, store_id: int, user_id: int, added_by: int, role: str = "admin"
+    ) -> bool:
+        """Add an admin to a store."""
+        ...
+
+    def remove_store_admin(self, store_id: int, user_id: int) -> bool:
+        """Remove an admin from a store."""
+        ...
+
+    def get_store_admins(self, store_id: int) -> list[dict]:
+        """Get all admins for a store."""
+        ...
+
+    def is_store_admin(self, store_id: int, user_id: int) -> bool:
+        """Check if user is an admin of the store."""
+        ...
+
+    def get_user_admin_stores(self, user_id: int) -> list[dict]:
+        """Get all stores where user is owner OR admin."""
         ...
 
     # ========== OFFER METHODS ==========

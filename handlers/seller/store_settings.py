@@ -23,6 +23,7 @@ class StoreSettingsStates(StatesGroup):
 
     waiting_photo = State()
     waiting_location = State()
+    waiting_admin_contact = State()  # Waiting for admin contact/username
     waiting_click_merchant_id = State()
     waiting_click_service_id = State()
     waiting_click_secret_key = State()
@@ -38,7 +39,11 @@ def setup_dependencies(database: DatabaseProtocol, bot_instance: Any) -> None:
 
 
 def store_settings_keyboard(
-    store_id: int, lang: str = "ru", has_photo: bool = False, has_location: bool = False
+    store_id: int,
+    lang: str = "ru",
+    has_photo: bool = False,
+    has_location: bool = False,
+    is_owner: bool = True,
 ) -> types.InlineKeyboardMarkup:
     """Store settings keyboard."""
     builder = InlineKeyboardBuilder()
@@ -59,9 +64,14 @@ def store_settings_keyboard(
         location_text = "📍 Добавить локацию" if lang == "ru" else "📍 Joylashuv qo'shish"
     builder.button(text=location_text, callback_data=f"store_set_location_{store_id}")
 
-    # Payment integrations
-    payment_text = "💳 Онлайн оплата" if lang == "ru" else "💳 Onlayn to'lov"
-    builder.button(text=payment_text, callback_data=f"store_payment_settings_{store_id}")
+    # Payment integrations (only for owner)
+    if is_owner:
+        payment_text = "💳 Онлайн оплата" if lang == "ru" else "💳 Onlayn to'lov"
+        builder.button(text=payment_text, callback_data=f"store_payment_settings_{store_id}")
+
+        # Store admins management (only for owner)
+        admins_text = "👥 Сотрудники" if lang == "ru" else "👥 Xodimlar"
+        builder.button(text=admins_text, callback_data=f"store_admins_{store_id}")
 
     back_text = "◀️ Назад" if lang == "ru" else "◀️ Orqaga"
     builder.button(text=back_text, callback_data="store_settings_back")
@@ -79,9 +89,10 @@ async def show_store_settings(callback: types.CallbackQuery) -> None:
 
     assert callback.from_user is not None
     lang = db.get_user_language(callback.from_user.id)
+    user_id = callback.from_user.id
 
-    # Get user's store
-    stores = db.get_user_stores(callback.from_user.id)
+    # Get user's stores (owned + admin access)
+    stores = db.get_user_accessible_stores(user_id)
     active_stores = [s for s in stores if s.get("status") in ("active", "approved")]
 
     if not active_stores:
@@ -96,14 +107,17 @@ async def show_store_settings(callback: types.CallbackQuery) -> None:
     store_name = store.get("name", "Магазин")
     has_photo = bool(store.get("photo"))
     has_location = bool(store.get("latitude") and store.get("longitude"))
+    is_owner = store.get("user_role") == "owner" or store.get("owner_id") == user_id
+
+    role_text = "" if is_owner else (" (сотрудник)" if lang == "ru" else " (xodim)")
 
     text = (
-        f"⚙️ <b>Настройки магазина</b>\n\n"
+        f"⚙️ <b>Настройки магазина{role_text}</b>\n\n"
         f"🏪 <b>{store_name}</b>\n\n"
         f"📸 Фото: {'✅ Загружено' if has_photo else '❌ Не загружено'}\n"
         f"📍 Геолокация: {'✅ Установлена' if has_location else '❌ Не установлена'}"
         if lang == "ru"
-        else f"⚙️ <b>Do'kon sozlamalari</b>\n\n"
+        else f"⚙️ <b>Do'kon sozlamalari{role_text}</b>\n\n"
         f"🏪 <b>{store_name}</b>\n\n"
         f"📸 Rasm: {'✅ Yuklangan' if has_photo else '❌ Yuklanmagan'}\n"
         f"📍 Geolokatsiya: {'✅ O\'rnatilgan' if has_location else '❌ O\'rnatilmagan'}"
@@ -121,27 +135,35 @@ async def show_store_settings(callback: types.CallbackQuery) -> None:
                 photo=store.get("photo"),
                 caption=text,
                 parse_mode="HTML",
-                reply_markup=store_settings_keyboard(store_id, lang, has_photo, has_location),
+                reply_markup=store_settings_keyboard(
+                    store_id, lang, has_photo, has_location, is_owner
+                ),
             )
         except Exception:
             await bot.send_message(
                 callback.from_user.id,
                 text,
                 parse_mode="HTML",
-                reply_markup=store_settings_keyboard(store_id, lang, has_photo, has_location),
+                reply_markup=store_settings_keyboard(
+                    store_id, lang, has_photo, has_location, is_owner
+                ),
             )
     else:
         try:
             await callback.message.edit_text(
                 text,
                 parse_mode="HTML",
-                reply_markup=store_settings_keyboard(store_id, lang, has_photo, has_location),
+                reply_markup=store_settings_keyboard(
+                    store_id, lang, has_photo, has_location, is_owner
+                ),
             )
         except Exception:
             await callback.message.answer(
                 text,
                 parse_mode="HTML",
-                reply_markup=store_settings_keyboard(store_id, lang, has_photo, has_location),
+                reply_markup=store_settings_keyboard(
+                    store_id, lang, has_photo, has_location, is_owner
+                ),
             )
 
     await callback.answer()
@@ -1127,3 +1149,302 @@ async def disable_payme_integration(callback: types.CallbackQuery) -> None:
     except Exception as e:
         logger.error(f"Error disabling Payme: {e}")
         await callback.answer("Error", show_alert=True)
+
+
+# ===================== STORE ADMINS MANAGEMENT =====================
+
+
+def store_admins_keyboard(
+    store_id: int, admins: list, lang: str = "ru"
+) -> types.InlineKeyboardMarkup:
+    """Keyboard for store admins management."""
+    builder = InlineKeyboardBuilder()
+
+    # Show current admins with remove button
+    for admin in admins:
+        user_id = admin.get("user_id")
+        name = admin.get("first_name") or admin.get("username") or f"ID:{user_id}"
+        builder.button(
+            text=f"❌ {name}",
+            callback_data=f"remove_admin_{store_id}_{user_id}",
+        )
+
+    # Add admin button
+    add_text = "➕ Добавить сотрудника" if lang == "ru" else "➕ Xodim qo'shish"
+    builder.button(text=add_text, callback_data=f"add_admin_{store_id}")
+
+    # Back button
+    back_text = "◀️ Назад" if lang == "ru" else "◀️ Orqaga"
+    builder.button(text=back_text, callback_data="my_store_settings")
+
+    builder.adjust(1)
+    return builder.as_markup()
+
+
+@router.callback_query(F.data.startswith("store_admins_"))
+async def show_store_admins(callback: types.CallbackQuery) -> None:
+    """Show store admins management."""
+    if not db:
+        await callback.answer("System error", show_alert=True)
+        return
+
+    assert callback.from_user is not None
+    assert callback.data is not None
+    lang = db.get_user_language(callback.from_user.id)
+
+    store_id = int(callback.data.replace("store_admins_", ""))
+
+    # Check if user is owner
+    stores = db.get_user_stores(callback.from_user.id)
+    if not any(s.get("store_id") == store_id for s in stores):
+        await callback.answer("Доступ запрещён" if lang == "ru" else "Ruxsat yo'q", show_alert=True)
+        return
+
+    # Get store admins
+    admins = []
+    if hasattr(db, "get_store_admins"):
+        admins = db.get_store_admins(store_id)
+
+    admin_count = len(admins)
+
+    if lang == "ru":
+        hint = (
+            "Нажмите на сотрудника чтобы удалить."
+            if admins
+            else "Добавьте сотрудников чтобы они могли управлять магазином."
+        )
+        text = f"👥 <b>Сотрудники магазина</b>\n\nВсего сотрудников: <b>{admin_count}</b>\n\n{hint}"
+    else:
+        hint = (
+            "Xodimni oʻchirish uchun ustiga bosing."
+            if admins
+            else "Xodimlar qoʻshing, ular doʻkonni boshqarishlari mumkin."
+        )
+        text = f"👥 <b>Doʻkon xodimlari</b>\n\nJami xodimlar: <b>{admin_count}</b>\n\n{hint}"
+
+    try:
+        await callback.message.edit_text(
+            text,
+            parse_mode="HTML",
+            reply_markup=store_admins_keyboard(store_id, admins, lang),
+        )
+    except Exception:
+        await callback.message.answer(
+            text,
+            parse_mode="HTML",
+            reply_markup=store_admins_keyboard(store_id, admins, lang),
+        )
+
+    await callback.answer()
+
+
+@router.callback_query(F.data.startswith("add_admin_"))
+async def start_add_admin(callback: types.CallbackQuery, state: FSMContext) -> None:
+    """Start adding a new admin."""
+    if not db:
+        await callback.answer("System error", show_alert=True)
+        return
+
+    assert callback.from_user is not None
+    assert callback.data is not None
+    lang = db.get_user_language(callback.from_user.id)
+
+    store_id = int(callback.data.replace("add_admin_", ""))
+
+    await state.update_data(store_id=store_id)
+    await state.set_state(StoreSettingsStates.waiting_admin_contact)
+
+    text = (
+        "👤 <b>Добавление сотрудника</b>\n\n"
+        "Перешлите любое сообщение от пользователя, которого хотите добавить.\n\n"
+        "Или отправьте его контакт."
+        if lang == "ru"
+        else "👤 <b>Xodim qo'shish</b>\n\n"
+        "Qo'shmoqchi bo'lgan foydalanuvchidan biror xabarni yo'naltiring.\n\n"
+        "Yoki uning kontaktini yuboring."
+    )
+
+    cancel_kb = InlineKeyboardBuilder()
+    cancel_kb.button(
+        text="❌ Отмена" if lang == "ru" else "❌ Bekor qilish",
+        callback_data=f"store_admins_{store_id}",
+    )
+
+    try:
+        await callback.message.edit_text(
+            text, parse_mode="HTML", reply_markup=cancel_kb.as_markup()
+        )
+    except Exception:
+        await callback.message.answer(text, parse_mode="HTML", reply_markup=cancel_kb.as_markup())
+
+    await callback.answer()
+
+
+@router.message(StoreSettingsStates.waiting_admin_contact)
+async def process_admin_contact(message: types.Message, state: FSMContext) -> None:
+    """Process forwarded message or contact to add admin."""
+    if not db:
+        await message.answer("System error")
+        return
+
+    assert message.from_user is not None
+    lang = db.get_user_language(message.from_user.id)
+
+    data = await state.get_data()
+    store_id = data.get("store_id")
+
+    if not store_id:
+        await state.clear()
+        await message.answer("Error: store not found")
+        return
+
+    new_admin_id = None
+    new_admin_name = None
+
+    # Check if it's a forwarded message
+    if message.forward_from:
+        new_admin_id = message.forward_from.id
+        new_admin_name = message.forward_from.first_name or message.forward_from.username
+
+    # Check if it's a contact
+    elif message.contact:
+        new_admin_id = message.contact.user_id
+        new_admin_name = message.contact.first_name
+
+    if not new_admin_id:
+        error_text = (
+            "❌ Не удалось определить пользователя.\n\n"
+            "Перешлите сообщение от пользователя или отправьте его контакт."
+            if lang == "ru"
+            else "❌ Foydalanuvchini aniqlab bo'lmadi.\n\n"
+            "Foydalanuvchidan xabar yo'naltiring yoki kontaktini yuboring."
+        )
+        await message.answer(error_text)
+        return
+
+    # Check if user exists in database
+    user = db.get_user(new_admin_id)
+    if not user:
+        # Create user
+        db.add_user(new_admin_id, new_admin_name or "User")
+
+    # Add admin
+    try:
+        if hasattr(db, "add_store_admin"):
+            success = db.add_store_admin(store_id, new_admin_id, message.from_user.id)
+            if success:
+                await state.clear()
+
+                success_text = (
+                    f"✅ <b>Сотрудник добавлен!</b>\n\n"
+                    f"👤 {new_admin_name or new_admin_id}\n\n"
+                    f"Теперь этот пользователь может управлять магазином."
+                    if lang == "ru"
+                    else f"✅ <b>Xodim qo'shildi!</b>\n\n"
+                    f"👤 {new_admin_name or new_admin_id}\n\n"
+                    f"Endi bu foydalanuvchi do'konni boshqarishi mumkin."
+                )
+
+                # Notify the new admin
+                try:
+                    stores = db.get_user_stores(message.from_user.id)
+                    store = next((s for s in stores if s.get("store_id") == store_id), None)
+                    store_name = store.get("name", "Магазин") if store else "Магазин"
+
+                    notify_text = (
+                        f"🎉 <b>Вы добавлены как сотрудник!</b>\n\n"
+                        f"🏪 Магазин: <b>{store_name}</b>\n\n"
+                        f"Теперь вы можете управлять товарами и заказами этого магазина."
+                        if lang == "ru"
+                        else f"🎉 <b>Siz xodim sifatida qo'shildingiz!</b>\n\n"
+                        f"🏪 Do'kon: <b>{store_name}</b>\n\n"
+                        f"Endi siz bu do'konning mahsulotlari va buyurtmalarini boshqarishingiz mumkin."
+                    )
+                    await bot.send_message(new_admin_id, notify_text, parse_mode="HTML")
+                except Exception as e:
+                    logger.warning(f"Failed to notify new admin: {e}")
+
+                back_kb = InlineKeyboardBuilder()
+                back_kb.button(
+                    text="👥 К сотрудникам" if lang == "ru" else "👥 Xodimlarga",
+                    callback_data=f"store_admins_{store_id}",
+                )
+
+                await message.answer(
+                    success_text, parse_mode="HTML", reply_markup=back_kb.as_markup()
+                )
+                logger.info(
+                    f"Admin {new_admin_id} added to store {store_id} by {message.from_user.id}"
+                )
+            else:
+                await message.answer(
+                    "❌ Не удалось добавить сотрудника"
+                    if lang == "ru"
+                    else "❌ Xodim qo'shib bo'lmadi"
+                )
+        else:
+            await message.answer("Feature not available")
+
+    except Exception as e:
+        logger.error(f"Error adding admin: {e}")
+        await message.answer("❌ Ошибка" if lang == "ru" else "❌ Xatolik")
+
+
+@router.callback_query(F.data.startswith("remove_admin_"))
+async def remove_admin(callback: types.CallbackQuery) -> None:
+    """Remove an admin from store."""
+    if not db:
+        await callback.answer("System error", show_alert=True)
+        return
+
+    assert callback.from_user is not None
+    assert callback.data is not None
+    lang = db.get_user_language(callback.from_user.id)
+
+    # Parse: remove_admin_{store_id}_{user_id}
+    parts = callback.data.split("_")
+    if len(parts) < 4:
+        await callback.answer("Error", show_alert=True)
+        return
+
+    store_id = int(parts[2])
+    admin_user_id = int(parts[3])
+
+    # Check if user is owner
+    stores = db.get_user_stores(callback.from_user.id)
+    if not any(s.get("store_id") == store_id for s in stores):
+        await callback.answer("Доступ запрещён" if lang == "ru" else "Ruxsat yo'q", show_alert=True)
+        return
+
+    try:
+        if hasattr(db, "remove_store_admin"):
+            db.remove_store_admin(store_id, admin_user_id)
+
+            await callback.answer("✅ Сотрудник удалён" if lang == "ru" else "✅ Xodim o'chirildi")
+
+            # Refresh admins list
+            admins = db.get_store_admins(store_id) if hasattr(db, "get_store_admins") else []
+
+            admin_count = len(admins)
+            if lang == "ru":
+                hint = "Нажмите на сотрудника чтобы удалить." if admins else "Добавьте сотрудников."
+                text = f"👥 <b>Сотрудники магазина</b>\n\nВсего сотрудников: <b>{admin_count}</b>\n\n{hint}"
+            else:
+                hint = "Xodimni oʻchirish uchun ustiga bosing." if admins else "Xodimlar qoʻshing."
+                text = (
+                    f"👥 <b>Doʻkon xodimlari</b>\n\nJami xodimlar: <b>{admin_count}</b>\n\n{hint}"
+                )
+
+            await callback.message.edit_text(
+                text,
+                parse_mode="HTML",
+                reply_markup=store_admins_keyboard(store_id, admins, lang),
+            )
+
+            logger.info(
+                f"Admin {admin_user_id} removed from store {store_id} by {callback.from_user.id}"
+            )
+
+    except Exception as e:
+        logger.error(f"Error removing admin: {e}")
+        await callback.answer("❌ Ошибка" if lang == "ru" else "❌ Xatolik", show_alert=True)

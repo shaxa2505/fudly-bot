@@ -97,6 +97,24 @@ class StoreMixin:
             )
             return [dict(row) for row in cursor.fetchall()]
 
+    def get_user_accessible_stores(self, user_id: int):
+        """Get ALL stores accessible to user (owned + admin access)."""
+        with self.get_connection() as conn:
+            cursor = conn.cursor(row_factory=dict_row)
+            cursor.execute(
+                """
+                SELECT s.*, u.first_name, u.username,
+                       CASE WHEN s.owner_id = %s THEN 'owner' ELSE 'admin' END as user_role
+                FROM stores s
+                LEFT JOIN users u ON s.owner_id = u.user_id
+                WHERE s.owner_id = %s
+                   OR s.store_id IN (SELECT store_id FROM store_admins WHERE user_id = %s)
+                ORDER BY s.created_at DESC
+            """,
+                (user_id, user_id, user_id),
+            )
+            return [dict(row) for row in cursor.fetchall()]
+
     def get_stores_by_city(self, city: str):
         """Return active stores for a given city."""
         with self.get_connection() as conn:
@@ -485,5 +503,93 @@ class StoreMixin:
                 AND (s.status = 'active' OR s.status = 'approved')
             """,
                 (provider,),
+            )
+            return [dict(row) for row in cursor.fetchall()]
+
+    # ===================== STORE ADMINS =====================
+
+    def add_store_admin(
+        self, store_id: int, user_id: int, added_by: int, role: str = "admin"
+    ) -> bool:
+        """Add an admin to a store."""
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            try:
+                cursor.execute(
+                    """
+                    INSERT INTO store_admins (store_id, user_id, added_by, role)
+                    VALUES (%s, %s, %s, %s)
+                    ON CONFLICT (store_id, user_id) DO NOTHING
+                    """,
+                    (store_id, user_id, added_by, role),
+                )
+                logger.info(f"Admin {user_id} added to store {store_id} by {added_by}")
+                return True
+            except Exception as e:
+                logger.error(f"Failed to add store admin: {e}")
+                return False
+
+    def remove_store_admin(self, store_id: int, user_id: int) -> bool:
+        """Remove an admin from a store."""
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                "DELETE FROM store_admins WHERE store_id = %s AND user_id = %s",
+                (store_id, user_id),
+            )
+            logger.info(f"Admin {user_id} removed from store {store_id}")
+            return True
+
+    def get_store_admins(self, store_id: int) -> list[dict]:
+        """Get all admins for a store."""
+        with self.get_connection() as conn:
+            cursor = conn.cursor(row_factory=dict_row)
+            cursor.execute(
+                """
+                SELECT sa.*, u.username, u.first_name, u.phone
+                FROM store_admins sa
+                JOIN users u ON sa.user_id = u.user_id
+                WHERE sa.store_id = %s
+                ORDER BY sa.created_at
+                """,
+                (store_id,),
+            )
+            return [dict(row) for row in cursor.fetchall()]
+
+    def is_store_admin(self, store_id: int, user_id: int) -> bool:
+        """Check if user is an admin of the store (owner or added admin)."""
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            # Check if user is owner
+            cursor.execute(
+                "SELECT owner_id FROM stores WHERE store_id = %s",
+                (store_id,),
+            )
+            result = cursor.fetchone()
+            if result and result[0] == user_id:
+                return True
+
+            # Check if user is added admin
+            cursor.execute(
+                "SELECT 1 FROM store_admins WHERE store_id = %s AND user_id = %s",
+                (store_id, user_id),
+            )
+            return cursor.fetchone() is not None
+
+    def get_user_admin_stores(self, user_id: int) -> list[dict]:
+        """Get all stores where user is owner OR admin."""
+        with self.get_connection() as conn:
+            cursor = conn.cursor(row_factory=dict_row)
+            cursor.execute(
+                """
+                SELECT DISTINCT s.*,
+                    CASE WHEN s.owner_id = %s THEN 'owner' ELSE 'admin' END as user_role
+                FROM stores s
+                LEFT JOIN store_admins sa ON s.store_id = sa.store_id
+                WHERE (s.owner_id = %s OR sa.user_id = %s)
+                AND (s.status = 'active' OR s.status = 'approved' OR s.status = 'pending')
+                ORDER BY s.created_at DESC
+                """,
+                (user_id, user_id, user_id),
             )
             return [dict(row) for row in cursor.fetchall()]

@@ -121,8 +121,8 @@ def get_uzb_time() -> datetime:
 
 
 def has_approved_store(user_id: int, db: DatabaseProtocol) -> bool:
-    """Check if user has an approved store."""
-    stores = db.get_user_stores(user_id)
+    """Check if user has an approved store (owned or admin access)."""
+    stores = db.get_user_accessible_stores(user_id)
     return any(store.get("status") == "active" for store in stores)
 
 
