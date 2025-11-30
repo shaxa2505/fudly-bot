@@ -198,6 +198,58 @@ const api = {
     })
     return data
   },
+
+  // Recently viewed endpoints
+  async addRecentlyViewed(userId, offerId) {
+    try {
+      const { data } = await client.post('/user/recently-viewed', { user_id: userId, offer_id: offerId })
+      return data
+    } catch (error) {
+      console.warn('addRecentlyViewed error:', error)
+      return null
+    }
+  },
+
+  async getRecentlyViewed(userId, limit = 20) {
+    try {
+      const { data } = await client.get('/user/recently-viewed', { params: { user_id: userId, limit } })
+      return data.offers || []
+    } catch (error) {
+      console.warn('getRecentlyViewed error:', error)
+      return []
+    }
+  },
+
+  // Search history endpoints
+  async addSearchHistory(userId, query) {
+    try {
+      const { data } = await client.post('/user/search-history', { user_id: userId, query })
+      return data
+    } catch (error) {
+      console.warn('addSearchHistory error:', error)
+      return null
+    }
+  },
+
+  async getSearchHistory(userId, limit = 10) {
+    try {
+      const { data } = await client.get('/user/search-history', { params: { user_id: userId, limit } })
+      return data.history || []
+    } catch (error) {
+      console.warn('getSearchHistory error:', error)
+      return []
+    }
+  },
+
+  async clearSearchHistory(userId) {
+    try {
+      const { data } = await client.delete('/user/search-history', { params: { user_id: userId } })
+      return data
+    } catch (error) {
+      console.warn('clearSearchHistory error:', error)
+      return null
+    }
+  },
 }
 
 export default api

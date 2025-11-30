@@ -181,3 +181,98 @@ class UserMixin:
             cursor.execute("DELETE FROM orders WHERE user_id = %s", (user_id,))
             cursor.execute("DELETE FROM users WHERE user_id = %s", (user_id,))
             logger.info(f"User {user_id} and related data deleted")
+
+    # ==================== RECENTLY VIEWED ====================
+
+    def add_recently_viewed(self, user_id: int, offer_id: int) -> None:
+        """Add offer to user's recently viewed list."""
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            # Remove old entry if exists
+            cursor.execute(
+                "DELETE FROM recently_viewed WHERE user_id = %s AND offer_id = %s",
+                (user_id, offer_id),
+            )
+            # Add new entry
+            cursor.execute(
+                "INSERT INTO recently_viewed (user_id, offer_id) VALUES (%s, %s)",
+                (user_id, offer_id),
+            )
+            # Keep only last 20 items
+            cursor.execute(
+                """
+                DELETE FROM recently_viewed
+                WHERE user_id = %s AND id NOT IN (
+                    SELECT id FROM recently_viewed WHERE user_id = %s
+                    ORDER BY viewed_at DESC LIMIT 20
+                )
+                """,
+                (user_id, user_id),
+            )
+
+    def get_recently_viewed(self, user_id: int, limit: int = 10) -> list[int]:
+        """Get user's recently viewed offer IDs."""
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                """
+                SELECT offer_id FROM recently_viewed
+                WHERE user_id = %s
+                ORDER BY viewed_at DESC
+                LIMIT %s
+                """,
+                (user_id, limit),
+            )
+            return [row[0] for row in cursor.fetchall()]
+
+    # ==================== SEARCH HISTORY ====================
+
+    def add_search_history(self, user_id: int, query: str) -> None:
+        """Add search query to user's history."""
+        if not query or len(query.strip()) < 2:
+            return
+        query = query.strip()[:100]  # Limit query length
+
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            # Remove duplicate if exists
+            cursor.execute(
+                "DELETE FROM search_history WHERE user_id = %s AND LOWER(query) = LOWER(%s)",
+                (user_id, query),
+            )
+            # Add new entry
+            cursor.execute(
+                "INSERT INTO search_history (user_id, query) VALUES (%s, %s)", (user_id, query)
+            )
+            # Keep only last 10 searches
+            cursor.execute(
+                """
+                DELETE FROM search_history
+                WHERE user_id = %s AND id NOT IN (
+                    SELECT id FROM search_history WHERE user_id = %s
+                    ORDER BY searched_at DESC LIMIT 10
+                )
+                """,
+                (user_id, user_id),
+            )
+
+    def get_search_history(self, user_id: int, limit: int = 10) -> list[str]:
+        """Get user's search history."""
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                """
+                SELECT query FROM search_history
+                WHERE user_id = %s
+                ORDER BY searched_at DESC
+                LIMIT %s
+                """,
+                (user_id, limit),
+            )
+            return [row[0] for row in cursor.fetchall()]
+
+    def clear_search_history(self, user_id: int) -> None:
+        """Clear user's search history."""
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("DELETE FROM search_history WHERE user_id = %s", (user_id,))

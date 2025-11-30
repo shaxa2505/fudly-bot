@@ -6,6 +6,7 @@ import { transliterateCity, getSavedLocation, saveLocation, DEFAULT_LOCATION } f
 import OfferCard from '../components/OfferCard'
 import BottomNav from '../components/BottomNav'
 import PullToRefresh from '../components/PullToRefresh'
+import RecentlyViewed from '../components/RecentlyViewed'
 import { usePullToRefresh } from '../hooks/usePullToRefresh'
 import './HomePage.css'
 
@@ -34,6 +35,11 @@ function HomePage() {
   const [manualCity, setManualCity] = useState(location.city)
   const [manualAddress, setManualAddress] = useState(location.address)
 
+  // Search history state
+  const [searchHistory, setSearchHistory] = useState([])
+  const [showSearchHistory, setShowSearchHistory] = useState(false)
+  const searchInputRef = useRef(null)
+
   // Use cart from context instead of local state
   const { addToCart, removeFromCart, getQuantity, cartCount } = useCart()
 
@@ -60,6 +66,62 @@ function HomePage() {
   useEffect(() => {
     saveLocation(location)
   }, [location])
+
+  // Load search history on mount
+  useEffect(() => {
+    const loadSearchHistory = async () => {
+      const userId = window.Telegram?.WebApp?.initDataUnsafe?.user?.id
+      if (userId) {
+        try {
+          const history = await api.getSearchHistory(userId, 5)
+          setSearchHistory(history)
+        } catch (error) {
+          console.error('Error loading search history:', error)
+        }
+      }
+    }
+    loadSearchHistory()
+  }, [])
+
+  // Save search query to history when searching
+  const handleSearchSubmit = useCallback(async () => {
+    if (searchQuery.trim().length >= 2) {
+      const userId = window.Telegram?.WebApp?.initDataUnsafe?.user?.id
+      if (userId) {
+        try {
+          await api.addSearchHistory(userId, searchQuery.trim())
+          // Update local history
+          setSearchHistory(prev => {
+            const filtered = prev.filter(q => q.toLowerCase() !== searchQuery.trim().toLowerCase())
+            return [searchQuery.trim(), ...filtered].slice(0, 5)
+          })
+        } catch (error) {
+          console.error('Error saving search history:', error)
+        }
+      }
+    }
+    setShowSearchHistory(false)
+  }, [searchQuery])
+
+  // Handle search history item click
+  const handleHistoryClick = (query) => {
+    setSearchQuery(query)
+    setShowSearchHistory(false)
+  }
+
+  // Clear search history
+  const handleClearHistory = async () => {
+    const userId = window.Telegram?.WebApp?.initDataUnsafe?.user?.id
+    if (userId) {
+      try {
+        await api.clearSearchHistory(userId)
+        setSearchHistory([])
+      } catch (error) {
+        console.error('Error clearing search history:', error)
+      }
+    }
+    setShowSearchHistory(false)
+  }
 
   // Автоопределение локации при первом запуске
   useEffect(() => {
@@ -335,16 +397,45 @@ function HomePage() {
             <path d="M21 21l-4.35-4.35" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
           </svg>
           <input
+            ref={searchInputRef}
             type="text"
             className="search-input"
             placeholder="Mahsulot qidirish..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
+            onFocus={() => setShowSearchHistory(true)}
+            onBlur={() => setTimeout(() => setShowSearchHistory(false), 200)}
+            onKeyDown={(e) => e.key === 'Enter' && handleSearchSubmit()}
           />
           {searchQuery && (
             <button className="search-clear" onClick={() => setSearchQuery('')}>
               ✕
             </button>
+          )}
+
+          {/* Search History Dropdown */}
+          {showSearchHistory && searchHistory.length > 0 && !searchQuery && (
+            <div className="search-history-dropdown">
+              <div className="search-history-header">
+                <span>So'nggi qidiruvlar</span>
+                <button className="search-history-clear" onClick={handleClearHistory}>
+                  Tozalash
+                </button>
+              </div>
+              {searchHistory.map((query, index) => (
+                <button
+                  key={index}
+                  className="search-history-item"
+                  onMouseDown={() => handleHistoryClick(query)}
+                >
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                    <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="2"/>
+                    <path d="M12 6v6l4 2" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+                  </svg>
+                  <span>{query}</span>
+                </button>
+              ))}
+            </div>
           )}
         </div>
       </header>
@@ -434,6 +525,11 @@ function HomePage() {
           ))}
         </div>
       </div>
+
+      {/* Recently Viewed - Show only on home without search */}
+      {selectedCategory === 'all' && !searchQuery && (
+        <RecentlyViewed />
+      )}
 
       {/* Popular Nearby - Horizontal Scroll */}
       {offers.length > 0 && selectedCategory === 'all' && !searchQuery && (

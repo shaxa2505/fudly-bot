@@ -679,7 +679,9 @@ async def create_webhook_app(
                                 offer = db.get_offer(b[1])
                                 if offer:
                                     # Try photo or photo_id field
-                                    photo_file_id = get_offer_value(offer, "photo") or get_offer_value(offer, "photo_id")
+                                    photo_file_id = get_offer_value(
+                                        offer, "photo"
+                                    ) or get_offer_value(offer, "photo_id")
                                     if photo_file_id:
                                         try:
                                             file = await bot.get_file(photo_file_id)
@@ -863,6 +865,134 @@ async def create_webhook_app(
             )
         )
 
+    async def api_add_recently_viewed(request: web.Request) -> web.Response:
+        """POST /api/v1/user/recently-viewed - Add offer to recently viewed."""
+        try:
+            data = await request.json()
+            user_id = data.get("user_id")
+            offer_id = data.get("offer_id")
+
+            if not user_id or not offer_id:
+                return add_cors_headers(
+                    web.json_response({"error": "user_id and offer_id required"}, status=400)
+                )
+
+            if hasattr(db, "add_recently_viewed"):
+                db.add_recently_viewed(int(user_id), int(offer_id))
+                return add_cors_headers(web.json_response({"success": True}))
+            else:
+                return add_cors_headers(
+                    web.json_response({"error": "Feature not available"}, status=501)
+                )
+        except Exception as e:
+            logger.error(f"API add recently viewed error: {e}")
+            return add_cors_headers(web.json_response({"error": str(e)}, status=500))
+
+    async def api_get_recently_viewed(request: web.Request) -> web.Response:
+        """GET /api/v1/user/recently-viewed - Get user's recently viewed offers."""
+        try:
+            user_id = request.query.get("user_id")
+            limit = int(request.query.get("limit", "20"))
+
+            if not user_id:
+                return add_cors_headers(
+                    web.json_response({"error": "user_id required"}, status=400)
+                )
+
+            if hasattr(db, "get_recently_viewed"):
+                offers = db.get_recently_viewed(int(user_id), limit=limit)
+                # Format offers like api_offers does
+                formatted_offers = []
+                for offer in offers:
+                    formatted_offers.append(
+                        {
+                            "id": offer.get("id"),
+                            "name": offer.get("name", ""),
+                            "description": offer.get("description", ""),
+                            "old_price": float(offer.get("old_price", 0)),
+                            "price": float(offer.get("price", 0)),
+                            "category_id": offer.get("category_id"),
+                            "store_id": offer.get("store_id"),
+                            "photo": offer.get("photo"),
+                            "photo_id": offer.get("photo_id"),
+                            "available": offer.get("available", True),
+                            "viewed_at": offer.get("viewed_at", ""),
+                        }
+                    )
+                return add_cors_headers(web.json_response({"offers": formatted_offers}))
+            else:
+                return add_cors_headers(web.json_response({"offers": []}))
+        except Exception as e:
+            logger.error(f"API get recently viewed error: {e}")
+            return add_cors_headers(web.json_response({"error": str(e)}, status=500))
+
+    async def api_add_search_history(request: web.Request) -> web.Response:
+        """POST /api/v1/user/search-history - Add search query to history."""
+        try:
+            data = await request.json()
+            user_id = data.get("user_id")
+            query = data.get("query", "").strip()
+
+            if not user_id or not query:
+                return add_cors_headers(
+                    web.json_response({"error": "user_id and query required"}, status=400)
+                )
+
+            if len(query) < 2:
+                return add_cors_headers(web.json_response({"error": "Query too short"}, status=400))
+
+            if hasattr(db, "add_search_query"):
+                db.add_search_query(int(user_id), query)
+                return add_cors_headers(web.json_response({"success": True}))
+            else:
+                return add_cors_headers(
+                    web.json_response({"error": "Feature not available"}, status=501)
+                )
+        except Exception as e:
+            logger.error(f"API add search history error: {e}")
+            return add_cors_headers(web.json_response({"error": str(e)}, status=500))
+
+    async def api_get_search_history(request: web.Request) -> web.Response:
+        """GET /api/v1/user/search-history - Get user's search history."""
+        try:
+            user_id = request.query.get("user_id")
+            limit = int(request.query.get("limit", "10"))
+
+            if not user_id:
+                return add_cors_headers(
+                    web.json_response({"error": "user_id required"}, status=400)
+                )
+
+            if hasattr(db, "get_search_history"):
+                history = db.get_search_history(int(user_id), limit=limit)
+                return add_cors_headers(web.json_response({"history": history}))
+            else:
+                return add_cors_headers(web.json_response({"history": []}))
+        except Exception as e:
+            logger.error(f"API get search history error: {e}")
+            return add_cors_headers(web.json_response({"error": str(e)}, status=500))
+
+    async def api_clear_search_history(request: web.Request) -> web.Response:
+        """DELETE /api/v1/user/search-history - Clear user's search history."""
+        try:
+            user_id = request.query.get("user_id")
+
+            if not user_id:
+                return add_cors_headers(
+                    web.json_response({"error": "user_id required"}, status=400)
+                )
+
+            if hasattr(db, "clear_search_history"):
+                db.clear_search_history(int(user_id))
+                return add_cors_headers(web.json_response({"success": True}))
+            else:
+                return add_cors_headers(
+                    web.json_response({"error": "Feature not available"}, status=501)
+                )
+        except Exception as e:
+            logger.error(f"API clear search history error: {e}")
+            return add_cors_headers(web.json_response({"error": str(e)}, status=500))
+
     # Register routes
     path_main = webhook_path if webhook_path.startswith("/") else f"/{webhook_path}"
     path_alt = path_main.rstrip("/") + "/"
@@ -902,6 +1032,15 @@ async def create_webhook_app(
     app.router.add_post("/api/v1/orders/{order_id}/payment-proof", api_upload_payment_proof)
     app.router.add_get("/api/v1/health", api_health)
     app.router.add_get("/api/v1/debug", api_debug)
+
+    # User history routes (recently viewed, search history)
+    app.router.add_options("/api/v1/user/recently-viewed", cors_preflight)
+    app.router.add_post("/api/v1/user/recently-viewed", api_add_recently_viewed)
+    app.router.add_get("/api/v1/user/recently-viewed", api_get_recently_viewed)
+    app.router.add_options("/api/v1/user/search-history", cors_preflight)
+    app.router.add_post("/api/v1/user/search-history", api_add_search_history)
+    app.router.add_get("/api/v1/user/search-history", api_get_search_history)
+    app.router.add_delete("/api/v1/user/search-history", api_clear_search_history)
 
     # Setup WebSocket routes for real-time notifications
     setup_websocket_routes(app)

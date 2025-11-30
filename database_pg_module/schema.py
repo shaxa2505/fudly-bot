@@ -271,6 +271,33 @@ class SchemaMixin:
             """
             )
 
+            # Recently viewed offers table
+            cursor.execute(
+                """
+                CREATE TABLE IF NOT EXISTS recently_viewed (
+                    id SERIAL PRIMARY KEY,
+                    user_id BIGINT NOT NULL,
+                    offer_id INTEGER NOT NULL,
+                    viewed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    FOREIGN KEY (user_id) REFERENCES users(user_id),
+                    FOREIGN KEY (offer_id) REFERENCES offers(offer_id)
+                )
+            """
+            )
+
+            # Search history table
+            cursor.execute(
+                """
+                CREATE TABLE IF NOT EXISTS search_history (
+                    id SERIAL PRIMARY KEY,
+                    user_id BIGINT NOT NULL,
+                    query TEXT NOT NULL,
+                    searched_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    FOREIGN KEY (user_id) REFERENCES users(user_id)
+                )
+            """
+            )
+
             # Platform settings table (for payment card, etc)
             cursor.execute(
                 """

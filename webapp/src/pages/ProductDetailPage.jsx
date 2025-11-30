@@ -1,7 +1,8 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { useCart } from '../context/CartContext'
 import { useFavorites } from '../context/FavoritesContext'
+import api from '../api/client'
 import './ProductDetailPage.css'
 
 function ProductDetailPage() {
@@ -14,6 +15,16 @@ function ProductDetailPage() {
   const [quantity, setQuantity] = useState(1)
   const [addedToCart, setAddedToCart] = useState(false)
   const [imgError, setImgError] = useState(false)
+
+  // Track recently viewed
+  useEffect(() => {
+    if (offer?.id) {
+      const userId = window.Telegram?.WebApp?.initDataUnsafe?.user?.id
+      if (userId) {
+        api.addRecentlyViewed(userId, offer.id).catch(() => {})
+      }
+    }
+  }, [offer?.id])
 
   // Get image URL - support multiple field names
   const imageUrl = offer?.image_url || offer?.photo || ''
