@@ -1,4 +1,5 @@
 import axios from 'axios'
+import { captureException } from '../utils/sentry'
 
 const API_BASE = import.meta.env.VITE_API_URL || 'https://fudly-bot-production.up.railway.app/api/v1'
 
@@ -48,6 +49,16 @@ client.interceptors.response.use(
       const backoffDelay = RETRY_CONFIG.retryDelay * Math.pow(2, config.__retryCount - 1)
       await delay(backoffDelay)
       return client(config)
+    }
+
+    // Log failed requests to Sentry (after all retries exhausted)
+    if (error.response?.status >= 400) {
+      captureException(error, {
+        url: config?.url,
+        method: config?.method,
+        status: error.response?.status,
+        data: error.response?.data,
+      })
     }
 
     return Promise.reject(error)

@@ -19,9 +19,6 @@ from typing import Any
 from aiogram import F, Router, types
 from aiogram.fsm.context import FSMContext
 
-# =============================================================================
-# CONFIGURATION
-# =============================================================================
 from app.core.bootstrap import build_application
 from app.core.config import load_settings
 from app.core.security import (
@@ -29,8 +26,17 @@ from app.core.security import (
     logger,
     start_background_tasks,
 )
+from app.integrations.sentry_integration import init_sentry
 from database_protocol import DatabaseProtocol
 
+# =============================================================================
+# SENTRY INITIALIZATION (must be early)
+# =============================================================================
+init_sentry()
+
+# =============================================================================
+# CONFIGURATION
+# =============================================================================
 # Load typed settings
 settings = load_settings()
 
