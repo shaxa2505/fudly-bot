@@ -164,26 +164,32 @@
 }
 
 .qty-btn {
-  width: 28px;
-  height: 28px;
+  width: 32px;
+  height: 32px;
   border: none;
-  border-radius: var(--radius-sm);
-  background: var(--color-bg-primary);
-  font-size: var(--font-lg);
-  color: var(--color-text-tertiary);
+  border-radius: 8px;
+  background: #E8E8E8;
+  font-size: 18px;
+  font-weight: 600;
+  color: #999999;
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
+  transition: all 0.15s ease;
 }
 
 .qty-btn.plus {
-  background: var(--color-primary);
-  color: var(--color-text-inverse);
+  background: #E8F5E9;
+  color: #53B175;
 }
 
 .qty-btn:active {
-  transform: scale(0.9);
+  transform: scale(0.92);
+}
+
+.qty-btn.plus:active {
+  background: #C8E6C9;
 }
 
 .qty-value {

@@ -131,7 +131,7 @@
 
 .store-name {
   font-size: 11px;
-  color: #22C55E;
+  color: #888888;
   font-weight: 600;
   line-height: 1;
   margin-bottom: 6px;
@@ -218,53 +218,53 @@
 .quantity-control {
   display: flex;
   align-items: center;
+  justify-content: center;
+  gap: 4px;
   width: 100%;
   height: 48px;
   background: #F5F5F5;
   border-radius: 14px;
-  padding: 5px;
+  padding: 4px;
   box-sizing: border-box;
 }
 
 .qty-btn {
-  width: 38px;
-  height: 38px;
+  width: 40px;
+  height: 40px;
   display: flex;
   align-items: center;
   justify-content: center;
   border: none;
-  border-radius: 12px;
-  background: #FFFFFF;
-  color: #333333;
-  font-size: 24px;
-  font-weight: 300;
+  border-radius: 10px;
+  background: #E8E8E8;
+  color: #999999;
+  font-size: 20px;
+  font-weight: 600;
   cursor: pointer;
   padding: 0;
   line-height: 1;
   flex-shrink: 0;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
-  transition: background 0.15s ease;
+  transition: all 0.15s ease;
 }
 
 .qty-btn:active {
-  background: #EEEEEE;
+  transform: scale(0.92);
 }
 
 .qty-btn.qty-plus {
-  background: linear-gradient(135deg, #22C55E 0%, #16A34A 100%);
-  color: #FFFFFF;
-  box-shadow: 0 2px 6px rgba(34, 197, 94, 0.3);
+  background: #E8F5E9;
+  color: #53B175;
 }
 
 .qty-btn.qty-plus:active {
-  opacity: 0.9;
+  background: #C8E6C9;
 }
 
 .qty-num {
-  flex: 1;
+  min-width: 40px;
   text-align: center;
   font-size: 18px;
-  font-weight: 800;
-  color: #1A1A1A;
+  font-weight: 700;
+  color: #333333;
   line-height: 1;
 }

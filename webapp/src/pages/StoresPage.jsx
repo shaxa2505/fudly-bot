@@ -160,18 +160,21 @@ function StoresPage() {
               >
                 {/* Store Image */}
                 <div className="sp-card-image">
-                  {store.photo_url ? (
+                  {store.photo_url && (
                     <img
                       src={store.photo_url}
                       alt={store.name}
+                      className="sp-card-img"
                       onError={(e) => {
                         e.target.style.display = 'none'
-                        e.target.nextSibling.style.display = 'flex'
+                        e.target.parentNode.querySelector('.sp-card-placeholder').style.display = 'flex'
                       }}
                     />
-                  ) : null}
+                  )}
                   <div className="sp-card-placeholder" style={{ display: store.photo_url ? 'none' : 'flex' }}>
-                    <span>{getTypeIcon(store.business_type)}</span>
+                    <svg width="40" height="40" viewBox="0 0 24 24" fill="none">
+                      <path d="M3 21h18M3 7v14M21 7v14M6 7V4a1 1 0 011-1h10a1 1 0 011 1v3M12 11v6M9 14h6" stroke="#bbb" strokeWidth="1.5" strokeLinecap="round"/>
+                    </svg>
                   </div>
                   {store.offers_count > 0 && (
                     <span className="sp-card-badge">{store.offers_count} ta</span>

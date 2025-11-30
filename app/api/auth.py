@@ -5,6 +5,7 @@ Validates initData from Telegram WebApp and returns user profile
 import hashlib
 import hmac
 import json
+import logging
 from datetime import datetime
 from typing import Any
 from urllib.parse import parse_qsl
@@ -13,6 +14,8 @@ from fastapi import APIRouter, Depends, HTTPException, Header
 from pydantic import BaseModel
 
 from app.core.config import load_settings
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/v1", tags=["auth"])
 settings = load_settings()

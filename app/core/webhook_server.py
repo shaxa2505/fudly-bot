@@ -678,7 +678,8 @@ async def create_webhook_app(
                             try:
                                 offer = db.get_offer(b[1])
                                 if offer:
-                                    photo_file_id = get_offer_value(offer, "photo_file_id")
+                                    # Try photo or photo_id field
+                                    photo_file_id = get_offer_value(offer, "photo") or get_offer_value(offer, "photo_id")
                                     if photo_file_id:
                                         try:
                                             file = await bot.get_file(photo_file_id)

@@ -12,7 +12,7 @@ import './HomePage.css'
 const CATEGORIES = [
   { id: 'all', name: 'Hammasi', icon: '🔥', color: '#FF6B35' },
   { id: 'dairy', name: 'Sut', icon: '🥛', color: '#2196F3' },
-  { id: 'snacks', name: 'Gazaklar', icon: '🍪', color: '#FF9800' },
+  { id: 'snacks', name: 'Yengil taom', icon: '🍪', color: '#FF9800' },
   { id: 'drinks', name: 'Ichimlik', icon: '🧃', color: '#4CAF50' },
   { id: 'bakery', name: 'Non', icon: '🍞', color: '#8D6E63' },
   { id: 'meat', name: "Go'sht", icon: '🥩', color: '#E53935' },
@@ -391,12 +391,23 @@ function HomePage() {
       </div>
 
       {/* Hero Banner */}
-      <div className="hero-banner">
+      <div className="hero-banner" onClick={() => {
+        setSelectedCategory('all')
+        setTimeout(() => {
+          document.querySelector('.section-header')?.scrollIntoView({ behavior: 'smooth' })
+        }, 100)
+      }}>
         <div className="hero-content">
           <div className="hero-badge">🔥 Bugungi taklif</div>
-          <h2 className="hero-title">40% gacha chegirma</h2>
+          <h2 className="hero-title">70% gacha chegirma</h2>
           <p className="hero-subtitle">Tanlangan mahsulotlarga</p>
-          <button className="hero-btn" onClick={() => setSelectedCategory('all')}>
+          <button className="hero-btn" onClick={(e) => {
+            e.stopPropagation()
+            setSelectedCategory('all')
+            setTimeout(() => {
+              document.querySelector('.section-header')?.scrollIntoView({ behavior: 'smooth' })
+            }, 100)
+          }}>
             Ko'rish
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
               <path d="M5 12h14M12 5l7 7-7 7" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>

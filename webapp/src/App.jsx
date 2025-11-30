@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { MemoryRouter, Routes, Route, useNavigate, useLocation } from 'react-router-dom'
 import { FavoritesProvider } from './context/FavoritesContext'
+import api from './api/client'
 import HomePage from './pages/HomePage'
 import CartPage from './pages/CartPage'
 import YanaPage from './pages/YanaPage'
@@ -33,6 +34,10 @@ function AppContent() {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
+    initializeApp()
+  }, [])
+
+  const initializeApp = async () => {
     // Initialize Telegram WebApp
     const tg = window.Telegram?.WebApp
 
@@ -44,14 +49,41 @@ function AppContent() {
       // Get user from Telegram
       const tgUser = tg.initDataUnsafe?.user
       if (tgUser) {
-        setUser({
+        const userData = {
           id: tgUser.id,
           first_name: tgUser.first_name || 'User',
           last_name: tgUser.last_name || '',
           username: tgUser.username || '',
           photo_url: tgUser.photo_url,
           language_code: tgUser.language_code || 'uz',
-        })
+        }
+        setUser(userData)
+
+        // Sync with backend to get full profile (phone, city from bot registration)
+        try {
+          const profile = await api.getProfile(tgUser.id)
+          if (profile) {
+            const fullUser = {
+              ...userData,
+              phone: profile.phone,
+              city: profile.city,
+              language: profile.language,
+              registered: profile.registered,
+            }
+            setUser(fullUser)
+            // Save to localStorage for other components
+            localStorage.setItem('fudly_user', JSON.stringify(fullUser))
+            if (profile.phone) {
+              localStorage.setItem('fudly_phone', profile.phone)
+            }
+            if (profile.city) {
+              localStorage.setItem('fudly_location', JSON.stringify({ city: profile.city }))
+            }
+          }
+        } catch (error) {
+          console.log('Profile sync:', error.message)
+          // User not registered yet - that's ok
+        }
       }
 
       // Theme colors
@@ -61,7 +93,7 @@ function AppContent() {
     }
 
     setLoading(false)
-  }, [])
+  }
 
   // Handle Telegram back button
   useEffect(() => {
