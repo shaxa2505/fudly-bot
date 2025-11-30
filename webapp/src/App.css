@@ -1,5 +1,10 @@
+/**
+ * App Root Styles
+ * Uses CSS Variables from design-tokens.css
+ */
+
 .app {
   min-height: 100vh;
-  background: #f5f5f5;
+  background: var(--color-bg-secondary);
   position: relative;
 }

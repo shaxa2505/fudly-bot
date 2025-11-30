@@ -1,12 +1,17 @@
+/**
+ * Bottom Navigation Component
+ * Uses CSS Variables from design-tokens.css
+ */
+
 .bottom-nav {
   position: fixed;
   bottom: 0;
   left: 0;
   right: 0;
-  background: #FFFFFF;
+  background: var(--color-bg-primary);
   border-top: none;
-  z-index: 1000;
-  padding-bottom: env(safe-area-inset-bottom, 0);
+  z-index: var(--z-modal);
+  padding-bottom: var(--safe-area-bottom);
   box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.08);
 }
 
@@ -14,7 +19,7 @@
   display: flex;
   justify-content: space-around;
   align-items: center;
-  padding: 10px 8px 8px;
+  padding: var(--spacing-md) var(--spacing-sm) var(--spacing-sm);
   max-width: 600px;
   margin: 0 auto;
 }
@@ -23,18 +28,23 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 4px;
+  gap: var(--spacing-xs);
   background: none;
   border: none;
-  padding: 8px 12px;
+  padding: var(--spacing-sm) var(--spacing-md);
   min-width: 64px;
-  transition: all 0.2s ease;
-  border-radius: 12px;
+  transition: all var(--transition-normal);
+  border-radius: var(--radius-lg);
 }
 
 .nav-item:active {
   transform: scale(0.92);
-  background: rgba(83, 177, 117, 0.1);
+  background: var(--color-primary-light);
+}
+
+.nav-item:focus-visible {
+  outline: 3px solid var(--color-primary);
+  outline-offset: 2px;
 }
 
 .nav-item.active {
@@ -52,12 +62,12 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: transform 0.2s ease;
+  transition: transform var(--transition-normal);
 }
 
 .nav-icon svg {
-  width: 24px;
-  height: 24px;
+  width: var(--icon-size-md);
+  height: var(--icon-size-md);
 }
 
 .nav-item.active .nav-icon {
@@ -68,10 +78,10 @@
   position: absolute;
   top: -6px;
   right: -10px;
-  background: #FF3B30;
-  color: white;
+  background: var(--color-error);
+  color: var(--color-text-inverse);
   font-size: 11px;
-  font-weight: 700;
+  font-weight: var(--font-bold);
   min-width: 18px;
   height: 18px;
   border-radius: 9px;
@@ -84,29 +94,30 @@
 
 .nav-label {
   font-size: 11px;
-  font-weight: 600;
-  color: #7C7C7C;
-  transition: all 0.2s ease;
+  font-weight: var(--font-semibold);
+  color: var(--color-text-secondary);
+  transition: all var(--transition-normal);
   white-space: nowrap;
 }
 
 .nav-item.active .nav-label {
-  color: #53B175;
-  font-weight: 700;
+  color: var(--color-primary);
+  font-weight: var(--font-bold);
 }
 
 /* Fix for very small screens */
 @media (max-width: 360px) {
   .nav-label {
-    font-size: 10px;
+    font-size: var(--font-2xs);
   }
 
-  .nav-icon {
-    font-size: 20px;
+  .nav-icon svg {
+    width: 20px;
+    height: 20px;
   }
 
   .nav-item {
     min-width: 50px;
-    padding: 4px 4px;
+    padding: var(--spacing-xs);
   }
 }

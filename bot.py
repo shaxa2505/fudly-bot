@@ -256,90 +256,94 @@ async def fallback_text_handler(message: types.Message, state: FSMContext) -> No
 
 
 @fallback_router.callback_query(F.data.startswith("order_accept:"))
-async def handle_order_accept(callback: types.CallbackQuery, db: DatabaseProtocol = None) -> None:
+async def handle_order_accept(callback: types.CallbackQuery, db: DatabaseProtocol) -> None:
     """Handle seller accepting Mini App order."""
     try:
         parts = callback.data.split(":")
         if len(parts) != 3:
             await callback.answer("Ошибка данных", show_alert=True)
             return
-        
+
         _, booking_code, customer_id = parts
-        
+        logger.info(f"Order accept: code={booking_code}, customer={customer_id}")
+
         # Update booking status in database
+        booking = None
+        booking_id = None
         if db and hasattr(db, "get_booking_by_code"):
             booking = db.get_booking_by_code(booking_code)
+            logger.info(f"Found booking: {booking}")
             if booking:
-                booking_id = booking.get("booking_id") or booking[0] if isinstance(booking, tuple) else None
+                booking_id = booking.get("booking_id") if isinstance(booking, dict) else booking[0]
                 if booking_id and hasattr(db, "update_booking_status"):
                     db.update_booking_status(booking_id, "confirmed")
                     logger.info(f"Booking {booking_id} ({booking_code}) confirmed by seller")
-        
+
         # Update message to show accepted
         await callback.message.edit_text(
-            callback.message.text + "\n\n✅ <b>Заказ принят!</b>",
-            parse_mode="HTML"
+            callback.message.text + "\n\n✅ <b>Заказ принят!</b>", parse_mode="HTML"
         )
-        
+
         # Notify customer
         try:
             await callback.bot.send_message(
                 chat_id=int(customer_id),
                 text=f"🎉 <b>Ваш заказ принят!</b>\n\n"
-                     f"🎫 Код бронирования: <code>{booking_code}</code>\n\n"
-                     f"Продавец подтвердил ваш заказ. Ожидайте дальнейших инструкций!",
-                parse_mode="HTML"
+                f"🎫 Код бронирования: <code>{booking_code}</code>\n\n"
+                f"Продавец подтвердил ваш заказ. Ожидайте дальнейших инструкций!",
+                parse_mode="HTML",
             )
         except Exception as e:
             logger.warning(f"Failed to notify customer {customer_id}: {e}")
-        
+
         await callback.answer("Заказ принят! Покупатель уведомлен.", show_alert=True)
-        
+
     except Exception as e:
         logger.error(f"Error accepting order: {e}")
         await callback.answer("Ошибка при обработке", show_alert=True)
 
 
 @fallback_router.callback_query(F.data.startswith("order_reject:"))
-async def handle_order_reject(callback: types.CallbackQuery, db: DatabaseProtocol = None) -> None:
+async def handle_order_reject(callback: types.CallbackQuery, db: DatabaseProtocol) -> None:
     """Handle seller rejecting Mini App order."""
     try:
         parts = callback.data.split(":")
         if len(parts) != 3:
             await callback.answer("Ошибка данных", show_alert=True)
             return
-        
+
         _, booking_code, customer_id = parts
-        
+        logger.info(f"Order reject: code={booking_code}, customer={customer_id}")
+
         # Update booking status in database
         if db and hasattr(db, "get_booking_by_code"):
             booking = db.get_booking_by_code(booking_code)
+            logger.info(f"Found booking for rejection: {booking}")
             if booking:
-                booking_id = booking.get("booking_id") or booking[0] if isinstance(booking, tuple) else None
+                booking_id = booking.get("booking_id") if isinstance(booking, dict) else booking[0]
                 if booking_id and hasattr(db, "update_booking_status"):
                     db.update_booking_status(booking_id, "cancelled")
                     logger.info(f"Booking {booking_id} ({booking_code}) rejected by seller")
-        
+
         # Update message to show rejected
         await callback.message.edit_text(
-            callback.message.text + "\n\n❌ <b>Заказ отклонён</b>",
-            parse_mode="HTML"
+            callback.message.text + "\n\n❌ <b>Заказ отклонён</b>", parse_mode="HTML"
         )
-        
+
         # Notify customer
         try:
             await callback.bot.send_message(
                 chat_id=int(customer_id),
                 text=f"😔 <b>К сожалению, ваш заказ отклонён</b>\n\n"
-                     f"🎫 Код: <code>{booking_code}</code>\n\n"
-                     f"Продавец не может выполнить ваш заказ. Попробуйте выбрать другой товар.",
-                parse_mode="HTML"
+                f"🎫 Код: <code>{booking_code}</code>\n\n"
+                f"Продавец не может выполнить ваш заказ. Попробуйте выбрать другой товар.",
+                parse_mode="HTML",
             )
         except Exception as e:
             logger.warning(f"Failed to notify customer {customer_id}: {e}")
-        
+
         await callback.answer("Заказ отклонён. Покупатель уведомлен.", show_alert=True)
-        
+
     except Exception as e:
         logger.error(f"Error rejecting order: {e}")
         await callback.answer("Ошибка при обработке", show_alert=True)
@@ -373,8 +377,8 @@ def _register_handlers() -> None:
     from handlers.admin import legacy as admin_legacy
     from handlers.admin import panel as admin_panel
     from handlers.admin import stats as admin_stats
-    from handlers.common.router import router as common_router
     from handlers.common import webapp as webapp_handler
+    from handlers.common.router import router as common_router
     from handlers.customer import (
         favorites,
         profile,

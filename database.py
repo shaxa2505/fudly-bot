@@ -1811,22 +1811,42 @@ class Database:
             logger.error(f"Failed to convert booking {booking_id} to model: {e}")
             return None
 
-    def get_booking_by_code(self, booking_code: str) -> tuple | None:
-        """Получить бронирование по коду"""
+    def get_booking_by_code(self, booking_code: str, any_status: bool = False) -> tuple | None:
+        """Получить бронирование по коду.
+
+        Args:
+            booking_code: Код бронирования
+            any_status: Если True, ищет среди всех статусов. Если False - только pending.
+        """
         conn = self.get_connection()
         try:
             cursor = conn.cursor()
-            cursor.execute(
-                """
-                SELECT b.booking_id, b.offer_id, b.user_id, b.status, b.booking_code,
-                       b.pickup_time, COALESCE(b.quantity, 1) as quantity, b.created_at,
-                       u.first_name, u.username
-                FROM bookings b
-                JOIN users u ON b.user_id = u.user_id
-                WHERE b.booking_code = ? AND b.status = 'pending'
-            """,
-                (booking_code,),
-            )
+            if any_status:
+                cursor.execute(
+                    """
+                    SELECT b.booking_id, b.offer_id, b.user_id, b.status, b.booking_code,
+                           b.pickup_time, COALESCE(b.quantity, 1) as quantity, b.created_at,
+                           u.first_name, u.username
+                    FROM bookings b
+                    JOIN users u ON b.user_id = u.user_id
+                    WHERE b.booking_code = ?
+                    ORDER BY b.created_at DESC
+                    LIMIT 1
+                """,
+                    (booking_code,),
+                )
+            else:
+                cursor.execute(
+                    """
+                    SELECT b.booking_id, b.offer_id, b.user_id, b.status, b.booking_code,
+                           b.pickup_time, COALESCE(b.quantity, 1) as quantity, b.created_at,
+                           u.first_name, u.username
+                    FROM bookings b
+                    JOIN users u ON b.user_id = u.user_id
+                    WHERE b.booking_code = ? AND b.status = 'pending'
+                """,
+                    (booking_code,),
+                )
             booking = cursor.fetchone()
             return booking
         finally:

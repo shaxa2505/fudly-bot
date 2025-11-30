@@ -6,6 +6,15 @@ import { getSavedLocation, getLatinCity, getCyrillicCity } from '../utils/cityUt
 import BottomNav from '../components/BottomNav'
 import './StoresPage.css'
 
+const BUSINESS_TYPES = [
+  { id: 'all', label: 'Barchasi', icon: '🏪' },
+  { id: 'supermarket', label: 'Supermarket', icon: '🛒' },
+  { id: 'cafe', label: 'Kafe', icon: '☕' },
+  { id: 'restaurant', label: 'Restoran', icon: '🍽️' },
+  { id: 'bakery', label: 'Novvoyxona', icon: '🥖' },
+  { id: 'grocery', label: 'Oziq-ovqat', icon: '🥬' },
+]
+
 function StoresPage() {
   const navigate = useNavigate()
   const { cartCount } = useCart()
@@ -18,19 +27,9 @@ function StoresPage() {
   const [storeOffers, setStoreOffers] = useState([])
   const [loadingOffers, setLoadingOffers] = useState(false)
 
-  // Get current city using shared utils
   const location = getSavedLocation()
   const cityLatin = getLatinCity(location)
   const cityRaw = getCyrillicCity(location.city)
-
-  const BUSINESS_TYPES = [
-    { id: 'all', label: 'Barchasi', icon: '🏪' },
-    { id: 'supermarket', label: 'Supermarket', icon: '🛒' },
-    { id: 'cafe', label: 'Kafe', icon: '☕' },
-    { id: 'restaurant', label: 'Restoran', icon: '🍽️' },
-    { id: 'bakery', label: 'Novvoyxona', icon: '🥖' },
-    { id: 'grocery', label: 'Oziq-ovqat', icon: '🥬' },
-  ]
 
   useEffect(() => {
     loadStores()
@@ -45,7 +44,6 @@ function StoresPage() {
       }
       let data = await api.getStores(params)
 
-      // If no stores found with city filter, try without city
       if ((!data || data.length === 0) && cityRaw) {
         const paramsNoCity = selectedType !== 'all' ? { business_type: selectedType } : {}
         data = await api.getStores(paramsNoCity)
@@ -65,7 +63,7 @@ function StoresPage() {
     setLoadingOffers(true)
     try {
       const offers = await api.getStoreOffers(store.id)
-      setStoreOffers(offers)
+      setStoreOffers(offers || [])
     } catch (error) {
       console.error('Error loading store offers:', error)
       setStoreOffers([])
@@ -74,7 +72,7 @@ function StoresPage() {
     }
   }
 
-  const closeStoreModal = () => {
+  const closeModal = () => {
     setSelectedStore(null)
     setStoreOffers([])
   }
@@ -85,118 +83,102 @@ function StoresPage() {
   )
 
   const getTypeIcon = (type) => {
-    const found = BUSINESS_TYPES.find(t => t.id === type)
-    return found?.icon || '🏪'
+    return BUSINESS_TYPES.find(t => t.id === type)?.icon || '🏪'
   }
 
-  const renderStars = (rating) => {
-    const stars = []
-    const fullStars = Math.floor(rating)
-    const hasHalf = rating % 1 >= 0.5
-
-    for (let i = 0; i < 5; i++) {
-      if (i < fullStars) {
-        stars.push(<span key={i} className="star filled">★</span>)
-      } else if (i === fullStars && hasHalf) {
-        stars.push(<span key={i} className="star half">★</span>)
-      } else {
-        stars.push(<span key={i} className="star empty">★</span>)
-      }
-    }
-    return stars
+  const handleOfferClick = (offer) => {
+    closeModal()
+    navigate('/product', { state: { offer } })
   }
 
   return (
-    <div className="stores-page">
+    <div className="sp">
       {/* Header */}
-      <header className="stores-header">
-        <div className="header-top">
-          <h1 className="page-title">Do'konlar</h1>
-          <span className="city-badge">📍 {cityLatin}</span>
+      <header className="sp-header">
+        <div className="sp-header-top">
+          <h1 className="sp-title">Do'konlar</h1>
+          <span className="sp-city">📍 {cityLatin}</span>
         </div>
 
-        {/* Search */}
-        <div className="search-box">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" className="search-icon">
-            <circle cx="11" cy="11" r="8" stroke="#7C7C7C" strokeWidth="2"/>
-            <path d="M21 21l-4.35-4.35" stroke="#7C7C7C" strokeWidth="2" strokeLinecap="round"/>
+        <div className="sp-search">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+            <circle cx="11" cy="11" r="8" stroke="currentColor" strokeWidth="2"/>
+            <path d="M21 21l-4.35-4.35" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
           </svg>
           <input
             type="text"
-            className="search-input"
             placeholder="Do'kon qidirish..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
           />
           {searchQuery && (
-            <button className="clear-search" onClick={() => setSearchQuery('')}>
-              ✕
-            </button>
+            <button onClick={() => setSearchQuery('')}>✕</button>
           )}
         </div>
       </header>
 
       {/* Type Filters */}
-      <div className="type-filters">
+      <div className="sp-filters">
         {BUSINESS_TYPES.map(type => (
           <button
             key={type.id}
-            className={`type-chip ${selectedType === type.id ? 'active' : ''}`}
+            className={`sp-filter ${selectedType === type.id ? 'active' : ''}`}
             onClick={() => setSelectedType(type.id)}
           >
-            <span className="type-icon">{type.icon}</span>
-            <span className="type-label">{type.label}</span>
+            <span>{type.icon}</span>
+            <span>{type.label}</span>
           </button>
         ))}
       </div>
 
-      {/* Stores List */}
-      <div className="stores-content">
+      {/* Content */}
+      <div className="sp-content">
         {loading ? (
-          <div className="loading-grid">
+          <div className="sp-grid">
             {[...Array(6)].map((_, i) => (
-              <div key={i} className="store-skeleton">
-                <div className="skeleton-header"></div>
-                <div className="skeleton-line"></div>
-                <div className="skeleton-line short"></div>
+              <div key={i} className="sp-card sp-skeleton">
+                <div className="sp-skel-icon"></div>
+                <div className="sp-skel-line"></div>
+                <div className="sp-skel-line short"></div>
               </div>
             ))}
           </div>
         ) : filteredStores.length === 0 ? (
-          <div className="empty-state">
-            <div className="empty-icon">🏪</div>
+          <div className="sp-empty">
+            <span>🏪</span>
             <h3>Do'konlar topilmadi</h3>
-            <p>Bu shaharda hali do'konlar yo'q yoki qidiruv bo'yicha hech narsa topilmadi</p>
+            <p>Bu shaharda hali do'konlar yo'q</p>
           </div>
         ) : (
-          <div className="stores-grid">
+          <div className="sp-grid">
             {filteredStores.map((store, idx) => (
               <div
                 key={store.id}
-                className="store-card"
+                className="sp-card"
                 onClick={() => loadStoreOffers(store)}
                 style={{ animationDelay: `${idx * 0.05}s` }}
               >
-                <div className="store-header">
-                  <span className="store-type-icon">{getTypeIcon(store.business_type)}</span>
+                <div className="sp-card-top">
+                  <span className="sp-card-icon">{getTypeIcon(store.business_type)}</span>
                   {store.offers_count > 0 && (
-                    <span className="offers-badge">{store.offers_count} ta taklif</span>
+                    <span className="sp-card-badge">{store.offers_count}</span>
                   )}
                 </div>
 
-                <h3 className="store-name">{store.name}</h3>
+                <h3 className="sp-card-name">{store.name}</h3>
 
                 {store.address && (
-                  <p className="store-address">📍 {store.address}</p>
+                  <p className="sp-card-addr">📍 {store.address}</p>
                 )}
 
-                <div className="store-footer">
-                  <div className="store-rating">
-                    {renderStars(store.rating || 0)}
-                    <span className="rating-value">{(store.rating || 0).toFixed(1)}</span>
-                  </div>
+                <div className="sp-card-footer">
+                  {store.rating > 0 ? (
+                    <span className="sp-card-rating">
+                      ⭐ {store.rating.toFixed(1)}
+                    </span>
+                  ) : null}
                   {store.delivery_enabled && (
-                    <span className="delivery-badge">🚚 Yetkazib berish</span>
+                    <span className="sp-card-delivery">🚚 Yetkazish</span>
                   )}
                 </div>
               </div>
@@ -205,78 +187,130 @@ function StoresPage() {
         )}
       </div>
 
-      {/* Store Modal */}
+      {/* Bottom Sheet Modal */}
       {selectedStore && (
-        <div className="modal-overlay" onClick={closeStoreModal}>
-          <div className="store-modal" onClick={e => e.stopPropagation()}>
-            <div className="modal-header">
-              <div className="modal-store-info">
-                <span className="modal-type-icon">{getTypeIcon(selectedStore.business_type)}</span>
+        <div className="sp-overlay" onClick={closeModal}>
+          <div className="sp-sheet" onClick={e => e.stopPropagation()}>
+            {/* Drag Handle */}
+            <div className="sp-sheet-handle"></div>
+
+            {/* Header */}
+            <div className="sp-sheet-header">
+              <div className="sp-sheet-info">
+                <span className="sp-sheet-icon">{getTypeIcon(selectedStore.business_type)}</span>
                 <div>
-                  <h2 className="modal-store-name">{selectedStore.name}</h2>
-                  {selectedStore.address && (
-                    <p className="modal-store-address">📍 {selectedStore.address}</p>
+                  <h2>{selectedStore.name}</h2>
+                  {selectedStore.address && <p>📍 {selectedStore.address}</p>}
+                  {selectedStore.rating > 0 && (
+                    <span className="sp-sheet-rating">⭐ {selectedStore.rating.toFixed(1)}</span>
                   )}
                 </div>
               </div>
-              <button className="modal-close" onClick={closeStoreModal}>✕</button>
+              <button className="sp-sheet-close" onClick={closeModal}>
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+                  <path d="M18 6L6 18M6 6l12 12" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+                </svg>
+              </button>
             </div>
 
-            <div className="modal-body">
+            {/* Body */}
+            <div className="sp-sheet-body">
               {loadingOffers ? (
-                <div className="loading-offers">
-                  <div className="spinner"></div>
-                  <p>Takliflar yuklanmoqda...</p>
+                <div className="sp-sheet-loading">
+                  <div className="sp-spinner"></div>
+                  <p>Yuklanmoqda...</p>
                 </div>
               ) : storeOffers.length === 0 ? (
-                <div className="no-offers">
-                  <span className="no-offers-icon">📦</span>
+                <div className="sp-sheet-empty">
+                  <span>📦</span>
                   <p>Hozirda takliflar yo'q</p>
                 </div>
               ) : (
-                <div className="modal-offers">
-                  <h3 className="offers-title">Mavjud takliflar</h3>
-                  <div className="offers-list">
-                    {storeOffers.map(offer => (
-                      <div
-                        key={offer.id}
-                        className="offer-item"
-                        onClick={() => {
-                          closeStoreModal()
-                          navigate('/product', { state: { offerId: offer.id } })
-                        }}
-                      >
-                        <img
-                          src={offer.photo || 'https://via.placeholder.com/60?text=📷'}
-                          alt={offer.title}
-                          className="offer-image"
-                        />
-                        <div className="offer-info">
-                          <h4 className="offer-title">{offer.title}</h4>
-                          <div className="offer-prices">
-                            <span className="offer-discount">{Math.round(offer.discount_price).toLocaleString()} so'm</span>
-                            <span className="offer-original">{Math.round(offer.original_price).toLocaleString()}</span>
-                            <span className="offer-percent">-{Math.round(offer.discount_percent)}%</span>
+                <>
+                  <h3 className="sp-sheet-title">
+                    Mavjud takliflar
+                    <span>({storeOffers.length})</span>
+                  </h3>
+                  <div className="sp-offers">
+                    {storeOffers.map(offer => {
+                      const imgUrl = offer.image_url || offer.photo || ''
+                      // Calculate discount percent if not provided
+                      let discountPercent = 0
+                      if (offer.discount_percent) {
+                        discountPercent = Math.round(offer.discount_percent)
+                      } else if (offer.original_price && offer.discount_price && offer.original_price > offer.discount_price) {
+                        discountPercent = Math.round((1 - offer.discount_price / offer.original_price) * 100)
+                      }
+
+                      return (
+                        <div
+                          key={offer.id}
+                          className="sp-offer"
+                          onClick={() => handleOfferClick(offer)}
+                        >
+                          <div className="sp-offer-img">
+                            {imgUrl ? (
+                              <img
+                                src={imgUrl}
+                                alt=""
+                                onError={(e) => {
+                                  e.target.style.display = 'none'
+                                  e.target.nextSibling.style.display = 'flex'
+                                }}
+                              />
+                            ) : null}
+                            <div className="sp-offer-placeholder" style={{ display: imgUrl ? 'none' : 'flex' }}>
+                              <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+                                <rect x="3" y="3" width="18" height="18" rx="2" stroke="#ccc" strokeWidth="1.5"/>
+                                <circle cx="8.5" cy="8.5" r="1.5" fill="#ccc"/>
+                                <path d="M21 15l-5-5L5 21" stroke="#ccc" strokeWidth="1.5"/>
+                              </svg>
+                            </div>
                           </div>
+                          <div className="sp-offer-info">
+                            <h4>{offer.title}</h4>
+                            <div className="sp-offer-price">
+                              <span className="sp-offer-current">
+                                {Math.round(offer.discount_price).toLocaleString()} so'm
+                              </span>
+                              {offer.original_price > offer.discount_price && (
+                                <span className="sp-offer-old">
+                                  {Math.round(offer.original_price).toLocaleString()}
+                                </span>
+                              )}
+                              {discountPercent > 0 && (
+                                <span className="sp-offer-badge">-{discountPercent}%</span>
+                              )}
+                            </div>
+                          </div>
+                          <svg className="sp-offer-arrow" width="20" height="20" viewBox="0 0 24 24" fill="none">
+                            <path d="M9 18l6-6-6-6" stroke="#999" strokeWidth="2" strokeLinecap="round"/>
+                          </svg>
                         </div>
-                      </div>
-                    ))}
+                      )
+                    })}
                   </div>
-                </div>
+                </>
               )}
             </div>
 
-            <div className="modal-footer">
-              <button
-                className="view-all-btn"
-                onClick={() => {
-                  closeStoreModal()
-                  navigate('/', { state: { storeId: selectedStore.id } })
-                }}
-              >
-                Barcha mahsulotlarni ko'rish →
-              </button>
-            </div>
+            {/* Footer */}
+            {storeOffers.length > 0 && (
+              <div className="sp-sheet-footer">
+                <button
+                  className="sp-sheet-btn"
+                  onClick={() => {
+                    closeModal()
+                    navigate('/', { state: { storeId: selectedStore.id } })
+                  }}
+                >
+                  Barcha mahsulotlarni ko'rish
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+                    <path d="M5 12h14M12 5l7 7-7 7" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                  </svg>
+                </button>
+              </div>
+            )}
           </div>
         </div>
       )}

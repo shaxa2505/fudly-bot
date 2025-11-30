@@ -16,5 +16,30 @@
   <body>
     <div id="root"></div>
     <script type="module" src="/src/main.jsx"></script>
+
+    <!-- Service Worker регистрация -->
+    <script>
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+          navigator.serviceWorker.register('/sw.js')
+            .then(reg => {
+              console.log('[App] Service Worker зарегистрирован:', reg.scope)
+
+              // Проверка обновлений каждые 5 минут
+              setInterval(() => {
+                reg.update()
+              }, 5 * 60 * 1000)
+            })
+            .catch(err => {
+              console.log('[App] Ошибка регистрации SW:', err)
+            })
+        })
+
+        // Уведомление об обновлении
+        navigator.serviceWorker.addEventListener('controllerchange', () => {
+          console.log('[App] Новый Service Worker активирован')
+        })
+      }
+    </script>
   </body>
 </html>

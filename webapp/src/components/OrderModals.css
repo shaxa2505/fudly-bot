@@ -1,15 +1,20 @@
+/**
+ * Order Modals Styles
+ * Uses CSS Variables from design-tokens.css
+ */
+
 .modal-overlay {
   position: fixed;
   top: 0;
   left: 0;
   right: 0;
   bottom: 0;
-  background: rgba(0, 0, 0, 0.5);
+  background: var(--color-bg-overlay);
   z-index: 2000;
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 20px;
+  padding: var(--spacing-xl);
   animation: fadeIn 0.2s ease;
 }
 
@@ -18,9 +23,9 @@
 }
 
 .modal-content {
-  background: white;
-  border-radius: 28px;
-  padding: 32px 24px;
+  background: var(--color-bg-primary);
+  border-radius: var(--radius-3xl);
+  padding: var(--spacing-3xl) var(--spacing-2xl);
   max-width: 420px;
   width: 100%;
   text-align: center;
@@ -32,26 +37,10 @@
   background: transparent;
 }
 
-@keyframes fadeIn {
-  from { opacity: 0; }
-  to { opacity: 1; }
-}
-
-@keyframes slideUp {
-  from {
-    opacity: 0;
-    transform: translateY(30px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
 .modal-close-btn {
   position: absolute;
-  top: 20px;
-  left: 20px;
+  top: var(--spacing-xl);
+  left: var(--spacing-xl);
   width: 40px;
   height: 40px;
   border: none;
@@ -66,16 +55,21 @@
   transform: scale(0.95);
 }
 
+.modal-close-btn:focus-visible {
+  outline: 3px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
 /* Illustration */
 .modal-illustration {
-  margin: 40px 0 32px;
+  margin: var(--spacing-4xl) 0 var(--spacing-3xl);
   position: relative;
 }
 
 .illustration-circle {
   width: 200px;
   height: 200px;
-  border-radius: 50%;
+  border-radius: var(--radius-full);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -88,8 +82,8 @@
 }
 
 .illustration-circle.success {
-  background: #53B175;
-  box-shadow: 0 8px 24px rgba(83, 177, 117, 0.3);
+  background: var(--color-primary);
+  box-shadow: var(--shadow-primary);
 }
 
 .grocery-bag {
@@ -107,20 +101,15 @@
 
 .confetti {
   position: absolute;
-  font-size: 12px;
+  font-size: var(--font-xs);
   animation: float 2s ease-in-out infinite;
 }
 
 .confetti-line {
   position: absolute;
-  font-size: 24px;
-  color: #FF6B35;
+  font-size: var(--font-3xl);
+  color: var(--color-accent);
   animation: rotate 3s ease-in-out infinite;
-}
-
-@keyframes float {
-  0%, 100% { transform: translateY(0); }
-  50% { transform: translateY(-10px); }
 }
 
 @keyframes rotate {
@@ -130,60 +119,70 @@
 
 /* Text */
 .modal-title {
-  font-size: 28px;
-  font-weight: 600;
-  color: #181725;
-  margin: 0 0 12px 0;
-  line-height: 1.3;
+  font-size: var(--font-4xl);
+  font-weight: var(--font-semibold);
+  color: var(--color-text-primary);
+  margin: 0 0 var(--spacing-md) 0;
+  line-height: var(--line-height-tight);
 }
 
 .modal-description {
-  font-size: 16px;
-  color: #7C7C7C;
-  margin: 0 0 32px 0;
-  line-height: 1.5;
+  font-size: var(--font-lg);
+  color: var(--color-text-secondary);
+  margin: 0 0 var(--spacing-3xl) 0;
+  line-height: var(--line-height-relaxed);
 }
 
 /* Buttons */
 .modal-primary-btn {
   width: 100%;
-  padding: 20px;
-  background: #53B175;
-  color: white;
+  padding: var(--spacing-xl);
+  background: var(--color-primary);
+  color: var(--color-text-inverse);
   border: none;
-  border-radius: 19px;
-  font-size: 18px;
-  font-weight: 600;
+  border-radius: var(--radius-2xl);
+  font-size: var(--font-xl);
+  font-weight: var(--font-semibold);
   cursor: pointer;
-  transition: all 0.2s ease;
-  margin-bottom: 16px;
+  transition: all var(--transition-normal);
+  margin-bottom: var(--spacing-lg);
 }
 
 .modal-primary-btn:active {
   transform: scale(0.98);
-  background: #4A9D66;
+  background: var(--color-primary-dark);
+}
+
+.modal-primary-btn:focus-visible {
+  outline: 3px solid var(--color-primary-light);
+  outline-offset: 2px;
 }
 
 .modal-secondary-btn {
   width: 100%;
-  padding: 18px;
+  padding: var(--spacing-xl);
   background: transparent;
-  color: #181725;
+  color: var(--color-text-primary);
   border: none;
-  font-size: 18px;
-  font-weight: 600;
+  font-size: var(--font-xl);
+  font-weight: var(--font-semibold);
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: all var(--transition-normal);
 }
 
 .modal-secondary-btn:active {
   opacity: 0.7;
 }
 
+.modal-secondary-btn:focus-visible {
+  outline: 3px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
 /* Checkout Modal */
 .checkout-modal {
-  background: white;
-  border-radius: 28px 28px 0 0;
+  background: var(--color-bg-primary);
+  border-radius: var(--radius-3xl) var(--radius-3xl) 0 0;
   position: fixed;
   bottom: 0;
   left: 0;
@@ -207,14 +206,14 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 24px 24px 20px;
-  border-bottom: 1px solid #E2E2E2;
+  padding: var(--spacing-2xl) var(--spacing-2xl) var(--spacing-xl);
+  border-bottom: 1px solid var(--color-border);
 }
 
 .checkout-title {
-  font-size: 24px;
-  font-weight: 600;
-  color: #181725;
+  font-size: var(--font-3xl);
+  font-weight: var(--font-semibold);
+  color: var(--color-text-primary);
   margin: 0;
   flex: 1;
   text-align: center;
@@ -222,21 +221,21 @@
 
 .checkout-header .modal-close-btn {
   position: static;
-  margin-right: 12px;
+  margin-right: var(--spacing-md);
 }
 
 .checkout-options {
   flex: 1;
   overflow-y: auto;
-  padding: 20px 24px;
+  padding: var(--spacing-xl) var(--spacing-2xl);
 }
 
 .checkout-row {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 20px 0;
-  border-bottom: 1px solid #E2E2E2;
+  padding: var(--spacing-xl) 0;
+  border-bottom: 1px solid var(--color-border);
 }
 
 .checkout-row.total-row {
@@ -244,20 +243,20 @@
 }
 
 .checkout-label {
-  font-size: 18px;
-  color: #7C7C7C;
-  font-weight: 600;
+  font-size: var(--font-xl);
+  color: var(--color-text-secondary);
+  font-weight: var(--font-semibold);
 }
 
 .checkout-value {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--spacing-sm);
   background: none;
   border: none;
-  font-size: 16px;
-  color: #181725;
-  font-weight: 600;
+  font-size: var(--font-lg);
+  color: var(--color-text-primary);
+  font-weight: var(--font-semibold);
   cursor: pointer;
 }
 
@@ -265,53 +264,68 @@
   opacity: 0.7;
 }
 
+.checkout-value:focus-visible {
+  outline: 3px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
 .total-value {
-  font-size: 18px;
+  font-size: var(--font-xl);
 }
 
 .payment-icon {
-  font-size: 20px;
+  font-size: var(--font-2xl);
 }
 
 .checkout-footer {
-  padding: 20px 24px 32px;
-  border-top: 1px solid #E2E2E2;
+  padding: var(--spacing-xl) var(--spacing-2xl) var(--spacing-3xl);
+  border-top: 1px solid var(--color-border);
 }
 
 .checkout-terms {
-  font-size: 14px;
-  color: #7C7C7C;
-  margin: 0 0 20px 0;
-  line-height: 1.5;
+  font-size: var(--font-base);
+  color: var(--color-text-secondary);
+  margin: 0 0 var(--spacing-xl) 0;
+  line-height: var(--line-height-relaxed);
   text-align: center;
 }
 
 .terms-link {
   background: none;
   border: none;
-  color: #181725;
-  font-weight: 600;
+  color: var(--color-text-primary);
+  font-weight: var(--font-semibold);
   padding: 0;
   cursor: pointer;
   text-decoration: underline;
 }
 
+.terms-link:focus-visible {
+  outline: 3px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
 .place-order-btn {
   width: 100%;
-  padding: 20px;
-  background: #53B175;
-  color: white;
+  padding: var(--spacing-xl);
+  background: var(--color-primary);
+  color: var(--color-text-inverse);
   border: none;
-  border-radius: 19px;
-  font-size: 18px;
-  font-weight: 600;
+  border-radius: var(--radius-2xl);
+  font-size: var(--font-xl);
+  font-weight: var(--font-semibold);
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: all var(--transition-normal);
 }
 
 .place-order-btn:active:not(:disabled) {
   transform: scale(0.98);
-  background: #4A9D66;
+  background: var(--color-primary-dark);
+}
+
+.place-order-btn:focus-visible {
+  outline: 3px solid var(--color-primary-light);
+  outline-offset: 2px;
 }
 
 .place-order-btn:disabled {

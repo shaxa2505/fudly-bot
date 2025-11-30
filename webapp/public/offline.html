@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="theme-color" content="#53B175">
+  <title>Офлайн - Fudly</title>
+  <link rel="manifest" href="/manifest.json">
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', sans-serif;
+      background: linear-gradient(135deg, #f8fdf9 0%, #e8f5ec 100%);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+    }
+
+    .container {
+      text-align: center;
+      max-width: 320px;
+      animation: fadeIn 0.5s ease;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(20px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .offline-icon {
+      width: 120px;
+      height: 120px;
+      background: white;
+      border-radius: 32px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin: 0 auto 24px;
+      box-shadow: 0 8px 32px rgba(83, 177, 117, 0.15);
+    }
+
+    .offline-icon svg {
+      width: 64px;
+      height: 64px;
+      color: #53B175;
+    }
+
+    h1 {
+      font-size: 24px;
+      font-weight: 700;
+      color: #181725;
+      margin-bottom: 12px;
+    }
+
+    p {
+      font-size: 15px;
+      color: #7C7C7C;
+      line-height: 1.6;
+      margin-bottom: 32px;
+    }
+
+    .retry-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      background: #53B175;
+      color: white;
+      border: none;
+      padding: 16px 32px;
+      border-radius: 16px;
+      font-size: 16px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      box-shadow: 0 4px 16px rgba(83, 177, 117, 0.3);
+    }
+
+    .retry-btn:hover {
+      background: #4a9f68;
+      transform: translateY(-2px);
+    }
+
+    .retry-btn:active {
+      transform: scale(0.95);
+    }
+
+    .retry-btn svg {
+      width: 20px;
+      height: 20px;
+    }
+
+    .tips {
+      margin-top: 48px;
+      padding: 20px;
+      background: white;
+      border-radius: 16px;
+      text-align: left;
+    }
+
+    .tips h3 {
+      font-size: 14px;
+      font-weight: 600;
+      color: #181725;
+      margin-bottom: 12px;
+    }
+
+    .tips ul {
+      list-style: none;
+      font-size: 13px;
+      color: #7C7C7C;
+    }
+
+    .tips li {
+      padding: 6px 0;
+      padding-left: 20px;
+      position: relative;
+    }
+
+    .tips li::before {
+      content: '✓';
+      position: absolute;
+      left: 0;
+      color: #53B175;
+    }
+
+    .status {
+      margin-top: 24px;
+      font-size: 13px;
+      color: #B0B0B0;
+    }
+
+    .status.online {
+      color: #53B175;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="offline-icon">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <line x1="1" y1="1" x2="23" y2="23"></line>
+        <path d="M16.72 11.06A10.94 10.94 0 0 1 19 12.55"></path>
+        <path d="M5 12.55a10.94 10.94 0 0 1 5.17-2.39"></path>
+        <path d="M10.71 5.05A16 16 0 0 1 22.58 9"></path>
+        <path d="M1.42 9a15.91 15.91 0 0 1 4.7-2.88"></path>
+        <path d="M8.53 16.11a6 6 0 0 1 6.95 0"></path>
+        <line x1="12" y1="20" x2="12.01" y2="20"></line>
+      </svg>
+    </div>
+
+    <h1>Internet yo'q</h1>
+    <p>Internet aloqasini tekshiring. Aloqa tiklanishi bilan sahifa avtomatik yangilanadi.</p>
+
+    <button class="retry-btn" onclick="location.reload()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <polyline points="23 4 23 10 17 10"></polyline>
+        <polyline points="1 20 1 14 7 14"></polyline>
+        <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
+      </svg>
+      Qayta yuklash
+    </button>
+
+    <div class="tips">
+      <h3>💡 Foydali maslahatlar</h3>
+      <ul>
+        <li>WiFi yoki mobil ma'lumotlarni tekshiring</li>
+        <li>Samolyot rejimini o'chiring</li>
+        <li>Routerni qayta yoqing</li>
+        <li>Boshqa sahifalarga kiring</li>
+      </ul>
+    </div>
+
+    <div class="status" id="status">
+      Aloqa tekshirilmoqda...
+    </div>
+  </div>
+
+  <script>
+    // Проверка статуса сети
+    function updateStatus() {
+      const statusEl = document.getElementById('status')
+      if (navigator.onLine) {
+        statusEl.textContent = '✓ Internet aloqasi tiklandi!'
+        statusEl.className = 'status online'
+        setTimeout(() => location.reload(), 1000)
+      } else {
+        statusEl.textContent = '✕ Hali oflayn'
+        statusEl.className = 'status'
+      }
+    }
+
+    window.addEventListener('online', updateStatus)
+    window.addEventListener('offline', updateStatus)
+
+    // Периодическая проверка
+    setInterval(updateStatus, 5000)
+    updateStatus()
+  </script>
+</body>
+</html>

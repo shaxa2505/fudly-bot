@@ -1,24 +1,28 @@
+/* ===================================
+   ProfilePageNew - мигрировано на CSS Variables
+   =================================== */
+
 .profile-page {
-  background: white;
+  background: var(--color-bg-primary);
   min-height: 100vh;
-  padding-bottom: 100px;
+  padding-bottom: calc(var(--bottom-nav-height) + var(--spacing-xl));
 }
 
 /* User Section */
 .profile-user-section {
   display: flex;
   align-items: center;
-  padding: 40px 24px 24px;
-  border-bottom: 1px solid #E2E2E2;
+  padding: var(--spacing-3xl) var(--spacing-lg) var(--spacing-lg);
+  border-bottom: 1px solid var(--color-border);
   position: relative;
 }
 
 .profile-user-avatar {
   width: 64px;
   height: 64px;
-  border-radius: 32px;
+  border-radius: var(--radius-full);
   overflow: hidden;
-  background: #F2F3F2;
+  background: var(--color-bg-secondary);
   flex-shrink: 0;
 }
 
@@ -30,30 +34,30 @@
 
 .profile-user-info {
   flex: 1;
-  margin-left: 16px;
+  margin-left: var(--spacing-md);
 }
 
 .profile-user-name {
-  font-size: 20px;
-  font-weight: 700;
-  color: #181725;
-  margin: 0 0 4px 0;
+  font-size: var(--font-xl);
+  font-weight: var(--font-bold);
+  color: var(--color-text-primary);
+  margin: 0 0 var(--spacing-2xs) 0;
 }
 
 .profile-user-email {
-  font-size: 16px;
-  color: #7C7C7C;
+  font-size: var(--font-md);
+  color: var(--color-text-secondary);
   margin: 0;
 }
 
 .profile-edit-btn {
   background: none;
   border: none;
-  padding: 8px;
+  padding: var(--spacing-xs);
   cursor: pointer;
   position: absolute;
-  right: 24px;
-  top: 40px;
+  right: var(--spacing-lg);
+  top: var(--spacing-3xl);
 }
 
 .profile-edit-btn:active {
@@ -62,66 +66,66 @@
 
 /* Menu */
 .profile-menu {
-  padding: 12px 0;
+  padding: var(--spacing-sm) 0;
 }
 
 .profile-menu-item {
   width: 100%;
   display: flex;
   align-items: center;
-  padding: 20px 24px;
+  padding: var(--spacing-lg) var(--spacing-lg);
   background: none;
   border: none;
-  border-bottom: 1px solid #E2E2E2;
+  border-bottom: 1px solid var(--color-border);
   cursor: pointer;
   text-align: left;
-  transition: background 0.2s ease;
+  transition: background var(--transition-normal) ease;
 }
 
 .profile-menu-item:active {
-  background: #F8F8F8;
+  background: var(--color-bg-tertiary);
 }
 
 .menu-item-icon {
-  font-size: 24px;
-  margin-right: 16px;
+  font-size: var(--font-2xl);
+  margin-right: var(--spacing-md);
   flex-shrink: 0;
 }
 
 .menu-item-label {
   flex: 1;
-  font-size: 18px;
-  font-weight: 600;
-  color: #181725;
+  font-size: var(--font-lg);
+  font-weight: var(--font-semibold);
+  color: var(--color-text-primary);
 }
 
 .menu-item-arrow {
   flex-shrink: 0;
-  margin-left: 8px;
+  margin-left: var(--spacing-xs);
 }
 
 /* Logout Button */
 .profile-logout-btn {
-  margin: 24px 24px 0;
-  width: calc(100% - 48px);
-  padding: 20px;
-  background: #F2F3F2;
+  margin: var(--spacing-lg) var(--spacing-lg) 0;
+  width: calc(100% - var(--spacing-3xl));
+  padding: var(--spacing-lg);
+  background: var(--color-bg-secondary);
   border: none;
-  border-radius: 19px;
+  border-radius: var(--radius-lg);
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 12px;
-  font-size: 18px;
-  font-weight: 600;
-  color: #53B175;
+  gap: var(--spacing-sm);
+  font-size: var(--font-lg);
+  font-weight: var(--font-semibold);
+  color: var(--color-primary);
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: all var(--transition-normal) ease;
 }
 
 .profile-logout-btn:active {
   transform: scale(0.98);
-  background: #E8E9E8;
+  background: var(--color-bg-tertiary);
 }
 
 /* Responsive */

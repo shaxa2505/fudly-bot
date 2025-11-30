@@ -1,9 +1,14 @@
+/**
+ * Offer Card Component
+ * Uses CSS Variables from design-tokens.css
+ */
+
 .offer-card {
-  background: #FFFFFF;
-  border-radius: 16px;
+  background: var(--color-bg-card);
+  border-radius: var(--radius-2xl);
   overflow: hidden;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
-  transition: all 0.2s ease;
+  box-shadow: var(--shadow-sm);
+  transition: all var(--transition-normal);
   display: flex;
   flex-direction: column;
   cursor: pointer;
@@ -13,12 +18,17 @@
   transform: scale(0.98);
 }
 
+.offer-card:focus-visible {
+  outline: 3px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
 /* Image Container */
 .card-image-container {
   position: relative;
   width: 100%;
   padding-top: 100%;
-  background: #F8F8F8;
+  background: var(--color-bg-tertiary);
   overflow: hidden;
 }
 
@@ -29,73 +39,117 @@
   width: 100%;
   height: 100%;
   object-fit: contain;
-  padding: 10px;
+  padding: var(--spacing-md);
+}
+
+/* Favorite Button */
+.favorite-btn {
+  position: absolute;
+  top: var(--spacing-sm);
+  right: var(--spacing-sm);
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.9);
+  border: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  z-index: 3;
+  transition: all var(--transition-fast);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.favorite-btn:active {
+  transform: scale(0.9);
+}
+
+.favorite-btn svg {
+  width: 20px;
+  height: 20px;
+  transition: all var(--transition-fast);
+}
+
+.favorite-btn.is-favorite svg {
+  color: #ef4444;
+  animation: heartBeat 0.3s ease;
+}
+
+.favorite-btn:not(.is-favorite) svg {
+  color: var(--color-text-tertiary);
+}
+
+@keyframes heartBeat {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.3); }
+  100% { transform: scale(1); }
 }
 
 /* Badges */
 .card-badges {
   position: absolute;
-  top: 8px;
-  left: 8px;
+  top: var(--spacing-sm);
+  left: var(--spacing-sm);
   display: flex;
-  gap: 4px;
+  gap: var(--spacing-xs);
   z-index: 2;
 }
 
 .badge {
-  padding: 3px 8px;
-  border-radius: 6px;
+  padding: 3px var(--spacing-sm);
+  border-radius: var(--radius-sm);
   font-size: 11px;
-  font-weight: 700;
-  color: white;
+  font-weight: var(--font-bold);
+  color: var(--color-text-inverse);
 }
 
 .discount-badge {
-  background: #FF4757;
+  background: var(--color-error);
 }
 
 .hit-badge {
-  background: #FF9F43;
+  background: var(--color-warning);
   padding: 3px 6px;
 }
 
 .expiry-badge {
   position: absolute;
-  bottom: 8px;
-  left: 8px;
+  bottom: var(--spacing-sm);
+  left: var(--spacing-sm);
   background: rgba(0, 0, 0, 0.7);
-  color: white;
-  padding: 3px 8px;
-  border-radius: 6px;
-  font-size: 10px;
-  font-weight: 600;
+  color: var(--color-text-inverse);
+  padding: 3px var(--spacing-sm);
+  border-radius: var(--radius-sm);
+  font-size: var(--font-2xs);
+  font-weight: var(--font-semibold);
   z-index: 2;
 }
 
 /* Content */
 .card-content {
-  padding: 10px 12px 12px;
+  padding: var(--spacing-md) var(--spacing-md) var(--spacing-md);
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: var(--spacing-xs);
   flex: 1;
 }
 
 .store-name {
   font-size: 11px;
-  color: #999;
-  font-weight: 500;
+  color: var(--color-text-tertiary);
+  font-weight: var(--font-medium);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
 .offer-title {
-  font-size: 13px;
-  font-weight: 600;
-  color: #1a1a1a;
+  font-size: var(--font-sm);
+  font-weight: var(--font-semibold);
+  color: var(--color-text-primary);
   margin: 0;
-  line-height: 1.3;
+  line-height: var(--line-height-tight);
   display: -webkit-box;
   -webkit-line-clamp: 2;
   line-clamp: 2;
@@ -110,7 +164,7 @@
   align-items: center;
   justify-content: space-between;
   margin-top: auto;
-  padding-top: 8px;
+  padding-top: var(--spacing-sm);
 }
 
 .prices {
@@ -120,9 +174,9 @@
 }
 
 .current-price {
-  font-size: 15px;
-  font-weight: 700;
-  color: #1a1a1a;
+  font-size: var(--font-md);
+  font-weight: var(--font-bold);
+  color: var(--color-text-primary);
   display: flex;
   align-items: baseline;
   gap: 2px;
@@ -130,13 +184,13 @@
 
 .currency {
   font-size: 11px;
-  font-weight: 500;
-  color: #666;
+  font-weight: var(--font-medium);
+  color: var(--color-text-secondary);
 }
 
 .original-price {
   font-size: 11px;
-  color: #B3B3B3;
+  color: var(--color-text-muted);
   text-decoration: line-through;
 }
 
@@ -146,19 +200,24 @@
   height: 36px;
   padding: 0;
   border: none;
-  border-radius: 12px;
-  background: #53B175;
-  color: white;
+  border-radius: var(--radius-lg);
+  background: var(--color-primary);
+  color: var(--color-text-inverse);
   display: flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
-  transition: all 0.15s ease;
+  transition: all var(--transition-fast);
 }
 
 .add-btn:active {
   transform: scale(0.9);
-  background: #47a066;
+  background: var(--color-primary-dark);
+}
+
+.add-btn:focus-visible {
+  outline: 3px solid var(--color-primary-light);
+  outline-offset: 2px;
 }
 
 /* Quantity Controls */
@@ -166,8 +225,8 @@
   display: flex;
   align-items: center;
   gap: 2px;
-  background: #F0F0F0;
-  border-radius: 12px;
+  background: var(--color-bg-tertiary);
+  border-radius: var(--radius-lg);
   padding: 2px;
 }
 
@@ -175,34 +234,39 @@
   width: 32px;
   height: 32px;
   border: none;
-  border-radius: 10px;
-  font-size: 18px;
-  font-weight: 500;
+  border-radius: var(--radius-md);
+  font-size: var(--font-xl);
+  font-weight: var(--font-medium);
   display: flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  transition: all 0.15s ease;
+  transition: all var(--transition-fast);
 }
 
 .qty-btn.minus {
-  background: white;
-  color: #999;
+  background: var(--color-bg-primary);
+  color: var(--color-text-tertiary);
 }
 
 .qty-btn.plus {
-  background: #53B175;
-  color: white;
+  background: var(--color-primary);
+  color: var(--color-text-inverse);
 }
 
 .qty-btn:active {
   transform: scale(0.9);
 }
 
+.qty-btn:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 1px;
+}
+
 .qty-value {
   min-width: 24px;
   text-align: center;
-  font-size: 14px;
-  font-weight: 700;
-  color: #1a1a1a;
+  font-size: var(--font-base);
+  font-weight: var(--font-bold);
+  color: var(--color-text-primary);
 }

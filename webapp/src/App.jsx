@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { MemoryRouter, Routes, Route, useNavigate, useLocation } from 'react-router-dom'
+import { FavoritesProvider } from './context/FavoritesContext'
 import HomePage from './pages/HomePage'
 import CartPage from './pages/CartPage'
 import YanaPage from './pages/YanaPage'
@@ -8,6 +9,7 @@ import CheckoutPage from './pages/CheckoutPage'
 import ProductDetailPage from './pages/ProductDetailPage'
 import StoresPage from './pages/StoresPage'
 import CategoryProductsPage from './pages/CategoryProductsPage'
+import FavoritesPage from './pages/FavoritesPage'
 import './App.css'
 import './styles/animations.css'
 
@@ -117,6 +119,10 @@ function AppContent() {
           element={<StoresPage user={user} />}
         />
         <Route
+          path="/favorites"
+          element={<FavoritesPage />}
+        />
+        <Route
           path="/order/:bookingId"
           element={<OrderTrackingPage user={user} />}
         />
@@ -138,7 +144,9 @@ function AppContent() {
 function App() {
   return (
     <MemoryRouter>
-      <AppContent />
+      <FavoritesProvider>
+        <AppContent />
+      </FavoritesProvider>
     </MemoryRouter>
   )
 }

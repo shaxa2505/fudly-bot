@@ -1,121 +1,117 @@
-import { useState, useEffect } from 'react'
-import api from '../api/client'
-import OfferCard from '../components/OfferCard'
+import { useNavigate } from 'react-router-dom'
+import { useFavorites } from '../context/FavoritesContext'
+import { useCart } from '../context/CartContext'
 import BottomNav from '../components/BottomNav'
 import './FavoritesPage.css'
 
-function FavoritesPage({ onNavigate }) {
-  const [favorites, setFavorites] = useState([])
-  const [loading, setLoading] = useState(true)
-  const [favoriteIds, setFavoriteIds] = useState(new Set())
+function FavoritesPage() {
+  const navigate = useNavigate()
+  const { favorites, removeFromFavorites, isEmpty, favoritesCount } = useFavorites()
+  const { addToCart, getQuantity, cartCount } = useCart()
 
-  useEffect(() => {
-    loadFavorites()
-  }, [])
-
-  const loadFavorites = async () => {
-    setLoading(true)
-    try {
-      const data = await api.getFavorites()
-      setFavorites(data)
-      setFavoriteIds(new Set(data.map(o => o.id)))
-    } catch (error) {
-      console.error('Error loading favorites:', error)
-    } finally {
-      setLoading(false)
-    }
+  const handleAddToCart = (offer) => {
+    addToCart(offer)
   }
 
-  const handleRemoveFavorite = async (offerId) => {
-    try {
-      await api.removeFavorite(offerId)
-      setFavorites(prev => prev.filter(o => o.id !== offerId))
-      setFavoriteIds(prev => {
-        const next = new Set(prev)
-        next.delete(offerId)
-        return next
-      })
-    } catch (error) {
-      console.error('Error removing favorite:', error)
-    }
-  }
-
-  const addToCart = (offer) => {
-    const saved = localStorage.getItem('fudly_cart')
-    const cart = saved ? new Map(Object.entries(JSON.parse(saved))) : new Map()
-
-    const current = cart.get(String(offer.id)) || 0
-    cart.set(String(offer.id), current + 1)
-
-    localStorage.setItem('fudly_cart', JSON.stringify(Object.fromEntries(cart)))
-    window.Telegram?.WebApp?.HapticFeedback?.impactOccurred?.('medium')
-    window.Telegram?.WebApp?.showAlert?.('Savatga qo\'shildi!')
-  }
-
-  if (loading) {
+  if (isEmpty) {
     return (
       <div className="favorites-page">
-        <header className="page-header">
-          <button className="back-btn" onClick={() => onNavigate('home')}>
-            ← Orqaga
+        <header className="favorites-header">
+          <button className="back-btn" onClick={() => navigate(-1)}>
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+              <path d="M15 18l-6-6 6-6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
           </button>
-          <h1>Saqlanganlar</h1>
-          <div></div>
-        </header>
-        <div className="loading-state">Yuklanmoqda...</div>
-        <BottomNav currentPage="favorites" onNavigate={onNavigate} favoritesCount={0} />
-      </div>
-    )
-  }
-
-  if (favorites.length === 0) {
-    return (
-      <div className="favorites-page">
-        <header className="page-header">
-          <button className="back-btn" onClick={() => onNavigate('home')}>
-            ← Orqaga
-          </button>
-          <h1>Saqlanganlar</h1>
-          <div></div>
+          <h1>Sevimlilar</h1>
+          <div style={{ width: 44 }} />
         </header>
 
-        <div className="empty-state">
+        <div className="favorites-empty">
           <div className="empty-icon">❤️</div>
-          <h2>Saqlanganlar bo'sh</h2>
+          <h2>Sevimlilar bo'sh</h2>
           <p>Mahsulotlarni saqlash uchun yurak belgisini bosing</p>
-          <button className="primary-btn" onClick={() => onNavigate('home')}>
-            Katalogga o'tish
+          <button className="primary-btn" onClick={() => navigate('/')}>
+            🏠 Bosh sahifaga
           </button>
         </div>
 
-        <BottomNav currentPage="favorites" onNavigate={onNavigate} favoritesCount={0} />
+        <BottomNav currentPage="favorites" cartCount={cartCount} />
       </div>
     )
   }
 
   return (
     <div className="favorites-page">
-      <header className="page-header">
-        <button className="back-btn" onClick={() => onNavigate('home')}>
-          ← Orqaga
+      <header className="favorites-header">
+        <button className="back-btn" onClick={() => navigate(-1)}>
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+            <path d="M15 18l-6-6 6-6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+          </svg>
         </button>
-        <h1>Saqlanganlar ({favorites.length})</h1>
-        <div></div>
+        <h1>Sevimlilar ({favoritesCount})</h1>
+        <div style={{ width: 44 }} />
       </header>
 
-      <div className="favorites-grid">
+      <div className="favorites-list">
         {favorites.map(offer => (
-          <OfferCard
-            key={offer.id}
-            offer={offer}
-            isFavorite={true}
-            onToggleFavorite={() => handleRemoveFavorite(offer.id)}
-            onAddToCart={() => addToCart(offer)}
-          />
+          <div key={offer.id} className="favorite-card">
+            <img
+              src={offer.photo || 'https://placehold.co/100x100/F5F5F5/CCCCCC?text=📷'}
+              alt={offer.title}
+              className="favorite-image"
+              onClick={() => navigate('/product', { state: { offer } })}
+              onError={(e) => { e.target.src = 'https://placehold.co/100x100/F5F5F5/CCCCCC?text=📷' }}
+            />
+
+            <div className="favorite-info" onClick={() => navigate('/product', { state: { offer } })}>
+              <h3 className="favorite-title">{offer.title}</h3>
+              {offer.store_name && (
+                <p className="favorite-store">🏪 {offer.store_name}</p>
+              )}
+              <div className="favorite-prices">
+                <span className="favorite-price">
+                  {Math.round(offer.discount_price).toLocaleString()} so'm
+                </span>
+                {offer.original_price > offer.discount_price && (
+                  <span className="favorite-original">
+                    {Math.round(offer.original_price).toLocaleString()}
+                  </span>
+                )}
+              </div>
+            </div>
+
+            <div className="favorite-actions">
+              <button
+                className="remove-favorite-btn"
+                onClick={() => removeFromFavorites(offer.id)}
+                aria-label="O'chirish"
+              >
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="#E53935">
+                  <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>
+                </svg>
+              </button>
+
+              {getQuantity(offer.id) > 0 ? (
+                <span className="in-cart-badge">
+                  ✓ Savatda ({getQuantity(offer.id)})
+                </span>
+              ) : (
+                <button
+                  className="add-to-cart-btn"
+                  onClick={() => handleAddToCart(offer)}
+                >
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+                    <line x1="12" y1="5" x2="12" y2="19" stroke="white" strokeWidth="2.5" strokeLinecap="round"/>
+                    <line x1="5" y1="12" x2="19" y2="12" stroke="white" strokeWidth="2.5" strokeLinecap="round"/>
+                  </svg>
+                </button>
+              )}
+            </div>
+          </div>
         ))}
       </div>
 
-      <BottomNav currentPage="favorites" onNavigate={onNavigate} favoritesCount={favorites.length} />
+      <BottomNav currentPage="favorites" cartCount={cartCount} />
     </div>
   )
 }

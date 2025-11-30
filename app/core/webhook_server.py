@@ -5,7 +5,7 @@ from datetime import datetime
 from typing import Any
 
 from aiogram import Bot, Dispatcher, types
-from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
+from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 from aiohttp import web
 
 from app.core.metrics import metrics as app_metrics
@@ -33,11 +33,11 @@ async def get_photo_url(bot: Bot, file_id: str | None) -> str | None:
     """Convert Telegram file_id to photo URL."""
     if not file_id:
         return None
-    
+
     # Check cache
     if file_id in _photo_url_cache:
         return _photo_url_cache[file_id]
-    
+
     try:
         file = await bot.get_file(file_id)
         if file and file.file_path:
@@ -53,10 +53,10 @@ def offer_to_dict(offer: Any, photo_url: str | None = None) -> dict:
     """Convert offer to API response dict."""
     # Try offer_id first (PostgreSQL), then id (SQLite)
     offer_id = get_offer_value(offer, "offer_id", 0) or get_offer_value(offer, "id", 0)
-    
+
     # Use provided photo_url, or fallback to photo field
     photo = photo_url or get_offer_value(offer, "photo")
-    
+
     return {
         "id": offer_id,
         "title": get_offer_value(offer, "title", ""),
@@ -370,7 +370,9 @@ async def create_webhook_app(
                 elif hasattr(db, "get_hot_offers"):
                     # Fallback: filter hot offers by category
                     all_offers = db.get_hot_offers(city, limit=100) or []
-                    raw_offers = [o for o in all_offers if get_offer_value(o, "category") == category][:limit]
+                    raw_offers = [
+                        o for o in all_offers if get_offer_value(o, "category") == category
+                    ][:limit]
                     logger.info(f"Filtered hot_offers by {category}: {len(raw_offers)} items")
             else:
                 if hasattr(db, "get_hot_offers"):
@@ -385,7 +387,7 @@ async def create_webhook_app(
                 photo_id = get_offer_value(o, "photo_id")
                 photo_url = await get_photo_url(bot, photo_id) if photo_id else None
                 offers.append(offer_to_dict(o, photo_url))
-            
+
             logger.info(f"Returning {len(offers)} offers")
             return add_cors_headers(web.json_response(offers))
 
@@ -423,9 +425,13 @@ async def create_webhook_app(
             try:
                 with db.get_connection() as conn:
                     cursor = conn.cursor()
-                    cursor.execute("SELECT offer_id, title, photo_id FROM offers WHERE photo_id IS NOT NULL LIMIT 5")
+                    cursor.execute(
+                        "SELECT offer_id, title, photo_id FROM offers WHERE photo_id IS NOT NULL LIMIT 5"
+                    )
                     rows = cursor.fetchall()
-                    info["offers_with_photos"] = [{"id": r[0], "title": r[1], "photo_id": r[2]} for r in rows]
+                    info["offers_with_photos"] = [
+                        {"id": r[0], "title": r[1], "photo_id": r[2]} for r in rows
+                    ]
             except Exception as e:
                 info["photo_check_error"] = str(e)
 
@@ -448,7 +454,7 @@ async def create_webhook_app(
             # Convert photo_id to URL
             photo_id = get_offer_value(offer, "photo_id")
             photo_url = await get_photo_url(bot, photo_id) if photo_id else None
-            
+
             return add_cors_headers(web.json_response(offer_to_dict(offer, photo_url)))
 
         except Exception as e:
@@ -470,7 +476,7 @@ async def create_webhook_app(
                     if city:
                         cursor.execute(
                             "SELECT * FROM stores WHERE (status = 'active' OR status = 'approved') AND city = %s",
-                            (city,)
+                            (city,),
                         )
                     else:
                         cursor.execute(
@@ -496,10 +502,12 @@ async def create_webhook_app(
             # Extract order data
             items = data.get("items", [])
             user_id = data.get("user_id")
-            delivery_type = data.get("delivery_type", "pickup")  # pickup or delivery
+            # Support both order_type and delivery_type field names
+            delivery_type = data.get("order_type") or data.get("delivery_type", "pickup")
             phone = data.get("phone", "")
-            address = data.get("address", "")
-            notes = data.get("notes", "")
+            # Support both address and delivery_address field names
+            address = data.get("delivery_address") or data.get("address", "")
+            notes = data.get("notes") or data.get("comment", "")
 
             if not items:
                 return add_cors_headers(
@@ -583,25 +591,27 @@ async def create_webhook_app(
                                                 msg += f"📝 Примечание: {notes}\n"
 
                                             # Create inline keyboard for seller actions
-                                            keyboard = InlineKeyboardMarkup(inline_keyboard=[
-                                                [
-                                                    InlineKeyboardButton(
-                                                        text="✅ Принять",
-                                                        callback_data=f"order_accept:{booking_code}:{user_id}"
-                                                    ),
-                                                    InlineKeyboardButton(
-                                                        text="❌ Отклонить",
-                                                        callback_data=f"order_reject:{booking_code}:{user_id}"
-                                                    )
+                                            keyboard = InlineKeyboardMarkup(
+                                                inline_keyboard=[
+                                                    [
+                                                        InlineKeyboardButton(
+                                                            text="✅ Принять",
+                                                            callback_data=f"order_accept:{booking_code}:{user_id}",
+                                                        ),
+                                                        InlineKeyboardButton(
+                                                            text="❌ Отклонить",
+                                                            callback_data=f"order_reject:{booking_code}:{user_id}",
+                                                        ),
+                                                    ]
                                                 ]
-                                            ])
+                                            )
 
                                             # Send via bot with keyboard
                                             await bot.send_message(
-                                                chat_id=int(seller_id), 
-                                                text=msg, 
+                                                chat_id=int(seller_id),
+                                                text=msg,
                                                 parse_mode="HTML",
-                                                reply_markup=keyboard
+                                                reply_markup=keyboard,
                                             )
                                             logger.info(f"Notification sent to seller {seller_id}")
                         except Exception as notify_err:

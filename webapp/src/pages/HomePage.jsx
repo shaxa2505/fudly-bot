@@ -5,19 +5,20 @@ import { useCart } from '../context/CartContext'
 import { transliterateCity, getSavedLocation, saveLocation, DEFAULT_LOCATION } from '../utils/cityUtils'
 import OfferCard from '../components/OfferCard'
 import BottomNav from '../components/BottomNav'
-import fudlyLogo from '../assets/fudly-logo.svg'
+import PullToRefresh from '../components/PullToRefresh'
+import { usePullToRefresh } from '../hooks/usePullToRefresh'
 import './HomePage.css'
 
 const CATEGORIES = [
-  { id: 'all', name: 'Hammasi', icon: '🔥' },
-  { id: 'dairy', name: 'Sut', icon: '🥛' },
-  { id: 'snacks', name: 'Gazaklar', icon: '🍪' },
-  { id: 'drinks', name: 'Ichimlik', icon: '🧃' },
-  { id: 'bakery', name: 'Non', icon: '🍞' },
-  { id: 'meat', name: "Go'sht", icon: '🥩' },
-  { id: 'fruits', name: 'Mevalar', icon: '🍎' },
-  { id: 'vegetables', name: 'Sabzavot', icon: '🥬' },
-  { id: 'other', name: 'Boshqa', icon: '📦' },
+  { id: 'all', name: 'Hammasi', icon: '🔥', color: '#FF6B35' },
+  { id: 'dairy', name: 'Sut', icon: '🥛', color: '#2196F3' },
+  { id: 'snacks', name: 'Gazaklar', icon: '🍪', color: '#FF9800' },
+  { id: 'drinks', name: 'Ichimlik', icon: '🧃', color: '#4CAF50' },
+  { id: 'bakery', name: 'Non', icon: '🍞', color: '#8D6E63' },
+  { id: 'meat', name: "Go'sht", icon: '🥩', color: '#E53935' },
+  { id: 'fruits', name: 'Mevalar', icon: '🍎', color: '#F44336' },
+  { id: 'vegetables', name: 'Sabzavot', icon: '🥬', color: '#43A047' },
+  { id: 'other', name: 'Boshqa', icon: '📦', color: '#78909C' },
 ]
 
 function HomePage() {
@@ -38,7 +39,6 @@ function HomePage() {
 
   const [hasMore, setHasMore] = useState(true)
   const [offset, setOffset] = useState(0)
-  const [bannerIndex, setBannerIndex] = useState(0)
   const formattedAddress = location.address
     ? location.address
         .split(',')
@@ -175,6 +175,15 @@ function HomePage() {
     }
   }, [selectedCategory, searchQuery, offset, loading, cityForApi, showingAllCities])
 
+  // Pull-to-refresh handler
+  const handleRefresh = useCallback(async () => {
+    setShowingAllCities(false)
+    await loadOffers(true)
+  }, [loadOffers])
+
+  // Pull-to-refresh hook
+  const { isPulling, isRefreshing, pullDistance, progress } = usePullToRefresh(handleRefresh)
+
   // Initial load and search with debounce
   useEffect(() => {
     setShowingAllCities(false) // Сбрасываем при смене города/фильтров
@@ -204,14 +213,6 @@ function HomePage() {
   }, [hasMore, loading, loadOffers])
 
   // Cart is now saved automatically via CartContext
-
-  // Banner auto-slide
-  useEffect(() => {
-    const timer = setInterval(() => {
-      setBannerIndex(prev => (prev + 1) % 3)
-    }, 4000)
-    return () => clearInterval(timer)
-  }, [])
 
   const reverseGeocode = async (lat, lon) => {
     try {
@@ -292,112 +293,181 @@ function HomePage() {
 
   return (
     <div className="home-page">
+      {/* Pull-to-Refresh */}
+      <PullToRefresh
+        isRefreshing={isRefreshing}
+        pullDistance={pullDistance}
+        progress={progress}
+      />
+
       {/* Header */}
       <header className="header">
-        <div className="header-content">
-          <div className="brand-row">
-            <div className="brand-mark" aria-label="Fudly">
-              <img src={fudlyLogo} alt="Fudly" className="brand-logo" />
+        <div className="header-top">
+          <button className="header-location" onClick={openAddressModal}>
+            <span className="header-location-icon">📍</span>
+            <div className="header-location-text">
+              <span className="header-location-label">Yetkazish</span>
+              <span className="header-location-city">
+                {cityRaw}
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none">
+                  <path d="M6 9l6 6 6-6" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              </span>
             </div>
-            <button className="brand-location" onClick={openAddressModal}>
-              <span className="brand-location-label">📍</span>
-              <span className="brand-location-city">{cityRaw}</span>
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" className="brand-location-arrow">
-                <path d="M6 9l6 6 6-6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+          </button>
+          <div className="header-actions">
+            <button className="header-action-btn" onClick={() => navigate('/favorites')} aria-label="Sevimlilar">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+                <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
+            </button>
+            <button className="header-action-btn" onClick={() => navigate('/profile')} aria-label="Profil">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+                <circle cx="12" cy="8" r="4" stroke="currentColor" strokeWidth="2"/>
+                <path d="M6 21v-2a4 4 0 0 1 4-4h4a4 4 0 0 1 4 4v2" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
               </svg>
             </button>
           </div>
-          <div className="search-container">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" className="search-icon">
-              <circle cx="11" cy="11" r="8" stroke="#7C7C7C" strokeWidth="2"/>
-              <path d="M21 21l-4.35-4.35" stroke="#7C7C7C" strokeWidth="2" strokeLinecap="round"/>
-            </svg>
-            <input
-              type="text"
-              className="search-input"
-              placeholder="Mahsulot qidirish..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-            />
-            {searchQuery && (
-              <button className="search-clear" onClick={() => setSearchQuery('')}>
-                ✕
-              </button>
-            )}
-          </div>
+        </div>
+        <div className="header-search">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" className="search-icon">
+            <circle cx="11" cy="11" r="8" stroke="currentColor" strokeWidth="2"/>
+            <path d="M21 21l-4.35-4.35" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+          </svg>
+          <input
+            type="text"
+            className="search-input"
+            placeholder="Mahsulot qidirish..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+          />
+          {searchQuery && (
+            <button className="search-clear" onClick={() => setSearchQuery('')}>
+              ✕
+            </button>
+          )}
         </div>
       </header>
 
-      {/* Banner Slider */}
-      <div className="banner-slider">
-        <div className="banner-track" style={{ transform: `translateX(-${bannerIndex * 100}%)` }}>
-          <div className="banner-slide gradient-green">
-            <div className="banner-content">
-              <div className="banner-left">
-                <div className="banner-badge">🔥 Chegirma</div>
-                <h2 className="banner-title">Yangi Takliflar</h2>
-                <p className="banner-subtitle">40% gacha</p>
-                <button className="banner-btn">Ko'rish</button>
-              </div>
-              <div className="banner-emoji">🥬🥕🍅</div>
-            </div>
+      {/* Quick Actions */}
+      <div className="quick-actions">
+        <button className="quick-action" onClick={() => navigate('/profile')}>
+          <div className="quick-action-icon">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+              <path d="M17 1l4 4-4 4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+              <path d="M3 11V9a4 4 0 0 1 4-4h14" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+              <path d="M7 23l-4-4 4-4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+              <path d="M21 13v2a4 4 0 0 1-4 4H3" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
           </div>
-          <div className="banner-slide gradient-orange">
-            <div className="banner-content">
-              <div className="banner-left">
-                <div className="banner-badge">⚡ Tezkor</div>
-                <h2 className="banner-title">Kunlik Mahsulot</h2>
-                <p className="banner-subtitle">Yaqin do'kondan</p>
-                <button className="banner-btn">Buyurtma</button>
-              </div>
-              <div className="banner-emoji">🍞🥛🧀</div>
-            </div>
+          <span className="quick-action-text">Takrorlash</span>
+        </button>
+        <button className="quick-action" onClick={() => navigate('/favorites')}>
+          <div className="quick-action-icon accent">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+              <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
           </div>
-          <div className="banner-slide gradient-purple">
-            <div className="banner-content">
-              <div className="banner-left">
-                <div className="banner-badge">🎁 Bonus</div>
-                <h2 className="banner-title">Meva & Sabzavot</h2>
-                <p className="banner-subtitle">Har kuni yangi</p>
-                <button className="banner-btn">Tanlash</button>
-              </div>
-              <div className="banner-emoji">🍎🍊🍋</div>
-            </div>
+          <span className="quick-action-text">Sevimlilar</span>
+        </button>
+        <button className="quick-action" onClick={() => navigate('/profile')}>
+          <div className="quick-action-icon purple">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+              <rect x="2" y="3" width="20" height="14" rx="2" stroke="currentColor" strokeWidth="2"/>
+              <path d="M8 21h8M12 17v4" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+            </svg>
           </div>
+          <span className="quick-action-text">Buyurtmalar</span>
+        </button>
+        <button className="quick-action" onClick={() => navigate('/stores')}>
+          <div className="quick-action-icon orange">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+              <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+              <polyline points="9,22 9,12 15,12 15,22" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
+          </div>
+          <span className="quick-action-text">Do'konlar</span>
+        </button>
+      </div>
+
+      {/* Hero Banner */}
+      <div className="hero-banner">
+        <div className="hero-content">
+          <div className="hero-badge">🔥 Bugungi taklif</div>
+          <h2 className="hero-title">40% gacha chegirma</h2>
+          <p className="hero-subtitle">Tanlangan mahsulotlarga</p>
+          <button className="hero-btn" onClick={() => setSelectedCategory('all')}>
+            Ko'rish
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+              <path d="M5 12h14M12 5l7 7-7 7" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
+          </button>
         </div>
-        <div className="banner-dots">
-          {[0, 1, 2].map(i => (
-            <button
-              key={i}
-              className={`dot ${bannerIndex === i ? 'active' : ''}`}
-              onClick={() => setBannerIndex(i)}
-              aria-label={`Slide ${i + 1}`}
-            />
-          ))}
-        </div>
+        <div className="hero-emoji">🥬🍅🥕</div>
       </div>
 
       {/* Categories */}
       <div className="categories-section">
-        <div className="categories-scroll">
+        <h3 className="categories-title">Kategoriyalar</h3>
+        <div className="categories-grid">
           {CATEGORIES.map(cat => (
             <button
               key={cat.id}
-              className={`category-chip ${selectedCategory === cat.id ? 'active' : ''}`}
+              className={`category-card ${selectedCategory === cat.id ? 'active' : ''}`}
               onClick={() => setSelectedCategory(cat.id)}
+              style={{ '--cat-color': cat.color }}
             >
-              <span className="category-icon">{cat.icon}</span>
-              <span className="category-name">{cat.name}</span>
+              <div className="category-card-icon">{cat.icon}</div>
+              <span className="category-card-name">{cat.name}</span>
             </button>
           ))}
         </div>
-        <div className="categories-fade" />
       </div>
+
+      {/* Popular Nearby - Horizontal Scroll */}
+      {offers.length > 0 && selectedCategory === 'all' && !searchQuery && (
+        <div className="popular-section">
+          <div className="popular-header">
+            <h3 className="popular-title">🔥 Ommabop takliflar</h3>
+            <button className="popular-see-all" onClick={() => {
+              document.querySelector('.section-header')?.scrollIntoView({ behavior: 'smooth' })
+            }}>
+              Hammasi
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                <path d="M9 18l6-6-6-6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
+            </button>
+          </div>
+          <div className="popular-scroll">
+            {offers.slice(0, 8).map(offer => (
+              <div key={`pop-${offer.id}`} className="popular-card" onClick={() => navigate('/product', { state: { offer } })}>
+                <div className="popular-card-image">
+                  <img
+                    src={offer.photo || 'https://placehold.co/300x300/F5F5F5/CCCCCC?text=📷'}
+                    alt={offer.title}
+                    loading="lazy"
+                    onError={(e) => {
+                      e.target.src = 'https://placehold.co/300x300/F5F5F5/CCCCCC?text=📷'
+                    }}
+                  />
+                  {offer.discount_percent > 0 && (
+                    <span className="popular-card-badge">-{Math.round(offer.discount_percent)}%</span>
+                  )}
+                </div>
+                <div className="popular-card-info">
+                  <span className="popular-card-price">{Math.round(offer.discount_price || 0).toLocaleString()} so'm</span>
+                  <span className="popular-card-title">{offer.title}</span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Section Title */}
       <div className="section-header">
         <h2 className="section-title">
-          {selectedCategory === 'all' ? 'Maxsus Takliflar' : CATEGORIES.find(c => c.id === selectedCategory)?.name}
+          {selectedCategory === 'all' ? 'Barcha takliflar' : CATEGORIES.find(c => c.id === selectedCategory)?.name}
         </h2>
         <span className="offers-count">{offers.length} ta</span>
       </div>
@@ -416,17 +486,23 @@ function HomePage() {
       <div className="offers-grid">
         {loading && offers.length === 0 ? (
           Array.from({ length: 6 }).map((_, i) => (
-            <div key={i} className="offer-card skeleton">
-              <div className="skeleton-image" />
-              <div className="skeleton-text" />
-              <div className="skeleton-text short" />
+            <div key={i} className="skeleton-card" style={{ animationDelay: `${i * 0.1}s` }}>
+              <div className="skeleton-card-image" />
+              <div className="skeleton-card-content">
+                <div className="skeleton-line wide" />
+                <div className="skeleton-line medium" />
+                <div className="skeleton-row">
+                  <div className="skeleton-line price" />
+                  <div className="skeleton-btn" />
+                </div>
+              </div>
             </div>
           ))
         ) : offers.length === 0 ? (
-          <div style={{ gridColumn: '1 / -1', textAlign: 'center', padding: '60px 20px' }}>
-            <div style={{ fontSize: '64px', marginBottom: '16px' }}>🔍</div>
-            <h3 style={{ fontSize: '20px', color: '#181725', marginBottom: '8px' }}>Hech narsa topilmadi</h3>
-            <p style={{ color: '#7C7C7C' }}>Boshqa so'z bilan qidiring</p>
+          <div className="empty-state">
+            <div className="empty-state-icon">🔍</div>
+            <h3 className="empty-state-title">Hech narsa topilmadi</h3>
+            <p className="empty-state-text">Boshqa so'z bilan qidiring</p>
           </div>
         ) : (
           offers.map(offer => (

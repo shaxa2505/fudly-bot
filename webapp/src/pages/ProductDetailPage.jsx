@@ -1,295 +1,256 @@
 import { useState } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { useCart } from '../context/CartContext'
+import { useFavorites } from '../context/FavoritesContext'
 import './ProductDetailPage.css'
 
 function ProductDetailPage() {
   const navigate = useNavigate()
   const location = useLocation()
   const { addToCart } = useCart()
+  const { isFavorite, toggleFavorite } = useFavorites()
 
-  // Get offer from route state
   const offer = location.state?.offer
-
   const [quantity, setQuantity] = useState(1)
-  const [currentImageIndex, setCurrentImageIndex] = useState(0)
-  const [showDetails, setShowDetails] = useState(true)
   const [addedToCart, setAddedToCart] = useState(false)
-  const [touchStart, setTouchStart] = useState(null)
-  const [touchEnd, setTouchEnd] = useState(null)
+  const [imgError, setImgError] = useState(false)
 
-  // Swipe detection for image carousel
-  const minSwipeDistance = 50
-  const images = [offer?.photo].filter(Boolean)
-
-  const onTouchStart = (e) => {
-    setTouchEnd(null)
-    setTouchStart(e.targetTouches[0].clientX)
-  }
-
-  const onTouchMove = (e) => {
-    setTouchEnd(e.targetTouches[0].clientX)
-  }
-
-  const onTouchEnd = () => {
-    if (!touchStart || !touchEnd) return
-    const distance = touchStart - touchEnd
-    const isLeftSwipe = distance > minSwipeDistance
-    const isRightSwipe = distance < -minSwipeDistance
-
-    if (isLeftSwipe && currentImageIndex < images.length - 1) {
-      setCurrentImageIndex(prev => prev + 1)
-    }
-    if (isRightSwipe && currentImageIndex > 0) {
-      setCurrentImageIndex(prev => prev - 1)
-    }
-  }
+  // Get image URL - support multiple field names
+  const imageUrl = offer?.image_url || offer?.photo || ''
 
   const handleQuantityChange = (delta) => {
     const maxQty = offer?.quantity || 99
-    const newQty = Math.max(1, Math.min(quantity + delta, maxQty))
-    setQuantity(newQty)
+    setQuantity(prev => Math.max(1, Math.min(prev + delta, maxQty)))
+    window.Telegram?.WebApp?.HapticFeedback?.impactOccurred?.('light')
   }
 
-  const handleAddToBasket = () => {
+  const handleAddToCart = () => {
     for (let i = 0; i < quantity; i++) {
       addToCart(offer)
     }
-
     setAddedToCart(true)
     setTimeout(() => setAddedToCart(false), 2000)
-    window.Telegram?.WebApp?.HapticFeedback?.impactOccurred?.('medium')
+    window.Telegram?.WebApp?.HapticFeedback?.notificationOccurred?.('success')
+  }
+
+  const handleFavorite = (e) => {
+    e.stopPropagation()
+    toggleFavorite(offer)
+    window.Telegram?.WebApp?.HapticFeedback?.impactOccurred?.('light')
   }
 
   const handleShare = () => {
-    const shareText = `${offer.title}\n💰 ${Math.round(offer.discount_price).toLocaleString()} so'm (-${Math.round(offer.discount_percent)}%)\n🏪 ${offer.store_name || ''}`
-
+    const text = `${offer.title}\n💰 ${Math.round(offer.discount_price).toLocaleString()} so'm\n🏪 ${offer.store_name || ''}`
     if (navigator.share) {
-      navigator.share({
-        title: offer.title,
-        text: shareText,
-        url: window.location.href
-      }).catch(() => {})
-    } else if (window.Telegram?.WebApp) {
-      window.Telegram.WebApp.switchInlineQuery(shareText, ['users', 'groups'])
+      navigator.share({ title: offer.title, text }).catch(() => {})
     }
   }
 
-  // Calculate days until expiry
+  // Expiry calculation
   const getExpiryInfo = () => {
     if (!offer?.expiry_date) return null
-
     try {
-      const expiry = new Date(offer.expiry_date)
-      const now = new Date()
-      const diffTime = expiry - now
-      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
+      const days = Math.ceil((new Date(offer.expiry_date) - new Date()) / 86400000)
+      if (days < 0) return { text: "Muddati o'tgan", urgent: true }
+      if (days === 0) return { text: "Bugun tugaydi!", urgent: true }
+      if (days === 1) return { text: "Ertaga tugaydi", urgent: true }
+      if (days <= 3) return { text: `${days} kun qoldi`, urgent: true }
+      if (days <= 7) return { text: `${days} kun qoldi`, urgent: false }
+      return null
+    } catch { return null }
+  }
 
-      if (diffDays < 0) return { text: "Muddati o'tgan", urgent: true }
-      if (diffDays === 0) return { text: "Bugun tugaydi!", urgent: true }
-      if (diffDays === 1) return { text: "Ertaga tugaydi", urgent: true }
-      if (diffDays <= 3) return { text: `${diffDays} kundan keyin tugaydi`, urgent: true }
-      if (diffDays <= 7) return { text: `${diffDays} kun qoldi`, urgent: false }
-      return null
-    } catch {
-      return null
-    }
+  if (!offer) {
+    return (
+      <div className="pdp">
+        <div className="pdp-error">
+          <span>😕</span>
+          <p>Mahsulot topilmadi</p>
+          <button onClick={() => navigate(-1)}>Orqaga</button>
+        </div>
+      </div>
+    )
   }
 
   const expiryInfo = getExpiryInfo()
-
-  if (!offer) return null
-
   const totalPrice = offer.discount_price * quantity
   const savings = (offer.original_price - offer.discount_price) * quantity
+  const hasDiscount = offer.original_price > offer.discount_price
+  // Calculate discount percent if not provided
+  const discountPercent = offer.discount_percent
+    ? Math.round(offer.discount_percent)
+    : hasDiscount
+      ? Math.round((1 - offer.discount_price / offer.original_price) * 100)
+      : 0
+  const isFav = isFavorite(offer.id)
 
   return (
-    <div className="product-detail-page">
-      {/* Header */}
-      <div className="detail-header">
-        <button className="back-btn" onClick={() => navigate(-1)}>
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
-            <path d="M15 18l-6-6 6-6" stroke="#181725" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+    <div className="pdp">
+      {/* Floating Header */}
+      <header className="pdp-header">
+        <button className="pdp-back" onClick={() => navigate(-1)} aria-label="Orqaga">
+          <svg width="28" height="28" viewBox="0 0 24 24" fill="none">
+            <path d="M15 18l-6-6 6-6" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/>
           </svg>
         </button>
-        <button className="share-btn" onClick={handleShare}>
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
-            <path d="M4 12v8a2 2 0 002 2h12a2 2 0 002-2v-8" stroke="#181725" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-            <polyline points="16 6 12 2 8 6" stroke="#181725" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-            <line x1="12" y1="2" x2="12" y2="15" stroke="#181725" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-          </svg>
-        </button>
-      </div>
+
+        <div className="pdp-header-actions">
+          <button
+            className={`pdp-fav ${isFav ? 'active' : ''}`}
+            onClick={handleFavorite}
+            aria-label="Sevimli"
+          >
+            <svg width="26" height="26" viewBox="0 0 24 24" fill={isFav ? "#FF4757" : "none"}>
+              <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"
+                stroke={isFav ? "#FF4757" : "currentColor"}
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"/>
+            </svg>
+          </button>
+          <button className="pdp-share" onClick={handleShare} aria-label="Ulashish">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+              <path d="M4 12v8a2 2 0 002 2h12a2 2 0 002-2v-8M16 6l-4-4-4 4M12 2v13"
+                stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
+          </button>
+        </div>
+      </header>
 
       {/* Image Section */}
-      <div
-        className="product-image-section"
-        onTouchStart={onTouchStart}
-        onTouchMove={onTouchMove}
-        onTouchEnd={onTouchEnd}
-      >
-        {/* Discount Badge */}
-        {offer.discount_percent > 0 && (
-          <div className="discount-badge-large">
-            -{Math.round(offer.discount_percent)}%
-          </div>
+      <section className="pdp-image-section">
+        {discountPercent > 0 && (
+          <span className="pdp-discount-badge">-{discountPercent}%</span>
         )}
 
-        {/* Expiry Warning */}
-        {expiryInfo && (
-          <div className={`expiry-badge ${expiryInfo.urgent ? 'urgent' : ''}`}>
-            ⏰ {expiryInfo.text}
-          </div>
+        {expiryInfo?.urgent && (
+          <span className="pdp-expiry-badge">⏰ {expiryInfo.text}</span>
         )}
 
-        <img
-          src={images[currentImageIndex] || 'https://placehold.co/400x400/F5F5F5/999999?text=📷'}
-          alt={offer.title}
-          className="product-main-image"
-          onError={(e) => { e.target.src = 'https://placehold.co/400x400/F5F5F5/999999?text=📷' }}
-        />
-
-        {images.length > 1 && (
-          <div className="image-indicators">
-            {images.map((_, idx) => (
-              <span
-                key={idx}
-                className={`indicator ${idx === currentImageIndex ? 'active' : ''}`}
-                onClick={() => setCurrentImageIndex(idx)}
-              />
-            ))}
-          </div>
-        )}
-      </div>
-
-      {/* Product Info */}
-      <div className="product-info">
-        {/* Title & Store */}
-        <div className="product-header-section">
-          <h1 className="product-name">{offer.title}</h1>
-          {offer.store_name && (
-            <div className="store-info">
-              <span className="store-icon">🏪</span>
-              <span className="store-name-text">{offer.store_name}</span>
-              {offer.store_address && (
-                <span className="store-address-text"> • {offer.store_address}</span>
-              )}
+        <div className="pdp-image-wrapper">
+          {!imgError && imageUrl ? (
+            <img
+              src={imageUrl}
+              alt={offer.title}
+              className="pdp-image"
+              onError={() => setImgError(true)}
+            />
+          ) : (
+            <div className="pdp-image-placeholder">
+              <svg width="64" height="64" viewBox="0 0 24 24" fill="none">
+                <rect x="3" y="3" width="18" height="18" rx="2" stroke="#ccc" strokeWidth="1.5"/>
+                <circle cx="8.5" cy="8.5" r="1.5" fill="#ccc"/>
+                <path d="M21 15l-5-5L5 21" stroke="#ccc" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
             </div>
           )}
         </div>
+      </section>
 
-        {/* Price Section */}
-        <div className="price-section">
-          <div className="price-row">
-            <div className="prices">
-              <span className="current-price">{Math.round(offer.discount_price).toLocaleString()} so'm</span>
-              {offer.original_price > offer.discount_price && (
-                <span className="original-price">{Math.round(offer.original_price).toLocaleString()}</span>
+      {/* Content */}
+      <section className="pdp-content">
+        {/* Title & Store */}
+        <div className="pdp-title-section">
+          <h1 className="pdp-title">{offer.title}</h1>
+          {offer.store_name && (
+            <p className="pdp-store">
+              <span className="pdp-store-icon">🏪</span>
+              <span className="pdp-store-name">{offer.store_name}</span>
+              {offer.store_address && <span className="pdp-store-addr"> • {offer.store_address}</span>}
+            </p>
+          )}
+        </div>
+
+        {/* Price Card */}
+        <div className="pdp-price-card">
+          <div className="pdp-price-row">
+            <div className="pdp-prices">
+              <span className="pdp-current-price">
+                {Math.round(offer.discount_price).toLocaleString()} so'm
+              </span>
+              {hasDiscount && (
+                <span className="pdp-old-price">
+                  {Math.round(offer.original_price).toLocaleString()}
+                </span>
               )}
             </div>
             {offer.quantity > 0 && (
-              <span className="stock-badge">📦 {offer.quantity} dona</span>
+              <span className="pdp-stock">📦 {offer.quantity} dona</span>
             )}
           </div>
 
           {savings > 0 && (
-            <div className="savings-info">
-              💰 {quantity > 1 ? `Jami ${Math.round(savings).toLocaleString()} so'm tejaysiz` : `${Math.round(savings).toLocaleString()} so'm tejaysiz`}
+            <div className="pdp-savings">
+              💰 {Math.round(savings).toLocaleString()} so'm tejaysiz
             </div>
           )}
         </div>
 
-        {/* Quantity & Total */}
-        <div className="quantity-section">
-          <div className="quantity-label">Miqdor:</div>
-          <div className="quantity-controls">
+        {/* Quantity Selector */}
+        <div className="pdp-quantity-row">
+          <span className="pdp-qty-label">Miqdor:</span>
+          <div className="pdp-qty-controls">
             <button
-              className="qty-btn minus"
+              className="pdp-qty-btn"
               onClick={() => handleQuantityChange(-1)}
               disabled={quantity <= 1}
             >
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
-                <line x1="5" y1="12" x2="19" y2="12" stroke="#B0B0B0" strokeWidth="2.5" strokeLinecap="round"/>
-              </svg>
+              −
             </button>
-            <span className="quantity-value">{quantity}</span>
+            <span className="pdp-qty-value">{quantity}</span>
             <button
-              className="qty-btn plus"
+              className="pdp-qty-btn pdp-qty-plus"
               onClick={() => handleQuantityChange(1)}
               disabled={quantity >= (offer.quantity || 99)}
             >
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
-                <line x1="12" y1="5" x2="12" y2="19" stroke="#53B175" strokeWidth="2.5" strokeLinecap="round"/>
-                <line x1="5" y1="12" x2="19" y2="12" stroke="#53B175" strokeWidth="2.5" strokeLinecap="round"/>
-              </svg>
+              +
             </button>
           </div>
-          <div className="total-price">
-            {Math.round(totalPrice).toLocaleString()} so'm
-          </div>
+          <span className="pdp-total">{Math.round(totalPrice).toLocaleString()} so'm</span>
+        </div>
+
+        {/* Tags */}
+        <div className="pdp-tags">
+          {offer.category && (
+            <span className="pdp-tag">🏷️ {offer.category}</span>
+          )}
+          {expiryInfo && !expiryInfo.urgent && (
+            <span className="pdp-tag">⏰ {expiryInfo.text}</span>
+          )}
         </div>
 
         {/* Description */}
-        {offer.description && (
-          <div className="description-section">
-            <button
-              className="section-header"
-              onClick={() => setShowDetails(!showDetails)}
-            >
-              <span className="section-title">📝 Tavsif</span>
-              <svg
-                width="20"
-                height="20"
-                viewBox="0 0 24 24"
-                fill="none"
-                className={`chevron ${showDetails ? 'open' : ''}`}
-              >
-                <path d="M6 9l6 6 6-6" stroke="#7C7C7C" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-              </svg>
-            </button>
-            {showDetails && (
-              <div className="description-content">
-                <p>{offer.description}</p>
-              </div>
-            )}
+        {offer.description && offer.description.toLowerCase() !== offer.title?.toLowerCase() && (
+          <div className="pdp-description">
+            <h3>📝 Tavsif</h3>
+            <p>{offer.description}</p>
           </div>
         )}
+      </section>
 
-        {/* Category & Info Chips */}
-        <div className="info-chips">
-          {offer.category && (
-            <span className="info-chip">
-              🏷️ {offer.category}
-            </span>
-          )}
-          {expiryInfo && (
-            <span className={`info-chip ${expiryInfo.urgent ? 'urgent' : ''}`}>
-              ⏰ {expiryInfo.text}
-            </span>
-          )}
-        </div>
-
-        {/* Add to Cart Button */}
+      {/* Fixed Bottom Button */}
+      <div className="pdp-bottom">
         <button
-          className={`add-to-cart-btn ${addedToCart ? 'added' : ''}`}
-          onClick={handleAddToBasket}
+          className={`pdp-add-btn ${addedToCart ? 'success' : ''}`}
+          onClick={handleAddToCart}
           disabled={addedToCart}
         >
           {addedToCart ? (
             <>
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
-                <path d="M20 6L9 17l-5-5" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/>
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
+                <path d="M20 6L9 17l-5-5" stroke="white" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"/>
               </svg>
-              Savatga qo'shildi!
+              Qo'shildi!
             </>
           ) : (
             <>
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
-                <circle cx="9" cy="21" r="1" stroke="white" strokeWidth="2"/>
-                <circle cx="20" cy="21" r="1" stroke="white" strokeWidth="2"/>
-                <path d="M1 1h4l2.68 13.39a2 2 0 002 1.61h9.72a2 2 0 002-1.61L23 6H6" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
+                <circle cx="9" cy="21" r="1" fill="white"/>
+                <circle cx="20" cy="21" r="1" fill="white"/>
+                <path d="M1 1h4l2.68 13.39a2 2 0 002 1.61h9.72a2 2 0 002-1.61L23 6H6"
+                  stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
               </svg>
-              Savatga qo'shish • {Math.round(totalPrice).toLocaleString()} so'm
+              Savatga qo'shish
             </>
           )}
         </button>
