@@ -111,17 +111,21 @@ async def show_store_settings(callback: types.CallbackQuery) -> None:
 
     role_text = "" if is_owner else (" (сотрудник)" if lang == "ru" else " (xodim)")
 
-    text = (
-        f"⚙️ <b>Настройки магазина{role_text}</b>\n\n"
-        f"🏪 <b>{store_name}</b>\n\n"
-        f"📸 Фото: {'✅ Загружено' if has_photo else '❌ Не загружено'}\n"
-        f"📍 Геолокация: {'✅ Установлена' if has_location else '❌ Не установлена'}"
-        if lang == "ru"
-        else f"⚙️ <b>Do'kon sozlamalari{role_text}</b>\n\n"
-        f"🏪 <b>{store_name}</b>\n\n"
-        f"📸 Rasm: {'✅ Yuklangan' if has_photo else '❌ Yuklanmagan'}\n"
-        f"📍 Geolokatsiya: {'✅ O\'rnatilgan' if has_location else '❌ O\'rnatilmagan'}"
-    )
+    geo_set = "✅ O'rnatilgan" if has_location else "❌ O'rnatilmagan"
+    if lang == "ru":
+        text = (
+            f"⚙️ <b>Настройки магазина{role_text}</b>\n\n"
+            f"🏪 <b>{store_name}</b>\n\n"
+            f"📸 Фото: {'✅ Загружено' if has_photo else '❌ Не загружено'}\n"
+            f"📍 Геолокация: {'✅ Установлена' if has_location else '❌ Не установлена'}"
+        )
+    else:
+        text = (
+            f"⚙️ <b>Do'kon sozlamalari{role_text}</b>\n\n"
+            f"🏪 <b>{store_name}</b>\n\n"
+            f"📸 Rasm: {'✅ Yuklangan' if has_photo else '❌ Yuklanmagan'}\n"
+            f"📍 Geolokatsiya: {geo_set}"
+        )
 
     # Show current photo if exists
     if has_photo and callback.message:
