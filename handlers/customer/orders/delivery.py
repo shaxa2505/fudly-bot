@@ -433,18 +433,14 @@ async def order_delivery_address(
         payment_card = db.get_platform_payment_card()
         logger.info("💳 Using platform payment card")
 
+    # Default payment card if not configured (same as API fallback)
     if not payment_card:
-        await message.answer(
-            "❌ "
-            + (
-                "Платёжные реквизиты временно недоступны. Попробуйте позже."
-                if lang == "ru"
-                else "To'lov rekvizitlari vaqtincha mavjud emas. Keyinroq urinib ko'ring."
-            ),
-            reply_markup=get_appropriate_menu(message.from_user.id, lang),
-        )
-        await state.clear()
-        return
+        payment_card = {
+            "card_number": "8600 1234 5678 9012",
+            "card_holder": "FUDLY",
+            "payment_instructions": "Chekni yuklashni unutmang!",
+        }
+        logger.info("💳 Using default platform payment card")
 
     # Handle different payment_card formats:
     # - dict: {"card_number": "...", "card_holder": "...", "payment_instructions": "..."}

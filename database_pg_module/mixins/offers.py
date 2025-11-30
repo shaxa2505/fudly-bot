@@ -409,7 +409,17 @@ class OfferMixin:
         """Delete offer and all related records."""
         with self.get_connection() as conn:
             cursor = conn.cursor()
-            # Delete from all tables that reference this offer
+            # Delete from all tables that reference this offer (in correct order)
+            # First get all booking_ids for this offer to delete their ratings
+            cursor.execute("SELECT booking_id FROM bookings WHERE offer_id = %s", (offer_id,))
+            booking_ids = [row[0] for row in cursor.fetchall()]
+            if booking_ids:
+                # Delete ratings that reference these bookings
+                cursor.execute(
+                    "DELETE FROM ratings WHERE booking_id = ANY(%s)",
+                    (booking_ids,)
+                )
+            # Now delete in correct FK order
             cursor.execute("DELETE FROM orders WHERE offer_id = %s", (offer_id,))
             cursor.execute("DELETE FROM bookings WHERE offer_id = %s", (offer_id,))
             cursor.execute("DELETE FROM favorites WHERE offer_id = %s", (offer_id,))

@@ -40,12 +40,15 @@ export function CartProvider({ children }) {
       const existing = prev[key];
       const currentQty = existing?.quantity || 0;
 
-      // Use offer's available stock as limit (fallback to 99 if not provided)
-      const stockLimit = offer.quantity || offer.stock || 99;
+      // Use offer's available stock as limit
+      // Priority: existing.offer.stock (saved) > offer.quantity > offer.stock > 99 (fallback)
+      const stockLimit = existing?.offer?.stock || offer.quantity || offer.stock || 99;
 
       // Check if we've reached the stock limit
       if (currentQty >= stockLimit) {
         window.Telegram?.WebApp?.HapticFeedback?.notificationOccurred?.('warning');
+        // Show toast or alert if possible
+        console.warn(`Stock limit reached: ${currentQty}/${stockLimit}`);
         return prev;
       }
 
@@ -54,13 +57,13 @@ export function CartProvider({ children }) {
         [key]: {
           offer: {
             id: offer.id,
-            title: offer.title,
-            photo: offer.photo,
-            discount_price: offer.discount_price,
-            original_price: offer.original_price,
-            store_id: offer.store_id,
-            store_name: offer.store_name,
-            store_address: offer.store_address,
+            title: offer.title || existing?.offer?.title,
+            photo: offer.photo || existing?.offer?.photo,
+            discount_price: offer.discount_price || existing?.offer?.discount_price,
+            original_price: offer.original_price || existing?.offer?.original_price,
+            store_id: offer.store_id || existing?.offer?.store_id,
+            store_name: offer.store_name || existing?.offer?.store_name,
+            store_address: offer.store_address || existing?.offer?.store_address,
             stock: stockLimit, // Save stock limit for later checks
           },
           quantity: Math.min(currentQty + 1, stockLimit),
