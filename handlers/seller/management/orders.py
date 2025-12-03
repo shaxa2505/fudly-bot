@@ -5,6 +5,7 @@ import asyncio
 from typing import Any
 
 from aiogram import F, Router, types
+from aiogram.fsm.context import FSMContext
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
 from localization import get_text
@@ -16,9 +17,12 @@ router = Router()
 
 
 @router.message(F.text.contains("🎫 Заказы продавца") | F.text.contains("Buyurtmalar (sotuvchi)"))
-async def seller_orders(message: types.Message) -> Any:
+async def seller_orders(message: types.Message, state: FSMContext) -> Any:
     """Display seller's orders and bookings from all stores. Only for sellers WITH stores."""
     db = get_db()
+    
+    # Clear any active FSM state first
+    await state.clear()
 
     # Check if user has stores - if not, don't handle this message
     try:

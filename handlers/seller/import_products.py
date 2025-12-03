@@ -43,6 +43,33 @@ def setup_dependencies(database: Any, bot_instance: Any) -> None:
 
 
 # =============================================================================
+# SELLER MENU CALLBACK - Return to seller main menu
+# =============================================================================
+
+
+@router.callback_query(F.data == "seller_menu")
+async def back_to_seller_menu(callback: types.CallbackQuery, state: FSMContext) -> None:
+    """Return to seller main menu - clear state and show menu."""
+    if not db or not callback.message:
+        await callback.answer("Ошибка", show_alert=True)
+        return
+
+    # Clear any active FSM state
+    await state.clear()
+
+    user_id = callback.from_user.id
+    lang = db.get_user_language(user_id)
+
+    from app.keyboards import main_menu_seller
+
+    await callback.message.answer(
+        "📋 Главное меню" if lang == "ru" else "📋 Asosiy menyu",
+        reply_markup=main_menu_seller(lang),
+    )
+    await callback.answer()
+
+
+# =============================================================================
 # IMPORT HANDLERS
 # =============================================================================
 

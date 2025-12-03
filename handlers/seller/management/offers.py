@@ -19,8 +19,11 @@ router = Router()
 
 
 @router.message(F.text.contains("Мои товары") | F.text.contains("Mening mahsulotlarim"))
-async def my_offers(message: types.Message) -> None:
+async def my_offers(message: types.Message, state: FSMContext) -> None:
     """Display seller's offers with management buttons."""
+    # Clear any active FSM state
+    await state.clear()
+    
     db = get_db()
     lang = db.get_user_language(message.from_user.id)
     stores = db.get_user_accessible_stores(message.from_user.id)

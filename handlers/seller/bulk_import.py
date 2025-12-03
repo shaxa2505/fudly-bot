@@ -38,6 +38,9 @@ class BulkImport(StatesGroup):
 async def start_bulk_import(message: types.Message, state: FSMContext):
     """Start bulk import process"""
 
+    # Clear any previous FSM state
+    await state.clear()
+
     if not db:
         await message.answer("❌ System error")
         return

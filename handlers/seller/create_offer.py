@@ -119,6 +119,9 @@ def build_progress_text(data: dict, lang: str, current_step: int) -> str:
 @router.message(F.text.contains("Добавить") | F.text.contains("Qo'shish"))
 async def add_offer_start(message: types.Message, state: FSMContext) -> None:
     """Start offer creation - select store and category."""
+    # Clear any previous FSM state
+    await state.clear()
+    
     if not db:
         await message.answer("System error")
         return

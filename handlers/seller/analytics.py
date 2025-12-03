@@ -5,6 +5,7 @@ from datetime import datetime
 from typing import Any
 
 from aiogram import F, Router, types
+from aiogram.fsm.context import FSMContext
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
 from app.core.utils import get_store_field
@@ -111,8 +112,11 @@ async def show_store_analytics(callback: types.CallbackQuery) -> None:
 
 
 @router.message(F.text.contains("Сегодня") | F.text.contains("Bugun"))
-async def partner_today_stats(message: types.Message) -> None:
+async def partner_today_stats(message: types.Message, state: FSMContext) -> None:
     """Компактная статистика партнёра за сегодня"""
+    # Clear any active FSM state
+    await state.clear()
+    
     if not db:
         await message.answer("System error")
         return
