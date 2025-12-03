@@ -300,9 +300,16 @@ def setup(
         # Safely read incoming text and handle cancellation
         raw_text = (message.text or "").strip()
 
-        # Check if user pressed main menu button - clear state and let other handlers process
+        # Check if user pressed main menu button - clear state and re-trigger the button handler
         if is_main_menu_button(raw_text):
             await state.clear()
+            # Re-send the same message to let other handlers process it
+            # This is a workaround - we can't easily re-dispatch in aiogram
+            # So we manually call the appropriate handler
+            from app.keyboards.user import main_menu_customer
+            await message.answer(
+                get_text(lang, "operation_cancelled"), reply_markup=main_menu_customer(lang)
+            )
             return
 
         # Skip commands - let them be handled by command handlers

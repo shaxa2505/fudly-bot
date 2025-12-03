@@ -929,7 +929,19 @@ def setup(
 
         keyboard = offers_category_filter(lang, store_id=store_id)
 
-        await msg.edit_text(text, parse_mode="HTML", reply_markup=keyboard)
+        # Try edit_text first, then edit_caption, then send new message
+        try:
+            await msg.edit_text(text, parse_mode="HTML", reply_markup=keyboard)
+        except Exception:
+            try:
+                await msg.edit_caption(caption=text, parse_mode="HTML", reply_markup=keyboard)
+            except Exception:
+                # Delete old message and send new one
+                try:
+                    await msg.delete()
+                except Exception:
+                    pass
+                await callback.message.answer(text, parse_mode="HTML", reply_markup=keyboard)
         await callback.answer()
 
     @dp.callback_query(F.data == "back_to_places")
