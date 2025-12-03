@@ -267,7 +267,9 @@ def setup(
     """Register search handlers."""
 
     # Cancel handler - must be registered BEFORE Search.query handler
-    @dp.message(Search.query, F.text.contains("Bekor") | F.text.contains("Отмена") | F.text.contains("❌"))
+    @dp.message(
+        Search.query, F.text.contains("Bekor") | F.text.contains("Отмена") | F.text.contains("❌")
+    )
     async def cancel_search(message: types.Message, state: FSMContext):
         """Cancel search - handle cancel button immediately."""
         assert message.from_user is not None
@@ -296,7 +298,7 @@ def setup(
         """Process search query with improved search."""
         assert message.from_user is not None
         lang = db.get_user_language(message.from_user.id)
-        
+
         # Import at function level to avoid UnboundLocalError
         from app.keyboards.user import main_menu_customer as menu_customer
 
@@ -410,15 +412,13 @@ def setup(
                 if lang == "ru"
                 else "😔 Hech narsa topilmadi\n\nBoshqa so'z bilan qidirib ko'ring"
             )
-            await message.answer(no_results_msg, parse_mode="HTML", reply_markup=menu_customer(lang))
+            await message.answer(
+                no_results_msg, parse_mode="HTML", reply_markup=menu_customer(lang)
+            )
             return
 
         # Show results - compact
-        result_msg = (
-            f"🔍 «{query}» - "
-            if lang == "ru"
-            else f"🔍 «{query}» - "
-        )
+        result_msg = f"🔍 «{query}» - " if lang == "ru" else f"🔍 «{query}» - "
         parts = []
         if store_results:
             parts.append(f"🏪 {len(store_results)}")
@@ -594,7 +594,7 @@ def setup(
 
     @dp.callback_query(F.data.startswith("search_select_"))
     async def search_select_handler(callback: types.CallbackQuery, state: FSMContext) -> None:
-        """Handle search result selection - show full offer details."""
+        """Handle search result selection - show full offer card with booking controls."""
         if not callback.from_user or not callback.message:
             await callback.answer()
             return
@@ -616,24 +616,96 @@ def setup(
                 )
                 return
 
-            # Send full offer card
-            caption = render_offer_card(lang, offer)
-            keyboard = offer_quick_keyboard(
-                lang, offer.id, offer.store_id, getattr(offer, "delivery_enabled", False)
+            # Get store details
+            store = offer_service.get_store(offer.store_id) if offer.store_id else None
+            store_name = store.name if store else "Магазин"
+            store_address = store.address if store else ""
+            delivery_enabled = store.delivery_enabled if store else False
+            delivery_price = store.delivery_price if store and delivery_enabled else 0
+
+            max_quantity = offer.quantity or 0
+            if max_quantity <= 0:
+                await callback.answer(
+                    "Товар закончился" if lang == "ru" else "Mahsulot tugadi",
+                    show_alert=True,
+                )
+                return
+
+            initial_qty = 1
+            initial_method = None if delivery_enabled else "pickup"
+
+            # Save to FSM state for booking flow
+            from handlers.common.states import BookOffer
+
+            await state.update_data(
+                offer_id=offer_id,
+                max_quantity=max_quantity,
+                offer_price=offer.discount_price,
+                original_price=offer.original_price or 0,
+                offer_title=offer.title,
+                offer_description=offer.description or "",
+                offer_unit=offer.unit or "",
+                expiry_date=str(offer.expiry_date) if offer.expiry_date else "",
+                store_id=offer.store_id,
+                store_name=store_name,
+                store_address=store_address,
+                delivery_enabled=delivery_enabled,
+                delivery_price=delivery_price,
+                selected_qty=initial_qty,
+                selected_delivery=initial_method,
+                offer_photo=getattr(offer, "photo", None),
             )
+            await state.set_state(BookOffer.quantity)
+
+            # Build booking card
+            from handlers.bookings.customer import build_order_card_keyboard, build_order_card_text
+
+            text = build_order_card_text(
+                lang,
+                offer.title,
+                offer.discount_price,
+                initial_qty,
+                store_name,
+                delivery_enabled,
+                delivery_price,
+                initial_method,
+                max_quantity,
+                original_price=offer.original_price or 0,
+                description=offer.description or "",
+                expiry_date=str(offer.expiry_date) if offer.expiry_date else "",
+                store_address=store_address,
+                unit=offer.unit or "",
+            )
+            kb = build_order_card_keyboard(
+                lang,
+                offer_id,
+                offer.store_id,
+                initial_qty,
+                max_quantity,
+                delivery_enabled,
+                initial_method,
+            )
+
+            # Delete search results and send offer card with photo
+            try:
+                await callback.message.delete()
+            except Exception:
+                pass
 
             if getattr(offer, "photo", None):
                 try:
                     await callback.message.answer_photo(
                         photo=offer.photo,
-                        caption=caption,
+                        caption=text,
                         parse_mode="HTML",
-                        reply_markup=keyboard,
+                        reply_markup=kb.as_markup(),
                     )
+                    await callback.answer()
+                    return
                 except Exception:
-                    await callback.message.answer(caption, parse_mode="HTML", reply_markup=keyboard)
-            else:
-                await callback.message.answer(caption, parse_mode="HTML", reply_markup=keyboard)
+                    pass
+
+            await callback.message.answer(text, parse_mode="HTML", reply_markup=kb.as_markup())
 
         except Exception as e:
             logger.error(f"Failed to show offer {offer_id}: {e}")
@@ -885,36 +957,106 @@ def setup(
             return
 
         offer_id = offer_list[global_index]
-        # Fetch details and send
+        # Fetch details and send with booking controls
         try:
             details = offer_service.get_offer_details(offer_id)
             from aiogram import types as _ai_types
 
             msg = callback.message if isinstance(callback.message, _ai_types.Message) else None
             if msg and details:
-                # Render a reasonable detail card and send with quick keyboard
-                caption = render_offer_card(lang, details)
-                try:
-                    keyboard = offer_quick_keyboard(
-                        lang,
-                        details.id,
-                        details.store_id,
-                        getattr(details, "delivery_enabled", False),
+                # Get store details
+                store = offer_service.get_store(details.store_id) if details.store_id else None
+                store_name = store.name if store else "Магазин"
+                store_address = store.address if store else ""
+                delivery_enabled = store.delivery_enabled if store else False
+                delivery_price = store.delivery_price if store and delivery_enabled else 0
+
+                max_quantity = details.quantity or 0
+                if max_quantity <= 0:
+                    await callback.answer(
+                        "Товар закончился" if lang == "ru" else "Mahsulot tugadi",
+                        show_alert=True,
                     )
+                    return
+
+                initial_qty = 1
+                initial_method = None if delivery_enabled else "pickup"
+
+                # Save to FSM state for booking flow
+                from handlers.common.states import BookOffer
+
+                await state.update_data(
+                    offer_id=offer_id,
+                    max_quantity=max_quantity,
+                    offer_price=details.discount_price,
+                    original_price=details.original_price or 0,
+                    offer_title=details.title,
+                    offer_description=details.description or "",
+                    offer_unit=details.unit or "",
+                    expiry_date=str(details.expiry_date) if details.expiry_date else "",
+                    store_id=details.store_id,
+                    store_name=store_name,
+                    store_address=store_address,
+                    delivery_enabled=delivery_enabled,
+                    delivery_price=delivery_price,
+                    selected_qty=initial_qty,
+                    selected_delivery=initial_method,
+                    offer_photo=getattr(details, "photo", None),
+                )
+                await state.set_state(BookOffer.quantity)
+
+                # Build booking card
+                from handlers.bookings.customer import (
+                    build_order_card_keyboard,
+                    build_order_card_text,
+                )
+
+                text = build_order_card_text(
+                    lang,
+                    details.title,
+                    details.discount_price,
+                    initial_qty,
+                    store_name,
+                    delivery_enabled,
+                    delivery_price,
+                    initial_method,
+                    max_quantity,
+                    original_price=details.original_price or 0,
+                    description=details.description or "",
+                    expiry_date=str(details.expiry_date) if details.expiry_date else "",
+                    store_address=store_address,
+                    unit=details.unit or "",
+                )
+                kb = build_order_card_keyboard(
+                    lang,
+                    offer_id,
+                    details.store_id,
+                    initial_qty,
+                    max_quantity,
+                    delivery_enabled,
+                    initial_method,
+                )
+
+                # Delete message and send offer card with photo
+                try:
+                    await msg.delete()
                 except Exception:
-                    keyboard = None
+                    pass
+
                 if getattr(details, "photo", None):
                     try:
                         await msg.answer_photo(
                             photo=details.photo,
-                            caption=caption,
+                            caption=text,
                             parse_mode="HTML",
-                            reply_markup=keyboard,
+                            reply_markup=kb.as_markup(),
                         )
+                        await callback.answer()
+                        return
                     except Exception:
-                        await msg.answer(caption, parse_mode="HTML", reply_markup=keyboard)
-                else:
-                    await msg.answer(caption, parse_mode="HTML", reply_markup=keyboard)
+                        pass
+
+                await msg.answer(text, parse_mode="HTML", reply_markup=kb.as_markup())
             else:
                 await callback.answer(
                     get_text(lang, "open_chat_to_view") or "Open chat to view the offer",

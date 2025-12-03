@@ -76,6 +76,14 @@ class DatabaseProtocol(Protocol):
         """Set user view mode (customer or seller)."""
         ...
 
+    def get_last_delivery_address(self, user_id: int) -> str | None:
+        """Get user's last saved delivery address."""
+        ...
+
+    def save_delivery_address(self, user_id: int, address: str) -> None:
+        """Save user's delivery address."""
+        ...
+
     def get_all_users(self) -> list[tuple[Any, ...]]:
         ...
 
@@ -320,6 +328,10 @@ class DatabaseProtocol(Protocol):
     def get_platform_payment_card(self) -> str | None:
         ...
 
+    def get_payment_card(self, store_id: int) -> Any | None:
+        """Get payment card for a specific store."""
+        ...
+
     def set_platform_payment_card(self, card_number: str) -> None:
         ...
 
@@ -350,6 +362,10 @@ class DatabaseProtocol(Protocol):
         ...
 
     def get_order(self, order_id: int) -> tuple[Any, ...] | None:
+        ...
+
+    def update_order_status(self, order_id: int, status: str) -> bool:
+        """Update order status."""
         ...
 
     # ======= SEARCH =======

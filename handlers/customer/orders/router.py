@@ -3,4 +3,7 @@ Customer orders router - delivery orders.
 """
 from aiogram import Router
 
-router = Router(name='customer_orders')
+from . import delivery
+
+router = Router(name="customer_orders")
+router.include_router(delivery.router)

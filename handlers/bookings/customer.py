@@ -82,65 +82,68 @@ def build_order_card_text(
     """Build order card in same style as product card."""
     currency = "so'm" if lang == "uz" else "сум"
     unit = unit or ("dona" if lang == "uz" else "шт")
-    
+
     # Calculate totals
     subtotal = price * quantity
     delivery_cost = delivery_price if delivery_method == "delivery" else 0
     total = subtotal + delivery_cost
-    
+
     # Header - same as product card
     lines = [f"📦 <b>{_esc(title)}</b>"]
-    
+
     if description:
         desc = description[:80] + "..." if len(description) > 80 else description
         lines.append(f"<i>{_esc(desc)}</i>")
-    
+
     lines.append("")
     lines.append("─" * 25)
-    
+
     # Price with discount - same style as product card
     if original_price and original_price > price:
         discount_pct = int((1 - price / original_price) * 100)
-        lines.append(f"<s>{int(original_price):,}</s> → <b>{int(price):,}</b> {currency} (-{discount_pct}%)")
+        lines.append(
+            f"<s>{int(original_price):,}</s> → <b>{int(price):,}</b> {currency} (-{discount_pct}%)"
+        )
     else:
         lines.append(f"💰 <b>{int(price):,}</b> {currency}")
-    
+
     lines.append("─" * 25)
     lines.append("")
-    
+
     # Quantity selection
     qty_label = "Miqdor" if lang == "uz" else "Количество"
     lines.append(f"📦 {qty_label}: <b>{quantity}</b> {unit}")
-    
+
     # Expiry date if available
     if expiry_date:
         expiry_label = "Yaroqlilik" if lang == "uz" else "Срок до"
         expiry_str = str(expiry_date)[:10]
         try:
             from datetime import datetime
+
             dt = datetime.strptime(expiry_str, "%Y-%m-%d")
             expiry_str = dt.strftime("%d.%m.%Y")
         except Exception:
             pass
         lines.append(f"📅 {expiry_label}: {expiry_str}")
-    
+
     # Store info - same style
     lines.append("")
     lines.append(f"🏪 {_esc(store_name)}")
     if store_address:
         lines.append(f"📍 {_esc(store_address)}")
-    
+
     # Delivery section - cleaner style
     if delivery_enabled:
         lines.append("")
         delivery_label = "Yetkazish" if lang == "uz" else "Доставка"
         lines.append(f"🚚 {delivery_label}: {delivery_price:,} {currency}")
-        
+
         # Show selection hint if not selected
         if not delivery_method:
             hint = "👇 Usulni tanlang" if lang == "uz" else "👇 Выберите способ"
             lines.append(f"<i>{hint}</i>")
-    
+
     # Totals section
     lines.append("")
     lines.append("─" * 25)
@@ -149,7 +152,7 @@ def build_order_card_text(
     if delivery_method == "delivery" and delivery_cost > 0:
         incl_delivery = "yetkazish bilan" if lang == "uz" else "с доставкой"
         lines.append(f"   <i>({incl_delivery})</i>")
-    
+
     return "\n".join(lines)
 
 
@@ -164,46 +167,46 @@ def build_order_card_keyboard(
 ) -> InlineKeyboardBuilder:
     """Build order card keyboard with [−] [qty] [+] and delivery options."""
     kb = InlineKeyboardBuilder()
-    
+
     # Row 1: Quantity controls [−] [qty] [+]
     minus_enabled = quantity > 1
     plus_enabled = quantity < max_qty
-    
+
     minus_text = "➖" if minus_enabled else "⬜"
     plus_text = "➕" if plus_enabled else "⬜"
-    
+
     kb.button(
-        text=minus_text, 
-        callback_data=f"pbook_qty_{offer_id}_{quantity - 1}" if minus_enabled else "pbook_noop"
+        text=minus_text,
+        callback_data=f"pbook_qty_{offer_id}_{quantity - 1}" if minus_enabled else "pbook_noop",
     )
     kb.button(text=f"📦 {quantity}", callback_data="pbook_noop")
     kb.button(
-        text=plus_text, 
-        callback_data=f"pbook_qty_{offer_id}_{quantity + 1}" if plus_enabled else "pbook_noop"
+        text=plus_text,
+        callback_data=f"pbook_qty_{offer_id}_{quantity + 1}" if plus_enabled else "pbook_noop",
     )
-    
+
     # Row 2-3: Delivery options (if enabled)
     if delivery_enabled:
         pickup_text = "🏪 O'zim olib ketaman" if lang == "uz" else "🏪 Самовывоз"
         delivery_text = "🚚 Yetkazish" if lang == "uz" else "🚚 Доставка"
-        
+
         # Add checkmarks for selected option
         if delivery_method == "pickup":
             pickup_text = "✓ " + pickup_text
         elif delivery_method == "delivery":
             delivery_text = "✓ " + delivery_text
-        
+
         kb.button(text=pickup_text, callback_data=f"pbook_method_{offer_id}_pickup")
         kb.button(text=delivery_text, callback_data=f"pbook_method_{offer_id}_delivery")
-    
+
     # Row 4: Confirm and Cancel
     if delivery_method or not delivery_enabled:
         confirm_text = "✅ Tasdiqlash" if lang == "uz" else "✅ Подтвердить"
         kb.button(text=confirm_text, callback_data=f"pbook_confirm_{offer_id}")
-    
+
     cancel_text = "❌ Bekor" if lang == "uz" else "❌ Отмена"
     kb.button(text=cancel_text, callback_data=f"pbook_cancel_{offer_id}_{store_id}")
-    
+
     # Layout
     if delivery_enabled:
         if delivery_method:
@@ -212,7 +215,7 @@ def build_order_card_keyboard(
             kb.adjust(3, 2, 1)  # [−][qty][+], [pickup][delivery], [cancel]
     else:
         kb.adjust(3, 2)  # [−][qty][+], [confirm][cancel]
-    
+
     return kb
 
 
@@ -269,6 +272,9 @@ async def book_offer_start(callback: types.CallbackQuery, state: FSMContext) -> 
     initial_qty = 1
     initial_method = None if delivery_enabled else "pickup"
 
+    # Get offer photo
+    offer_photo = get_offer_field(offer, "photo", None)
+
     # Save to state (including new fields)
     await state.update_data(
         offer_id=offer_id,
@@ -286,13 +292,21 @@ async def book_offer_start(callback: types.CallbackQuery, state: FSMContext) -> 
         delivery_price=delivery_price,
         selected_qty=initial_qty,
         selected_delivery=initial_method,
+        offer_photo=offer_photo,
     )
     await state.set_state(BookOffer.quantity)
 
     # Build card text and keyboard
     text = build_order_card_text(
-        lang, offer_title, offer_price, initial_qty, store_name,
-        delivery_enabled, delivery_price, initial_method, max_quantity,
+        lang,
+        offer_title,
+        offer_price,
+        initial_qty,
+        store_name,
+        delivery_enabled,
+        delivery_price,
+        initial_method,
+        max_quantity,
         original_price=original_price,
         description=offer_description,
         expiry_date=str(expiry_date) if expiry_date else "",
@@ -300,24 +314,17 @@ async def book_offer_start(callback: types.CallbackQuery, state: FSMContext) -> 
         unit=offer_unit,
     )
     kb = build_order_card_keyboard(
-        lang, offer_id, store_id, initial_qty, max_quantity,
-        delivery_enabled, initial_method
+        lang, offer_id, store_id, initial_qty, max_quantity, delivery_enabled, initial_method
     )
 
     # Update EXISTING message - edit in place, no new messages
     try:
         if callback.message.photo:
             await callback.message.edit_caption(
-                caption=text,
-                parse_mode="HTML",
-                reply_markup=kb.as_markup()
+                caption=text, parse_mode="HTML", reply_markup=kb.as_markup()
             )
         else:
-            await callback.message.edit_text(
-                text,
-                parse_mode="HTML",
-                reply_markup=kb.as_markup()
-            )
+            await callback.message.edit_text(text, parse_mode="HTML", reply_markup=kb.as_markup())
         await callback.answer()
     except Exception as e:
         logger.warning(f"Failed to edit message in book_offer_start: {e}")
@@ -329,17 +336,10 @@ async def book_offer_start(callback: types.CallbackQuery, state: FSMContext) -> 
         offer_photo = get_offer_field(offer, "photo", None)
         if offer_photo:
             await callback.message.answer_photo(
-                photo=offer_photo,
-                caption=text,
-                parse_mode="HTML",
-                reply_markup=kb.as_markup()
+                photo=offer_photo, caption=text, parse_mode="HTML", reply_markup=kb.as_markup()
             )
         else:
-            await callback.message.answer(
-                text,
-                parse_mode="HTML", 
-                reply_markup=kb.as_markup()
-            )
+            await callback.message.answer(text, parse_mode="HTML", reply_markup=kb.as_markup())
         await callback.answer()
 
 
@@ -402,13 +402,15 @@ async def pbook_change_qty(callback: types.CallbackQuery, state: FSMContext) -> 
         new_qty,
         max_quantity,
         data.get("delivery_enabled", False),
-        data.get("selected_delivery")
+        data.get("selected_delivery"),
     )
 
     # Update message
     try:
         if callback.message.photo:
-            await callback.message.edit_caption(caption=text, parse_mode="HTML", reply_markup=kb.as_markup())
+            await callback.message.edit_caption(
+                caption=text, parse_mode="HTML", reply_markup=kb.as_markup()
+            )
         else:
             await callback.message.edit_text(text, parse_mode="HTML", reply_markup=kb.as_markup())
     except Exception:
@@ -465,13 +467,15 @@ async def pbook_select_method(callback: types.CallbackQuery, state: FSMContext) 
         quantity,
         max_quantity,
         data.get("delivery_enabled", False),
-        method
+        method,
     )
 
     # Update message
     try:
         if callback.message.photo:
-            await callback.message.edit_caption(caption=text, parse_mode="HTML", reply_markup=kb.as_markup())
+            await callback.message.edit_caption(
+                caption=text, parse_mode="HTML", reply_markup=kb.as_markup()
+            )
         else:
             await callback.message.edit_text(text, parse_mode="HTML", reply_markup=kb.as_markup())
     except Exception:
@@ -481,17 +485,80 @@ async def pbook_select_method(callback: types.CallbackQuery, state: FSMContext) 
 
 @router.callback_query(F.data.startswith("pbook_cancel_"))
 async def pbook_cancel(callback: types.CallbackQuery, state: FSMContext) -> None:
-    """Cancel booking - return to hot offers list."""
+    """Cancel booking - return to offer details card with photo."""
     if not db or not callback.message:
         await callback.answer()
         return
 
     user_id = callback.from_user.id
     lang = db.get_user_language(user_id)
+    data = await state.get_data()
+
+    # Get offer details from state for returning to card
+    offer_id = data.get("offer_id")
+    store_id = data.get("store_id")
+    offer_photo = data.get("offer_photo")
 
     await state.clear()
 
-    # Delete current message and show cancellation
+    # Try to get offer and show original card
+    if offer_id:
+        offer = db.get_offer(offer_id)
+        if offer:
+            from app.keyboards.offers import offer_quick_keyboard
+
+            # Build simple offer card text
+            title = get_offer_field(offer, "title", "")
+            original_price = get_offer_field(offer, "original_price", 0)
+            discount_price = get_offer_field(offer, "discount_price", 0)
+            quantity = get_offer_field(offer, "quantity", 0)
+            unit = get_offer_field(offer, "unit", "шт")
+            expiry_date = get_offer_field(offer, "expiry_date", "")
+            photo = get_offer_field(offer, "photo", None) or offer_photo
+
+            currency = "so'm" if lang == "uz" else "сум"
+            discount_pct = (
+                int((1 - discount_price / original_price) * 100) if original_price > 0 else 0
+            )
+
+            lines = [f"<b>{_esc(title)}</b>"]
+            lines.append(
+                f"<s>{int(original_price):,}</s> → <b>{int(discount_price):,}</b> {currency} (-{discount_pct}%)"
+            )
+
+            if quantity:
+                stock = "Mavjud" if lang == "uz" else "В наличии"
+                lines.append(f"\n{stock}: <b>{quantity} {unit}</b>")
+
+            if expiry_date:
+                exp_label = "Yaroqlilik" if lang == "uz" else "Срок"
+                exp_str = str(expiry_date)[:10]
+                lines.append(f"{exp_label}: {exp_str}")
+
+            text = "\n".join(lines)
+            delivery_enabled = data.get("delivery_enabled", False)
+            kb = offer_quick_keyboard(lang, offer_id, store_id or 0, delivery_enabled)
+
+            try:
+                await callback.message.delete()
+            except Exception:
+                pass
+
+            if photo:
+                try:
+                    await callback.message.answer_photo(
+                        photo=photo, caption=text, parse_mode="HTML", reply_markup=kb
+                    )
+                    await callback.answer()
+                    return
+                except Exception:
+                    pass
+
+            await callback.message.answer(text, parse_mode="HTML", reply_markup=kb)
+            await callback.answer()
+            return
+
+    # Fallback: show main menu
     try:
         await callback.message.delete()
     except Exception:
@@ -499,6 +566,7 @@ async def pbook_cancel(callback: types.CallbackQuery, state: FSMContext) -> None
 
     cancelled = "❌ Bekor qilindi" if lang == "uz" else "❌ Отменено"
     from app.keyboards import main_menu_customer
+
     await callback.message.answer(cancelled, reply_markup=main_menu_customer(lang))
     await callback.answer()
 
@@ -507,7 +575,7 @@ async def pbook_cancel(callback: types.CallbackQuery, state: FSMContext) -> None
 async def pbook_confirm(callback: types.CallbackQuery, state: FSMContext) -> None:
     """Confirm order - create booking or start delivery flow."""
     logger.info(f"📥 pbook_confirm called: user={callback.from_user.id}, data={callback.data}")
-    
+
     if not db or not bot or not callback.message:
         logger.error("pbook_confirm: db or bot or message is None")
         await callback.answer("System error", show_alert=True)
@@ -530,8 +598,10 @@ async def pbook_confirm(callback: types.CallbackQuery, state: FSMContext) -> Non
     store_id = data.get("store_id")
     offer_price = data.get("offer_price", 0)
     offer_title = data.get("offer_title", "Товар")
-    
-    logger.info(f"📥 pbook_confirm: offer_id={offer_id}, qty={quantity}, delivery={selected_delivery}")
+
+    logger.info(
+        f"📥 pbook_confirm: offer_id={offer_id}, qty={quantity}, delivery={selected_delivery}"
+    )
 
     # Check minimum order for delivery
     if selected_delivery == "delivery":
@@ -556,15 +626,17 @@ async def pbook_confirm(callback: types.CallbackQuery, state: FSMContext) -> Non
         f"⏳ <b>Bron yuborilmoqda...</b>\n\n"
         f"🛒 {_esc(offer_title)} × {quantity}\n"
         f"💵 {total:,} {currency}"
-        if lang == "uz" else
-        f"⏳ <b>Оформляем бронь...</b>\n\n"
+        if lang == "uz"
+        else f"⏳ <b>Оформляем бронь...</b>\n\n"
         f"🛒 {_esc(offer_title)} × {quantity}\n"
         f"💵 {total:,} {currency}"
     )
-    
+
     try:
         if callback.message.photo:
-            await callback.message.edit_caption(caption=processing_text, parse_mode="HTML", reply_markup=None)
+            await callback.message.edit_caption(
+                caption=processing_text, parse_mode="HTML", reply_markup=None
+            )
         else:
             await callback.message.edit_text(processing_text, parse_mode="HTML", reply_markup=None)
         logger.info("📥 pbook_confirm: processing text shown")
@@ -781,7 +853,7 @@ async def create_booking(
 ) -> None:
     """Create the final booking."""
     logger.info(f"📦 create_booking called: real_user_id={real_user_id}")
-    
+
     if not db or not bot:
         logger.error("create_booking: db or bot is None")
         await message.answer("System error")
@@ -800,7 +872,7 @@ async def create_booking(
     offer_price = data.get("offer_price", 0)
     offer_title = data.get("offer_title", "Товар")
     store_id = data.get("store_id")
-    
+
     logger.info(f"📦 create_booking: offer_id={offer_id}, qty={quantity}, store={store_id}")
 
     if not offer_id:
@@ -950,10 +1022,12 @@ async def create_booking(
                 photo=offer_photo,
                 caption=customer_msg,
                 parse_mode="HTML",
-                reply_markup=main_menu_customer(lang)
+                reply_markup=main_menu_customer(lang),
             )
         except Exception:
-            await message.answer(customer_msg, parse_mode="HTML", reply_markup=main_menu_customer(lang))
+            await message.answer(
+                customer_msg, parse_mode="HTML", reply_markup=main_menu_customer(lang)
+            )
     else:
         await message.answer(customer_msg, parse_mode="HTML", reply_markup=main_menu_customer(lang))
 

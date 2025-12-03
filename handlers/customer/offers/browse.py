@@ -193,7 +193,7 @@ def setup(
         # Save current page for back navigation
         data = await state.get_data()
         current_page = data.get("hot_offers_page", 0)
-        
+
         # Check availability
         max_quantity = offer.quantity or 0
         if max_quantity <= 0:
@@ -216,6 +216,7 @@ def setup(
 
         # Save to FSM state for booking flow
         from handlers.common.states import BookOffer
+
         await state.update_data(
             offer_id=offer_id,
             max_quantity=max_quantity,
@@ -233,15 +234,23 @@ def setup(
             selected_qty=initial_qty,
             selected_delivery=initial_method,
             last_hot_page=current_page,
+            offer_photo=offer.photo,
         )
         await state.set_state(BookOffer.quantity)
 
         # Build booking card directly (skip intermediate product card)
-        from handlers.bookings.customer import build_order_card_text, build_order_card_keyboard
-        
+        from handlers.bookings.customer import build_order_card_keyboard, build_order_card_text
+
         text = build_order_card_text(
-            lang, offer.title, offer.discount_price, initial_qty, store_name,
-            delivery_enabled, delivery_price, initial_method, max_quantity,
+            lang,
+            offer.title,
+            offer.discount_price,
+            initial_qty,
+            store_name,
+            delivery_enabled,
+            delivery_price,
+            initial_method,
+            max_quantity,
             original_price=offer.original_price or 0,
             description=offer.description or "",
             expiry_date=str(offer.expiry_date) if offer.expiry_date else "",
@@ -249,33 +258,33 @@ def setup(
             unit=offer.unit or "",
         )
         kb = build_order_card_keyboard(
-            lang, offer_id, offer.store_id, initial_qty, max_quantity,
-            delivery_enabled, initial_method
+            lang,
+            offer_id,
+            offer.store_id,
+            initial_qty,
+            max_quantity,
+            delivery_enabled,
+            initial_method,
         )
 
-        # Edit current message or send new with photo
+        # Always delete list and send new message with photo if available
         try:
-            await msg.edit_text(text, parse_mode="HTML", reply_markup=kb.as_markup())
-            await callback.answer()
+            await msg.delete()
         except Exception:
-            # List message has no photo, need to delete and send with photo if available
+            pass
+
+        if offer.photo:
             try:
-                await msg.delete()
+                await msg.answer_photo(
+                    photo=offer.photo, caption=text, parse_mode="HTML", reply_markup=kb.as_markup()
+                )
+                await callback.answer()
+                return
             except Exception:
                 pass
-            if offer.photo:
-                try:
-                    await msg.answer_photo(
-                        photo=offer.photo,
-                        caption=text,
-                        parse_mode="HTML",
-                        reply_markup=kb.as_markup()
-                    )
-                except Exception:
-                    await msg.answer(text, parse_mode="HTML", reply_markup=kb.as_markup())
-            else:
-                await msg.answer(text, parse_mode="HTML", reply_markup=kb.as_markup())
-            await callback.answer()
+
+        await msg.answer(text, parse_mode="HTML", reply_markup=kb.as_markup())
+        await callback.answer()
 
     @dp.callback_query(F.data == "hot_noop")
     async def hot_noop_handler(callback: types.CallbackQuery) -> None:
@@ -490,7 +499,9 @@ def setup(
     async def select_offer_by_number(message: types.Message, state: FSMContext):
         if not message.from_user:
             return
-        logger.info(f"📥 select_offer_by_number triggered: user={message.from_user.id}, text={message.text}")
+        logger.info(
+            f"📥 select_offer_by_number triggered: user={message.from_user.id}, text={message.text}"
+        )
         lang = db.get_user_language(message.from_user.id)
         data = await state.get_data()
         offer_list: list[int] = data.get("offer_list", [])
@@ -729,17 +740,17 @@ def setup(
             return
         city = user.city or "Ташкент"
         search_city = normalize_city(city)
-        
+
         # Get last page from state or default to 0
         data = await state.get_data()
         last_page = data.get("last_hot_page", 0)
-        
+
         # Delete current message (may have photo) and send list
         try:
             await msg.delete()
         except Exception:
             pass
-        
+
         await _send_hot_offers_list(
             msg,
             state,
@@ -1210,44 +1221,51 @@ def setup(
         """Edit current message to show offer details (no new message)."""
         store = offer_service.get_store(offer.store_id)
         currency = "so'm" if lang == "uz" else "сум"
-        
+
         # Clean professional card format
         lines = [f"📦 <b>{offer.title}</b>"]
-        
+
         if offer.description:
-            desc = offer.description[:100] + "..." if len(offer.description) > 100 else offer.description
+            desc = (
+                offer.description[:100] + "..."
+                if len(offer.description) > 100
+                else offer.description
+            )
             lines.append(f"<i>{desc}</i>")
-        
+
         lines.append("")
         lines.append("─" * 25)
-        
+
         # Price with discount
         if offer.original_price and offer.discount_price:
             discount_pct = int((1 - offer.discount_price / offer.original_price) * 100)
-            lines.append(f"<s>{int(offer.original_price):,}</s> → <b>{int(offer.discount_price):,}</b> {currency} <b>(-{discount_pct}%)</b>")
+            lines.append(
+                f"<s>{int(offer.original_price):,}</s> → <b>{int(offer.discount_price):,}</b> {currency} <b>(-{discount_pct}%)</b>"
+            )
         else:
             lines.append(f"💰 <b>{int(offer.discount_price):,}</b> {currency}")
-        
+
         lines.append("─" * 25)
         lines.append("")
-        
+
         # Stock info
         stock_label = "Mavjud" if lang == "uz" else "В наличии"
         unit = offer.unit or "шт"
         lines.append(f"📦 {stock_label}: <b>{offer.quantity}</b> {unit}")
-        
+
         # Expiry date
         if offer.expiry_date:
             expiry_label = "Yaroqlilik" if lang == "uz" else "Срок до"
             expiry_str = str(offer.expiry_date)[:10]
             try:
                 from datetime import datetime
+
                 dt = datetime.strptime(expiry_str, "%Y-%m-%d")
                 expiry_str = dt.strftime("%d.%m.%Y")
             except Exception:
                 pass
             lines.append(f"📅 {expiry_label}: {expiry_str}")
-        
+
         # Store info
         lines.append("")
         store_name = store.name if store else offer.store_name
@@ -1255,7 +1273,7 @@ def setup(
         lines.append(f"🏪 {store_name}")
         if store_addr:
             lines.append(f"📍 {store_addr}")
-        
+
         # Delivery info
         if store and store.delivery_enabled:
             lines.append("")
@@ -1264,14 +1282,14 @@ def setup(
             if store.min_order_amount:
                 min_label = "Min." if lang == "uz" else "Мин."
                 lines.append(f"   {min_label}: {int(store.min_order_amount):,} {currency}")
-        
+
         text = "\n".join(lines)
-        
+
         # Keyboard with back button
         keyboard = offer_keyboards.offer_details_with_back_keyboard(
             lang, offer.id, offer.store_id, store.delivery_enabled if store else False
         )
-        
+
         # If offer has photo, need to delete old message and send photo
         if offer.photo:
             try:
@@ -1288,7 +1306,7 @@ def setup(
                 return
             except Exception:
                 pass
-        
+
         # Try to edit text message
         try:
             await message.edit_text(text, parse_mode="HTML", reply_markup=keyboard)
@@ -1357,13 +1375,17 @@ def setup(
 
     async def _set_offer_state(state: FSMContext, offers: list[OfferListItem]) -> None:
         offer_ids = [offer.id for offer in offers]
-        logger.info(f"📝 Setting FSM state BrowseOffers.offer_list with {len(offer_ids)} offers: {offer_ids[:5]}...")
+        logger.info(
+            f"📝 Setting FSM state BrowseOffers.offer_list with {len(offer_ids)} offers: {offer_ids[:5]}..."
+        )
         await state.set_state(BrowseOffers.offer_list)
         await state.update_data(offer_list=offer_ids)
         # Verify state was set
         current_state = await state.get_state()
         current_data = await state.get_data()
-        logger.info(f"📝 FSM state after set: state={current_state}, data_keys={list(current_data.keys())}")
+        logger.info(
+            f"📝 FSM state after set: state={current_state}, data_keys={list(current_data.keys())}"
+        )
 
     async def _append_offer_ids(state: FSMContext, offers: list[OfferListItem]) -> None:
         data = await state.get_data()

@@ -443,6 +443,13 @@ class SchemaMixin:
         except Exception as e:
             logger.warning(f"Could not add view_mode column: {e}")
 
+        # Add last_delivery_address for saved addresses
+        try:
+            cursor.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS last_delivery_address TEXT")
+            logger.info("✅ last_delivery_address column ensured in users table")
+        except Exception as e:
+            logger.warning(f"Could not add last_delivery_address column: {e}")
+
     def _migrate_favorites_table(self, cursor):
         """Migrate favorites from offer_id to store_id if needed."""
         try:
