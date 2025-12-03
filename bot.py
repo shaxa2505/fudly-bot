@@ -494,7 +494,7 @@ def _register_middlewares() -> None:
         dp.callback_query.outer_middleware(UserCacheMiddleware(cache))
 
     # 3. Rate limiting (prevent abuse)
-    dp.update.middleware(RateLimitMiddleware(rate_limit=30, burst_limit=20))
+    dp.update.middleware(RateLimitMiddleware(rate_limit=100, burst_limit=30))
 
     # 4. Registration check (ensure users are registered)
     dp.update.middleware(RegistrationCheckMiddleware(db, get_text, phone_request_keyboard))
