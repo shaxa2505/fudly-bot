@@ -164,7 +164,7 @@ def setup(
 
     @dp.callback_query(F.data.startswith("hot_offer_"))
     async def hot_offer_selected_handler(callback: types.CallbackQuery, state: FSMContext) -> None:
-        """Handle hot offer selection by inline button - EDIT current message."""
+        """Handle hot offer selection - show booking card directly (skip intermediate step)."""
         if not callback.from_user or not callback.data:
             await callback.answer()
             return
@@ -193,10 +193,89 @@ def setup(
         # Save current page for back navigation
         data = await state.get_data()
         current_page = data.get("hot_offers_page", 0)
-        await state.update_data(last_hot_page=current_page)
+        
+        # Check availability
+        max_quantity = offer.quantity or 0
+        if max_quantity <= 0:
+            await callback.answer(
+                "Товар закончился" if lang == "ru" else "Mahsulot tugadi",
+                show_alert=True,
+            )
+            return
 
-        await _send_offer_details_edit(msg, offer, lang, offer_id)
-        await callback.answer()
+        # Get store details
+        store = offer_service.get_store(offer.store_id) if offer.store_id else None
+        store_name = store.name if store else "Магазин"
+        store_address = store.address if store else ""
+        delivery_enabled = store.delivery_enabled if store else False
+        delivery_price = store.delivery_price if store and delivery_enabled else 0
+
+        # Initial state: quantity=1, no delivery method selected
+        initial_qty = 1
+        initial_method = None if delivery_enabled else "pickup"
+
+        # Save to FSM state for booking flow
+        from handlers.common.states import BookOffer
+        await state.update_data(
+            offer_id=offer_id,
+            max_quantity=max_quantity,
+            offer_price=offer.discount_price,
+            original_price=offer.original_price or 0,
+            offer_title=offer.title,
+            offer_description=offer.description or "",
+            offer_unit=offer.unit or "",
+            expiry_date=str(offer.expiry_date) if offer.expiry_date else "",
+            store_id=offer.store_id,
+            store_name=store_name,
+            store_address=store_address,
+            delivery_enabled=delivery_enabled,
+            delivery_price=delivery_price,
+            selected_qty=initial_qty,
+            selected_delivery=initial_method,
+            last_hot_page=current_page,
+        )
+        await state.set_state(BookOffer.quantity)
+
+        # Build booking card directly (skip intermediate product card)
+        from handlers.bookings.customer import build_order_card_text, build_order_card_keyboard
+        
+        text = build_order_card_text(
+            lang, offer.title, offer.discount_price, initial_qty, store_name,
+            delivery_enabled, delivery_price, initial_method, max_quantity,
+            original_price=offer.original_price or 0,
+            description=offer.description or "",
+            expiry_date=str(offer.expiry_date) if offer.expiry_date else "",
+            store_address=store_address,
+            unit=offer.unit or "",
+        )
+        kb = build_order_card_keyboard(
+            lang, offer_id, offer.store_id, initial_qty, max_quantity,
+            delivery_enabled, initial_method
+        )
+
+        # Edit current message or send new with photo
+        try:
+            await msg.edit_text(text, parse_mode="HTML", reply_markup=kb.as_markup())
+            await callback.answer()
+        except Exception:
+            # List message has no photo, need to delete and send with photo if available
+            try:
+                await msg.delete()
+            except Exception:
+                pass
+            if offer.photo:
+                try:
+                    await msg.answer_photo(
+                        photo=offer.photo,
+                        caption=text,
+                        parse_mode="HTML",
+                        reply_markup=kb.as_markup()
+                    )
+                except Exception:
+                    await msg.answer(text, parse_mode="HTML", reply_markup=kb.as_markup())
+            else:
+                await msg.answer(text, parse_mode="HTML", reply_markup=kb.as_markup())
+            await callback.answer()
 
     @dp.callback_query(F.data == "hot_noop")
     async def hot_noop_handler(callback: types.CallbackQuery) -> None:
