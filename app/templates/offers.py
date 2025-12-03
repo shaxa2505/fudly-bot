@@ -301,50 +301,41 @@ def render_store_reviews(
 
 
 def render_offer_card(lang: str, offer: OfferListItem) -> str:
-    """Render offer card with full details and delivery info."""
+    """Render clean, minimal offer card."""
     lines = [f"<b>{offer.title}</b>"]
 
     # Price line with discount
     lines.append(_format_price_line(offer, lang))
-    lines.append("")
 
-    # Store location
-    lines.append(f"🏪 {offer.store_name}")
-    if offer.store_address:
-        lines.append(f"📍 {offer.store_address}")
-    lines.append("")
+    # Category if available
+    if hasattr(offer, 'category') and offer.category:
+        lines.append(f"🏷 {offer.category}")
 
-    # Stock and expiry
-    stock_lines = []
-    if offer.quantity is not None:
-        stock_label = "Доступно" if lang == "ru" else "Mavjud"
-        unit = offer.unit or ""
-        stock_lines.append(f"{stock_label}: <b>{offer.quantity} {unit}</b>".strip())
-
+    # Stock and expiry on same area
+    unit = offer.unit or "шт"
+    if offer.quantity is not None and offer.quantity > 0:
+        stock_label = "Mavjud" if lang == "uz" else "В наличии"
+        lines.append(f"\n{stock_label}: <b>{offer.quantity} {unit}</b>")
+    
     if offer.expiry_date:
-        expiry_label = "Годен до" if lang == "ru" else "Yaroqlilik"
+        expiry_label = "Yaroqlilik" if lang == "uz" else "Срок"
         expiry_str = str(offer.expiry_date)[:10]
         try:
             from datetime import datetime
-
             dt = datetime.strptime(expiry_str, "%Y-%m-%d")
             expiry_str = dt.strftime("%d.%m.%Y")
         except Exception:
             pass
-        stock_lines.append(f"{expiry_label}: {expiry_str}")
+        lines.append(f"{expiry_label}: {expiry_str}")
 
-    if stock_lines:
-        lines.extend(stock_lines)
-
-    # Delivery info
+    # Delivery info (compact)
     if offer.delivery_enabled:
-        lines.append("")
-        currency = "сум" if lang == "ru" else "so'm"
-        delivery_label = "Доставка" if lang == "ru" else "Yetkazib berish"
-        lines.append(f"🚚 {delivery_label}: {offer.delivery_price:,.0f} {currency}")
+        currency = "so'm" if lang == "uz" else "сум"
+        delivery_text = "Yetkazib berish" if lang == "uz" else "Доставка"
+        min_text = "Min. buyurtma" if lang == "uz" else "Мин. заказ"
+        lines.append(f"\n🚚 {delivery_text}: {offer.delivery_price:,.0f} {currency}")
         if offer.min_order_amount:
-            min_label = "Мин. заказ" if lang == "ru" else "Min. buyurtma"
-            lines.append(f"   {min_label}: {offer.min_order_amount:,.0f} {currency}")
+            lines.append(f" {min_text}: {offer.min_order_amount:,.0f} {currency}")
 
     return "\n".join(lines)
 

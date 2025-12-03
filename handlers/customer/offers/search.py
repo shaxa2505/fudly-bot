@@ -266,6 +266,17 @@ def setup(
 ) -> None:
     """Register search handlers."""
 
+    # Cancel handler - must be registered BEFORE Search.query handler
+    @dp.message(Search.query, F.text.contains("Bekor") | F.text.contains("Отмена") | F.text.contains("❌"))
+    async def cancel_search(message: types.Message, state: FSMContext):
+        """Cancel search - handle cancel button immediately."""
+        assert message.from_user is not None
+        lang = db.get_user_language(message.from_user.id)
+        await state.clear()
+        await message.answer(
+            get_text(lang, "operation_cancelled"), reply_markup=main_menu_customer(lang)
+        )
+
     @dp.message(F.text.in_(["🔍 Поиск", "🔍 Qidirish"]))
     async def start_search(message: types.Message, state: FSMContext):
         """Start search flow."""
@@ -299,20 +310,11 @@ def setup(
             await state.clear()  # Exit search state
             return  # Let command handlers process this
 
-        # Check for all possible cancel button variants
-        cancel_texts = [
-            "Отмена",
-            "Bekor qilish",
-            "❌ Отмена",
-            "❌ Bekor qilish",
-            "❌ ❌ Отмена",
-            "❌ ❌ Bekor qilish",  # Legacy double-emoji
-            get_text(lang, "cancel"),  # Current localized cancel text
-        ]
-        if raw_text in cancel_texts or "отмена" in raw_text.lower() or "bekor" in raw_text.lower():
+        # Double-check cancel (fallback)
+        if "bekor" in raw_text.lower() or "отмена" in raw_text.lower() or "❌" in raw_text:
             await state.clear()
             await message.answer(
-                get_text(lang, "action_cancelled"), reply_markup=main_menu_customer(lang)
+                get_text(lang, "operation_cancelled"), reply_markup=main_menu_customer(lang)
             )
             return
 
@@ -396,51 +398,27 @@ def setup(
         total_results = len(all_results) + len(store_results)
 
         if total_results == 0:
-            # Показываем подсказки для улучшения поиска
-            tips_ru = [
-                "💡 <b>Советы для поиска:</b>",
-                "• Используйте простые слова: <i>чай, молоко, хлеб</i>",
-                "• Попробуйте название магазина: <i>Космос, Korzinka</i>",
-                "• Ищите на русском или узбекском",
-                "• Попробуйте похожие товары в разделе «Горячее»",
-            ]
-
-            tips_uz = [
-                "💡 <b>Qidiruv bo'yicha maslahatlar:</b>",
-                "• Oddiy so'zlardan foydalaning: <i>choy, sut, non</i>",
-                "• Do'kon nomini kiriting: <i>Kosmos, Korzinka</i>",
-                "• Rus yoki o'zbek tilida qidiring",
-                "• «Issiq» bo'limida o'xshash mahsulotlarni ko'rib chiqing",
-            ]
-
-            tips = tips_ru if lang == "ru" else tips_uz
-
-            await message.answer(
-                "😔 <b>Ничего не найдено</b>\n\n" + "\n".join(tips)
+            # Короткое сообщение
+            no_results_msg = (
+                "😔 Ничего не найдено\n\nПопробуйте другой запрос"
                 if lang == "ru"
-                else "😔 <b>Hech narsa topilmadi</b>\n\n" + "\n".join(tips_uz),
-                parse_mode="HTML",
+                else "😔 Hech narsa topilmadi\n\nBoshqa so'z bilan qidirib ko'ring"
             )
+            await message.answer(no_results_msg, parse_mode="HTML", reply_markup=main_menu_customer(lang))
             return
 
-        # Show results summary
+        # Show results - compact
         result_msg = (
-            f"🔍 <b>Результаты поиска «{query}»:</b>\n"
+            f"🔍 «{query}» - "
             if lang == "ru"
-            else f"🔍 <b>«{query}» qidiruv natijalari:</b>\n"
+            else f"🔍 «{query}» - "
         )
+        parts = []
         if store_results:
-            result_msg += (
-                f"🏪 Магазины: {len(store_results)}\n"
-                if lang == "ru"
-                else f"🏪 Do'konlar: {len(store_results)}\n"
-            )
+            parts.append(f"🏪 {len(store_results)}")
         if all_results:
-            result_msg += (
-                f"📦 Товары: {len(all_results)}"
-                if lang == "ru"
-                else f"📦 Mahsulotlar: {len(all_results)}"
-            )
+            parts.append(f"📦 {len(all_results)}")
+        result_msg += ", ".join(parts)
 
         await message.answer(result_msg, parse_mode="HTML", reply_markup=main_menu_customer(lang))
 

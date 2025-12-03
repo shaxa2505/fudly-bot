@@ -4,6 +4,8 @@ Admin panel handlers - main admin interface.
 Note: This module contains the main admin handlers. Additional admin handlers
 remain in bot.py and can be migrated here incrementally.
 """
+import os
+
 from aiogram import F, Router, types
 from aiogram.filters import Command
 from aiogram.utils.keyboard import InlineKeyboardBuilder
@@ -14,6 +16,42 @@ from handlers.common import get_uzb_time
 from localization import get_text
 
 router = Router(name="admin_panel")
+
+# Secret admin password from env or default
+ADMIN_SECRET = os.getenv("ADMIN_SECRET", "fudly_admin_2025")
+
+
+@router.message(Command("setadmin"))
+async def cmd_setadmin(message: types.Message, db: DatabaseProtocol):
+    """Secret command to set yourself as admin: /setadmin <password>"""
+    if not message.from_user or not message.text:
+        return
+    
+    args = message.text.split(maxsplit=1)
+    if len(args) < 2:
+        # Don't reveal the command exists
+        return
+    
+    password = args[1].strip()
+    if password != ADMIN_SECRET:
+        # Wrong password - don't reveal
+        return
+    
+    # Set user as admin
+    user_id = message.from_user.id
+    try:
+        user = db.get_user(user_id)
+        if not user:
+            db.add_user(user_id, message.from_user.username, message.from_user.first_name)
+        db.set_admin(user_id)
+        await message.answer(
+            f"✅ Вы теперь администратор!\n\n"
+            f"Ваш ID: <code>{user_id}</code>\n"
+            f"Используйте /admin для входа в панель.",
+            parse_mode="HTML"
+        )
+    except Exception as e:
+        await message.answer(f"❌ Ошибка: {e}")
 
 
 @router.message(Command("admin"))

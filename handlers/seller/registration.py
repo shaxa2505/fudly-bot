@@ -365,17 +365,17 @@ async def register_store_description(message: types.Message, state: FSMContext) 
     lang = db.get_user_language(message.from_user.id)
     await state.update_data(description=message.text)
 
-    # Ask for store photo
+    # Ask for store photo (required)
     photo_prompt = (
         "📸 <b>Шаг 6/6: Фото магазина</b>\n\n"
         "Отправьте фото вашего магазина или витрины.\n"
         "Это поможет покупателям узнать ваш магазин!\n\n"
-        "Можете пропустить этот шаг, отправив /skip"
+        "⚠️ Фото обязательно для подачи заявки"
         if lang == "ru"
         else "📸 <b>6/6-qadam: Do'kon fotosurati</b>\n\n"
         "Do'koningiz yoki vitrina fotosuratini yuboring.\n"
         "Bu xaridorlarga do'koningizni tanishga yordam beradi!\n\n"
-        "Bu qadamni o'tkazib yuborishingiz mumkin: /skip"
+        "⚠️ Fotosurat ariza uchun majburiy"
     )
 
     await message.answer(photo_prompt, parse_mode="HTML", reply_markup=cancel_keyboard(lang))
@@ -420,19 +420,13 @@ async def register_store_photo(message: types.Message, state: FSMContext) -> Non
 
 @router.message(RegisterStore.photo, F.text)
 async def register_store_photo_text(message: types.Message, state: FSMContext) -> None:
-    """Handle text input during photo upload."""
+    """Handle text input during photo upload - photo is required."""
     if not db or not bot:
         await message.answer("System error")
         return
     assert message.from_user is not None
     lang = db.get_user_language(message.from_user.id)
     text = (message.text or "").lower().strip()
-
-    # Check for skip command
-    if text in ["/skip", "пропустить", "o'tkazib yuborish", "skip"]:
-        await state.update_data(photo=None)
-        await create_store_from_data(message, state)
-        return
 
     # Check for cancel command
     if "отмена" in text or "bekor" in text or text == "/cancel":
@@ -444,35 +438,33 @@ async def register_store_photo_text(message: types.Message, state: FSMContext) -
         )
         return
 
-    # Any other text - show error and auto-skip
+    # Any other text - require photo
     await message.answer(
-        "❌ Пожалуйста, отправьте фото или используйте /skip для пропуска\n\n"
-        "⏭️ Пропускаю этот шаг..."
+        "❌ Пожалуйста, отправьте фото магазина.\n\n"
+        "📸 Фото обязательно для подачи заявки."
         if lang == "ru"
-        else "❌ Iltimos, fotosurat yuboring yoki /skip buyrug'idan foydalaning\n\n"
-        "⏭️ Bu qadamni o'tkazib yuboraman..."
+        else "❌ Iltimos, do'kon fotosuratini yuboring.\n\n"
+        "📸 Fotosurat ariza uchun majburiy."
     )
-    await state.update_data(photo=None)
-    await create_store_from_data(message, state)
 
 
 @router.message(RegisterStore.photo)
 async def register_store_photo_invalid(message: types.Message, state: FSMContext) -> None:
-    """Handle any other input - auto-skip to prevent loop."""
+    """Handle any other input - require photo."""
     if not db:
         await message.answer("System error")
         return
     assert message.from_user is not None
     lang = db.get_user_language(message.from_user.id)
 
-    # Show error and auto-skip
+    # Show error - photo is required
     await message.answer(
-        "⏭️ Пропускаю фото..." if lang == "ru" else "⏭️ Fotosurat o'tkazib yuborilmoqda..."
+        "❌ Отправьте фото магазина (изображение).\n\n"
+        "📸 Это обязательный шаг."
+        if lang == "ru"
+        else "❌ Do'kon fotosuratini yuboring (rasm).\n\n"
+        "📸 Bu majburiy qadam."
     )
-
-    # Auto-skip to prevent infinite loop
-    await state.update_data(photo=None)
-    await create_store_from_data(message, state)
 
 
 async def create_store_from_data(message: types.Message, state: FSMContext) -> None:

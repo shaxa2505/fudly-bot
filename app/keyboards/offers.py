@@ -33,25 +33,23 @@ def hot_offers_compact_keyboard(
     else:
         builder.adjust(1)
 
-    # Pagination row
+    # Pagination row - only prev/next and refresh
     nav_builder = InlineKeyboardBuilder()
     if page > 0:
         nav_builder.button(text="◀️", callback_data=f"hot_page_{page - 1}")
-    nav_builder.button(text=f"{page + 1}/{total_pages}", callback_data="hot_noop")
     if page < total_pages - 1:
         nav_builder.button(text="▶️", callback_data=f"hot_page_{page + 1}")
 
     # Refresh button
-    refresh_text = "🔄" if lang == "ru" else "🔄"
-    nav_builder.button(text=refresh_text, callback_data="hot_offers_refresh")
+    nav_builder.button(text="🔄", callback_data="hot_offers_refresh")
 
     # Adjust nav: pagination buttons + refresh
     if page > 0 and page < total_pages - 1:
-        nav_builder.adjust(3, 1)  # ◀️ 1/5 ▶️ then 🔄
+        nav_builder.adjust(3)  # ◀️ ▶️ 🔄
     elif page > 0 or page < total_pages - 1:
-        nav_builder.adjust(2, 1)  # ◀️ 1/5 or 1/5 ▶️ then 🔄
+        nav_builder.adjust(2)  # ◀️ 🔄 or ▶️ 🔄
     else:
-        nav_builder.adjust(1, 1)  # Just 1/1 then 🔄
+        nav_builder.adjust(1)  # Just 🔄
 
     # Combine keyboards
     builder.attach(nav_builder)
