@@ -304,7 +304,7 @@ async def book_offer_start(callback: types.CallbackQuery, state: FSMContext) -> 
         delivery_enabled, initial_method
     )
 
-    # Update EXISTING message (edit caption for photo, edit text for text)
+    # Update EXISTING message - edit in place, no new messages
     try:
         if callback.message.photo:
             await callback.message.edit_caption(
@@ -318,10 +318,29 @@ async def book_offer_start(callback: types.CallbackQuery, state: FSMContext) -> 
                 parse_mode="HTML",
                 reply_markup=kb.as_markup()
             )
+        await callback.answer()
     except Exception as e:
-        logger.warning(f"Failed to edit message: {e}")
-    
-    await callback.answer()
+        logger.warning(f"Failed to edit message in book_offer_start: {e}")
+        # Fallback: delete old and send new
+        try:
+            await callback.message.delete()
+        except Exception:
+            pass
+        offer_photo = get_offer_field(offer, "photo", None)
+        if offer_photo:
+            await callback.message.answer_photo(
+                photo=offer_photo,
+                caption=text,
+                parse_mode="HTML",
+                reply_markup=kb.as_markup()
+            )
+        else:
+            await callback.message.answer(
+                text,
+                parse_mode="HTML", 
+                reply_markup=kb.as_markup()
+            )
+        await callback.answer()
 
 
 @router.callback_query(F.data == "pbook_noop")
