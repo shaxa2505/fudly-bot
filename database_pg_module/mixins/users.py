@@ -173,41 +173,88 @@ class UserMixin:
             return bool(result and result[0] == 1)
 
     def delete_user(self, user_id: int):
-        """Delete user and related data."""
+        """Delete user and ALL related data (respecting FK constraints)."""
         with self.get_connection() as conn:
             cursor = conn.cursor()
-            # First delete related records
-            cursor.execute("DELETE FROM notifications WHERE user_id = %s", (user_id,))
-            cursor.execute("DELETE FROM favorites WHERE user_id = %s", (user_id,))
-            cursor.execute("DELETE FROM ratings WHERE user_id = %s", (user_id,))
+            
+            # ============ USER-LEVEL DATA ============
+            # Delete user's search history
+            cursor.execute("DELETE FROM search_history WHERE user_id = %s", (user_id,))
+            # Delete user's recently viewed
             cursor.execute("DELETE FROM recently_viewed WHERE user_id = %s", (user_id,))
+            # Delete user's notifications
+            cursor.execute("DELETE FROM notifications WHERE user_id = %s", (user_id,))
+            # Delete user's favorites
+            cursor.execute("DELETE FROM favorites WHERE user_id = %s", (user_id,))
+            # Delete promo usage by user
+            cursor.execute("DELETE FROM promo_usage WHERE user_id = %s", (user_id,))
+            # Delete referrals (both as referrer and referred)
+            cursor.execute("DELETE FROM referrals WHERE referrer_user_id = %s OR referred_user_id = %s", (user_id, user_id,))
+            # Delete FSM state
+            cursor.execute("DELETE FROM fsm_states WHERE user_id = %s", (user_id,))
 
+            # ============ STORE-LEVEL DATA ============
             # Get user's stores
             cursor.execute("SELECT store_id FROM stores WHERE owner_id = %s", (user_id,))
             stores = cursor.fetchall()
+            
             for store in stores:
                 store_id = store[0]
-                # Get offer_ids to clean up related tables
+                
+                # Get all offer_ids for this store
                 cursor.execute("SELECT offer_id FROM offers WHERE store_id = %s", (store_id,))
                 offer_ids = [row[0] for row in cursor.fetchall()]
+                
                 if offer_ids:
-                    # Delete bookings referencing these offers first (FK constraint)
+                    # Delete ratings that reference bookings of these offers
+                    cursor.execute(
+                        """DELETE FROM ratings WHERE booking_id IN 
+                           (SELECT booking_id FROM bookings WHERE offer_id = ANY(%s))""",
+                        (offer_ids,)
+                    )
+                    # Delete orders referencing these offers
+                    cursor.execute("DELETE FROM orders WHERE offer_id = ANY(%s)", (offer_ids,))
+                    # Delete bookings referencing these offers
                     cursor.execute("DELETE FROM bookings WHERE offer_id = ANY(%s)", (offer_ids,))
                     # Delete recently_viewed referencing these offers
-                    cursor.execute(
-                        "DELETE FROM recently_viewed WHERE offer_id = ANY(%s)", (offer_ids,)
-                    )
-                # Delete store ratings
+                    cursor.execute("DELETE FROM recently_viewed WHERE offer_id = ANY(%s)", (offer_ids,))
+                
+                # Delete ratings for this store
                 cursor.execute("DELETE FROM ratings WHERE store_id = %s", (store_id,))
+                # Delete orders for this store
+                cursor.execute("DELETE FROM orders WHERE store_id = %s", (store_id,))
+                # Delete bookings for this store  
+                cursor.execute("DELETE FROM bookings WHERE store_id = %s", (store_id,))
+                # Delete favorites for this store
+                cursor.execute("DELETE FROM favorites WHERE store_id = %s", (store_id,))
+                # Delete pickup_slots for this store
+                cursor.execute("DELETE FROM pickup_slots WHERE store_id = %s", (store_id,))
+                # Delete store_admins for this store
+                cursor.execute("DELETE FROM store_admins WHERE store_id = %s", (store_id,))
+                # Delete store_payment_integrations for this store
+                cursor.execute("DELETE FROM store_payment_integrations WHERE store_id = %s", (store_id,))
+                # Delete payment_settings for this store
+                cursor.execute("DELETE FROM payment_settings WHERE store_id = %s", (store_id,))
                 # Now safe to delete offers
                 cursor.execute("DELETE FROM offers WHERE store_id = %s", (store_id,))
-                cursor.execute("DELETE FROM payment_settings WHERE store_id = %s", (store_id,))
 
+            # Delete stores owned by user
             cursor.execute("DELETE FROM stores WHERE owner_id = %s", (user_id,))
+            
+            # ============ USER AS CUSTOMER ============
+            # Delete user's ratings (as customer)
+            cursor.execute("DELETE FROM ratings WHERE user_id = %s", (user_id,))
+            # Delete user's bookings (as customer)
             cursor.execute("DELETE FROM bookings WHERE user_id = %s", (user_id,))
+            # Delete user's orders (as customer)
             cursor.execute("DELETE FROM orders WHERE user_id = %s", (user_id,))
+            # Delete store_admins where user is admin
+            cursor.execute("DELETE FROM store_admins WHERE user_id = %s OR added_by = %s", (user_id, user_id,))
+            
+            # ============ FINALLY DELETE USER ============
             cursor.execute("DELETE FROM users WHERE user_id = %s", (user_id,))
-            logger.info(f"User {user_id} and related data deleted")
+            
+            logger.info(f"User {user_id} and ALL related data deleted successfully")
 
     # ==================== RECENTLY VIEWED ====================
 

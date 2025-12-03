@@ -304,25 +304,50 @@ class StoreMixin:
             logger.info(f"Store {store_id} rejected: {reason}")
 
     def delete_store(self, store_id: int):
-        """Delete store and related data."""
+        """Delete store and ALL related data (respecting FK constraints)."""
         with self.get_connection() as conn:
             cursor = conn.cursor()
-            # First get all offer_ids for this store to clean up related tables
+            
+            # Get all offer_ids for this store
             cursor.execute("SELECT offer_id FROM offers WHERE store_id = %s", (store_id,))
             offer_ids = [row[0] for row in cursor.fetchall()]
+            
             if offer_ids:
-                # Delete bookings first (FK constraint: bookings -> offers)
+                # Delete ratings that reference bookings of these offers
+                cursor.execute(
+                    """DELETE FROM ratings WHERE booking_id IN 
+                       (SELECT booking_id FROM bookings WHERE offer_id = ANY(%s))""",
+                    (offer_ids,)
+                )
+                # Delete orders referencing these offers
+                cursor.execute("DELETE FROM orders WHERE offer_id = ANY(%s)", (offer_ids,))
+                # Delete bookings referencing these offers
                 cursor.execute("DELETE FROM bookings WHERE offer_id = ANY(%s)", (offer_ids,))
-                # Delete recently_viewed
+                # Delete recently_viewed referencing these offers
                 cursor.execute("DELETE FROM recently_viewed WHERE offer_id = ANY(%s)", (offer_ids,))
-            # Delete store ratings
+            
+            # Delete ratings for this store
             cursor.execute("DELETE FROM ratings WHERE store_id = %s", (store_id,))
+            # Delete orders for this store
+            cursor.execute("DELETE FROM orders WHERE store_id = %s", (store_id,))
+            # Delete bookings for this store
+            cursor.execute("DELETE FROM bookings WHERE store_id = %s", (store_id,))
+            # Delete favorites for this store
+            cursor.execute("DELETE FROM favorites WHERE store_id = %s", (store_id,))
+            # Delete pickup_slots for this store
+            cursor.execute("DELETE FROM pickup_slots WHERE store_id = %s", (store_id,))
+            # Delete store_admins for this store
+            cursor.execute("DELETE FROM store_admins WHERE store_id = %s", (store_id,))
+            # Delete store_payment_integrations for this store
+            cursor.execute("DELETE FROM store_payment_integrations WHERE store_id = %s", (store_id,))
+            # Delete payment_settings for this store
+            cursor.execute("DELETE FROM payment_settings WHERE store_id = %s", (store_id,))
             # Now safe to delete offers
             cursor.execute("DELETE FROM offers WHERE store_id = %s", (store_id,))
-            cursor.execute("DELETE FROM payment_settings WHERE store_id = %s", (store_id,))
-            cursor.execute("DELETE FROM favorites WHERE store_id = %s", (store_id,))
+            # Finally delete the store
             cursor.execute("DELETE FROM stores WHERE store_id = %s", (store_id,))
-            logger.info(f"Store {store_id} deleted")
+            
+            logger.info(f"Store {store_id} and ALL related data deleted")
 
     def get_store_owner(self, store_id: int):
         """Get store owner user_id."""
