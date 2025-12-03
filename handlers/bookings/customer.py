@@ -207,7 +207,7 @@ def build_order_card_keyboard(
 
 @router.callback_query(F.data.regexp(r"^book_\d+$"))
 async def book_offer_start(callback: types.CallbackQuery, state: FSMContext) -> None:
-    """Premium UX: Send new message with photo and order card."""
+    """Premium UX: Update current card with order controls (no new message)."""
     if not db or not bot or not callback.message:
         await callback.answer("System error", show_alert=True)
         return
@@ -241,7 +241,6 @@ async def book_offer_start(callback: types.CallbackQuery, state: FSMContext) -> 
     # Get offer details
     offer_price = get_offer_field(offer, "discount_price", 0)
     offer_title = get_offer_field(offer, "title", "Товар")
-    offer_photo = get_offer_field(offer, "photo")
     store_id = get_offer_field(offer, "store_id")
 
     # Get store details
@@ -260,7 +259,6 @@ async def book_offer_start(callback: types.CallbackQuery, state: FSMContext) -> 
         max_quantity=max_quantity,
         offer_price=offer_price,
         offer_title=offer_title,
-        offer_photo=offer_photo,
         store_id=store_id,
         store_name=store_name,
         delivery_enabled=delivery_enabled,
@@ -280,37 +278,23 @@ async def book_offer_start(callback: types.CallbackQuery, state: FSMContext) -> 
         delivery_enabled, initial_method
     )
 
-    # Send NEW message with photo (premium UX)
+    # Update EXISTING message (edit caption for photo, edit text for text)
     try:
-        if offer_photo:
-            try:
-                sent = await bot.send_photo(
-                    user_id,
-                    photo=offer_photo,
-                    caption=text,
-                    parse_mode="HTML",
-                    reply_markup=kb.as_markup()
-                )
-                # Save message_id to edit later
-                await state.update_data(order_card_message_id=sent.message_id)
-                await callback.answer()
-                return
-            except Exception as e:
-                logger.warning(f"Failed to send photo: {e}")
-        
-        # Fallback: text only
-        sent = await bot.send_message(
-            user_id,
-            text,
-            parse_mode="HTML",
-            reply_markup=kb.as_markup()
-        )
-        await state.update_data(order_card_message_id=sent.message_id)
+        if callback.message.photo:
+            await callback.message.edit_caption(
+                caption=text,
+                parse_mode="HTML",
+                reply_markup=kb.as_markup()
+            )
+        else:
+            await callback.message.edit_text(
+                text,
+                parse_mode="HTML",
+                reply_markup=kb.as_markup()
+            )
     except Exception as e:
-        logger.error(f"Failed to send order card: {e}")
-        await callback.answer("❌", show_alert=True)
-        return
-
+        logger.warning(f"Failed to edit message: {e}")
+    
     await callback.answer()
 
 
@@ -442,7 +426,7 @@ async def pbook_select_method(callback: types.CallbackQuery, state: FSMContext) 
 
 @router.callback_query(F.data.startswith("pbook_cancel_"))
 async def pbook_cancel(callback: types.CallbackQuery, state: FSMContext) -> None:
-    """Premium UX: Cancel and delete order card message."""
+    """Cancel booking - restore original product card."""
     if not db or not callback.message:
         await callback.answer()
         return
@@ -450,35 +434,78 @@ async def pbook_cancel(callback: types.CallbackQuery, state: FSMContext) -> None
     user_id = callback.from_user.id
     lang = db.get_user_language(user_id)
 
+    try:
+        parts = callback.data.split("_")
+        offer_id = int(parts[2])
+        store_id = int(parts[3])
+    except (ValueError, IndexError):
+        await callback.answer()
+        return
+
     await state.clear()
 
-    # Delete the order card message
-    try:
-        await callback.message.delete()
-    except Exception:
-        # If can't delete, just remove keyboard
+    # Restore original product card keyboard
+    from app.keyboards.offers import offer_details_keyboard
+
+    store = db.get_store(store_id) if store_id else None
+    delivery_enabled = get_store_field(store, "delivery_enabled", 0) == 1
+
+    kb = offer_details_keyboard(lang, offer_id, store_id, delivery_enabled)
+    
+    # Restore original offer card text
+    offer = db.get_offer(offer_id)
+    if offer:
+        from app.templates.offers import render_offer_details
+        from app.services.offer_service import OfferService
+        
+        # Get store details for template
+        store_details = None
         try:
-            if callback.message.photo:
-                await callback.message.edit_caption(
-                    caption=f"❌ {'Bekor qilindi' if lang == 'uz' else 'Отменено'}",
-                    parse_mode="HTML",
-                    reply_markup=None
-                )
-            else:
-                await callback.message.edit_text(
-                    f"❌ {'Bekor qilindi' if lang == 'uz' else 'Отменено'}",
-                    parse_mode="HTML",
-                    reply_markup=None
-                )
+            # Try to get full store details
+            offer_service = OfferService(db)
+            store_details = offer_service.get_store(store_id)
         except Exception:
             pass
+        
+        # Build original card text
+        try:
+            from app.services.offer_service import OfferDetails
+            offer_details = OfferDetails(
+                id=get_offer_field(offer, "offer_id", offer_id),
+                title=get_offer_field(offer, "title", ""),
+                description=get_offer_field(offer, "description", ""),
+                original_price=get_offer_field(offer, "original_price", 0),
+                discount_price=get_offer_field(offer, "discount_price", 0),
+                quantity=get_offer_field(offer, "quantity", 0),
+                unit=get_offer_field(offer, "unit", "шт"),
+                expiry_date=get_offer_field(offer, "expiry_date"),
+                photo=get_offer_field(offer, "photo"),
+                store_id=store_id,
+                store_name=get_store_field(store, "name", ""),
+                store_address=get_store_field(store, "address", ""),
+                category=get_offer_field(offer, "category", ""),
+            )
+            text = render_offer_details(lang, offer_details, store_details)
+        except Exception:
+            # Fallback simple text
+            text = f"🛒 {get_offer_field(offer, 'title', 'Товар')}"
+    else:
+        text = "❌"
+    
+    try:
+        if callback.message.photo:
+            await callback.message.edit_caption(caption=text, parse_mode="HTML", reply_markup=kb)
+        else:
+            await callback.message.edit_text(text, parse_mode="HTML", reply_markup=kb)
+    except Exception:
+        pass
     
     await callback.answer()
 
 
 @router.callback_query(F.data.startswith("pbook_confirm_"))
 async def pbook_confirm(callback: types.CallbackQuery, state: FSMContext) -> None:
-    """Premium UX: Confirm order - create booking or start delivery flow."""
+    """Confirm order - create booking or start delivery flow."""
     if not db or not bot or not callback.message:
         await callback.answer("System error", show_alert=True)
         return
@@ -498,6 +525,7 @@ async def pbook_confirm(callback: types.CallbackQuery, state: FSMContext) -> Non
     quantity = data.get("selected_qty", 1)
     store_id = data.get("store_id")
     offer_price = data.get("offer_price", 0)
+    offer_title = data.get("offer_title", "Товар")
 
     # Check minimum order for delivery
     if selected_delivery == "delivery":
@@ -515,9 +543,24 @@ async def pbook_confirm(callback: types.CallbackQuery, state: FSMContext) -> Non
             await callback.answer(msg, show_alert=True)
             return
 
-    # Delete order card message
+    # Show processing status in the card (no keyboard)
+    currency = "so'm" if lang == "uz" else "сум"
+    total = offer_price * quantity
+    processing_text = (
+        f"⏳ <b>Bron yuborilmoqda...</b>\n\n"
+        f"🛒 {_esc(offer_title)} × {quantity}\n"
+        f"💵 {total:,} {currency}"
+        if lang == "uz" else
+        f"⏳ <b>Оформляем бронь...</b>\n\n"
+        f"🛒 {_esc(offer_title)} × {quantity}\n"
+        f"💵 {total:,} {currency}"
+    )
+    
     try:
-        await callback.message.delete()
+        if callback.message.photo:
+            await callback.message.edit_caption(caption=processing_text, parse_mode="HTML", reply_markup=None)
+        else:
+            await callback.message.edit_text(processing_text, parse_mode="HTML", reply_markup=None)
     except Exception:
         pass
 
@@ -541,13 +584,8 @@ async def pbook_confirm(callback: types.CallbackQuery, state: FSMContext) -> Non
         # Pickup - create booking directly
         await state.update_data(quantity=quantity, delivery_option=0, delivery_cost=0)
 
-        # Create booking
-        msg = await bot.send_message(user_id, "⏳...")
-        await create_booking(msg, state, real_user_id=user_id)
-        try:
-            await msg.delete()
-        except Exception:
-            pass
+        # Create booking (will send notification in same chat)
+        await create_booking(callback.message, state, real_user_id=user_id)
 
     await callback.answer()
 
