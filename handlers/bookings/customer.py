@@ -73,71 +73,82 @@ def build_order_card_text(
     delivery_price: int,
     delivery_method: str | None,
     max_qty: int,
+    original_price: int = 0,
+    description: str = "",
+    expiry_date: str = "",
+    store_address: str = "",
+    unit: str = "",
 ) -> str:
-    """Build beautiful order card text with current selection."""
+    """Build order card in same style as product card."""
     currency = "so'm" if lang == "uz" else "сум"
+    unit = unit or ("dona" if lang == "uz" else "шт")
     
     # Calculate totals
     subtotal = price * quantity
     delivery_cost = delivery_price if delivery_method == "delivery" else 0
     total = subtotal + delivery_cost
     
-    # Header
-    lines = [
-        f"🛒 <b>{_esc(title)}</b>",
-        "",
-        f"━━━━━━━━━━━━━━━━━━",
-    ]
+    # Header - same as product card
+    lines = [f"📦 <b>{_esc(title)}</b>"]
     
-    # Price info
-    price_label = "Narxi" if lang == "uz" else "Цена"
-    qty_label = "Miqdor" if lang == "uz" else "Количество"
-    lines.append(f"💰 {price_label}: <b>{price:,}</b> {currency}")
-    lines.append(f"📦 {qty_label}: <b>{quantity}</b> {'dona' if lang == 'uz' else 'шт'}")
+    if description:
+        desc = description[:80] + "..." if len(description) > 80 else description
+        lines.append(f"<i>{_esc(desc)}</i>")
     
-    # Delivery section
-    if delivery_enabled:
-        lines.append("")
-        delivery_label = "Yetkazish usuli" if lang == "uz" else "Способ получения"
-        lines.append(f"🚚 <b>{delivery_label}:</b>")
-        
-        # Show current selection with radio buttons
-        pickup_label = "O'zim olib ketaman" if lang == "uz" else "Самовывоз"
-        delivery_label = f"Yetkazish (+{delivery_price:,} {currency})" if lang == "uz" else f"Доставка (+{delivery_price:,} {currency})"
-        
-        if delivery_method == "pickup":
-            lines.append(f"   🔘 {pickup_label}")
-            lines.append(f"   ⚪ {delivery_label}")
-        elif delivery_method == "delivery":
-            lines.append(f"   ⚪ {pickup_label}")
-            lines.append(f"   🔘 {delivery_label}")
-        else:
-            lines.append(f"   ⚪ {pickup_label}")
-            lines.append(f"   ⚪ {delivery_label}")
-    
-    # Totals
     lines.append("")
-    lines.append(f"━━━━━━━━━━━━━━━━━━")
+    lines.append("─" * 25)
     
-    subtotal_label = "Mahsulot" if lang == "uz" else "Товар"
-    lines.append(f"📦 {subtotal_label}: {subtotal:,} {currency}")
+    # Price with discount - same style as product card
+    if original_price and original_price > price:
+        discount_pct = int((1 - price / original_price) * 100)
+        lines.append(f"<s>{int(original_price):,}</s> → <b>{int(price):,}</b> {currency} (-{discount_pct}%)")
+    else:
+        lines.append(f"💰 <b>{int(price):,}</b> {currency}")
     
-    if delivery_method == "delivery" and delivery_cost > 0:
-        delivery_cost_label = "Yetkazish" if lang == "uz" else "Доставка"
-        lines.append(f"🚚 {delivery_cost_label}: +{delivery_cost:,} {currency}")
+    lines.append("─" * 25)
+    lines.append("")
     
-    total_label = "JAMI" if lang == "uz" else "ИТОГО"
-    lines.append(f"💵 <b>{total_label}: {total:,} {currency}</b>")
+    # Quantity selection
+    qty_label = "Miqdor" if lang == "uz" else "Количество"
+    lines.append(f"📦 {qty_label}: <b>{quantity}</b> {unit}")
     
-    # Store info
+    # Expiry date if available
+    if expiry_date:
+        expiry_label = "Yaroqlilik" if lang == "uz" else "Срок до"
+        expiry_str = str(expiry_date)[:10]
+        try:
+            from datetime import datetime
+            dt = datetime.strptime(expiry_str, "%Y-%m-%d")
+            expiry_str = dt.strftime("%d.%m.%Y")
+        except Exception:
+            pass
+        lines.append(f"📅 {expiry_label}: {expiry_str}")
+    
+    # Store info - same style
     lines.append("")
     lines.append(f"🏪 {_esc(store_name)}")
+    if store_address:
+        lines.append(f"📍 {_esc(store_address)}")
     
-    # Hint
-    if not delivery_method and delivery_enabled:
-        hint = "👇 Yetkazish usulini tanlang" if lang == "uz" else "👇 Выберите способ получения"
+    # Delivery section - cleaner style
+    if delivery_enabled:
         lines.append("")
-        lines.append(f"<i>{hint}</i>")
+        delivery_label = "Yetkazish" if lang == "uz" else "Доставка"
+        lines.append(f"🚚 {delivery_label}: {delivery_price:,} {currency}")
+        
+        # Show selection hint if not selected
+        if not delivery_method:
+            hint = "👇 Usulni tanlang" if lang == "uz" else "👇 Выберите способ"
+            lines.append(f"<i>{hint}</i>")
+    
+    # Totals section
+    lines.append("")
+    lines.append("─" * 25)
+    total_label = "JAMI" if lang == "uz" else "ИТОГО"
+    lines.append(f"💵 <b>{total_label}: {total:,} {currency}</b>")
+    if delivery_method == "delivery" and delivery_cost > 0:
+        incl_delivery = "yetkazish bilan" if lang == "uz" else "с доставкой"
+        lines.append(f"   <i>({incl_delivery})</i>")
     
     return "\n".join(lines)
 
@@ -240,12 +251,17 @@ async def book_offer_start(callback: types.CallbackQuery, state: FSMContext) -> 
 
     # Get offer details
     offer_price = get_offer_field(offer, "discount_price", 0)
+    original_price = get_offer_field(offer, "original_price", 0)
     offer_title = get_offer_field(offer, "title", "Товар")
+    offer_description = get_offer_field(offer, "description", "")
+    offer_unit = get_offer_field(offer, "unit", "")
+    expiry_date = get_offer_field(offer, "expiry_date", "")
     store_id = get_offer_field(offer, "store_id")
 
     # Get store details
     store = db.get_store(store_id) if store_id else None
     store_name = get_store_field(store, "name", "Магазин")
+    store_address = get_store_field(store, "address", "")
     delivery_enabled = get_store_field(store, "delivery_enabled", 0) == 1
     delivery_price = get_store_field(store, "delivery_price", 0) if delivery_enabled else 0
 
@@ -253,14 +269,19 @@ async def book_offer_start(callback: types.CallbackQuery, state: FSMContext) -> 
     initial_qty = 1
     initial_method = None if delivery_enabled else "pickup"
 
-    # Save to state
+    # Save to state (including new fields)
     await state.update_data(
         offer_id=offer_id,
         max_quantity=max_quantity,
         offer_price=offer_price,
+        original_price=original_price,
         offer_title=offer_title,
+        offer_description=offer_description,
+        offer_unit=offer_unit,
+        expiry_date=str(expiry_date) if expiry_date else "",
         store_id=store_id,
         store_name=store_name,
+        store_address=store_address,
         delivery_enabled=delivery_enabled,
         delivery_price=delivery_price,
         selected_qty=initial_qty,
@@ -271,7 +292,12 @@ async def book_offer_start(callback: types.CallbackQuery, state: FSMContext) -> 
     # Build card text and keyboard
     text = build_order_card_text(
         lang, offer_title, offer_price, initial_qty, store_name,
-        delivery_enabled, delivery_price, initial_method, max_quantity
+        delivery_enabled, delivery_price, initial_method, max_quantity,
+        original_price=original_price,
+        description=offer_description,
+        expiry_date=str(expiry_date) if expiry_date else "",
+        store_address=store_address,
+        unit=offer_unit,
     )
     kb = build_order_card_keyboard(
         lang, offer_id, store_id, initial_qty, max_quantity,
@@ -343,7 +369,12 @@ async def pbook_change_qty(callback: types.CallbackQuery, state: FSMContext) -> 
         data.get("delivery_enabled", False),
         data.get("delivery_price", 0),
         data.get("selected_delivery"),
-        max_quantity
+        max_quantity,
+        original_price=data.get("original_price", 0),
+        description=data.get("offer_description", ""),
+        expiry_date=data.get("expiry_date", ""),
+        store_address=data.get("store_address", ""),
+        unit=data.get("offer_unit", ""),
     )
     kb = build_order_card_keyboard(
         lang,
@@ -401,7 +432,12 @@ async def pbook_select_method(callback: types.CallbackQuery, state: FSMContext) 
         data.get("delivery_enabled", False),
         data.get("delivery_price", 0),
         method,
-        max_quantity
+        max_quantity,
+        original_price=data.get("original_price", 0),
+        description=data.get("offer_description", ""),
+        expiry_date=data.get("expiry_date", ""),
+        store_address=data.get("store_address", ""),
+        unit=data.get("offer_unit", ""),
     )
     kb = build_order_card_keyboard(
         lang,
