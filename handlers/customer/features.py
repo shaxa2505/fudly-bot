@@ -71,18 +71,18 @@ def setup(
         # Filter active items only
         # Bookings (самовывоз): pending → confirmed → completed/cancelled
         active_bookings = [
-            b for b in bookings if get_field(b, "status", 3) in ["pending", "confirmed"]
+            b for b in bookings if get_field(b, "status", "") in ["pending", "confirmed"]
         ]
         # Orders (доставка): pending → confirmed → preparing → delivering → completed/cancelled
         active_orders = [
             o
             for o in orders
-            if get_field(o, "order_status", 10)
+            if get_field(o, "order_status", "")
             in ["pending", "confirmed", "preparing", "delivering"]
         ]
 
         # Recent completed (last 3)
-        recent_completed = [b for b in bookings if get_field(b, "status", 3) in ["completed"]][:3]
+        recent_completed = [b for b in bookings if get_field(b, "status", "") in ["completed"]][:3]
 
         logger.info(
             f"Cart: active_bookings={len(active_bookings)}, active_orders={len(active_orders)}, recent_completed={len(recent_completed)}"
@@ -100,8 +100,8 @@ def setup(
             if recent_completed:
                 text += f"\n\n📜 <b>{'Недавние заказы' if lang == 'ru' else 'Oxirgi buyurtmalar'}:</b>\n"
                 for b in recent_completed:
-                    title = get_field(b, "title", 8, "Товар")
-                    status = get_field(b, "status", 3, "completed")
+                    title = get_field(b, "title", "Товар")
+                    status = get_field(b, "status", "completed")
                     emoji = "✔️" if status == "completed" else "❌"
                     text += f"{emoji} {title}\n"
 
@@ -121,13 +121,13 @@ def setup(
 
             for b in active_bookings[:5]:  # Limit to 5
                 booking_id = get_field(b, "booking_id", 0)
-                status = get_field(b, "status", 3, "pending")
-                code = get_field(b, "booking_code", 4, "")
-                quantity = get_field(b, "quantity", 6, 1)
-                title = get_field(b, "title", 8, "Товар")
-                price = get_field(b, "discount_price", 9, 0)
-                store_name = get_field(b, "name", 11, "Магазин")
-                address = get_field(b, "address", 12, "")
+                status = get_field(b, "status", "pending")
+                code = get_field(b, "booking_code", "")
+                quantity = get_field(b, "quantity", 1)
+                title = get_field(b, "title", "Товар")
+                price = get_field(b, "discount_price", 0)
+                store_name = get_field(b, "name", "Магазин")
+                address = get_field(b, "address", "")
 
                 total = int(price * quantity)
                 currency = "сум" if lang == "ru" else "so'm"
@@ -178,15 +178,15 @@ def setup(
 
             for o in active_orders[:5]:  # Limit to 5
                 _order_id = get_field(o, "order_id", 0)  # noqa: F841
-                status = get_field(o, "order_status", 10, "pending")
-                quantity = get_field(o, "quantity", 9, 1)
-                total_price = get_field(o, "total_price", 11, 0)
-                delivery_address = get_field(o, "delivery_address", 4, "")
+                status = get_field(o, "order_status", "pending")
+                quantity = get_field(o, "quantity", 1)
+                total_price = get_field(o, "total_price", 0)
+                delivery_address = get_field(o, "delivery_address", "")
 
                 # Get offer title (may need separate query)
-                offer_id = get_field(o, "offer_id", 2)
+                offer_id = get_field(o, "offer_id", None)
                 offer = db.get_offer(offer_id) if offer_id else None
-                title = get_field(offer, "title", 2, "Товар") if offer else "Товар"
+                title = get_field(offer, "title", "Товар") if offer else "Товар"
 
                 status_emoji = {
                     "pending": "⏳",
