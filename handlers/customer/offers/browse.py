@@ -164,7 +164,7 @@ def setup(
 
     @dp.callback_query(F.data.startswith("hot_offer_"))
     async def hot_offer_selected_handler(callback: types.CallbackQuery, state: FSMContext) -> None:
-        """Handle hot offer selection by inline button."""
+        """Handle hot offer selection by inline button - EDIT current message."""
         if not callback.from_user or not callback.data:
             await callback.answer()
             return
@@ -190,7 +190,12 @@ def setup(
             )
             return
 
-        await _send_offer_details(msg, offer, lang)
+        # Save current page for back navigation
+        data = await state.get_data()
+        current_page = data.get("hot_offers_page", 0)
+        await state.update_data(last_hot_page=current_page)
+
+        await _send_offer_details_edit(msg, offer, lang, offer_id)
         await callback.answer()
 
     @dp.callback_query(F.data == "hot_noop")
@@ -1017,38 +1022,27 @@ def setup(
             )
 
             total_pages = (result.total + ITEMS_PER_PAGE - 1) // ITEMS_PER_PAGE
+            currency = "so'm" if lang == "uz" else "сум"
 
-            # Build compact text
+            # Clean professional header
             text = f"🔥 <b>{'ГОРЯЧЕЕ' if lang == 'ru' else 'ISSIQ'}</b> | 📍 {city}\n"
-            text += f"{'Стр.' if lang == 'ru' else 'Sah.'} {page + 1}/{total_pages} ({result.total} {'товаров' if lang == 'ru' else 'mahsulot'})\n\n"
-
-            # Category emoji mapping
-            category_emoji = {
-                "bakery": "🍞",
-                "dairy": "🥛",
-                "meat": "🥩",
-                "fish": "🐟",
-                "vegetables": "🥬",
-                "fruits": "🍎",
-                "cheese": "🧀",
-                "beverages": "🥤",
-                "ready_food": "🍱",
-                "other": "🏪",
-            }
+            text += f"{'Стр.' if lang == 'ru' else 'Sah.'} {page + 1}/{total_pages} ({result.total} {'махсулот' if lang == 'uz' else 'товаров'})\n"
+            text += "─" * 28 + "\n\n"
 
             for idx, offer in enumerate(result.items, start=1):
-                cat = offer.store_category or "other"
-                emoji = category_emoji.get(cat, "🏪")
-                title = offer.title[:20] + "..." if len(offer.title) > 20 else offer.title
+                title = offer.title[:25] + ".." if len(offer.title) > 25 else offer.title
                 discount_pct = 0
                 if offer.original_price and offer.discount_price and offer.original_price > 0:
                     discount_pct = int((1 - offer.discount_price / offer.original_price) * 100)
 
-                text += f"{idx}. {emoji} <b>{title}</b>\n"
-                text += f"   💰 {int(offer.discount_price):,}"
-                if discount_pct > 0:
-                    text += f" <s>{int(offer.original_price):,}</s> (-{discount_pct}%)"
-                text += "\n"
+                # Clean format: number + title on first line
+                text += f"<b>{idx}.</b> {title}\n"
+                # Price on second line - compact
+                text += f"    <s>{int(offer.original_price):,}</s> → <b>{int(offer.discount_price):,}</b> {currency} <i>(-{discount_pct}%)</i>\n"
+
+            # Hint at bottom
+            hint = "👆 Tanlang" if lang == "uz" else "👆 Выберите товар"
+            text += f"\n{hint}"
 
             # Build keyboard with offer buttons
             keyboard = offer_keyboards.hot_offers_compact_keyboard(
@@ -1117,6 +1111,97 @@ def setup(
             except Exception:  # pragma: no cover - fallback to text only
                 pass
         await message.answer(text, parse_mode="HTML", reply_markup=keyboard)
+
+    async def _send_offer_details_edit(
+        message: types.Message, offer: OfferDetails, lang: str, offer_id: int
+    ) -> None:
+        """Edit current message to show offer details (no new message)."""
+        store = offer_service.get_store(offer.store_id)
+        currency = "so'm" if lang == "uz" else "сум"
+        
+        # Clean professional card format
+        lines = [f"📦 <b>{offer.title}</b>"]
+        
+        if offer.description:
+            desc = offer.description[:100] + "..." if len(offer.description) > 100 else offer.description
+            lines.append(f"<i>{desc}</i>")
+        
+        lines.append("")
+        lines.append("─" * 25)
+        
+        # Price with discount
+        if offer.original_price and offer.discount_price:
+            discount_pct = int((1 - offer.discount_price / offer.original_price) * 100)
+            lines.append(f"<s>{int(offer.original_price):,}</s> → <b>{int(offer.discount_price):,}</b> {currency} <b>(-{discount_pct}%)</b>")
+        else:
+            lines.append(f"💰 <b>{int(offer.discount_price):,}</b> {currency}")
+        
+        lines.append("─" * 25)
+        lines.append("")
+        
+        # Stock info
+        stock_label = "Mavjud" if lang == "uz" else "В наличии"
+        unit = offer.unit or "шт"
+        lines.append(f"📦 {stock_label}: <b>{offer.quantity}</b> {unit}")
+        
+        # Expiry date
+        if offer.expiry_date:
+            expiry_label = "Yaroqlilik" if lang == "uz" else "Срок до"
+            expiry_str = str(offer.expiry_date)[:10]
+            try:
+                from datetime import datetime
+                dt = datetime.strptime(expiry_str, "%Y-%m-%d")
+                expiry_str = dt.strftime("%d.%m.%Y")
+            except Exception:
+                pass
+            lines.append(f"📅 {expiry_label}: {expiry_str}")
+        
+        # Store info
+        lines.append("")
+        store_name = store.name if store else offer.store_name
+        store_addr = store.address if store else offer.store_address
+        lines.append(f"🏪 {store_name}")
+        if store_addr:
+            lines.append(f"📍 {store_addr}")
+        
+        # Delivery info
+        if store and store.delivery_enabled:
+            lines.append("")
+            delivery_label = "Yetkazish" if lang == "uz" else "Доставка"
+            lines.append(f"🚚 {delivery_label}: {int(store.delivery_price):,} {currency}")
+            if store.min_order_amount:
+                min_label = "Min." if lang == "uz" else "Мин."
+                lines.append(f"   {min_label}: {int(store.min_order_amount):,} {currency}")
+        
+        text = "\\n".join(lines)
+        
+        # Keyboard with back button
+        keyboard = offer_keyboards.offer_details_with_back_keyboard(
+            lang, offer.id, offer.store_id, store.delivery_enabled if store else False
+        )
+        
+        # If offer has photo, need to delete old message and send photo
+        if offer.photo:
+            try:
+                await message.delete()
+            except Exception:
+                pass
+            try:
+                await message.answer_photo(
+                    photo=offer.photo,
+                    caption=text,
+                    parse_mode="HTML",
+                    reply_markup=keyboard,
+                )
+                return
+            except Exception:
+                pass
+        
+        # Try to edit text message
+        try:
+            await message.edit_text(text, parse_mode="HTML", reply_markup=keyboard)
+        except Exception:
+            await message.answer(text, parse_mode="HTML", reply_markup=keyboard)
 
     async def _send_offer_card(message: types.Message, offer: OfferListItem, lang: str) -> None:
         text = offer_templates.render_offer_card(lang, offer)

@@ -99,7 +99,7 @@ async def partner_confirm_booking(callback: types.CallbackQuery) -> None:
         await callback.answer(get_text(lang, "error"), show_alert=True)
         return
 
-    # Notify customer
+    # Notify customer - OPTIMIZED: single message with QR + all info
     customer_id = get_booking_field(booking, "user_id")
     code = get_booking_field(booking, "code")
     code_display = format_booking_code(code, booking_id)
@@ -109,45 +109,39 @@ async def partner_confirm_booking(callback: types.CallbackQuery) -> None:
         store_name = get_store_field(store, "name", "Магазин")
         store_address = get_store_field(store, "address", "")
 
+        # Compact single message with all info
         if customer_lang == "uz":
             customer_msg = (
                 f"✅ <b>Broningiz tasdiqlandi!</b>\n\n"
                 f"🏪 {_esc(store_name)}\n"
                 f"📍 Manzil: {_esc(store_address)}\n\n"
-                f"━━━━━━━━━━━━━━━━━━\n"
+                f"━━━━━━━━━━\n"
                 f"🎫 <b>Bron kodi:</b>\n"
                 f"<code>{code_display}</code>\n"
-                f"━━━━━━━━━━━━━━━━━━\n\n"
+                f"━━━━━━━━━━\n\n"
                 f"⚠️ Ushbu kodni yoki QR kodni sotuvchiga ko'rsating."
             )
         else:
             customer_msg = (
-                f"✅ <b>Ваша бронь подтверждена!</b>\n\n"
+                f"✅ <b>Broningiz tasdiqlandi!</b>\n\n"
                 f"🏪 {_esc(store_name)}\n"
-                f"📍 Адрес: {_esc(store_address)}\n\n"
-                f"━━━━━━━━━━━━━━━━━━\n"
-                f"🎫 <b>Код бронирования:</b>\n"
+                f"📍 Manzil: {_esc(store_address)}\n\n"
+                f"━━━━━━━━━━\n"
+                f"🎫 <b>Bron kodi:</b>\n"
                 f"<code>{code_display}</code>\n"
-                f"━━━━━━━━━━━━━━━━━━\n\n"
-                f"⚠️ Покажите этот код или QR-код продавцу при получении."
+                f"━━━━━━━━━━\n\n"
+                f"⚠️ Ushbu kodni yoki QR kodni sotuvchiga ko'rsating."
             )
 
         try:
-            # Try to send with QR code
+            # Single message with QR code - no separate messages
             qr_sent = False
             if QR_ENABLED and generate_booking_qr:
-                # Get bot username dynamically
                 try:
                     bot_info = await bot.get_me()
                     current_bot_username = bot_info.username or bot_username
-                    logger.info(
-                        f"🔗 QR: Using bot username from get_me(): '{current_bot_username}'"
-                    )
-                except Exception as e:
+                except Exception:
                     current_bot_username = bot_username
-                    logger.warning(
-                        f"🔗 QR: Failed to get bot username, using default: '{current_bot_username}', error: {e}"
-                    )
 
                 qr_image = generate_booking_qr(
                     code or str(booking_id), booking_id, bot_username=current_bot_username
@@ -161,15 +155,12 @@ async def partner_confirm_booking(callback: types.CallbackQuery) -> None:
                             customer_id, qr_file, caption=customer_msg, parse_mode="HTML"
                         )
                         qr_sent = True
-                        logger.info(f"Sent QR code to customer {customer_id}")
                     except Exception as qr_e:
                         logger.warning(f"Failed to send QR: {qr_e}")
 
-            # Fallback to text message if QR failed
             if not qr_sent:
                 await bot.send_message(customer_id, customer_msg, parse_mode="HTML")
 
-            logger.info(f"Successfully sent confirmation to customer {customer_id}")
         except Exception as e:
             error_msg = str(e).lower()
             if "bot" in error_msg or "blocked" in error_msg or "deactivated" in error_msg:
@@ -191,11 +182,9 @@ async def partner_confirm_booking(callback: types.CallbackQuery) -> None:
     kb.adjust(2)
 
     if lang == "uz":
-        text = (
-            f"✅ Bron #{booking_id} tasdiqlandi.\n\n📋 Mijoz kelganda 'Berildi' tugmasini bosing."
-        )
+        text = f"✅ Bron #{booking_id} tasdiqlandi.\n📋 Mijoz kelganda 'Berildi' tugmasini bosing."
     else:
-        text = f"✅ Бронь #{booking_id} подтверждена.\n\n📋 Нажмите 'Выдано' когда клиент заберёт заказ."
+        text = f"✅ Бронь #{booking_id} подтверждена.\n📋 Нажмите 'Выдано' когда клиент заберёт."
 
     await safe_answer_or_send(
         callback.message, partner_id, text, bot=bot, reply_markup=kb.as_markup()

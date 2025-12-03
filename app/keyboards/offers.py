@@ -101,11 +101,28 @@ def offer_details_keyboard(
 ) -> InlineKeyboardMarkup:
     builder = InlineKeyboardBuilder()
     # Inline buttons: Заказать и О магазине (menu keeps delivery/pickup choice)
-    pickup = "✅ Заказать" if lang == "ru" else "✅ Buyurtma"
+    pickup = "✅ Buyurtma" if lang == "uz" else "✅ Заказать"
     builder.button(text=pickup, callback_data=f"book_{offer_id}")
-    about = "🏪 О магазине" if lang == "ru" else "🏪 Do'kon haqida"
+    about = "🏪 Do'kon haqida" if lang == "uz" else "🏪 О магазине"
     builder.button(text=about, callback_data=f"store_info_{store_id}")
     builder.adjust(2)
+    return builder.as_markup()
+
+
+def offer_details_with_back_keyboard(
+    lang: str, offer_id: int, store_id: int, delivery_enabled: bool
+) -> InlineKeyboardMarkup:
+    """Offer card keyboard with back button to return to hot offers list."""
+    builder = InlineKeyboardBuilder()
+    # Main actions
+    order = "✅ Buyurtma" if lang == "uz" else "✅ Заказать"
+    builder.button(text=order, callback_data=f"book_{offer_id}")
+    about = "🏪 Do'kon" if lang == "uz" else "🏪 Магазин"
+    builder.button(text=about, callback_data=f"store_info_{store_id}")
+    # Back button
+    back = "◀️ Orqaga" if lang == "uz" else "◀️ Назад"
+    builder.button(text=back, callback_data="back_to_hot")
+    builder.adjust(2, 1)
     return builder.as_markup()
 
 
