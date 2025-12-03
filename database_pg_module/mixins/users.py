@@ -187,13 +187,19 @@ class UserMixin:
             stores = cursor.fetchall()
             for store in stores:
                 store_id = store[0]
-                # Get offer_ids to clean up recently_viewed
+                # Get offer_ids to clean up related tables
                 cursor.execute("SELECT offer_id FROM offers WHERE store_id = %s", (store_id,))
                 offer_ids = [row[0] for row in cursor.fetchall()]
                 if offer_ids:
+                    # Delete bookings referencing these offers first (FK constraint)
+                    cursor.execute("DELETE FROM bookings WHERE offer_id = ANY(%s)", (offer_ids,))
+                    # Delete recently_viewed referencing these offers
                     cursor.execute(
                         "DELETE FROM recently_viewed WHERE offer_id = ANY(%s)", (offer_ids,)
                     )
+                # Delete store ratings
+                cursor.execute("DELETE FROM ratings WHERE store_id = %s", (store_id,))
+                # Now safe to delete offers
                 cursor.execute("DELETE FROM offers WHERE store_id = %s", (store_id,))
                 cursor.execute("DELETE FROM payment_settings WHERE store_id = %s", (store_id,))
 
