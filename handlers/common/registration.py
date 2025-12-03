@@ -41,7 +41,7 @@ async def _safe_answer_or_send(msg_like, user_id: int, text: str, **kwargs) -> N
 
 @router.message(Registration.phone, F.contact)
 async def process_phone(message: types.Message, state: FSMContext, db: DatabaseProtocol):
-    """Process phone number with improved messaging."""
+    """Process phone number - save and show city selection."""
     if not db:
         await message.answer("System error")
         return
@@ -60,41 +60,46 @@ async def process_phone(message: types.Message, state: FSMContext, db: DatabaseP
 
     db.update_user_phone(message.from_user.id, phone)
 
+    # Build city card text
+    city_text = (
+        f"✅ {'Telefon saqlandi!' if lang == 'uz' else 'Телефон сохранён!'}\n\n"
+        f"📍 <b>{'Shahringizni tanlang' if lang == 'uz' else 'Выберите ваш город'}</b>\n\n"
+        f"{'Yaqin takliflarni koʻrsatamiz' if lang == 'uz' else 'Покажем предложения рядом с вами'}"
+    )
+
     await state.set_state(Registration.city)
-    try:
-        await message.answer(
-            get_text(lang, "welcome_city_step"),
-            parse_mode="HTML",
-            reply_markup=city_inline_keyboard(lang),
-        )
-    except Exception:
-        await message.answer(
-            get_text(lang, "welcome_city_step"), parse_mode="HTML", reply_markup=city_keyboard(lang)
-        )
+
+    # Remove reply keyboard and show inline cities
+    from aiogram.types import ReplyKeyboardRemove
+
+    await message.answer(
+        city_text,
+        parse_mode="HTML",
+        reply_markup=ReplyKeyboardRemove(),
+    )
+    await message.answer(
+        f"👇 {'Tanlang' if lang == 'uz' else 'Выберите'}:",
+        reply_markup=city_inline_keyboard(lang),
+    )
 
 
 @router.callback_query(F.data.startswith("reg_city_"), StateFilter(Registration.city, None))
 async def registration_city_callback(
     callback: types.CallbackQuery, state: FSMContext, db: DatabaseProtocol
 ):
-    """Handle city selection from inline keyboard during registration."""
+    """Handle city selection - complete registration."""
     if not db or not callback.message:
         await callback.answer("System error", show_alert=True)
         return
 
-    current_state = await state.get_state()
-    logger.info(
-        f"City callback: user={callback.from_user.id}, state={current_state}, data={callback.data}"
-    )
-
     lang = db.get_user_language(callback.from_user.id)
+
     try:
         raw = callback.data or ""
         parts = raw.split("_", 2)
         city = parts[2] if len(parts) > 2 else ""
         if not city:
             raise ValueError("empty city")
-        logger.info(f"Selected city: {city}")
     except Exception as e:
         logger.error(f"City parse error: {e}")
         await callback.answer(get_text(lang, "error"), show_alert=True)
@@ -108,25 +113,30 @@ async def registration_city_callback(
 
     await state.clear()
 
-    # Delete old message and send new menu
+    # Edit message to show completion
+    user = db.get_user_model(callback.from_user.id)
+    name = user.first_name if user else callback.from_user.first_name
+
+    complete_text = (
+        f"🎉 <b>{'Tayyor!' if lang == 'uz' else 'Готово!'}</b>\n\n"
+        f"👋 {'Xush kelibsiz' if lang == 'uz' else 'Добро пожаловать'}, {name}!\n"
+        f"📍 {'Shahar' if lang == 'uz' else 'Город'}: {city}\n\n"
+        f"{'Endi siz qila olasiz' if lang == 'uz' else 'Теперь вы можете'}:\n"
+        f"🔥 <b>{'Issiq' if lang == 'uz' else 'Горячее'}</b> — {'eng yaxshi chegirmalar' if lang == 'uz' else 'лучшие скидки'}\n"
+        f"🏪 <b>{'Doʻkonlar' if lang == 'uz' else 'Заведения'}</b> — {'barcha doʻkonlar' if lang == 'uz' else 'все магазины'}\n"
+        f"🔍 <b>{'Qidirish' if lang == 'uz' else 'Поиск'}</b> — {'mahsulot topish' if lang == 'uz' else 'найти товар'}"
+    )
+
     try:
-        await callback.message.delete()
+        await callback.message.edit_text(complete_text, parse_mode="HTML")
     except Exception:
         pass
 
-    try:
-        await callback.message.answer(
-            get_text(lang, "registration_complete"),
-            parse_mode="HTML",
-            reply_markup=main_menu_customer(lang),
-        )
-    except Exception as e:
-        logger.error(f"Failed to send completion message: {e}")
-        try:
-            await callback.answer(get_text(lang, "registration_complete"), show_alert=True)
-        except Exception:
-            pass
-
+    # Send main menu (single message)
+    await callback.message.answer(
+        f"👇 {'Tanlang' if lang == 'uz' else 'Выберите'}:",
+        reply_markup=main_menu_customer(lang),
+    )
     await callback.answer()
 
 
