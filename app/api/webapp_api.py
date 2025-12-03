@@ -504,8 +504,11 @@ async def create_order(
         except Exception as e:
             logger.warning(f"Could not create bot instance: {e}")
 
-        # Process each offer separately (create booking per offer)
-        created_bookings = []
+        # Determine if this is delivery or pickup based on delivery_address
+        is_delivery = bool(order.delivery_address and order.delivery_address.strip())
+        
+        # Process each offer separately
+        created_items = []
 
         for item in order.items:
             offer = db.get_offer(item.offer_id) if hasattr(db, "get_offer") else None
@@ -522,58 +525,90 @@ async def create_order(
             store_id = get_val(offer, "store_id")
             offer_title = get_val(offer, "title", "Товар")
 
-            # Create booking using create_booking method
             try:
-                if hasattr(db, "create_booking"):
+                if is_delivery and hasattr(db, "create_order"):
+                    # Create delivery ORDER
+                    store = db.get_store(store_id) if hasattr(db, "get_store") else None
+                    delivery_price = get_val(store, "delivery_price", 15000) if store else 15000
+                    
+                    order_id = db.create_order(
+                        user_id=user_id,
+                        store_id=store_id,
+                        offer_id=item.offer_id,
+                        quantity=item.quantity,
+                        order_type="delivery",
+                        delivery_address=order.delivery_address,
+                        delivery_price=delivery_price,
+                        payment_method="card",
+                    )
+                    
+                    if order_id:
+                        created_items.append({
+                            "id": order_id,
+                            "type": "order",
+                            "offer_id": item.offer_id,
+                            "quantity": item.quantity,
+                            "total": total + delivery_price,
+                            "offer_title": offer_title,
+                            "store_id": store_id,
+                        })
+                        logger.info(f"✅ Created delivery ORDER {order_id} for user {user_id}")
+                        
+                elif hasattr(db, "create_booking"):
+                    # Create pickup BOOKING
                     booking_id = db.create_booking(
                         user_id=user_id,
                         offer_id=item.offer_id,
                         quantity=item.quantity,
-                        pickup_date="2024-01-01 00:00",  # Will be updated by partner
+                        pickup_date="",
                         comment=order.comment or "",
                     )
 
-                    created_bookings.append(
-                        {
-                            "booking_id": booking_id,
+                    if booking_id:
+                        created_items.append({
+                            "id": booking_id,
+                            "type": "booking",
                             "offer_id": item.offer_id,
                             "quantity": item.quantity,
                             "total": total,
                             "offer_title": offer_title,
-                        }
-                    )
+                            "store_id": store_id,
+                        })
+                        logger.info(f"✅ Created pickup BOOKING {booking_id} for user {user_id}")
 
-                    # Notify partner about new booking
-                    if bot_instance and store_id:
-                        store = db.get_store(store_id) if hasattr(db, "get_store") else None
-                        if store:
-                            owner_id = get_val(store, "owner_id")
-                            if owner_id:
-                                await notify_partner_webapp_order(
-                                    bot=bot_instance,
-                                    db=db,
-                                    owner_id=owner_id,
-                                    booking_id=booking_id,
-                                    offer_title=offer_title,
-                                    quantity=item.quantity,
-                                    total=total,
-                                    user_id=user_id,
-                                    delivery_address=order.delivery_address,
-                                    phone=order.phone,
-                                    photo=get_val(offer, "photo"),
-                                )
+                # Notify partner about new order/booking
+                if bot_instance and store_id and created_items:
+                    last_item = created_items[-1]
+                    store = db.get_store(store_id) if hasattr(db, "get_store") else None
+                    if store:
+                        owner_id = get_val(store, "owner_id")
+                        if owner_id:
+                            await notify_partner_webapp_order(
+                                bot=bot_instance,
+                                db=db,
+                                owner_id=owner_id,
+                                booking_id=last_item["id"],
+                                offer_title=offer_title,
+                                quantity=item.quantity,
+                                total=last_item["total"],
+                                user_id=user_id,
+                                delivery_address=order.delivery_address if is_delivery else None,
+                                phone=order.phone,
+                                photo=get_val(offer, "photo"),
+                                is_delivery=is_delivery,
+                            )
 
             except Exception as e:
-                logger.error(f"Error creating booking for offer {item.offer_id}: {e}")
+                logger.error(f"Error creating order for offer {item.offer_id}: {e}")
                 continue
 
         if bot_instance:
             await bot_instance.session.close()
 
-        # Return first booking as order_id (or 0 if none created)
-        order_id = created_bookings[0]["booking_id"] if created_bookings else 0
-        total_amount = sum(b["total"] for b in created_bookings)
-        total_items = sum(b["quantity"] for b in created_bookings)
+        # Return first item as order_id (or 0 if none created)
+        order_id = created_items[0]["id"] if created_items else 0
+        total_amount = sum(b["total"] for b in created_items)
+        total_items = sum(b["quantity"] for b in created_items)
 
         return OrderResponse(
             order_id=order_id, status="pending", total=total_amount, items_count=total_items
@@ -598,6 +633,7 @@ async def notify_partner_webapp_order(
     delivery_address: str | None,
     phone: str | None,
     photo: str | None,
+    is_delivery: bool = False,
 ):
     """Send notification to partner about new webapp order."""
     import html
@@ -618,9 +654,14 @@ async def notify_partner_webapp_order(
     def _esc(val):
         return html.escape(str(val)) if val else ""
 
+    # Order type label
+    order_type_uz = "🚚 Yetkazib berish" if is_delivery else "🏪 O'zi olib ketadi"
+    order_type_ru = "🚚 Доставка" if is_delivery else "🏪 Самовывоз"
+
     if partner_lang == "uz":
         text = (
             f"🔔 <b>Yangi buyurtma (Mini App)!</b>\n\n"
+            f"{order_type_uz}\n"
             f"📦 {_esc(offer_title)} × {quantity}\n"
             f"💰 {int(total):,} so'm\n"
             f"👤 {_esc(customer_name)}\n"
@@ -628,13 +669,12 @@ async def notify_partner_webapp_order(
         )
         if delivery_address:
             text += f"🏠 Manzil: {_esc(delivery_address)}\n"
-        else:
-            text += "🏪 O'zi olib ketadi\n"
         confirm_text = "✅ Tasdiqlash"
         reject_text = "❌ Rad etish"
     else:
         text = (
             f"🔔 <b>Новый заказ (Mini App)!</b>\n\n"
+            f"{order_type_ru}\n"
             f"📦 {_esc(offer_title)} × {quantity}\n"
             f"💰 {int(total):,} сум\n"
             f"👤 {_esc(customer_name)}\n"
@@ -642,15 +682,20 @@ async def notify_partner_webapp_order(
         )
         if delivery_address:
             text += f"🏠 Адрес: {_esc(delivery_address)}\n"
-        else:
-            text += "🏪 Самовывоз\n"
         confirm_text = "✅ Подтвердить"
         reject_text = "❌ Отклонить"
 
-    kb = InlineKeyboardBuilder()
-    kb.button(text=confirm_text, callback_data=f"partner_confirm_{booking_id}")
-    kb.button(text=reject_text, callback_data=f"partner_reject_{booking_id}")
-    kb.adjust(2)
+    # Use different callback_data for orders vs bookings
+    if is_delivery:
+        kb = InlineKeyboardBuilder()
+        kb.button(text=confirm_text, callback_data=f"confirm_order_{booking_id}")
+        kb.button(text=reject_text, callback_data=f"cancel_order_{booking_id}")
+        kb.adjust(2)
+    else:
+        kb = InlineKeyboardBuilder()
+        kb.button(text=confirm_text, callback_data=f"partner_confirm_{booking_id}")
+        kb.button(text=reject_text, callback_data=f"partner_reject_{booking_id}")
+        kb.adjust(2)
 
     try:
         if photo:
