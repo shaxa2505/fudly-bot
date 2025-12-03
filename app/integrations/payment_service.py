@@ -22,7 +22,7 @@ import hashlib
 import os
 from datetime import datetime
 from enum import Enum
-from typing import Any, Optional
+from typing import Any
 from urllib.parse import urlencode
 
 try:
@@ -530,7 +530,7 @@ class PaymentService:
 
 
 # Singleton instance
-_payment_service: Optional[PaymentService] = None
+_payment_service: PaymentService | None = None
 
 
 def get_payment_service() -> PaymentService:

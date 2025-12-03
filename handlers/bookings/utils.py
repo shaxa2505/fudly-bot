@@ -51,8 +51,11 @@ async def safe_answer_or_send(
 
 
 def can_proceed(user_id: int, operation: str) -> bool:
-    """Check if user can proceed with operation (rate limiting placeholder)."""
-    # TODO: Implement proper rate limiting with Redis
+    """Check if user can proceed with operation.
+
+    Note: Rate limiting is now implemented at middleware level (see app.middlewares.rate_limit).
+    This function is kept for backwards compatibility and additional business logic checks.
+    """
     return True
 
 

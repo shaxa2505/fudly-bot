@@ -76,6 +76,19 @@ class UserMixin:
         user = self.get_user(user_id)
         return user["language"] if user else "ru"
 
+    def get_user_view_mode(self, user_id: int) -> str:
+        """Get user view mode (customer or seller)."""
+        user = self.get_user(user_id)
+        return user["view_mode"] if user and user.get("view_mode") else "customer"
+
+    def set_user_view_mode(self, user_id: int, mode: str) -> None:
+        """Set user view mode (customer or seller)."""
+        if mode not in ("customer", "seller"):
+            mode = "customer"
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("UPDATE users SET view_mode = %s WHERE user_id = %s", (mode, user_id))
+
     def get_user_model(self, user_id: int) -> Any | None:
         """Return user as Pydantic model."""
         try:
@@ -167,12 +180,20 @@ class UserMixin:
             cursor.execute("DELETE FROM notifications WHERE user_id = %s", (user_id,))
             cursor.execute("DELETE FROM favorites WHERE user_id = %s", (user_id,))
             cursor.execute("DELETE FROM ratings WHERE user_id = %s", (user_id,))
+            cursor.execute("DELETE FROM recently_viewed WHERE user_id = %s", (user_id,))
 
             # Get user's stores
             cursor.execute("SELECT store_id FROM stores WHERE owner_id = %s", (user_id,))
             stores = cursor.fetchall()
             for store in stores:
                 store_id = store[0]
+                # Get offer_ids to clean up recently_viewed
+                cursor.execute("SELECT offer_id FROM offers WHERE store_id = %s", (store_id,))
+                offer_ids = [row[0] for row in cursor.fetchall()]
+                if offer_ids:
+                    cursor.execute(
+                        "DELETE FROM recently_viewed WHERE offer_id = ANY(%s)", (offer_ids,)
+                    )
                 cursor.execute("DELETE FROM offers WHERE store_id = %s", (store_id,))
                 cursor.execute("DELETE FROM payment_settings WHERE store_id = %s", (store_id,))
 

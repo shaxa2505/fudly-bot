@@ -32,6 +32,7 @@ class SchemaMixin:
                     role TEXT DEFAULT 'customer',
                     is_admin INTEGER DEFAULT 0,
                     notifications_enabled INTEGER DEFAULT 1,
+                    view_mode TEXT DEFAULT 'customer',
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 )
             """
@@ -372,25 +373,75 @@ class SchemaMixin:
 
     def _create_indexes(self, cursor):
         """Create database indexes."""
+        # Store indexes
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_stores_owner ON stores(owner_id)")
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_stores_status ON stores(status)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_stores_city ON stores(city)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_stores_city_status ON stores(city, status)")
+
+        # Offer indexes - critical for browsing/search performance
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_offers_store ON offers(store_id)")
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_offers_status ON offers(status)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_offers_category ON offers(category)")
+        cursor.execute(
+            "CREATE INDEX IF NOT EXISTS idx_offers_status_store ON offers(status, store_id)"
+        )
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_offers_expiry ON offers(expiry_date)")
+
+        # Order indexes
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_orders_user ON orders(user_id)")
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_orders_store ON orders(store_id)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_orders_status ON orders(order_status)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_orders_created ON orders(created_at DESC)")
+
+        # Booking indexes - critical for daily operations
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_bookings_user ON bookings(user_id)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_bookings_store ON bookings(store_id)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_bookings_offer ON bookings(offer_id)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_bookings_status ON bookings(status)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_bookings_code ON bookings(booking_code)")
+        cursor.execute(
+            "CREATE INDEX IF NOT EXISTS idx_bookings_created ON bookings(created_at DESC)"
+        )
+
+        # Notification indexes
         cursor.execute(
             "CREATE INDEX IF NOT EXISTS idx_notifications_user ON notifications(user_id)"
         )
+        cursor.execute(
+            "CREATE INDEX IF NOT EXISTS idx_notifications_unread ON notifications(user_id, is_read)"
+        )
+
+        # Rating and favorites indexes
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_ratings_store ON ratings(store_id)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_ratings_user ON ratings(user_id)")
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_favorites_user ON favorites(user_id)")
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_favorites_store ON favorites(store_id)")
+
+        # Search optimization indexes
+        cursor.execute(
+            "CREATE INDEX IF NOT EXISTS idx_recently_viewed_user ON recently_viewed(user_id)"
+        )
+        cursor.execute(
+            "CREATE INDEX IF NOT EXISTS idx_search_history_user ON search_history(user_id)"
+        )
 
     def _run_migrations(self, cursor):
         """Run database migrations."""
         self._migrate_favorites_table(cursor)
         self._migrate_stores_delivery(cursor)
         self._migrate_bookings_delivery(cursor)
+        self._migrate_user_view_mode(cursor)
+
+    def _migrate_user_view_mode(self, cursor):
+        """Add view_mode column to users table if not exists."""
+        try:
+            cursor.execute(
+                "ALTER TABLE users ADD COLUMN IF NOT EXISTS view_mode TEXT DEFAULT 'customer'"
+            )
+            logger.info("✅ view_mode column ensured in users table")
+        except Exception as e:
+            logger.warning(f"Could not add view_mode column: {e}")
 
     def _migrate_favorites_table(self, cursor):
         """Migrate favorites from offer_id to store_id if needed."""

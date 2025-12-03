@@ -15,6 +15,7 @@ from app.keyboards import (
     photo_keyboard,
     product_categories_keyboard,
     quantity_keyboard,
+    unit_type_keyboard,
 )
 from database_protocol import DatabaseProtocol
 from handlers.common.states import CreateOffer
@@ -75,6 +76,7 @@ def build_progress_text(data: dict, lang: str, current_step: int) -> str:
         ("Название", "Nomi", data.get("title")),
         ("Цена", "Narx", data.get("original_price")),
         ("Скидка", "Chegirma", data.get("discount_percent")),
+        ("Единица", "Birlik", data.get("unit")),
         ("Количество", "Miqdor", data.get("quantity")),
         ("Срок", "Muddat", data.get("expiry_date")),
         ("Фото", "Rasm", data.get("photo")),
@@ -91,8 +93,11 @@ def build_progress_text(data: dict, lang: str, current_step: int) -> str:
                 display_value = f"{int(value):,} сум"
             elif i == 4 and value:  # Discount
                 display_value = f"{value}%"
-            elif i == 5 and value:  # Quantity
-                display_value = f"{value} шт"
+            elif i == 5 and value:  # Unit
+                display_value = value
+            elif i == 6 and value:  # Quantity
+                unit = data.get("unit", "шт")
+                display_value = f"{value} {unit}"
             elif value:
                 display_value = str(value)[:20]
             else:
@@ -142,9 +147,9 @@ async def add_offer_start(message: types.Message, state: FSMContext) -> None:
     )
 
     step_text = (
-        "📂 <b>Шаг 1/7:</b> Выберите категорию"
+        "📂 <b>Шаг 1/8:</b> Выберите категорию"
         if lang == "ru"
-        else "📂 <b>1/7-qadam:</b> Kategoriyani tanlang"
+        else "📂 <b>1/8-qadam:</b> Kategoriyani tanlang"
     )
 
     await message.answer(
@@ -354,7 +359,7 @@ async def discount_entered(message: types.Message, state: FSMContext) -> None:
 async def _process_discount(
     target: types.Message, state: FSMContext, lang: str, discount_percent: int
 ) -> None:
-    """Process discount and move to quantity step."""
+    """Process discount and move to unit type step."""
     data = await state.get_data()
     original_price = data.get("original_price", 0)
     discount_price = original_price * (1 - discount_percent / 100)
@@ -368,14 +373,45 @@ async def _process_discount(
         f"🏪 <b>{data.get('store_name', 'Магазин')}</b>\n\n"
         f"{progress}\n\n"
         f"💰 Цена со скидкой: <b>{int(discount_price):,} сум</b>\n\n"
+        f"📦 <b>{'Выберите единицу измерения:' if lang == 'ru' else 'O`lchov birligini tanlang:'}</b>"
+    )
+
+    await target.answer(text, parse_mode="HTML", reply_markup=unit_type_keyboard(lang))
+    await state.set_state(CreateOffer.unit_type)
+
+
+# ============ STEP 5: Unit Type ============
+
+
+@router.callback_query(CreateOffer.unit_type, F.data.startswith("unit_type_"))
+async def unit_type_selected(callback: types.CallbackQuery, state: FSMContext) -> None:
+    """Unit type selected via button."""
+    if not db or not callback.message:
+        await callback.answer("System error", show_alert=True)
+        return
+
+    lang = db.get_user_language(callback.from_user.id)
+    unit = callback.data.replace("unit_type_", "")
+
+    await state.update_data(unit=unit)
+    data = await state.get_data()
+
+    progress = build_progress_text(data, lang, 6)
+
+    text = (
+        f"🏪 <b>{data.get('store_name', 'Магазин')}</b>\n\n"
+        f"{progress}\n\n"
         f"📊 <b>{'Выберите количество:' if lang == 'ru' else 'Miqdorni tanlang:'}</b>"
     )
 
-    await target.answer(text, parse_mode="HTML", reply_markup=quantity_keyboard(lang))
+    await callback.message.edit_text(
+        text, parse_mode="HTML", reply_markup=quantity_keyboard(lang, unit)
+    )
     await state.set_state(CreateOffer.quantity)
+    await callback.answer()
 
 
-# ============ STEP 4: Quantity ============
+# ============ STEP 6: Quantity ============
 
 
 @router.callback_query(CreateOffer.quantity, F.data.startswith("quantity_"))
@@ -387,26 +423,31 @@ async def quantity_selected(callback: types.CallbackQuery, state: FSMContext) ->
 
     lang = db.get_user_language(callback.from_user.id)
     qty_data = callback.data.replace("quantity_", "")
+    data = await state.get_data()
+    unit = data.get("unit", "шт")
 
     if qty_data == "custom":
         # Ask for custom quantity
         builder = InlineKeyboardBuilder()
         builder.button(
-            text="◀️ Назад" if lang == "ru" else "◀️ Orqaga", callback_data="create_back_discount"
+            text="◀️ Назад" if lang == "ru" else "◀️ Orqaga", callback_data="create_back_unit"
         )
+
+        example = "Пример: 2.5" if unit == "кг" else "Пример: 25"
+        example_uz = "Misol: 2.5" if unit == "кг" else "Misol: 25"
 
         await callback.message.edit_text(
             "📊 <b>"
             + ("Введите количество:" if lang == "ru" else "Miqdorni kiriting:")
             + "</b>\n\n"
-            + ("Пример: 25" if lang == "ru" else "Misol: 25"),
+            + (example if lang == "ru" else example_uz),
             parse_mode="HTML",
             reply_markup=builder.as_markup(),
         )
         await callback.answer()
         return
 
-    quantity = int(qty_data)
+    quantity = float(qty_data)
     await _process_quantity(callback.message, state, lang, quantity)
     await callback.answer()
 
@@ -424,11 +465,25 @@ async def quantity_entered(message: types.Message, state: FSMContext) -> None:
         return
 
     lang = db.get_user_language(message.from_user.id)
+    data = await state.get_data()
+    unit = data.get("unit", "шт")
 
     try:
-        quantity = int(message.text.strip())
+        quantity_text = message.text.strip().replace(",", ".")
+        quantity = float(quantity_text)
         if quantity <= 0:
             raise ValueError("Invalid quantity")
+        # For pieces, ensure integer
+        if unit == "шт" and quantity != int(quantity):
+            await message.answer(
+                "❌ "
+                + (
+                    "Для штук введите целое число"
+                    if lang == "ru"
+                    else "Dona uchun butun son kiriting"
+                )
+            )
+            return
     except ValueError:
         await message.answer(
             "❌ " + ("Введите положительное число" if lang == "ru" else "Musbat raqam kiriting")
@@ -439,13 +494,13 @@ async def quantity_entered(message: types.Message, state: FSMContext) -> None:
 
 
 async def _process_quantity(
-    target: types.Message, state: FSMContext, lang: str, quantity: int
+    target: types.Message, state: FSMContext, lang: str, quantity: float
 ) -> None:
     """Process quantity and move to expiry step."""
     await state.update_data(quantity=quantity)
     data = await state.get_data()
 
-    progress = build_progress_text(data, lang, 6)
+    progress = build_progress_text(data, lang, 7)
 
     text = (
         f"🏪 <b>{data.get('store_name', 'Магазин')}</b>\n\n"
@@ -457,7 +512,7 @@ async def _process_quantity(
     await state.set_state(CreateOffer.expiry_date)
 
 
-# ============ STEP 5: Expiry Date ============
+# ============ STEP 7: Expiry Date ============
 
 
 @router.callback_query(CreateOffer.expiry_date, F.data.startswith("expiry_"))
@@ -543,7 +598,7 @@ async def _process_expiry(
     await state.update_data(expiry_date=expiry_date)
     data = await state.get_data()
 
-    progress = build_progress_text(data, lang, 7)
+    progress = build_progress_text(data, lang, 8)
 
     text = (
         f"🏪 <b>{data.get('store_name', 'Магазин')}</b>\n\n"
@@ -555,7 +610,7 @@ async def _process_expiry(
     await state.set_state(CreateOffer.photo)
 
 
-# ============ STEP 6: Photo ============
+# ============ STEP 8: Photo ============
 
 
 @router.message(CreateOffer.photo, F.photo)
@@ -594,18 +649,27 @@ async def _finalize_offer(target: types.Message, state: FSMContext, lang: str) -
         if not db:
             raise ValueError("Database not initialized")
 
+        unit = data.get("unit", "шт")
+        quantity = data["quantity"]
+
+        # Format quantity display
+        if unit == "кг":
+            qty_display = f"{quantity} кг"
+        else:
+            qty_display = f"{int(quantity)} шт"
+
         offer_id = db.add_offer(
             store_id=data["store_id"],
             title=data["title"],
             description=data["title"],
             original_price=data["original_price"],
             discount_price=data["discount_price"],
-            quantity=data["quantity"],
+            quantity=quantity,
             available_from="08:00",
             available_until="23:00",
             photo=data.get("photo"),
             expiry_date=data["expiry_date"],
-            unit="шт",
+            unit=unit,
             category=data.get("category", "other"),
         )
 
@@ -615,7 +679,7 @@ async def _finalize_offer(target: types.Message, state: FSMContext, lang: str) -
             f"✅ <b>{'ТОВАР СОЗДАН!' if lang == 'ru' else 'MAHSULOT YARATILDI!'}</b>\n\n"
             f"📦 {data['title']}\n"
             f"💰 {int(data['original_price']):,} ➜ {int(data['discount_price']):,} сум (-{discount_percent}%)\n"
-            f"📊 {data['quantity']} шт\n"
+            f"📊 {qty_display}\n"
             f"📅 До: {data['expiry_date']}\n\n"
         )
 
@@ -669,9 +733,9 @@ async def back_to_category(callback: types.CallbackQuery, state: FSMContext) -> 
         f"➕ <b>{'ДОБАВИТЬ ТОВАР' if lang == 'ru' else 'MAHSULOT QO`SHISH'}</b>\n\n"
     )
     step_text = (
-        "📂 <b>Шаг 1/7:</b> Выберите категорию"
+        "📂 <b>Шаг 1/8:</b> Выберите категорию"
         if lang == "ru"
-        else "📂 <b>1/7-qadam:</b> Kategoriyani tanlang"
+        else "📂 <b>1/8-qadam:</b> Kategoriyani tanlang"
     )
 
     await callback.message.edit_text(
@@ -745,8 +809,9 @@ async def back_to_quantity(callback: types.CallbackQuery, state: FSMContext) -> 
 
     lang = db.get_user_language(callback.from_user.id)
     data = await state.get_data()
+    unit = data.get("unit", "шт")
 
-    progress = build_progress_text(data, lang, 5)
+    progress = build_progress_text(data, lang, 6)
 
     text = (
         f"🏪 <b>{data.get('store_name', 'Магазин')}</b>\n\n"
@@ -754,8 +819,33 @@ async def back_to_quantity(callback: types.CallbackQuery, state: FSMContext) -> 
         f"📊 <b>{'Выберите количество:' if lang == 'ru' else 'Miqdorni tanlang:'}</b>"
     )
 
-    await callback.message.edit_text(text, parse_mode="HTML", reply_markup=quantity_keyboard(lang))
+    await callback.message.edit_text(
+        text, parse_mode="HTML", reply_markup=quantity_keyboard(lang, unit)
+    )
     await state.set_state(CreateOffer.quantity)
+    await callback.answer()
+
+
+@router.callback_query(F.data == "create_back_unit")
+async def back_to_unit(callback: types.CallbackQuery, state: FSMContext) -> None:
+    """Go back to unit type selection."""
+    if not db or not callback.message:
+        await callback.answer()
+        return
+
+    lang = db.get_user_language(callback.from_user.id)
+    data = await state.get_data()
+
+    progress = build_progress_text(data, lang, 5)
+
+    text = (
+        f"🏪 <b>{data.get('store_name', 'Магазин')}</b>\n\n"
+        f"{progress}\n\n"
+        f"📦 <b>{'Выберите единицу измерения:' if lang == 'ru' else 'O`lchov birligini tanlang:'}</b>"
+    )
+
+    await callback.message.edit_text(text, parse_mode="HTML", reply_markup=unit_type_keyboard(lang))
+    await state.set_state(CreateOffer.unit_type)
     await callback.answer()
 
 
@@ -769,7 +859,7 @@ async def back_to_expiry(callback: types.CallbackQuery, state: FSMContext) -> No
     lang = db.get_user_language(callback.from_user.id)
     data = await state.get_data()
 
-    progress = build_progress_text(data, lang, 6)
+    progress = build_progress_text(data, lang, 7)
 
     text = (
         f"🏪 <b>{data.get('store_name', 'Магазин')}</b>\n\n"
@@ -830,9 +920,9 @@ async def create_another(callback: types.CallbackQuery, state: FSMContext) -> No
         f"➕ <b>{'ДОБАВИТЬ ТОВАР' if lang == 'ru' else 'MAHSULOT QO`SHISH'}</b>\n\n"
     )
     step_text = (
-        "📂 <b>Шаг 1/7:</b> Выберите категорию"
+        "📂 <b>Шаг 1/8:</b> Выберите категорию"
         if lang == "ru"
-        else "📂 <b>1/7-qadam:</b> Kategoriyani tanlang"
+        else "📂 <b>1/8-qadam:</b> Kategoriyani tanlang"
     )
 
     await callback.message.edit_text(

@@ -4,8 +4,8 @@
 
 Товары из накладной № 95183 от 18.11.2025
 """
-import sys
 import os
+import sys
 from datetime import datetime
 
 # Add parent directory to path
@@ -45,40 +45,43 @@ def add_products(db: Database, store_id: int):
     """Add all products to the store."""
     conn = db.get_connection()
     cursor = conn.cursor()
-    
+
     added = 0
     for name, qty, discount_price, original_price, expiry_str, barcode in PRODUCTS:
         try:
             expiry_date = parse_date(expiry_str)
-            
+
             # Вычисляем скидку
             if original_price > discount_price:
                 discount_percent = int((1 - discount_price / original_price) * 100)
             else:
                 discount_percent = 0
-            
-            cursor.execute("""
+
+            cursor.execute(
+                """
                 INSERT INTO offers (
                     store_id, title, description, original_price, discount_price,
                     discount_percent, quantity, expiry_date, status, barcode
                 ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'active', ?)
-            """, (
-                store_id,
-                name,
-                f"Штрихкод: {barcode}",
-                original_price,
-                discount_price,
-                discount_percent,
-                qty,
-                expiry_date,
-                barcode
-            ))
+            """,
+                (
+                    store_id,
+                    name,
+                    f"Штрихкод: {barcode}",
+                    original_price,
+                    discount_price,
+                    discount_percent,
+                    qty,
+                    expiry_date,
+                    barcode,
+                ),
+            )
             added += 1
             print(f"✅ {name} - {qty} шт, {discount_price:,} сум ({discount_percent}% скидка)")
-            
+
         except Exception as e:
             print(f"❌ Ошибка добавления {name}: {e}")
-    
+
     conn.commit()
     conn.close()
     print(f"\n📦 Добавлено товаров: {added}/{len(PRODUCTS)}")
@@ -91,7 +94,7 @@ def list_stores(db: Database):
     cursor.execute("SELECT store_id, name, city, status FROM stores")
     stores = cursor.fetchall()
     conn.close()
-    
+
     print("\n📍 Доступные магазины:")
     for s in stores:
         print(f"  ID={s[0]}: {s[1]} ({s[2]}) - {s[3]}")
@@ -100,11 +103,11 @@ def list_stores(db: Database):
 
 def main():
     db = Database()
-    
+
     if STORE_ID is None:
         print("⚠️  STORE_ID не указан!")
         stores = list_stores(db)
-        
+
         if stores:
             try:
                 store_id = int(input("\nВведите ID магазина для добавления товаров: "))

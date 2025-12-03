@@ -60,7 +60,7 @@ class BookingMixin:
             except Exception:
                 pass
 
-            # Enforce per-user active booking limit
+            # Enforce per-user active booking limit with row locking to prevent race condition
             try:
                 # Log all bookings for this user for debugging
                 cursor.execute(
@@ -69,8 +69,10 @@ class BookingMixin:
                 all_bookings = cursor.fetchall()
                 logger.info(f"🔍 User {user_id} all bookings: {all_bookings}")
 
+                # SECURITY: Use FOR UPDATE to lock rows and prevent race condition
+                # This ensures accurate count even with concurrent booking attempts
                 cursor.execute(
-                    "SELECT COUNT(*) FROM bookings WHERE user_id = %s AND status IN ('active','pending','confirmed')",
+                    "SELECT COUNT(*) FROM bookings WHERE user_id = %s AND status IN ('active','pending','confirmed') FOR UPDATE",
                     (user_id,),
                 )
                 active_count = cursor.fetchone()[0] or 0

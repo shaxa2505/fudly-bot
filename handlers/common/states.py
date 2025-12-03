@@ -71,9 +71,9 @@ class RegisterStore(StatesGroup):
 
 class CreateOffer(StatesGroup):
     """
-    Offer creation flow (7 steps).
+    Offer creation flow (8 steps).
 
-    Flow: Add Offer → category → title → price → discount → quantity → expiry → photo → done
+    Flow: Add Offer → category → title → price → discount → unit → quantity → expiry → photo → done
     """
 
     # Main flow states
@@ -81,9 +81,10 @@ class CreateOffer(StatesGroup):
     title = State()  # Step 2: Enter title
     original_price = State()  # Step 3: Enter original price
     discount_price = State()  # Step 4: Enter/select discount
-    quantity = State()  # Step 5: Enter quantity
-    expiry_date = State()  # Step 6: Select expiry date
-    photo = State()  # Step 7: Upload photo (optional)
+    unit_type = State()  # Step 5: Select unit type (шт/кг)
+    quantity = State()  # Step 6: Enter quantity
+    expiry_date = State()  # Step 7: Select expiry date
+    photo = State()  # Step 8: Upload photo (optional)
 
     # Legacy/alternative states (for backward compatibility)
     store = State()

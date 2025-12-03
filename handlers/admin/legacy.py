@@ -501,16 +501,16 @@ async def admin_settings(message: types.Message):
         return
 
     from aiogram.utils.keyboard import InlineKeyboardBuilder
-    
+
     kb = InlineKeyboardBuilder()
     kb.button(text="💳 Платёжные реквизиты", callback_data="admin_payment_settings")
     kb.button(text="🔔 Уведомления", callback_data="admin_notifications_settings")
     kb.button(text="📊 Лимиты", callback_data="admin_limits_settings")
     kb.adjust(1)
-    
+
     text = "⚙️ <b>Настройки платформы</b>\n\n"
     text += "Выберите раздел для настройки:"
-    
+
     await message.answer(text, parse_mode="HTML", reply_markup=kb.as_markup())
 
 

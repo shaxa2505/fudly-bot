@@ -92,7 +92,7 @@ class TestHasApprovedStore:
     def test_user_with_active_store(self) -> None:
         """Test user with active store returns True."""
         mock_db = MagicMock()
-        mock_db.get_user_stores.return_value = [
+        mock_db.get_user_accessible_stores.return_value = [
             {"id": 1, "name": "Test Store", "status": "active"},
         ]
 
@@ -101,7 +101,7 @@ class TestHasApprovedStore:
     def test_user_with_pending_store(self) -> None:
         """Test user with only pending store returns False."""
         mock_db = MagicMock()
-        mock_db.get_user_stores.return_value = [
+        mock_db.get_user_accessible_stores.return_value = [
             {"id": 1, "name": "Test Store", "status": "pending"},
         ]
 
@@ -110,14 +110,14 @@ class TestHasApprovedStore:
     def test_user_without_stores(self) -> None:
         """Test user without stores returns False."""
         mock_db = MagicMock()
-        mock_db.get_user_stores.return_value = []
+        mock_db.get_user_accessible_stores.return_value = []
 
         assert has_approved_store(123, mock_db) is False
 
     def test_user_with_multiple_stores_one_active(self) -> None:
         """Test user with multiple stores, one active."""
         mock_db = MagicMock()
-        mock_db.get_user_stores.return_value = [
+        mock_db.get_user_accessible_stores.return_value = [
             {"id": 1, "name": "Store 1", "status": "pending"},
             {"id": 2, "name": "Store 2", "status": "active"},
             {"id": 3, "name": "Store 3", "status": "rejected"},
@@ -180,12 +180,11 @@ class TestGetAppropriateMenu:
         mock_db = MagicMock()
         mock_db.get_user_model.return_value = mock_user
         mock_db.get_user_stores.return_value = [{"status": "active"}]
+        mock_db.get_user_accessible_stores.return_value = [{"status": "active"}]
+        mock_db.get_user_view_mode.return_value = "seller"
 
         mock_customer_menu = MagicMock(return_value="customer_menu")
         mock_seller_menu = MagicMock(return_value="seller_menu")
-
-        # Set user view mode to seller
-        user_view_mode[123] = "seller"
 
         result = get_appropriate_menu(
             user_id=123,
@@ -197,9 +196,6 @@ class TestGetAppropriateMenu:
 
         assert result == "seller_menu"
 
-        # Cleanup
-        del user_view_mode[123]
-
     def test_seller_with_approved_store_in_customer_mode(self) -> None:
         """Test seller with approved store in customer mode gets customer menu."""
         mock_user = MagicMock()
@@ -208,12 +204,11 @@ class TestGetAppropriateMenu:
         mock_db = MagicMock()
         mock_db.get_user_model.return_value = mock_user
         mock_db.get_user_stores.return_value = [{"status": "active"}]
+        mock_db.get_user_accessible_stores.return_value = [{"status": "active"}]
+        mock_db.get_user_view_mode.return_value = "customer"
 
         mock_customer_menu = MagicMock(return_value="customer_menu")
         mock_seller_menu = MagicMock(return_value="seller_menu")
-
-        # Set user view mode to customer
-        user_view_mode[123] = "customer"
 
         result = get_appropriate_menu(
             user_id=123,
@@ -225,9 +220,6 @@ class TestGetAppropriateMenu:
 
         assert result == "customer_menu"
 
-        # Cleanup
-        del user_view_mode[123]
-
     def test_seller_without_approved_store(self) -> None:
         """Test seller without approved store gets customer menu."""
         mock_user = MagicMock()
@@ -236,6 +228,8 @@ class TestGetAppropriateMenu:
         mock_db = MagicMock()
         mock_db.get_user_model.return_value = mock_user
         mock_db.get_user_stores.return_value = [{"status": "pending"}]
+        mock_db.get_user_accessible_stores.return_value = [{"status": "pending"}]
+        mock_db.get_user_view_mode.return_value = "customer"
 
         mock_customer_menu = MagicMock(return_value="customer_menu")
         mock_seller_menu = MagicMock(return_value="seller_menu")
@@ -258,12 +252,11 @@ class TestGetAppropriateMenu:
         mock_db = MagicMock()
         mock_db.get_user_model.return_value = mock_user
         mock_db.get_user_stores.return_value = [{"status": "active"}]
+        mock_db.get_user_accessible_stores.return_value = [{"status": "active"}]
+        mock_db.get_user_view_mode.return_value = "seller"
 
         mock_customer_menu = MagicMock(return_value="customer_menu")
         mock_seller_menu = MagicMock(return_value="seller_menu")
-
-        # Set user view mode to seller
-        user_view_mode[123] = "seller"
 
         result = get_appropriate_menu(
             user_id=123,
@@ -274,9 +267,6 @@ class TestGetAppropriateMenu:
         )
 
         assert result == "seller_menu"
-
-        # Cleanup
-        del user_view_mode[123]
 
 
 # =============================================================================

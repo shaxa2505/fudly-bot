@@ -10,6 +10,7 @@ from aiogram import F, Router, types
 from aiogram.fsm.context import FSMContext
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
+from app.core.utils import get_field
 from handlers.common.states import CourierHandover
 from localization import get_text
 
@@ -102,14 +103,6 @@ async def cancel_order(callback: types.CallbackQuery):
 
     # Обновляем статус
     db.update_order_status(order_id, "cancelled")
-
-    # Helper for dict/tuple
-    def get_field(item, field, index):
-        return (
-            item.get(field)
-            if isinstance(item, dict)
-            else (item[index] if len(item) > index else None)
-        )
 
     # Возвращаем товар в наличие
     offer_id = get_field(order, "offer_id", 3)
@@ -238,14 +231,6 @@ async def reject_payment(callback: types.CallbackQuery):
     # Обновляем статусы
     db.update_payment_status(order_id, "pending")
     db.update_order_status(order_id, "cancelled")
-
-    # Helper for dict/tuple
-    def get_field(item, field, index):
-        return (
-            item.get(field)
-            if isinstance(item, dict)
-            else (item[index] if len(item) > index else None)
-        )
 
     # Возвращаем товар в наличие
     offer_id = get_field(order, "offer_id", 3)

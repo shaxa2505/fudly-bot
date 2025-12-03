@@ -80,10 +80,17 @@ class Database:
                 role TEXT DEFAULT 'customer',
                 is_admin INTEGER DEFAULT 0,
                 notifications_enabled INTEGER DEFAULT 1,
+                view_mode TEXT DEFAULT 'customer',
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         """
         )
+
+        # Migration: Add view_mode column if not exists
+        try:
+            cursor.execute("ALTER TABLE users ADD COLUMN view_mode TEXT DEFAULT 'customer'")
+        except Exception:
+            pass  # Column already exists
 
         # Таблица ресторанов/магазинов
         cursor.execute(
@@ -634,19 +641,46 @@ class Database:
     def update_user_language(self, user_id: int, language: str) -> None:
         """Обновить язык пользователя"""
         conn = self.get_connection()
-        cursor = conn.cursor()
-        cursor.execute("UPDATE users SET language = ? WHERE user_id = ?", (language, user_id))
-        conn.commit()
-        conn.close()
+        try:
+            cursor = conn.cursor()
+            cursor.execute("UPDATE users SET language = ? WHERE user_id = ?", (language, user_id))
+            conn.commit()
+        finally:
+            conn.close()
 
     def get_user_language(self, user_id: int) -> str:
         """Получить язык пользователя"""
         conn = self.get_connection()
-        cursor = conn.cursor()
-        cursor.execute("SELECT language FROM users WHERE user_id = ?", (user_id,))
-        result = cursor.fetchone()
-        conn.close()
-        return result[0] if result else "ru"
+        try:
+            cursor = conn.cursor()
+            cursor.execute("SELECT language FROM users WHERE user_id = ?", (user_id,))
+            result = cursor.fetchone()
+            return result[0] if result else "ru"
+        finally:
+            conn.close()
+
+    def get_user_view_mode(self, user_id: int) -> str:
+        """Get user view mode (customer or seller)."""
+        conn = self.get_connection()
+        try:
+            cursor = conn.cursor()
+            cursor.execute("SELECT view_mode FROM users WHERE user_id = ?", (user_id,))
+            result = cursor.fetchone()
+            return result[0] if result and result[0] else "customer"
+        finally:
+            conn.close()
+
+    def set_user_view_mode(self, user_id: int, mode: str) -> None:
+        """Set user view mode (customer or seller)."""
+        if mode not in ("customer", "seller"):
+            mode = "customer"
+        conn = self.get_connection()
+        try:
+            cursor = conn.cursor()
+            cursor.execute("UPDATE users SET view_mode = ? WHERE user_id = ?", (mode, user_id))
+            conn.commit()
+        finally:
+            conn.close()
 
     # Методы для магазинов
     def add_store(
@@ -2020,27 +2054,33 @@ class Database:
     # Методы для админа
     def set_admin(self, user_id: int):
         conn = self.get_connection()
-        cursor = conn.cursor()
-        cursor.execute("UPDATE users SET is_admin = 1 WHERE user_id = ?", (user_id,))
-        conn.commit()
-        conn.close()
+        try:
+            cursor = conn.cursor()
+            cursor.execute("UPDATE users SET is_admin = 1 WHERE user_id = ?", (user_id,))
+            conn.commit()
+        finally:
+            conn.close()
 
     def is_admin(self, user_id: int) -> bool:
         conn = self.get_connection()
-        cursor = conn.cursor()
-        cursor.execute("SELECT is_admin FROM users WHERE user_id = ?", (user_id,))
-        result = cursor.fetchone()
-        conn.close()
-        return result and result[0] == 1
+        try:
+            cursor = conn.cursor()
+            cursor.execute("SELECT is_admin FROM users WHERE user_id = ?", (user_id,))
+            result = cursor.fetchone()
+            return result and result[0] == 1
+        finally:
+            conn.close()
 
     def get_all_admins(self) -> list[tuple]:
         """Получить всех администраторов"""
         conn = self.get_connection()
-        cursor = conn.cursor()
-        cursor.execute("SELECT user_id FROM users WHERE is_admin = 1")
-        admins = cursor.fetchall()
-        conn.close()
-        return admins
+        try:
+            cursor = conn.cursor()
+            cursor.execute("SELECT user_id FROM users WHERE is_admin = 1")
+            admins = cursor.fetchall()
+            return admins
+        finally:
+            conn.close()
 
     def get_pending_stores(self) -> list[tuple]:
         conn = self.get_connection()

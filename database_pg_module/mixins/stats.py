@@ -83,14 +83,16 @@ class StatsMixin:
             card_result = cursor.fetchone()
             cursor.execute("SELECT value FROM platform_settings WHERE key = 'payment_card_holder'")
             holder_result = cursor.fetchone()
-            
+
             if card_result:
                 card_number = card_result[0]
                 card_holder = holder_result[0] if holder_result else "FUDLY PLATFORM"
                 return {"card_number": card_number, "card_holder": card_holder}
             return None
 
-    def set_platform_payment_card(self, card_number: str, card_holder: str = "FUDLY PLATFORM") -> None:
+    def set_platform_payment_card(
+        self, card_number: str, card_holder: str = "FUDLY PLATFORM"
+    ) -> None:
         """Set platform payment card in platform_settings table."""
         with self.get_connection() as conn:
             cursor = conn.cursor()

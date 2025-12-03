@@ -53,6 +53,7 @@ from .common import (
     photo_keyboard,
     product_categories_keyboard,
     quantity_keyboard,
+    unit_type_keyboard,
     units_keyboard,
 )
 
@@ -108,6 +109,7 @@ __all__ = [
     "category_keyboard",
     "category_inline_keyboard",
     "units_keyboard",
+    "unit_type_keyboard",
     "product_categories_keyboard",
     # User
     "main_menu_customer",

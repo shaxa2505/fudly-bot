@@ -307,6 +307,11 @@ class StoreMixin:
         """Delete store and related data."""
         with self.get_connection() as conn:
             cursor = conn.cursor()
+            # First get all offer_ids for this store to clean up recently_viewed
+            cursor.execute("SELECT offer_id FROM offers WHERE store_id = %s", (store_id,))
+            offer_ids = [row[0] for row in cursor.fetchall()]
+            if offer_ids:
+                cursor.execute("DELETE FROM recently_viewed WHERE offer_id = ANY(%s)", (offer_ids,))
             cursor.execute("DELETE FROM offers WHERE store_id = %s", (store_id,))
             cursor.execute("DELETE FROM payment_settings WHERE store_id = %s", (store_id,))
             cursor.execute("DELETE FROM favorites WHERE store_id = %s", (store_id,))

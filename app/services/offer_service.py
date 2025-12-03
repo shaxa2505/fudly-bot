@@ -334,19 +334,19 @@ class OfferService:
             value = store.get("offers_count", 0)
         else:
             value = store[-1] if isinstance(store, Sequence) and len(store) > 12 else 0
-        
+
         try:
             count = int(value or 0)
         except (TypeError, ValueError):
             count = 0
-        
+
         # If no count in store object, query DB for actual count
         if count == 0:
             store_id = int(get_store_field(store, "store_id", get_field(store, 0, 0)) or 0)
             if store_id and hasattr(self._db, "get_store_offers"):
                 offers = self._db.get_store_offers(store_id) or []
                 count = len(offers)
-        
+
         return count
 
     def search_offers(self, query: str, city: str | None = None) -> list[OfferListItem]:

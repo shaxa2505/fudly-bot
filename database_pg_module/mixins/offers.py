@@ -415,11 +415,9 @@ class OfferMixin:
             booking_ids = [row[0] for row in cursor.fetchall()]
             if booking_ids:
                 # Delete ratings that reference these bookings
-                cursor.execute(
-                    "DELETE FROM ratings WHERE booking_id = ANY(%s)",
-                    (booking_ids,)
-                )
+                cursor.execute("DELETE FROM ratings WHERE booking_id = ANY(%s)", (booking_ids,))
             # Now delete in correct FK order
+            cursor.execute("DELETE FROM recently_viewed WHERE offer_id = %s", (offer_id,))
             cursor.execute("DELETE FROM orders WHERE offer_id = %s", (offer_id,))
             cursor.execute("DELETE FROM bookings WHERE offer_id = %s", (offer_id,))
             cursor.execute("DELETE FROM favorites WHERE offer_id = %s", (offer_id,))

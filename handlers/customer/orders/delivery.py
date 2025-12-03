@@ -32,8 +32,9 @@ def setup_dependencies(
 
 
 def can_proceed(user_id: int, action: str) -> bool:
-    """Rate limiting check - placeholder."""
-    # TODO: Implement actual rate limiting
+    """Rate limiting check - now handled by middleware (see app.middlewares.rate_limit)."""
+    # Rate limiting is now implemented at middleware level with Redis support
+    # This function is kept for backwards compatibility and additional business logic
     return True
 
 

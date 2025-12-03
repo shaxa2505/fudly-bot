@@ -12,6 +12,7 @@ from aiogram import F, Router, types
 from aiogram.fsm.context import FSMContext
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
+from app.core.utils import get_field
 from database_protocol import DatabaseProtocol
 
 logger = logging.getLogger(__name__)
@@ -50,17 +51,6 @@ def setup(
         except Exception as e:
             logger.error(f"Failed to get orders for user {user_id}: {e}")
             orders = []
-
-        # Helper to safely get field from dict or tuple
-        def get_field(item, field, index=None, default=None):
-            """Get field from dict (PostgreSQL) or tuple (SQLite)."""
-            if item is None:
-                return default
-            if isinstance(item, dict):
-                return item.get(field, default)
-            if isinstance(item, (list, tuple)) and index is not None and len(item) > index:
-                return item[index]
-            return default
 
         # Debug: log what we got
         logger.info(
@@ -185,7 +175,7 @@ def setup(
             text_parts.append("━━━━━━━━━━━━━━━━━━")
 
             for o in active_orders[:5]:  # Limit to 5
-                order_id = get_field(o, "order_id", 0)
+                _order_id = get_field(o, "order_id", 0)  # noqa: F841
                 status = get_field(o, "order_status", 10, "pending")
                 quantity = get_field(o, "quantity", 9, 1)
                 total_price = get_field(o, "total_price", 11, 0)
@@ -399,85 +389,5 @@ def setup(
 
         await callback.answer()
 
-    @dp_or_router.callback_query(F.data == "delete_account")
-    async def delete_account_prompt(callback: types.CallbackQuery):
-        """Ask for confirmation before deleting account"""
-        lang = db.get_user_language(callback.from_user.id)
-
-        # Confirmation with two buttons (aiogram 3.x syntax)
-        builder = InlineKeyboardBuilder()
-        builder.button(text=get_text(lang, "yes_delete"), callback_data="confirm_delete_yes")
-        builder.button(text=get_text(lang, "no_cancel"), callback_data="confirm_delete_no")
-        builder.adjust(2)
-
-        # Edit message (or send new) with warning
-        try:
-            await callback.message.edit_text(
-                get_text(lang, "confirm_delete_account"),
-                parse_mode="HTML",
-                reply_markup=builder.as_markup(),
-            )
-        except Exception:
-            await callback.message.answer(
-                get_text(lang, "confirm_delete_account"),
-                parse_mode="HTML",
-                reply_markup=builder.as_markup(),
-            )
-
-        await callback.answer()
-
-    @dp_or_router.callback_query(F.data == "confirm_delete_yes")
-    async def confirm_delete_account(callback: types.CallbackQuery, state: FSMContext):
-        """Delete user account"""
-        lang = db.get_user_language(callback.from_user.id)
-        user_id = callback.from_user.id
-
-        try:
-            # Delete user data
-            db.delete_user(user_id)
-            await state.clear()
-
-            # Clear user view mode cache
-            try:
-                from handlers.common.utils import user_view_mode
-
-                if user_view_mode and user_id in user_view_mode:
-                    del user_view_mode[user_id]
-            except Exception:
-                pass
-
-            await callback.message.edit_text(get_text(lang, "account_deleted"), parse_mode="HTML")
-
-            # Show welcome message for re-registration
-            from app.keyboards import language_keyboard
-
-            await callback.message.answer(get_text("ru", "welcome"), parse_mode="HTML")
-            await callback.message.answer(
-                get_text("ru", "choose_language"), reply_markup=language_keyboard()
-            )
-
-            await callback.answer()
-        except Exception as e:
-            await callback.answer(f"❌ Ошибка при удалении аккаунта: {str(e)}", show_alert=True)
-
-    @dp_or_router.callback_query(F.data == "confirm_delete_no")
-    async def cancel_delete_account(callback: types.CallbackQuery):
-        """Cancel account deletion"""
-        lang = db.get_user_language(callback.from_user.id)
-        user = db.get_user_model(callback.from_user.id)
-        role = user.role if user else "customer"
-        notifications_enabled = user.notifications_enabled if user else True
-
-        try:
-            await callback.message.edit_text(
-                get_text(lang, "settings"),
-                parse_mode="HTML",
-                reply_markup=settings_keyboard(notifications_enabled, lang, role=role),
-            )
-        except Exception:
-            await callback.message.answer(
-                get_text(lang, "operation_cancelled"),
-                reply_markup=settings_keyboard(notifications_enabled, lang, role=role),
-            )
-
-        await callback.answer()
+    # NOTE: delete_account, confirm_delete_yes, confirm_delete_no handlers
+    # are now handled in handlers/customer/profile.py to avoid duplication

@@ -16,7 +16,12 @@ from app.keyboards import (
 )
 from database_protocol import DatabaseProtocol
 from handlers.common.states import ConfirmOrder, Registration
-from handlers.common.utils import has_approved_store, user_view_mode
+from handlers.common.utils import (
+    get_user_view_mode,
+    has_approved_store,
+    set_user_view_mode,
+    user_view_mode,
+)
 from localization import get_cities, get_text
 
 try:
@@ -307,9 +312,10 @@ async def back_to_main_menu(callback: types.CallbackQuery, db: DatabaseProtocol)
     user = db.get_user_model(callback.from_user.id)
     user_role = user.role if user else "customer"
 
-    if user_view_mode and user_role == "seller":
-        if callback.from_user.id not in user_view_mode:
-            user_view_mode[callback.from_user.id] = "seller"
+    if user_role == "seller":
+        current_mode = get_user_view_mode(callback.from_user.id, db)
+        if current_mode != "seller":
+            set_user_view_mode(callback.from_user.id, "seller", db)
 
     menu = main_menu_seller(lang) if user_role == "seller" else main_menu_customer(lang)
 
@@ -394,21 +400,18 @@ async def cmd_start(message: types.Message, state: FSMContext, db: DatabaseProto
         await state.set_state(Registration.phone)
         return
 
-    if user_view_mode:
-        # Preserve existing mode or default to customer
-        # After bot restart, user_view_mode is empty, so default to customer menu
-        current_mode = user_view_mode.get(message.from_user.id)
-        if current_mode is None:
-            # No mode set - use customer mode by default (safer, works for all users)
-            user_view_mode[message.from_user.id] = "customer"
-            menu = main_menu_customer(lang)
-        elif current_mode == "seller" and user_role == "seller":
-            menu = main_menu_seller(lang)
-        else:
-            menu = main_menu_customer(lang)
+    # Get current view mode from database
+    current_mode = get_user_view_mode(message.from_user.id, db)
+
+    # Determine appropriate menu based on role and mode
+    if current_mode == "seller" and user_role == "seller":
+        menu = main_menu_seller(lang)
     else:
-        # Fallback if user_view_mode not initialized
+        # Default to customer mode
+        if current_mode != "customer":
+            set_user_view_mode(message.from_user.id, "customer", db)
         menu = main_menu_customer(lang)
+
     await message.answer(
         get_text(
             lang, "welcome_back", name=message.from_user.first_name, city=user_city or "Ташкент"

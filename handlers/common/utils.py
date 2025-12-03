@@ -13,7 +13,7 @@ from database_protocol import DatabaseProtocol
 logger = logging.getLogger("fudly")
 
 # Re-export states for backward compatibility
-from handlers.common.states import (
+from handlers.common.states import (  # noqa: E402
     BookOffer,
     Browse,
     BrowseOffers,
@@ -44,6 +44,8 @@ __all__ = [
     "Browse",
     # Utils
     "user_view_mode",
+    "get_user_view_mode",
+    "set_user_view_mode",
     "normalize_city",
     "get_uzb_time",
     "has_approved_store",
@@ -92,7 +94,36 @@ def is_main_menu_button(text: str | None) -> bool:
 
 
 # In-memory per-session view mode override: {'seller'|'customer'}
+# DEPRECATED: Use get_user_view_mode()/set_user_view_mode() with database instead
+# Kept for backward compatibility during migration
 user_view_mode: dict[int, str] = {}
+
+
+def get_user_view_mode(user_id: int, db: DatabaseProtocol) -> str:
+    """Get user view mode from database. Falls back to in-memory dict for compatibility."""
+    # Try database first
+    try:
+        mode = db.get_user_view_mode(user_id)
+        if mode:
+            return mode
+    except (AttributeError, Exception):
+        pass
+    # Fallback to in-memory dict
+    return user_view_mode.get(user_id, "customer")
+
+
+def set_user_view_mode(user_id: int, mode: str, db: DatabaseProtocol) -> None:
+    """Set user view mode in database and in-memory dict for compatibility."""
+    if mode not in ("customer", "seller"):
+        mode = "customer"
+    # Update database
+    try:
+        db.set_user_view_mode(user_id, mode)
+    except (AttributeError, Exception):
+        pass
+    # Also update in-memory dict for backward compatibility
+    user_view_mode[user_id] = mode
+
 
 # Uzbek city names mapping to Russian
 CITY_UZ_TO_RU = {
@@ -102,6 +133,7 @@ CITY_UZ_TO_RU = {
     "Andijon": "Андижан",
     "Namangan": "Наманган",
     "Farg'ona": "Фергана",
+    "Qo'qon": "Коканд",
     "Xiva": "Хива",
     "Nukus": "Нукус",
 }
@@ -142,7 +174,7 @@ def get_appropriate_menu(
     if role == "store_owner":
         role = "seller"
 
-    current_mode = user_view_mode.get(user_id, "customer")
+    current_mode = get_user_view_mode(user_id, db)
 
     if role == "seller":
         if has_approved_store(user_id, db):

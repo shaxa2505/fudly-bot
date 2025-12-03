@@ -6,6 +6,9 @@ from typing import Any
 
 from aiogram import F, Router, types
 
+from app.core.utils import get_field
+from handlers.common.utils import set_user_view_mode
+
 logger = logging.getLogger(__name__)
 
 router = Router(name="mode_switch")
@@ -13,7 +16,6 @@ router = Router(name="mode_switch")
 # Module-level dependencies
 db: Any = None
 bot: Any = None
-user_view_mode: dict[int, str] | None = None
 get_text: Any = None
 main_menu_customer: Any = None
 main_menu_seller: Any = None
@@ -23,24 +25,16 @@ booking_filters_keyboard: Any = None
 def setup(
     bot_instance: Any,
     db_instance: Any,
-    user_view_mode_dict: Any,
-    get_text_func: Any,
-    main_menu_func: Any,
+    user_view_mode_dict: Any = None,  # Deprecated parameter, ignored
+    get_text_func: Any = None,
+    main_menu_func: Any = None,
     booking_filters_kb: Any = None,
     main_menu_seller_func: Any = None,
 ) -> None:
     """Initialize module with bot and database instances."""
-    global \
-        bot, \
-        db, \
-        user_view_mode, \
-        get_text, \
-        main_menu_customer, \
-        main_menu_seller, \
-        booking_filters_keyboard
+    global bot, db, get_text, main_menu_customer, main_menu_seller, booking_filters_keyboard
     bot = bot_instance
     db = db_instance
-    user_view_mode = user_view_mode_dict
     get_text = get_text_func
     main_menu_customer = main_menu_func
     main_menu_seller = main_menu_seller_func
@@ -74,13 +68,6 @@ async def my_orders_handler(message: types.Message) -> None:
         text = f"<b>{empty_title}</b>\n\n{empty_desc}"
         await message.answer(text, parse_mode="HTML")
         return
-
-    def get_field(item, field, index, default=None):
-        if isinstance(item, dict):
-            return item.get(field, default)
-        if isinstance(item, (list, tuple)) and len(item) > index:
-            return item[index]
-        return default
 
     active_bookings = [b for b in bookings if get_field(b, "status", 3) in ("pending", "confirmed")]
     completed_bookings = [b for b in bookings if get_field(b, "status", 3) == "completed"]
@@ -125,7 +112,7 @@ async def my_orders_handler(message: types.Message) -> None:
 @router.message(F.text.contains("Режим покупателя") | F.text.contains("Xaridor rejimi"))
 async def switch_to_customer(message: types.Message):
     """Switch user to customer mode."""
-    if not db or not get_text or not main_menu_customer or user_view_mode is None:
+    if not db or not get_text or not main_menu_customer:
         logger.error("❌ switch_to_customer: dependencies not initialized!")
         await message.answer("System error: dependencies not initialized")
         return
@@ -135,7 +122,7 @@ async def switch_to_customer(message: types.Message):
 
     logger.info(f"🔄 User {user_id} switching to customer mode")
 
-    user_view_mode[user_id] = "customer"
+    set_user_view_mode(user_id, "customer", db)
 
     await message.answer(
         get_text(lang, "switched_to_customer"), reply_markup=main_menu_customer(lang)
@@ -147,7 +134,7 @@ async def switch_to_customer(message: types.Message):
 @router.message(F.text.contains("Режим партнера") | F.text.contains("Hamkor rejimi"))
 async def switch_to_seller(message: types.Message):
     """Switch user to seller mode."""
-    if not db or not get_text or not main_menu_seller or user_view_mode is None:
+    if not db or not get_text or not main_menu_seller:
         logger.error("❌ switch_to_seller: dependencies not initialized!")
         await message.answer("System error: dependencies not initialized")
         return
@@ -166,7 +153,7 @@ async def switch_to_seller(message: types.Message):
 
     logger.info(f"🔄 User {user_id} switching to seller mode")
 
-    user_view_mode[user_id] = "seller"
+    set_user_view_mode(user_id, "seller", db)
 
     await message.answer(
         "Переключено в режим партнера" if lang == "ru" else "Hamkor rejimiga o'tkazildi",

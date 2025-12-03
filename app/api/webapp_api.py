@@ -171,11 +171,17 @@ async def get_current_user(
 ) -> dict[str, Any] | None:
     """
     Dependency to validate Telegram initData and extract user.
-    For development, allows requests without validation.
+    Guest access only allowed in development mode.
     """
+    import os
+
     if not x_telegram_init_data:
-        # Allow unauthenticated access for development/testing
-        return {"id": 0, "first_name": "Guest"}
+        # SECURITY: Only allow guest access in development mode
+        if os.getenv("ALLOW_GUEST_ACCESS", "false").lower() in ("true", "1", "yes"):
+            logger.warning("Guest access allowed - DEVELOPMENT MODE ONLY")
+            return {"id": 0, "first_name": "Guest"}
+        else:
+            raise HTTPException(status_code=401, detail="Authentication required")
 
     bot_token = settings.bot_token
     validated = validate_init_data(x_telegram_init_data, bot_token)
@@ -183,7 +189,7 @@ async def get_current_user(
     if not validated:
         raise HTTPException(status_code=401, detail="Invalid Telegram initData")
 
-    return validated.get("user", {"id": 0, "first_name": "Guest"})
+    return validated.get("user")
 
 
 # =============================================================================

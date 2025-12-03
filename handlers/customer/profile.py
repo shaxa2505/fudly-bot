@@ -9,7 +9,7 @@ from aiogram.fsm.context import FSMContext
 from aiogram.types import ReplyKeyboardRemove
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
-from app.core.utils import get_store_field
+from app.core.utils import get_field, get_store_field
 from app.integrations.sentry_integration import capture_exception
 from app.keyboards import (
     city_inline_keyboard,
@@ -21,31 +21,29 @@ from app.keyboards import (
 )
 from database_protocol import DatabaseProtocol
 from handlers.common.states import ChangeCity
-from handlers.common.utils import has_approved_store
+from handlers.common.utils import get_user_view_mode, has_approved_store, set_user_view_mode
 from localization import get_text
 from logging_config import logger
 
 # Module-level dependencies
 db: DatabaseProtocol | None = None
 bot: Any | None = None
-user_view_mode: dict[int, str] | None = None
 
 router = Router()
 
 
 def setup_dependencies(
-    database: DatabaseProtocol, bot_instance: Any, view_mode_dict: dict[int, str]
+    database: DatabaseProtocol, bot_instance: Any, view_mode_dict: dict[int, str] | None = None
 ) -> None:
-    """Setup module dependencies."""
-    global db, bot, user_view_mode
+    """Setup module dependencies. view_mode_dict is deprecated and ignored."""
+    global db, bot
     db = database
     bot = bot_instance
-    user_view_mode = view_mode_dict
 
 
 def get_appropriate_menu(user_id: int, lang: str) -> Any:
     """Get appropriate menu based on user view mode."""
-    if user_view_mode and user_view_mode.get(user_id) == "seller":
+    if db and get_user_view_mode(user_id, db) == "seller":
         return main_menu_seller(lang)
     return main_menu_customer(lang)
 
@@ -94,9 +92,7 @@ async def profile(message: types.Message, state: FSMContext) -> None:
     # If user is seller, check their current mode, otherwise always customer
     # Default to customer mode if not explicitly set (safer - matches the menu they see after /start)
     if effective_role == "seller":
-        current_mode = (
-            user_view_mode.get(message.from_user.id, "customer") if user_view_mode else "customer"
-        )
+        current_mode = get_user_view_mode(message.from_user.id, db)
     else:
         current_mode = "customer"
 
@@ -107,12 +103,6 @@ async def profile(message: types.Message, state: FSMContext) -> None:
             orders = db.get_user_orders(message.from_user.id)
         except Exception:
             orders = []
-
-        # Helper to get field from booking/order (dict or tuple)
-        def get_field(item, field, index):
-            if isinstance(item, dict):
-                return item.get(field)
-            return item[index] if isinstance(item, list | tuple) and len(item) > index else None
 
         active_bookings = len(
             [b for b in bookings if get_field(b, "status", 3) in ["pending", "confirmed"]]
@@ -271,16 +261,14 @@ async def profile_change_city_cb(callback: types.CallbackQuery, state: FSMContex
 @router.callback_query(F.data == "switch_to_customer")
 async def switch_to_customer_cb(callback: types.CallbackQuery) -> None:
     """Switch to customer mode from profile."""
-    if not db or user_view_mode is None:
-        logger.error(
-            f"❌ switch_to_customer_cb: db={db is not None}, user_view_mode={user_view_mode is not None}"
-        )
+    if not db:
+        logger.error("❌ switch_to_customer_cb: db is None")
         await callback.answer("System error", show_alert=True)
         return
 
     try:
         lang = db.get_user_language(callback.from_user.id)
-        user_view_mode[callback.from_user.id] = "customer"
+        set_user_view_mode(callback.from_user.id, "customer", db)
         logger.info(f"✅ User {callback.from_user.id} switched to customer mode")
 
         # Send new message with ReplyKeyboard (cannot use edit_text with ReplyKeyboard)
@@ -297,10 +285,8 @@ async def switch_to_customer_cb(callback: types.CallbackQuery) -> None:
 @router.callback_query(F.data == "switch_to_seller")
 async def switch_to_seller_cb(callback: types.CallbackQuery) -> None:
     """Switch to seller mode from profile."""
-    if not db or user_view_mode is None:
-        logger.error(
-            f"❌ switch_to_seller_cb: db={db is not None}, user_view_mode={user_view_mode is not None}"
-        )
+    if not db:
+        logger.error("❌ switch_to_seller_cb: db is None")
         await callback.answer("System error", show_alert=True)
         return
 
@@ -324,7 +310,7 @@ async def switch_to_seller_cb(callback: types.CallbackQuery) -> None:
             )
             return
 
-        user_view_mode[callback.from_user.id] = "seller"
+        set_user_view_mode(callback.from_user.id, "seller", db)
         logger.info(f"✅ User {callback.from_user.id} switched to seller mode")
 
         # Send new message with ReplyKeyboard
@@ -373,9 +359,7 @@ async def toggle_notifications_callback(callback: types.CallbackQuery) -> None:
     )
     user = db.get_user_model(callback.from_user.id)
     role = user.role if user else "customer"
-    current_mode = (
-        user_view_mode.get(callback.from_user.id, "customer") if user_view_mode else "customer"
-    )
+    current_mode = get_user_view_mode(callback.from_user.id, db)
 
     try:
         await callback.message.edit_text(
@@ -423,7 +407,7 @@ async def delete_account_prompt(callback: types.CallbackQuery) -> None:
 
 
 @router.callback_query(F.data == "confirm_delete_yes")
-async def confirm_delete_yes(callback: types.CallbackQuery) -> None:
+async def confirm_delete_yes(callback: types.CallbackQuery, state: FSMContext) -> None:
     """Confirm account deletion."""
     if not db:
         await callback.answer("System error")
@@ -431,13 +415,24 @@ async def confirm_delete_yes(callback: types.CallbackQuery) -> None:
 
     # Get language BEFORE deleting user
     lang = db.get_user_language(callback.from_user.id)
+    user_id = callback.from_user.id
 
     try:
-        db.delete_user(callback.from_user.id)
-        logger.info(f"User {callback.from_user.id} deleted their account successfully")
+        # Clear FSM state first
+        await state.clear()
+
+        # Clear user view mode cache
+        try:
+            set_user_view_mode(user_id, "customer", db)
+        except Exception:
+            pass
+
+        # Delete user from database
+        db.delete_user(user_id)
+        logger.info(f"User {user_id} deleted their account successfully")
     except Exception as e:
-        logger.error(f"Error deleting user {callback.from_user.id}: {e}")
-        capture_exception(e, user_id=callback.from_user.id, action="delete_account")
+        logger.error(f"Error deleting user {user_id}: {e}")
+        capture_exception(e, user_id=user_id, action="delete_account")
         await callback.answer(get_text(lang, "error"), show_alert=True)
         return
 
@@ -481,9 +476,7 @@ async def confirm_delete_no(callback: types.CallbackQuery) -> None:
         await callback.answer()
         return
 
-    current_mode = (
-        user_view_mode.get(callback.from_user.id, "customer") if user_view_mode else "customer"
-    )
+    current_mode = get_user_view_mode(callback.from_user.id, db)
 
     try:
         await callback.message.edit_text(
@@ -512,12 +505,12 @@ async def confirm_delete_no(callback: types.CallbackQuery) -> None:
 @router.message(F.text.contains("Режим покупателя") | F.text.contains("Xaridor rejimi"))
 async def switch_to_customer(message: types.Message) -> None:
     """Switch to customer mode."""
-    if not db or user_view_mode is None:
+    if not db:
         await message.answer("System error")
         return
 
     lang = db.get_user_language(message.from_user.id)
-    user_view_mode[message.from_user.id] = "customer"
+    set_user_view_mode(message.from_user.id, "customer", db)
 
     await message.answer(
         get_text(lang, "switched_to_customer"), reply_markup=main_menu_customer(lang)

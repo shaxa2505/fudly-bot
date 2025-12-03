@@ -20,6 +20,12 @@ from app.keyboards import (
 )
 from database_protocol import DatabaseProtocol
 from handlers.common.states import RegisterStore
+from handlers.common.utils import (
+    get_user_view_mode,
+    has_approved_store,
+    normalize_city,
+    set_user_view_mode,
+)
 from localization import get_categories, get_cities, get_text
 from logging_config import logger
 
@@ -51,7 +57,7 @@ async def _safe_answer_or_send(msg_like, user_id: int, text: str, **kwargs) -> N
 
 def get_appropriate_menu(user_id: int, lang: str) -> Any:
     """Get appropriate menu based on user view mode."""
-    if user_view_mode and user_view_mode.get(user_id) == "seller":
+    if db and get_user_view_mode(user_id, db) == "seller":
         return main_menu_seller(lang)
     return main_menu_customer(lang)
 
@@ -59,48 +65,21 @@ def get_appropriate_menu(user_id: int, lang: str) -> Any:
 # Module-level dependencies
 db: DatabaseProtocol | None = None
 bot: Any | None = None
-user_view_mode: dict | None = None  # Tracks seller/customer view preference
 
 router = Router()
 
 
-def setup_dependencies(database: DatabaseProtocol, bot_instance: Any, view_mode_dict: dict) -> None:
-    """Setup module dependencies."""
-    global db, bot, user_view_mode
+def setup_dependencies(
+    database: DatabaseProtocol, bot_instance: Any, view_mode_dict: dict | None = None
+) -> None:
+    """Setup module dependencies. view_mode_dict is deprecated and ignored."""
+    global db, bot
     db = database
     bot = bot_instance
-    user_view_mode = view_mode_dict
 
 
-def has_approved_store(user_id: int) -> bool:
-    """Check if user has an approved store (owned or admin access)."""
-    if not db:
-        return False
-    stores = db.get_user_accessible_stores(user_id)
-    for store in stores:
-        # Store dict with status field
-        status = store.get("status", "pending")
-        if status in ("active", "approved"):
-            return True
-    return False
-
-
-def normalize_city(city_text: str) -> str:
-    """Normalize city name to Russian for DB consistency."""
-    city_map = {
-        "Toshkent": "Ташкент",
-        "Samarqand": "Самарканд",
-        "Buxoro": "Бухара",
-        "Andijon": "Андижан",
-        "Namangan": "Наманган",
-        "Farg'ona": "Фергана",
-        "Qo'qon": "Коканд",
-    }
-    return city_map.get(city_text, city_text)
-
-
-def normalize_category(cat_text: str) -> str:
-    """Normalize category name to Russian for DB consistency."""
+def normalize_business_type(cat_text: str) -> str:
+    """Normalize business type name to Russian for DB consistency."""
     cat_map = {
         "Restoran": "Ресторан",
         "Kafe": "Кафе",
@@ -139,10 +118,9 @@ async def become_partner(message: types.Message, state: FSMContext) -> None:
 
     # If already a seller with approved store - switch to seller mode
     if user.role == "seller":
-        if has_approved_store(message.from_user.id):
+        if has_approved_store(message.from_user.id, db):
             # Remember seller view preference
-            if user_view_mode is not None:
-                user_view_mode[message.from_user.id] = "seller"
+            set_user_view_mode(message.from_user.id, "seller", db)
             await message.answer(
                 get_text(lang, "switched_to_seller"),
                 reply_markup=main_menu_seller(lang),
@@ -286,8 +264,8 @@ async def register_store_category(message: types.Message, state: FSMContext) -> 
     cat_text = raw_text.replace("🏷 ", "").replace("▫️ ", "").strip()
 
     if cat_text in categories:
-        # CRITICAL: Normalize category to Russian for DB consistency
-        normalized_category = normalize_category(cat_text)
+        # CRITICAL: Normalize business type to Russian for DB consistency
+        normalized_category = normalize_business_type(cat_text)
         await state.update_data(category=normalized_category)
         await message.answer(get_text(lang, "store_name"), reply_markup=cancel_keyboard(lang))
         await state.set_state(RegisterStore.name)
@@ -611,8 +589,7 @@ async def become_partner_cb(callback: types.CallbackQuery, state: FSMContext) ->
 
         if approved_stores:
             # Has approved store - switch to seller mode
-            if user_view_mode is not None:
-                user_view_mode[callback.from_user.id] = "seller"
+            set_user_view_mode(callback.from_user.id, "seller", db)
             try:
                 await _safe_answer_or_send(
                     callback.message,

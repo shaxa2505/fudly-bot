@@ -14,10 +14,12 @@ import uvicorn
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from app.api.auth import router as auth_router
+from app.api.auth import set_auth_db
+from app.api.orders import router as orders_router
+from app.api.orders import set_orders_db
 from app.api.webapp_api import router as webapp_router
 from app.api.webapp_api import set_db_instance
-from app.api.auth import router as auth_router, set_auth_db
-from app.api.orders import router as orders_router, set_orders_db
 
 logger = logging.getLogger(__name__)
 

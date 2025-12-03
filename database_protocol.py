@@ -68,6 +68,14 @@ class DatabaseProtocol(Protocol):
     def get_user_language(self, user_id: int) -> str:
         ...
 
+    def get_user_view_mode(self, user_id: int) -> str:
+        """Get user view mode (customer or seller)."""
+        ...
+
+    def set_user_view_mode(self, user_id: int, mode: str) -> None:
+        """Set user view mode (customer or seller)."""
+        ...
+
     def get_all_users(self) -> list[tuple[Any, ...]]:
         ...
 
