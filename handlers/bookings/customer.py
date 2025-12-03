@@ -574,13 +574,17 @@ async def pbook_cancel(callback: types.CallbackQuery, state: FSMContext) -> None
 @router.callback_query(F.data.startswith("pbook_confirm_"))
 async def pbook_confirm(callback: types.CallbackQuery, state: FSMContext) -> None:
     """Confirm order - create booking or start delivery flow."""
+    logger.info(f"📥 pbook_confirm called: user={callback.from_user.id}, data={callback.data}")
+    
     if not db or not bot or not callback.message:
+        logger.error("pbook_confirm: db or bot or message is None")
         await callback.answer("System error", show_alert=True)
         return
 
     user_id = callback.from_user.id
     lang = db.get_user_language(user_id)
     data = await state.get_data()
+    logger.info(f"📥 pbook_confirm state data: {data}")
 
     selected_delivery = data.get("selected_delivery")
 
@@ -594,6 +598,8 @@ async def pbook_confirm(callback: types.CallbackQuery, state: FSMContext) -> Non
     store_id = data.get("store_id")
     offer_price = data.get("offer_price", 0)
     offer_title = data.get("offer_title", "Товар")
+    
+    logger.info(f"📥 pbook_confirm: offer_id={offer_id}, qty={quantity}, delivery={selected_delivery}")
 
     # Check minimum order for delivery
     if selected_delivery == "delivery":
@@ -629,10 +635,12 @@ async def pbook_confirm(callback: types.CallbackQuery, state: FSMContext) -> Non
             await callback.message.edit_caption(caption=processing_text, parse_mode="HTML", reply_markup=None)
         else:
             await callback.message.edit_text(processing_text, parse_mode="HTML", reply_markup=None)
-    except Exception:
-        pass
+        logger.info("📥 pbook_confirm: processing text shown")
+    except Exception as e:
+        logger.warning(f"📥 pbook_confirm: failed to show processing: {e}")
 
     if selected_delivery == "delivery":
+        logger.info("📥 pbook_confirm: starting delivery flow")
         # Switch to delivery flow - ask for address
         await state.clear()
         await state.update_data(
@@ -840,7 +848,10 @@ async def create_booking(
     message: types.Message, state: FSMContext, real_user_id: int | None = None
 ) -> None:
     """Create the final booking."""
+    logger.info(f"📦 create_booking called: real_user_id={real_user_id}")
+    
     if not db or not bot:
+        logger.error("create_booking: db or bot is None")
         await message.answer("System error")
         return
 
@@ -849,14 +860,19 @@ async def create_booking(
     user_id = real_user_id if real_user_id else message.from_user.id
     lang = db.get_user_language(user_id)
     data = await state.get_data()
+    logger.info(f"📦 create_booking state data: {data}")
 
     offer_id = data.get("offer_id")
-    quantity = data.get("quantity", 1)
+    # Support both "quantity" and "selected_qty" keys
+    quantity = data.get("quantity") or data.get("selected_qty", 1)
     offer_price = data.get("offer_price", 0)
     offer_title = data.get("offer_title", "Товар")
     store_id = data.get("store_id")
+    
+    logger.info(f"📦 create_booking: offer_id={offer_id}, qty={quantity}, store={store_id}")
 
     if not offer_id:
+        logger.error("create_booking: offer_id is None")
         await message.answer(get_text(lang, "error"))
         await state.clear()
         return
