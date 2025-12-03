@@ -650,6 +650,17 @@ def setup(
             return
         city = user.city or "Ташкент"
         search_city = normalize_city(city)
+        
+        # Get last page from state or default to 0
+        data = await state.get_data()
+        last_page = data.get("last_hot_page", 0)
+        
+        # Delete current message (may have photo) and send list
+        try:
+            await msg.delete()
+        except Exception:
+            pass
+        
         await _send_hot_offers_list(
             msg,
             state,
@@ -658,6 +669,8 @@ def setup(
             search_city,
             offer_service,
             logger,
+            page=last_page,
+            edit_message=False,  # Already deleted, send new
         )
         await callback.answer()
 
@@ -1173,7 +1186,7 @@ def setup(
                 min_label = "Min." if lang == "uz" else "Мин."
                 lines.append(f"   {min_label}: {int(store.min_order_amount):,} {currency}")
         
-        text = "\\n".join(lines)
+        text = "\n".join(lines)
         
         # Keyboard with back button
         keyboard = offer_keyboards.offer_details_with_back_keyboard(
