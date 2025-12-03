@@ -69,14 +69,16 @@ def setup(
                 logger.info(f"First booking is tuple: {first}")
 
         # Filter active items only
+        # Bookings (самовывоз): pending → confirmed → completed/cancelled
         active_bookings = [
-            b for b in bookings if get_field(b, "status", 3) in ["pending", "confirmed", "active", "paid"]
+            b for b in bookings if get_field(b, "status", 3) in ["pending", "confirmed"]
         ]
+        # Orders (доставка): pending → confirmed → preparing → delivering → completed/cancelled
         active_orders = [
             o
             for o in orders
             if get_field(o, "order_status", 10)
-            in ["pending", "confirmed", "preparing", "delivering", "paid"]
+            in ["pending", "confirmed", "preparing", "delivering"]
         ]
 
         # Recent completed (last 3)

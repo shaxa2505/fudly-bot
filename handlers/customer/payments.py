@@ -234,15 +234,13 @@ async def process_successful_payment(message: types.Message) -> None:
         )
 
         # Update order status in database
+        order_type = payload.get("type", "booking")  # Move outside try block
         if db and order_id:
             try:
-                # Check if it's an order (delivery) or booking (pickup)
-                order_type = payload.get("type", "booking")
-                
-                if order_type == "order" and hasattr(db, "update_order_status"):
-                    # Update order status for delivery orders
-                    db.update_order_status(order_id, "confirmed")
-                    logger.info(f"✅ Order {order_id} status updated to confirmed")
+                if order_type in ("order", "multi_order") and hasattr(db, "update_order_status"):
+                    # Update order status and payment status for delivery orders
+                    db.update_order_status(order_id, "confirmed", "paid")
+                    logger.info(f"✅ Order {order_id} status updated to confirmed, payment to paid")
                 elif hasattr(db, "update_booking_status"):
                     # Update booking status for pickup
                     db.update_booking_status(order_id, "confirmed")
@@ -297,43 +295,49 @@ async def process_successful_payment(message: types.Message) -> None:
         # Notify store owner
         if db and order_id:
             try:
-                # Get booking to find store
-                if hasattr(db, "get_booking"):
-                    booking = db.get_booking(order_id)
-                    if booking:
-                        offer_id = (
-                            booking.get("offer_id")
-                            if isinstance(booking, dict)
-                            else (booking[1] if len(booking) > 1 else None)
-                        )
+                store_id = None
+                title = "Товар"
+                phone = payment.order_info.phone_number if payment.order_info else None
+                
+                # Check order type and get store info
+                if order_type in ("order", "multi_order") and hasattr(db, "get_order"):
+                    # Delivery order
+                    order = db.get_order(order_id)
+                    if order:
+                        store_id = order.get("store_id") if isinstance(order, dict) else None
+                        offer_id = order.get("offer_id") if isinstance(order, dict) else None
                         if offer_id and hasattr(db, "get_offer"):
                             offer = db.get_offer(offer_id)
                             if offer:
-                                store_id = (
-                                    offer.get("store_id")
-                                    if isinstance(offer, dict)
-                                    else (offer[1] if len(offer) > 1 else None)
-                                )
-                                if store_id and hasattr(db, "get_store_owner"):
-                                    owner_id = db.get_store_owner(store_id)
-                                    if owner_id:
-                                        # Get offer title
-                                        title = (
-                                            offer.get("title")
-                                            if isinstance(offer, dict)
-                                            else (offer[2] if len(offer) > 2 else "Товар")
-                                        )
-
-                                        await bot.send_message(
-                                            owner_id,
-                                            f"🎉 <b>Новый оплаченный заказ!</b>\n\n"
-                                            f"📦 {title}\n"
-                                            f"💰 {total_amount:,.0f} UZS\n"
-                                            f"👤 Покупатель: {message.from_user.full_name}\n"
-                                            f"📱 Телефон: {payment.order_info.phone_number if payment.order_info else 'Не указан'}\n\n"
-                                            f"Заказ #{order_id} - подтвердите готовность!",
-                                            parse_mode="HTML",
-                                        )
+                                title = offer.get("title") if isinstance(offer, dict) else (offer[2] if len(offer) > 2 else "Товар")
+                elif hasattr(db, "get_booking"):
+                    # Pickup booking
+                    booking = db.get_booking(order_id)
+                    if booking:
+                        offer_id = booking.get("offer_id") if isinstance(booking, dict) else (booking[1] if len(booking) > 1 else None)
+                        if offer_id and hasattr(db, "get_offer"):
+                            offer = db.get_offer(offer_id)
+                            if offer:
+                                store_id = offer.get("store_id") if isinstance(offer, dict) else (offer[1] if len(offer) > 1 else None)
+                                title = offer.get("title") if isinstance(offer, dict) else (offer[2] if len(offer) > 2 else "Товар")
+                
+                # Send notification to store owner
+                if store_id and hasattr(db, "get_store_owner"):
+                    owner_id = db.get_store_owner(store_id)
+                    if owner_id:
+                        order_type_text = "🚚 Доставка" if order_type in ("order", "multi_order") else "🏪 Самовывоз"
+                        await bot.send_message(
+                            owner_id,
+                            f"🎉 <b>Новый оплаченный заказ!</b>\n\n"
+                            f"{order_type_text}\n"
+                            f"📦 {title}\n"
+                            f"💰 {total_amount:,.0f} UZS\n"
+                            f"👤 Покупатель: {message.from_user.full_name}\n"
+                            f"📱 Телефон: {phone or 'Не указан'}\n\n"
+                            f"Заказ #{order_id} - подтвердите готовность!",
+                            parse_mode="HTML",
+                        )
+                        logger.info(f"✅ Notification sent to store owner {owner_id} for order {order_id}")
             except Exception as e:
                 logger.error(f"Error notifying store owner: {e}")
 
