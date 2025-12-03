@@ -48,6 +48,11 @@ class BookingMixin:
         conn = None
         try:
             conn = self.pool.getconn()
+            # Reset any failed transaction state before starting
+            try:
+                conn.rollback()
+            except Exception:
+                pass
             conn.autocommit = False
             cursor = conn.cursor()
 

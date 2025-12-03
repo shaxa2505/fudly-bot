@@ -53,63 +53,97 @@ def _esc(val: Any) -> str:
     return html.escape(str(val))
 
 
-# ===================== UNIFIED INLINE BOOKING FLOW =====================
-# When user clicks "Buyurtma", the same product card gets updated with
-# quantity buttons, delivery options, and confirm/cancel - all inline!
+# ===================== STEP-BY-STEP INLINE BOOKING FLOW =====================
+# Step 1: Click "Buyurtma" → show quantity buttons
+# Step 2: Select quantity → show delivery method (if available) or confirm
+# Step 3: Select method → show confirm button
 
 
-def build_booking_keyboard(
+def build_step1_keyboard(
     lang: str,
     offer_id: int,
     store_id: int,
     max_quantity: int,
+) -> InlineKeyboardBuilder:
+    """Step 1: Quantity selection only."""
+    kb = InlineKeyboardBuilder()
+
+    # Quantity buttons
+    qty_buttons = _get_quantity_buttons(max_quantity)
+    for qty in qty_buttons:
+        kb.button(text=str(qty), callback_data=f"ubook_qty_{offer_id}_{qty}")
+
+    # Cancel button
+    kb.button(text="❌", callback_data=f"ubook_back_{offer_id}_{store_id}")
+
+    # Layout: qty buttons in one row, cancel below
+    kb.adjust(len(qty_buttons), 1)
+    return kb
+
+
+def build_step2_keyboard(
+    lang: str,
+    offer_id: int,
+    store_id: int,
     selected_qty: int,
     delivery_enabled: bool,
     delivery_price: int,
-    selected_delivery: str | None,  # None, "pickup", "delivery"
 ) -> InlineKeyboardBuilder:
-    """Build inline keyboard for booking flow (updates in place)."""
+    """Step 2: Delivery method selection (or confirm if no delivery)."""
     kb = InlineKeyboardBuilder()
 
-    # Row 1: Quantity buttons
-    qty_buttons = _get_quantity_buttons(max_quantity)
-    for qty in qty_buttons:
-        if qty == selected_qty:
-            kb.button(text=f"• {qty} •", callback_data=f"ubook_qty_{offer_id}_{qty}")
-        else:
-            kb.button(text=str(qty), callback_data=f"ubook_qty_{offer_id}_{qty}")
+    # Show selected quantity
+    qty_text = f"📦 {selected_qty}"
+    kb.button(text=qty_text, callback_data=f"ubook_reset_{offer_id}")
 
-    # Row 2: Delivery options (if enabled)
     if delivery_enabled:
-        pickup_text = "🏪 O'zim" if lang == "uz" else "🏪 Сам"
-        delivery_text = f"🚚 +{delivery_price:,}" if lang == "uz" else f"🚚 +{delivery_price:,}"
-
-        if selected_delivery == "pickup":
-            pickup_text = f"• {pickup_text} •"
-        elif selected_delivery == "delivery":
-            delivery_text = f"• {delivery_text} •"
+        # Delivery options
+        pickup_text = "🏪 O'zim olib ketaman" if lang == "uz" else "🏪 Самовывоз"
+        delivery_text = f"🚚 Yetkazish (+{delivery_price:,})" if lang == "uz" else f"🚚 Доставка (+{delivery_price:,})"
 
         kb.button(text=pickup_text, callback_data=f"ubook_method_{offer_id}_pickup")
         kb.button(text=delivery_text, callback_data=f"ubook_method_{offer_id}_delivery")
 
-    # Row 3: Confirm and Cancel
-    confirm_text = "✅ Tasdiqlash" if lang == "uz" else "✅ Подтвердить"
-    cancel_text = "❌"
-
-    # Confirm enabled only if delivery method selected (or no delivery option)
-    if not delivery_enabled or selected_delivery:
+        # Cancel
+        kb.button(text="❌", callback_data=f"ubook_back_{offer_id}_{store_id}")
+        kb.adjust(1, 1, 1, 1)
+    else:
+        # No delivery - show confirm directly
+        confirm_text = "✅ Tasdiqlash" if lang == "uz" else "✅ Подтвердить"
         kb.button(text=confirm_text, callback_data=f"ubook_confirm_{offer_id}")
-    else:
-        kb.button(text=f"⬜ {confirm_text}", callback_data="ubook_noop")
-    kb.button(text=cancel_text, callback_data=f"ubook_back_{offer_id}_{store_id}")
+        kb.button(text="❌", callback_data=f"ubook_back_{offer_id}_{store_id}")
+        kb.adjust(1, 2)
 
-    # Adjust layout
-    qty_count = len(qty_buttons)
-    if delivery_enabled:
-        kb.adjust(qty_count, 2, 2)
-    else:
-        kb.adjust(qty_count, 2)
+    return kb
 
+
+def build_step3_keyboard(
+    lang: str,
+    offer_id: int,
+    store_id: int,
+    selected_qty: int,
+    selected_delivery: str,
+    delivery_price: int,
+) -> InlineKeyboardBuilder:
+    """Step 3: Confirm after selecting delivery method."""
+    kb = InlineKeyboardBuilder()
+
+    # Show selected options
+    qty_text = f"📦 {selected_qty}"
+    if selected_delivery == "pickup":
+        method_text = "🏪 O'zim" if lang == "uz" else "🏪 Сам"
+    else:
+        method_text = f"🚚 +{delivery_price:,}"
+
+    kb.button(text=qty_text, callback_data=f"ubook_reset_{offer_id}")
+    kb.button(text=method_text, callback_data=f"ubook_reset_{offer_id}")
+
+    # Confirm button
+    confirm_text = "✅ Tasdiqlash" if lang == "uz" else "✅ Подтвердить"
+    kb.button(text=confirm_text, callback_data=f"ubook_confirm_{offer_id}")
+    kb.button(text="❌", callback_data=f"ubook_back_{offer_id}_{store_id}")
+
+    kb.adjust(2, 2)
     return kb
 
 
@@ -127,7 +161,7 @@ def _get_quantity_buttons(max_qty: int) -> list[int]:
 
 @router.callback_query(F.data.regexp(r"^book_\d+$"))
 async def book_offer_start(callback: types.CallbackQuery, state: FSMContext) -> None:
-    """Start booking flow - update current card with booking options inline."""
+    """Step 1: Show quantity selection buttons."""
     if not db or not callback.message:
         await callback.answer("System error", show_alert=True)
         return
@@ -168,10 +202,6 @@ async def book_offer_start(callback: types.CallbackQuery, state: FSMContext) -> 
     delivery_enabled = get_store_field(store, "delivery_enabled", 0) == 1
     delivery_price = get_store_field(store, "delivery_price", 0) if delivery_enabled else 0
 
-    # Default selection: qty=1, pickup if no delivery option
-    selected_qty = 1
-    selected_delivery = "pickup" if not delivery_enabled else None
-
     # Save to state
     await state.update_data(
         offer_id=offer_id,
@@ -181,22 +211,13 @@ async def book_offer_start(callback: types.CallbackQuery, state: FSMContext) -> 
         store_id=store_id,
         delivery_enabled=delivery_enabled,
         delivery_price=delivery_price,
-        selected_qty=selected_qty,
-        selected_delivery=selected_delivery,
+        selected_qty=None,
+        selected_delivery=None,
     )
     await state.set_state(BookOffer.quantity)
 
-    # Build booking keyboard and update inline
-    kb = build_booking_keyboard(
-        lang=lang,
-        offer_id=offer_id,
-        store_id=store_id,
-        max_quantity=max_quantity,
-        selected_qty=selected_qty,
-        delivery_enabled=delivery_enabled,
-        delivery_price=delivery_price,
-        selected_delivery=selected_delivery,
-    )
+    # Step 1: Show quantity buttons only
+    kb = build_step1_keyboard(lang, offer_id, store_id, max_quantity)
 
     try:
         await callback.message.edit_reply_markup(reply_markup=kb.as_markup())
@@ -207,7 +228,7 @@ async def book_offer_start(callback: types.CallbackQuery, state: FSMContext) -> 
 
 @router.callback_query(F.data.startswith("ubook_qty_"))
 async def unified_book_qty(callback: types.CallbackQuery, state: FSMContext) -> None:
-    """Handle quantity selection - update keyboard inline."""
+    """Step 2: Quantity selected - show delivery options or confirm."""
     if not db or not callback.message:
         await callback.answer()
         return
@@ -232,20 +253,51 @@ async def unified_book_qty(callback: types.CallbackQuery, state: FSMContext) -> 
         return
 
     # Update state
-    await state.update_data(selected_qty=new_qty)
-    data = await state.get_data()
+    store_id = data.get("store_id", 0)
+    delivery_enabled = data.get("delivery_enabled", False)
+    delivery_price = data.get("delivery_price", 0)
 
-    # Rebuild keyboard
-    kb = build_booking_keyboard(
-        lang=lang,
-        offer_id=offer_id,
-        store_id=data.get("store_id", 0),
-        max_quantity=max_quantity,
-        selected_qty=new_qty,
-        delivery_enabled=data.get("delivery_enabled", False),
-        delivery_price=data.get("delivery_price", 0),
-        selected_delivery=data.get("selected_delivery"),
-    )
+    await state.update_data(selected_qty=new_qty)
+
+    # If no delivery option - set pickup as default
+    if not delivery_enabled:
+        await state.update_data(selected_delivery="pickup")
+
+    # Step 2: Show delivery options or confirm
+    kb = build_step2_keyboard(lang, offer_id, store_id, new_qty, delivery_enabled, delivery_price)
+
+    try:
+        await callback.message.edit_reply_markup(reply_markup=kb.as_markup())
+    except Exception:
+        pass
+    await callback.answer()
+
+
+@router.callback_query(F.data.startswith("ubook_reset_"))
+async def unified_book_reset(callback: types.CallbackQuery, state: FSMContext) -> None:
+    """Reset to step 1 - show quantity selection again."""
+    if not db or not callback.message:
+        await callback.answer()
+        return
+
+    user_id = callback.from_user.id
+    lang = db.get_user_language(user_id)
+
+    try:
+        offer_id = int(callback.data.split("_")[2])
+    except (ValueError, IndexError):
+        await callback.answer()
+        return
+
+    data = await state.get_data()
+    store_id = data.get("store_id", 0)
+    max_quantity = data.get("max_quantity", 1)
+
+    # Reset selections
+    await state.update_data(selected_qty=None, selected_delivery=None)
+
+    # Back to step 1
+    kb = build_step1_keyboard(lang, offer_id, store_id, max_quantity)
 
     try:
         await callback.message.edit_reply_markup(reply_markup=kb.as_markup())
@@ -256,7 +308,7 @@ async def unified_book_qty(callback: types.CallbackQuery, state: FSMContext) -> 
 
 @router.callback_query(F.data.startswith("ubook_method_"))
 async def unified_book_method(callback: types.CallbackQuery, state: FSMContext) -> None:
-    """Handle delivery method selection - update keyboard inline."""
+    """Step 3: Delivery method selected - show confirm."""
     if not db or not callback.message:
         await callback.answer()
         return
@@ -276,31 +328,18 @@ async def unified_book_method(callback: types.CallbackQuery, state: FSMContext) 
     await state.update_data(selected_delivery=method)
     data = await state.get_data()
 
-    # Rebuild keyboard
-    kb = build_booking_keyboard(
-        lang=lang,
-        offer_id=offer_id,
-        store_id=data.get("store_id", 0),
-        max_quantity=data.get("max_quantity", 1),
-        selected_qty=data.get("selected_qty", 1),
-        delivery_enabled=data.get("delivery_enabled", False),
-        delivery_price=data.get("delivery_price", 0),
-        selected_delivery=method,
-    )
+    store_id = data.get("store_id", 0)
+    selected_qty = data.get("selected_qty", 1)
+    delivery_price = data.get("delivery_price", 0)
+
+    # Step 3: Show confirm
+    kb = build_step3_keyboard(lang, offer_id, store_id, selected_qty, method, delivery_price)
 
     try:
         await callback.message.edit_reply_markup(reply_markup=kb.as_markup())
     except Exception:
         pass
     await callback.answer()
-
-
-@router.callback_query(F.data == "ubook_noop")
-async def unified_book_noop(callback: types.CallbackQuery) -> None:
-    """Handle clicks on disabled buttons."""
-    lang = db.get_user_language(callback.from_user.id) if db else "uz"
-    msg = "Avval olish usulini tanlang" if lang == "uz" else "Сначала выберите способ получения"
-    await callback.answer(msg, show_alert=True)
 
 
 @router.callback_query(F.data.startswith("ubook_back_"))
