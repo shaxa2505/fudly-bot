@@ -26,9 +26,27 @@ class RatingMixin:
                 """
                 INSERT INTO ratings (booking_id, user_id, store_id, rating, comment)
                 VALUES (%s, %s, %s, %s, %s)
+                ON CONFLICT (booking_id) DO UPDATE SET rating = %s, comment = %s
             """,
-                (booking_id, user_id, store_id, rating, comment),
+                (booking_id, user_id, store_id, rating, comment, rating, comment),
             )
+
+    def update_rating_review(self, booking_id: int, user_id: int, review_text: str) -> bool:
+        """Update rating with review text."""
+        try:
+            with self.get_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute(
+                    """
+                    UPDATE ratings SET comment = %s
+                    WHERE booking_id = %s AND user_id = %s
+                """,
+                    (review_text, booking_id, user_id),
+                )
+                return cursor.rowcount > 0
+        except Exception as e:
+            logger.error(f"Error updating rating review: {e}")
+            return False
 
     def save_booking_rating(self, booking_id: int, rating: int) -> bool:
         """Save booking rating (used in bookings handlers)."""

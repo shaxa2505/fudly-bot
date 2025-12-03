@@ -209,140 +209,193 @@ async def process_pre_checkout(pre_checkout_query: types.PreCheckoutQuery) -> No
 async def process_successful_payment(message: types.Message) -> None:
     """
     Handle successful payment notification from Telegram.
-
-    This is called after payment is completed successfully.
+    Unified flow for both delivery and pickup orders.
     """
     import json
 
     payment = message.successful_payment
+    user_id = message.from_user.id
 
     try:
         # Parse payload
         payload = json.loads(payment.invoice_payload)
         order_id = payload.get("order_id")
+        order_type = payload.get("type", "order")
 
         # Get payment details
         total_amount = payment.total_amount / 100  # Convert from tiyin to UZS
         currency = payment.currency
-        provider_payment_charge_id = payment.provider_payment_charge_id
-        telegram_payment_charge_id = payment.telegram_payment_charge_id
+        provider_charge_id = payment.provider_payment_charge_id
+        phone = payment.order_info.phone_number if payment.order_info else None
 
-        logger.info(
-            f"💰 Payment successful! Order: {order_id}, "
-            f"Amount: {total_amount} {currency}, "
-            f"Charge ID: {provider_payment_charge_id}"
-        )
+        logger.info(f"💰 Click payment SUCCESS: order={order_id}, amount={total_amount}, type={order_type}")
 
-        # Update order status in database
-        order_type = payload.get("type", "booking")  # Move outside try block
-        if db and order_id:
-            try:
-                if order_type in ("order", "multi_order") and hasattr(db, "update_order_status"):
-                    # Update order status and payment status for delivery orders
-                    db.update_order_status(order_id, "confirmed", "paid")
-                    logger.info(f"✅ Order {order_id} status updated to confirmed, payment to paid")
-                elif hasattr(db, "update_booking_status"):
-                    # Update booking status for pickup
+        if not db or not order_id:
+            raise ValueError("No database or order_id")
+
+        # Get order/booking details
+        offer_id = None
+        store_id = None
+        quantity = 1
+        address = None
+        delivery_price = 0
+        
+        # Try to get from orders table first (delivery)
+        order = None
+        booking = None
+        
+        if hasattr(db, "get_order"):
+            order = db.get_order(order_id)
+        
+        if order:
+            # Delivery order
+            offer_id = order.get("offer_id") if isinstance(order, dict) else None
+            store_id = order.get("store_id") if isinstance(order, dict) else None
+            quantity = order.get("quantity", 1) if isinstance(order, dict) else 1
+            address = order.get("delivery_address") if isinstance(order, dict) else None
+            delivery_price = order.get("delivery_price", 0) if isinstance(order, dict) else 0
+            
+            # Update order status
+            if hasattr(db, "update_order_status"):
+                db.update_order_status(order_id, "confirmed")
+            if hasattr(db, "update_payment_status"):
+                db.update_payment_status(order_id, "paid")
+        else:
+            # Try bookings table (pickup from hot_offer flow)
+            if hasattr(db, "get_booking"):
+                booking = db.get_booking(order_id)
+            
+            if booking:
+                offer_id = booking.get("offer_id") if isinstance(booking, dict) else (booking[2] if len(booking) > 2 else None)
+                quantity = booking.get("quantity", 1) if isinstance(booking, dict) else (booking[3] if len(booking) > 3 else 1)
+                
+                # Update booking status
+                if hasattr(db, "update_booking_status"):
                     db.update_booking_status(order_id, "confirmed")
-                    logger.info(f"✅ Booking {order_id} status updated to confirmed")
 
-                # Save payment record
-                if hasattr(db, "save_payment_record"):
-                    db.save_payment_record(
-                        order_id=order_id,
-                        amount=total_amount,
-                        currency=currency,
-                        provider="click_telegram",
-                        provider_charge_id=provider_payment_charge_id,
-                        telegram_charge_id=telegram_payment_charge_id,
-                        status="completed",
-                        phone=payment.order_info.phone_number if payment.order_info else None,
-                    )
+        # Get offer and store details
+        offer = db.get_offer(offer_id) if offer_id else None
+        if offer:
+            title = offer.get("title") if isinstance(offer, dict) else (offer[2] if len(offer) > 2 else "Товар")
+            unit_price = offer.get("discount_price", 0) if isinstance(offer, dict) else (offer[4] if len(offer) > 4 else 0)
+            if not store_id:
+                store_id = offer.get("store_id") if isinstance(offer, dict) else (offer[1] if len(offer) > 1 else None)
+        else:
+            title = "Товар"
+            unit_price = 0
 
-                logger.info(f"✅ Order {order_id} marked as paid")
-
-            except Exception as e:
-                logger.error(f"Error updating order status: {e}")
+        store = db.get_store(store_id) if store_id else None
+        store_name = ""
+        store_address = ""
+        owner_id = None
+        
+        if store:
+            store_name = store.get("name") if isinstance(store, dict) else (store[1] if len(store) > 1 else "")
+            store_address = store.get("address") if isinstance(store, dict) else (store[3] if len(store) > 3 else "")
+            owner_id = store.get("owner_id") if isinstance(store, dict) else (store[2] if len(store) > 2 else None)
 
         # Get user language
-        lang = "uz"
-        if db and hasattr(db, "get_user_language"):
-            lang = db.get_user_language(message.from_user.id) or "uz"
+        lang = db.get_user_language(user_id) or "uz"
 
-        # Send success message
-        success_text = (
-            (
-                f"✅ To'lov muvaffaqiyatli amalga oshirildi!\n\n"
-                f"📋 Buyurtma: #{order_id}\n"
-                f"💰 Summa: {total_amount:,.0f} {currency}\n"
-                f"🧾 Chek: {provider_payment_charge_id}\n\n"
-                f"Buyurtmangiz tayyorlanmoqda. Tayyor bo'lganda xabar beramiz! 🎉"
-            )
-            if lang == "uz"
-            else (
-                f"✅ Оплата успешно проведена!\n\n"
-                f"📋 Заказ: #{order_id}\n"
-                f"💰 Сумма: {total_amount:,.0f} {currency}\n"
-                f"🧾 Чек: {provider_payment_charge_id}\n\n"
-                f"Ваш заказ готовится. Уведомим когда будет готов! 🎉"
-            )
-        )
+        # Build detailed success message for customer
+        is_delivery = bool(address)
+        subtotal = unit_price * quantity
+        
+        # Text labels
+        success_title = "To'lov muvaffaqiyatli!" if lang == "uz" else "Оплата успешна!"
+        qty_label = "Miqdor" if lang == "uz" else "Кол-во"
+        price_label = "Narxi" if lang == "uz" else "Цена"
+        unit_label = "dona" if lang == "uz" else "шт"
+        delivery_label = "Yetkazish" if lang == "uz" else "Доставка"
+        total_label = "JAMI" if lang == "uz" else "ИТОГО"
+        receipt_label = "Chek" if lang == "uz" else "Чек"
+        addr_label = "Manzil" if lang == "uz" else "Адрес"
+        
+        lines = []
+        lines.append(f"✅ <b>{success_title}</b>")
+        lines.append("")
+        lines.append(f"📦 <b>{title}</b>")
+        lines.append(f"   {qty_label}: {quantity} {unit_label}")
+        lines.append(f"   {price_label}: {subtotal:,} {currency}")
+        
+        if is_delivery and delivery_price:
+            lines.append(f"🚚 {delivery_label}: {delivery_price:,} {currency}")
+        
+        lines.append("")
+        lines.append("─" * 25)
+        lines.append(f"💵 <b>{total_label}: {int(total_amount):,} {currency}</b>")
+        lines.append(f"🧾 {receipt_label}: <code>{provider_charge_id[:20]}</code>")
+        lines.append("")
+        
+        if store_name:
+            lines.append(f"🏪 {store_name}")
+        if is_delivery and address:
+            lines.append(f"📍 {addr_label}: {address}")
+        elif store_address:
+            lines.append(f"📍 {store_address}")
+        
+        lines.append("")
+        if is_delivery:
+            hint = "Buyurtmangiz yetkazilmoqda!" if lang == "uz" else "Ваш заказ в пути!"
+        else:
+            hint = "Do'konga boring va buyurtmani oling!" if lang == "uz" else "Приходите в магазин за заказом!"
+        lines.append(f"🚚 {hint}" if is_delivery else f"🏪 {hint}")
 
-        # Show main menu to remove any lingering cancel buttons
+        success_text = "\n".join(lines)
+
         from app.keyboards.user import main_menu_customer
-        await message.answer(success_text, reply_markup=main_menu_customer(lang))
+        await message.answer(success_text, parse_mode="HTML", reply_markup=main_menu_customer(lang))
 
-        # Notify store owner
-        if db and order_id:
+        # NOTIFY STORE OWNER - detailed card like card payment
+        if owner_id and bot:
+            seller_lang = db.get_user_language(owner_id) or "ru"
+            
+            customer = db.get_user_model(user_id)
+            customer_name = customer.first_name if customer else message.from_user.first_name
+            customer_phone = customer.phone if customer else (phone or "Не указан")
+            
+            # Labels for seller
+            new_order_title = "Yangi to'langan buyurtma!" if seller_lang == "uz" else "Новый оплаченный заказ!"
+            click_paid = "💳 Click orqali to'langan" if seller_lang == "uz" else "💳 Оплачено через Click"
+            order_label = "Buyurtma" if seller_lang == "uz" else "Заказ"
+            qty_s = "Miqdor" if seller_lang == "uz" else "Количество"
+            sum_s = "Summa" if seller_lang == "uz" else "Сумма"
+            client_s = "Mijoz" if seller_lang == "uz" else "Клиент"
+            phone_s = "Telefon" if seller_lang == "uz" else "Телефон"
+            unit_s = "dona" if seller_lang == "uz" else "шт"
+            
+            order_caption = (
+                f"🎉 <b>{new_order_title}</b>\n\n"
+                f"{click_paid}\n"
+                f"━━━━━━━━━━━━━━━━━━━━\n"
+                f"📦 {order_label} #{order_id}\n"
+                f"🍽 <b>{title}</b>\n"
+                f"📦 {qty_s}: {quantity} {unit_s}\n"
+                f"💵 {sum_s}: <b>{int(total_amount):,} {currency}</b>\n"
+                f"━━━━━━━━━━━━━━━━━━━━\n"
+                f"👤 {client_s}: {customer_name}\n"
+                f"📱 {phone_s}: <code>{customer_phone}</code>\n"
+            )
+            
+            if is_delivery and address:
+                addr_s = "Manzil" if seller_lang == "uz" else "Адрес доставки"
+                hint_s = "Yetkazib berishni tashkil qiling!" if seller_lang == "uz" else "Организуйте доставку!"
+                order_caption += f"📍 {addr_s}: {address}\n\n🚚 {hint_s}"
+            else:
+                hint_s = "Mijoz do'konga keladi" if seller_lang == "uz" else "Клиент придёт в магазин"
+                order_caption += f"\n🏪 {hint_s}"
+            
             try:
-                store_id = None
-                title = "Товар"
-                phone = payment.order_info.phone_number if payment.order_info else None
-                
-                # Check order type and get store info
-                if order_type in ("order", "multi_order") and hasattr(db, "get_order"):
-                    # Delivery order
-                    order = db.get_order(order_id)
-                    if order:
-                        store_id = order.get("store_id") if isinstance(order, dict) else None
-                        offer_id = order.get("offer_id") if isinstance(order, dict) else None
-                        if offer_id and hasattr(db, "get_offer"):
-                            offer = db.get_offer(offer_id)
-                            if offer:
-                                title = offer.get("title") if isinstance(offer, dict) else (offer[2] if len(offer) > 2 else "Товар")
-                elif hasattr(db, "get_booking"):
-                    # Pickup booking
-                    booking = db.get_booking(order_id)
-                    if booking:
-                        offer_id = booking.get("offer_id") if isinstance(booking, dict) else (booking[1] if len(booking) > 1 else None)
-                        if offer_id and hasattr(db, "get_offer"):
-                            offer = db.get_offer(offer_id)
-                            if offer:
-                                store_id = offer.get("store_id") if isinstance(offer, dict) else (offer[1] if len(offer) > 1 else None)
-                                title = offer.get("title") if isinstance(offer, dict) else (offer[2] if len(offer) > 2 else "Товар")
-                
-                # Send notification to store owner
-                if store_id and hasattr(db, "get_store_owner"):
-                    owner_id = db.get_store_owner(store_id)
-                    if owner_id:
-                        order_type_text = "🚚 Доставка" if order_type in ("order", "multi_order") else "🏪 Самовывоз"
-                        await bot.send_message(
-                            owner_id,
-                            f"🎉 <b>Новый оплаченный заказ!</b>\n\n"
-                            f"{order_type_text}\n"
-                            f"📦 {title}\n"
-                            f"💰 {total_amount:,.0f} UZS\n"
-                            f"👤 Покупатель: {message.from_user.full_name}\n"
-                            f"📱 Телефон: {phone or 'Не указан'}\n\n"
-                            f"Заказ #{order_id} - подтвердите готовность!",
-                            parse_mode="HTML",
-                        )
-                        logger.info(f"✅ Notification sent to store owner {owner_id} for order {order_id}")
+                await bot.send_message(owner_id, order_caption, parse_mode="HTML")
+                logger.info(f"✅ Notified store owner {owner_id} about Click payment for order {order_id}")
             except Exception as e:
-                logger.error(f"Error notifying store owner: {e}")
+                logger.error(f"Failed to notify store owner {owner_id}: {e}")
+
+        logger.info(f"✅ Click payment processed successfully for order {order_id}")
 
     except Exception as e:
-        logger.error(f"Successful payment processing error: {e}")
+        logger.error(f"Click payment processing error: {e}", exc_info=True)
+        # Fallback message
         await message.answer(
             "✅ To'lov qabul qilindi!\n\n"
             "Buyurtmangiz qabul qilindi. Tez orada siz bilan bog'lanamiz."
