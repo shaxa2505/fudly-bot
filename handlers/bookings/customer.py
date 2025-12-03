@@ -485,7 +485,7 @@ async def pbook_select_method(callback: types.CallbackQuery, state: FSMContext) 
 
 @router.callback_query(F.data.startswith("pbook_cancel_"))
 async def pbook_cancel(callback: types.CallbackQuery, state: FSMContext) -> None:
-    """Cancel booking - return to offer details card with photo."""
+    """Cancel booking - return to hot offers list."""
     if not db or not callback.message:
         await callback.answer()
         return
@@ -494,80 +494,52 @@ async def pbook_cancel(callback: types.CallbackQuery, state: FSMContext) -> None
     lang = db.get_user_language(user_id)
     data = await state.get_data()
 
-    # Get offer details from state for returning to card
-    offer_id = data.get("offer_id")
-    store_id = data.get("store_id")
-    offer_photo = data.get("offer_photo")
+    # Get last page to return to list
+    last_page = data.get("last_hot_page", 0)
 
     await state.clear()
 
-    # Try to get offer and show original card
-    if offer_id:
-        offer = db.get_offer(offer_id)
-        if offer:
-            from app.keyboards.offers import offer_quick_keyboard
-
-            # Build simple offer card text
-            title = get_offer_field(offer, "title", "")
-            original_price = get_offer_field(offer, "original_price", 0)
-            discount_price = get_offer_field(offer, "discount_price", 0)
-            quantity = get_offer_field(offer, "quantity", 0)
-            unit = get_offer_field(offer, "unit", "шт")
-            expiry_date = get_offer_field(offer, "expiry_date", "")
-            photo = get_offer_field(offer, "photo", None) or offer_photo
-
-            currency = "so'm" if lang == "uz" else "сум"
-            discount_pct = (
-                int((1 - discount_price / original_price) * 100) if original_price > 0 else 0
-            )
-
-            lines = [f"<b>{_esc(title)}</b>"]
-            lines.append(
-                f"<s>{int(original_price):,}</s> → <b>{int(discount_price):,}</b> {currency} (-{discount_pct}%)"
-            )
-
-            if quantity:
-                stock = "Mavjud" if lang == "uz" else "В наличии"
-                lines.append(f"\n{stock}: <b>{quantity} {unit}</b>")
-
-            if expiry_date:
-                exp_label = "Yaroqlilik" if lang == "uz" else "Срок"
-                exp_str = str(expiry_date)[:10]
-                lines.append(f"{exp_label}: {exp_str}")
-
-            text = "\n".join(lines)
-            delivery_enabled = data.get("delivery_enabled", False)
-            kb = offer_quick_keyboard(lang, offer_id, store_id or 0, delivery_enabled)
-
-            try:
-                await callback.message.delete()
-            except Exception:
-                pass
-
-            if photo:
-                try:
-                    await callback.message.answer_photo(
-                        photo=photo, caption=text, parse_mode="HTML", reply_markup=kb
-                    )
-                    await callback.answer()
-                    return
-                except Exception:
-                    pass
-
-            await callback.message.answer(text, parse_mode="HTML", reply_markup=kb)
-            await callback.answer()
-            return
-
-    # Fallback: show main menu
+    # Delete current message and return to hot offers list
     try:
         await callback.message.delete()
     except Exception:
         pass
 
-    cancelled = "❌ Bekor qilindi" if lang == "uz" else "❌ Отменено"
-    from app.keyboards import main_menu_customer
+    # Trigger hot offers list refresh via callback simulation
+    # Import and call the hot offers list function
+    from app.core.utils import normalize_city
 
-    await callback.message.answer(cancelled, reply_markup=main_menu_customer(lang))
+    user = db.get_user_model(user_id)
+    city = user.city if user else "Ташкент"
+    search_city = normalize_city(city)
+
+    from app.services.offer_service import OfferService
+
+    offer_service = OfferService(db)
+
+    result = offer_service.list_hot_offers(search_city, limit=5, offset=last_page * 5)
+    if not result.items:
+        # No offers - show main menu
+        cancelled = "❌ Bekor qilindi" if lang == "uz" else "❌ Отменено"
+        await callback.message.answer(
+            cancelled, reply_markup=main_menu_customer(lang)
+        )
+        await callback.answer()
+        return
+
+    # Build hot offers list
+    from app.keyboards.offers import hot_offers_compact_keyboard
+    from app.templates.offers import render_hot_offers_list
+
+    per_page = 5
+    total_pages = (result.total + per_page - 1) // per_page
+    select_hint = "👆 Выберите товар" if lang == "ru" else "👆 Mahsulotni tanlang"
+    text = render_hot_offers_list(
+        lang, city, result.items, result.total, select_hint, offset=last_page * per_page
+    )
+    kb = hot_offers_compact_keyboard(lang, result.items, last_page, total_pages)
+
+    await callback.message.answer(text, parse_mode="HTML", reply_markup=kb)
     await callback.answer()
 
 
@@ -645,21 +617,66 @@ async def pbook_confirm(callback: types.CallbackQuery, state: FSMContext) -> Non
 
     if selected_delivery == "delivery":
         logger.info("📥 pbook_confirm: starting delivery flow")
-        # Switch to delivery flow - ask for address
+        # Switch to delivery flow - preserve ALL data for delivery card
+        delivery_price = data.get("delivery_price", 0)
+
+        # Load saved address
+        saved_address = None
+        try:
+            saved_address = db.get_last_delivery_address(user_id)
+        except Exception:
+            pass
+
         await state.clear()
         await state.update_data(
             offer_id=offer_id,
             store_id=store_id,
             quantity=quantity,
+            max_qty=data.get("max_quantity", 1),
+            price=offer_price,
+            title=offer_title,
+            store_name=data.get("store_name", ""),
+            delivery_price=delivery_price,
+            saved_address=saved_address,
+            offer_photo=data.get("offer_photo"),
         )
         await state.set_state(OrderDelivery.address)
 
-        if lang == "uz":
-            text = "📍 Yetkazib berish manzilini kiriting:\n\nMasalan: Chilanzar tumani, 5-mavze, 10-uy"
-        else:
-            text = "📍 Введите адрес доставки:\n\nНапример: Чиланзарский район, 5-массив, дом 10"
+        # Build delivery card text inline (no extra message)
+        from handlers.customer.orders.delivery import (
+            build_delivery_address_keyboard,
+            build_delivery_card_text,
+        )
 
-        await bot.send_message(user_id, text, reply_markup=cancel_keyboard(lang))
+        card_text = build_delivery_card_text(
+            lang,
+            offer_title,
+            offer_price,
+            quantity,
+            data.get("max_quantity", 1),
+            data.get("store_name", ""),
+            delivery_price,
+            None,
+            "address",
+        )
+        kb = build_delivery_address_keyboard(lang, offer_id, saved_address)
+
+        # Update existing message with delivery card
+        try:
+            if callback.message.photo:
+                await callback.message.edit_caption(
+                    caption=card_text, parse_mode="HTML", reply_markup=kb.as_markup()
+                )
+            else:
+                await callback.message.edit_text(
+                    card_text, parse_mode="HTML", reply_markup=kb.as_markup()
+                )
+        except Exception as e:
+            logger.warning(f"Failed to edit message for delivery: {e}")
+            # Fallback - send new message
+            await bot.send_message(
+                user_id, card_text, parse_mode="HTML", reply_markup=kb.as_markup()
+            )
     else:
         # Pickup - create booking directly
         await state.update_data(quantity=quantity, delivery_option=0, delivery_cost=0)

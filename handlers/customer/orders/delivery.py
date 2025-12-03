@@ -322,84 +322,51 @@ async def dlv_noop(callback: types.CallbackQuery) -> None:
 async def dlv_cancel(
     callback: types.CallbackQuery, state: FSMContext, db: DatabaseProtocol
 ) -> None:
-    """Cancel delivery order - return to offer card with photo."""
+    """Cancel delivery order - return to hot offers list."""
     data = await state.get_data()
+    last_page = data.get("last_hot_page", 0)
     await state.clear()
 
     lang = db.get_user_language(callback.from_user.id) if db else "ru"
-    offer_id = data.get("offer_id")
-    store_id = data.get("store_id")
-    offer_photo = data.get("offer_photo")
+    user_id = callback.from_user.id
 
-    # Try to return to offer card
-    if offer_id:
-        offer = db.get_offer(offer_id)
-        if offer:
-            from app.keyboards.offers import offer_quick_keyboard
-
-            # Build simple offer card text
-            title = get_offer_field(offer, "title", "")
-            original_price = get_offer_field(offer, "original_price", 0)
-            discount_price = get_offer_field(offer, "discount_price", 0)
-            quantity = get_offer_field(offer, "quantity", 0)
-            unit = get_offer_field(offer, "unit", "шт")
-            expiry_date = get_offer_field(offer, "expiry_date", "")
-            photo = get_offer_field(offer, "photo", None) or offer_photo
-
-            currency = "so'm" if lang == "uz" else "сум"
-            discount_pct = (
-                int((1 - discount_price / original_price) * 100) if original_price > 0 else 0
-            )
-
-            lines = [f"<b>{_esc(title)}</b>"]
-            lines.append(
-                f"<s>{int(original_price):,}</s> → <b>{int(discount_price):,}</b> {currency} (-{discount_pct}%)"
-            )
-
-            if quantity:
-                stock = "Mavjud" if lang == "uz" else "В наличии"
-                lines.append(f"\n{stock}: <b>{quantity} {unit}</b>")
-
-            if expiry_date:
-                exp_label = "Yaroqlilik" if lang == "uz" else "Срок"
-                exp_str = str(expiry_date)[:10]
-                lines.append(f"{exp_label}: {exp_str}")
-
-            text = "\n".join(lines)
-            delivery_enabled = (
-                get_store_field(db.get_store(store_id), "delivery_enabled", False)
-                if store_id
-                else False
-            )
-            kb = offer_quick_keyboard(lang, offer_id, store_id or 0, delivery_enabled)
-
-            try:
-                await callback.message.delete()
-            except Exception:
-                pass
-
-            if photo:
-                try:
-                    await callback.message.answer_photo(
-                        photo=photo, caption=text, parse_mode="HTML", reply_markup=kb
-                    )
-                    await callback.answer()
-                    return
-                except Exception:
-                    pass
-
-            await callback.message.answer(text, parse_mode="HTML", reply_markup=kb)
-            await callback.answer()
-            return
-
-    # Fallback: show main menu
+    # Delete current message
     try:
         await callback.message.delete()
     except Exception:
         pass
 
-    msg = "❌ Bekor qilindi" if lang == "uz" else "❌ Отменено"
-    await callback.message.answer(msg, reply_markup=main_menu_customer(lang))
+    # Return to hot offers list
+    from app.core.utils import normalize_city
+    from app.services.offer_service import OfferService
+
+    user = db.get_user_model(user_id)
+    city = user.city if user else "Ташкент"
+    search_city = normalize_city(city)
+
+    offer_service = OfferService(db)
+    per_page = 5
+    result = offer_service.list_hot_offers(search_city, limit=per_page, offset=last_page * per_page)
+
+    if not result.items:
+        # No offers - show main menu
+        msg = "❌ Bekor qilindi" if lang == "uz" else "❌ Отменено"
+        await callback.message.answer(msg, reply_markup=main_menu_customer(lang))
+        await callback.answer()
+        return
+
+    # Build hot offers list
+    from app.keyboards.offers import hot_offers_compact_keyboard
+    from app.templates.offers import render_hot_offers_list
+
+    total_pages = (result.total + per_page - 1) // per_page
+    select_hint = "👆 Выберите товар" if lang == "ru" else "👆 Mahsulotni tanlang"
+    text = render_hot_offers_list(
+        lang, city, result.items, result.total, select_hint, offset=last_page * per_page
+    )
+    kb = hot_offers_compact_keyboard(lang, result.items, last_page, total_pages)
+
+    await callback.message.answer(text, parse_mode="HTML", reply_markup=kb)
     await callback.answer()
 
 
