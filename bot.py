@@ -398,7 +398,8 @@ def _register_handlers() -> None:
     from handlers.customer import payments as telegram_payments
     from handlers.customer.offers import browse as offers_browse
     from handlers.customer.offers import search as offers_search
-    from handlers.customer.orders import delivery as orders
+    from handlers.customer.orders import orders_router
+    from handlers.customer.orders import delivery as orders_delivery
     from handlers.seller import (
         analytics,
         bulk_import,
@@ -414,7 +415,7 @@ def _register_handlers() -> None:
 
     # Setup dependencies for handler modules
     bookings.setup_dependencies(db, bot, cache, METRICS)
-    orders.setup_dependencies(db, bot, user_view_mode)
+    orders_delivery.setup_dependencies(db, bot, user_view_mode)
     partner.setup_dependencies(db, bot, user_view_mode)
     create_offer.setup_dependencies(db, bot)
     management.setup_dependencies(db, bot)
@@ -458,7 +459,7 @@ def _register_handlers() -> None:
     dp.include_router(profile.router)
     dp.include_router(favorites.router)
     dp.include_router(customer_menu.router)
-    dp.include_router(orders.router)
+    dp.include_router(orders_router)
     dp.include_router(bookings.router)
     dp.include_router(partner.router)
 
