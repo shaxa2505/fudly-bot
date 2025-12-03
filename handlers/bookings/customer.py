@@ -53,59 +53,25 @@ def _esc(val: Any) -> str:
     return html.escape(str(val))
 
 
-# ===================== UNIFIED BOOKING FLOW =====================
+# ===================== UNIFIED INLINE BOOKING FLOW =====================
+# When user clicks "Buyurtma", the same product card gets updated with
+# quantity buttons, delivery options, and confirm/cancel - all inline!
 
 
-def build_order_card(
+def build_booking_keyboard(
     lang: str,
-    offer_title: str,
-    offer_price: float,
+    offer_id: int,
+    store_id: int,
     max_quantity: int,
     selected_qty: int,
-    store_name: str,
     delivery_enabled: bool,
     delivery_price: int,
     selected_delivery: str | None,  # None, "pickup", "delivery"
-    offer_id: int,
-    unit: str = "dona",
-) -> tuple[str, InlineKeyboardBuilder]:
-    """Build unified order card with text and keyboard."""
-
-    total = int(offer_price * selected_qty)
-    if selected_delivery == "delivery":
-        total += delivery_price
-
-    currency = "so'm" if lang == "uz" else "сум"
-
-    # Build text
-    text_parts = [
-        f"📦 <b>{_esc(offer_title)}</b>",
-        f"💰 {int(offer_price):,} {currency}/{unit}",
-        f"🏪 {_esc(store_name)}",
-        "",
-    ]
-
-    # Quantity section
-    qty_label = "Miqdor" if lang == "uz" else "Количество"
-    text_parts.append(f"━━ {qty_label} ━━")
-
-    # Delivery section (if enabled)
-    if delivery_enabled:
-        text_parts.append("")
-        delivery_label = "Olish usuli" if lang == "uz" else "Способ получения"
-        text_parts.append(f"━━ {delivery_label} ━━")
-
-    # Total
-    text_parts.append("")
-    total_label = "Jami" if lang == "uz" else "Итого"
-    text_parts.append(f"💵 <b>{total_label}: {total:,} {currency}</b>")
-
-    text = "\n".join(text_parts)
-
-    # Build keyboard
+) -> InlineKeyboardBuilder:
+    """Build inline keyboard for booking flow (updates in place)."""
     kb = InlineKeyboardBuilder()
 
-    # Quantity buttons (row 1)
+    # Row 1: Quantity buttons
     qty_buttons = _get_quantity_buttons(max_quantity)
     for qty in qty_buttons:
         if qty == selected_qty:
@@ -113,7 +79,7 @@ def build_order_card(
         else:
             kb.button(text=str(qty), callback_data=f"ubook_qty_{offer_id}_{qty}")
 
-    # Delivery buttons (row 2) - if enabled
+    # Row 2: Delivery options (if enabled)
     if delivery_enabled:
         pickup_text = "🏪 O'zim" if lang == "uz" else "🏪 Сам"
         delivery_text = f"🚚 +{delivery_price:,}" if lang == "uz" else f"🚚 +{delivery_price:,}"
@@ -126,25 +92,25 @@ def build_order_card(
         kb.button(text=pickup_text, callback_data=f"ubook_method_{offer_id}_pickup")
         kb.button(text=delivery_text, callback_data=f"ubook_method_{offer_id}_delivery")
 
-    # Confirm and Cancel buttons (row 3)
+    # Row 3: Confirm and Cancel
     confirm_text = "✅ Tasdiqlash" if lang == "uz" else "✅ Подтвердить"
     cancel_text = "❌"
 
-    # Confirm only enabled if delivery method selected (or no delivery)
+    # Confirm enabled only if delivery method selected (or no delivery option)
     if not delivery_enabled or selected_delivery:
         kb.button(text=confirm_text, callback_data=f"ubook_confirm_{offer_id}")
     else:
         kb.button(text=f"⬜ {confirm_text}", callback_data="ubook_noop")
-    kb.button(text=cancel_text, callback_data="ubook_cancel")
+    kb.button(text=cancel_text, callback_data=f"ubook_back_{offer_id}_{store_id}")
 
     # Adjust layout
     qty_count = len(qty_buttons)
     if delivery_enabled:
-        kb.adjust(qty_count, 2, 2)  # qty buttons, delivery options, confirm+cancel
+        kb.adjust(qty_count, 2, 2)
     else:
-        kb.adjust(qty_count, 2)  # qty buttons, confirm+cancel
+        kb.adjust(qty_count, 2)
 
-    return text, kb
+    return kb
 
 
 def _get_quantity_buttons(max_qty: int) -> list[int]:
@@ -161,7 +127,7 @@ def _get_quantity_buttons(max_qty: int) -> list[int]:
 
 @router.callback_query(F.data.regexp(r"^book_\d+$"))
 async def book_offer_start(callback: types.CallbackQuery, state: FSMContext) -> None:
-    """Start unified booking flow - show card with all options."""
+    """Start booking flow - update current card with booking options inline."""
     if not db or not callback.message:
         await callback.answer("System error", show_alert=True)
         return
@@ -196,18 +162,13 @@ async def book_offer_start(callback: types.CallbackQuery, state: FSMContext) -> 
     offer_price = get_offer_field(offer, "discount_price", 0)
     offer_title = get_offer_field(offer, "title", "Товар")
     store_id = get_offer_field(offer, "store_id")
-    unit = get_offer_field(offer, "unit", "dona")
-
-    # Map unit to display
-    unit_display = "kg" if unit == "кг" else "dona"
 
     # Get store details
     store = db.get_store(store_id) if store_id else None
-    store_name = get_store_field(store, "name", "Магазин")
     delivery_enabled = get_store_field(store, "delivery_enabled", 0) == 1
     delivery_price = get_store_field(store, "delivery_price", 0) if delivery_enabled else 0
 
-    # Default selection: qty=1, no delivery method selected yet (or pickup if no delivery)
+    # Default selection: qty=1, pickup if no delivery option
     selected_qty = 1
     selected_delivery = "pickup" if not delivery_enabled else None
 
@@ -218,37 +179,35 @@ async def book_offer_start(callback: types.CallbackQuery, state: FSMContext) -> 
         offer_price=offer_price,
         offer_title=offer_title,
         store_id=store_id,
-        store_name=store_name,
         delivery_enabled=delivery_enabled,
         delivery_price=delivery_price,
         selected_qty=selected_qty,
         selected_delivery=selected_delivery,
-        unit=unit_display,
     )
     await state.set_state(BookOffer.quantity)
 
-    # Build and send unified card
-    text, kb = build_order_card(
+    # Build booking keyboard and update inline
+    kb = build_booking_keyboard(
         lang=lang,
-        offer_title=offer_title,
-        offer_price=offer_price,
+        offer_id=offer_id,
+        store_id=store_id,
         max_quantity=max_quantity,
         selected_qty=selected_qty,
-        store_name=store_name,
         delivery_enabled=delivery_enabled,
         delivery_price=delivery_price,
         selected_delivery=selected_delivery,
-        offer_id=offer_id,
-        unit=unit_display,
     )
 
-    await callback.message.answer(text, parse_mode="HTML", reply_markup=kb.as_markup())
+    try:
+        await callback.message.edit_reply_markup(reply_markup=kb.as_markup())
+    except Exception:
+        pass
     await callback.answer()
 
 
 @router.callback_query(F.data.startswith("ubook_qty_"))
 async def unified_book_qty(callback: types.CallbackQuery, state: FSMContext) -> None:
-    """Handle quantity selection - update card inline."""
+    """Handle quantity selection - update keyboard inline."""
     if not db or not callback.message:
         await callback.answer()
         return
@@ -276,24 +235,20 @@ async def unified_book_qty(callback: types.CallbackQuery, state: FSMContext) -> 
     await state.update_data(selected_qty=new_qty)
     data = await state.get_data()
 
-    # Rebuild card
-    text, kb = build_order_card(
+    # Rebuild keyboard
+    kb = build_booking_keyboard(
         lang=lang,
-        offer_title=data.get("offer_title", ""),
-        offer_price=data.get("offer_price", 0),
+        offer_id=offer_id,
+        store_id=data.get("store_id", 0),
         max_quantity=max_quantity,
         selected_qty=new_qty,
-        store_name=data.get("store_name", ""),
         delivery_enabled=data.get("delivery_enabled", False),
         delivery_price=data.get("delivery_price", 0),
         selected_delivery=data.get("selected_delivery"),
-        offer_id=offer_id,
-        unit=data.get("unit", "dona"),
     )
 
-    # Edit message inline
     try:
-        await callback.message.edit_text(text, parse_mode="HTML", reply_markup=kb.as_markup())
+        await callback.message.edit_reply_markup(reply_markup=kb.as_markup())
     except Exception:
         pass
     await callback.answer()
@@ -301,7 +256,7 @@ async def unified_book_qty(callback: types.CallbackQuery, state: FSMContext) -> 
 
 @router.callback_query(F.data.startswith("ubook_method_"))
 async def unified_book_method(callback: types.CallbackQuery, state: FSMContext) -> None:
-    """Handle delivery method selection - update card inline."""
+    """Handle delivery method selection - update keyboard inline."""
     if not db or not callback.message:
         await callback.answer()
         return
@@ -321,24 +276,20 @@ async def unified_book_method(callback: types.CallbackQuery, state: FSMContext) 
     await state.update_data(selected_delivery=method)
     data = await state.get_data()
 
-    # Rebuild card
-    text, kb = build_order_card(
+    # Rebuild keyboard
+    kb = build_booking_keyboard(
         lang=lang,
-        offer_title=data.get("offer_title", ""),
-        offer_price=data.get("offer_price", 0),
+        offer_id=offer_id,
+        store_id=data.get("store_id", 0),
         max_quantity=data.get("max_quantity", 1),
         selected_qty=data.get("selected_qty", 1),
-        store_name=data.get("store_name", ""),
         delivery_enabled=data.get("delivery_enabled", False),
         delivery_price=data.get("delivery_price", 0),
         selected_delivery=method,
-        offer_id=offer_id,
-        unit=data.get("unit", "dona"),
     )
 
-    # Edit message inline
     try:
-        await callback.message.edit_text(text, parse_mode="HTML", reply_markup=kb.as_markup())
+        await callback.message.edit_reply_markup(reply_markup=kb.as_markup())
     except Exception:
         pass
     await callback.answer()
@@ -350,6 +301,40 @@ async def unified_book_noop(callback: types.CallbackQuery) -> None:
     lang = db.get_user_language(callback.from_user.id) if db else "uz"
     msg = "Avval olish usulini tanlang" if lang == "uz" else "Сначала выберите способ получения"
     await callback.answer(msg, show_alert=True)
+
+
+@router.callback_query(F.data.startswith("ubook_back_"))
+async def unified_book_back(callback: types.CallbackQuery, state: FSMContext) -> None:
+    """Cancel booking - restore original product card buttons."""
+    if not db or not callback.message:
+        await callback.answer()
+        return
+
+    user_id = callback.from_user.id
+    lang = db.get_user_language(user_id)
+
+    try:
+        parts = callback.data.split("_")
+        offer_id = int(parts[2])
+        store_id = int(parts[3])
+    except (ValueError, IndexError):
+        await callback.answer()
+        return
+
+    await state.clear()
+
+    # Restore original product card keyboard
+    from app.keyboards.offers import offer_details_keyboard
+
+    store = db.get_store(store_id) if store_id else None
+    delivery_enabled = get_store_field(store, "delivery_enabled", 0) == 1
+
+    kb = offer_details_keyboard(lang, offer_id, store_id, delivery_enabled)
+    try:
+        await callback.message.edit_reply_markup(reply_markup=kb)
+    except Exception:
+        pass
+    await callback.answer()
 
 
 @router.callback_query(F.data.startswith("ubook_confirm_"))
@@ -374,7 +359,6 @@ async def unified_book_confirm(callback: types.CallbackQuery, state: FSMContext)
     quantity = data.get("selected_qty", 1)
     store_id = data.get("store_id")
     offer_price = data.get("offer_price", 0)
-    delivery_price = data.get("delivery_price", 0)
 
     # Check minimum order for delivery
     if selected_delivery == "delivery":
@@ -392,12 +376,6 @@ async def unified_book_confirm(callback: types.CallbackQuery, state: FSMContext)
             await callback.answer(msg, show_alert=True)
             return
 
-    # Remove the order card
-    try:
-        await callback.message.delete()
-    except Exception:
-        pass
-
     if selected_delivery == "delivery":
         # Switch to delivery flow - ask for address
         await state.clear()
@@ -408,6 +386,12 @@ async def unified_book_confirm(callback: types.CallbackQuery, state: FSMContext)
         )
         await state.set_state(OrderDelivery.address)
 
+        # Remove inline keyboard
+        try:
+            await callback.message.edit_reply_markup(reply_markup=None)
+        except Exception:
+            pass
+
         if lang == "uz":
             text = "📍 Yetkazib berish manzilini kiriting:\n\nMasalan: Chilanzar tumani, 5-mavze, 10-uy"
         else:
@@ -417,29 +401,21 @@ async def unified_book_confirm(callback: types.CallbackQuery, state: FSMContext)
     else:
         # Pickup - create booking directly
         await state.update_data(quantity=quantity, delivery_option=0, delivery_cost=0)
-        await create_booking(callback.message, state, real_user_id=user_id)
 
-    await callback.answer()
+        # Remove inline keyboard before creating booking
+        try:
+            await callback.message.edit_reply_markup(reply_markup=None)
+        except Exception:
+            pass
 
+        # Create booking using bot.send_message for proper typing
+        msg = await bot.send_message(user_id, "⏳...")
+        await create_booking(msg, state, real_user_id=user_id)
+        try:
+            await msg.delete()
+        except Exception:
+            pass
 
-@router.callback_query(F.data == "ubook_cancel")
-async def unified_book_cancel(callback: types.CallbackQuery, state: FSMContext) -> None:
-    """Cancel unified booking flow."""
-    if not db:
-        await callback.answer()
-        return
-
-    lang = db.get_user_language(callback.from_user.id)
-    await state.clear()
-
-    try:
-        await callback.message.delete()
-    except Exception:
-        pass
-
-    await callback.message.answer(
-        get_text(lang, "action_cancelled"), reply_markup=main_menu_customer(lang)
-    )
     await callback.answer()
 
 
