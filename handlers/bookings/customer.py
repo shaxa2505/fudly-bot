@@ -1,4 +1,7 @@
-"""Customer booking handlers - create, view, cancel, rate bookings."""
+"""Customer booking handlers - create, view, cancel, rate bookings.
+
+Premium UX v3 - Beautiful booking cards with photos and inline controls.
+"""
 from __future__ import annotations
 
 import html
@@ -53,116 +56,159 @@ def _esc(val: Any) -> str:
     return html.escape(str(val))
 
 
-# ===================== STEP-BY-STEP INLINE BOOKING FLOW =====================
-# Step 1: Click "Buyurtma" → show quantity buttons
-# Step 2: Select quantity → show delivery method (if available) or confirm
-# Step 3: Select method → show confirm button
+# ===================== PREMIUM UX v3: Beautiful booking cards =====================
+# - New message with photo when booking
+# - [−] [qty] [+] quantity controls
+# - Radio-style delivery selection
+# - Real-time total updates
 
 
-def build_step1_keyboard(
+def build_order_card_text(
     lang: str,
-    offer_id: int,
-    store_id: int,
-    max_quantity: int,
-) -> InlineKeyboardBuilder:
-    """Step 1: Quantity selection only."""
-    kb = InlineKeyboardBuilder()
-
-    # Quantity buttons
-    qty_buttons = _get_quantity_buttons(max_quantity)
-    for qty in qty_buttons:
-        kb.button(text=str(qty), callback_data=f"ubook_qty_{offer_id}_{qty}")
-
-    # Cancel button
-    kb.button(text="❌", callback_data=f"ubook_back_{offer_id}_{store_id}")
-
-    # Layout: qty buttons in one row, cancel below
-    kb.adjust(len(qty_buttons), 1)
-    return kb
-
-
-def build_step2_keyboard(
-    lang: str,
-    offer_id: int,
-    store_id: int,
-    selected_qty: int,
+    title: str,
+    price: int,
+    quantity: int,
+    store_name: str,
     delivery_enabled: bool,
     delivery_price: int,
-) -> InlineKeyboardBuilder:
-    """Step 2: Delivery method selection (or confirm if no delivery)."""
-    kb = InlineKeyboardBuilder()
-
-    # Show selected quantity
-    qty_text = f"📦 {selected_qty}"
-    kb.button(text=qty_text, callback_data=f"ubook_reset_{offer_id}")
-
+    delivery_method: str | None,
+    max_qty: int,
+) -> str:
+    """Build beautiful order card text with current selection."""
+    currency = "so'm" if lang == "uz" else "сум"
+    
+    # Calculate totals
+    subtotal = price * quantity
+    delivery_cost = delivery_price if delivery_method == "delivery" else 0
+    total = subtotal + delivery_cost
+    
+    # Header
+    lines = [
+        f"🛒 <b>{_esc(title)}</b>",
+        "",
+        f"━━━━━━━━━━━━━━━━━━",
+    ]
+    
+    # Price info
+    price_label = "Narxi" if lang == "uz" else "Цена"
+    qty_label = "Miqdor" if lang == "uz" else "Количество"
+    lines.append(f"💰 {price_label}: <b>{price:,}</b> {currency}")
+    lines.append(f"📦 {qty_label}: <b>{quantity}</b> {'dona' if lang == 'uz' else 'шт'}")
+    
+    # Delivery section
     if delivery_enabled:
-        # Delivery options
-        pickup_text = "🏪 O'zim olib ketaman" if lang == "uz" else "🏪 Самовывоз"
-        delivery_text = f"🚚 Yetkazish (+{delivery_price:,})" if lang == "uz" else f"🚚 Доставка (+{delivery_price:,})"
+        lines.append("")
+        delivery_label = "Yetkazish usuli" if lang == "uz" else "Способ получения"
+        lines.append(f"🚚 <b>{delivery_label}:</b>")
+        
+        # Show current selection with radio buttons
+        pickup_label = "O'zim olib ketaman" if lang == "uz" else "Самовывоз"
+        delivery_label = f"Yetkazish (+{delivery_price:,} {currency})" if lang == "uz" else f"Доставка (+{delivery_price:,} {currency})"
+        
+        if delivery_method == "pickup":
+            lines.append(f"   🔘 {pickup_label}")
+            lines.append(f"   ⚪ {delivery_label}")
+        elif delivery_method == "delivery":
+            lines.append(f"   ⚪ {pickup_label}")
+            lines.append(f"   🔘 {delivery_label}")
+        else:
+            lines.append(f"   ⚪ {pickup_label}")
+            lines.append(f"   ⚪ {delivery_label}")
+    
+    # Totals
+    lines.append("")
+    lines.append(f"━━━━━━━━━━━━━━━━━━")
+    
+    subtotal_label = "Mahsulot" if lang == "uz" else "Товар"
+    lines.append(f"📦 {subtotal_label}: {subtotal:,} {currency}")
+    
+    if delivery_method == "delivery" and delivery_cost > 0:
+        delivery_cost_label = "Yetkazish" if lang == "uz" else "Доставка"
+        lines.append(f"🚚 {delivery_cost_label}: +{delivery_cost:,} {currency}")
+    
+    total_label = "JAMI" if lang == "uz" else "ИТОГО"
+    lines.append(f"💵 <b>{total_label}: {total:,} {currency}</b>")
+    
+    # Store info
+    lines.append("")
+    lines.append(f"🏪 {_esc(store_name)}")
+    
+    # Hint
+    if not delivery_method and delivery_enabled:
+        hint = "👇 Yetkazish usulini tanlang" if lang == "uz" else "👇 Выберите способ получения"
+        lines.append("")
+        lines.append(f"<i>{hint}</i>")
+    
+    return "\n".join(lines)
 
-        kb.button(text=pickup_text, callback_data=f"ubook_method_{offer_id}_pickup")
-        kb.button(text=delivery_text, callback_data=f"ubook_method_{offer_id}_delivery")
 
-        # Cancel
-        kb.button(text="❌", callback_data=f"ubook_back_{offer_id}_{store_id}")
-        kb.adjust(1, 1, 1, 1)
-    else:
-        # No delivery - show confirm directly
-        confirm_text = "✅ Tasdiqlash" if lang == "uz" else "✅ Подтвердить"
-        kb.button(text=confirm_text, callback_data=f"ubook_confirm_{offer_id}")
-        kb.button(text="❌", callback_data=f"ubook_back_{offer_id}_{store_id}")
-        kb.adjust(1, 2)
-
-    return kb
-
-
-def build_step3_keyboard(
+def build_order_card_keyboard(
     lang: str,
     offer_id: int,
     store_id: int,
-    selected_qty: int,
-    selected_delivery: str,
-    delivery_price: int,
+    quantity: int,
+    max_qty: int,
+    delivery_enabled: bool,
+    delivery_method: str | None,
 ) -> InlineKeyboardBuilder:
-    """Step 3: Confirm after selecting delivery method."""
+    """Build order card keyboard with [−] [qty] [+] and delivery options."""
     kb = InlineKeyboardBuilder()
-
-    # Show selected options
-    qty_text = f"📦 {selected_qty}"
-    if selected_delivery == "pickup":
-        method_text = "🏪 O'zim" if lang == "uz" else "🏪 Сам"
+    
+    # Row 1: Quantity controls [−] [qty] [+]
+    minus_enabled = quantity > 1
+    plus_enabled = quantity < max_qty
+    
+    minus_text = "➖" if minus_enabled else "⬜"
+    plus_text = "➕" if plus_enabled else "⬜"
+    
+    kb.button(
+        text=minus_text, 
+        callback_data=f"pbook_qty_{offer_id}_{quantity - 1}" if minus_enabled else "pbook_noop"
+    )
+    kb.button(text=f"📦 {quantity}", callback_data="pbook_noop")
+    kb.button(
+        text=plus_text, 
+        callback_data=f"pbook_qty_{offer_id}_{quantity + 1}" if plus_enabled else "pbook_noop"
+    )
+    
+    # Row 2-3: Delivery options (if enabled)
+    if delivery_enabled:
+        pickup_text = "🏪 O'zim olib ketaman" if lang == "uz" else "🏪 Самовывоз"
+        delivery_text = "🚚 Yetkazish" if lang == "uz" else "🚚 Доставка"
+        
+        # Add checkmarks for selected option
+        if delivery_method == "pickup":
+            pickup_text = "✓ " + pickup_text
+        elif delivery_method == "delivery":
+            delivery_text = "✓ " + delivery_text
+        
+        kb.button(text=pickup_text, callback_data=f"pbook_method_{offer_id}_pickup")
+        kb.button(text=delivery_text, callback_data=f"pbook_method_{offer_id}_delivery")
+    
+    # Row 4: Confirm and Cancel
+    if delivery_method or not delivery_enabled:
+        confirm_text = "✅ Tasdiqlash" if lang == "uz" else "✅ Подтвердить"
+        kb.button(text=confirm_text, callback_data=f"pbook_confirm_{offer_id}")
+    
+    cancel_text = "❌ Bekor" if lang == "uz" else "❌ Отмена"
+    kb.button(text=cancel_text, callback_data=f"pbook_cancel_{offer_id}_{store_id}")
+    
+    # Layout
+    if delivery_enabled:
+        if delivery_method:
+            kb.adjust(3, 2, 2)  # [−][qty][+], [pickup][delivery], [confirm][cancel]
+        else:
+            kb.adjust(3, 2, 1)  # [−][qty][+], [pickup][delivery], [cancel]
     else:
-        method_text = f"🚚 +{delivery_price:,}"
-
-    kb.button(text=qty_text, callback_data=f"ubook_reset_{offer_id}")
-    kb.button(text=method_text, callback_data=f"ubook_reset_{offer_id}")
-
-    # Confirm button
-    confirm_text = "✅ Tasdiqlash" if lang == "uz" else "✅ Подтвердить"
-    kb.button(text=confirm_text, callback_data=f"ubook_confirm_{offer_id}")
-    kb.button(text="❌", callback_data=f"ubook_back_{offer_id}_{store_id}")
-
-    kb.adjust(2, 2)
+        kb.adjust(3, 2)  # [−][qty][+], [confirm][cancel]
+    
     return kb
-
-
-def _get_quantity_buttons(max_qty: int) -> list[int]:
-    """Generate quantity button values."""
-    if max_qty <= 5:
-        return list(range(1, max_qty + 1))
-    elif max_qty <= 10:
-        return [1, 2, 3, 5, max_qty]
-    elif max_qty <= 20:
-        return [1, 2, 5, 10, max_qty]
-    else:
-        return [1, 5, 10, 20, max_qty]
 
 
 @router.callback_query(F.data.regexp(r"^book_\d+$"))
 async def book_offer_start(callback: types.CallbackQuery, state: FSMContext) -> None:
-    """Step 1: Show quantity selection buttons."""
-    if not db or not callback.message:
+    """Premium UX: Send new message with photo and order card."""
+    if not db or not bot or not callback.message:
         await callback.answer("System error", show_alert=True)
         return
 
@@ -195,12 +241,18 @@ async def book_offer_start(callback: types.CallbackQuery, state: FSMContext) -> 
     # Get offer details
     offer_price = get_offer_field(offer, "discount_price", 0)
     offer_title = get_offer_field(offer, "title", "Товар")
+    offer_photo = get_offer_field(offer, "photo")
     store_id = get_offer_field(offer, "store_id")
 
     # Get store details
     store = db.get_store(store_id) if store_id else None
+    store_name = get_store_field(store, "name", "Магазин")
     delivery_enabled = get_store_field(store, "delivery_enabled", 0) == 1
     delivery_price = get_store_field(store, "delivery_price", 0) if delivery_enabled else 0
+
+    # Initial state: quantity=1, no delivery method selected
+    initial_qty = 1
+    initial_method = None if delivery_enabled else "pickup"
 
     # Save to state
     await state.update_data(
@@ -208,28 +260,70 @@ async def book_offer_start(callback: types.CallbackQuery, state: FSMContext) -> 
         max_quantity=max_quantity,
         offer_price=offer_price,
         offer_title=offer_title,
+        offer_photo=offer_photo,
         store_id=store_id,
+        store_name=store_name,
         delivery_enabled=delivery_enabled,
         delivery_price=delivery_price,
-        selected_qty=None,
-        selected_delivery=None,
+        selected_qty=initial_qty,
+        selected_delivery=initial_method,
     )
     await state.set_state(BookOffer.quantity)
 
-    # Step 1: Show quantity buttons only
-    kb = build_step1_keyboard(lang, offer_id, store_id, max_quantity)
+    # Build card text and keyboard
+    text = build_order_card_text(
+        lang, offer_title, offer_price, initial_qty, store_name,
+        delivery_enabled, delivery_price, initial_method, max_quantity
+    )
+    kb = build_order_card_keyboard(
+        lang, offer_id, store_id, initial_qty, max_quantity,
+        delivery_enabled, initial_method
+    )
 
+    # Send NEW message with photo (premium UX)
     try:
-        await callback.message.edit_reply_markup(reply_markup=kb.as_markup())
-    except Exception:
-        pass
+        if offer_photo:
+            try:
+                sent = await bot.send_photo(
+                    user_id,
+                    photo=offer_photo,
+                    caption=text,
+                    parse_mode="HTML",
+                    reply_markup=kb.as_markup()
+                )
+                # Save message_id to edit later
+                await state.update_data(order_card_message_id=sent.message_id)
+                await callback.answer()
+                return
+            except Exception as e:
+                logger.warning(f"Failed to send photo: {e}")
+        
+        # Fallback: text only
+        sent = await bot.send_message(
+            user_id,
+            text,
+            parse_mode="HTML",
+            reply_markup=kb.as_markup()
+        )
+        await state.update_data(order_card_message_id=sent.message_id)
+    except Exception as e:
+        logger.error(f"Failed to send order card: {e}")
+        await callback.answer("❌", show_alert=True)
+        return
+
     await callback.answer()
 
 
-@router.callback_query(F.data.startswith("ubook_qty_"))
-async def unified_book_qty(callback: types.CallbackQuery, state: FSMContext) -> None:
-    """Step 2: Quantity selected - show delivery options or confirm."""
-    if not db or not callback.message:
+@router.callback_query(F.data == "pbook_noop")
+async def pbook_noop(callback: types.CallbackQuery) -> None:
+    """No-op for disabled buttons."""
+    await callback.answer()
+
+
+@router.callback_query(F.data.startswith("pbook_qty_"))
+async def pbook_change_qty(callback: types.CallbackQuery, state: FSMContext) -> None:
+    """Premium UX: Change quantity and update card."""
+    if not db or not bot or not callback.message:
         await callback.answer()
         return
 
@@ -244,7 +338,6 @@ async def unified_book_qty(callback: types.CallbackQuery, state: FSMContext) -> 
         await callback.answer("❌", show_alert=True)
         return
 
-    # Get state data
     data = await state.get_data()
     max_quantity = data.get("max_quantity", 1)
 
@@ -253,63 +346,46 @@ async def unified_book_qty(callback: types.CallbackQuery, state: FSMContext) -> 
         return
 
     # Update state
-    store_id = data.get("store_id", 0)
-    delivery_enabled = data.get("delivery_enabled", False)
-    delivery_price = data.get("delivery_price", 0)
-
     await state.update_data(selected_qty=new_qty)
-
-    # If no delivery option - set pickup as default
-    if not delivery_enabled:
-        await state.update_data(selected_delivery="pickup")
-
-    # Step 2: Show delivery options or confirm
-    kb = build_step2_keyboard(lang, offer_id, store_id, new_qty, delivery_enabled, delivery_price)
-
-    try:
-        await callback.message.edit_reply_markup(reply_markup=kb.as_markup())
-    except Exception:
-        pass
-    await callback.answer()
-
-
-@router.callback_query(F.data.startswith("ubook_reset_"))
-async def unified_book_reset(callback: types.CallbackQuery, state: FSMContext) -> None:
-    """Reset to step 1 - show quantity selection again."""
-    if not db or not callback.message:
-        await callback.answer()
-        return
-
-    user_id = callback.from_user.id
-    lang = db.get_user_language(user_id)
-
-    try:
-        offer_id = int(callback.data.split("_")[2])
-    except (ValueError, IndexError):
-        await callback.answer()
-        return
-
     data = await state.get_data()
-    store_id = data.get("store_id", 0)
-    max_quantity = data.get("max_quantity", 1)
 
-    # Reset selections
-    await state.update_data(selected_qty=None, selected_delivery=None)
+    # Rebuild card
+    text = build_order_card_text(
+        lang,
+        data.get("offer_title", ""),
+        data.get("offer_price", 0),
+        new_qty,
+        data.get("store_name", ""),
+        data.get("delivery_enabled", False),
+        data.get("delivery_price", 0),
+        data.get("selected_delivery"),
+        max_quantity
+    )
+    kb = build_order_card_keyboard(
+        lang,
+        offer_id,
+        data.get("store_id", 0),
+        new_qty,
+        max_quantity,
+        data.get("delivery_enabled", False),
+        data.get("selected_delivery")
+    )
 
-    # Back to step 1
-    kb = build_step1_keyboard(lang, offer_id, store_id, max_quantity)
-
+    # Update message
     try:
-        await callback.message.edit_reply_markup(reply_markup=kb.as_markup())
+        if callback.message.photo:
+            await callback.message.edit_caption(caption=text, parse_mode="HTML", reply_markup=kb.as_markup())
+        else:
+            await callback.message.edit_text(text, parse_mode="HTML", reply_markup=kb.as_markup())
     except Exception:
         pass
     await callback.answer()
 
 
-@router.callback_query(F.data.startswith("ubook_method_"))
-async def unified_book_method(callback: types.CallbackQuery, state: FSMContext) -> None:
-    """Step 3: Delivery method selected - show confirm."""
-    if not db or not callback.message:
+@router.callback_query(F.data.startswith("pbook_method_"))
+async def pbook_select_method(callback: types.CallbackQuery, state: FSMContext) -> None:
+    """Premium UX: Select delivery method and update card."""
+    if not db or not bot or not callback.message:
         await callback.answer()
         return
 
@@ -328,23 +404,45 @@ async def unified_book_method(callback: types.CallbackQuery, state: FSMContext) 
     await state.update_data(selected_delivery=method)
     data = await state.get_data()
 
-    store_id = data.get("store_id", 0)
-    selected_qty = data.get("selected_qty", 1)
-    delivery_price = data.get("delivery_price", 0)
+    quantity = data.get("selected_qty", 1)
+    max_quantity = data.get("max_quantity", 1)
 
-    # Step 3: Show confirm
-    kb = build_step3_keyboard(lang, offer_id, store_id, selected_qty, method, delivery_price)
+    # Rebuild card
+    text = build_order_card_text(
+        lang,
+        data.get("offer_title", ""),
+        data.get("offer_price", 0),
+        quantity,
+        data.get("store_name", ""),
+        data.get("delivery_enabled", False),
+        data.get("delivery_price", 0),
+        method,
+        max_quantity
+    )
+    kb = build_order_card_keyboard(
+        lang,
+        offer_id,
+        data.get("store_id", 0),
+        quantity,
+        max_quantity,
+        data.get("delivery_enabled", False),
+        method
+    )
 
+    # Update message
     try:
-        await callback.message.edit_reply_markup(reply_markup=kb.as_markup())
+        if callback.message.photo:
+            await callback.message.edit_caption(caption=text, parse_mode="HTML", reply_markup=kb.as_markup())
+        else:
+            await callback.message.edit_text(text, parse_mode="HTML", reply_markup=kb.as_markup())
     except Exception:
         pass
     await callback.answer()
 
 
-@router.callback_query(F.data.startswith("ubook_back_"))
-async def unified_book_back(callback: types.CallbackQuery, state: FSMContext) -> None:
-    """Cancel booking - restore original product card buttons."""
+@router.callback_query(F.data.startswith("pbook_cancel_"))
+async def pbook_cancel(callback: types.CallbackQuery, state: FSMContext) -> None:
+    """Premium UX: Cancel and delete order card message."""
     if not db or not callback.message:
         await callback.answer()
         return
@@ -352,34 +450,36 @@ async def unified_book_back(callback: types.CallbackQuery, state: FSMContext) ->
     user_id = callback.from_user.id
     lang = db.get_user_language(user_id)
 
-    try:
-        parts = callback.data.split("_")
-        offer_id = int(parts[2])
-        store_id = int(parts[3])
-    except (ValueError, IndexError):
-        await callback.answer()
-        return
-
     await state.clear()
 
-    # Restore original product card keyboard
-    from app.keyboards.offers import offer_details_keyboard
-
-    store = db.get_store(store_id) if store_id else None
-    delivery_enabled = get_store_field(store, "delivery_enabled", 0) == 1
-
-    kb = offer_details_keyboard(lang, offer_id, store_id, delivery_enabled)
+    # Delete the order card message
     try:
-        await callback.message.edit_reply_markup(reply_markup=kb)
+        await callback.message.delete()
     except Exception:
-        pass
+        # If can't delete, just remove keyboard
+        try:
+            if callback.message.photo:
+                await callback.message.edit_caption(
+                    caption=f"❌ {'Bekor qilindi' if lang == 'uz' else 'Отменено'}",
+                    parse_mode="HTML",
+                    reply_markup=None
+                )
+            else:
+                await callback.message.edit_text(
+                    f"❌ {'Bekor qilindi' if lang == 'uz' else 'Отменено'}",
+                    parse_mode="HTML",
+                    reply_markup=None
+                )
+        except Exception:
+            pass
+    
     await callback.answer()
 
 
-@router.callback_query(F.data.startswith("ubook_confirm_"))
-async def unified_book_confirm(callback: types.CallbackQuery, state: FSMContext) -> None:
-    """Confirm order - create booking or start delivery flow."""
-    if not db or not callback.message:
+@router.callback_query(F.data.startswith("pbook_confirm_"))
+async def pbook_confirm(callback: types.CallbackQuery, state: FSMContext) -> None:
+    """Premium UX: Confirm order - create booking or start delivery flow."""
+    if not db or not bot or not callback.message:
         await callback.answer("System error", show_alert=True)
         return
 
@@ -415,6 +515,12 @@ async def unified_book_confirm(callback: types.CallbackQuery, state: FSMContext)
             await callback.answer(msg, show_alert=True)
             return
 
+    # Delete order card message
+    try:
+        await callback.message.delete()
+    except Exception:
+        pass
+
     if selected_delivery == "delivery":
         # Switch to delivery flow - ask for address
         await state.clear()
@@ -425,29 +531,17 @@ async def unified_book_confirm(callback: types.CallbackQuery, state: FSMContext)
         )
         await state.set_state(OrderDelivery.address)
 
-        # Remove inline keyboard
-        try:
-            await callback.message.edit_reply_markup(reply_markup=None)
-        except Exception:
-            pass
-
         if lang == "uz":
             text = "📍 Yetkazib berish manzilini kiriting:\n\nMasalan: Chilanzar tumani, 5-mavze, 10-uy"
         else:
             text = "📍 Введите адрес доставки:\n\nНапример: Чиланзарский район, 5-массив, дом 10"
 
-        await callback.message.answer(text, reply_markup=cancel_keyboard(lang))
+        await bot.send_message(user_id, text, reply_markup=cancel_keyboard(lang))
     else:
         # Pickup - create booking directly
         await state.update_data(quantity=quantity, delivery_option=0, delivery_cost=0)
 
-        # Remove inline keyboard before creating booking
-        try:
-            await callback.message.edit_reply_markup(reply_markup=None)
-        except Exception:
-            pass
-
-        # Create booking using bot.send_message for proper typing
+        # Create booking
         msg = await bot.send_message(user_id, "⏳...")
         await create_booking(msg, state, real_user_id=user_id)
         try:
@@ -761,39 +855,56 @@ async def create_booking(
 
     # Calculate total (no delivery cost for pickup)
     total = calculate_total(offer_price, quantity, 0)
+    currency = "so'm" if lang == "uz" else "сум"
 
-    # Notify customer (pickup only - delivery handled by orders.py)
+    # Beautiful customer notification with photo
     if lang == "uz":
         customer_msg = (
-            f"⏳ <b>Bron yuborildi!</b>\n\n"
-            f"📦 {_esc(offer_title)} × {quantity}\n"
-            f"💰 Jami: {total:,} so'm\n\n"
+            f"✅ <b>BRON YUBORILDI!</b>\n"
+            f"━━━━━━━━━━━━━━━━━━\n\n"
+            f"🛒 <b>{_esc(offer_title)}</b>\n"
+            f"📦 Miqdor: <b>{quantity}</b> dona\n"
+            f"💰 Jami: <b>{total:,}</b> {currency}\n\n"
             f"🏪 {_esc(store_name)}\n"
             f"📍 {_esc(store_address)}\n\n"
             f"━━━━━━━━━━━━━━━━━━\n"
-            f"⏳ Sotuvchi tasdig'ini kutmoqda...\n"
+            f"⏳ <i>Sotuvchi tasdig'ini kutmoqda...</i>\n"
             f"━━━━━━━━━━━━━━━━━━\n\n"
             f"💡 Tasdiqlangandan so'ng sizga bron kodi va QR kod yuboriladi."
         )
     else:
         customer_msg = (
-            f"⏳ <b>Бронь отправлена!</b>\n\n"
-            f"📦 {_esc(offer_title)} × {quantity}\n"
-            f"💰 Итого: {total:,} сум\n\n"
+            f"✅ <b>БРОНЬ ОТПРАВЛЕНА!</b>\n"
+            f"━━━━━━━━━━━━━━━━━━\n\n"
+            f"🛒 <b>{_esc(offer_title)}</b>\n"
+            f"📦 Количество: <b>{quantity}</b> шт\n"
+            f"💰 Итого: <b>{total:,}</b> {currency}\n\n"
             f"🏪 {_esc(store_name)}\n"
             f"📍 {_esc(store_address)}\n\n"
             f"━━━━━━━━━━━━━━━━━━\n"
-            f"⏳ Ожидаем подтверждения продавца...\n"
+            f"⏳ <i>Ожидаем подтверждения продавца...</i>\n"
             f"━━━━━━━━━━━━━━━━━━\n\n"
             f"💡 После подтверждения вы получите код бронирования и QR-код."
         )
 
-    await message.answer(customer_msg, parse_mode="HTML", reply_markup=main_menu_customer(lang))
+    # Try to send with photo for beautiful notification
+    offer_photo = get_offer_field(offer, "photo") if offer else None
+    if offer_photo:
+        try:
+            await bot.send_photo(
+                user_id,
+                photo=offer_photo,
+                caption=customer_msg,
+                parse_mode="HTML",
+                reply_markup=main_menu_customer(lang)
+            )
+        except Exception:
+            await message.answer(customer_msg, parse_mode="HTML", reply_markup=main_menu_customer(lang))
+    else:
+        await message.answer(customer_msg, parse_mode="HTML", reply_markup=main_menu_customer(lang))
 
     # Notify partner
     if owner_id:
-        # Get offer photo for notification
-        offer_photo = get_offer_field(offer, "photo") if offer else None
         await notify_partner_new_booking(
             owner_id=owner_id,
             booking_id=booking_id,
@@ -816,7 +927,7 @@ async def notify_partner_new_booking(
     customer_name: str,
     offer_photo: str | None = None,
 ) -> None:
-    """Send new booking notification to partner (pickup only)."""
+    """Send beautiful booking notification to partner with photo (pickup only)."""
     if not db or not bot:
         return
 
@@ -829,30 +940,42 @@ async def notify_partner_new_booking(
     customer_phone = get_user_field(customer, "phone") or "Не указан"
     customer_username = get_user_field(customer, "username")
 
-    # Build notification (pickup - no delivery info)
+    # Contact info
     contact_info = f"@{customer_username}" if customer_username else customer_phone
+    currency = "so'm" if partner_lang == "uz" else "сум"
 
+    # Build beautiful notification card
     if partner_lang == "uz":
         text = (
-            f"🔔 <b>Yangi bron!</b>\n\n"
-            f"📦 {_esc(offer_title)} × {quantity}\n"
-            f"💰 {total:,} so'm\n"
-            f"👤 {_esc(customer_name)}\n"
-            f"📱 Tel: <code>{_esc(customer_phone)}</code>\n"
-            f"💬 Kontakt: {_esc(contact_info)}\n"
-            f"🏪 O'zi olib ketadi"
+            f"🔔 <b>YANGI BRON!</b>\n"
+            f"━━━━━━━━━━━━━━━━━━\n\n"
+            f"🛒 <b>{_esc(offer_title)}</b>\n"
+            f"📦 Miqdor: <b>{quantity}</b> dona\n"
+            f"💰 Jami: <b>{total:,}</b> {currency}\n\n"
+            f"━━━━━━━━━━━━━━━━━━\n"
+            f"👤 <b>Xaridor:</b>\n"
+            f"   Ism: {_esc(customer_name)}\n"
+            f"   📱 <code>{_esc(customer_phone)}</code>\n"
+            f"   💬 {_esc(contact_info)}\n\n"
+            f"🏪 <b>O'zi olib ketadi</b>\n"
+            f"━━━━━━━━━━━━━━━━━━"
         )
         confirm_text = "✅ Tasdiqlash"
         reject_text = "❌ Rad etish"
     else:
         text = (
-            f"🔔 <b>Новая бронь!</b>\n\n"
-            f"📦 {_esc(offer_title)} × {quantity}\n"
-            f"💰 {total:,} сум\n"
-            f"👤 {_esc(customer_name)}\n"
-            f"📱 Тел: <code>{_esc(customer_phone)}</code>\n"
-            f"💬 Контакт: {_esc(contact_info)}\n"
-            f"🏪 Самовывоз"
+            f"🔔 <b>НОВАЯ БРОНЬ!</b>\n"
+            f"━━━━━━━━━━━━━━━━━━\n\n"
+            f"🛒 <b>{_esc(offer_title)}</b>\n"
+            f"📦 Количество: <b>{quantity}</b> шт\n"
+            f"💰 Итого: <b>{total:,}</b> {currency}\n\n"
+            f"━━━━━━━━━━━━━━━━━━\n"
+            f"👤 <b>Покупатель:</b>\n"
+            f"   Имя: {_esc(customer_name)}\n"
+            f"   📱 <code>{_esc(customer_phone)}</code>\n"
+            f"   💬 {_esc(contact_info)}\n\n"
+            f"🏪 <b>Самовывоз</b>\n"
+            f"━━━━━━━━━━━━━━━━━━"
         )
         confirm_text = "✅ Подтвердить"
         reject_text = "❌ Отклонить"
@@ -863,7 +986,7 @@ async def notify_partner_new_booking(
     kb.adjust(2)
 
     try:
-        # Try to send with photo first
+        # Try to send with photo first for beautiful card
         if offer_photo:
             try:
                 await bot.send_photo(
