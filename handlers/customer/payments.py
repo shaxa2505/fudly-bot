@@ -236,9 +236,17 @@ async def process_successful_payment(message: types.Message) -> None:
         # Update order status in database
         if db and order_id:
             try:
-                # Update booking/order status to paid
-                if hasattr(db, "update_booking_status"):
+                # Check if it's an order (delivery) or booking (pickup)
+                order_type = payload.get("type", "booking")
+                
+                if order_type == "order" and hasattr(db, "update_order_status"):
+                    # Update order status for delivery orders
+                    db.update_order_status(order_id, "confirmed")
+                    logger.info(f"✅ Order {order_id} status updated to confirmed")
+                elif hasattr(db, "update_booking_status"):
+                    # Update booking status for pickup
                     db.update_booking_status(order_id, "confirmed")
+                    logger.info(f"✅ Booking {order_id} status updated to confirmed")
 
                 # Save payment record
                 if hasattr(db, "save_payment_record"):
@@ -282,7 +290,9 @@ async def process_successful_payment(message: types.Message) -> None:
             )
         )
 
-        await message.answer(success_text)
+        # Show main menu to remove any lingering cancel buttons
+        from app.keyboards.user import main_menu_customer
+        await message.answer(success_text, reply_markup=main_menu_customer(lang))
 
         # Notify store owner
         if db and order_id:

@@ -62,7 +62,7 @@ def store_settings_keyboard(
         location_text = "📍 Изменить локацию" if lang == "ru" else "📍 Joylashuvni o'zgartirish"
     else:
         location_text = "📍 Добавить локацию" if lang == "ru" else "📍 Joylashuv qo'shish"
-    builder.button(text=location_text, callback_data=f"store_set_location_{store_id}")
+    builder.button(text=location_text, callback_data=f"store_location_setup_{store_id}")
 
     # Payment integrations (only for owner)
     if is_owner:
