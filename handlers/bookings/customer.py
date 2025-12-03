@@ -481,7 +481,7 @@ async def pbook_select_method(callback: types.CallbackQuery, state: FSMContext) 
 
 @router.callback_query(F.data.startswith("pbook_cancel_"))
 async def pbook_cancel(callback: types.CallbackQuery, state: FSMContext) -> None:
-    """Cancel booking - restore original product card."""
+    """Cancel booking - return to hot offers list."""
     if not db or not callback.message:
         await callback.answer()
         return
@@ -489,104 +489,17 @@ async def pbook_cancel(callback: types.CallbackQuery, state: FSMContext) -> None
     user_id = callback.from_user.id
     lang = db.get_user_language(user_id)
 
-    try:
-        parts = callback.data.split("_")
-        offer_id = int(parts[2])
-        store_id = int(parts[3])
-    except (ValueError, IndexError):
-        await callback.answer()
-        return
-
     await state.clear()
 
-    # Get offer and store
-    offer = db.get_offer(offer_id)
-    store = db.get_store(store_id) if store_id else None
-    
-    if not offer:
-        await callback.answer()
-        return
-
-    # Build card text manually (more reliable than OfferDetails)
-    currency = "so'm" if lang == "uz" else "сум"
-    title = get_offer_field(offer, "title", "Товар")
-    description = get_offer_field(offer, "description", "")
-    original_price = get_offer_field(offer, "original_price", 0)
-    discount_price = get_offer_field(offer, "discount_price", 0)
-    quantity = get_offer_field(offer, "quantity", 0)
-    unit = get_offer_field(offer, "unit", "шт" if lang == "ru" else "dona")
-    expiry_date = get_offer_field(offer, "expiry_date")
-    store_name = get_store_field(store, "name", "")
-    store_address = get_store_field(store, "address", "")
-    delivery_enabled = get_store_field(store, "delivery_enabled", 0) == 1
-    delivery_price = get_store_field(store, "delivery_price", 0)
-    min_order = get_store_field(store, "min_order_amount", 0)
-    
-    lines = [f"📦 <b>{_esc(title)}</b>"]
-    
-    if description:
-        desc = description[:100] + "..." if len(description) > 100 else description
-        lines.append(f"<i>{_esc(desc)}</i>")
-    
-    lines.append("")
-    lines.append("─" * 25)
-    
-    # Price
-    if original_price and discount_price:
-        discount_pct = int((1 - discount_price / original_price) * 100) if original_price > 0 else 0
-        lines.append(f"<s>{int(original_price):,}</s> → <b>{int(discount_price):,}</b> {currency} (-{discount_pct}%)")
-    else:
-        lines.append(f"💰 <b>{int(discount_price or 0):,}</b> {currency}")
-    
-    lines.append("─" * 25)
-    lines.append("")
-    
-    # Stock
-    stock_label = "Mavjud" if lang == "uz" else "В наличии"
-    lines.append(f"📦 {stock_label}: <b>{quantity}</b> {unit}")
-    
-    # Expiry
-    if expiry_date:
-        expiry_label = "Yaroqlilik" if lang == "uz" else "Срок до"
-        expiry_str = str(expiry_date)[:10]
-        try:
-            from datetime import datetime
-            dt = datetime.strptime(expiry_str, "%Y-%m-%d")
-            expiry_str = dt.strftime("%d.%m.%Y")
-        except Exception:
-            pass
-        lines.append(f"📅 {expiry_label}: {expiry_str}")
-    
-    # Store
-    lines.append("")
-    if store_name:
-        lines.append(f"🏪 {_esc(store_name)}")
-    if store_address:
-        lines.append(f"📍 {_esc(store_address)}")
-    
-    # Delivery
-    if delivery_enabled:
-        lines.append("")
-        delivery_label = "Yetkazish" if lang == "uz" else "Доставка"
-        lines.append(f"🚚 {delivery_label}: {int(delivery_price):,} {currency}")
-        if min_order:
-            min_label = "Min." if lang == "uz" else "Мин."
-            lines.append(f"   {min_label}: {int(min_order):,} {currency}")
-    
-    text = "\n".join(lines)
-    
-    # Keyboard with back button
-    from app.keyboards.offers import offer_details_with_back_keyboard
-    kb = offer_details_with_back_keyboard(lang, offer_id, store_id, delivery_enabled)
-    
+    # Delete current message and show cancellation
     try:
-        if callback.message.photo:
-            await callback.message.edit_caption(caption=text, parse_mode="HTML", reply_markup=kb)
-        else:
-            await callback.message.edit_text(text, parse_mode="HTML", reply_markup=kb)
-    except Exception as e:
-        logger.warning(f"Failed to edit message on cancel: {e}")
-    
+        await callback.message.delete()
+    except Exception:
+        pass
+
+    cancelled = "❌ Bekor qilindi" if lang == "uz" else "❌ Отменено"
+    from app.keyboards import main_menu_customer
+    await callback.message.answer(cancelled, reply_markup=main_menu_customer(lang))
     await callback.answer()
 
 

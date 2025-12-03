@@ -455,41 +455,33 @@ async def handle_click_payment(
     store = db.get_store(store_id)
     delivery_price = int(get_store_field(store, "delivery_price", 15000)) if store else 15000
 
-    # total_amount calculated on demand: (discount_price * quantity) + delivery_price
+    # Get delivery address from state
+    address = data.get("address", "")
 
-    # Create booking first using atomic method
-    booking_id = None
-    booking_code = None
-
+    # Create ORDER (not booking) for delivery - includes address
+    order_id = None
     try:
-        if hasattr(db, "create_booking_atomic"):
-            ok, booking_id, booking_code, error_reason = db.create_booking_atomic(
-                offer_id=offer_id,
-                user_id=callback.from_user.id,
-                quantity=quantity,
-            )
-            if not ok:
-                logger.warning(
-                    f"create_booking_atomic returned False for offer {offer_id}: {error_reason}"
-                )
-                booking_id = None
-
-        # Fallback if atomic method doesn't exist or failed
-        if not booking_id and hasattr(db, "add_booking"):
-            booking_code = f"D{callback.from_user.id % 10000:04d}{offer_id % 1000:03d}"
-            booking_id = db.add_booking(
-                user_id=callback.from_user.id,
-                offer_id=offer_id,
-                quantity=quantity,
-                booking_code=booking_code,
-            )
+        order_id = db.create_order(
+            user_id=callback.from_user.id,
+            store_id=store_id,
+            offer_id=offer_id,
+            quantity=quantity,
+            order_type="delivery",
+            delivery_address=address,
+            delivery_price=delivery_price,
+            payment_method="click",
+        )
+        if order_id:
+            # Decrement offer quantity
+            db.increment_offer_quantity_atomic(offer_id, -int(quantity))
+            logger.info(f"✅ Created delivery order {order_id} for Click payment")
     except Exception as e:
-        logger.error(f"Failed to create booking: {e}")
+        logger.error(f"Failed to create order for Click: {e}")
 
-    # Use offer_id as fallback if booking creation failed
-    if not booking_id:
-        booking_id = offer_id
-        booking_code = f"TMP{offer_id}"
+    if not order_id:
+        await callback.message.edit_text("❌ Buyurtma yaratishda xatolik")
+        await state.clear()
+        return
 
     # Send Telegram invoice
     from handlers.customer.payments import send_payment_invoice_for_booking
@@ -499,7 +491,7 @@ async def handle_click_payment(
 
         invoice_msg = await send_payment_invoice_for_booking(
             user_id=callback.from_user.id,
-            booking_id=booking_id,
+            booking_id=order_id,  # Using order_id
             offer_title=title,
             quantity=quantity,
             unit_price=discount_price,
@@ -507,7 +499,7 @@ async def handle_click_payment(
         )
 
         if invoice_msg:
-            logger.info(f"✅ Click invoice sent for order {booking_id}")
+            logger.info(f"✅ Click invoice sent for delivery order {order_id}")
             await state.clear()
         else:
             # Fallback to card payment
