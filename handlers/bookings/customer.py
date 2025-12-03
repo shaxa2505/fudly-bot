@@ -444,61 +444,93 @@ async def pbook_cancel(callback: types.CallbackQuery, state: FSMContext) -> None
 
     await state.clear()
 
-    # Restore original product card keyboard
-    from app.keyboards.offers import offer_details_keyboard
-
-    store = db.get_store(store_id) if store_id else None
-    delivery_enabled = get_store_field(store, "delivery_enabled", 0) == 1
-
-    kb = offer_details_keyboard(lang, offer_id, store_id, delivery_enabled)
-    
-    # Restore original offer card text
+    # Get offer and store
     offer = db.get_offer(offer_id)
-    if offer:
-        from app.templates.offers import render_offer_details
-        from app.services.offer_service import OfferService
-        
-        # Get store details for template
-        store_details = None
+    store = db.get_store(store_id) if store_id else None
+    
+    if not offer:
+        await callback.answer()
+        return
+
+    # Build card text manually (more reliable than OfferDetails)
+    currency = "so'm" if lang == "uz" else "сум"
+    title = get_offer_field(offer, "title", "Товар")
+    description = get_offer_field(offer, "description", "")
+    original_price = get_offer_field(offer, "original_price", 0)
+    discount_price = get_offer_field(offer, "discount_price", 0)
+    quantity = get_offer_field(offer, "quantity", 0)
+    unit = get_offer_field(offer, "unit", "шт" if lang == "ru" else "dona")
+    expiry_date = get_offer_field(offer, "expiry_date")
+    store_name = get_store_field(store, "name", "")
+    store_address = get_store_field(store, "address", "")
+    delivery_enabled = get_store_field(store, "delivery_enabled", 0) == 1
+    delivery_price = get_store_field(store, "delivery_price", 0)
+    min_order = get_store_field(store, "min_order_amount", 0)
+    
+    lines = [f"📦 <b>{_esc(title)}</b>"]
+    
+    if description:
+        desc = description[:100] + "..." if len(description) > 100 else description
+        lines.append(f"<i>{_esc(desc)}</i>")
+    
+    lines.append("")
+    lines.append("─" * 25)
+    
+    # Price
+    if original_price and discount_price:
+        discount_pct = int((1 - discount_price / original_price) * 100) if original_price > 0 else 0
+        lines.append(f"<s>{int(original_price):,}</s> → <b>{int(discount_price):,}</b> {currency} (-{discount_pct}%)")
+    else:
+        lines.append(f"💰 <b>{int(discount_price or 0):,}</b> {currency}")
+    
+    lines.append("─" * 25)
+    lines.append("")
+    
+    # Stock
+    stock_label = "Mavjud" if lang == "uz" else "В наличии"
+    lines.append(f"📦 {stock_label}: <b>{quantity}</b> {unit}")
+    
+    # Expiry
+    if expiry_date:
+        expiry_label = "Yaroqlilik" if lang == "uz" else "Срок до"
+        expiry_str = str(expiry_date)[:10]
         try:
-            # Try to get full store details
-            offer_service = OfferService(db)
-            store_details = offer_service.get_store(store_id)
+            from datetime import datetime
+            dt = datetime.strptime(expiry_str, "%Y-%m-%d")
+            expiry_str = dt.strftime("%d.%m.%Y")
         except Exception:
             pass
-        
-        # Build original card text
-        try:
-            from app.services.offer_service import OfferDetails
-            offer_details = OfferDetails(
-                id=get_offer_field(offer, "offer_id", offer_id),
-                title=get_offer_field(offer, "title", ""),
-                description=get_offer_field(offer, "description", ""),
-                original_price=get_offer_field(offer, "original_price", 0),
-                discount_price=get_offer_field(offer, "discount_price", 0),
-                quantity=get_offer_field(offer, "quantity", 0),
-                unit=get_offer_field(offer, "unit", "шт"),
-                expiry_date=get_offer_field(offer, "expiry_date"),
-                photo=get_offer_field(offer, "photo"),
-                store_id=store_id,
-                store_name=get_store_field(store, "name", ""),
-                store_address=get_store_field(store, "address", ""),
-                category=get_offer_field(offer, "category", ""),
-            )
-            text = render_offer_details(lang, offer_details, store_details)
-        except Exception:
-            # Fallback simple text
-            text = f"🛒 {get_offer_field(offer, 'title', 'Товар')}"
-    else:
-        text = "❌"
+        lines.append(f"📅 {expiry_label}: {expiry_str}")
+    
+    # Store
+    lines.append("")
+    if store_name:
+        lines.append(f"🏪 {_esc(store_name)}")
+    if store_address:
+        lines.append(f"📍 {_esc(store_address)}")
+    
+    # Delivery
+    if delivery_enabled:
+        lines.append("")
+        delivery_label = "Yetkazish" if lang == "uz" else "Доставка"
+        lines.append(f"🚚 {delivery_label}: {int(delivery_price):,} {currency}")
+        if min_order:
+            min_label = "Min." if lang == "uz" else "Мин."
+            lines.append(f"   {min_label}: {int(min_order):,} {currency}")
+    
+    text = "\n".join(lines)
+    
+    # Keyboard with back button
+    from app.keyboards.offers import offer_details_with_back_keyboard
+    kb = offer_details_with_back_keyboard(lang, offer_id, store_id, delivery_enabled)
     
     try:
         if callback.message.photo:
             await callback.message.edit_caption(caption=text, parse_mode="HTML", reply_markup=kb)
         else:
             await callback.message.edit_text(text, parse_mode="HTML", reply_markup=kb)
-    except Exception:
-        pass
+    except Exception as e:
+        logger.warning(f"Failed to edit message on cancel: {e}")
     
     await callback.answer()
 
