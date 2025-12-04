@@ -386,10 +386,13 @@ def setup(
             await callback.answer()
             return
         await state.set_state(BrowseOffers.store_list)
-        await state.update_data(store_list=[store.id for store in stores])
+        # Save store list and business type for pagination
+        await state.update_data(
+            store_list=[store.id for store in stores], current_business_type=business_type
+        )
         text = offer_templates.render_business_type_store_list(lang, business_type, city, stores)
-        # Add inline keyboard for store selection
-        keyboard = offer_keyboards.store_list_keyboard(lang, stores)
+        # Compact keyboard with pagination
+        keyboard = offer_keyboards.store_list_keyboard(lang, stores, page=0)
         await msg.edit_text(text, parse_mode="HTML", reply_markup=keyboard)
         await callback.answer()
 
@@ -1069,6 +1072,64 @@ def setup(
         )
         await callback.answer()
 
+    @dp.callback_query(F.data.startswith("stores_page_"))
+    async def stores_page_handler(callback: types.CallbackQuery, state: FSMContext):
+        """Handle store list pagination."""
+        if not callback.from_user or not callback.data:
+            await callback.answer()
+            return
+        msg = _callback_message(callback)
+        if not msg:
+            await callback.answer()
+            return
+
+        lang = db.get_user_language(callback.from_user.id)
+
+        try:
+            page = int(callback.data.split("_")[-1])
+        except (ValueError, IndexError):
+            await callback.answer()
+            return
+
+        # Get stored data
+        data = await state.get_data()
+        store_ids = data.get("store_list", [])
+        business_type = data.get("current_business_type", "")
+
+        if not store_ids:
+            await callback.answer()
+            return
+
+        user = db.get_user_model(callback.from_user.id)
+        city = user.city if user else "Ташкент"
+
+        # Get stores
+        stores = []
+        for sid in store_ids:
+            store = offer_service.get_store(sid)
+            if store:
+                stores.append(store)
+
+        if not stores:
+            await callback.answer()
+            return
+
+        # Render with new page
+        text = offer_templates.render_business_type_store_list(lang, business_type, city, stores)
+        keyboard = offer_keyboards.store_list_keyboard(lang, stores, page=page)
+
+        try:
+            await msg.edit_text(text, parse_mode="HTML", reply_markup=keyboard)
+        except Exception:
+            pass
+
+        await callback.answer()
+
+    @dp.callback_query(F.data == "stores_noop")
+    async def stores_noop_handler(callback: types.CallbackQuery):
+        """Handle noop button (page indicator)."""
+        await callback.answer()
+
     # Touch handler names so static analysis does not flag them as unused.
     _ = (
         hot_offers_handler,
@@ -1090,6 +1151,8 @@ def setup(
         show_store_reviews,
         back_to_store_card,
         back_to_places_menu,
+        stores_page_handler,
+        stores_noop_handler,
     )
 
     # ------------------------------------------------------------------

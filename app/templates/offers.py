@@ -73,6 +73,7 @@ def render_business_type_store_list(
     city: str,
     stores: Sequence[StoreSummary],
 ) -> str:
+    """Render store list in unified compact style like hot offers."""
     emoji_map = {
         "supermarket": "🛒",
         "restaurant": "🍽",
@@ -92,20 +93,38 @@ def render_business_type_store_list(
     emoji = emoji_map.get(business_type, "🏪")
     title = type_names.get(business_type, business_type.upper())
 
-    lines = [f"{emoji} <b>{title}</b>", f"📍 {city}", ""]
+    # Header
+    lines = [f"{emoji} <b>{title}</b>", f"📍 {city}"]
+
+    # Count info
+    total_text = "Найдено" if lang == "ru" else "Topildi"
+    stores_word = "заведений" if lang == "ru" else "ta joy"
+    lines.append(f"{total_text}: {len(stores)} {stores_word}")
+    lines.append("")
+
+    # Compact store list (like hot offers)
     for idx, store in enumerate(stores, 1):
-        address = f"\n   📍 {store.address}" if store.address else ""
-        ratings = f"{store.rating:.1f}/5 ({store.ratings_count})"
-        offers_text = "Предложений" if lang == "ru" else "Takliflar"
-        lines.append(f"{idx}. <b>{store.name}</b>")
-        if address:
-            lines.append(address.strip())
-        lines.append(f"   ⭐ {ratings}")
-        lines.append(f"   🔥 {offers_text}: {store.offers_count}")
+        # Store name
+        name = store.name[:30] + "..." if len(store.name) > 30 else store.name
+
+        # Rating and offers count
+        rating_str = f"⭐{store.rating:.1f}" if store.rating else "⭐—"
+        offers_word = "шт" if lang == "ru" else "ta"
+        offers_str = f"🔥{store.offers_count} {offers_word}" if store.offers_count else ""
+
+        # Build line
+        lines.append(f"{idx}. <b>{name}</b>")
+        if store.address:
+            short_addr = store.address[:25] + "..." if len(store.address) > 25 else store.address
+            lines.append(f"   📍 {short_addr}")
+        lines.append(f"   {rating_str} {offers_str}".strip())
         lines.append("")
 
+    # Selection prompt
     prompt = (
-        "💬 Введите номер магазина для просмотра" if lang == "ru" else "💬 Do'kon raqamini kiriting"
+        "👆 Нажмите на заведение для просмотра"
+        if lang == "ru"
+        else "👆 Ko'rish uchun joyni tanlang"
     )
     lines.append(prompt)
     return "\n".join(lines)
@@ -308,7 +327,7 @@ def render_offer_card(lang: str, offer: OfferListItem) -> str:
     lines.append(_format_price_line(offer, lang))
 
     # Category if available
-    if hasattr(offer, 'category') and offer.category:
+    if hasattr(offer, "category") and offer.category:
         lines.append(f"🏷 {offer.category}")
 
     # Stock and expiry on same area
@@ -316,12 +335,13 @@ def render_offer_card(lang: str, offer: OfferListItem) -> str:
     if offer.quantity is not None and offer.quantity > 0:
         stock_label = "Mavjud" if lang == "uz" else "В наличии"
         lines.append(f"\n{stock_label}: <b>{offer.quantity} {unit}</b>")
-    
+
     if offer.expiry_date:
         expiry_label = "Yaroqlilik" if lang == "uz" else "Срок"
         expiry_str = str(offer.expiry_date)[:10]
         try:
             from datetime import datetime
+
             dt = datetime.strptime(expiry_str, "%Y-%m-%d")
             expiry_str = dt.strftime("%d.%m.%Y")
         except Exception:

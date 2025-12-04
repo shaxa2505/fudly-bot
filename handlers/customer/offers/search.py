@@ -761,50 +761,77 @@ def setup(
         # (including inactive / out-of-stock) so users can at least see what's offered.
         # Store offer ids in FSM so we can paginate and let user pick by inline numbers
         await state.set_state(BrowseOffers.offer_list)
-        await state.update_data(offer_list=[o.id for o in offers])
+        await state.update_data(offer_list=[o.id for o in offers], current_store_id=store_id)
 
-        # Header + compact paginated view (first page)
-        header = (
-            "📦 <b>Товары магазина</b>\n" if lang == "ru" else "📦 <b>Do'kon mahsulotlari</b>\n"
-        )
+        # Get store name
+        store = offer_service.get_store(store_id)
+        store_name = store.name if store else "Магазин"
+
+        # Header like hot offers
+        total = len(offers)
+        header = f"🏪 <b>{store_name}</b>\n"
+        shown_text = "Товаров" if lang == "ru" else "Mahsulotlar"
+        header += f"📦 {shown_text}: {total}\n"
+
         page_offset = 0
         per_page = 10
         page_offers = offers[page_offset : page_offset + per_page]
 
-        # Build compact lines for page
-        page_lines = []
+        # Build compact lines like hot offers
+        lines = [header]
         for idx, off in enumerate(page_offers, start=1):
             title = getattr(off, "title", "Товар")
+            short_title = title[:25] + ".." if len(title) > 25 else title
             price = getattr(off, "discount_price", getattr(off, "price", 0))
             qty = getattr(off, "quantity", 0)
-            page_lines.append(f"{idx}. <b>{title}</b> — {int(price):,} — {qty} шт")
 
-        page_text = header + (
-            "\n".join(page_lines)
-            if page_lines
-            else ("(Нет доступных товаров)" if lang == "ru" else "(Mavjud mahsulotlar yo'q)")
-        )
+            lines.append(f"{idx}. <b>{short_title}</b>")
+            currency = "сум" if lang == "ru" else "so'm"
+            qty_text = "шт" if lang == "ru" else "ta"
+            lines.append(f"   💰 {int(price):,} {currency} • 📦 {qty} {qty_text}")
+            lines.append("")
 
-        # Pagination & choose keyboard
+        if not page_offers:
+            empty = "(Нет доступных товаров)" if lang == "ru" else "(Mavjud mahsulotlar yo'q)"
+            lines.append(empty)
+        else:
+            hint = "👆 Нажмите для заказа" if lang == "ru" else "👆 Buyurtma uchun tanlang"
+            lines.append(hint)
+
+        page_text = "\n".join(lines)
+
+        # Compact keyboard with offer buttons
         from aiogram.utils.keyboard import InlineKeyboardBuilder
 
         kb = InlineKeyboardBuilder()
-        # Arrange pagination: first row Prev | Next, second row a single "Выбрать товар" button
-        kb.button(
-            text=("⬅️ Назад" if lang == "ru" else "⬅️ Orqaga"),
-            callback_data=f"store_page_{store_id}_{max(0, page_offset - per_page)}",
-        )
-        if page_offset + per_page < len(offers):
-            kb.button(
-                text=("Вперёд ➡️" if lang == "ru" else "Oldinga ➡️"),
-                callback_data=f"store_page_{store_id}_{page_offset + per_page}",
-            )
-        # Second-row: single selector button
-        kb.button(
-            text=("🛒 Выбрать товар" if lang == "ru" else "🛒 Mahsulotni tanlash"),
-            callback_data=f"store_choose_page_{store_id}_{page_offset}",
-        )
-        kb.adjust(2, 1)
+
+        # Offer buttons - 2 columns
+        for idx, off in enumerate(page_offers, start=1):
+            offer_id = getattr(off, "id", 0)
+            title = getattr(off, "title", "Товар")
+            short = title[:10] + ".." if len(title) > 10 else title
+            price = getattr(off, "discount_price", getattr(off, "price", 0))
+            price_str = f"{int(price/1000)}k" if price >= 1000 else str(int(price))
+            kb.button(text=f"{idx}. {short} {price_str}", callback_data=f"hot_offer_{offer_id}")
+
+        # Adjust to 2 columns
+        kb.adjust(2)
+
+        # Pagination row
+        total_pages = (total + per_page - 1) // per_page
+        if total_pages > 1:
+            if page_offset > 0:
+                kb.button(
+                    text="◀️",
+                    callback_data=f"store_page_{store_id}_{max(0, page_offset - per_page)}",
+                )
+            kb.button(text=f"1/{total_pages}", callback_data="store_offers_noop")
+            if page_offset + per_page < total:
+                kb.button(text="▶️", callback_data=f"store_page_{store_id}_{page_offset + per_page}")
+
+        # Back button
+        back_text = "◀️ Назад" if lang == "ru" else "◀️ Orqaga"
+        kb.button(text=back_text, callback_data=f"back_to_store_{store_id}")
 
         if msg:
             await msg.answer(page_text, parse_mode="HTML", reply_markup=kb.as_markup())
@@ -813,7 +840,7 @@ def setup(
 
     @dp.callback_query(F.data.startswith("store_page_"))
     async def store_page(callback: types.CallbackQuery, state: FSMContext) -> None:
-        """Show a different page of store offers."""
+        """Show a different page of store offers - unified style."""
         if not callback.from_user:
             await callback.answer()
             return
@@ -830,53 +857,91 @@ def setup(
             )
             return
 
+        lang = db.get_user_language(callback.from_user.id)
+
         try:
             offers = offer_service.list_active_offers_by_store(store_id)
         except Exception:
             offers = []
 
+        # Get store name
+        store = offer_service.get_store(store_id)
+        store_name = store.name if store else "Магазин"
+
+        total = len(offers)
         per_page = 10
         page_offers = offers[offset : offset + per_page]
-        lang = db.get_user_language(callback.from_user.id)
+        current_page = offset // per_page + 1
+        total_pages = (total + per_page - 1) // per_page
+
+        # Header
+        header = f"🏪 <b>{store_name}</b>\n"
+        shown_text = "Товаров" if lang == "ru" else "Mahsulotlar"
+        header += f"📦 {shown_text}: {total}\n"
 
         # Build compact lines
-        page_lines = []
-        for idx, off in enumerate(page_offers, start=1):
+        lines = [header]
+        for idx, off in enumerate(page_offers, start=offset + 1):
             title = getattr(off, "title", "Товар")
+            short_title = title[:25] + ".." if len(title) > 25 else title
             price = getattr(off, "discount_price", getattr(off, "price", 0))
             qty = getattr(off, "quantity", 0)
-            page_lines.append(f"{idx}. <b>{title}</b> — {int(price):,} — {qty} шт")
 
-        page_text = (
-            "\n".join(page_lines)
-            if page_lines
-            else ("(Нет доступных товаров)" if lang == "ru" else "(Mavjud mahsulotlar yo'q)")
-        )
+            lines.append(f"{idx}. <b>{short_title}</b>")
+            currency = "сум" if lang == "ru" else "so'm"
+            qty_text = "шт" if lang == "ru" else "ta"
+            lines.append(f"   💰 {int(price):,} {currency} • 📦 {qty} {qty_text}")
+            lines.append("")
 
-        # KB
+        if not page_offers:
+            empty = "(Нет доступных товаров)" if lang == "ru" else "(Mavjud mahsulotlar yo'q)"
+            lines.append(empty)
+        else:
+            hint = "👆 Нажмите для заказа" if lang == "ru" else "👆 Buyurtma uchun tanlang"
+            lines.append(hint)
+
+        page_text = "\n".join(lines)
+
+        # Compact keyboard
         from aiogram.utils.keyboard import InlineKeyboardBuilder
 
         kb = InlineKeyboardBuilder()
-        # Prev | Next on first row, selector on second row
-        kb.button(
-            text=("⬅️ Назад" if lang == "ru" else "⬅️ Orqaga"),
-            callback_data=f"store_page_{store_id}_{max(0, offset - per_page)}",
-        )
-        if offset + per_page < len(offers):
-            kb.button(
-                text=("Вперёд ➡️" if lang == "ru" else "Oldinga ➡️"),
-                callback_data=f"store_page_{store_id}_{offset + per_page}",
-            )
-        kb.button(
-            text=("🛒 Выбрать товар" if lang == "ru" else "🛒 Mahsulotni tanlash"),
-            callback_data=f"store_choose_page_{store_id}_{offset}",
-        )
-        kb.adjust(2, 1)
+
+        # Offer buttons - 2 columns
+        for idx, off in enumerate(page_offers, start=offset + 1):
+            offer_id = getattr(off, "id", 0)
+            title = getattr(off, "title", "Товар")
+            short = title[:10] + ".." if len(title) > 10 else title
+            price = getattr(off, "discount_price", getattr(off, "price", 0))
+            price_str = f"{int(price/1000)}k" if price >= 1000 else str(int(price))
+            kb.button(text=f"{idx}. {short} {price_str}", callback_data=f"hot_offer_{offer_id}")
+
+        kb.adjust(2)
+
+        # Pagination row
+        if total_pages > 1:
+            if offset > 0:
+                kb.button(
+                    text="◀️", callback_data=f"store_page_{store_id}_{max(0, offset - per_page)}"
+                )
+            kb.button(text=f"{current_page}/{total_pages}", callback_data="store_offers_noop")
+            if offset + per_page < total:
+                kb.button(text="▶️", callback_data=f"store_page_{store_id}_{offset + per_page}")
+
+        # Back button
+        back_text = "◀️ Назад" if lang == "ru" else "◀️ Orqaga"
+        kb.button(text=back_text, callback_data=f"back_to_store_{store_id}")
 
         if msg:
-            await msg.answer(page_text, parse_mode="HTML", reply_markup=kb.as_markup())
-        else:
-            await callback.answer(page_text, show_alert=True)
+            try:
+                await msg.edit_text(page_text, parse_mode="HTML", reply_markup=kb.as_markup())
+            except Exception:
+                await msg.answer(page_text, parse_mode="HTML", reply_markup=kb.as_markup())
+        await callback.answer()
+
+    @dp.callback_query(F.data == "store_offers_noop")
+    async def store_offers_noop(callback: types.CallbackQuery) -> None:
+        """Handle noop button (page indicator)."""
         await callback.answer()
 
     @dp.callback_query(F.data.startswith("store_choose_page_"))

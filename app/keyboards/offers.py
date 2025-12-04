@@ -157,19 +157,55 @@ def store_offers_keyboard(
 def store_list_keyboard(
     lang: str,
     stores: list,
+    page: int = 0,
+    per_page: int = 10,
 ) -> InlineKeyboardMarkup:
-    """Keyboard with inline buttons for store selection."""
+    """Compact keyboard for store selection with pagination (like hot offers)."""
     builder = InlineKeyboardBuilder()
-    for idx, store in enumerate(stores, 1):
-        # store can be StoreSummary object or dict
+
+    total = len(stores)
+    start_idx = page * per_page
+    page_stores = stores[start_idx : start_idx + per_page]
+
+    # Store buttons - compact 2 columns
+    for idx, store in enumerate(page_stores, start_idx + 1):
         store_id = store.id if hasattr(store, "id") else store.get("store_id", idx)
         store_name = store.name if hasattr(store, "name") else store.get("name", f"Store {idx}")
-        # Truncate long names
-        display_name = store_name[:25] + "..." if len(store_name) > 25 else store_name
-        builder.button(text=f"{idx}. {display_name}", callback_data=f"select_store_{store_id}")
+        # Very short for 2-column layout
+        short_name = store_name[:12] + ".." if len(store_name) > 12 else store_name
+        builder.button(text=f"{idx}. {short_name}", callback_data=f"select_store_{store_id}")
+
+    # Adjust to 2 columns for compact view
+    builder.adjust(2)
+
+    # Pagination row
+    nav_row = []
+    if page > 0:
+        prev_text = "◀️"
+        builder.button(text=prev_text, callback_data=f"stores_page_{page - 1}")
+        nav_row.append(1)
+
+    # Page indicator
+    total_pages = (total + per_page - 1) // per_page
+    if total_pages > 1:
+        builder.button(text=f"{page + 1}/{total_pages}", callback_data="stores_noop")
+        nav_row.append(1)
+
+    if start_idx + per_page < total:
+        next_text = "▶️"
+        builder.button(text=next_text, callback_data=f"stores_page_{page + 1}")
+        nav_row.append(1)
+
+    # Back button
     back = "◀️ Назад" if lang == "ru" else "◀️ Orqaga"
     builder.button(text=back, callback_data="back_to_places")
-    builder.adjust(1)
+
+    # Final adjust: store buttons (2 cols), then nav row, then back
+    rows = [2] * len(page_stores)  # Each pair of stores
+    if nav_row:
+        rows.append(sum(nav_row))
+    rows.append(1)  # Back button
+
     return builder.as_markup()
 
 

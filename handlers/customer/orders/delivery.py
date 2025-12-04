@@ -1172,50 +1172,67 @@ async def admin_confirm_payment(
     except Exception:
         pass
 
-    # Notify seller
+    # Notify seller with confirmation buttons
     if owner_id:
         seller_lang = db.get_user_language(owner_id)
+        currency = "so'm" if seller_lang == "uz" else "сум"
 
         if seller_lang == "uz":
             caption = (
                 f"🔔 <b>Yangi buyurtma!</b>\n\n"
                 f"📦 #{order_id} | ✅ To'langan\n"
                 f"🛒 {offer_title} × {quantity}\n"
-                f"💵 {total:,} so'm\n"
+                f"💵 {total:,} {currency}\n"
                 f"📍 {address}\n"
                 f"👤 {customer_name}\n"
                 f"📱 <code>{customer_phone}</code>\n\n"
-                f"🚚 Yetkazib berishni tashkil qiling!"
+                f"⏳ <b>Buyurtmani tasdiqlang!</b>"
             )
+            confirm_text = "✅ Qabul qilish"
+            reject_text = "❌ Rad etish"
         else:
             caption = (
                 f"🔔 <b>Новый заказ!</b>\n\n"
                 f"📦 #{order_id} | ✅ Оплачено\n"
                 f"🛒 {offer_title} × {quantity}\n"
-                f"💵 {total:,} сум\n"
+                f"💵 {total:,} {currency}\n"
                 f"📍 {address}\n"
                 f"👤 {customer_name}\n"
                 f"📱 <code>{customer_phone}</code>\n\n"
-                f"🚚 Организуйте доставку!"
+                f"⏳ <b>Подтвердите заказ!</b>"
             )
+            confirm_text = "✅ Принять"
+            reject_text = "❌ Отклонить"
+
+        # Partner confirmation keyboard
+        partner_kb = InlineKeyboardBuilder()
+        partner_kb.button(text=confirm_text, callback_data=f"partner_confirm_order_{order_id}")
+        partner_kb.button(text=reject_text, callback_data=f"partner_reject_order_{order_id}")
+        partner_kb.adjust(2)
 
         try:
             if payment_photo:
                 await bot.send_photo(
-                    owner_id, photo=payment_photo, caption=caption, parse_mode="HTML"
+                    owner_id,
+                    photo=payment_photo,
+                    caption=caption,
+                    parse_mode="HTML",
+                    reply_markup=partner_kb.as_markup(),
                 )
             else:
-                await bot.send_message(owner_id, caption, parse_mode="HTML")
+                await bot.send_message(
+                    owner_id, caption, parse_mode="HTML", reply_markup=partner_kb.as_markup()
+                )
         except Exception as e:
             logger.error(f"Failed to notify seller: {e}")
 
-    # Notify customer
+    # Notify customer - payment confirmed, waiting for partner
     if customer_id:
         cust_lang = db.get_user_language(customer_id)
         if cust_lang == "uz":
-            text = f"✅ <b>To'lov tasdiqlandi!</b>\n\n📦 #{order_id}\n🚚 Yetkazib berish tashkil qilinmoqda..."
+            text = f"✅ <b>To'lov tasdiqlandi!</b>\n\n📦 #{order_id}\n⏳ Sotuvchi tasdiqlashini kutamiz..."
         else:
-            text = f"✅ <b>Оплата подтверждена!</b>\n\n📦 #{order_id}\n🚚 Доставка организуется..."
+            text = f"✅ <b>Оплата подтверждена!</b>\n\n📦 #{order_id}\n⏳ Ожидаем подтверждение продавца..."
 
         try:
             await bot.send_message(customer_id, text, parse_mode="HTML")
@@ -1286,6 +1303,228 @@ async def admin_reject_payment(
             pass
 
     await callback.answer("❌ Rad etildi", show_alert=True)
+
+
+# =============================================================================
+# PARTNER CONFIRM/REJECT ORDER (delivery)
+# =============================================================================
+
+
+@router.callback_query(F.data.startswith("partner_confirm_order_"))
+async def partner_confirm_order(
+    callback: types.CallbackQuery, db: DatabaseProtocol, bot: Any
+) -> None:
+    """Partner confirms a delivery order."""
+    if not callback.from_user or not callback.data:
+        await callback.answer()
+        return
+
+    partner_id = callback.from_user.id
+    lang = db.get_user_language(partner_id)
+
+    try:
+        order_id = int(callback.data.split("_")[-1])
+    except (ValueError, IndexError):
+        await callback.answer("❌", show_alert=True)
+        return
+
+    order = db.get_order(order_id)
+    if not order:
+        await callback.answer(
+            "❌ Buyurtma topilmadi" if lang == "uz" else "❌ Заказ не найден", show_alert=True
+        )
+        return
+
+    # Verify ownership
+    store_id = _get_order_field(order, "store_id", 2)
+    store = db.get_store(store_id) if store_id else None
+    owner_id = get_store_field(store, "owner_id") if store else None
+
+    if partner_id != owner_id:
+        await callback.answer("❌", show_alert=True)
+        return
+
+    # Update order status
+    db.update_order_status(order_id, "preparing")
+
+    # Get order details
+    customer_id = _get_order_field(order, "user_id", 1)
+    offer_id = _get_order_field(order, "offer_id", 3)
+    quantity = _get_order_field(order, "quantity", 4)
+    address = _get_order_field(order, "delivery_address", 7)
+    delivery_price = _get_order_field(order, "delivery_price", 8) or 0
+
+    offer = db.get_offer(offer_id) if offer_id else None
+    offer_title = get_offer_field(offer, "title", "Товар") if offer else "Товар"
+    offer_price = get_offer_field(offer, "discount_price", 0) if offer else 0
+    store_name = get_store_field(store, "name", "Магазин") if store else "Магазин"
+    store_address = get_store_field(store, "address", "") if store else ""
+
+    total = (offer_price * quantity) + delivery_price
+    currency = "so'm" if lang == "uz" else "сум"
+
+    # Update partner message
+    try:
+        if callback.message:
+            if hasattr(callback.message, "caption") and callback.message.caption:
+                await callback.message.edit_caption(
+                    caption=callback.message.caption + "\n\n✅ <b>QABUL QILINDI</b>"
+                    if lang == "uz"
+                    else callback.message.caption + "\n\n✅ <b>ПРИНЯТО</b>",
+                    parse_mode="HTML",
+                )
+            elif hasattr(callback.message, "text") and callback.message.text:
+                await callback.message.edit_text(
+                    text=callback.message.text + "\n\n✅ <b>QABUL QILINDI</b>"
+                    if lang == "uz"
+                    else callback.message.text + "\n\n✅ <b>ПРИНЯТО</b>",
+                    parse_mode="HTML",
+                )
+    except Exception:
+        pass
+
+    # Notify customer - order accepted, delivery starting
+    if customer_id:
+        cust_lang = db.get_user_language(customer_id)
+        cust_currency = "so'm" if cust_lang == "uz" else "сум"
+
+        if cust_lang == "uz":
+            customer_msg = (
+                f"🎉 <b>Buyurtma qabul qilindi!</b>\n\n"
+                f"📦 #{order_id}\n"
+                f"🏪 {_esc(store_name)}\n"
+                f"🛒 {_esc(offer_title)} × {quantity}\n"
+                f"💵 {total:,} {cust_currency}\n"
+                f"📍 {_esc(address)}\n\n"
+                f"🚚 <b>Yetkazib berish tashkil qilinmoqda!</b>\n"
+                f"Tez orada sizga yetkazamiz."
+            )
+        else:
+            customer_msg = (
+                f"🎉 <b>Заказ принят!</b>\n\n"
+                f"📦 #{order_id}\n"
+                f"🏪 {_esc(store_name)}\n"
+                f"🛒 {_esc(offer_title)} × {quantity}\n"
+                f"💵 {total:,} {cust_currency}\n"
+                f"📍 {_esc(address)}\n\n"
+                f"🚚 <b>Доставка организуется!</b>\n"
+                f"Скоро привезём ваш заказ."
+            )
+
+        try:
+            await bot.send_message(customer_id, customer_msg, parse_mode="HTML")
+        except Exception as e:
+            logger.error(f"Failed to notify customer: {e}")
+
+    await callback.answer("✅ Qabul qilindi!" if lang == "uz" else "✅ Принято!", show_alert=True)
+
+
+@router.callback_query(F.data.startswith("partner_reject_order_"))
+async def partner_reject_order(
+    callback: types.CallbackQuery, db: DatabaseProtocol, bot: Any
+) -> None:
+    """Partner rejects a delivery order."""
+    if not callback.from_user or not callback.data:
+        await callback.answer()
+        return
+
+    partner_id = callback.from_user.id
+    lang = db.get_user_language(partner_id)
+
+    try:
+        order_id = int(callback.data.split("_")[-1])
+    except (ValueError, IndexError):
+        await callback.answer("❌", show_alert=True)
+        return
+
+    order = db.get_order(order_id)
+    if not order:
+        await callback.answer(
+            "❌ Buyurtma topilmadi" if lang == "uz" else "❌ Заказ не найден", show_alert=True
+        )
+        return
+
+    # Verify ownership
+    store_id = _get_order_field(order, "store_id", 2)
+    store = db.get_store(store_id) if store_id else None
+    owner_id = get_store_field(store, "owner_id") if store else None
+
+    if partner_id != owner_id:
+        await callback.answer("❌", show_alert=True)
+        return
+
+    # Update order status
+    db.update_order_status(order_id, "rejected")
+
+    # Restore quantity
+    offer_id = _get_order_field(order, "offer_id", 3)
+    quantity = _get_order_field(order, "quantity", 4)
+    if offer_id:
+        try:
+            db.increment_offer_quantity_atomic(offer_id, int(quantity))
+        except Exception:
+            pass
+
+    # Update partner message
+    try:
+        if callback.message:
+            if hasattr(callback.message, "caption") and callback.message.caption:
+                await callback.message.edit_caption(
+                    caption=callback.message.caption + "\n\n❌ <b>RAD ETILDI</b>"
+                    if lang == "uz"
+                    else callback.message.caption + "\n\n❌ <b>ОТКЛОНЕНО</b>",
+                    parse_mode="HTML",
+                )
+            elif hasattr(callback.message, "text") and callback.message.text:
+                await callback.message.edit_text(
+                    text=callback.message.text + "\n\n❌ <b>RAD ETILDI</b>"
+                    if lang == "uz"
+                    else callback.message.text + "\n\n❌ <b>ОТКЛОНЕНО</b>",
+                    parse_mode="HTML",
+                )
+    except Exception:
+        pass
+
+    # Notify customer - order rejected, refund will be processed
+    customer_id = _get_order_field(order, "user_id", 1)
+    if customer_id:
+        cust_lang = db.get_user_language(customer_id)
+        store_name = get_store_field(store, "name", "Магазин") if store else "Магазин"
+
+        if cust_lang == "uz":
+            customer_msg = (
+                f"😔 <b>Buyurtma rad etildi</b>\n\n"
+                f"📦 #{order_id}\n"
+                f"🏪 {_esc(store_name)}\n\n"
+                f"💰 Pul qaytariladi.\n"
+                f"Boshqa do'kondan sinab ko'ring!"
+            )
+        else:
+            customer_msg = (
+                f"😔 <b>Заказ отклонён</b>\n\n"
+                f"📦 #{order_id}\n"
+                f"🏪 {_esc(store_name)}\n\n"
+                f"💰 Деньги будут возвращены.\n"
+                f"Попробуйте другой магазин!"
+            )
+
+        try:
+            await bot.send_message(customer_id, customer_msg, parse_mode="HTML")
+        except Exception as e:
+            logger.error(f"Failed to notify customer: {e}")
+
+    # Notify admin about rejection
+    if ADMIN_ID > 0:
+        try:
+            await bot.send_message(
+                ADMIN_ID,
+                f"⚠️ Заказ #{order_id} отклонён продавцом\n" f"💰 Требуется возврат средств",
+                parse_mode="HTML",
+            )
+        except Exception:
+            pass
+
+    await callback.answer("❌ Rad etildi" if lang == "uz" else "❌ Отклонено", show_alert=True)
 
 
 @router.callback_query(F.data.startswith("cancel_order_customer_"))
