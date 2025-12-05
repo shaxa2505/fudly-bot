@@ -38,6 +38,10 @@ function HomePage() {
   const [manualCity, setManualCity] = useState(location.city)
   const [manualAddress, setManualAddress] = useState(location.address)
 
+  // Quick filters state
+  const [minDiscount, setMinDiscount] = useState(null) // null, 20, 30, 50
+  const [sortBy, setSortBy] = useState('default') // default, discount, price_asc, price_desc
+
   // Search history state
   const [searchHistory, setSearchHistory] = useState([])
   const [showSearchHistory, setShowSearchHistory] = useState(false)
@@ -214,6 +218,16 @@ function HomePage() {
         params.search = searchQuery.trim()
       }
 
+      // Добавляем фильтр по скидке
+      if (minDiscount) {
+        params.min_discount = minDiscount
+      }
+
+      // Добавляем сортировку
+      if (sortBy !== 'default') {
+        params.sort_by = sortBy
+      }
+
       const data = await api.getOffers(params)
 
       // Если город пустой и это первая загрузка - загружаем из всех городов
@@ -238,7 +252,7 @@ function HomePage() {
     } finally {
       setLoading(false)
     }
-  }, [selectedCategory, searchQuery, offset, loading, cityForApi, showingAllCities])
+  }, [selectedCategory, searchQuery, offset, loading, cityForApi, showingAllCities, minDiscount, sortBy])
 
   // Pull-to-refresh handler
   const handleRefresh = useCallback(async () => {
@@ -257,7 +271,7 @@ function HomePage() {
     }, searchQuery ? 500 : 0)
 
     return () => clearTimeout(timer)
-  }, [selectedCategory, searchQuery, cityForApi])
+  }, [selectedCategory, searchQuery, cityForApi, minDiscount, sortBy])
 
   // Infinite scroll
   useEffect(() => {
@@ -515,6 +529,66 @@ function HomePage() {
               <span className="category-pill-name">{cat.name}</span>
             </button>
           ))}
+        </div>
+      </div>
+
+      {/* Quick Filters */}
+      <div className="quick-filters">
+        <div className="quick-filters-row">
+          {/* Discount Filters */}
+          <div className="filter-group">
+            <button 
+              className={`filter-chip ${minDiscount === null ? 'active' : ''}`}
+              onClick={() => {
+                window.Telegram?.WebApp?.HapticFeedback?.selectionChanged?.()
+                setMinDiscount(null)
+              }}
+            >
+              Hammasi
+            </button>
+            <button 
+              className={`filter-chip discount ${minDiscount === 20 ? 'active' : ''}`}
+              onClick={() => {
+                window.Telegram?.WebApp?.HapticFeedback?.selectionChanged?.()
+                setMinDiscount(minDiscount === 20 ? null : 20)
+              }}
+            >
+              🏷️ 20%+
+            </button>
+            <button 
+              className={`filter-chip discount ${minDiscount === 30 ? 'active' : ''}`}
+              onClick={() => {
+                window.Telegram?.WebApp?.HapticFeedback?.selectionChanged?.()
+                setMinDiscount(minDiscount === 30 ? null : 30)
+              }}
+            >
+              🔥 30%+
+            </button>
+            <button 
+              className={`filter-chip discount ${minDiscount === 50 ? 'active' : ''}`}
+              onClick={() => {
+                window.Telegram?.WebApp?.HapticFeedback?.selectionChanged?.()
+                setMinDiscount(minDiscount === 50 ? null : 50)
+              }}
+            >
+              💥 50%+
+            </button>
+          </div>
+
+          {/* Sort Dropdown */}
+          <select 
+            className="sort-select"
+            value={sortBy}
+            onChange={(e) => {
+              window.Telegram?.WebApp?.HapticFeedback?.selectionChanged?.()
+              setSortBy(e.target.value)
+            }}
+          >
+            <option value="default">Tartiblash</option>
+            <option value="discount">Chegirma ↓</option>
+            <option value="price_asc">Narx ↑</option>
+            <option value="price_desc">Narx ↓</option>
+          </select>
         </div>
       </div>
 

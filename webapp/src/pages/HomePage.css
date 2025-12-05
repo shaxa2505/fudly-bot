@@ -430,6 +430,89 @@
   font-weight: var(--font-semibold);
 }
 
+/* =============================================================================
+   Quick Filters Section
+   ============================================================================= */
+
+.quick-filters {
+  padding: var(--spacing-md) var(--spacing-lg);
+  background: var(--color-bg-primary);
+  border-bottom: 1px solid var(--color-border-light);
+}
+
+.quick-filters-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--spacing-md);
+}
+
+.filter-group {
+  display: flex;
+  gap: var(--spacing-xs);
+  overflow-x: auto;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+  flex: 1;
+}
+
+.filter-group::-webkit-scrollbar {
+  display: none;
+}
+
+.filter-chip {
+  flex-shrink: 0;
+  padding: 6px 12px;
+  background: var(--color-bg-secondary);
+  border: 1.5px solid transparent;
+  border-radius: var(--radius-full);
+  font-size: 13px;
+  font-weight: var(--font-medium);
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  white-space: nowrap;
+}
+
+.filter-chip:active {
+  transform: scale(0.95);
+}
+
+.filter-chip.active {
+  background: var(--color-primary-light, rgba(83, 177, 117, 0.12));
+  border-color: var(--color-primary);
+  color: var(--color-primary);
+  font-weight: var(--font-semibold);
+}
+
+.filter-chip.discount.active {
+  background: linear-gradient(135deg, rgba(255, 107, 53, 0.12) 0%, rgba(255, 61, 0, 0.12) 100%);
+  border-color: #FF6B35;
+  color: #FF6B35;
+}
+
+.sort-select {
+  flex-shrink: 0;
+  padding: 6px 28px 6px 12px;
+  background: var(--color-bg-secondary);
+  border: 1.5px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  font-size: 13px;
+  font-weight: var(--font-medium);
+  color: var(--color-text-primary);
+  cursor: pointer;
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23666' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 8px center;
+  transition: all var(--transition-fast);
+}
+
+.sort-select:focus {
+  outline: none;
+  border-color: var(--color-primary);
+}
+
 /* Popular Section */
 .popular-section {
   background: var(--color-bg-primary);
