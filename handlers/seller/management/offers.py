@@ -453,6 +453,18 @@ async def set_expiry(callback: types.CallbackQuery) -> None:
     offer_id = int(parts[1])
     days_add = int(parts[2])
 
+    offer = db.get_offer(offer_id)
+    if not offer:
+        await callback.answer(get_text(lang, "offer_not_found"), show_alert=True)
+        return
+
+    # Verify ownership
+    user_stores = db.get_user_accessible_stores(callback.from_user.id)
+    offer_store_id = get_offer_field(offer, "store_id")
+    if not any(get_store_field(store, "store_id") == offer_store_id for store in user_stores):
+        await callback.answer(get_text(lang, "not_your_offer"), show_alert=True)
+        return
+
     new_expiry = (datetime.now() + timedelta(days=days_add)).strftime("%Y-%m-%d")
     db.update_offer_expiry(offer_id, new_expiry)
 
@@ -768,6 +780,18 @@ async def edit_photo_start(callback: types.CallbackQuery, state: FSMContext) -> 
         await callback.answer(get_text(lang, "error"), show_alert=True)
         return
 
+    offer = db.get_offer(offer_id)
+    if not offer:
+        await callback.answer(get_text(lang, "offer_not_found"), show_alert=True)
+        return
+
+    # Verify ownership
+    user_stores = db.get_user_accessible_stores(callback.from_user.id)
+    offer_store_id = get_offer_field(offer, "store_id")
+    if not any(get_store_field(store, "store_id") == offer_store_id for store in user_stores):
+        await callback.answer(get_text(lang, "not_your_offer"), show_alert=True)
+        return
+
     await state.update_data(offer_id=offer_id)
     await state.set_state(EditOffer.photo)
 
@@ -798,6 +822,18 @@ async def remove_photo(callback: types.CallbackQuery, state: FSMContext) -> None
         offer_id = int(callback.data.split("_")[2])
     except (ValueError, IndexError):
         await callback.answer(get_text(lang, "error"), show_alert=True)
+        return
+
+    offer = db.get_offer(offer_id)
+    if not offer:
+        await callback.answer(get_text(lang, "offer_not_found"), show_alert=True)
+        return
+
+    # Verify ownership
+    user_stores = db.get_user_accessible_stores(callback.from_user.id)
+    offer_store_id = get_offer_field(offer, "store_id")
+    if not any(get_store_field(store, "store_id") == offer_store_id for store in user_stores):
+        await callback.answer(get_text(lang, "not_your_offer"), show_alert=True)
         return
 
     with db.get_connection() as conn:
