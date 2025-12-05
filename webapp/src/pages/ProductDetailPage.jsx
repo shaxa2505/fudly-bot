@@ -26,8 +26,9 @@ function ProductDetailPage() {
     }
   }, [offer?.id])
 
-  // Get image URL - support multiple field names
-  const imageUrl = offer?.image_url || offer?.photo || ''
+  // Get image URL - support multiple field names and convert file_id
+  const rawPhoto = offer?.image_url || offer?.photo || ''
+  const imageUrl = api.getPhotoUrl(rawPhoto) || ''
 
   const handleQuantityChange = (delta) => {
     const maxQty = offer?.quantity || 99

@@ -1,6 +1,7 @@
 import { memo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useFavorites } from '../context/FavoritesContext'
+import api from '../api/client'
 import './OfferCard.css'
 
 const OfferCard = memo(function OfferCard({ offer, cartQuantity = 0, onAddToCart, onRemoveFromCart }) {
@@ -13,8 +14,16 @@ const OfferCard = memo(function OfferCard({ offer, cartQuantity = 0, onAddToCart
     navigate('/product', { state: { offer } })
   }
 
+  // Get stock limit from offer
+  const stockLimit = offer.quantity || offer.stock || 99
+  const isMaxReached = cartQuantity >= stockLimit
+
   const handleAddClick = (e) => {
     e.stopPropagation()
+    if (isMaxReached) {
+      window.Telegram?.WebApp?.HapticFeedback?.notificationOccurred?.('warning')
+      return
+    }
     onAddToCart?.(offer)
   }
 
@@ -43,6 +52,9 @@ const OfferCard = memo(function OfferCard({ offer, cartQuantity = 0, onAddToCart
   }
 
   const expiryText = formatExpiry(offer.expiry_date)
+
+  // Get photo URL (handles Telegram file_id conversion)
+  const photoUrl = api.getPhotoUrl(offer.photo) || 'https://placehold.co/300x300/F8F8F8/CCCCCC?text=📷'
 
   return (
     <div className={`offer-card ${cartQuantity > 0 ? 'in-cart' : ''}`} onClick={handleCardClick}>
@@ -76,12 +88,15 @@ const OfferCard = memo(function OfferCard({ offer, cartQuantity = 0, onAddToCart
         )}
 
         <img
-          src={offer.photo || 'https://placehold.co/300x300/F8F8F8/CCCCCC?text=📷'}
+          src={photoUrl}
           alt={offer.title}
           className="card-image"
           loading="lazy"
           onError={(e) => {
-            e.target.src = 'https://placehold.co/300x300/F8F8F8/CCCCCC?text=📷'
+            if (!e.target.dataset.fallback) {
+              e.target.dataset.fallback = 'true'
+              e.target.src = 'https://placehold.co/300x300/F8F8F8/CCCCCC?text=📷'
+            }
           }}
         />
       </div>
@@ -109,8 +124,12 @@ const OfferCard = memo(function OfferCard({ offer, cartQuantity = 0, onAddToCart
           {cartQuantity > 0 ? (
             <div className="quantity-control">
               <button className="qty-btn" onClick={handleRemoveClick}>−</button>
-              <span className="qty-num">{cartQuantity}</span>
-              <button className="qty-btn qty-plus" onClick={handleAddClick}>+</button>
+              <span className="qty-num">{cartQuantity}{stockLimit < 99 ? `/${stockLimit}` : ''}</span>
+              <button 
+                className={`qty-btn qty-plus ${isMaxReached ? 'disabled' : ''}`} 
+                onClick={handleAddClick}
+                disabled={isMaxReached}
+              >+</button>
             </div>
           ) : (
             <button className="add-to-cart-btn" onClick={handleAddClick}>

@@ -87,6 +87,23 @@ const cachedGet = async (url, params = {}, ttl = CACHE_TTL) => {
 }
 
 const api = {
+  // Helper to convert Telegram file_id to photo URL
+  getPhotoUrl(photo) {
+    if (!photo) return null
+    
+    // Already a URL
+    if (photo.startsWith('http://') || photo.startsWith('https://')) {
+      return photo
+    }
+    
+    // Telegram file_id - use our API endpoint
+    if (photo.startsWith('AgAC') || photo.length > 50) {
+      return `${API_BASE}/photo/${encodeURIComponent(photo)}`
+    }
+    
+    return null
+  },
+
   // Auth endpoints
   async validateAuth(initData) {
     const { data } = await client.post('/auth/validate', { init_data: initData })

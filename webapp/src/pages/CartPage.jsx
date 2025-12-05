@@ -259,13 +259,20 @@ function CartPage({ user }) {
       </header>
 
       <div className="cart-items">
-        {cartItems.map(item => (
+        {cartItems.map(item => {
+          const photoUrl = api.getPhotoUrl(item.offer.photo) || 'https://placehold.co/80x80/F5F5F5/CCCCCC?text=📷'
+          return (
           <div key={item.offer.id} className="cart-item">
             <img
-              src={item.offer.photo || 'https://placehold.co/80x80/F5F5F5/CCCCCC?text=📷'}
+              src={photoUrl}
               alt={item.offer.title}
               className="cart-item-img"
-              onError={(e) => { e.target.src = 'https://placehold.co/80x80/F5F5F5/CCCCCC?text=📷' }}
+              onError={(e) => { 
+                if (!e.target.dataset.fallback) {
+                  e.target.dataset.fallback = 'true'
+                  e.target.src = 'https://placehold.co/80x80/F5F5F5/CCCCCC?text=📷' 
+                }
+              }}
             />
             <div className="cart-item-info">
               <h3 className="cart-item-title">{item.offer.title}</h3>
@@ -307,7 +314,7 @@ function CartPage({ user }) {
               </button>
             </div>
           </div>
-        ))}
+        )})}
       </div>
 
       <div className="cart-summary">

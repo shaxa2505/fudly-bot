@@ -211,6 +211,44 @@ async def get_current_user(
 _db_instance = None
 _offer_service = None
 
+# Photo URL cache (file_id -> url)
+_photo_cache: dict[str, str] = {}
+
+
+def get_photo_url_sync(file_id: str | None) -> str | None:
+    """Convert Telegram file_id to photo URL (sync version for API).
+    
+    Telegram file_ids start with 'AgAC' for photos.
+    If it's already a URL (http/https), return as-is.
+    """
+    if not file_id:
+        return None
+    
+    # Already a URL
+    if file_id.startswith(('http://', 'https://')):
+        return file_id
+    
+    # Check cache
+    if file_id in _photo_cache:
+        return _photo_cache[file_id]
+    
+    # It's a Telegram file_id - construct URL
+    # Note: This URL will work for ~1 hour, Telegram file URLs expire
+    try:
+        bot_token = settings.bot_token
+        if bot_token and file_id.startswith('AgAC'):
+            # For photos, we need to use the Bot API getFile endpoint
+            # But since this is sync, we'll return a proxy URL
+            # that the frontend can use to fetch the photo
+            url = f"https://api.telegram.org/file/bot{bot_token}/{file_id}"
+            # Note: This won't work directly - file_id needs to be converted via getFile
+            # For now, return None and let fallback image show
+            return None
+    except Exception:
+        pass
+    
+    return None
+
 
 def set_db_instance(db: Any, offer_service: Any = None):
     """Set database instance for API routes."""
@@ -472,6 +510,44 @@ async def get_stores(
     except Exception as e:
         logger.error(f"Error getting stores: {e}")
         raise HTTPException(status_code=500, detail=str(e)) from e
+
+
+# =============================================================================
+# Photo URL Conversion
+# =============================================================================
+
+
+@router.get("/photo/{file_id:path}")
+async def get_photo(file_id: str):
+    """Convert Telegram file_id to actual photo URL.
+    
+    Returns redirect to Telegram file server or 404.
+    """
+    from aiogram import Bot
+    
+    if not file_id or len(file_id) < 10:
+        raise HTTPException(status_code=404, detail="Invalid file_id")
+    
+    # Check cache first
+    if file_id in _photo_cache:
+        from fastapi.responses import RedirectResponse
+        return RedirectResponse(url=_photo_cache[file_id])
+    
+    try:
+        bot = Bot(token=settings.bot_token)
+        try:
+            file = await bot.get_file(file_id)
+            if file and file.file_path:
+                url = f"https://api.telegram.org/file/bot{settings.bot_token}/{file.file_path}"
+                _photo_cache[file_id] = url
+                from fastapi.responses import RedirectResponse
+                return RedirectResponse(url=url)
+        finally:
+            await bot.session.close()
+    except Exception as e:
+        logger.debug(f"Could not get photo for {file_id[:20]}...: {e}")
+    
+    raise HTTPException(status_code=404, detail="Photo not found")
 
 
 # =============================================================================

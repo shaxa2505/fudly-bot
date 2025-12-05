@@ -14,6 +14,7 @@
   cursor: pointer;
   -webkit-tap-highlight-color: transparent;
   transition: box-shadow 0.2s ease, transform 0.15s ease;
+  height: 100%; /* Uniform height */
 }
 
 .offer-card:active {
@@ -127,6 +128,8 @@
   padding: 14px;
   display: flex;
   flex-direction: column;
+  flex: 1; /* Fill remaining space */
+  justify-content: space-between;
 }
 
 .store-name {
@@ -258,6 +261,16 @@
 
 .qty-btn.qty-plus:active {
   background: #C8E6C9;
+}
+
+.qty-btn.qty-plus.disabled {
+  background: #F0F0F0;
+  color: #CCCCCC;
+  cursor: not-allowed;
+}
+
+.qty-btn.qty-plus.disabled:active {
+  transform: none;
 }
 
 .qty-num {
