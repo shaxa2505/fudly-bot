@@ -10,7 +10,7 @@ from aiogram import F, Router, types
 from aiogram.fsm.context import FSMContext
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
-from app.core.utils import get_field
+from app.core.utils import get_field, get_store_field
 from handlers.common.states import CourierHandover
 from localization import get_text
 
@@ -53,6 +53,15 @@ async def confirm_order(callback: types.CallbackQuery):
         await callback.answer(
             "❌ " + ("Заказ не найден" if lang == "ru" else "Buyurtma topilmadi"), show_alert=True
         )
+        return
+
+    # Verify store ownership
+    store_id = get_order_field(order, "store_id", 2)
+    store = db.get_store(store_id) if store_id else None
+    owner_id = get_store_field(store, "owner_id") if store else None
+
+    if callback.from_user.id != owner_id:
+        await callback.answer("❌", show_alert=True)
         return
 
     # Обновляем статус
@@ -99,6 +108,15 @@ async def cancel_order(callback: types.CallbackQuery):
         await callback.answer(
             "❌ " + ("Заказ не найден" if lang == "ru" else "Buyurtma topilmadi"), show_alert=True
         )
+        return
+
+    # Verify store ownership
+    store_id = get_order_field(order, "store_id", 2)
+    store = db.get_store(store_id) if store_id else None
+    owner_id = get_store_field(store, "owner_id") if store else None
+
+    if callback.from_user.id != owner_id:
+        await callback.answer("❌", show_alert=True)
         return
 
     # Обновляем статус
@@ -155,6 +173,15 @@ async def confirm_payment(callback: types.CallbackQuery):
         await callback.answer(
             "❌ " + ("Заказ не найден" if lang == "ru" else "Buyurtma topilmadi"), show_alert=True
         )
+        return
+
+    # Verify store ownership
+    store_id = get_order_field(order, "store_id", 2)
+    store = db.get_store(store_id) if store_id else None
+    owner_id = get_store_field(store, "owner_id") if store else None
+
+    if callback.from_user.id != owner_id:
+        await callback.answer("❌", show_alert=True)
         return
 
     # Обновляем статус оплаты
@@ -228,6 +255,15 @@ async def reject_payment(callback: types.CallbackQuery):
         )
         return
 
+    # Verify store ownership
+    store_id = get_order_field(order, "store_id", 2)
+    store = db.get_store(store_id) if store_id else None
+    owner_id = get_store_field(store, "owner_id") if store else None
+
+    if callback.from_user.id != owner_id:
+        await callback.answer("❌", show_alert=True)
+        return
+
     # Обновляем статусы
     db.update_payment_status(order_id, "pending")
     db.update_order_status(order_id, "cancelled")
@@ -294,6 +330,15 @@ async def start_courier_handover(callback: types.CallbackQuery, state: FSMContex
         await callback.answer(
             "❌ " + ("Заказ не найден" if lang == "ru" else "Buyurtma topilmadi"), show_alert=True
         )
+        return
+
+    # Verify store ownership
+    store_id = get_order_field(order, "store_id", 2)
+    store = db.get_store(store_id) if store_id else None
+    owner_id = get_store_field(store, "owner_id") if store else None
+
+    if callback.from_user.id != owner_id:
+        await callback.answer("❌", show_alert=True)
         return
 
     # Сохраняем order_id в состояние
@@ -509,16 +554,24 @@ async def rate_order(callback: types.CallbackQuery):
         )
         return
 
+    # Verify order belongs to this customer
+    order_user_id = get_order_field(order, "user_id", 1)
+    if callback.from_user.id != order_user_id:
+        await callback.answer("❌", show_alert=True)
+        return
+
     # Check if already rated
     if hasattr(db, "has_rated_order") and db.has_rated_order(order_id):
         await callback.answer(
-            "Вы уже оценили этот заказ" if lang == "ru" else "Siz bu buyurtmani allaqachon baholadingiz",
-            show_alert=True
+            "Вы уже оценили этот заказ"
+            if lang == "ru"
+            else "Siz bu buyurtmani allaqachon baholadingiz",
+            show_alert=True,
         )
         return
 
     # Get store_id from order
-    store_id = order[2] if len(order) > 2 else None  # order structure: [0]=id, [1]=user, [2]=store
+    store_id = get_order_field(order, "store_id", 2)
     user_id = callback.from_user.id
 
     # Save rating to database
