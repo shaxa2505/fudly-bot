@@ -16,6 +16,7 @@ from aiogram import F, Router, types
 from aiogram.fsm.context import FSMContext
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
+from app.core.constants import OFFERS_PER_PAGE
 from app.core.utils import get_offer_field, get_store_field
 from app.keyboards import main_menu_customer, main_menu_seller
 from database_protocol import DatabaseProtocol
@@ -345,8 +346,7 @@ async def dlv_cancel(
     search_city = normalize_city(city)
 
     offer_service = OfferService(db)
-    per_page = 5
-    result = offer_service.list_hot_offers(search_city, limit=per_page, offset=last_page * per_page)
+    result = offer_service.list_hot_offers(search_city, limit=OFFERS_PER_PAGE, offset=last_page * OFFERS_PER_PAGE)
 
     if not result.items:
         # No offers - show main menu
@@ -359,10 +359,10 @@ async def dlv_cancel(
     from app.keyboards.offers import hot_offers_compact_keyboard
     from app.templates.offers import render_hot_offers_list
 
-    total_pages = (result.total + per_page - 1) // per_page
+    total_pages = (result.total + OFFERS_PER_PAGE - 1) // OFFERS_PER_PAGE
     select_hint = "👆 Выберите товар" if lang == "ru" else "👆 Mahsulotni tanlang"
     text = render_hot_offers_list(
-        lang, city, result.items, result.total, select_hint, offset=last_page * per_page
+        lang, city, result.items, result.total, select_hint, offset=last_page * OFFERS_PER_PAGE
     )
     kb = hot_offers_compact_keyboard(lang, result.items, last_page, total_pages)
 

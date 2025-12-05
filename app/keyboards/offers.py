@@ -7,6 +7,8 @@ from typing import Any
 from aiogram.types import InlineKeyboardMarkup
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
+from app.core.constants import OFFERS_PER_PAGE, STORES_PER_PAGE
+
 
 def hot_offers_compact_keyboard(
     lang: str, offers: Sequence[Any], page: int, total_pages: int
@@ -220,7 +222,7 @@ def store_list_keyboard(
     lang: str,
     stores: list,
     page: int = 0,
-    per_page: int = 10,
+    per_page: int = STORES_PER_PAGE,
 ) -> InlineKeyboardMarkup:
     """Compact keyboard for store selection with pagination (like hot offers)."""
     builder = InlineKeyboardBuilder()

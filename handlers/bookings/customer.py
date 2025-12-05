@@ -11,6 +11,7 @@ from aiogram import F, Router, types
 from aiogram.fsm.context import FSMContext
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
+from app.core.constants import OFFERS_PER_PAGE
 from app.keyboards import cancel_keyboard, main_menu_customer
 from handlers.common.states import BookOffer, OrderDelivery
 from handlers.common.utils import is_main_menu_button
@@ -546,11 +547,10 @@ async def pbook_cancel(callback: types.CallbackQuery, state: FSMContext) -> None
                     from app.keyboards.offers import store_offers_compact_keyboard
                     from handlers.common import BrowseOffers
 
-                    ITEMS_PER_PAGE = 5
-                    total_pages = (len(offers) + ITEMS_PER_PAGE - 1) // ITEMS_PER_PAGE
+                    total_pages = (len(offers) + OFFERS_PER_PAGE - 1) // OFFERS_PER_PAGE
                     page = min(store_page, total_pages - 1)  # Ensure valid page
-                    offset = page * ITEMS_PER_PAGE
-                    page_offers = offers[offset : offset + ITEMS_PER_PAGE]
+                    offset = page * OFFERS_PER_PAGE
+                    page_offers = offers[offset : offset + OFFERS_PER_PAGE]
 
                     await state.set_state(BrowseOffers.offer_list)
                     await state.update_data(
@@ -626,13 +626,12 @@ async def pbook_cancel(callback: types.CallbackQuery, state: FSMContext) -> None
                     pass
 
             if all_results:
-                ITEMS_PER_PAGE = 5
                 total_count = len(all_results)
-                total_pages = max(1, (total_count + ITEMS_PER_PAGE - 1) // ITEMS_PER_PAGE)
+                total_pages = max(1, (total_count + OFFERS_PER_PAGE - 1) // OFFERS_PER_PAGE)
                 page = min(search_page, total_pages - 1)
 
-                start_idx = page * ITEMS_PER_PAGE
-                end_idx = min(start_idx + ITEMS_PER_PAGE, total_count)
+                start_idx = page * OFFERS_PER_PAGE
+                end_idx = min(start_idx + OFFERS_PER_PAGE, total_count)
                 page_offers = all_results[start_idx:end_idx]
 
                 # Build compact list text
@@ -678,7 +677,7 @@ async def pbook_cancel(callback: types.CallbackQuery, state: FSMContext) -> None
     last_page = data.get("last_hot_page", 0)
     await state.clear()
 
-    result = offer_service.list_hot_offers(search_city, limit=5, offset=last_page * 5)
+    result = offer_service.list_hot_offers(search_city, limit=OFFERS_PER_PAGE, offset=last_page * OFFERS_PER_PAGE)
     if not result.items:
         # No offers - show main menu
         cancelled = "❌ Bekor qilindi" if lang == "uz" else "❌ Отменено"
@@ -690,11 +689,10 @@ async def pbook_cancel(callback: types.CallbackQuery, state: FSMContext) -> None
     from app.keyboards.offers import hot_offers_compact_keyboard
     from app.templates.offers import render_hot_offers_list
 
-    per_page = 5
-    total_pages = (result.total + per_page - 1) // per_page
+    total_pages = (result.total + OFFERS_PER_PAGE - 1) // OFFERS_PER_PAGE
     select_hint = "👆 Выберите товар" if lang == "ru" else "👆 Mahsulotni tanlang"
     text = render_hot_offers_list(
-        lang, city, result.items, result.total, select_hint, offset=last_page * per_page
+        lang, city, result.items, result.total, select_hint, offset=last_page * OFFERS_PER_PAGE
     )
     kb = hot_offers_compact_keyboard(lang, result.items, last_page, total_pages)
 
