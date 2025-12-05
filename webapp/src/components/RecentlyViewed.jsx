@@ -53,11 +53,11 @@ function RecentlyViewed() {
           >
             <div className="recently-viewed-card-image">
               <img
-                src={offer.photo || offer.photo_id || 'https://placehold.co/120x120/F5F5F5/CCCCCC?text=📷'}
+                src={api.getPhotoUrl(offer.photo) || offer.photo_id || 'https://placehold.co/120x120/F8F9FA/94A3B8?text=🛒'}
                 alt={offer.name || offer.title}
                 loading="lazy"
                 onError={(e) => {
-                  e.target.src = 'https://placehold.co/120x120/F5F5F5/CCCCCC?text=📷'
+                  e.target.src = 'https://placehold.co/120x120/F8F9FA/94A3B8?text=🛒'
                 }}
               />
             </div>
