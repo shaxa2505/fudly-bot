@@ -211,18 +211,21 @@
   display: flex;
   align-items: baseline;
   gap: 10px;
+  flex-wrap: nowrap;
 }
 
 .pdp-current-price {
   font-size: 24px;
   font-weight: 800;
   color: #181725;
+  white-space: nowrap;
 }
 
 .pdp-old-price {
   font-size: 16px;
   color: #B0B0B0;
   text-decoration: line-through;
+  white-space: nowrap;
 }
 
 .pdp-stock {

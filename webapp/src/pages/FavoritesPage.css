@@ -143,18 +143,21 @@
   display: flex;
   align-items: baseline;
   gap: var(--spacing-sm);
+  flex-wrap: nowrap;
 }
 
 .favorite-price {
   font-size: var(--font-md);
   font-weight: var(--font-bold);
   color: var(--color-primary);
+  white-space: nowrap;
 }
 
 .favorite-original {
   font-size: var(--font-sm);
   color: var(--color-text-muted);
   text-decoration: line-through;
+  white-space: nowrap;
 }
 
 .favorite-actions {
