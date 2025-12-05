@@ -213,27 +213,29 @@
   display: flex;
   align-items: baseline;
   gap: 8px;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
 }
 
 .price-main {
-  font-size: 20px;
+  font-size: 18px;
   font-weight: 800;
   color: #22C55E;
   line-height: 1;
+  white-space: nowrap;
 }
 
 .price-main .currency {
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 600;
   color: #666666;
 }
 
 .price-original {
-  font-size: 14px;
+  font-size: 13px;
   color: #BBBBBB;
   text-decoration: line-through;
   line-height: 1;
+  white-space: nowrap;
 }
 
 /* ===== CART ACTION ===== */
