@@ -474,47 +474,6 @@ function HomePage() {
         </div>
       </header>
 
-      {/* Quick Actions */}
-      <div className="quick-actions">
-        <button className="quick-action" onClick={() => navigate('/profile')}>
-          <div className="quick-action-icon">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
-              <path d="M17 1l4 4-4 4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-              <path d="M3 11V9a4 4 0 0 1 4-4h14" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-              <path d="M7 23l-4-4 4-4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-              <path d="M21 13v2a4 4 0 0 1-4 4H3" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-            </svg>
-          </div>
-          <span className="quick-action-text">Takrorlash</span>
-        </button>
-        <button className="quick-action" onClick={() => navigate('/favorites')}>
-          <div className="quick-action-icon accent">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
-              <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-            </svg>
-          </div>
-          <span className="quick-action-text">Sevimlilar</span>
-        </button>
-        <button className="quick-action" onClick={() => navigate('/profile')}>
-          <div className="quick-action-icon purple">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
-              <rect x="2" y="3" width="20" height="14" rx="2" stroke="currentColor" strokeWidth="2"/>
-              <path d="M8 21h8M12 17v4" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
-            </svg>
-          </div>
-          <span className="quick-action-text">Buyurtmalar</span>
-        </button>
-        <button className="quick-action" onClick={() => navigate('/stores')}>
-          <div className="quick-action-icon orange">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
-              <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-              <polyline points="9,22 9,12 15,12 15,22" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-            </svg>
-          </div>
-          <span className="quick-action-text">Do'konlar</span>
-        </button>
-      </div>
-
       {/* Hero Banner Carousel */}
       <HeroBanner onCategorySelect={(category) => {
         setSelectedCategory(category)
@@ -562,7 +521,7 @@ function HomePage() {
                 setMinDiscount(null)
               }}
             >
-              Hammasi
+              Barchasi
             </button>
             <button
               className={`filter-chip discount ${minDiscount === 20 ? 'active' : ''}`}
@@ -571,7 +530,7 @@ function HomePage() {
                 setMinDiscount(minDiscount === 20 ? null : 20)
               }}
             >
-              🏷️ 20%+
+              20%+ chegirma
             </button>
             <button
               className={`filter-chip discount ${minDiscount === 30 ? 'active' : ''}`}
@@ -583,7 +542,7 @@ function HomePage() {
               🔥 30%+
             </button>
             <button
-              className={`filter-chip discount ${minDiscount === 50 ? 'active' : ''}`}
+              className={`filter-chip discount hot ${minDiscount === 50 ? 'active' : ''}`}
               onClick={() => {
                 window.Telegram?.WebApp?.HapticFeedback?.selectionChanged?.()
                 setMinDiscount(minDiscount === 50 ? null : 50)

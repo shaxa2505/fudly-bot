@@ -217,7 +217,7 @@
 
 /* ===== CONTENT SECTION ===== */
 .card-content {
-  padding: 14px;
+  padding: 12px;
   display: flex;
   flex-direction: column;
   flex: 1; /* Fill remaining space */
@@ -225,27 +225,28 @@
 }
 
 .store-name {
-  font-size: 12px;
-  color: #666666;
+  display: none; /* Hidden for cleaner look */
+  font-size: 11px;
+  color: #888888;
   font-weight: 600;
   line-height: 1;
-  margin-bottom: 6px;
+  margin-bottom: 4px;
   text-transform: uppercase;
-  letter-spacing: 0.5px;
+  letter-spacing: 0.3px;
 }
 
 .offer-title {
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 600;
   color: #1A1A1A;
   margin: 0;
-  line-height: 1.4;
+  line-height: 1.35;
   display: -webkit-box;
   -webkit-line-clamp: 2;
   line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
-  min-height: 40px;
+  min-height: 36px;
 }
 
 /* ===== STOCK PROGRESS BAR ===== */
@@ -301,16 +302,16 @@
 
 /* ===== PRICE SECTION - Enhanced Typography ===== */
 .price-section {
-  margin-top: 12px;
+  margin-top: 8px;
   display: flex;
   align-items: baseline;
-  gap: 8px;
+  gap: 6px;
   flex-wrap: nowrap;
   overflow: hidden;
 }
 
 .price-main {
-  font-size: 18px;
+  font-size: 16px;
   font-weight: 800;
   background: linear-gradient(135deg, #22C55E 0%, #16A34A 100%);
   -webkit-background-clip: text;
@@ -350,10 +351,10 @@
   align-items: center;
   justify-content: center;
   width: 100%;
-  height: 48px;
+  height: 42px;
   background: linear-gradient(135deg, #22C55E 0%, #16A34A 100%);
   border: none;
-  border-radius: 14px;
+  border-radius: 12px;
   color: #FFFFFF;
   cursor: pointer;
   padding: 0;
@@ -382,8 +383,8 @@
 }
 
 .add-to-cart-btn svg {
-  width: 28px;
-  height: 28px;
+  width: 22px;
+  height: 22px;
 }
 
 /* ===== QUANTITY CONTROL ===== */
@@ -393,24 +394,24 @@
   justify-content: center;
   gap: 4px;
   width: 100%;
-  height: 48px;
+  height: 42px;
   background: #F5F5F5;
-  border-radius: 14px;
+  border-radius: 12px;
   padding: 4px;
   box-sizing: border-box;
 }
 
 .qty-btn {
-  width: 44px;
-  height: 44px;
+  width: 36px;
+  height: 36px;
   display: flex;
   align-items: center;
   justify-content: center;
   border: none;
-  border-radius: 12px;
+  border-radius: 10px;
   background: #E8E8E8;
   color: #999999;
-  font-size: 20px;
+  font-size: 18px;
   font-weight: 600;
   cursor: pointer;
   padding: 0;

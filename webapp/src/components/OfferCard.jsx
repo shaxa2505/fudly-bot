@@ -80,7 +80,8 @@ const OfferCard = memo(function OfferCard({ offer, cartQuantity = 0, onAddToCart
 
   // Get photo URL (handles Telegram file_id conversion)
   const photoUrl = api.getPhotoUrl(offer.photo)
-  const fallbackUrl = 'https://placehold.co/300x300/F5F5F5/CCCCCC?text=📷'
+  // Better placeholder with product icon
+  const fallbackUrl = 'https://placehold.co/300x300/F8F9FA/CBD5E1?text=🛒'
 
   return (
     <div className={`offer-card ${cartQuantity > 0 ? 'in-cart' : ''} ${isAdding ? 'adding' : ''}`} onClick={handleCardClick}>
@@ -137,14 +138,13 @@ const OfferCard = memo(function OfferCard({ offer, cartQuantity = 0, onAddToCart
 
       {/* Content Section */}
       <div className="card-content">
-        {offer.store_name && <span className="store-name">{offer.store_name}</span>}
         <h3 className="offer-title">{offer.title}</h3>
 
         {/* Stock Progress Bar */}
         {stockLimit < 50 && (
           <div className="stock-progress">
             <div className="stock-progress-bar">
-              <div 
+              <div
                 className={`stock-progress-fill ${stockProgress.level}`}
                 style={{ width: `${stockProgress.percent}%` }}
               />

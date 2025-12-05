@@ -500,7 +500,7 @@
 
 .filter-chip {
   flex-shrink: 0;
-  padding: 6px 12px;
+  padding: 8px 14px;
   background: var(--color-bg-secondary);
   border: 1.5px solid transparent;
   border-radius: var(--radius-full);
@@ -523,10 +523,24 @@
   font-weight: var(--font-semibold);
 }
 
+.filter-chip.discount {
+  background: rgba(255, 107, 53, 0.06);
+}
+
 .filter-chip.discount.active {
-  background: linear-gradient(135deg, rgba(255, 107, 53, 0.12) 0%, rgba(255, 61, 0, 0.12) 100%);
+  background: linear-gradient(135deg, rgba(255, 107, 53, 0.15) 0%, rgba(255, 61, 0, 0.15) 100%);
   border-color: #FF6B35;
   color: #FF6B35;
+}
+
+.filter-chip.discount.hot {
+  background: rgba(229, 57, 53, 0.08);
+}
+
+.filter-chip.discount.hot.active {
+  background: linear-gradient(135deg, rgba(255, 61, 0, 0.18) 0%, rgba(229, 57, 53, 0.18) 100%);
+  border-color: #E53935;
+  color: #E53935;
 }
 
 .sort-select {
@@ -877,11 +891,11 @@
 }
 
 @keyframes slideUp {
-  from { 
+  from {
     opacity: 0;
     transform: translateY(20px);
   }
-  to { 
+  to {
     opacity: 1;
     transform: translateY(0);
   }
