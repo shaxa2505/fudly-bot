@@ -399,8 +399,8 @@ def _register_handlers() -> None:
     from handlers.customer import payments as telegram_payments
     from handlers.customer.offers import browse as offers_browse
     from handlers.customer.offers import search as offers_search
-    from handlers.customer.orders import orders_router
     from handlers.customer.orders import delivery as orders_delivery
+    from handlers.customer.orders import orders_router
     from handlers.seller import (
         analytics,
         bulk_import,

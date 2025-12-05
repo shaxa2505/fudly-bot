@@ -62,6 +62,7 @@ MAX_KEYBOARD_BUTTONS = 100
 CURRENCY_UZ = "so'm"
 CURRENCY_RU = "сум"
 
+
 # ============== STATUS VALUES ==============
 class OrderStatus:
     PENDING = "pending"
