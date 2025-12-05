@@ -1,0 +1,125 @@
+/**
+ * Hero Banner Carousel - Premium Design
+ * Swipeable promotional banners with auto-play
+ */
+
+.hero-banner-container {
+  padding: 16px 16px 8px;
+}
+
+.hero-banner {
+  position: relative;
+  border-radius: 20px;
+  padding: 24px;
+  min-height: 140px;
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+  overflow: hidden;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.hero-banner:active {
+  transform: scale(0.98);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+}
+
+.banner-content {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  gap: 16px;
+}
+
+.banner-text {
+  flex: 1;
+}
+
+.banner-title {
+  font-size: 22px;
+  font-weight: 800;
+  color: #FFFFFF;
+  margin: 0 0 6px;
+  line-height: 1.2;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.banner-subtitle {
+  font-size: 14px;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.9);
+  margin: 0 0 12px;
+}
+
+.banner-cta {
+  display: inline-block;
+  font-size: 13px;
+  font-weight: 600;
+  color: #FFFFFF;
+  background: rgba(255, 255, 255, 0.2);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  padding: 8px 16px;
+  border-radius: 20px;
+}
+
+.banner-icon {
+  font-size: 64px;
+  line-height: 1;
+  opacity: 0.9;
+  filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.1));
+  animation: bannerIconFloat 3s ease-in-out infinite;
+}
+
+@keyframes bannerIconFloat {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-6px); }
+}
+
+/* Dots Indicator */
+.banner-dots {
+  display: flex;
+  justify-content: center;
+  gap: 8px;
+  padding: 12px 0;
+}
+
+.banner-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #E0E0E0;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.banner-dot.active {
+  width: 24px;
+  border-radius: 4px;
+  background: linear-gradient(135deg, #22C55E 0%, #16A34A 100%);
+}
+
+/* Mobile optimizations */
+@media (max-width: 360px) {
+  .hero-banner {
+    padding: 20px;
+    min-height: 120px;
+  }
+
+  .banner-title {
+    font-size: 18px;
+  }
+
+  .banner-subtitle {
+    font-size: 12px;
+  }
+
+  .banner-icon {
+    font-size: 48px;
+  }
+}

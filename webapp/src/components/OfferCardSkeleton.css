@@ -1,0 +1,91 @@
+/**
+ * Offer Card Skeleton - Loading placeholder
+ */
+
+.offer-card-skeleton {
+  background: #FFFFFF;
+  border-radius: 20px;
+  overflow: hidden;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+  height: 100%;
+}
+
+.skeleton-image {
+  width: 100%;
+  aspect-ratio: 1;
+  background: linear-gradient(135deg, #F5F5F5 0%, #EEEEEE 100%);
+}
+
+.skeleton-content {
+  padding: 16px;
+}
+
+.skeleton-store {
+  width: 60px;
+  height: 10px;
+  border-radius: 4px;
+  background: #F0F0F0;
+  margin-bottom: 10px;
+}
+
+.skeleton-title {
+  width: 100%;
+  height: 14px;
+  border-radius: 4px;
+  background: #F0F0F0;
+  margin-bottom: 8px;
+}
+
+.skeleton-title-short {
+  width: 70%;
+  height: 14px;
+  border-radius: 4px;
+  background: #F0F0F0;
+  margin-bottom: 16px;
+}
+
+.skeleton-price {
+  width: 80px;
+  height: 20px;
+  border-radius: 6px;
+  background: #F0F0F0;
+  margin-bottom: 16px;
+}
+
+.skeleton-button {
+  width: 100%;
+  height: 48px;
+  border-radius: 14px;
+  background: linear-gradient(135deg, #E8F5E9 0%, #C8E6C9 100%);
+}
+
+/* Shimmer animation */
+.shimmer {
+  position: relative;
+  overflow: hidden;
+}
+
+.shimmer::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(255, 255, 255, 0.4) 50%,
+    transparent 100%
+  );
+  animation: shimmer 1.5s infinite;
+}
+
+@keyframes shimmer {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(100%);
+  }
+}

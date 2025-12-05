@@ -4,6 +4,8 @@ import api from '../api/client'
 import { useCart } from '../context/CartContext'
 import { transliterateCity, getSavedLocation, saveLocation, DEFAULT_LOCATION } from '../utils/cityUtils'
 import OfferCard from '../components/OfferCard'
+import OfferCardSkeleton from '../components/OfferCardSkeleton'
+import HeroBanner from '../components/HeroBanner'
 import BottomNav from '../components/BottomNav'
 import PullToRefresh from '../components/PullToRefresh'
 import RecentlyViewed from '../components/RecentlyViewed'
@@ -481,46 +483,30 @@ function HomePage() {
         </button>
       </div>
 
-      {/* Hero Banner */}
-      <div className="hero-banner" onClick={() => {
-        setSelectedCategory('all')
+      {/* Hero Banner Carousel */}
+      <HeroBanner onCategorySelect={(category) => {
+        setSelectedCategory(category)
         setTimeout(() => {
           document.querySelector('.section-header')?.scrollIntoView({ behavior: 'smooth' })
         }, 100)
-      }}>
-        <div className="hero-content">
-          <div className="hero-badge">🔥 Bugungi taklif</div>
-          <h2 className="hero-title">70% gacha chegirma</h2>
-          <p className="hero-subtitle">Tanlangan mahsulotlarga</p>
-          <button className="hero-btn" onClick={(e) => {
-            e.stopPropagation()
-            setSelectedCategory('all')
-            setTimeout(() => {
-              document.querySelector('.section-header')?.scrollIntoView({ behavior: 'smooth' })
-            }, 100)
-          }}>
-            Ko'rish
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
-              <path d="M5 12h14M12 5l7 7-7 7" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-            </svg>
-          </button>
-        </div>
-        <div className="hero-emoji">🥬🍅🥕</div>
-      </div>
+      }} />
 
-      {/* Categories */}
+      {/* Categories - Horizontal Scroll */}
       <div className="categories-section">
         <h3 className="categories-title">Kategoriyalar</h3>
-        <div className="categories-grid">
+        <div className="categories-scroll">
           {CATEGORIES.map(cat => (
             <button
               key={cat.id}
-              className={`category-card ${selectedCategory === cat.id ? 'active' : ''}`}
-              onClick={() => setSelectedCategory(cat.id)}
+              className={`category-pill ${selectedCategory === cat.id ? 'active' : ''}`}
+              onClick={() => {
+                window.Telegram?.WebApp?.HapticFeedback?.impactOccurred?.('light')
+                setSelectedCategory(cat.id)
+              }}
               style={{ '--cat-color': cat.color }}
             >
-              <div className="category-card-icon">{cat.icon}</div>
-              <span className="category-card-name">{cat.name}</span>
+              <span className="category-pill-icon">{cat.icon}</span>
+              <span className="category-pill-name">{cat.name}</span>
             </button>
           ))}
         </div>
@@ -593,17 +579,7 @@ function HomePage() {
       <div className="offers-grid">
         {loading && offers.length === 0 ? (
           Array.from({ length: 6 }).map((_, i) => (
-            <div key={i} className="skeleton-card" style={{ animationDelay: `${i * 0.1}s` }}>
-              <div className="skeleton-card-image" />
-              <div className="skeleton-card-content">
-                <div className="skeleton-line wide" />
-                <div className="skeleton-line medium" />
-                <div className="skeleton-row">
-                  <div className="skeleton-line price" />
-                  <div className="skeleton-btn" />
-                </div>
-              </div>
-            </div>
+            <OfferCardSkeleton key={i} />
           ))
         ) : offers.length === 0 ? (
           <div className="empty-state">

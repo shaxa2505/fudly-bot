@@ -69,6 +69,9 @@ function BottomNav({ currentPage, cartCount }) {
   ]
 
   const handleNavigate = (pageId) => {
+    // Haptic feedback
+    window.Telegram?.WebApp?.HapticFeedback?.impactOccurred?.('light')
+
     const route = PAGE_ROUTES[pageId] || '/'
     navigate(route)
   }

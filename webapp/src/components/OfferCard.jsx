@@ -1,4 +1,4 @@
-import { memo } from 'react'
+import { memo, useState, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useFavorites } from '../context/FavoritesContext'
 import api from '../api/client'
@@ -7,6 +7,9 @@ import './OfferCard.css'
 const OfferCard = memo(function OfferCard({ offer, cartQuantity = 0, onAddToCart, onRemoveFromCart }) {
   const navigate = useNavigate()
   const { isFavorite, toggleFavorite } = useFavorites()
+  const [imageLoaded, setImageLoaded] = useState(false)
+  const [imageError, setImageError] = useState(false)
+  const [isAdding, setIsAdding] = useState(false)
 
   const isInFavorites = isFavorite(offer.id)
 
@@ -18,24 +21,34 @@ const OfferCard = memo(function OfferCard({ offer, cartQuantity = 0, onAddToCart
   const stockLimit = offer.quantity || offer.stock || 99
   const isMaxReached = cartQuantity >= stockLimit
 
-  const handleAddClick = (e) => {
+  const handleAddClick = useCallback((e) => {
     e.stopPropagation()
     if (isMaxReached) {
       window.Telegram?.WebApp?.HapticFeedback?.notificationOccurred?.('warning')
       return
     }
+
+    // Haptic feedback
+    window.Telegram?.WebApp?.HapticFeedback?.impactOccurred?.('light')
+
+    // Add animation
+    setIsAdding(true)
+    setTimeout(() => setIsAdding(false), 300)
+
     onAddToCart?.(offer)
-  }
+  }, [isMaxReached, offer, onAddToCart])
 
-  const handleRemoveClick = (e) => {
+  const handleRemoveClick = useCallback((e) => {
     e.stopPropagation()
+    window.Telegram?.WebApp?.HapticFeedback?.impactOccurred?.('light')
     onRemoveFromCart?.(offer)
-  }
+  }, [offer, onRemoveFromCart])
 
-  const handleFavoriteClick = (e) => {
+  const handleFavoriteClick = useCallback((e) => {
     e.stopPropagation()
+    window.Telegram?.WebApp?.HapticFeedback?.impactOccurred?.('medium')
     toggleFavorite(offer)
-  }
+  }, [offer, toggleFavorite])
 
   const discountPercent = Math.round(offer.discount_percent ||
     ((offer.original_price - offer.discount_price) / offer.original_price * 100))
@@ -54,10 +67,11 @@ const OfferCard = memo(function OfferCard({ offer, cartQuantity = 0, onAddToCart
   const expiryText = formatExpiry(offer.expiry_date)
 
   // Get photo URL (handles Telegram file_id conversion)
-  const photoUrl = api.getPhotoUrl(offer.photo) || 'https://placehold.co/300x300/F8F8F8/CCCCCC?text=📷'
+  const photoUrl = api.getPhotoUrl(offer.photo)
+  const fallbackUrl = 'https://placehold.co/300x300/F5F5F5/CCCCCC?text=📷'
 
   return (
-    <div className={`offer-card ${cartQuantity > 0 ? 'in-cart' : ''}`} onClick={handleCardClick}>
+    <div className={`offer-card ${cartQuantity > 0 ? 'in-cart' : ''} ${isAdding ? 'adding' : ''}`} onClick={handleCardClick}>
       {/* Image Section */}
       <div className="card-image-container">
         {/* Discount Badge */}
@@ -87,15 +101,23 @@ const OfferCard = memo(function OfferCard({ offer, cartQuantity = 0, onAddToCart
           <div className="expiry-badge">⏰ {expiryText}</div>
         )}
 
+        {/* Image skeleton while loading */}
+        {!imageLoaded && !imageError && (
+          <div className="image-skeleton shimmer" />
+        )}
+
         <img
-          src={photoUrl}
+          src={photoUrl || fallbackUrl}
           alt={offer.title}
-          className="card-image"
+          className={`card-image ${imageLoaded ? 'loaded' : ''}`}
           loading="lazy"
+          onLoad={() => setImageLoaded(true)}
           onError={(e) => {
             if (!e.target.dataset.fallback) {
               e.target.dataset.fallback = 'true'
-              e.target.src = 'https://placehold.co/300x300/F8F8F8/CCCCCC?text=📷'
+              e.target.src = fallbackUrl
+              setImageError(true)
+              setImageLoaded(true)
             }
           }}
         />
@@ -103,7 +125,7 @@ const OfferCard = memo(function OfferCard({ offer, cartQuantity = 0, onAddToCart
 
       {/* Content Section */}
       <div className="card-content">
-        <span className="store-name">{offer.store_name}</span>
+        {offer.store_name && <span className="store-name">{offer.store_name}</span>}
         <h3 className="offer-title">{offer.title}</h3>
 
         {/* Prices */}
@@ -125,14 +147,14 @@ const OfferCard = memo(function OfferCard({ offer, cartQuantity = 0, onAddToCart
             <div className="quantity-control">
               <button className="qty-btn" onClick={handleRemoveClick}>−</button>
               <span className="qty-num">{cartQuantity}{stockLimit < 99 ? `/${stockLimit}` : ''}</span>
-              <button 
-                className={`qty-btn qty-plus ${isMaxReached ? 'disabled' : ''}`} 
+              <button
+                className={`qty-btn qty-plus ${isMaxReached ? 'disabled' : ''}`}
                 onClick={handleAddClick}
                 disabled={isMaxReached}
               >+</button>
             </div>
           ) : (
-            <button className="add-to-cart-btn" onClick={handleAddClick}>
+            <button className={`add-to-cart-btn ${isAdding ? 'pulse' : ''}`} onClick={handleAddClick}>
               <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
                 <path d="M12 5v14M5 12h14" stroke="white" strokeWidth="2.5" strokeLinecap="round"/>
               </svg>
