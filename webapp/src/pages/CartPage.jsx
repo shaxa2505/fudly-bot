@@ -37,6 +37,7 @@ function CartPage({ user }) {
   const [deliveryFee, setDeliveryFee] = useState(0)
   const [minOrderAmount, setMinOrderAmount] = useState(0)
   const [storeDeliveryEnabled, setStoreDeliveryEnabled] = useState(false)
+  const [deliveryReason, setDeliveryReason] = useState('')
 
   // Payment step for delivery
   const [checkoutStep, setCheckoutStep] = useState('details') // 'details' | 'payment' | 'upload'
@@ -66,27 +67,39 @@ function CartPage({ user }) {
   // Check if stores in cart support delivery
   useEffect(() => {
     const checkDeliveryAvailability = async () => {
-      // Get unique store IDs from cart
       const storeIds = [...new Set(cartItems.map(item => item.offer?.store_id).filter(Boolean))]
 
       if (storeIds.length === 0) return
 
-      try {
-        // Check first store for simplicity
-        const stores = await api.getStores({})
-        const cartStore = stores.find(s => storeIds.includes(s.id))
+      // If multiple stores in one cart, disable delivery to avoid wrong fee
+      if (storeIds.length > 1) {
+        setStoreDeliveryEnabled(false)
+        setDeliveryFee(0)
+        setMinOrderAmount(0)
+        setDeliveryReason('Bir nechta do\'konlardan mahsulotlar — yetkazib berish o\'chirilgan')
+        return
+      }
 
-        if (cartStore) {
-          setStoreDeliveryEnabled(cartStore.delivery_enabled || false)
-          setDeliveryFee(cartStore.delivery_price || 15000)
-          setMinOrderAmount(cartStore.min_order_amount || 30000)
+      const storeId = storeIds[0]
+      try {
+        const store = await api.getStore(storeId)
+        if (store?.delivery_enabled) {
+          setStoreDeliveryEnabled(true)
+          setDeliveryFee(store.delivery_price || 15000)
+          setMinOrderAmount(store.min_order_amount || 30000)
+          setDeliveryReason('')
+        } else {
+          setStoreDeliveryEnabled(false)
+          setDeliveryFee(0)
+          setMinOrderAmount(0)
+          setDeliveryReason('Ushbu do\'kon yetkazib berishni qo\'llab-quvvatlamaydi')
         }
       } catch (e) {
         console.warn('Could not fetch store info:', e)
-        // Default values
-        setStoreDeliveryEnabled(true)
-        setDeliveryFee(15000)
-        setMinOrderAmount(30000)
+        setStoreDeliveryEnabled(false)
+        setDeliveryFee(0)
+        setMinOrderAmount(0)
+        setDeliveryReason('Yetkazib berish ma\'lumoti olinmadi')
       }
     }
 
@@ -468,6 +481,12 @@ function CartPage({ user }) {
                         </span>
                       </button>
                     </div>
+
+                    {!storeDeliveryEnabled && (
+                      <p className="delivery-hint">
+                        🚫 {deliveryReason || "Yetkazib berish mavjud emas"}
+                      </p>
+                    )}
 
                     {!canDelivery && storeDeliveryEnabled && (
                       <p className="delivery-hint">

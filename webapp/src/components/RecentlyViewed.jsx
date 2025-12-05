@@ -49,7 +49,7 @@ function RecentlyViewed() {
           <div
             key={`rv-${offer.id}`}
             className="recently-viewed-card"
-            onClick={() => navigate('/product', { state: { offer } })}
+            onClick={() => navigate(`/product/${offer.id}`, { state: { offer } })}
           >
             <div className="recently-viewed-card-image">
               <img

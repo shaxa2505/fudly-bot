@@ -5,6 +5,11 @@ html, body {
   background: var(--color-bg);
   font-family: var(--font-sans);
   color: var(--color-text);
+.categories-title {
+  font-size: var(--font-lg);
+  font-weight: var(--font-bold);
+  color: var(--color-text-primary);
+  margin: 0 0 var(--space-3) var(--space-4);
 }
 
 .HomePage {
@@ -44,17 +49,42 @@ html, body {
 .SearchBar {
   margin: var(--space-3) var(--space-4);
   display: flex;
+.category-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding: 8px 14px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  cursor: pointer;
+  transition: background 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease, transform 0.1s ease;
+  -webkit-tap-highlight-color: transparent;
+  white-space: nowrap;
+  flex-shrink: 0;
+  box-shadow: var(--elev-1);
+}
 }
 
 .SearchBar input {
   width: 100%;
   height: 40px;
   border-radius: var(--radius-md);
+.category-pill.active {
+  background: color-mix(in srgb, var(--cat-color) 10%, #ffffff);
+  border-color: var(--cat-color);
+  box-shadow: 0 4px 12px color-mix(in srgb, var(--cat-color) 18%, transparent);
+}
   border: 1px solid var(--color-border);
   background: var(--color-surface);
   padding: 0 var(--space-4);
   font-size: var(--text-md);
   color: var(--color-text);
+}
+.category-pill-name {
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--color-text-muted);
 }
 
 .SearchBar input::placeholder { color: var(--color-text-muted); }

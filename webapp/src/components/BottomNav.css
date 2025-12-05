@@ -81,6 +81,8 @@
 
 .nav-icon svg {
   width: var(--icon-size-md);
+  min-height: var(--touch-target-min, 44px);
+  min-width: var(--touch-target-min, 44px);
   height: var(--icon-size-md);
 }
 

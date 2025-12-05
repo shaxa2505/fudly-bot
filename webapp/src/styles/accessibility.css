@@ -46,7 +46,15 @@ button,
 a,
 [role="button"],
 input[type="checkbox"],
-input[type="radio"] {
+input[type="radio"],
+label.btn,
+.nav-item,
+.category-pill,
+.filter-chip,
+.order-type-btn,
+.payment-option,
+.pdp-qty-btn,
+.pdp-add-btn {
   min-height: var(--touch-target-min, 44px);
   min-width: var(--touch-target-min, 44px);
 }

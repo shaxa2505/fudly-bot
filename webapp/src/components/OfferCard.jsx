@@ -15,7 +15,8 @@ const OfferCard = memo(function OfferCard({ offer, cartQuantity = 0, onAddToCart
   const isInFavorites = isFavorite(offer.id)
 
   const handleCardClick = () => {
-    navigate('/product', { state: { offer } })
+    const productPath = offer?.id ? `/product/${offer.id}` : '/product'
+    navigate(productPath, { state: { offer } })
   }
 
   // Get stock limit from offer
@@ -24,9 +25,9 @@ const OfferCard = memo(function OfferCard({ offer, cartQuantity = 0, onAddToCart
 
   // Stock progress calculation
   const stockProgress = useMemo(() => {
-    const maxStock = 50 // Assume 50 is "full stock" for visual purposes
+    const maxStock = Math.max(10, Math.min(100, stockLimit))
     const current = stockLimit
-    const percent = Math.min(100, (current / maxStock) * 100)
+    const percent = Math.min(100, Math.round((current / maxStock) * 100))
     let level = 'high'
     if (current <= 5) level = 'low'
     else if (current <= 15) level = 'medium'
@@ -62,8 +63,12 @@ const OfferCard = memo(function OfferCard({ offer, cartQuantity = 0, onAddToCart
     toggleFavorite(offer)
   }, [offer, toggleFavorite])
 
-  const discountPercent = Math.round(offer.discount_percent ||
-    ((offer.original_price - offer.discount_price) / offer.original_price * 100))
+  const hasPriceData = offer.original_price > 0 && offer.discount_price > 0
+  const discountPercent = offer.discount_percent != null
+    ? Math.round(offer.discount_percent)
+    : hasPriceData
+      ? Math.max(0, Math.round((1 - offer.discount_price / offer.original_price) * 100))
+      : 0
 
   const formatExpiry = (date) => {
     if (!date) return null
@@ -78,8 +83,8 @@ const OfferCard = memo(function OfferCard({ offer, cartQuantity = 0, onAddToCart
 
   const expiryText = formatExpiry(offer.expiry_date)
 
-  // Get photo URL (handles Telegram file_id conversion)
-  const photoUrl = api.getPhotoUrl(offer.photo)
+  // Get photo URL (handles Telegram file_id conversion) and also image_url field
+  const photoUrl = api.getPhotoUrl(offer.image_url || offer.photo)
   // Better placeholder with product icon
   const fallbackUrl = 'https://placehold.co/300x300/F8F9FA/CBD5E1?text=🛒'
 
@@ -141,7 +146,7 @@ const OfferCard = memo(function OfferCard({ offer, cartQuantity = 0, onAddToCart
         <h3 className="offer-title">{offer.title}</h3>
 
         {/* Stock Progress Bar */}
-        {stockLimit < 50 && (
+        {stockLimit < 99 && (
           <div className="stock-progress">
             <div className="stock-progress-bar">
               <div

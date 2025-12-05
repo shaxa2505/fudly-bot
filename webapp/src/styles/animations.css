@@ -375,4 +375,15 @@ a, button, input {
     transition-duration: 0.01ms !important;
     scroll-behavior: auto !important;
   }
+
+  /* Disable shimmer and entrance helpers */
+  .shimmer,
+  .animate-in,
+  .animate-fadeIn,
+  .animate-fadeInUp,
+  .animate-slideUp,
+  .card-enter,
+  .page-enter {
+    animation: none !important;
+  }
 }

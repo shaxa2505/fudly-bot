@@ -606,7 +606,7 @@ function HomePage() {
                   key={`pop-${offer.id}`}
                   className="popular-card animate-in"
                   style={{ animationDelay: `${index * 50}ms` }}
-                  onClick={() => navigate('/product', { state: { offer } })}
+                  onClick={() => navigate(`/product/${offer.id}`, { state: { offer } })}
                 >
                   <div className="popular-card-image">
                     <img

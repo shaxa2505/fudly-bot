@@ -129,7 +129,7 @@ function StoresPage() {
 
   const handleOfferClick = (offer) => {
     closeModal()
-    navigate('/product', { state: { offer } })
+    navigate(`/product/${offer.id}`, { state: { offer } })
   }
 
   return (
@@ -175,7 +175,7 @@ function StoresPage() {
       {/* View Toggle & Location */}
       <div className="sp-view-controls">
         <div className="sp-view-toggle">
-          <button 
+          <button
             className={`sp-view-btn ${viewMode === 'list' ? 'active' : ''}`}
             onClick={() => setViewMode('list')}
           >
@@ -184,7 +184,7 @@ function StoresPage() {
             </svg>
             Ro'yxat
           </button>
-          <button 
+          <button
             className={`sp-view-btn ${viewMode === 'map' ? 'active' : ''}`}
             onClick={() => setViewMode('map')}
           >
@@ -195,7 +195,7 @@ function StoresPage() {
             Xarita
           </button>
         </div>
-        <button 
+        <button
           className={`sp-location-btn ${userLocation ? 'active' : ''}`}
           onClick={requestLocation}
           disabled={locationLoading}
@@ -215,7 +215,7 @@ function StoresPage() {
       {/* Content */}
       <div className="sp-content">
         {viewMode === 'map' ? (
-          <StoreMap 
+          <StoreMap
             stores={filteredStores}
             userLocation={userLocation}
             onStoreSelect={loadStoreOffers}
@@ -331,13 +331,13 @@ function StoresPage() {
 
             {/* Tabs */}
             <div className="sp-sheet-tabs">
-              <button 
+              <button
                 className={`sp-sheet-tab ${activeTab === 'offers' ? 'active' : ''}`}
                 onClick={() => setActiveTab('offers')}
               >
                 📦 Takliflar ({storeOffers.length})
               </button>
-              <button 
+              <button
                 className={`sp-sheet-tab ${activeTab === 'reviews' ? 'active' : ''}`}
                 onClick={() => setActiveTab('reviews')}
               >

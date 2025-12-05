@@ -156,6 +156,15 @@ const api = {
     return cachedGet('/offers', params, 20000) // 20s cache
   },
 
+  async getOfferById(offerId) {
+    if (!offerId) return null
+    try {
+      return await cachedGet(`/offers/${offerId}`, {}, 20000)
+    } catch (error) {
+      return null
+    }
+  },
+
   async getFlashDeals(city = 'Ташкент', limit = 10) {
     return cachedGet('/flash-deals', { city, limit }, 30000) // 30s cache
   },

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { useNavigate, useLocation } from 'react-router-dom'
+import { useNavigate, useLocation, useParams } from 'react-router-dom'
 import { useCart } from '../context/CartContext'
 import { useFavorites } from '../context/FavoritesContext'
 import { getUnitLabel } from '../utils/helpers'
@@ -9,13 +9,59 @@ import './ProductDetailPage.css'
 function ProductDetailPage() {
   const navigate = useNavigate()
   const location = useLocation()
+  const { id: paramId } = useParams()
   const { addToCart } = useCart()
   const { isFavorite, toggleFavorite } = useFavorites()
 
-  const offer = location.state?.offer
+  const offerFromState = location.state?.offer
+  const [loadedOffer, setLoadedOffer] = useState(null)
   const [quantity, setQuantity] = useState(1)
   const [addedToCart, setAddedToCart] = useState(false)
   const [imgError, setImgError] = useState(false)
+  const [loading, setLoading] = useState(!offerFromState && Boolean(paramId))
+  const [loadError, setLoadError] = useState('')
+
+  const offer = offerFromState || loadedOffer
+  const offerId = offer?.id || paramId
+
+  // Fetch offer when opened via deep link without state
+  useEffect(() => {
+    if (offerFromState) {
+      setLoadedOffer(null)
+      setLoadError('')
+      setLoading(false)
+      return
+    }
+
+    if (!paramId) {
+      setLoadError('Mahsulot topilmadi')
+      setLoading(false)
+      return
+    }
+
+    let cancelled = false
+    const fetchOffer = async () => {
+      setLoading(true)
+      setLoadError('')
+      try {
+        const data = await api.getOfferById(paramId)
+        if (cancelled) return
+        if (data) {
+          setLoadedOffer(data)
+        } else {
+          setLoadError('Mahsulot topilmadi')
+        }
+      } catch (error) {
+        if (cancelled) return
+        setLoadError('Mahsulot topilmadi')
+      } finally {
+        if (!cancelled) setLoading(false)
+      }
+    }
+
+    fetchOffer()
+    return () => { cancelled = true }
+  }, [offerFromState, paramId])
 
   // Track recently viewed
   useEffect(() => {
@@ -73,13 +119,24 @@ function ProductDetailPage() {
     } catch { return null }
   }
 
+  if (loading) {
+    return (
+      <div className="pdp">
+        <div className="pdp-error">
+          <div className="spinner" />
+          <p>Yuklanmoqda...</p>
+        </div>
+      </div>
+    )
+  }
+
   if (!offer) {
     return (
       <div className="pdp">
         <div className="pdp-error">
           <span>😕</span>
-          <p>Mahsulot topilmadi</p>
-          <button onClick={() => navigate(-1)}>Orqaga</button>
+          <p>{loadError || 'Mahsulot topilmadi'}</p>
+          <button onClick={() => navigate('/')}>Bosh sahifa</button>
         </div>
       </div>
     )
@@ -90,10 +147,10 @@ function ProductDetailPage() {
   const savings = (offer.original_price - offer.discount_price) * quantity
   const hasDiscount = offer.original_price > offer.discount_price
   // Calculate discount percent if not provided
-  const discountPercent = offer.discount_percent
+  const discountPercent = offer.discount_percent != null
     ? Math.round(offer.discount_percent)
-    : hasDiscount
-      ? Math.round((1 - offer.discount_price / offer.original_price) * 100)
+    : offer.original_price > 0 && offer.discount_price > 0
+      ? Math.max(0, Math.round((1 - offer.discount_price / offer.original_price) * 100))
       : 0
   const isFav = isFavorite(offer.id)
 

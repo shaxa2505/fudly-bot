@@ -7,16 +7,16 @@ import './FlashDeals.css'
 // Calculate time remaining until expiry
 const getTimeRemaining = (expiryDate) => {
   if (!expiryDate) return null
-  
+
   const now = new Date()
   const expiry = new Date(expiryDate)
   const diff = expiry - now
-  
+
   if (diff <= 0) return null
-  
+
   const days = Math.floor(diff / (1000 * 60 * 60 * 24))
   const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60))
-  
+
   if (days > 0) {
     return `${days} kun ${hours} soat`
   } else if (hours > 0) {
@@ -71,7 +71,7 @@ function FlashDeals({ city = 'Ташкент' }) {
           <h3>Flash chegirmalar</h3>
           <span className="flash-badge">TEZKOR</span>
         </div>
-        <button 
+        <button
           className="flash-deals-more"
           onClick={() => navigate('/offers?sort=discount')}
         >
@@ -98,14 +98,14 @@ function FlashDeals({ city = 'Ташкент' }) {
             const photoUrl = api.getPhotoUrl(deal.photo) || 'https://placehold.co/120x120/F5F5F5/CCCCCC?text=📷'
 
             return (
-              <div 
-                key={deal.id} 
+              <div
+                key={deal.id}
                 className="flash-card"
-                onClick={() => navigate('/product', { state: { offer: deal } })}
+                onClick={() => navigate(`/product/${deal.id}`, { state: { offer: deal } })}
               >
                 <div className="flash-card-image">
-                  <img 
-                    src={photoUrl} 
+                  <img
+                    src={photoUrl}
                     alt={deal.title}
                     loading="lazy"
                     onError={(e) => {
@@ -121,7 +121,7 @@ function FlashDeals({ city = 'Ташкент' }) {
 
                 <div className="flash-card-info">
                   <span className="flash-card-title">{deal.title}</span>
-                  
+
                   <div className="flash-card-prices">
                     <span className="flash-price-current">
                       {Math.round(deal.discount_price).toLocaleString()}

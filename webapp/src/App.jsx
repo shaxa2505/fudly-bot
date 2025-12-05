@@ -1,5 +1,5 @@
 import { useState, useEffect, lazy, Suspense } from 'react'
-import { MemoryRouter, Routes, Route, useNavigate, useLocation } from 'react-router-dom'
+import { HashRouter, Routes, Route, useNavigate, useLocation } from 'react-router-dom'
 import { FavoritesProvider } from './context/FavoritesContext'
 import api from './api/client'
 import HomePage from './pages/HomePage'
@@ -10,7 +10,6 @@ import './styles/animations.css'
 const CartPage = lazy(() => import('./pages/CartPage'))
 const YanaPage = lazy(() => import('./pages/YanaPage'))
 const OrderTrackingPage = lazy(() => import('./pages/OrderTrackingPage'))
-const CheckoutPage = lazy(() => import('./pages/CheckoutPage'))
 const ProductDetailPage = lazy(() => import('./pages/ProductDetailPage'))
 const StoresPage = lazy(() => import('./pages/StoresPage'))
 const CategoryProductsPage = lazy(() => import('./pages/CategoryProductsPage'))
@@ -153,7 +152,7 @@ function AppContent() {
           />
           <Route
             path="/checkout"
-            element={<CheckoutPage user={user} />}
+            element={<CartPage user={user} />}
           />
           <Route
             path="/stores"
@@ -166,6 +165,10 @@ function AppContent() {
           <Route
             path="/order/:bookingId"
             element={<OrderTrackingPage user={user} />}
+          />
+          <Route
+            path="/product/:id"
+            element={<ProductDetailPage />}
           />
           <Route
             path="/product"
@@ -185,11 +188,11 @@ function AppContent() {
 
 function App() {
   return (
-    <MemoryRouter>
+    <HashRouter>
       <FavoritesProvider>
         <AppContent />
       </FavoritesProvider>
-    </MemoryRouter>
+    </HashRouter>
   )
 }
 
