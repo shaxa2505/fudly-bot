@@ -523,10 +523,11 @@ function HomePage() {
         }, 100)
       }} />
 
-      {/* Flash Deals - Show on home without search */}
+      {/* Flash Deals - temporarily disabled until API deployed
       {selectedCategory === 'all' && !searchQuery && (
         <FlashDeals city={cityForApi} />
       )}
+      */}
 
       {/* Categories - Horizontal Scroll */}
       <div className="categories-section">
@@ -554,7 +555,7 @@ function HomePage() {
         <div className="quick-filters-row">
           {/* Discount Filters */}
           <div className="filter-group">
-            <button 
+            <button
               className={`filter-chip ${minDiscount === null ? 'active' : ''}`}
               onClick={() => {
                 window.Telegram?.WebApp?.HapticFeedback?.selectionChanged?.()
@@ -563,7 +564,7 @@ function HomePage() {
             >
               Hammasi
             </button>
-            <button 
+            <button
               className={`filter-chip discount ${minDiscount === 20 ? 'active' : ''}`}
               onClick={() => {
                 window.Telegram?.WebApp?.HapticFeedback?.selectionChanged?.()
@@ -572,7 +573,7 @@ function HomePage() {
             >
               🏷️ 20%+
             </button>
-            <button 
+            <button
               className={`filter-chip discount ${minDiscount === 30 ? 'active' : ''}`}
               onClick={() => {
                 window.Telegram?.WebApp?.HapticFeedback?.selectionChanged?.()
@@ -581,7 +582,7 @@ function HomePage() {
             >
               🔥 30%+
             </button>
-            <button 
+            <button
               className={`filter-chip discount ${minDiscount === 50 ? 'active' : ''}`}
               onClick={() => {
                 window.Telegram?.WebApp?.HapticFeedback?.selectionChanged?.()
@@ -593,7 +594,7 @@ function HomePage() {
           </div>
 
           {/* Sort Dropdown */}
-          <select 
+          <select
             className="sort-select"
             value={sortBy}
             onChange={(e) => {
@@ -642,8 +643,8 @@ function HomePage() {
               ))
             ) : (
               offers.slice(0, 8).map((offer, index) => (
-                <div 
-                  key={`pop-${offer.id}`} 
+                <div
+                  key={`pop-${offer.id}`}
                   className="popular-card animate-in"
                   style={{ animationDelay: `${index * 50}ms` }}
                   onClick={() => navigate('/product', { state: { offer } })}
@@ -704,8 +705,8 @@ function HomePage() {
           </div>
         ) : (
           offers.map((offer, index) => (
-            <div 
-              key={offer.id} 
+            <div
+              key={offer.id}
               className="offer-card-wrapper animate-in"
               style={{ animationDelay: `${Math.min(index, 5) * 60}ms` }}
             >
