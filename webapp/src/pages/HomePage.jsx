@@ -524,7 +524,7 @@ function HomePage() {
       )}
 
       {/* Popular Nearby - Horizontal Scroll */}
-      {offers.length > 0 && selectedCategory === 'all' && !searchQuery && (
+      {selectedCategory === 'all' && !searchQuery && (
         <div className="popular-section">
           <div className="popular-header">
             <h3 className="popular-title">🔥 Ommabop takliflar</h3>
@@ -538,27 +538,45 @@ function HomePage() {
             </button>
           </div>
           <div className="popular-scroll">
-            {offers.slice(0, 8).map(offer => (
-              <div key={`pop-${offer.id}`} className="popular-card" onClick={() => navigate('/product', { state: { offer } })}>
-                <div className="popular-card-image">
-                  <img
-                    src={offer.photo || 'https://placehold.co/300x300/F5F5F5/CCCCCC?text=📷'}
-                    alt={offer.title}
-                    loading="lazy"
-                    onError={(e) => {
-                      e.target.src = 'https://placehold.co/300x300/F5F5F5/CCCCCC?text=📷'
-                    }}
-                  />
-                  {offer.discount_percent > 0 && (
-                    <span className="popular-card-badge">-{Math.round(offer.discount_percent)}%</span>
-                  )}
+            {loading && offers.length === 0 ? (
+              // Skeleton loading for popular section
+              Array.from({ length: 4 }).map((_, i) => (
+                <div key={`pop-skeleton-${i}`} className="popular-card skeleton">
+                  <div className="popular-card-image skeleton-box" />
+                  <div className="popular-card-info">
+                    <div className="skeleton-text" style={{ width: '70%', height: '14px' }} />
+                    <div className="skeleton-text" style={{ width: '90%', height: '12px' }} />
+                  </div>
                 </div>
-                <div className="popular-card-info">
-                  <span className="popular-card-price">{Math.round(offer.discount_price || 0).toLocaleString()} so'm</span>
-                  <span className="popular-card-title">{offer.title}</span>
+              ))
+            ) : (
+              offers.slice(0, 8).map((offer, index) => (
+                <div 
+                  key={`pop-${offer.id}`} 
+                  className="popular-card animate-in"
+                  style={{ animationDelay: `${index * 50}ms` }}
+                  onClick={() => navigate('/product', { state: { offer } })}
+                >
+                  <div className="popular-card-image">
+                    <img
+                      src={offer.photo || 'https://placehold.co/300x300/F5F5F5/CCCCCC?text=📷'}
+                      alt={offer.title}
+                      loading="lazy"
+                      onError={(e) => {
+                        e.target.src = 'https://placehold.co/300x300/F5F5F5/CCCCCC?text=📷'
+                      }}
+                    />
+                    {offer.discount_percent > 0 && (
+                      <span className="popular-card-badge">-{Math.round(offer.discount_percent)}%</span>
+                    )}
+                  </div>
+                  <div className="popular-card-info">
+                    <span className="popular-card-price">{Math.round(offer.discount_price || 0).toLocaleString()} so'm</span>
+                    <span className="popular-card-title">{offer.title}</span>
+                  </div>
                 </div>
-              </div>
-            ))}
+              ))
+            )}
           </div>
         </div>
       )}
@@ -594,14 +612,19 @@ function HomePage() {
             <p className="empty-state-text">Boshqa so'z bilan qidiring</p>
           </div>
         ) : (
-          offers.map(offer => (
-            <OfferCard
-              key={offer.id}
-              offer={offer}
-              cartQuantity={getQuantity(offer.id)}
-              onAddToCart={addToCart}
-              onRemoveFromCart={removeFromCart}
-            />
+          offers.map((offer, index) => (
+            <div 
+              key={offer.id} 
+              className="offer-card-wrapper animate-in"
+              style={{ animationDelay: `${Math.min(index, 5) * 60}ms` }}
+            >
+              <OfferCard
+                offer={offer}
+                cartQuantity={getQuantity(offer.id)}
+                onAddToCart={addToCart}
+                onRemoveFromCart={removeFromCart}
+              />
+            </div>
           ))
         )}
       </div>

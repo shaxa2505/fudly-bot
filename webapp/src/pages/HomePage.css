@@ -865,6 +865,74 @@
   color: #4C4F56;
 }
 
+/* =============================================================================
+   Skeleton Loading & Animations
+   ============================================================================= */
+
+/* Skeleton base styles */
+.skeleton-box {
+  background: linear-gradient(90deg, #f0f0f0 25%, #e8e8e8 50%, #f0f0f0 75%);
+  background-size: 200% 100%;
+  animation: skeleton-shimmer 1.5s infinite;
+}
+
+.skeleton-text {
+  height: 12px;
+  background: linear-gradient(90deg, #f0f0f0 25%, #e8e8e8 50%, #f0f0f0 75%);
+  background-size: 200% 100%;
+  animation: skeleton-shimmer 1.5s infinite;
+  border-radius: 4px;
+  margin-bottom: 6px;
+}
+
+@keyframes skeleton-shimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+/* Popular card skeleton */
+.popular-card.skeleton {
+  pointer-events: none;
+}
+
+.popular-card.skeleton .popular-card-image {
+  height: 100px;
+}
+
+.popular-card.skeleton .popular-card-info {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+/* Staggered fade-in animation */
+@keyframes fade-slide-in {
+  0% {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-in {
+  animation: fade-slide-in 0.4s ease-out forwards;
+  opacity: 0;
+}
+
+/* Offer card wrapper for animation */
+.offer-card-wrapper {
+  display: contents;
+}
+
+.offer-card-wrapper.animate-in > * {
+  animation: fade-slide-in 0.4s ease-out forwards;
+  opacity: 0;
+  animation-delay: inherit;
+}
+
 /* Responsive */
 @media (min-width: 768px) {
   .offers-grid {
