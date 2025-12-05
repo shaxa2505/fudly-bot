@@ -8,11 +8,11 @@
   bottom: 0;
   left: 0;
   right: 0;
-  background: var(--color-bg-primary);
-  border-top: none;
+  background: var(--color-surface);
+  border-top: 1px solid var(--color-border);
   z-index: var(--z-modal);
   padding-bottom: var(--safe-area-bottom);
-  box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.08);
+  box-shadow: var(--elev-1);
 }
 
 .bottom-nav-content {
@@ -50,7 +50,7 @@
 }
 
 .nav-item.active {
-  background: rgba(83, 177, 117, 0.1);
+  background: rgba(83, 177, 117, 0.12);
 }
 
 .nav-item.active::before {
