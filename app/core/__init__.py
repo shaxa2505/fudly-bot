@@ -1,1 +1,1 @@
-"""Core infrastructure: config, bootstrap, cache, utilities."""
+"""Core infrastructure: config, bootstrap, cache, utilities, constants."""

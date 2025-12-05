@@ -5,6 +5,8 @@ import importlib.util
 import json
 from typing import Any
 
+from app.core.constants import CACHE_TTL_LONG
+
 # Determine availability once to avoid reassigning constants
 REDIS_AVAILABLE: bool = importlib.util.find_spec("redis") is not None
 
@@ -52,7 +54,7 @@ class RedisCache:
             socket_connect_timeout=5,
             socket_timeout=5,
         )
-        self._default_ttl = 3600  # 1 hour
+        self._default_ttl = CACHE_TTL_LONG  # 1 hour
 
     def get(self, key: str) -> Any:
         """Get value from cache.

@@ -14,6 +14,7 @@ from typing import Any
 from aiogram import BaseMiddleware
 from aiogram.types import CallbackQuery, Message, TelegramObject
 
+from app.core.constants import SECONDS_PER_HOUR
 from app.core.metrics import metrics
 
 try:
@@ -29,7 +30,7 @@ class MetricsMiddleware(BaseMiddleware):
 
     def __init__(self):
         self._active_users: dict[int, float] = {}  # user_id -> last_seen timestamp
-        self._active_users_window = 3600  # 1 hour window for "active" users
+        self._active_users_window = SECONDS_PER_HOUR  # 1 hour window for "active" users
 
     async def __call__(
         self,

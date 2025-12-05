@@ -21,6 +21,7 @@ from aiogram.fsm.context import FSMContext
 
 from app.core.bootstrap import build_application
 from app.core.config import load_settings
+from app.core.constants import SECONDS_PER_HOUR
 from app.core.security import (
     PRODUCTION_FEATURES,
     logger,
@@ -524,7 +525,7 @@ async def cleanup_expired_fsm_states() -> None:
     """Background task to cleanup expired FSM states."""
     while True:
         try:
-            await asyncio.sleep(3600)  # Every hour
+            await asyncio.sleep(SECONDS_PER_HOUR)  # Every hour
             # Check if storage supports cleanup
             storage = dp.storage
             if hasattr(storage, "cleanup_expired"):
