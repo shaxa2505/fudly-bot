@@ -150,8 +150,10 @@ def get_user_view_mode(user_id: int, db: DatabaseProtocol) -> str:
         mode = db.get_user_view_mode(user_id)
         if mode:
             return mode
-    except (AttributeError, Exception):
-        pass
+    except AttributeError:
+        logger.debug("get_user_view_mode not available in database")
+    except Exception as e:
+        logger.debug("Could not get user view mode: %s", e)
     # Fallback to in-memory dict
     return user_view_mode.get(user_id, "customer")
 
@@ -163,8 +165,10 @@ def set_user_view_mode(user_id: int, mode: str, db: DatabaseProtocol) -> None:
     # Update database
     try:
         db.set_user_view_mode(user_id, mode)
-    except (AttributeError, Exception):
-        pass
+    except AttributeError:
+        logger.debug("set_user_view_mode not available in database")
+    except Exception as e:
+        logger.debug("Could not set user view mode: %s", e)
     # Also update in-memory dict for backward compatibility
     user_view_mode[user_id] = mode
 

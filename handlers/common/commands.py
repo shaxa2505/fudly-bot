@@ -225,8 +225,8 @@ async def change_city(
         stats_text = (
             f"\n\n📊 В вашем городе:\n🏪 Магазинов: {stores_count}\n🍽 Предложений: {offers_count}"
         )
-    except Exception:
-        pass
+    except Exception as e:
+        logger.debug("Could not load city stats: %s", e)
 
     builder = InlineKeyboardBuilder()
     builder.button(
@@ -324,8 +324,8 @@ async def back_to_main_menu(callback: types.CallbackQuery, db: DatabaseProtocol)
     if callback.message:
         try:
             await callback.message.delete()
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug("Could not delete message in back_to_menu: %s", e)
         await callback.message.answer(get_text(lang, "main_menu"), reply_markup=menu)
     await callback.answer()
 
@@ -491,8 +491,8 @@ async def registration_choose_language(
             parse_mode="HTML",
             reply_markup=None,  # Remove inline keyboard
         )
-    except Exception:
-        pass
+    except Exception as e:
+        logger.debug("Could not edit phone card: %s", e)
 
     # Send phone request with ReplyKeyboard
     await callback.message.answer(
@@ -525,8 +525,8 @@ async def choose_language(callback: types.CallbackQuery, state: FSMContext, db: 
             await callback.message.edit_text(
                 build_phone_card(lang), parse_mode="HTML", reply_markup=None
             )
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug("Could not edit phone card: %s", e)
 
         await callback.message.answer(
             f"👇 {'Tugmani bosing' if lang == 'uz' else 'Нажмите кнопку'}",
@@ -543,8 +543,8 @@ async def choose_language(callback: types.CallbackQuery, state: FSMContext, db: 
         await callback.message.edit_text(
             f"✅ {'Til oʻzgartirildi' if lang == 'uz' else 'Язык изменён'}: {lang_name}"
         )
-    except Exception:
-        pass
+    except Exception as e:
+        logger.debug("Could not edit language confirmation: %s", e)
 
     user_phone = user.phone
     user_city = user.city
@@ -742,8 +742,8 @@ async def force_cancel_booking(callback: types.CallbackQuery, db: DatabaseProtoc
         if callback.message:
             try:
                 await callback.message.delete()
-            except Exception:
-                pass
+            except Exception as del_e:
+                logger.debug("Could not delete message: %s", del_e)
 
         # Get updated bookings count
         bookings = db.get_user_bookings(user_id) or []

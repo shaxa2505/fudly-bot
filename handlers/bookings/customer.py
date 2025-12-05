@@ -124,8 +124,8 @@ def build_order_card_text(
 
             dt = datetime.strptime(expiry_str, "%Y-%m-%d")
             expiry_str = dt.strftime("%d.%m.%Y")
-        except Exception:
-            pass
+        except ValueError:
+            logger.debug("Could not parse expiry date: %s", expiry_str)
         lines.append(f"📅 {expiry_label}: {expiry_str}")
 
     # Store info - same style
@@ -332,8 +332,8 @@ async def book_offer_start(callback: types.CallbackQuery, state: FSMContext) -> 
         # Fallback: delete old and send new
         try:
             await callback.message.delete()
-        except Exception:
-            pass
+        except Exception as del_e:
+            logger.debug("Could not delete message: %s", del_e)
         offer_photo = get_offer_field(offer, "photo", None)
         if offer_photo:
             await callback.message.answer_photo(
@@ -414,8 +414,8 @@ async def pbook_change_qty(callback: types.CallbackQuery, state: FSMContext) -> 
             )
         else:
             await callback.message.edit_text(text, parse_mode="HTML", reply_markup=kb.as_markup())
-    except Exception:
-        pass
+    except Exception as e:
+        logger.debug("Could not edit quantity message: %s", e)
     await callback.answer()
 
 
@@ -479,8 +479,8 @@ async def pbook_select_method(callback: types.CallbackQuery, state: FSMContext) 
             )
         else:
             await callback.message.edit_text(text, parse_mode="HTML", reply_markup=kb.as_markup())
-    except Exception:
-        pass
+    except Exception as e:
+        logger.debug("Could not edit delivery method message: %s", e)
     await callback.answer()
 
 
@@ -501,8 +501,8 @@ async def pbook_cancel(callback: types.CallbackQuery, state: FSMContext) -> None
     # Delete current message
     try:
         await callback.message.delete()
-    except Exception:
-        pass
+    except Exception as e:
+        logger.debug("Could not delete cancel message: %s", e)
 
     from app.core.utils import normalize_city
     from app.services.offer_service import OfferService
@@ -622,8 +622,8 @@ async def pbook_cancel(callback: types.CallbackQuery, state: FSMContext) -> None
                     offer = offer_service.get_offer_details(offer_id)
                     if offer:
                         all_results.append(offer)
-                except Exception:
-                    pass
+                except Exception as e:
+                    logger.debug("Could not fetch offer %s: %s", offer_id, e)
 
             if all_results:
                 total_count = len(all_results)
@@ -781,8 +781,8 @@ async def pbook_confirm(callback: types.CallbackQuery, state: FSMContext) -> Non
         saved_address = None
         try:
             saved_address = db.get_last_delivery_address(user_id)
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug("Could not load saved address for user %d: %s", user_id, e)
 
         await state.clear()
         await state.update_data(
