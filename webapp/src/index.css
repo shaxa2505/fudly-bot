@@ -10,6 +10,7 @@
 
 /* Design System Imports */
 @import './styles/design-tokens.css';
+@import './styles/tokens.css';
 @import './styles/animations.css';
 @import './styles/shared-components.css';
 @import './styles/accessibility.css';
