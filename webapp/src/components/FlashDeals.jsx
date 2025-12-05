@@ -108,6 +108,9 @@ function FlashDeals({ city = 'Ташкент' }) {
                     src={photoUrl}
                     alt={deal.title}
                     loading="lazy"
+                    decoding="async"
+                    width="120"
+                    height="120"
                     onError={(e) => {
                       e.target.src = 'https://placehold.co/120x120/F5F5F5/CCCCCC?text=📷'
                     }}

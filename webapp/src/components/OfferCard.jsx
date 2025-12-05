@@ -129,6 +129,9 @@ const OfferCard = memo(function OfferCard({ offer, cartQuantity = 0, onAddToCart
           alt={offer.title}
           className={`card-image ${imageLoaded ? 'loaded' : ''}`}
           loading="lazy"
+          decoding="async"
+          width="300"
+          height="300"
           onLoad={() => setImageLoaded(true)}
           onError={(e) => {
             if (!e.target.dataset.fallback) {

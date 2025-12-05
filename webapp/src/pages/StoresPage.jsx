@@ -16,6 +16,9 @@ const BUSINESS_TYPES = [
   { id: 'bakery', label: 'Novvoyxona', icon: '🥖' },
   { id: 'grocery', label: 'Oziq-ovqat', icon: '🥬' },
 ]
+                  decoding="async"
+                  width="80"
+                  height="80"
 
 function StoresPage() {
   const navigate = useNavigate()

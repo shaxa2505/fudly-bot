@@ -56,6 +56,9 @@ function RecentlyViewed() {
                 src={api.getPhotoUrl(offer.photo) || offer.photo_id || 'https://placehold.co/120x120/F8F9FA/94A3B8?text=🛒'}
                 alt={offer.name || offer.title}
                 loading="lazy"
+                decoding="async"
+                width="120"
+                height="120"
                 onError={(e) => {
                   e.target.src = 'https://placehold.co/120x120/F8F9FA/94A3B8?text=🛒'
                 }}

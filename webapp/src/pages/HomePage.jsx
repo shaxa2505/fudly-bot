@@ -49,6 +49,9 @@ function HomePage() {
   const [searchHistory, setSearchHistory] = useState([])
   const [showSearchHistory, setShowSearchHistory] = useState(false)
   const searchInputRef = useRef(null)
+  const lastScrollTrigger = useRef('')
+  const pendingResetRef = useRef(false)
+  const [loadError, setLoadError] = useState('')
 
   // Use cart from context instead of local state
   const { addToCart, removeFromCart, getQuantity, cartCount } = useCart()
@@ -205,9 +208,15 @@ function HomePage() {
 
   // Load offers - сначала по городу, если пусто - из всех городов
   const loadOffers = useCallback(async (reset = false, forceAllCities = false) => {
-    if (loading) return
+    if (loading) {
+      if (reset) {
+        pendingResetRef.current = true
+      }
+      return
+    }
 
     setLoading(true)
+    setLoadError('')
     try {
       const currentOffset = reset ? 0 : offset
       const params = {
@@ -261,8 +270,13 @@ function HomePage() {
       setHasMore((data?.length || 0) === 20)
     } catch (error) {
       console.error('Error loading offers:', error)
+      setLoadError('Takliflarni yuklashda xatolik. Qayta urinib ko\'ring.')
     } finally {
       setLoading(false)
+      if (pendingResetRef.current) {
+        pendingResetRef.current = false
+        loadOffers(true, forceAllCities)
+      }
     }
   }, [selectedCategory, searchQuery, offset, loading, cityForApi, showingAllCities, minDiscount, sortBy])
 
@@ -271,6 +285,14 @@ function HomePage() {
     setShowingAllCities(false)
     await loadOffers(true)
   }, [loadOffers])
+
+  const handleResetFilters = useCallback(() => {
+    window.Telegram?.WebApp?.HapticFeedback?.selectionChanged?.()
+    setSearchQuery('')
+    setSelectedCategory('all')
+    setMinDiscount(null)
+    setSortBy('default')
+  }, [])
 
   // Pull-to-refresh hook
   const { isPulling, isRefreshing, pullDistance, progress } = usePullToRefresh(handleRefresh)
@@ -382,6 +404,47 @@ function HomePage() {
 
   // Cart functions now come from useCart() hook
 
+  const isFiltered = Boolean(
+    searchQuery ||
+    selectedCategory !== 'all' ||
+    minDiscount !== null ||
+    sortBy !== 'default'
+  )
+  const filterSummary = [
+    selectedCategory !== 'all' ? CATEGORIES.find(c => c.id === selectedCategory)?.name : null,
+    searchQuery ? `"${searchQuery}"` : null,
+    minDiscount ? `${minDiscount}%+` : null,
+    sortBy === 'discount' ? 'Chegirma ↓' : null,
+    sortBy === 'price_asc' ? 'Narx ↑' : null,
+    sortBy === 'price_desc' ? 'Narx ↓' : null,
+  ].filter(Boolean)
+  const showEmptyHighlight = isFiltered && !loading && offers.length === 0
+  const heroLocationLine = formattedAddress || 'Manzilni belgilang'
+  const heroOfferSummary = loading ? 'Takliflar yuklanmoqda...' : `${offers.length} ta taklif`
+  const heroDiscountSummary = minDiscount ? `${minDiscount}%+ chegirma faolda` : 'Chegirmalar ochiq'
+
+  // Scroll to results when filters/search change and data is ready
+  useEffect(() => {
+    if (loading || offers.length === 0) return
+    const trigger = `${selectedCategory}|${minDiscount}|${sortBy}|${searchQuery}`
+    if (trigger === lastScrollTrigger.current) return
+    lastScrollTrigger.current = trigger
+    const sectionHeader = document.querySelector('.section-header')
+    if (sectionHeader) {
+      sectionHeader.scrollIntoView({ behavior: 'smooth' })
+    }
+  }, [selectedCategory, minDiscount, sortBy, searchQuery, loading, offers.length])
+
+  // Autofocus search when no results to encourage refinement
+  useEffect(() => {
+    if (!loading && offers.length === 0 && !showAddressModal) {
+      window.scrollTo({ top: 0, behavior: 'smooth' })
+      if (searchInputRef.current) {
+        searchInputRef.current.focus()
+      }
+    }
+  }, [loading, offers.length, showAddressModal])
+
   return (
     <div className="home-page">
       {/* Pull-to-Refresh */}
@@ -441,6 +504,9 @@ function HomePage() {
             onBlur={() => setTimeout(() => setShowSearchHistory(false), 200)}
             onKeyDown={(e) => e.key === 'Enter' && handleSearchSubmit()}
           />
+          {loading && (
+            <span className="search-spinner" role="status" aria-label="Yuklanmoqda" />
+          )}
           {searchQuery && (
             <button className="search-clear" onClick={() => setSearchQuery('')}>
               ✕
@@ -472,15 +538,75 @@ function HomePage() {
             </div>
           )}
         </div>
+
+        {loading && (
+          <div className="search-status" role="status" aria-live="polite">
+            Qidirilmoqda...
+          </div>
+        )}
+
+        {loadError && (
+          <div className="load-error" role="alert">
+            <span>{loadError}</span>
+            <button onClick={() => loadOffers(true, showingAllCities)}>Qayta yuklash</button>
+          </div>
+        )}
       </header>
 
-      {/* Hero Banner Carousel */}
-      <HeroBanner onCategorySelect={(category) => {
-        setSelectedCategory(category)
-        setTimeout(() => {
-          document.querySelector('.section-header')?.scrollIntoView({ behavior: 'smooth' })
-        }, 100)
-      }} />
+      <section className="hero-shell">
+        <div className="hero-content">
+          <div className="hero-primary">
+            <HeroBanner onCategorySelect={(category) => {
+              setSelectedCategory(category)
+              setTimeout(() => {
+                document.querySelector('.section-header')?.scrollIntoView({ behavior: 'smooth' })
+              }, 100)
+            }} />
+          </div>
+          <div className="hero-secondary">
+            <div className="hero-side-card hero-location-card">
+              <p className="eyebrow-text">Yetkazish manzili</p>
+              <h3>{cityRaw}</h3>
+              <p className="hero-location-address">{heroLocationLine}</p>
+              <button type="button" className="hero-link-btn" onClick={openAddressModal}>
+                Manzilni o'zgartirish
+              </button>
+              {!hasPreciseLocation && (
+                <span className="hero-location-hint">Aniqlik uchun manzil yoki geolokatsiya kiriting</span>
+              )}
+            </div>
+            <div className="hero-side-card hero-metrics-card">
+              <div className="hero-metric">
+                <span className="hero-metric-icon">🛒</span>
+                <div>
+                  <p className="hero-metric-label">Savatcha</p>
+                  <strong>{cartCount || 0} ta mahsulot</strong>
+                </div>
+              </div>
+              <div className="hero-metric">
+                <span className="hero-metric-icon">⚡</span>
+                <div>
+                  <p className="hero-metric-label">Bugungi topilmalar</p>
+                  <strong>{heroOfferSummary}</strong>
+                </div>
+              </div>
+              <div className="hero-metric">
+                <span className="hero-metric-icon">🎯</span>
+                <div>
+                  <p className="hero-metric-label">Filtr holati</p>
+                  <strong>{heroDiscountSummary}</strong>
+                </div>
+              </div>
+              {showingAllCities && (
+                <div className="hero-pill" role="status">
+                  <span>🌍</span>
+                  <p>{cityRaw} da topilmadi, boshqa shaharlar ko'rsatilmoqda</p>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      </section>
 
       {/* Flash Deals - temporarily disabled until API deployed
       {selectedCategory === 'all' && !searchQuery && (
@@ -509,65 +635,86 @@ function HomePage() {
         </div>
       </div>
 
-      {/* Quick Filters */}
-      <div className="quick-filters">
-        <div className="quick-filters-row">
-          {/* Discount Filters */}
-          <div className="filter-group">
-            <button
-              className={`filter-chip ${minDiscount === null ? 'active' : ''}`}
-              onClick={() => {
+      <section className="filters-panel">
+        <div className="filters-panel-header">
+          <div className="filters-panel-heading">
+            <p className="eyebrow-text">Tez filtrlar</p>
+            <h3>Topilmangizni aniqlang</h3>
+            <p className="filters-panel-subcopy">
+              Chegirmalar va tartiblash yordamida eng mos taklifni toping.
+            </p>
+          </div>
+          {isFiltered && (
+            <button type="button" className="filters-reset-btn" onClick={handleResetFilters}>
+              Filtrlarni tozalash
+            </button>
+          )}
+        </div>
+        <div className={`quick-filters ${showEmptyHighlight ? 'attention' : ''}`}>
+          <div className="quick-filters-row">
+            {/* Discount Filters */}
+            <div className="filter-group">
+              <button
+                className={`filter-chip ${minDiscount === null ? 'active' : ''}`}
+                onClick={() => {
+                  window.Telegram?.WebApp?.HapticFeedback?.selectionChanged?.()
+                  setMinDiscount(null)
+                }}
+              >
+                Barchasi
+              </button>
+              <button
+                className={`filter-chip discount ${minDiscount === 20 ? 'active' : ''}`}
+                onClick={() => {
+                  window.Telegram?.WebApp?.HapticFeedback?.selectionChanged?.()
+                  setMinDiscount(minDiscount === 20 ? null : 20)
+                }}
+              >
+                20%+ chegirma
+              </button>
+              <button
+                className={`filter-chip discount ${minDiscount === 30 ? 'active' : ''}`}
+                onClick={() => {
+                  window.Telegram?.WebApp?.HapticFeedback?.selectionChanged?.()
+                  setMinDiscount(minDiscount === 30 ? null : 30)
+                }}
+              >
+                🔥 30%+
+              </button>
+              <button
+                className={`filter-chip discount hot ${minDiscount === 50 ? 'active' : ''}`}
+                onClick={() => {
+                  window.Telegram?.WebApp?.HapticFeedback?.selectionChanged?.()
+                  setMinDiscount(minDiscount === 50 ? null : 50)
+                }}
+              >
+                💥 50%+
+              </button>
+            </div>
+
+            {/* Sort Dropdown */}
+            <select
+              className="sort-select"
+              value={sortBy}
+              onChange={(e) => {
                 window.Telegram?.WebApp?.HapticFeedback?.selectionChanged?.()
-                setMinDiscount(null)
+                setSortBy(e.target.value)
               }}
             >
-              Barchasi
-            </button>
-            <button
-              className={`filter-chip discount ${minDiscount === 20 ? 'active' : ''}`}
-              onClick={() => {
-                window.Telegram?.WebApp?.HapticFeedback?.selectionChanged?.()
-                setMinDiscount(minDiscount === 20 ? null : 20)
-              }}
-            >
-              20%+ chegirma
-            </button>
-            <button
-              className={`filter-chip discount ${minDiscount === 30 ? 'active' : ''}`}
-              onClick={() => {
-                window.Telegram?.WebApp?.HapticFeedback?.selectionChanged?.()
-                setMinDiscount(minDiscount === 30 ? null : 30)
-              }}
-            >
-              🔥 30%+
-            </button>
-            <button
-              className={`filter-chip discount hot ${minDiscount === 50 ? 'active' : ''}`}
-              onClick={() => {
-                window.Telegram?.WebApp?.HapticFeedback?.selectionChanged?.()
-                setMinDiscount(minDiscount === 50 ? null : 50)
-              }}
-            >
-              💥 50%+
-            </button>
+              <option value="default">Tartiblash</option>
+              <option value="discount">Chegirma ↓</option>
+              <option value="price_asc">Narx ↑</option>
+              <option value="price_desc">Narx ↓</option>
+            </select>
           </div>
 
-          {/* Sort Dropdown */}
-          <select
-            className="sort-select"
-            value={sortBy}
-            onChange={(e) => {
-              window.Telegram?.WebApp?.HapticFeedback?.selectionChanged?.()
-              setSortBy(e.target.value)
-            }}
-          >
-            <option value="default">Tartiblash</option>
-            <option value="discount">Chegirma ↓</option>
-            <option value="price_asc">Narx ↑</option>
-            <option value="price_desc">Narx ↓</option>
-          </select>
+          {isFiltered && (
+            <div className="filter-hint" role="status" aria-live="polite">
+              Faol filtrlar: {filterSummary.join(', ')}
+            </div>
+          )}
         </div>
-      </div>
+      </section>
 
       {/* Recently Viewed - Show only on home without search */}
       {selectedCategory === 'all' && !searchQuery && (
@@ -613,6 +760,9 @@ function HomePage() {
                       src={offer.photo || 'https://placehold.co/300x300/F5F5F5/CCCCCC?text=📷'}
                       alt={offer.title}
                       loading="lazy"
+                      decoding="async"
+                      width="300"
+                      height="300"
                       onError={(e) => {
                         e.target.src = 'https://placehold.co/300x300/F5F5F5/CCCCCC?text=📷'
                       }}
@@ -661,6 +811,17 @@ function HomePage() {
             <div className="empty-state-icon">🔍</div>
             <h3 className="empty-state-title">Hech narsa topilmadi</h3>
             <p className="empty-state-text">Boshqa so'z bilan qidiring</p>
+            <p className="empty-state-hint">Maslahat: qisqa so'z ishlating yoki toifani almashtiring.</p>
+            {isFiltered && (
+              <div className="empty-state-actions">
+                <button
+                  className="empty-state-btn"
+                  onClick={handleResetFilters}
+                >
+                  Filtrlarni tozalash
+                </button>
+              </div>
+            )}
           </div>
         ) : (
           offers.map((offer, index) => (
