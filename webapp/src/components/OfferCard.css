@@ -222,30 +222,35 @@
   margin-top: 12px;
   display: flex;
   align-items: baseline;
-  gap: 8px;
+  gap: 6px;
   flex-wrap: nowrap;
+  overflow: hidden;
 }
 
 .price-main {
-  font-size: 18px;
+  font-size: 16px;
   font-weight: 800;
   color: #22C55E;
   line-height: 1;
   white-space: nowrap;
+  flex-shrink: 0;
 }
 
 .price-main .currency {
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 600;
   color: #666666;
 }
 
 .price-original {
-  font-size: 13px;
+  font-size: 12px;
   color: #BBBBBB;
   text-decoration: line-through;
   line-height: 1;
   white-space: nowrap;
+  flex-shrink: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 /* ===== CART ACTION ===== */
