@@ -1,3 +1,152 @@
+/* Home page refinements using design tokens */
+@import url('../styles/tokens.css');
+
+html, body {
+  background: var(--color-bg);
+  font-family: var(--font-sans);
+  color: var(--color-text);
+}
+
+.HomePage {
+  max-width: 480px;
+  margin: 0 auto;
+  padding-bottom: var(--space-8);
+}
+
+/* Header density & search affordance */
+.HomeHeader {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  background: var(--color-surface);
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  box-shadow: var(--elev-1);
+}
+
+.HomeHeader .Location {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 6px 10px;
+  border-radius: var(--radius-md);
+  background: #f3f4f6;
+  font-size: var(--text-sm);
+}
+
+.HomeHeader .Actions {
+  display: inline-flex;
+  gap: var(--space-2);
+}
+
+.SearchBar {
+  margin: var(--space-3) var(--space-4);
+  display: flex;
+}
+
+.SearchBar input {
+  width: 100%;
+  height: 40px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  padding: 0 var(--space-4);
+  font-size: var(--text-md);
+  color: var(--color-text);
+}
+
+.SearchBar input::placeholder { color: var(--color-text-muted); }
+.SearchBar input:focus-visible { outline: 2px solid #a7f3d0; outline-offset: 2px; }
+
+/* Promo card standardization */
+.PromoCard {
+  margin: 0 var(--space-4);
+  border-radius: var(--radius-lg);
+  padding: var(--space-5);
+  box-shadow: var(--elev-2);
+  color: var(--color-primary-contrast);
+  background: linear-gradient(90deg, var(--color-accent), #4ade80);
+}
+
+.PromoCard .Title { font-size: var(--text-xl); font-weight: 700; line-height: var(--line-tight); }
+.PromoCard .Subtitle { font-size: var(--text-md); opacity: 0.9; }
+.PromoCard .CTA { margin-top: var(--space-4); }
+.PromoCard .CTA .btn { box-shadow: var(--elev-1); }
+
+/* Carousel dots: unify to single style */
+.CarouselDots {
+  display: flex;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-4);
+}
+.CarouselDots .dot {
+  width: 8px; height: 8px; border-radius: 50%;
+  background: #e5e7eb;
+}
+.CarouselDots .dot.is-active { background: var(--color-primary); }
+
+/* Section spacing rhythm */
+.Section {
+  margin-top: var(--space-6);
+}
+.Section .SectionHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 var(--space-4);
+}
+.Section .SectionTitle { font-size: var(--text-lg); font-weight: 700; }
+.Section .SectionLink { font-size: var(--text-sm); color: var(--color-text-muted); }
+
+/* Cards grid */
+.CardsGrid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: var(--space-3);
+  padding: var(--space-4);
+}
+
+.ProductCard {
+  background: var(--color-surface);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--elev-2);
+  overflow: hidden;
+}
+.ProductCard .Media { height: 120px; background: #f3f4f6; }
+.ProductCard .Body { padding: var(--space-3); }
+.ProductCard .Price { font-weight: 700; color: var(--color-text); }
+.ProductCard .OldPrice { color: var(--color-text-muted); text-decoration: line-through; }
+.ProductCard .Stock { color: var(--color-success); font-size: var(--text-sm); }
+.ProductCard .Actions { padding: var(--space-3); }
+.ProductCard .Actions .btn { width: 100%; }
+
+/* Bottom navigation refinement */
+.BottomNav {
+  position: sticky;
+  bottom: 0;
+  background: var(--color-surface);
+  border-top: 1px solid var(--color-border);
+  box-shadow: var(--elev-1);
+  padding: var(--space-2) var(--space-4);
+}
+.BottomNav .items {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: var(--space-2);
+}
+.BottomNav .item { text-align: center; font-size: var(--text-xs); color: var(--color-text-muted); }
+.BottomNav .item.is-active { color: var(--color-primary); }
+
+/* Accessibility improvements for focus */
+.Section a:focus-visible,
+.BottomNav .item:focus-visible,
+.ProductCard .btn:focus-visible {
+  outline: 2px solid #93c5fd;
+  outline-offset: 2px;
+}
+
 /**
  * Home Page Styles
  * Uses CSS Variables from design-tokens.css
