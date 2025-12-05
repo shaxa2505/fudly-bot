@@ -457,6 +457,79 @@ async def get_offer(offer_id: int, db=Depends(get_db)):
         raise HTTPException(status_code=500, detail=str(e)) from e
 
 
+@router.get("/flash-deals", response_model=list[OfferResponse])
+async def get_flash_deals(
+    city: str = Query("Ташкент", description="City to filter by"),
+    limit: int = Query(10, ge=1, le=50),
+    db=Depends(get_db),
+):
+    """Get flash deals - high discount items expiring soon."""
+    from datetime import datetime, timedelta
+
+    try:
+        # Get offers with high discounts
+        raw_offers = (
+            db.get_hot_offers(city, limit=100, offset=0)
+            if hasattr(db, "get_hot_offers")
+            else []
+        )
+
+        if not raw_offers:
+            raw_offers = []
+
+        offers = []
+        today = datetime.now().date()
+        max_expiry = today + timedelta(days=7)  # Within 7 days
+
+        for offer in raw_offers:
+            try:
+                discount = float(get_val(offer, "discount_percent", 0) or 0)
+                expiry_str = get_val(offer, "expiry_date")
+
+                # Filter: discount >= 20% OR expiring within 7 days
+                is_high_discount = discount >= 20
+                is_expiring_soon = False
+
+                if expiry_str:
+                    try:
+                        expiry = datetime.fromisoformat(str(expiry_str).split("T")[0]).date()
+                        is_expiring_soon = today <= expiry <= max_expiry
+                    except (ValueError, AttributeError):
+                        pass
+
+                if is_high_discount or is_expiring_soon:
+                    offers.append(
+                        OfferResponse(
+                            id=get_val(offer, "id", 0),
+                            title=get_val(offer, "title", "Без названия"),
+                            description=get_val(offer, "description"),
+                            original_price=float(get_val(offer, "original_price", 0) or 0),
+                            discount_price=float(get_val(offer, "discount_price", 0) or 0),
+                            discount_percent=discount,
+                            quantity=int(get_val(offer, "quantity", 0) or 0),
+                            unit=get_val(offer, "unit", "шт") or "шт",
+                            category=get_val(offer, "category", "other") or "other",
+                            store_id=int(get_val(offer, "store_id", 0) or 0),
+                            store_name=get_val(offer, "store_name", "") or "",
+                            store_address=get_val(offer, "store_address"),
+                            photo=get_val(offer, "photo"),
+                            expiry_date=str(expiry_str) if expiry_str else None,
+                        )
+                    )
+            except Exception as e:
+                logger.warning(f"Error parsing flash deal offer: {e}")
+                continue
+
+        # Sort by discount (highest first), then by expiry (soonest first)
+        offers.sort(key=lambda x: (-x.discount_percent, x.expiry_date or "9999"))
+
+        return offers[:limit]
+
+    except Exception as e:
+        logger.error(f"Error getting flash deals: {e}")
+        raise HTTPException(status_code=500, detail=str(e)) from e
+
+
 # =============================================================================
 # Stores
 # =============================================================================

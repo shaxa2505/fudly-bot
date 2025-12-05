@@ -156,6 +156,10 @@ const api = {
     return cachedGet('/offers', params, 20000) // 20s cache
   },
 
+  async getFlashDeals(city = 'Ташкент', limit = 10) {
+    return cachedGet('/flash-deals', { city, limit }, 30000) // 30s cache
+  },
+
   async getFavorites() {
     try {
       const { data } = await client.get('/favorites')

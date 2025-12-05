@@ -6,6 +6,7 @@ import { transliterateCity, getSavedLocation, saveLocation, DEFAULT_LOCATION } f
 import OfferCard from '../components/OfferCard'
 import OfferCardSkeleton from '../components/OfferCardSkeleton'
 import HeroBanner from '../components/HeroBanner'
+import FlashDeals from '../components/FlashDeals'
 import BottomNav from '../components/BottomNav'
 import PullToRefresh from '../components/PullToRefresh'
 import RecentlyViewed from '../components/RecentlyViewed'
@@ -490,6 +491,11 @@ function HomePage() {
           document.querySelector('.section-header')?.scrollIntoView({ behavior: 'smooth' })
         }, 100)
       }} />
+
+      {/* Flash Deals - Show on home without search */}
+      {selectedCategory === 'all' && !searchQuery && (
+        <FlashDeals city={cityForApi} />
+      )}
 
       {/* Categories - Horizontal Scroll */}
       <div className="categories-section">
