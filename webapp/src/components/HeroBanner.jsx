@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, memo } from 'react'
+import React, { useState, useEffect, useCallback, memo, useRef } from 'react'
 import './HeroBanner.css'
 
 const BANNERS = [
@@ -41,6 +41,16 @@ const HeroBanner = memo(function HeroBanner({ onCategorySelect }) {
   const [isAutoPlaying, setIsAutoPlaying] = useState(true)
   const [touchStart, setTouchStart] = useState(null)
   const [touchEnd, setTouchEnd] = useState(null)
+  const resumeTimeoutRef = React.useRef(null)
+
+  // Cleanup timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (resumeTimeoutRef.current) {
+        clearTimeout(resumeTimeoutRef.current)
+      }
+    }
+  }, [])
 
   // Auto-play carousel
   useEffect(() => {
@@ -83,7 +93,8 @@ const HeroBanner = memo(function HeroBanner({ onCategorySelect }) {
     }
 
     // Resume auto-play after 5 seconds
-    setTimeout(() => setIsAutoPlaying(true), 5000)
+    if (resumeTimeoutRef.current) clearTimeout(resumeTimeoutRef.current)
+    resumeTimeoutRef.current = setTimeout(() => setIsAutoPlaying(true), 5000)
   }
 
   const handleBannerClick = useCallback(() => {
@@ -99,7 +110,8 @@ const HeroBanner = memo(function HeroBanner({ onCategorySelect }) {
     setCurrentIndex(index)
     setIsAutoPlaying(false)
     // Resume auto-play after 5 seconds
-    setTimeout(() => setIsAutoPlaying(true), 5000)
+    if (resumeTimeoutRef.current) clearTimeout(resumeTimeoutRef.current)
+    resumeTimeoutRef.current = setTimeout(() => setIsAutoPlaying(true), 5000)
   }, [])
 
   const currentBanner = BANNERS[currentIndex]
