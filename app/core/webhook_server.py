@@ -745,20 +745,29 @@ async def create_webhook_app(
             return add_cors_headers(web.json_response({"error": str(e)}, status=500))
 
     async def api_get_photo(request: web.Request) -> web.Response:
-        """GET /api/v1/photo/{file_id} - Get photo URL from Telegram file_id."""
+        """GET /api/v1/photo/{file_id} - Get photo URL from Telegram file_id and redirect."""
         file_id = request.match_info.get("file_id")
         if not file_id:
             return add_cors_headers(web.json_response({"error": "file_id required"}, status=400))
 
         try:
+            # Check cache first
+            if file_id in _photo_url_cache:
+                # Redirect to cached URL
+                raise web.HTTPFound(location=_photo_url_cache[file_id])
+
             # Get file info from Telegram
             file = await bot.get_file(file_id)
             if file and file.file_path:
-                # Construct URL
+                # Construct URL and cache it
                 photo_url = f"https://api.telegram.org/file/bot{bot.token}/{file.file_path}"
-                return add_cors_headers(web.json_response({"url": photo_url}))
+                _photo_url_cache[file_id] = photo_url
+                # Redirect to photo URL
+                raise web.HTTPFound(location=photo_url)
             else:
                 return add_cors_headers(web.json_response({"error": "File not found"}, status=404))
+        except web.HTTPFound:
+            raise  # Re-raise redirect
         except Exception as e:
             logger.error(f"API get photo error: {e}")
             return add_cors_headers(web.json_response({"error": str(e)}, status=500))

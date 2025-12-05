@@ -90,17 +90,17 @@ const api = {
   // Helper to convert Telegram file_id to photo URL
   getPhotoUrl(photo) {
     if (!photo) return null
-    
+
     // Already a URL
     if (photo.startsWith('http://') || photo.startsWith('https://')) {
       return photo
     }
-    
+
     // Telegram file_id - use our API endpoint
     if (photo.startsWith('AgAC') || photo.length > 50) {
       return `${API_BASE}/photo/${encodeURIComponent(photo)}`
     }
-    
+
     return null
   },
 
@@ -289,7 +289,9 @@ const api = {
   async getPaymentProviders() {
     try {
       const { data } = await client.get('/payment/providers')
-      return data.providers || []
+      // API returns [{ id: 'click', ... }] - extract IDs as strings
+      const providers = data.providers || []
+      return providers.map(p => typeof p === 'string' ? p : p.id)
     } catch (error) {
       console.warn('getPaymentProviders error:', error)
       return []

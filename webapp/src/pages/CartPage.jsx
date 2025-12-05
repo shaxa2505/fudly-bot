@@ -117,6 +117,14 @@ function CartPage({ user }) {
     }
   }
 
+  // Open file picker using Telegram WebApp or native input
+  const openFilePicker = () => {
+    const input = document.getElementById('payment-proof-input')
+    if (input) {
+      input.click()
+    }
+  }
+
   // Proceed to payment step (for delivery)
   const proceedToPayment = async () => {
     if (!phone.trim()) {
@@ -267,10 +275,10 @@ function CartPage({ user }) {
               src={photoUrl}
               alt={item.offer.title}
               className="cart-item-img"
-              onError={(e) => { 
+              onError={(e) => {
                 if (!e.target.dataset.fallback) {
                   e.target.dataset.fallback = 'true'
-                  e.target.src = 'https://placehold.co/80x80/F5F5F5/CCCCCC?text=📷' 
+                  e.target.src = 'https://placehold.co/80x80/F5F5F5/CCCCCC?text=📷'
                 }
               }}
             />
@@ -513,20 +521,17 @@ function CartPage({ user }) {
                           type="file"
                           id="payment-proof-input"
                           accept="image/*"
-                          onChange={(e) => {
-                            e.stopPropagation()
-                            handleFileSelect(e)
-                          }}
-                          onClick={(e) => e.stopPropagation()}
-                          style={{ display: 'none' }}
+                          capture="environment"
+                          onChange={handleFileSelect}
+                          className="file-input-hidden"
                         />
-                        <label
-                          htmlFor="payment-proof-input"
+                        <button
+                          type="button"
                           className="upload-btn"
-                          onClick={(e) => e.stopPropagation()}
+                          onClick={openFilePicker}
                         >
                           📷 Rasm tanlash
-                        </label>
+                        </button>
                       </div>
                     )}
                   </div>
