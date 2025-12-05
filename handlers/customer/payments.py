@@ -27,11 +27,10 @@ db: DatabaseProtocol | None = None
 bot: types.Bot | None = None
 get_text = None
 
-# Telegram Payments provider token (Click test token)
-PROVIDER_TOKEN = os.getenv(
-    "TELEGRAM_PAYMENT_PROVIDER_TOKEN",
-    "398062629:TEST:999999999_F91D8F69C042267444B74CC0B3C747757EB0E065",
-)
+# Telegram Payments provider token (required env var)
+PROVIDER_TOKEN = os.getenv("TELEGRAM_PAYMENT_PROVIDER_TOKEN")
+if not PROVIDER_TOKEN:
+    logger.warning("⚠️ TELEGRAM_PAYMENT_PROVIDER_TOKEN not set - payments will not work")
 
 
 def setup(

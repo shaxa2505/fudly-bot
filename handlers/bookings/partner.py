@@ -123,14 +123,14 @@ async def partner_confirm_booking(callback: types.CallbackQuery) -> None:
             )
         else:
             customer_msg = (
-                f"✅ <b>Broningiz tasdiqlandi!</b>\n\n"
+                f"✅ <b>Ваша бронь подтверждена!</b>\n\n"
                 f"🏪 {_esc(store_name)}\n"
-                f"📍 Manzil: {_esc(store_address)}\n\n"
+                f"📍 Адрес: {_esc(store_address)}\n\n"
                 f"━━━━━━━━━━\n"
-                f"🎫 <b>Bron kodi:</b>\n"
+                f"🎫 <b>Код брони:</b>\n"
                 f"<code>{code_display}</code>\n"
                 f"━━━━━━━━━━\n\n"
-                f"⚠️ Ushbu kodni yoki QR kodni sotuvchiga ko'rsating."
+                f"⚠️ Покажите этот код или QR-код продавцу."
             )
 
         try:

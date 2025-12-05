@@ -17,8 +17,11 @@ from localization import get_text
 
 router = Router(name="admin_panel")
 
-# Secret admin password from env or default
-ADMIN_SECRET = os.getenv("ADMIN_SECRET", "fudly_admin_2025")
+# Secret admin password from env (required for security)
+ADMIN_SECRET = os.getenv("ADMIN_SECRET")
+if not ADMIN_SECRET:
+    import logging as _logging
+    _logging.getLogger(__name__).warning("⚠️ ADMIN_SECRET not set - /setadmin will not work")
 
 
 @router.message(Command("setadmin"))
@@ -26,12 +29,16 @@ async def cmd_setadmin(message: types.Message, db: DatabaseProtocol):
     """Secret command to set yourself as admin: /setadmin <password>"""
     if not message.from_user or not message.text:
         return
-    
+
+    # Security: require ADMIN_SECRET to be set
+    if not ADMIN_SECRET:
+        return
+
     args = message.text.split(maxsplit=1)
     if len(args) < 2:
         # Don't reveal the command exists
         return
-    
+
     password = args[1].strip()
     if password != ADMIN_SECRET:
         # Wrong password - don't reveal
