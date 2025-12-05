@@ -851,31 +851,82 @@ async def create_webhook_app(
             from aiogram.types import BufferedInputFile
 
             photo_file = BufferedInputFile(photo_data, filename=filename)
-            # Send to admin/bot to get file_id
-            admin_id = int(os.getenv("ADMIN_ID", "0"))
-            if admin_id:
-                sent_msg = await bot.send_photo(
-                    admin_id, photo_file, caption=f"📸 Чек для заказа #{order_id} (Mini App)"
+
+            # Get booking info to find seller
+            booking = None
+            seller_id = None
+            booking_code = None
+            user_id = None
+
+            if hasattr(db, "get_booking"):
+                booking = db.get_booking(int(order_id))
+                if booking:
+                    booking_code = booking.get("booking_code") if isinstance(booking, dict) else (booking[4] if len(booking) > 4 else None)
+                    user_id = booking.get("user_id") if isinstance(booking, dict) else (booking[2] if len(booking) > 2 else None)
+                    offer_id = booking.get("offer_id") if isinstance(booking, dict) else (booking[1] if len(booking) > 1 else None)
+
+                    if offer_id and hasattr(db, "get_offer"):
+                        offer = db.get_offer(offer_id)
+                        if offer:
+                            store_id = get_offer_value(offer, "store_id")
+                            if store_id and hasattr(db, "get_store"):
+                                store = db.get_store(store_id)
+                                if store:
+                                    seller_id = get_offer_value(store, "owner_id") or get_offer_value(store, "user_id")
+
+            # Send payment proof to seller with action buttons
+            if seller_id and booking_code:
+                keyboard = InlineKeyboardMarkup(
+                    inline_keyboard=[
+                        [
+                            InlineKeyboardButton(
+                                text="✅ Принять",
+                                callback_data=f"order_accept:{booking_code}:{user_id}",
+                            ),
+                            InlineKeyboardButton(
+                                text="❌ Отклонить",
+                                callback_data=f"order_reject:{booking_code}:{user_id}",
+                            ),
+                        ]
+                    ]
                 )
-                file_id = sent_msg.photo[-1].file_id
-
-                # Update order with payment proof
-                if hasattr(db, "update_payment_status"):
-                    db.update_payment_status(int(order_id), "pending", file_id)
-
-                return add_cors_headers(
-                    web.json_response(
-                        {
-                            "success": True,
-                            "message": "Payment proof uploaded",
-                            "file_id": file_id,
-                        }
+                try:
+                    sent_msg = await bot.send_photo(
+                        chat_id=int(seller_id),
+                        photo=photo_file,
+                        caption=f"📸 <b>Чек оплаты для заказа</b>\n🎫 Код: <code>{booking_code}</code>",
+                        parse_mode="HTML",
+                        reply_markup=keyboard,
                     )
-                )
+                    file_id = sent_msg.photo[-1].file_id
+                    logger.info(f"Payment proof sent to seller {seller_id}")
+                except Exception as e:
+                    logger.error(f"Failed to send payment proof to seller: {e}")
+                    file_id = None
             else:
-                return add_cors_headers(
-                    web.json_response({"error": "Admin not configured"}, status=500)
+                # Fallback: send to admin
+                admin_id = int(os.getenv("ADMIN_ID", "0"))
+                if admin_id:
+                    sent_msg = await bot.send_photo(
+                        admin_id, photo_file, caption=f"📸 Чек для заказа #{order_id} (Mini App)"
+                    )
+                    file_id = sent_msg.photo[-1].file_id
+                else:
+                    file_id = None
+
+            # Update order with payment proof
+            if file_id and hasattr(db, "update_payment_status"):
+                db.update_payment_status(int(order_id), "pending", file_id)
+
+            return add_cors_headers(
+                web.json_response(
+                    {
+                        "success": True,
+                        "message": "Payment proof uploaded",
+                        "file_id": file_id,
+                    }
                 )
+            )
 
         except Exception as e:
             logger.error(f"API upload payment proof error: {e}")

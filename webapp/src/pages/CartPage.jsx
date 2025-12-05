@@ -43,9 +43,24 @@ function CartPage({ user }) {
   const [paymentProof, setPaymentProof] = useState(null)
   const [paymentProofPreview, setPaymentProofPreview] = useState(null)
   const [createdOrderId, setCreatedOrderId] = useState(null)
+  const [paymentProviders, setPaymentProviders] = useState([])
+  const [selectedPaymentMethod, setSelectedPaymentMethod] = useState('card') // 'card' | 'click'
 
   // Success/Error modals
   const [orderResult, setOrderResult] = useState(null)
+
+  // Load payment providers
+  useEffect(() => {
+    const loadProviders = async () => {
+      try {
+        const providers = await api.getPaymentProviders()
+        setPaymentProviders(providers)
+      } catch (e) {
+        console.warn('Could not load payment providers:', e)
+      }
+    }
+    loadProviders()
+  }, [])
 
   // Check if stores in cart support delivery
   useEffect(() => {
@@ -230,6 +245,61 @@ function CartPage({ user }) {
       console.error('Error placing order:', error)
       setOrderResult({ success: false, error: error.message })
       window.Telegram?.WebApp?.HapticFeedback?.notificationOccurred?.('error')
+    } finally {
+      setOrderLoading(false)
+    }
+  }
+
+  // Handle Click payment
+  const handleClickPayment = async () => {
+    setOrderLoading(true)
+    try {
+      const userId = window.Telegram?.WebApp?.initDataUnsafe?.user?.id || user?.id || 1
+
+      // First create the order
+      const orderData = {
+        items: cartItems.map(item => ({
+          offer_id: item.offer.id,
+          quantity: item.quantity,
+        })),
+        user_id: userId,
+        delivery_address: orderType === 'delivery' ? address.trim() : null,
+        phone: phone.trim(),
+        comment: `${orderType === 'pickup' ? '🏪 O\'zi olib ketadi' : '🚚 Yetkazib berish'}\n${comment.trim()}`.trim(),
+        order_type: orderType,
+        delivery_fee: orderType === 'delivery' ? deliveryFee : 0,
+        payment_method: 'click',
+      }
+
+      localStorage.setItem('fudly_phone', phone.trim())
+      const result = await api.createOrder(orderData)
+
+      if (!result.success && !result.bookings?.length) {
+        throw new Error(result.message || result.error || 'Order failed')
+      }
+
+      const orderId = result.order_id || result.bookings?.[0]?.booking_id
+      const storeId = cartItems[0]?.offer?.store_id || null
+      const returnUrl = window.location.origin + '/profile'
+
+      // Create Click payment link
+      const paymentData = await api.createPaymentLink(orderId, 'click', returnUrl, storeId, total, userId)
+
+      if (paymentData.payment_url) {
+        clearCart()
+        setShowCheckout(false)
+        // Open Click payment
+        if (window.Telegram?.WebApp) {
+          window.Telegram.WebApp.openLink(paymentData.payment_url)
+        } else {
+          window.location.href = paymentData.payment_url
+        }
+      } else {
+        throw new Error('Payment URL not received')
+      }
+    } catch (error) {
+      console.error('Click payment error:', error)
+      alert('Click to\'lovda xatolik: ' + (error.message || 'Noma\'lum xatolik'))
     } finally {
       setOrderLoading(false)
     }
@@ -458,83 +528,120 @@ function CartPage({ user }) {
               )}
 
               {/* Step 2: Payment (for delivery) */}
-              {checkoutStep === 'payment' && paymentCard && (
+              {checkoutStep === 'payment' && (
                 <div className="payment-step">
-                  <div className="payment-info">
-                    <p className="payment-instruction">
-                      💳 Quyidagi kartaga {Math.round(total).toLocaleString()} so'm o'tkazing:
-                    </p>
+                  {/* Payment Method Selection */}
+                  <div className="payment-methods">
+                    <p className="payment-label">To'lov usulini tanlang:</p>
+                    <div className="payment-options">
+                      <button
+                        className={`payment-option ${selectedPaymentMethod === 'card' ? 'active' : ''}`}
+                        onClick={() => setSelectedPaymentMethod('card')}
+                      >
+                        💳 Kartaga o'tkazish
+                      </button>
+                      <button
+                        className={`payment-option ${selectedPaymentMethod === 'click' ? 'active' : ''}`}
+                        onClick={() => setSelectedPaymentMethod('click')}
+                      >
+                        <img src="https://click.uz/favicon.ico" alt="Click" style={{width: 20, height: 20, marginRight: 8}} onError={(e) => e.target.style.display = 'none'} />
+                        Click
+                      </button>
+                    </div>
+                  </div>
 
-                    <div className="payment-card">
-                      <div className="card-number">
-                        <span className="card-label">Karta raqami:</span>
-                        <span
-                          className="card-value"
-                          onClick={() => {
-                            navigator.clipboard.writeText(paymentCard.card_number)
-                            window.Telegram?.WebApp?.HapticFeedback?.notificationOccurred?.('success')
-                            alert('Karta raqami nusxalandi!')
-                          }}
-                        >
-                          {paymentCard.card_number} 📋
-                        </span>
-                      </div>
-                      {paymentCard.card_holder && (
-                        <div className="card-holder">
-                          <span className="card-label">Egasi:</span>
-                          <span className="card-value">{paymentCard.card_holder}</span>
+                  {/* Card Transfer UI */}
+                  {selectedPaymentMethod === 'card' && paymentCard && (
+                    <>
+                      <div className="payment-info">
+                        <p className="payment-instruction">
+                          💳 Quyidagi kartaga {Math.round(total).toLocaleString()} so'm o'tkazing:
+                        </p>
+
+                        <div className="payment-card">
+                          <div className="card-number">
+                            <span className="card-label">Karta raqami:</span>
+                            <span
+                              className="card-value"
+                              onClick={() => {
+                                navigator.clipboard.writeText(paymentCard.card_number)
+                                window.Telegram?.WebApp?.HapticFeedback?.notificationOccurred?.('success')
+                                alert('Karta raqami nusxalandi!')
+                              }}
+                            >
+                              {paymentCard.card_number} 📋
+                            </span>
+                          </div>
+                          {paymentCard.card_holder && (
+                            <div className="card-holder">
+                              <span className="card-label">Egasi:</span>
+                              <span className="card-value">{paymentCard.card_holder}</span>
+                            </div>
+                          )}
                         </div>
-                      )}
-                    </div>
 
-                    {paymentCard.payment_instructions && (
-                      <p className="payment-instructions">
-                        📋 {paymentCard.payment_instructions}
+                        {paymentCard.payment_instructions && (
+                          <p className="payment-instructions">
+                            📋 {paymentCard.payment_instructions}
+                          </p>
+                        )}
+
+                        <div className="payment-amount">
+                          <span>To'lov summasi:</span>
+                          <strong>{Math.round(total).toLocaleString()} so'm</strong>
+                        </div>
+                      </div>
+
+                      <div className="upload-section">
+                        <p className="upload-label">📸 O'tkazma chekini yuklang:</p>
+
+                        {paymentProofPreview ? (
+                          <div className="proof-preview">
+                            <img src={paymentProofPreview} alt="Chek" />
+                            <button
+                              className="remove-proof"
+                              onClick={() => {
+                                setPaymentProof(null)
+                                setPaymentProofPreview(null)
+                              }}
+                            >
+                              ✕ O'chirish
+                            </button>
+                          </div>
+                        ) : (
+                          <div className="upload-area">
+                            <input
+                              type="file"
+                              id="payment-proof-input"
+                              accept="image/*"
+                              onChange={handleFileSelect}
+                              className="file-input-hidden"
+                            />
+                            <button
+                              type="button"
+                              className="upload-btn"
+                              onClick={openFilePicker}
+                            >
+                              📷 Rasm tanlash
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    </>
+                  )}
+
+                  {/* Click Payment UI */}
+                  {selectedPaymentMethod === 'click' && (
+                    <div className="click-payment-info">
+                      <p className="click-instruction">
+                        Click orqali to'lov qilish uchun "Click bilan to'lash" tugmasini bosing.
                       </p>
-                    )}
-
-                    <div className="payment-amount">
-                      <span>To'lov summasi:</span>
-                      <strong>{Math.round(total).toLocaleString()} so'm</strong>
+                      <div className="payment-amount">
+                        <span>To'lov summasi:</span>
+                        <strong>{Math.round(total).toLocaleString()} so'm</strong>
+                      </div>
                     </div>
-                  </div>
-
-                  <div className="upload-section">
-                    <p className="upload-label">📸 O'tkazma chekini yuklang:</p>
-
-                    {paymentProofPreview ? (
-                      <div className="proof-preview">
-                        <img src={paymentProofPreview} alt="Chek" />
-                        <button
-                          className="remove-proof"
-                          onClick={() => {
-                            setPaymentProof(null)
-                            setPaymentProofPreview(null)
-                          }}
-                        >
-                          ✕ O'chirish
-                        </button>
-                      </div>
-                    ) : (
-                      <div className="upload-area">
-                        <input
-                          type="file"
-                          id="payment-proof-input"
-                          accept="image/*"
-                          capture="environment"
-                          onChange={handleFileSelect}
-                          className="file-input-hidden"
-                        />
-                        <button
-                          type="button"
-                          className="upload-btn"
-                          onClick={openFilePicker}
-                        >
-                          📷 Rasm tanlash
-                        </button>
-                      </div>
-                    )}
-                  </div>
+                  )}
                 </div>
               )}
             </div>
@@ -568,13 +675,23 @@ function CartPage({ user }) {
                   >
                     ← Orqaga
                   </button>
-                  <button
-                    className="confirm-btn"
-                    onClick={placeOrder}
-                    disabled={orderLoading || !paymentProof}
-                  >
-                    {orderLoading ? '⏳ Yuborilmoqda...' : '✅ Buyurtma berish'}
-                  </button>
+                  {selectedPaymentMethod === 'card' ? (
+                    <button
+                      className="confirm-btn"
+                      onClick={placeOrder}
+                      disabled={orderLoading || !paymentProof}
+                    >
+                      {orderLoading ? '⏳ Yuborilmoqda...' : '✅ Buyurtma berish'}
+                    </button>
+                  ) : (
+                    <button
+                      className="confirm-btn click-btn"
+                      onClick={handleClickPayment}
+                      disabled={orderLoading}
+                    >
+                      {orderLoading ? '⏳ ...' : '💳 Click bilan to\'lash'}
+                    </button>
+                  )}
                 </>
               )}
             </div>
