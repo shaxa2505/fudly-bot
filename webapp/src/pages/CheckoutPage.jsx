@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '../api/client';
 import { getCurrentUser, getUserCity } from '../utils/auth';
+import { getUnitLabel } from '../utils/helpers';
 import BottomNav from '../components/BottomNav';
 import './CheckoutPage.css';
 
@@ -56,6 +57,7 @@ function CheckoutPage({ user }) {
       store_name: item.offer.store_name,
       store_address: item.offer.store_address,
       photo: item.offer.photo,
+      unit: item.offer.unit,
     }));
   }, [cart]);
 
@@ -343,7 +345,7 @@ function CheckoutPage({ user }) {
               <div key={index} className="summary-item">
                 <div className="item-info">
                   <p className="item-title">{item.title}</p>
-                  <p className="item-quantity">{item.quantity} {t('шт', 'dona')}</p>
+                  <p className="item-quantity">{item.quantity} {getUnitLabel(item.unit)}</p>
                 </div>
                 <p className="item-price">{Math.round(item.price * item.quantity).toLocaleString()}</p>
               </div>

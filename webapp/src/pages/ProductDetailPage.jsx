@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { useCart } from '../context/CartContext'
 import { useFavorites } from '../context/FavoritesContext'
+import { getUnitLabel } from '../utils/helpers'
 import api from '../api/client'
 import './ProductDetailPage.css'
 
@@ -187,7 +188,7 @@ function ProductDetailPage() {
               )}
             </div>
             {offer.quantity > 0 && (
-              <span className="pdp-stock">📦 {offer.quantity} dona</span>
+              <span className="pdp-stock">📦 {offer.quantity} {getUnitLabel(offer.unit)}</span>
             )}
           </div>
 

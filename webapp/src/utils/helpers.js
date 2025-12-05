@@ -94,6 +94,28 @@ export const calculateDiscount = (originalPrice, discountPrice) => {
   return Math.round(discount)
 }
 
+// Перевод единиц измерения
+const UNIT_LABELS = {
+  'шт': { uz: 'dona', ru: 'шт' },
+  'кг': { uz: 'kg', ru: 'кг' },
+  'г': { uz: 'g', ru: 'г' },
+  'л': { uz: 'l', ru: 'л' },
+  'мл': { uz: 'ml', ru: 'мл' },
+  'упак': { uz: 'qadoq', ru: 'упак' },
+  'м': { uz: 'm', ru: 'м' },
+  'см': { uz: 'sm', ru: 'см' }
+}
+
+export const getUnitLabel = (unit, lang = 'uz') => {
+  const normalizedUnit = (unit || 'шт').toLowerCase()
+  const unitMap = UNIT_LABELS[normalizedUnit]
+  if (unitMap) {
+    return unitMap[lang] || unitMap['uz']
+  }
+  // Если единица не найдена, вернуть как есть
+  return unit || 'dona'
+}
+
 // Группировка массива
 export const groupBy = (array, key) => {
   return array.reduce((result, item) => {

@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import api from '../api/client'
 import { useCart } from '../context/CartContext'
+import { getUnitLabel } from '../utils/helpers'
 import BottomNav from '../components/BottomNav'
 import './CartPage.css'
 
@@ -361,7 +362,7 @@ function CartPage({ user }) {
                 <p className="cart-item-store">🏪 {item.offer.store_name}</p>
               )}
               {item.offer.stock && item.quantity >= item.offer.stock && (
-                <p className="cart-item-stock-warning">⚠️ Maksimum: {item.offer.stock} dona</p>
+                <p className="cart-item-stock-warning">⚠️ Maksimum: {item.offer.stock} {getUnitLabel(item.offer.unit)}</p>
               )}
             </div>
             <div className="cart-item-controls">

@@ -53,6 +53,7 @@ class OfferResponse(BaseModel):
     discount_price: float
     discount_percent: float
     quantity: int
+    unit: str = "шт"
     category: str
     store_id: int
     store_name: str
@@ -217,26 +218,26 @@ _photo_cache: dict[str, str] = {}
 
 def get_photo_url_sync(file_id: str | None) -> str | None:
     """Convert Telegram file_id to photo URL (sync version for API).
-    
+
     Telegram file_ids start with 'AgAC' for photos.
     If it's already a URL (http/https), return as-is.
     """
     if not file_id:
         return None
-    
+
     # Already a URL
-    if file_id.startswith(('http://', 'https://')):
+    if file_id.startswith(("http://", "https://")):
         return file_id
-    
+
     # Check cache
     if file_id in _photo_cache:
         return _photo_cache[file_id]
-    
+
     # It's a Telegram file_id - construct URL
     # Note: This URL will work for ~1 hour, Telegram file URLs expire
     try:
         bot_token = settings.bot_token
-        if bot_token and file_id.startswith('AgAC'):
+        if bot_token and file_id.startswith("AgAC"):
             # For photos, we need to use the Bot API getFile endpoint
             # But since this is sync, we'll return a proxy URL
             # that the frontend can use to fetch the photo
@@ -246,7 +247,7 @@ def get_photo_url_sync(file_id: str | None) -> str | None:
             return None
     except Exception:
         pass
-    
+
     return None
 
 
@@ -378,6 +379,7 @@ async def get_offers(
                         discount_price=float(get_val(offer, "discount_price", 0) or 0),
                         discount_percent=float(get_val(offer, "discount_percent", 0) or 0),
                         quantity=int(get_val(offer, "quantity", 0) or 0),
+                        unit=get_val(offer, "unit", "шт") or "шт",
                         category=get_val(offer, "category", "other") or "other",
                         store_id=int(get_val(offer, "store_id", 0) or 0),
                         store_name=get_val(offer, "store_name", "") or "",
@@ -437,6 +439,7 @@ async def get_offer(offer_id: int, db=Depends(get_db)):
             discount_price=float(get_val(offer, "discount_price", 0) or 0),
             discount_percent=float(get_val(offer, "discount_percent", 0) or 0),
             quantity=int(get_val(offer, "quantity", 0) or 0),
+            unit=get_val(offer, "unit", "шт") or "шт",
             category=get_val(offer, "category", "other") or "other",
             store_id=int(get_val(offer, "store_id", 0) or 0),
             store_name=get_val(offer, "store_name", "") or "",
@@ -474,9 +477,7 @@ async def get_stores(
                 else []
             )
         else:
-            raw_stores = (
-                db.get_stores_by_city(city) if hasattr(db, "get_stores_by_city") else []
-            )
+            raw_stores = db.get_stores_by_city(city) if hasattr(db, "get_stores_by_city") else []
 
         if not raw_stores:
             raw_stores = []
@@ -520,19 +521,20 @@ async def get_stores(
 @router.get("/photo/{file_id:path}")
 async def get_photo(file_id: str):
     """Convert Telegram file_id to actual photo URL.
-    
+
     Returns redirect to Telegram file server or 404.
     """
     from aiogram import Bot
-    
+
     if not file_id or len(file_id) < 10:
         raise HTTPException(status_code=404, detail="Invalid file_id")
-    
+
     # Check cache first
     if file_id in _photo_cache:
         from fastapi.responses import RedirectResponse
+
         return RedirectResponse(url=_photo_cache[file_id])
-    
+
     try:
         bot = Bot(token=settings.bot_token)
         try:
@@ -541,12 +543,13 @@ async def get_photo(file_id: str):
                 url = f"https://api.telegram.org/file/bot{settings.bot_token}/{file.file_path}"
                 _photo_cache[file_id] = url
                 from fastapi.responses import RedirectResponse
+
                 return RedirectResponse(url=url)
         finally:
             await bot.session.close()
     except Exception as e:
         logger.debug(f"Could not get photo for {file_id[:20]}...: {e}")
-    
+
     raise HTTPException(status_code=404, detail="Photo not found")
 
 
@@ -845,6 +848,7 @@ async def get_favorites(db=Depends(get_db), user: dict = Depends(get_current_use
                             discount_price=float(get_val(offer, "discount_price", 0) or 0),
                             discount_percent=float(get_val(offer, "discount_percent", 0) or 0),
                             quantity=int(get_val(offer, "quantity", 0) or 0),
+                            unit=get_val(offer, "unit", "шт") or "шт",
                             category=get_val(offer, "category", "other") or "other",
                             store_id=int(get_val(offer, "store_id", 0) or 0),
                             store_name=get_val(offer, "store_name", "") or "",
