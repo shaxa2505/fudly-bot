@@ -2272,6 +2272,57 @@ class Database:
         conn.close()
         return rating_id
 
+    def add_order_rating(
+        self, order_id: int, user_id: int, store_id: int, rating: int, comment: str = None
+    ) -> int | None:
+        """Add rating for a delivery order.
+        
+        Args:
+            order_id: Order ID
+            user_id: User ID who rated
+            store_id: Store ID being rated
+            rating: Rating value (1-5)
+            comment: Optional comment
+            
+        Returns:
+            rating_id if successful, None otherwise
+        """
+        conn = self.get_connection()
+        try:
+            cursor = conn.cursor()
+            cursor.execute(
+                """
+                INSERT INTO ratings (order_id, user_id, store_id, rating, comment)
+                VALUES (?, ?, ?, ?, ?)
+            """,
+                (order_id, user_id, store_id, rating, comment),
+            )
+            rating_id = cursor.lastrowid
+            conn.commit()
+            return rating_id
+        except Exception as e:
+            logger.error(f"Failed to add order rating: {e}")
+            return None
+        finally:
+            try:
+                conn.close()
+            except Exception:
+                pass
+
+    def has_rated_order(self, order_id: int) -> bool:
+        """Check if order has already been rated."""
+        conn = self.get_connection()
+        try:
+            cursor = conn.cursor()
+            cursor.execute("SELECT COUNT(*) FROM ratings WHERE order_id = ?", (order_id,))
+            count = cursor.fetchone()[0]
+            return count > 0
+        finally:
+            try:
+                conn.close()
+            except Exception:
+                pass
+
     def get_store_ratings(self, store_id: int) -> list[tuple]:
         conn = self.get_connection()
         cursor = conn.cursor()

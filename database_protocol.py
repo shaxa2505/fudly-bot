@@ -318,6 +318,21 @@ class DatabaseProtocol(Protocol):
     ) -> None:
         ...
 
+    def add_order_rating(
+        self,
+        order_id: int,
+        user_id: int,
+        store_id: int,
+        rating: int,
+        comment: str | None = None,
+    ) -> int | None:
+        """Add rating for a delivery order."""
+        ...
+
+    def has_rated_order(self, order_id: int) -> bool:
+        """Check if order has already been rated."""
+        ...
+
     def get_store_ratings(self, store_id: int) -> list[tuple[Any, ...]]:
         ...
 

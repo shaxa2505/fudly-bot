@@ -54,6 +54,9 @@ __all__ = [
     "UZB_TZ",
     "CITY_UZ_TO_RU",
     "is_main_menu_button",
+    # Safe message operations
+    "safe_delete_message",
+    "safe_edit_message",
 ]
 
 # Main menu button texts (Russian and Uzbek)
@@ -91,6 +94,47 @@ def is_main_menu_button(text: str | None) -> bool:
     if not text:
         return False
     return text.strip() in MAIN_MENU_BUTTONS
+
+
+# =============================================================================
+# Safe Message Operations (no silent failures)
+# =============================================================================
+
+
+async def safe_delete_message(message: Any) -> bool:
+    """Safely delete a message, returning True if successful.
+    
+    Does not raise exceptions - message may already be deleted.
+    """
+    try:
+        await message.delete()
+        return True
+    except Exception:
+        # Message may already be deleted or user blocked bot
+        return False
+
+
+async def safe_edit_message(
+    message: Any,
+    text: str,
+    parse_mode: str = "HTML",
+    reply_markup: Any = None,
+) -> bool:
+    """Safely edit a message, returning True if successful.
+    
+    Does not raise exceptions - message may be too old or already edited.
+    """
+    try:
+        if hasattr(message, "photo") and message.photo:
+            await message.edit_caption(
+                caption=text, parse_mode=parse_mode, reply_markup=reply_markup
+            )
+        else:
+            await message.edit_text(text, parse_mode=parse_mode, reply_markup=reply_markup)
+        return True
+    except Exception:
+        # Message may be too old, already edited, or deleted
+        return False
 
 
 # In-memory per-session view mode override: {'seller'|'customer'}

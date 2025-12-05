@@ -509,8 +509,25 @@ async def rate_order(callback: types.CallbackQuery):
         )
         return
 
-    # TODO: Сохранить рейтинг в БД (можно добавить поле rating в orders или отдельную таблицу)
-    # db.save_order_rating(order_id, callback.from_user.id, rating)
+    # Check if already rated
+    if hasattr(db, "has_rated_order") and db.has_rated_order(order_id):
+        await callback.answer(
+            "Вы уже оценили этот заказ" if lang == "ru" else "Siz bu buyurtmani allaqachon baholadingiz",
+            show_alert=True
+        )
+        return
+
+    # Get store_id from order
+    store_id = order[2] if len(order) > 2 else None  # order structure: [0]=id, [1]=user, [2]=store
+    user_id = callback.from_user.id
+
+    # Save rating to database
+    if store_id and hasattr(db, "add_order_rating"):
+        rating_id = db.add_order_rating(order_id, user_id, store_id, rating)
+        if rating_id:
+            logger.info(f"✅ Order {order_id} rated {rating} stars by user {user_id}")
+        else:
+            logger.warning(f"Failed to save rating for order {order_id}")
 
     thanks_ru = f"Спасибо за оценку! {'⭐' * rating}\n\nБудем рады видеть вас снова! 😊"
     thanks_uz = f"Baholaganingiz uchun rahmat! {'⭐' * rating}\n\nSizni yana kutamiz! 😊"
