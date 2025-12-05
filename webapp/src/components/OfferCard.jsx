@@ -1,6 +1,7 @@
-import { memo, useState, useCallback } from 'react'
+import { memo, useState, useCallback, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useFavorites } from '../context/FavoritesContext'
+import { getUnitLabel } from '../utils/helpers'
 import api from '../api/client'
 import './OfferCard.css'
 
@@ -20,6 +21,17 @@ const OfferCard = memo(function OfferCard({ offer, cartQuantity = 0, onAddToCart
   // Get stock limit from offer
   const stockLimit = offer.quantity || offer.stock || 99
   const isMaxReached = cartQuantity >= stockLimit
+
+  // Stock progress calculation
+  const stockProgress = useMemo(() => {
+    const maxStock = 50 // Assume 50 is "full stock" for visual purposes
+    const current = stockLimit
+    const percent = Math.min(100, (current / maxStock) * 100)
+    let level = 'high'
+    if (current <= 5) level = 'low'
+    else if (current <= 15) level = 'medium'
+    return { percent, level, current }
+  }, [stockLimit])
 
   const handleAddClick = useCallback((e) => {
     e.stopPropagation()
@@ -127,6 +139,22 @@ const OfferCard = memo(function OfferCard({ offer, cartQuantity = 0, onAddToCart
       <div className="card-content">
         {offer.store_name && <span className="store-name">{offer.store_name}</span>}
         <h3 className="offer-title">{offer.title}</h3>
+
+        {/* Stock Progress Bar */}
+        {stockLimit < 50 && (
+          <div className="stock-progress">
+            <div className="stock-progress-bar">
+              <div 
+                className={`stock-progress-fill ${stockProgress.level}`}
+                style={{ width: `${stockProgress.percent}%` }}
+              />
+            </div>
+            <div className={`stock-label ${stockProgress.level === 'low' ? 'low' : ''}`}>
+              <span>{stockProgress.level === 'low' ? '🔥 Tez tugaydi!' : 'Qoldi'}</span>
+              <span>{stockProgress.current} {getUnitLabel(offer.unit)}</span>
+            </div>
+          </div>
+        )}
 
         {/* Prices */}
         <div className="price-section">

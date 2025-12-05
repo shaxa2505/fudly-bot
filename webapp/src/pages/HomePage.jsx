@@ -42,6 +42,9 @@ function HomePage() {
   const [minDiscount, setMinDiscount] = useState(null) // null, 20, 30, 50
   const [sortBy, setSortBy] = useState('default') // default, discount, price_asc, price_desc
 
+  // Header scroll state
+  const [isScrolled, setIsScrolled] = useState(false)
+
   // Search history state
   const [searchHistory, setSearchHistory] = useState([])
   const [showSearchHistory, setShowSearchHistory] = useState(false)
@@ -63,6 +66,15 @@ function HomePage() {
   const hasPreciseLocation = Boolean(location.coordinates || location.address)
   const observerTarget = useRef(null)
   const autoLocationAttempted = useRef(null)
+
+  // Header scroll effect
+  useEffect(() => {
+    const handleScroll = () => {
+      setIsScrolled(window.scrollY > 50)
+    }
+    window.addEventListener('scroll', handleScroll, { passive: true })
+    return () => window.removeEventListener('scroll', handleScroll)
+  }, [])
 
   // Извлекаем название города для API (без страны) и транслитерируем в кириллицу
   const cityRaw = location.city
@@ -379,11 +391,16 @@ function HomePage() {
         progress={progress}
       />
 
-      {/* Header */}
-      <header className="header">
+      {/* Header - Glassmorphism with scroll effect */}
+      <header className={`header ${isScrolled ? 'scrolled' : ''}`}>
         <div className="header-top">
           <button className="header-location" onClick={openAddressModal}>
-            <span className="header-location-icon">📍</span>
+            <div className="header-location-icon">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+                <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" stroke="var(--color-primary)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                <circle cx="12" cy="10" r="3" stroke="var(--color-primary)" strokeWidth="2"/>
+              </svg>
+            </div>
             <div className="header-location-text">
               <span className="header-location-label">Yetkazish</span>
               <span className="header-location-city">

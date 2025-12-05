@@ -6,17 +6,34 @@
 .home-page {
   min-height: 100vh;
   padding-bottom: 80px;
-  background: var(--color-bg-primary);
+  background: linear-gradient(180deg, #FAFFFE 0%, #F5F7F6 100%);
 }
 
-/* Header */
+/* Header - Glassmorphism */
 .header {
   position: sticky;
   top: 0;
   z-index: var(--z-sticky);
-  background: var(--color-bg-primary);
+  background: rgba(255, 255, 255, 0.85);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
   padding: var(--spacing-md) var(--spacing-lg);
-  border-bottom: 1px solid var(--color-border-light);
+  border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+  transition: all 0.3s ease;
+}
+
+.header.scrolled {
+  background: rgba(255, 255, 255, 0.95);
+  padding: var(--spacing-sm) var(--spacing-lg);
+  box-shadow: 0 4px 30px rgba(0, 0, 0, 0.08);
+}
+
+.header.scrolled .header-top {
+  margin-bottom: var(--spacing-sm);
+}
+
+.header.scrolled .header-location-label {
+  display: none;
 }
 
 .header-top {
@@ -24,6 +41,7 @@
   align-items: center;
   justify-content: space-between;
   margin-bottom: var(--spacing-md);
+  transition: margin 0.3s ease;
 }
 
 .header-location {
@@ -39,7 +57,18 @@
 }
 
 .header-location-icon {
-  font-size: var(--font-xl);
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, rgba(83, 177, 117, 0.15) 0%, rgba(61, 144, 88, 0.1) 100%);
+  border-radius: 10px;
+  transition: transform 0.2s ease;
+}
+
+.header-location:active .header-location-icon {
+  transform: scale(0.92);
 }
 
 .header-location-text {
@@ -70,7 +99,7 @@
 .header-actions {
   display: flex;
   align-items: center;
-  gap: var(--spacing-xs);
+  gap: var(--spacing-sm);
 }
 
 .header-action-btn {
@@ -79,13 +108,22 @@
   justify-content: center;
   width: 44px;
   height: 44px;
-  background: var(--color-bg-secondary);
-  border: none;
+  background: rgba(245, 247, 246, 0.8);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border: 1px solid rgba(0, 0, 0, 0.04);
   border-radius: var(--radius-full);
   color: var(--color-text-primary);
   cursor: pointer;
-  transition: all var(--transition-normal);
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
   -webkit-tap-highlight-color: transparent;
+}
+
+.header-action-btn:hover {
+  background: rgba(83, 177, 117, 0.1);
+  border-color: rgba(83, 177, 117, 0.2);
+  color: var(--color-primary);
+  transform: scale(1.05);
 }
 
 .header-action-btn:active {
@@ -805,25 +843,48 @@
   text-align: center;
 }
 
-/* Address Modal */
+/* Address Modal - Glassmorphism */
 .address-modal-overlay {
   position: fixed;
   inset: 0;
-  background: var(--color-bg-overlay);
+  background: rgba(0, 0, 0, 0.4);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
   display: flex;
   align-items: center;
   justify-content: center;
   padding: var(--spacing-xl);
   z-index: 200;
+  animation: fadeIn 0.2s ease;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
 }
 
 .address-modal {
-  background: var(--color-bg-primary);
-  border-radius: var(--radius-2xl);
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border-radius: 24px;
   padding: var(--spacing-2xl);
   width: 100%;
   max-width: 420px;
-  box-shadow: var(--shadow-xl);
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+  border: 1px solid rgba(255, 255, 255, 0.5);
+  animation: slideUp 0.3s ease;
+}
+
+@keyframes slideUp {
+  from { 
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to { 
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .address-modal-header {
