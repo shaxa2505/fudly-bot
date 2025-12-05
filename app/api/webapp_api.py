@@ -29,6 +29,18 @@ settings = load_settings()
 
 
 # =============================================================================
+# Helper Functions
+# =============================================================================
+
+
+def get_val(obj: Any, key: str, default: Any = None) -> Any:
+    """Universal getter for dict or object attributes."""
+    if isinstance(obj, dict):
+        return obj.get(key, default)
+    return getattr(obj, key, default)
+
+
+# =============================================================================
 # Pydantic Models
 # =============================================================================
 
@@ -319,12 +331,6 @@ async def get_offers(
         # Convert to response format
         for offer in raw_offers:
             try:
-                # Handle both dict and object access
-                def get_val(obj, key, default=None):
-                    if isinstance(obj, dict):
-                        return obj.get(key, default)
-                    return getattr(obj, key, default)
-
                 offers.append(
                     OfferResponse(
                         id=get_val(offer, "id", 0),
@@ -385,11 +391,6 @@ async def get_offer(offer_id: int, db=Depends(get_db)):
         if not offer:
             raise HTTPException(status_code=404, detail="Offer not found")
 
-        def get_val(obj, key, default=None):
-            if isinstance(obj, dict):
-                return obj.get(key, default)
-            return getattr(obj, key, default)
-
         return OfferResponse(
             id=get_val(offer, "id", 0),
             title=get_val(offer, "title", "Без названия"),
@@ -435,19 +436,15 @@ async def get_stores(
                 else []
             )
         else:
-            raw_stores = db.get_all_stores(city) if hasattr(db, "get_all_stores") else []
+            raw_stores = (
+                db.get_stores_by_city(city) if hasattr(db, "get_stores_by_city") else []
+            )
 
         if not raw_stores:
             raw_stores = []
 
         stores = []
         for store in raw_stores:
-
-            def get_val(obj, key, default=None):
-                if isinstance(obj, dict):
-                    return obj.get(key, default)
-                return getattr(obj, key, default)
-
             stores.append(
                 StoreResponse(
                     id=get_val(store, "id", 0),
@@ -490,6 +487,8 @@ async def create_order(
 
     from aiogram import Bot
 
+    bot_instance = None  # Initialize outside try for finally block access
+
     try:
         # Use user_id from request or from Telegram auth
         user_id = order.user_id or user.get("id", 0)
@@ -498,7 +497,6 @@ async def create_order(
             raise HTTPException(status_code=400, detail="User ID required")
 
         # Get bot instance from global settings
-        bot_instance = None
         try:
             bot_instance = Bot(token=settings.bot_token)
         except Exception as e:
@@ -514,11 +512,6 @@ async def create_order(
             offer = db.get_offer(item.offer_id) if hasattr(db, "get_offer") else None
             if not offer:
                 continue
-
-            def get_val(obj, key, default=None):
-                if isinstance(obj, dict):
-                    return obj.get(key, default)
-                return getattr(obj, key, default)
 
             price = float(get_val(offer, "discount_price", 0) or 0)
             total = price * item.quantity
@@ -556,17 +549,15 @@ async def create_order(
                         )
                         logger.info(f"✅ Created delivery ORDER {order_id} for user {user_id}")
 
-                elif hasattr(db, "create_booking"):
-                    # Create pickup BOOKING
-                    booking_id = db.create_booking(
-                        user_id=user_id,
+                elif hasattr(db, "create_booking_atomic"):
+                    # Create pickup BOOKING (atomic to prevent race conditions)
+                    ok, booking_id, booking_code = db.create_booking_atomic(
                         offer_id=item.offer_id,
+                        user_id=user_id,
                         quantity=item.quantity,
-                        pickup_date="",
-                        comment=order.comment or "",
                     )
 
-                    if booking_id:
+                    if ok and booking_id:
                         created_items.append(
                             {
                                 "id": booking_id,
@@ -606,9 +597,6 @@ async def create_order(
                 logger.error(f"Error creating order for offer {item.offer_id}: {e}")
                 continue
 
-        if bot_instance:
-            await bot_instance.session.close()
-
         # Return first item as order_id (or 0 if none created)
         order_id = created_items[0]["id"] if created_items else 0
         total_amount = sum(b["total"] for b in created_items)
@@ -623,6 +611,13 @@ async def create_order(
     except Exception as e:
         logger.error(f"Error creating order: {e}")
         raise HTTPException(status_code=500, detail=str(e)) from e
+    finally:
+        # Always close bot session to prevent resource leaks
+        if bot_instance:
+            try:
+                await bot_instance.session.close()
+            except Exception:
+                pass
 
 
 async def notify_partner_webapp_order(
@@ -765,12 +760,6 @@ async def get_favorites(db=Depends(get_db), user: dict = Depends(get_current_use
             try:
                 offer = db.get_offer(offer_id) if hasattr(db, "get_offer") else None
                 if offer:
-
-                    def get_val(obj, key, default=None):
-                        if isinstance(obj, dict):
-                            return obj.get(key, default)
-                        return getattr(obj, key, default)
-
                     offers.append(
                         OfferResponse(
                             id=get_val(offer, "id", 0),
@@ -875,12 +864,6 @@ async def calculate_cart(
 
             offer = db.get_offer(offer_id) if hasattr(db, "get_offer") else None
             if offer:
-
-                def get_val(obj, key, default=None):
-                    if isinstance(obj, dict):
-                        return obj.get(key, default)
-                    return getattr(obj, key, default)
-
                 price = float(get_val(offer, "discount_price", 0) or 0)
                 items.append(
                     CartItem(
@@ -914,8 +897,18 @@ async def get_nearby_stores(
 ):
     """Get stores near user's location."""
     try:
-        # Get all stores
-        raw_stores = db.get_all_stores() if hasattr(db, "get_all_stores") else []
+        # Get all stores (using get_stores_by_city with no filter returns all)
+        # Note: get_all_stores doesn't exist, using get_stores_by_city
+        raw_stores = []
+        if hasattr(db, "get_stores_by_city"):
+            # Try common cities or get all by iterating
+            for city in ["Ташкент", "Tashkent", "Самарканд", "Бухара"]:
+                try:
+                    stores = db.get_stores_by_city(city)
+                    if stores:
+                        raw_stores.extend(stores)
+                except Exception:
+                    continue
 
         if not raw_stores:
             return []
@@ -924,12 +917,6 @@ async def get_nearby_stores(
         stores_with_distance = []
 
         for store in raw_stores:
-
-            def get_val(obj, key, default=None):
-                if isinstance(obj, dict):
-                    return obj.get(key, default)
-                return getattr(obj, key, default)
-
             # Mock distance calculation - replace with real geospatial query
             # For now, random distance for demo
             import random
@@ -1023,12 +1010,6 @@ async def get_hot_deals_stats(city: str = Query("Ташкент"), db=Depends(ge
 
                 discounts = []
                 for offer in offers:
-
-                    def get_val(obj, key, default=None):
-                        if isinstance(obj, dict):
-                            return obj.get(key, default)
-                        return getattr(obj, key, default)
-
                     discount = float(get_val(offer, "discount_percent", 0) or 0)
                     discounts.append(discount)
 
@@ -1037,8 +1018,8 @@ async def get_hot_deals_stats(city: str = Query("Ташкент"), db=Depends(ge
                     stats["max_discount"] = round(max(discounts), 1)
 
         # Get stores count
-        if hasattr(db, "get_all_stores"):
-            stores = db.get_all_stores(city)
+        if hasattr(db, "get_stores_by_city"):
+            stores = db.get_stores_by_city(city)
             if stores:
                 stats["total_stores"] = len(stores)
 
