@@ -370,14 +370,18 @@ async def process_successful_payment(message: types.Message) -> None:
 
         lines.append("")
         if is_delivery:
-            hint = "Buyurtmangiz yetkazilmoqda!" if lang == "uz" else "Ваш заказ в пути!"
+            hint = (
+                "Do'kon tasdiqlashini kuting..."
+                if lang == "uz"
+                else "Ожидаем подтверждения магазина..."
+            )
         else:
             hint = (
                 "Do'konga boring va buyurtmani oling!"
                 if lang == "uz"
                 else "Приходите в магазин за заказом!"
             )
-        lines.append(f"🚚 {hint}" if is_delivery else f"🏪 {hint}")
+        lines.append(f"⏳ {hint}" if is_delivery else f"🏪 {hint}")
 
         success_text = "\n".join(lines)
 

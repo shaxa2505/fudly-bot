@@ -485,7 +485,7 @@ async def pbook_select_method(callback: types.CallbackQuery, state: FSMContext) 
 
 @router.callback_query(F.data.startswith("pbook_cancel_"))
 async def pbook_cancel(callback: types.CallbackQuery, state: FSMContext) -> None:
-    """Cancel booking - return to hot offers list."""
+    """Cancel booking - return to source list (store, search, or hot offers)."""
     if not db or not callback.message:
         await callback.answer()
         return
@@ -494,36 +494,195 @@ async def pbook_cancel(callback: types.CallbackQuery, state: FSMContext) -> None
     lang = db.get_user_language(user_id)
     data = await state.get_data()
 
-    # Get last page to return to list
-    last_page = data.get("last_hot_page", 0)
+    # Check source context
+    source = data.get("source", "hot")  # Default to hot offers
 
-    await state.clear()
-
-    # Delete current message and return to hot offers list
+    # Delete current message
     try:
         await callback.message.delete()
     except Exception:
         pass
 
-    # Trigger hot offers list refresh via callback simulation
-    # Import and call the hot offers list function
     from app.core.utils import normalize_city
+    from app.services.offer_service import OfferService
+
+    offer_service = OfferService(db)
 
     user = db.get_user_model(user_id)
     city = user.city if user else "Ташкент"
     search_city = normalize_city(city)
 
-    from app.services.offer_service import OfferService
+    # Return to store list
+    if source == "store":
+        store_id = data.get("last_store_id") or data.get("store_id")
+        store_page = data.get("last_store_page", 0)
+        category = data.get("last_store_category", "all")
 
-    offer_service = OfferService(db)
+        await state.clear()
+
+        if store_id:
+            store = offer_service.get_store(store_id)
+            if store:
+                all_offers = offer_service.list_store_offers(store_id)
+
+                # Filter by category if not "all"
+                if category != "all":
+                    category_map = {
+                        "bakery": "bakery",
+                        "dairy": "dairy",
+                        "meat": "meat",
+                        "fruits": "fruits",
+                        "vegetables": "vegetables",
+                        "drinks": "drinks",
+                        "snacks": "snacks",
+                        "frozen": "frozen",
+                    }
+                    db_category = category_map.get(category, category)
+                    offers = [offer for offer in all_offers if offer.category == db_category]
+                else:
+                    offers = all_offers
+
+                if offers:
+                    from app.keyboards.offers import store_offers_compact_keyboard
+                    from handlers.common import BrowseOffers
+
+                    ITEMS_PER_PAGE = 5
+                    total_pages = (len(offers) + ITEMS_PER_PAGE - 1) // ITEMS_PER_PAGE
+                    page = min(store_page, total_pages - 1)  # Ensure valid page
+                    offset = page * ITEMS_PER_PAGE
+                    page_offers = offers[offset : offset + ITEMS_PER_PAGE]
+
+                    await state.set_state(BrowseOffers.offer_list)
+                    await state.update_data(
+                        offer_list=[offer.id for offer in offers],
+                        store_offers_page=page,
+                        current_store_id=store_id,
+                        store_category=category,
+                    )
+
+                    currency = "so'm" if lang == "uz" else "сум"
+                    category_title = (
+                        category.replace("_", " ").title()
+                        if category != "all"
+                        else ("Все категории" if lang == "ru" else "Barcha toifalar")
+                    )
+
+                    text = f"🏪 <b>{store.name}</b> | 📂 {category_title}\n"
+                    text += f"{'Стр.' if lang == 'ru' else 'Sah.'} {page + 1}/{total_pages} ({len(offers)} {'махсулот' if lang == 'uz' else 'товаров'})\n"
+                    text += "─" * 28 + "\n\n"
+
+                    for idx, offer in enumerate(page_offers, start=1):
+                        title = offer.title[:25] + ".." if len(offer.title) > 25 else offer.title
+                        discount_pct = 0
+                        if (
+                            offer.original_price
+                            and offer.discount_price
+                            and offer.original_price > 0
+                        ):
+                            discount_pct = int(
+                                (1 - offer.discount_price / offer.original_price) * 100
+                            )
+                        text += f"<b>{idx}.</b> {title}\n"
+                        if offer.original_price and discount_pct > 0:
+                            text += f"    <s>{int(offer.original_price):,}</s> → <b>{int(offer.discount_price):,}</b> {currency} <i>(-{discount_pct}%)</i>\n"
+                        else:
+                            text += f"    <b>{int(offer.discount_price or offer.price or 0):,}</b> {currency}\n"
+
+                    hint = "👆 Tanlang" if lang == "uz" else "👆 Выберите товар"
+                    text += f"\n{hint}"
+
+                    kb = store_offers_compact_keyboard(
+                        lang, page_offers, store_id, page, total_pages
+                    )
+                    await callback.message.answer(text, parse_mode="HTML", reply_markup=kb)
+                    await callback.answer()
+                    return
+
+        # Fallback to main menu if store not found
+        cancelled = "❌ Bekor qilindi" if lang == "uz" else "❌ Отменено"
+        await callback.message.answer(cancelled, reply_markup=main_menu_customer(lang))
+        await callback.answer()
+        return
+
+    # Return to search results
+    if source == "search":
+        search_results = data.get("search_results", [])
+        search_query = data.get("search_query", "")
+        search_page = data.get("search_page", 0)
+
+        await state.clear()
+
+        if search_results and search_query:
+            from app.keyboards.offers import search_results_compact_keyboard
+
+            # Fetch offer objects
+            all_results = []
+            for offer_id in search_results:
+                try:
+                    offer = offer_service.get_offer_details(offer_id)
+                    if offer:
+                        all_results.append(offer)
+                except Exception:
+                    pass
+
+            if all_results:
+                ITEMS_PER_PAGE = 5
+                total_count = len(all_results)
+                total_pages = max(1, (total_count + ITEMS_PER_PAGE - 1) // ITEMS_PER_PAGE)
+                page = min(search_page, total_pages - 1)
+
+                start_idx = page * ITEMS_PER_PAGE
+                end_idx = min(start_idx + ITEMS_PER_PAGE, total_count)
+                page_offers = all_results[start_idx:end_idx]
+
+                # Build compact list text
+                lines = []
+                for idx, offer in enumerate(page_offers, start=1):
+                    title = offer.title if hasattr(offer, "title") else "Товар"
+                    price = getattr(offer, "discount_price", 0) or getattr(offer, "price", 0)
+                    quantity = getattr(offer, "quantity", 0)
+                    price_str = f"{int(price):,}".replace(",", " ")
+                    qty_text = (
+                        f"({quantity} шт)"
+                        if quantity > 0
+                        else "(нет)"
+                        if lang == "ru"
+                        else "(yo'q)"
+                    )
+                    lines.append(f"<b>{idx}.</b> {title}\n   💰 {price_str} сум {qty_text}")
+
+                header = (
+                    f"📦 <b>Товары по запросу «{search_query}»</b>\n"
+                    f"Показано {start_idx + 1}-{end_idx} из {total_count}\n\n"
+                    if lang == "ru"
+                    else f"📦 <b>«{search_query}» bo'yicha mahsulotlar</b>\n"
+                    f"{start_idx + 1}-{end_idx} / {total_count} ko'rsatilmoqda\n\n"
+                )
+
+                text = header + "\n".join(lines)
+                kb = search_results_compact_keyboard(
+                    lang, page_offers, page, total_pages, search_query
+                )
+
+                await callback.message.answer(text, parse_mode="HTML", reply_markup=kb)
+                await callback.answer()
+                return
+
+        # Fallback to main menu
+        cancelled = "❌ Bekor qilindi" if lang == "uz" else "❌ Отменено"
+        await callback.message.answer(cancelled, reply_markup=main_menu_customer(lang))
+        await callback.answer()
+        return
+
+    # Default: return to hot offers
+    last_page = data.get("last_hot_page", 0)
+    await state.clear()
 
     result = offer_service.list_hot_offers(search_city, limit=5, offset=last_page * 5)
     if not result.items:
         # No offers - show main menu
         cancelled = "❌ Bekor qilindi" if lang == "uz" else "❌ Отменено"
-        await callback.message.answer(
-            cancelled, reply_markup=main_menu_customer(lang)
-        )
+        await callback.message.answer(cancelled, reply_markup=main_menu_customer(lang))
         await callback.answer()
         return
 

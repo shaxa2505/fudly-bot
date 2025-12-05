@@ -74,6 +74,7 @@ from .offers import (
     search_results_compact_keyboard,
     store_card_keyboard,
     store_list_keyboard,
+    store_offers_compact_keyboard,
     store_offers_keyboard,
     store_reviews_keyboard,
 )
@@ -140,6 +141,7 @@ __all__ = [
     "store_list_keyboard",
     "offer_details_keyboard",
     "offer_quick_keyboard",
+    "store_offers_compact_keyboard",
     "store_offers_keyboard",
     "store_reviews_keyboard",
     "back_to_hot_keyboard",

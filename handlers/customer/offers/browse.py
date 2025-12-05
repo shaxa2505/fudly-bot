@@ -235,6 +235,7 @@ def setup(
             selected_delivery=initial_method,
             last_hot_page=current_page,
             offer_photo=offer.photo,
+            source="hot",  # Mark source for cancel navigation
         )
         await state.set_state(BookOffer.quantity)
 
@@ -885,42 +886,199 @@ def setup(
             )
             return
 
-        await _set_offer_state(state, offers)
-        page = offers[:20]
-
-        category_title = (
-            category.replace("_", " ").title()
-            if category != "all"
-            else ("Все категории" if lang == "ru" else "Barcha toifalar")
-        )
-        products_word = "Mahsulotlar" if lang == "uz" else "Товаров"
-        text = (
-            f"🏪 <b>{store.name}</b>\n"
-            f"📂 {category_title}\n"
-            f"📦 {products_word}: {len(offers)}\n\n"
-        )
-        text += offer_templates.render_store_offers_list(
-            lang,
-            store.name,
-            page,
-            offset=0,
-            total=len(offers),
-        )
-
-        keyboard = offer_keyboards.store_offers_keyboard(
-            lang,
-            store_id,
-            has_more=len(offers) > 20,
-            next_offset=20 if len(offers) > 20 else None,
-        )
+        # Delete current message and send new compact list
         try:
-            await msg.edit_text(text, parse_mode="HTML", reply_markup=keyboard)
+            await msg.delete()
         except Exception:
+            pass
+
+        await _send_store_offers_list(
+            msg, state, lang, store, offers, page=0, edit_message=False, category=category
+        )
+        await callback.answer()
+
+    @dp.callback_query(F.data.startswith("store_offers_page_"))
+    async def store_offers_page_handler(callback: types.CallbackQuery, state: FSMContext):
+        """Handle store offers pagination with compact view."""
+        if not callback.from_user or not callback.data:
+            await callback.answer()
+            return
+        msg = _callback_message(callback)
+        if not msg:
+            await callback.answer()
+            return
+        lang = db.get_user_language(callback.from_user.id)
+
+        try:
+            # Parse: store_offers_page_{store_id}_{page}
+            parts = callback.data.split("_")
+            store_id = int(parts[3])
+            page = int(parts[4])
+        except (ValueError, IndexError) as e:
+            logger.error(f"Invalid pagination data: {callback.data}, error: {e}")
+            await callback.answer(get_text(lang, "error"), show_alert=True)
+            return
+
+        store = offer_service.get_store(store_id)
+        if not store:
+            await callback.answer("Магазин не найден", show_alert=True)
+            return
+
+        # Get stored category from state
+        data = await state.get_data()
+        category = data.get("store_category", "all")
+
+        # Get all offers for the store
+        all_offers = offer_service.list_store_offers(store_id)
+
+        # Filter by category if not "all"
+        if category != "all":
+            category_map = {
+                "bakery": "bakery",
+                "dairy": "dairy",
+                "meat": "meat",
+                "fruits": "fruits",
+                "vegetables": "vegetables",
+                "drinks": "drinks",
+                "snacks": "snacks",
+                "frozen": "frozen",
+            }
+            db_category = category_map.get(category, category)
+            offers = [offer for offer in all_offers if offer.category == db_category]
+        else:
+            offers = all_offers
+
+        await _send_store_offers_list(
+            msg, state, lang, store, offers, page=page, edit_message=True, category=category
+        )
+        await callback.answer()
+
+    @dp.callback_query(F.data.startswith("store_offer_"))
+    async def store_offer_select_handler(callback: types.CallbackQuery, state: FSMContext):
+        """Handle store offer selection - show offer details with booking controls."""
+        if not callback.from_user or not callback.message:
+            await callback.answer()
+            return
+
+        lang = db.get_user_language(callback.from_user.id)
+
+        try:
+            # Parse: store_offer_{store_id}_{offer_id}
+            parts = callback.data.split("_")
+            store_id = int(parts[2])
+            offer_id = int(parts[3])
+        except (ValueError, IndexError) as e:
+            logger.error(f"Invalid offer data: {callback.data}, error: {e}")
+            await callback.answer(get_text(lang, "error"), show_alert=True)
+            return
+
+        # Get offer details
+        offer = offer_service.get_offer_details(offer_id)
+        if not offer:
+            await callback.answer(
+                "Товар не найден" if lang == "ru" else "Mahsulot topilmadi", show_alert=True
+            )
+            return
+
+        # Save store context for returning
+        data = await state.get_data()
+        await state.update_data(
+            last_store_id=store_id,
+            last_store_page=data.get("store_offers_page", 0),
+            last_store_category=data.get("store_category", "all"),
+            source="store",  # Mark source for cancel navigation
+        )
+
+        # Get store info
+        store = offer_service.get_store(offer.store_id) if offer.store_id else None
+        store_name = store.name if store else "Магазин"
+        store_address = store.address if store else ""
+        delivery_enabled = store.delivery_enabled if store else False
+        delivery_price = store.delivery_price if store and delivery_enabled else 0
+
+        max_quantity = offer.quantity or 0
+        if max_quantity <= 0:
+            await callback.answer(
+                "Товар закончился" if lang == "ru" else "Mahsulot tugadi",
+                show_alert=True,
+            )
+            return
+
+        initial_qty = 1
+        initial_method = None if delivery_enabled else "pickup"
+
+        # Save to FSM state for booking flow
+        from handlers.common.states import BookOffer
+
+        await state.update_data(
+            offer_id=offer_id,
+            max_quantity=max_quantity,
+            offer_price=offer.discount_price,
+            original_price=offer.original_price or 0,
+            offer_title=offer.title,
+            offer_description=offer.description or "",
+            offer_unit=offer.unit or "",
+            expiry_date=str(offer.expiry_date) if offer.expiry_date else "",
+            store_id=offer.store_id,
+            store_name=store_name,
+            store_address=store_address,
+            delivery_enabled=delivery_enabled,
+            delivery_price=delivery_price,
+            selected_qty=initial_qty,
+            selected_delivery=initial_method,
+            offer_photo=getattr(offer, "photo", None),
+        )
+        await state.set_state(BookOffer.quantity)
+
+        # Build booking card
+        from handlers.bookings.customer import build_order_card_keyboard, build_order_card_text
+
+        text = build_order_card_text(
+            lang,
+            offer.title,
+            offer.discount_price,
+            initial_qty,
+            store_name,
+            delivery_enabled,
+            delivery_price,
+            initial_method,
+            max_quantity,
+            original_price=offer.original_price or 0,
+            description=offer.description or "",
+            expiry_date=str(offer.expiry_date) if offer.expiry_date else "",
+            store_address=store_address,
+            unit=offer.unit or "",
+        )
+        kb = build_order_card_keyboard(
+            lang,
+            offer_id,
+            offer.store_id,
+            initial_qty,
+            max_quantity,
+            delivery_enabled,
+            initial_method,
+        )
+
+        # Delete list message and send offer card with photo
+        try:
+            await callback.message.delete()
+        except Exception:
+            pass
+
+        if getattr(offer, "photo", None):
             try:
-                await msg.edit_caption(caption=text, parse_mode="HTML", reply_markup=keyboard)
+                await callback.message.answer_photo(
+                    photo=offer.photo,
+                    caption=text,
+                    parse_mode="HTML",
+                    reply_markup=kb.as_markup(),
+                )
+                await callback.answer()
+                return
             except Exception:
-                await msg.delete()
-                await callback.message.answer(text, parse_mode="HTML", reply_markup=keyboard)
+                pass
+
+        await callback.message.answer(text, parse_mode="HTML", reply_markup=kb.as_markup())
         await callback.answer()
 
     @dp.callback_query(F.data.startswith("store_offers_next_"))
@@ -1225,6 +1383,94 @@ def setup(
 
         except Exception as exc:  # pragma: no cover
             log.error("Failed to send hot offers: %s", exc)
+            await target.answer(f"😔 {get_text(lang, 'error')}")
+
+    async def _send_store_offers_list(
+        target: types.Message,
+        state: FSMContext,
+        lang: str,
+        store: Any,
+        offers: list,
+        page: int = 0,
+        edit_message: bool = False,
+        category: str = "all",
+    ) -> None:
+        """Send store offers with compact list and inline buttons (like hot offers)."""
+        ITEMS_PER_PAGE = 5
+        try:
+            store_id = store.id
+            total_offers = len(offers)
+
+            if total_offers == 0:
+                await target.answer(
+                    "В этом магазине пока нет товаров"
+                    if lang == "ru"
+                    else "Bu do'konda hali mahsulotlar yo'q",
+                    parse_mode="HTML",
+                )
+                return
+
+            offset = page * ITEMS_PER_PAGE
+            page_offers = offers[offset : offset + ITEMS_PER_PAGE]
+
+            await state.set_state(BrowseOffers.offer_list)
+            await state.update_data(
+                offer_list=[offer.id for offer in offers],
+                store_offers_page=page,
+                current_store_id=store_id,
+                store_category=category,
+            )
+
+            total_pages = (total_offers + ITEMS_PER_PAGE - 1) // ITEMS_PER_PAGE
+            currency = "so'm" if lang == "uz" else "сум"
+
+            # Category title
+            category_title = (
+                category.replace("_", " ").title()
+                if category != "all"
+                else ("Все категории" if lang == "ru" else "Barcha toifalar")
+            )
+
+            # Clean professional header
+            text = f"🏪 <b>{store.name}</b> | 📂 {category_title}\n"
+            text += f"{'Стр.' if lang == 'ru' else 'Sah.'} {page + 1}/{total_pages} ({total_offers} {'махсулот' if lang == 'uz' else 'товаров'})\n"
+            text += "─" * 28 + "\n\n"
+
+            for idx, offer in enumerate(page_offers, start=1):
+                title = offer.title[:25] + ".." if len(offer.title) > 25 else offer.title
+                discount_pct = 0
+                if offer.original_price and offer.discount_price and offer.original_price > 0:
+                    discount_pct = int((1 - offer.discount_price / offer.original_price) * 100)
+
+                # Clean format: number + title on first line
+                text += f"<b>{idx}.</b> {title}\n"
+                # Price on second line - compact
+                if offer.original_price and discount_pct > 0:
+                    text += f"    <s>{int(offer.original_price):,}</s> → <b>{int(offer.discount_price):,}</b> {currency} <i>(-{discount_pct}%)</i>\n"
+                else:
+                    text += (
+                        f"    <b>{int(offer.discount_price or offer.price or 0):,}</b> {currency}\n"
+                    )
+
+            # Hint at bottom
+            hint = "👆 Tanlang" if lang == "uz" else "👆 Выберите товар"
+            text += f"\n{hint}"
+
+            # Build keyboard with offer buttons
+            keyboard = offer_keyboards.store_offers_compact_keyboard(
+                lang, page_offers, store_id, page, total_pages
+            )
+
+            if edit_message:
+                try:
+                    await target.edit_text(text, parse_mode="HTML", reply_markup=keyboard)
+                except Exception:
+                    await target.answer(text, parse_mode="HTML", reply_markup=keyboard)
+            else:
+                await target.answer(text, parse_mode="HTML", reply_markup=keyboard)
+
+        except Exception as exc:  # pragma: no cover
+            logger.error("Failed to send store offers: %s", exc)
             await target.answer(f"😔 {get_text(lang, 'error')}")
 
     async def _send_store_card(message: types.Message, store_id: int, lang: str) -> None:

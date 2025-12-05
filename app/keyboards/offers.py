@@ -154,6 +154,68 @@ def store_offers_keyboard(
     return builder.as_markup()
 
 
+def store_offers_compact_keyboard(
+    lang: str,
+    offers: Sequence[Any],
+    store_id: int,
+    page: int,
+    total_pages: int,
+) -> InlineKeyboardMarkup:
+    """Compact keyboard for store offers with item buttons and pagination (like hot offers)."""
+    builder = InlineKeyboardBuilder()
+
+    # Add buttons for each offer (max 5)
+    for idx, offer in enumerate(offers[:5], start=1):
+        offer_id = offer.id if hasattr(offer, "id") else offer.get("offer_id", 0)
+        title = offer.title if hasattr(offer, "title") else offer.get("title", "Товар")
+        short_title = title[:12] + ".." if len(title) > 12 else title
+        builder.button(
+            text=f"{idx}. {short_title}", callback_data=f"store_offer_{store_id}_{offer_id}"
+        )
+
+    # Adjust offer buttons: 2 per row for 5 items = 2+2+1
+    if len(offers) == 5:
+        builder.adjust(2, 2, 1)
+    elif len(offers) == 4:
+        builder.adjust(2, 2)
+    elif len(offers) == 3:
+        builder.adjust(2, 1)
+    elif len(offers) == 2:
+        builder.adjust(2)
+    else:
+        builder.adjust(1)
+
+    # Pagination row - only prev/next and back
+    nav_builder = InlineKeyboardBuilder()
+    if page > 0:
+        nav_builder.button(text="◀️", callback_data=f"store_offers_page_{store_id}_{page - 1}")
+    if page < total_pages - 1:
+        nav_builder.button(text="▶️", callback_data=f"store_offers_page_{store_id}_{page + 1}")
+
+    # Back button
+    back = (
+        "🏪"
+        if page > 0 or page < total_pages - 1
+        else "◀️ Do'konga"
+        if lang == "uz"
+        else "◀️ К магазину"
+    )
+    nav_builder.button(text=back, callback_data=f"back_to_store_{store_id}")
+
+    # Adjust nav: pagination buttons + back
+    nav_count = 1  # back always
+    if page > 0:
+        nav_count += 1
+    if page < total_pages - 1:
+        nav_count += 1
+    nav_builder.adjust(nav_count)
+
+    # Combine keyboards
+    builder.attach(nav_builder)
+
+    return builder.as_markup()
+
+
 def store_list_keyboard(
     lang: str,
     stores: list,

@@ -634,6 +634,11 @@ def setup(
             initial_qty = 1
             initial_method = None if delivery_enabled else "pickup"
 
+            # Get current search context to restore later
+            data = await state.get_data()
+            search_results = data.get("search_results", [])
+            search_query = data.get("search_query", "")
+
             # Save to FSM state for booking flow
             from handlers.common.states import BookOffer
 
@@ -654,6 +659,11 @@ def setup(
                 selected_qty=initial_qty,
                 selected_delivery=initial_method,
                 offer_photo=getattr(offer, "photo", None),
+                # Save source context for cancel navigation
+                source="search",
+                search_results=search_results,
+                search_query=search_query,
+                search_page=0,
             )
             await state.set_state(BookOffer.quantity)
 
