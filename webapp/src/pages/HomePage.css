@@ -93,6 +93,11 @@
   background: var(--color-bg-tertiary);
 }
 
+.header-action-btn:focus-visible {
+  outline: 3px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
 .header-search {
   position: relative;
   display: flex;
@@ -244,6 +249,11 @@
   transform: scale(0.95);
 }
 
+.quick-action:focus-visible {
+  outline: 3px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
 .quick-action-icon {
   display: flex;
   align-items: center;
@@ -329,6 +339,11 @@
   transform: scale(0.95);
 }
 
+.category-pill:focus-visible {
+  outline: 3px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
 .category-pill.active {
   background: color-mix(in srgb, var(--cat-color) 15%, white);
   border-color: var(--cat-color);
@@ -373,6 +388,11 @@
 
 .category-card:active {
   transform: scale(0.95);
+}
+
+.category-card:focus-visible {
+  outline: 3px solid var(--color-primary);
+  outline-offset: 2px;
 }
 
 .category-card.active {
@@ -472,6 +492,11 @@
 
 .popular-card:active {
   transform: scale(0.97);
+}
+
+.popular-card:focus-visible {
+  outline: 3px solid var(--color-primary);
+  outline-offset: 2px;
 }
 
 .popular-card-image {

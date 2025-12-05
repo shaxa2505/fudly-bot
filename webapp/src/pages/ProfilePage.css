@@ -151,6 +151,11 @@
   transform: scale(0.98);
 }
 
+.order-card:focus-visible {
+  outline: 3px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
 .order-content {
   display: flex;
   gap: var(--spacing-md);
