@@ -285,6 +285,7 @@ async def process_successful_payment(message: types.Message) -> None:
 
         # Get offer and store details
         offer = db.get_offer(offer_id) if offer_id else None
+        offer_photo = None
         if offer:
             title = (
                 offer.get("title")
@@ -295,6 +296,12 @@ async def process_successful_payment(message: types.Message) -> None:
                 offer.get("discount_price", 0)
                 if isinstance(offer, dict)
                 else (offer[4] if len(offer) > 4 else 0)
+            )
+            # Get photo for partner notification
+            offer_photo = (
+                offer.get("photo")
+                if isinstance(offer, dict)
+                else (offer[10] if len(offer) > 10 else None)
             )
             if not store_id:
                 store_id = (
@@ -456,9 +463,35 @@ async def process_successful_payment(message: types.Message) -> None:
             partner_kb.adjust(2)
 
             try:
-                await bot.send_message(
-                    owner_id, order_caption, parse_mode="HTML", reply_markup=partner_kb.as_markup()
-                )
+                # Try to send with photo first for beautiful card
+                if offer_photo:
+                    try:
+                        await bot.send_photo(
+                            owner_id,
+                            photo=offer_photo,
+                            caption=order_caption,
+                            parse_mode="HTML",
+                            reply_markup=partner_kb.as_markup(),
+                        )
+                        logger.info(
+                            f"✅ Notified store owner {owner_id} with photo about Click payment for order {order_id}"
+                        )
+                    except Exception as photo_err:
+                        logger.warning(f"Failed to send photo to partner: {photo_err}")
+                        # Fallback to text only
+                        await bot.send_message(
+                            owner_id,
+                            order_caption,
+                            parse_mode="HTML",
+                            reply_markup=partner_kb.as_markup(),
+                        )
+                else:
+                    await bot.send_message(
+                        owner_id,
+                        order_caption,
+                        parse_mode="HTML",
+                        reply_markup=partner_kb.as_markup(),
+                    )
                 logger.info(
                     f"✅ Notified store owner {owner_id} about Click payment for order {order_id}"
                 )

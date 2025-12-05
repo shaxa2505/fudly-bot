@@ -506,7 +506,7 @@ async def create_order(
 
         # Determine if this is delivery or pickup based on delivery_address
         is_delivery = bool(order.delivery_address and order.delivery_address.strip())
-        
+
         # Process each offer separately
         created_items = []
 
@@ -530,7 +530,7 @@ async def create_order(
                     # Create delivery ORDER
                     store = db.get_store(store_id) if hasattr(db, "get_store") else None
                     delivery_price = get_val(store, "delivery_price", 15000) if store else 15000
-                    
+
                     order_id = db.create_order(
                         user_id=user_id,
                         store_id=store_id,
@@ -541,19 +541,21 @@ async def create_order(
                         delivery_price=delivery_price,
                         payment_method="card",
                     )
-                    
+
                     if order_id:
-                        created_items.append({
-                            "id": order_id,
-                            "type": "order",
-                            "offer_id": item.offer_id,
-                            "quantity": item.quantity,
-                            "total": total + delivery_price,
-                            "offer_title": offer_title,
-                            "store_id": store_id,
-                        })
+                        created_items.append(
+                            {
+                                "id": order_id,
+                                "type": "order",
+                                "offer_id": item.offer_id,
+                                "quantity": item.quantity,
+                                "total": total + delivery_price,
+                                "offer_title": offer_title,
+                                "store_id": store_id,
+                            }
+                        )
                         logger.info(f"✅ Created delivery ORDER {order_id} for user {user_id}")
-                        
+
                 elif hasattr(db, "create_booking"):
                     # Create pickup BOOKING
                     booking_id = db.create_booking(
@@ -565,15 +567,17 @@ async def create_order(
                     )
 
                     if booking_id:
-                        created_items.append({
-                            "id": booking_id,
-                            "type": "booking",
-                            "offer_id": item.offer_id,
-                            "quantity": item.quantity,
-                            "total": total,
-                            "offer_title": offer_title,
-                            "store_id": store_id,
-                        })
+                        created_items.append(
+                            {
+                                "id": booking_id,
+                                "type": "booking",
+                                "offer_id": item.offer_id,
+                                "quantity": item.quantity,
+                                "total": total,
+                                "offer_title": offer_title,
+                                "store_id": store_id,
+                            }
+                        )
                         logger.info(f"✅ Created pickup BOOKING {booking_id} for user {user_id}")
 
                 # Notify partner about new order/booking
@@ -654,48 +658,64 @@ async def notify_partner_webapp_order(
     def _esc(val):
         return html.escape(str(val)) if val else ""
 
-    # Order type label
-    order_type_uz = "🚚 Yetkazib berish" if is_delivery else "🏪 O'zi olib ketadi"
-    order_type_ru = "🚚 Доставка" if is_delivery else "🏪 Самовывоз"
+    # Build beautiful notification card (unified with bot style)
+    currency = "so'm" if partner_lang == "uz" else "сум"
+    unit_label = "dona" if partner_lang == "uz" else "шт"
 
     if partner_lang == "uz":
         text = (
-            f"🔔 <b>Yangi buyurtma (Mini App)!</b>\n\n"
-            f"{order_type_uz}\n"
-            f"📦 {_esc(offer_title)} × {quantity}\n"
-            f"💰 {int(total):,} so'm\n"
-            f"👤 {_esc(customer_name)}\n"
-            f"📱 Tel: <code>{_esc(customer_phone)}</code>\n"
+            f"🔔 <b>YANGI BUYURTMA (Mini App)!</b>\n"
+            f"━━━━━━━━━━━━━━━━━━━━\n\n"
+            f"🛒 <b>{_esc(offer_title)}</b>\n"
+            f"📦 Miqdor: <b>{quantity}</b> {unit_label}\n"
+            f"💰 Jami: <b>{int(total):,}</b> {currency}\n\n"
+            f"━━━━━━━━━━━━━━━━━━━━\n"
+            f"👤 <b>Xaridor:</b>\n"
+            f"   Ism: {_esc(customer_name)}\n"
+            f"   📱 <code>{_esc(customer_phone)}</code>\n"
         )
-        if delivery_address:
-            text += f"🏠 Manzil: {_esc(delivery_address)}\n"
+        if is_delivery:
+            text += "\n🚚 <b>Yetkazib berish</b>\n"
+            if delivery_address:
+                text += f"   📍 {_esc(delivery_address)}\n"
+        else:
+            text += "\n🏪 <b>O'zi olib ketadi</b>\n"
+        text += "━━━━━━━━━━━━━━━━━━━━"
         confirm_text = "✅ Tasdiqlash"
         reject_text = "❌ Rad etish"
     else:
         text = (
-            f"🔔 <b>Новый заказ (Mini App)!</b>\n\n"
-            f"{order_type_ru}\n"
-            f"📦 {_esc(offer_title)} × {quantity}\n"
-            f"💰 {int(total):,} сум\n"
-            f"👤 {_esc(customer_name)}\n"
-            f"📱 Тел: <code>{_esc(customer_phone)}</code>\n"
+            f"🔔 <b>НОВЫЙ ЗАКАЗ (Mini App)!</b>\n"
+            f"━━━━━━━━━━━━━━━━━━━━\n\n"
+            f"🛒 <b>{_esc(offer_title)}</b>\n"
+            f"📦 Количество: <b>{quantity}</b> {unit_label}\n"
+            f"💰 Итого: <b>{int(total):,}</b> {currency}\n\n"
+            f"━━━━━━━━━━━━━━━━━━━━\n"
+            f"👤 <b>Покупатель:</b>\n"
+            f"   Имя: {_esc(customer_name)}\n"
+            f"   📱 <code>{_esc(customer_phone)}</code>\n"
         )
-        if delivery_address:
-            text += f"🏠 Адрес: {_esc(delivery_address)}\n"
+        if is_delivery:
+            text += "\n🚚 <b>Доставка</b>\n"
+            if delivery_address:
+                text += f"   📍 {_esc(delivery_address)}\n"
+        else:
+            text += "\n🏪 <b>Самовывоз</b>\n"
+        text += "━━━━━━━━━━━━━━━━━━━━"
         confirm_text = "✅ Подтвердить"
         reject_text = "❌ Отклонить"
 
-    # Use different callback_data for orders vs bookings
+    # Use unified callback_data (same as bot)
+    kb = InlineKeyboardBuilder()
     if is_delivery:
-        kb = InlineKeyboardBuilder()
-        kb.button(text=confirm_text, callback_data=f"confirm_order_{booking_id}")
-        kb.button(text=reject_text, callback_data=f"cancel_order_{booking_id}")
-        kb.adjust(2)
+        # Delivery orders use partner_confirm_order_ / partner_reject_order_
+        kb.button(text=confirm_text, callback_data=f"partner_confirm_order_{booking_id}")
+        kb.button(text=reject_text, callback_data=f"partner_reject_order_{booking_id}")
     else:
-        kb = InlineKeyboardBuilder()
+        # Pickup bookings use partner_confirm_ / partner_reject_
         kb.button(text=confirm_text, callback_data=f"partner_confirm_{booking_id}")
         kb.button(text=reject_text, callback_data=f"partner_reject_{booking_id}")
-        kb.adjust(2)
+    kb.adjust(2)
 
     try:
         if photo:
