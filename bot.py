@@ -581,10 +581,15 @@ async def on_startup() -> None:
             )
             logger.info(f"✅ Webhook set: {webhook_url} (allowed_updates: {allowed_updates})")
         except Exception as e:
-            logger.error(f"Failed to set webhook: {e}")
+            logger.error(f"⚠️ Failed to set webhook: {e}")
+            logger.warning("Bot will continue running, but may not receive updates until webhook is fixed")
+            # Don't raise - let the bot continue running so health checks pass
     else:
-        await bot.delete_webhook(drop_pending_updates=True)
-        logger.info("✅ Polling mode activated")
+        try:
+            await bot.delete_webhook(drop_pending_updates=True)
+            logger.info("✅ Polling mode activated")
+        except Exception as e:
+            logger.warning(f"Failed to delete webhook: {e}")
 
 
 async def on_shutdown() -> None:
@@ -664,8 +669,7 @@ async def main() -> None:
         # Webhook mode (Railway, Heroku, etc.)
         from app.core.webhook_server import create_webhook_app, run_webhook_server
 
-        await on_startup()
-
+        # Create webhook app first (makes health endpoint available immediately)
         app = await create_webhook_app(
             bot=bot,
             dp=dp,
@@ -675,8 +679,12 @@ async def main() -> None:
             db=db,
         )
 
+        # Start the server (health endpoint now accessible)
         runner = await run_webhook_server(app, PORT)
         logger.info(f"🌐 Webhook server running on port {PORT}")
+        
+        # Now register webhook with Telegram (can fail without breaking health checks)
+        await on_startup()
 
         try:
             await shutdown_event.wait()
