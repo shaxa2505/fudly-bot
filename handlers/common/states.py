@@ -39,8 +39,6 @@ class ChangeCity(StatesGroup):
     """
 
     city = State()  # Waiting for new city selection
-    # Alias for backward compatibility
-    new_city = State()
 
 
 # =============================================================================
@@ -85,13 +83,6 @@ class CreateOffer(StatesGroup):
     quantity = State()  # Step 6: Enter quantity
     expiry_date = State()  # Step 7: Select expiry date
     photo = State()  # Step 8: Upload photo (optional)
-
-    # Legacy/alternative states (for backward compatibility)
-    store = State()
-    prices = State()
-    unit = State()
-    available_from = State()
-    available_until = State()
 
 
 class EditOffer(StatesGroup):

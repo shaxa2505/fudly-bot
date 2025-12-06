@@ -1,24 +1,21 @@
 """
-Легаси админские обработчики (система модерации, команды, статистика)
+Легаси админские обработчики (система модерации, статистика)
 
 Содержит:
 - Статистика с экспортом CSV (admin_analytics)
 - Модерация магазинов (pending/approve/reject)
 - Просмотр магазинов и товаров
-- Системные команды (migrate_db, enable_delivery)
 """
 
 import csv
 import logging
 
 from aiogram import F, Router, types
-from aiogram.filters import Command
 from aiogram.types import FSInputFile
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
 logger = logging.getLogger(__name__)
 import os
-import sqlite3
 from datetime import datetime
 
 router = Router(name="admin_legacy")
@@ -528,133 +525,3 @@ async def admin_settings(message: types.Message):
     text += "Выберите раздел для настройки:"
 
     await message.answer(text, parse_mode="HTML", reply_markup=kb.as_markup())
-
-
-# ============== СИСТЕМНЫЕ КОМАНДЫ ==============
-
-
-@router.message(Command("migrate_db"))
-async def cmd_migrate_db(message: types.Message):
-    """Миграция базы данных (только для SQLite)"""
-    if message.from_user.id != _ADMIN_ID:
-        await message.answer("❌ Доступ запрещён")
-        return
-
-    try:
-        if _DATABASE_URL:
-            await message.answer("⚠️ Эта команда работает только с SQLite")
-            return
-
-        await message.answer("🔄 Начинаю миграцию БД...")
-
-        conn = sqlite3.connect(_db.db_name)
-        cursor = conn.cursor()
-
-        # Добавляем поля доставки если их нет
-        cursor.execute("PRAGMA table_info(stores)")
-        columns = [col[1] for col in cursor.fetchall()]
-
-        added = []
-        if "delivery_enabled" not in columns:
-            cursor.execute("ALTER TABLE stores ADD COLUMN delivery_enabled INTEGER DEFAULT 1")
-            added.append("delivery_enabled")
-
-        if "delivery_price" not in columns:
-            cursor.execute("ALTER TABLE stores ADD COLUMN delivery_price INTEGER DEFAULT 15000")
-            added.append("delivery_price")
-
-        if "min_order_amount" not in columns:
-            cursor.execute("ALTER TABLE stores ADD COLUMN min_order_amount INTEGER DEFAULT 30000")
-            added.append("min_order_amount")
-
-        conn.commit()
-
-        if added:
-            await message.answer(f"✅ Добавлены поля: {', '.join(added)}")
-        else:
-            await message.answer("✅ Все поля уже существуют")
-
-        # Показываем список таблиц
-        cursor.execute("SELECT name FROM sqlite_master WHERE type='table'")
-        tables = cursor.fetchall()
-        conn.close()
-
-        tables_text = "\n".join([f"✅ {t[0]}" for t in tables])
-        await message.answer(f"📊 Таблицы в БД:\n{tables_text}")
-
-    except Exception as e:
-        await message.answer(f"❌ Ошибка миграции: {e}")
-
-
-@router.message(Command("enable_delivery"))
-async def cmd_enable_delivery(message: types.Message):
-    """Команда для включения доставки для всех магазинов (только для админа)"""
-    if message.from_user.id != _ADMIN_ID:
-        await message.answer("❌ Доступ запрещён")
-        return
-
-    try:
-        if _DATABASE_URL:
-            await message.answer(
-                "⚠️ Эта команда работает только с SQLite.\nДля PostgreSQL доставка работает автоматически."
-            )
-            return
-
-        await message.answer("🔄 Включаю доставку для всех магазинов...")
-
-        conn = sqlite3.connect(_db.db_name)
-        cursor = conn.cursor()
-
-        # Проверяем наличие таблицы stores и полей доставки
-        cursor.execute("PRAGMA table_info(stores)")
-        columns = [col[1] for col in cursor.fetchall()]
-
-        if "delivery_enabled" not in columns:
-            await message.answer("❌ Таблица stores не имеет полей доставки. Запустите /migrate_db")
-            conn.close()
-            return
-
-        # Включаем доставку
-        cursor.execute(
-            """
-            UPDATE stores
-            SET delivery_enabled = 1,
-                delivery_price = 15000,
-                min_order_amount = 30000
-            WHERE delivery_enabled = 0
-        """
-        )
-        updated = cursor.rowcount
-        conn.commit()
-
-        # Проверяем результат
-        cursor.execute("SELECT store_id, name, delivery_enabled FROM stores")
-        stores = cursor.fetchall()
-        conn.close()
-
-        result = f"✅ Доставка включена для {updated} магазина(ов)\n\n"
-        result += "📊 Статус магазинов:\n"
-        for store in stores:
-            # Dict-compatible access
-            store_id = (
-                store.get("store_id")
-                if isinstance(store, dict)
-                else (store[0] if len(store) > 0 else 0)
-            )
-            store_name = (
-                store.get("name")
-                if isinstance(store, dict)
-                else (store[1] if len(store) > 1 else "Без названия")
-            )
-            delivery_enabled = (
-                store.get("delivery_enabled")
-                if isinstance(store, dict)
-                else (store[2] if len(store) > 2 else False)
-            )
-            status = "✅" if delivery_enabled else "❌"
-            result += f"{status} {store_name} (ID: {store_id})\n"
-
-        await message.answer(result)
-
-    except Exception as e:
-        await message.answer(f"❌ Ошибка: {e}")

@@ -297,7 +297,6 @@ class TestStates:
 
     def test_change_city_states_exist(self) -> None:
         """Test ChangeCity states are defined."""
-        assert hasattr(ChangeCity, "new_city")
         assert hasattr(ChangeCity, "city")
 
     def test_book_offer_states_exist(self) -> None:
