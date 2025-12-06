@@ -80,7 +80,7 @@ def build_cart_item_keyboard(
 
 
 def build_cart_keyboard(lang: str, has_items: bool) -> InlineKeyboardBuilder:
-    """Build main cart keyboard."""
+    """Build main cart keyboard with improved empty state CTA."""
     kb = InlineKeyboardBuilder()
 
     if has_items:
@@ -92,11 +92,17 @@ def build_cart_keyboard(lang: str, has_items: bool) -> InlineKeyboardBuilder:
         clear_text = "🗑 Очистить корзину" if lang == "ru" else "🗑 Savatni tozalash"
         kb.button(text=clear_text, callback_data="cart_clear")
 
-    # Continue shopping
-    continue_text = "🔙 Продолжить покупки" if lang == "ru" else "🔙 Xaridni davom ettirish"
-    kb.button(text=continue_text, callback_data="cart_continue")
+        # Continue shopping
+        continue_text = "🔙 Продолжить покупки" if lang == "ru" else "🔙 Xaridni davom ettirish"
+        kb.button(text=continue_text, callback_data="cart_continue")
 
-    kb.adjust(1)
+        kb.adjust(1)
+    else:
+        # Empty cart - show CTA to browse offers
+        cta_text = get_text(lang, "cart_empty_cta")
+        kb.button(text=cta_text, callback_data="cart_browse_offers")
+        kb.adjust(1)
+
     return kb
 
 
@@ -131,9 +137,9 @@ def build_add_to_cart_keyboard(
     add_text = "🛒 В корзину" if lang == "ru" else "🛒 Savatga"
     kb.button(text=add_text, callback_data=f"addcart_confirm_{offer_id}_{quantity}")
 
-    # Cancel
-    cancel_text = "❌ Отмена" if lang == "ru" else "❌ Bekor"
-    kb.button(text=cancel_text, callback_data=f"addcart_cancel_{store_id}")
+    # Back button
+    back_text = "◀️ Назад" if lang == "ru" else "◀️ Orqaga"
+    kb.button(text=back_text, callback_data=f"addcart_cancel_{store_id}")
 
     kb.adjust(3, 1, 1)
     return kb
@@ -143,13 +149,10 @@ def build_add_to_cart_keyboard(
 
 
 def build_cart_text(lang: str, items: list[CartItem]) -> str:
-    """Build cart view text."""
+    """Build cart view text with improved empty state."""
     if not items:
-        return (
-            "🛒 <b>Корзина пуста</b>\n\n" "Добавьте товары из каталога!"
-            if lang == "ru"
-            else "🛒 <b>Savat bo'sh</b>\n\n" "Katalogdan mahsulotlar qo'shing!"
-        )
+        # Use localized empty state from localization.py
+        return get_text(lang, "cart_empty")
 
     currency = "so'm" if lang == "uz" else "сум"
     lines = [f"🛒 <b>{'Savat' if lang == 'uz' else 'Корзина'}</b>\n"]
@@ -230,6 +233,22 @@ async def show_cart(message: types.Message, state: FSMContext) -> None:
     await message.answer(text, parse_mode="HTML", reply_markup=kb.as_markup())
 
 
+async def view_cart_message(message: types.Message, state: FSMContext) -> None:
+    """Show cart from regular message (for menu button)."""
+    if not db:
+        return
+
+    await state.clear()
+    user_id = message.from_user.id
+    lang = db.get_user_language(user_id)
+
+    items = cart_storage.get_cart(user_id)
+    text = build_cart_text(lang, items)
+    kb = build_cart_keyboard(lang, len(items) > 0)
+
+    await message.answer(text, parse_mode="HTML", reply_markup=kb.as_markup())
+
+
 @router.callback_query(F.data == "view_cart")
 async def view_cart_callback(callback: types.CallbackQuery, state: FSMContext) -> None:
     """Show cart from callback."""
@@ -254,6 +273,35 @@ async def view_cart_callback(callback: types.CallbackQuery, state: FSMContext) -
 @router.callback_query(F.data == "cart_noop")
 async def cart_noop(callback: types.CallbackQuery) -> None:
     """No-op for disabled buttons."""
+    await callback.answer()
+
+
+@router.callback_query(F.data == "cart_browse_offers")
+async def cart_browse_offers(callback: types.CallbackQuery, state: FSMContext) -> None:
+    """CTA button from empty cart - go to hot offers."""
+    if not db or not callback.message:
+        await callback.answer()
+        return
+
+    user_id = callback.from_user.id
+    lang = db.get_user_language(user_id)
+
+    # Delete cart message and redirect to hot offers
+    try:
+        await callback.message.delete()
+    except Exception:
+        pass
+
+    # Simulate clicking "Hot offers" button
+    from aiogram.types import Message
+
+    # Send a synthetic message to trigger hot offers handler
+    # or just send the main menu and let user click
+    await callback.message.answer(
+        "🔥 " + get_text(lang, "hot_offers_title"),
+        parse_mode="HTML",
+        reply_markup=main_menu_customer(lang),
+    )
     await callback.answer()
 
 
@@ -487,15 +535,12 @@ async def checkout_pickup(callback: types.CallbackQuery, state: FSMContext) -> N
 
     for item in items:
         try:
-            booking_id = db.create_booking(
+            booking_id = db.create_booking_atomic(
                 user_id=user_id,
                 offer_id=item.offer_id,
                 quantity=item.quantity,
                 delivery_type="pickup",
             )
-
-            # Update offer quantity
-            db.update_offer_quantity(item.offer_id, -item.quantity)
 
             # Get booking code
             booking = db.get_booking(booking_id)
@@ -619,6 +664,160 @@ async def checkout_delivery(callback: types.CallbackQuery, state: FSMContext) ->
     await callback.answer()
 
 
+@router.callback_query(F.data == "cart_use_saved_address")
+async def cart_use_saved_address(callback: types.CallbackQuery, state: FSMContext) -> None:
+    """Use saved address for cart delivery."""
+    if not db or not callback.message:
+        await callback.answer()
+        return
+
+    user_id = callback.from_user.id
+    lang = db.get_user_language(user_id)
+
+    # Get saved address
+    saved_address = None
+    try:
+        saved_address = db.get_last_delivery_address(user_id)
+    except Exception:
+        pass
+
+    if not saved_address:
+        await callback.answer(
+            "Нет сохраненного адреса" if lang == "ru" else "Saqlangan manzil yo'q", show_alert=True
+        )
+        return
+
+    # Save address to state
+    await state.update_data(address=saved_address)
+
+    # Move to payment method selection
+    await cart_address_to_payment(callback, state, saved_address)
+
+
+@router.message(OrderDelivery.address)
+async def cart_address_input(message: types.Message, state: FSMContext) -> None:
+    """Handle address input for cart delivery."""
+    if not db or not message.from_user:
+        return
+
+    lang = db.get_user_language(message.from_user.id)
+    text = (message.text or "").strip()
+
+    # Check main menu button
+    if text in ["🏠 Главное меню", "🏠 Bosh sahifa", "🏠 Asosiy menyu"]:
+        await state.clear()
+        cart_count = cart_storage.get_cart_count(message.from_user.id)
+        await message.answer(
+            get_text(lang, "main_menu"),
+            reply_markup=main_menu_customer(lang, cart_count),
+        )
+        return
+
+    # Check cancel
+    if any(c in text.lower() for c in ["отмена", "bekor", "❌"]) or text.startswith("/"):
+        await state.clear()
+        msg = "❌ Bekor qilindi" if lang == "uz" else "❌ Отменено"
+        cart_count = cart_storage.get_cart_count(message.from_user.id)
+        await message.answer(msg, reply_markup=main_menu_customer(lang, cart_count))
+        return
+
+    # Validate address length
+    if len(text) < 10:
+        msg = (
+            "❌ Manzil juda qisqa (min 10 belgi)"
+            if lang == "uz"
+            else "❌ Адрес слишком короткий (мин 10 символов)"
+        )
+        await message.answer(msg)
+        return
+
+    # Save address
+    await state.update_data(address=text)
+
+    # Save as last address for user
+    try:
+        db.save_delivery_address(message.from_user.id, text)
+    except Exception as e:
+        logger.warning(f"Could not save address: {e}")
+
+    # Show payment options
+    data = await state.get_data()
+    items = cart_storage.get_cart(message.from_user.id)
+
+    if not items:
+        await message.answer("Корзина пуста" if lang == "ru" else "Savat bo'sh")
+        await state.clear()
+        return
+
+    currency = "so'm" if lang == "uz" else "сум"
+    total = sum(item.price * item.quantity for item in items)
+    delivery_price = items[0].delivery_price if items else 0
+
+    payment_text = "To'lov turini tanlang" if lang == "uz" else "Выберите способ оплаты"
+    lines = [
+        f"✅ <b>{'Manzil saqlandi' if lang == 'uz' else 'Адрес сохранён'}</b>\n",
+        f"📍 {_esc(text)}\n",
+        f"💵 {'Mahsulotlar' if lang == 'uz' else 'Товары'}: {total:,} {currency}",
+        f"🚚 {'Yetkazish' if lang == 'uz' else 'Доставка'}: {delivery_price:,} {currency}",
+        f"💰 <b>{'Jami' if lang == 'uz' else 'Итого'}: {total + delivery_price:,} {currency}</b>\n",
+        f"💳 {payment_text}:",
+    ]
+
+    text_msg = "\n".join(lines)
+
+    kb = InlineKeyboardBuilder()
+    kb.button(text="💵 Наличные" if lang == "ru" else "💵 Naqd", callback_data="cart_payment_cash")
+    kb.button(text="💳 Карта" if lang == "ru" else "💳 Karta", callback_data="cart_payment_card")
+    kb.button(text="◀️ Назад" if lang == "ru" else "◀️ Orqaga", callback_data="checkout_delivery")
+    kb.adjust(2, 1)
+
+    await message.answer(text_msg, parse_mode="HTML", reply_markup=kb.as_markup())
+
+
+async def cart_address_to_payment(
+    callback: types.CallbackQuery, state: FSMContext, address: str
+) -> None:
+    """Helper to transition from address to payment selection."""
+    if not db:
+        return
+
+    user_id = callback.from_user.id
+    lang = db.get_user_language(user_id)
+    items = cart_storage.get_cart(user_id)
+
+    if not items:
+        await callback.answer("Корзина пуста" if lang == "ru" else "Savat bo'sh", show_alert=True)
+        return
+
+    currency = "so'm" if lang == "uz" else "сум"
+    total = sum(item.price * item.quantity for item in items)
+    delivery_price = items[0].delivery_price if items else 0
+
+    payment_text = "To'lov turini tanlang" if lang == "uz" else "Выберите способ оплаты"
+    lines = [
+        f"✅ <b>{'Manzil saqlandi' if lang == 'uz' else 'Адрес сохранён'}</b>\n",
+        f"📍 {_esc(address)}\n",
+        f"💵 {'Mahsulotlar' if lang == 'uz' else 'Товары'}: {total:,} {currency}",
+        f"🚚 {'Yetkazish' if lang == 'uz' else 'Доставка'}: {delivery_price:,} {currency}",
+        f"💰 <b>{'Jami' if lang == 'uz' else 'Итого'}: {total + delivery_price:,} {currency}</b>\n",
+        f"💳 {payment_text}:",
+    ]
+
+    text = "\n".join(lines)
+
+    kb = InlineKeyboardBuilder()
+    kb.button(text="💵 Наличные" if lang == "ru" else "💵 Naqd", callback_data="cart_payment_cash")
+    kb.button(text="💳 Карта" if lang == "ru" else "💳 Karta", callback_data="cart_payment_card")
+    kb.button(text="◀️ Назад" if lang == "ru" else "◀️ Orqaga", callback_data="checkout_delivery")
+    kb.adjust(2, 1)
+
+    try:
+        await callback.message.edit_text(text, parse_mode="HTML", reply_markup=kb.as_markup())
+    except Exception:
+        await callback.message.answer(text, parse_mode="HTML", reply_markup=kb.as_markup())
+    await callback.answer()
+
+
 # ===================== ADD TO CART (from offer view) =====================
 
 
@@ -730,6 +929,133 @@ async def addcart_update_qty(callback: types.CallbackQuery, state: FSMContext) -
     await callback.answer()
 
 
+@router.callback_query(F.data == "cart_payment_cash")
+async def cart_payment_cash(callback: types.CallbackQuery, state: FSMContext) -> None:
+    """Process cart order with cash payment."""
+    await finalize_cart_order(callback, state, "cash")
+
+
+@router.callback_query(F.data == "cart_payment_card")
+async def cart_payment_card(callback: types.CallbackQuery, state: FSMContext) -> None:
+    """Process cart order with card payment."""
+    await finalize_cart_order(callback, state, "card")
+
+
+async def finalize_cart_order(
+    callback: types.CallbackQuery, state: FSMContext, payment_method: str
+) -> None:
+    """Create orders from cart items."""
+    if not db or not bot or not callback.message:
+        await callback.answer()
+        return
+
+    user_id = callback.from_user.id
+    lang = db.get_user_language(user_id)
+
+    items = cart_storage.get_cart(user_id)
+    if not items:
+        await callback.answer("Корзина пуста" if lang == "ru" else "Savat bo'sh", show_alert=True)
+        return
+
+    data = await state.get_data()
+    address = data.get("address", "")
+
+    if not address:
+        await callback.answer(
+            "Адрес не указан" if lang == "ru" else "Manzil ko'rsatilmagan",
+            show_alert=True,
+        )
+        return
+
+    # Create orders for each item
+    success_orders = []
+    currency = "so'm" if lang == "uz" else "сум"
+
+    for item in items:
+        try:
+            # Create order
+            order_id = db.create_order(
+                user_id=user_id,
+                offer_id=item.offer_id,
+                quantity=item.quantity,
+                address=address,
+                payment_method=payment_method,
+            )
+
+            # Update offer quantity
+            db.update_offer_quantity(item.offer_id, -item.quantity)
+
+            success_orders.append(
+                {
+                    "title": item.title,
+                    "quantity": item.quantity,
+                    "price": item.price,
+                    "store_name": item.store_name,
+                }
+            )
+
+            logger.info(f"Created delivery order {order_id} for user {user_id}")
+
+        except Exception as e:
+            logger.error(f"Failed to create order for offer {item.offer_id}: {e}")
+
+    if not success_orders:
+        await callback.answer(
+            "Ошибка при создании заказа" if lang == "ru" else "Buyurtma yaratishda xatolik",
+            show_alert=True,
+        )
+        return
+
+    # Clear cart
+    cart_storage.clear_cart(user_id)
+    await state.clear()
+
+    # Build success message
+    delivery_price = items[0].delivery_price if items else 0
+    total = sum(o["price"] * o["quantity"] for o in success_orders)
+
+    lines = [f"✅ <b>{'Buyurtma qabul qilindi!' if lang == 'uz' else 'Заказ оформлен!'}</b>\n"]
+    lines.append(f"📍 {_esc(address)}\n")
+
+    for o in success_orders:
+        subtotal = o["price"] * o["quantity"]
+        lines.append(f"• {_esc(o['title'])} × {o['quantity']} = {subtotal:,} {currency}")
+
+    lines.append("")
+    lines.append("─" * 25)
+    lines.append(f"💵 {'Mahsulotlar' if lang == 'uz' else 'Товары'}: {total:,} {currency}")
+    lines.append(f"🚚 {'Yetkazish' if lang == 'uz' else 'Доставка'}: {delivery_price:,} {currency}")
+    lines.append(
+        f"💰 <b>{'Jami' if lang == 'uz' else 'Итого'}: {total + delivery_price:,} {currency}</b>"
+    )
+    lines.append("")
+
+    payment_text = "💵 Naqd" if payment_method == "cash" else "💳 Karta"
+    if lang == "ru":
+        payment_text = "💵 Наличные" if payment_method == "cash" else "💳 Карта"
+    lines.append(f"💳 {payment_text}")
+    lines.append("")
+    lines.append(
+        "🚚 Заказ будет доставлен в течение часа"
+        if lang == "ru"
+        else "🚚 Buyurtma 1 soat ichida yetkaziladi"
+    )
+
+    text = "\n".join(lines)
+
+    try:
+        await callback.message.edit_text(text, parse_mode="HTML")
+    except Exception:
+        pass
+
+    cart_count = cart_storage.get_cart_count(user_id)
+    await callback.message.answer(
+        get_text(lang, "main_menu"),
+        reply_markup=main_menu_customer(lang, cart_count),
+    )
+    await callback.answer()
+
+
 @router.callback_query(F.data.startswith("addcart_confirm_"))
 async def addcart_confirm(callback: types.CallbackQuery, state: FSMContext) -> None:
     """Add item to cart and show confirmation."""
@@ -816,7 +1142,7 @@ async def addcart_confirm(callback: types.CallbackQuery, state: FSMContext) -> N
 
 @router.callback_query(F.data.startswith("addcart_cancel_"))
 async def addcart_cancel(callback: types.CallbackQuery, state: FSMContext) -> None:
-    """Cancel add-to-cart and return."""
+    """Cancel add-to-cart and return to main menu."""
     if not db or not callback.message:
         await callback.answer()
         return
@@ -825,15 +1151,17 @@ async def addcart_cancel(callback: types.CallbackQuery, state: FSMContext) -> No
 
     user_id = callback.from_user.id
     lang = db.get_user_language(user_id)
-    cart_count = cart_storage.get_cart_count(user_id)
 
     try:
         await callback.message.delete()
     except Exception:
         pass
 
+    # Return to main menu
+    cart_count = cart_storage.get_cart_count(user_id)
     await callback.message.answer(
         get_text(lang, "main_menu"),
         reply_markup=main_menu_customer(lang, cart_count),
     )
+
     await callback.answer()

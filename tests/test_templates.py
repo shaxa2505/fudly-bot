@@ -239,8 +239,8 @@ class TestRenderBusinessTypeStoreList:
         assert "СУПЕРМАРКЕТЫ" in result
         assert "Ташкент" in result
         assert "Тестовый магазин" in result
-        assert "4.5/5" in result
-        assert "Предложений: 15" in result
+        assert "⭐4.5" in result  # New format: ⭐4.5 instead of 4.5/5
+        assert "🔥15" in result  # New format: 🔥15 шт instead of Предложений: 15
 
     def test_render_restaurant_list_uz(self, sample_store_summary: StoreSummary) -> None:
         """Test rendering restaurant list in Uzbek."""
@@ -254,7 +254,7 @@ class TestRenderBusinessTypeStoreList:
 
         assert "🍽" in result
         assert "RESTORANLAR" in result
-        assert "Takliflar" in result
+        assert "🔥15 ta" in result  # New format: 🔥15 ta instead of Takliflar
 
     def test_render_with_prompt_ru(self, sample_store_summary: StoreSummary) -> None:
         """Test that prompt is shown in Russian."""
@@ -265,7 +265,7 @@ class TestRenderBusinessTypeStoreList:
             stores=[sample_store_summary],
         )
 
-        assert "Введите номер магазина" in result
+        assert "Нажмите на заведение для просмотра" in result  # New prompt text
 
 
 # =============================================================================
@@ -448,9 +448,8 @@ class TestRenderOfferCard:
 
         assert "Хлеб белый" in result
         assert "5,000" in result
-        assert "Супермаркет Тест" in result
-        assert "ул. Пушкина 1" in result
-        assert "Доступно" in result
+        # Note: store_name and store_address are not rendered in offer_card
+        assert "В наличии" in result  # Changed from "Доступно" to "В наличии"
         assert "Доставка" in result
 
     def test_render_offer_card_without_delivery(self) -> None:

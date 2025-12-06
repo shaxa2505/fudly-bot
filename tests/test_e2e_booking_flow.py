@@ -117,18 +117,33 @@ async def test_book_offer_quantity_flow(temp_db: Database, monkeypatch: pytest.M
         return TgUser(id=42, is_bot=True, first_name="FudlyBot")
 
     monkeypatch.setattr(Bot, "get_me", fake_get_me, raising=True)
-    from aiogram.methods import AnswerCallbackQuery, EditMessageText, SendMessage
+    from aiogram.methods import (
+        AnswerCallbackQuery,
+        EditMessageCaption,
+        EditMessageText,
+        SendMessage,
+    )
 
     async def fake_bot_call(self, method, request_timeout=None):
         if isinstance(method, SendMessage):
             return await fake_send_message(self, method.chat_id, method.text)
         if isinstance(method, EditMessageText):
-            # Not used here but keep for completeness
+            # Track edited messages too (new UX edits in place)
+            sent.append(SentEvent("editMessageText", method.chat_id, method.text))
             return Message(
                 message_id=99,
                 date=datetime.now(),
                 chat=Chat(id=method.chat_id or 0, type="private"),
                 text=method.text,
+            )
+        if isinstance(method, EditMessageCaption):
+            # Track edited captions (for photo messages)
+            sent.append(SentEvent("editMessageCaption", method.chat_id, method.caption))
+            return Message(
+                message_id=99,
+                date=datetime.now(),
+                chat=Chat(id=method.chat_id or 0, type="private"),
+                text=method.caption,
             )
         if isinstance(method, AnswerCallbackQuery):
             return await fake_answer_callback_query(method.callback_query_id)
@@ -139,6 +154,28 @@ async def test_book_offer_quantity_flow(temp_db: Database, monkeypatch: pytest.M
     # Wire bookings module dependencies
     cache = CacheManager(temp_db)
     bookings_mod.setup_dependencies(temp_db, cache, bot, metrics={"bookings_created": 0})
+
+    # Patch Message.edit_text and edit_caption for inline editing
+    async def fake_edit_text(self, text, **kwargs):
+        sent.append(SentEvent("editMessageText", self.chat.id if self.chat else 0, text))
+        return Message(
+            message_id=self.message_id,
+            date=datetime.now(),
+            chat=self.chat,
+            text=text,
+        )
+
+    async def fake_edit_caption(self, caption, **kwargs):
+        sent.append(SentEvent("editMessageCaption", self.chat.id if self.chat else 0, caption))
+        return Message(
+            message_id=self.message_id,
+            date=datetime.now(),
+            chat=self.chat,
+            text=caption,
+        )
+
+    monkeypatch.setattr(Message, "edit_text", fake_edit_text, raising=True)
+    monkeypatch.setattr(Message, "edit_caption", fake_edit_caption, raising=True)
 
     # Simulate callback "book_{offer_id}"
     tg_user = TgUser(id=user_id, is_bot=False, first_name="Buyer")
@@ -161,19 +198,50 @@ async def test_book_offer_quantity_flow(temp_db: Database, monkeypatch: pytest.M
 
     await dp.feed_update(bot, update1)
 
-    # Expect a quantity prompt message
-    assert any("Сколько хотите забронировать" in (e.text or "") for e in sent if e.text)
+    # After clicking "book_{offer_id}", expect an order card with quantity buttons
+    # New UX: shows order card immediately with quick qty buttons [1][2][3][5]
+    # Check for order card elements (title, price, totals)
+    assert any(
+        "ИТОГО" in (e.text or "") or "JAMI" in (e.text or "") or "💵" in (e.text or "")
+        for e in sent
+        if e.text
+    ), f"Expected order card with totals, got: {[e.text for e in sent if e.text]}"
 
-    # Send quantity = 2
-    qty_msg = Message(
+    # Select quantity = 2 via callback button (new UX)
+    qty_cb_message = Message(
         message_id=2,
         date=datetime.now(),
         chat=chat,
         from_user=tg_user,
-        text="2",
+        text="Order card",
     )
-    update2 = Update(update_id=101, message=qty_msg)
+    qty_cbq = CallbackQuery(
+        id="cbq_qty",
+        from_user=tg_user,
+        chat_instance="ci_2",
+        data=f"pbook_qty_{offer_id}_2",
+        message=qty_cb_message,
+    )
+    update2 = Update(update_id=101, callback_query=qty_cbq)
     await dp.feed_update(bot, update2)
+
+    # Now confirm the booking (skip delivery method selection for this test)
+    confirm_cb_message = Message(
+        message_id=3,
+        date=datetime.now(),
+        chat=chat,
+        from_user=tg_user,
+        text="Confirm",
+    )
+    confirm_cbq = CallbackQuery(
+        id="cbq_confirm",
+        from_user=tg_user,
+        chat_instance="ci_3",
+        data=f"pbook_confirm_{offer_id}",
+        message=confirm_cb_message,
+    )
+    update3 = Update(update_id=102, callback_query=confirm_cbq)
+    await dp.feed_update(bot, update3)
 
     # Validate booking created and confirmation sent
     bookings_list = temp_db.get_user_bookings(user_id)
@@ -187,9 +255,9 @@ async def test_book_offer_quantity_flow(temp_db: Database, monkeypatch: pytest.M
     )
     assert any(
         "Заказ успешно создан" in text
-        or "ожидает подтверждения" in text
+        or "ожидает подтверждения" in text.lower()
         or "Бронирование" in text
-        or "Бронь отправлена" in text  # New pending booking message
+        or "бронь отправлена" in text.lower()  # New pending booking message (case-insensitive)
         or (pickup_code and pickup_code in text)
         for text in sent_texts
     ), f"Expected booking confirmation message, got: {sent_texts}"

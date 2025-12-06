@@ -303,16 +303,18 @@ TEXTS = {
 
 ⏳ Ожидайте одобрения администратором.
 Обычно это занимает не более 24 часов.""",
-        "store_approved": """🎉 <b>Поздравляем!</b>
+        "store_approved": """🎉 <b>Поздравляем! Ваш магазин одобрен!</b>
 
-Ваша заявка на партнёрство <b>ОДОБРЕНА</b>!
+Теперь вы официальный партнёр Fudly!
 
-Теперь вы можете:
-➕ Создавать предложения
-📸 Загружать фото товаров
-📊 Управлять бронированиями
+<b>🚀 С чего начать:</b>
+1️⃣ Добавьте первый товар (кнопка «➕ Добавить»)
+2️⃣ Установите скидку 30-70% — это привлекает покупателей
+3️⃣ Загрузите фото — товары с фото продаются в 3 раза лучше!
 
-Желаем успешных продаж!""",
+<b>💡 Совет:</b> Начните с 3-5 товаров и смотрите что лучше продаётся.
+
+Желаем успешных продаж! 🎉""",
         "store_rejected": """❌ <b>Заявка отклонена</b>
 
 К сожалению, ваша заявка не была одобрена.
@@ -439,6 +441,46 @@ TEXTS = {
         "no_cancel": "❌ Нет, отменить",
         "store_deleted": "✅ Магазин успешно удалён",
         "error_general": "❌ Произошла ошибка. Попробуйте позже.",
+        "system_error": "⚠️ Системная ошибка. Попробуйте позже или напишите в поддержку.",
+        # Улучшенные пустые состояния
+        "cart_empty": """🛒 <b>Корзина пуста</b>
+
+Найдите что-нибудь вкусное со скидкой до 70%!
+
+💡 Совет: загляните в раздел «Горячее»""",
+        "cart_empty_cta": "🔥 Смотреть предложения",
+        # Навигация
+        "go_back": "◀️ Назад",
+        "continue_shopping": "🔙 Продолжить покупки",
+        # Кнопки количества
+        "qty_select": "📦 Выберите количество:",
+        "qty_custom": "✏️ Другое",
+        "qty_enter_custom": "Введите количество (от 1 до {max}):",
+        # Улучшенные ошибки с подсказками
+        "error_qty_invalid": """❌ <b>Неверное количество</b>
+
+Доступно: {available} шт
+Попробуйте: 1, 2 или {max}""",
+        "error_qty_exceeded": """❌ <b>Слишком много</b>
+
+Максимум: {max} шт
+Введите число от 1 до {max}""",
+        # Quick actions
+        "add_to_cart": "🛒 В корзину",
+        "buy_now": "⚡ Купить сейчас",
+        "added_to_cart": "✅ Добавлено в корзину!",
+        # Партнёрский онбординг
+        "partner_welcome": """🎉 <b>Добро пожаловать, партнёр!</b>
+
+Ваш магазин одобрен и готов к работе.
+
+<b>Начните прямо сейчас:</b>
+1️⃣ Добавьте первый товар
+2️⃣ Установите скидку 30-70%
+3️⃣ Получайте заказы!
+
+💡 Совет: товары с фото продаются в 3 раза лучше""",
+        "partner_add_first": "➕ Добавить первый товар",
         # Хардкод-тексты которые нужно было перевести
         "offer_not_found": "❌ Товар не найден",
         "not_your_offer": "❌ Это не ваш товар",
@@ -757,16 +799,18 @@ Qaror haqida xabar olasiz!""",
 
 ⏳ Administrator tomonidan tasdiqlanishini kuting.
 Odatda bu 24 soatdan ortiq vaqt olmaydi.""",
-        "store_approved": """🎉 <b>Tabriklaymiz!</b>
+        "store_approved": """🎉 <b>Tabriklaymiz! Do'koningiz tasdiqlandi!</b>
 
-Hamkorlik uchun arizangiz <b>TASDIQLANDI</b>!
+Endi siz Fudly ning rasmiy hamkorisiz!
 
-Endi siz qila olasiz:
-➕ Takliflar yaratish
-📸 Mahsulot fotosuratlarini yuklash
-📊 Buyurtmalarni boshqarish
+<b>🚀 Nimadan boshlash kerak:</b>
+1️⃣ Birinchi mahsulotni qo'shing («➕ Qo'shish» tugmasi)
+2️⃣ 30-70% chegirma qo'ying — bu xaridorlarni jalb qiladi
+3️⃣ Rasm yuklang — rasmli tovarlar 3 baravar yaxshi sotiladi!
 
-Muvaffaqiyatli savdo tilaymiz!""",
+<b>💡 Maslahat:</b> 3-5 ta tovar bilan boshlang va qaysi biri yaxshi sotilishini kuzating.
+
+Muvaffaqiyatli savdo tilaymiz! 🎉""",
         "store_rejected": """❌ <b>Ariza rad etildi</b>
 
 Afsuski, arizangiz tasdiqlanmadi.
@@ -891,6 +935,46 @@ Bu harakatni qaytarib bo\'lmaydi!""",
         "no_cancel": "❌ Yo'q, bekor qilish",
         "store_deleted": "✅ Do'kon muvaffaqiyatli o'chirildi",
         "error_general": "❌ Xatolik yuz berdi. Keyinroq urinib ko'ring.",
+        "system_error": "⚠️ Tizim xatosi. Keyinroq urinib ko'ring yoki qo'llab-quvvatlash xizmatiga yozing.",
+        # Yaxshilangan bo'sh holatlar
+        "cart_empty": """🛒 <b>Savat bo'sh</b>
+
+70% gacha chegirma bilan mazali narsa toping!
+
+💡 Maslahat: «Issiq takliflar» bo'limiga qarang""",
+        "cart_empty_cta": "🔥 Takliflarni ko'rish",
+        # Navigatsiya
+        "go_back": "◀️ Orqaga",
+        "continue_shopping": "🔙 Xaridni davom ettirish",
+        # Miqdor tugmalari
+        "qty_select": "📦 Miqdorni tanlang:",
+        "qty_custom": "✏️ Boshqa",
+        "qty_enter_custom": "Miqdorni kiriting (1 dan {max} gacha):",
+        # Yaxshilangan xatolar
+        "error_qty_invalid": """❌ <b>Noto'g'ri miqdor</b>
+
+Mavjud: {available} dona
+Urinib ko'ring: 1, 2 yoki {max}""",
+        "error_qty_exceeded": """❌ <b>Juda ko'p</b>
+
+Maksimum: {max} dona
+1 dan {max} gacha son kiriting""",
+        # Tezkor harakatlar
+        "add_to_cart": "🛒 Savatga",
+        "buy_now": "⚡ Hozir sotib olish",
+        "added_to_cart": "✅ Savatga qo'shildi!",
+        # Hamkor onbordingi
+        "partner_welcome": """🎉 <b>Xush kelibsiz, hamkor!</b>
+
+Do'koningiz tasdiqlandi va ishlashga tayyor.
+
+<b>Hoziroq boshlang:</b>
+1️⃣ Birinchi mahsulotni qo'shing
+2️⃣ 30-70% chegirma qo'ying
+3️⃣ Buyurtmalar oling!
+
+💡 Maslahat: rasmli mahsulotlar 3 baravar yaxshi sotiladi""",
+        "partner_add_first": "➕ Birinchi mahsulotni qo'shish",
         # Qo'shimcha tarjimalar (xardkod-tekstlar)
         "offer_not_found": "❌ Mahsulot topilmadi",
         "not_your_offer": "❌ Bu sizning mahsulotingiz emas",

@@ -166,25 +166,34 @@ def build_order_card_keyboard(
     delivery_enabled: bool,
     delivery_method: str | None,
 ) -> InlineKeyboardBuilder:
-    """Build order card keyboard with [−] [qty] [+] and delivery options."""
+    """Build order card keyboard with quick quantity buttons and delivery options."""
     kb = InlineKeyboardBuilder()
 
-    # Row 1: Quantity controls [−] [qty] [+]
-    minus_enabled = quantity > 1
-    plus_enabled = quantity < max_qty
+    # Row 1: Quick quantity buttons [1] [2] [3] [5] or [−][qty][+] for large max
+    if max_qty <= 10:
+        # Show quick buttons for small quantities
+        quick_qtys = [q for q in [1, 2, 3, 5, 10] if q <= max_qty]
+        for q in quick_qtys[:4]:  # Max 4 quick buttons
+            is_selected = quantity == q
+            text = f"✓ {q}" if is_selected else str(q)
+            kb.button(text=text, callback_data=f"pbook_qty_{offer_id}_{q}")
+    else:
+        # Show [−][qty][+] for large quantities
+        minus_enabled = quantity > 1
+        plus_enabled = quantity < max_qty
 
-    minus_text = "➖" if minus_enabled else "⬜"
-    plus_text = "➕" if plus_enabled else "⬜"
+        minus_text = "➖" if minus_enabled else "⬜"
+        plus_text = "➕" if plus_enabled else "⬜"
 
-    kb.button(
-        text=minus_text,
-        callback_data=f"pbook_qty_{offer_id}_{quantity - 1}" if minus_enabled else "pbook_noop",
-    )
-    kb.button(text=f"📦 {quantity}", callback_data="pbook_noop")
-    kb.button(
-        text=plus_text,
-        callback_data=f"pbook_qty_{offer_id}_{quantity + 1}" if plus_enabled else "pbook_noop",
-    )
+        kb.button(
+            text=minus_text,
+            callback_data=f"pbook_qty_{offer_id}_{quantity - 1}" if minus_enabled else "pbook_noop",
+        )
+        kb.button(text=f"📦 {quantity}", callback_data="pbook_noop")
+        kb.button(
+            text=plus_text,
+            callback_data=f"pbook_qty_{offer_id}_{quantity + 1}" if plus_enabled else "pbook_noop",
+        )
 
     # Row 2-3: Delivery options (if enabled)
     if delivery_enabled:
@@ -200,22 +209,25 @@ def build_order_card_keyboard(
         kb.button(text=pickup_text, callback_data=f"pbook_method_{offer_id}_pickup")
         kb.button(text=delivery_text, callback_data=f"pbook_method_{offer_id}_delivery")
 
-    # Row 4: Confirm and Cancel
+    # Row 4: Confirm and Back
     if delivery_method or not delivery_enabled:
         confirm_text = "✅ Tasdiqlash" if lang == "uz" else "✅ Подтвердить"
         kb.button(text=confirm_text, callback_data=f"pbook_confirm_{offer_id}")
 
-    cancel_text = "❌ Bekor" if lang == "uz" else "❌ Отмена"
-    kb.button(text=cancel_text, callback_data=f"pbook_cancel_{offer_id}_{store_id}")
+    back_text = "◀️ Orqaga" if lang == "uz" else "◀️ Назад"
+    kb.button(text=back_text, callback_data=f"pbook_cancel_{offer_id}_{store_id}")
 
-    # Layout
+    # Layout - calculate based on what we have
+    qty_button_count = (
+        min(4, len([q for q in [1, 2, 3, 5, 10] if q <= max_qty])) if max_qty <= 10 else 3
+    )
     if delivery_enabled:
         if delivery_method:
-            kb.adjust(3, 2, 2)  # [−][qty][+], [pickup][delivery], [confirm][cancel]
+            kb.adjust(qty_button_count, 2, 2)  # qty buttons, [pickup][delivery], [confirm][back]
         else:
-            kb.adjust(3, 2, 1)  # [−][qty][+], [pickup][delivery], [cancel]
+            kb.adjust(qty_button_count, 2, 1)  # qty buttons, [pickup][delivery], [back]
     else:
-        kb.adjust(3, 2)  # [−][qty][+], [confirm][cancel]
+        kb.adjust(qty_button_count, 2)  # qty buttons, [confirm][back]
 
     return kb
 
@@ -224,7 +236,7 @@ def build_order_card_keyboard(
 async def book_offer_start(callback: types.CallbackQuery, state: FSMContext) -> None:
     """Premium UX: Update current card with order controls (no new message)."""
     if not db or not bot or not callback.message:
-        await callback.answer("System error", show_alert=True)
+        await callback.answer(get_text("ru", "system_error"), show_alert=True)
         return
 
     user_id = callback.from_user.id
@@ -716,8 +728,10 @@ async def pbook_confirm(callback: types.CallbackQuery, state: FSMContext) -> Non
     lang = db.get_user_language(user_id)
 
     # Check if user has phone - required for order
-    user = db.get_user_model(user_id)
-    if not user or not user.phone:
+    # Use get_user() which is more robust than get_user_model()
+    user_dict = db.get_user(user_id)
+    user_phone = user_dict.get("phone") if user_dict else None
+    if not user_phone:
         # Ask for phone before proceeding
         from app.keyboards import phone_request_keyboard
         from handlers.common.states import Registration

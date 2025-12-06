@@ -321,15 +321,31 @@ async def approve_store(callback: types.CallbackQuery):
         # Обновляем роль владельца на seller
         _db.update_user_role(store["owner_id"], "seller")
 
-        # Отправляем уведомление владельцу
-        lang = _db.get_user_language(store["owner_id"])
+        # Устанавливаем режим просмотра продавца
+        try:
+            _db.set_user_view_mode(store["owner_id"], "seller")
+        except Exception:
+            pass
 
+        # Отправляем уведомление владельцу с меню продавца
+        lang = _db.get_user_language(store["owner_id"])
         notification = _get_text(lang, "store_approved")
 
         try:
-            await _bot.send_message(store["owner_id"], notification)
+            from app.keyboards.seller import main_menu_seller
+
+            await _bot.send_message(
+                store["owner_id"],
+                notification,
+                parse_mode="HTML",
+                reply_markup=main_menu_seller(lang),
+            )
         except Exception:
-            pass
+            # Fallback without keyboard
+            try:
+                await _bot.send_message(store["owner_id"], notification, parse_mode="HTML")
+            except Exception:
+                pass
 
         await callback.message.edit_text(
             f"✅ Магазин '{store['name']}' одобрен!\n\n{callback.message.text}"

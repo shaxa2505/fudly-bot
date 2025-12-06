@@ -57,6 +57,8 @@ __all__ = [
     # Safe message operations
     "safe_delete_message",
     "safe_edit_message",
+    # Error helpers
+    "get_system_error_text",
 ]
 
 # Main menu button texts (Russian and Uzbek)
@@ -135,6 +137,16 @@ async def safe_edit_message(
     except Exception:
         # Message may be too old, already edited, or deleted
         return False
+
+
+def get_system_error_text(lang: str = "ru") -> str:
+    """Get localized system error text.
+
+    Use this instead of hardcoded 'System error' strings.
+    """
+    from localization import get_text
+
+    return get_text(lang, "system_error")
 
 
 # In-memory per-session view mode override: {'seller'|'customer'}
