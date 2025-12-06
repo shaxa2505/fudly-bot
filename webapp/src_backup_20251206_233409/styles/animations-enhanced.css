@@ -1,0 +1,386 @@
+/**
+ * Animations & Micro-interactions
+ * Design System v2.0
+ */
+
+/* ========================================
+   Button Interactions
+======================================== */
+
+/* Button Press */
+.btn:active,
+.card__cta:active,
+.card__quantity-btn:active {
+  transform: scale(0.96);
+}
+
+/* Icon Button Press */
+.btn--icon:active {
+  transform: scale(0.95);
+}
+
+/* ========================================
+   Card Interactions
+======================================== */
+
+/* Card Hover */
+.card:hover,
+.card--product:hover,
+.flash-deal-card:hover {
+  transform: translateY(-8px);
+  box-shadow: var(--shadow-xl);
+}
+
+.card:active {
+  transform: translateY(-6px) scale(0.98);
+}
+
+/* Card Image Zoom on Hover */
+.card--product:hover .card__image img,
+.flash-deal-card:hover .flash-deal-card__image img {
+  transform: scale(1.1);
+}
+
+/* ========================================
+   Add to Cart Animation
+======================================== */
+
+@keyframes addToCart {
+  0% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.2);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+.card__cta.adding {
+  animation: addToCart 0.3s ease;
+}
+
+/* Success ripple effect */
+@keyframes successRipple {
+  0% {
+    box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7);
+  }
+  100% {
+    box-shadow: 0 0 0 10px rgba(16, 185, 129, 0);
+  }
+}
+
+.card__cta:active {
+  animation: successRipple 0.6s ease-out;
+}
+
+/* ========================================
+   Loading Skeleton (Shimmer)
+======================================== */
+
+@keyframes shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+.skeleton,
+.animate-shimmer {
+  background: linear-gradient(
+    90deg,
+    #f0f0f0 25%,
+    #e0e0e0 50%,
+    #f0f0f0 75%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+  border-radius: var(--radius-xs);
+}
+
+/* Skeleton variants */
+.skeleton--text {
+  height: 12px;
+  width: 100%;
+  margin: 4px 0;
+}
+
+.skeleton--title {
+  height: 16px;
+  width: 80%;
+  margin: 8px 0;
+}
+
+.skeleton--image {
+  width: 100%;
+  height: 170px;
+  border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+}
+
+.skeleton--circle {
+  width: 40px;
+  height: 40px;
+  border-radius: var(--radius-full);
+}
+
+/* ========================================
+   Page Transitions
+======================================== */
+
+/* Fade In */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fade-in,
+.page {
+  animation: fadeIn 0.4s ease-out;
+}
+
+/* Fade In Delayed (for list items) */
+@keyframes fadeInDelayed {
+  0% {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.card--product:nth-child(1) { animation: fadeInDelayed 0.3s ease-out 0.05s both; }
+.card--product:nth-child(2) { animation: fadeInDelayed 0.3s ease-out 0.1s both; }
+.card--product:nth-child(3) { animation: fadeInDelayed 0.3s ease-out 0.15s both; }
+.card--product:nth-child(4) { animation: fadeInDelayed 0.3s ease-out 0.2s both; }
+.card--product:nth-child(5) { animation: fadeInDelayed 0.3s ease-out 0.25s both; }
+.card--product:nth-child(6) { animation: fadeInDelayed 0.3s ease-out 0.3s both; }
+
+/* ========================================
+   Modal & Bottom Sheet Animations
+======================================== */
+
+/* Slide Up (Bottom Sheet) */
+@keyframes slideUp {
+  from {
+    transform: translateY(100%);
+  }
+  to {
+    transform: translateY(0);
+  }
+}
+
+.bottom-sheet,
+.animate-slide-up {
+  animation: slideUp 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Modal Backdrop Fade */
+@keyframes fadeInOverlay {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.modal-backdrop {
+  animation: fadeInOverlay 0.2s ease-out;
+}
+
+/* Modal Slide Up */
+@keyframes slideUpModal {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -40%);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, -50%);
+  }
+}
+
+.modal {
+  animation: slideUpModal 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* ========================================
+   Badge & Notification Animations
+======================================== */
+
+/* Badge Pulse */
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.9;
+    transform: scale(1.05);
+  }
+}
+
+.badge--flash,
+.animate-pulse {
+  animation: pulse 2s ease-in-out infinite;
+}
+
+/* Badge Pop In */
+@keyframes popIn {
+  0% {
+    opacity: 0;
+    transform: scale(0);
+  }
+  50% {
+    transform: scale(1.1);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.badge--notification {
+  animation: popIn 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+/* ========================================
+   Input Focus Animation
+======================================== */
+
+@keyframes focusGlow {
+  0% {
+    box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.4);
+  }
+  100% {
+    box-shadow: 0 0 0 4px rgba(16, 185, 129, 0.1);
+  }
+}
+
+.input:focus,
+.select:focus {
+  animation: focusGlow 0.3s ease-out;
+}
+
+/* ========================================
+   Navigation Transitions
+======================================== */
+
+/* Bottom Nav Icon Pop */
+@keyframes navIconPop {
+  0% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.2);
+  }
+  100% {
+    transform: scale(1.1);
+  }
+}
+
+.nav-item.active .nav-icon {
+  animation: navIconPop 0.3s ease;
+}
+
+/* ========================================
+   Loading Spinner
+======================================== */
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.spinner {
+  animation: spin 0.8s linear infinite;
+}
+
+/* ========================================
+   Swipe Gestures (for carousels)
+======================================== */
+
+.swipeable {
+  touch-action: pan-y;
+  user-select: none;
+}
+
+/* ========================================
+   Hover Effects (Desktop)
+======================================== */
+
+@media (hover: hover) {
+  /* Button Hover Lift */
+  .btn--primary:hover,
+  .btn--accent:hover,
+  .btn--danger:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-lg);
+  }
+
+  /* Card Subtle Lift */
+  .card:hover {
+    transform: translateY(-4px);
+  }
+
+  /* Icon Button Hover */
+  .btn--icon:hover {
+    background: var(--color-bg-secondary);
+    border-color: var(--color-primary);
+  }
+}
+
+/* ========================================
+   Accessibility - Reduced Motion
+======================================== */
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+
+  .card:hover {
+    transform: none;
+  }
+
+  .btn:active {
+    transform: none;
+  }
+}
+
+/* ========================================
+   Performance Optimizations
+======================================== */
+
+/* GPU Acceleration for smooth animations */
+.card,
+.btn,
+.modal,
+.bottom-sheet,
+.card__image img {
+  will-change: transform;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+}
+
+/* Remove will-change after animation */
+.card:not(:hover),
+.btn:not(:active) {
+  will-change: auto;
+}

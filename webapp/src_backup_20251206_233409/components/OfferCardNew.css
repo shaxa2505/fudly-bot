@@ -1,0 +1,42 @@
+/**
+ * OfferCard v2.0 - Design System
+ * Uses card--product from cards.css as base
+ */
+
+/* Card uses card--product class from Design System */
+
+/* In-cart highlight */
+.card--product.in-cart {
+  border: 2px solid var(--color-primary-light);
+  box-shadow: var(--shadow-green);
+}
+
+/* Adding animation trigger */
+.card--product.adding .card__cta {
+  animation: addToCart 0.3s ease;
+}
+
+/* Quantity positioned at bottom when in cart */
+.card--product .card__quantity {
+  position: absolute;
+  bottom: var(--spacing-md);
+  right: var(--spacing-md);
+  left: var(--spacing-md);
+  z-index: 2;
+}
+
+/* Image fade-in */
+.card__image img.loaded {
+  animation: fadeIn 0.3s ease-out;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+/* Grid responsive */
+.offers-grid .card--product {
+  width: 100%;
+  height: auto;
+}

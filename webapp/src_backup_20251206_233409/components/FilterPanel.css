@@ -1,0 +1,194 @@
+/**
+ * Filter Panel Styles
+ * Uses CSS Variables from design-tokens.css
+ */
+
+.filter-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: var(--color-bg-overlay);
+  z-index: var(--z-modal);
+  display: flex;
+  animation: fadeIn 0.2s ease;
+}
+
+.filter-panel {
+  position: absolute;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  width: 85%;
+  max-width: 400px;
+  background: var(--color-bg-primary);
+  display: flex;
+  flex-direction: column;
+  animation: slideIn 0.3s ease;
+}
+
+@keyframes slideIn {
+  from {
+    transform: translateX(100%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+
+/* Header */
+.filter-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--spacing-xl);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.close-btn {
+  width: 40px;
+  height: 40px;
+  border: none;
+  background: transparent;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.close-btn:active {
+  transform: scale(0.95);
+}
+
+.close-btn:focus-visible {
+  outline: 3px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
+.filter-title {
+  font-size: var(--font-2xl);
+  font-weight: var(--font-bold);
+  color: var(--color-text-primary);
+  margin: 0;
+}
+
+/* Content */
+.filter-content {
+  flex: 1;
+  overflow-y: auto;
+  padding: var(--spacing-2xl) var(--spacing-xl);
+}
+
+.filter-section {
+  margin-bottom: var(--spacing-3xl);
+}
+
+.section-title {
+  font-size: var(--font-3xl);
+  font-weight: var(--font-semibold);
+  color: var(--color-text-primary);
+  margin: 0 0 var(--spacing-xl) 0;
+}
+
+.filter-options {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-lg);
+}
+
+.filter-option {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-md);
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  text-align: left;
+}
+
+.filter-option:active {
+  opacity: 0.7;
+}
+
+.filter-option:focus-visible {
+  outline: 3px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
+.checkbox {
+  width: 24px;
+  height: 24px;
+  border: 2px solid var(--color-text-muted);
+  border-radius: var(--radius-sm);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: all var(--transition-normal);
+}
+
+.checkbox.checked {
+  background: var(--color-primary);
+  border-color: var(--color-primary);
+}
+
+.option-label {
+  font-size: var(--font-lg);
+  color: var(--color-text-primary);
+  font-weight: var(--font-medium);
+  transition: color var(--transition-normal);
+}
+
+.option-label.active {
+  color: var(--color-primary);
+  font-weight: var(--font-semibold);
+}
+
+/* Footer */
+.filter-footer {
+  padding: var(--spacing-xl);
+  border-top: 1px solid var(--color-border);
+}
+
+.apply-filter-btn {
+  width: 100%;
+  padding: var(--spacing-xl);
+  background: var(--color-primary);
+  color: var(--color-text-inverse);
+  border: none;
+  border-radius: var(--radius-2xl);
+  font-size: var(--font-xl);
+  font-weight: var(--font-semibold);
+  cursor: pointer;
+  transition: all var(--transition-normal);
+}
+
+.apply-filter-btn:active {
+  transform: scale(0.98);
+  background: var(--color-primary-dark);
+}
+
+.apply-filter-btn:focus-visible {
+  outline: 3px solid var(--color-primary-light);
+  outline-offset: 2px;
+}
+
+/* Scrollbar */
+.filter-content::-webkit-scrollbar {
+  width: 6px;
+}
+
+.filter-content::-webkit-scrollbar-track {
+  background: var(--color-bg-tertiary);
+}
+
+.filter-content::-webkit-scrollbar-thumb {
+  background: var(--color-text-muted);
+  border-radius: 3px;
+}
+
+.filter-content::-webkit-scrollbar-thumb:hover {
+  background: var(--color-text-tertiary);
+}

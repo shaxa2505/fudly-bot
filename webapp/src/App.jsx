@@ -4,7 +4,6 @@ import { FavoritesProvider } from './context/FavoritesContext'
 import api from './api/client'
 import HomePage from './pages/HomePage'
 import './App.css'
-import './styles/animations.css'
 
 // Lazy load pages for better initial load
 const CartPage = lazy(() => import('./pages/CartPage'))

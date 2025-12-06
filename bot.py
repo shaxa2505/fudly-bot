@@ -27,13 +27,9 @@ from app.core.security import (
     logger,
     start_background_tasks,
 )
-from app.integrations.sentry_integration import init_sentry
 from database_protocol import DatabaseProtocol
 
-# =============================================================================
-# SENTRY INITIALIZATION (must be early)
-# =============================================================================
-init_sentry()
+# NOTE: Sentry initialization moved to _init_sentry() function below for better configuration
 
 # =============================================================================
 # CONFIGURATION
@@ -397,6 +393,8 @@ def _register_handlers() -> None:
         menu as customer_menu,
     )
     from handlers.customer import payments as telegram_payments
+    from handlers.customer.cart import router as cart_router
+    from handlers.customer.cart import setup_dependencies as cart_setup
     from handlers.customer.offers import browse as offers_browse
     from handlers.customer.offers import search as offers_search
     from handlers.customer.orders import delivery as orders_delivery
@@ -428,6 +426,7 @@ def _register_handlers() -> None:
     favorites.setup_dependencies(db, bot, user_view_mode)
     order_management.setup(bot, db)
     telegram_payments.setup(db, bot, get_text)
+    cart_setup(db, bot)  # Setup cart dependencies
     customer_menu.setup(
         bot,
         db,
@@ -457,6 +456,7 @@ def _register_handlers() -> None:
 
     # 2. Customer routers
     dp.include_router(telegram_payments.router)  # Payments must be high priority
+    dp.include_router(cart_router)  # Cart before other customer handlers
     dp.include_router(profile.router)
     dp.include_router(favorites.router)
     dp.include_router(customer_menu.router)
@@ -471,7 +471,8 @@ def _register_handlers() -> None:
     dp.include_router(admin_stats.router)
 
     # 4. Common handlers (registration, commands, help)
-    dp.include_router(webapp_handler.router)
+    # NOTE: webapp_handler.router DISABLED for production (Mini App not ready)
+    # dp.include_router(webapp_handler.router)
     dp.include_router(common_router)
 
     # 5. Offer browsing (generic patterns, lower priority)

@@ -1,0 +1,230 @@
+/* ========================================
+   Button Components
+   Based on DESIGN_SPEC.md
+======================================== */
+
+/* Base Button */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--spacing-sm);
+  height: var(--btn-height);
+  padding: 0 var(--spacing-xl);
+  font-family: var(--font-body);
+  font-size: var(--text-md);
+  font-weight: var(--font-semibold);
+  line-height: var(--line-tight);
+  border: none;
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  user-select: none;
+  white-space: nowrap;
+}
+
+.btn:active {
+  transform: scale(0.96);
+}
+
+.btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+/* Primary Button */
+.btn--primary {
+  background: var(--gradient-hero);
+  color: var(--color-text-inverse);
+  box-shadow: var(--shadow-green);
+}
+
+.btn--primary:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-lg);
+}
+
+.btn--primary:active {
+  transform: scale(0.98);
+}
+
+/* Secondary Button */
+.btn--secondary {
+  background: var(--color-bg-secondary);
+  color: var(--color-text-primary);
+  border: 2px solid var(--color-border-light);
+}
+
+.btn--secondary:hover {
+  border-color: var(--color-primary);
+  background: var(--color-surface);
+}
+
+.btn--secondary:active {
+  transform: scale(0.98);
+}
+
+/* Accent Button (Amber) */
+.btn--accent {
+  background: var(--gradient-accent);
+  color: var(--color-text-inverse);
+  box-shadow: var(--shadow-amber);
+}
+
+.btn--accent:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-lg);
+}
+
+/* Danger Button (Red) */
+.btn--danger {
+  background: var(--gradient-discount);
+  color: var(--color-text-inverse);
+  box-shadow: var(--shadow-red);
+}
+
+.btn--danger:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-lg);
+}
+
+/* Ghost Button */
+.btn--ghost {
+  background: transparent;
+  color: var(--color-text-primary);
+  box-shadow: none;
+}
+
+.btn--ghost:hover {
+  background: var(--color-bg-secondary);
+}
+
+/* Icon Button */
+.btn--icon {
+  width: var(--btn-icon-size);
+  height: var(--btn-icon-size);
+  padding: 0;
+  background: var(--color-bg-primary);
+  border: 1px solid var(--color-border-light);
+  border-radius: var(--radius-md);
+}
+
+.btn--icon svg,
+.btn--icon img {
+  width: 24px;
+  height: 24px;
+}
+
+.btn--icon:hover {
+  background: var(--color-bg-secondary);
+  border-color: var(--color-primary);
+}
+
+.btn--icon:active {
+  transform: scale(0.95);
+}
+
+/* Icon Button Primary */
+.btn--icon.btn--primary {
+  background: var(--gradient-hero);
+  color: var(--color-text-inverse);
+  border: none;
+}
+
+/* Floating Action Button (FAB) */
+.btn--fab {
+  position: fixed;
+  bottom: calc(var(--bottom-nav-height) + var(--spacing-lg));
+  right: var(--spacing-lg);
+  width: 56px;
+  height: 56px;
+  padding: 0;
+  border-radius: var(--radius-full);
+  background: var(--gradient-hero);
+  color: var(--color-text-inverse);
+  box-shadow: var(--shadow-xl);
+  z-index: var(--z-fixed);
+}
+
+.btn--fab:hover {
+  transform: translateY(-4px) scale(1.05);
+}
+
+/* Button Sizes */
+.btn--sm {
+  height: 40px;
+  padding: 0 var(--spacing-lg);
+  font-size: var(--text-sm);
+}
+
+.btn--lg {
+  height: 56px;
+  padding: 0 var(--spacing-3xl);
+  font-size: var(--text-base);
+}
+
+/* Full Width Button */
+.btn--full {
+  width: 100%;
+}
+
+/* Button Group */
+.btn-group {
+  display: flex;
+  gap: var(--spacing-sm);
+}
+
+.btn-group--vertical {
+  flex-direction: column;
+}
+
+/* Loading State */
+.btn--loading {
+  position: relative;
+  color: transparent;
+  pointer-events: none;
+}
+
+.btn--loading::after {
+  content: '';
+  position: absolute;
+  width: 20px;
+  height: 20px;
+  border: 2px solid currentColor;
+  border-top-color: transparent;
+  border-radius: 50%;
+  animation: spin 0.6s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* Add to Cart Button (Circle) */
+.btn--add-cart {
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  border-radius: var(--radius-full);
+  background: var(--gradient-hero);
+  color: var(--color-text-inverse);
+  font-size: 20px;
+  font-weight: var(--font-bold);
+  line-height: 1;
+  box-shadow: var(--shadow-green);
+}
+
+.btn--add-cart:hover {
+  transform: scale(1.1);
+}
+
+.btn--add-cart:active {
+  animation: addToCart 0.3s ease;
+}
+
+@keyframes addToCart {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.2); }
+  100% { transform: scale(1); }
+}

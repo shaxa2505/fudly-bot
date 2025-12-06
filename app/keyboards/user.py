@@ -7,18 +7,25 @@ from aiogram.utils.keyboard import InlineKeyboardBuilder, ReplyKeyboardBuilder
 from localization import get_text
 
 
-def main_menu_customer(lang: str = "ru") -> ReplyKeyboardMarkup:
+def main_menu_customer(lang: str = "ru", cart_count: int = 0) -> ReplyKeyboardMarkup:
     """Main menu for customers.
 
     Args:
         lang: Interface language
+        cart_count: Number of items in cart (shown on button)
     """
     builder = ReplyKeyboardBuilder()
 
     builder.button(text=get_text(lang, "hot_offers"))
     builder.button(text=get_text(lang, "establishments"))
     builder.button(text=get_text(lang, "search"))
-    builder.button(text=get_text(lang, "my_cart"))
+
+    # Show cart count if any items
+    cart_text = get_text(lang, "my_cart")
+    if cart_count > 0:
+        cart_text = f"{cart_text} ({cart_count})"
+    builder.button(text=cart_text)
+
     builder.button(text=get_text(lang, "profile"))
 
     builder.adjust(2, 1, 2)

@@ -41,7 +41,7 @@ async def _safe_answer_or_send(msg_like, user_id: int, text: str, **kwargs) -> N
 
 @router.message(Registration.phone, F.contact)
 async def process_phone(message: types.Message, state: FSMContext, db: DatabaseProtocol):
-    """Process phone number - save and show city selection."""
+    """Process phone number - save and continue (order or city selection)."""
     if not db:
         await message.answer("System error")
         return
@@ -60,7 +60,36 @@ async def process_phone(message: types.Message, state: FSMContext, db: DatabaseP
 
     db.update_user_phone(message.from_user.id, phone)
 
-    # Build city card text
+    # Check if there was a pending order
+    data = await state.get_data()
+    pending_order = data.get("pending_order")
+
+    if pending_order:
+        # Resume order flow - user was trying to place an order
+        from aiogram.types import ReplyKeyboardRemove
+
+        await message.answer(
+            "✅ Телефон сохранён! Продолжаем оформление заказа..."
+            if lang == "ru"
+            else "✅ Telefon saqlandi! Buyurtmani davom ettiramiz...",
+            reply_markup=ReplyKeyboardRemove(),
+        )
+
+        # Restore order state and re-trigger confirm
+        from handlers.common.states import BookOffer
+
+        await state.update_data(pending_order=False)
+        await state.set_state(BookOffer.quantity)
+
+        # Send message to user to click confirm again
+        await message.answer(
+            "👆 Нажмите кнопку 'Подтвердить' ещё раз"
+            if lang == "ru"
+            else "👆 Tasdiqlash tugmasini qayta bosing",
+        )
+        return
+
+    # Normal registration flow - show city selection
     city_text = (
         f"✅ {'Telefon saqlandi!' if lang == 'uz' else 'Телефон сохранён!'}\n\n"
         f"📍 <b>{'Shahringizni tanlang' if lang == 'uz' else 'Выберите ваш город'}</b>\n\n"

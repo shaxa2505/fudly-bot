@@ -1,0 +1,228 @@
+/**
+ * Favorites Page Styles
+ * Uses CSS Variables from design-tokens.css
+ */
+
+.favorites-page {
+  min-height: 100vh;
+  background: var(--color-bg-secondary);
+  padding-bottom: 90px;
+}
+
+/* Header */
+.favorites-header {
+  position: sticky;
+  top: 0;
+  z-index: var(--z-sticky);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--spacing-lg) var(--spacing-lg);
+  background: var(--color-bg-primary);
+  border-bottom: 1px solid var(--color-border-light);
+}
+
+.favorites-header h1 {
+  font-size: var(--font-xl);
+  font-weight: var(--font-bold);
+  color: var(--color-text-primary);
+  margin: 0;
+}
+
+.favorites-header .back-btn {
+  width: 44px;
+  height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #F0F0F0;
+  border: none;
+  border-radius: var(--radius-full);
+  cursor: pointer;
+  transition: all var(--transition-normal);
+  font-size: 20px;
+  color: #333;
+}
+
+.favorites-header .back-btn:active {
+  transform: scale(0.92);
+}
+
+.favorites-header .back-btn:focus-visible {
+  outline: 3px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
+/* Empty State */
+.favorites-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: var(--spacing-5xl) var(--spacing-xl);
+  text-align: center;
+}
+
+.favorites-empty .empty-icon {
+  font-size: 64px;
+  margin-bottom: var(--spacing-lg);
+}
+
+.favorites-empty h2 {
+  font-size: var(--font-xl);
+  font-weight: var(--font-bold);
+  color: var(--color-text-primary);
+  margin: 0 0 var(--spacing-sm) 0;
+}
+
+.favorites-empty p {
+  font-size: var(--font-base);
+  color: var(--color-text-secondary);
+  margin: 0 0 var(--spacing-xl) 0;
+}
+
+.favorites-empty .primary-btn {
+  padding: var(--spacing-md) var(--spacing-2xl);
+  background: var(--color-primary);
+  color: white;
+  border: none;
+  border-radius: var(--radius-2xl);
+  font-size: var(--font-base);
+  font-weight: var(--font-semibold);
+  cursor: pointer;
+}
+
+/* Favorites List */
+.favorites-list {
+  padding: var(--spacing-md);
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-md);
+}
+
+.favorite-card {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-md);
+  padding: var(--spacing-md);
+  background: var(--color-bg-primary);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-sm);
+}
+
+.favorite-image {
+  width: 80px;
+  height: 80px;
+  border-radius: var(--radius-lg);
+  object-fit: cover;
+  background: var(--color-bg-secondary);
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.favorite-info {
+  flex: 1;
+  min-width: 0;
+  cursor: pointer;
+}
+
+.favorite-title {
+  font-size: var(--font-base);
+  font-weight: var(--font-semibold);
+  color: var(--color-text-primary);
+  margin: 0 0 var(--spacing-xs) 0;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.favorite-store {
+  font-size: var(--font-xs);
+  color: var(--color-text-secondary);
+  margin: 0 0 var(--spacing-sm) 0;
+}
+
+.favorite-prices {
+  display: flex;
+  align-items: baseline;
+  gap: var(--spacing-sm);
+  flex-wrap: nowrap;
+}
+
+.favorite-price {
+  font-size: var(--font-md);
+  font-weight: var(--font-bold);
+  color: var(--color-primary);
+  white-space: nowrap;
+}
+
+.favorite-original {
+  font-size: var(--font-sm);
+  color: var(--color-text-muted);
+  text-decoration: line-through;
+  white-space: nowrap;
+}
+
+.favorite-actions {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--spacing-sm);
+  flex-shrink: 0;
+}
+
+.remove-favorite-btn {
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #FFF0F0;
+  border: none;
+  border-radius: var(--radius-full);
+  cursor: pointer;
+  transition: all var(--transition-normal);
+}
+
+.remove-favorite-btn:active {
+  transform: scale(0.9);
+}
+
+.remove-favorite-btn:focus-visible {
+  outline: 3px solid #FF4444;
+  outline-offset: 2px;
+}
+
+.add-to-cart-btn {
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--color-primary);
+  border: none;
+  border-radius: var(--radius-full);
+  cursor: pointer;
+  transition: all var(--transition-normal);
+}
+
+.add-to-cart-btn:active {
+  transform: scale(0.9);
+}
+
+.add-to-cart-btn:focus-visible {
+  outline: 3px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
+.in-cart-badge {
+  font-size: var(--font-2xs);
+  font-weight: var(--font-semibold);
+  color: var(--color-primary);
+  background: var(--color-primary-light);
+  padding: var(--spacing-xs) var(--spacing-sm);
+  border-radius: var(--radius-sm);
+  white-space: nowrap;
+}

@@ -1,0 +1,256 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Sora:wght@500;600;700&display=swap');
+
+/* ========================================
+   Fudly WebApp Design System v2.0
+   Based on DESIGN_SPEC.md
+   Date: December 6, 2025
+======================================== */
+
+:root {
+  /* ===== Primary Colors - Emerald Green ===== */
+  --color-primary: #10B981;
+  --color-primary-dark: #059669;
+  --color-primary-light: #D1FAE5;
+  --color-primary-lighter: #ECFDF5;
+
+  /* ===== Accent Colors - Amber (Discounts) ===== */
+  --color-accent: #F59E0B;
+  --color-accent-dark: #D97706;
+  --color-accent-light: #FEF3C7;
+
+  /* ===== Urgent Colors - Red (Flash Deals) ===== */
+  --color-danger: #EF4444;
+  --color-danger-dark: #DC2626;
+  --color-danger-light: #FEE2E2;
+
+  /* ===== Neutral Gray Scale ===== */
+  --color-text-primary: #1F2937;
+  --color-text-secondary: #4B5563;
+  --color-text-tertiary: #6B7280;
+  --color-text-inverse: #FFFFFF;
+  --color-border: #9CA3AF;
+  --color-border-light: #E5E7EB;
+  --color-bg-secondary: #F3F4F6;
+  --color-bg-primary: #F9FAFB;
+  --color-surface: #FFFFFF;
+
+  /* ===== Status Colors ===== */
+  --color-success: #10B981;
+  --color-success-muted: #D1FAE5;
+  --color-warning: #F59E0B;
+  --color-warning-muted: #FEF3C7;
+  --color-error: #EF4444;
+  --color-error-light: #FEE2E2;
+  --color-error-dark: #DC2626;
+  --color-info: #3B82F6;
+  --color-info-muted: #DBEAFE;
+
+  /* ===== Gradients ===== */
+  --gradient-hero: linear-gradient(135deg, #10B981 0%, #059669 100%);
+  --gradient-accent: linear-gradient(135deg, #F59E0B 0%, #D97706 100%);
+  --gradient-discount: linear-gradient(135deg, #EF4444 0%, #DC2626 100%);
+  --gradient-card: linear-gradient(135deg, #FFFFFF 0%, #FAFAFA 100%);
+  --gradient-shimmer: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+
+  /* ===== Legacy Support ===== */
+  --color-bg: var(--color-bg-primary);
+  --color-bg-card: var(--color-surface);
+  --color-bg-input: #F9FAFB;
+  --color-bg-overlay: rgba(31, 41, 55, 0.6);
+  --color-text: var(--color-text-primary);
+  --color-text-muted: var(--color-text-tertiary);
+  --color-secondary: #3B82F6;
+  --color-secondary-light: #DBEAFE;
+
+  /* ===== Elevation System (Box Shadows) ===== */
+  --shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.05);
+  --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.08);
+  --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.12);
+  --shadow-lg: 0 8px 32px rgba(0, 0, 0, 0.15);
+  --shadow-xl: 0 16px 48px rgba(0, 0, 0, 0.18);
+
+  /* Special Shadows */
+  --shadow-green: 0 4px 16px rgba(16, 185, 129, 0.3);
+  --shadow-amber: 0 4px 16px rgba(245, 158, 11, 0.3);
+  --shadow-red: 0 4px 16px rgba(239, 68, 68, 0.3);
+
+  /* Legacy Shadows */
+  --shadow-hero: var(--shadow-lg);
+  --shadow-card: var(--shadow-md);
+  --shadow-button: var(--shadow-green);
+  --elev-0: none;
+  --elev-1: var(--shadow-sm);
+  --elev-2: var(--shadow-md);
+  --elev-3: var(--shadow-lg);
+
+  /* ===== Typography System ===== */
+  /* Font Families */
+  --font-display: 'Sora', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --font-body: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --font-mono: 'JetBrains Mono', 'Courier New', monospace;
+  --font-sans: var(--font-body);
+  --font-family: var(--font-body);
+
+  /* Font Scale - Headings */
+  --text-h1: 32px;      /* Hero */
+  --text-h2: 24px;      /* Section */
+  --text-h3: 18px;      /* Card Title */
+  --text-h4: 16px;      /* Subheading */
+
+  /* Font Scale - Body */
+  --text-2xs: 10px;     /* Labels */
+  --text-xs: 12px;      /* Caption */
+  --text-sm: 13px;      /* Small body */
+  --text-md: 14px;      /* Body */
+  --text-base: 16px;    /* Body Large */
+  --text-lg: 18px;      /* Large */
+  --text-xl: 20px;      /* Extra Large */
+  --text-2xl: 24px;     /* 2XL */
+  --text-3xl: 32px;     /* 3XL */
+
+  /* Line Heights */
+  --line-tight: 1.2;
+  --line-normal: 1.5;
+  --line-relaxed: 1.6;
+
+  /* Font Weights */
+  --font-normal: 400;
+  --font-medium: 500;
+  --font-semibold: 600;
+  --font-bold: 700;
+
+  /* Legacy aliases */
+  --font-2xs: var(--text-2xs);
+  --font-xs: var(--text-xs);
+  --font-sm: var(--text-sm);
+  --font-md: var(--text-md);
+  --font-base: var(--text-base);
+  --font-lg: var(--text-lg);
+  --font-xl: var(--text-xl);
+  --font-2xl: var(--text-2xl);
+  --font-3xl: var(--text-3xl);
+
+  /* ===== Spacing Scale ===== */
+  --spacing-2xs: 2px;
+  --spacing-xs: 4px;    /* Tight spacing */
+  --spacing-sm: 8px;    /* Card padding */
+  --spacing-md: 12px;   /* Component gaps */
+  --spacing-lg: 16px;   /* Section padding */
+  --spacing-xl: 24px;   /* Large gaps */
+  --spacing-2xl: 32px;  /* Page margins */
+  --spacing-3xl: 48px;  /* Hero sections */
+  --spacing-4xl: 64px;  /* Major sections */
+  --spacing-5xl: 80px;
+  --spacing-6xl: 96px;
+
+  /* Legacy space aliases for backward compatibility */
+  --space-0: 0;
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-10: 40px;
+
+  /* ===== Border Radius ===== */
+  --radius-xs: 4px;     /* Inputs, tags */
+  --radius-sm: 8px;     /* Badges */
+  --radius-md: 12px;    /* Buttons, cards */
+  --radius-lg: 16px;    /* Large cards */
+  --radius-xl: 24px;    /* Hero sections */
+  --radius-2xl: 32px;
+  --radius-3xl: 40px;
+  --radius-pill: 999px;
+  --radius-full: 50%;   /* Avatars, dots */
+
+  /* ===== Motion & Transitions ===== */
+  --transition-fast: 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-normal: 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-slow: 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+  --ease-in-out: cubic-bezier(0.4, 0, 0.2, 1);
+  --ease-out: cubic-bezier(0, 0, 0.2, 1);
+  --ease-in: cubic-bezier(0.4, 0, 1, 1);
+
+  /* ===== Layout Dimensions ===== */
+  --container-max-width: 520px;
+  --bottom-nav-height: 76px;         /* 60px + 16px safe area */
+  --header-height: 60px;
+  --search-height: 56px;
+  --flash-deals-height: 180px;
+  --categories-height: 64px;
+  --sticky-cta-height: 64px;
+  --safe-area-bottom: env(safe-area-inset-bottom, 16px);
+
+  /* ===== Z-Index Scale ===== */
+  --z-base: 1;
+  --z-sticky: 10;
+  --z-dropdown: 100;
+  --z-fixed: 100;
+  --z-modal-backdrop: 200;
+  --z-modal: 200;
+  --z-popover: 300;
+  --z-tooltip: 400;
+
+  /* ===== Utility Surfaces ===== */
+  --surface-glass: rgba(255, 255, 255, 0.95);
+  --surface-glass-light: rgba(255, 255, 255, 0.8);
+  --surface-card-muted: rgba(255, 255, 255, 0.9);
+  --surface-overlay: rgba(31, 41, 55, 0.75);
+  --backdrop-blur: blur(20px);
+
+  /* ===== Component Dimensions ===== */
+  --btn-height: 48px;
+  --btn-icon-size: 44px;
+  --input-height: 48px;
+  --card-product-width: 170px;
+  --card-product-height: 240px;
+  --flash-card-width: 140px;
+  --flash-card-height: 160px;
+
+  /* ===== Responsive Breakpoints ===== */
+  --breakpoint-xs: 0px;       /* iPhone SE */
+  --breakpoint-sm: 375px;     /* iPhone 12 */
+  --breakpoint-md: 768px;     /* iPad Mini */
+  --breakpoint-lg: 1024px;    /* iPad Pro */
+  --breakpoint-xl: 1280px;    /* Desktop */
+}
+
+/* ========================================
+   Utility Classes
+======================================== */
+
+/* Container */
+.container {
+  max-width: var(--container-max-width);
+  margin: 0 auto;
+  padding: 0 var(--spacing-lg);
+}
+
+/* Card Base */
+.card {
+  background: var(--color-surface);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-md);
+  padding: var(--spacing-lg);
+  transition: all var(--transition-normal);
+}
+
+.card:hover {
+  transform: translateY(-4px);
+  box-shadow: var(--shadow-lg);
+}
+
+/* Glassmorphism */
+.glass {
+  background: var(--surface-glass);
+  backdrop-filter: var(--backdrop-blur);
+  -webkit-backdrop-filter: var(--backdrop-blur);
+}
+
+/* Focus Visible */
+*:focus-visible {
+  outline: 3px solid var(--color-primary);
+  outline-offset: 2px;
+}

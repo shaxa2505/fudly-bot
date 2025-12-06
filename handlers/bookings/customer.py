@@ -677,7 +677,9 @@ async def pbook_cancel(callback: types.CallbackQuery, state: FSMContext) -> None
     last_page = data.get("last_hot_page", 0)
     await state.clear()
 
-    result = offer_service.list_hot_offers(search_city, limit=OFFERS_PER_PAGE, offset=last_page * OFFERS_PER_PAGE)
+    result = offer_service.list_hot_offers(
+        search_city, limit=OFFERS_PER_PAGE, offset=last_page * OFFERS_PER_PAGE
+    )
     if not result.items:
         # No offers - show main menu
         cancelled = "❌ Bekor qilindi" if lang == "uz" else "❌ Отменено"
@@ -712,6 +714,32 @@ async def pbook_confirm(callback: types.CallbackQuery, state: FSMContext) -> Non
 
     user_id = callback.from_user.id
     lang = db.get_user_language(user_id)
+
+    # Check if user has phone - required for order
+    user = db.get_user_model(user_id)
+    if not user or not user.phone:
+        # Ask for phone before proceeding
+        from app.keyboards import phone_request_keyboard
+        from handlers.common.states import Registration
+
+        msg = (
+            "📱 Buyurtma berish uchun telefon raqamingizni kiriting"
+            if lang == "uz"
+            else "📱 Для оформления заказа укажите номер телефона"
+        )
+
+        await callback.message.answer(
+            msg,
+            reply_markup=phone_request_keyboard(lang),
+        )
+
+        # Save current state to resume after phone
+        data = await state.get_data()
+        await state.update_data(pending_order=True, **data)
+        await state.set_state(Registration.phone)
+        await callback.answer()
+        return
+
     data = await state.get_data()
     logger.info(f"📥 pbook_confirm state data: {data}")
 

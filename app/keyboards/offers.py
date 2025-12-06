@@ -102,12 +102,15 @@ def offer_details_keyboard(
     lang: str, offer_id: int, store_id: int, delivery_enabled: bool
 ) -> InlineKeyboardMarkup:
     builder = InlineKeyboardBuilder()
-    # Inline buttons: Заказать и О магазине (menu keeps delivery/pickup choice)
-    pickup = "✅ Buyurtma" if lang == "uz" else "✅ Заказать"
-    builder.button(text=pickup, callback_data=f"book_{offer_id}")
+    # Add to cart button (primary action)
+    cart = "🛒 В корзину" if lang == "ru" else "🛒 Savatga"
+    builder.button(text=cart, callback_data=f"add_to_cart_{offer_id}")
+    # Quick order button (skip cart)
+    order = "⚡ Заказать сейчас" if lang == "ru" else "⚡ Hozir buyurtma"
+    builder.button(text=order, callback_data=f"book_{offer_id}")
     about = "🏪 Do'kon haqida" if lang == "uz" else "🏪 О магазине"
     builder.button(text=about, callback_data=f"store_info_{store_id}")
-    builder.adjust(2)
+    builder.adjust(2, 1)
     return builder.as_markup()
 
 
@@ -116,15 +119,18 @@ def offer_details_with_back_keyboard(
 ) -> InlineKeyboardMarkup:
     """Offer card keyboard with back button to return to hot offers list."""
     builder = InlineKeyboardBuilder()
-    # Main actions
-    order = "✅ Buyurtma" if lang == "uz" else "✅ Заказать"
+    # Add to cart button (primary action)
+    cart = "🛒 В корзину" if lang == "ru" else "🛒 Savatga"
+    builder.button(text=cart, callback_data=f"add_to_cart_{offer_id}")
+    # Quick order button
+    order = "⚡ Сейчас" if lang == "ru" else "⚡ Hozir"
     builder.button(text=order, callback_data=f"book_{offer_id}")
-    about = "🏪 Do'kon" if lang == "uz" else "🏪 Магазин"
+    about = "🏪 Магазин" if lang == "ru" else "🏪 Do'kon"
     builder.button(text=about, callback_data=f"store_info_{store_id}")
     # Back button
     back = "◀️ Orqaga" if lang == "uz" else "◀️ Назад"
     builder.button(text=back, callback_data="back_to_hot")
-    builder.adjust(2, 1)
+    builder.adjust(2, 1, 1)
     return builder.as_markup()
 
 
@@ -132,11 +138,15 @@ def offer_quick_keyboard(
     lang: str, offer_id: int, store_id: int, delivery_enabled: bool = False
 ) -> InlineKeyboardMarkup:
     builder = InlineKeyboardBuilder()
-    pickup = "✅ Заказать" if lang == "ru" else "✅ Buyurtma"
-    builder.button(text=pickup, callback_data=f"book_{offer_id}")
+    # Add to cart
+    cart = "🛒 В корзину" if lang == "ru" else "🛒 Savatga"
+    builder.button(text=cart, callback_data=f"add_to_cart_{offer_id}")
+    # Quick order
+    order = "⚡ Заказать" if lang == "ru" else "⚡ Buyurtma"
+    builder.button(text=order, callback_data=f"book_{offer_id}")
     about = "🏪 О магазине" if lang == "ru" else "🏪 Do'kon haqida"
     builder.button(text=about, callback_data=f"store_info_{store_id}")
-    builder.adjust(2)
+    builder.adjust(2, 1)
     return builder.as_markup()
 
 

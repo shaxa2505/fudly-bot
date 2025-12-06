@@ -3,14 +3,17 @@ import { useNavigate } from 'react-router-dom'
 import api from '../api/client'
 import { useCart } from '../context/CartContext'
 import { transliterateCity, getSavedLocation, saveLocation, DEFAULT_LOCATION } from '../utils/cityUtils'
-import OfferCard from '../components/OfferCard'
-import OfferCardSkeleton from '../components/OfferCardSkeleton'
-import HeroBanner from '../components/HeroBanner'
-import FlashDeals from '../components/FlashDeals'
 import BottomNav from '../components/BottomNav'
 import PullToRefresh from '../components/PullToRefresh'
 import RecentlyViewed from '../components/RecentlyViewed'
 import { usePullToRefresh } from '../hooks/usePullToRefresh'
+import HomeHeader from './home/HomeHeader'
+import FlashDeals from '../components/FlashDeals'
+import CategoriesSection from './home/CategoriesSection'
+import FiltersPanel from './home/FiltersPanel'
+import PopularSection from './home/PopularSection'
+import OffersSection from './home/OffersSection'
+import AddressModal from './home/AddressModal'
 import './HomePage.css'
 
 const CATEGORIES = [
@@ -93,99 +96,72 @@ function HomePage() {
   useEffect(() => {
     const loadSearchHistory = async () => {
       const userId = window.Telegram?.WebApp?.initDataUnsafe?.user?.id
-      if (userId) {
-        try {
-          const history = await api.getSearchHistory(userId, 5)
-          <section className="hero-shell">
-        } catch (error) {
-          console.error('Error loading search history:', error)
-        }
+      if (!userId) return
+
+      try {
+        const history = await api.getSearchHistory(userId, 5)
+        const normalizedHistory = (history || [])
+          .map(item => (typeof item === 'string' ? item : item?.query))
+          .filter(Boolean)
+        setSearchHistory(normalizedHistory)
+      } catch (error) {
+        console.error('Error loading search history:', error)
       }
     }
+
     loadSearchHistory()
   }, [])
 
   // Save search query to history when searching
   const handleSearchSubmit = useCallback(async () => {
-    if (searchQuery.trim().length >= 2) {
-                  <div className="hero-location-header">
-                    <span className="hero-location-chip">
-                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
-                        <path d="M12 21s-7-5-7-11a7 7 0 1 1 14 0c0 6-7 11-7 11z" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
-                        <circle cx="12" cy="10" r="2.5" stroke="currentColor" strokeWidth="1.6" />
-                      </svg>
-                      Yetkazish manzili
-                    </span>
-                    <button type="button" className="hero-link-btn" onClick={openAddressModal}>
-                      Manzilni o'zgartirish
-                    </button>
-                  </div>
-                  <h3 className="hero-location-city">{cityRaw}</h3>
-                  <p className="hero-location-address">{heroLocationLine}</p>
-                  {!hasPreciseLocation && (
-                    <span className="hero-location-hint">Aniqlik uchun manzil yoki geolokatsiya kiriting</span>
-                  )}
-        } catch (error) {
-          console.error('Error saving search history:', error)
-        }
-      }
+    const trimmedQuery = searchQuery.trim()
+    if (trimmedQuery.length < 2) {
+      setShowSearchHistory(false)
+      return
     }
-                      <p className="hero-metric-label">Savatcha</p>
-                      <strong className="hero-metric-value">{cartCount || 0} ta mahsulot</strong>
+
+    const userId = window.Telegram?.WebApp?.initDataUnsafe?.user?.id
+    if (!userId) {
+      setShowSearchHistory(false)
+      return
+    }
+
+    try {
+      await api.addSearchHistory(userId, trimmedQuery)
+      setSearchHistory(prev => {
+        const updated = [trimmedQuery, ...prev.filter(item => item !== trimmedQuery)]
+        return updated.slice(0, 5)
+      })
+    } catch (error) {
+      console.error('Error saving search history:', error)
+    } finally {
+      setShowSearchHistory(false)
+    }
+  }, [searchQuery])
 
   // Handle search history item click
-  const handleHistoryClick = (query) => {
+  const handleHistoryClick = useCallback((query) => {
     setSearchQuery(query)
     setShowSearchHistory(false)
-                      <p className="hero-metric-label">Bugungi topilmalar</p>
-                      <strong className="hero-metric-value">{heroOfferSummary}</strong>
+  }, [])
+
   // Clear search history
-  const handleClearHistory = async () => {
+  const handleClearHistory = useCallback(async () => {
     const userId = window.Telegram?.WebApp?.initDataUnsafe?.user?.id
-    if (userId) {
-      try {
-                      <p className="hero-metric-label">Filtr holati</p>
-                      <strong className="hero-metric-value">{heroDiscountSummary}</strong>
-      } catch (error) {
-        console.error('Error clearing search history:', error)
+    try {
+      if (userId) {
+        await api.clearSearchHistory(userId)
       }
-    }
-    setShowSearchHistory(false)
-  }
-
-  // Автоопределение локации при первом запуске
-  useEffect(() => {
-    if (autoLocationAttempted.current) return
-    autoLocationAttempted.current = true
-
-    // Если уже есть сохранённый адрес - не запрашиваем
-    if (location.address || location.coordinates) return
-          <section className="categories-shell">
-            <div className="categories-section">
-              <h3 className="categories-title">Kategoriyalar</h3>
-              <div className="categories-scroll">
-                {CATEGORIES.map(cat => (
-                  <button
-                    key={cat.id}
-                    className={`category-pill ${selectedCategory === cat.id ? 'active' : ''}`}
-                    onClick={() => {
-                      window.Telegram?.WebApp?.HapticFeedback?.impactOccurred?.('light')
-                      setSelectedCategory(cat.id)
-                    }}
-                    style={{ '--cat-color': cat.color }}
-                  >
-                    <span className="category-pill-icon">{cat.icon}</span>
-                    <span className="category-pill-name">{cat.name}</span>
-                  </button>
-                ))}
-              </div>
-            </div>
-          </section>
+      setSearchHistory([])
+    } catch (error) {
+      console.error('Error clearing search history:', error)
+    } finally {
+      setShowSearchHistory(false)
     }
   }, [])
 
   // Функция для автоматического геокодирования (при старте)
-  const reverseGeocodeAuto = async (lat, lon) => {
+  const reverseGeocodeAuto = useCallback(async (lat, lon) => {
     try {
       const response = await fetch(
         `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lon}&accept-language=uz`,
@@ -212,7 +188,31 @@ function HomePage() {
     } finally {
       setIsLocating(false)
     }
-  }
+  }, [])
+
+  // Автоопределение локации при первом запуске
+  useEffect(() => {
+    if (autoLocationAttempted.current) return
+    autoLocationAttempted.current = true
+
+    if (location.address || location.coordinates) return
+    if (!navigator.geolocation) {
+      setLocationError('Qurilmada geolokatsiya qo\'llab-quvvatlanmaydi')
+      return
+    }
+
+    setIsLocating(true)
+    navigator.geolocation.getCurrentPosition(
+      ({ coords }) => {
+        reverseGeocodeAuto(coords.latitude, coords.longitude)
+      },
+      (error) => {
+        console.error('Auto geolocation error', error)
+        setIsLocating(false)
+      },
+      { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
+    )
+  }, [location.address, location.coordinates, reverseGeocodeAuto])
 
   const [showingAllCities, setShowingAllCities] = useState(false)
 
@@ -464,477 +464,92 @@ function HomePage() {
         progress={progress}
       />
 
-      {/* Header - Glassmorphism with scroll effect */}
-      <header className={`header ${isScrolled ? 'scrolled' : ''}`}>
-        <div className="header-top">
-          <button className="header-location" onClick={openAddressModal}>
-            <div className="header-location-icon">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
-                <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" stroke="var(--color-primary)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                <circle cx="12" cy="10" r="3" stroke="var(--color-primary)" strokeWidth="2"/>
-              </svg>
-            </div>
-            <div className="header-location-text">
-              <span className="header-location-label">Yetkazish</span>
-              <span className="header-location-city">
-                {cityRaw}
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none">
-                  <path d="M6 9l6 6 6-6" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
-                </svg>
-              </span>
-            </div>
-          </button>
-          <div className="header-actions">
-            <button className="header-action-btn" onClick={() => navigate('/favorites')} aria-label="Sevimlilar">
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
-                <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-              </svg>
-            </button>
-            <button className="header-action-btn" onClick={() => navigate('/profile')} aria-label="Profil">
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
-                <circle cx="12" cy="8" r="4" stroke="currentColor" strokeWidth="2"/>
-                <path d="M6 21v-2a4 4 0 0 1 4-4h4a4 4 0 0 1 4 4v2" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
-              </svg>
-            </button>
-          </div>
-        </div>
-        <div className="header-search">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" className="search-icon">
-            <circle cx="11" cy="11" r="8" stroke="currentColor" strokeWidth="2"/>
-            <path d="M21 21l-4.35-4.35" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
-          </svg>
-          <input
-            ref={searchInputRef}
-            type="text"
-            className="search-input"
-            placeholder="Mahsulot qidirish..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            onFocus={() => setShowSearchHistory(true)}
-            onBlur={() => setTimeout(() => setShowSearchHistory(false), 200)}
-            onKeyDown={(e) => e.key === 'Enter' && handleSearchSubmit()}
-          />
-          {loading && (
-            <span className="search-spinner" role="status" aria-label="Yuklanmoqda" />
-          )}
-          {searchQuery && (
-            <button className="search-clear" onClick={() => setSearchQuery('')}>
-              ✕
-            </button>
-          )}
+      <HomeHeader
+        city={cityRaw}
+        isScrolled={isScrolled}
+        onSelectAddress={openAddressModal}
+        onNavigateFavorites={() => navigate('/favorites')}
+        onNavigateProfile={() => navigate('/profile')}
+        searchQuery={searchQuery}
+        onSearchChange={setSearchQuery}
+        onSubmitSearch={handleSearchSubmit}
+        searchInputRef={searchInputRef}
+        showSearchHistory={showSearchHistory}
+        searchHistory={searchHistory}
+        onHistoryClick={handleHistoryClick}
+        onClearHistory={handleClearHistory}
+        setShowSearchHistory={setShowSearchHistory}
+        loading={loading}
+        loadError={loadError}
+        onRetryLoad={() => loadOffers(true, showingAllCities)}
+      />
 
-          {/* Search History Dropdown */}
-          {showSearchHistory && searchHistory.length > 0 && !searchQuery && (
-            <div className="search-history-dropdown">
-              <div className="search-history-header">
-                <span>So'nggi qidiruvlar</span>
-                <button className="search-history-clear" onClick={handleClearHistory}>
-                  Tozalash
-                </button>
-              </div>
-              {searchHistory.map((query, index) => (
-                <button
-                  key={index}
-                  className="search-history-item"
-                  onMouseDown={() => handleHistoryClick(query)}
-                >
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
-                    <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="2"/>
-                    <path d="M12 6v6l4 2" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
-                  </svg>
-                  <span>{query}</span>
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
-
-        {loading && (
-          <div className="search-status" role="status" aria-live="polite">
-            Qidirilmoqda...
-          </div>
-        )}
-
-        {loadError && (
-          <div className="load-error" role="alert">
-            <span>{loadError}</span>
-            <button onClick={() => loadOffers(true, showingAllCities)}>Qayta yuklash</button>
-          </div>
-        )}
-      </header>
-
-      <section className="hero-shell">
-        <div className="hero-content">
-          <div className="hero-primary">
-            <HeroBanner onCategorySelect={(category) => {
-              setSelectedCategory(category)
-              setTimeout(() => {
-                document.querySelector('.section-header')?.scrollIntoView({ behavior: 'smooth' })
-              }, 100)
-            }} />
-          </div>
-          <div className="hero-secondary">
-            <article className="hero-side-card hero-location-card">
-              <div className="hero-location-header">
-                <span className="hero-location-chip">
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
-                    <path d="M12 21s-7-5-7-11a7 7 0 1 1 14 0c0 6-7 11-7 11z" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
-                    <circle cx="12" cy="10" r="2.5" stroke="currentColor" strokeWidth="1.6" />
-                  </svg>
-                  Yetkazish manzili
-                </span>
-                <button type="button" className="hero-link-btn" onClick={openAddressModal}>
-                  Manzilni o'zgartirish
-                </button>
-              </div>
-              <h3 className="hero-location-city">{cityRaw}</h3>
-              <p className="hero-location-address">{heroLocationLine}</p>
-              {!hasPreciseLocation && (
-                <span className="hero-location-hint">Aniqlik uchun manzil yoki geolokatsiya kiriting</span>
-              )}
-            </article>
-            <article className="hero-side-card hero-metrics-card">
-              <div className="hero-metric">
-                <span className="hero-metric-icon">🛒</span>
-                <div>
-                  <p className="hero-metric-label">Savatcha</p>
-                  <strong className="hero-metric-value">{cartCount || 0} ta mahsulot</strong>
-                </div>
-              </div>
-              <div className="hero-metric">
-                <span className="hero-metric-icon">⚡</span>
-                <div>
-                  <p className="hero-metric-label">Bugungi topilmalar</p>
-                  <strong className="hero-metric-value">{heroOfferSummary}</strong>
-                </div>
-              </div>
-              <div className="hero-metric">
-                <span className="hero-metric-icon">🎯</span>
-                <div>
-                  <p className="hero-metric-label">Filtr holati</p>
-                  <strong className="hero-metric-value">{heroDiscountSummary}</strong>
-                </div>
-              </div>
-              {showingAllCities && (
-                <div className="hero-pill" role="status" aria-live="polite">
-                  <span>🌍</span>
-                  <p>{cityRaw} da topilmadi, boshqa shaharlar ko'rsatilmoqda</p>
-                </div>
-              )}
-            </article>
-          </div>
-        </div>
-      </section>
-
-      {/* Flash Deals - temporarily disabled until API deployed
+      {/* Flash Deals Section */}
       {selectedCategory === 'all' && !searchQuery && (
-        <FlashDeals city={cityForApi} />
+        <FlashDeals />
       )}
-      */}
 
-      {/* Categories - Horizontal Scroll */}
-      <section className="categories-shell">
-        <div className="categories-section">
-          <h3 className="categories-title">Kategoriyalar</h3>
-          <div className="categories-scroll">
-            {CATEGORIES.map(cat => (
-              <button
-                key={cat.id}
-                className={`category-pill ${selectedCategory === cat.id ? 'active' : ''}`}
-                onClick={() => {
-                  window.Telegram?.WebApp?.HapticFeedback?.impactOccurred?.('light')
-                  setSelectedCategory(cat.id)
-                }}
-                style={{ '--cat-color': cat.color }}
-              >
-                <span className="category-pill-icon">{cat.icon}</span>
-                <span className="category-pill-name">{cat.name}</span>
-              </button>
-            ))}
-          </div>
-        </div>
-      </section>
+      <CategoriesSection
+        categories={CATEGORIES}
+        selectedCategory={selectedCategory}
+        onSelectCategory={setSelectedCategory}
+      />
 
-      <section className="filters-panel">
-        <div className="filters-panel-header">
-          <div className="filters-panel-heading">
-            <p className="eyebrow-text">Tez filtrlar</p>
-            <h3>Topilmangizni aniqlang</h3>
-            <p className="filters-panel-subcopy">
-              Chegirmalar va tartiblash yordamida eng mos taklifni toping.
-            </p>
-          </div>
-          {isFiltered && (
-            <button type="button" className="filters-reset-btn" onClick={handleResetFilters}>
-              Filtrlarni tozalash
-            </button>
-          )}
-        </div>
-        <div className={`quick-filters ${showEmptyHighlight ? 'attention' : ''}`}>
-          <div className="quick-filters-row">
-            {/* Discount Filters */}
-            <div className="filter-group">
-              <button
-                className={`filter-chip ${minDiscount === null ? 'active' : ''}`}
-                onClick={() => {
-                  window.Telegram?.WebApp?.HapticFeedback?.selectionChanged?.()
-                  setMinDiscount(null)
-                }}
-              >
-                Barchasi
-              </button>
-              <button
-                className={`filter-chip discount ${minDiscount === 20 ? 'active' : ''}`}
-                onClick={() => {
-                  window.Telegram?.WebApp?.HapticFeedback?.selectionChanged?.()
-                  setMinDiscount(minDiscount === 20 ? null : 20)
-                }}
-              >
-                20%+ chegirma
-              </button>
-              <button
-                className={`filter-chip discount ${minDiscount === 30 ? 'active' : ''}`}
-                onClick={() => {
-                  window.Telegram?.WebApp?.HapticFeedback?.selectionChanged?.()
-                  setMinDiscount(minDiscount === 30 ? null : 30)
-                }}
-              >
-                🔥 30%+
-              </button>
-              <button
-                className={`filter-chip discount hot ${minDiscount === 50 ? 'active' : ''}`}
-                onClick={() => {
-                  window.Telegram?.WebApp?.HapticFeedback?.selectionChanged?.()
-                  setMinDiscount(minDiscount === 50 ? null : 50)
-                }}
-              >
-                💥 50%+
-              </button>
-            </div>
+      <FiltersPanel
+        isFiltered={isFiltered}
+        onResetFilters={handleResetFilters}
+        minDiscount={minDiscount}
+        onMinDiscountChange={setMinDiscount}
+        sortBy={sortBy}
+        onSortChange={setSortBy}
+        filterSummary={filterSummary}
+        showEmptyHighlight={showEmptyHighlight}
+      />
 
-            {/* Sort Dropdown */}
-            <select
-              className="sort-select"
-              value={sortBy}
-              onChange={(e) => {
-                window.Telegram?.WebApp?.HapticFeedback?.selectionChanged?.()
-                setSortBy(e.target.value)
-              }}
-            >
-              <option value="default">Tartiblash</option>
-              <option value="discount">Chegirma ↓</option>
-              <option value="price_asc">Narx ↑</option>
-              <option value="price_desc">Narx ↓</option>
-            </select>
-          </div>
-
-          {isFiltered && (
-            <div className="filter-hint" role="status" aria-live="polite">
-              Faol filtrlar: {filterSummary.join(', ')}
-            </div>
-          )}
-        </div>
-      </section>
-
-      {/* Recently Viewed - Show only on home without search */}
       {selectedCategory === 'all' && !searchQuery && (
         <RecentlyViewed />
       )}
 
-      {/* Popular Nearby - Horizontal Scroll */}
-      {selectedCategory === 'all' && !searchQuery && (
-        <div className="popular-section">
-          <div className="popular-header">
-            <h3 className="popular-title">🔥 Ommabop takliflar</h3>
-            <button className="popular-see-all" onClick={() => {
-              document.querySelector('.section-header')?.scrollIntoView({ behavior: 'smooth' })
-            }}>
-              Hammasi
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
-                <path d="M9 18l6-6-6-6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-              </svg>
-            </button>
-          </div>
-          <div className="popular-scroll">
-            {loading && offers.length === 0 ? (
-              // Skeleton loading for popular section
-              Array.from({ length: 4 }).map((_, i) => (
-                <div key={`pop-skeleton-${i}`} className="popular-card skeleton">
-                  <div className="popular-card-image skeleton-box" />
-                  <div className="popular-card-info">
-                    <div className="skeleton-text" style={{ width: '70%', height: '14px' }} />
-                    <div className="skeleton-text" style={{ width: '90%', height: '12px' }} />
-                  </div>
-                </div>
-              ))
-            ) : (
-              offers.slice(0, 8).map((offer, index) => (
-                <div
-                  key={`pop-${offer.id}`}
-                  className="popular-card animate-in"
-                  style={{ animationDelay: `${index * 50}ms` }}
-                  onClick={() => navigate(`/product/${offer.id}`, { state: { offer } })}
-                >
-                  <div className="popular-card-image">
-                    <img
-                      src={offer.photo || 'https://placehold.co/300x300/F5F5F5/CCCCCC?text=📷'}
-                      alt={offer.title}
-                      loading="lazy"
-                      decoding="async"
-                      width="300"
-                      height="300"
-                      onError={(e) => {
-                        e.target.src = 'https://placehold.co/300x300/F5F5F5/CCCCCC?text=📷'
-                      }}
-                    />
-                    {offer.discount_percent > 0 && (
-                      <span className="popular-card-badge">-{Math.round(offer.discount_percent)}%</span>
-                    )}
-                  </div>
-                  <div className="popular-card-info">
-                    <span className="popular-card-price">{Math.round(offer.discount_price || 0).toLocaleString()} so'm</span>
-                    <span className="popular-card-title">{offer.title}</span>
-                  </div>
-                </div>
-              ))
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* Section Title */}
-      <div className="section-header">
-        <h2 className="section-title">
-          {selectedCategory === 'all' ? 'Barcha takliflar' : CATEGORIES.find(c => c.id === selectedCategory)?.name}
-        </h2>
-        <span className="offers-count">{offers.length} ta</span>
-      </div>
-
-      {/* Info banner if showing all cities */}
-      {showingAllCities && offers.length > 0 && (
-        <div className="all-cities-banner">
-          <span className="all-cities-icon">🌍</span>
-          <span className="all-cities-text">
-            {cityRaw} da mahsulot yo'q. Barcha shaharlardan ko'rsatilmoqda
-          </span>
-        </div>
-      )}
-
-      {/* Offers Grid */}
-      <div className="offers-grid">
-        {loading && offers.length === 0 ? (
-          Array.from({ length: 6 }).map((_, i) => (
-            <OfferCardSkeleton key={i} />
-          ))
-        ) : offers.length === 0 ? (
-          <div className="empty-state">
-            <div className="empty-state-icon">🔍</div>
-            <h3 className="empty-state-title">Hech narsa topilmadi</h3>
-            <p className="empty-state-text">Boshqa so'z bilan qidiring</p>
-            <p className="empty-state-hint">Maslahat: qisqa so'z ishlating yoki toifani almashtiring.</p>
-            {isFiltered && (
-              <div className="empty-state-actions">
-                <button
-                  className="empty-state-btn"
-                  onClick={handleResetFilters}
-                >
-                  Filtrlarni tozalash
-                </button>
-              </div>
-            )}
-          </div>
-        ) : (
-          offers.map((offer, index) => (
-            <div
-              key={offer.id}
-              className="offer-card-wrapper animate-in"
-              style={{ animationDelay: `${Math.min(index, 5) * 60}ms` }}
-            >
-              <OfferCard
-                offer={offer}
-                cartQuantity={getQuantity(offer.id)}
-                onAddToCart={addToCart}
-                onRemoveFromCart={removeFromCart}
-              />
-            </div>
-          ))
-        )}
-      </div>
-
-      {/* Loading more */}
-      {hasMore && (
-        <div ref={observerTarget} className="loading-more">
-          {loading && <div className="spinner" />}
-        </div>
-      )}
-
-      {/* Bottom Navigation */}
-      <BottomNav
-        currentPage="home"
-        cartCount={cartCount}
+      <PopularSection
+        isVisible={selectedCategory === 'all' && !searchQuery}
+        offers={offers}
+        loading={loading}
+        onOfferClick={(offer) => navigate(`/product/${offer.id}`, { state: { offer } })}
+        onScrollToList={() => {
+          document.querySelector('.section-header')?.scrollIntoView({ behavior: 'smooth' })
+        }}
       />
 
-      {showAddressModal && (
-        <div className="address-modal-overlay" onClick={() => setShowAddressModal(false)}>
-          <div className="address-modal" onClick={(e) => e.stopPropagation()}>
-            <div className="address-modal-header">
-              <h3>Manzilni kiriting</h3>
-              <button className="address-modal-close" onClick={() => setShowAddressModal(false)} aria-label="Yopish">
-                ×
-              </button>
-            </div>
+      <OffersSection
+        selectedCategory={selectedCategory}
+        categories={CATEGORIES}
+        offers={offers}
+        loading={loading}
+        isFiltered={isFiltered}
+        onResetFilters={handleResetFilters}
+        showingAllCities={showingAllCities}
+        city={cityRaw}
+        getQuantity={getQuantity}
+        onAddToCart={addToCart}
+        onRemoveFromCart={removeFromCart}
+        hasMore={hasMore}
+        observerRef={observerTarget}
+      />
 
-            {/* Кнопка автоопределения */}
-            <button
-              className="address-detect-btn"
-              onClick={handleDetectLocation}
-              disabled={isLocating}
-            >
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
-                <circle cx="12" cy="12" r="3" stroke="currentColor" strokeWidth="2"/>
-                <path d="M12 2v4M12 18v4M2 12h4M18 12h4" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
-              </svg>
-              {isLocating ? "Aniqlanmoqda..." : "Joylashuvni aniqlash"}
-            </button>
+      <BottomNav currentPage="home" cartCount={cartCount} />
 
-            {locationError && (
-              <div className="address-error">{locationError}</div>
-            )}
-
-            <div className="address-divider">
-              <span>yoki</span>
-            </div>
-
-            <label className="address-label">
-              Shahar yoki hudud
-              <input
-                type="text"
-                value={manualCity}
-                onChange={(e) => setManualCity(e.target.value)}
-                className="address-input"
-                placeholder="Masalan, Toshkent, O'zbekiston"
-              />
-            </label>
-            <label className="address-label">
-              Aniq manzil
-              <textarea
-                value={manualAddress}
-                onChange={(e) => setManualAddress(e.target.value)}
-                className="address-textarea"
-                placeholder="Ko'cha, uy, blok, mo'ljal"
-              />
-            </label>
-            <div className="address-modal-actions">
-              <button className="address-btn secondary" onClick={() => setShowAddressModal(false)}>
-                Bekor qilish
-              </button>
-              <button className="address-btn" onClick={handleSaveManualAddress}>
-                Saqlash
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <AddressModal
+        isOpen={showAddressModal}
+        onClose={() => setShowAddressModal(false)}
+        manualCity={manualCity}
+        onCityChange={setManualCity}
+        manualAddress={manualAddress}
+        onAddressChange={setManualAddress}
+        onSave={handleSaveManualAddress}
+        onDetectLocation={handleDetectLocation}
+        isLocating={isLocating}
+        locationError={locationError}
+      />
     </div>
   )
 }

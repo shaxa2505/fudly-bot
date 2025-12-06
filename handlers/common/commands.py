@@ -261,6 +261,44 @@ async def show_city_selection(
         )
 
 
+@router.callback_query(F.data.startswith("select_city:"))
+async def handle_city_selection(
+    callback: types.CallbackQuery, state: FSMContext, db: DatabaseProtocol
+):
+    """Handle city selection from inline keyboard."""
+    if not callback.data or not callback.message:
+        await callback.answer()
+        return
+
+    lang = db.get_user_language(callback.from_user.id)
+    city = callback.data.split(":", 1)[1] if ":" in callback.data else ""
+
+    if not city:
+        await callback.answer(get_text(lang, "error"), show_alert=True)
+        return
+
+    db.update_user_city(callback.from_user.id, city)
+    await state.clear()
+
+    user = db.get_user_model(callback.from_user.id)
+    user_role = user.role if user else "customer"
+    menu = main_menu_seller(lang) if user_role == "seller" else main_menu_customer(lang)
+
+    try:
+        await callback.message.edit_text(
+            f"✅ {'Shahar tanlandi' if lang == 'uz' else 'Город выбран'}: {city}"
+        )
+    except Exception as e:
+        logger.debug("Could not edit city confirmation: %s", e)
+
+    await callback.message.answer(
+        get_text(lang, "welcome_back", name=callback.from_user.first_name, city=city),
+        parse_mode="HTML",
+        reply_markup=menu,
+    )
+    await callback.answer()
+
+
 @router.message(Command("code"))
 async def cmd_code(message: types.Message, state: FSMContext, db: DatabaseProtocol):
     """Handle /code command for manual booking code entry by partner."""
@@ -363,12 +401,17 @@ async def change_city_text(
 
 
 def build_welcome_card(lang: str = "ru") -> str:
-    """Build welcome card text with step indicator."""
+    """Build welcome message for new users."""
     return (
         f"🎉 <b>{'Fudly ga xush kelibsiz!' if lang == 'uz' else 'Добро пожаловать в Fudly!'}</b>\n\n"
-        f"💰 {'70% gacha tejang' if lang == 'uz' else 'Экономьте до 70%'}\n"
-        f"🏪 {'Yaqin doʻkonlar' if lang == 'uz' else 'Магазины рядом'}\n"
-        f"♻️ {'Oziq-ovqat isrofini kamaytiramiz' if lang == 'uz' else 'Сокращаем потери еды'}\n\n"
+        f"{'Biz nima qilamiz' if lang == 'uz' else 'Что мы делаем'}:\n"
+        f"💰 {'Oziq-ovqat chegirmalarini 70% gacha topish' if lang == 'uz' else 'Находим скидки на еду до 70%'}\n"
+        f"🏪 {'Yaqin doʻkonlardan eng yaxshi takliflar' if lang == 'uz' else 'Лучшие предложения из магазинов рядом'}\n"
+        f"♻️ {'Isrof qilinadigan oziq-ovqatni saqlaymiz' if lang == 'uz' else 'Спасаем еду от списания'}\n\n"
+        f"{'Qanday ishlaydi' if lang == 'uz' else 'Как это работает'}:\n"
+        f"1️⃣ {'Taklifni tanlang' if lang == 'uz' else 'Выберите товар'}\n"
+        f"2️⃣ {'Savatga qoʻshing' if lang == 'uz' else 'Добавьте в корзину'}\n"
+        f"3️⃣ {'Doʻkondan oling yoki yetkazib bering' if lang == 'uz' else 'Заберите или закажите доставку'}\n\n"
         f"━━━━━━━━━━━━━━━━━━\n"
         f"🌍 <b>{'Tilni tanlang' if lang == 'uz' else 'Выберите язык'}:</b>"
     )
@@ -424,27 +467,31 @@ async def cmd_start(message: types.Message, state: FSMContext, db: DatabaseProto
 
     user = db.get_user_model(message.from_user.id)
 
-    # NEW USER - show welcome card with language selection
+    # NEW USER - create immediately and show welcome card with language selection
     if not user:
+        # Create user right away to avoid duplicate welcome on second /start
+        db.add_user(message.from_user.id, message.from_user.username, message.from_user.first_name)
         await message.answer(
             build_welcome_card("ru"), parse_mode="HTML", reply_markup=build_welcome_keyboard()
         )
         return
 
     lang = db.get_user_language(message.from_user.id)
-    user_phone = user.phone
     user_city = user.city
     user_role = user.role or "customer"
 
-    # No phone - ask for phone
-    if not user_phone:
+    # User exists but hasn't selected city yet - show city selection
+    if not user_city:
         await message.answer(
-            build_phone_card(lang),
+            get_text(lang, "choose_city"),
             parse_mode="HTML",
-            reply_markup=phone_request_keyboard(lang),
+            reply_markup=city_inline_keyboard(lang),
         )
-        await state.set_state(Registration.phone)
+        await state.set_state(Registration.city)
         return
+
+    # Phone is optional - user can browse without it
+    # Phone will be requested only when placing an order
 
     # Registered user - show menu
     current_mode = get_user_view_mode(message.from_user.id, db)
@@ -468,15 +515,15 @@ async def cmd_start(message: types.Message, state: FSMContext, db: DatabaseProto
 async def registration_choose_language(
     callback: types.CallbackQuery, state: FSMContext, db: DatabaseProtocol
 ):
-    """Step 1: Language selected → ask for phone (edit same message)."""
+    """Step 1: Language selected → show city selection (skip phone, ask at checkout)."""
     if not callback.data or not callback.message:
         await callback.answer()
         return
 
     lang = callback.data.split("_")[2]  # reg_lang_ru → ru
-    user = db.get_user_model(callback.from_user.id)
 
-    # Create user if new
+    # User should already exist from /start, but create if somehow missing
+    user = db.get_user_model(callback.from_user.id)
     if not user:
         db.add_user(
             callback.from_user.id, callback.from_user.username, callback.from_user.first_name
@@ -484,23 +531,17 @@ async def registration_choose_language(
 
     db.update_user_language(callback.from_user.id, lang)
 
-    # Edit welcome message to show phone request
+    # Show city selection instead of phone request
     try:
         await callback.message.edit_text(
-            build_phone_card(lang),
+            get_text(lang, "choose_city"),
             parse_mode="HTML",
-            reply_markup=None,  # Remove inline keyboard
+            reply_markup=city_inline_keyboard(lang),
         )
     except Exception as e:
-        logger.debug("Could not edit phone card: %s", e)
+        logger.debug("Could not edit city selection: %s", e)
 
-    # Send phone request with ReplyKeyboard
-    await callback.message.answer(
-        f"👇 {'Tugmani bosing' if lang == 'uz' else 'Нажмите кнопку'}",
-        reply_markup=phone_request_keyboard(lang),
-    )
-
-    await state.set_state(Registration.phone)
+    await state.set_state(Registration.city)
     await callback.answer()
 
 
@@ -515,7 +556,7 @@ async def choose_language(callback: types.CallbackQuery, state: FSMContext, db: 
     user = db.get_user_model(callback.from_user.id)
 
     if not user:
-        # Redirect to new registration flow
+        # Redirect to new registration flow - show city selection
         db.add_user(
             callback.from_user.id, callback.from_user.username, callback.from_user.first_name
         )
@@ -523,16 +564,14 @@ async def choose_language(callback: types.CallbackQuery, state: FSMContext, db: 
 
         try:
             await callback.message.edit_text(
-                build_phone_card(lang), parse_mode="HTML", reply_markup=None
+                get_text(lang, "choose_city"),
+                parse_mode="HTML",
+                reply_markup=city_inline_keyboard(lang),
             )
         except Exception as e:
-            logger.debug("Could not edit phone card: %s", e)
+            logger.debug("Could not edit city selection: %s", e)
 
-        await callback.message.answer(
-            f"👇 {'Tugmani bosing' if lang == 'uz' else 'Нажмите кнопку'}",
-            reply_markup=phone_request_keyboard(lang),
-        )
-        await state.set_state(Registration.phone)
+        await state.set_state(Registration.city)
         await callback.answer()
         return
 
@@ -546,19 +585,7 @@ async def choose_language(callback: types.CallbackQuery, state: FSMContext, db: 
     except Exception as e:
         logger.debug("Could not edit language confirmation: %s", e)
 
-    user_phone = user.phone
     user_city = user.city
-
-    if not user_phone:
-        await callback.message.answer(
-            build_phone_card(lang),
-            parse_mode="HTML",
-            reply_markup=phone_request_keyboard(lang),
-        )
-        await state.set_state(Registration.phone)
-        await callback.answer()
-        return
-
     user_role = user.role or "customer"
     menu = main_menu_seller(lang) if user_role == "seller" else main_menu_customer(lang)
     await callback.message.answer(

@@ -1,0 +1,237 @@
+/**
+ * Flash Deals Section Styles
+ * Urgent deals with countdown timers
+ */
+
+.flash-deals {
+  margin: var(--spacing-lg) 0;
+  padding: 0 var(--spacing-lg);
+}
+
+.flash-deals-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: var(--spacing-md);
+}
+
+.flash-deals-title {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+}
+
+.flash-deals-title h3 {
+  font-size: var(--font-lg);
+  font-weight: var(--font-bold);
+  color: var(--color-text-primary);
+  margin: 0;
+}
+
+.flash-icon {
+  font-size: 1.25rem;
+  animation: flash-pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes flash-pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.7; transform: scale(1.1); }
+}
+
+.flash-badge {
+  background: linear-gradient(135deg, #FF6B35 0%, #FF3D00 100%);
+  color: white;
+  font-size: 10px;
+  font-weight: var(--font-bold);
+  padding: 2px 6px;
+  border-radius: var(--radius-sm);
+  letter-spacing: 0.5px;
+}
+
+.flash-deals-more {
+  background: none;
+  border: none;
+  color: var(--color-primary);
+  font-size: var(--font-sm);
+  font-weight: var(--font-semibold);
+  cursor: pointer;
+  padding: var(--spacing-xs) var(--spacing-sm);
+  margin: calc(-1 * var(--spacing-xs)) calc(-1 * var(--spacing-sm));
+  transition: opacity var(--transition-fast);
+}
+
+.flash-deals-more:active {
+  opacity: 0.7;
+}
+
+.flash-deals-scroll {
+  display: flex;
+  gap: var(--spacing-md);
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+  margin: 0 calc(-1 * var(--spacing-lg));
+  padding: 0 var(--spacing-lg);
+  padding-bottom: var(--spacing-sm);
+}
+
+.flash-deals-scroll::-webkit-scrollbar {
+  display: none;
+}
+
+/* Flash Card */
+.flash-card {
+  flex: 0 0 140px;
+  scroll-snap-align: start;
+  background: var(--color-bg-primary);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  cursor: pointer;
+  transition: transform var(--transition-fast), box-shadow var(--transition-fast);
+}
+
+.flash-card:active {
+  transform: scale(0.97);
+}
+
+.flash-card-image {
+  position: relative;
+  width: 100%;
+  height: 100px;
+  background: var(--color-bg-secondary);
+  overflow: hidden;
+}
+
+.flash-card-image img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.flash-discount-badge {
+  position: absolute;
+  top: 6px;
+  left: 6px;
+  background: linear-gradient(135deg, #FF6B35 0%, #FF3D00 100%);
+  color: white;
+  font-size: 11px;
+  font-weight: var(--font-bold);
+  padding: 2px 6px;
+  border-radius: var(--radius-sm);
+}
+
+.flash-card-info {
+  padding: var(--spacing-sm);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.flash-card-title {
+  font-size: 12px;
+  font-weight: var(--font-medium);
+  color: var(--color-text-primary);
+  line-height: 1.3;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  min-height: 32px;
+}
+
+.flash-card-prices {
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+
+.flash-price-current {
+  font-size: 14px;
+  font-weight: var(--font-bold);
+  color: var(--color-primary);
+}
+
+.flash-price-old {
+  font-size: 11px;
+  color: var(--color-text-muted);
+  text-decoration: line-through;
+}
+
+.flash-timer {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 2px;
+}
+
+.flash-timer-icon {
+  font-size: 12px;
+}
+
+.flash-timer-text {
+  font-size: 11px;
+  color: #FF6B35;
+  font-weight: var(--font-semibold);
+}
+
+.flash-add-btn {
+  margin-top: 6px;
+  width: 100%;
+  padding: 6px 8px;
+  background: var(--color-primary);
+  color: white;
+  border: none;
+  border-radius: var(--radius-md);
+  font-size: 12px;
+  font-weight: var(--font-semibold);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.flash-add-btn:active {
+  transform: scale(0.96);
+}
+
+.flash-add-btn.in-cart {
+  background: var(--color-bg-tertiary);
+  color: var(--color-primary);
+}
+
+/* Skeleton Loading */
+.flash-card.skeleton {
+  pointer-events: none;
+}
+
+.flash-card.skeleton .skeleton-box {
+  background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+  background-size: 200% 100%;
+  animation: skeleton-loading 1.5s infinite;
+}
+
+.flash-card.skeleton .skeleton-text {
+  height: 12px;
+  background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+  background-size: 200% 100%;
+  animation: skeleton-loading 1.5s infinite;
+  border-radius: 4px;
+  margin-bottom: 6px;
+}
+
+@keyframes skeleton-loading {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+/* Responsive */
+@media (min-width: 480px) {
+  .flash-card {
+    flex: 0 0 160px;
+  }
+  
+  .flash-card-image {
+    height: 120px;
+  }
+}

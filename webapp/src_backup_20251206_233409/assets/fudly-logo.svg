@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 90" role="img" aria-label="Fudly logo">
+  <defs>
+    <linearGradient id="leafDarkGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#214332" />
+      <stop offset="100%" stop-color="#2f5f45" />
+    </linearGradient>
+    <linearGradient id="leafLightGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#a6e050" />
+      <stop offset="100%" stop-color="#63b425" />
+    </linearGradient>
+  </defs>
+  <g transform="translate(0 5)">
+    <path d="M55 50c-22 0-36-13-36-27 0-14 13-24 29-24 16 0 29 11 29 26 0 14-10 25-22 25z" fill="url(#leafDarkGradient)" />
+    <path d="M61 42c-10-14-4-32 14-35 8 8 11 19 7 28-4 9-13 14-21 7z" fill="url(#leafLightGradient)" />
+    <path d="M53 28c-3 8-10 14-19 17" fill="none" stroke="#dff4c3" stroke-width="3" stroke-linecap="round" />
+  </g>
+  <text x="90" y="60" fill="#2f4233" font-family="'Poppins','Segoe UI',sans-serif" font-size="48" font-weight="600">fudly.</text>
+</svg>

@@ -103,7 +103,7 @@ def is_main_menu_button(text: str | None) -> bool:
 
 async def safe_delete_message(message: Any) -> bool:
     """Safely delete a message, returning True if successful.
-    
+
     Does not raise exceptions - message may already be deleted.
     """
     try:
@@ -121,7 +121,7 @@ async def safe_edit_message(
     reply_markup: Any = None,
 ) -> bool:
     """Safely edit a message, returning True if successful.
-    
+
     Does not raise exceptions - message may be too old or already edited.
     """
     try:
@@ -237,7 +237,10 @@ def get_appropriate_menu(
 
 
 class RegistrationCheckMiddleware(BaseMiddleware):
-    """Check that user is registered (has phone number) before any action."""
+    """Check that user exists (has account) before any action.
+
+    Phone is now optional - will be requested only at checkout.
+    """
 
     def __init__(
         self,
@@ -278,7 +281,7 @@ class RegistrationCheckMiddleware(BaseMiddleware):
         logger.debug(f"[Middleware] User {user_id}, type: {content_type}")
 
         allowed_commands = ["/start", "/help"]
-        allowed_callbacks = ["lang_ru", "lang_uz"]
+        allowed_callbacks = ["lang_ru", "lang_uz", "reg_lang_ru", "reg_lang_uz"]
         allowed_callback_patterns = [
             "book_",
             "order_delivery_",
@@ -288,6 +291,8 @@ class RegistrationCheckMiddleware(BaseMiddleware):
             "back_to_store_",
             "hot_offers_",
             "filter_",
+            "select_city:",  # Allow city selection for new users
+            "city_",  # Allow city callbacks
         ]
 
         if msg:
@@ -310,15 +315,15 @@ class RegistrationCheckMiddleware(BaseMiddleware):
             if current_state:
                 return await handler(event, data)
 
+        # Only check if user exists, NOT if they have phone
+        # Phone will be requested at checkout time
         user = self.db.get_user_model(user_id)
-        user_phone = user.phone if user else None
-        if not user or not user_phone:
-            lang = self.db.get_user_language(user_id) if user else "ru"
+        if not user:
+            lang = "ru"
             if msg:
                 await msg.answer(
                     self.get_text(lang, "registration_required"),
                     parse_mode="HTML",
-                    reply_markup=self.phone_request_keyboard(lang),
                 )
             elif cb:
                 await cb.answer(self.get_text(lang, "registration_required"), show_alert=True)

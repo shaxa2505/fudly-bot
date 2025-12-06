@@ -1,0 +1,431 @@
+/**
+ * Order Tracking Page Styles
+ * Uses CSS Variables from design-tokens.css
+ */
+
+.order-tracking-page {
+  min-height: 100vh;
+  background: linear-gradient(135deg, var(--color-accent-light) 0%, #FFE8DC 100%);
+  padding: 0 0 80px 0;
+}
+
+.tracking-header {
+  background: var(--color-bg-primary);
+  padding: var(--spacing-lg) var(--spacing-xl);
+  box-shadow: var(--shadow-sm);
+  position: sticky;
+  top: 0;
+  z-index: var(--z-sticky);
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-md);
+}
+
+.back-button {
+  background: none;
+  border: none;
+  font-size: var(--font-lg);
+  color: var(--color-accent);
+  cursor: pointer;
+  padding: var(--spacing-sm);
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+  font-weight: var(--font-medium);
+}
+
+.back-button:focus-visible {
+  outline: 3px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
+.tracking-header h1 {
+  font-size: var(--font-2xl);
+  font-weight: var(--font-semibold);
+  color: var(--color-text-primary);
+  margin: 0;
+}
+
+/* Loading & Error States */
+.loading-container,
+.error-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 60vh;
+  padding: var(--spacing-xl);
+  text-align: center;
+}
+
+.spinner {
+  width: 50px;
+  height: 50px;
+  border: 4px solid rgba(255, 107, 53, 0.2);
+  border-top-color: var(--color-accent);
+  border-radius: var(--radius-full);
+  animation: spin 0.8s linear infinite;
+}
+
+.error-icon {
+  font-size: 60px;
+  margin-bottom: var(--spacing-lg);
+}
+
+.error-message {
+  font-size: var(--font-lg);
+  color: var(--color-text-secondary);
+  margin-bottom: var(--spacing-2xl);
+}
+
+.back-btn {
+  background: var(--color-accent);
+  color: var(--color-text-inverse);
+  border: none;
+  padding: var(--spacing-md) var(--spacing-3xl);
+  border-radius: var(--radius-xl);
+  font-size: var(--font-lg);
+  font-weight: var(--font-medium);
+  cursor: pointer;
+}
+
+.back-btn:focus-visible {
+  outline: 3px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
+/* Order Status Card */
+.order-status-card {
+  background: var(--color-bg-primary);
+  margin: var(--spacing-lg) var(--spacing-lg) var(--spacing-md);
+  padding: var(--spacing-xl);
+  border-radius: var(--radius-2xl);
+  box-shadow: var(--shadow-md);
+}
+
+.status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: var(--spacing-md) var(--spacing-xl);
+  border-radius: var(--radius-xl);
+  color: var(--color-text-inverse);
+  font-weight: var(--font-semibold);
+  font-size: var(--font-base);
+  margin-bottom: var(--spacing-lg);
+}
+
+.estimated-time {
+  background: rgba(255, 193, 7, 0.1);
+  color: #F57C00;
+  padding: var(--spacing-md) var(--spacing-lg);
+  border-radius: var(--radius-md);
+  font-size: var(--font-base);
+  margin-bottom: var(--spacing-lg);
+  font-weight: var(--font-medium);
+}
+
+.order-details h3 {
+  font-size: var(--font-xl);
+  font-weight: var(--font-semibold);
+  color: var(--color-text-primary);
+  margin: 0 0 var(--spacing-md) 0;
+}
+
+.order-details .quantity,
+.order-details .price {
+  font-size: var(--font-base);
+  color: var(--color-text-secondary);
+  margin: 6px 0;
+}
+
+.order-details .price {
+  font-size: var(--font-xl);
+  font-weight: var(--font-semibold);
+  color: var(--color-accent);
+  margin-top: var(--spacing-md);
+}
+
+.order-photo {
+  width: 100%;
+  height: 180px;
+  object-fit: cover;
+  border-radius: var(--radius-xl);
+  margin-top: var(--spacing-lg);
+}
+
+/* Timeline */
+.timeline-container {
+  background: var(--color-bg-primary);
+  margin: var(--spacing-md) var(--spacing-lg);
+  padding: var(--spacing-xl);
+  border-radius: var(--radius-2xl);
+  box-shadow: var(--shadow-md);
+}
+
+.timeline-container h2 {
+  font-size: var(--font-xl);
+  font-weight: var(--font-semibold);
+  color: var(--color-text-primary);
+  margin: 0 0 var(--spacing-xl) 0;
+}
+
+.timeline {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-lg);
+}
+
+.timeline-item {
+  display: flex;
+  gap: var(--spacing-lg);
+  position: relative;
+}
+
+.timeline-marker {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  position: relative;
+}
+
+.timeline-dot {
+  width: 16px;
+  height: 16px;
+  border-radius: var(--radius-full);
+  background: var(--color-border);
+  border: 3px solid var(--color-bg-secondary);
+  transition: all var(--transition-slow);
+  z-index: 2;
+}
+
+.timeline-item.active .timeline-dot {
+  background: var(--color-accent);
+  border-color: var(--color-bg-primary);
+  box-shadow: 0 0 0 4px rgba(255, 107, 53, 0.2);
+}
+
+.timeline-item.current .timeline-dot {
+  width: 20px;
+  height: 20px;
+  animation: pulse 2s infinite;
+}
+
+.timeline-line {
+  width: 2px;
+  flex: 1;
+  background: var(--color-border);
+  margin-top: var(--spacing-xs);
+  transition: background var(--transition-slow);
+}
+
+.timeline-item.active .timeline-line {
+  background: var(--color-accent);
+}
+
+.timeline-content {
+  flex: 1;
+  padding-bottom: var(--spacing-sm);
+}
+
+.timeline-content h4 {
+  font-size: var(--font-lg);
+  font-weight: var(--font-semibold);
+  color: var(--color-text-primary);
+  margin: 0 0 var(--spacing-xs) 0;
+}
+
+.timeline-message {
+  font-size: var(--font-base);
+  color: var(--color-text-secondary);
+  margin: var(--spacing-xs) 0;
+}
+
+.timeline-time {
+  font-size: var(--font-xs);
+  color: var(--color-text-muted);
+  margin: var(--spacing-xs) 0 0 0;
+}
+
+/* Store & Delivery Info Cards */
+.store-info-card,
+.delivery-info-card {
+  background: var(--color-bg-primary);
+  margin: var(--spacing-md) var(--spacing-lg);
+  padding: var(--spacing-xl);
+  border-radius: var(--radius-2xl);
+  box-shadow: var(--shadow-md);
+}
+
+.store-info-card h3,
+.delivery-info-card h3 {
+  font-size: var(--font-xl);
+  font-weight: var(--font-semibold);
+  color: var(--color-text-primary);
+  margin: 0 0 var(--spacing-md) 0;
+}
+
+.order-store-name {
+  font-size: var(--font-lg);
+  font-weight: var(--font-semibold);
+  color: var(--color-accent);
+  margin: var(--spacing-sm) 0;
+}
+
+.store-address,
+.store-phone,
+.delivery-address,
+.pickup-address,
+.pickup-time {
+  font-size: var(--font-base);
+  color: var(--color-text-secondary);
+  margin: var(--spacing-sm) 0;
+  line-height: var(--line-height-relaxed);
+}
+
+.store-phone a {
+  color: var(--color-accent);
+  text-decoration: none;
+  font-weight: var(--font-medium);
+}
+
+.delivery-cost {
+  font-size: var(--font-md);
+  font-weight: var(--font-semibold);
+  color: var(--color-accent);
+  margin: var(--spacing-md) 0 0 0;
+}
+
+/* QR Button */
+.qr-button {
+  margin: var(--spacing-xl) var(--spacing-lg);
+  width: calc(100% - 32px);
+  background: var(--color-accent);
+  color: var(--color-text-inverse);
+  border: none;
+  padding: var(--spacing-lg);
+  border-radius: var(--radius-xl);
+  font-size: var(--font-lg);
+  font-weight: var(--font-semibold);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--spacing-sm);
+  box-shadow: var(--shadow-accent);
+  transition: all var(--transition-normal);
+}
+
+.qr-button:active {
+  transform: scale(0.98);
+}
+
+.qr-button:focus-visible {
+  outline: 3px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
+/* QR Modal */
+.qr-modal {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.8);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: var(--z-modal);
+  padding: var(--spacing-xl);
+  animation: fadeIn 0.2s;
+}
+
+.qr-modal-content {
+  background: var(--color-bg-primary);
+  border-radius: var(--radius-3xl);
+  padding: 30px var(--spacing-xl);
+  max-width: 400px;
+  width: 100%;
+  text-align: center;
+  position: relative;
+  animation: slideUp 0.3s;
+}
+
+.close-btn {
+  position: absolute;
+  top: var(--spacing-md);
+  right: var(--spacing-md);
+  background: var(--color-bg-secondary);
+  border: none;
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-full);
+  font-size: var(--font-2xl);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-text-secondary);
+}
+
+.close-btn:focus-visible {
+  outline: 3px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
+.qr-modal-content h2 {
+  font-size: var(--font-2xl);
+  font-weight: var(--font-semibold);
+  color: var(--color-text-primary);
+  margin: 0 0 var(--spacing-sm) 0;
+}
+
+.qr-instruction {
+  font-size: var(--font-base);
+  color: var(--color-text-secondary);
+  margin: 0 0 var(--spacing-2xl) 0;
+}
+
+.qr-code-image {
+  width: 100%;
+  max-width: 280px;
+  height: auto;
+  margin: 0 auto var(--spacing-lg);
+  display: block;
+  border: 2px solid var(--color-border-light);
+  border-radius: var(--radius-xl);
+  padding: var(--spacing-md);
+  background: var(--color-bg-primary);
+}
+
+.booking-code {
+  font-size: var(--font-2xl);
+  font-weight: var(--font-bold);
+  color: var(--color-accent);
+  letter-spacing: 2px;
+  margin: var(--spacing-lg) 0 0 0;
+}
+
+/* Responsive */
+@media (max-width: 480px) {
+  .tracking-header h1 {
+    font-size: var(--font-xl);
+  }
+
+  .order-status-card,
+  .timeline-container,
+  .store-info-card,
+  .delivery-info-card {
+    margin: var(--spacing-md) var(--spacing-md);
+    padding: var(--spacing-lg);
+  }
+
+  .qr-modal {
+    padding: var(--spacing-md);
+  }
+
+  .qr-modal-content {
+    padding: var(--spacing-2xl) var(--spacing-lg);
+  }
+}

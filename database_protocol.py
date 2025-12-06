@@ -225,7 +225,8 @@ class DatabaseProtocol(Protocol):
     def delete_offer(self, offer_id: int) -> bool:
         ...
 
-    def delete_expired_offers(self) -> None:
+    def delete_expired_offers(self) -> int:
+        """Delete/mark expired offers and return count of affected rows."""
         ...
 
     # ========== BOOKING METHODS ==========

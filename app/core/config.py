@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import os
+import secrets
 from dataclasses import dataclass
 
 from dotenv import load_dotenv
@@ -30,6 +31,11 @@ class Settings:
     redis_url: str | None
     webhook: WebhookConfig
 
+    @property
+    def telegram_bot_token(self) -> str:
+        """Alias for bot_token for backward compatibility."""
+        return self.bot_token
+
 
 def load_settings() -> Settings:
     """Load environment variables once and expose typed settings."""
@@ -56,12 +62,18 @@ def load_settings() -> Settings:
         print("⚠️ USE_WEBHOOK=true but WEBHOOK_URL is empty, falling back to polling")
         use_webhook = False
 
+    # Generate SECRET_TOKEN automatically for webhook security if not provided
+    secret_token = os.getenv("SECRET_TOKEN", "")
+    if use_webhook and not secret_token:
+        secret_token = secrets.token_urlsafe(32)
+        print("⚠️ SECRET_TOKEN not set, auto-generated for webhook security")
+
     webhook = WebhookConfig(
         enabled=use_webhook,
         url=webhook_url,
         path=os.getenv("WEBHOOK_PATH", "/webhook"),
         port=int(os.getenv("PORT", "8080")),
-        secret_token=os.getenv("SECRET_TOKEN", ""),
+        secret_token=secret_token,
     )
 
     return Settings(
