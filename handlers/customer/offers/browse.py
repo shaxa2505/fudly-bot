@@ -164,7 +164,7 @@ def setup(
 
     @dp.callback_query(F.data.startswith("hot_offer_"))
     async def hot_offer_selected_handler(callback: types.CallbackQuery, state: FSMContext) -> None:
-        """Handle hot offer selection - show booking card directly (skip intermediate step)."""
+        """Handle hot offer selection - show offer card with cart/order buttons."""
         if not callback.from_user or not callback.data:
             await callback.answer()
             return
@@ -193,6 +193,7 @@ def setup(
         # Save current page for back navigation
         data = await state.get_data()
         current_page = data.get("hot_offers_page", 0)
+        await state.update_data(last_hot_page=current_page, source="hot")
 
         # Check availability
         max_quantity = offer.quantity or 0
@@ -210,65 +211,39 @@ def setup(
         delivery_enabled = store.delivery_enabled if store else False
         delivery_price = store.delivery_price if store and delivery_enabled else 0
 
-        # Initial state: quantity=1, no delivery method selected
-        initial_qty = 1
-        initial_method = None if delivery_enabled else "pickup"
+        # Build offer card text
+        discount_pct = 0
+        if offer.original_price and offer.original_price > offer.discount_price:
+            discount_pct = int((1 - offer.discount_price / offer.original_price) * 100)
 
-        # Save to FSM state for booking flow
-        from handlers.common.states import BookOffer
+        lines = [f"🏷 <b>{offer.title}</b>"]
+        if offer.description:
+            lines.append(f"<i>{offer.description[:100]}</i>")
+        lines.append("")
 
-        await state.update_data(
-            offer_id=offer_id,
-            max_quantity=max_quantity,
-            offer_price=offer.discount_price,
-            original_price=offer.original_price or 0,
-            offer_title=offer.title,
-            offer_description=offer.description or "",
-            offer_unit=offer.unit or "",
-            expiry_date=str(offer.expiry_date) if offer.expiry_date else "",
-            store_id=offer.store_id,
-            store_name=store_name,
-            store_address=store_address,
-            delivery_enabled=delivery_enabled,
-            delivery_price=delivery_price,
-            selected_qty=initial_qty,
-            selected_delivery=initial_method,
-            last_hot_page=current_page,
-            offer_photo=offer.photo,
-            source="hot",  # Mark source for cancel navigation
-        )
-        await state.set_state(BookOffer.quantity)
+        if discount_pct > 0:
+            lines.append(f"<s>{offer.original_price:,.0f}</s> → <b>{offer.discount_price:,.0f} сум</b> (-{discount_pct}%)")
+        else:
+            lines.append(f"💰 <b>{offer.discount_price:,.0f} сум</b>")
 
-        # Build booking card directly (skip intermediate product card)
-        from handlers.bookings.customer import build_order_card_keyboard, build_order_card_text
+        lines.append(f"📦 В наличии: {max_quantity} шт")
+        if offer.expiry_date:
+            lines.append(f"📅 Годен до: {offer.expiry_date}")
+        lines.append("")
+        lines.append(f"🏪 {store_name}")
+        if store_address:
+            lines.append(f"📍 {store_address}")
+        if delivery_enabled:
+            lines.append(f"🚚 Доставка: {delivery_price:,.0f} сум")
 
-        text = build_order_card_text(
-            lang,
-            offer.title,
-            offer.discount_price,
-            initial_qty,
-            store_name,
-            delivery_enabled,
-            delivery_price,
-            initial_method,
-            max_quantity,
-            original_price=offer.original_price or 0,
-            description=offer.description or "",
-            expiry_date=str(offer.expiry_date) if offer.expiry_date else "",
-            store_address=store_address,
-            unit=offer.unit or "",
-        )
-        kb = build_order_card_keyboard(
-            lang,
-            offer_id,
-            offer.store_id,
-            initial_qty,
-            max_quantity,
-            delivery_enabled,
-            initial_method,
+        text = "\n".join(lines)
+
+        # Use new keyboard with cart buttons
+        kb = offer_keyboards.offer_details_with_back_keyboard(
+            lang, offer_id, offer.store_id, delivery_enabled
         )
 
-        # Always delete list and send new message with photo if available
+        # Delete list and send new message with photo if available
         try:
             await msg.delete()
         except Exception:
@@ -277,14 +252,14 @@ def setup(
         if offer.photo:
             try:
                 await msg.answer_photo(
-                    photo=offer.photo, caption=text, parse_mode="HTML", reply_markup=kb.as_markup()
+                    photo=offer.photo, caption=text, parse_mode="HTML", reply_markup=kb
                 )
                 await callback.answer()
                 return
             except Exception:
                 pass
 
-        await msg.answer(text, parse_mode="HTML", reply_markup=kb.as_markup())
+        await msg.answer(text, parse_mode="HTML", reply_markup=kb)
         await callback.answer()
 
     @dp.callback_query(F.data == "hot_noop")

@@ -100,13 +100,20 @@ def setup(
 
     @dp_or_router.message(F.text.in_(["🛒 Корзина", "🛒 Savat"]))
     async def my_cart(message: types.Message, state: FSMContext):
-        """Show user's cart with active bookings and orders."""
+        """Show user's cart with items from new cart storage + active bookings/orders."""
         await state.clear()
 
         user_id = message.from_user.id
         lang = db.get_user_language(user_id)
 
-        # Fetch data (with error handling)
+        # Import new cart storage
+        try:
+            from handlers.customer.cart.storage import cart_storage
+            cart_items = cart_storage.get_items(user_id)
+        except Exception:
+            cart_items = []
+
+        # Fetch old booking data (with error handling)
         try:
             bookings = db.get_user_bookings(user_id) or []
         except Exception:
@@ -121,14 +128,14 @@ def setup(
         active_bookings = [b for b in bookings if get_field(b, "status", "") in ("pending", "confirmed")]
         active_orders = [o for o in orders if get_field(o, "order_status", "") in ("pending", "confirmed", "preparing", "delivering")]
 
-        # Empty cart
-        if not active_bookings and not active_orders:
+        # Empty cart check - now includes new cart items
+        if not cart_items and not active_bookings and not active_orders:
             recent = [b for b in bookings if get_field(b, "status", "") == "completed"][:3]
             text = _t(lang, "🛒 Корзина пуста", "🛒 Savat bo'sh")
             text += "\n\n" + _t(
                 lang,
-                "Выберите товар и нажмите «Забронировать»",
-                "Mahsulotni tanlang va «Buyurtma berish» tugmasini bosing",
+                "Добавьте товар через кнопку «🛒 В корзину»",
+                "«🛒 Savatga» tugmasi orqali mahsulot qo'shing",
             )
             if recent:
                 text += "\n\n📜 <b>" + _t(lang, "Недавние", "Oxirgilar") + ":</b>\n"
@@ -138,8 +145,27 @@ def setup(
 
         # Build cart text
         lines = [f"🛒 <b>{_t(lang, 'Моя корзина', 'Mening savatim')}</b>", ""]
+        kb = InlineKeyboardBuilder()
 
-        # Pickup bookings
+        # NEW: Show cart items from new storage
+        if cart_items:
+            lines.append(f"🛍 <b>{_t(lang, 'Товары в корзине', 'Savatdagi mahsulotlar')}</b> ({len(cart_items)})")
+            lines.append("─" * 20)
+            total_sum = 0
+            for item in cart_items[:5]:
+                item_total = item.price * item.quantity
+                total_sum += item_total
+                lines.append(f"📦 {item.title}")
+                lines.append(f"   {item.quantity} × {item.price:,.0f} = {item_total:,.0f} сум")
+                lines.append(f"   🏪 {item.store_name}")
+                lines.append("")
+            lines.append(f"💰 <b>{_t(lang, 'Итого', 'Jami')}: {total_sum:,.0f} сум</b>")
+            lines.append("")
+            # Add checkout button for cart items
+            kb.button(text=f"✅ {_t(lang, 'Оформить заказ', 'Buyurtma berish')}", callback_data="cart_checkout")
+            kb.button(text=f"🗑 {_t(lang, 'Очистить', 'Tozalash')}", callback_data="cart_clear")
+
+        # Pickup bookings (old system)
         if active_bookings:
             lines.append(f"🏪 <b>{_t(lang, 'Самовывоз', 'Olib ketish')}</b> ({len(active_bookings)})")
             lines.append("─" * 20)
@@ -163,12 +189,11 @@ def setup(
                 lines.append("")
 
         # Summary
-        total = len(active_bookings) + len(active_orders)
+        total = len(cart_items) + len(active_bookings) + len(active_orders)
         lines.append("─" * 20)
         lines.append(f"{_t(lang, 'Активных', 'Faol')}: <b>{total}</b>")
 
-        # Keyboard
-        kb = InlineKeyboardBuilder()
+        # Cancel buttons for old bookings
         cancel_count = 0
         for b in active_bookings[:3]:
             bid = get_field(b, "booking_id", 0)
@@ -183,8 +208,13 @@ def setup(
             kb.button(text=f"🚚 {len(active_orders)}", callback_data="orders_active")
         kb.button(text=f"📜 {_t(lang, 'История', 'Tarix')}", callback_data="bookings_completed")
 
-        # Layout
-        rows = [1] * cancel_count + [min(3, (1 if active_bookings else 0) + (1 if active_orders else 0) + 1)]
+        # Layout - adjust based on what buttons we have
+        if cart_items:
+            rows = [2]  # Checkout + Clear buttons
+            rows.extend([1] * cancel_count)
+            rows.append(min(3, (1 if active_bookings else 0) + (1 if active_orders else 0) + 1))
+        else:
+            rows = [1] * cancel_count + [min(3, (1 if active_bookings else 0) + (1 if active_orders else 0) + 1)]
         kb.adjust(*rows)
 
         await message.answer("\n".join(lines), parse_mode="HTML", reply_markup=kb.as_markup())
