@@ -70,7 +70,7 @@ describe('useLocalStorage', () => {
     })
 
     expect(result.current[0]).toEqual({ count: 5, name: 'test' })
-    
+
     const stored = JSON.parse(localStorage.getItem('test-key'))
     expect(stored).toEqual({ count: 5, name: 'test' })
   })
@@ -94,7 +94,7 @@ describe('useLocalStorageMultiple', () => {
   })
 
   it('should manage multiple keys', () => {
-    const { result } = renderHook(() => 
+    const { result } = renderHook(() =>
       useLocalStorageMultiple({
         user: null,
         theme: 'light',
@@ -108,7 +108,7 @@ describe('useLocalStorageMultiple', () => {
   })
 
   it('should update individual keys', () => {
-    const { result } = renderHook(() => 
+    const { result } = renderHook(() =>
       useLocalStorageMultiple({
         user: null,
         theme: 'light',
@@ -125,7 +125,7 @@ describe('useLocalStorageMultiple', () => {
   })
 
   it('should clear all keys', () => {
-    const { result } = renderHook(() => 
+    const { result } = renderHook(() =>
       useLocalStorageMultiple({
         key1: 'value1',
         key2: 'value2',

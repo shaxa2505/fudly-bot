@@ -3,17 +3,17 @@ import { useState, useEffect, useCallback } from 'react'
 /**
  * Hook for syncing state with localStorage
  * Automatically saves to localStorage on change and loads on mount
- * 
+ *
  * @param {string} key - localStorage key
  * @param {any} initialValue - Initial value if key doesn't exist
  * @returns {[any, Function, Function]} [value, setValue, removeValue]
- * 
+ *
  * @example
  * const [user, setUser, removeUser] = useLocalStorage('user', null)
- * 
+ *
  * setUser({ id: 1, name: 'John' })
  * // Automatically saved to localStorage
- * 
+ *
  * removeUser()
  * // Removed from localStorage
  */
@@ -39,9 +39,9 @@ export function useLocalStorage(key, initialValue) {
     try {
       // Allow value to be a function so we have same API as useState
       const valueToStore = value instanceof Function ? value(storedValue) : value
-      
+
       setStoredValue(valueToStore)
-      
+
       if (typeof window !== 'undefined') {
         window.localStorage.setItem(key, JSON.stringify(valueToStore))
       }
@@ -54,7 +54,7 @@ export function useLocalStorage(key, initialValue) {
   const removeValue = useCallback(() => {
     try {
       setStoredValue(initialValue)
-      
+
       if (typeof window !== 'undefined') {
         window.localStorage.removeItem(key)
       }
@@ -69,17 +69,17 @@ export function useLocalStorage(key, initialValue) {
 /**
  * Hook for syncing multiple localStorage keys
  * Useful for related data that should be updated together
- * 
+ *
  * @param {Object} config - Object with key-value pairs for localStorage
  * @returns {Object} Object with getters, setters, and removers
- * 
+ *
  * @example
  * const storage = useLocalStorageMultiple({
  *   user: null,
  *   theme: 'light',
  *   language: 'uz'
  * })
- * 
+ *
  * storage.user.set({ id: 1 })
  * storage.theme.set('dark')
  * storage.clear() // Remove all
@@ -89,7 +89,7 @@ export function useLocalStorageMultiple(config) {
 
   for (const [key, initialValue] of Object.entries(config)) {
     const [value, setValue, removeValue] = useLocalStorage(key, initialValue)
-    
+
     storage[key] = {
       value,
       set: setValue,
@@ -109,10 +109,10 @@ export function useLocalStorageMultiple(config) {
 
 /**
  * Hook for watching localStorage changes across tabs/windows
- * 
+ *
  * @param {string} key - localStorage key to watch
  * @param {Function} callback - Called when value changes
- * 
+ *
  * @example
  * useLocalStorageListener('cart', (newValue, oldValue) => {
  *   console.log('Cart updated:', newValue)
@@ -134,7 +134,7 @@ export function useLocalStorageListener(key, callback) {
     }
 
     window.addEventListener('storage', handleStorageChange)
-    
+
     return () => {
       window.removeEventListener('storage', handleStorageChange)
     }

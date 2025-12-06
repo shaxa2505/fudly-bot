@@ -36,7 +36,7 @@ const CartItem = memo(function CartItem({
       <div className="cart-item-info">
         <h4 className="cart-item-title">{offer.title}</h4>
         <p className="cart-item-store">{offer.store_name}</p>
-        
+
         <div className="cart-item-price">
           <span className="price-current">{formatPrice(offer.discount_price)} so'm</span>
           {offer.original_price > offer.discount_price && (
@@ -58,9 +58,9 @@ const CartItem = memo(function CartItem({
         >
           −
         </button>
-        
+
         <span className="qty-value">{quantity}</span>
-        
+
         <button
           className="qty-btn qty-plus"
           onClick={() => onIncrement(offer.id)}

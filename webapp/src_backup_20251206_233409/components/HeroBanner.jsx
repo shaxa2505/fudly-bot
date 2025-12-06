@@ -133,7 +133,7 @@ const HeroBanner = memo(function HeroBanner({ onCategorySelect }) {
           </div>
           <div className="banner-icon">{currentBanner.icon}</div>
         </div>
-        
+
         {/* Dots indicator inside banner */}
         <div className="banner-dots">
           {BANNERS.map((_, index) => (

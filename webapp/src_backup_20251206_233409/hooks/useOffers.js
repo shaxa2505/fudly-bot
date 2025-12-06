@@ -153,7 +153,7 @@ export function useOffers({
       console.error('Error loading offers:', err);
       const errorMsg = err.message || 'Mahsulotlar yuklanmadi';
       setError(errorMsg);
-      
+
       // Log to Sentry
       captureException(err, {
         context: 'useOffers.loadOffers',

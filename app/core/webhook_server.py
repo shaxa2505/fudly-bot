@@ -234,8 +234,7 @@ async def create_webhook_app(
             logger.error(f"Health check failed: {e}")
             # Return 200 even on error to keep service up during transient issues
             return web.json_response(
-                {"status": "error", "error": str(e), "bot": "Fudly"}, 
-                status=200
+                {"status": "error", "error": str(e), "bot": "Fudly"}, status=200
             )
 
     async def version_info(request: web.Request) -> web.Response:
@@ -868,9 +867,21 @@ async def create_webhook_app(
             if hasattr(db, "get_booking"):
                 booking = db.get_booking(int(order_id))
                 if booking:
-                    booking_code = booking.get("booking_code") if isinstance(booking, dict) else (booking[4] if len(booking) > 4 else None)
-                    user_id = booking.get("user_id") if isinstance(booking, dict) else (booking[2] if len(booking) > 2 else None)
-                    offer_id = booking.get("offer_id") if isinstance(booking, dict) else (booking[1] if len(booking) > 1 else None)
+                    booking_code = (
+                        booking.get("booking_code")
+                        if isinstance(booking, dict)
+                        else (booking[4] if len(booking) > 4 else None)
+                    )
+                    user_id = (
+                        booking.get("user_id")
+                        if isinstance(booking, dict)
+                        else (booking[2] if len(booking) > 2 else None)
+                    )
+                    offer_id = (
+                        booking.get("offer_id")
+                        if isinstance(booking, dict)
+                        else (booking[1] if len(booking) > 1 else None)
+                    )
 
                     if offer_id and hasattr(db, "get_offer"):
                         offer = db.get_offer(offer_id)
@@ -879,7 +890,9 @@ async def create_webhook_app(
                             if store_id and hasattr(db, "get_store"):
                                 store = db.get_store(store_id)
                                 if store:
-                                    seller_id = get_offer_value(store, "owner_id") or get_offer_value(store, "user_id")
+                                    seller_id = get_offer_value(
+                                        store, "owner_id"
+                                    ) or get_offer_value(store, "user_id")
 
             # Send payment proof to seller with action buttons
             if seller_id and booking_code:

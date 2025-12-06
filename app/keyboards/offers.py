@@ -59,24 +59,7 @@ def hot_offers_compact_keyboard(
     return builder.as_markup()
 
 
-def hot_offers_pagination_keyboard(
-    lang: str, has_more: bool, next_offset: int
-) -> InlineKeyboardMarkup | None:
-    builder = InlineKeyboardBuilder()
-
-    # Кнопка "Обновить" всегда слева
-    refresh_text = "🔄 Обновить" if lang == "ru" else "🔄 Yangilash"
-    builder.button(text=refresh_text, callback_data="hot_offers_refresh")
-
-    # Кнопка "Далее" справа (если есть ещё товары)
-    if has_more:
-        next_text = "Далее ➡️" if lang == "ru" else "Keyingi ➡️"
-        builder.button(text=next_text, callback_data=f"hot_offers_next_{next_offset}")
-        builder.adjust(2)  # Две кнопки в ряд
-    else:
-        builder.adjust(1)  # Только "Обновить"
-
-    return builder.as_markup() if builder.export() else None
+# NOTE: hot_offers_pagination_keyboard removed - using hot_offers_compact_keyboard now
 
 
 def store_card_keyboard(
@@ -291,13 +274,7 @@ def store_reviews_keyboard(lang: str, store_id: int) -> InlineKeyboardMarkup:
     return builder.as_markup()
 
 
-def back_to_hot_keyboard(lang: str, has_more: bool) -> InlineKeyboardMarkup | None:
-    builder = InlineKeyboardBuilder()
-    if has_more:
-        next_text = "➡️ Показать ещё 20" if lang == "ru" else "➡️ Yana 20 ta ko'rsatish"
-        builder.button(text=next_text, callback_data="hot_offers_next_20")
-    builder.adjust(1)
-    return builder.as_markup() if builder.export() else None
+# NOTE: back_to_hot_keyboard removed - not used, use offer_details_with_back_keyboard instead
 
 
 def search_results_compact_keyboard(

@@ -5,7 +5,7 @@ import { useCart } from '../../context/CartContext'
 /**
  * Custom hook for managing checkout flow
  * Handles order creation, delivery options, payment
- * 
+ *
  * @returns {Object} Checkout state and methods
  */
 export function useCheckout() {

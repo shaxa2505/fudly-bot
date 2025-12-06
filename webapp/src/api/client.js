@@ -77,7 +77,7 @@ client.interceptors.response.use(
 // Cached GET request helper with LRU cache
 const cachedGet = async (url, params = {}, ttl = CACHE_TTL) => {
   const cacheKey = `${url}?${JSON.stringify(params)}`
-  
+
   // Try to get from cache
   const cached = requestCache.get(cacheKey)
   if (cached !== null) {
@@ -86,7 +86,7 @@ const cachedGet = async (url, params = {}, ttl = CACHE_TTL) => {
 
   // Fetch from API
   const { data } = await client.get(url, { params })
-  
+
   // Store in cache (LRU handles eviction automatically)
   requestCache.set(cacheKey, data)
 
@@ -97,14 +97,14 @@ const cachedGet = async (url, params = {}, ttl = CACHE_TTL) => {
 const clearCache = (urlPattern) => {
   const keys = requestCache.keys()
   let cleared = 0
-  
+
   keys.forEach(key => {
     if (key.includes(urlPattern)) {
       requestCache.delete(key)
       cleared++
     }
   })
-  
+
   if (cleared > 0) {
     console.log(`[Cache] Cleared ${cleared} entries matching: ${urlPattern}`)
   }

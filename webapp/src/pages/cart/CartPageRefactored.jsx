@@ -17,7 +17,7 @@ import '../CartPage.css'
 function CartPageRefactored({ user }) {
   const navigate = useNavigate()
   const { cartItems, isEmpty, updateQuantity, removeItem } = useCart()
-  
+
   const checkout = useCheckout()
 
   // Handle quantity changes
@@ -50,11 +50,11 @@ function CartPageRefactored({ user }) {
   // Handle checkout form submission
   const handleCheckoutSubmit = useCallback(async () => {
     const shouldPlaceOrder = await checkout.proceedToPayment()
-    
+
     if (shouldPlaceOrder) {
       // Pickup order - place immediately
       const result = await checkout.placeOrder()
-      
+
       if (result) {
         // Navigate to order tracking
         navigate(`/order/${result.order_id || result.id}`)
@@ -73,7 +73,7 @@ function CartPageRefactored({ user }) {
 
     // Upload payment proof
     const success = await checkout.uploadPaymentProof()
-    
+
     if (success) {
       // Navigate to order tracking
       navigate(`/order/${checkout.createdOrderId}`)

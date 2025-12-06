@@ -17,11 +17,11 @@ function ErrorFallback({ error, resetErrorBoundary }) {
     <div className="error-fallback">
       <div className="error-fallback-content">
         <div className="error-fallback-icon">⚠️</div>
-        
+
         <h2 className="error-fallback-title">
           Xatolik yuz berdi
         </h2>
-        
+
         <p className="error-fallback-message">
           Nimadir noto'g'ri ketdi. Iltimos, qayta urinib ko'ring.
         </p>
@@ -38,14 +38,14 @@ function ErrorFallback({ error, resetErrorBoundary }) {
         )}
 
         <div className="error-fallback-actions">
-          <button 
+          <button
             className="error-fallback-btn primary"
             onClick={resetErrorBoundary}
           >
             🔄 Qayta yuklash
           </button>
-          
-          <button 
+
+          <button
             className="error-fallback-btn secondary"
             onClick={() => {
               if (window.Telegram?.WebApp) {
@@ -61,8 +61,8 @@ function ErrorFallback({ error, resetErrorBoundary }) {
 
         <div className="error-fallback-help">
           <p>Muammo takrorlanayotganmi?</p>
-          <a 
-            href="https://t.me/fudly_support" 
+          <a
+            href="https://t.me/fudly_support"
             className="error-fallback-link"
             target="_blank"
             rel="noopener noreferrer"
@@ -87,10 +87,10 @@ export function InlineError({ error, onRetry, onDismiss }) {
         <span className="inline-error-icon">⚠️</span>
         <p className="inline-error-message">{error}</p>
       </div>
-      
+
       <div className="inline-error-actions">
         {onRetry && (
-          <button 
+          <button
             className="inline-error-btn retry"
             onClick={onRetry}
           >
@@ -98,7 +98,7 @@ export function InlineError({ error, onRetry, onDismiss }) {
           </button>
         )}
         {onDismiss && (
-          <button 
+          <button
             className="inline-error-btn dismiss"
             onClick={onDismiss}
           >

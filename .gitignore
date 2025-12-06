@@ -66,3 +66,6 @@ backup/
 # Temporary files
 *.tmp
 *.temp
+
+# Ignore the webapp directory
+webapp/

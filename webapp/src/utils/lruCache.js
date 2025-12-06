@@ -1,12 +1,12 @@
 /**
  * LRU (Least Recently Used) Cache implementation with TTL support
- * 
+ *
  * Features:
  * - Automatic eviction of least recently used items when maxSize is reached
  * - TTL (Time To Live) for cache entries
  * - Move accessed items to end (most recently used)
  * - Memory efficient (removes expired items on access)
- * 
+ *
  * @example
  * const cache = new LRUCache(100, 30000) // 100 items, 30s TTL
  * cache.set('key', { data: 'value' })
@@ -26,7 +26,7 @@ export class LRUCache {
    */
   get(key) {
     const item = this.cache.get(key)
-    
+
     if (!item) {
       return null
     }
@@ -72,7 +72,7 @@ export class LRUCache {
    */
   has(key) {
     const item = this.cache.get(key)
-    
+
     if (!item) {
       return false
     }

@@ -142,11 +142,25 @@ class TestCommonKeyboards:
 class TestOfferKeyboards:
     """Test offer-related keyboards."""
 
-    def test_hot_offers_pagination_keyboard(self) -> None:
-        """Test hot offers pagination keyboard."""
-        from app.keyboards.offers import hot_offers_pagination_keyboard
+    def test_hot_offers_compact_keyboard(self) -> None:
+        """Test hot offers compact keyboard."""
+        from app.keyboards.offers import hot_offers_compact_keyboard
+        from app.services.offer_service import OfferListItem
 
-        keyboard = hot_offers_pagination_keyboard(lang="ru", has_more=True, next_offset=10)
+        # Create sample offers
+        offers = [
+            OfferListItem(
+                id=1,
+                store_id=10,
+                title="Test Offer",
+                original_price=10000.0,
+                discount_price=5000.0,
+                discount_percent=50.0,
+                store_name="Test Store",
+            )
+        ]
+
+        keyboard = hot_offers_compact_keyboard(lang="ru", offers=offers, page=0, total_pages=1)
 
         assert keyboard is None or isinstance(keyboard, InlineKeyboardMarkup)
 

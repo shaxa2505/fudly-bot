@@ -16,9 +16,9 @@ const FlashDealsSection = ({ deals = [] }) => {
     const now = new Date();
     const endOfDay = new Date();
     endOfDay.setHours(23, 59, 59, 999);
-    
+
     const difference = endOfDay - now;
-    
+
     if (difference > 0) {
       return {
         hours: Math.floor(difference / (1000 * 60 * 60)),
@@ -26,7 +26,7 @@ const FlashDealsSection = ({ deals = [] }) => {
         seconds: Math.floor((difference / 1000) % 60)
       };
     }
-    
+
     return { hours: 0, minutes: 0, seconds: 0 };
   }
 
@@ -45,7 +45,7 @@ const FlashDealsSection = ({ deals = [] }) => {
   // Mock flash deals if none provided
   const flashDeals = useMemo(() => {
     if (deals.length > 0) return deals;
-    
+
     return [
       {
         id: 1,
@@ -103,7 +103,7 @@ const FlashDealsSection = ({ deals = [] }) => {
           <span className="flash-deals__icon">🔥</span>
           <h2 className="flash-deals__title">Flash Deals</h2>
         </div>
-        
+
         <div className="flash-deals__timer">
           <span className="flash-deals__timer-label">⏰ Tugaydi:</span>
           <div className="flash-deals__countdown">
@@ -144,7 +144,7 @@ const FlashDealsSection = ({ deals = [] }) => {
 
             <div className="flash-deal-card__content">
               <h3 className="flash-deal-card__title">{deal.name}</h3>
-              
+
               <div className="flash-deal-card__price">
                 <span className="flash-deal-card__current">
                   {formatPrice(deal.currentPrice)} so'm
@@ -157,7 +157,7 @@ const FlashDealsSection = ({ deals = [] }) => {
               {deal.stock <= 10 && (
                 <div className="flash-deal-card__stock">
                   <div className="flash-deal-card__stock-bar">
-                    <div 
+                    <div
                       className="flash-deal-card__stock-fill"
                       style={{ width: `${(deal.stock / 10) * 100}%` }}
                     />

@@ -323,7 +323,7 @@ const [theme, setTheme] = useLocalStorage('theme', 'light')
 <PaymentUpload {...uploadProps} />
 ```
 
-**Time Savings**: 
+**Time Savings**:
 - Writing debounce logic: 15 min → 30 sec (96% faster)
 - localStorage integration: 10 min → 20 sec (97% faster)
 - Understanding CartPage: 2 hours → 15 min (87% faster)
@@ -389,7 +389,7 @@ const [theme, setTheme] = useLocalStorage('theme', 'light')
 
 - <img src={highResUrl} alt={title} />
 + const [imgRef, shouldLoad] = useLazyImage()
-+ <img 
++ <img
 +   ref={imgRef}
 +   src={shouldLoad ? highResUrl : placeholderUrl}
 +   alt={title}
@@ -489,7 +489,7 @@ const [theme, setTheme] = useLocalStorage('theme', 'light')
 
 **Solution**: Switched to `useRef` for timeoutId and `useCallback` for memoization.
 
-**Lesson**: 
+**Lesson**:
 - `useState` triggers re-render on every update
 - `useRef` persists values without re-rendering
 - `useCallback` ensures referential equality across renders
@@ -501,7 +501,7 @@ const [theme, setTheme] = useLocalStorage('theme', 'light')
 
 **Solution**: Split into 5 small components, each testable in isolation.
 
-**Lesson**: 
+**Lesson**:
 - Small components = focused tests (fewer mocks)
 - Business logic in hooks = testable without JSX
 - Snapshot tests validate UI without implementation details
@@ -513,7 +513,7 @@ const [theme, setTheme] = useLocalStorage('theme', 'light')
 
 **Solution**: Implemented LRU cache with TTL and automatic cleanup.
 
-**Lesson**: 
+**Lesson**:
 - Always consider eviction strategy for caches
 - TTL prevents stale data bugs
 - Statistics API helps monitor cache effectiveness

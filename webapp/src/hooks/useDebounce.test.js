@@ -48,10 +48,10 @@ describe('useDebounce', () => {
     // Change value multiple times rapidly
     rerender({ value: 'change1' })
     act(() => { vi.advanceTimersByTime(100) })
-    
+
     rerender({ value: 'change2' })
     act(() => { vi.advanceTimersByTime(100) })
-    
+
     rerender({ value: 'change3' })
     act(() => { vi.advanceTimersByTime(100) })
 
@@ -122,7 +122,7 @@ describe('useDebouncedCallback', () => {
 
   it('should cleanup timeout on unmount', () => {
     const callback = vi.fn()
-    const { result, unmount } = renderHook(() => 
+    const { result, unmount } = renderHook(() =>
       useDebouncedCallback(callback, 500)
     )
 

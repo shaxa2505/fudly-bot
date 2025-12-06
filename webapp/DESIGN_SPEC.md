@@ -1,7 +1,7 @@
 # 🎨 Fudly WebApp - Design Specification
 
-**Version**: 2.0  
-**Date**: December 6, 2025  
+**Version**: 2.0
+**Date**: December 6, 2025
 **Status**: Concept Design
 
 ---

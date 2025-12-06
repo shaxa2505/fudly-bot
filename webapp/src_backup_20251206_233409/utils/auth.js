@@ -9,7 +9,7 @@ import api from '../api/client'
  */
 export const initializeTelegramAuth = async () => {
   const tg = window.Telegram?.WebApp
-  
+
   if (!tg) {
     console.error('Telegram WebApp is not available')
     return null
@@ -17,10 +17,10 @@ export const initializeTelegramAuth = async () => {
 
   // Expand WebApp to full height
   tg.expand()
-  
+
   // Enable closing confirmation
   tg.enableClosingConfirmation()
-  
+
   // Set theme colors
   tg.setHeaderColor('#FF6B35')
   tg.setBackgroundColor('#FAFAFA')
@@ -28,7 +28,7 @@ export const initializeTelegramAuth = async () => {
   // Get initData for authentication
   const initData = tg.initData
   const user = tg.initDataUnsafe?.user
-  
+
   if (!initData || !user) {
     console.error('No initData available')
     return null
@@ -41,12 +41,12 @@ export const initializeTelegramAuth = async () => {
     })
 
     const profile = response.data
-    
+
     // Check if user is registered
     if (!profile.registered || !profile.phone) {
       // User needs to register in bot first
       tg.showAlert(
-        profile.language === 'uz' 
+        profile.language === 'uz'
           ? "Iltimos, avval botda ro'yxatdan o'ting"
           : "Пожалуйста, сначала зарегистрируйтесь в боте",
         () => {
@@ -60,11 +60,11 @@ export const initializeTelegramAuth = async () => {
 
     // Save to localStorage
     localStorage.setItem('fudly_user', JSON.stringify(profile))
-    
+
     return profile
   } catch (error) {
     console.error('Auth validation failed:', error)
-    
+
     if (error.response?.status === 401) {
       tg.showAlert(
         user.language_code === 'uz'
@@ -72,7 +72,7 @@ export const initializeTelegramAuth = async () => {
           : "Ошибка аутентификации"
       )
     }
-    
+
     return null
   }
 }
@@ -84,7 +84,7 @@ export const initializeTelegramAuth = async () => {
 export const getCurrentUser = () => {
   const userStr = localStorage.getItem('fudly_user')
   if (!userStr) return null
-  
+
   try {
     return JSON.parse(userStr)
   } catch (e) {
@@ -103,7 +103,7 @@ export const getUserId = () => {
   if (telegramUser?.id) {
     return telegramUser.id
   }
-  
+
   // Fallback to localStorage
   const user = getCurrentUser()
   return user?.user_id || 0
@@ -125,7 +125,7 @@ export const getUserCity = () => {
 export const getUserLanguage = () => {
   const user = getCurrentUser()
   if (user?.language) return user.language
-  
+
   const telegramLang = window.Telegram?.WebApp?.initDataUnsafe?.user?.language_code
   return telegramLang === 'uz' ? 'uz' : 'ru'
 }

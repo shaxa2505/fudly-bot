@@ -655,7 +655,9 @@ def setup(
             lines.append("")
 
             if discount_pct > 0:
-                lines.append(f"<s>{offer.original_price:,.0f}</s> → <b>{offer.discount_price:,.0f} сум</b> (-{discount_pct}%)")
+                lines.append(
+                    f"<s>{offer.original_price:,.0f}</s> → <b>{offer.discount_price:,.0f} сум</b> (-{discount_pct}%)"
+                )
             else:
                 lines.append(f"💰 <b>{offer.discount_price:,.0f} сум</b>")
 
@@ -673,6 +675,7 @@ def setup(
 
             # Use new keyboard with cart buttons and back to search
             from app.keyboards.offers import offer_details_keyboard
+
             kb = offer_details_keyboard(lang, offer_id, offer.store_id, delivery_enabled)
 
             # Delete search results and send offer card with photo
@@ -1044,7 +1047,9 @@ def setup(
                 lines.append("")
 
                 if discount_pct > 0:
-                    lines.append(f"<s>{details.original_price:,.0f}</s> → <b>{details.discount_price:,.0f} сум</b> (-{discount_pct}%)")
+                    lines.append(
+                        f"<s>{details.original_price:,.0f}</s> → <b>{details.discount_price:,.0f} сум</b> (-{discount_pct}%)"
+                    )
                 else:
                     lines.append(f"💰 <b>{details.discount_price:,.0f} сум</b>")
 
@@ -1062,6 +1067,7 @@ def setup(
 
                 # Use new keyboard with cart buttons
                 from app.keyboards.offers import offer_details_keyboard
+
                 kb = offer_details_keyboard(lang, offer_id, details.store_id, delivery_enabled)
 
                 # Delete message and send offer card with photo
@@ -1093,49 +1099,3 @@ def setup(
             logger.error(f"Failed to send offer details for {offer_id}: {e}")
             await callback.answer(get_text(lang, "error"), show_alert=True)
         await callback.answer()
-
-    @dp.message(F.text.in_(["🎯 Горячее", "🎯 Issiq"]))
-    async def show_hot_offers(message: types.Message):
-        """Show popular/hot offers."""
-        assert message.from_user is not None
-        lang = db.get_user_language(message.from_user.id)
-
-        # Use get_user instead of get_user_model
-        user_data = db.get_user(message.from_user.id)
-        city = user_data.get("city") if user_data else "Ташкент"
-
-        # Получаем популярные товары (можно добавить логику для определения "горячих")
-        # Используем list_hot_offers как аналог get_popular_offers
-        result = offer_service.list_hot_offers(city or "Ташкент", limit=10)
-        popular_offers = result.items
-
-        if not popular_offers:
-            text = (
-                "😔 <b>Популярные товары пока отсутствуют</b>\n\n"
-                "Загляните сюда позже или воспользуйтесь поиском."
-                if lang == "ru"
-                else "😔 <b>Hozircha mashhur mahsulotlar yo'q</b>\n\n"
-                "Keyinroq qaytib keling yoki qidiruvdan foydalaning."
-            )
-            await message.answer(text, parse_mode="HTML")
-            return
-
-        await message.answer(
-            "🎯 <b>Горячие предложения</b>" if lang == "ru" else "🎯 <b>Issiq takliflar</b>",
-            parse_mode="HTML",
-        )
-
-        for offer in popular_offers:
-            caption = render_offer_card(lang, offer)
-
-            keyboard = offer_quick_keyboard(lang, offer.id, offer.store_id, offer.delivery_enabled)
-
-            if offer.photo:
-                try:
-                    await message.answer_photo(
-                        photo=offer.photo, caption=caption, parse_mode="HTML", reply_markup=keyboard
-                    )
-                except Exception:
-                    await message.answer(caption, parse_mode="HTML", reply_markup=keyboard)
-            else:
-                await message.answer(caption, parse_mode="HTML", reply_markup=keyboard)

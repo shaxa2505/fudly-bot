@@ -66,10 +66,9 @@ from .inline import (
 
 # Offers keyboards (specific flows)
 from .offers import (
-    back_to_hot_keyboard,
     hot_offers_compact_keyboard,
-    hot_offers_pagination_keyboard,
     offer_details_keyboard,
+    offer_details_with_back_keyboard,
     offer_quick_keyboard,
     search_results_compact_keyboard,
     store_card_keyboard,
@@ -135,16 +134,15 @@ __all__ = [
     "admin_bookings_keyboard",
     # Offers
     "hot_offers_compact_keyboard",
-    "hot_offers_pagination_keyboard",
     "search_results_compact_keyboard",
     "store_card_keyboard",
     "store_list_keyboard",
     "offer_details_keyboard",
+    "offer_details_with_back_keyboard",
     "offer_quick_keyboard",
     "store_offers_compact_keyboard",
     "store_offers_keyboard",
     "store_reviews_keyboard",
-    "back_to_hot_keyboard",
     # Inline
     "offer_keyboard",
     "filters_keyboard",

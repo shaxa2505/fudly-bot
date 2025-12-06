@@ -4,16 +4,16 @@ import { useEffect, useRef, useState } from 'react'
  * Hook for Intersection Observer API
  * Detects when element enters/exits viewport
  * Useful for lazy loading, infinite scroll, animations
- * 
+ *
  * @param {Object} options - IntersectionObserver options
  * @param {string} options.root - Root element (default: viewport)
  * @param {string} options.rootMargin - Margin around root (default: '0px')
  * @param {number} options.threshold - Visibility threshold 0-1 (default: 0)
  * @returns {[RefObject, boolean]} [ref, isIntersecting]
- * 
+ *
  * @example
  * const [ref, isVisible] = useIntersectionObserver({ threshold: 0.5 })
- * 
+ *
  * return (
  *   <div ref={ref}>
  *     {isVisible ? <Image /> : <Placeholder />}
@@ -58,13 +58,13 @@ export function useIntersectionObserver(options = {}) {
 /**
  * Hook for infinite scroll
  * Triggers callback when target element enters viewport
- * 
+ *
  * @param {Object} options
  * @param {Function} options.onIntersect - Called when element is visible
  * @param {boolean} options.enabled - Enable/disable observer (default: true)
  * @param {string} options.rootMargin - Load trigger distance (default: '100px')
  * @returns {RefObject} ref - Attach to trigger element
- * 
+ *
  * @example
  * const { targetRef } = useInfiniteScroll({
  *   onIntersect: () => {
@@ -74,7 +74,7 @@ export function useIntersectionObserver(options = {}) {
  *   },
  *   enabled: hasMore,
  * })
- * 
+ *
  * return (
  *   <>
  *     {items.map(item => <Item key={item.id} />)}
@@ -123,19 +123,19 @@ export function useInfiniteScroll(options = {}) {
 /**
  * Hook for lazy loading images
  * Shows placeholder until image enters viewport
- * 
+ *
  * @param {string} src - Image source URL
  * @param {string} placeholder - Placeholder image URL
  * @returns {Object} { ref, src: currentSrc, isLoading }
- * 
+ *
  * @example
  * const { ref, src, isLoading } = useLazyImage(
  *   'https://example.com/image.jpg',
  *   '/placeholder.jpg'
  * )
- * 
+ *
  * return (
- *   <img 
+ *   <img
  *     ref={ref}
  *     src={src}
  *     className={isLoading ? 'loading' : 'loaded'}
@@ -153,16 +153,16 @@ export function useLazyImage(src, placeholder = '') {
   useEffect(() => {
     if (isIntersecting && src !== currentSrc) {
       const img = new Image()
-      
+
       img.onload = () => {
         setCurrentSrc(src)
         setIsLoading(false)
       }
-      
+
       img.onerror = () => {
         setIsLoading(false)
       }
-      
+
       img.src = src
     }
   }, [isIntersecting, src, currentSrc])
@@ -177,13 +177,13 @@ export function useLazyImage(src, placeholder = '') {
 /**
  * Hook for viewport visibility tracking
  * Tracks if element is in viewport and percentage visible
- * 
+ *
  * @param {Object} options
  * @returns {Object} { ref, isVisible, visibilityRatio }
- * 
+ *
  * @example
  * const { ref, isVisible, visibilityRatio } = useViewportVisibility()
- * 
+ *
  * return (
  *   <div ref={ref}>
  *     {isVisible && `${Math.round(visibilityRatio * 100)}% visible`}

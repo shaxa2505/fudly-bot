@@ -3,10 +3,10 @@ import { captureException } from '../utils/sentry'
 
 /**
  * Universal hook for async operations with loading, error handling, and abort support
- * 
+ *
  * @example
  * const { loading, error, data, execute } = useAsyncOperation()
- * 
+ *
  * const loadData = async () => {
  *   const result = await execute(
  *     () => api.getOffers(),
