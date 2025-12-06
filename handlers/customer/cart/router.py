@@ -116,12 +116,12 @@ def build_add_to_cart_keyboard(
     """Build keyboard for adding item to cart with quantity selection."""
     kb = InlineKeyboardBuilder()
 
-    # Quantity controls
+    # Quantity controls - use ▫️ for disabled state instead of ugly ⬜
     minus_enabled = quantity > 1
     plus_enabled = quantity < max_qty
 
-    minus_text = "➖" if minus_enabled else "⬜"
-    plus_text = "➕" if plus_enabled else "⬜"
+    minus_text = "➖" if minus_enabled else "▫️"
+    plus_text = "➕" if plus_enabled else "▫️"
 
     kb.button(
         text=minus_text,
@@ -976,9 +976,12 @@ async def finalize_cart_order(
             # Create order
             order_id = db.create_order(
                 user_id=user_id,
+                store_id=item.store_id,
                 offer_id=item.offer_id,
                 quantity=item.quantity,
-                address=address,
+                order_type="delivery",
+                delivery_address=address,
+                delivery_price=item.delivery_price,
                 payment_method=payment_method,
             )
 

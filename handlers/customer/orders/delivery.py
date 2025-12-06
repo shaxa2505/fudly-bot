@@ -122,12 +122,12 @@ def build_delivery_qty_keyboard(
     plus_ok = quantity < max_qty
 
     kb.button(
-        text="➖" if minus_ok else "⬜",
+        text="➖" if minus_ok else "▫️",
         callback_data=f"dlv_qty_{offer_id}_{quantity - 1}" if minus_ok else "dlv_noop",
     )
     kb.button(text=f"📦 {quantity}", callback_data="dlv_noop")
     kb.button(
-        text="➕" if plus_ok else "⬜",
+        text="➕" if plus_ok else "▫️",
         callback_data=f"dlv_qty_{offer_id}_{quantity + 1}" if plus_ok else "dlv_noop",
     )
 

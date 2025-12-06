@@ -223,10 +223,10 @@ def setup(
 
         if discount_pct > 0:
             lines.append(
-                f"<s>{offer.original_price:,.0f}</s> → <b>{offer.discount_price:,.0f} сум</b> (-{discount_pct}%)"
+                f"<s>{int(offer.original_price):,}</s> → <b>{int(offer.discount_price):,} сум</b> (-{discount_pct}%)"
             )
         else:
-            lines.append(f"💰 <b>{offer.discount_price:,.0f} сум</b>")
+            lines.append(f"💰 <b>{int(offer.discount_price):,} сум</b>")
 
         lines.append(f"📦 В наличии: {max_quantity} шт")
         if offer.expiry_date:
@@ -236,7 +236,7 @@ def setup(
         if store_address:
             lines.append(f"📍 {store_address}")
         if delivery_enabled:
-            lines.append(f"🚚 Доставка: {delivery_price:,.0f} сум")
+            lines.append(f"🚚 Доставка: {int(delivery_price):,} сум")
 
         text = "\n".join(lines)
 
@@ -942,10 +942,10 @@ def setup(
 
         if discount_pct > 0:
             lines.append(
-                f"<s>{offer.original_price:,.0f}</s> → <b>{offer.discount_price:,.0f} сум</b> (-{discount_pct}%)"
+                f"<s>{int(offer.original_price):,}</s> → <b>{int(offer.discount_price):,} сум</b> (-{discount_pct}%)"
             )
         else:
-            lines.append(f"💰 <b>{offer.discount_price:,.0f} сум</b>")
+            lines.append(f"💰 <b>{int(offer.discount_price):,} сум</b>")
 
         lines.append(f"📦 В наличии: {max_quantity} шт")
         if offer.expiry_date:
@@ -962,7 +962,7 @@ def setup(
         if store_address:
             lines.append(f"📍 {store_address}")
         if delivery_enabled:
-            lines.append(f"🚚 Доставка: {delivery_price:,.0f} сум")
+            lines.append(f"🚚 Доставка: {int(delivery_price):,} сум")
 
         text = "\n".join(lines)
 

@@ -182,8 +182,8 @@ def build_order_card_keyboard(
         minus_enabled = quantity > 1
         plus_enabled = quantity < max_qty
 
-        minus_text = "➖" if minus_enabled else "⬜"
-        plus_text = "➕" if plus_enabled else "⬜"
+        minus_text = "➖" if minus_enabled else "▫️"
+        plus_text = "➕" if plus_enabled else "▫️"
 
         kb.button(
             text=minus_text,
