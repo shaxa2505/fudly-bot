@@ -83,10 +83,15 @@ const OfferCard = memo(function OfferCard({ offer, cartQuantity = 0, onAddToCart
 
   const expiryText = formatExpiry(offer.expiry_date)
 
+  const storeName = offer.store_name || offer.store?.name || offer.storeName || ''
+  const storeAddress = offer.store_address || offer.store?.address || offer.address || ''
+  const showStoreMeta = Boolean(storeName || storeAddress)
+
   // Get photo URL (handles Telegram file_id conversion) and also image_url field
   const photoUrl = api.getPhotoUrl(offer.image_url || offer.photo)
-  // Better placeholder with product icon
-  const fallbackUrl = 'https://placehold.co/300x300/F8F9FA/CBD5E1?text=🛒'
+  // Better placeholder with dynamic initial
+  const fallbackInitial = encodeURIComponent((offer.title?.[0] || 'F').toUpperCase())
+  const fallbackUrl = `https://placehold.co/300x300/F0F4F8/C1CBD8?text=${fallbackInitial}`
 
   return (
     <div className={`offer-card ${cartQuantity > 0 ? 'in-cart' : ''} ${isAdding ? 'adding' : ''}`} onClick={handleCardClick}>
@@ -146,6 +151,16 @@ const OfferCard = memo(function OfferCard({ offer, cartQuantity = 0, onAddToCart
 
       {/* Content Section */}
       <div className="card-content">
+        {showStoreMeta && (
+          <div className="store-info" aria-label="Do'kon ma'lumotlari">
+            <span className="store-icon" aria-hidden="true">🏬</span>
+            <div className="store-meta">
+              {storeName && <p className="store-name">{storeName}</p>}
+              {storeAddress && <p className="store-address">{storeAddress}</p>}
+            </div>
+          </div>
+        )}
+
         <h3 className="offer-title">{offer.title}</h3>
 
         {/* Stock Progress Bar */}

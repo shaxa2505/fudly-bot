@@ -130,14 +130,14 @@ const HeroBanner = memo(function HeroBanner({ onCategorySelect }) {
           <div className="banner-text">
             <h2 className="banner-title">{currentBanner.title}</h2>
             <p className="banner-subtitle">{currentBanner.subtitle}</p>
-            <span className="banner-cta">Ko'rish →</span>
+            <span className="banner-cta">Ko'rish</span>
           </div>
           <div className="banner-icon">{currentBanner.icon}</div>
         </div>
       </div>
 
       {/* Dots indicator */}
-      <div className="banner-dots">
+      <div className="banner-dots banner-dots-floating">
         {BANNERS.map((_, index) => (
           <button
             key={index}

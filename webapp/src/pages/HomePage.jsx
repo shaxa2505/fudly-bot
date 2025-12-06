@@ -96,7 +96,7 @@ function HomePage() {
       if (userId) {
         try {
           const history = await api.getSearchHistory(userId, 5)
-          setSearchHistory(history)
+          <section className="hero-shell">
         } catch (error) {
           console.error('Error loading search history:', error)
         }
@@ -108,36 +108,44 @@ function HomePage() {
   // Save search query to history when searching
   const handleSearchSubmit = useCallback(async () => {
     if (searchQuery.trim().length >= 2) {
-      const userId = window.Telegram?.WebApp?.initDataUnsafe?.user?.id
-      if (userId) {
-        try {
-          await api.addSearchHistory(userId, searchQuery.trim())
-          // Update local history
-          setSearchHistory(prev => {
-            const filtered = prev.filter(q => q.toLowerCase() !== searchQuery.trim().toLowerCase())
-            return [searchQuery.trim(), ...filtered].slice(0, 5)
-          })
+                  <div className="hero-location-header">
+                    <span className="hero-location-chip">
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                        <path d="M12 21s-7-5-7-11a7 7 0 1 1 14 0c0 6-7 11-7 11z" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+                        <circle cx="12" cy="10" r="2.5" stroke="currentColor" strokeWidth="1.6" />
+                      </svg>
+                      Yetkazish manzili
+                    </span>
+                    <button type="button" className="hero-link-btn" onClick={openAddressModal}>
+                      Manzilni o'zgartirish
+                    </button>
+                  </div>
+                  <h3 className="hero-location-city">{cityRaw}</h3>
+                  <p className="hero-location-address">{heroLocationLine}</p>
+                  {!hasPreciseLocation && (
+                    <span className="hero-location-hint">Aniqlik uchun manzil yoki geolokatsiya kiriting</span>
+                  )}
         } catch (error) {
           console.error('Error saving search history:', error)
         }
       }
     }
-    setShowSearchHistory(false)
-  }, [searchQuery])
+                      <p className="hero-metric-label">Savatcha</p>
+                      <strong className="hero-metric-value">{cartCount || 0} ta mahsulot</strong>
 
   // Handle search history item click
   const handleHistoryClick = (query) => {
     setSearchQuery(query)
     setShowSearchHistory(false)
-  }
-
+                      <p className="hero-metric-label">Bugungi topilmalar</p>
+                      <strong className="hero-metric-value">{heroOfferSummary}</strong>
   // Clear search history
   const handleClearHistory = async () => {
     const userId = window.Telegram?.WebApp?.initDataUnsafe?.user?.id
     if (userId) {
       try {
-        await api.clearSearchHistory(userId)
-        setSearchHistory([])
+                      <p className="hero-metric-label">Filtr holati</p>
+                      <strong className="hero-metric-value">{heroDiscountSummary}</strong>
       } catch (error) {
         console.error('Error clearing search history:', error)
       }
@@ -152,25 +160,27 @@ function HomePage() {
 
     // Если уже есть сохранённый адрес - не запрашиваем
     if (location.address || location.coordinates) return
-
-    // Пытаемся определить автоматически
-    if (navigator.geolocation) {
-      setIsLocating(true)
-      navigator.geolocation.getCurrentPosition(
-        (position) => {
-          const { latitude, longitude } = position.coords
-          reverseGeocodeAuto(latitude, longitude)
-        },
-        (error) => {
-          console.log('Auto-geolocation denied or failed:', error.message)
-          setIsLocating(false)
-          // Если отклонил - показываем модалку ручного ввода
-          if (error.code === error.PERMISSION_DENIED) {
-            setShowAddressModal(true)
-          }
-        },
-        { enableHighAccuracy: true, timeout: 10000, maximumAge: 300000 }
-      )
+          <section className="categories-shell">
+            <div className="categories-section">
+              <h3 className="categories-title">Kategoriyalar</h3>
+              <div className="categories-scroll">
+                {CATEGORIES.map(cat => (
+                  <button
+                    key={cat.id}
+                    className={`category-pill ${selectedCategory === cat.id ? 'active' : ''}`}
+                    onClick={() => {
+                      window.Telegram?.WebApp?.HapticFeedback?.impactOccurred?.('light')
+                      setSelectedCategory(cat.id)
+                    }}
+                    style={{ '--cat-color': cat.color }}
+                  >
+                    <span className="category-pill-icon">{cat.icon}</span>
+                    <span className="category-pill-name">{cat.name}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          </section>
     }
   }, [])
 
@@ -564,46 +574,54 @@ function HomePage() {
             }} />
           </div>
           <div className="hero-secondary">
-            <div className="hero-side-card hero-location-card">
-              <p className="eyebrow-text">Yetkazish manzili</p>
-              <h3>{cityRaw}</h3>
+            <article className="hero-side-card hero-location-card">
+              <div className="hero-location-header">
+                <span className="hero-location-chip">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                    <path d="M12 21s-7-5-7-11a7 7 0 1 1 14 0c0 6-7 11-7 11z" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+                    <circle cx="12" cy="10" r="2.5" stroke="currentColor" strokeWidth="1.6" />
+                  </svg>
+                  Yetkazish manzili
+                </span>
+                <button type="button" className="hero-link-btn" onClick={openAddressModal}>
+                  Manzilni o'zgartirish
+                </button>
+              </div>
+              <h3 className="hero-location-city">{cityRaw}</h3>
               <p className="hero-location-address">{heroLocationLine}</p>
-              <button type="button" className="hero-link-btn" onClick={openAddressModal}>
-                Manzilni o'zgartirish
-              </button>
               {!hasPreciseLocation && (
                 <span className="hero-location-hint">Aniqlik uchun manzil yoki geolokatsiya kiriting</span>
               )}
-            </div>
-            <div className="hero-side-card hero-metrics-card">
+            </article>
+            <article className="hero-side-card hero-metrics-card">
               <div className="hero-metric">
                 <span className="hero-metric-icon">🛒</span>
                 <div>
                   <p className="hero-metric-label">Savatcha</p>
-                  <strong>{cartCount || 0} ta mahsulot</strong>
+                  <strong className="hero-metric-value">{cartCount || 0} ta mahsulot</strong>
                 </div>
               </div>
               <div className="hero-metric">
                 <span className="hero-metric-icon">⚡</span>
                 <div>
                   <p className="hero-metric-label">Bugungi topilmalar</p>
-                  <strong>{heroOfferSummary}</strong>
+                  <strong className="hero-metric-value">{heroOfferSummary}</strong>
                 </div>
               </div>
               <div className="hero-metric">
                 <span className="hero-metric-icon">🎯</span>
                 <div>
                   <p className="hero-metric-label">Filtr holati</p>
-                  <strong>{heroDiscountSummary}</strong>
+                  <strong className="hero-metric-value">{heroDiscountSummary}</strong>
                 </div>
               </div>
               {showingAllCities && (
-                <div className="hero-pill" role="status">
+                <div className="hero-pill" role="status" aria-live="polite">
                   <span>🌍</span>
                   <p>{cityRaw} da topilmadi, boshqa shaharlar ko'rsatilmoqda</p>
                 </div>
               )}
-            </div>
+            </article>
           </div>
         </div>
       </section>
@@ -615,25 +633,27 @@ function HomePage() {
       */}
 
       {/* Categories - Horizontal Scroll */}
-      <div className="categories-section">
-        <h3 className="categories-title">Kategoriyalar</h3>
-        <div className="categories-scroll">
-          {CATEGORIES.map(cat => (
-            <button
-              key={cat.id}
-              className={`category-pill ${selectedCategory === cat.id ? 'active' : ''}`}
-              onClick={() => {
-                window.Telegram?.WebApp?.HapticFeedback?.impactOccurred?.('light')
-                setSelectedCategory(cat.id)
-              }}
-              style={{ '--cat-color': cat.color }}
-            >
-              <span className="category-pill-icon">{cat.icon}</span>
-              <span className="category-pill-name">{cat.name}</span>
-            </button>
-          ))}
+      <section className="categories-shell">
+        <div className="categories-section">
+          <h3 className="categories-title">Kategoriyalar</h3>
+          <div className="categories-scroll">
+            {CATEGORIES.map(cat => (
+              <button
+                key={cat.id}
+                className={`category-pill ${selectedCategory === cat.id ? 'active' : ''}`}
+                onClick={() => {
+                  window.Telegram?.WebApp?.HapticFeedback?.impactOccurred?.('light')
+                  setSelectedCategory(cat.id)
+                }}
+                style={{ '--cat-color': cat.color }}
+              >
+                <span className="category-pill-icon">{cat.icon}</span>
+                <span className="category-pill-name">{cat.name}</span>
+              </button>
+            ))}
+          </div>
         </div>
-      </div>
+      </section>
 
       <section className="filters-panel">
         <div className="filters-panel-header">
