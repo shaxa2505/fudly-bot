@@ -63,6 +63,86 @@ async def process_phone(message: types.Message, state: FSMContext, db: DatabaseP
     # Check if there was a pending order
     data = await state.get_data()
     pending_order = data.get("pending_order")
+    pending_cart_checkout = data.get("pending_cart_checkout")
+
+    from aiogram.types import ReplyKeyboardRemove
+
+    if pending_cart_checkout:
+        # Resume cart checkout flow
+        await message.answer(
+            "✅ Телефон сохранён! Продолжаем оформление заказа..."
+            if lang == "ru"
+            else "✅ Telefon saqlandi! Buyurtmani davom ettiramiz...",
+            reply_markup=ReplyKeyboardRemove(),
+        )
+        await state.update_data(pending_cart_checkout=False)
+        await state.clear()
+
+        # Show cart checkout directly
+        from handlers.customer.cart.router import cart_storage
+        import html
+
+        def _esc(val):
+            if val is None:
+                return ""
+            return html.escape(str(val))
+
+        items = cart_storage.get_cart(message.from_user.id)
+        if items:
+            # Trigger checkout flow
+            from aiogram.utils.keyboard import InlineKeyboardBuilder
+
+            total = cart_storage.get_cart_total(message.from_user.id)
+            currency = "so'm" if lang == "uz" else "сум"
+            delivery_enabled = items[0].delivery_enabled if items else False
+            delivery_price = items[0].delivery_price if items else 0
+
+            store_name = items[0].store_name if items else ""
+
+            lines = [f"📋 <b>{'Buyurtma' if lang == 'uz' else 'Заказ'}</b>\n"]
+            lines.append(f"🏪 {_esc(store_name)}\n")
+
+            for item in items:
+                subtotal = item.price * item.quantity
+                lines.append(f"• {_esc(item.title)} × {item.quantity} = {subtotal:,} {currency}")
+
+            lines.append("\n" + "─" * 25)
+            lines.append(f"💵 <b>{'Jami' if lang == 'uz' else 'Итого'}: {total:,} {currency}</b>")
+
+            if delivery_enabled:
+                lines.append(
+                    f"🚚 {'Yetkazish' if lang == 'uz' else 'Доставка'}: {delivery_price:,} {currency}"
+                )
+
+            text = "\n".join(lines)
+
+            kb = InlineKeyboardBuilder()
+            if delivery_enabled:
+                kb.button(
+                    text="🏪 Самовывоз" if lang == "ru" else "🏪 O'zim olib ketaman",
+                    callback_data="checkout_pickup",
+                )
+                kb.button(
+                    text="🚚 Доставка" if lang == "ru" else "🚚 Yetkazish",
+                    callback_data="checkout_delivery",
+                )
+            else:
+                kb.button(
+                    text="✅ Подтвердить" if lang == "ru" else "✅ Tasdiqlash",
+                    callback_data="checkout_pickup",
+                )
+            kb.button(text="◀️ Назад" if lang == "ru" else "◀️ Orqaga", callback_data="view_cart")
+            kb.adjust(2 if delivery_enabled else 1, 1)
+
+            await message.answer(text, parse_mode="HTML", reply_markup=kb.as_markup())
+        else:
+            # Cart is empty
+            from handlers.customer.cart.router import main_menu_customer
+            await message.answer(
+                "🛒 Корзина пуста" if lang == "ru" else "🛒 Savat bo'sh",
+                reply_markup=main_menu_customer(lang),
+            )
+        return
 
     if pending_order:
         # Resume order flow - user was trying to place an order
@@ -86,6 +166,27 @@ async def process_phone(message: types.Message, state: FSMContext, db: DatabaseP
             "👆 Нажмите кнопку 'Подтвердить' ещё раз"
             if lang == "ru"
             else "👆 Tasdiqlash tugmasini qayta bosing",
+        )
+        return
+
+    # Check if user already has a city set - skip city selection
+    user = db.get_user_model(message.from_user.id)
+    if user and user.city:
+        # User already has city, complete registration
+        await state.clear()
+
+        from aiogram.types import ReplyKeyboardRemove
+        from app.keyboards import main_menu_customer
+
+        await message.answer(
+            "✅ Телефон сохранён!" if lang == "ru" else "✅ Telefon saqlandi!",
+            reply_markup=ReplyKeyboardRemove(),
+        )
+
+        # Send main menu
+        await message.answer(
+            f"👇 {'Tanlang' if lang == 'uz' else 'Выберите'}:",
+            reply_markup=main_menu_customer(lang),
         )
         return
 
