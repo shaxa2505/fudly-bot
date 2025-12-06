@@ -487,7 +487,8 @@ async def cmd_start(message: types.Message, state: FSMContext, db: DatabaseProto
             parse_mode="HTML",
             reply_markup=city_inline_keyboard(lang),
         )
-        await state.set_state(Registration.city)
+        # DON'T set state - city is selected via inline buttons only
+        await state.clear()
         return
 
     # Phone is optional - user can browse without it
@@ -541,7 +542,8 @@ async def registration_choose_language(
     except Exception as e:
         logger.debug("Could not edit city selection: %s", e)
 
-    await state.set_state(Registration.city)
+    # DON'T set state - city is selected via inline buttons only
+    await state.clear()
     await callback.answer()
 
 
@@ -571,7 +573,8 @@ async def choose_language(callback: types.CallbackQuery, state: FSMContext, db: 
         except Exception as e:
             logger.debug("Could not edit city selection: %s", e)
 
-        await state.set_state(Registration.city)
+        # DON'T set state - city is selected via inline buttons only
+        await state.clear()
         await callback.answer()
         return
 

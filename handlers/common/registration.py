@@ -169,39 +169,6 @@ async def registration_city_callback(
     await callback.answer()
 
 
-@router.message(Registration.city)
-@secure_user_input
-async def process_city(message: types.Message, state: FSMContext, db: DatabaseProtocol):
-    """Handle city selection (now used only when changing city from profile)."""
-    if not db:
-        await message.answer("System error")
-        return
-
-    lang = db.get_user_language(message.from_user.id)
-
-    try:
-        if not rate_limiter.is_allowed(
-            message.from_user.id, "city_selection", max_requests=5, window_seconds=60
-        ):
-            await message.answer(get_text(lang, "rate_limit_exceeded"))
-            return
-    except Exception as e:
-        logger.warning(f"Rate limiter error: {e}")
-
-    cities = get_cities(lang)
-    raw_text = message.text or ""
-    city_text = validator.sanitize_text(raw_text.replace("📍 ", "").strip())
-
-    if not validator.validate_city(city_text):
-        await message.answer(get_text(lang, "invalid_city"))
-        return
-
-    if city_text in cities:
-        db.update_user_city(message.from_user.id, city_text)
-        await state.clear()
-
-        await message.answer(
-            get_text(lang, "registration_complete"),
-            parse_mode="HTML",
-            reply_markup=main_menu_customer(lang),
-        )
+# OLD TEXT-BASED CITY HANDLER REMOVED
+# City is now selected ONLY via inline buttons (select_city:) in commands.py
+# This prevents accidental triggering when user types numbers during registration
