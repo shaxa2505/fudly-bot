@@ -399,7 +399,7 @@ async def cart_confirm_pickup(callback: types.CallbackQuery) -> None:
 
 @router.callback_query(F.data == "cart_confirm_delivery")
 async def cart_confirm_delivery(callback: types.CallbackQuery, state: FSMContext) -> None:
-    """Start delivery address input for cart."""
+    """Start delivery flow for cart - with min order check."""
     if not db or not callback.message:
         await callback.answer()
         return
@@ -411,6 +411,36 @@ async def cart_confirm_delivery(callback: types.CallbackQuery, state: FSMContext
     if not items:
         await callback.answer("Корзина пуста" if lang == "ru" else "Savat bo'sh", show_alert=True)
         return
+
+    store_id = items[0].store_id
+    delivery_price = items[0].delivery_price
+
+    # Calculate total
+    total = sum(item.price * item.quantity for item in items)
+
+    # CHECK MIN_ORDER_AMOUNT before allowing delivery
+    store = db.get_store(store_id)
+    if store:
+        from handlers.bookings.utils import get_store_field
+
+        min_order_amount = get_store_field(store, "min_order_amount", 0)
+
+        if min_order_amount > 0 and total < min_order_amount:
+            currency = "so'm" if lang == "uz" else "сум"
+            if lang == "uz":
+                msg = (
+                    f"❌ Yetkazib berish uchun minimal buyurtma: {min_order_amount:,} {currency}\n"
+                    f"Sizning buyurtmangiz: {total:,} {currency}\n\n"
+                    f"Iltimos, ko'proq mahsulot qo'shing yoki olib ketishni tanlang."
+                )
+            else:
+                msg = (
+                    f"❌ Минимальная сумма для доставки: {min_order_amount:,} {currency}\n"
+                    f"Ваш заказ: {total:,} {currency}\n\n"
+                    f"Пожалуйста, добавьте ещё товары или выберите самовывоз."
+                )
+            await callback.answer(msg, show_alert=True)
+            return
 
     # Save cart to state (convert CartItem objects to dicts for JSON serialization)
     cart_items_dict = [
@@ -427,8 +457,9 @@ async def cart_confirm_delivery(callback: types.CallbackQuery, state: FSMContext
     ]
     await state.update_data(
         cart_items=cart_items_dict,
-        store_id=items[0].store_id,
-        delivery_price=items[0].delivery_price,
+        store_id=store_id,
+        delivery_price=delivery_price,
+        is_cart_order=True,  # Flag to identify cart orders
     )
 
     await state.set_state(OrderDelivery.address)
@@ -445,7 +476,7 @@ async def cart_confirm_delivery(callback: types.CallbackQuery, state: FSMContext
 
 @router.message(OrderDelivery.address)
 async def cart_process_delivery_address(message: types.Message, state: FSMContext) -> None:
-    """Process delivery address and create cart order."""
+    """Process delivery address for cart - same flow as regular orders."""
     if not db or not message.from_user or not message.text:
         return
 
@@ -454,19 +485,103 @@ async def cart_process_delivery_address(message: types.Message, state: FSMContex
     delivery_address = message.text.strip()
 
     data = await state.get_data()
+    is_cart_order = data.get("is_cart_order", False)
+
+    # Only handle cart orders in this handler
+    if not is_cart_order:
+        return
+
     cart_items_stored = data.get("cart_items", [])
     store_id = data.get("store_id")
     delivery_price = data.get("delivery_price", 0)
-
-    await state.clear()
 
     if not cart_items_stored or not store_id:
         await message.answer(
             "❌ Данные корзины потеряны" if lang == "ru" else "❌ Savat ma'lumotlari yo'qoldi"
         )
+        await state.clear()
         return
 
-    # Prepare cart_items for database (cart_items_stored is already list of dicts)
+    # Validate address length
+    if len(delivery_address) < 10:
+        msg = "❌ Manzil juda qisqa" if lang == "uz" else "❌ Адрес слишком короткий"
+        await message.answer(msg)
+        return
+
+    # Save address
+    await state.update_data(address=delivery_address)
+
+    # Save as last address for user
+    try:
+        db.save_delivery_address(user_id, delivery_address)
+    except Exception as e:
+        logger.warning(f"Could not save address: {e}")
+
+    await state.set_state(OrderDelivery.payment_method_select)
+
+    # Build payment selection message
+    currency = "so'm" if lang == "uz" else "сум"
+    total = sum(item["price"] * item["quantity"] for item in cart_items_stored)
+    total_with_delivery = total + delivery_price
+
+    lines = []
+    lines.append(f"<b>{'Mahsulotlar' if lang == 'uz' else 'Товары'}:</b>")
+    for item in cart_items_stored:
+        subtotal = item["price"] * item["quantity"]
+        lines.append(f"• {_esc(item['title'])} × {item['quantity']} = {subtotal:,} {currency}")
+
+    lines.append(f"\n🚚 {'Yetkazish' if lang == 'uz' else 'Доставка'}: {delivery_price:,} {currency}")
+    lines.append(
+        f"💵 <b>{'JAMI' if lang == 'uz' else 'ИТОГО'}: {total_with_delivery:,} {currency}</b>\n"
+    )
+    lines.append(f"📍 {'Manzil' if lang == 'uz' else 'Адрес'}: {_esc(delivery_address)}\n")
+    lines.append(f"{'To\'lov usulini tanlang:' if lang == 'uz' else 'Выберите способ оплаты:'}")
+
+    text = "\n".join(lines)
+
+    # Payment buttons - same as regular orders
+    kb = InlineKeyboardBuilder()
+    kb.button(
+        text="💳 Click" if lang == "uz" else "💳 Click",
+        callback_data=f"cart_pay_click_{store_id}",
+    )
+    kb.button(
+        text="💳 Karta" if lang == "uz" else "💳 Карта",
+        callback_data=f"cart_pay_card_{store_id}",
+    )
+    kb.button(
+        text="🔙 Ortga" if lang == "uz" else "🔙 Назад",
+        callback_data="cart_back_to_address",
+    )
+    kb.adjust(2, 1)
+
+    await message.answer(text, parse_mode="HTML", reply_markup=kb.as_markup())
+
+
+# ===================== CART PAYMENT HANDLERS =====================
+
+
+@router.callback_query(F.data.startswith("cart_pay_click_"))
+async def cart_pay_click(callback: types.CallbackQuery, state: FSMContext) -> None:
+    """Process Click payment for cart."""
+    if not db or not callback.message:
+        await callback.answer()
+        return
+
+    user_id = callback.from_user.id
+    lang = db.get_user_language(user_id)
+
+    data = await state.get_data()
+    cart_items_stored = data.get("cart_items", [])
+    store_id = data.get("store_id")
+    delivery_price = data.get("delivery_price", 0)
+    address = data.get("address", "")
+
+    if not cart_items_stored or not store_id:
+        await callback.answer("❌ Ошибка" if lang == "ru" else "❌ Xatolik", show_alert=True)
+        return
+
+    # Prepare cart_items for database
     cart_items_data = [
         {
             "offer_id": item["offer_id"],
@@ -483,107 +598,295 @@ async def cart_process_delivery_address(message: types.Message, state: FSMContex
         user_id=user_id,
         store_id=store_id,
         cart_items=cart_items_data,
-        delivery_address=delivery_address,
+        delivery_address=address,
         delivery_price=delivery_price,
-        payment_method="cash",
+        payment_method="click",
     )
 
     if not ok:
-        error_text = (
-            "❌ Не удалось создать заказ" if lang == "ru" else "❌ Buyurtma yaratib bo'lmadi"
-        )
-        if error_reason and "insufficient_stock" in error_reason:
-            error_text = (
-                "❌ Недостаточно товара на складе"
-                if lang == "ru"
-                else "❌ Omborda yetarli mahsulot yo'q"
-            )
-
-        await message.answer(error_text)
+        error_text = "❌ Не удалось создать заказ" if lang == "ru" else "❌ Buyurtma yaratib bo'lmadi"
+        await callback.answer(error_text, show_alert=True)
         return
 
-    # Clear cart after successful order
+    # Clear cart
     cart_storage.clear_cart(user_id)
 
-    # Build success message
-    currency = "so'm" if lang == "uz" else "сум"
-    lines = [f"✅ <b>{'Buyurtma yaratildi!' if lang == 'uz' else 'Заказ создан!'}</b>\n"]
-    lines.append(f"📋 {'Buyurtma kodi' if lang == 'uz' else 'Код заказа'}: <b>{pickup_code}</b>\n")
-    lines.append(f"🏪 {_esc(cart_items_stored[0]['store_name'])}")
-    lines.append(f"📍 {'Yetkazish' if lang == 'uz' else 'Доставка'}: {_esc(delivery_address)}\n")
-    lines.append(f"<b>{'Mahsulotlar' if lang == 'uz' else 'Товары'}:</b>")
+    # Send Click invoice
+    from handlers.customer.payments import send_payment_invoice_for_booking
 
-    total = 0
-    for item in cart_items_stored:
-        subtotal = item["price"] * item["quantity"]
-        total += subtotal
-        lines.append(f"• {_esc(item['title'])} × {item['quantity']} = {subtotal:,} {currency}")
+    try:
+        await callback.message.delete()
 
-    lines.append(f"🚚 {'Yetkazish' if lang == 'uz' else 'Доставка'}: {delivery_price:,} {currency}")
-    total_with_delivery = total + delivery_price
-    lines.append(
-        f"\n💵 <b>{'JAMI' if lang == 'uz' else 'ИТОГО'}: {total_with_delivery:,} {currency}</b>"
+        total = sum(item["price"] * item["quantity"] for item in cart_items_stored)
+        # Use first item title + " и др." if multiple
+        title_text = cart_items_stored[0]["title"]
+        if len(cart_items_stored) > 1:
+            title_text += " и др."
+
+        invoice_msg = await send_payment_invoice_for_booking(
+            user_id=user_id,
+            booking_id=order_id,
+            offer_title=title_text,
+            quantity=1,  # Already in total
+            unit_price=total,
+            delivery_cost=delivery_price,
+        )
+
+        if invoice_msg:
+            logger.info(f"✅ Click invoice sent for cart order {order_id}")
+            await state.clear()
+        else:
+            # Fallback to card
+            await _cart_switch_to_card_payment(callback.message, state, data, order_id, lang)
+    except Exception as e:
+        logger.error(f"Click invoice error for cart: {e}")
+        await _cart_switch_to_card_payment(callback.message, state, data, order_id, lang)
+
+    await callback.answer()
+
+
+async def _cart_switch_to_card_payment(message, state, data, order_id, lang):
+    """Switch to card payment when Click fails for cart."""
+    msg = (
+        "⚠️ Click ishlamayapti. Karta orqali to'lang."
+        if lang == "uz"
+        else "⚠️ Click недоступен. Оплатите картой."
+    )
+    await message.answer(msg)
+
+    await state.update_data(order_id=order_id, payment_method="card")
+    await state.set_state(OrderDelivery.payment_proof)
+    await _cart_show_card_payment_details(message, state, lang)
+
+
+@router.callback_query(F.data.startswith("cart_pay_card_"))
+async def cart_pay_card(callback: types.CallbackQuery, state: FSMContext) -> None:
+    """Process card payment for cart - show card details."""
+    if not db or not callback.message:
+        await callback.answer()
+        return
+
+    user_id = callback.from_user.id
+    lang = db.get_user_language(user_id)
+
+    data = await state.get_data()
+    cart_items_stored = data.get("cart_items", [])
+    store_id = data.get("store_id")
+    delivery_price = data.get("delivery_price", 0)
+    address = data.get("address", "")
+
+    if not cart_items_stored or not store_id:
+        await callback.answer("❌ Ошибка" if lang == "ru" else "❌ Xatolik", show_alert=True)
+        return
+
+    # Prepare cart_items for database
+    cart_items_data = [
+        {
+            "offer_id": item["offer_id"],
+            "quantity": item["quantity"],
+            "price": item["price"],
+            "title": item["title"],
+            "unit": item["unit"],
+        }
+        for item in cart_items_stored
+    ]
+
+    # Create ONE order with all items
+    ok, order_id, pickup_code, error_reason = db.create_cart_order_atomic(
+        user_id=user_id,
+        store_id=store_id,
+        cart_items=cart_items_data,
+        delivery_address=address,
+        delivery_price=delivery_price,
+        payment_method="card",
     )
 
-    text = "\n".join(lines)
-    await message.answer(text, parse_mode="HTML")
+    if not ok:
+        error_text = "❌ Не удалось создать заказ" if lang == "ru" else "❌ Buyurtma yaratib bo'lmadi"
+        await callback.answer(error_text, show_alert=True)
+        return
 
-    # Notify partner - send ONE notification with all items
+    # Clear cart
+    cart_storage.clear_cart(user_id)
+
+    await state.update_data(order_id=order_id, payment_method="card")
+    await state.set_state(OrderDelivery.payment_proof)
+
+    await callback.message.delete()
+    await _cart_show_card_payment_details(callback.message, state, lang)
+    await callback.answer()
+
+
+async def _cart_show_card_payment_details(message: types.Message, state: FSMContext, lang: str) -> None:
+    """Show card payment details for cart order."""
+    data = await state.get_data()
+    store_id = data.get("store_id")
+    cart_items_stored = data.get("cart_items", [])
+    delivery_price = data.get("delivery_price", 0)
+
+    # Get payment card
+    payment_card = None
     try:
-        store = db.get_store(store_id)
-        if store:
-            owner_id = store.get("owner_id") if isinstance(store, dict) else store[1]
+        payment_card = db.get_payment_card(store_id)
+    except Exception:
+        pass
 
-            # Build partner notification
-            partner_lines = [
-                f"🛒🚚 <b>{'Yangi savat buyurtmasi!' if lang == 'uz' else 'Новый заказ корзины!'}</b>\n"
-            ]
-            partner_lines.append(
-                f"📋 {'Buyurtma kodi' if lang == 'uz' else 'Код'}: <b>{pickup_code}</b>"
-            )
-            partner_lines.append(
-                f"👤 {'Mijoz' if lang == 'uz' else 'Клиент'}: {message.from_user.first_name or 'User'}"
-            )
-            partner_lines.append(
-                f"📍 {'Manzil' if lang == 'uz' else 'Адрес'}: {_esc(delivery_address)}\n"
-            )
-            partner_lines.append(f"<b>{'Mahsulotlar' if lang == 'uz' else 'Товары'}:</b>")
+    if not payment_card:
+        try:
+            payment_card = db.get_platform_payment_card()
+        except Exception:
+            pass
 
-            for item in cart_items_stored:
-                subtotal = item["price"] * item["quantity"]
-                partner_lines.append(
-                    f"• {_esc(item['title'])} × {item['quantity']} = {subtotal:,} {currency}"
-                )
+    if not payment_card:
+        payment_card = {
+            "card_number": "8600 1234 5678 9012",
+            "card_holder": "FUDLY",
+        }
 
-            partner_lines.append(
-                f"🚚 {'Yetkazish' if lang == 'uz' else 'Доставка'}: {delivery_price:,} {currency}"
-            )
-            partner_lines.append(
-                f"\n💵 <b>{'JAMI' if lang == 'uz' else 'ИТОГО'}: {total_with_delivery:,} {currency}</b>"
-            )
+    # Extract card details
+    if isinstance(payment_card, dict):
+        card_number = payment_card.get("card_number", "")
+        card_holder = payment_card.get("card_holder", "—")
+    elif isinstance(payment_card, (tuple, list)) and len(payment_card) > 1:
+        card_number = payment_card[1]
+        card_holder = payment_card[2] if len(payment_card) > 2 else "—"
+    else:
+        card_number = str(payment_card)
+        card_holder = "—"
 
-            partner_text = "\n".join(partner_lines)
+    # Calculate total
+    total = sum(item["price"] * item["quantity"] for item in cart_items_stored)
+    total_with_delivery = total + delivery_price
 
-            # One button to confirm/reject entire cart order (uses same handlers as regular orders)
-            kb = InlineKeyboardBuilder()
-            kb.button(
-                text="✅ Подтвердить" if lang == "ru" else "✅ Tasdiqlash",
-                callback_data=f"partner_confirm_order_{order_id}",
-            )
-            kb.button(
-                text="❌ Отклонить" if lang == "ru" else "❌ Rad etish",
-                callback_data=f"partner_reject_order_{order_id}",
-            )
-            kb.adjust(2)
+    currency = "so'm" if lang == "uz" else "сум"
 
-            await message.bot.send_message(
-                owner_id, partner_text, parse_mode="HTML", reply_markup=kb.as_markup()
+    # Compact payment message
+    if lang == "uz":
+        text = (
+            f"💳 <b>Kartaga o'tkazing:</b>\n\n"
+            f"💰 Summa: <b>{total_with_delivery:,} {currency}</b>\n"
+            f"💳 Karta: <code>{card_number}</code>\n"
+            f"👤 {card_holder}\n\n"
+            f"📸 <i>Chek skrinshotini yuboring</i>"
+        )
+    else:
+        text = (
+            f"💳 <b>Переведите на карту:</b>\n\n"
+            f"💰 Сумма: <b>{total_with_delivery:,} {currency}</b>\n"
+            f"💳 Карта: <code>{card_number}</code>\n"
+            f"👤 {card_holder}\n\n"
+            f"📸 <i>Отправьте скриншот чека</i>"
+        )
+
+    # Cancel button
+    kb = InlineKeyboardBuilder()
+    cancel_text = "❌ Bekor" if lang == "uz" else "❌ Отмена"
+    kb.button(text=cancel_text, callback_data="cart_cancel_payment")
+
+    await message.answer(text, parse_mode="HTML", reply_markup=kb.as_markup())
+
+
+@router.message(OrderDelivery.payment_proof, F.photo)
+async def cart_payment_proof(message: types.Message, state: FSMContext) -> None:
+    """Process payment screenshot for cart order."""
+    if not db or not bot or not message.from_user:
+        return
+
+    user_id = message.from_user.id
+    lang = db.get_user_language(user_id)
+    data = await state.get_data()
+
+    is_cart_order = data.get("is_cart_order", False)
+    
+    # Only handle cart orders in this handler
+    if not is_cart_order:
+        return
+
+    order_id = data.get("order_id")
+    cart_items_stored = data.get("cart_items", [])
+    store_id = data.get("store_id")
+    delivery_price = data.get("delivery_price", 0)
+    address = data.get("address", "")
+
+    if not order_id or not cart_items_stored:
+        msg = "❌ Ma'lumotlar yo'qoldi" if lang == "uz" else "❌ Данные потеряны"
+        await message.answer(msg)
+        await state.clear()
+        return
+
+    photo_id = message.photo[-1].file_id
+
+    # Update payment status
+    db.update_payment_status(order_id, "pending", photo_id)
+
+    await state.clear()
+
+    # Get store info
+    store = db.get_store(store_id)
+    from handlers.bookings.utils import get_store_field
+
+    store_name = get_store_field(store, "name", "Магазин")
+    owner_id = get_store_field(store, "owner_id")
+
+    customer = db.get_user_model(user_id)
+    customer_phone = customer.phone if customer else "—"
+
+    total = sum(item["price"] * item["quantity"] for item in cart_items_stored)
+    total_with_delivery = total + delivery_price
+    currency = "so'm" if lang == "uz" else "сум"
+
+    # Notify ADMIN
+    from bot import ADMIN_ID
+
+    if ADMIN_ID > 0:
+        kb = InlineKeyboardBuilder()
+        kb.button(text="✅ Tasdiqlash", callback_data=f"admin_confirm_payment_{order_id}")
+        kb.button(text="❌ Rad etish", callback_data=f"admin_reject_payment_{order_id}")
+        kb.adjust(2)
+
+        # Build items list for admin
+        items_text = "\n".join([f"• {item['title']} × {item['quantity']}" for item in cart_items_stored])
+
+        try:
+            await bot.send_photo(
+                chat_id=ADMIN_ID,
+                photo=photo_id,
+                caption=(
+                    f"💳 <b>Yangi chek (Savat)!</b>\n\n"
+                    f"📦 #{order_id} | {store_name}\n"
+                    f"🛒 {items_text}\n"
+                    f"💵 {total_with_delivery:,} {currency}\n"
+                    f"📍 {address}\n"
+                    f"👤 {message.from_user.first_name}\n"
+                    f"📱 <code>{customer_phone}</code>"
+                ),
+                parse_mode="HTML",
+                reply_markup=kb.as_markup(),
             )
-            logger.info(
-                f"🛒 Sent cart order notification to partner {owner_id} for order {order_id}"
-            )
-    except Exception as e:
-        logger.error(f"Failed to notify partner: {e}")
+        except Exception as e:
+            logger.error(f"Failed to notify admin: {e}")
+
+    # Confirm to customer
+    if lang == "uz":
+        confirm_text = (
+            f"✅ <b>Buyurtma qabul qilindi!</b>\n\n"
+            f"📦 #{order_id}\n"
+            f"💵 {total_with_delivery:,} {currency}\n"
+            f"📍 {address}\n\n"
+            f"⏳ To'lov tasdiqlanishi kutilmoqda..."
+        )
+    else:
+        confirm_text = (
+            f"✅ <b>Заказ принят!</b>\n\n"
+            f"📦 #{order_id}\n"
+            f"💵 {total_with_delivery:,} {currency}\n"
+            f"📍 {address}\n\n"
+            f"⏳ Ожидаем подтверждения оплаты..."
+        )
+
+    from app.keyboards import main_menu_customer
+
+    await message.answer(confirm_text, parse_mode="HTML", reply_markup=main_menu_customer(lang))
 
 
 # ===================== BACK TO MENU =====================
