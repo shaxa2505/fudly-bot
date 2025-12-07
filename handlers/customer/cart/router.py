@@ -944,7 +944,7 @@ async def cart_payment_card(callback: types.CallbackQuery, state: FSMContext) ->
 async def finalize_cart_order(
     callback: types.CallbackQuery, state: FSMContext, payment_method: str
 ) -> None:
-    """Create orders from cart items with proper seller notifications."""
+    """Create orders from cart items using unified OrderService."""
     if not db or not bot or not callback.message:
         await callback.answer()
         return
@@ -952,8 +952,8 @@ async def finalize_cart_order(
     user_id = callback.from_user.id
     lang = db.get_user_language(user_id)
 
-    items = cart_storage.get_cart(user_id)
-    if not items:
+    cart_items = cart_storage.get_cart(user_id)
+    if not cart_items:
         await callback.answer("Корзина пуста" if lang == "ru" else "Savat bo'sh", show_alert=True)
         return
 
@@ -967,41 +967,41 @@ async def finalize_cart_order(
         )
         return
 
-    # Get customer info for notifications
-    customer = db.get_user_model(user_id)
-    customer_name = customer.first_name if customer else "—"
-    customer_phone = customer.phone if customer else "—"
+    # Import and use OrderService
+    from app.services.order_service import OrderItem, OrderService
 
-    # Prepare items for batch creation
-    cart_items = [
-        {
-            "offer_id": item.offer_id,
-            "store_id": item.store_id,
-            "quantity": item.quantity,
-            "price": item.price,
-            "delivery_price": item.delivery_price,
-            "title": item.title,
-            "store_name": item.store_name,
-            "store_address": item.store_address,
-        }
-        for item in items
+    order_service = OrderService(db, bot)
+
+    # Convert cart items to OrderItem objects
+    order_items = [
+        OrderItem(
+            offer_id=item.offer_id,
+            store_id=item.store_id,
+            title=item.title,
+            price=item.price,
+            original_price=item.original_price,
+            quantity=item.quantity,
+            store_name=item.store_name,
+            store_address=item.store_address,
+            delivery_price=item.delivery_price,
+            photo=item.photo,
+        )
+        for item in cart_items
     ]
 
-    # Create all orders using batch method
-    result = db.create_cart_order(
+    # Create order using unified service
+    result = await order_service.create_order(
         user_id=user_id,
-        items=cart_items,
+        items=order_items,
         order_type="delivery",
         delivery_address=address,
         payment_method=payment_method,
+        notify_sellers=True,
     )
 
-    created_orders = result.get("created_orders", [])
-    stores_orders = result.get("stores_orders", {})
-
-    if not created_orders:
+    if not result.success:
         await callback.answer(
-            "Ошибка при создании заказа" if lang == "ru" else "Buyurtma yaratishda xatolik",
+            result.error_message or ("Ошибка при создании заказа" if lang == "ru" else "Buyurtma yaratishda xatolik"),
             show_alert=True,
         )
         return
@@ -1010,125 +1010,28 @@ async def finalize_cart_order(
     cart_storage.clear_cart(user_id)
     await state.clear()
 
-    # Calculate totals
-    currency = "so'm" if lang == "uz" else "сум"
-    total_items = sum(o["price"] * o["quantity"] for o in created_orders)
-    delivery_price = items[0].delivery_price if items else 0
-    grand_total = total_items + delivery_price
-
-    # Build success message for customer
-    lines = [f"✅ <b>{'Buyurtma qabul qilindi!' if lang == 'uz' else 'Заказ оформлен!'}</b>\n"]
-    lines.append(f"📍 {_esc(address)}\n")
-
-    for o in created_orders:
-        subtotal = o["price"] * o["quantity"]
-        lines.append(f"• {_esc(o['title'])} × {o['quantity']} = {int(subtotal):,} {currency}")
-
-    lines.append("")
-    lines.append("─" * 25)
-    lines.append(f"💵 {'Mahsulotlar' if lang == 'uz' else 'Товары'}: {int(total_items):,} {currency}")
-    lines.append(f"🚚 {'Yetkazish' if lang == 'uz' else 'Доставка'}: {int(delivery_price):,} {currency}")
-    lines.append(
-        f"💰 <b>{'Jami' if lang == 'uz' else 'Итого'}: {int(grand_total):,} {currency}</b>"
-    )
-    lines.append("")
-
-    payment_text = "💵 Naqd" if payment_method == "cash" else "💳 Karta"
-    if lang == "ru":
-        payment_text = "💵 Наличные" if payment_method == "cash" else "💳 Карта"
-    lines.append(f"💳 {payment_text}")
-    lines.append("")
-    lines.append(
-        "🚚 Заказ будет доставлен в течение часа"
-        if lang == "ru"
-        else "🚚 Buyurtma 1 soat ichida yetkaziladi"
-    )
-
-    text = "\n".join(lines)
+    # Build customer confirmation
+    if lang == "uz":
+        text = order_service.build_customer_confirmation_uz(
+            result=result,
+            order_type="delivery",
+            delivery_address=address,
+            payment_method=payment_method,
+            items=order_items,
+        )
+    else:
+        text = order_service.build_customer_confirmation_ru(
+            result=result,
+            order_type="delivery",
+            delivery_address=address,
+            payment_method=payment_method,
+            items=order_items,
+        )
 
     try:
         await callback.message.edit_text(text, parse_mode="HTML")
     except Exception:
         pass
-
-    # Send notifications to sellers (grouped by store)
-    for store_id, store_orders in stores_orders.items():
-        try:
-            store = db.get_store(store_id)
-            if not store:
-                continue
-                
-            owner_id = store.get("owner_id") if isinstance(store, dict) else None
-            if not owner_id:
-                continue
-
-            seller_lang = db.get_user_language(owner_id)
-            seller_currency = "so'm" if seller_lang == "uz" else "сум"
-            
-            # Calculate store total
-            store_total = sum(o["price"] * o["quantity"] for o in store_orders)
-            store_delivery = store_orders[0].get("delivery_price", 0)
-            
-            # Build notification for seller
-            order_ids = [str(o["order_id"]) for o in store_orders]
-            
-            if seller_lang == "uz":
-                seller_text = (
-                    f"🔔 <b>Yangi buyurtma!</b>\n\n"
-                    f"📦 #{', #'.join(order_ids)}\n"
-                    f"👤 {customer_name}\n"
-                    f"📱 <code>{customer_phone}</code>\n"
-                    f"📍 {_esc(address)}\n\n"
-                )
-                for o in store_orders:
-                    subtotal = o["price"] * o["quantity"]
-                    seller_text += f"• {_esc(o['title'])} × {o['quantity']} = {int(subtotal):,} {seller_currency}\n"
-                
-                seller_text += (
-                    f"\n💵 Mahsulotlar: {int(store_total):,} {seller_currency}\n"
-                    f"🚚 Yetkazish: {int(store_delivery):,} {seller_currency}\n"
-                    f"💰 <b>Jami: {int(store_total + store_delivery):,} {seller_currency}</b>\n\n"
-                    f"💳 {'Naqd' if payment_method == 'cash' else 'Karta'}\n\n"
-                    f"⏳ <b>Buyurtmani tasdiqlang!</b>"
-                )
-                confirm_text = "✅ Qabul qilish"
-                reject_text = "❌ Rad etish"
-            else:
-                seller_text = (
-                    f"🔔 <b>Новый заказ!</b>\n\n"
-                    f"📦 #{', #'.join(order_ids)}\n"
-                    f"👤 {customer_name}\n"
-                    f"📱 <code>{customer_phone}</code>\n"
-                    f"📍 {_esc(address)}\n\n"
-                )
-                for o in store_orders:
-                    subtotal = o["price"] * o["quantity"]
-                    seller_text += f"• {_esc(o['title'])} × {o['quantity']} = {int(subtotal):,} {seller_currency}\n"
-                
-                seller_text += (
-                    f"\n💵 Товары: {int(store_total):,} {seller_currency}\n"
-                    f"🚚 Доставка: {int(store_delivery):,} {seller_currency}\n"
-                    f"💰 <b>Итого: {int(store_total + store_delivery):,} {seller_currency}</b>\n\n"
-                    f"💳 {'Наличные' if payment_method == 'cash' else 'Карта'}\n\n"
-                    f"⏳ <b>Подтвердите заказ!</b>"
-                )
-                confirm_text = "✅ Принять"
-                reject_text = "❌ Отклонить"
-
-            # Build keyboard with first order ID for confirmation
-            first_order_id = store_orders[0]["order_id"]
-            partner_kb = InlineKeyboardBuilder()
-            partner_kb.button(text=confirm_text, callback_data=f"partner_confirm_order_{first_order_id}")
-            partner_kb.button(text=reject_text, callback_data=f"partner_reject_order_{first_order_id}")
-            partner_kb.adjust(2)
-
-            await bot.send_message(
-                owner_id, seller_text, parse_mode="HTML", reply_markup=partner_kb.as_markup()
-            )
-            logger.info(f"Sent order notification to seller {owner_id} for orders {order_ids}")
-
-        except Exception as e:
-            logger.error(f"Failed to notify seller for store {store_id}: {e}")
 
     # Show main menu with updated cart count (should be 0 now)
     cart_count = cart_storage.get_cart_count(user_id)
