@@ -93,17 +93,31 @@ async def show_cart(message: types.Message, state: FSMContext) -> None:
 
     text = "\n".join(lines)
 
-    # Cart keyboard
+    # Cart keyboard with edit buttons for each item
     kb = InlineKeyboardBuilder()
+
+    # Edit buttons for each item
+    for i, item in enumerate(items, 1):
+        # Show short title + edit buttons
+        title_short = item.title[:15] + "..." if len(item.title) > 15 else item.title
+        kb.button(text="➖", callback_data=f"cart_qty_dec_{item.offer_id}")
+        kb.button(text=f"{i}. {title_short} ({item.quantity})", callback_data="cart_noop")
+        kb.button(text="➕", callback_data=f"cart_qty_inc_{item.offer_id}")
+        kb.button(text="🗑", callback_data=f"cart_remove_{item.offer_id}")
+
+    # Adjust: 4 buttons per row (-, item, +, delete)
+    kb.adjust(4)
+
+    # Main actions
     kb.button(
         text="✅ Оформить заказ" if lang == "ru" else "✅ Buyurtma berish",
         callback_data="cart_checkout",
     )
     kb.button(
-        text="🗑 Очистить корзину" if lang == "ru" else "🗑 Savatni tozalash",
+        text="🗑 Очистить всё" if lang == "ru" else "🗑 Hammasini tozalash",
         callback_data="cart_clear",
     )
-    kb.adjust(1)
+    kb.adjust(4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 2)
 
     await message.answer(text, parse_mode="HTML", reply_markup=kb.as_markup())
 
@@ -147,6 +161,30 @@ async def cart_checkout(callback: types.CallbackQuery, state: FSMContext) -> Non
     if not items:
         await callback.answer("Корзина пуста" if lang == "ru" else "Savat bo'sh", show_alert=True)
         return
+
+    # SMART NOTIFICATION: Check if any items are low in stock
+    low_stock_warnings = []
+    for item in items:
+        # If item quantity is < 5 AND cart takes > 50% of available stock
+        if item.max_quantity < 5 and item.quantity > (item.max_quantity * 0.5):
+            low_stock_warnings.append(
+                f"⚠️ {item.title}: осталось всего {item.max_quantity} {item.unit}"
+                if lang == "ru"
+                else f"⚠️ {item.title}: faqat {item.max_quantity} {item.unit} qoldi"
+            )
+
+    if low_stock_warnings:
+        warning_text = "\n".join(low_stock_warnings)
+        warning_text += "\n\n" + (
+            "Товар заканчивается! Рекомендуем оформить заказ как можно скорее."
+            if lang == "ru"
+            else "Mahsulot tugayapti! Tezroq buyurtma berishni tavsiya qilamiz."
+        )
+        # Show warning but don't block checkout
+        try:
+            await callback.message.answer(warning_text, parse_mode="HTML")
+        except Exception:
+            pass
 
     # Check if user has phone
     user = db.get_user_model(user_id)
@@ -1307,6 +1345,139 @@ async def cart_add_cancel(callback: types.CallbackQuery, state: FSMContext) -> N
 async def cart_noop(callback: types.CallbackQuery) -> None:
     """No-op handler for disabled buttons."""
     await callback.answer()
+
+
+# ===================== CART EDITING HANDLERS =====================
+
+
+@router.callback_query(F.data.startswith("cart_qty_inc_"))
+async def cart_quantity_increase(callback: types.CallbackQuery, state: FSMContext) -> None:
+    """Increase item quantity in cart."""
+    if not db or not callback.message:
+        await callback.answer()
+        return
+
+    user_id = callback.from_user.id
+    lang = db.get_user_language(user_id)
+
+    try:
+        offer_id = int(callback.data.split("_")[-1])
+    except (ValueError, IndexError):
+        await callback.answer("❌ Ошибка" if lang == "ru" else "❌ Xatolik", show_alert=True)
+        return
+
+    # Get current item
+    items = cart_storage.get_cart(user_id)
+    item = next((i for i in items if i.offer_id == offer_id), None)
+
+    if not item:
+        await callback.answer(
+            "❌ Товар не найден" if lang == "ru" else "❌ Mahsulot topilmadi", show_alert=True
+        )
+        return
+
+    # Check max quantity
+    if item.quantity >= item.max_quantity:
+        await callback.answer(
+            f"⚠️ Максимум: {item.max_quantity}"
+            if lang == "ru"
+            else f"⚠️ Maksimal: {item.max_quantity}",
+            show_alert=True,
+        )
+        return
+
+    # Increase quantity
+    cart_storage.update_quantity(user_id, offer_id, item.quantity + 1)
+
+    # Refresh cart display
+    from aiogram.types import Message
+
+    fake_message = Message(
+        message_id=callback.message.message_id,
+        date=callback.message.date,
+        chat=callback.message.chat,
+        from_user=callback.from_user,
+    )
+    await show_cart(fake_message, state)
+    await callback.answer(f"✅ +1 ({item.quantity + 1})")
+
+
+@router.callback_query(F.data.startswith("cart_qty_dec_"))
+async def cart_quantity_decrease(callback: types.CallbackQuery, state: FSMContext) -> None:
+    """Decrease item quantity in cart."""
+    if not db or not callback.message:
+        await callback.answer()
+        return
+
+    user_id = callback.from_user.id
+    lang = db.get_user_language(user_id)
+
+    try:
+        offer_id = int(callback.data.split("_")[-1])
+    except (ValueError, IndexError):
+        await callback.answer("❌ Ошибка" if lang == "ru" else "❌ Xatolik", show_alert=True)
+        return
+
+    # Get current item
+    items = cart_storage.get_cart(user_id)
+    item = next((i for i in items if i.offer_id == offer_id), None)
+
+    if not item:
+        await callback.answer(
+            "❌ Товар не найден" if lang == "ru" else "❌ Mahsulot topilmadi", show_alert=True
+        )
+        return
+
+    # Decrease or remove
+    if item.quantity <= 1:
+        cart_storage.remove_item(user_id, offer_id)
+        msg = "🗑 Удалён" if lang == "ru" else "🗑 O'chirildi"
+    else:
+        cart_storage.update_quantity(user_id, offer_id, item.quantity - 1)
+        msg = f"✅ -1 ({item.quantity - 1})"
+
+    # Refresh cart display
+    from aiogram.types import Message
+
+    fake_message = Message(
+        message_id=callback.message.message_id,
+        date=callback.message.date,
+        chat=callback.message.chat,
+        from_user=callback.from_user,
+    )
+    await show_cart(fake_message, state)
+    await callback.answer(msg)
+
+
+@router.callback_query(F.data.startswith("cart_remove_"))
+async def cart_remove_item(callback: types.CallbackQuery, state: FSMContext) -> None:
+    """Remove item from cart."""
+    if not db or not callback.message:
+        await callback.answer()
+        return
+
+    user_id = callback.from_user.id
+    lang = db.get_user_language(user_id)
+
+    try:
+        offer_id = int(callback.data.split("_")[-1])
+    except (ValueError, IndexError):
+        await callback.answer("❌ Ошибка" if lang == "ru" else "❌ Xatolik", show_alert=True)
+        return
+
+    cart_storage.remove_item(user_id, offer_id)
+
+    # Refresh cart display
+    from aiogram.types import Message
+
+    fake_message = Message(
+        message_id=callback.message.message_id,
+        date=callback.message.date,
+        chat=callback.message.chat,
+        from_user=callback.from_user,
+    )
+    await show_cart(fake_message, state)
+    await callback.answer("🗑 Удалён" if lang == "ru" else "🗑 O'chirildi")
 
 
 @router.callback_query(F.data.startswith("continue_shopping_"))

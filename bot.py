@@ -395,9 +395,11 @@ def _register_handlers() -> None:
     from handlers.customer import payments as telegram_payments
     from handlers.customer.cart import router as cart_router
     from handlers.customer.cart import setup_dependencies as cart_setup
+    from handlers.customer.cart.storage import cart_storage
     from handlers.customer.offers import browse as offers_browse
     from handlers.customer.offers import search as offers_search
     from handlers.customer.orders import delivery as orders_delivery
+    from handlers.customer.orders import history as orders_history
     from handlers.customer.orders import orders_router
     from handlers.seller import (
         analytics,
@@ -415,6 +417,7 @@ def _register_handlers() -> None:
     # Setup dependencies for handler modules
     bookings.setup_dependencies(db, bot, cache, METRICS)
     orders_delivery.setup_dependencies(db, bot, user_view_mode)
+    orders_history.setup_dependencies(db, bot, cart_storage)
     partner.setup_dependencies(db, bot, user_view_mode)
     create_offer.setup_dependencies(db, bot)
     management.setup_dependencies(db, bot)

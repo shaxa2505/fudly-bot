@@ -8,7 +8,7 @@ from localization import get_text
 
 
 def main_menu_customer(lang: str = "ru", cart_count: int = 0) -> ReplyKeyboardMarkup:
-    """Main menu for customers - optimized 4 buttons.
+    """Main menu for customers - optimized 5 buttons.
 
     Args:
         lang: Interface language
@@ -20,15 +20,18 @@ def main_menu_customer(lang: str = "ru", cart_count: int = 0) -> ReplyKeyboardMa
     builder.button(text=get_text(lang, "hot_offers"))
     builder.button(text=get_text(lang, "search"))
 
-    # Row 2: Cart with counter + Profile
+    # Row 2: Cart with counter + My Orders
     cart_text = get_text(lang, "my_cart")
     if cart_count > 0:
         cart_text = f"{cart_text} ({cart_count})"
     builder.button(text=cart_text)
+    builder.button(text="📋 Мои заказы" if lang == "ru" else "📋 Buyurtmalarim")
+
+    # Row 3: Profile
     builder.button(text=get_text(lang, "profile"))
 
-    # 2x2 layout - cleaner and easier to use
-    builder.adjust(2, 2)
+    # 2x2x1 layout
+    builder.adjust(2, 2, 1)
     return builder.as_markup(resize_keyboard=True)
 
 

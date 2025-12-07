@@ -79,8 +79,9 @@ async def process_phone(message: types.Message, state: FSMContext, db: DatabaseP
         await state.clear()
 
         # Show cart checkout directly
-        from handlers.customer.cart.router import cart_storage
         import html
+
+        from handlers.customer.cart.router import cart_storage
 
         def _esc(val):
             if val is None:
@@ -120,16 +121,16 @@ async def process_phone(message: types.Message, state: FSMContext, db: DatabaseP
             if delivery_enabled:
                 kb.button(
                     text="🏪 Самовывоз" if lang == "ru" else "🏪 O'zim olib ketaman",
-                    callback_data="checkout_pickup",
+                    callback_data="cart_confirm_pickup",
                 )
                 kb.button(
                     text="🚚 Доставка" if lang == "ru" else "🚚 Yetkazish",
-                    callback_data="checkout_delivery",
+                    callback_data="cart_confirm_delivery",
                 )
             else:
                 kb.button(
                     text="✅ Подтвердить" if lang == "ru" else "✅ Tasdiqlash",
-                    callback_data="checkout_pickup",
+                    callback_data="cart_confirm_pickup",
                 )
             kb.button(text="◀️ Назад" if lang == "ru" else "◀️ Orqaga", callback_data="view_cart")
             kb.adjust(2 if delivery_enabled else 1, 1)
@@ -138,6 +139,7 @@ async def process_phone(message: types.Message, state: FSMContext, db: DatabaseP
         else:
             # Cart is empty
             from handlers.customer.cart.router import main_menu_customer
+
             await message.answer(
                 "🛒 Корзина пуста" if lang == "ru" else "🛒 Savat bo'sh",
                 reply_markup=main_menu_customer(lang),
@@ -176,6 +178,7 @@ async def process_phone(message: types.Message, state: FSMContext, db: DatabaseP
         await state.clear()
 
         from aiogram.types import ReplyKeyboardRemove
+
         from app.keyboards import main_menu_customer
 
         await message.answer(
