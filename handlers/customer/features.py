@@ -101,9 +101,9 @@ def setup(
     @dp_or_router.message(F.text.in_(["🛒 Корзина", "🛒 Savat"]))
     async def my_cart(message: types.Message, state: FSMContext):
         """Redirect to new cart view."""
-        from handlers.customer.cart.router import view_cart_message
+        from handlers.customer.cart.router import show_cart
 
-        await view_cart_message(message, state)
+        await show_cart(message, state)
 
     # ============== ИЗБРАННОЕ ==============
 
