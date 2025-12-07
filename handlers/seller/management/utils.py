@@ -341,23 +341,42 @@ async def send_order_card(
         store_name = get_store_field(store, "name", "Магазин")
         store_address = get_store_field(store, "address", "")
 
-        # Try to get offer/unit price
-        offer_id = (
-            order.get("offer_id")
-            if isinstance(order, dict)
-            else (order[2] if len(order) > 2 else None)
-        )
-        unit_price = None
-        total_price = None
-        try:
-            if offer_id:
-                offer = database.get_offer(offer_id)
-                if offer:
-                    unit_price = get_offer_field(offer, "discount_price")
-                    if unit_price is not None:
-                        total_price = int(unit_price) * int(quantity)
-        except Exception:
-            pass
+        # Check if cart booking
+        is_cart_booking = order.get("is_cart_booking", 0) if isinstance(order, dict) else 0
+        cart_items_json = order.get("cart_items") if isinstance(order, dict) else None
+
+        # Try to get offer/unit price or cart items
+        if is_cart_booking and cart_items_json:
+            import json
+            try:
+                cart_items = json.loads(cart_items_json) if isinstance(cart_items_json, str) else cart_items_json
+                items_text = "\n".join([f"• {item.get('title', 'Товар')} × {item.get('quantity', 1)}" for item in cart_items])
+                total_price = sum(item.get("price", 0) * item.get("quantity", 1) for item in cart_items)
+            except Exception:
+                items_text = offer_title
+                total_price = None
+        else:
+            # Single item booking
+            offer_id = (
+                order.get("offer_id")
+                if isinstance(order, dict)
+                else (order[2] if len(order) > 2 else None)
+            )
+            unit_price = None
+            total_price = None
+            try:
+                if offer_id:
+                    offer = database.get_offer(offer_id)
+                    if offer:
+                        unit_price = get_offer_field(offer, "discount_price")
+                        if unit_price is not None:
+                            total_price = int(unit_price) * int(quantity)
+            except Exception:
+                pass
+            items_text = f"{offer_title}"
+            if unit_price is not None:
+                items_text += f"\n💰 Цена за ед.: <b>{int(unit_price):,}</b>"
+            items_text += f"\n🔢 {'Количество' if lang == 'ru' else 'Miqdor'}: <b>{quantity}</b>"
 
         status_emoji = {
             "pending": "⏳",
@@ -370,10 +389,7 @@ async def send_order_card(
         text += f"🏬 <b>{store_name}</b>\n"
         if store_address:
             text += f"📍 {store_address}\n"
-        text += f"📦 {offer_title}\n"
-        if unit_price is not None:
-            text += f"💰 Цена за ед.: <b>{int(unit_price):,}</b>\n"
-        text += f"🔢 {'Количество' if lang == 'ru' else 'Miqdor'}: <b>{quantity}</b>\n"
+        text += f"🛒 <b>{'Товары:' if lang == 'ru' else 'Mahsulotlar:'}</b>\n{items_text}\n"
         if total_price is not None:
             text += f"🧾 Итого: <b>{total_price:,}</b>\n"
         text += "\n"
@@ -441,16 +457,32 @@ async def send_order_card(
             else (order[11] if len(order) > 11 else "pending")
         )
 
-        # Get offer info
-        offer_id = (
-            order.get("offer_id")
-            if isinstance(order, dict)
-            else (order[2] if len(order) > 2 else None)
-        )
-        offer = database.get_offer(offer_id) if offer_id else None
-        offer_title = get_offer_field(offer, "title", "Товар") if offer else "Товар"
-        offer_price = int(get_offer_field(offer, "discount_price", 0)) if offer else 0
-        total_price = offer_price * int(quantity)
+        # Check if cart order
+        is_cart_order = order.get("is_cart_order", 0) if isinstance(order, dict) else 0
+        cart_items_json = order.get("cart_items") if isinstance(order, dict) else None
+
+        # Get offer info or cart items
+        if is_cart_order and cart_items_json:
+            import json
+            try:
+                cart_items = json.loads(cart_items_json) if isinstance(cart_items_json, str) else cart_items_json
+                items_text = "\n".join([f"• {item['title']} × {item['quantity']}" for item in cart_items])
+                total_price = sum(item.get("price", 0) * item.get("quantity", 1) for item in cart_items)
+            except Exception:
+                items_text = "Товары из корзины"
+                total_price = 0
+        else:
+            # Single item order
+            offer_id = (
+                order.get("offer_id")
+                if isinstance(order, dict)
+                else (order[2] if len(order) > 2 else None)
+            )
+            offer = database.get_offer(offer_id) if offer_id else None
+            offer_title = get_offer_field(offer, "title", "Товар") if offer else "Товар"
+            offer_price = int(get_offer_field(offer, "discount_price", 0)) if offer else 0
+            items_text = f"• {offer_title} × {quantity}"
+            total_price = offer_price * int(quantity)
 
         status_emoji = {
             "pending": "⏳",
@@ -468,8 +500,7 @@ async def send_order_card(
 
         text = f"{status_emoji} <b>{'ДОСТАВКА' if lang == 'ru' else 'YETKAZIB BERISH'}</b>\n\n"
         text += f"📦 {'Заказ' if lang == 'ru' else 'Buyurtma'} #{order_id}\n"
-        text += f"🍽 {offer_title}\n"
-        text += f"🔢 {quantity} {'шт' if lang == 'ru' else 'dona'}\n"
+        text += f"🛒 <b>{'Товары:' if lang == 'ru' else 'Mahsulotlar:'}</b>\n{items_text}\n"
         if total_price > 0:
             text += f"💰 {'Сумма' if lang == 'ru' else 'Summa'}: {total_price:,} {'сум' if lang == 'ru' else 'so`m'}\n"
         text += f"\n👤 {user_name}\n"
