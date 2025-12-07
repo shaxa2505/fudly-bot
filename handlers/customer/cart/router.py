@@ -13,6 +13,7 @@ from aiogram.fsm.context import FSMContext
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
 from app.keyboards import main_menu_customer
+from handlers.common.states import OrderDelivery
 from localization import get_text
 
 from .storage import CartItem, cart_storage
@@ -416,9 +417,7 @@ async def cart_confirm_delivery(callback: types.CallbackQuery, state: FSMContext
         cart_items=items, store_id=items[0].store_id, delivery_price=items[0].delivery_price
     )
 
-    from handlers.common.states import DeliveryOrder
-
-    await state.set_state(DeliveryOrder.address)
+    await state.set_state(OrderDelivery.address)
 
     text = "📍 Введите адрес доставки:" if lang == "ru" else "📍 Yetkazish manzilini kiriting:"
 
@@ -430,10 +429,7 @@ async def cart_confirm_delivery(callback: types.CallbackQuery, state: FSMContext
     await callback.answer()
 
 
-from handlers.common.states import DeliveryOrder
-
-
-@router.message(DeliveryOrder.address)
+@router.message(OrderDelivery.address)
 async def cart_process_delivery_address(message: types.Message, state: FSMContext) -> None:
     """Process delivery address and create cart order."""
     if not db or not bot or not message.from_user or not message.text:
