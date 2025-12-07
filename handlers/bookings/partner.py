@@ -579,3 +579,201 @@ async def skip_review(callback: types.CallbackQuery, state: FSMContext) -> None:
 
     await safe_answer_or_send(callback.message, user_id, text, bot=bot)
     await callback.answer(get_text(lang, "rating_saved") or "Оценка сохранена")
+
+
+# ===================== BATCH CONFIRM/REJECT (for cart orders) =====================
+
+
+@router.callback_query(F.data.startswith("partner_confirm_batch_"))
+async def partner_confirm_batch_bookings(callback: types.CallbackQuery) -> None:
+    """Partner confirms multiple bookings at once (from cart)."""
+    if not db or not bot:
+        await callback.answer("System error", show_alert=True)
+        return
+
+    partner_id = callback.from_user.id
+    lang = db.get_user_language(partner_id)
+
+    try:
+        # Extract booking IDs from callback data: "partner_confirm_batch_1,2,3"
+        booking_ids_str = callback.data.replace("partner_confirm_batch_", "")
+        booking_ids = [int(bid) for bid in booking_ids_str.split(",")]
+    except (ValueError, AttributeError):
+        await callback.answer(get_text(lang, "error"), show_alert=True)
+        return
+
+    if not booking_ids:
+        await callback.answer(get_text(lang, "error"), show_alert=True)
+        return
+
+    # Confirm all bookings
+    confirmed_count = 0
+    customer_notifications = {}  # {customer_id: [booking_infos]}
+
+    for booking_id in booking_ids:
+        try:
+            booking = db.get_booking(booking_id)
+            if not booking:
+                continue
+
+            # Verify ownership
+            offer_id = get_booking_field(booking, "offer_id")
+            offer = db.get_offer(offer_id) if offer_id else None
+            store_id = get_offer_field(offer, "store_id") if offer else None
+            store = db.get_store(store_id) if store_id else None
+            owner_id = get_store_field(store, "owner_id")
+
+            if partner_id != owner_id:
+                continue
+
+            # Confirm booking
+            db.update_booking_status(booking_id, "confirmed")
+            db.mark_reminder_sent(booking_id)
+            confirmed_count += 1
+
+            # Collect info for customer notification
+            customer_id = get_booking_field(booking, "user_id")
+            if customer_id:
+                if customer_id not in customer_notifications:
+                    customer_notifications[customer_id] = []
+                
+                code = get_booking_field(booking, "code")
+                code_display = format_booking_code(code, booking_id)
+                store_name = get_store_field(store, "name", "Магазин")
+                store_address = get_store_field(store, "address", "")
+                
+                customer_notifications[customer_id].append({
+                    "code": code_display,
+                    "store_name": store_name,
+                    "store_address": store_address,
+                })
+
+        except Exception as e:
+            logger.error(f"Failed to confirm booking {booking_id}: {e}")
+            continue
+
+    # Notify customers (grouped)
+    for customer_id, bookings_info in customer_notifications.items():
+        try:
+            customer_lang = db.get_user_language(customer_id)
+            
+            lines = []
+            if customer_lang == "uz":
+                lines.append("✅ <b>Barcha bronlaringiz tasdiqlandi!</b>\n")
+            else:
+                lines.append("✅ <b>Все ваши брони подтверждены!</b>\n")
+            
+            for info in bookings_info:
+                lines.append(f"🏪 {_esc(info['store_name'])}")
+                if info['store_address']:
+                    lines.append(f"📍 {_esc(info['store_address'])}")
+                lines.append(f"🎫 Kod: <code>{info['code']}</code>\n")
+            
+            if customer_lang == "uz":
+                lines.append("⚠️ Kodni sotuvchiga ko'rsating.")
+            else:
+                lines.append("⚠️ Покажите код продавцу.")
+            
+            customer_msg = "\n".join(lines)
+            await bot.send_message(customer_id, customer_msg, parse_mode="HTML")
+            
+        except Exception as e:
+            logger.error(f"Failed to notify customer {customer_id}: {e}")
+
+    # Update partner message
+    try:
+        await callback.message.edit_reply_markup(reply_markup=None)
+    except Exception:
+        pass
+
+    success_text = f"✅ {confirmed_count} ta bron tasdiqlandi" if lang == "uz" else f"✅ Подтверждено броней: {confirmed_count}"
+    await callback.answer(success_text)
+
+
+@router.callback_query(F.data.startswith("partner_reject_batch_"))
+async def partner_reject_batch_bookings(callback: types.CallbackQuery) -> None:
+    """Partner rejects multiple bookings at once (from cart)."""
+    if not db or not bot:
+        await callback.answer("System error", show_alert=True)
+        return
+
+    partner_id = callback.from_user.id
+    lang = db.get_user_language(partner_id)
+
+    try:
+        # Extract booking IDs from callback data: "partner_reject_batch_1,2,3"
+        booking_ids_str = callback.data.replace("partner_reject_batch_", "")
+        booking_ids = [int(bid) for bid in booking_ids_str.split(",")]
+    except (ValueError, AttributeError):
+        await callback.answer(get_text(lang, "error"), show_alert=True)
+        return
+
+    if not booking_ids:
+        await callback.answer(get_text(lang, "error"), show_alert=True)
+        return
+
+    # Reject all bookings and restore quantities
+    rejected_count = 0
+    customer_notifications = {}  # {customer_id: [store_names]}
+
+    for booking_id in booking_ids:
+        try:
+            booking = db.get_booking(booking_id)
+            if not booking:
+                continue
+
+            # Verify ownership
+            offer_id = get_booking_field(booking, "offer_id")
+            offer = db.get_offer(offer_id) if offer_id else None
+            store_id = get_offer_field(offer, "store_id") if offer else None
+            store = db.get_store(store_id) if store_id else None
+            owner_id = get_store_field(store, "owner_id")
+
+            if partner_id != owner_id:
+                continue
+
+            # Return quantity to offer
+            quantity = get_booking_field(booking, "quantity", 1)
+            if offer_id:
+                db.increment_offer_quantity_atomic(offer_id, quantity)
+
+            # Reject booking
+            db.update_booking_status(booking_id, "rejected")
+            rejected_count += 1
+
+            # Collect info for customer notification
+            customer_id = get_booking_field(booking, "user_id")
+            if customer_id:
+                if customer_id not in customer_notifications:
+                    customer_notifications[customer_id] = []
+                
+                store_name = get_store_field(store, "name", "Магазин")
+                customer_notifications[customer_id].append(store_name)
+
+        except Exception as e:
+            logger.error(f"Failed to reject booking {booking_id}: {e}")
+            continue
+
+    # Notify customers (grouped)
+    for customer_id, store_names in customer_notifications.items():
+        try:
+            customer_lang = db.get_user_language(customer_id)
+            
+            if customer_lang == "uz":
+                customer_msg = f"❌ Afsuski, {', '.join(store_names)} bronlaringiz rad etildi."
+            else:
+                customer_msg = f"❌ К сожалению, ваши брони в {', '.join(store_names)} отклонены."
+            
+            await bot.send_message(customer_id, customer_msg, parse_mode="HTML")
+            
+        except Exception as e:
+            logger.error(f"Failed to notify customer {customer_id}: {e}")
+
+    # Update partner message
+    try:
+        await callback.message.edit_reply_markup(reply_markup=None)
+    except Exception:
+        pass
+
+    reject_text = f"❌ {rejected_count} ta bron rad etildi" if lang == "uz" else f"❌ Отклонено броней: {rejected_count}"
+    await callback.answer(reject_text)

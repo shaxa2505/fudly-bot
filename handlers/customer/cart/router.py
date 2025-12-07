@@ -246,7 +246,15 @@ async def view_cart_message(message: types.Message, state: FSMContext) -> None:
     text = build_cart_text(lang, items)
     kb = build_cart_keyboard(lang, len(items) > 0)
 
+    # Show cart with inline keyboard
     await message.answer(text, parse_mode="HTML", reply_markup=kb.as_markup())
+    
+    # Update main menu with correct cart count
+    cart_count = cart_storage.get_cart_count(user_id)
+    await message.answer(
+        get_text(lang, "main_menu"),
+        reply_markup=main_menu_customer(lang, cart_count),
+    )
 
 
 @router.callback_query(F.data == "view_cart")
@@ -622,19 +630,20 @@ async def checkout_pickup(callback: types.CallbackQuery, state: FSMContext) -> N
 
             seller_text = "\n".join(lines)
 
-            # Build keyboard with first booking ID
-            first_booking_id = store_bookings[0]["booking_id"]
+            # Build keyboard with ALL booking IDs for batch confirmation
+            booking_ids = [str(b["booking_id"]) for b in store_bookings]
+            booking_ids_str = ",".join(booking_ids)
             kb = InlineKeyboardBuilder()
-            confirm_text = "✅ Qabul qilish" if seller_lang == "uz" else "✅ Подтвердить"
-            reject_text = "❌ Rad etish" if seller_lang == "uz" else "❌ Отклонить"
-            kb.button(text=confirm_text, callback_data=f"partner_confirm_{first_booking_id}")
-            kb.button(text=reject_text, callback_data=f"partner_reject_{first_booking_id}")
-            kb.adjust(2)
+            confirm_text = "✅ Barchasini qabul qilish" if seller_lang == "uz" else "✅ Подтвердить все"
+            reject_text = "❌ Barchasini rad etish" if seller_lang == "uz" else "❌ Отклонить все"
+            kb.button(text=confirm_text, callback_data=f"partner_confirm_batch_{booking_ids_str}")
+            kb.button(text=reject_text, callback_data=f"partner_reject_batch_{booking_ids_str}")
+            kb.adjust(1)
 
             await bot.send_message(
                 owner_id, seller_text, parse_mode="HTML", reply_markup=kb.as_markup()
             )
-            logger.info(f"Sent booking notification to seller {owner_id} for store {store_id}")
+            logger.info(f"Sent batch booking notification to seller {owner_id} for bookings {booking_ids}")
 
         except Exception as e:
             logger.error(f"Failed to notify seller for store {store_id}: {e}")
@@ -1167,19 +1176,19 @@ async def finalize_cart_order(
 
             seller_text = "\n".join(lines)
 
-            # Build keyboard with first order ID
-            first_order_id = store_orders[0]["order_id"]
+            # Build keyboard with ALL order IDs for batch confirmation
+            order_ids_str = ",".join(order_ids)
             kb = InlineKeyboardBuilder()
-            confirm_text = "✅ Qabul qilish" if seller_lang == "uz" else "✅ Принять"
-            reject_text = "❌ Rad etish" if seller_lang == "uz" else "❌ Отклонить"
-            kb.button(text=confirm_text, callback_data=f"partner_confirm_order_{first_order_id}")
-            kb.button(text=reject_text, callback_data=f"partner_reject_order_{first_order_id}")
-            kb.adjust(2)
+            confirm_text = "✅ Barchasini qabul qilish" if seller_lang == "uz" else "✅ Подтвердить все"
+            reject_text = "❌ Barchasini rad etish" if seller_lang == "uz" else "❌ Отклонить все"
+            kb.button(text=confirm_text, callback_data=f"partner_confirm_order_batch_{order_ids_str}")
+            kb.button(text=reject_text, callback_data=f"partner_reject_order_batch_{order_ids_str}")
+            kb.adjust(1)
 
             await bot.send_message(
                 owner_id, seller_text, parse_mode="HTML", reply_markup=kb.as_markup()
             )
-            logger.info(f"Sent order notification to seller {owner_id} for orders {order_ids}")
+            logger.info(f"Sent batch order notification to seller {owner_id} for orders {order_ids}")
 
         except Exception as e:
             logger.error(f"Failed to notify seller for store {store_id}: {e}")
