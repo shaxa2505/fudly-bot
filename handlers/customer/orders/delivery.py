@@ -1378,18 +1378,20 @@ async def partner_confirm_order(
     delivery_price = _get_order_field(order, "delivery_price", 8) or 0
 
     # Check if cart order
-    is_cart = (_get_order_field(order, "is_cart_order") or 0) == 1
+    if isinstance(order, dict):
+        is_cart = order.get("is_cart_order", 0) == 1
+        cart_items_json = order.get("cart_items")
+    else:
+        is_cart = False
+        cart_items_json = None
+    
     cart_items = []
-
-    if is_cart:
+    if is_cart and cart_items_json:
         import json
-
-        cart_items_str = _get_order_field(order, "cart_items")
-        if cart_items_str:
-            try:
-                cart_items = json.loads(cart_items_str)
-            except Exception:
-                pass
+        try:
+            cart_items = json.loads(cart_items_json) if isinstance(cart_items_json, str) else cart_items_json
+        except Exception:
+            pass
 
     offer = db.get_offer(offer_id) if offer_id else None
     offer_title = get_offer_field(offer, "title", "Товар") if offer else "Товар"
@@ -1525,14 +1527,38 @@ async def partner_reject_order(
     # Update order status
     db.update_order_status(order_id, "rejected")
 
-    # Restore quantity
-    offer_id = _get_order_field(order, "offer_id", 3)
-    quantity = _get_order_field(order, "quantity", 4)
-    if offer_id:
+    # Restore quantity - check if cart order
+    if isinstance(order, dict):
+        is_cart = order.get("is_cart_order", 0) == 1
+        cart_items_json = order.get("cart_items")
+    else:
+        is_cart = False
+        cart_items_json = None
+
+    if is_cart and cart_items_json:
+        # Restore quantities for all items in cart
+        import json
         try:
-            db.increment_offer_quantity_atomic(offer_id, int(quantity))
+            cart_items = json.loads(cart_items_json) if isinstance(cart_items_json, str) else cart_items_json
+            for item in cart_items:
+                offer_id = item.get("offer_id")
+                quantity = item.get("quantity", 1)
+                if offer_id:
+                    try:
+                        db.increment_offer_quantity_atomic(offer_id, int(quantity))
+                    except Exception:
+                        pass
         except Exception:
             pass
+    else:
+        # Single item order - restore quantity
+        offer_id = _get_order_field(order, "offer_id", 3)
+        quantity = _get_order_field(order, "quantity", 4)
+        if offer_id:
+            try:
+                db.increment_offer_quantity_atomic(offer_id, int(quantity))
+            except Exception:
+                pass
 
     # Update partner message
     try:
