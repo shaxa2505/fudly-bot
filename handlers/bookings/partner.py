@@ -79,14 +79,19 @@ async def partner_confirm_booking(callback: types.CallbackQuery) -> None:
         await callback.answer(get_text(lang, "booking_not_found"), show_alert=True)
         return
 
-    # Verify ownership
-    offer_id = get_booking_field(booking, "offer_id")
-    offer = db.get_offer(offer_id) if offer_id else None
-    store_id = get_offer_field(offer, "store_id") if offer else None
+    # Verify ownership - get store_id from booking directly (important for cart bookings)
+    store_id = get_booking_field(booking, "store_id")
+    if not store_id:
+        # Fallback: try to get from offer
+        offer_id = get_booking_field(booking, "offer_id")
+        offer = db.get_offer(offer_id) if offer_id else None
+        store_id = get_offer_field(offer, "store_id") if offer else None
+    
     store = db.get_store(store_id) if store_id else None
-    owner_id = get_store_field(store, "owner_id")
+    owner_id = get_store_field(store, "owner_id") if store else None
 
-    if partner_id != owner_id:
+    if not owner_id or partner_id != owner_id:
+        logger.warning(f"Ownership verification failed: partner={partner_id}, owner={owner_id}, booking={booking_id}")
         await callback.answer(get_text(lang, "error"), show_alert=True)
         return
 
@@ -256,22 +261,47 @@ async def partner_reject_booking(callback: types.CallbackQuery) -> None:
         await callback.answer(get_text(lang, "booking_not_found"), show_alert=True)
         return
 
-    # Verify ownership
-    offer_id = get_booking_field(booking, "offer_id")
-    offer = db.get_offer(offer_id) if offer_id else None
-    store_id = get_offer_field(offer, "store_id") if offer else None
+    # Verify ownership - get store_id from booking directly (important for cart bookings)
+    store_id = get_booking_field(booking, "store_id")
+    if not store_id:
+        # Fallback: try to get from offer
+        offer_id = get_booking_field(booking, "offer_id")
+        offer = db.get_offer(offer_id) if offer_id else None
+        store_id = get_offer_field(offer, "store_id") if offer else None
+    
     store = db.get_store(store_id) if store_id else None
-    owner_id = get_store_field(store, "owner_id")
+    owner_id = get_store_field(store, "owner_id") if store else None
 
-    if partner_id != owner_id:
+    if not owner_id or partner_id != owner_id:
+        logger.warning(f"Ownership verification failed in reject: partner={partner_id}, owner={owner_id}, booking={booking_id}")
         await callback.answer(get_text(lang, "error"), show_alert=True)
         return
 
     # Cancel booking and restore quantity
     try:
         db.cancel_booking(booking_id)
-        qty = get_booking_field(booking, "quantity", 1)
-        db.increment_offer_quantity_atomic(offer_id, int(qty))
+        
+        # Restore quantities - check if cart booking
+        is_cart_booking = get_booking_field(booking, "is_cart_booking", 0)
+        if is_cart_booking:
+            import json
+            cart_items_json = get_booking_field(booking, "cart_items")
+            if cart_items_json:
+                try:
+                    cart_items = json.loads(cart_items_json) if isinstance(cart_items_json, str) else cart_items_json
+                    for item in cart_items:
+                        item_offer_id = item.get("offer_id")
+                        item_qty = item.get("quantity", 1)
+                        if item_offer_id:
+                            db.increment_offer_quantity_atomic(item_offer_id, int(item_qty))
+                except Exception as e:
+                    logger.error(f"Failed to restore cart quantities: {e}")
+        else:
+            # Single item booking
+            offer_id = get_booking_field(booking, "offer_id")
+            qty = get_booking_field(booking, "quantity", 1)
+            if offer_id:
+                db.increment_offer_quantity_atomic(offer_id, int(qty))
     except Exception as e:
         logger.error(f"Failed to reject booking: {e}")
         await callback.answer(get_text(lang, "error"), show_alert=True)
@@ -328,14 +358,18 @@ async def complete_booking(callback: types.CallbackQuery) -> None:
         await callback.answer(get_text(lang, "booking_not_found"), show_alert=True)
         return
 
-    # Verify ownership
-    offer_id = get_booking_field(booking, "offer_id")
-    offer = db.get_offer(offer_id) if offer_id else None
-    store_id = get_offer_field(offer, "store_id") if offer else None
+    # Verify ownership - get store_id from booking directly (important for cart bookings)
+    store_id = get_booking_field(booking, "store_id")
+    if not store_id:
+        # Fallback: try to get from offer
+        offer_id = get_booking_field(booking, "offer_id")
+        offer = db.get_offer(offer_id) if offer_id else None
+        store_id = get_offer_field(offer, "store_id") if offer else None
+    
     store = db.get_store(store_id) if store_id else None
-    owner_id = get_store_field(store, "owner_id")
+    owner_id = get_store_field(store, "owner_id") if store else None
 
-    if partner_id != owner_id:
+    if not owner_id or partner_id != owner_id:
         await callback.answer(get_text(lang, "error"), show_alert=True)
         return
 
@@ -403,22 +437,46 @@ async def partner_cancel_booking(callback: types.CallbackQuery) -> None:
         await callback.answer(get_text(lang, "booking_not_found"), show_alert=True)
         return
 
-    # Verify ownership
-    offer_id = get_booking_field(booking, "offer_id")
-    offer = db.get_offer(offer_id) if offer_id else None
-    store_id = get_offer_field(offer, "store_id") if offer else None
+    # Verify ownership - get store_id from booking directly (important for cart bookings)
+    store_id = get_booking_field(booking, "store_id")
+    if not store_id:
+        # Fallback: try to get from offer
+        offer_id = get_booking_field(booking, "offer_id")
+        offer = db.get_offer(offer_id) if offer_id else None
+        store_id = get_offer_field(offer, "store_id") if offer else None
+    
     store = db.get_store(store_id) if store_id else None
-    owner_id = get_store_field(store, "owner_id")
+    owner_id = get_store_field(store, "owner_id") if store else None
 
-    if partner_id != owner_id:
+    if not owner_id or partner_id != owner_id:
         await callback.answer(get_text(lang, "error"), show_alert=True)
         return
 
-    # Cancel and restore
+    # Cancel and restore quantities
     try:
         db.cancel_booking(booking_id)
-        qty = get_booking_field(booking, "quantity", 1)
-        db.increment_offer_quantity_atomic(offer_id, int(qty))
+        
+        # Restore quantities - check if cart booking
+        is_cart_booking = get_booking_field(booking, "is_cart_booking", 0)
+        if is_cart_booking:
+            import json
+            cart_items_json = get_booking_field(booking, "cart_items")
+            if cart_items_json:
+                try:
+                    cart_items = json.loads(cart_items_json) if isinstance(cart_items_json, str) else cart_items_json
+                    for item in cart_items:
+                        item_offer_id = item.get("offer_id")
+                        item_qty = item.get("quantity", 1)
+                        if item_offer_id:
+                            db.increment_offer_quantity_atomic(item_offer_id, int(item_qty))
+                except Exception as e:
+                    logger.error(f"Failed to restore cart quantities in cancel: {e}")
+        else:
+            # Single item booking
+            offer_id = get_booking_field(booking, "offer_id")
+            qty = get_booking_field(booking, "quantity", 1)
+            if offer_id:
+                db.increment_offer_quantity_atomic(offer_id, int(qty))
     except Exception as e:
         logger.error(f"Failed to cancel booking: {e}")
         await callback.answer(get_text(lang, "error"), show_alert=True)
