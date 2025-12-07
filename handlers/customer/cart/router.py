@@ -426,7 +426,9 @@ async def cart_confirm_delivery(callback: types.CallbackQuery, state: FSMContext
         for item in items
     ]
     await state.update_data(
-        cart_items=cart_items_dict, store_id=items[0].store_id, delivery_price=items[0].delivery_price
+        cart_items=cart_items_dict,
+        store_id=items[0].store_id,
+        delivery_price=items[0].delivery_price,
     )
 
     await state.set_state(OrderDelivery.address)
@@ -588,11 +590,13 @@ async def cart_process_delivery_address(message: types.Message, state: FSMContex
 
 
 @router.callback_query(F.data == "back_to_menu")
-async def back_to_menu(callback: types.CallbackQuery) -> None:
+async def back_to_menu(callback: types.CallbackQuery, state: FSMContext) -> None:
     """Return to main menu."""
     if not db or not callback.message:
         await callback.answer()
         return
+
+    await state.clear()  # Clear any ongoing state
 
     user_id = callback.from_user.id
     lang = db.get_user_language(user_id)
@@ -605,12 +609,12 @@ async def back_to_menu(callback: types.CallbackQuery) -> None:
     await callback.answer()
 
 
-# ===================== ADD TO CART =====================
+# ===================== ADD TO CART (with quantity selection like "Сейчас") =====================
 
 
 @router.callback_query(F.data.startswith("add_to_cart_"))
-async def add_to_cart(callback: types.CallbackQuery) -> None:
-    """Add item to cart from offer view."""
+async def add_to_cart_start(callback: types.CallbackQuery, state: FSMContext) -> None:
+    """Show cart addition card with quantity selection - unified with book_offer."""
     if not db or not callback.message or not callback.data:
         await callback.answer()
         return
@@ -647,7 +651,11 @@ async def add_to_cart(callback: types.CallbackQuery) -> None:
     price = get_field(offer, "discount_price", 0)
     original_price = get_field(offer, "original_price", 0)
     title = get_field(offer, "title", "Товар")
+    description = get_field(offer, "description", "")
+    unit = get_field(offer, "unit", "шт")
+    expiry_date = get_field(offer, "expiry_date", "")
     store_id = get_field(offer, "store_id")
+    offer_photo = get_field(offer, "photo", None)
 
     store = db.get_store(store_id) if store_id else None
     store_name = get_field(store, "name", "")
@@ -655,24 +663,284 @@ async def add_to_cart(callback: types.CallbackQuery) -> None:
     delivery_enabled = get_field(store, "delivery_enabled", 0) == 1
     delivery_price = get_field(store, "delivery_price", 0)
 
-    # Add to cart with quantity 1
+    # Initial quantity=1, no delivery method selected yet
+    initial_qty = 1
+
+    # Save to state
+    await state.update_data(
+        offer_id=offer_id,
+        max_quantity=max_qty,
+        offer_price=price,
+        original_price=original_price,
+        offer_title=title,
+        offer_description=description,
+        offer_unit=unit,
+        expiry_date=str(expiry_date) if expiry_date else "",
+        store_id=store_id,
+        store_name=store_name,
+        store_address=store_address,
+        delivery_enabled=delivery_enabled,
+        delivery_price=delivery_price,
+        selected_qty=initial_qty,
+        offer_photo=offer_photo,
+        is_cart_add=True,  # Flag to indicate this is cart addition, not direct booking
+    )
+
+    # Build card (same as book_offer)
+    from handlers.bookings.customer import build_order_card_keyboard, build_order_card_text
+
+    text = build_order_card_text(
+        lang,
+        title,
+        price,
+        initial_qty,
+        store_name,
+        delivery_enabled,
+        delivery_price,
+        None,  # No delivery method selected yet
+        max_qty,
+        original_price=original_price,
+        description=description,
+        expiry_date=str(expiry_date) if expiry_date else "",
+        store_address=store_address,
+        unit=unit,
+    )
+
+    kb = build_order_card_keyboard(
+        lang, offer_id, store_id, initial_qty, max_qty, delivery_enabled, None
+    )
+
+    # Update existing message
+    try:
+        if callback.message.photo:
+            await callback.message.edit_caption(
+                caption=text, parse_mode="HTML", reply_markup=kb.as_markup()
+            )
+        else:
+            await callback.message.edit_text(text, parse_mode="HTML", reply_markup=kb.as_markup())
+        await callback.answer()
+    except Exception as e:
+        logger.warning(f"Failed to edit message in add_to_cart_start: {e}")
+        await callback.answer("❌", show_alert=True)
+
+
+# ===================== CART QUANTITY & METHOD HANDLERS (unified with "Сейчас") =====================
+
+
+@router.callback_query(F.data.startswith("pbook_qty_"))
+async def cart_update_quantity(callback: types.CallbackQuery, state: FSMContext) -> None:
+    """Update quantity in cart addition card - reuses pbook_qty_ callbacks."""
+    if not db or not callback.message:
+        await callback.answer()
+        return
+
+    data = await state.get_data()
+    is_cart = data.get("is_cart_add", False)
+
+    if not is_cart:
+        # This is a regular booking, not cart - let bookings handler handle it
+        return
+
+    user_id = callback.from_user.id
+    lang = db.get_user_language(user_id)
+
+    try:
+        parts = callback.data.split("_")
+        offer_id = int(parts[2])
+        new_qty = int(parts[3])
+    except (ValueError, IndexError):
+        await callback.answer("❌", show_alert=True)
+        return
+
+    max_qty = data.get("max_quantity", 1)
+    if new_qty < 1 or new_qty > max_qty:
+        await callback.answer()
+        return
+
+    # Update quantity in state
+    await state.update_data(selected_qty=new_qty)
+
+    # Rebuild card
+    from handlers.bookings.customer import build_order_card_keyboard, build_order_card_text
+
+    text = build_order_card_text(
+        lang,
+        data.get("offer_title", ""),
+        data.get("offer_price", 0),
+        new_qty,
+        data.get("store_name", ""),
+        data.get("delivery_enabled", False),
+        data.get("delivery_price", 0),
+        data.get("selected_delivery"),
+        max_qty,
+        original_price=data.get("original_price", 0),
+        description=data.get("offer_description", ""),
+        expiry_date=data.get("expiry_date", ""),
+        store_address=data.get("store_address", ""),
+        unit=data.get("offer_unit", ""),
+    )
+
+    kb = build_order_card_keyboard(
+        lang,
+        offer_id,
+        data.get("store_id", 0),
+        new_qty,
+        max_qty,
+        data.get("delivery_enabled", False),
+        data.get("selected_delivery"),
+    )
+
+    try:
+        if callback.message.photo:
+            await callback.message.edit_caption(
+                caption=text, parse_mode="HTML", reply_markup=kb.as_markup()
+            )
+        else:
+            await callback.message.edit_text(text, parse_mode="HTML", reply_markup=kb.as_markup())
+    except Exception:
+        pass
+
+    await callback.answer()
+
+
+@router.callback_query(F.data.startswith("pbook_method_"))
+async def cart_select_method(callback: types.CallbackQuery, state: FSMContext) -> None:
+    """Select delivery method in cart addition card - reuses pbook_method_ callbacks."""
+    if not db or not callback.message:
+        await callback.answer()
+        return
+
+    data = await state.get_data()
+    is_cart = data.get("is_cart_add", False)
+
+    if not is_cart:
+        # This is a regular booking, not cart
+        return
+
+    user_id = callback.from_user.id
+    lang = db.get_user_language(user_id)
+
+    try:
+        parts = callback.data.split("_")
+        offer_id = int(parts[2])
+        method = parts[3]  # "pickup" or "delivery"
+    except (ValueError, IndexError):
+        await callback.answer("❌", show_alert=True)
+        return
+
+    if method not in ["pickup", "delivery"]:
+        await callback.answer()
+        return
+
+    # Update method in state
+    await state.update_data(selected_delivery=method)
+
+    # Rebuild card
+    from handlers.bookings.customer import build_order_card_keyboard, build_order_card_text
+
+    quantity = data.get("selected_qty", 1)
+    max_qty = data.get("max_quantity", 1)
+
+    text = build_order_card_text(
+        lang,
+        data.get("offer_title", ""),
+        data.get("offer_price", 0),
+        quantity,
+        data.get("store_name", ""),
+        data.get("delivery_enabled", False),
+        data.get("delivery_price", 0),
+        method,
+        max_qty,
+        original_price=data.get("original_price", 0),
+        description=data.get("offer_description", ""),
+        expiry_date=data.get("expiry_date", ""),
+        store_address=data.get("store_address", ""),
+        unit=data.get("offer_unit", ""),
+    )
+
+    kb = build_order_card_keyboard(
+        lang,
+        offer_id,
+        data.get("store_id", 0),
+        quantity,
+        max_qty,
+        data.get("delivery_enabled", False),
+        method,
+    )
+
+    try:
+        if callback.message.photo:
+            await callback.message.edit_caption(
+                caption=text, parse_mode="HTML", reply_markup=kb.as_markup()
+            )
+        else:
+            await callback.message.edit_text(text, parse_mode="HTML", reply_markup=kb.as_markup())
+    except Exception:
+        pass
+
+    await callback.answer()
+
+
+@router.callback_query(F.data.startswith("pbook_confirm_"))
+async def cart_add_confirm(callback: types.CallbackQuery, state: FSMContext) -> None:
+    """Confirm adding to cart - only handles cart additions."""
+    if not db or not callback.message:
+        await callback.answer()
+        return
+
+    data = await state.get_data()
+    is_cart = data.get("is_cart_add", False)
+
+    if not is_cart:
+        # This is a regular booking, not cart - let bookings handler handle it
+        return
+
+    user_id = callback.from_user.id
+    lang = db.get_user_language(user_id)
+
+    # Validate selection
+    selected_delivery = data.get("selected_delivery")
+    if not selected_delivery:
+        msg = "Avval olish usulini tanlang" if lang == "uz" else "Сначала выберите способ получения"
+        await callback.answer(msg, show_alert=True)
+        return
+
+    # Get all data
+    offer_id = data.get("offer_id")
+    quantity = data.get("selected_qty", 1)
+    store_id = data.get("store_id")
+    offer_title = data.get("offer_title", "")
+    offer_price = data.get("offer_price", 0)
+    original_price = data.get("original_price", 0)
+    max_qty = data.get("max_quantity", 1)
+    store_name = data.get("store_name", "")
+    store_address = data.get("store_address", "")
+    delivery_enabled = data.get("delivery_enabled", False)
+    delivery_price = data.get("delivery_price", 0)
+    offer_photo = data.get("offer_photo")
+    offer_unit = data.get("offer_unit", "шт")
+    expiry_date = data.get("expiry_date", "")
+
+    # Add to cart
     cart_storage.add_item(
         user_id=user_id,
         offer_id=offer_id,
         store_id=store_id,
-        title=title,
-        price=price,
-        quantity=1,
+        title=offer_title,
+        price=offer_price,
+        quantity=quantity,
         original_price=original_price,
         max_quantity=max_qty,
         store_name=store_name,
         store_address=store_address,
-        photo=get_field(offer, "photo"),
-        unit=get_field(offer, "unit", "шт"),
-        expiry_date=str(get_field(offer, "expiry_date", "")),
+        photo=offer_photo,
+        unit=offer_unit,
+        expiry_date=expiry_date,
         delivery_enabled=delivery_enabled,
         delivery_price=delivery_price,
     )
+
+    await state.clear()
 
     cart_count = cart_storage.get_cart_count(user_id)
 
@@ -699,6 +967,36 @@ async def add_to_cart(callback: types.CallbackQuery) -> None:
         await callback.message.answer(text, parse_mode="HTML", reply_markup=kb.as_markup())
 
     await callback.answer("✅")
+
+
+@router.callback_query(F.data.startswith("pbook_cancel_"))
+async def cart_add_cancel(callback: types.CallbackQuery, state: FSMContext) -> None:
+    """Cancel cart addition - only handles cart additions."""
+    if not callback.message:
+        await callback.answer()
+        return
+
+    data = await state.get_data()
+    is_cart = data.get("is_cart_add", False)
+
+    if not is_cart:
+        # This is a regular booking, not cart
+        return
+
+    await state.clear()
+
+    try:
+        await callback.message.delete()
+    except Exception:
+        pass
+
+    await callback.answer()
+
+
+@router.callback_query(F.data == "pbook_noop")
+async def cart_noop(callback: types.CallbackQuery) -> None:
+    """No-op handler for disabled buttons."""
+    await callback.answer()
 
 
 @router.callback_query(F.data == "view_cart")
