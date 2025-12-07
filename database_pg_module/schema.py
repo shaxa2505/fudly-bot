@@ -116,6 +116,7 @@ class SchemaMixin:
                     order_status TEXT DEFAULT 'pending',
                     quantity INTEGER DEFAULT 1,
                     total_price REAL,
+                    pickup_code TEXT,
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                     FOREIGN KEY (user_id) REFERENCES users(user_id),
                     FOREIGN KEY (offer_id) REFERENCES offers(offer_id),
@@ -123,6 +124,12 @@ class SchemaMixin:
                 )
             """
             )
+
+            # Migration: Add pickup_code column to orders table
+            try:
+                cursor.execute("ALTER TABLE orders ADD COLUMN IF NOT EXISTS pickup_code TEXT")
+            except Exception as e:
+                logger.warning(f"Migration for orders pickup_code column: {e}")
 
             # Bookings table
             cursor.execute(
