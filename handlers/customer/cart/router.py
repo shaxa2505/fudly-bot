@@ -259,7 +259,7 @@ async def back_to_cart(callback: types.CallbackQuery, state: FSMContext) -> None
 @router.callback_query(F.data == "cart_confirm_pickup")
 async def cart_confirm_pickup(callback: types.CallbackQuery) -> None:
     """Confirm pickup for cart - create ONE booking with all items."""
-    if not db or not bot or not callback.message:
+    if not db or not callback.message:
         await callback.answer()
         return
 
@@ -382,7 +382,7 @@ async def cart_confirm_pickup(callback: types.CallbackQuery) -> None:
             )
             kb.adjust(2)
 
-            await bot.send_message(
+            await callback.bot.send_message(
                 owner_id, partner_text, parse_mode="HTML", reply_markup=kb.as_markup()
             )
             logger.info(
@@ -432,7 +432,7 @@ async def cart_confirm_delivery(callback: types.CallbackQuery, state: FSMContext
 @router.message(OrderDelivery.address)
 async def cart_process_delivery_address(message: types.Message, state: FSMContext) -> None:
     """Process delivery address and create cart order."""
-    if not db or not bot or not message.from_user or not message.text:
+    if not db or not message.from_user or not message.text:
         return
 
     user_id = message.from_user.id
@@ -562,7 +562,7 @@ async def cart_process_delivery_address(message: types.Message, state: FSMContex
             )
             kb.adjust(2)
 
-            await bot.send_message(
+            await message.bot.send_message(
                 owner_id, partner_text, parse_mode="HTML", reply_markup=kb.as_markup()
             )
             logger.info(
