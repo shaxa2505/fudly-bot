@@ -530,7 +530,9 @@ async def cart_process_delivery_address(message: types.Message, state: FSMContex
         subtotal = item["price"] * item["quantity"]
         lines.append(f"• {_esc(item['title'])} × {item['quantity']} = {subtotal:,} {currency}")
 
-    lines.append(f"\n🚚 {'Yetkazish' if lang == 'uz' else 'Доставка'}: {delivery_price:,} {currency}")
+    lines.append(
+        f"\n🚚 {'Yetkazish' if lang == 'uz' else 'Доставка'}: {delivery_price:,} {currency}"
+    )
     lines.append(
         f"💵 <b>{'JAMI' if lang == 'uz' else 'ИТОГО'}: {total_with_delivery:,} {currency}</b>\n"
     )
@@ -604,7 +606,9 @@ async def cart_pay_click(callback: types.CallbackQuery, state: FSMContext) -> No
     )
 
     if not ok:
-        error_text = "❌ Не удалось создать заказ" if lang == "ru" else "❌ Buyurtma yaratib bo'lmadi"
+        error_text = (
+            "❌ Не удалось создать заказ" if lang == "ru" else "❌ Buyurtma yaratib bo'lmadi"
+        )
         await callback.answer(error_text, show_alert=True)
         return
 
@@ -702,7 +706,9 @@ async def cart_pay_card(callback: types.CallbackQuery, state: FSMContext) -> Non
     )
 
     if not ok:
-        error_text = "❌ Не удалось создать заказ" if lang == "ru" else "❌ Buyurtma yaratib bo'lmadi"
+        error_text = (
+            "❌ Не удалось создать заказ" if lang == "ru" else "❌ Buyurtma yaratib bo'lmadi"
+        )
         await callback.answer(error_text, show_alert=True)
         return
 
@@ -717,7 +723,9 @@ async def cart_pay_card(callback: types.CallbackQuery, state: FSMContext) -> Non
     await callback.answer()
 
 
-async def _cart_show_card_payment_details(message: types.Message, state: FSMContext, lang: str) -> None:
+async def _cart_show_card_payment_details(
+    message: types.Message, state: FSMContext, lang: str
+) -> None:
     """Show card payment details for cart order."""
     data = await state.get_data()
     store_id = data.get("store_id")
@@ -797,7 +805,7 @@ async def cart_payment_proof(message: types.Message, state: FSMContext) -> None:
     data = await state.get_data()
 
     is_cart_order = data.get("is_cart_order", False)
-    
+
     # Only handle cart orders in this handler
     if not is_cart_order:
         return
@@ -845,7 +853,9 @@ async def cart_payment_proof(message: types.Message, state: FSMContext) -> None:
         kb.adjust(2)
 
         # Build items list for admin
-        items_text = "\n".join([f"• {item['title']} × {item['quantity']}" for item in cart_items_stored])
+        items_text = "\n".join(
+            [f"• {item['title']} × {item['quantity']}" for item in cart_items_stored]
+        )
 
         try:
             await bot.send_photo(
@@ -949,7 +959,9 @@ def build_cart_add_card_text(
 
     # Quantity
     text_parts.append(
-        f"📦 Количество: <b>{quantity} {unit}</b>" if lang == "ru" else f"📦 Miqdor: <b>{quantity} {unit}</b>"
+        f"📦 Количество: <b>{quantity} {unit}</b>"
+        if lang == "ru"
+        else f"📦 Miqdor: <b>{quantity} {unit}</b>"
     )
 
     # Stock
@@ -973,7 +985,9 @@ def build_cart_add_card_text(
     # Total
     total = price * quantity
     text_parts.append(
-        f"💳 <b>ИТОГО: {total:,.0f} сум</b>" if lang == "ru" else f"💳 <b>JAMI: {total:,.0f} so'm</b>"
+        f"💳 <b>ИТОГО: {total:,.0f} сум</b>"
+        if lang == "ru"
+        else f"💳 <b>JAMI: {total:,.0f} so'm</b>"
     )
 
     return "\n".join(text_parts)
@@ -1004,7 +1018,9 @@ def build_cart_add_card_keyboard(
         kb.button(text=f"📦 {quantity}", callback_data="cart_noop")
         kb.button(
             text=plus_btn,
-            callback_data=f"cart_qty_{offer_id}_{quantity + 1}" if quantity < max_qty else "cart_noop",
+            callback_data=f"cart_qty_{offer_id}_{quantity + 1}"
+            if quantity < max_qty
+            else "cart_noop",
         )
         kb.adjust(3)
 
@@ -1240,8 +1256,6 @@ async def cart_add_confirm(callback: types.CallbackQuery, state: FSMContext) -> 
         delivery_price=delivery_price,
     )
 
-    await state.clear()
-
     cart_count = cart_storage.get_cart_count(user_id)
 
     text = (
@@ -1257,9 +1271,11 @@ async def cart_add_confirm(callback: types.CallbackQuery, state: FSMContext) -> 
     )
     kb.button(
         text="🔙 Продолжить покупки" if lang == "ru" else "🔙 Xaridni davom ettirish",
-        callback_data="back_to_menu",
+        callback_data=f"continue_shopping_{store_id}",
     )
     kb.adjust(1)
+
+    await state.clear()
 
     try:
         await callback.message.edit_text(text, parse_mode="HTML", reply_markup=kb.as_markup())
@@ -1289,6 +1305,126 @@ async def cart_add_cancel(callback: types.CallbackQuery, state: FSMContext) -> N
 @router.callback_query(F.data == "cart_noop")
 async def cart_noop(callback: types.CallbackQuery) -> None:
     """No-op handler for disabled buttons."""
+    await callback.answer()
+
+
+@router.callback_query(F.data.startswith("continue_shopping_"))
+async def continue_shopping(callback: types.CallbackQuery, state: FSMContext) -> None:
+    """Return to store offers list after adding to cart."""
+    if not db or not callback.message or not callback.data:
+        await callback.answer()
+        return
+
+    try:
+        store_id = int(callback.data.split("_")[-1])
+    except (ValueError, IndexError):
+        await callback.answer()
+        return
+
+    user_id = callback.from_user.id
+    lang = db.get_user_language(user_id)
+
+    # Get store and offers
+    store = db.get_store(store_id)
+    if not store:
+        await callback.answer(
+            "Магазин не найден" if lang == "ru" else "Do'kon topilmadi", show_alert=True
+        )
+        return
+
+    from handlers.bookings.utils import get_store_field
+
+    store_name = get_store_field(store, "name", "Магазин")
+
+    # Get active offers
+    offers = db.get_active_offers(store_id)
+    if not offers:
+        await callback.answer(
+            "Нет доступных товаров" if lang == "ru" else "Mahsulotlar yo'q", show_alert=True
+        )
+        return
+
+    # Build offers list with pagination
+    from aiogram.utils.keyboard import InlineKeyboardBuilder
+
+    text_lines = []
+    text_lines.append(f"🏪 <b>{_esc(store_name)}</b>\n")
+    text_lines.append(f"{'Mahsulotlar:' if lang == 'uz' else 'Товары:'}\n")
+
+    # Show first 5 offers
+    ITEMS_PER_PAGE = 5
+    page = 0
+    start_idx = page * ITEMS_PER_PAGE
+    end_idx = start_idx + ITEMS_PER_PAGE
+    page_offers = (
+        offers[start_idx:end_idx] if isinstance(offers, list) else list(offers)[start_idx:end_idx]
+    )
+
+    for i, offer in enumerate(page_offers, start=start_idx + 1):
+        from handlers.bookings.utils import get_offer_field
+
+        title = get_offer_field(offer, "title", "Товар")
+        price = get_offer_field(offer, "discount_price", 0)
+        qty = get_offer_field(offer, "quantity", 0)
+
+        text_lines.append(f"{i}. {_esc(title)} - {price:,} сум (в наличии: {qty})")
+
+    text = "\n".join(text_lines)
+
+    # Build keyboard with offer buttons
+    kb = InlineKeyboardBuilder()
+
+    for offer in page_offers:
+        offer_id = get_offer_field(offer, "id", 0) or get_offer_field(offer, "offer_id", 0)
+        title = get_offer_field(offer, "title", "Товар")
+
+        kb.button(
+            text=f"📦 {title[:30]}{'...' if len(title) > 30 else ''}",
+            callback_data=f"view_offer_{offer_id}",
+        )
+
+    kb.adjust(1)
+
+    # Add pagination if needed
+    total_offers = len(offers) if isinstance(offers, list) else offers
+    total_pages = (total_offers + ITEMS_PER_PAGE - 1) // ITEMS_PER_PAGE
+
+    if total_pages > 1:
+        nav_buttons = []
+        if page > 0:
+            nav_buttons.append(
+                ("◀️ Назад" if lang == "ru" else "◀️ Orqaga", f"store_page_{store_id}_{page - 1}")
+            )
+        nav_buttons.append((f"📄 {page + 1}/{total_pages}", "noop"))
+        if page < total_pages - 1:
+            nav_buttons.append(
+                ("Вперед ▶️" if lang == "ru" else "Oldinga ▶️", f"store_page_{store_id}_{page + 1}")
+            )
+
+        for btn_text, btn_data in nav_buttons:
+            kb.button(text=btn_text, callback_data=btn_data)
+        kb.adjust(1, *([len(nav_buttons)] if len(nav_buttons) > 1 else [1]))
+
+    # Cart button
+    cart_count = cart_storage.get_cart_count(user_id)
+    if cart_count > 0:
+        kb.button(
+            text=f"🛒 Корзина ({cart_count})" if lang == "ru" else f"🛒 Savat ({cart_count})",
+            callback_data="view_cart",
+        )
+        kb.adjust(1)
+
+    # Back button
+    kb.button(
+        text="🔙 Назад" if lang == "ru" else "🔙 Orqaga",
+        callback_data="back_to_menu",
+    )
+
+    try:
+        await callback.message.edit_text(text, parse_mode="HTML", reply_markup=kb.as_markup())
+    except Exception:
+        await callback.message.answer(text, parse_mode="HTML", reply_markup=kb.as_markup())
+
     await callback.answer()
 
 
