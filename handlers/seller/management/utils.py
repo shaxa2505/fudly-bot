@@ -405,11 +405,11 @@ async def send_order_card(
         if status == "pending":
             builder.button(
                 text="✅ Подтвердить" if lang == "ru" else "✅ Tasdiqlash",
-                callback_data=f"confirm_booking_{booking_id}",
+                callback_data=f"partner_confirm_{booking_id}",
             )
             builder.button(
                 text="❌ Отменить" if lang == "ru" else "❌ Bekor qilish",
-                callback_data=f"cancel_booking_{booking_id}",
+                callback_data=f"partner_cancel_{booking_id}",
             )
             builder.adjust(2, 2)
         elif status == "confirmed":
@@ -419,7 +419,7 @@ async def send_order_card(
             )
             builder.button(
                 text="❌ Отменить" if lang == "ru" else "❌ Bekor qilish",
-                callback_data=f"cancel_booking_{booking_id}",
+                callback_data=f"partner_cancel_{booking_id}",
             )
             builder.adjust(2, 2)
     else:
