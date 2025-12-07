@@ -374,11 +374,11 @@ async def cart_confirm_pickup(callback: types.CallbackQuery) -> None:
             kb = InlineKeyboardBuilder()
             kb.button(
                 text="✅ Подтвердить" if lang == "ru" else "✅ Tasdiqlash",
-                callback_data=f"partner_confirm_booking_{booking_id}",
+                callback_data=f"partner_confirm_{booking_id}",
             )
             kb.button(
                 text="❌ Отклонить" if lang == "ru" else "❌ Rad etish",
-                callback_data=f"partner_reject_booking_{booking_id}",
+                callback_data=f"partner_reject_{booking_id}",
             )
             kb.adjust(2)
 
@@ -564,15 +564,15 @@ async def cart_process_delivery_address(message: types.Message, state: FSMContex
 
             partner_text = "\n".join(partner_lines)
 
-            # One button to confirm/reject entire cart order
+            # One button to confirm/reject entire cart order (uses same handlers as regular orders)
             kb = InlineKeyboardBuilder()
             kb.button(
                 text="✅ Подтвердить" if lang == "ru" else "✅ Tasdiqlash",
-                callback_data=f"partner_confirm_cart_order_{order_id}",
+                callback_data=f"partner_confirm_order_{order_id}",
             )
             kb.button(
                 text="❌ Отклонить" if lang == "ru" else "❌ Rad etish",
-                callback_data=f"partner_reject_cart_order_{order_id}",
+                callback_data=f"partner_reject_order_{order_id}",
             )
             kb.adjust(2)
 
