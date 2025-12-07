@@ -412,9 +412,21 @@ async def cart_confirm_delivery(callback: types.CallbackQuery, state: FSMContext
         await callback.answer("Корзина пуста" if lang == "ru" else "Savat bo'sh", show_alert=True)
         return
 
-    # Save cart to state
+    # Save cart to state (convert CartItem objects to dicts for JSON serialization)
+    cart_items_dict = [
+        {
+            "offer_id": item.offer_id,
+            "store_id": item.store_id,
+            "title": item.title,
+            "price": item.price,
+            "quantity": item.quantity,
+            "unit": item.unit,
+            "store_name": item.store_name,
+        }
+        for item in items
+    ]
     await state.update_data(
-        cart_items=items, store_id=items[0].store_id, delivery_price=items[0].delivery_price
+        cart_items=cart_items_dict, store_id=items[0].store_id, delivery_price=items[0].delivery_price
     )
 
     await state.set_state(OrderDelivery.address)
@@ -452,14 +464,14 @@ async def cart_process_delivery_address(message: types.Message, state: FSMContex
         )
         return
 
-    # Prepare cart_items for database
+    # Prepare cart_items for database (cart_items_stored is already list of dicts)
     cart_items_data = [
         {
-            "offer_id": item.offer_id,
-            "quantity": item.quantity,
-            "price": item.price,
-            "title": item.title,
-            "unit": item.unit,
+            "offer_id": item["offer_id"],
+            "quantity": item["quantity"],
+            "price": item["price"],
+            "title": item["title"],
+            "unit": item["unit"],
         }
         for item in cart_items_stored
     ]
@@ -495,15 +507,15 @@ async def cart_process_delivery_address(message: types.Message, state: FSMContex
     currency = "so'm" if lang == "uz" else "сум"
     lines = [f"✅ <b>{'Buyurtma yaratildi!' if lang == 'uz' else 'Заказ создан!'}</b>\n"]
     lines.append(f"📋 {'Buyurtma kodi' if lang == 'uz' else 'Код заказа'}: <b>{pickup_code}</b>\n")
-    lines.append(f"🏪 {_esc(cart_items_stored[0].store_name)}")
+    lines.append(f"🏪 {_esc(cart_items_stored[0]['store_name'])}")
     lines.append(f"📍 {'Yetkazish' if lang == 'uz' else 'Доставка'}: {_esc(delivery_address)}\n")
     lines.append(f"<b>{'Mahsulotlar' if lang == 'uz' else 'Товары'}:</b>")
 
     total = 0
     for item in cart_items_stored:
-        subtotal = item.price * item.quantity
+        subtotal = item["price"] * item["quantity"]
         total += subtotal
-        lines.append(f"• {_esc(item.title)} × {item.quantity} = {subtotal:,} {currency}")
+        lines.append(f"• {_esc(item['title'])} × {item['quantity']} = {subtotal:,} {currency}")
 
     lines.append(f"🚚 {'Yetkazish' if lang == 'uz' else 'Доставка'}: {delivery_price:,} {currency}")
     total_with_delivery = total + delivery_price
@@ -536,9 +548,9 @@ async def cart_process_delivery_address(message: types.Message, state: FSMContex
             partner_lines.append(f"<b>{'Mahsulotlar' if lang == 'uz' else 'Товары'}:</b>")
 
             for item in cart_items_stored:
-                subtotal = item.price * item.quantity
+                subtotal = item["price"] * item["quantity"]
                 partner_lines.append(
-                    f"• {_esc(item.title)} × {item.quantity} = {subtotal:,} {currency}"
+                    f"• {_esc(item['title'])} × {item['quantity']} = {subtotal:,} {currency}"
                 )
 
             partner_lines.append(
