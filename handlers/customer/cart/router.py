@@ -537,7 +537,8 @@ async def cart_process_delivery_address(message: types.Message, state: FSMContex
         f"💵 <b>{'JAMI' if lang == 'uz' else 'ИТОГО'}: {total_with_delivery:,} {currency}</b>\n"
     )
     lines.append(f"📍 {'Manzil' if lang == 'uz' else 'Адрес'}: {_esc(delivery_address)}\n")
-    lines.append(f"{'To\'lov usulini tanlang:' if lang == 'uz' else 'Выберите способ оплаты:'}")
+    payment_prompt = "To'lov usulini tanlang:" if lang == "uz" else "Выберите способ оплаты:"
+    lines.append(payment_prompt)
 
     text = "\n".join(lines)
 
