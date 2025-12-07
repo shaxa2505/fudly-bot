@@ -131,6 +131,15 @@ class SchemaMixin:
             except Exception as e:
                 logger.warning(f"Migration for orders pickup_code column: {e}")
 
+            # Migration: Add cart_items column to orders table for multi-item orders
+            try:
+                cursor.execute("ALTER TABLE orders ADD COLUMN IF NOT EXISTS cart_items JSONB")
+                cursor.execute(
+                    "ALTER TABLE orders ADD COLUMN IF NOT EXISTS is_cart_order INTEGER DEFAULT 0"
+                )
+            except Exception as e:
+                logger.warning(f"Migration for orders cart columns: {e}")
+
             # Bookings table
             cursor.execute(
                 """
@@ -150,6 +159,15 @@ class SchemaMixin:
                 )
             """
             )
+
+            # Migration: Add cart_items column to bookings table for multi-item bookings
+            try:
+                cursor.execute("ALTER TABLE bookings ADD COLUMN IF NOT EXISTS cart_items JSONB")
+                cursor.execute(
+                    "ALTER TABLE bookings ADD COLUMN IF NOT EXISTS is_cart_booking INTEGER DEFAULT 0"
+                )
+            except Exception as e:
+                logger.warning(f"Migration for bookings cart columns: {e}")
 
             # Payment settings table
             cursor.execute(

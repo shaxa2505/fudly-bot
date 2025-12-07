@@ -109,12 +109,35 @@ async def partner_confirm_booking(callback: types.CallbackQuery) -> None:
         store_name = get_store_field(store, "name", "Магазин")
         store_address = get_store_field(store, "address", "")
 
+        # Check if cart booking
+        is_cart = get_booking_field(booking, "is_cart_booking", 0) == 1
+
         # Compact single message with all info
         if customer_lang == "uz":
             customer_msg = (
-                f"✅ <b>Broningiz tasdiqlandi!</b>\n\n"
+                f"✅ <b>{'Savat broningiz' if is_cart else 'Broningiz'} tasdiqlandi!</b>\n\n"
                 f"🏪 {_esc(store_name)}\n"
                 f"📍 Manzil: {_esc(store_address)}\n\n"
+            )
+
+            # Add cart items if cart booking
+            if is_cart:
+                import json
+
+                cart_items_str = get_booking_field(booking, "cart_items")
+                if cart_items_str:
+                    try:
+                        cart_items = json.loads(cart_items_str)
+                        customer_msg += "<b>Mahsulotlar:</b>\n"
+                        for item in cart_items:
+                            qty = item.get("quantity", 1)
+                            title = item.get("title", "Товар")
+                            customer_msg += f"• {_esc(title)} × {qty}\n"
+                        customer_msg += "\n"
+                    except Exception:
+                        pass
+
+            customer_msg += (
                 f"━━━━━━━━━━\n"
                 f"🎫 <b>Bron kodi:</b>\n"
                 f"<code>{code_display}</code>\n"
@@ -123,9 +146,29 @@ async def partner_confirm_booking(callback: types.CallbackQuery) -> None:
             )
         else:
             customer_msg = (
-                f"✅ <b>Ваша бронь подтверждена!</b>\n\n"
+                f"✅ <b>{'Ваша корзина' if is_cart else 'Ваша бронь'} подтверждена!</b>\n\n"
                 f"🏪 {_esc(store_name)}\n"
                 f"📍 Адрес: {_esc(store_address)}\n\n"
+            )
+
+            # Add cart items if cart booking
+            if is_cart:
+                import json
+
+                cart_items_str = get_booking_field(booking, "cart_items")
+                if cart_items_str:
+                    try:
+                        cart_items = json.loads(cart_items_str)
+                        customer_msg += "<b>Товары:</b>\n"
+                        for item in cart_items:
+                            qty = item.get("quantity", 1)
+                            title = item.get("title", "Товар")
+                            customer_msg += f"• {_esc(title)} × {qty}\n"
+                        customer_msg += "\n"
+                    except Exception:
+                        pass
+
+            customer_msg += (
                 f"━━━━━━━━━━\n"
                 f"🎫 <b>Код брони:</b>\n"
                 f"<code>{code_display}</code>\n"
@@ -456,15 +499,17 @@ async def rate_booking(callback: types.CallbackQuery, state: FSMContext) -> None
     kb = InlineKeyboardBuilder()
     kb.button(
         text="📝 Sharh qoldirish" if lang == "uz" else "📝 Оставить отзыв",
-        callback_data=f"add_review_{booking_id}"
+        callback_data=f"add_review_{booking_id}",
     )
     kb.adjust(1)
 
     thanks = "Rahmat!" if lang == "uz" else "Спасибо!"
     try:
         await callback.message.edit_text(
-            f"⭐ {thanks} Siz {rating} ball berdingiz." if lang == "uz" else f"⭐ {thanks} Вы поставили {rating} {'звезду' if rating == 1 else 'звезды' if rating < 5 else 'звёзд'}.",
-            reply_markup=kb.as_markup()
+            f"⭐ {thanks} Siz {rating} ball berdingiz."
+            if lang == "uz"
+            else f"⭐ {thanks} Вы поставили {rating} {'звезду' if rating == 1 else 'звезды' if rating < 5 else 'звёзд'}.",
+            reply_markup=kb.as_markup(),
         )
     except Exception:
         pass
@@ -527,6 +572,7 @@ async def process_review_text(message: types.Message, state: FSMContext) -> None
 
     thanks = "Rahmat! Sharh saqlandi." if lang == "uz" else "Спасибо! Отзыв сохранён."
     from app.keyboards import main_menu_customer
+
     await message.answer(f"✅ {thanks}", reply_markup=main_menu_customer(lang))
 
 
@@ -636,17 +682,19 @@ async def partner_confirm_batch_bookings(callback: types.CallbackQuery) -> None:
             if customer_id:
                 if customer_id not in customer_notifications:
                     customer_notifications[customer_id] = []
-                
+
                 code = get_booking_field(booking, "code")
                 code_display = format_booking_code(code, booking_id)
                 store_name = get_store_field(store, "name", "Магазин")
                 store_address = get_store_field(store, "address", "")
-                
-                customer_notifications[customer_id].append({
-                    "code": code_display,
-                    "store_name": store_name,
-                    "store_address": store_address,
-                })
+
+                customer_notifications[customer_id].append(
+                    {
+                        "code": code_display,
+                        "store_name": store_name,
+                        "store_address": store_address,
+                    }
+                )
 
         except Exception as e:
             logger.error(f"Failed to confirm booking {booking_id}: {e}")
@@ -656,27 +704,27 @@ async def partner_confirm_batch_bookings(callback: types.CallbackQuery) -> None:
     for customer_id, bookings_info in customer_notifications.items():
         try:
             customer_lang = db.get_user_language(customer_id)
-            
+
             lines = []
             if customer_lang == "uz":
                 lines.append("✅ <b>Barcha bronlaringiz tasdiqlandi!</b>\n")
             else:
                 lines.append("✅ <b>Все ваши брони подтверждены!</b>\n")
-            
+
             for info in bookings_info:
                 lines.append(f"🏪 {_esc(info['store_name'])}")
-                if info['store_address']:
+                if info["store_address"]:
                     lines.append(f"📍 {_esc(info['store_address'])}")
                 lines.append(f"🎫 Kod: <code>{info['code']}</code>\n")
-            
+
             if customer_lang == "uz":
                 lines.append("⚠️ Kodni sotuvchiga ko'rsating.")
             else:
                 lines.append("⚠️ Покажите код продавцу.")
-            
+
             customer_msg = "\n".join(lines)
             await bot.send_message(customer_id, customer_msg, parse_mode="HTML")
-            
+
         except Exception as e:
             logger.error(f"Failed to notify customer {customer_id}: {e}")
 
@@ -686,7 +734,11 @@ async def partner_confirm_batch_bookings(callback: types.CallbackQuery) -> None:
     except Exception:
         pass
 
-    success_text = f"✅ {confirmed_count} ta bron tasdiqlandi" if lang == "uz" else f"✅ Подтверждено броней: {confirmed_count}"
+    success_text = (
+        f"✅ {confirmed_count} ta bron tasdiqlandi"
+        if lang == "uz"
+        else f"✅ Подтверждено броней: {confirmed_count}"
+    )
     await callback.answer(success_text)
 
 
@@ -746,7 +798,7 @@ async def partner_reject_batch_bookings(callback: types.CallbackQuery) -> None:
             if customer_id:
                 if customer_id not in customer_notifications:
                     customer_notifications[customer_id] = []
-                
+
                 store_name = get_store_field(store, "name", "Магазин")
                 customer_notifications[customer_id].append(store_name)
 
@@ -758,14 +810,14 @@ async def partner_reject_batch_bookings(callback: types.CallbackQuery) -> None:
     for customer_id, store_names in customer_notifications.items():
         try:
             customer_lang = db.get_user_language(customer_id)
-            
+
             if customer_lang == "uz":
                 customer_msg = f"❌ Afsuski, {', '.join(store_names)} bronlaringiz rad etildi."
             else:
                 customer_msg = f"❌ К сожалению, ваши брони в {', '.join(store_names)} отклонены."
-            
+
             await bot.send_message(customer_id, customer_msg, parse_mode="HTML")
-            
+
         except Exception as e:
             logger.error(f"Failed to notify customer {customer_id}: {e}")
 
@@ -775,5 +827,9 @@ async def partner_reject_batch_bookings(callback: types.CallbackQuery) -> None:
     except Exception:
         pass
 
-    reject_text = f"❌ {rejected_count} ta bron rad etildi" if lang == "uz" else f"❌ Отклонено броней: {rejected_count}"
+    reject_text = (
+        f"❌ {rejected_count} ta bron rad etildi"
+        if lang == "uz"
+        else f"❌ Отклонено броней: {rejected_count}"
+    )
     await callback.answer(reject_text)

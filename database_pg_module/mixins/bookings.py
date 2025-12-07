@@ -240,7 +240,8 @@ class BookingMixin:
             cursor.execute(
                 """
                 SELECT booking_id, offer_id, user_id, status, booking_code,
-                       pickup_time, COALESCE(quantity, 1) as quantity, created_at
+                       pickup_time, COALESCE(quantity, 1) as quantity, created_at,
+                       store_id, cart_items, is_cart_booking
                 FROM bookings
                 WHERE booking_id = %s
             """,
@@ -497,3 +498,139 @@ class BookingMixin:
                 (user_id, offer_id, store_id, quantity),
             )
             return cursor.fetchone()[0]
+
+    def create_cart_booking_atomic(
+        self,
+        user_id: int,
+        store_id: int,
+        cart_items: list[dict[str, Any]],
+        pickup_time: str | None = None,
+    ):
+        """Create one booking for multiple cart items atomically.
+
+        cart_items format: [{"offer_id": 1, "quantity": 2, "price": 100, "title": "Item"}, ...]
+
+        Returns: Tuple[bool, Optional[int], Optional[str], Optional[str]]
+            - ok: True if booking created successfully
+            - booking_id: ID of created booking or None on error
+            - booking_code: Booking code or None on error
+            - error_reason: Reason for failure or None on success
+        """
+        import json
+
+        logger.info(
+            f"🛒 create_cart_booking_atomic: user_id={user_id}, store={store_id}, items={len(cart_items)}"
+        )
+
+        if not cart_items:
+            return (False, None, None, "empty_cart")
+
+        conn = None
+        try:
+            conn = self.pool.getconn()
+            try:
+                conn.rollback()
+            except Exception:
+                pass
+            conn.autocommit = False
+            cursor = conn.cursor()
+
+            # Ensure user exists
+            try:
+                cursor.execute(
+                    "INSERT INTO users (user_id) VALUES (%s) ON CONFLICT (user_id) DO NOTHING",
+                    (user_id,),
+                )
+            except Exception:
+                pass
+
+            # Check active bookings limit
+            try:
+                cursor.execute(
+                    "SELECT COUNT(*) FROM bookings WHERE user_id = %s AND status IN ('active','pending','confirmed')",
+                    (user_id,),
+                )
+                active_count = cursor.fetchone()[0] or 0
+            except Exception:
+                active_count = 0
+
+            if active_count >= MAX_ACTIVE_BOOKINGS_PER_USER:
+                conn.rollback()
+                logger.warning(f"🛒 User {user_id} reached booking limit: {active_count}")
+                return (False, None, None, f"booking_limit:{active_count}")
+
+            # Check and reserve all items
+            total_price = 0
+            for item in cart_items:
+                offer_id = item["offer_id"]
+                quantity = item["quantity"]
+
+                cursor.execute(
+                    "SELECT quantity, status, store_id FROM offers WHERE offer_id = %s AND status = 'active' FOR UPDATE",
+                    (offer_id,),
+                )
+                row = cursor.fetchone()
+                if not row:
+                    conn.rollback()
+                    logger.warning(f"🛒 Offer {offer_id} not found or inactive")
+                    return (False, None, None, f"offer_unavailable:{offer_id}")
+
+                available_qty = row[0] or 0
+                if available_qty < quantity:
+                    conn.rollback()
+                    logger.warning(
+                        f"🛒 Offer {offer_id}: requested {quantity}, available {available_qty}"
+                    )
+                    return (False, None, None, f"insufficient_stock:{offer_id}")
+
+                # Reserve quantity
+                new_qty = available_qty - quantity
+                cursor.execute(
+                    "UPDATE offers SET quantity = %s WHERE offer_id = %s",
+                    (new_qty, offer_id),
+                )
+                logger.info(f"🛒 Reserved offer {offer_id}: {quantity} units (new qty: {new_qty})")
+
+                total_price += item.get("price", 0) * quantity
+
+            # Generate booking code
+            booking_code = "".join(random.choices(string.ascii_uppercase + string.digits, k=6))
+
+            # Create booking with cart_items
+            cart_items_json = json.dumps(cart_items, ensure_ascii=False)
+
+            cursor.execute(
+                """
+                INSERT INTO bookings (
+                    user_id, store_id, booking_code, pickup_time, status,
+                    cart_items, is_cart_booking, quantity
+                )
+                VALUES (%s, %s, %s, %s, 'pending', %s, 1, %s)
+                RETURNING booking_id
+                """,
+                (user_id, store_id, booking_code, pickup_time, cart_items_json, len(cart_items)),
+            )
+            booking_id = cursor.fetchone()[0]
+
+            conn.commit()
+            logger.info(
+                f"🛒✅ Cart booking created: id={booking_id}, code={booking_code}, items={len(cart_items)}"
+            )
+            return (True, booking_id, booking_code, None)
+
+        except Exception as e:
+            logger.error(f"🛒❌ Failed to create cart booking: {e}", exc_info=True)
+            if conn:
+                try:
+                    conn.rollback()
+                except Exception:
+                    pass
+            return (False, None, None, f"error:{str(e)}")
+
+        finally:
+            if conn:
+                try:
+                    conn.autocommit = True
+                    self.pool.putconn(conn)
+                except Exception:
+                    pass

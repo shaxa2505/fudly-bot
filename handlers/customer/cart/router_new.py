@@ -165,7 +165,7 @@ async def cart_checkout(callback: types.CallbackQuery, state: FSMContext) -> Non
         return
 
     # Check if all items from same store (for now)
-    stores = {item.store_id for item in items}
+    stores = set(item.store_id for item in items)
     if len(stores) > 1:
         await callback.answer(
             "Можно оформить заказ только из одного магазина"

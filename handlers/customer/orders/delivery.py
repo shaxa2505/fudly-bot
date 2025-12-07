@@ -346,7 +346,9 @@ async def dlv_cancel(
     search_city = normalize_city(city)
 
     offer_service = OfferService(db)
-    result = offer_service.list_hot_offers(search_city, limit=OFFERS_PER_PAGE, offset=last_page * OFFERS_PER_PAGE)
+    result = offer_service.list_hot_offers(
+        search_city, limit=OFFERS_PER_PAGE, offset=last_page * OFFERS_PER_PAGE
+    )
 
     if not result.items:
         # No offers - show main menu
@@ -1354,13 +1356,35 @@ async def partner_confirm_order(
     address = _get_order_field(order, "delivery_address", 7)
     delivery_price = _get_order_field(order, "delivery_price", 8) or 0
 
+    # Check if cart order
+    is_cart = (_get_order_field(order, "is_cart_order") or 0) == 1
+    cart_items = []
+
+    if is_cart:
+        import json
+
+        cart_items_str = _get_order_field(order, "cart_items")
+        if cart_items_str:
+            try:
+                cart_items = json.loads(cart_items_str)
+            except Exception:
+                pass
+
     offer = db.get_offer(offer_id) if offer_id else None
     offer_title = get_offer_field(offer, "title", "Товар") if offer else "Товар"
     offer_price = get_offer_field(offer, "discount_price", 0) if offer else 0
     store_name = get_store_field(store, "name", "Магазин") if store else "Магазин"
     store_address = get_store_field(store, "address", "") if store else ""
 
-    total = (offer_price * quantity) + delivery_price
+    # Calculate total (use cart items if available)
+    if is_cart and cart_items:
+        total = (
+            sum(item.get("price", 0) * item.get("quantity", 1) for item in cart_items)
+            + delivery_price
+        )
+    else:
+        total = (offer_price * quantity) + delivery_price
+
     currency = "so'm" if lang == "uz" else "сум"
 
     # Update partner message
@@ -1390,10 +1414,22 @@ async def partner_confirm_order(
 
         if cust_lang == "uz":
             customer_msg = (
-                f"🎉 <b>Buyurtma qabul qilindi!</b>\n\n"
+                f"🎉 <b>{'Savat buyurtmangiz' if is_cart else 'Buyurtma'} qabul qilindi!</b>\n\n"
                 f"📦 #{order_id}\n"
                 f"🏪 {_esc(store_name)}\n"
-                f"🛒 {_esc(offer_title)} × {quantity}\n"
+            )
+
+            # Show cart items or single item
+            if is_cart and cart_items:
+                customer_msg += "<b>Mahsulotlar:</b>\n"
+                for item in cart_items:
+                    qty = item.get("quantity", 1)
+                    title = item.get("title", "Товар")
+                    customer_msg += f"• {_esc(title)} × {qty}\n"
+            else:
+                customer_msg += f"🛒 {_esc(offer_title)} × {quantity}\n"
+
+            customer_msg += (
                 f"💵 {total:,} {cust_currency}\n"
                 f"📍 {_esc(address)}\n\n"
                 f"🚚 <b>Yetkazib berish tashkil qilinmoqda!</b>\n"
@@ -1401,10 +1437,22 @@ async def partner_confirm_order(
             )
         else:
             customer_msg = (
-                f"🎉 <b>Заказ принят!</b>\n\n"
+                f"🎉 <b>{'Ваша корзина' if is_cart else 'Заказ'} принят!</b>\n\n"
                 f"📦 #{order_id}\n"
                 f"🏪 {_esc(store_name)}\n"
-                f"🛒 {_esc(offer_title)} × {quantity}\n"
+            )
+
+            # Show cart items or single item
+            if is_cart and cart_items:
+                customer_msg += "<b>Товары:</b>\n"
+                for item in cart_items:
+                    qty = item.get("quantity", 1)
+                    title = item.get("title", "Товар")
+                    customer_msg += f"• {_esc(title)} × {qty}\n"
+            else:
+                customer_msg += f"🛒 {_esc(offer_title)} × {quantity}\n"
+
+            customer_msg += (
                 f"💵 {total:,} {cust_currency}\n"
                 f"📍 {_esc(address)}\n\n"
                 f"🚚 <b>Доставка организуется!</b>\n"
@@ -1659,22 +1707,24 @@ async def partner_confirm_order_batch(
             if customer_id:
                 if customer_id not in customer_notifications:
                     customer_notifications[customer_id] = []
-                
+
                 offer_id = _get_order_field(order, "offer_id", 3)
                 quantity = _get_order_field(order, "quantity", 4)
                 address = _get_order_field(order, "delivery_address", 7)
-                
+
                 offer = db.get_offer(offer_id) if offer_id else None
                 offer_title = get_offer_field(offer, "title", "Товар") if offer else "Товар"
                 store_name = get_store_field(store, "name", "Магазин") if store else "Магазин"
-                
-                customer_notifications[customer_id].append({
-                    "order_id": order_id,
-                    "title": offer_title,
-                    "quantity": quantity,
-                    "store_name": store_name,
-                    "address": address,
-                })
+
+                customer_notifications[customer_id].append(
+                    {
+                        "order_id": order_id,
+                        "title": offer_title,
+                        "quantity": quantity,
+                        "store_name": store_name,
+                        "address": address,
+                    }
+                )
 
         except Exception as e:
             logger.error(f"Failed to confirm order {order_id}: {e}")
@@ -1684,27 +1734,27 @@ async def partner_confirm_order_batch(
     for customer_id, orders_info in customer_notifications.items():
         try:
             cust_lang = db.get_user_language(customer_id)
-            
+
             lines = []
             if cust_lang == "uz":
                 lines.append("🎉 <b>Barcha buyurtmalar qabul qilindi!</b>\n")
             else:
                 lines.append("🎉 <b>Все заказы приняты!</b>\n")
-            
+
             for info in orders_info:
                 lines.append(f"📦 #{info['order_id']}")
                 lines.append(f"🏪 {_esc(info['store_name'])}")
                 lines.append(f"🛒 {_esc(info['title'])} × {info['quantity']}")
                 lines.append(f"📍 {_esc(info['address'])}\n")
-            
+
             if cust_lang == "uz":
                 lines.append("🚚 <b>Yetkazib berish tashkil qilinmoqda!</b>")
             else:
                 lines.append("🚚 <b>Доставка организуется!</b>")
-            
+
             customer_msg = "\n".join(lines)
             await bot.send_message(customer_id, customer_msg, parse_mode="HTML")
-            
+
         except Exception as e:
             logger.error(f"Failed to notify customer {customer_id}: {e}")
 
@@ -1715,7 +1765,11 @@ async def partner_confirm_order_batch(
     except Exception:
         pass
 
-    success_text = f"✅ {confirmed_count} ta buyurtma qabul qilindi" if lang == "uz" else f"✅ Принято заказов: {confirmed_count}"
+    success_text = (
+        f"✅ {confirmed_count} ta buyurtma qabul qilindi"
+        if lang == "uz"
+        else f"✅ Принято заказов: {confirmed_count}"
+    )
     await callback.answer(success_text)
 
 
@@ -1780,7 +1834,7 @@ async def partner_reject_order_batch(
             if customer_id:
                 if customer_id not in customer_notifications:
                     customer_notifications[customer_id] = []
-                
+
                 store_name = get_store_field(store, "name", "Магазин") if store else "Магазин"
                 customer_notifications[customer_id].append(store_name)
 
@@ -1803,14 +1857,14 @@ async def partner_reject_order_batch(
     for customer_id, store_names in customer_notifications.items():
         try:
             cust_lang = db.get_user_language(customer_id)
-            
+
             if cust_lang == "uz":
                 customer_msg = f"😔 <b>Buyurtmalar rad etildi</b>\n\n🏪 {', '.join(store_names)}\n\n💰 Pul qaytariladi."
             else:
                 customer_msg = f"😔 <b>Заказы отклонены</b>\n\n🏪 {', '.join(store_names)}\n\n💰 Деньги будут возвращены."
-            
+
             await bot.send_message(customer_id, customer_msg, parse_mode="HTML")
-            
+
         except Exception as e:
             logger.error(f"Failed to notify customer {customer_id}: {e}")
 
@@ -1821,5 +1875,9 @@ async def partner_reject_order_batch(
     except Exception:
         pass
 
-    reject_text = f"❌ {rejected_count} ta buyurtma rad etildi" if lang == "uz" else f"❌ Отклонено заказов: {rejected_count}"
+    reject_text = (
+        f"❌ {rejected_count} ta buyurtma rad etildi"
+        if lang == "uz"
+        else f"❌ Отклонено заказов: {rejected_count}"
+    )
     await callback.answer(reject_text)
