@@ -1149,21 +1149,42 @@ async def admin_confirm_payment(
     address = _get_order_field(order, "delivery_address", 7)
     customer_id = _get_order_field(order, "user_id", 1)
     payment_photo = _get_order_field(order, "payment_proof_photo_id", 10)
+    
+    # Check if cart order by trying to get cart_items from dict
+    if isinstance(order, dict):
+        is_cart_order = order.get("is_cart_order", 0)
+        cart_items_json = order.get("cart_items")
+    else:
+        is_cart_order = 0
+        cart_items_json = None
 
     store = db.get_store(store_id)
-    offer = db.get_offer(offer_id)
     customer = db.get_user_model(customer_id)
 
     owner_id = get_store_field(store, "owner_id") if store else None
     delivery_price = get_store_field(store, "delivery_price", 0) if store else 0
 
-    offer_title = get_offer_field(offer, "title", "Товар") if offer else "Товар"
-    offer_price = get_offer_field(offer, "discount_price", 0) if offer else 0
-
     customer_name = customer.first_name if customer else "—"
     customer_phone = customer.phone if customer else "—"
 
-    total = (offer_price * quantity) + delivery_price
+    # Build items list and calculate total
+    if is_cart_order and cart_items_json:
+        import json
+
+        try:
+            cart_items = json.loads(cart_items_json) if isinstance(cart_items_json, str) else cart_items_json
+        except Exception:
+            cart_items = []
+
+        items_list = "\n".join([f"• {item['title']} × {item['quantity']}" for item in cart_items])
+        total = sum(item["price"] * item["quantity"] for item in cart_items) + delivery_price
+    else:
+        # Single item order
+        offer = db.get_offer(offer_id)
+        offer_title = get_offer_field(offer, "title", "Товар") if offer else "Товар"
+        offer_price = get_offer_field(offer, "discount_price", 0) if offer else 0
+        items_list = f"• {offer_title} × {quantity}"
+        total = (offer_price * quantity) + delivery_price
 
     # Update admin message
     try:
@@ -1183,7 +1204,7 @@ async def admin_confirm_payment(
             caption = (
                 f"🔔 <b>Yangi buyurtma!</b>\n\n"
                 f"📦 #{order_id} | ✅ To'langan\n"
-                f"🛒 {offer_title} × {quantity}\n"
+                f"🛒 <b>Mahsulotlar:</b>\n{items_list}\n"
                 f"💵 {total:,} {currency}\n"
                 f"📍 {address}\n"
                 f"👤 {customer_name}\n"
@@ -1196,7 +1217,7 @@ async def admin_confirm_payment(
             caption = (
                 f"🔔 <b>Новый заказ!</b>\n\n"
                 f"📦 #{order_id} | ✅ Оплачено\n"
-                f"🛒 {offer_title} × {quantity}\n"
+                f"🛒 <b>Товары:</b>\n{items_list}\n"
                 f"💵 {total:,} {currency}\n"
                 f"📍 {address}\n"
                 f"👤 {customer_name}\n"
