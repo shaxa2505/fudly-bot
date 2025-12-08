@@ -926,9 +926,17 @@ async def customer_received_handler(callback: types.CallbackQuery) -> None:
         await callback.answer("❌", show_alert=True)
         return
 
-    # Check order status is DELIVERING
+    # Check order status allows completion
+    # Valid: DELIVERING (for delivery), PREPARING (for pickup-style orders), or legacy "confirmed"
     current_status = _get_entity_field(order, "status")
-    if current_status != OrderStatus.DELIVERING:
+    valid_statuses = (
+        OrderStatus.DELIVERING,
+        OrderStatus.PREPARING,
+        "delivering",
+        "preparing",
+        "confirmed",  # Legacy status
+    )
+    if current_status not in valid_statuses:
         msg = "Buyurtma allaqachon yakunlangan" if lang == "uz" else "Заказ уже завершён"
         await callback.answer(msg, show_alert=True)
         return
@@ -984,6 +992,105 @@ async def customer_received_handler(callback: types.CallbackQuery) -> None:
                 )
     except Exception as e:
         logger.warning(f"Failed to edit customer received message: {e}")
+
+    msg = "Rahmat! Buyurtma yakunlandi" if lang == "uz" else "Спасибо! Заказ завершён"
+    await callback.answer(f"✅ {msg}", show_alert=True)
+
+
+@router.callback_query(F.data.regexp(r"^booking_received_(\d+)$"))
+async def booking_received_handler(callback: types.CallbackQuery) -> None:
+    """Customer confirms they received the booking (pickup) - marks as COMPLETED."""
+    if not callback.from_user or not callback.data:
+        await callback.answer()
+        return
+
+    db_instance = _get_db()
+    if not db_instance:
+        await callback.answer("System error", show_alert=True)
+        return
+
+    order_service = get_unified_order_service()
+    customer_id = callback.from_user.id
+    lang = db_instance.get_user_language(customer_id)
+
+    try:
+        booking_id = int(callback.data.split("_")[-1])
+    except ValueError:
+        await callback.answer("❌", show_alert=True)
+        return
+
+    booking = db_instance.get_booking(booking_id)
+    if not booking:
+        await callback.answer("❌", show_alert=True)
+        return
+
+    # Verify this is the customer's booking
+    booking_user_id = _get_entity_field(booking, "user_id")
+    if booking_user_id != customer_id:
+        await callback.answer("❌", show_alert=True)
+        return
+
+    # Check booking status is valid for completion (PREPARING or legacy "confirmed")
+    current_status = _get_entity_field(booking, "status")
+    if current_status not in (OrderStatus.PREPARING, "confirmed", "preparing"):
+        msg = "Buyurtma allaqachon yakunlangan" if lang == "uz" else "Заказ уже завершён"
+        await callback.answer(msg, show_alert=True)
+        return
+
+    # Complete the booking
+    if order_service:
+        success = await order_service.complete_order(booking_id, "booking")
+    else:
+        try:
+            db_instance.update_booking_status(booking_id, OrderStatus.COMPLETED)
+            success = True
+        except Exception:
+            success = False
+
+    if not success:
+        await callback.answer("❌", show_alert=True)
+        return
+
+    # Update customer message with completed status + rating buttons
+    from app.services.unified_order_service import NotificationTemplates
+
+    # Get store info from booking
+    offer_id = _get_entity_field(booking, "offer_id")
+    offer = db_instance.get_offer(offer_id) if offer_id else None
+    store_id = _get_entity_field(offer, "store_id") if offer else None
+    store = db_instance.get_store(store_id) if store_id else None
+    store_name = _get_store_field(store, "name", "")
+
+    completed_text = NotificationTemplates.customer_status_update(
+        lang=lang,
+        order_id=booking_id,
+        status=OrderStatus.COMPLETED,
+        order_type="pickup",
+        store_name=store_name,
+    )
+
+    # Add rating buttons
+    kb = InlineKeyboardBuilder()
+    for i in range(1, 6):
+        kb.button(text="⭐" * i, callback_data=f"rate_booking_{booking_id}_{i}")
+    kb.adjust(5)
+
+    try:
+        if callback.message:
+            if hasattr(callback.message, "caption") and callback.message.caption:
+                await callback.message.edit_caption(
+                    caption=completed_text,
+                    parse_mode="HTML",
+                    reply_markup=kb.as_markup(),
+                )
+            else:
+                await callback.message.edit_text(
+                    text=completed_text,
+                    parse_mode="HTML",
+                    reply_markup=kb.as_markup(),
+                )
+    except Exception as e:
+        logger.warning(f"Failed to edit booking received message: {e}")
 
     msg = "Rahmat! Buyurtma yakunlandi" if lang == "uz" else "Спасибо! Заказ завершён"
     await callback.answer(f"✅ {msg}", show_alert=True)

@@ -135,7 +135,9 @@ class NotificationTemplates:
         display_name = _esc(customer_name) if customer_name and customer_name.strip() else "Клиент"
 
         if lang == "uz":
-            display_name = _esc(customer_name) if customer_name and customer_name.strip() else "Mijoz"
+            display_name = (
+                _esc(customer_name) if customer_name and customer_name.strip() else "Mijoz"
+            )
             order_type_text = "🏪 O'zi olib ketadi" if order_type == "pickup" else "🚚 Yetkazish"
             lines = [
                 "🔔 <b>YANGI BUYURTMA!</b>",
@@ -165,9 +167,7 @@ class NotificationTemplates:
                 item_price = item.get("price") or 0
                 item_qty = item.get("quantity") or 1
                 subtotal = item_price * item_qty
-                lines.append(
-                    f"  • {_esc(item_title)} × {item_qty} = {int(subtotal):,} {currency}"
-                )
+                lines.append(f"  • {_esc(item_title)} × {item_qty} = {int(subtotal):,} {currency}")
 
             lines.append("")
             lines.append("━━━━━━━━━━━━━━━━━━")
@@ -177,7 +177,7 @@ class NotificationTemplates:
                 grand_total = int(total + delivery_price)
             else:
                 grand_total = int(total)
-            
+
             lines.append(f"💰 <b>JAMI: {grand_total:,} {currency}</b>")
 
             payment_text = "💵 Naqd" if payment_method == "cash" else "💳 Karta"
@@ -185,7 +185,9 @@ class NotificationTemplates:
             lines.append("⏳ <b>Buyurtmani tasdiqlang!</b>")
 
         else:  # Russian
-            display_name = _esc(customer_name) if customer_name and customer_name.strip() else "Клиент"
+            display_name = (
+                _esc(customer_name) if customer_name and customer_name.strip() else "Клиент"
+            )
             order_type_text = "🏪 Самовывоз" if order_type == "pickup" else "🚚 Доставка"
             lines = [
                 "🔔 <b>НОВЫЙ ЗАКАЗ!</b>",
@@ -215,9 +217,7 @@ class NotificationTemplates:
                 item_price = item.get("price") or 0
                 item_qty = item.get("quantity") or 1
                 subtotal = item_price * item_qty
-                lines.append(
-                    f"  • {_esc(item_title)} × {item_qty} = {int(subtotal):,} {currency}"
-                )
+                lines.append(f"  • {_esc(item_title)} × {item_qty} = {int(subtotal):,} {currency}")
 
             lines.append("")
             lines.append("━━━━━━━━━━━━━━━━━━")
@@ -1112,6 +1112,13 @@ class UnifiedOrderService:
                     kb = InlineKeyboardBuilder()
                     received_text = "✅ Oldim" if customer_lang == "uz" else "✅ Получил"
                     kb.button(text=received_text, callback_data=f"customer_received_{entity_id}")
+                    reply_markup = kb.as_markup()
+                elif new_status == OrderStatus.PREPARING and order_type == "pickup":
+                    # "Received" button for pickup bookings when preparing
+                    # Customer can mark as received when they pick up the order
+                    kb = InlineKeyboardBuilder()
+                    received_text = "✅ Oldim" if customer_lang == "uz" else "✅ Получил"
+                    kb.button(text=received_text, callback_data=f"booking_received_{entity_id}")
                     reply_markup = kb.as_markup()
 
                 # Try to EDIT existing message first (live status update)
