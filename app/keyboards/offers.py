@@ -16,7 +16,7 @@ def hot_offers_compact_keyboard(
     """Compact keyboard for hot offers with item buttons and pagination."""
     builder = InlineKeyboardBuilder()
 
-    # Add buttons for each offer (max 5) - show price in button
+    # Add buttons for each offer (max 5) - show title + price
     for idx, offer in enumerate(offers[:5], start=1):
         offer_id = offer.id if hasattr(offer, "id") else offer.get("offer_id", 0)
         price = (
@@ -24,21 +24,20 @@ def hot_offers_compact_keyboard(
             if hasattr(offer, "discount_price")
             else offer.get("discount_price", 0)
         )
-        # Format: "1. 25,000 ➜" - shows price directly
-        price_str = f"{int(price):,}" if price else "?"
-        builder.button(text=f"{idx}. {price_str} ➜", callback_data=f"hot_offer_{offer_id}")
+        title = (
+            offer.title if hasattr(offer, "title") else offer.get("title", "")
+        )
+        # Truncate title to fit in button (max ~15 chars)
+        short_title = title[:12] + ".." if len(title) > 14 else title
+        # Format: "1. Молоко 25k ➜" - shows title and short price
+        price_k = f"{int(price // 1000)}k" if price >= 1000 else str(int(price))
+        builder.button(
+            text=f"{idx}. {short_title} {price_k} ➜",
+            callback_data=f"hot_offer_{offer_id}",
+        )
 
-    # Adjust offer buttons: 2 per row for 5 items = 2+2+1
-    if len(offers) == 5:
-        builder.adjust(2, 2, 1)
-    elif len(offers) == 4:
-        builder.adjust(2, 2)
-    elif len(offers) == 3:
-        builder.adjust(2, 1)
-    elif len(offers) == 2:
-        builder.adjust(2)
-    else:
-        builder.adjust(1)
+    # Adjust offer buttons: 1 per row for better readability with titles
+    builder.adjust(1)
 
     # Pagination row - only prev/next and refresh
     nav_builder = InlineKeyboardBuilder()

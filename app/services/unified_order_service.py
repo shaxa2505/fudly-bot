@@ -131,14 +131,17 @@ class NotificationTemplates:
         def _esc(val: Any) -> str:
             return html.escape(str(val)) if val else ""
 
+        # Ensure customer name is not empty
+        display_name = _esc(customer_name) if customer_name and customer_name.strip() else "Клиент"
+
         if lang == "uz":
+            display_name = _esc(customer_name) if customer_name and customer_name.strip() else "Mijoz"
             order_type_text = "🏪 O'zi olib ketadi" if order_type == "pickup" else "🚚 Yetkazish"
             lines = [
                 "🔔 <b>YANGI BUYURTMA!</b>",
                 "━━━━━━━━━━━━━━━━━━",
                 "",
-                f"📦 #{', #'.join(order_ids)}",
-                f"📋 {order_type_text}",
+                f"📦 #{', #'.join(order_ids)} | {order_type_text}",
             ]
 
             if pickup_codes:
@@ -147,8 +150,8 @@ class NotificationTemplates:
             lines.extend(
                 [
                     "",
-                    f"👤 {_esc(customer_name)}",
-                    f"📱 <code>{_esc(customer_phone)}</code>",
+                    f"👤 {display_name}",
+                    f"📱 <code>{_esc(customer_phone) if customer_phone else 'Не указан'}</code>",
                 ]
             )
 
@@ -156,35 +159,39 @@ class NotificationTemplates:
                 lines.append(f"📍 {_esc(delivery_address)}")
 
             lines.append("")
-            lines.append("<b>Mahsulotlar:</b>")
+            lines.append("<b>📦 Mahsulotlar:</b>")
             for item in items:
-                subtotal = item["price"] * item["quantity"]
+                item_title = item.get("title") or "Товар"
+                item_price = item.get("price") or 0
+                item_qty = item.get("quantity") or 1
+                subtotal = item_price * item_qty
                 lines.append(
-                    f"• {_esc(item['title'])} × {item['quantity']} = {int(subtotal):,} {currency}"
+                    f"  • {_esc(item_title)} × {item_qty} = {int(subtotal):,} {currency}"
                 )
 
             lines.append("")
             lines.append("━━━━━━━━━━━━━━━━━━")
-            lines.append(f"💵 Mahsulotlar: {int(total):,} {currency}")
 
             if order_type == "delivery":
                 lines.append(f"🚚 Yetkazish: {int(delivery_price):,} {currency}")
-                lines.append(f"💰 <b>JAMI: {int(total + delivery_price):,} {currency}</b>")
+                grand_total = int(total + delivery_price)
             else:
-                lines.append(f"💰 <b>JAMI: {int(total):,} {currency}</b>")
+                grand_total = int(total)
+            
+            lines.append(f"💰 <b>JAMI: {grand_total:,} {currency}</b>")
 
             payment_text = "💵 Naqd" if payment_method == "cash" else "💳 Karta"
             lines.extend(["", payment_text, ""])
             lines.append("⏳ <b>Buyurtmani tasdiqlang!</b>")
 
         else:  # Russian
+            display_name = _esc(customer_name) if customer_name and customer_name.strip() else "Клиент"
             order_type_text = "🏪 Самовывоз" if order_type == "pickup" else "🚚 Доставка"
             lines = [
                 "🔔 <b>НОВЫЙ ЗАКАЗ!</b>",
                 "━━━━━━━━━━━━━━━━━━",
                 "",
-                f"📦 #{', #'.join(order_ids)}",
-                f"📋 {order_type_text}",
+                f"📦 #{', #'.join(order_ids)} | {order_type_text}",
             ]
 
             if pickup_codes:
@@ -193,8 +200,8 @@ class NotificationTemplates:
             lines.extend(
                 [
                     "",
-                    f"👤 {_esc(customer_name)}",
-                    f"📱 <code>{_esc(customer_phone)}</code>",
+                    f"👤 {display_name}",
+                    f"📱 <code>{_esc(customer_phone) if customer_phone else 'Не указан'}</code>",
                 ]
             )
 
@@ -202,22 +209,26 @@ class NotificationTemplates:
                 lines.append(f"📍 {_esc(delivery_address)}")
 
             lines.append("")
-            lines.append("<b>Товары:</b>")
+            lines.append("<b>📦 Товары:</b>")
             for item in items:
-                subtotal = item["price"] * item["quantity"]
+                item_title = item.get("title") or "Товар"
+                item_price = item.get("price") or 0
+                item_qty = item.get("quantity") or 1
+                subtotal = item_price * item_qty
                 lines.append(
-                    f"• {_esc(item['title'])} × {item['quantity']} = {int(subtotal):,} {currency}"
+                    f"  • {_esc(item_title)} × {item_qty} = {int(subtotal):,} {currency}"
                 )
 
             lines.append("")
             lines.append("━━━━━━━━━━━━━━━━━━")
-            lines.append(f"💵 Товары: {int(total):,} {currency}")
 
             if order_type == "delivery":
                 lines.append(f"🚚 Доставка: {int(delivery_price):,} {currency}")
-                lines.append(f"💰 <b>ИТОГО: {int(total + delivery_price):,} {currency}</b>")
+                grand_total = int(total + delivery_price)
             else:
-                lines.append(f"💰 <b>ИТОГО: {int(total):,} {currency}</b>")
+                grand_total = int(total)
+
+            lines.append(f"💰 <b>ИТОГО: {grand_total:,} {currency}</b>")
 
             payment_text = "💵 Наличные" if payment_method == "cash" else "💳 Карта"
             lines.extend(["", payment_text, ""])
