@@ -79,33 +79,23 @@ def build_cart_add_card_text(
 def build_cart_add_card_keyboard(
     lang: str, offer_id: int, quantity: int, max_qty: int
 ) -> InlineKeyboardBuilder:
-    """Build simplified cart addition keyboard - only quantity buttons + add to cart button."""
+    """Build simplified cart addition keyboard - quantity buttons + add to cart button."""
     kb = InlineKeyboardBuilder()
 
-    # Quantity buttons
-    if max_qty <= 5:
-        # Show all quantities as buttons
-        for q in range(1, max_qty + 1):
-            btn_text = f"📦 {q}" if q == quantity else str(q)
-            kb.button(text=btn_text, callback_data=f"cart_qty_{offer_id}_{q}")
-        kb.adjust(min(max_qty, 5))
-    else:
-        # Show -/+/value buttons
-        minus_btn = "−" if quantity > 1 else "•"
-        plus_btn = "+" if quantity < max_qty else "•"
+    # Simple quantity control: [ - ] [qty] [ + ]
+    minus_btn = "➖" if quantity > 1 else "▫️"
+    plus_btn = "➕" if quantity < max_qty else "▫️"
 
-        kb.button(
-            text=minus_btn,
-            callback_data=f"cart_qty_{offer_id}_{quantity - 1}" if quantity > 1 else "cart_noop",
-        )
-        kb.button(text=f"📦 {quantity}", callback_data="cart_noop")
-        kb.button(
-            text=plus_btn,
-            callback_data=f"cart_qty_{offer_id}_{quantity + 1}"
-            if quantity < max_qty
-            else "cart_noop",
-        )
-        kb.adjust(3)
+    kb.button(
+        text=minus_btn,
+        callback_data=f"cart_qty_{offer_id}_{quantity - 1}" if quantity > 1 else "cart_noop",
+    )
+    kb.button(text=f"📦 {quantity}", callback_data="cart_noop")
+    kb.button(
+        text=plus_btn,
+        callback_data=f"cart_qty_{offer_id}_{quantity + 1}" if quantity < max_qty else "cart_noop",
+    )
+    kb.adjust(3)
 
     # Add to cart button
     kb.button(
@@ -119,7 +109,7 @@ def build_cart_add_card_keyboard(
         callback_data=f"cart_add_cancel_{offer_id}",
     )
 
-    kb.adjust(1)
+    kb.adjust(3, 1, 1)
 
     return kb
 

@@ -1,13 +1,16 @@
-"""Customer order history - view past orders and repeat them."""
+"""Customer order history - repeat orders functionality.
+
+NOTE: Main "My Orders" handler is in my_orders.py for better UX.
+This module only handles repeat_order functionality.
+"""
 from __future__ import annotations
 
+import json
 from typing import Any
 
 from aiogram import F, Router, types
 from aiogram.fsm.context import FSMContext
 from aiogram.utils.keyboard import InlineKeyboardBuilder
-
-from handlers.common.utils import html_escape as _esc
 
 try:
     from logging_config import logger
@@ -31,146 +34,6 @@ def setup_dependencies(database: Any, bot_instance: Any, cart_storage_instance: 
     db = database
     bot = bot_instance
     cart_storage = cart_storage_instance
-
-
-@router.message(F.text.in_(["📋 Мои заказы", "📋 Buyurtmalarim"]))
-async def my_orders_history(message: types.Message) -> None:
-    """Show user's order history."""
-    if not db or not message.from_user:
-        return
-
-    user_id = message.from_user.id
-    lang = db.get_user_language(user_id)
-
-    # Get user's completed orders (last 15)
-    try:
-        with db.get_connection() as conn:
-            cursor = conn.cursor()
-            cursor.execute(
-                """
-                SELECT
-                    o.order_id,
-                    o.pickup_code,
-                    o.created_at,
-                    o.delivery_address,
-                    o.total_price,
-                    o.is_cart_order,
-                    o.cart_items,
-                    off.title as offer_title,
-                    s.name as store_name
-                FROM orders o
-                LEFT JOIN offers off ON o.offer_id = off.offer_id
-                LEFT JOIN stores s ON o.store_id = s.store_id
-                WHERE o.user_id = %s
-                  AND o.status IN ('completed', 'confirmed', 'pending')
-                ORDER BY o.created_at DESC
-                LIMIT 15
-            """,
-                (user_id,),
-            )
-            orders = cursor.fetchall()
-    except Exception as e:
-        logger.error(f"Failed to get order history for user {user_id}: {e}")
-        await message.answer(
-            "❌ Ошибка загрузки истории" if lang == "ru" else "❌ Tarix yuklanmadi",
-            parse_mode="HTML",
-        )
-        return
-
-    if not orders:
-        await message.answer(
-            "📋 История заказов пуста\n\nВы ещё не делали заказов."
-            if lang == "ru"
-            else "📋 Buyurtmalar tarixi bo'sh\n\nSiz hali buyurtma qilmadingiz.",
-            parse_mode="HTML",
-        )
-        return
-
-    # Build history list
-    text_lines = [f"📋 <b>{'Buyurtmalar tarixi' if lang == 'uz' else 'История заказов'}</b>\n"]
-    currency = "so'm" if lang == "uz" else "сум"
-
-    kb = InlineKeyboardBuilder()
-
-    for i, order in enumerate(orders[:10], 1):
-        # Parse order data
-        if hasattr(order, "get"):
-            order_id = order.get("order_id")
-            code = order.get("pickup_code")
-            created = order.get("created_at")
-            address = order.get("delivery_address")
-            total = order.get("total_price", 0)
-            is_cart = int(order.get("is_cart_order") or 0)
-            cart_items_json = order.get("cart_items")
-            offer_title = order.get("offer_title", "Заказ")
-            store_name = order.get("store_name", "Магазин")
-        else:
-            order_id = order[0]
-            code = order[1]
-            created = order[2]
-            address = order[3]
-            total = order[4]
-            is_cart = int(order[5] if len(order) > 5 else 0)
-            cart_items_json = order[6] if len(order) > 6 else None
-            offer_title = order[7] if len(order) > 7 else "Заказ"
-            store_name = order[8] if len(order) > 8 else "Магазин"
-
-        # Format date
-        date_str = (
-            created.strftime("%d.%m.%Y") if hasattr(created, "strftime") else str(created)[:10]
-        )
-
-        # Build order card
-        if is_cart:
-            # Cart order - show multiple items
-            text_lines.append(f"\n<b>{i}. 🛒 {_esc(store_name)}</b>")
-
-            # Parse cart items
-            if cart_items_json:
-                try:
-                    import json
-
-                    cart_items = (
-                        json.loads(cart_items_json)
-                        if isinstance(cart_items_json, str)
-                        else cart_items_json
-                    )
-                    item_count = len(cart_items)
-                    text_lines.append(
-                        f"   📦 {item_count} {'mahsulot' if lang == 'uz' else 'товар(ов)'}"
-                    )
-                except Exception:
-                    text_lines.append(f"   📦 {'Savat' if lang == 'uz' else 'Корзина'}")
-            else:
-                text_lines.append(f"   📦 {'Savat' if lang == 'uz' else 'Корзина'}")
-        else:
-            # Single item order
-            text_lines.append(f"\n<b>{i}. {_esc(offer_title)}</b>")
-            text_lines.append(f"   🏪 {_esc(store_name)}")
-
-        text_lines.append(f"   💰 {total:,} {currency}")
-        text_lines.append(f"   📅 {date_str}")
-
-        if address:
-            delivery_label = "Yetkazish" if lang == "uz" else "Доставка"
-            text_lines.append(f"   🚚 {delivery_label}")
-        else:
-            pickup_label = "Olib ketish" if lang == "uz" else "Самовывоз"
-            text_lines.append(f"   🏪 {pickup_label}")
-
-        # Add repeat button
-        kb.button(text=f"🔄 {i}" if i <= 5 else f"{i}", callback_data=f"repeat_order_{order_id}")
-
-    text = "\n".join(text_lines)
-
-    # Arrange buttons: 5 per row
-    kb.adjust(5)
-
-    # Add pagination hint if more than 10
-    if len(orders) > 10:
-        text += f"\n\n{'Va yana' if lang == 'uz' else 'И ещё'} {len(orders) - 10}..."
-
-    await message.answer(text, parse_mode="HTML", reply_markup=kb.as_markup())
 
 
 @router.callback_query(F.data.startswith("repeat_order_"))
@@ -257,8 +120,6 @@ async def repeat_order(callback: types.CallbackQuery, state: FSMContext) -> None
     if is_cart and cart_items_json:
         # Repeat cart order - add all items
         try:
-            import json
-
             cart_items = (
                 json.loads(cart_items_json) if isinstance(cart_items_json, str) else cart_items_json
             )

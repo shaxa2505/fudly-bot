@@ -439,26 +439,21 @@ async def process_successful_payment(message: types.Message) -> None:
 
             order_caption += f"⏳ <b>{confirm_hint}</b>"
 
-            # Partner confirmation keyboard
+            # Partner confirmation keyboard - use unified callback pattern
             from aiogram.utils.keyboard import InlineKeyboardBuilder
 
             partner_kb = InlineKeyboardBuilder()
 
-            # Use partner_confirm_order for delivery, partner_confirm for pickup (booking)
+            # Use unified order_confirm_ / order_reject_ pattern for all orders
             if is_delivery:
                 confirm_text = "✅ Qabul qilish" if seller_lang == "uz" else "✅ Принять"
                 reject_text = "❌ Rad etish" if seller_lang == "uz" else "❌ Отклонить"
-                partner_kb.button(
-                    text=confirm_text, callback_data=f"partner_confirm_order_{order_id}"
-                )
-                partner_kb.button(
-                    text=reject_text, callback_data=f"partner_reject_order_{order_id}"
-                )
             else:
                 confirm_text = "✅ Tasdiqlash" if seller_lang == "uz" else "✅ Подтвердить"
                 reject_text = "❌ Rad etish" if seller_lang == "uz" else "❌ Отклонить"
-                partner_kb.button(text=confirm_text, callback_data=f"partner_confirm_{order_id}")
-                partner_kb.button(text=reject_text, callback_data=f"partner_reject_{order_id}")
+
+            partner_kb.button(text=confirm_text, callback_data=f"order_confirm_{order_id}")
+            partner_kb.button(text=reject_text, callback_data=f"order_reject_{order_id}")
             partner_kb.adjust(2)
 
             try:

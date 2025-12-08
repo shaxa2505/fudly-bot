@@ -48,7 +48,7 @@ def build_order_card_text(
 
     # Price with discount - same style as product card
     if original_price and original_price > price:
-        discount_pct = int((1 - price / original_price) * 100)
+        discount_pct = round((1 - price / original_price) * 100)
         lines.append(
             f"<s>{int(original_price):,}</s> → <b>{int(price):,}</b> {currency} (-{discount_pct}%)"
         )
@@ -188,26 +188,32 @@ def build_booking_list_text(lang: str, bookings: list, status_filter: str = "all
 
     lines = []
     if lang == "uz":
-        title = "📋 Sizning bronlaringiz" if status_filter == "all" else f"📋 Bronlar ({status_filter})"
+        title = (
+            "📋 Sizning bronlaringiz" if status_filter == "all" else f"📋 Bronlar ({status_filter})"
+        )
     else:
-        title = "📋 Ваши бронирования" if status_filter == "all" else f"📋 Бронирования ({status_filter})"
+        title = (
+            "📋 Ваши бронирования"
+            if status_filter == "all"
+            else f"📋 Бронирования ({status_filter})"
+        )
 
     lines.append(f"<b>{title}</b>\n")
 
     for b in bookings[:10]:  # Limit to 10
         from .utils import get_booking_field
-        
+
         booking_id = get_booking_field(b, "id")
         code = get_booking_field(b, "code", "—")
         status = get_booking_field(b, "status", "pending")
-        
+
         status_emoji = {
             "pending": "⏳",
             "confirmed": "✅",
             "completed": "🎉",
             "cancelled": "❌",
         }.get(status, "❓")
-        
+
         lines.append(f"{status_emoji} #{booking_id} | {code}")
 
     return "\n".join(lines)
@@ -216,13 +222,13 @@ def build_booking_list_text(lang: str, bookings: list, status_filter: str = "all
 def build_booking_list_keyboard(lang: str, bookings: list) -> InlineKeyboardBuilder:
     """Build keyboard for booking list with cancel buttons."""
     kb = InlineKeyboardBuilder()
-    
+
     for b in bookings[:5]:  # Limit buttons
         from .utils import get_booking_field
-        
+
         booking_id = get_booking_field(b, "id")
         status = get_booking_field(b, "status", "pending")
-        
+
         if status in ("pending", "confirmed"):
             text = f"❌ Отменить #{booking_id}" if lang == "ru" else f"❌ Bekor #{booking_id}"
             kb.button(text=text, callback_data=f"cancel_booking_{booking_id}")

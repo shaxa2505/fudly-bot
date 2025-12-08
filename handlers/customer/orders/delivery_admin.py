@@ -171,6 +171,7 @@ async def admin_confirm_payment(
             logger.error(f"Failed to notify seller: {e}")
 
     # Notify customer - payment confirmed, waiting for partner
+    # Use UnifiedOrderService for live editing if customer_message_id exists
     if customer_id:
         cust_lang = db.get_user_language(customer_id)
         if cust_lang == "uz":
@@ -179,7 +180,25 @@ async def admin_confirm_payment(
             text = f"✅ <b>Оплата подтверждена!</b>\n\n📦 #{order_id}\n⏳ Ожидаем подтверждение продавца..."
 
         try:
-            await bot.send_message(customer_id, text, parse_mode="HTML")
+            # Try to edit existing customer message first
+            existing_msg_id = order.get("customer_message_id") if isinstance(order, dict) else None
+            edit_success = False
+
+            if existing_msg_id:
+                try:
+                    await bot.edit_message_text(
+                        chat_id=customer_id,
+                        message_id=existing_msg_id,
+                        text=text,
+                        parse_mode="HTML",
+                    )
+                    edit_success = True
+                    logger.info(f"Edited payment confirmation for order #{order_id}")
+                except Exception:
+                    pass
+
+            if not edit_success:
+                await bot.send_message(customer_id, text, parse_mode="HTML")
         except Exception as e:
             logger.error(f"Failed to notify customer: {e}")
 

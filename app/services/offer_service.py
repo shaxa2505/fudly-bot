@@ -264,8 +264,11 @@ class OfferService:
         unit = get_offer_field(data, "unit", get_field(data, 13, "шт"))
         discount_percent_src = get_field(data, "discount_percent", get_field(data, 18, 0))
         discount_percent = self._safe_float(discount_percent_src, 0.0)
-        if not discount_percent and original_price:
-            discount_percent = max(0.0, round((1 - (discount_price / original_price)) * 100, 1))
+        # Safe discount calculation - handle edge cases
+        if not discount_percent and original_price and original_price > discount_price:
+            discount_percent = min(
+                99.0, max(0.0, round((1 - (discount_price / original_price)) * 100, 1))
+            )
 
         # Extract delivery info from joined store fields (indices 19, 20, 21)
         delivery_enabled = bool(get_field(data, "delivery_enabled", get_field(data, 19, 0)))

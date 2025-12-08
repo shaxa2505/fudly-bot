@@ -50,45 +50,45 @@ async def process_phone(message: types.Message, state: FSMContext, db: DatabaseP
     # Handle cart and order pending states
     if pending_cart_checkout or pending_order:
         await message.answer(
-            "✅ Телефон сохранён!"
-            if lang == "ru"
-            else "✅ Telefon saqlandi!",
+            "✅ Телефон сохранён!" if lang == "ru" else "✅ Telefon saqlandi!",
             reply_markup=ReplyKeyboardRemove(),
         )
-        
+
         # Get order data to show confirmation button
         data = await state.get_data()
         offer_id = data.get("offer_id")
         store_id = data.get("store_id")
         quantity = data.get("selected_qty", 1)
         delivery_method = data.get("selected_delivery")
-        
+
         # Check if we have minimum required data
         if not offer_id or not store_id or not delivery_method:
             # Data incomplete - show menu
             await state.clear()
             from app.keyboards import main_menu_customer
+
             await message.answer(
-                "⚠️ Продолжите оформление через 🛒 Корзина или 🔥 Горячее"
+                "⚠️ Продолжите оформление через 🛒 Корзина или 🔥 Акции"
                 if lang == "ru"
-                else "⚠️ 🛒 Savat yoki 🔥 Issiq orqali davom eting",
+                else "⚠️ 🛒 Savat yoki 🔥 Aksiyalar orqali davom eting",
                 reply_markup=main_menu_customer(lang),
             )
             return
-        
+
         # Show confirmation button to continue
         from aiogram.utils.keyboard import InlineKeyboardBuilder
+
         kb = InlineKeyboardBuilder()
         kb.button(
             text="✅ Продолжить оформление" if lang == "ru" else "✅ Davom ettirish",
-            callback_data=f"pbook_confirm_{offer_id}"
+            callback_data=f"pbook_confirm_{offer_id}",
         )
-        
+
         await message.answer(
             "👇 Нажмите кнопку ниже для продолжения:"
             if lang == "ru"
             else "👇 Davom etish uchun tugmani bosing:",
-            reply_markup=kb.as_markup()
+            reply_markup=kb.as_markup(),
         )
         return
 
@@ -96,16 +96,15 @@ async def process_phone(message: types.Message, state: FSMContext, db: DatabaseP
         # User was trying to place an order but needed to provide phone first
         # DECISION: Don't try to restore complex state - just show menu and let user start fresh
         # This is more reliable and better UX than trying to restore potentially corrupted state
-        
+
         await state.clear()
-        
+
         from aiogram.types import ReplyKeyboardRemove
+
         from app.keyboards import main_menu_customer
 
         await message.answer(
-            "✅ Телефон сохранён!"
-            if lang == "ru"
-            else "✅ Telefon saqlandi!",
+            "✅ Телефон сохранён!" if lang == "ru" else "✅ Telefon saqlandi!",
             reply_markup=ReplyKeyboardRemove(),
         )
 
@@ -201,7 +200,7 @@ async def registration_city_callback(
         f"👋 {'Xush kelibsiz' if lang == 'uz' else 'Добро пожаловать'}, {name}!\n"
         f"📍 {'Shahar' if lang == 'uz' else 'Город'}: {city}\n\n"
         f"{'Endi siz qila olasiz' if lang == 'uz' else 'Теперь вы можете'}:\n"
-        f"🔥 <b>{'Issiq' if lang == 'uz' else 'Горячее'}</b> — {'eng yaxshi chegirmalar' if lang == 'uz' else 'лучшие скидки'}\n"
+        f"🔥 <b>{'Aksiyalar' if lang == 'uz' else 'Акции'}</b> — {'70% gacha chegirmalar' if lang == 'uz' else 'скидки до 70%'}\n"
         f"🏪 <b>{'Doʻkonlar' if lang == 'uz' else 'Заведения'}</b> — {'barcha doʻkonlar' if lang == 'uz' else 'все магазины'}\n"
         f"🔍 <b>{'Qidirish' if lang == 'uz' else 'Поиск'}</b> — {'mahsulot topish' if lang == 'uz' else 'найти товар'}"
     )

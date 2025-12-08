@@ -15,12 +15,16 @@ from app.keyboards import (
     city_inline_keyboard,
     city_keyboard,
     language_keyboard,
+    main_menu_customer,
+    main_menu_seller,
     settings_keyboard,
 )
 from database_protocol import DatabaseProtocol
 from handlers.common.states import ChangeCity
 from handlers.common.utils import (
     get_appropriate_menu as _get_appropriate_menu,
+)
+from handlers.common.utils import (
     get_user_view_mode,
     has_approved_store,
     set_user_view_mode,
@@ -48,6 +52,7 @@ def get_appropriate_menu(user_id: int, lang: str) -> Any:
     """Get appropriate menu based on user view mode."""
     if not db:
         from app.keyboards import main_menu_customer
+
         return main_menu_customer(lang)
     return _get_appropriate_menu(user_id, lang, db)
 
@@ -270,20 +275,52 @@ async def switch_to_customer_cb(callback: types.CallbackQuery) -> None:
         await callback.answer("System error", show_alert=True)
         return
 
+    if not callback.message:
+        logger.error("❌ switch_to_customer_cb: callback.message is None")
+        await callback.answer("System error", show_alert=True)
+        return
+
     try:
-        lang = db.get_user_language(callback.from_user.id)
-        set_user_view_mode(callback.from_user.id, "customer", db)
-        logger.info(f"✅ User {callback.from_user.id} switched to customer mode")
+        user_id = callback.from_user.id
+        logger.info(f"🔄 User {user_id} switching to customer mode")
+
+        lang = db.get_user_language(user_id)
+
+        # Set customer mode
+        try:
+            set_user_view_mode(user_id, "customer", db)
+            logger.info(f"✅ User {user_id} switched to customer mode")
+        except Exception as e:
+            logger.error(f"❌ Error setting user view mode for {user_id}: {e}", exc_info=True)
+            await callback.answer(
+                "Ошибка при смене режима" if lang == "ru" else "Rejim o'zgartirishda xatolik",
+                show_alert=True,
+            )
+            return
 
         # Send new message with ReplyKeyboard (cannot use edit_text with ReplyKeyboard)
-        await callback.message.answer(
-            get_text(lang, "switched_to_customer"),
-            reply_markup=main_menu_customer(lang),
-        )
-        await callback.answer()
+        try:
+            await callback.message.answer(
+                get_text(lang, "switched_to_customer"),
+                reply_markup=main_menu_customer(lang),
+            )
+            await callback.answer()
+        except Exception as e:
+            logger.error(f"❌ Error sending customer menu to user {user_id}: {e}", exc_info=True)
+            await callback.answer(
+                "Ошибка отправки меню" if lang == "ru" else "Menyu yuborishda xatolik",
+                show_alert=True,
+            )
     except Exception as e:
-        logger.error(f"❌ Error in switch_to_customer_cb: {e}", exc_info=True)
-        await callback.answer("Произошла ошибка", show_alert=True)
+        logger.error(f"❌ Unexpected error in switch_to_customer_cb: {e}", exc_info=True)
+        try:
+            lang = db.get_user_language(callback.from_user.id)
+        except Exception:
+            lang = "ru"
+        await callback.answer(
+            f"Произошла ошибка: {str(e)}" if lang == "ru" else f"Xatolik yuz berdi: {str(e)}",
+            show_alert=True,
+        )
 
 
 @router.callback_query(F.data == "switch_to_seller")
@@ -294,18 +331,48 @@ async def switch_to_seller_cb(callback: types.CallbackQuery) -> None:
         await callback.answer("System error", show_alert=True)
         return
 
+    if not callback.message:
+        logger.error("❌ switch_to_seller_cb: callback.message is None")
+        await callback.answer("System error", show_alert=True)
+        return
+
     try:
-        lang = db.get_user_language(callback.from_user.id)
-        user = db.get_user_model(callback.from_user.id)
+        user_id = callback.from_user.id
+        logger.info(f"🔄 User {user_id} attempting to switch to seller mode")
+
+        lang = db.get_user_language(user_id)
+        logger.debug(f"User {user_id} language: {lang}")
+
+        user = db.get_user_model(user_id)
+        if not user:
+            logger.error(f"❌ User {user_id} not found in database")
+            await callback.answer(
+                "Пользователь не найден" if lang == "ru" else "Foydalanuvchi topilmadi",
+                show_alert=True,
+            )
+            return
 
         # Check if user is a seller (role is "seller" or "store_owner") AND has approved store
-        user_role = user.role if user else "customer"
+        user_role = getattr(user, "role", "customer")
+        logger.debug(f"User {user_id} role from DB: {user_role}")
+
         if user_role == "store_owner":
             user_role = "seller"
 
-        is_seller = user_role == "seller" and has_approved_store(callback.from_user.id, db)
+        # Check for approved store
+        try:
+            has_store = has_approved_store(user_id, db)
+            logger.debug(f"User {user_id} has approved store: {has_store}")
+        except Exception as e:
+            logger.error(f"❌ Error checking approved store for user {user_id}: {e}", exc_info=True)
+            has_store = False
 
-        if not user or not is_seller:
+        is_seller = user_role == "seller" and has_store
+
+        if not is_seller:
+            logger.info(
+                f"❌ User {user_id} denied switch to seller mode (role={user_role}, has_store={has_store})"
+            )
             await callback.answer(
                 "Только партнеры с одобренным магазином могут использовать этот режим"
                 if lang == "ru"
@@ -314,18 +381,41 @@ async def switch_to_seller_cb(callback: types.CallbackQuery) -> None:
             )
             return
 
-        set_user_view_mode(callback.from_user.id, "seller", db)
-        logger.info(f"✅ User {callback.from_user.id} switched to seller mode")
+        # Set seller mode
+        try:
+            set_user_view_mode(user_id, "seller", db)
+            logger.info(f"✅ User {user_id} switched to seller mode")
+        except Exception as e:
+            logger.error(f"❌ Error setting user view mode for {user_id}: {e}", exc_info=True)
+            await callback.answer(
+                "Ошибка при смене режима" if lang == "ru" else "Rejim o'zgartirishda xatolik",
+                show_alert=True,
+            )
+            return
 
         # Send new message with ReplyKeyboard
-        await callback.message.answer(
-            "Переключено в режим партнера" if lang == "ru" else "Hamkor rejimiga o'tkazildi",
-            reply_markup=main_menu_seller(lang),
-        )
-        await callback.answer()
+        try:
+            await callback.message.answer(
+                "Переключено в режим партнера" if lang == "ru" else "Hamkor rejimiga o'tkazildi",
+                reply_markup=main_menu_seller(lang),
+            )
+            await callback.answer()
+        except Exception as e:
+            logger.error(f"❌ Error sending seller menu to user {user_id}: {e}", exc_info=True)
+            await callback.answer(
+                "Ошибка отправки меню" if lang == "ru" else "Menyu yuborishda xatolik",
+                show_alert=True,
+            )
     except Exception as e:
-        logger.error(f"❌ Error in switch_to_seller_cb: {e}", exc_info=True)
-        await callback.answer("Произошла ошибка", show_alert=True)
+        logger.error(f"❌ Unexpected error in switch_to_seller_cb: {e}", exc_info=True)
+        try:
+            lang = db.get_user_language(callback.from_user.id)
+        except Exception:
+            lang = "ru"
+        await callback.answer(
+            f"Произошла ошибка: {str(e)}" if lang == "ru" else f"Xatolik yuz berdi: {str(e)}",
+            show_alert=True,
+        )
 
 
 @router.callback_query(F.data == "change_language")

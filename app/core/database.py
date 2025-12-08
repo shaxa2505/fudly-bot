@@ -17,5 +17,5 @@ def create_database(database_url: str | None):
     from database_pg import Database as PostgresDatabase
 
     logger.info("Using PostgreSQL database")
-    print("🐘 Using PostgreSQL database")
+    print("[DB] Using PostgreSQL database")
     return PostgresDatabase(database_url=database_url)

@@ -62,9 +62,11 @@ bot, dp, db, cache = build_application(settings)
 
 from app.services.admin_service import AdminService
 from app.services.offer_service import OfferService
+from app.services.unified_order_service import init_unified_order_service
 
 offer_service = OfferService(db, cache)
 admin_service = AdminService(db, bool(DATABASE_URL))
+unified_order_service = init_unified_order_service(db, bot)
 
 # =============================================================================
 # METRICS
@@ -190,10 +192,10 @@ async def fallback_photo_handler(message: types.Message, state: FSMContext) -> N
             "Это может произойти если:\n"
             "• Прошло много времени между шагами\n"
             "• Сервер был перезапущен\n\n"
-            "Пожалуйста, начните заново через 🔥 Горячее"
+            "Пожалуйста, начните заново через 🔥 Акции"
             if lang == "ru"
             else "⚠️ Xatolik: buyurtma ma'lumotlari yo'qoldi.\n\n"
-            "Iltimos, 🔥 Issiq takliflar orqali qaytadan boshlang"
+            "Iltimos, 🔥 Aksiyalar orqali qaytadan boshlang"
         )
         await state.clear()
         await message.answer(error_text, reply_markup=get_appropriate_menu(user_id, lang))
@@ -230,10 +232,10 @@ async def fallback_text_handler(message: types.Message, state: FSMContext) -> No
             "Это может произойти если:\n"
             "• Прошло много времени между шагами\n"
             "• Сервер был перезапущен\n\n"
-            "Пожалуйста, начните заново через 🔥 Горячее"
+            "Пожалуйста, начните заново через 🔥 Акции"
             if lang == "ru"
             else "⚠️ Xatolik: buyurtma ma'lumotlari yo'qoldi.\n\n"
-            "Iltimos, 🔥 Issiq takliflar orqali qaytadan boshlang"
+            "Iltimos, 🔥 Aksiyalar orqali qaytadan boshlang"
         )
         await state.clear()
         await message.answer(error_text, reply_markup=get_appropriate_menu(user_id, lang))
@@ -242,9 +244,9 @@ async def fallback_text_handler(message: types.Message, state: FSMContext) -> No
     # Help users who type numbers without context
     if text.isdigit():
         hint = (
-            "Чтобы выбрать товар по номеру, сначала откройте 🔥 Горячее"
+            "Чтобы выбрать товар по номеру, сначала откройте 🔥 Акции"
             if lang == "ru"
-            else "Mahsulotni tanlash uchun avval 🔥 Issiq takliflar ni oching"
+            else "Mahsulotni tanlash uchun avval 🔥 Aksiyalar ni oching"
         )
         await message.answer(hint)
         return
@@ -254,8 +256,11 @@ async def fallback_text_handler(message: types.Message, state: FSMContext) -> No
 
 
 # =============================================================================
-# MINI APP ORDER CALLBACKS
+# MINI APP ORDER CALLBACKS (LEGACY - for backwards compatibility)
 # =============================================================================
+# These handlers use the OLD format: order_accept:{booking_code}:{customer_id}
+# New orders use: booking_confirm_{id} or order_confirm_{id} (handled by unified_order_handlers)
+# Keep these for processing old messages that users might still click
 
 
 @fallback_router.callback_query(F.data.startswith("order_accept:"))
@@ -399,8 +404,9 @@ def _register_handlers() -> None:
     from handlers.customer.offers import browse as offers_browse
     from handlers.customer.offers import search as offers_search
     from handlers.customer.orders import delivery as orders_delivery
-    from handlers.customer.orders import orders_router
     from handlers.customer.orders import history as orders_history
+    from handlers.customer.orders import my_orders as my_orders_module
+    from handlers.customer.orders import orders_router
     from handlers.seller import (
         analytics,
         bulk_import,
@@ -418,6 +424,7 @@ def _register_handlers() -> None:
     bookings.setup_dependencies(db, bot, cache, METRICS)
     orders_delivery.setup_dependencies(db, bot, user_view_mode)
     orders_history.setup_dependencies(db, bot, cart_storage)
+    my_orders_module.setup_dependencies(db, bot, cart_storage)
     partner.setup_dependencies(db, bot, user_view_mode)
     create_offer.setup_dependencies(db, bot)
     management.setup_dependencies(db, bot)
@@ -447,7 +454,15 @@ def _register_handlers() -> None:
     # Setup search handler
     offers_search.setup(dp, db, offer_service)
 
+    # Setup unified order handlers
+    from handlers.common import unified_order_handlers
+
+    unified_order_handlers.setup_dependencies(db, bot)
+
     # Register routers in PRIORITY order (most specific first)
+    # 0. Unified order handlers (HIGHEST PRIORITY for order confirm/reject)
+    dp.include_router(unified_order_handlers.router)
+
     # 1. Seller-specific routers
     dp.include_router(bulk_import.router)
     dp.include_router(import_products.router)
@@ -544,19 +559,28 @@ async def cleanup_expired_fsm_states() -> None:
 
 async def start_booking_worker() -> asyncio.Task | None:
     """Start the booking expiry worker if available."""
-    # TEMPORARILY DISABLED: Requires migration 003_add_partner_reminder.sql
-    # Apply migration first: ALTER TABLE bookings ADD COLUMN IF NOT EXISTS partner_reminder_sent INTEGER DEFAULT 0;
-    logger.warning("⚠️ Booking expiry worker DISABLED - migration required (003_add_partner_reminder.sql)")
-    return None
-    
-    # try:
-    #     from tasks.booking_expiry_worker import start_booking_expiry_worker
-    #     task = asyncio.create_task(start_booking_expiry_worker(db, bot))
-    #     logger.info("✅ Booking expiry worker started")
-    #     return task
-    # except Exception as e:
-    #     logger.warning(f"Could not start booking expiry worker: {e}")
-    #     return None
+    try:
+        from tasks.booking_expiry_worker import start_booking_expiry_worker
+
+        task = asyncio.create_task(start_booking_expiry_worker(db, bot))
+        logger.info("✅ Booking expiry worker started")
+        return task
+    except Exception as e:
+        logger.warning(f"Could not start booking expiry worker: {e}")
+        return None
+
+
+async def start_rating_reminder_worker_task() -> asyncio.Task | None:
+    """Start the rating reminder worker."""
+    try:
+        from tasks.rating_reminder_worker import start_rating_reminder_worker
+
+        task = asyncio.create_task(start_rating_reminder_worker(db, bot))
+        logger.info("✅ Rating reminder worker started")
+        return task
+    except Exception as e:
+        logger.warning(f"Could not start rating reminder worker: {e}")
+        return None
 
 
 # =============================================================================
@@ -669,6 +693,7 @@ async def main() -> None:
     cleanup_task = asyncio.create_task(cleanup_expired_offers())
     fsm_cleanup_task = asyncio.create_task(cleanup_expired_fsm_states())
     booking_task = await start_booking_worker()
+    rating_task = await start_rating_reminder_worker_task()
 
     if PRODUCTION_FEATURES:
         start_background_tasks(db)

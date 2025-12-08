@@ -27,19 +27,23 @@ from database_protocol import DatabaseProtocol
 from handlers.common.states import OrderDelivery
 from handlers.common.utils import (
     get_appropriate_menu as _get_appropriate_menu,
+)
+from handlers.common.utils import (
     html_escape as _esc,
+)
+from handlers.common.utils import (
     is_main_menu_button,
 )
-from localization import get_text
-from logging_config import logger
 
 # Import UI builders from separate module
 from handlers.customer.orders.delivery_ui import (
-    build_delivery_card_text,
-    build_delivery_qty_keyboard,
     build_delivery_address_keyboard,
+    build_delivery_card_text,
     build_delivery_payment_keyboard,
+    build_delivery_qty_keyboard,
 )
+from localization import get_text
+from logging_config import logger
 
 router = Router()
 
@@ -525,6 +529,7 @@ async def dlv_address_input(
 
     # Save address
     await state.update_data(address=text, awaiting_address_input=False)
+    logger.info(f"✅ User {message.from_user.id} entered delivery address: {text[:30]}...")
 
     # Save as last address for user
     try:
@@ -536,6 +541,7 @@ async def dlv_address_input(
     offer_id = data.get("offer_id")
 
     await state.set_state(OrderDelivery.payment_method_select)
+    logger.info(f"🔄 User {message.from_user.id} moved to payment method selection state")
 
     # Send card with payment step
     card_text = build_delivery_card_text(
@@ -697,9 +703,15 @@ async def dlv_pay_card(
         await callback.answer()
         return
 
-    lang = db.get_user_language(callback.from_user.id)
+    user_id = callback.from_user.id
+    lang = db.get_user_language(user_id)
+
+    logger.info(f"💳 User {user_id} selected card payment")
+
     await state.update_data(payment_method="card")
     await state.set_state(OrderDelivery.payment_proof)
+
+    logger.info(f"🔄 User {user_id} state set to payment_proof, awaiting screenshot")
 
     await callback.message.delete()
     await _show_card_payment_details(callback.message, state, lang, db)
@@ -712,6 +724,7 @@ async def _show_card_payment_details(
     """Show card payment details - compact version."""
     data = await state.get_data()
     store_id = data.get("store_id")
+    logger.info(f"💳 Showing card payment details for user (store_id={store_id})")
 
     # Get payment card
     payment_card = None
@@ -778,18 +791,25 @@ async def _show_card_payment_details(
 
 
 @router.message(OrderDelivery.payment_proof, F.photo)
-async def dlv_payment_proof(message: types.Message, state: FSMContext) -> None:
+async def dlv_payment_proof(
+    message: types.Message, state: FSMContext, db: DatabaseProtocol
+) -> None:
     """Process payment screenshot."""
-    if not message.from_user or not db or not bot:
+    if not message.from_user or not bot:
         return
 
     user_id = message.from_user.id
     lang = db.get_user_language(user_id)
     data = await state.get_data()
 
+    logger.info(f"📸 User {user_id} uploaded payment screenshot for delivery order")
+
     # Check required data
     required = ["offer_id", "store_id", "quantity", "address"]
     if not all(k in data for k in required):
+        missing = [k for k in required if k not in data]
+        logger.error(f"❌ User {user_id} missing required data for order: {missing}")
+        logger.debug(f"Available data keys: {list(data.keys())}")
         msg = "❌ Ma'lumotlar yo'qoldi" if lang == "uz" else "❌ Данные потеряны"
         await message.answer(msg, reply_markup=get_appropriate_menu(user_id, lang))
         await state.clear()
@@ -896,9 +916,17 @@ async def dlv_payment_proof(message: types.Message, state: FSMContext) -> None:
             f"⏳ Ожидаем подтверждения оплаты..."
         )
 
-    await message.answer(
-        confirm_text, parse_mode="HTML", reply_markup=get_appropriate_menu(user_id, lang)
-    )
+    # IMPORTANT: Don't use reply_markup here! Messages with ReplyKeyboard can't be edited later.
+    # The keyboard is already shown to user, we just need an editable status message.
+    sent_msg = await message.answer(confirm_text, parse_mode="HTML")
+
+    # Save message_id for live status updates
+    if sent_msg and order_id and hasattr(db, "set_order_customer_message_id"):
+        try:
+            db.set_order_customer_message_id(order_id, sent_msg.message_id)
+            logger.info(f"Saved customer_message_id={sent_msg.message_id} for order #{order_id}")
+        except Exception as e:
+            logger.warning(f"Failed to save customer_message_id: {e}")
 
 
 @router.message(OrderDelivery.payment_proof)

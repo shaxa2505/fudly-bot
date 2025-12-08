@@ -49,372 +49,15 @@ def setup_dependencies(database: Any, bot_instance: Any):
 
 
 # ===================== PARTNER CONFIRM/REJECT =====================
-
-
-@router.callback_query(F.data.regexp(r"^partner_confirm_\d+$") | F.data.regexp(r"^partner_confirm_order_\d+$"))
-async def partner_confirm_booking(callback: types.CallbackQuery) -> None:
-    """Partner confirms a booking (supports both old and new callback patterns)."""
-    if not db or not bot:
-        await callback.answer("System error", show_alert=True)
-        return
-
-    partner_id = callback.from_user.id
-    lang = db.get_user_language(partner_id)
-
-    try:
-        # Support both patterns: partner_confirm_{id} and partner_confirm_order_{id}
-        if "partner_confirm_order_" in callback.data:
-            booking_id = int(callback.data.replace("partner_confirm_order_", ""))
-        else:
-            booking_id = int(callback.data.split("_")[-1])
-    except ValueError:
-        await callback.answer(get_text(lang, "error"), show_alert=True)
-        return
-
-    booking = db.get_booking(booking_id)
-    if not booking:
-        await callback.answer(get_text(lang, "booking_not_found"), show_alert=True)
-        return
-
-    # Verify ownership - get store_id from booking directly (important for cart bookings)
-    store_id = get_booking_field(booking, "store_id")
-    if not store_id:
-        # Fallback: try to get from offer
-        offer_id = get_booking_field(booking, "offer_id")
-        offer = db.get_offer(offer_id) if offer_id else None
-        store_id = get_offer_field(offer, "store_id") if offer else None
-    
-    store = db.get_store(store_id) if store_id else None
-    owner_id = get_store_field(store, "owner_id") if store else None
-
-    if not owner_id or partner_id != owner_id:
-        logger.warning(f"Ownership verification failed: partner={partner_id}, owner={owner_id}, booking={booking_id}")
-        await callback.answer(get_text(lang, "error"), show_alert=True)
-        return
-
-    # Confirm booking
-    try:
-        db.update_booking_status(booking_id, "confirmed")
-        db.mark_reminder_sent(booking_id)  # Prevent reminder spam
-    except Exception as e:
-        logger.error(f"Failed to confirm booking: {e}")
-        await callback.answer(get_text(lang, "error"), show_alert=True)
-        return
-
-    # Notify customer - OPTIMIZED: single message with QR + all info
-    customer_id = get_booking_field(booking, "user_id")
-    code = get_booking_field(booking, "code")
-    code_display = format_booking_code(code, booking_id)
-
-    if customer_id:
-        customer_lang = db.get_user_language(customer_id)
-        store_name = get_store_field(store, "name", "Магазин")
-        store_address = get_store_field(store, "address", "")
-
-        # Check if cart booking
-        is_cart = get_booking_field(booking, "is_cart_booking", 0) == 1
-
-        # Compact single message with all info
-        if customer_lang == "uz":
-            customer_msg = (
-                f"✅ <b>{'Savat broningiz' if is_cart else 'Broningiz'} tasdiqlandi!</b>\n\n"
-                f"🏪 {_esc(store_name)}\n"
-                f"📍 Manzil: {_esc(store_address)}\n\n"
-            )
-
-            # Add cart items if cart booking
-            if is_cart:
-                import json
-
-                cart_items_str = get_booking_field(booking, "cart_items")
-                if cart_items_str:
-                    try:
-                        cart_items = json.loads(cart_items_str)
-                        customer_msg += "<b>Mahsulotlar:</b>\n"
-                        for item in cart_items:
-                            qty = item.get("quantity", 1)
-                            title = item.get("title", "Товар")
-                            customer_msg += f"• {_esc(title)} × {qty}\n"
-                        customer_msg += "\n"
-                    except Exception:
-                        pass
-
-            customer_msg += (
-                f"━━━━━━━━━━\n"
-                f"🎫 <b>Bron kodi:</b>\n"
-                f"<code>{code_display}</code>\n"
-                f"━━━━━━━━━━\n\n"
-                f"⚠️ Ushbu kodni yoki QR kodni sotuvchiga ko'rsating."
-            )
-        else:
-            customer_msg = (
-                f"✅ <b>{'Ваша корзина' if is_cart else 'Ваша бронь'} подтверждена!</b>\n\n"
-                f"🏪 {_esc(store_name)}\n"
-                f"📍 Адрес: {_esc(store_address)}\n\n"
-            )
-
-            # Add cart items if cart booking
-            if is_cart:
-                import json
-
-                cart_items_str = get_booking_field(booking, "cart_items")
-                if cart_items_str:
-                    try:
-                        cart_items = json.loads(cart_items_str)
-                        customer_msg += "<b>Товары:</b>\n"
-                        for item in cart_items:
-                            qty = item.get("quantity", 1)
-                            title = item.get("title", "Товар")
-                            customer_msg += f"• {_esc(title)} × {qty}\n"
-                        customer_msg += "\n"
-                    except Exception:
-                        pass
-
-            customer_msg += (
-                f"━━━━━━━━━━\n"
-                f"🎫 <b>Код брони:</b>\n"
-                f"<code>{code_display}</code>\n"
-                f"━━━━━━━━━━\n\n"
-                f"⚠️ Покажите этот код или QR-код продавцу."
-            )
-
-        try:
-            # Single message with QR code - no separate messages
-            qr_sent = False
-            if QR_ENABLED and generate_booking_qr:
-                try:
-                    bot_info = await bot.get_me()
-                    current_bot_username = bot_info.username or bot_username
-                except Exception:
-                    current_bot_username = bot_username
-
-                qr_image = generate_booking_qr(
-                    code or str(booking_id), booking_id, bot_username=current_bot_username
-                )
-                if qr_image:
-                    try:
-                        qr_file = BufferedInputFile(
-                            qr_image.read(), filename=f"booking_{booking_id}_qr.png"
-                        )
-                        await bot.send_photo(
-                            customer_id, qr_file, caption=customer_msg, parse_mode="HTML"
-                        )
-                        qr_sent = True
-                    except Exception as qr_e:
-                        logger.warning(f"Failed to send QR: {qr_e}")
-
-            if not qr_sent:
-                await bot.send_message(customer_id, customer_msg, parse_mode="HTML")
-
-        except Exception as e:
-            error_msg = str(e).lower()
-            if "bot" in error_msg or "blocked" in error_msg or "deactivated" in error_msg:
-                logger.warning(f"Cannot notify customer {customer_id}: {e}")
-            else:
-                logger.error(f"Failed to notify customer {customer_id}: {e}")
-
-    # Update partner's message
-    await safe_edit_reply_markup(callback.message)
-
-    # Add complete/cancel buttons
-    kb = InlineKeyboardBuilder()
-    if lang == "uz":
-        kb.button(text="✅ Berildi", callback_data=f"complete_booking_{booking_id}")
-        kb.button(text="❌ Bekor qilish", callback_data=f"partner_cancel_{booking_id}")
-    else:
-        kb.button(text="✅ Выдано", callback_data=f"complete_booking_{booking_id}")
-        kb.button(text="❌ Отменить", callback_data=f"partner_cancel_{booking_id}")
-    kb.adjust(2)
-
-    if lang == "uz":
-        text = f"✅ Bron #{booking_id} tasdiqlandi.\n📋 Mijoz kelganda 'Berildi' tugmasini bosing."
-    else:
-        text = f"✅ Бронь #{booking_id} подтверждена.\n📋 Нажмите 'Выдано' когда клиент заберёт."
-
-    await safe_answer_or_send(
-        callback.message, partner_id, text, bot=bot, reply_markup=kb.as_markup()
-    )
-    await callback.answer(get_text(lang, "booking_confirmed") or "Подтверждено")
-
-
-@router.callback_query(F.data.regexp(r"^partner_reject_\d+$") | F.data.regexp(r"^partner_reject_order_\d+$"))
-async def partner_reject_booking(callback: types.CallbackQuery) -> None:
-    """Partner rejects a booking (supports both old and new callback patterns)."""
-    if not db or not bot:
-        await callback.answer("System error", show_alert=True)
-        return
-
-    partner_id = callback.from_user.id
-    lang = db.get_user_language(partner_id)
-
-    try:
-        # Support both patterns: partner_reject_{id} and partner_reject_order_{id}
-        if callback.data and "partner_reject_order_" in callback.data:
-            booking_id = int(callback.data.replace("partner_reject_order_", ""))
-        else:
-            booking_id = int(callback.data.split("_")[-1])
-    except ValueError:
-        await callback.answer(get_text(lang, "error"), show_alert=True)
-        return
-
-    booking = db.get_booking(booking_id)
-    if not booking:
-        await callback.answer(get_text(lang, "booking_not_found"), show_alert=True)
-        return
-
-    # Verify ownership - get store_id from booking directly (important for cart bookings)
-    store_id = get_booking_field(booking, "store_id")
-    if not store_id:
-        # Fallback: try to get from offer
-        offer_id = get_booking_field(booking, "offer_id")
-        offer = db.get_offer(offer_id) if offer_id else None
-        store_id = get_offer_field(offer, "store_id") if offer else None
-    
-    store = db.get_store(store_id) if store_id else None
-    owner_id = get_store_field(store, "owner_id") if store else None
-
-    if not owner_id or partner_id != owner_id:
-        logger.warning(f"Ownership verification failed in reject: partner={partner_id}, owner={owner_id}, booking={booking_id}")
-        await callback.answer(get_text(lang, "error"), show_alert=True)
-        return
-
-    # Cancel booking and restore quantity
-    try:
-        db.cancel_booking(booking_id)
-        
-        # Restore quantities - check if cart booking
-        is_cart_booking = get_booking_field(booking, "is_cart_booking", 0)
-        if is_cart_booking:
-            import json
-            cart_items_json = get_booking_field(booking, "cart_items")
-            if cart_items_json:
-                try:
-                    cart_items = json.loads(cart_items_json) if isinstance(cart_items_json, str) else cart_items_json
-                    for item in cart_items:
-                        item_offer_id = item.get("offer_id")
-                        item_qty = item.get("quantity", 1)
-                        if item_offer_id:
-                            db.increment_offer_quantity_atomic(item_offer_id, int(item_qty))
-                except Exception as e:
-                    logger.error(f"Failed to restore cart quantities: {e}")
-        else:
-            # Single item booking
-            offer_id = get_booking_field(booking, "offer_id")
-            qty = get_booking_field(booking, "quantity", 1)
-            if offer_id:
-                db.increment_offer_quantity_atomic(offer_id, int(qty))
-    except Exception as e:
-        logger.error(f"Failed to reject booking: {e}")
-        await callback.answer(get_text(lang, "error"), show_alert=True)
-        return
-
-    # Notify customer
-    customer_id = get_booking_field(booking, "user_id")
-    if customer_id:
-        customer_lang = db.get_user_language(customer_id)
-
-        if customer_lang == "uz":
-            customer_msg = "❌ Afsuski, broningiz sotuvchi tomonidan rad etildi."
-        else:
-            customer_msg = "❌ К сожалению, продавец отклонил вашу бронь."
-
-        try:
-            await bot.send_message(customer_id, customer_msg)
-        except Exception as e:
-            logger.error(f"Failed to notify customer {customer_id}: {e}")
-
-    # Update partner's message
-    await safe_edit_reply_markup(callback.message)
-
-    if lang == "uz":
-        text = f"❌ Bron #{booking_id} rad etildi."
-    else:
-        text = f"❌ Бронь #{booking_id} отклонена."
-
-    await safe_answer_or_send(callback.message, partner_id, text, bot=bot)
-    await callback.answer(get_text(lang, "booking_rejected") or "Отклонено")
+# NOTE: Handlers for partner_confirm_ and partner_reject_ patterns
+# have been moved to handlers/common/unified_order_handlers.py
+# which is registered before this router in bot.py
+# This ensures all order/booking confirms/rejects go through UnifiedOrderService
 
 
 # ===================== COMPLETE BOOKING =====================
-
-
-@router.callback_query(F.data.regexp(r"^complete_booking_\d+$"))
-async def complete_booking(callback: types.CallbackQuery) -> None:
-    """Partner marks booking as completed (item handed to customer)."""
-    if not db or not bot:
-        await callback.answer("System error", show_alert=True)
-        return
-
-    partner_id = callback.from_user.id
-    lang = db.get_user_language(partner_id)
-
-    try:
-        booking_id = int(callback.data.split("_")[-1])
-    except ValueError:
-        await callback.answer(get_text(lang, "error"), show_alert=True)
-        return
-
-    booking = db.get_booking(booking_id)
-    if not booking:
-        await callback.answer(get_text(lang, "booking_not_found"), show_alert=True)
-        return
-
-    # Verify ownership - get store_id from booking directly (important for cart bookings)
-    store_id = get_booking_field(booking, "store_id")
-    if not store_id:
-        # Fallback: try to get from offer
-        offer_id = get_booking_field(booking, "offer_id")
-        offer = db.get_offer(offer_id) if offer_id else None
-        store_id = get_offer_field(offer, "store_id") if offer else None
-    
-    store = db.get_store(store_id) if store_id else None
-    owner_id = get_store_field(store, "owner_id") if store else None
-
-    if not owner_id or partner_id != owner_id:
-        await callback.answer(get_text(lang, "error"), show_alert=True)
-        return
-
-    # Complete booking
-    try:
-        db.complete_booking(booking_id)
-    except Exception as e:
-        logger.error(f"Failed to complete booking: {e}")
-        await callback.answer(get_text(lang, "error"), show_alert=True)
-        return
-
-    # Notify customer
-    customer_id = get_booking_field(booking, "user_id")
-    if customer_id:
-        customer_lang = db.get_user_language(customer_id)
-
-        kb = InlineKeyboardBuilder()
-        if customer_lang == "uz":
-            customer_msg = "🎉 <b>Buyurtma topshirildi!</b>\n\nRahmat! Qanday bo'ldi? Baholang:"
-            for i in range(1, 6):
-                kb.button(text="⭐" * i, callback_data=f"rate_booking_{booking_id}_{i}")
-        else:
-            customer_msg = "🎉 <b>Заказ выдан!</b>\n\nСпасибо! Как вам? Оцените:"
-            for i in range(1, 6):
-                kb.button(text="⭐" * i, callback_data=f"rate_booking_{booking_id}_{i}")
-        kb.adjust(5)
-
-        try:
-            await bot.send_message(
-                customer_id, customer_msg, parse_mode="HTML", reply_markup=kb.as_markup()
-            )
-        except Exception as e:
-            logger.error(f"Failed to notify customer {customer_id}: {e}")
-
-    # Update partner's message
-    await safe_edit_reply_markup(callback.message)
-
-    if lang == "uz":
-        text = f"✅ Bron #{booking_id} yakunlandi!"
-    else:
-        text = f"✅ Бронь #{booking_id} завершена!"
-
-    await safe_answer_or_send(callback.message, partner_id, text, bot=bot)
-    await callback.answer(get_text(lang, "booking_completed") or "Завершено")
+# NOTE: complete_booking_ handler has been moved to unified_order_handlers.py
+# to use UnifiedOrderService for consistent customer notifications
 
 
 @router.callback_query(F.data.regexp(r"^partner_cancel_\d+$"))
@@ -445,7 +88,7 @@ async def partner_cancel_booking(callback: types.CallbackQuery) -> None:
         offer_id = get_booking_field(booking, "offer_id")
         offer = db.get_offer(offer_id) if offer_id else None
         store_id = get_offer_field(offer, "store_id") if offer else None
-    
+
     store = db.get_store(store_id) if store_id else None
     owner_id = get_store_field(store, "owner_id") if store else None
 
@@ -456,15 +99,20 @@ async def partner_cancel_booking(callback: types.CallbackQuery) -> None:
     # Cancel and restore quantities
     try:
         db.cancel_booking(booking_id)
-        
+
         # Restore quantities - check if cart booking
         is_cart_booking = get_booking_field(booking, "is_cart_booking", 0)
         if is_cart_booking:
             import json
+
             cart_items_json = get_booking_field(booking, "cart_items")
             if cart_items_json:
                 try:
-                    cart_items = json.loads(cart_items_json) if isinstance(cart_items_json, str) else cart_items_json
+                    cart_items = (
+                        json.loads(cart_items_json)
+                        if isinstance(cart_items_json, str)
+                        else cart_items_json
+                    )
                     for item in cart_items:
                         item_offer_id = item.get("offer_id")
                         item_qty = item.get("quantity", 1)

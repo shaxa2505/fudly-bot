@@ -26,13 +26,13 @@ db = None
 bot: Bot | None = None
 
 # Import cart storage
-from .storage import cart_storage
-
 # Import FSM states
 from handlers.customer.orders.delivery import OrderDelivery
 
+from .storage import cart_storage
 
-def init_checkout(database, bot_instance: "Bot") -> None:
+
+def init_checkout(database, bot_instance: Bot) -> None:
     """Initialize checkout handlers with database and bot instance."""
     global db, bot
     db = database
@@ -113,58 +113,113 @@ async def cart_confirm_pickup(callback: types.CallbackQuery) -> None:
     lines.append(f"<b>{'Mahsulotlar' if lang == 'uz' else 'Товары'}:</b>")
 
     for item in items:
-        subtotal = item.price * item.quantity
+        subtotal = int(item.price * item.quantity)
         lines.append(f"• {_esc(item.title)} × {item.quantity} = {subtotal:,} {currency}")
 
-    total = sum(item.price * item.quantity for item in items)
+    total = int(sum(item.price * item.quantity for item in items))
     lines.append(f"\n💵 <b>{'JAMI' if lang == 'uz' else 'ИТОГО'}: {total:,} {currency}</b>")
 
     text = "\n".join(lines)
 
+    # Send/edit customer notification and save message_id for live editing
+    customer_message_id = None
     try:
         await callback.message.edit_text(text, parse_mode="HTML")
+        customer_message_id = callback.message.message_id
     except Exception:
-        await callback.message.answer(text, parse_mode="HTML")
+        sent_msg = await callback.message.answer(text, parse_mode="HTML")
+        customer_message_id = sent_msg.message_id
 
-    # Notify partner - send ONE notification with all items
+    # Save message_id for live status updates
+    if customer_message_id and booking_id and hasattr(db, "set_booking_customer_message_id"):
+        try:
+            db.set_booking_customer_message_id(booking_id, customer_message_id)
+            logger.info(
+                f"Saved customer_message_id={customer_message_id} for cart booking #{booking_id}"
+            )
+        except Exception as e:
+            logger.warning(f"Failed to save customer_message_id: {e}")
+
+    # Notify partner - send ONE notification with all items (UNIFIED format)
     try:
         store = db.get_store(store_id)
         if store:
             owner_id = store.get("owner_id") if isinstance(store, dict) else store[1]
 
-            # Build partner notification
-            partner_lines = [
-                f"🛒 <b>{'Yangi savat broni!' if lang == 'uz' else 'Новое бронирование корзины!'}</b>\n"
-            ]
-            partner_lines.append(
-                f"📋 {'Bron kodi' if lang == 'uz' else 'Код'}: <b>{booking_code}</b>"
-            )
-            partner_lines.append(
-                f"👤 {'Mijoz' if lang == 'uz' else 'Клиент'}: {callback.from_user.first_name or 'User'}\n"
-            )
-            partner_lines.append(f"<b>{'Mahsulotlar' if lang == 'uz' else 'Товары'}:</b>")
+            # Get customer info for unified notification
+            customer = db.get_user(user_id) if hasattr(db, "get_user") else None
+            customer_name = callback.from_user.first_name or "Клиент"
+            customer_phone = "Не указан"
+            customer_username = None
+            if customer:
+                if isinstance(customer, dict):
+                    customer_phone = customer.get("phone") or "Не указан"
+                    customer_username = customer.get("username")
+                else:
+                    customer_phone = getattr(customer, "phone", None) or "Не указан"
+                    customer_username = getattr(customer, "username", None)
+
+            contact_info = f"@{customer_username}" if customer_username else customer_phone
+
+            # Build UNIFIED partner notification (same format as tez buyurtma)
+            if lang == "uz":
+                partner_lines = [
+                    "🔔 <b>YANGI BRON!</b>",
+                    "━━━━━━━━━━━━━━━━━━",
+                    "",
+                    f"🎫 Kod: <b>{booking_code}</b>",
+                    "🏪 O'zi olib ketadi",
+                    "",
+                    "👤 <b>Xaridor:</b>",
+                    f"   Ism: {_esc(customer_name)}",
+                    f"   📱 <code>{_esc(customer_phone)}</code>",
+                    f"   💬 {_esc(contact_info)}",
+                    "",
+                    "<b>Mahsulotlar:</b>",
+                ]
+            else:
+                partner_lines = [
+                    "🔔 <b>НОВАЯ БРОНЬ!</b>",
+                    "━━━━━━━━━━━━━━━━━━",
+                    "",
+                    f"🎫 Код: <b>{booking_code}</b>",
+                    "🏪 Самовывоз",
+                    "",
+                    "👤 <b>Покупатель:</b>",
+                    f"   Имя: {_esc(customer_name)}",
+                    f"   📱 <code>{_esc(customer_phone)}</code>",
+                    f"   💬 {_esc(contact_info)}",
+                    "",
+                    "<b>Товары:</b>",
+                ]
 
             for item in items:
-                subtotal = item.price * item.quantity
+                subtotal = int(item.price * item.quantity)
                 partner_lines.append(
                     f"• {_esc(item.title)} × {item.quantity} = {subtotal:,} {currency}"
                 )
 
-            partner_lines.append(
-                f"\n💵 <b>{'JAMI' if lang == 'uz' else 'ИТОГО'}: {total:,} {currency}</b>"
+            partner_lines.extend(
+                [
+                    "",
+                    "━━━━━━━━━━━━━━━━━━",
+                    f"💰 <b>{'JAMI' if lang == 'uz' else 'ИТОГО'}: {total:,} {currency}</b>",
+                    "━━━━━━━━━━━━━━━━━━",
+                ]
             )
 
             partner_text = "\n".join(partner_lines)
 
             # One button to confirm/reject entire cart booking
+            # Use explicit booking_ prefix since this is pickup BOOKING
             kb = InlineKeyboardBuilder()
             kb.button(
-                text="✅ Подтвердить" if lang == "ru" else "✅ Tasdiqlash",
-                callback_data=f"partner_confirm_{booking_id}",
+                text="✅ Tasdiqlash" if lang == "uz" else "✅ Подтвердить",
+                callback_data=f"booking_confirm_{booking_id}",
             )
             kb.button(
-                text="❌ Отклонить" if lang == "ru" else "❌ Rad etish",
-                callback_data=f"partner_reject_{booking_id}",
+                text="❌ Rad etish" if lang == "uz" else "❌ Отклонить",
+                callback_data=f"booking_reject_{booking_id}",
             )
             kb.adjust(2)
 
@@ -202,7 +257,7 @@ async def cart_confirm_delivery(callback: types.CallbackQuery, state: FSMContext
     delivery_price = items[0].delivery_price
 
     # Calculate total
-    total = sum(item.price * item.quantity for item in items)
+    total = int(sum(item.price * item.quantity for item in items))
 
     # CHECK MIN_ORDER_AMOUNT before allowing delivery
     store = db.get_store(store_id)
@@ -683,7 +738,18 @@ async def cart_payment_proof(message: types.Message, state: FSMContext) -> None:
 
     from app.keyboards import main_menu_customer
 
-    await message.answer(confirm_text, parse_mode="HTML", reply_markup=main_menu_customer(lang))
+    # IMPORTANT: Don't use reply_markup here! Messages with ReplyKeyboard can't be edited later.
+    sent_msg = await message.answer(confirm_text, parse_mode="HTML")
+
+    # Save message_id for live status updates
+    if sent_msg and order_id and hasattr(db, "set_order_customer_message_id"):
+        try:
+            db.set_order_customer_message_id(order_id, sent_msg.message_id)
+            logger.info(
+                f"Saved customer_message_id={sent_msg.message_id} for cart order #{order_id}"
+            )
+        except Exception as e:
+            logger.warning(f"Failed to save customer_message_id: {e}")
 
 
 @router.callback_query(F.data == "cart_cancel_payment")

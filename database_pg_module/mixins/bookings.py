@@ -241,7 +241,7 @@ class BookingMixin:
                 """
                 SELECT booking_id, offer_id, user_id, status, booking_code,
                        pickup_time, COALESCE(quantity, 1) as quantity, created_at,
-                       store_id, cart_items, is_cart_booking
+                       store_id, cart_items, is_cart_booking, customer_message_id
                 FROM bookings
                 WHERE booking_id = %s
             """,
@@ -395,6 +395,36 @@ class BookingMixin:
             cursor.execute(
                 "UPDATE bookings SET status = %s WHERE booking_id = %s", (status, booking_id)
             )
+
+    def set_booking_customer_message_id(self, booking_id: int, message_id: int) -> bool:
+        """Save customer notification message_id for live updates."""
+        try:
+            with self.get_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute(
+                    "UPDATE bookings SET customer_message_id = %s WHERE booking_id = %s",
+                    (message_id, booking_id),
+                )
+                logger.info(f"✅ Saved customer_message_id={message_id} for booking #{booking_id}")
+                return True
+        except Exception as e:
+            logger.error(f"❌ Failed to save customer_message_id: {e}")
+            return False
+
+    def set_booking_seller_message_id(self, booking_id: int, message_id: int) -> bool:
+        """Save seller notification message_id for live updates."""
+        try:
+            with self.get_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute(
+                    "UPDATE bookings SET seller_message_id = %s WHERE booking_id = %s",
+                    (message_id, booking_id),
+                )
+                logger.info(f"✅ Saved seller_message_id={message_id} for booking #{booking_id}")
+                return True
+        except Exception as e:
+            logger.error(f"❌ Failed to save seller_message_id: {e}")
+            return False
 
     def complete_booking(self, booking_id: int):
         """Complete booking."""

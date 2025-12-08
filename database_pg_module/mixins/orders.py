@@ -63,12 +63,12 @@ class OrderMixin:
                 pickup_code = "".join(random.choices(string.ascii_uppercase + string.digits, k=6))
 
             try:
-                # Try with pickup_code column
+                # Try with pickup_code and order_type columns
                 cursor.execute(
                     """
                     INSERT INTO orders (user_id, store_id, offer_id, quantity, delivery_address,
-                                      total_price, payment_method, payment_status, order_status, pickup_code)
-                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                                      total_price, payment_method, payment_status, order_status, pickup_code, order_type)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                     RETURNING order_id
                     """,
                     (
@@ -82,6 +82,7 @@ class OrderMixin:
                         "pending",
                         "pending",
                         pickup_code,
+                        order_type,
                     ),
                 )
                 result = cursor.fetchone()
@@ -91,14 +92,14 @@ class OrderMixin:
                     return order_id
                 return None
             except Exception as e:
-                # Fallback: try without pickup_code column (for older DB schemas)
-                logger.warning(f"Trying order creation without pickup_code: {e}")
+                # Fallback: try without order_type column (for older DB schemas)
+                logger.warning(f"Trying order creation without order_type: {e}")
                 try:
                     cursor.execute(
                         """
                         INSERT INTO orders (user_id, store_id, offer_id, quantity, delivery_address,
-                                          total_price, payment_method, payment_status, order_status)
-                        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+                                          total_price, payment_method, payment_status, order_status, pickup_code)
+                        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                         RETURNING order_id
                         """,
                         (
@@ -111,17 +112,51 @@ class OrderMixin:
                             payment_method or "cash",
                             "pending",
                             "pending",
+                            pickup_code,
                         ),
                     )
                     result = cursor.fetchone()
                     if result:
                         order_id = result[0]
-                        logger.info(f"Order {order_id} created (fallback) by user {user_id}")
+                        logger.info(
+                            f"Order {order_id} created (fallback) by user {user_id} (type={order_type})"
+                        )
                         return order_id
                     return None
                 except Exception as e2:
-                    logger.error(f"Failed to create order (fallback): {e2}")
-                    return None
+                    # Fallback: try without pickup_code column (for oldest DB schemas)
+                    logger.warning(f"Trying order creation without pickup_code: {e2}")
+                    try:
+                        cursor.execute(
+                            """
+                            INSERT INTO orders (user_id, store_id, offer_id, quantity, delivery_address,
+                                              total_price, payment_method, payment_status, order_status)
+                            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+                            RETURNING order_id
+                            """,
+                            (
+                                user_id,
+                                store_id,
+                                offer_id,
+                                quantity,
+                                delivery_address,
+                                total_amount,
+                                payment_method or "cash",
+                                "pending",
+                                "pending",
+                            ),
+                        )
+                        result = cursor.fetchone()
+                        if result:
+                            order_id = result[0]
+                            logger.info(
+                                f"Order {order_id} created (oldest fallback) by user {user_id}"
+                            )
+                            return order_id
+                        return None
+                    except Exception as e3:
+                        logger.error(f"Failed to create order (all methods): {e3}")
+                        return None
 
     def create_cart_order(
         self,
@@ -319,6 +354,34 @@ class OrderMixin:
                     "UPDATE orders SET order_status = %s WHERE order_id = %s",
                     (order_status, order_id),
                 )
+
+    def set_order_customer_message_id(self, order_id: int, message_id: int) -> bool:
+        """Save customer notification message_id for live updates."""
+        try:
+            with self.get_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute(
+                    "UPDATE orders SET customer_message_id = %s WHERE order_id = %s",
+                    (message_id, order_id),
+                )
+                return True
+        except Exception:
+            return False
+
+    def set_order_seller_message_id(self, order_id: int, message_id: int) -> bool:
+        """Save seller notification message_id for live updates."""
+        try:
+            with self.get_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute(
+                    "UPDATE orders SET seller_message_id = %s WHERE order_id = %s",
+                    (message_id, order_id),
+                )
+                logger.info(f"Saved seller_message_id={message_id} for order #{order_id}")
+                return True
+        except Exception as e:
+            logger.warning(f"Failed to save seller_message_id: {e}")
+            return False
 
     def get_user_orders(self, user_id: int):
         """Get all orders for a user."""

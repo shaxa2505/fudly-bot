@@ -469,9 +469,7 @@ async def get_flash_deals(
     try:
         # Get offers with high discounts
         raw_offers = (
-            db.get_hot_offers(city, limit=100, offset=0)
-            if hasattr(db, "get_hot_offers")
-            else []
+            db.get_hot_offers(city, limit=100, offset=0) if hasattr(db, "get_hot_offers") else []
         )
 
         if not raw_offers:
@@ -667,10 +665,12 @@ async def create_order(
                     price = float(get_val(offer, "discount_price", 0) or 0)
                     total_check += price * item.quantity
                     store_id_check = get_val(offer, "store_id")
-            
+
             # Check min order for first store (simplified for now)
             if order.items:
-                first_offer = db.get_offer(order.items[0].offer_id) if hasattr(db, "get_offer") else None
+                first_offer = (
+                    db.get_offer(order.items[0].offer_id) if hasattr(db, "get_offer") else None
+                )
                 if first_offer:
                     store_id_check = get_val(first_offer, "store_id")
                     store_check = db.get_store(store_id_check) if hasattr(db, "get_store") else None
@@ -679,7 +679,7 @@ async def create_order(
                         if min_order > 0 and total_check < min_order:
                             raise HTTPException(
                                 status_code=400,
-                                detail=f"Minimum order amount: {min_order}. Your total: {total_check}"
+                                detail=f"Minimum order amount: {min_order}. Your total: {total_check}",
                             )
 
         # Process each offer separately
@@ -759,7 +759,7 @@ async def create_order(
                                 bot=bot_instance,
                                 db=db,
                                 owner_id=owner_id,
-                                booking_id=last_item["id"],
+                                entity_id=last_item["id"],
                                 offer_title=offer_title,
                                 quantity=item.quantity,
                                 total=last_item["total"],
@@ -782,13 +782,15 @@ async def create_order(
         # QUICK WIN #1: Send confirmation to customer
         if bot_instance and created_items and user_id:
             try:
-                customer_lang = db.get_user_language(user_id) if hasattr(db, "get_user_language") else "ru"
+                customer_lang = (
+                    db.get_user_language(user_id) if hasattr(db, "get_user_language") else "ru"
+                )
                 currency = "so'm" if customer_lang == "uz" else "сум"
-                
+
                 # Build confirmation message
                 if customer_lang == "uz":
                     order_type_uz = "🚚 Yetkazish" if is_delivery else "🏪 O'zi olib ketadi"
-                    confirm_msg = f"✅ <b>Buyurtma qabul qilindi!</b>\n\n"
+                    confirm_msg = "✅ <b>Buyurtma qabul qilindi!</b>\n\n"
                     confirm_msg += f"📦 #{order_id}\n"
                     confirm_msg += f"{order_type_uz}\n\n"
                     confirm_msg += "<b>Mahsulotlar:</b>\n"
@@ -800,7 +802,7 @@ async def create_order(
                     confirm_msg += "⏳ Sotuvchi tasdiqlashini kutamiz..."
                 else:
                     order_type_ru = "🚚 Доставка" if is_delivery else "🏪 Самовывоз"
-                    confirm_msg = f"✅ <b>Заказ оформлен!</b>\n\n"
+                    confirm_msg = "✅ <b>Заказ оформлен!</b>\n\n"
                     confirm_msg += f"📦 #{order_id}\n"
                     confirm_msg += f"{order_type_ru}\n\n"
                     confirm_msg += "<b>Товары:</b>\n"
@@ -810,7 +812,7 @@ async def create_order(
                     if is_delivery and order.delivery_address:
                         confirm_msg += f"📍 {order.delivery_address}\n\n"
                     confirm_msg += "⏳ Ожидаем подтверждения продавца..."
-                
+
                 await bot_instance.send_message(user_id, confirm_msg, parse_mode="HTML")
                 logger.info(f"✅ Sent order confirmation to customer {user_id}")
             except Exception as e:
@@ -844,7 +846,7 @@ async def notify_partner_webapp_order(
     bot,
     db,
     owner_id: int,
-    booking_id: int,
+    entity_id: int,  # order_id for delivery, booking_id for pickup
     offer_title: str,
     quantity: int,
     total: float,
@@ -920,28 +922,57 @@ async def notify_partner_webapp_order(
         confirm_text = "✅ Подтвердить"
         reject_text = "❌ Отклонить"
 
-    # Use unified callback_data (QUICK WIN #3: unified pattern for ALL orders)
+    # Use EXPLICIT callback_data pattern based on entity type
+    # This prevents ID collision issues between orders and bookings tables
     kb = InlineKeyboardBuilder()
-    # Always use partner_confirm_order_ / partner_reject_order_ for consistency
-    kb.button(text=confirm_text, callback_data=f"partner_confirm_order_{booking_id}")
-    kb.button(text=reject_text, callback_data=f"partner_reject_order_{booking_id}")
+    if is_delivery:
+        # Delivery = order table, use order_ prefix
+        kb.button(text=confirm_text, callback_data=f"order_confirm_{entity_id}")
+        kb.button(text=reject_text, callback_data=f"order_reject_{entity_id}")
+    else:
+        # Pickup = booking table, use booking_ prefix
+        kb.button(text=confirm_text, callback_data=f"booking_confirm_{entity_id}")
+        kb.button(text=reject_text, callback_data=f"booking_reject_{entity_id}")
     kb.adjust(2)
 
     try:
+        sent_msg = None
         if photo:
             try:
-                await bot.send_photo(
+                sent_msg = await bot.send_photo(
                     owner_id,
                     photo=photo,
                     caption=text,
                     parse_mode="HTML",
                     reply_markup=kb.as_markup(),
                 )
-                return
             except Exception:
                 pass
 
-        await bot.send_message(owner_id, text, parse_mode="HTML", reply_markup=kb.as_markup())
+        if not sent_msg:
+            sent_msg = await bot.send_message(
+                owner_id, text, parse_mode="HTML", reply_markup=kb.as_markup()
+            )
+
+        # Save seller_message_id for live editing
+        if (
+            sent_msg
+            and hasattr(db, "set_order_seller_message_id")
+            and hasattr(db, "set_booking_seller_message_id")
+        ):
+            try:
+                if is_delivery:
+                    db.set_order_seller_message_id(entity_id, sent_msg.message_id)
+                    logger.info(
+                        f"Saved seller_message_id={sent_msg.message_id} for order#{entity_id}"
+                    )
+                else:
+                    db.set_booking_seller_message_id(entity_id, sent_msg.message_id)
+                    logger.info(
+                        f"Saved seller_message_id={sent_msg.message_id} for booking#{entity_id}"
+                    )
+            except Exception as save_err:
+                logger.error(f"Failed to save seller_message_id: {save_err}")
     except Exception as e:
         logger.error(f"Failed to notify partner {owner_id}: {e}")
 

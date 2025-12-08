@@ -14,6 +14,7 @@ from localization import get_text
 
 if TYPE_CHECKING:
     from aiogram.fsm.context import FSMContext
+
     from app.services.offer_service import OfferListItem
 
 
@@ -58,12 +59,13 @@ def range_text(lang: str, max_value: int, subject: str) -> str:
     return f"❌ Raqam 1 dan {max_value} gacha bo'lishi kerak"
 
 
-def format_hot_offers_header(
-    lang: str, city: str, page: int, total_pages: int, total: int
-) -> str:
+def format_hot_offers_header(lang: str, city: str, page: int, total_pages: int, total: int) -> str:
     """Format header for hot offers list."""
-    text = f"🔥 <b>{'ГОРЯЧЕЕ' if lang == 'ru' else 'ISSIQ'}</b> | 📍 {city}\n"
-    text += f"{'Стр.' if lang == 'ru' else 'Sah.'} {page + 1}/{total_pages} ({total} {'махсулот' if lang == 'uz' else 'товаров'})\n"
+    header = "АКЦИИ" if lang == "ru" else "AKSIYALAR"
+    items_word = "mahsulot" if lang == "uz" else "товаров"
+    page_word = "Стр." if lang == "ru" else "Sah."
+    text = f"🔥 <b>{header}</b> | 📍 {city}\n"
+    text += f"{page_word} {page + 1}/{total_pages} ({total} {items_word})\n"
     text += "─" * 28 + "\n\n"
     return text
 
@@ -79,14 +81,18 @@ def format_offer_line(
     currency = "so'm" if lang == "uz" else "сум"
     title = title[:25] + ".." if len(title) > 25 else title
 
+    # Safe discount calculation - handle edge cases, use round() for proper rounding
     discount_pct = 0
-    if original_price and discount_price and original_price > 0:
-        discount_pct = int((1 - discount_price / original_price) * 100)
+    if original_price and discount_price and original_price > discount_price:
+        discount_pct = min(99, max(0, round((1 - discount_price / original_price) * 100)))
 
     lines = [f"<b>{idx}.</b> {title}"]
-    lines.append(
-        f"    <s>{int(original_price):,}</s> → <b>{int(discount_price):,}</b> {currency} <i>(-{discount_pct}%)</i>"
-    )
+    if discount_pct > 0:
+        lines.append(
+            f"    <s>{int(original_price):,}</s> → <b>{int(discount_price):,}</b> {currency} <i>(-{discount_pct}%)</i>"
+        )
+    else:
+        lines.append(f"    💰 <b>{int(discount_price):,}</b> {currency}")
     return "\n".join(lines)
 
 
@@ -134,7 +140,7 @@ def format_offer_card_text(
 
     # Price
     if original_price and original_price > discount_price:
-        discount_pct = int((1 - discount_price / original_price) * 100)
+        discount_pct = round((1 - discount_price / original_price) * 100)
         lines.append(
             f"<s>{int(original_price):,}</s> → <b>{int(discount_price):,} {currency}</b> (-{discount_pct}%)"
         )

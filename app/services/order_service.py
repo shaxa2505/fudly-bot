@@ -241,7 +241,9 @@ class OrderService:
 
                 # Calculate store totals
                 store_total = sum(o["price"] * o["quantity"] for o in store_orders)
-                store_delivery = store_orders[0].get("delivery_price", 0) if order_type == "delivery" else 0
+                store_delivery = (
+                    store_orders[0].get("delivery_price", 0) if order_type == "delivery" else 0
+                )
 
                 # Build notification text
                 order_ids = [str(o["order_id"]) for o in store_orders]
@@ -280,17 +282,29 @@ class OrderService:
                     confirm_text = "✅ Принять"
                     reject_text = "❌ Отклонить"
 
-                # Build keyboard
+                # Build keyboard - use unified callback pattern
                 first_order_id = store_orders[0]["order_id"]
                 partner_kb = InlineKeyboardBuilder()
-                partner_kb.button(text=confirm_text, callback_data=f"partner_confirm_order_{first_order_id}")
-                partner_kb.button(text=reject_text, callback_data=f"partner_reject_order_{first_order_id}")
+                partner_kb.button(
+                    text=confirm_text, callback_data=f"order_confirm_{first_order_id}"
+                )
+                partner_kb.button(text=reject_text, callback_data=f"order_reject_{first_order_id}")
                 partner_kb.adjust(2)
 
-                await self.bot.send_message(
+                sent_msg = await self.bot.send_message(
                     owner_id, seller_text, parse_mode="HTML", reply_markup=partner_kb.as_markup()
                 )
                 logger.info(f"Sent order notification to seller {owner_id} for orders {order_ids}")
+
+                # Save seller_message_id for live editing
+                if sent_msg and hasattr(self.db, "set_order_seller_message_id"):
+                    try:
+                        self.db.set_order_seller_message_id(first_order_id, sent_msg.message_id)
+                        logger.info(
+                            f"Saved seller_message_id={sent_msg.message_id} for order#{first_order_id}"
+                        )
+                    except Exception as save_err:
+                        logger.error(f"Failed to save seller_message_id: {save_err}")
 
             except Exception as e:
                 logger.error(f"Failed to notify seller for store {store_id}: {e}")
@@ -313,7 +327,7 @@ class OrderService:
         order_type_text = "🏪 Самовывоз" if order_type == "pickup" else "🚚 Доставка"
 
         lines = [
-            f"🔔 <b>Новый заказ!</b>\n",
+            "🔔 <b>Новый заказ!</b>\n",
             f"📦 #{', #'.join(order_ids)}",
             f"📋 {order_type_text}",
         ]
@@ -321,10 +335,12 @@ class OrderService:
         if pickup_codes:
             lines.append(f"🎫 Код: <b>{', '.join(pickup_codes)}</b>")
 
-        lines.extend([
-            f"👤 {customer_name}",
-            f"📱 <code>{customer_phone}</code>",
-        ])
+        lines.extend(
+            [
+                f"👤 {customer_name}",
+                f"📱 <code>{customer_phone}</code>",
+            ]
+        )
 
         if order_type == "delivery" and delivery_address:
             lines.append(f"📍 {self._esc(delivery_address)}")
@@ -332,7 +348,9 @@ class OrderService:
         lines.append("\n<b>Товары:</b>")
         for o in store_orders:
             subtotal = o["price"] * o["quantity"]
-            lines.append(f"• {self._esc(o['title'])} × {o['quantity']} = {int(subtotal):,} {currency}")
+            lines.append(
+                f"• {self._esc(o['title'])} × {o['quantity']} = {int(subtotal):,} {currency}"
+            )
 
         lines.append("")
         lines.append(f"💵 Товары: {int(store_total):,} {currency}")
@@ -369,7 +387,7 @@ class OrderService:
         order_type_text = "🏪 O'zim olib ketaman" if order_type == "pickup" else "🚚 Yetkazish"
 
         lines = [
-            f"🔔 <b>Yangi buyurtma!</b>\n",
+            "🔔 <b>Yangi buyurtma!</b>\n",
             f"📦 #{', #'.join(order_ids)}",
             f"📋 {order_type_text}",
         ]
@@ -377,10 +395,12 @@ class OrderService:
         if pickup_codes:
             lines.append(f"🎫 Kod: <b>{', '.join(pickup_codes)}</b>")
 
-        lines.extend([
-            f"👤 {customer_name}",
-            f"📱 <code>{customer_phone}</code>",
-        ])
+        lines.extend(
+            [
+                f"👤 {customer_name}",
+                f"📱 <code>{customer_phone}</code>",
+            ]
+        )
 
         if order_type == "delivery" and delivery_address:
             lines.append(f"📍 {self._esc(delivery_address)}")
@@ -388,7 +408,9 @@ class OrderService:
         lines.append("\n<b>Mahsulotlar:</b>")
         for o in store_orders:
             subtotal = o["price"] * o["quantity"]
-            lines.append(f"• {self._esc(o['title'])} × {o['quantity']} = {int(subtotal):,} {currency}")
+            lines.append(
+                f"• {self._esc(o['title'])} × {o['quantity']} = {int(subtotal):,} {currency}"
+            )
 
         lines.append("")
         lines.append(f"💵 Mahsulotlar: {int(store_total):,} {currency}")
@@ -435,7 +457,9 @@ class OrderService:
         lines.append("\n<b>Товары:</b>")
         for item in items:
             subtotal = item.price * item.quantity
-            lines.append(f"• {self._esc(item.title)} × {item.quantity} = {int(subtotal):,} {currency}")
+            lines.append(
+                f"• {self._esc(item.title)} × {item.quantity} = {int(subtotal):,} {currency}"
+            )
 
         lines.append("")
         lines.append("─" * 25)
@@ -486,7 +510,9 @@ class OrderService:
         lines.append("\n<b>Mahsulotlar:</b>")
         for item in items:
             subtotal = item.price * item.quantity
-            lines.append(f"• {self._esc(item.title)} × {item.quantity} = {int(subtotal):,} {currency}")
+            lines.append(
+                f"• {self._esc(item.title)} × {item.quantity} = {int(subtotal):,} {currency}"
+            )
 
         lines.append("")
         lines.append("─" * 25)

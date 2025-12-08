@@ -625,16 +625,17 @@ async def create_webhook_app(
                                                 msg += f"📝 Примечание: {notes}\n"
 
                                             # Create inline keyboard for seller actions
+                                            # Use explicit booking_ prefix since this creates BOOKING (pickup)
                                             keyboard = InlineKeyboardMarkup(
                                                 inline_keyboard=[
                                                     [
                                                         InlineKeyboardButton(
                                                             text="✅ Принять",
-                                                            callback_data=f"order_accept:{booking_code}:{user_id}",
+                                                            callback_data=f"booking_confirm_{booking_id}",
                                                         ),
                                                         InlineKeyboardButton(
                                                             text="❌ Отклонить",
-                                                            callback_data=f"order_reject:{booking_code}:{user_id}",
+                                                            callback_data=f"booking_reject_{booking_id}",
                                                         ),
                                                     ]
                                                 ]
@@ -895,17 +896,19 @@ async def create_webhook_app(
                                     ) or get_offer_value(store, "user_id")
 
             # Send payment proof to seller with action buttons
+            # Note: order_id here is actually booking_id for pickup orders
             if seller_id and booking_code:
+                # Use explicit booking_ prefix since this is payment proof for BOOKING (pickup)
                 keyboard = InlineKeyboardMarkup(
                     inline_keyboard=[
                         [
                             InlineKeyboardButton(
                                 text="✅ Принять",
-                                callback_data=f"order_accept:{booking_code}:{user_id}",
+                                callback_data=f"booking_confirm_{order_id}",
                             ),
                             InlineKeyboardButton(
                                 text="❌ Отклонить",
-                                callback_data=f"order_reject:{booking_code}:{user_id}",
+                                callback_data=f"booking_reject_{order_id}",
                             ),
                         ]
                     ]

@@ -7,12 +7,16 @@ TEXTS = {
         # Приветствие
         "choose_language": "🌍 Выберите язык / Tilni tanlang",
         "language_changed": "✅ Язык изменён на Русский",
-        "welcome": """🎉 <b>Добро пожаловать в Fudly!</b>
+        "welcome": """🛍 <b>Fudly — спасаем еду от выброса!</b>
 
-💰 Экономьте <b>до 70%</b> на качественных товарах
-🏪 Магазины рядом с вами
-🚚 Самовывоз или доставка
-♻️ Помогаем сокращать потери еды""",
+Покупайте товары с истекающим сроком годности
+со скидкой <b>до 70%</b>
+
+✅ <b>Безопасно</b> — товары свежие
+✅ <b>Выгодно</b> — скидки до 70%
+✅ <b>Полезно</b> — меньше отходов
+
+🔥 Более 100 магазинов в вашем городе""",
         "welcome_phone_step": """📱 <b>Укажите номер телефона</b>
 
 Это нужно чтобы:
@@ -28,11 +32,11 @@ TEXTS = {
         "registration_complete": """🎉 <b>Готово! Добро пожаловать!</b>
 
 Теперь вы можете:
-🔥 <b>Горячее</b> — лучшие скидки дня
+🔥 <b>Акции</b> — скидки до 70% каждый день
 🏪 <b>Заведения</b> — все магазины города
 🔍 <b>Поиск</b> — найти нужный товар
 
-💡 Совет: проверяйте "Горячее" каждый день!""",
+💡 Совет: проверяйте "Акции" каждый день — товары обновляются!""",
         "welcome_back": """👋 <b>Привет, {name}!</b>
 
 📍 Город: {city}""",
@@ -42,7 +46,7 @@ TEXTS = {
         # Кнопки
         "share_phone": "📱 Поделиться номером",
         "cancel": "❌ Отмена",
-        "hot_offers": "🔥 Горячее",
+        "hot_offers": "🔥 Акции до -70%",
         "browse_places": "Места",
         "my_cart": "🛒 Корзина",
         "available_offers": "Доступные предложения",
@@ -55,9 +59,9 @@ TEXTS = {
         "establishments": "🏪 Заведения",
         "search": "🔍 Поиск",
         "help": "❓ Как это работает",
-        "enter_search_query": "Введите название товара или магазина:",
-        "search_results": "Результаты поиска:",
-        "no_results": "Ничего не найдено",
+        "enter_search_query": "🔍 <b>Что ищете?</b>\n\nВведите название товара или магазина:\n\n💡 Примеры: <i>пицца, суши, KFC, хлеб</i>",
+        "search_results": "🔍 <b>Результаты поиска</b>",
+        "no_results": "😔 Ничего не найдено\n\nПопробуйте другой запрос или посмотрите раздел Акции",
         "action_cancelled": "❌ Действие отменено",
         "select_category_in_store": "Выберите категорию в этом заведении:",
         # Партнёр - новые короткие названия
@@ -94,8 +98,8 @@ TEXTS = {
         "no_offers_in_store": "😔 В этом магазине пока нет предложений",
         "offers_in_city": "🍽 <b>Доступные предложения в городе {city}</b>\n\nВсего: {count}",
         "offers_found": "🍽 <b>Доступные предложения</b>\n\nНайдено: {count}",
-        "hot_offers_title": "🔥 <b>ГОРЯЧИЕ ПРЕДЛОЖЕНИЯ</b>",
-        "hot_offers_subtitle": "Лучшие скидки дня в вашем городе!",
+        "hot_offers_title": "🔥 <b>АКЦИИ ДО -70%</b>",
+        "hot_offers_subtitle": "Свежие товары со скидками — обновляется каждый день!",
         "select_by_number": "Введите номер товара для просмотра:",
         "browse_by_business_type": "🏪 <b>Выберите тип заведения:</b>",
         "supermarkets": "🛒 Супермаркеты",
@@ -121,11 +125,11 @@ TEXTS = {
         # Help and FAQ
         "help_customer": """❓ <b>Как работает Fudly?</b>
 
-<b>🔥 Горячее</b>
+<b>🔥 Акции</b>
 Товары с самыми большими скидками (30-70%)
 Обновляется каждый день!
 
-<b>🏪 Do'konlar (Магазины)</b>
+<b>🏪 Магазины</b>
 1️⃣ Выберите магазин в вашем городе
 2️⃣ Посмотрите категории товаров
 3️⃣ Выберите товар и забронируйте
@@ -141,13 +145,13 @@ TEXTS = {
 4️⃣ Покажите код продавцу
 
 <b>📱 Статусы заказа:</b>
-⏳ <b>Ожидает подтверждения</b> - магазин проверяет заказ
-✅ <b>Готов к выдаче</b> - приезжайте забрать товар
+⏳ <b>Ожидает</b> - магазин проверяет заказ
+✅ <b>Готов</b> - приезжайте забрать товар
 🎉 <b>Завершён</b> - вы получили товар
 ❌ <b>Отменён</b> - заказ отменён
 
 <b>💡 Советы:</b>
-• Проверяйте раздел "Горячее" каждый день
+• Проверяйте раздел "Акции" каждый день
 • Забирайте товар в указанное время
 • Оценивайте магазины после покупки""",
         "help_partner": """❓ <b>Как работать партнёром?</b>
@@ -231,7 +235,7 @@ TEXTS = {
 🎫 Код бронирования: <code>{code}</code>
 
 ⚠️ Покажите этот код при получении заказа!""",
-        "my_bookings_empty": "У вас пока нет заказов.\n\nПопробуйте раздел Горячее!",
+        "my_bookings_empty": "У вас пока нет заказов.\n\nПопробуйте раздел 🔥 Акции!",
         "no_active_bookings": "Нет активных бронирований",
         "no_completed_bookings": "Нет завершённых бронирований",
         "no_cancelled_bookings": "Нет отменённых бронирований",
@@ -447,7 +451,7 @@ TEXTS = {
 
 Найдите что-нибудь вкусное со скидкой до 70%!
 
-💡 Совет: загляните в раздел «Горячее»""",
+💡 Совет: загляните в раздел «🔥 Акции»""",
         "cart_empty_cta": "🔥 Смотреть предложения",
         # Навигация
         "go_back": "◀️ Назад",
@@ -502,11 +506,16 @@ TEXTS = {
         # Salomlashish
         "choose_language": "🌍 Выберите язык / Tilni tanlang",
         "language_changed": "✅ Til O'zbekchaga o'zgartirildi",
-        "welcome": """🎉 <b>Fudly ga xush kelibsiz!</b>
+        "welcome": """🛍 <b>Fudly — oziq-ovqatni isrofdan saqlaymiz!</b>
 
-💰 <b>70% gacha</b> chegirmalar
-🏪 Yaqin atrofdagi do'konlar
-🚚 Yetkazib berish yoki olib ketish""",
+Muddati tugash arafasidagi mahsulotlarni
+<b>70% gacha</b> chegirma bilan sotib oling
+
+✅ <b>Xavfsiz</b> — mahsulotlar yangi
+✅ <b>Foydali</b> — 70% gacha chegirma
+✅ <b>Ekologik</b> — kamroq isrof
+
+🔥 Shahringizda 100 dan ortiq do'konlar""",
         "welcome_phone_step": """📱 <b>Telefon raqamingizni kiriting</b>
 
 Bu nima uchun kerak:
@@ -522,11 +531,11 @@ Yaqin atrofdagi do'konlarni ko'rsatamiz
         "registration_complete": """🎉 <b>Tayyor! Xush kelibsiz!</b>
 
 Endi siz:
-🔥 <b>Issiq takliflar</b> — kunning eng yaxshi chegirmalari
+🔥 <b>Aksiyalar</b> — har kuni 70% gacha chegirmalar
 🏪 <b>Do'konlar</b> — shahardagi barcha do'konlar
 🔍 <b>Qidirish</b> — kerakli mahsulotni topish
 
-💡 Maslahat: har kuni "Issiq takliflar" bo'limini tekshiring!""",
+💡 Maslahat: har kuni "Aksiyalar" bo'limini tekshiring — mahsulotlar yangilanadi!""",
         "welcome_back": """👋 <b>Salom, {name}!</b>
 
 📍 Shahar: {city}""",
@@ -536,7 +545,7 @@ Boshlash uchun /start bosing""",
         # Tugmalar
         "share_phone": "📱 Raqamni ulashish",
         "cancel": "❌ Bekor qilish",
-        "hot_offers": "🔥 Issiq takliflar",
+        "hot_offers": "🔥 -70% gacha aksiyalar",
         "browse_places": "🏪 Joylar",
         "my_cart": "🛒 Savat",
         "available_offers": "🍽 Mavjud takliflar",
@@ -550,9 +559,9 @@ Boshlash uchun /start bosing""",
         "establishments": "🏪 Do'konlar",
         "search": "🔍 Qidirish",
         "help": "❓ Qanday ishlaydi",
-        "enter_search_query": "Mahsulot yoki do'kon nomini kiriting:",
-        "search_results": "Qidiruv natijalari:",
-        "no_results": "Hech narsa topilmadi",
+        "enter_search_query": "🔍 <b>Nimani qidiryapsiz?</b>\n\nMahsulot yoki do'kon nomini kiriting:\n\n💡 Misollar: <i>pizza, sushi, KFC, non</i>",
+        "search_results": "🔍 <b>Qidiruv natijalari</b>",
+        "no_results": "😔 Hech narsa topilmadi\n\nBoshqa so'rov bilan sinab ko'ring yoki Aksiyalar bo'limiga qarang",
         "action_cancelled": "❌ Amal bekor qilindi",
         "select_category_in_store": "Ushbu muassasada toifani tanlang:",
         # Hamkor - yangi qisqa nomlar
@@ -590,8 +599,8 @@ Boshlash uchun /start bosing""",
         "no_offers_in_store": "😔 Bu do'konda hali takliflar yo'q",
         "offers_in_city": "🍽 <b>{city} shahridagi mavjud takliflar</b>\n\nJami: {count}",
         "offers_found": "🍽 <b>Mavjud takliflar</b>\n\nTopildi: {count}",
-        "hot_offers_title": "🔥 <b>ISSIQ TAKLIFLAR</b>",
-        "hot_offers_subtitle": "Kunning eng yaxshi chegirrmalari shahringizda!",
+        "hot_offers_title": "🔥 <b>-70% GACHA AKSIYALAR</b>",
+        "hot_offers_subtitle": "Chegirmali yangi mahsulotlar — har kuni yangilanadi!",
         "select_by_number": "Mahsulot raqamini kiriting:",
         "browse_by_business_type": "🏪 <b>Muassasa turini tanlang:</b>",
         "supermarkets": "🛒 Supermarketlar",
@@ -617,7 +626,7 @@ Boshlash uchun /start bosing""",
         # Help and FAQ
         "help_customer": """❓ <b>Fudly qanday ishlaydi?</b>
 
-<b>🔥 Issiq</b>
+<b>🔥 Aksiyalar</b>
 Eng katta chegirmali mahsulotlar (30-70%)
 Har kuni yangilanadi!
 
@@ -643,7 +652,7 @@ Misol: yogurt, non, sut
 ❌ <b>Bekor qilindi</b> - buyurtma bekor qilindi
 
 <b>💡 Maslahatlar:</b>
-• Har kuni "Issiq" bo'limini tekshiring
+• Har kuni "Aksiyalar" bo'limini tekshiring
 • Mahsulotni ko'rsatilgan vaqtda oling
 • Xariddan keyin do'konni baholang""",
         "help_partner": """❓ <b>Hamkor sifatida qanday ishlash?</b>
@@ -941,7 +950,7 @@ Bu harakatni qaytarib bo\'lmaydi!""",
 
 70% gacha chegirma bilan mazali narsa toping!
 
-💡 Maslahat: «Issiq takliflar» bo'limiga qarang""",
+💡 Maslahat: «🔥 Aksiyalar» bo'limiga qarang""",
         "cart_empty_cta": "🔥 Takliflarni ko'rish",
         # Navigatsiya
         "go_back": "◀️ Orqaga",

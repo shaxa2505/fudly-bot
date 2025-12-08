@@ -41,74 +41,8 @@ def setup(
     booking_filters_keyboard = booking_filters_kb
 
 
-@router.message(
-    F.text.in_(["📦 Мои заказы", "📦 Mening buyurtmalarim", "📋 Мои заказы", "📋 Buyurtmalarim"])
-)
-async def my_orders_handler(message: types.Message) -> None:
-    """Handler for Orders button - show user's bookings and orders."""
-    if not db or not booking_filters_keyboard:
-        await message.answer("System error")
-        return
-
-    user_id = message.from_user.id
-    lang = db.get_user_language(user_id)
-
-    bookings = db.get_user_bookings(user_id)
-
-    try:
-        orders = db.get_user_orders(user_id)
-    except Exception:
-        orders = []
-
-    if not bookings and not orders:
-        empty_title = "У вас пока нет заказов" if lang == "ru" else "Sizda hali buyurtmalar yo'q"
-        empty_desc = (
-            "Попробуйте раздел Горячее — там товары с лучшими скидками"
-            if lang == "ru"
-            else "Issiq bo'limini sinab ko'ring — u yerda eng yaxshi chegirmalar"
-        )
-        text = f"<b>{empty_title}</b>\n\n{empty_desc}"
-        await message.answer(text, parse_mode="HTML")
-        return
-
-    active_bookings = [b for b in bookings if get_field(b, "status", 3) in ("pending", "confirmed")]
-    completed_bookings = [b for b in bookings if get_field(b, "status", 3) == "completed"]
-    cancelled_bookings = [b for b in bookings if get_field(b, "status", 3) == "cancelled"]
-
-    active_orders = [
-        o
-        for o in orders
-        if get_field(o, "order_status", 10) in ["pending", "confirmed", "preparing", "delivering"]
-    ]
-    completed_orders = [o for o in orders if get_field(o, "order_status", 10) == "completed"]
-    cancelled_orders = [o for o in orders if get_field(o, "order_status", 10) == "cancelled"]
-
-    text = f"📦 <b>{'Мои заказы' if lang == 'ru' else 'Mening buyurtmalarim'}</b>\n\n"
-
-    if bookings:
-        text += f"<b>{'Самовывоз' if lang == 'ru' else 'Olib ketish'}</b>\n"
-        text += f"• {'Активные' if lang == 'ru' else 'Faol'} ({len(active_bookings)})\n"
-        text += (
-            f"• {'Завершённые' if lang == 'ru' else 'Yakunlangan'} ({len(completed_bookings)})\n"
-        )
-        text += f"• {'Отменённые' if lang == 'ru' else 'Bekor qilingan'} ({len(cancelled_bookings)})\n\n"
-
-    if orders:
-        text += f"<b>{'Доставка' if lang == 'ru' else 'Yetkazib berish'}</b>\n"
-        text += f"• {'Активные' if lang == 'ru' else 'Faol'} ({len(active_orders)})\n"
-        text += f"• {'Завершённые' if lang == 'ru' else 'Yakunlangan'} ({len(completed_orders)})\n"
-        text += f"• {'Отменённые' if lang == 'ru' else 'Bekor qilingan'} ({len(cancelled_orders)})"
-
-    await message.answer(
-        text,
-        parse_mode="HTML",
-        reply_markup=booking_filters_keyboard(
-            lang,
-            len(active_bookings) + len(active_orders),
-            len(completed_bookings) + len(completed_orders),
-            len(cancelled_bookings) + len(cancelled_orders),
-        ),
-    )
+# NOTE: "Мои заказы" handler moved to handlers/customer/orders/my_orders.py for better UX
+# This module now only handles mode switching (customer/seller)
 
 
 @router.message(F.text.contains("Режим покупателя") | F.text.contains("Xaridor rejimi"))

@@ -652,7 +652,7 @@ def setup(
             # Build offer card text
             discount_pct = 0
             if offer.original_price and offer.original_price > offer.discount_price:
-                discount_pct = int((1 - offer.discount_price / offer.original_price) * 100)
+                discount_pct = round((1 - offer.discount_price / offer.original_price) * 100)
 
             lines = [f"🏷 <b>{offer.title}</b>"]
             if offer.description:
@@ -1044,7 +1044,9 @@ def setup(
                 # Build offer card text
                 discount_pct = 0
                 if details.original_price and details.original_price > details.discount_price:
-                    discount_pct = int((1 - details.discount_price / details.original_price) * 100)
+                    discount_pct = round(
+                        (1 - details.discount_price / details.original_price) * 100
+                    )
 
                 lines = [f"🏷 <b>{details.title}</b>"]
                 if details.description:

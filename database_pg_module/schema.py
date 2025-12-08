@@ -140,6 +140,41 @@ class SchemaMixin:
             except Exception as e:
                 logger.warning(f"Migration for orders cart columns: {e}")
 
+            # Migration: Add customer_message_id for editable status notifications
+            try:
+                cursor.execute(
+                    "ALTER TABLE orders ADD COLUMN IF NOT EXISTS customer_message_id BIGINT"
+                )
+            except Exception as e:
+                logger.warning(f"Migration for orders customer_message_id: {e}")
+
+            # Migration: Add seller_message_id for editable seller notifications
+            try:
+                cursor.execute(
+                    "ALTER TABLE orders ADD COLUMN IF NOT EXISTS seller_message_id BIGINT"
+                )
+            except Exception as e:
+                logger.warning(f"Migration for orders seller_message_id: {e}")
+
+            # Migration: Add order_type column to orders (pickup/delivery)
+            try:
+                cursor.execute(
+                    "ALTER TABLE orders ADD COLUMN IF NOT EXISTS order_type TEXT DEFAULT 'delivery'"
+                )
+            except Exception as e:
+                logger.warning(f"Migration for orders order_type: {e}")
+
+            # Migration: Add rating_reminder_sent and updated_at for rating reminders
+            try:
+                cursor.execute(
+                    "ALTER TABLE orders ADD COLUMN IF NOT EXISTS rating_reminder_sent BOOLEAN DEFAULT false"
+                )
+                cursor.execute(
+                    "ALTER TABLE orders ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP"
+                )
+            except Exception as e:
+                logger.warning(f"Migration for orders rating_reminder: {e}")
+
             # Bookings table
             cursor.execute(
                 """
@@ -168,6 +203,33 @@ class SchemaMixin:
                 )
             except Exception as e:
                 logger.warning(f"Migration for bookings cart columns: {e}")
+
+            # Migration: Add customer_message_id for editable status notifications
+            try:
+                cursor.execute(
+                    "ALTER TABLE bookings ADD COLUMN IF NOT EXISTS customer_message_id BIGINT"
+                )
+            except Exception as e:
+                logger.warning(f"Migration for bookings customer_message_id: {e}")
+
+            # Migration: Add seller_message_id for editable seller notifications
+            try:
+                cursor.execute(
+                    "ALTER TABLE bookings ADD COLUMN IF NOT EXISTS seller_message_id BIGINT"
+                )
+            except Exception as e:
+                logger.warning(f"Migration for bookings seller_message_id: {e}")
+
+            # Migration: Add rating_reminder_sent and updated_at for rating reminders
+            try:
+                cursor.execute(
+                    "ALTER TABLE bookings ADD COLUMN IF NOT EXISTS rating_reminder_sent BOOLEAN DEFAULT false"
+                )
+                cursor.execute(
+                    "ALTER TABLE bookings ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP"
+                )
+            except Exception as e:
+                logger.warning(f"Migration for bookings rating_reminder: {e}")
 
             # Payment settings table
             cursor.execute(

@@ -73,10 +73,10 @@ async def _show_cart_internal(
         )
         kb = InlineKeyboardBuilder()
         kb.button(
-            text="🔥 Горячие предложения" if lang == "ru" else "🔥 Ҳаракатли таклифлар",
+            text="🔥 Горячие предложения" if lang == "ru" else "🔥 Issiq takliflar",
             callback_data="hot_offers",
         )
-        
+
         if is_callback and isinstance(event, types.CallbackQuery):
             try:
                 await event.message.edit_text(empty_text, reply_markup=kb.as_markup())
@@ -93,48 +93,65 @@ async def _show_cart_internal(
 
     total = 0
     for i, item in enumerate(items, 1):
-        subtotal = item.price * item.quantity
+        subtotal = int(item.price * item.quantity)
         total += subtotal
         lines.append(f"\n<b>{i}. {_esc(item.title)}</b>")
-        lines.append(f"   {item.quantity} × {item.price:,} = <b>{subtotal:,}</b> {currency}")
+        lines.append(f"   {item.quantity} × {int(item.price):,} = <b>{subtotal:,}</b> {currency}")
         lines.append(f"   🏪 {_esc(item.store_name)}")
 
     lines.append("\n" + "─" * 25)
     lines.append(f"💵 <b>{'JAMI' if lang == 'uz' else 'ИТОГО'}: {total:,} {currency}</b>")
 
+    # Check delivery availability
+    delivery_enabled = any(item.delivery_enabled for item in items)
+    delivery_price = max(
+        (item.delivery_price for item in items if item.delivery_enabled), default=0
+    )
+
+    if delivery_enabled:
+        lines.append(
+            f"\n🚚 {'Yetkazish' if lang == 'uz' else 'Доставка'}: +{delivery_price:,} {currency}"
+        )
+
     text = "\n".join(lines)
 
-    # Cart keyboard with edit buttons for each item
+    # Simplified cart keyboard - just item delete buttons + checkout options
     kb = InlineKeyboardBuilder()
 
-    # Edit buttons for each item (2 rows per item: qty controls + title/delete)
+    # Item delete buttons (one row per item)
     for i, item in enumerate(items, 1):
-        # Row 1: Quantity controls
-        kb.button(text="➖", callback_data=f"cart_qty_dec_{item.offer_id}")
-        kb.button(text=f"{item.quantity}", callback_data="cart_noop")
-        kb.button(text="➕", callback_data=f"cart_qty_inc_{item.offer_id}")
-        
-        # Row 2: Item title + delete
-        title_short = item.title[:35] + "..." if len(item.title) > 35 else item.title
-        kb.button(text=f"{i}. {title_short}", callback_data="cart_noop")
+        title_short = item.title[:25] + "..." if len(item.title) > 25 else item.title
+        kb.button(text=f"{i}. {title_short} ({item.quantity})", callback_data="cart_noop")
         kb.button(text="🗑", callback_data=f"cart_remove_{item.offer_id}")
 
-    # Adjust: 3 buttons for qty row, 2 buttons for title row, repeat for each item
-    num_items = len(items)
-    adjust_pattern = [3, 2] * num_items
-    
-    # Main actions
+    # Checkout options - directly on cart screen
     kb.button(
-        text="✅ Оформить заказ" if lang == "ru" else "✅ Buyurtma berish",
-        callback_data="cart_checkout",
+        text="🏪 Самовывоз" if lang == "ru" else "🏪 O'zim olaman",
+        callback_data="cart_confirm_pickup",
     )
+    if delivery_enabled:
+        kb.button(
+            text=f"🚚 Доставка (+{delivery_price:,})"
+            if lang == "ru"
+            else f"🚚 Yetkazish (+{delivery_price:,})",
+            callback_data="cart_confirm_delivery",
+        )
+
+    # Clear cart button
     kb.button(
-        text="🗑 Очистить всё" if lang == "ru" else "🗑 Hammasini tozalash",
+        text="🗑 Очистить" if lang == "ru" else "🗑 Tozalash",
         callback_data="cart_clear",
     )
-    
-    # Final adjust: all item rows + 2 action buttons
-    kb.adjust(*adjust_pattern, 2)
+
+    # Adjust: 2 buttons per item row + checkout buttons
+    num_items = len(items)
+    adjust_pattern = [2] * num_items  # 2 buttons per item row
+    if delivery_enabled:
+        adjust_pattern.extend([2, 1])  # pickup+delivery, then clear
+    else:
+        adjust_pattern.extend([1, 1])  # just pickup, then clear
+
+    kb.adjust(*adjust_pattern)
 
     if is_callback and isinstance(event, types.CallbackQuery):
         try:
@@ -251,14 +268,14 @@ async def cart_checkout(callback: types.CallbackQuery, state: FSMContext) -> Non
     delivery_price = items[0].delivery_price
 
     currency = "so'm" if lang == "uz" else "сум"
-    total = sum(item.price * item.quantity for item in items)
+    total = int(sum(item.price * item.quantity for item in items))
 
     # Build checkout summary
     lines = [f"📋 <b>{'Buyurtma' if lang == 'uz' else 'Заказ'}</b>\n"]
     lines.append(f"🏪 {_esc(items[0].store_name)}\n")
 
     for item in items:
-        subtotal = item.price * item.quantity
+        subtotal = int(item.price * item.quantity)
         lines.append(f"• {_esc(item.title)} × {item.quantity} = {subtotal:,} {currency}")
 
     lines.append("\n" + "─" * 25)
@@ -307,18 +324,8 @@ async def back_to_cart(callback: types.CallbackQuery, state: FSMContext) -> None
         await callback.answer()
         return
 
-    # Simulate message to reuse show_cart logic
-    from aiogram.types import Message
-
-    fake_message = Message(
-        message_id=callback.message.message_id,
-        date=callback.message.date,
-        chat=callback.message.chat,
-        from_user=callback.from_user,
-    )
-
-    await show_cart(fake_message, state)
-    await callback.answer()
+    # Use _show_cart_internal directly with is_callback=True
+    await _show_cart_internal(callback, state, is_callback=True)
 
 
 # ===================== PICKUP CONFIRMATION =====================
@@ -395,58 +402,113 @@ async def cart_confirm_pickup(callback: types.CallbackQuery) -> None:
     lines.append(f"<b>{'Mahsulotlar' if lang == 'uz' else 'Товары'}:</b>")
 
     for item in items:
-        subtotal = item.price * item.quantity
+        subtotal = int(item.price * item.quantity)
         lines.append(f"• {_esc(item.title)} × {item.quantity} = {subtotal:,} {currency}")
 
-    total = sum(item.price * item.quantity for item in items)
+    total = int(sum(item.price * item.quantity for item in items))
     lines.append(f"\n💵 <b>{'JAMI' if lang == 'uz' else 'ИТОГО'}: {total:,} {currency}</b>")
 
     text = "\n".join(lines)
 
+    # Send/edit customer notification and save message_id for live editing
+    customer_message_id = None
     try:
         await callback.message.edit_text(text, parse_mode="HTML")
+        customer_message_id = callback.message.message_id
     except Exception:
-        await callback.message.answer(text, parse_mode="HTML")
+        sent_msg = await callback.message.answer(text, parse_mode="HTML")
+        customer_message_id = sent_msg.message_id
 
-    # Notify partner - send ONE notification with all items
+    # Save message_id for live status updates
+    if customer_message_id and booking_id and hasattr(db, "set_booking_customer_message_id"):
+        try:
+            db.set_booking_customer_message_id(booking_id, customer_message_id)
+            logger.info(
+                f"Saved customer_message_id={customer_message_id} for cart booking #{booking_id}"
+            )
+        except Exception as e:
+            logger.warning(f"Failed to save customer_message_id: {e}")
+
+    # Notify partner - send ONE notification with all items (UNIFIED format)
     try:
         store = db.get_store(store_id)
         if store:
             owner_id = store.get("owner_id") if isinstance(store, dict) else store[1]
 
-            # Build partner notification
-            partner_lines = [
-                f"🛒 <b>{'Yangi savat broni!' if lang == 'uz' else 'Новое бронирование корзины!'}</b>\n"
-            ]
-            partner_lines.append(
-                f"📋 {'Bron kodi' if lang == 'uz' else 'Код'}: <b>{booking_code}</b>"
-            )
-            partner_lines.append(
-                f"👤 {'Mijoz' if lang == 'uz' else 'Клиент'}: {callback.from_user.first_name or 'User'}\n"
-            )
-            partner_lines.append(f"<b>{'Mahsulotlar' if lang == 'uz' else 'Товары'}:</b>")
+            # Get customer info for unified notification
+            customer = db.get_user(user_id) if hasattr(db, "get_user") else None
+            customer_name = callback.from_user.first_name or "Клиент"
+            customer_phone = "Не указан"
+            customer_username = None
+            if customer:
+                if isinstance(customer, dict):
+                    customer_phone = customer.get("phone") or "Не указан"
+                    customer_username = customer.get("username")
+                else:
+                    customer_phone = getattr(customer, "phone", None) or "Не указан"
+                    customer_username = getattr(customer, "username", None)
+
+            contact_info = f"@{customer_username}" if customer_username else customer_phone
+
+            # Build UNIFIED partner notification (same format as tez buyurtma)
+            if lang == "uz":
+                partner_lines = [
+                    "🔔 <b>YANGI BRON!</b>",
+                    "━━━━━━━━━━━━━━━━━━",
+                    "",
+                    f"🎫 Kod: <b>{booking_code}</b>",
+                    "🏪 O'zi olib ketadi",
+                    "",
+                    "👤 <b>Xaridor:</b>",
+                    f"   Ism: {_esc(customer_name)}",
+                    f"   📱 <code>{_esc(customer_phone)}</code>",
+                    f"   💬 {_esc(contact_info)}",
+                    "",
+                    "<b>Mahsulotlar:</b>",
+                ]
+            else:
+                partner_lines = [
+                    "🔔 <b>НОВАЯ БРОНЬ!</b>",
+                    "━━━━━━━━━━━━━━━━━━",
+                    "",
+                    f"🎫 Код: <b>{booking_code}</b>",
+                    "🏪 Самовывоз",
+                    "",
+                    "👤 <b>Покупатель:</b>",
+                    f"   Имя: {_esc(customer_name)}",
+                    f"   📱 <code>{_esc(customer_phone)}</code>",
+                    f"   💬 {_esc(contact_info)}",
+                    "",
+                    "<b>Товары:</b>",
+                ]
 
             for item in items:
-                subtotal = item.price * item.quantity
+                subtotal = int(item.price * item.quantity)
                 partner_lines.append(
                     f"• {_esc(item.title)} × {item.quantity} = {subtotal:,} {currency}"
                 )
 
-            partner_lines.append(
-                f"\n💵 <b>{'JAMI' if lang == 'uz' else 'ИТОГО'}: {total:,} {currency}</b>"
+            partner_lines.extend(
+                [
+                    "",
+                    "━━━━━━━━━━━━━━━━━━",
+                    f"💰 <b>{'JAMI' if lang == 'uz' else 'ИТОГО'}: {total:,} {currency}</b>",
+                    "━━━━━━━━━━━━━━━━━━",
+                ]
             )
 
             partner_text = "\n".join(partner_lines)
 
             # One button to confirm/reject entire cart booking
+            # Use explicit booking_ prefix since this is pickup BOOKING
             kb = InlineKeyboardBuilder()
             kb.button(
-                text="✅ Подтвердить" if lang == "ru" else "✅ Tasdiqlash",
-                callback_data=f"partner_confirm_{booking_id}",
+                text="✅ Tasdiqlash" if lang == "uz" else "✅ Подтвердить",
+                callback_data=f"booking_confirm_{booking_id}",
             )
             kb.button(
-                text="❌ Отклонить" if lang == "ru" else "❌ Rad etish",
-                callback_data=f"partner_reject_{booking_id}",
+                text="❌ Rad etish" if lang == "uz" else "❌ Отклонить",
+                callback_data=f"booking_reject_{booking_id}",
             )
             kb.adjust(2)
 
@@ -484,7 +546,7 @@ async def cart_confirm_delivery(callback: types.CallbackQuery, state: FSMContext
     delivery_price = items[0].delivery_price
 
     # Calculate total
-    total = sum(item.price * item.quantity for item in items)
+    total = int(sum(item.price * item.quantity for item in items))
 
     # CHECK MIN_ORDER_AMOUNT before allowing delivery
     store = db.get_store(store_id)
@@ -782,7 +844,9 @@ async def cart_pay_card(callback: types.CallbackQuery, state: FSMContext) -> Non
         return
 
     # Structured logging for cart order
-    total_amount = sum(item["price"] * item["quantity"] for item in cart_items_stored) + delivery_price
+    total_amount = (
+        sum(item["price"] * item["quantity"] for item in cart_items_stored) + delivery_price
+    )
     logger.info(
         f"ORDER_CREATED: id={order_id}, user={user_id}, type=delivery, "
         f"total={total_amount}, items={len(cart_items_stored)}, source=cart_card, pickup_code={pickup_code}"
@@ -972,7 +1036,19 @@ async def cart_payment_proof(message: types.Message, state: FSMContext) -> None:
 
     from app.keyboards import main_menu_customer
 
-    await message.answer(confirm_text, parse_mode="HTML", reply_markup=main_menu_customer(lang))
+    # IMPORTANT: Don't use reply_markup here! Messages with ReplyKeyboard can't be edited later.
+    # The keyboard is already shown to user, we just need an editable status message.
+    sent_msg = await message.answer(confirm_text, parse_mode="HTML")
+
+    # Save message_id for live status updates
+    if sent_msg and order_id and hasattr(db, "set_order_customer_message_id"):
+        try:
+            db.set_order_customer_message_id(order_id, sent_msg.message_id)
+            logger.info(
+                f"Saved customer_message_id={sent_msg.message_id} for cart order #{order_id}"
+            )
+        except Exception as e:
+            logger.warning(f"Failed to save customer_message_id: {e}")
 
 
 # ===================== BACK TO MENU =====================
@@ -1072,33 +1148,23 @@ def build_cart_add_card_text(
 def build_cart_add_card_keyboard(
     lang: str, offer_id: int, quantity: int, max_qty: int
 ) -> InlineKeyboardBuilder:
-    """Build simplified cart addition keyboard - only quantity buttons + add to cart button."""
+    """Build simplified cart addition keyboard - quantity buttons + add to cart button."""
     kb = InlineKeyboardBuilder()
 
-    # Quantity buttons
-    if max_qty <= 5:
-        # Show all quantities as buttons
-        for q in range(1, max_qty + 1):
-            btn_text = f"📦 {q}" if q == quantity else str(q)
-            kb.button(text=btn_text, callback_data=f"cart_qty_{offer_id}_{q}")
-        kb.adjust(min(max_qty, 5))
-    else:
-        # Show -/+/value buttons
-        minus_btn = "−" if quantity > 1 else "•"
-        plus_btn = "+" if quantity < max_qty else "•"
+    # Simple quantity control: [ - ] [qty] [ + ]
+    minus_btn = "➖" if quantity > 1 else "▫️"
+    plus_btn = "➕" if quantity < max_qty else "▫️"
 
-        kb.button(
-            text=minus_btn,
-            callback_data=f"cart_qty_{offer_id}_{quantity - 1}" if quantity > 1 else "cart_noop",
-        )
-        kb.button(text=f"📦 {quantity}", callback_data="cart_noop")
-        kb.button(
-            text=plus_btn,
-            callback_data=f"cart_qty_{offer_id}_{quantity + 1}"
-            if quantity < max_qty
-            else "cart_noop",
-        )
-        kb.adjust(3)
+    kb.button(
+        text=minus_btn,
+        callback_data=f"cart_qty_{offer_id}_{quantity - 1}" if quantity > 1 else "cart_noop",
+    )
+    kb.button(text=f"📦 {quantity}", callback_data="cart_noop")
+    kb.button(
+        text=plus_btn,
+        callback_data=f"cart_qty_{offer_id}_{quantity + 1}" if quantity < max_qty else "cart_noop",
+    )
+    kb.adjust(3)
 
     # Add to cart button
     kb.button(
@@ -1112,7 +1178,7 @@ def build_cart_add_card_keyboard(
         callback_data=f"cart_add_cancel_{offer_id}",
     )
 
-    kb.adjust(1)
+    kb.adjust(3, 1, 1)
 
     return kb
 
@@ -1334,31 +1400,101 @@ async def cart_add_confirm(callback: types.CallbackQuery, state: FSMContext) -> 
 
     cart_count = cart_storage.get_cart_count(user_id)
 
-    text = (
-        f"✅ Добавлено в корзину!\n\n🛒 В корзине: {cart_count} товар(ов)"
+    # Show popup notification
+    added_text = "Добавлено!" if lang == "ru" else "Qo'shildi!"
+    popup_text = (
+        f"✅ {added_text} В корзине: {cart_count} шт"
         if lang == "ru"
-        else f"✅ Savatga qo'shildi!\n\n🛒 Savatda: {cart_count} ta mahsulot"
+        else f"✅ {added_text} Savatda: {cart_count} ta"
     )
+    await callback.answer(popup_text, show_alert=False)
 
-    kb = InlineKeyboardBuilder()
-    kb.button(
-        text="🛒 Перейти в корзину" if lang == "ru" else "🛒 Savatga o'tish",
-        callback_data="view_cart",
-    )
-    kb.button(
-        text="🔥 Горячие предложения" if lang == "ru" else "🔥 Харакатли таклифлар",
-        callback_data="hot_offers",
-    )
-    kb.adjust(1)
+    # Save page info before clearing state
+    last_page = data.get("hot_offers_page", 0)
+    source = data.get("source", "hot")
 
     await state.clear()
 
-    try:
-        await callback.message.edit_text(text, parse_mode="HTML", reply_markup=kb.as_markup())
-    except Exception:
-        await callback.message.answer(text, parse_mode="HTML", reply_markup=kb.as_markup())
+    # Show the offers list again (edit current message)
+    # Import service to get offers
+    from app.keyboards import offers as offer_keyboards
+    from app.services.offer_service import OfferService
+    from app.templates import offers as offer_templates
+    from handlers.common.utils import normalize_city
+    from handlers.customer.offers.browse import BrowseOffers
 
-    await callback.answer("✅")
+    user = db.get_user_model(user_id)
+    city = user.city if user else "Ташкент"
+    search_city = normalize_city(city)
+
+    offer_service = OfferService(db)
+    ITEMS_PER_PAGE = 5
+
+    try:
+        result = offer_service.list_hot_offers(
+            search_city, limit=ITEMS_PER_PAGE, offset=last_page * ITEMS_PER_PAGE
+        )
+
+        if result.items:
+            # Set state for offer browsing
+            await state.set_state(BrowseOffers.offer_list)
+            await state.update_data(
+                offer_list=[offer.id for offer in result.items],
+                hot_offers_page=last_page,
+            )
+
+            total_pages = (result.total + ITEMS_PER_PAGE - 1) // ITEMS_PER_PAGE
+            currency = "so'm" if lang == "uz" else "сум"
+
+            header_title = "АКЦИИ ДО -70%" if lang == "ru" else "CHEGIRMALAR -70% GACHA"
+            page_label = "Стр." if lang == "ru" else "Sah."
+            text = f"🔥 <b>{header_title}</b>\n"
+            text += f"📍 {city} | {page_label} {last_page + 1}/{total_pages}\n"
+            text += "━" * 24 + "\n\n"
+
+            for idx, offer in enumerate(result.items, start=1):
+                title = offer.title
+                if title.startswith("Пример:"):
+                    title = title[7:].strip()
+                title = title[:22] + ".." if len(title) > 22 else title
+
+                if offer.original_price and offer.discount_price and offer.original_price > 0:
+                    discount_pct = round((1 - offer.discount_price / offer.original_price) * 100)
+                else:
+                    discount_pct = 0
+
+                text += f"<b>{idx}.</b> {_esc(title)}\n"
+                text += f"   💰 <s>{int(offer.original_price):,}</s> → <b>{int(offer.discount_price):,}</b> {currency}"
+                if discount_pct > 0:
+                    text += f" <b>(-{discount_pct}%)</b>"
+                text += f"\n   🏪 {_esc(offer.store_name)}\n\n"
+
+            select_hint = (
+                "👆 Выберите номер товара:" if lang == "ru" else "👆 Mahsulot raqamini tanlang:"
+            )
+            text += select_hint
+
+            kb = offer_keyboards.hot_offers_compact_keyboard(
+                lang, result.items, last_page, total_pages
+            )
+
+            try:
+                await callback.message.edit_text(text, parse_mode="HTML", reply_markup=kb)
+            except Exception:
+                await callback.message.delete()
+                await callback.message.answer(text, parse_mode="HTML", reply_markup=kb)
+        else:
+            # No offers - just delete message
+            try:
+                await callback.message.delete()
+            except Exception:
+                pass
+    except Exception as e:
+        logger.error(f"Error showing offers after add to cart: {e}")
+        try:
+            await callback.message.delete()
+        except Exception:
+            pass
 
 
 @router.callback_query(F.data.startswith("cart_add_cancel_"))

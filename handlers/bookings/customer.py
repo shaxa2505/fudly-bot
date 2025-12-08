@@ -1,4 +1,4 @@
-﻿"""Customer booking handlers - create, view, cancel, rate bookings.
+"""Customer booking handlers - create, view, cancel, rate bookings.
 
 Premium UX v3 - Beautiful booking cards with photos and inline controls.
 """
@@ -101,7 +101,7 @@ def build_order_card_text(
 
     # Price with discount - same style as product card
     if original_price and original_price > price:
-        discount_pct = int((1 - price / original_price) * 100)
+        discount_pct = round((1 - price / original_price) * 100)
         lines.append(
             f"<s>{int(original_price):,}</s> → <b>{int(price):,}</b> {currency} (-{discount_pct}%)"
         )
@@ -134,16 +134,27 @@ def build_order_card_text(
     if store_address:
         lines.append(f"📍 {_esc(store_address)}")
 
-    # Delivery section - cleaner style
+    # Delivery section - cleaner style with better hint
     if delivery_enabled:
         lines.append("")
+        # Show delivery price
         delivery_label = "Yetkazish" if lang == "uz" else "Доставка"
         lines.append(f"🚚 {delivery_label}: {delivery_price:,} {currency}")
 
-        # Show selection hint if not selected
+        # Pickup option
+        pickup_label = "Olib ketish" if lang == "uz" else "Самовывоз"
+        lines.append(
+            f"🏪 {pickup_label}: bepul" if lang == "uz" else f"🏪 {pickup_label}: бесплатно"
+        )
+
+        # Show selection hint if not selected - clearer text
         if not delivery_method:
-            hint = "👇 Usulni tanlang" if lang == "uz" else "👇 Выберите способ"
-            lines.append(f"<i>{hint}</i>")
+            hint = (
+                "👇 Yetkazish yoki olib ketish tanlang"
+                if lang == "uz"
+                else "👇 Выберите доставку или самовывоз"
+            )
+            lines.append(f"\n<i>{hint}</i>")
 
     # Totals section
     lines.append("")
@@ -182,14 +193,15 @@ def build_order_card_keyboard(
         minus_enabled = quantity > 1
         plus_enabled = quantity < max_qty
 
-        minus_text = "➖" if minus_enabled else "▫️"
-        plus_text = "➕" if plus_enabled else "▫️"
+        # Use simple ASCII/basic Unicode that works everywhere
+        minus_text = "−" if minus_enabled else "▫"
+        plus_text = "+" if plus_enabled else "▫"
 
         kb.button(
             text=minus_text,
             callback_data=f"pbook_qty_{offer_id}_{quantity - 1}" if minus_enabled else "pbook_noop",
         )
-        kb.button(text=f"📦 {quantity}", callback_data="pbook_noop")
+        kb.button(text=f"{quantity} шт", callback_data="pbook_noop")
         kb.button(
             text=plus_text,
             callback_data=f"pbook_qty_{offer_id}_{quantity + 1}" if plus_enabled else "pbook_noop",
@@ -197,14 +209,14 @@ def build_order_card_keyboard(
 
     # Row 2-3: Delivery options (if enabled)
     if delivery_enabled:
-        pickup_text = "🏪 O'zim olib ketaman" if lang == "uz" else "🏪 Самовывоз"
+        pickup_text = "🏪 Olib ketish" if lang == "uz" else "🏪 Самовывоз"
         delivery_text = "🚚 Yetkazish" if lang == "uz" else "🚚 Доставка"
 
         # Add checkmarks for selected option
         if delivery_method == "pickup":
-            pickup_text = "✓ " + pickup_text
+            pickup_text = "✅ " + pickup_text
         elif delivery_method == "delivery":
-            delivery_text = "✓ " + delivery_text
+            delivery_text = "✅ " + delivery_text
 
         kb.button(text=pickup_text, callback_data=f"pbook_method_{offer_id}_pickup")
         kb.button(text=delivery_text, callback_data=f"pbook_method_{offer_id}_delivery")
@@ -1186,7 +1198,7 @@ async def create_booking(
         METRICS["bookings_created"] = METRICS.get("bookings_created", 0) + 1
 
     logger.info(f"✅ Booking created: id={booking_id}, code={code}, user={user_id}")
-    
+
     # Structured logging
     total = calculate_total(offer_price, quantity, 0)
     logger.info(
@@ -1237,22 +1249,32 @@ async def create_booking(
         )
 
     # Try to send with photo for beautiful notification
+    # IMPORTANT: Don't use reply_markup here! Messages with ReplyKeyboard can't be edited later.
+    # The keyboard is already shown to user, we just need an editable status message.
     offer_photo = get_offer_field(offer, "photo") if offer else None
+    sent_message = None
     if offer_photo:
         try:
-            await bot.send_photo(
+            sent_message = await bot.send_photo(
                 user_id,
                 photo=offer_photo,
                 caption=customer_msg,
                 parse_mode="HTML",
-                reply_markup=main_menu_customer(lang),
             )
         except Exception:
-            await message.answer(
-                customer_msg, parse_mode="HTML", reply_markup=main_menu_customer(lang)
-            )
+            sent_message = await message.answer(customer_msg, parse_mode="HTML")
     else:
-        await message.answer(customer_msg, parse_mode="HTML", reply_markup=main_menu_customer(lang))
+        sent_message = await message.answer(customer_msg, parse_mode="HTML")
+
+    # Save message_id for live editing (status updates will edit this message)
+    if sent_message and hasattr(db, "set_booking_customer_message_id"):
+        try:
+            db.set_booking_customer_message_id(booking_id, sent_message.message_id)
+            logger.info(
+                f"Saved customer_message_id={sent_message.message_id} for booking #{booking_id}"
+            )
+        except Exception as e:
+            logger.warning(f"Failed to save customer_message_id: {e}")
 
     # Notify partner
     if owner_id:
@@ -1332,27 +1354,41 @@ async def notify_partner_new_booking(
         reject_text = "❌ Отклонить"
 
     kb = InlineKeyboardBuilder()
-    kb.button(text=confirm_text, callback_data=f"partner_confirm_{booking_id}")
-    kb.button(text=reject_text, callback_data=f"partner_reject_{booking_id}")
+    # Use explicit booking_ prefix since this is pickup BOOKING
+    kb.button(text=confirm_text, callback_data=f"booking_confirm_{booking_id}")
+    kb.button(text=reject_text, callback_data=f"booking_reject_{booking_id}")
     kb.adjust(2)
 
     try:
+        sent_msg = None
         # Try to send with photo first for beautiful card
         if offer_photo:
             try:
-                await bot.send_photo(
+                sent_msg = await bot.send_photo(
                     owner_id,
                     photo=offer_photo,
                     caption=text,
                     parse_mode="HTML",
                     reply_markup=kb.as_markup(),
                 )
-                return
             except Exception as photo_err:
                 logger.warning(f"Failed to send photo to partner: {photo_err}")
 
         # Fallback to text only
-        await bot.send_message(owner_id, text, parse_mode="HTML", reply_markup=kb.as_markup())
+        if not sent_msg:
+            sent_msg = await bot.send_message(
+                owner_id, text, parse_mode="HTML", reply_markup=kb.as_markup()
+            )
+
+        # Save seller_message_id for live editing
+        if sent_msg and hasattr(db, "set_booking_seller_message_id"):
+            try:
+                db.set_booking_seller_message_id(booking_id, sent_msg.message_id)
+                logger.info(
+                    f"Saved seller_message_id={sent_msg.message_id} for booking#{booking_id}"
+                )
+            except Exception as save_err:
+                logger.error(f"Failed to save seller_message_id: {save_err}")
     except Exception as e:
         logger.error(f"Failed to notify partner {owner_id}: {e}")
 

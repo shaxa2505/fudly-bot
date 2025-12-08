@@ -348,10 +348,22 @@ async def send_order_card(
         # Try to get offer/unit price or cart items
         if is_cart_booking and cart_items_json:
             import json
+
             try:
-                cart_items = json.loads(cart_items_json) if isinstance(cart_items_json, str) else cart_items_json
-                items_text = "\n".join([f"• {item.get('title', 'Товар')} × {item.get('quantity', 1)}" for item in cart_items])
-                total_price = sum(item.get("price", 0) * item.get("quantity", 1) for item in cart_items)
+                cart_items = (
+                    json.loads(cart_items_json)
+                    if isinstance(cart_items_json, str)
+                    else cart_items_json
+                )
+                items_text = "\n".join(
+                    [
+                        f"• {item.get('title', 'Товар')} × {item.get('quantity', 1)}"
+                        for item in cart_items
+                    ]
+                )
+                total_price = sum(
+                    item.get("price", 0) * item.get("quantity", 1) for item in cart_items
+                )
             except Exception:
                 items_text = offer_title
                 total_price = None
@@ -403,13 +415,14 @@ async def send_order_card(
         builder.button(text="👁️ Подробнее", callback_data=f"booking_details_seller_{booking_id}")
         builder.button(text="📞 Контакт", callback_data=f"contact_customer_{booking_id}")
         if status == "pending":
+            # Use explicit booking_ prefix since this is pickup BOOKING
             builder.button(
                 text="✅ Подтвердить" if lang == "ru" else "✅ Tasdiqlash",
-                callback_data=f"partner_confirm_{booking_id}",
+                callback_data=f"booking_confirm_{booking_id}",
             )
             builder.button(
                 text="❌ Отменить" if lang == "ru" else "❌ Bekor qilish",
-                callback_data=f"partner_cancel_{booking_id}",
+                callback_data=f"booking_reject_{booking_id}",
             )
             builder.adjust(2, 2)
         elif status == "confirmed":
@@ -464,10 +477,19 @@ async def send_order_card(
         # Get offer info or cart items
         if is_cart_order and cart_items_json:
             import json
+
             try:
-                cart_items = json.loads(cart_items_json) if isinstance(cart_items_json, str) else cart_items_json
-                items_text = "\n".join([f"• {item['title']} × {item['quantity']}" for item in cart_items])
-                total_price = sum(item.get("price", 0) * item.get("quantity", 1) for item in cart_items)
+                cart_items = (
+                    json.loads(cart_items_json)
+                    if isinstance(cart_items_json, str)
+                    else cart_items_json
+                )
+                items_text = "\n".join(
+                    [f"• {item['title']} × {item['quantity']}" for item in cart_items]
+                )
+                total_price = sum(
+                    item.get("price", 0) * item.get("quantity", 1) for item in cart_items
+                )
             except Exception:
                 items_text = "Товары из корзины"
                 total_price = 0
