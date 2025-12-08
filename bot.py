@@ -544,15 +544,19 @@ async def cleanup_expired_fsm_states() -> None:
 
 async def start_booking_worker() -> asyncio.Task | None:
     """Start the booking expiry worker if available."""
-    try:
-        from tasks.booking_expiry_worker import start_booking_expiry_worker
-
-        task = asyncio.create_task(start_booking_expiry_worker(db, bot))
-        logger.info("✅ Booking expiry worker started")
-        return task
-    except Exception as e:
-        logger.warning(f"Could not start booking expiry worker: {e}")
-        return None
+    # TEMPORARILY DISABLED: Requires migration 003_add_partner_reminder.sql
+    # Apply migration first: ALTER TABLE bookings ADD COLUMN IF NOT EXISTS partner_reminder_sent INTEGER DEFAULT 0;
+    logger.warning("⚠️ Booking expiry worker DISABLED - migration required (003_add_partner_reminder.sql)")
+    return None
+    
+    # try:
+    #     from tasks.booking_expiry_worker import start_booking_expiry_worker
+    #     task = asyncio.create_task(start_booking_expiry_worker(db, bot))
+    #     logger.info("✅ Booking expiry worker started")
+    #     return task
+    # except Exception as e:
+    #     logger.warning(f"Could not start booking expiry worker: {e}")
+    #     return None
 
 
 # =============================================================================
