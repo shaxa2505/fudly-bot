@@ -803,13 +803,15 @@ async def dlv_payment_proof(
     data = await state.get_data()
 
     logger.info(f"📸 User {user_id} uploaded payment screenshot for delivery order")
+    logger.info(f"📋 FSM data keys: {list(data.keys())}")
+    logger.info(f"📋 is_cart_order: {data.get('is_cart_order', 'NOT SET')}")
 
     # Check required data
     required = ["offer_id", "store_id", "quantity", "address"]
     if not all(k in data for k in required):
         missing = [k for k in required if k not in data]
         logger.error(f"❌ User {user_id} missing required data for order: {missing}")
-        logger.debug(f"Available data keys: {list(data.keys())}")
+        logger.error(f"Available data: {data}")
         msg = "❌ Ma'lumotlar yo'qoldi" if lang == "uz" else "❌ Данные потеряны"
         await message.answer(msg, reply_markup=get_appropriate_menu(user_id, lang))
         await state.clear()
