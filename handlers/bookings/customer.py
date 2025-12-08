@@ -1,4 +1,4 @@
-"""Customer booking handlers - create, view, cancel, rate bookings.
+﻿"""Customer booking handlers - create, view, cancel, rate bookings.
 
 Premium UX v3 - Beautiful booking cards with photos and inline controls.
 """
@@ -1186,6 +1186,13 @@ async def create_booking(
         METRICS["bookings_created"] = METRICS.get("bookings_created", 0) + 1
 
     logger.info(f"✅ Booking created: id={booking_id}, code={code}, user={user_id}")
+    
+    # Structured logging
+    total = calculate_total(offer_price, quantity, 0)
+    logger.info(
+        f"ORDER_CREATED: id={booking_id}, user={user_id}, type=pickup, "
+        f"total={total}, items=1, source=booking_bot, pickup_code={code}"
+    )
 
     await state.clear()
 

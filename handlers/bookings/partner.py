@@ -1,7 +1,6 @@
 """Partner booking handlers - confirm, reject, complete bookings."""
 from __future__ import annotations
 
-import html
 from typing import Any
 
 from aiogram import F, Router, types
@@ -10,6 +9,7 @@ from aiogram.types import BufferedInputFile
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
 from handlers.common.states import RateBooking
+from handlers.common.utils import html_escape as _esc
 from localization import get_text
 from logging_config import logger
 
@@ -48,19 +48,12 @@ def setup_dependencies(database: Any, bot_instance: Any):
     logger.info(f"Partner module initialized, default bot_username: {bot_username}")
 
 
-def _esc(val: Any) -> str:
-    """HTML-escape helper."""
-    if val is None:
-        return ""
-    return html.escape(str(val))
-
-
 # ===================== PARTNER CONFIRM/REJECT =====================
 
 
-@router.callback_query(F.data.regexp(r"^partner_confirm_\d+$"))
+@router.callback_query(F.data.regexp(r"^partner_confirm_\d+$") | F.data.regexp(r"^partner_confirm_order_\d+$"))
 async def partner_confirm_booking(callback: types.CallbackQuery) -> None:
-    """Partner confirms a booking."""
+    """Partner confirms a booking (supports both old and new callback patterns)."""
     if not db or not bot:
         await callback.answer("System error", show_alert=True)
         return
@@ -69,7 +62,11 @@ async def partner_confirm_booking(callback: types.CallbackQuery) -> None:
     lang = db.get_user_language(partner_id)
 
     try:
-        booking_id = int(callback.data.split("_")[-1])
+        # Support both patterns: partner_confirm_{id} and partner_confirm_order_{id}
+        if "partner_confirm_order_" in callback.data:
+            booking_id = int(callback.data.replace("partner_confirm_order_", ""))
+        else:
+            booking_id = int(callback.data.split("_")[-1])
     except ValueError:
         await callback.answer(get_text(lang, "error"), show_alert=True)
         return
@@ -240,9 +237,9 @@ async def partner_confirm_booking(callback: types.CallbackQuery) -> None:
     await callback.answer(get_text(lang, "booking_confirmed") or "Подтверждено")
 
 
-@router.callback_query(F.data.regexp(r"^partner_reject_\d+$"))
+@router.callback_query(F.data.regexp(r"^partner_reject_\d+$") | F.data.regexp(r"^partner_reject_order_\d+$"))
 async def partner_reject_booking(callback: types.CallbackQuery) -> None:
-    """Partner rejects a booking."""
+    """Partner rejects a booking (supports both old and new callback patterns)."""
     if not db or not bot:
         await callback.answer("System error", show_alert=True)
         return
@@ -251,7 +248,11 @@ async def partner_reject_booking(callback: types.CallbackQuery) -> None:
     lang = db.get_user_language(partner_id)
 
     try:
-        booking_id = int(callback.data.split("_")[-1])
+        # Support both patterns: partner_reject_{id} and partner_reject_order_{id}
+        if callback.data and "partner_reject_order_" in callback.data:
+            booking_id = int(callback.data.replace("partner_reject_order_", ""))
+        else:
+            booking_id = int(callback.data.split("_")[-1])
     except ValueError:
         await callback.answer(get_text(lang, "error"), show_alert=True)
         return

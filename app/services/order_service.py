@@ -199,6 +199,12 @@ class OrderService:
                 for f in failed_items_data
             ]
 
+        # Structured logging for OrderService
+        logger.info(
+            f"ORDER_CREATED: ids={','.join(map(str, order_ids))}, user={user_id}, type={order_type}, "
+            f"total={int(grand_total)}, items={total_items}, source=order_service"
+        )
+
         return OrderResult(
             success=True,
             order_ids=order_ids,

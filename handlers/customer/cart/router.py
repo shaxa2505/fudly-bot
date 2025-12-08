@@ -50,14 +50,17 @@ def _esc(val: Any) -> str:
 # ===================== CART VIEW =====================
 
 
-@router.message(F.text.in_(["🛒 Корзина", "🛒 Savat"]))
-async def show_cart(message: types.Message, state: FSMContext) -> None:
-    """Show cart contents - main entry point."""
-    if not db or not message.from_user:
+async def _show_cart_internal(
+    event: types.Message | types.CallbackQuery, state: FSMContext, is_callback: bool = False
+) -> None:
+    """Internal cart display logic that handles both messages and callbacks."""
+    if not db or not event.from_user:
+        if is_callback and isinstance(event, types.CallbackQuery):
+            await event.answer()
         return
 
     await state.clear()
-    user_id = message.from_user.id
+    user_id = event.from_user.id
     lang = db.get_user_language(user_id)
 
     items = cart_storage.get_cart(user_id)
@@ -73,7 +76,15 @@ async def show_cart(message: types.Message, state: FSMContext) -> None:
             text="🔥 Горячие предложения" if lang == "ru" else "🔥 Ҳаракатли таклифлар",
             callback_data="hot_offers",
         )
-        await message.answer(empty_text, reply_markup=kb.as_markup())
+        
+        if is_callback and isinstance(event, types.CallbackQuery):
+            try:
+                await event.message.edit_text(empty_text, reply_markup=kb.as_markup())
+            except Exception:
+                await event.message.answer(empty_text, reply_markup=kb.as_markup())
+            await event.answer()
+        else:
+            await event.answer(empty_text, reply_markup=kb.as_markup())
         return
 
     # Build cart view
@@ -96,18 +107,22 @@ async def show_cart(message: types.Message, state: FSMContext) -> None:
     # Cart keyboard with edit buttons for each item
     kb = InlineKeyboardBuilder()
 
-    # Edit buttons for each item
+    # Edit buttons for each item (2 rows per item: qty controls + title/delete)
     for i, item in enumerate(items, 1):
-        # Show short title + edit buttons
-        title_short = item.title[:15] + "..." if len(item.title) > 15 else item.title
+        # Row 1: Quantity controls
         kb.button(text="➖", callback_data=f"cart_qty_dec_{item.offer_id}")
-        kb.button(text=f"{i}. {title_short} ({item.quantity})", callback_data="cart_noop")
+        kb.button(text=f"{item.quantity}", callback_data="cart_noop")
         kb.button(text="➕", callback_data=f"cart_qty_inc_{item.offer_id}")
+        
+        # Row 2: Item title + delete
+        title_short = item.title[:35] + "..." if len(item.title) > 35 else item.title
+        kb.button(text=f"{i}. {title_short}", callback_data="cart_noop")
         kb.button(text="🗑", callback_data=f"cart_remove_{item.offer_id}")
 
-    # Adjust: 4 buttons per row (-, item, +, delete)
-    kb.adjust(4)
-
+    # Adjust: 3 buttons for qty row, 2 buttons for title row, repeat for each item
+    num_items = len(items)
+    adjust_pattern = [3, 2] * num_items
+    
     # Main actions
     kb.button(
         text="✅ Оформить заказ" if lang == "ru" else "✅ Buyurtma berish",
@@ -117,9 +132,24 @@ async def show_cart(message: types.Message, state: FSMContext) -> None:
         text="🗑 Очистить всё" if lang == "ru" else "🗑 Hammasini tozalash",
         callback_data="cart_clear",
     )
-    kb.adjust(4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 2)
+    
+    # Final adjust: all item rows + 2 action buttons
+    kb.adjust(*adjust_pattern, 2)
 
-    await message.answer(text, parse_mode="HTML", reply_markup=kb.as_markup())
+    if is_callback and isinstance(event, types.CallbackQuery):
+        try:
+            await event.message.edit_text(text, parse_mode="HTML", reply_markup=kb.as_markup())
+        except Exception:
+            await event.message.answer(text, parse_mode="HTML", reply_markup=kb.as_markup())
+        await event.answer()
+    else:
+        await event.answer(text, parse_mode="HTML", reply_markup=kb.as_markup())
+
+
+@router.message(F.text.in_(["🛒 Корзина", "🛒 Savat"]))
+async def show_cart(message: types.Message, state: FSMContext) -> None:
+    """Show cart contents - main entry point from text message."""
+    await _show_cart_internal(message, state, is_callback=False)
 
 
 # ===================== CART ACTIONS =====================
@@ -751,6 +781,13 @@ async def cart_pay_card(callback: types.CallbackQuery, state: FSMContext) -> Non
         await callback.answer(error_text, show_alert=True)
         return
 
+    # Structured logging for cart order
+    total_amount = sum(item["price"] * item["quantity"] for item in cart_items_stored) + delivery_price
+    logger.info(
+        f"ORDER_CREATED: id={order_id}, user={user_id}, type=delivery, "
+        f"total={total_amount}, items={len(cart_items_stored)}, source=cart_card, pickup_code={pickup_code}"
+    )
+
     # Clear cart
     cart_storage.clear_cart(user_id)
 
@@ -1309,8 +1346,8 @@ async def cart_add_confirm(callback: types.CallbackQuery, state: FSMContext) -> 
         callback_data="view_cart",
     )
     kb.button(
-        text="🔙 Продолжить покупки" if lang == "ru" else "🔙 Xaridni davom ettirish",
-        callback_data=f"continue_shopping_{store_id}",
+        text="🔥 Горячие предложения" if lang == "ru" else "🔥 Харакатли таклифлар",
+        callback_data="hot_offers",
     )
     kb.adjust(1)
 
@@ -1390,16 +1427,7 @@ async def cart_quantity_increase(callback: types.CallbackQuery, state: FSMContex
     cart_storage.update_quantity(user_id, offer_id, item.quantity + 1)
 
     # Refresh cart display
-    from aiogram.types import Message
-
-    fake_message = Message(
-        message_id=callback.message.message_id,
-        date=callback.message.date,
-        chat=callback.message.chat,
-        from_user=callback.from_user,
-    )
-    await show_cart(fake_message, state)
-    await callback.answer(f"✅ +1 ({item.quantity + 1})")
+    await _show_cart_internal(callback, state, is_callback=True)
 
 
 @router.callback_query(F.data.startswith("cart_qty_dec_"))
@@ -1431,22 +1459,11 @@ async def cart_quantity_decrease(callback: types.CallbackQuery, state: FSMContex
     # Decrease or remove
     if item.quantity <= 1:
         cart_storage.remove_item(user_id, offer_id)
-        msg = "🗑 Удалён" if lang == "ru" else "🗑 O'chirildi"
     else:
         cart_storage.update_quantity(user_id, offer_id, item.quantity - 1)
-        msg = f"✅ -1 ({item.quantity - 1})"
 
     # Refresh cart display
-    from aiogram.types import Message
-
-    fake_message = Message(
-        message_id=callback.message.message_id,
-        date=callback.message.date,
-        chat=callback.message.chat,
-        from_user=callback.from_user,
-    )
-    await show_cart(fake_message, state)
-    await callback.answer(msg)
+    await _show_cart_internal(callback, state, is_callback=True)
 
 
 @router.callback_query(F.data.startswith("cart_remove_"))
@@ -1468,16 +1485,7 @@ async def cart_remove_item(callback: types.CallbackQuery, state: FSMContext) -> 
     cart_storage.remove_item(user_id, offer_id)
 
     # Refresh cart display
-    from aiogram.types import Message
-
-    fake_message = Message(
-        message_id=callback.message.message_id,
-        date=callback.message.date,
-        chat=callback.message.chat,
-        from_user=callback.from_user,
-    )
-    await show_cart(fake_message, state)
-    await callback.answer("🗑 Удалён" if lang == "ru" else "🗑 O'chirildi")
+    await _show_cart_internal(callback, state, is_callback=True)
 
 
 @router.callback_query(F.data.startswith("continue_shopping_"))
@@ -1607,15 +1615,4 @@ async def view_cart_callback(callback: types.CallbackQuery, state: FSMContext) -
         await callback.answer()
         return
 
-    # Create fake message to reuse show_cart
-    from aiogram.types import Message
-
-    fake_message = Message(
-        message_id=callback.message.message_id,
-        date=callback.message.date,
-        chat=callback.message.chat,
-        from_user=callback.from_user,
-    )
-
-    await show_cart(fake_message, state)
-    await callback.answer()
+    await _show_cart_internal(callback, state, is_callback=True)

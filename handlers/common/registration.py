@@ -2,7 +2,6 @@
 User registration handlers (phone and city collection).
 """
 from aiogram import F, Router, types
-from aiogram import types as _ai_types
 from aiogram.filters import StateFilter
 from aiogram.fsm.context import FSMContext
 
@@ -15,28 +14,9 @@ from app.keyboards import (
 )
 from database_protocol import DatabaseProtocol
 from handlers.common.states import Registration
-from localization import get_cities, get_text
+from localization import get_text
 
 router = Router(name="registration")
-
-
-async def _safe_edit_reply_markup(msg_like, **kwargs) -> None:
-    """Edit reply markup if message is accessible, otherwise ignore."""
-    if isinstance(msg_like, _ai_types.Message):
-        try:
-            await msg_like.edit_reply_markup(**kwargs)
-        except Exception:
-            pass
-
-
-async def _safe_answer_or_send(msg_like, user_id: int, text: str, **kwargs) -> None:
-    """Try to answer via message.answer, fallback to bot.send_message."""
-    if isinstance(msg_like, _ai_types.Message):
-        try:
-            await msg_like.answer(text, **kwargs)
-            return
-        except Exception:
-            pass
 
 
 @router.message(Registration.phone, F.contact)
@@ -67,107 +47,73 @@ async def process_phone(message: types.Message, state: FSMContext, db: DatabaseP
 
     from aiogram.types import ReplyKeyboardRemove
 
-    if pending_cart_checkout:
-        # Resume cart checkout flow
+    # Handle cart and order pending states
+    if pending_cart_checkout or pending_order:
         await message.answer(
-            "✅ Телефон сохранён! Продолжаем оформление заказа..."
+            "✅ Телефон сохранён!"
             if lang == "ru"
-            else "✅ Telefon saqlandi! Buyurtmani davom ettiramiz...",
+            else "✅ Telefon saqlandi!",
             reply_markup=ReplyKeyboardRemove(),
         )
-        await state.update_data(pending_cart_checkout=False)
-        await state.clear()
-
-        # Show cart checkout directly
-        import html
-
-        from handlers.customer.cart.router import cart_storage
-
-        def _esc(val):
-            if val is None:
-                return ""
-            return html.escape(str(val))
-
-        items = cart_storage.get_cart(message.from_user.id)
-        if items:
-            # Trigger checkout flow
-            from aiogram.utils.keyboard import InlineKeyboardBuilder
-
-            total = cart_storage.get_cart_total(message.from_user.id)
-            currency = "so'm" if lang == "uz" else "сум"
-            delivery_enabled = items[0].delivery_enabled if items else False
-            delivery_price = items[0].delivery_price if items else 0
-
-            store_name = items[0].store_name if items else ""
-
-            lines = [f"📋 <b>{'Buyurtma' if lang == 'uz' else 'Заказ'}</b>\n"]
-            lines.append(f"🏪 {_esc(store_name)}\n")
-
-            for item in items:
-                subtotal = item.price * item.quantity
-                lines.append(f"• {_esc(item.title)} × {item.quantity} = {subtotal:,} {currency}")
-
-            lines.append("\n" + "─" * 25)
-            lines.append(f"💵 <b>{'Jami' if lang == 'uz' else 'Итого'}: {total:,} {currency}</b>")
-
-            if delivery_enabled:
-                lines.append(
-                    f"🚚 {'Yetkazish' if lang == 'uz' else 'Доставка'}: {delivery_price:,} {currency}"
-                )
-
-            text = "\n".join(lines)
-
-            kb = InlineKeyboardBuilder()
-            if delivery_enabled:
-                kb.button(
-                    text="🏪 Самовывоз" if lang == "ru" else "🏪 O'zim olib ketaman",
-                    callback_data="cart_confirm_pickup",
-                )
-                kb.button(
-                    text="🚚 Доставка" if lang == "ru" else "🚚 Yetkazish",
-                    callback_data="cart_confirm_delivery",
-                )
-            else:
-                kb.button(
-                    text="✅ Подтвердить" if lang == "ru" else "✅ Tasdiqlash",
-                    callback_data="cart_confirm_pickup",
-                )
-            kb.button(text="◀️ Назад" if lang == "ru" else "◀️ Orqaga", callback_data="view_cart")
-            kb.adjust(2 if delivery_enabled else 1, 1)
-
-            await message.answer(text, parse_mode="HTML", reply_markup=kb.as_markup())
-        else:
-            # Cart is empty
-            from handlers.customer.cart.router import main_menu_customer
-
+        
+        # Get order data to show confirmation button
+        data = await state.get_data()
+        offer_id = data.get("offer_id")
+        store_id = data.get("store_id")
+        quantity = data.get("selected_qty", 1)
+        delivery_method = data.get("selected_delivery")
+        
+        # Check if we have minimum required data
+        if not offer_id or not store_id or not delivery_method:
+            # Data incomplete - show menu
+            await state.clear()
+            from app.keyboards import main_menu_customer
             await message.answer(
-                "🛒 Корзина пуста" if lang == "ru" else "🛒 Savat bo'sh",
+                "⚠️ Продолжите оформление через 🛒 Корзина или 🔥 Горячее"
+                if lang == "ru"
+                else "⚠️ 🛒 Savat yoki 🔥 Issiq orqali davom eting",
                 reply_markup=main_menu_customer(lang),
             )
+            return
+        
+        # Show confirmation button to continue
+        from aiogram.utils.keyboard import InlineKeyboardBuilder
+        kb = InlineKeyboardBuilder()
+        kb.button(
+            text="✅ Продолжить оформление" if lang == "ru" else "✅ Davom ettirish",
+            callback_data=f"pbook_confirm_{offer_id}"
+        )
+        
+        await message.answer(
+            "👇 Нажмите кнопку ниже для продолжения:"
+            if lang == "ru"
+            else "👇 Davom etish uchun tugmani bosing:",
+            reply_markup=kb.as_markup()
+        )
         return
 
     if pending_order:
-        # Resume order flow - user was trying to place an order
+        # User was trying to place an order but needed to provide phone first
+        # DECISION: Don't try to restore complex state - just show menu and let user start fresh
+        # This is more reliable and better UX than trying to restore potentially corrupted state
+        
+        await state.clear()
+        
         from aiogram.types import ReplyKeyboardRemove
+        from app.keyboards import main_menu_customer
 
         await message.answer(
-            "✅ Телефон сохранён! Продолжаем оформление заказа..."
+            "✅ Телефон сохранён!"
             if lang == "ru"
-            else "✅ Telefon saqlandi! Buyurtmani davom ettiramiz...",
+            else "✅ Telefon saqlandi!",
             reply_markup=ReplyKeyboardRemove(),
         )
 
-        # Restore order state and re-trigger confirm
-        from handlers.common.states import BookOffer
-
-        await state.update_data(pending_order=False)
-        await state.set_state(BookOffer.quantity)
-
-        # Send message to user to click confirm again
         await message.answer(
-            "👆 Нажмите кнопку 'Подтвердить' ещё раз"
+            "👇 Теперь выберите товар через меню ниже:"
             if lang == "ru"
-            else "👆 Tasdiqlash tugmasini qayta bosing",
+            else "👇 Endi quyidagi menyudan mahsulot tanlang:",
+            reply_markup=main_menu_customer(lang),
         )
         return
 

@@ -657,6 +657,31 @@ async def create_order(
         # Determine if this is delivery or pickup based on delivery_address
         is_delivery = bool(order.delivery_address and order.delivery_address.strip())
 
+        # CHECK MIN_ORDER_AMOUNT for delivery (Quick Win #2)
+        if is_delivery:
+            # Calculate total first
+            total_check = 0
+            for item in order.items:
+                offer = db.get_offer(item.offer_id) if hasattr(db, "get_offer") else None
+                if offer:
+                    price = float(get_val(offer, "discount_price", 0) or 0)
+                    total_check += price * item.quantity
+                    store_id_check = get_val(offer, "store_id")
+            
+            # Check min order for first store (simplified for now)
+            if order.items:
+                first_offer = db.get_offer(order.items[0].offer_id) if hasattr(db, "get_offer") else None
+                if first_offer:
+                    store_id_check = get_val(first_offer, "store_id")
+                    store_check = db.get_store(store_id_check) if hasattr(db, "get_store") else None
+                    if store_check:
+                        min_order = get_val(store_check, "min_order_amount", 0)
+                        if min_order > 0 and total_check < min_order:
+                            raise HTTPException(
+                                status_code=400,
+                                detail=f"Minimum order amount: {min_order}. Your total: {total_check}"
+                            )
+
         # Process each offer separately
         created_items = []
 
@@ -753,6 +778,49 @@ async def create_order(
         order_id = created_items[0]["id"] if created_items else 0
         total_amount = sum(b["total"] for b in created_items)
         total_items = sum(b["quantity"] for b in created_items)
+
+        # QUICK WIN #1: Send confirmation to customer
+        if bot_instance and created_items and user_id:
+            try:
+                customer_lang = db.get_user_language(user_id) if hasattr(db, "get_user_language") else "ru"
+                currency = "so'm" if customer_lang == "uz" else "сум"
+                
+                # Build confirmation message
+                if customer_lang == "uz":
+                    order_type_uz = "🚚 Yetkazish" if is_delivery else "🏪 O'zi olib ketadi"
+                    confirm_msg = f"✅ <b>Buyurtma qabul qilindi!</b>\n\n"
+                    confirm_msg += f"📦 #{order_id}\n"
+                    confirm_msg += f"{order_type_uz}\n\n"
+                    confirm_msg += "<b>Mahsulotlar:</b>\n"
+                    for item in created_items:
+                        confirm_msg += f"• {item['offer_title']} × {item['quantity']}\n"
+                    confirm_msg += f"\n💰 <b>Jami: {int(total_amount):,} {currency}</b>\n\n"
+                    if is_delivery and order.delivery_address:
+                        confirm_msg += f"📍 {order.delivery_address}\n\n"
+                    confirm_msg += "⏳ Sotuvchi tasdiqlashini kutamiz..."
+                else:
+                    order_type_ru = "🚚 Доставка" if is_delivery else "🏪 Самовывоз"
+                    confirm_msg = f"✅ <b>Заказ оформлен!</b>\n\n"
+                    confirm_msg += f"📦 #{order_id}\n"
+                    confirm_msg += f"{order_type_ru}\n\n"
+                    confirm_msg += "<b>Товары:</b>\n"
+                    for item in created_items:
+                        confirm_msg += f"• {item['offer_title']} × {item['quantity']}\n"
+                    confirm_msg += f"\n💰 <b>Итого: {int(total_amount):,} {currency}</b>\n\n"
+                    if is_delivery and order.delivery_address:
+                        confirm_msg += f"📍 {order.delivery_address}\n\n"
+                    confirm_msg += "⏳ Ожидаем подтверждения продавца..."
+                
+                await bot_instance.send_message(user_id, confirm_msg, parse_mode="HTML")
+                logger.info(f"✅ Sent order confirmation to customer {user_id}")
+            except Exception as e:
+                logger.warning(f"Failed to send confirmation to customer: {e}")
+
+        # QUICK WIN #4: Structured logging
+        logger.info(
+            f"ORDER_CREATED: id={order_id}, user={user_id}, type={'delivery' if is_delivery else 'pickup'}, "
+            f"total={int(total_amount)}, items={total_items}, source=webapp_api"
+        )
 
         return OrderResponse(
             order_id=order_id, status="pending", total=total_amount, items_count=total_items
@@ -852,16 +920,11 @@ async def notify_partner_webapp_order(
         confirm_text = "✅ Подтвердить"
         reject_text = "❌ Отклонить"
 
-    # Use unified callback_data (same as bot)
+    # Use unified callback_data (QUICK WIN #3: unified pattern for ALL orders)
     kb = InlineKeyboardBuilder()
-    if is_delivery:
-        # Delivery orders use partner_confirm_order_ / partner_reject_order_
-        kb.button(text=confirm_text, callback_data=f"partner_confirm_order_{booking_id}")
-        kb.button(text=reject_text, callback_data=f"partner_reject_order_{booking_id}")
-    else:
-        # Pickup bookings use partner_confirm_ / partner_reject_
-        kb.button(text=confirm_text, callback_data=f"partner_confirm_{booking_id}")
-        kb.button(text=reject_text, callback_data=f"partner_reject_{booking_id}")
+    # Always use partner_confirm_order_ / partner_reject_order_ for consistency
+    kb.button(text=confirm_text, callback_data=f"partner_confirm_order_{booking_id}")
+    kb.button(text=reject_text, callback_data=f"partner_reject_order_{booking_id}")
     kb.adjust(2)
 
     try:
