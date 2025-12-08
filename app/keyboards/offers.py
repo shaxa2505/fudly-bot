@@ -283,7 +283,7 @@ def search_results_compact_keyboard(
     """Compact keyboard for search results with item buttons and pagination."""
     builder = InlineKeyboardBuilder()
 
-    # Add buttons for each offer (max 5)
+    # Add buttons for each offer in 2-column layout (similar to cart)
     for idx, offer in enumerate(offers[:5], start=1):
         offer_id = offer.id if hasattr(offer, "id") else offer.get("offer_id", 0)
         title = offer.title if hasattr(offer, "title") else offer.get("title", "Товар")
@@ -294,36 +294,40 @@ def search_results_compact_keyboard(
         )
         if not price:
             price = offer.price if hasattr(offer, "price") else offer.get("price", 0)
-        short_title = title[:10] + ".." if len(title) > 10 else title
-        price_str = f"{int(price):,}".replace(",", " ")
-        builder.button(
-            text=f"{idx}. {short_title} • {price_str}", callback_data=f"search_select_{offer_id}"
-        )
 
-    # Adjust offer buttons: 1 per row for readability
-    builder.adjust(1)
+        # Row 1: Number button
+        builder.button(text=f"{idx}", callback_data="search_noop")
+
+        # Row 1: Title button (longer)
+        short_title = title[:30] + ".." if len(title) > 30 else title
+        builder.button(text=short_title, callback_data=f"search_select_{offer_id}")
+
+        # Row 2: Price button (full width)
+        price_str = f"{int(price):,}".replace(",", " ")
+        builder.button(text=f"💰 {price_str}", callback_data=f"search_select_{offer_id}")
+
+    # Adjust: 2 buttons (number + title), then 1 button (price), repeat
+    num_offers = len(offers[:5])
+    adjust_pattern = [2, 1] * num_offers
+    builder.adjust(*adjust_pattern)
 
     # Pagination row
-    nav_builder = InlineKeyboardBuilder()
     if page > 0:
-        nav_builder.button(text="◀️", callback_data=f"search_page_{page - 1}")
-    nav_builder.button(text=f"{page + 1}/{total_pages}", callback_data="search_noop")
+        builder.button(text="◀️", callback_data=f"search_page_{page - 1}")
+    builder.button(text=f"📄 {page + 1}/{total_pages}", callback_data="search_noop")
     if page < total_pages - 1:
-        nav_builder.button(text="▶️", callback_data=f"search_page_{page + 1}")
+        builder.button(text="▶️", callback_data=f"search_page_{page + 1}")
 
     # New search button
-    new_search_text = "🔍 Новый поиск" if lang == "ru" else "🔍 Yangi qidiruv"
-    nav_builder.button(text=new_search_text, callback_data="search_new")
+    new_search_text = "🔍 Янги қидирув" if lang == "uz" else "🔍 Новый поиск"
+    builder.button(text=new_search_text, callback_data="search_new")
 
-    # Adjust nav
+    # Adjust pagination: up to 3 buttons (back/page/forward) + 1 new search
     nav_count = 1  # page indicator always
     if page > 0:
         nav_count += 1
     if page < total_pages - 1:
         nav_count += 1
-    nav_builder.adjust(nav_count, 1)  # nav buttons then new search
-
-    # Combine keyboards
-    builder.attach(nav_builder)
+    builder.adjust(*adjust_pattern, nav_count, 1)
 
     return builder.as_markup()

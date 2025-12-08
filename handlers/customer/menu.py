@@ -41,7 +41,9 @@ def setup(
     booking_filters_keyboard = booking_filters_kb
 
 
-@router.message(F.text.contains("📦") | F.text.contains("Заказы") | F.text.contains("Buyurtmalar"))
+@router.message(
+    F.text.in_(["📦 Мои заказы", "📦 Mening buyurtmalarim", "📋 Мои заказы", "📋 Buyurtmalarim"])
+)
 async def my_orders_handler(message: types.Message) -> None:
     """Handler for Orders button - show user's bookings and orders."""
     if not db or not booking_filters_keyboard:

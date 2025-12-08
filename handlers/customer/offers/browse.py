@@ -16,6 +16,23 @@ from app.templates import offers as offer_templates
 from handlers.common import BrowseOffers
 from localization import get_product_categories, get_text, normalize_category
 
+from .browse_helpers import (
+    CATEGORY_MAP,
+    normalize_db_category,
+)
+from .browse_helpers import (
+    callback_message as _callback_message,
+)
+from .browse_helpers import (
+    invalid_number_text as _invalid_number_text,
+)
+from .browse_helpers import (
+    no_stores_text as _no_stores_text,
+)
+from .browse_helpers import (
+    range_text as _range_text,
+)
+
 FetchOffersFn = Callable[[str, int], list[OfferListItem]]
 
 
@@ -44,6 +61,34 @@ def setup(
         search_city = normalize_city(city)
         await _send_hot_offers_list(
             message,
+            state,
+            lang,
+            city,
+            search_city,
+            offer_service,
+            logger,
+        )
+
+    @dp.callback_query(F.data == "hot_offers")
+    async def hot_offers_callback(callback: types.CallbackQuery, state: FSMContext) -> None:
+        """Handle hot offers inline button (e.g., from cart empty state)."""
+        if not callback.from_user or not callback.message:
+            await callback.answer()
+            return
+
+        user_id = callback.from_user.id
+        lang = db.get_user_language(user_id)
+        user = db.get_user_model(user_id)
+        if not user:
+            await callback.answer(get_text(lang, "error"), show_alert=True)
+            return
+
+        city = user.city or "Ташкент"
+        search_city = normalize_city(city)
+
+        await callback.answer()
+        await _send_hot_offers_list(
+            callback.message,
             state,
             lang,
             city,

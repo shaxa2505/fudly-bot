@@ -513,7 +513,7 @@ def setup(
         end_idx = min(start_idx + ITEMS_PER_PAGE, total_count)
         page_offers = all_results[start_idx:end_idx]
 
-        # Build compact list text
+        # Build compact list text with clearer formatting
         lines = []
         for idx, offer in enumerate(page_offers, start=1):
             title = offer.title if hasattr(offer, "title") else offer.get("title", "Товар")
@@ -522,20 +522,25 @@ def setup(
 
             # Format price with spaces
             price_str = f"{int(price):,}".replace(",", " ")
-            qty_text = f"({quantity} шт)" if quantity > 0 else "(нет)" if lang == "ru" else "(yo'q)"
 
-            lines.append(f"<b>{idx}.</b> {title}\n   💰 {price_str} сум {qty_text}")
+            # Quantity with icon
+            if quantity > 10:
+                qty_text = f"✅ {quantity} dona" if lang == "uz" else f"✅ {quantity} шт"
+            elif quantity > 0:
+                qty_text = f"⚠️ {quantity} dona" if lang == "uz" else f"⚠️ {quantity} шт"
+            else:
+                qty_text = "❌ Tugagan" if lang == "uz" else "❌ Нет в наличии"
 
-        # Header
+            lines.append(f"<b>{idx}. {title}</b>\n💰 {price_str} so'm  |  {qty_text}\n")
+
+        # Header - simpler and clearer
         header = (
-            f"📦 <b>Товары по запросу «{query}»</b>\n"
-            f"Показано {start_idx + 1}-{end_idx} из {total_count}\n\n"
-            if lang == "ru"
-            else f"📦 <b>«{query}» bo'yicha mahsulotlar</b>\n"
-            f"{start_idx + 1}-{end_idx} / {total_count} ko'rsatilmoqda\n\n"
+            f"🔍 <b>«{query}»</b>\n" f"📦 Topildi: {total_count}\n\n"
+            if lang == "uz"
+            else f"🔍 <b>«{query}»</b>\n" f"📦 Найдено: {total_count}\n\n"
         )
 
-        text = header + "\n".join(lines)
+        text = header + "".join(lines)
 
         # Create keyboard with inline buttons
         keyboard = search_results_compact_keyboard(lang, page_offers, page, total_pages, query)

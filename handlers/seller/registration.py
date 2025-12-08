@@ -21,6 +21,7 @@ from app.keyboards import (
 from database_protocol import DatabaseProtocol
 from handlers.common.states import RegisterStore
 from handlers.common.utils import (
+    get_appropriate_menu as _get_appropriate_menu,
     get_user_view_mode,
     has_approved_store,
     normalize_city,
@@ -28,15 +29,6 @@ from handlers.common.utils import (
 )
 from localization import get_categories, get_cities, get_text
 from logging_config import logger
-
-
-async def _safe_edit_reply_markup(msg_like, **kwargs) -> None:
-    """Edit reply markup if message is accessible (Message), otherwise ignore."""
-    if isinstance(msg_like, _ai_types.Message):
-        try:
-            await msg_like.edit_reply_markup(**kwargs)
-        except Exception:
-            pass
 
 
 async def _safe_answer_or_send(msg_like, user_id: int, text: str, **kwargs) -> None:
@@ -57,9 +49,9 @@ async def _safe_answer_or_send(msg_like, user_id: int, text: str, **kwargs) -> N
 
 def get_appropriate_menu(user_id: int, lang: str) -> Any:
     """Get appropriate menu based on user view mode."""
-    if db and get_user_view_mode(user_id, db) == "seller":
-        return main_menu_seller(lang)
-    return main_menu_customer(lang)
+    if not db:
+        return main_menu_customer(lang)
+    return _get_appropriate_menu(user_id, lang, db)
 
 
 # Module-level dependencies

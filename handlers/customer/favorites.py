@@ -7,10 +7,10 @@ from aiogram import F, Router, types
 from aiogram.fsm.context import FSMContext
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
-from app.keyboards import city_keyboard, main_menu_customer, main_menu_seller
+from app.keyboards import city_keyboard
 from database_protocol import DatabaseProtocol
 from handlers.common.states import ChangeCity
-from handlers.common.utils import is_main_menu_button
+from handlers.common.utils import get_appropriate_menu as _get_appropriate_menu, is_main_menu_button
 from localization import get_cities, get_text
 from logging_config import logger
 from security import secure_user_input, validator
@@ -18,26 +18,25 @@ from security import secure_user_input, validator
 # Module-level dependencies
 db: DatabaseProtocol | None = None
 bot: Any | None = None
-user_view_mode: dict[int, str] | None = None
 
 router = Router()
 
 
 def setup_dependencies(
-    database: DatabaseProtocol, bot_instance: Any, view_mode_dict: dict[int, str]
+    database: DatabaseProtocol, bot_instance: Any, view_mode_dict: dict[int, str] | None = None
 ) -> None:
-    """Setup module dependencies."""
-    global db, bot, user_view_mode
+    """Setup module dependencies. view_mode_dict is deprecated and ignored."""
+    global db, bot
     db = database
     bot = bot_instance
-    user_view_mode = view_mode_dict
 
 
 def get_appropriate_menu(user_id: int, lang: str) -> Any:
     """Get appropriate menu based on user view mode."""
-    if user_view_mode and user_view_mode.get(user_id) == "seller":
-        return main_menu_seller(lang)
-    return main_menu_customer(lang)
+    if not db:
+        from app.keyboards import main_menu_customer
+        return main_menu_customer(lang)
+    return _get_appropriate_menu(user_id, lang, db)
 
 
 @router.message(F.text.contains("Мой город") | F.text.contains("Mening shahrim"))

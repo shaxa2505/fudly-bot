@@ -1,12 +1,13 @@
 """Customer order history - view past orders and repeat them."""
 from __future__ import annotations
 
-import html
 from typing import Any
 
 from aiogram import F, Router, types
 from aiogram.fsm.context import FSMContext
 from aiogram.utils.keyboard import InlineKeyboardBuilder
+
+from handlers.common.utils import html_escape as _esc
 
 try:
     from logging_config import logger
@@ -30,13 +31,6 @@ def setup_dependencies(database: Any, bot_instance: Any, cart_storage_instance: 
     db = database
     bot = bot_instance
     cart_storage = cart_storage_instance
-
-
-def _esc(val: Any) -> str:
-    """HTML-escape helper."""
-    if val is None:
-        return ""
-    return html.escape(str(val))
 
 
 @router.message(F.text.in_(["📋 Мои заказы", "📋 Buyurtmalarim"]))

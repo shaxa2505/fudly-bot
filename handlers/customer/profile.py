@@ -15,13 +15,16 @@ from app.keyboards import (
     city_inline_keyboard,
     city_keyboard,
     language_keyboard,
-    main_menu_customer,
-    main_menu_seller,
     settings_keyboard,
 )
 from database_protocol import DatabaseProtocol
 from handlers.common.states import ChangeCity
-from handlers.common.utils import get_user_view_mode, has_approved_store, set_user_view_mode
+from handlers.common.utils import (
+    get_appropriate_menu as _get_appropriate_menu,
+    get_user_view_mode,
+    has_approved_store,
+    set_user_view_mode,
+)
 from localization import get_text
 from logging_config import logger
 
@@ -43,9 +46,10 @@ def setup_dependencies(
 
 def get_appropriate_menu(user_id: int, lang: str) -> Any:
     """Get appropriate menu based on user view mode."""
-    if db and get_user_view_mode(user_id, db) == "seller":
-        return main_menu_seller(lang)
-    return main_menu_customer(lang)
+    if not db:
+        from app.keyboards import main_menu_customer
+        return main_menu_customer(lang)
+    return _get_appropriate_menu(user_id, lang, db)
 
 
 @router.message(F.text.contains("Профиль") | F.text.contains("Profil"))

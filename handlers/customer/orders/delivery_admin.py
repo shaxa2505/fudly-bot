@@ -19,6 +19,17 @@ router = Router()
 
 ADMIN_ID = int(os.getenv("ADMIN_ID", "0"))
 
+# Module dependencies (set via setup_dependencies)
+_db: DatabaseProtocol | None = None
+_bot: Any = None
+
+
+def setup_dependencies(database: DatabaseProtocol, bot_instance: Any) -> None:
+    """Setup module dependencies."""
+    global _db, _bot
+    _db = database
+    _bot = bot_instance
+
 
 def _get_order_field(order: Any, field: str, index: int = 0) -> Any:
     """Helper to get field from order dict or tuple."""
@@ -81,19 +92,13 @@ async def admin_confirm_payment(
 
         try:
             cart_items = (
-                json.loads(cart_items_json)
-                if isinstance(cart_items_json, str)
-                else cart_items_json
+                json.loads(cart_items_json) if isinstance(cart_items_json, str) else cart_items_json
             )
         except Exception:
             cart_items = []
 
-        items_list = "\n".join(
-            [f"• {item['title']} × {item['quantity']}" for item in cart_items]
-        )
-        total = (
-            sum(item["price"] * item["quantity"] for item in cart_items) + delivery_price
-        )
+        items_list = "\n".join([f"• {item['title']} × {item['quantity']}" for item in cart_items])
+        total = sum(item["price"] * item["quantity"] for item in cart_items) + delivery_price
     else:
         # Single item order
         offer = db.get_offer(offer_id)
@@ -145,12 +150,8 @@ async def admin_confirm_payment(
 
         # Partner confirmation keyboard
         partner_kb = InlineKeyboardBuilder()
-        partner_kb.button(
-            text=confirm_text, callback_data=f"partner_confirm_order_{order_id}"
-        )
-        partner_kb.button(
-            text=reject_text, callback_data=f"partner_reject_order_{order_id}"
-        )
+        partner_kb.button(text=confirm_text, callback_data=f"partner_confirm_order_{order_id}")
+        partner_kb.button(text=reject_text, callback_data=f"partner_reject_order_{order_id}")
         partner_kb.adjust(2)
 
         try:
