@@ -1,6 +1,7 @@
 """
 Common utilities, constants and middleware.
 """
+import html
 import logging
 from collections.abc import Awaitable, Callable
 from datetime import datetime, timedelta, timezone
@@ -11,6 +12,18 @@ from aiogram import BaseMiddleware
 from database_protocol import DatabaseProtocol
 
 logger = logging.getLogger("fudly")
+
+
+def html_escape(val: Any) -> str:
+    """HTML-escape helper for safe rendering in Telegram messages.
+    
+    Use this instead of defining _esc() in each module.
+    """
+    return html.escape(str(val)) if val else ""
+
+
+# Alias for backward compatibility
+_esc = html_escape
 
 # Re-export states for backward compatibility
 from handlers.common.states import (  # noqa: E402
@@ -43,6 +56,8 @@ __all__ = [
     "Search",
     "Browse",
     # Utils
+    "html_escape",
+    "_esc",  # Alias for backward compatibility
     "user_view_mode",
     "get_user_view_mode",
     "set_user_view_mode",
@@ -222,10 +237,19 @@ def get_appropriate_menu(
     user_id: int,
     lang: str,
     db: DatabaseProtocol,
-    main_menu_seller: Callable[[str], Any],
-    main_menu_customer: Callable[[str], Any],
+    main_menu_seller: Callable[[str], Any] | None = None,
+    main_menu_customer: Callable[[str], Any] | None = None,
 ) -> Any:
-    """Return appropriate menu for user based on their store approval status and current mode."""
+    """Return appropriate menu for user based on their store approval status and current mode.
+    
+    If main_menu_seller/main_menu_customer are not provided, imports them from app.keyboards.
+    """
+    # Import keyboards if not provided (avoids circular imports at module level)
+    if main_menu_seller is None or main_menu_customer is None:
+        from app.keyboards import main_menu_customer as mmc, main_menu_seller as mms
+        main_menu_seller = main_menu_seller or mms
+        main_menu_customer = main_menu_customer or mmc
+    
     user = db.get_user_model(user_id)
     if not user:
         return main_menu_customer(lang)
@@ -342,3 +366,41 @@ class RegistrationCheckMiddleware(BaseMiddleware):
             return
 
         return await handler(event, data)
+
+
+# =============================================================================
+# SAFE MESSAGE HELPERS
+# =============================================================================
+
+
+async def safe_edit_reply_markup(msg_like, **kwargs) -> None:
+    """Edit reply markup if message is accessible (Message), otherwise ignore.
+    
+    Use this instead of defining _safe_edit_reply_markup() in each module.
+    """
+    from aiogram import types as _ai_types
+    if isinstance(msg_like, _ai_types.Message):
+        try:
+            await msg_like.edit_reply_markup(**kwargs)
+        except Exception:
+            pass
+
+
+async def safe_answer_or_send(msg_like, user_id: int, text: str, bot: Any = None, **kwargs) -> None:
+    """Try to answer via message.answer, fallback to bot.send_message.
+    
+    Use this instead of defining _safe_answer_or_send() in each module.
+    """
+    from aiogram import types as _ai_types
+    if isinstance(msg_like, _ai_types.Message):
+        try:
+            await msg_like.answer(text, **kwargs)
+            return
+        except Exception:
+            pass
+    # Fallback to bot-level send
+    if bot:
+        try:
+            await bot.send_message(user_id, text, **kwargs)
+        except Exception:
+            pass
