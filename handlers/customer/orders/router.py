@@ -14,5 +14,5 @@ from . import delivery, delivery_admin, delivery_partner, history
 router = Router(name="customer_orders")
 router.include_router(history.router)
 router.include_router(delivery.router)
-router.include_router(delivery_admin.router)
+router.include_router(delivery_admin.router)  # Admin payment confirmation
 router.include_router(delivery_partner.router)

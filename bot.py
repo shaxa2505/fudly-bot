@@ -399,7 +399,7 @@ def _register_handlers() -> None:
     from handlers.customer.offers import browse as offers_browse
     from handlers.customer.offers import search as offers_search
     from handlers.customer.orders import delivery as orders_delivery
-    from handlers.customer.orders import delivery_admin, orders_router
+    from handlers.customer.orders import orders_router
     from handlers.customer.orders import history as orders_history
     from handlers.seller import (
         analytics,
@@ -463,8 +463,7 @@ def _register_handlers() -> None:
     dp.include_router(profile.router)
     dp.include_router(favorites.router)
     dp.include_router(customer_menu.router)
-    dp.include_router(orders_router)
-    dp.include_router(delivery_admin.router)  # Admin payment confirmations
+    dp.include_router(orders_router)  # Includes delivery_admin.router internally
     dp.include_router(bookings.router)
     dp.include_router(partner.router)
 
