@@ -778,11 +778,9 @@ async def _show_card_payment_details(
 
 
 @router.message(OrderDelivery.payment_proof, F.photo)
-async def dlv_payment_proof(
-    message: types.Message, state: FSMContext, db: DatabaseProtocol, bot: Any
-) -> None:
+async def dlv_payment_proof(message: types.Message, state: FSMContext) -> None:
     """Process payment screenshot."""
-    if not message.from_user:
+    if not message.from_user or not db or not bot:
         return
 
     user_id = message.from_user.id
