@@ -934,7 +934,15 @@ async def _cart_show_card_payment_details(
     await message.answer(text, parse_mode="HTML", reply_markup=kb.as_markup())
 
 
-@router.message(OrderDelivery.payment_proof, F.photo)
+class IsCartOrderFilter:
+    """Filter that checks if current FSM state data has is_cart_order=True."""
+
+    async def __call__(self, message: types.Message, state: FSMContext) -> bool:
+        data = await state.get_data()
+        return data.get("is_cart_order", False)
+
+
+@router.message(OrderDelivery.payment_proof, F.photo, IsCartOrderFilter())
 async def cart_payment_proof(message: types.Message, state: FSMContext) -> None:
     """Process payment screenshot for cart order."""
     if not db or not bot or not message.from_user:
@@ -943,12 +951,6 @@ async def cart_payment_proof(message: types.Message, state: FSMContext) -> None:
     user_id = message.from_user.id
     lang = db.get_user_language(user_id)
     data = await state.get_data()
-
-    is_cart_order = data.get("is_cart_order", False)
-
-    # Only handle cart orders in this handler
-    if not is_cart_order:
-        return
 
     order_id = data.get("order_id")
     cart_items_stored = data.get("cart_items", [])

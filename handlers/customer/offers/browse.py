@@ -304,8 +304,9 @@ def setup(
         else:
             lines.append(f"💰 <b>{int(offer.discount_price):,} {currency}</b>")
 
-        pcs_label = "dona" if lang == "uz" else "шт"
-        lines.append(f"📦 {in_stock_label}: {max_quantity} {pcs_label}")
+        # Use actual unit from offer, fallback to dona/шт
+        unit_label = offer.unit if offer.unit else ("dona" if lang == "uz" else "шт")
+        lines.append(f"📦 {in_stock_label}: {max_quantity} {unit_label}")
         if offer.expiry_date:
             expiry_str = str(offer.expiry_date)[:10]
             try:
@@ -1073,8 +1074,9 @@ def setup(
         else:
             lines.append(f"💰 <b>{int(offer.discount_price):,} {currency}</b>")
 
-        pcs_label = "dona" if lang == "uz" else "шт"
-        lines.append(f"📦 {in_stock_label}: {max_quantity} {pcs_label}")
+        # Use actual unit from offer, fallback to dona/шт
+        unit_label = offer.unit if offer.unit else ("dona" if lang == "uz" else "шт")
+        lines.append(f"📦 {in_stock_label}: {max_quantity} {unit_label}")
         if offer.expiry_date:
             expiry_str = str(offer.expiry_date)[:10]
             try:
