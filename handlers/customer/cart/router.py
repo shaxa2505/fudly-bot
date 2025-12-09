@@ -107,6 +107,19 @@ async def _show_cart_internal(
     lines.append("\n" + "─" * 25)
     lines.append(f"💵 <b>{'JAMI' if lang == 'uz' else 'ИТОГО'}: {total:,} {currency}</b>")
 
+
+async def show_cart(
+    event: types.Message | types.CallbackQuery,
+    state: FSMContext,
+    is_callback: bool = False,
+) -> None:
+    """Public helper to display the current cart.
+
+    Thin wrapper around _show_cart_internal so other modules (e.g. registration)
+    can safely re-open the cart view without depending on a private function.
+    """
+    await _show_cart_internal(event, state, is_callback=is_callback)
+
     # Check delivery availability
     delivery_enabled = any(item.delivery_enabled for item in items)
     delivery_price = max(

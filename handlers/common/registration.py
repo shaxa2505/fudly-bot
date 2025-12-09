@@ -40,15 +40,45 @@ async def process_phone(message: types.Message, state: FSMContext, db: DatabaseP
 
     db.update_user_phone(message.from_user.id, phone)
 
-    # Check if there was a pending order
+    # Check if there was a pending order (Tez buyurtma) or cart checkout
     data = await state.get_data()
     pending_order = data.get("pending_order")
     pending_cart_checkout = data.get("pending_cart_checkout")
 
     from aiogram.types import ReplyKeyboardRemove
 
-    # Handle cart and order pending states
-    if pending_cart_checkout or pending_order:
+    # 1) Pending cart checkout: user started cart checkout without phone
+    if pending_cart_checkout:
+        # Confirm phone saved and hide contact keyboard
+        await message.answer(
+            "✅ Телефон сохранён!" if lang == "ru" else "✅ Telefon saqlandi!",
+            reply_markup=ReplyKeyboardRemove(),
+        )
+
+        # Try to show cart again so user can continue checkout
+        try:
+            from handlers.customer.cart.router import show_cart
+
+            await show_cart(message, state, is_callback=False)
+        except Exception as e:  # pragma: no cover - defensive logging
+            logger.warning(f"Failed to resume cart after phone: {e}")
+            from app.keyboards import main_menu_customer
+
+            await message.answer(
+                (
+                    "Теперь откройте 🛒 Корзина и нажмите «Оформить заказ» заново."
+                    if lang == "ru"
+                    else "Endi 🛒 Savat ni ochib, qayta ‘Buyurtma berish’ ni bosing."
+                ),
+                reply_markup=main_menu_customer(lang),
+            )
+
+        # Clear state – cart flow will set its own FSM state again
+        await state.clear()
+        return
+
+    # 2) Pending single-order / Tez buyurtma flow
+    if pending_order:
         await message.answer(
             "✅ Телефон сохранён!" if lang == "ru" else "✅ Telefon saqlandi!",
             reply_markup=ReplyKeyboardRemove(),
@@ -58,7 +88,6 @@ async def process_phone(message: types.Message, state: FSMContext, db: DatabaseP
         data = await state.get_data()
         offer_id = data.get("offer_id")
         store_id = data.get("store_id")
-        quantity = data.get("selected_qty", 1)
         delivery_method = data.get("selected_delivery")
 
         # Check if we have minimum required data
@@ -68,14 +97,14 @@ async def process_phone(message: types.Message, state: FSMContext, db: DatabaseP
             from app.keyboards import main_menu_customer
 
             await message.answer(
-                "⚠️ Продолжите оформление через 🛒 Корзина или 🔥 Акции"
+                "⚠️ Продолжите оформление через 🔥 Акции"
                 if lang == "ru"
-                else "⚠️ 🛒 Savat yoki 🔥 Aksiyalar orqali davom eting",
+                else "⚠️ 🔥 Aksiyalar orqali davom eting",
                 reply_markup=main_menu_customer(lang),
             )
             return
 
-        # Show confirmation button to continue
+        # Show confirmation button to continue Tez buyurtma
         from aiogram.utils.keyboard import InlineKeyboardBuilder
 
         kb = InlineKeyboardBuilder()
@@ -89,30 +118,6 @@ async def process_phone(message: types.Message, state: FSMContext, db: DatabaseP
             if lang == "ru"
             else "👇 Davom etish uchun tugmani bosing:",
             reply_markup=kb.as_markup(),
-        )
-        return
-
-    if pending_order:
-        # User was trying to place an order but needed to provide phone first
-        # DECISION: Don't try to restore complex state - just show menu and let user start fresh
-        # This is more reliable and better UX than trying to restore potentially corrupted state
-
-        await state.clear()
-
-        from aiogram.types import ReplyKeyboardRemove
-
-        from app.keyboards import main_menu_customer
-
-        await message.answer(
-            "✅ Телефон сохранён!" if lang == "ru" else "✅ Telefon saqlandi!",
-            reply_markup=ReplyKeyboardRemove(),
-        )
-
-        await message.answer(
-            "👇 Теперь выберите товар через меню ниже:"
-            if lang == "ru"
-            else "👇 Endi quyidagi menyudan mahsulot tanlang:",
-            reply_markup=main_menu_customer(lang),
         )
         return
 
