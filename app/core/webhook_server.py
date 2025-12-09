@@ -530,6 +530,12 @@ async def create_webhook_app(
     async def api_create_order(request: web.Request) -> web.Response:
         """POST /api/v1/orders - Create order from Mini App cart."""
         try:
+            from app.services.unified_order_service import (
+                OrderItem as UnifiedOrderItem,
+                OrderResult,
+                get_unified_order_service,
+            )
+
             data = await request.json()
             logger.info(f"API /orders request: {data}")
 
@@ -553,113 +559,209 @@ async def create_webhook_app(
                     web.json_response({"error": "User ID required"}, status=400)
                 )
 
-            # Process each item in cart
-            created_bookings = []
-            failed_items = []
+            is_delivery = delivery_type == "delivery"
 
-            for item in items:
-                offer_id = item.get("id") or item.get("offer_id")
-                quantity = item.get("quantity", 1)
+            # Try unified order service first
+            created_bookings: list[dict[str, Any]] = []
+            failed_items: list[dict[str, Any]] = []
 
-                if not offer_id:
-                    failed_items.append({"item": item, "error": "Missing offer_id"})
-                    continue
+            order_service = get_unified_order_service()
+            if order_service and hasattr(db, "create_cart_order"):
+                order_items: list[UnifiedOrderItem] = []
 
-                try:
-                    # Create booking atomically
-                    result = db.create_booking_atomic(
-                        offer_id=int(offer_id),
-                        user_id=int(user_id),
-                        quantity=int(quantity),
-                        pickup_time=None,
-                        pickup_address=address if delivery_type == "pickup" else None,
+                for item in items:
+                    offer_id = item.get("id") or item.get("offer_id")
+                    quantity = int(item.get("quantity", 1))
+
+                    if not offer_id:
+                        failed_items.append({"item": item, "error": "Missing offer_id"})
+                        continue
+
+                    offer = db.get_offer(int(offer_id)) if hasattr(db, "get_offer") else None
+                    if not offer:
+                        failed_items.append(
+                            {"offer_id": offer_id, "error": "Offer not found"}
+                        )
+                        continue
+
+                    price = int(get_offer_value(offer, "discount_price", 0) or 0)
+                    store_id = int(get_offer_value(offer, "store_id"))
+                    title = get_offer_value(offer, "title", "Товар")
+
+                    store = db.get_store(store_id) if hasattr(db, "get_store") else None
+                    store_name = get_offer_value(store, "name", "") if store else ""
+                    store_address = get_offer_value(store, "address", "") if store else ""
+                    delivery_price = 0
+                    if is_delivery and store:
+                        delivery_price = int(
+                            get_offer_value(store, "delivery_price", 15000) or 15000
+                        )
+
+                    order_items.append(
+                        UnifiedOrderItem(
+                            offer_id=int(offer_id),
+                            store_id=store_id,
+                            title=title,
+                            price=price,
+                            original_price=price,
+                            quantity=quantity,
+                            store_name=store_name,
+                            store_address=store_address,
+                            delivery_price=delivery_price,
+                        )
                     )
 
-                    # Handle result (3 or 4 tuple)
-                    if len(result) == 4:
-                        ok, booking_id, booking_code, error_reason = result
-                    else:
-                        ok, booking_id, booking_code = result
-                        error_reason = None
+                try:
+                    result: OrderResult = await order_service.create_order(
+                        user_id=int(user_id),
+                        items=order_items,
+                        order_type="delivery" if is_delivery else "pickup",
+                        delivery_address=address if is_delivery else None,
+                        payment_method="card",
+                        notify_customer=False,
+                        notify_sellers=False,
+                    )
+                except Exception as e:  # pragma: no cover - defensive
+                    logger.error(f"Unified order service failed for mini app order: {e}")
+                    result = None
 
-                    if ok and booking_id:
-                        created_bookings.append(
-                            {
-                                "booking_id": booking_id,
-                                "booking_code": booking_code,
-                                "offer_id": offer_id,
-                                "quantity": quantity,
-                            }
-                        )
-
-                        # Send notification to seller
-                        try:
-                            offer = (
-                                db.get_offer(int(offer_id)) if hasattr(db, "get_offer") else None
+                if result and result.success:
+                    # For compatibility this endpoint still returns bookings-style data
+                    if is_delivery:
+                        for item_obj, oid in zip(order_items, result.order_ids):
+                            created_bookings.append(
+                                {
+                                    "booking_id": oid,
+                                    "booking_code": None,
+                                    "offer_id": item_obj.offer_id,
+                                    "quantity": item_obj.quantity,
+                                }
                             )
-                            if offer:
-                                store_id = get_offer_value(offer, "store_id")
-                                if store_id and hasattr(db, "get_store"):
-                                    store = db.get_store(store_id)
-                                    if store:
-                                        seller_id = get_offer_value(
-                                            store, "owner_id"
-                                        ) or get_offer_value(store, "user_id")
-                                        if seller_id:
-                                            title = get_offer_value(offer, "title", "Товар")
-                                            price = get_offer_value(offer, "discount_price", 0)
-
-                                            # Format notification message
-                                            msg = (
-                                                f"🛒 <b>Новый заказ из Mini App!</b>\n\n"
-                                                f"📦 Товар: {title}\n"
-                                                f"🔢 Количество: {quantity}\n"
-                                                f"💰 Сумма: {int(price * quantity):,} сум\n"
-                                                f"🎫 Код: <code>{booking_code}</code>\n\n"
-                                                f"📱 Телефон: {phone or 'не указан'}\n"
-                                                f"🚚 Тип: {'Самовывоз' if delivery_type == 'pickup' else 'Доставка'}\n"
-                                            )
-                                            if address:
-                                                msg += f"📍 Адрес: {address}\n"
-                                            if notes:
-                                                msg += f"📝 Примечание: {notes}\n"
-
-                                            # Create inline keyboard for seller actions
-                                            # Use explicit booking_ prefix since this creates BOOKING (pickup)
-                                            keyboard = InlineKeyboardMarkup(
-                                                inline_keyboard=[
-                                                    [
-                                                        InlineKeyboardButton(
-                                                            text="✅ Принять",
-                                                            callback_data=f"booking_confirm_{booking_id}",
-                                                        ),
-                                                        InlineKeyboardButton(
-                                                            text="❌ Отклонить",
-                                                            callback_data=f"booking_reject_{booking_id}",
-                                                        ),
-                                                    ]
-                                                ]
-                                            )
-
-                                            # Send via bot with keyboard
-                                            await bot.send_message(
-                                                chat_id=int(seller_id),
-                                                text=msg,
-                                                parse_mode="HTML",
-                                                reply_markup=keyboard,
-                                            )
-                                            logger.info(f"Notification sent to seller {seller_id}")
-                        except Exception as notify_err:
-                            logger.warning(f"Failed to notify seller: {notify_err}")
-
                     else:
-                        failed_items.append(
-                            {"offer_id": offer_id, "error": error_reason or "Booking failed"}
+                        for item_obj, bid in zip(order_items, result.booking_ids):
+                            created_bookings.append(
+                                {
+                                    "booking_id": bid,
+                                    "booking_code": None,
+                                    "offer_id": item_obj.offer_id,
+                                    "quantity": item_obj.quantity,
+                                }
+                            )
+
+            # Fallback: legacy per-item booking creation
+            if not created_bookings and not failed_items:
+                for item in items:
+                    offer_id = item.get("id") or item.get("offer_id")
+                    quantity = item.get("quantity", 1)
+
+                    if not offer_id:
+                        failed_items.append({"item": item, "error": "Missing offer_id"})
+                        continue
+
+                    try:
+                        result = db.create_booking_atomic(
+                            offer_id=int(offer_id),
+                            user_id=int(user_id),
+                            quantity=int(quantity),
+                            pickup_time=None,
+                            pickup_address=address if delivery_type == "pickup" else None,
                         )
 
-                except Exception as item_err:
-                    logger.error(f"Error processing item {offer_id}: {item_err}")
-                    failed_items.append({"offer_id": offer_id, "error": str(item_err)})
+                        # Handle result (3 or 4 tuple)
+                        if len(result) == 4:
+                            ok, booking_id, booking_code, error_reason = result
+                        else:
+                            ok, booking_id, booking_code = result
+                            error_reason = None
+
+                        if ok and booking_id:
+                            created_bookings.append(
+                                {
+                                    "booking_id": booking_id,
+                                    "booking_code": booking_code,
+                                    "offer_id": offer_id,
+                                    "quantity": quantity,
+                                }
+                            )
+
+                            # Send notification to seller
+                            try:
+                                offer = (
+                                    db.get_offer(int(offer_id))
+                                    if hasattr(db, "get_offer")
+                                    else None
+                                )
+                                if offer:
+                                    store_id = get_offer_value(offer, "store_id")
+                                    if store_id and hasattr(db, "get_store"):
+                                        store = db.get_store(store_id)
+                                        if store:
+                                            seller_id = get_offer_value(
+                                                store, "owner_id"
+                                            ) or get_offer_value(store, "user_id")
+                                            if seller_id:
+                                                title = get_offer_value(
+                                                    offer, "title", "Товар"
+                                                )
+                                                price = get_offer_value(
+                                                    offer, "discount_price", 0
+                                                )
+
+                                                # Format notification message
+                                                msg = (
+                                                    f"🛒 <b>Новый заказ из Mini App!</b>\n\n"
+                                                    f"📦 Товар: {title}\n"
+                                                    f"🔢 Количество: {quantity}\n"
+                                                    f"💰 Сумма: {int(price * quantity):,} сум\n"
+                                                    f"🎫 Код: <code>{booking_code}</code>\n\n"
+                                                    f"📱 Телефон: {phone or 'не указан'}\n"
+                                                    f"🚚 Тип: {'Самовывоз' if delivery_type == 'pickup' else 'Доставка'}\n"
+                                                )
+                                                if address:
+                                                    msg += f"📍 Адрес: {address}\n"
+                                                if notes:
+                                                    msg += f"📝 Примечание: {notes}\n"
+
+                                                keyboard = InlineKeyboardMarkup(
+                                                    inline_keyboard=[
+                                                        [
+                                                            InlineKeyboardButton(
+                                                                text="✅ Принять",
+                                                                callback_data=f"booking_confirm_{booking_id}",
+                                                            ),
+                                                            InlineKeyboardButton(
+                                                                text="❌ Отклонить",
+                                                                callback_data=f"booking_reject_{booking_id}",
+                                                            ),
+                                                        ]
+                                                    ]
+                                                )
+
+                                                await bot.send_message(
+                                                    chat_id=int(seller_id),
+                                                    text=msg,
+                                                    parse_mode="HTML",
+                                                    reply_markup=keyboard,
+                                                )
+                                                logger.info(
+                                                    f"Notification sent to seller {seller_id}"
+                                                )
+                            except Exception as notify_err:
+                                logger.warning(
+                                    f"Failed to notify seller: {notify_err}"
+                                )
+
+                        else:
+                            failed_items.append(
+                                {
+                                    "offer_id": offer_id,
+                                    "error": error_reason or "Booking failed",
+                                }
+                            )
+
+                    except Exception as item_err:
+                        logger.error(f"Error processing item {offer_id}: {item_err}")
+                        failed_items.append({"offer_id": offer_id, "error": str(item_err)})
 
             # Return result
             response = {

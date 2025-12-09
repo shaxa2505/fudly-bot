@@ -23,6 +23,7 @@ from aiogram.utils.keyboard import InlineKeyboardBuilder
 from app.core.constants import OFFERS_PER_PAGE
 from app.core.utils import get_offer_field, get_store_field
 from app.keyboards import main_menu_customer
+from app.services.unified_order_service import OrderItem, get_unified_order_service
 from database_protocol import DatabaseProtocol
 from handlers.common.states import OrderDelivery
 from handlers.common.utils import (
@@ -457,16 +458,59 @@ async def dlv_use_saved_address(
     quantity = data.get("quantity", 1)
     delivery_price = data.get("delivery_price", 0)
 
-    order_id = db.create_order(
-        user_id=user_id,
-        store_id=store_id,
-        offer_id=offer_id,
-        quantity=quantity,
-        order_type="delivery",
-        delivery_address=saved_address,
-        delivery_price=delivery_price,
-        payment_method="pending",
-    )
+    order_id: int | None = None
+    used_legacy_create = False
+
+    order_service = get_unified_order_service()
+    if order_service and hasattr(db, "create_cart_order") and offer_id and store_id:
+        try:
+            offer = db.get_offer(offer_id)
+            store = db.get_store(store_id)
+
+            title = get_offer_field(offer, "title", "")
+            price = get_offer_field(offer, "discount_price", 0)
+            store_name = get_store_field(store, "name", "")
+            store_address = get_store_field(store, "address", "")
+
+            order_item = OrderItem(
+                offer_id=int(offer_id),
+                store_id=int(store_id),
+                title=title,
+                price=int(price),
+                original_price=int(price),
+                quantity=int(quantity),
+                store_name=store_name,
+                store_address=store_address,
+                delivery_price=int(delivery_price),
+            )
+
+            result = await order_service.create_order(
+                user_id=user_id,
+                items=[order_item],
+                order_type="delivery",
+                delivery_address=saved_address,
+                payment_method="pending",
+                notify_customer=False,
+                notify_sellers=False,
+            )
+            if result.success and result.order_ids:
+                order_id = result.order_ids[0]
+        except Exception as e:
+            logger.error(f"Failed to create unified delivery order (saved address): {e}")
+
+    if not order_id:
+        # Fallback to legacy single-order creation for environments without unified service
+        order_id = db.create_order(
+            user_id=user_id,
+            store_id=store_id,
+            offer_id=offer_id,
+            quantity=quantity,
+            order_type="delivery",
+            delivery_address=saved_address,
+            delivery_price=delivery_price,
+            payment_method="pending",
+        )
+        used_legacy_create = True
 
     if not order_id:
         msg = "❌ Xatolik" if lang == "uz" else "❌ Ошибка"
@@ -477,11 +521,12 @@ async def dlv_use_saved_address(
 
     logger.info(f"✅ Created order #{order_id} with saved address for user {user_id}")
 
-    # Decrement quantity
-    try:
-        db.increment_offer_quantity_atomic(offer_id, -int(quantity))
-    except Exception as e:
-        logger.error(f"Failed to decrement offer: {e}")
+    # Decrement quantity only for legacy path; unified service already updates stock
+    if used_legacy_create:
+        try:
+            db.increment_offer_quantity_atomic(offer_id, -int(quantity))
+        except Exception as e:
+            logger.error(f"Failed to decrement offer: {e}")
 
     # Save order_id and go to payment
     await state.update_data(order_id=order_id)
@@ -638,20 +683,63 @@ async def dlv_address_input(message: types.Message, state: FSMContext) -> None:
     user_id = message.from_user.id
 
     # CREATE ORDER NOW (before payment selection) - prevents FSM data loss
-    try:
-        order_id = db.create_order(
-            user_id=user_id,
-            store_id=store_id,
-            offer_id=offer_id,
-            quantity=quantity,
-            order_type="delivery",
-            delivery_address=text,
-            delivery_price=delivery_price,
-            payment_method="pending",  # Will be updated when payment selected
-        )
-    except Exception as e:
-        logger.error(f"Error creating delivery order: {e}", exc_info=True)
-        order_id = None
+    order_id: int | None = None
+    used_legacy_create = False
+
+    order_service = get_unified_order_service()
+    if order_service and hasattr(db, "create_cart_order") and offer_id and store_id:
+        try:
+            offer = db.get_offer(offer_id)
+            store = db.get_store(store_id)
+
+            title = get_offer_field(offer, "title", "")
+            price = get_offer_field(offer, "discount_price", 0)
+            store_name = get_store_field(store, "name", "")
+            store_address = get_store_field(store, "address", "")
+
+            order_item = OrderItem(
+                offer_id=int(offer_id),
+                store_id=int(store_id),
+                title=title,
+                price=int(price),
+                original_price=int(price),
+                quantity=int(quantity),
+                store_name=store_name,
+                store_address=store_address,
+                delivery_price=int(delivery_price),
+            )
+
+            result = await order_service.create_order(
+                user_id=user_id,
+                items=[order_item],
+                order_type="delivery",
+                delivery_address=text,
+                payment_method="pending",  # Will be updated when payment selected
+                notify_customer=False,
+                notify_sellers=False,
+            )
+            if result.success and result.order_ids:
+                order_id = result.order_ids[0]
+        except Exception as e:
+            logger.error(f"Error creating unified delivery order: {e}", exc_info=True)
+
+    if not order_id:
+        # Fallback to legacy single-order creation
+        try:
+            order_id = db.create_order(
+                user_id=user_id,
+                store_id=store_id,
+                offer_id=offer_id,
+                quantity=quantity,
+                order_type="delivery",
+                delivery_address=text,
+                delivery_price=delivery_price,
+                payment_method="pending",  # Will be updated when payment selected
+            )
+            used_legacy_create = True
+        except Exception as e:
+            logger.error(f"Error creating delivery order: {e}", exc_info=True)
+            order_id = None
 
     if not order_id:
         msg = "❌ Xatolik" if lang == "uz" else "❌ Ошибка создания заказа"
@@ -661,11 +749,12 @@ async def dlv_address_input(message: types.Message, state: FSMContext) -> None:
 
     logger.info(f"✅ Created order #{order_id} after address input (before payment)")
 
-    # Decrement quantity immediately
-    try:
-        db.increment_offer_quantity_atomic(offer_id, -int(quantity))
-    except Exception as e:
-        logger.error(f"Failed to decrement offer: {e}")
+    # Decrement quantity only for legacy path; unified service already updates stock
+    if used_legacy_create:
+        try:
+            db.increment_offer_quantity_atomic(offer_id, -int(quantity))
+        except Exception as e:
+            logger.error(f"Failed to decrement offer: {e}")
 
     # Save order_id in FSM
     await state.update_data(order_id=order_id)
