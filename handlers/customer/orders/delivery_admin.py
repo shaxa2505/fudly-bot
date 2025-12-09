@@ -59,7 +59,7 @@ async def admin_confirm_payment(
         return
 
     db.update_payment_status(order_id, "confirmed")
-    db.update_order_status(order_id, "confirmed")
+    db.update_order_status(order_id, "pending")  # Keep as pending until seller confirms
 
     # Get details
     store_id = _get_order_field(order, "store_id", 2)

@@ -45,6 +45,9 @@ class OrderMixin:
 
         Returns:
             order_id if successful, None otherwise
+            
+        TODO: This method has no transaction protection and no stock checking!
+        Should use create_cart_order() instead which has atomic stock reservation.
         """
         with self.get_connection() as conn:
             cursor = conn.cursor()
@@ -372,23 +375,22 @@ class OrderMixin:
                     (status, order_id),
                 )
 
-    def update_order_status(self, order_id: int, order_status: str, payment_status: str = None):
-        """Update order status."""
+    def update_order_status(self, order_id: int, order_status: str) -> bool:
+        """Update order status.
+        
+        NOTE: This method only updates order_status field.
+        Use update_payment_status() to update payment_status separately.
+        
+        Returns:
+            True if update was successful
+        """
         with self.get_connection() as conn:
             cursor = conn.cursor()
-            if payment_status:
-                cursor.execute(
-                    """
-                    UPDATE orders SET order_status = %s, payment_status = %s
-                    WHERE order_id = %s
-                """,
-                    (order_status, payment_status, order_id),
-                )
-            else:
-                cursor.execute(
-                    "UPDATE orders SET order_status = %s WHERE order_id = %s",
-                    (order_status, order_id),
-                )
+            cursor.execute(
+                "UPDATE orders SET order_status = %s WHERE order_id = %s",
+                (order_status, order_id),
+            )
+            return True
 
     def set_order_customer_message_id(self, order_id: int, message_id: int) -> bool:
         """Save customer notification message_id for live updates."""

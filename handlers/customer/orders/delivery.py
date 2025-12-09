@@ -453,6 +453,7 @@ async def dlv_use_saved_address(
     await state.update_data(address=saved_address)
 
     # CREATE ORDER NOW (same as in dlv_address_input)
+    # FIXED: Removed double stock decrement - unified_order_service handles it
     offer_id = data.get("offer_id")
     store_id = data.get("store_id")
     quantity = data.get("quantity", 1)
@@ -521,12 +522,8 @@ async def dlv_use_saved_address(
 
     logger.info(f"✅ Created order #{order_id} with saved address for user {user_id}")
 
-    # Decrement quantity only for legacy path; unified service already updates stock
-    if used_legacy_create:
-        try:
-            db.increment_offer_quantity_atomic(offer_id, -int(quantity))
-        except Exception as e:
-            logger.error(f"Failed to decrement offer: {e}")
+    # NOTE: Stock is decremented by unified_order_service or in create_order/create_cart_order
+    # No need to decrement here to avoid double decrement
 
     # Save order_id and go to payment
     await state.update_data(order_id=order_id)
@@ -749,12 +746,8 @@ async def dlv_address_input(message: types.Message, state: FSMContext) -> None:
 
     logger.info(f"✅ Created order #{order_id} after address input (before payment)")
 
-    # Decrement quantity only for legacy path; unified service already updates stock
-    if used_legacy_create:
-        try:
-            db.increment_offer_quantity_atomic(offer_id, -int(quantity))
-        except Exception as e:
-            logger.error(f"Failed to decrement offer: {e}")
+    # NOTE: Stock is decremented by unified_order_service or in create_order/create_cart_order
+    # No need to decrement here to avoid double decrement
 
     # Save order_id in FSM
     await state.update_data(order_id=order_id)
