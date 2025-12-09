@@ -897,15 +897,23 @@ async def dlv_payment_proof(
     order_id = data.get("order_id")
     
     if not order_id:
-        # Fallback: try to find pending order for this user
+        # Fallback: try to find pending order for this user (without payment screenshot)
         logger.warning(f"⚠️ User {user_id} has no order_id in FSM, checking for pending orders")
         try:
             pending_orders = db.get_user_orders(user_id)
             for o in (pending_orders or []):
-                status = o.get("order_status") if isinstance(o, dict) else (o[10] if len(o) > 10 else None)
-                payment = o.get("payment_status") if isinstance(o, dict) else (o[11] if len(o) > 11 else None)
-                if status == "pending" and payment is None:
-                    order_id = o.get("order_id") if isinstance(o, dict) else o[0]
+                if isinstance(o, dict):
+                    status = o.get("order_status")
+                    payment_photo = o.get("payment_proof_photo_id")
+                    oid = o.get("order_id")
+                else:
+                    status = o[10] if len(o) > 10 else None
+                    payment_photo = o[12] if len(o) > 12 else None  # payment_proof_photo_id
+                    oid = o[0]
+                
+                # Find pending order without payment screenshot
+                if status == "pending" and not payment_photo:
+                    order_id = oid
                     logger.info(f"✅ Found pending order #{order_id} for user {user_id}")
                     break
         except Exception as e:
