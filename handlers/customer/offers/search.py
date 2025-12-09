@@ -289,9 +289,9 @@ def setup(
         lang = db.get_user_language(message.from_user.id)
 
         await state.set_state(Search.query)
-        await message.answer(
-            get_text(lang, "enter_search_query"), reply_markup=search_cancel_keyboard(lang)
-        )
+        # Simple search prompt
+        prompt = "🔍 Nimani qidiryapsiz?" if lang == "uz" else "🔍 Что ищете?"
+        await message.answer(prompt, reply_markup=search_cancel_keyboard(lang))
 
     @dp.message(Search.query)
     async def process_search_query(message: types.Message, state: FSMContext):
@@ -412,21 +412,8 @@ def setup(
                 if lang == "ru"
                 else "😔 Hech narsa topilmadi\n\nBoshqa so'z bilan qidirib ko'ring"
             )
-            await message.answer(
-                no_results_msg, parse_mode="HTML", reply_markup=menu_customer(lang)
-            )
+            await message.answer(no_results_msg, reply_markup=menu_customer(lang))
             return
-
-        # Show results - compact
-        result_msg = f"🔍 «{query}» - " if lang == "ru" else f"🔍 «{query}» - "
-        parts = []
-        if store_results:
-            parts.append(f"🏪 {len(store_results)}")
-        if all_results:
-            parts.append(f"📦 {len(all_results)}")
-        result_msg += ", ".join(parts)
-
-        await message.answer(result_msg, parse_mode="HTML", reply_markup=menu_customer(lang))
 
         # Save search results to FSM for pagination
         await state.update_data(
@@ -513,34 +500,23 @@ def setup(
         end_idx = min(start_idx + ITEMS_PER_PAGE, total_count)
         page_offers = all_results[start_idx:end_idx]
 
-        # Build compact list text with clearer formatting
+        # Build simple list
         lines = []
         for idx, offer in enumerate(page_offers, start=1):
             title = offer.title if hasattr(offer, "title") else offer.get("title", "Товар")
             price = getattr(offer, "discount_price", 0) or getattr(offer, "price", 0)
             quantity = getattr(offer, "quantity", 0)
 
-            # Format price with spaces
+            # Format price
             price_str = f"{int(price):,}".replace(",", " ")
+            qty_icon = "✅" if quantity > 0 else "❌"
 
-            # Quantity with icon
-            if quantity > 10:
-                qty_text = f"✅ {quantity} dona" if lang == "uz" else f"✅ {quantity} шт"
-            elif quantity > 0:
-                qty_text = f"⚠️ {quantity} dona" if lang == "uz" else f"⚠️ {quantity} шт"
-            else:
-                qty_text = "❌ Tugagan" if lang == "uz" else "❌ Нет в наличии"
+            lines.append(f"{idx}. {title}\n💰 {price_str} | {qty_icon} {quantity}\n")
 
-            lines.append(f"<b>{idx}. {title}</b>\n💰 {price_str} so'm  |  {qty_text}\n")
+        # Simple header
+        header = f"«{query}»\n📦 Topildi: {total_count}\n\n" if lang == "uz" else f"«{query}»\n📦 Найдено: {total_count}\n\n"
 
-        # Header - simpler and clearer
-        header = (
-            f"🔍 <b>«{query}»</b>\n" f"📦 Topildi: {total_count}\n\n"
-            if lang == "uz"
-            else f"🔍 <b>«{query}»</b>\n" f"📦 Найдено: {total_count}\n\n"
-        )
-
-        text = header + "".join(lines)
+        text = header + "\n".join(lines)
 
         # Create keyboard with inline buttons
         keyboard = search_results_compact_keyboard(lang, page_offers, page, total_pages, query)
