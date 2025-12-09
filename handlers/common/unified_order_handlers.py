@@ -928,15 +928,19 @@ async def customer_received_handler(callback: types.CallbackQuery) -> None:
 
     # Check order status allows completion
     # Valid: DELIVERING (for delivery), PREPARING (for pickup-style orders), or legacy "confirmed"
-    current_status = _get_entity_field(order, "status")
+    current_status = _get_entity_field(order, "order_status") or _get_entity_field(order, "status")
+    logger.info(f"customer_received_handler: order #{order_id}, current_status={current_status}")
     valid_statuses = (
         OrderStatus.DELIVERING,
         OrderStatus.PREPARING,
+        OrderStatus.READY,
         "delivering",
         "preparing",
+        "ready",
         "confirmed",  # Legacy status
     )
     if current_status not in valid_statuses:
+        logger.warning(f"customer_received_handler: order #{order_id} status {current_status} not in {valid_statuses}")
         msg = "Buyurtma allaqachon yakunlangan" if lang == "uz" else "Заказ уже завершён"
         await callback.answer(msg, show_alert=True)
         return
