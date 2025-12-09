@@ -30,11 +30,14 @@ ALLOWED_FILES = {
     "app/services/order_service.py",  # legacy
     # Customer flows that show payment / immediate confirmation
     "handlers/customer/cart/payment.py",
+    "handlers/customer/cart/checkout.py",  # mentions text only in comment
     "handlers/customer/orders/delivery.py",
     # WebApp / Mini App integrations
     "app/api/webapp/routes_orders.py",
     "handlers/common/webapp.py",
     "bot.py",  # legacy Mini App callbacks
+    # This test module itself (contains phrases in constants)
+    "tests/test_order_notification_texts.py",
 }
 
 

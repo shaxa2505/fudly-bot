@@ -90,6 +90,9 @@ def test_direct_status_operations_only_in_allowed_files(needle: str, allowed: se
         text = path.read_text(encoding="utf-8")
         if needle in text:
             rel = path.relative_to(ROOT).as_posix()
+            # This guard test itself naturally contains the needles in constants.
+            if rel == "tests/test_status_update_guards.py":
+                continue
             if rel not in allowed:
                 offenders.append(rel)
 

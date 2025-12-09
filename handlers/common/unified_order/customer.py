@@ -100,6 +100,13 @@ async def customer_received_handler(callback: types.CallbackQuery) -> None:
         await callback.answer("❌", show_alert=True)
         return
 
+    # Determine order type for proper completion template
+    order_type = _get_entity_field(order, "order_type")
+    if not order_type:
+        # Fallback: infer from delivery_address presence
+        delivery_address = _get_entity_field(order, "delivery_address")
+        order_type = "delivery" if delivery_address else "pickup"
+
     store_id = _get_entity_field(order, "store_id")
     store = db_instance.get_store(store_id) if store_id else None
     store_name = _get_store_field(store, "name", "")
@@ -108,7 +115,7 @@ async def customer_received_handler(callback: types.CallbackQuery) -> None:
         lang=lang,
         order_id=order_id,
         status=OrderStatus.COMPLETED,
-        order_type="delivery",
+        order_type=order_type,
         store_name=store_name,
     )
 

@@ -1167,11 +1167,15 @@ class UnifiedOrderService:
                     kb.button(text=received_text, callback_data=f"customer_received_{entity_id}")
                     reply_markup = kb.as_markup()
                 elif target_status == OrderStatus.PREPARING and order_type == "pickup":
-                    # "Received" button for pickup bookings when preparing
-                    # Customer can mark as received when they pick up the order
+                    # "Received" button for pickup orders/bookings when preparing
+                    # For legacy bookings we keep booking_received_, for cart orders
+                    # we use customer_received_ so the handler reads from orders table.
                     kb = InlineKeyboardBuilder()
                     received_text = "✅ Oldim" if customer_lang == "uz" else "✅ Получил"
-                    kb.button(text=received_text, callback_data=f"booking_received_{entity_id}")
+                    callback_prefix = (
+                        "booking_received_" if entity_type == "booking" else "customer_received_"
+                    )
+                    kb.button(text=received_text, callback_data=f"{callback_prefix}{entity_id}")
                     reply_markup = kb.as_markup()
 
                 # Try to EDIT existing message first (live status update)
