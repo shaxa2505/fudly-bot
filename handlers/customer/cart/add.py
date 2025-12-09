@@ -320,6 +320,14 @@ def register(router: Router) -> None:
         )
         await callback.answer(popup_text, show_alert=False)
 
+        # After adding, show the store's offer list again
+        if store_id is not None:
+            try:
+                await _show_store_offers(callback, state, int(store_id), lang)
+            except Exception:
+                # Fallback: just clear state if showing offers fails
+                pass
+
         await state.clear()
 
     @router.callback_query(F.data.startswith("cart_add_cancel_"))
@@ -341,20 +349,15 @@ def register(router: Router) -> None:
     async def cart_noop(callback: types.CallbackQuery) -> None:
         await callback.answer()
 
-    @router.callback_query(F.data.startswith("continue_shopping_"))
-    async def continue_shopping(callback: types.CallbackQuery, state: FSMContext) -> None:
-        if not common.db or not callback.message or not callback.data:
-            await callback.answer()
-            return
-
-        try:
-            store_id = int(callback.data.split("_")[-1])
-        except (ValueError, IndexError):
+    async def _show_store_offers(
+        callback: types.CallbackQuery, state: FSMContext, store_id: int, lang: str
+    ) -> None:
+        """Show offers list for a given store (used after add and from button)."""
+        if not common.db or not callback.message:
             await callback.answer()
             return
 
         user_id = callback.from_user.id
-        lang = common.db.get_user_language(user_id)
 
         store = common.db.get_store(store_id)
         if not store:
@@ -468,3 +471,20 @@ def register(router: Router) -> None:
             await callback.message.answer(text, parse_mode="HTML", reply_markup=kb.as_markup())
 
         await callback.answer()
+
+    @router.callback_query(F.data.startswith("continue_shopping_"))
+    async def continue_shopping(callback: types.CallbackQuery, state: FSMContext) -> None:
+        if not common.db or not callback.message or not callback.data:
+            await callback.answer()
+            return
+
+        try:
+            store_id = int(callback.data.split("_")[-1])
+        except (ValueError, IndexError):
+            await callback.answer()
+            return
+
+        user_id = callback.from_user.id
+        lang = common.db.get_user_language(user_id)
+
+        await _show_store_offers(callback, state, store_id, lang)

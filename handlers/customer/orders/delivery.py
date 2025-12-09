@@ -551,10 +551,23 @@ async def dlv_new_address(
 
     text += hint
 
-    # Keyboard with just cancel
+    # Keyboard: Back to address options + full cancel
     kb = InlineKeyboardBuilder()
+    try:
+        offer_id = int((callback.data or "").split("_")[-1])
+    except (ValueError, IndexError):
+        offer_id = 0
+
+    back_text = "⬅️ Orqaga" if lang == "uz" else "⬅️ Назад"
     cancel_text = "❌ Bekor" if lang == "uz" else "❌ Отмена"
+    if offer_id:
+        kb.button(text=back_text, callback_data=f"dlv_back_address_{offer_id}")
     kb.button(text=cancel_text, callback_data="dlv_cancel")
+
+    if offer_id:
+        kb.adjust(1, 1)
+    else:
+        kb.adjust(1)
 
     try:
         if callback.message.photo:
