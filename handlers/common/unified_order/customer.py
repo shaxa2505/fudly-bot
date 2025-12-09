@@ -18,6 +18,13 @@ from app.services.unified_order_service import (
 from .common import _get_db, _get_store_field, _get_entity_field, logger
 
 
+# Public callback patterns used for customer "received" buttons.
+# Having them as constants allows tests to verify that they
+# actually match simple ids like "customer_received_123".
+CUSTOMER_RECEIVED_PATTERN = r"^customer_received_(\d+)$"
+BOOKING_RECEIVED_PATTERN = r"^booking_received_(\d+)$"
+
+
 async def customer_received_handler(callback: types.CallbackQuery) -> None:
     """Customer confirms they received a delivery order."""
 
@@ -230,8 +237,8 @@ def register(router: Router) -> None:
     """Register all customer-side unified order handlers on the router."""
 
     router.callback_query.register(
-        customer_received_handler, F.data.regexp(r"^customer_received_(\d+)$")
+        customer_received_handler, F.data.regexp(CUSTOMER_RECEIVED_PATTERN)
     )
     router.callback_query.register(
-        booking_received_handler, F.data.regexp(r"^booking_received_(\d+)$")
+        booking_received_handler, F.data.regexp(BOOKING_RECEIVED_PATTERN)
     )
