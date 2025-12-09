@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 from aiogram import F, Router, types
-from aiogram.exceptions import SkipHandler
+from aiogram.filters import BaseFilter
 from aiogram.fsm.context import FSMContext
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
@@ -10,6 +10,14 @@ from handlers.common.states import OrderDelivery
 
 from .common import esc
 from . import common
+
+
+class IsCartOrder(BaseFilter):
+    """Filter messages for which current FSM data indicates cart delivery flow."""
+
+    async def __call__(self, message: types.Message, state: FSMContext) -> bool:  # type: ignore[override]
+        data = await state.get_data()
+        return bool(data.get("is_cart_order"))
 
 
 def register(router: Router) -> None:
@@ -95,7 +103,7 @@ def register(router: Router) -> None:
 
         await callback.answer()
 
-    @router.message(OrderDelivery.address)
+    @router.message(OrderDelivery.address, IsCartOrder())
     async def cart_process_delivery_address(message: types.Message, state: FSMContext) -> None:
         if not common.db or not message.from_user or not message.text:
             return
@@ -105,11 +113,6 @@ def register(router: Router) -> None:
         delivery_address = message.text.strip()
 
         data = await state.get_data()
-        is_cart_order = data.get("is_cart_order", False)
-
-        # If this is not a cart delivery flow, let other handlers process it
-        if not is_cart_order:
-            raise SkipHandler()
 
         cart_items_stored = data.get("cart_items", [])
         store_id = data.get("store_id")
