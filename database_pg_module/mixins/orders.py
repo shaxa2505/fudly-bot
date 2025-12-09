@@ -228,13 +228,13 @@ class OrderMixin:
                         failed_items.append(item)
                         continue
 
-                    # Try with pickup_code first, fallback to without if column doesn't exist
+                    # Try with pickup_code + order_type first, fallback to legacy schemas
                     try:
                         cursor.execute(
                             """
                             INSERT INTO orders (user_id, store_id, offer_id, quantity, delivery_address,
-                                              total_price, payment_method, payment_status, order_status, pickup_code)
-                            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                                              total_price, payment_method, payment_status, order_status, pickup_code, order_type)
+                            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                             RETURNING order_id
                             """,
                             (
@@ -248,11 +248,15 @@ class OrderMixin:
                                 "pending",
                                 "pending",
                                 pickup_code,
+                                order_type,
                             ),
                         )
                     except Exception as e:
-                        if "pickup_code" in str(e):
-                            logger.warning(f"pickup_code column missing, trying without: {e}")
+                        # Older schemas may not have pickup_code or order_type columns
+                        if "pickup_code" in str(e) or "order_type" in str(e):
+                            logger.warning(
+                                f"pickup_code/order_type column missing, trying without: {e}"
+                            )
                             cursor.execute(
                                 """
                                 INSERT INTO orders (user_id, store_id, offer_id, quantity, delivery_address,
