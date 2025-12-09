@@ -850,6 +850,7 @@ async def pbook_confirm(callback: types.CallbackQuery, state: FSMContext) -> Non
             delivery_price=delivery_price,
             saved_address=saved_address,
             offer_photo=data.get("offer_photo"),
+            order_type="delivery",  # FIXED: Explicitly mark as delivery order
         )
         await state.set_state(OrderDelivery.address)
 

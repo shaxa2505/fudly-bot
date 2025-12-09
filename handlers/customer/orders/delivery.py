@@ -452,83 +452,13 @@ async def dlv_use_saved_address(
 
     await state.update_data(address=saved_address)
 
-    # CREATE ORDER NOW (same as in dlv_address_input)
-    # FIXED: Removed double stock decrement - unified_order_service handles it
-    offer_id = data.get("offer_id")
-    store_id = data.get("store_id")
-    quantity = data.get("quantity", 1)
-    delivery_price = data.get("delivery_price", 0)
+    # DON'T CREATE ORDER YET - wait for payment screenshot
+    # Order will be created in dlv_payment_proof after screenshot is received
+    logger.info(f"✅ User {user_id} selected saved address, waiting for payment screenshot")
 
-    order_id: int | None = None
-    used_legacy_create = False
-
-    order_service = get_unified_order_service()
-    if order_service and hasattr(db, "create_cart_order") and offer_id and store_id:
-        try:
-            offer = db.get_offer(offer_id)
-            store = db.get_store(store_id)
-
-            title = get_offer_field(offer, "title", "")
-            price = get_offer_field(offer, "discount_price", 0)
-            store_name = get_store_field(store, "name", "")
-            store_address = get_store_field(store, "address", "")
-
-            order_item = OrderItem(
-                offer_id=int(offer_id),
-                store_id=int(store_id),
-                title=title,
-                price=int(price),
-                original_price=int(price),
-                quantity=int(quantity),
-                store_name=store_name,
-                store_address=store_address,
-                delivery_price=int(delivery_price),
-            )
-
-            result = await order_service.create_order(
-                user_id=user_id,
-                items=[order_item],
-                order_type="delivery",
-                delivery_address=saved_address,
-                payment_method="pending",
-                notify_customer=False,
-                notify_sellers=False,
-            )
-            if result.success and result.order_ids:
-                order_id = result.order_ids[0]
-        except Exception as e:
-            logger.error(f"Failed to create unified delivery order (saved address): {e}")
-
-    if not order_id:
-        # Fallback to legacy single-order creation for environments without unified service
-        order_id = db.create_order(
-            user_id=user_id,
-            store_id=store_id,
-            offer_id=offer_id,
-            quantity=quantity,
-            order_type="delivery",
-            delivery_address=saved_address,
-            delivery_price=delivery_price,
-            payment_method="pending",
-        )
-        used_legacy_create = True
-
-    if not order_id:
-        msg = "❌ Xatolik" if lang == "uz" else "❌ Ошибка"
-        await callback.message.answer(msg, reply_markup=main_menu_customer(lang))
-        await state.clear()
-        await callback.answer()
-        return
-
-    logger.info(f"✅ Created order #{order_id} with saved address for user {user_id}")
-
-    # NOTE: Stock is decremented by unified_order_service or in create_order/create_cart_order
-    # No need to decrement here to avoid double decrement
-
-    # Save order_id and go to payment
-    await state.update_data(order_id=order_id)
     await state.set_state(OrderDelivery.payment_method_select)
 
+    offer_id = data.get("offer_id")
     text = build_delivery_card_text(
         lang,
         data.get("title", ""),
@@ -679,78 +609,10 @@ async def dlv_address_input(message: types.Message, state: FSMContext) -> None:
     delivery_price = data.get("delivery_price", 0)
     user_id = message.from_user.id
 
-    # CREATE ORDER NOW (before payment selection) - prevents FSM data loss
-    order_id: int | None = None
-    used_legacy_create = False
+    # DON'T CREATE ORDER YET - wait for payment screenshot
+    # Order will be created in dlv_payment_proof after screenshot is received
+    logger.info(f"✅ User {user_id} saved address, waiting for payment screenshot")
 
-    order_service = get_unified_order_service()
-    if order_service and hasattr(db, "create_cart_order") and offer_id and store_id:
-        try:
-            offer = db.get_offer(offer_id)
-            store = db.get_store(store_id)
-
-            title = get_offer_field(offer, "title", "")
-            price = get_offer_field(offer, "discount_price", 0)
-            store_name = get_store_field(store, "name", "")
-            store_address = get_store_field(store, "address", "")
-
-            order_item = OrderItem(
-                offer_id=int(offer_id),
-                store_id=int(store_id),
-                title=title,
-                price=int(price),
-                original_price=int(price),
-                quantity=int(quantity),
-                store_name=store_name,
-                store_address=store_address,
-                delivery_price=int(delivery_price),
-            )
-
-            result = await order_service.create_order(
-                user_id=user_id,
-                items=[order_item],
-                order_type="delivery",
-                delivery_address=text,
-                payment_method="pending",  # Will be updated when payment selected
-                notify_customer=False,
-                notify_sellers=False,
-            )
-            if result.success and result.order_ids:
-                order_id = result.order_ids[0]
-        except Exception as e:
-            logger.error(f"Error creating unified delivery order: {e}", exc_info=True)
-
-    if not order_id:
-        # Fallback to legacy single-order creation
-        try:
-            order_id = db.create_order(
-                user_id=user_id,
-                store_id=store_id,
-                offer_id=offer_id,
-                quantity=quantity,
-                order_type="delivery",
-                delivery_address=text,
-                delivery_price=delivery_price,
-                payment_method="pending",  # Will be updated when payment selected
-            )
-            used_legacy_create = True
-        except Exception as e:
-            logger.error(f"Error creating delivery order: {e}", exc_info=True)
-            order_id = None
-
-    if not order_id:
-        msg = "❌ Xatolik" if lang == "uz" else "❌ Ошибка создания заказа"
-        await message.answer(msg, reply_markup=main_menu_customer(lang))
-        await state.clear()
-        return
-
-    logger.info(f"✅ Created order #{order_id} after address input (before payment)")
-
-    # NOTE: Stock is decremented by unified_order_service or in create_order/create_cart_order
-    # No need to decrement here to avoid double decrement
-
-    # Save order_id in FSM
-    await state.update_data(order_id=order_id)
     await state.set_state(OrderDelivery.payment_method_select)
     logger.info(f"🔄 User {message.from_user.id} moved to payment method selection state")
 
@@ -828,81 +690,17 @@ async def dlv_pay_click(
     logger.info(f"🖱️ User {user_id} selected Click payment")
     logger.info(f"📋 FSM data: {data}")
 
-    # Order should already exist from address input
-    order_id = data.get("order_id")
+    # TODO: Click payment not implemented yet - order is created after screenshot
+    # For now, redirect to card payment
+    logger.warning(f"⚠️ Click payment selected but not implemented, redirecting to card")
 
-    # FALLBACK: If no order_id in FSM, try to find recent pending order
-    if not order_id:
-        logger.warning(f"⚠️ User {user_id} no order_id in FSM for Click, searching...")
-        try:
-            pending_orders = db.get_user_orders(user_id)
-            for o in pending_orders or []:
-                if isinstance(o, dict):
-                    status = o.get("order_status") or o.get("status")
-                    order_type = o.get("order_type")
-                    if status == "pending" and order_type == "delivery":
-                        order_id = o.get("id")
-                        # Restore data
-                        await state.update_data(
-                            order_id=order_id,
-                            store_id=o.get("store_id"),
-                            offer_id=o.get("offer_id"),
-                            quantity=o.get("quantity", 1),
-                            price=o.get("unit_price", 0),
-                            title=o.get("offer_title", ""),
-                            delivery_price=o.get("delivery_price", 0),
-                        )
-                        data = await state.get_data()
-                        logger.info(f"✅ FALLBACK: Found order #{order_id}")
-                        break
-        except Exception as e:
-            logger.error(f"Fallback search failed: {e}")
-
-    if not order_id:
-        logger.error(f"❌ User {user_id} no order_id found")
-        msg = "❌ Ma'lumotlar yo'qoldi" if lang == "uz" else "❌ Данные потеряны"
-        await callback.message.answer(msg, reply_markup=get_appropriate_menu(user_id, lang))
-        await state.clear()
-        await callback.answer()
-        return
-
-    logger.info(f"✅ Using order #{order_id} for Click payment")
-
-    quantity = data.get("quantity", 1)
-    price = data.get("price", 0)
-    title = data.get("title", "")
-    delivery_price = data.get("delivery_price", 0)
-
-    # Send Click invoice
-    from handlers.customer.payments import send_payment_invoice_for_booking
-
-    try:
-        await callback.message.delete()
-
-        invoice_msg = await send_payment_invoice_for_booking(
-            user_id=callback.from_user.id,
-            booking_id=order_id,
-            offer_title=title,
-            quantity=quantity,
-            unit_price=price,
-            delivery_cost=delivery_price,
-        )
-
-        if invoice_msg:
-            logger.info(f"✅ Click invoice sent for order {order_id}")
-            await state.clear()
-        else:
-            # Fallback to card
-            await _switch_to_card_payment(callback.message, state, data, order_id, lang, db)
-    except Exception as e:
-        logger.error(f"Click invoice error: {e}")
-        await _switch_to_card_payment(callback.message, state, data, order_id, lang, db)
-
+    # Redirect to card payment
+    await _switch_to_card_payment_no_order(callback.message, state, data, lang, db)
     await callback.answer()
 
 
-async def _switch_to_card_payment(message, state, data, order_id, lang, db):
-    """Switch to card payment when Click fails."""
+async def _switch_to_card_payment_no_order(message, state, data, lang, db):
+    """Switch to card payment when Click fails - no order created yet."""
     msg = (
         "⚠️ Click ishlamayapti. Karta orqali to'lang."
         if lang == "uz"
@@ -910,7 +708,7 @@ async def _switch_to_card_payment(message, state, data, order_id, lang, db):
     )
     await message.answer(msg)
 
-    await state.update_data(order_id=order_id, payment_method="card")
+    await state.update_data(payment_method="card")
     await state.set_state(OrderDelivery.payment_proof)
     await _show_card_payment_details(message, state, lang, db)
 
@@ -930,63 +728,16 @@ async def dlv_pay_card(
 
     logger.info(f"💳 User {user_id} selected card payment")
     logger.info(f"📋 FSM data keys: {list(data.keys())}")
-    logger.info(f"📋 FSM data: {data}")
 
-    # Order should already exist from address input
-    order_id = data.get("order_id")
-
-    # FALLBACK: If no order_id in FSM, try to find recent pending order for user
-    if not order_id:
-        logger.warning(f"⚠️ User {user_id} no order_id in FSM, searching for pending order...")
-        try:
-            # Get recent pending delivery orders for this user
-            pending_orders = db.get_user_orders(user_id)
-            for o in pending_orders or []:
-                if isinstance(o, dict):
-                    status = o.get("order_status") or o.get("status")
-                    order_type = o.get("order_type")
-                    if status == "pending" and order_type == "delivery":
-                        order_id = o.get("id")
-                        logger.info(
-                            f"✅ FALLBACK: Found pending order #{order_id} for user {user_id}"
-                        )
-                        # Restore FSM data from order
-                        await state.update_data(
-                            order_id=order_id,
-                            store_id=o.get("store_id"),
-                            offer_id=o.get("offer_id"),
-                            quantity=o.get("quantity", 1),
-                            address=o.get("delivery_address"),
-                            delivery_price=o.get("delivery_price", 0),
-                            price=o.get("unit_price", 0),
-                        )
-                        data = await state.get_data()
-                        break
-        except Exception as e:
-            logger.error(f"Fallback order search failed: {e}")
-
-    if not order_id:
-        logger.error(f"❌ User {user_id} no order_id found anywhere")
-        msg = (
-            "❌ Ma'lumotlar yo'qoldi. Qaytadan buyurtma bering."
-            if lang == "uz"
-            else "❌ Данные потеряны. Оформите заказ заново."
-        )
-        await callback.message.answer(msg, reply_markup=get_appropriate_menu(user_id, lang))
-        await state.clear()
-        await callback.answer()
-        return
-
-    logger.info(f"✅ Using order #{order_id} for card payment")
-
+    # Order will be created when screenshot is uploaded
     # Save payment method and show card details
     await state.update_data(payment_method="card")
     await state.set_state(OrderDelivery.payment_proof)
 
-    logger.info(f"🔄 User {user_id} state set to payment_proof for order #{order_id}")
+    logger.info(f"🔄 User {user_id} state set to payment_proof (order will be created after screenshot)")
 
     await callback.message.delete()
-    await _show_card_payment_details(callback.message, state, lang, db, order_id)
+    await _show_card_payment_details(callback.message, state, lang, db, order_id=None)
     await callback.answer()
 
 
@@ -1068,62 +819,6 @@ async def _show_card_payment_details(
     await message.answer(text, parse_mode="HTML", reply_markup=kb.as_markup())
 
 
-def _find_recent_unpaid_order(user_id: int, db: DatabaseProtocol) -> tuple[int | None, Any | None]:
-    """Find the most suitable unpaid order for attaching a payment screenshot.
-
-    Works with both Postgres (dict rows) and legacy SQLite (tuple rows).
-    Prefers orders with pending-like status and without payment proof.
-    """
-
-    try:
-        orders = db.get_user_orders(user_id) or []
-    except Exception as e:  # pragma: no cover - defensive logging
-        logger.error(f"Failed to load user orders for fallback (user={user_id}): {e}")
-        return None, None
-
-    if not orders:
-        return None, None
-
-    # Helper to normalize one row
-    def normalize(row: Any) -> tuple[int | None, str | None, bool]:
-        """Return (order_id, status, has_payment_proof)."""
-
-        if isinstance(row, dict):
-            oid = row.get("order_id") or row.get("id")
-            status = row.get("order_status") or row.get("status") or row.get("payment_status")
-            payment_photo = (
-                row.get("payment_proof_photo_id")
-                or row.get("payment_photo_id")
-                or row.get("payment_screenshot")
-            )
-            has_photo = bool(payment_photo)
-        else:
-            # SQLite schema: see CREATE TABLE orders + get_user_orders join
-            oid = row[0] if len(row) > 0 else None
-            status = row[10] if len(row) > 10 else None
-            payment_photo = row[9] if len(row) > 9 else None
-            has_photo = bool(payment_photo)
-
-        return oid, status, has_photo
-
-    # 1) Try to find a clear pending order without payment proof
-    pending_like = {"pending", "new", None}
-    for row in orders:
-        oid, status, has_photo = normalize(row)
-        if oid and not has_photo and status in pending_like:
-            return oid, row
-
-    # 2) Fallback: first order without payment proof, regardless of status
-    for row in orders:
-        oid, _status, has_photo = normalize(row)
-        if oid and not has_photo:
-            return oid, row
-
-    # 3) Last resort: just take the most recent order
-    oid, _status, _has_photo = normalize(orders[0])
-    return oid, orders[0] if oid else (None, None)
-
-
 @router.message(OrderDelivery.payment_proof, F.photo)
 async def dlv_payment_proof(
     message: types.Message, state: FSMContext, db: DatabaseProtocol
@@ -1139,50 +834,88 @@ async def dlv_payment_proof(
     logger.info(f"📸 User {user_id} uploaded payment screenshot for delivery order")
     logger.info(f"📋 FSM data keys: {list(data.keys())}")
 
-    # Get order_id - ORDER ALREADY EXISTS
-    order_id = data.get("order_id")
+    # Get data from FSM
+    offer_id = data.get("offer_id")
+    store_id = data.get("store_id")
+    quantity = data.get("quantity", 1)
+    address = data.get("address", "")
+    delivery_price = data.get("delivery_price", 0)
 
-    if not order_id:
-        # Fallback: try to find recent unpaid order for this user (without payment screenshot)
-        logger.warning(
-            f"⚠️ User {user_id} has no order_id in FSM, searching for recent unpaid order"
-        )
-        fallback_order_id, _ = _find_recent_unpaid_order(user_id, db)
-        if fallback_order_id:
-            order_id = fallback_order_id
-            logger.info(f"✅ Fallback selected order #{order_id} for user {user_id}")
-
-    if not order_id:
-        logger.error(f"❌ User {user_id} has no pending order for screenshot")
+    if not offer_id or not store_id or not address:
+        logger.error(f"❌ User {user_id} has incomplete data in FSM: {data}")
         msg = "❌ Ma'lumotlar yo'qoldi" if lang == "uz" else "❌ Данные потеряны"
         await message.answer(msg, reply_markup=get_appropriate_menu(user_id, lang))
         await state.clear()
         return
 
-    # Get order details for notification
-    order = db.get_order(order_id)
-    if not order:
-        logger.error(f"❌ Order #{order_id} not found")
-        msg = "❌ Buyurtma topilmadi" if lang == "uz" else "❌ Заказ не найден"
-        await message.answer(msg, reply_markup=get_appropriate_menu(user_id, lang))
+    # CREATE ORDER NOW (after screenshot received)
+    order_id: int | None = None
+    order_service = get_unified_order_service()
+
+    if order_service and hasattr(db, "create_cart_order"):
+        try:
+            offer = db.get_offer(offer_id)
+            store = db.get_store(store_id)
+
+            title = get_offer_field(offer, "title", "")
+            price = get_offer_field(offer, "discount_price", 0)
+            store_name = get_store_field(store, "name", "")
+            store_address = get_store_field(store, "address", "")
+
+            order_item = OrderItem(
+                offer_id=int(offer_id),
+                store_id=int(store_id),
+                title=title,
+                price=int(price),
+                original_price=int(price),
+                quantity=int(quantity),
+                store_name=store_name,
+                store_address=store_address,
+                delivery_price=int(delivery_price),
+            )
+
+            order_type = data.get("order_type", "delivery")
+            result = await order_service.create_order(
+                user_id=user_id,
+                items=[order_item],
+                order_type=order_type,
+                delivery_address=address if order_type == "delivery" else None,
+                payment_method="pending",
+                notify_customer=False,
+                notify_sellers=False,
+            )
+            if result.success and result.order_ids:
+                order_id = result.order_ids[0]
+                logger.info(f"✅ Created order #{order_id} after screenshot via unified service")
+        except Exception as e:
+            logger.error(f"Error creating unified delivery order after screenshot: {e}", exc_info=True)
+
+    if not order_id:
+        # Fallback to legacy single-order creation
+        try:
+            order_type = data.get("order_type", "delivery")
+            order_id = db.create_order(
+                user_id=user_id,
+                store_id=store_id,
+                offer_id=offer_id,
+                quantity=quantity,
+                order_type=order_type,
+                delivery_address=address if order_type == "delivery" else None,
+                delivery_price=delivery_price if order_type == "delivery" else 0,
+                payment_method="pending",
+            )
+            logger.info(f"✅ Created order #{order_id} after screenshot via legacy create_order")
+        except Exception as e:
+            logger.error(f"Error creating delivery order after screenshot: {e}", exc_info=True)
+            order_id = None
+
+    if not order_id:
+        msg = "❌ Xatolik" if lang == "uz" else "❌ Ошибка создания заказа"
+        await message.answer(msg, reply_markup=main_menu_customer(lang))
         await state.clear()
         return
 
-    # Extract order details
-    if isinstance(order, dict):
-        store_id = order.get("store_id")
-        offer_id = order.get("offer_id")
-        quantity = order.get("quantity", 1)
-        address = order.get("delivery_address", "")
-        delivery_price = order.get("delivery_price", 0)
-    else:
-        store_id = order[2] if len(order) > 2 else None
-        offer_id = order[3] if len(order) > 3 else None
-        quantity = order[4] if len(order) > 4 else 1
-        address = order[7] if len(order) > 7 else ""
-        delivery_price = order[8] if len(order) > 8 else 0
-
-    # Get offer info
+    # Get offer info for notification
     offer = db.get_offer(offer_id) if offer_id else None
     title = get_offer_field(offer, "title", "Товар")
     price = get_offer_field(offer, "discount_price", 0)

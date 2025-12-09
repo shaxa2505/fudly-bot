@@ -68,6 +68,13 @@ async def admin_confirm_payment(
     address = _get_order_field(order, "delivery_address", 7)
     customer_id = _get_order_field(order, "user_id", 1)
     payment_photo = _get_order_field(order, "payment_proof_photo_id", 10)
+    
+    # Get order_type to determine if this is delivery or pickup
+    order_type = _get_order_field(order, "order_type", -1)  # Index -1 means use dict only
+    if isinstance(order, dict):
+        order_type = order.get("order_type", "delivery")  # Default to delivery for backward compat
+    else:
+        order_type = "delivery"  # Legacy orders without order_type field
 
     # Check if cart order by trying to get cart_items from dict
     if isinstance(order, dict):
@@ -122,12 +129,21 @@ async def admin_confirm_payment(
         currency = "so'm" if seller_lang == "uz" else "сум"
 
         if seller_lang == "uz":
+            # Build order type indicator
+            order_type_text = "🏪 O'zi olib ketadi" if order_type == "pickup" else "🚚 Yetkazish"
+            
             caption = (
                 f"🔔 <b>Yangi buyurtma!</b>\n\n"
-                f"📦 #{order_id} | ✅ To'langan\n"
+                f"📦 #{order_id} | {order_type_text} | ✅ To'langan\n"
                 f"🛒 <b>Mahsulotlar:</b>\n{items_list}\n"
                 f"💵 {total:,} {currency}\n"
-                f"📍 {address}\n"
+            )
+            
+            # Show address ONLY for delivery orders
+            if order_type == "delivery" and address:
+                caption += f"📍 {address}\n"
+            
+            caption += (
                 f"👤 {customer_name}\n"
                 f"📱 <code>{customer_phone}</code>\n\n"
                 f"⏳ <b>Buyurtmani tasdiqlang!</b>"
@@ -135,12 +151,21 @@ async def admin_confirm_payment(
             confirm_text = "✅ Qabul qilish"
             reject_text = "❌ Rad etish"
         else:
+            # Build order type indicator
+            order_type_text = "🏪 Самовывоз" if order_type == "pickup" else "🚚 Доставка"
+            
             caption = (
                 f"🔔 <b>Новый заказ!</b>\n\n"
-                f"📦 #{order_id} | ✅ Оплачено\n"
+                f"📦 #{order_id} | {order_type_text} | ✅ Оплачено\n"
                 f"🛒 <b>Товары:</b>\n{items_list}\n"
                 f"💵 {total:,} {currency}\n"
-                f"📍 {address}\n"
+            )
+            
+            # Show address ONLY for delivery orders
+            if order_type == "delivery" and address:
+                caption += f"📍 {address}\n"
+            
+            caption += (
                 f"👤 {customer_name}\n"
                 f"📱 <code>{customer_phone}</code>\n\n"
                 f"⏳ <b>Подтвердите заказ!</b>"
