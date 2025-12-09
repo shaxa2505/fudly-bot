@@ -230,8 +230,8 @@ def register(router: Router) -> None:
     """Register all customer-side unified order handlers on the router."""
 
     router.callback_query.register(
-        customer_received_handler, F.data.regexp(r"^customer_received_(\\d+)$")
+        customer_received_handler, F.data.regexp(r"^customer_received_(\d+)$")
     )
     router.callback_query.register(
-        booking_received_handler, F.data.regexp(r"^booking_received_(\\d+)$")
+        booking_received_handler, F.data.regexp(r"^booking_received_(\d+)$")
     )
