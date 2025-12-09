@@ -163,12 +163,12 @@ def register(router: Router) -> None:
 
     @router.callback_query(F.data.startswith("cart_qty_inc_"))
     async def cart_quantity_increase(callback: types.CallbackQuery, state: FSMContext) -> None:
-        if not db or not callback.message:
+        if not common.db or not callback.message:
             await callback.answer()
             return
 
         user_id = callback.from_user.id
-        lang = db.get_user_language(user_id)
+        lang = common.db.get_user_language(user_id)
 
         try:
             offer_id = int(callback.data.split("_")[-1])
@@ -204,12 +204,12 @@ def register(router: Router) -> None:
 
     @router.callback_query(F.data.startswith("cart_qty_dec_"))
     async def cart_quantity_decrease(callback: types.CallbackQuery, state: FSMContext) -> None:
-        if not db or not callback.message:
+        if not common.db or not callback.message:
             await callback.answer()
             return
 
         user_id = callback.from_user.id
-        lang = db.get_user_language(user_id)
+        lang = common.db.get_user_language(user_id)
 
         try:
             offer_id = int(callback.data.split("_")[-1])
@@ -238,12 +238,12 @@ def register(router: Router) -> None:
 
     @router.callback_query(F.data.startswith("cart_remove_"))
     async def cart_remove_item(callback: types.CallbackQuery, state: FSMContext) -> None:
-        if not db or not callback.message:
+        if not common.db or not callback.message:
             await callback.answer()
             return
 
         user_id = callback.from_user.id
-        lang = db.get_user_language(user_id)
+        lang = common.db.get_user_language(user_id)
 
         try:
             offer_id = int(callback.data.split("_")[-1])

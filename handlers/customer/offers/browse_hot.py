@@ -38,8 +38,10 @@ def register_hot(
             [
                 "🔥 Горячее",
                 "🔥 Issiq takliflar",  # Old names
-                "🔥 Акции до -70%",
-                "🔥 -70% gacha aksiyalar",  # New names
+                "🔥 Акции до -70%",  # Legacy label
+                "🔥 -70% gacha aksiyalar",  # Legacy label
+                "🏪 Магазины и акции",  # Current RU label
+                "🏪 Do'konlar va aksiyalar",  # Current UZ label
             ]
         )
     )

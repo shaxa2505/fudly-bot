@@ -158,7 +158,7 @@ def register(router: Router) -> None:
             )
 
         kb.button(
-            text="◀️ Назад" if lang == "ru" else "◀️ Orqaga",
+            text="⬅️ Назад" if lang == "ru" else "⬅️ Orqaga",
             callback_data="back_to_cart",
         )
 

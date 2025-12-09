@@ -25,7 +25,7 @@ def main_menu_customer(lang: str = "ru", cart_count: int = 0) -> ReplyKeyboardMa
     if cart_count > 0:
         cart_text = f"{cart_text} ({cart_count})"
     builder.button(text=cart_text)
-    builder.button(text="📋 Мои заказы" if lang == "ru" else "📋 Buyurtmalarim")
+    builder.button(text=get_text(lang, "my_orders"))
 
     # Row 3: Profile
     builder.button(text=get_text(lang, "profile"))

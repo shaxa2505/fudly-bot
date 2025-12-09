@@ -428,7 +428,7 @@ def register(router: Router) -> None:
             if page > 0:
                 nav_buttons.append(
                     (
-                        "◀️ Назад" if lang == "ru" else "◀️ Orqaga",
+                        "⬅️ Назад" if lang == "ru" else "⬅️ Orqaga",
                         f"store_page_{store_id}_{page - 1}",
                     )
                 )
@@ -458,7 +458,7 @@ def register(router: Router) -> None:
             kb.adjust(1)
 
         kb.button(
-            text="🔙 Назад" if lang == "ru" else "🔙 Orqaga",
+            text="⬅️ Назад" if lang == "ru" else "⬅️ Orqaga",
             callback_data="back_to_menu",
         )
 

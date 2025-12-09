@@ -178,7 +178,7 @@ def register(router: Router) -> None:
             callback_data=f"cart_pay_card_{store_id}",
         )
         kb.button(
-            text="🔙 Ortga" if lang == "uz" else "🔙 Назад",
+            text="⬅️ Назад" if lang == "ru" else "⬅️ Orqaga",
             callback_data="cart_back_to_address",
         )
         kb.adjust(2, 1)
