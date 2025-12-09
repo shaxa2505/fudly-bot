@@ -1,55 +1,43 @@
 -- Migration: Add CASCADE DELETE to foreign keys
 -- This allows deleting stores without manually deleting offers/orders first
+--
+-- IMPORTANT: таблицы и ключи приведены в соответствие с текущей
+-- схемой проекта, где используется stores.store_id и offers.offer_id.
 
--- 1. Drop existing foreign key constraints and recreate with CASCADE
--- offers.store_id -> stores.id
+-- 1. offers.store_id -> stores.store_id
 ALTER TABLE offers DROP CONSTRAINT IF EXISTS offers_store_id_fkey;
-ALTER TABLE offers ADD CONSTRAINT offers_store_id_fkey 
-    FOREIGN KEY (store_id) REFERENCES stores(id) ON DELETE CASCADE;
+ALTER TABLE offers ADD CONSTRAINT offers_store_id_fkey
+    FOREIGN KEY (store_id) REFERENCES stores(store_id) ON DELETE CASCADE;
 
--- 2. orders.store_id -> stores.id  
+-- 2. orders.store_id -> stores.store_id
 ALTER TABLE orders DROP CONSTRAINT IF EXISTS orders_store_id_fkey;
-ALTER TABLE orders ADD CONSTRAINT orders_store_id_fkey 
-    FOREIGN KEY (store_id) REFERENCES stores(id) ON DELETE CASCADE;
+ALTER TABLE orders ADD CONSTRAINT orders_store_id_fkey
+    FOREIGN KEY (store_id) REFERENCES stores(store_id) ON DELETE CASCADE;
 
--- 3. orders.offer_id -> offers.id
+-- 3. orders.offer_id -> offers.offer_id
 ALTER TABLE orders DROP CONSTRAINT IF EXISTS orders_offer_id_fkey;
-ALTER TABLE orders ADD CONSTRAINT orders_offer_id_fkey 
-    FOREIGN KEY (offer_id) REFERENCES offers(id) ON DELETE SET NULL;
+ALTER TABLE orders ADD CONSTRAINT orders_offer_id_fkey
+    FOREIGN KEY (offer_id) REFERENCES offers(offer_id) ON DELETE SET NULL;
 
--- 4. bookings.store_id -> stores.id
+-- 4. bookings.store_id -> stores.store_id
 ALTER TABLE bookings DROP CONSTRAINT IF EXISTS bookings_store_id_fkey;
-ALTER TABLE bookings ADD CONSTRAINT bookings_store_id_fkey 
-    FOREIGN KEY (store_id) REFERENCES stores(id) ON DELETE CASCADE;
+ALTER TABLE bookings ADD CONSTRAINT bookings_store_id_fkey
+    FOREIGN KEY (store_id) REFERENCES stores(store_id) ON DELETE CASCADE;
 
--- 5. bookings.offer_id -> offers.id
+-- 5. bookings.offer_id -> offers.offer_id
 ALTER TABLE bookings DROP CONSTRAINT IF EXISTS bookings_offer_id_fkey;
-ALTER TABLE bookings ADD CONSTRAINT bookings_offer_id_fkey 
-    FOREIGN KEY (offer_id) REFERENCES offers(id) ON DELETE SET NULL;
+ALTER TABLE bookings ADD CONSTRAINT bookings_offer_id_fkey
+    FOREIGN KEY (offer_id) REFERENCES offers(offer_id) ON DELETE SET NULL;
 
--- 6. cart_items.offer_id -> offers.id
-ALTER TABLE cart_items DROP CONSTRAINT IF EXISTS cart_items_offer_id_fkey;
-ALTER TABLE cart_items ADD CONSTRAINT cart_items_offer_id_fkey 
-    FOREIGN KEY (offer_id) REFERENCES offers(id) ON DELETE CASCADE;
-
--- 7. favorites -> stores
+-- 6. favorites.store_id -> stores.store_id
 ALTER TABLE favorites DROP CONSTRAINT IF EXISTS favorites_store_id_fkey;
-ALTER TABLE favorites ADD CONSTRAINT favorites_store_id_fkey 
-    FOREIGN KEY (store_id) REFERENCES stores(id) ON DELETE CASCADE;
+ALTER TABLE favorites ADD CONSTRAINT favorites_store_id_fkey
+    FOREIGN KEY (store_id) REFERENCES stores(store_id) ON DELETE CASCADE;
 
--- 8. store_ratings -> stores
-ALTER TABLE store_ratings DROP CONSTRAINT IF EXISTS store_ratings_store_id_fkey;
-ALTER TABLE store_ratings ADD CONSTRAINT store_ratings_store_id_fkey 
-    FOREIGN KEY (store_id) REFERENCES stores(id) ON DELETE CASCADE;
+-- NOTE:
+--   В проекте нет таблиц cart_items, store_ratings, payment_cards
+--   с согласованной схемой, поэтому они исключены из миграции,
+--   чтобы не ломать существующую базу. Если такие таблицы появятся
+--   в будущем, для них нужно будет сделать отдельную Alembic-миграцию.
 
--- 9. payment_cards -> stores (if exists)
-DO $$ 
-BEGIN
-    IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'payment_cards') THEN
-        ALTER TABLE payment_cards DROP CONSTRAINT IF EXISTS payment_cards_store_id_fkey;
-        ALTER TABLE payment_cards ADD CONSTRAINT payment_cards_store_id_fkey 
-            FOREIGN KEY (store_id) REFERENCES stores(id) ON DELETE CASCADE;
-    END IF;
-END $$;
-
-SELECT 'CASCADE DELETE constraints added successfully' AS result;
+SELECT 'CASCADE DELETE constraints (offers/orders/bookings/favorites) added successfully' AS result;

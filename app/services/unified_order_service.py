@@ -733,6 +733,27 @@ class UnifiedOrderService:
                 error_message="Delivery address required",
             )
 
+        # Enforce business invariant: one order must belong to ONE store
+        # This protects from mixed-store carts and keeps pricing logic correct.
+        store_ids = {item.store_id for item in items}
+        if len(store_ids) > 1:
+            total_items = sum(item.quantity for item in items)
+            total_price = sum(item.price * item.quantity for item in items)
+            return OrderResult(
+                success=False,
+                order_ids=[],
+                booking_ids=[],
+                pickup_codes=[],
+                total_items=total_items,
+                total_price=int(total_price),
+                delivery_price=0,
+                grand_total=0,
+                error_message=(
+                    "Orders from multiple stores are not supported. "
+                    "Please place separate orders for each store."
+                ),
+            )
+
         # Prepare items for database
         db_items = [
             {
@@ -1020,6 +1041,7 @@ class UnifiedOrderService:
                 store_id_field = "store_id"
                 code_field = "pickup_code"
                 order_type_field = "order_type"
+                status_field = "order_status"
             else:
                 entity = self.db.get_booking(entity_id)
                 update_func = self.db.update_booking_status
@@ -1027,6 +1049,7 @@ class UnifiedOrderService:
                 store_id_field = "store_id"
                 code_field = "code"
                 order_type_field = None  # Bookings are always pickup
+                status_field = "status"
 
             if not entity:
                 logger.warning(f"Entity not found: {entity_type}#{entity_id}")
@@ -1037,6 +1060,7 @@ class UnifiedOrderService:
                 user_id = entity.get(user_id_field)
                 store_id = entity.get(store_id_field)
                 pickup_code = entity.get(code_field)
+                current_status_raw = entity.get(status_field)
                 # For orders, check delivery_address to determine type if order_type not set
                 if order_type_field:
                     order_type = entity.get(order_type_field)
@@ -1049,6 +1073,7 @@ class UnifiedOrderService:
                 user_id = getattr(entity, user_id_field, None)
                 store_id = getattr(entity, store_id_field, None)
                 pickup_code = getattr(entity, code_field, None)
+                current_status_raw = getattr(entity, status_field, None)
                 if order_type_field:
                     order_type = getattr(entity, order_type_field, None)
                     if not order_type:
@@ -1058,11 +1083,39 @@ class UnifiedOrderService:
                 else:
                     order_type = "pickup"
 
+            # Normalize statuses and enforce safe transitions/idempotence
+            current_status = (
+                OrderStatus.normalize(str(current_status_raw)) if current_status_raw else None
+            )
+            target_status = OrderStatus.normalize(str(new_status))
+            terminal_statuses = {
+                OrderStatus.COMPLETED,
+                OrderStatus.CANCELLED,
+                OrderStatus.REJECTED,
+            }
+
+            # Idempotent update: requested status already set
+            if current_status == target_status:
+                logger.info(
+                    f"STATUS_UPDATE no-op (already {target_status}): " f"{entity_type}#{entity_id}"
+                )
+                return True
+
+            # Do not move away from terminal statuses (completed/cancelled/rejected)
+            if current_status in terminal_statuses and target_status != current_status:
+                logger.info(
+                    "STATUS_UPDATE ignored for terminal entity: "
+                    f"{entity_type}#{entity_id} status={current_status} -> {target_status}"
+                )
+                return True
+
             # Update status in DB
-            update_func(entity_id, new_status)
+            update_func(entity_id, target_status)
 
             # Restore quantity if rejected or cancelled
-            if new_status in [OrderStatus.REJECTED, OrderStatus.CANCELLED]:
+            if target_status in [OrderStatus.REJECTED, OrderStatus.CANCELLED] and (
+                current_status not in [OrderStatus.REJECTED, OrderStatus.CANCELLED]
+            ):
                 await self._restore_quantities(entity, entity_type)
 
             # Send notification to customer - SMART FILTERING
@@ -1072,7 +1125,7 @@ class UnifiedOrderService:
             should_notify = notify_customer and user_id
 
             # Skip READY notification for pickup - go directly from PREPARING to COMPLETED
-            if order_type == "pickup" and new_status == OrderStatus.READY:
+            if order_type == "pickup" and target_status == OrderStatus.READY:
                 should_notify = False
 
             if should_notify:
@@ -1084,7 +1137,7 @@ class UnifiedOrderService:
                 msg = NotificationTemplates.customer_status_update(
                     lang=customer_lang,
                     order_id=entity_id,
-                    status=new_status,
+                    status=target_status,
                     order_type=order_type,
                     store_name=store_name,
                     store_address=store_address,
@@ -1095,7 +1148,7 @@ class UnifiedOrderService:
 
                 # Add buttons for customer based on status
                 reply_markup = None
-                if new_status == OrderStatus.COMPLETED:
+                if target_status == OrderStatus.COMPLETED:
                     # Rating buttons for completed orders
                     kb = InlineKeyboardBuilder()
                     callback_prefix = (
@@ -1113,7 +1166,7 @@ class UnifiedOrderService:
                     received_text = "✅ Oldim" if customer_lang == "uz" else "✅ Получил"
                     kb.button(text=received_text, callback_data=f"customer_received_{entity_id}")
                     reply_markup = kb.as_markup()
-                elif new_status == OrderStatus.PREPARING and order_type == "pickup":
+                elif target_status == OrderStatus.PREPARING and order_type == "pickup":
                     # "Received" button for pickup bookings when preparing
                     # Customer can mark as received when they pick up the order
                     kb = InlineKeyboardBuilder()
@@ -1178,7 +1231,7 @@ class UnifiedOrderService:
                         )
                         logger.info(f"📤 Sent NEW message for {entity_type}#{entity_id}")
                         # Save message_id for future edits (only for first notification)
-                        if message_sent and new_status == OrderStatus.PREPARING:
+                        if message_sent and target_status == OrderStatus.PREPARING:
                             if entity_type == "order" and hasattr(
                                 self.db, "set_order_customer_message_id"
                             ):
@@ -1194,7 +1247,7 @@ class UnifiedOrderService:
                     except Exception as e:
                         logger.error(f"Failed to notify customer {user_id}: {e}")
 
-            logger.info(f"STATUS_UPDATE: {entity_type}#{entity_id} -> {new_status}")
+            logger.info(f"STATUS_UPDATE: {entity_type}#{entity_id} -> {target_status}")
             return True
 
         except Exception as e:

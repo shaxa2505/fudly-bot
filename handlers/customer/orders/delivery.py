@@ -570,11 +570,15 @@ async def dlv_new_address(
 
 
 @router.message(OrderDelivery.address)
-async def dlv_address_input(
-    message: types.Message, state: FSMContext, db: DatabaseProtocol
-) -> None:
-    """Handle address text input."""
+async def dlv_address_input(message: types.Message, state: FSMContext) -> None:
+    """Handle address text input for delivery orders (Tez buyurtma, etc.)."""
     if not message.from_user:
+        return
+
+    # Use module-level db to avoid DI issues
+    global db
+    if not db:
+        await message.answer("System error")
         return
 
     lang = db.get_user_language(message.from_user.id)
@@ -616,16 +620,20 @@ async def dlv_address_input(
     user_id = message.from_user.id
 
     # CREATE ORDER NOW (before payment selection) - prevents FSM data loss
-    order_id = db.create_order(
-        user_id=user_id,
-        store_id=store_id,
-        offer_id=offer_id,
-        quantity=quantity,
-        order_type="delivery",
-        delivery_address=text,
-        delivery_price=delivery_price,
-        payment_method="pending",  # Will be updated when payment selected
-    )
+    try:
+        order_id = db.create_order(
+            user_id=user_id,
+            store_id=store_id,
+            offer_id=offer_id,
+            quantity=quantity,
+            order_type="delivery",
+            delivery_address=text,
+            delivery_price=delivery_price,
+            payment_method="pending",  # Will be updated when payment selected
+        )
+    except Exception as e:
+        logger.error(f"Error creating delivery order: {e}", exc_info=True)
+        order_id = None
 
     if not order_id:
         msg = "❌ Xatolik" if lang == "uz" else "❌ Ошибка создания заказа"
@@ -722,7 +730,7 @@ async def dlv_pay_click(
 
     # Order should already exist from address input
     order_id = data.get("order_id")
-    
+
     # FALLBACK: If no order_id in FSM, try to find recent pending order
     if not order_id:
         logger.warning(f"⚠️ User {user_id} no order_id in FSM for Click, searching...")
@@ -749,7 +757,7 @@ async def dlv_pay_click(
                         break
         except Exception as e:
             logger.error(f"Fallback search failed: {e}")
-    
+
     if not order_id:
         logger.error(f"❌ User {user_id} no order_id found")
         msg = "❌ Ma'lumotlar yo'qoldi" if lang == "uz" else "❌ Данные потеряны"
@@ -826,7 +834,7 @@ async def dlv_pay_card(
 
     # Order should already exist from address input
     order_id = data.get("order_id")
-    
+
     # FALLBACK: If no order_id in FSM, try to find recent pending order for user
     if not order_id:
         logger.warning(f"⚠️ User {user_id} no order_id in FSM, searching for pending order...")
@@ -839,7 +847,9 @@ async def dlv_pay_card(
                     order_type = o.get("order_type")
                     if status == "pending" and order_type == "delivery":
                         order_id = o.get("id")
-                        logger.info(f"✅ FALLBACK: Found pending order #{order_id} for user {user_id}")
+                        logger.info(
+                            f"✅ FALLBACK: Found pending order #{order_id} for user {user_id}"
+                        )
                         # Restore FSM data from order
                         await state.update_data(
                             order_id=order_id,
@@ -854,10 +864,14 @@ async def dlv_pay_card(
                         break
         except Exception as e:
             logger.error(f"Fallback order search failed: {e}")
-    
+
     if not order_id:
         logger.error(f"❌ User {user_id} no order_id found anywhere")
-        msg = "❌ Ma'lumotlar yo'qoldi. Qaytadan buyurtma bering." if lang == "uz" else "❌ Данные потеряны. Оформите заказ заново."
+        msg = (
+            "❌ Ma'lumotlar yo'qoldi. Qaytadan buyurtma bering."
+            if lang == "uz"
+            else "❌ Данные потеряны. Оформите заказ заново."
+        )
         await callback.message.answer(msg, reply_markup=get_appropriate_menu(user_id, lang))
         await state.clear()
         await callback.answer()

@@ -12,8 +12,8 @@ from aiogram.fsm.context import FSMContext
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
 from app.core.constants import OFFERS_PER_PAGE
-from app.keyboards import cancel_keyboard, main_menu_customer
-from handlers.common.states import BookOffer, OrderDelivery
+from app.keyboards import cancel_keyboard, main_menu_customer, phone_request_keyboard
+from handlers.common.states import BookOffer, OrderDelivery, Registration
 from handlers.common.utils import is_main_menu_button
 from localization import get_text
 from logging_config import logger
@@ -1093,6 +1093,38 @@ async def create_booking(
     lang = db.get_user_language(user_id)
     data = await state.get_data()
     logger.info(f"📦 create_booking state data: {data}")
+
+    # SAFETY NET: ensure user has phone before creating any booking
+    # (pbook_confirm/cart_checkout already check this, but we double-check here
+    #  so что бы ни один заказ не прошёл без номера телефона в профиле).
+    user_dict = None
+    user_phone: str | None = None
+    try:
+        if hasattr(db, "get_user"):
+            user_dict = db.get_user(user_id)
+        elif hasattr(db, "get_user_model"):
+            user_dict = db.get_user_model(user_id)
+        if user_dict is not None:
+            if isinstance(user_dict, dict):
+                user_phone = user_dict.get("phone")  # type: ignore[arg-type]
+            else:
+                user_phone = getattr(user_dict, "phone", None)
+    except Exception as e:
+        logger.warning(f"create_booking: failed to load user phone: {e}")
+
+    if not user_phone:
+        msg = (
+            "📱 Для оформления заказа укажите номер телефона"
+            if lang == "ru"
+            else "📱 Buyurtma berish uchun telefon raqamingizni kiriting"
+        )
+
+        await message.answer(msg, reply_markup=phone_request_keyboard(lang))
+
+        # Сохраняем состояние, чтобы вернуться к бронированию после ввода телефона
+        await state.update_data(pending_order=True, **data)
+        await state.set_state(Registration.phone)
+        return
 
     offer_id = data.get("offer_id")
     # Support both "quantity" and "selected_qty" keys

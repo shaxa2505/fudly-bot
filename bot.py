@@ -727,6 +727,8 @@ async def main() -> None:
             fsm_cleanup_task.cancel()
             if booking_task:
                 booking_task.cancel()
+            if rating_task:
+                rating_task.cancel()
             await runner.cleanup()
             await on_shutdown()
     else:
@@ -756,12 +758,24 @@ async def main() -> None:
                 pass
         finally:
             cleanup_task.cancel()
+            fsm_cleanup_task.cancel()
             if booking_task:
                 booking_task.cancel()
+            if rating_task:
+                rating_task.cancel()
             try:
                 await cleanup_task
             except asyncio.CancelledError:
                 pass
+            try:
+                await fsm_cleanup_task
+            except asyncio.CancelledError:
+                pass
+            if rating_task:
+                try:
+                    await rating_task
+                except asyncio.CancelledError:
+                    pass
             if health_runner:
                 await health_runner.cleanup()
             await on_shutdown()

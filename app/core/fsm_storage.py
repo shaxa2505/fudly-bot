@@ -81,6 +81,18 @@ class EnhancedPostgreSQLStorage(BaseStorage):
                     )
                     conn.commit()
                     logger.info("✅ FSM table schema upgraded")
+
+                # Ensure composite unique index on (user_id, chat_id)
+                try:
+                    cursor.execute(
+                        """
+                        CREATE UNIQUE INDEX IF NOT EXISTS fsm_states_user_chat_idx
+                        ON fsm_states (user_id, chat_id)
+                        """
+                    )
+                    conn.commit()
+                except Exception as index_err:
+                    logger.warning(f"Could not ensure FSM unique index: {index_err}")
         except Exception as e:
             logger.warning(f"Could not upgrade fsm_states schema: {e}")
 
@@ -119,9 +131,8 @@ class EnhancedPostgreSQLStorage(BaseStorage):
                     """
                     INSERT INTO fsm_states (user_id, chat_id, state, state_name, expires_at, updated_at)
                     VALUES (%s, %s, %s, %s, %s, CURRENT_TIMESTAMP)
-                    ON CONFLICT (user_id)
+                    ON CONFLICT (user_id, chat_id)
                     DO UPDATE SET
-                        chat_id = EXCLUDED.chat_id,
                         state = EXCLUDED.state,
                         state_name = EXCLUDED.state_name,
                         expires_at = EXCLUDED.expires_at,
@@ -146,6 +157,7 @@ class EnhancedPostgreSQLStorage(BaseStorage):
         Returns None if state doesn't exist or has expired.
         """
         user_id = key.user_id
+        chat_id = key.chat_id
 
         try:
             with self.db.get_connection() as conn:
@@ -153,10 +165,10 @@ class EnhancedPostgreSQLStorage(BaseStorage):
                 cursor.execute(
                     """
                     SELECT state FROM fsm_states
-                    WHERE user_id = %s
+                    WHERE user_id = %s AND chat_id = %s
                     AND (expires_at IS NULL OR expires_at > CURRENT_TIMESTAMP)
                     """,
-                    (user_id,),
+                    (user_id, chat_id),
                 )
                 result = cursor.fetchone()
                 if result:
@@ -191,9 +203,8 @@ class EnhancedPostgreSQLStorage(BaseStorage):
                     """
                     INSERT INTO fsm_states (user_id, chat_id, data, expires_at, updated_at)
                     VALUES (%s, %s, %s::jsonb, %s, CURRENT_TIMESTAMP)
-                    ON CONFLICT (user_id)
+                    ON CONFLICT (user_id, chat_id)
                     DO UPDATE SET
-                        chat_id = EXCLUDED.chat_id,
                         data = EXCLUDED.data,
                         expires_at = EXCLUDED.expires_at,
                         updated_at = CURRENT_TIMESTAMP
@@ -211,6 +222,7 @@ class EnhancedPostgreSQLStorage(BaseStorage):
         Returns empty dict if data doesn't exist or has expired.
         """
         user_id = key.user_id
+        chat_id = key.chat_id
 
         try:
             with self.db.get_connection() as conn:
@@ -218,10 +230,10 @@ class EnhancedPostgreSQLStorage(BaseStorage):
                 cursor.execute(
                     """
                     SELECT data FROM fsm_states
-                    WHERE user_id = %s
+                    WHERE user_id = %s AND chat_id = %s
                     AND (expires_at IS NULL OR expires_at > CURRENT_TIMESTAMP)
                     """,
-                    (user_id,),
+                    (user_id, chat_id),
                 )
                 result = cursor.fetchone()
 
@@ -257,6 +269,7 @@ class EnhancedPostgreSQLStorage(BaseStorage):
             or None if not found
         """
         user_id = key.user_id
+        chat_id = key.chat_id
 
         try:
             with self.db.get_connection() as conn:
@@ -265,9 +278,9 @@ class EnhancedPostgreSQLStorage(BaseStorage):
                     """
                     SELECT state, state_name, data, created_at, updated_at, expires_at
                     FROM fsm_states
-                    WHERE user_id = %s
+                    WHERE user_id = %s AND chat_id = %s
                     """,
-                    (user_id,),
+                    (user_id, chat_id),
                 )
                 result = cursor.fetchone()
 

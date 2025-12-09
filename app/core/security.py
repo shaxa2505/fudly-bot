@@ -160,6 +160,16 @@ class RateLimiter:
             ts for ts in requests if current_time - ts < window_seconds
         ]
 
+        # If user has no recent activity for any action, drop them from memory
+        if not self._user_requests[user_id][action]:
+            # Check if all actions for this user are empty
+            if all(not timestamps for timestamps in self._user_requests[user_id].values()):
+                self._user_requests.pop(user_id, None)
+                # Recreate entry lazily below when appending new timestamp
+                self._user_requests[user_id] = {}
+            # Ensure action key exists for further logic
+            self._user_requests[user_id][action] = []
+
         # Check if under limit
         if len(self._user_requests[user_id][action]) < max_requests:
             self._user_requests[user_id][action].append(current_time)

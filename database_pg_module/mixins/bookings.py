@@ -360,13 +360,15 @@ class BookingMixin:
 
             # Map status to database values
             if status == "active":
-                status_values = ("pending", "confirmed")
+                # Treat both legacy "confirmed" and unified "preparing" as active
+                status_values = ("pending", "confirmed", "preparing")
             elif status == "completed":
                 status_values = ("completed",)
             elif status == "cancelled":
-                status_values = ("cancelled",)
+                # Include both cancelled by user and rejected by seller
+                status_values = ("cancelled", "rejected")
             else:
-                status_values = ("pending", "confirmed")
+                status_values = ("pending", "confirmed", "preparing")
 
             cursor.execute(
                 """

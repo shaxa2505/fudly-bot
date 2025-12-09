@@ -13,6 +13,11 @@ from aiogram.fsm.context import FSMContext
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
 from app.keyboards import main_menu_customer
+from app.services.unified_order_service import (
+    OrderItem,
+    OrderResult,
+    get_unified_order_service,
+)
 from handlers.common.states import OrderDelivery
 from localization import get_text
 
@@ -333,7 +338,7 @@ async def back_to_cart(callback: types.CallbackQuery, state: FSMContext) -> None
 
 @router.callback_query(F.data == "cart_confirm_pickup")
 async def cart_confirm_pickup(callback: types.CallbackQuery) -> None:
-    """Confirm pickup for cart - create ONE booking with all items."""
+    """Confirm pickup for cart using UnifiedOrderService (single store)."""
     if not db or not callback.message:
         await callback.answer()
         return
@@ -348,180 +353,64 @@ async def cart_confirm_pickup(callback: types.CallbackQuery) -> None:
 
     store_id = items[0].store_id
 
-    # Prepare cart_items for database
-    cart_items_data = [
-        {
-            "offer_id": item.offer_id,
-            "quantity": item.quantity,
-            "price": item.price,
-            "title": item.title,
-            "unit": item.unit,
-        }
-        for item in items
-    ]
-
-    # Create ONE booking with all items
-    ok, booking_id, booking_code, error_reason = db.create_cart_booking_atomic(
-        user_id=user_id,
-        store_id=store_id,
-        cart_items=cart_items_data,
-        pickup_time=None,
-    )
-
-    if not ok:
-        error_text = (
-            "❌ Не удалось создать бронирование" if lang == "ru" else "❌ Bron yaratib bo'lmadi"
+    # Use unified order service
+    order_service = get_unified_order_service()
+    if not order_service:
+        await callback.answer(
+            "❌ Система заказов недоступна" if lang == "ru" else "❌ Buyurtma xizmati mavjud emas",
+            show_alert=True,
         )
-        if error_reason and "insufficient_stock" in error_reason:
-            error_text = (
-                "❌ Недостаточно товара на складе"
-                if lang == "ru"
-                else "❌ Omborda yetarli mahsulot yo'q"
-            )
-        elif error_reason and "booking_limit" in error_reason:
-            error_text = (
-                "❌ Достигнут лимит активных бронирований"
-                if lang == "ru"
-                else "❌ Faol bronlar limiti tugadi"
-            )
-
-        await callback.answer(error_text, show_alert=True)
         return
 
-    # Clear cart after successful booking
+    # Map cart items to OrderItem list (pickup = no delivery price)
+    order_items: list[OrderItem] = []
+    for item in items:
+        order_items.append(
+            OrderItem(
+                offer_id=item.offer_id,
+                store_id=item.store_id,
+                title=item.title,
+                price=int(item.price),
+                original_price=int(item.price),
+                quantity=int(item.quantity),
+                store_name=item.store_name,
+                store_address=item.store_address,
+                delivery_price=0,
+            )
+        )
+
+    # Create pickup order(s) via unified service
+    try:
+        result: OrderResult = await order_service.create_order(
+            user_id=user_id,
+            items=order_items,
+            order_type="pickup",
+            delivery_address=None,
+            payment_method="cash",
+            notify_customer=True,
+            notify_sellers=True,
+        )
+    except Exception as e:
+        logger.error(f"Failed to create unified pickup order from cart: {e}")
+        await callback.answer(
+            "❌ Не удалось создать заказ" if lang == "ru" else "❌ Buyurtma yaratib bo'lmadi",
+            show_alert=True,
+        )
+        return
+
+    if not result.success:
+        msg = result.error_message or (
+            "❌ Не удалось создать заказ" if lang == "ru" else "❌ Buyurtma yaratib bo'lmadi"
+        )
+        await callback.answer(msg, show_alert=True)
+        return
+
+    # Clear cart after successful order creation
     cart_storage.clear_cart(user_id)
 
-    # Build success message
-    currency = "so'm" if lang == "uz" else "сум"
-    lines = [f"✅ <b>{'Bron yaratildi!' if lang == 'uz' else 'Бронирование создано!'}</b>\n"]
-    lines.append(
-        f"📋 {'Bron kodi' if lang == 'uz' else 'Код бронирования'}: <b>{booking_code}</b>\n"
-    )
-    lines.append(f"🏪 {_esc(items[0].store_name)}")
-    lines.append(f"📍 {_esc(items[0].store_address)}\n")
-    lines.append(f"<b>{'Mahsulotlar' if lang == 'uz' else 'Товары'}:</b>")
-
-    for item in items:
-        subtotal = int(item.price * item.quantity)
-        lines.append(f"• {_esc(item.title)} × {item.quantity} = {subtotal:,} {currency}")
-
-    total = int(sum(item.price * item.quantity for item in items))
-    lines.append(f"\n💵 <b>{'JAMI' if lang == 'uz' else 'ИТОГО'}: {total:,} {currency}</b>")
-
-    text = "\n".join(lines)
-
-    # Send/edit customer notification and save message_id for live editing
-    customer_message_id = None
-    try:
-        await callback.message.edit_text(text, parse_mode="HTML")
-        customer_message_id = callback.message.message_id
-    except Exception:
-        sent_msg = await callback.message.answer(text, parse_mode="HTML")
-        customer_message_id = sent_msg.message_id
-
-    # Save message_id for live status updates
-    if customer_message_id and booking_id and hasattr(db, "set_booking_customer_message_id"):
-        try:
-            db.set_booking_customer_message_id(booking_id, customer_message_id)
-            logger.info(
-                f"Saved customer_message_id={customer_message_id} for cart booking #{booking_id}"
-            )
-        except Exception as e:
-            logger.warning(f"Failed to save customer_message_id: {e}")
-
-    # Notify partner - send ONE notification with all items (UNIFIED format)
-    try:
-        store = db.get_store(store_id)
-        if store:
-            owner_id = store.get("owner_id") if isinstance(store, dict) else store[1]
-
-            # Get customer info for unified notification
-            customer = db.get_user(user_id) if hasattr(db, "get_user") else None
-            customer_name = callback.from_user.first_name or "Клиент"
-            customer_phone = "Не указан"
-            customer_username = None
-            if customer:
-                if isinstance(customer, dict):
-                    customer_phone = customer.get("phone") or "Не указан"
-                    customer_username = customer.get("username")
-                else:
-                    customer_phone = getattr(customer, "phone", None) or "Не указан"
-                    customer_username = getattr(customer, "username", None)
-
-            contact_info = f"@{customer_username}" if customer_username else customer_phone
-
-            # Build UNIFIED partner notification (same format as tez buyurtma)
-            if lang == "uz":
-                partner_lines = [
-                    "🔔 <b>YANGI BRON!</b>",
-                    "━━━━━━━━━━━━━━━━━━",
-                    "",
-                    f"🎫 Kod: <b>{booking_code}</b>",
-                    "🏪 O'zi olib ketadi",
-                    "",
-                    "👤 <b>Xaridor:</b>",
-                    f"   Ism: {_esc(customer_name)}",
-                    f"   📱 <code>{_esc(customer_phone)}</code>",
-                    f"   💬 {_esc(contact_info)}",
-                    "",
-                    "<b>Mahsulotlar:</b>",
-                ]
-            else:
-                partner_lines = [
-                    "🔔 <b>НОВАЯ БРОНЬ!</b>",
-                    "━━━━━━━━━━━━━━━━━━",
-                    "",
-                    f"🎫 Код: <b>{booking_code}</b>",
-                    "🏪 Самовывоз",
-                    "",
-                    "👤 <b>Покупатель:</b>",
-                    f"   Имя: {_esc(customer_name)}",
-                    f"   📱 <code>{_esc(customer_phone)}</code>",
-                    f"   💬 {_esc(contact_info)}",
-                    "",
-                    "<b>Товары:</b>",
-                ]
-
-            for item in items:
-                subtotal = int(item.price * item.quantity)
-                partner_lines.append(
-                    f"• {_esc(item.title)} × {item.quantity} = {subtotal:,} {currency}"
-                )
-
-            partner_lines.extend(
-                [
-                    "",
-                    "━━━━━━━━━━━━━━━━━━",
-                    f"💰 <b>{'JAMI' if lang == 'uz' else 'ИТОГО'}: {total:,} {currency}</b>",
-                    "━━━━━━━━━━━━━━━━━━",
-                ]
-            )
-
-            partner_text = "\n".join(partner_lines)
-
-            # One button to confirm/reject entire cart booking
-            # Use explicit booking_ prefix since this is pickup BOOKING
-            kb = InlineKeyboardBuilder()
-            kb.button(
-                text="✅ Tasdiqlash" if lang == "uz" else "✅ Подтвердить",
-                callback_data=f"booking_confirm_{booking_id}",
-            )
-            kb.button(
-                text="❌ Rad etish" if lang == "uz" else "❌ Отклонить",
-                callback_data=f"booking_reject_{booking_id}",
-            )
-            kb.adjust(2)
-
-            await callback.bot.send_message(
-                owner_id, partner_text, parse_mode="HTML", reply_markup=kb.as_markup()
-            )
-            logger.info(
-                f"🛒 Sent cart booking notification to partner {owner_id} for booking {booking_id}"
-            )
-    except Exception as e:
-        logger.error(f"Failed to notify partner: {e}")
-
-    await callback.answer("✅")
+    # Customer уже получает красивое уведомление из UnifiedOrderService,
+    # здесь достаточно показать компактный статус в callback
+    await callback.answer("✅", show_alert=False)
 
 
 # ===================== DELIVERY CONFIRMATION =====================
@@ -710,40 +599,65 @@ async def cart_pay_click(callback: types.CallbackQuery, state: FSMContext) -> No
     delivery_price = data.get("delivery_price", 0)
     address = data.get("address", "")
 
-    if not cart_items_stored or not store_id:
+    if not cart_items_stored or not store_id or not address:
         await callback.answer("❌ Ошибка" if lang == "ru" else "❌ Xatolik", show_alert=True)
         return
 
-    # Prepare cart_items for database
-    cart_items_data = [
-        {
-            "offer_id": item["offer_id"],
-            "quantity": item["quantity"],
-            "price": item["price"],
-            "title": item["title"],
-            "unit": item["unit"],
-        }
-        for item in cart_items_stored
-    ]
-
-    # Create ONE order with all items
-    ok, order_id, pickup_code, error_reason = db.create_cart_order_atomic(
-        user_id=user_id,
-        store_id=store_id,
-        cart_items=cart_items_data,
-        delivery_address=address,
-        delivery_price=delivery_price,
-        payment_method="click",
-    )
-
-    if not ok:
-        error_text = (
-            "❌ Не удалось создать заказ" if lang == "ru" else "❌ Buyurtma yaratib bo'lmadi"
+    # Use unified order service for delivery cart
+    order_service = get_unified_order_service()
+    if not order_service:
+        await callback.answer(
+            "❌ Система заказов недоступна" if lang == "ru" else "❌ Buyurtma xizmati mavjud emas",
+            show_alert=True,
         )
-        await callback.answer(error_text, show_alert=True)
         return
 
-    # Clear cart
+    # Map stored cart items to OrderItem list
+    order_items: list[OrderItem] = []
+    for item in cart_items_stored:
+        order_items.append(
+            OrderItem(
+                offer_id=int(item["offer_id"]),
+                store_id=int(item["store_id"]),
+                title=str(item["title"]),
+                price=int(item["price"]),
+                original_price=int(item["price"]),
+                quantity=int(item["quantity"]),
+                store_name=str(item.get("store_name", "")),
+                store_address="",
+                delivery_price=int(delivery_price),
+            )
+        )
+
+    try:
+        result: OrderResult = await order_service.create_order(
+            user_id=user_id,
+            items=order_items,
+            order_type="delivery",
+            delivery_address=address,
+            payment_method="click",
+            notify_customer=True,
+            notify_sellers=True,
+        )
+    except Exception as e:
+        logger.error(f"Failed to create unified delivery order from cart (click): {e}")
+        await callback.answer(
+            "❌ Не удалось создать заказ" if lang == "ru" else "❌ Buyurtma yaratib bo'lmadi",
+            show_alert=True,
+        )
+        return
+
+    if not result.success or not result.order_ids:
+        msg = result.error_message or (
+            "❌ Не удалось создать заказ" if lang == "ru" else "❌ Buyurtma yaratib bo'lmadi"
+        )
+        await callback.answer(msg, show_alert=True)
+        return
+
+    # Use first order id for payment flow
+    order_id = result.order_ids[0]
+
+    # Clear cart after successful order creation
     cart_storage.clear_cart(user_id)
 
     # Send Click invoice
@@ -810,49 +724,63 @@ async def cart_pay_card(callback: types.CallbackQuery, state: FSMContext) -> Non
     delivery_price = data.get("delivery_price", 0)
     address = data.get("address", "")
 
-    if not cart_items_stored or not store_id:
+    if not cart_items_stored or not store_id or not address:
         await callback.answer("❌ Ошибка" if lang == "ru" else "❌ Xatolik", show_alert=True)
         return
 
-    # Prepare cart_items for database
-    cart_items_data = [
-        {
-            "offer_id": item["offer_id"],
-            "quantity": item["quantity"],
-            "price": item["price"],
-            "title": item["title"],
-            "unit": item["unit"],
-        }
-        for item in cart_items_stored
-    ]
-
-    # Create ONE order with all items
-    ok, order_id, pickup_code, error_reason = db.create_cart_order_atomic(
-        user_id=user_id,
-        store_id=store_id,
-        cart_items=cart_items_data,
-        delivery_address=address,
-        delivery_price=delivery_price,
-        payment_method="card",
-    )
-
-    if not ok:
-        error_text = (
-            "❌ Не удалось создать заказ" if lang == "ru" else "❌ Buyurtma yaratib bo'lmadi"
+    # Use unified order service for delivery cart (card payment)
+    order_service = get_unified_order_service()
+    if not order_service:
+        await callback.answer(
+            "❌ Система заказов недоступна" if lang == "ru" else "❌ Buyurtma xizmati mavjud emas",
+            show_alert=True,
         )
-        await callback.answer(error_text, show_alert=True)
         return
 
-    # Structured logging for cart order
-    total_amount = (
-        sum(item["price"] * item["quantity"] for item in cart_items_stored) + delivery_price
-    )
-    logger.info(
-        f"ORDER_CREATED: id={order_id}, user={user_id}, type=delivery, "
-        f"total={total_amount}, items={len(cart_items_stored)}, source=cart_card, pickup_code={pickup_code}"
-    )
+    order_items: list[OrderItem] = []
+    for item in cart_items_stored:
+        order_items.append(
+            OrderItem(
+                offer_id=int(item["offer_id"]),
+                store_id=int(item["store_id"]),
+                title=str(item["title"]),
+                price=int(item["price"]),
+                original_price=int(item["price"]),
+                quantity=int(item["quantity"]),
+                store_name=str(item.get("store_name", "")),
+                store_address="",
+                delivery_price=int(delivery_price),
+            )
+        )
 
-    # Clear cart
+    try:
+        result: OrderResult = await order_service.create_order(
+            user_id=user_id,
+            items=order_items,
+            order_type="delivery",
+            delivery_address=address,
+            payment_method="card",
+            notify_customer=True,
+            notify_sellers=True,
+        )
+    except Exception as e:
+        logger.error(f"Failed to create unified delivery order from cart (card): {e}")
+        await callback.answer(
+            "❌ Не удалось создать заказ" if lang == "ru" else "❌ Buyurtma yaratib bo'lmadi",
+            show_alert=True,
+        )
+        return
+
+    if not result.success or not result.order_ids:
+        msg = result.error_message or (
+            "❌ Не удалось создать заказ" if lang == "ru" else "❌ Buyurtma yaratib bo'lmadi"
+        )
+        await callback.answer(msg, show_alert=True)
+        return
+
+    order_id = result.order_ids[0]
+
+    # Clear cart after successful order creation
     cart_storage.clear_cart(user_id)
 
     await state.update_data(order_id=order_id, payment_method="card")

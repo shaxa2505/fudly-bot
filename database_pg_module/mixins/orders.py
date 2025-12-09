@@ -204,6 +204,30 @@ class OrderMixin:
                     )
 
                 try:
+                    # First, check and reserve stock for this offer atomically
+                    cursor.execute(
+                        "SELECT quantity, status FROM offers WHERE offer_id = %s FOR UPDATE",
+                        (offer_id,),
+                    )
+                    offer_row = cursor.fetchone()
+                    if not offer_row:
+                        logger.warning("Offer %s not found for cart order", offer_id)
+                        failed_items.append(item)
+                        continue
+
+                    current_qty = offer_row[0] or 0
+                    offer_status = offer_row[1]
+
+                    if current_qty < quantity or offer_status != "active":
+                        logger.warning(
+                            "Insufficient stock or inactive offer %s in cart order (qty=%s, status=%s)",
+                            offer_id,
+                            current_qty,
+                            offer_status,
+                        )
+                        failed_items.append(item)
+                        continue
+
                     # Try with pickup_code first, fallback to without if column doesn't exist
                     try:
                         cursor.execute(
@@ -250,14 +274,21 @@ class OrderMixin:
                             )
                         else:
                             raise
+
                     result = cursor.fetchone()
                     if result:
                         order_id = result[0]
 
-                        # Update offer quantity
+                        # Update offer quantity based on previously locked value
+                        new_qty = current_qty - quantity
                         cursor.execute(
-                            "UPDATE offers SET quantity = quantity - %s WHERE offer_id = %s",
-                            (quantity, offer_id),
+                            """
+                            UPDATE offers
+                            SET quantity = %s,
+                                status = CASE WHEN %s <= 0 THEN 'inactive' ELSE status END
+                            WHERE offer_id = %s
+                            """,
+                            (new_qty, new_qty, offer_id),
                         )
 
                         order_info = {
