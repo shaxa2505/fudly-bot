@@ -435,11 +435,13 @@ async def dlv_back_to_qty(
 async def dlv_use_saved_address(
     callback: types.CallbackQuery, state: FSMContext, db: DatabaseProtocol
 ) -> None:
-    """Use saved address and go to payment."""
+    """Use saved address and go to payment - CREATE ORDER HERE."""
     if not callback.from_user:
         await callback.answer()
         return
 
+    user_id = callback.from_user.id
+    lang = db.get_user_language(user_id)
     data = await state.get_data()
     saved_address = data.get("saved_address")
 
@@ -449,10 +451,40 @@ async def dlv_use_saved_address(
 
     await state.update_data(address=saved_address)
 
-    # Go to payment
-    lang = db.get_user_language(callback.from_user.id)
+    # CREATE ORDER NOW (same as in dlv_address_input)
     offer_id = data.get("offer_id")
+    store_id = data.get("store_id")
+    quantity = data.get("quantity", 1)
+    delivery_price = data.get("delivery_price", 0)
 
+    order_id = db.create_order(
+        user_id=user_id,
+        store_id=store_id,
+        offer_id=offer_id,
+        quantity=quantity,
+        order_type="delivery",
+        delivery_address=saved_address,
+        delivery_price=delivery_price,
+        payment_method="pending",
+    )
+
+    if not order_id:
+        msg = "❌ Xatolik" if lang == "uz" else "❌ Ошибка"
+        await callback.message.answer(msg, reply_markup=main_menu_customer(lang))
+        await state.clear()
+        await callback.answer()
+        return
+
+    logger.info(f"✅ Created order #{order_id} with saved address for user {user_id}")
+
+    # Decrement quantity
+    try:
+        db.increment_offer_quantity_atomic(offer_id, -int(quantity))
+    except Exception as e:
+        logger.error(f"Failed to decrement offer: {e}")
+
+    # Save order_id and go to payment
+    await state.update_data(order_id=order_id)
     await state.set_state(OrderDelivery.payment_method_select)
 
     text = build_delivery_card_text(
