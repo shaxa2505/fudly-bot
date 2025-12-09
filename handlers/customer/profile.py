@@ -64,7 +64,12 @@ async def profile(message: types.Message, state: FSMContext) -> None:
     await state.clear()
 
     if not db:
-        await message.answer("System error")
+        lang_code = (message.from_user.language_code or "ru") if message.from_user else "ru"
+        if lang_code.startswith("uz"):
+            text = "❌ Xizmat vaqtincha mavjud emas. Keyinroq urinib ko'ring."
+        else:
+            text = "❌ Сервис временно недоступен. Попробуйте позже."
+        await message.answer(text)
         return
 
     lang = db.get_user_language(message.from_user.id)
@@ -213,7 +218,12 @@ async def profile(message: types.Message, state: FSMContext) -> None:
 async def profile_change_city(callback: types.CallbackQuery, state: FSMContext) -> None:
     """Start city change from profile."""
     if not db:
-        await callback.answer("System error")
+        lang_code = (callback.from_user.language_code or "ru") if callback.from_user else "ru"
+        if lang_code.startswith("uz"):
+            text = "❌ Xizmat vaqtincha mavjud emas. Keyinroq urinib ko'ring."
+        else:
+            text = "❌ Сервис временно недоступен. Попробуйте позже."
+        await callback.answer(text)
         return
 
     lang = db.get_user_language(callback.from_user.id)
@@ -237,7 +247,12 @@ async def profile_change_city(callback: types.CallbackQuery, state: FSMContext) 
 async def profile_change_city_cb(callback: types.CallbackQuery, state: FSMContext) -> None:
     """Handle inline city selection from profile change flow."""
     if not db or not callback.message:
-        await callback.answer("System error", show_alert=True)
+        lang_code = (callback.from_user.language_code or "ru") if callback.from_user else "ru"
+        if lang_code.startswith("uz"):
+            text = "❌ Xizmat vaqtincha mavjud emas. Keyinroq urinib ko'ring."
+        else:
+            text = "❌ Сервис временно недоступен. Попробуйте позже."
+        await callback.answer(text, show_alert=True)
         return
 
     assert callback.from_user is not None
@@ -272,12 +287,22 @@ async def switch_to_customer_cb(callback: types.CallbackQuery) -> None:
     """Switch to customer mode from profile."""
     if not db:
         logger.error("❌ switch_to_customer_cb: db is None")
-        await callback.answer("System error", show_alert=True)
+        lang_code = (callback.from_user.language_code or "ru") if callback.from_user else "ru"
+        if lang_code.startswith("uz"):
+            text = "❌ Xizmat vaqtincha mavjud emas. Keyinroq urinib ko'ring."
+        else:
+            text = "❌ Сервис временно недоступен. Попробуйте позже."
+        await callback.answer(text, show_alert=True)
         return
 
     if not callback.message:
         logger.error("❌ switch_to_customer_cb: callback.message is None")
-        await callback.answer("System error", show_alert=True)
+        lang_code = (callback.from_user.language_code or "ru") if callback.from_user else "ru"
+        if lang_code.startswith("uz"):
+            text = "❌ Xizmat vaqtincha mavjud emas. Keyinroq urinib ko'ring."
+        else:
+            text = "❌ Сервис временно недоступен. Попробуйте позже."
+        await callback.answer(text, show_alert=True)
         return
 
     try:

@@ -695,7 +695,12 @@ def setup(
     async def show_store_products(callback: types.CallbackQuery, state: FSMContext) -> None:
         """Show products for a specific store when user taps 'Смотреть товары'."""
         if not db:
-            await callback.answer("System error", show_alert=True)
+            lang_code = (callback.from_user.language_code or "ru") if callback.from_user else "ru"
+            if lang_code.startswith("uz"):
+                text = "❌ Xizmat vaqtincha mavjud emas. Keyinroq urinib ko'ring."
+            else:
+                text = "❌ Сервис временно недоступен. Попробуйте позже."
+            await callback.answer(text, show_alert=True)
             return
         assert callback.from_user is not None
         # Ensure callback.message is accessible

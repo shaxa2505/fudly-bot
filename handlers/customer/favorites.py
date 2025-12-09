@@ -43,7 +43,12 @@ def get_appropriate_menu(user_id: int, lang: str) -> Any:
 async def show_my_city(message: types.Message, state: FSMContext) -> None:
     """Show current city and offer change."""
     if not db:
-        await message.answer("System error")
+        lang_code = (message.from_user.language_code or "ru") if message.from_user else "ru"
+        if lang_code.startswith("uz"):
+            text = "❌ Xizmat vaqtincha mavjud emas. Keyinroq urinib ko'ring."
+        else:
+            text = "❌ Сервис временно недоступен. Попробуйте позже."
+        await message.answer(text)
         return
 
     user_id = message.from_user.id
@@ -62,7 +67,12 @@ async def show_my_city(message: types.Message, state: FSMContext) -> None:
 async def change_city_process(message: types.Message, state: FSMContext) -> None:
     """Process city change."""
     if not db:
-        await message.answer("System error")
+        lang_code = (message.from_user.language_code or "ru") if message.from_user else "ru"
+        if lang_code.startswith("uz"):
+            text = "❌ Xizmat vaqtincha mavjud emas. Keyinroq urinib ko'ring."
+        else:
+            text = "❌ Сервис временно недоступен. Попробуйте позже."
+        await message.answer(text)
         return
 
     # Check if user pressed main menu button - clear state and let other handlers process

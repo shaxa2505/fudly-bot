@@ -50,7 +50,12 @@ async def switch_to_customer(message: types.Message):
     """Switch user to customer mode."""
     if not db or not get_text or not main_menu_customer:
         logger.error("❌ switch_to_customer: dependencies not initialized!")
-        await message.answer("System error: dependencies not initialized")
+        lang_code = (message.from_user.language_code or "ru") if message.from_user else "ru"
+        if lang_code.startswith("uz"):
+            text = "❌ Xizmat vaqtincha mavjud emas. Keyinroq urinib ko'ring."
+        else:
+            text = "❌ Сервис временно недоступен. Попробуйте позже."
+        await message.answer(text)
         return
 
     user_id = message.from_user.id
@@ -72,7 +77,12 @@ async def switch_to_seller(message: types.Message):
     """Switch user to seller mode."""
     if not db or not get_text or not main_menu_seller:
         logger.error("❌ switch_to_seller: dependencies not initialized!")
-        await message.answer("System error: dependencies not initialized")
+        lang_code = (message.from_user.language_code or "ru") if message.from_user else "ru"
+        if lang_code.startswith("uz"):
+            text = "❌ Xizmat vaqtincha mavjud emas. Keyinroq urinib ko'ring."
+        else:
+            text = "❌ Сервис временно недоступен. Попробуйте позже."
+        await message.answer(text)
         return
 
     user_id = message.from_user.id

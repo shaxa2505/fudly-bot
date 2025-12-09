@@ -103,7 +103,12 @@ async def my_orders_handler(message: types.Message) -> None:
     Показывает активные заказы с кнопками детализации.
     """
     if not db:
-        await message.answer("❌ System error")
+        lang_code = (message.from_user.language_code or "ru") if message.from_user else "ru"
+        if lang_code.startswith("uz"):
+            text = "❌ Xizmat vaqtincha mavjud emas. Keyinroq urinib ko'ring."
+        else:
+            text = "❌ Сервис временно недоступен. Попробуйте позже."
+        await message.answer(text)
         return
 
     user_id = message.from_user.id

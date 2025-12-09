@@ -591,7 +591,12 @@ async def dlv_address_input(message: types.Message, state: FSMContext) -> None:
     # Use module-level db to avoid DI issues
     global db
     if not db:
-        await message.answer("System error")
+        lang_code = (message.from_user.language_code or "ru") if message.from_user else "ru"
+        if lang_code.startswith("uz"):
+            text = "❌ Xizmat vaqtincha mavjud emas. Keyinroq urinib ko'ring."
+        else:
+            text = "❌ Сервис временно недоступен. Попробуйте позже."
+        await message.answer(text)
         return
 
     lang = db.get_user_language(message.from_user.id)
