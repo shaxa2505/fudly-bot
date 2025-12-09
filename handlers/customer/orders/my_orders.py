@@ -85,7 +85,17 @@ def _format_price(amount: int | float, lang: str) -> str:
 
 
 @router.message(
-    F.text.in_(["📋 Мои заказы", "📋 Buyurtmalarim", "📦 Мои заказы", "📦 Mening buyurtmalarim"])
+    F.text.in_
+    (
+        [
+            "📋 Мои заказы",
+            "📋 Buyurtmalarim",
+            "📦 Мои заказы",
+            "📦 Mening buyurtmalarim",
+            "📋 Заказы и бронирования",
+            "📋 Buyurtmalar va bronlar",
+        ]
+    )
 )
 async def my_orders_handler(message: types.Message) -> None:
     """

@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from aiogram import F, Router, types
+from aiogram.exceptions import SkipHandler
 from aiogram.fsm.context import FSMContext
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
@@ -106,8 +107,9 @@ def register(router: Router) -> None:
         data = await state.get_data()
         is_cart_order = data.get("is_cart_order", False)
 
+        # If this is not a cart delivery flow, let other handlers process it
         if not is_cart_order:
-            return
+            raise SkipHandler()
 
         cart_items_stored = data.get("cart_items", [])
         store_id = data.get("store_id")
