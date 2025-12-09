@@ -29,10 +29,10 @@ from .common import _get_db, _get_store_field, _get_entity_field, logger
 
 # Regex patterns for all supported callback formats
 CONFIRM_PATTERN = re.compile(
-    r"^(booking_confirm_|order_confirm_|partner_confirm_order_|partner_confirm_|confirm_order_)(\\d+)$"
+    r"^(booking_confirm_|order_confirm_|partner_confirm_order_|partner_confirm_|confirm_order_)(\d+)$"
 )
 REJECT_PATTERN = re.compile(
-    r"^(booking_reject_|order_reject_|partner_reject_order_|partner_reject_|cancel_order_)(\\d+)$"
+    r"^(booking_reject_|order_reject_|partner_reject_order_|partner_reject_|cancel_order_)(\d+)$"
 )
 
 # Mapping from callback prefix to entity type
