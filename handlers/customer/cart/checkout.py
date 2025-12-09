@@ -80,8 +80,9 @@ def register(router: Router) -> None:
             except Exception:
                 pass
 
-        user = db.get_user_model(user_id)
-        if not user or not user.phone:
+        # Require phone number before checkout
+        user = common.db.get_user_model(user_id)
+        if not user or not getattr(user, "phone", None):
             from app.keyboards import phone_request_keyboard
             from handlers.common.states import Registration
 
@@ -97,8 +98,9 @@ def register(router: Router) -> None:
             await state.set_state(Registration.phone)
             await callback.answer()
             return
-
-        user = common.db.get_user_model(user_id)
+        
+        # Enforce single-store cart
+        stores = {item.store_id for item in items}
         if len(stores) > 1:
             await callback.answer(
                 (
@@ -111,7 +113,7 @@ def register(router: Router) -> None:
             return
 
         store_id = items[0].store_id
-        store = db.get_store(store_id)
+        store = common.db.get_store(store_id)
         delivery_enabled = items[0].delivery_enabled
         delivery_price = items[0].delivery_price
 
@@ -169,12 +171,14 @@ def register(router: Router) -> None:
 
     @router.callback_query(F.data == "cart_confirm_pickup")
     async def cart_confirm_pickup(callback: types.CallbackQuery) -> None:
-        if not db or not callback.message:
+        """Create a pickup order from the cart and show a clear confirmation."""
+
+        if not common.db or not callback.message:
             await callback.answer()
             return
 
         user_id = callback.from_user.id
-        lang = db.get_user_language(user_id)
+        lang = common.db.get_user_language(user_id)
 
         items = cart_storage.get_cart(user_id)
         if not items:
@@ -182,8 +186,6 @@ def register(router: Router) -> None:
                 "Корзина пуста" if lang == "ru" else "Savat bo'sh", show_alert=True
             )
             return
-
-        store_id = items[0].store_id
 
         order_service = get_unified_order_service()
         if not order_service:
@@ -248,18 +250,58 @@ def register(router: Router) -> None:
 
         cart_storage.clear_cart(user_id)
 
+        order_id = result.order_ids[0] if result.order_ids else None
+
+        # Short popup for continuity
         await callback.answer("✅", show_alert=False)
+
+        # Send a clear confirmation message with basic summary
+        currency = "so'm" if lang == "uz" else "сум"
+        total = int(sum(item.price * item.quantity for item in items))
+
+        lines: list[str] = []
+        if lang == "uz":
+            lines.append("✅ <b>Buyurtma qabul qilindi!</b>")
+        else:
+            lines.append("✅ <b>Заказ принят!</b>")
+
+        if order_id:
+            lines.append("")
+            lines.append(f"📦 #{order_id}")
+
+        lines.append("")
+        lines.append(f"💵 {total:,} {currency}")
+
+        if lang == "uz":
+            lines.append("")
+            lines.append("📍 Mahsulotni do'kondan olib ketishingiz mumkin.")
+            lines.append(
+                "ℹ️ Batafsil ma'lumotni 'Mening buyurtmalarim' bo'limida ko'rishingiz mumkin."
+            )
+        else:
+            lines.append("")
+            lines.append("📍 Заказ ожидает вас в магазине.")
+            lines.append(
+                "ℹ️ Подробности доступны в разделе 'Мои заказы'."
+            )
+
+        text = "\n".join(lines)
+
+        try:
+            await callback.message.answer(text, parse_mode="HTML")
+        except Exception:
+            pass
 
     @router.callback_query(F.data == "back_to_menu")
     async def back_to_menu(callback: types.CallbackQuery, state: FSMContext) -> None:
-        if not db or not callback.message:
+        if not common.db or not callback.message:
             await callback.answer()
             return
 
         await state.clear()
 
         user_id = callback.from_user.id
-        lang = db.get_user_language(user_id)
+        lang = common.db.get_user_language(user_id)
 
         cart_count = cart_storage.get_cart_count(user_id)
 

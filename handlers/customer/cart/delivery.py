@@ -7,7 +7,8 @@ from aiogram.utils.keyboard import InlineKeyboardBuilder
 
 from handlers.common.states import OrderDelivery
 
-from .common import db, esc
+from .common import esc
+from . import common
 
 
 def register(router: Router) -> None:
@@ -15,12 +16,12 @@ def register(router: Router) -> None:
 
     @router.callback_query(F.data == "cart_confirm_delivery")
     async def cart_confirm_delivery(callback: types.CallbackQuery, state: FSMContext) -> None:
-        if not db or not callback.message:
+        if not common.db or not callback.message:
             await callback.answer()
             return
 
         user_id = callback.from_user.id
-        lang = db.get_user_language(user_id)
+        lang = common.db.get_user_language(user_id)
 
         from .storage import cart_storage
 
@@ -36,7 +37,7 @@ def register(router: Router) -> None:
 
         total = int(sum(item.price * item.quantity for item in items))
 
-        store = db.get_store(store_id)
+        store = common.db.get_store(store_id)
         if store:
             from handlers.bookings.utils import get_store_field
 
@@ -95,11 +96,11 @@ def register(router: Router) -> None:
 
     @router.message(OrderDelivery.address)
     async def cart_process_delivery_address(message: types.Message, state: FSMContext) -> None:
-        if not db or not message.from_user or not message.text:
+        if not common.db or not message.from_user or not message.text:
             return
 
         user_id = message.from_user.id
-        lang = db.get_user_language(user_id)
+        lang = common.db.get_user_language(user_id)
         delivery_address = message.text.strip()
 
         data = await state.get_data()
@@ -129,7 +130,7 @@ def register(router: Router) -> None:
         await state.update_data(address=delivery_address)
 
         try:
-            db.save_delivery_address(user_id, delivery_address)
+            common.db.save_delivery_address(user_id, delivery_address)
         except Exception as e:  # pragma: no cover - defensive logging
             from logging_config import logger
 
@@ -186,12 +187,12 @@ def register(router: Router) -> None:
 
     @router.callback_query(F.data == "cart_back_to_address")
     async def cart_back_to_address(callback: types.CallbackQuery, state: FSMContext) -> None:
-        if not db or not callback.message:
+        if not common.db or not callback.message:
             await callback.answer()
             return
 
         user_id = callback.from_user.id
-        lang = db.get_user_language(user_id)
+        lang = common.db.get_user_language(user_id)
 
         text = (
             "📍 Введите адрес доставки:"

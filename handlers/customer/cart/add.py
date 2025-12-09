@@ -5,7 +5,8 @@ from aiogram import F, Router, types
 from aiogram.fsm.context import FSMContext
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
-from .common import db, esc
+from .common import esc
+from . import common
 from .storage import cart_storage
 
 
@@ -111,12 +112,12 @@ def register(router: Router) -> None:
 
     @router.callback_query(F.data.startswith("add_to_cart_"))
     async def add_to_cart_start(callback: types.CallbackQuery, state: FSMContext) -> None:
-        if not db or not callback.message or not callback.data:
+        if not common.db or not callback.message or not callback.data:
             await callback.answer()
             return
 
         user_id = callback.from_user.id
-        lang = db.get_user_language(user_id)
+        lang = common.db.get_user_language(user_id)
 
         try:
             offer_id = int(callback.data.split("_")[-1])
@@ -124,7 +125,7 @@ def register(router: Router) -> None:
             await callback.answer("❌", show_alert=True)
             return
 
-        offer = db.get_offer(offer_id)
+        offer = common.db.get_offer(offer_id)
         if not offer:
             await callback.answer(
                 "Товар не найден" if lang == "ru" else "Mahsulot topilmadi",
@@ -154,7 +155,7 @@ def register(router: Router) -> None:
         store_id = get_field(offer, "store_id")
         offer_photo = get_field(offer, "photo", None)
 
-        store = db.get_store(store_id) if store_id else None
+        store = common.db.get_store(store_id) if store_id else None
         store_name = str(get_field(store, "name", ""))
         store_address = str(get_field(store, "address", ""))
         delivery_enabled = bool(get_field(store, "delivery_enabled", 0) == 1)
@@ -211,12 +212,12 @@ def register(router: Router) -> None:
 
     @router.callback_query(F.data.startswith("cart_qty_"))
     async def cart_update_quantity(callback: types.CallbackQuery, state: FSMContext) -> None:
-        if not db or not callback.message:
+        if not common.db or not callback.message:
             await callback.answer()
             return
 
         user_id = callback.from_user.id
-        lang = db.get_user_language(user_id)
+        lang = common.db.get_user_language(user_id)
 
         try:
             parts = callback.data.split("_")
@@ -267,12 +268,12 @@ def register(router: Router) -> None:
 
     @router.callback_query(F.data.startswith("cart_add_confirm_"))
     async def cart_add_confirm(callback: types.CallbackQuery, state: FSMContext) -> None:
-        if not db or not callback.message:
+        if not common.db or not callback.message:
             await callback.answer()
             return
 
         user_id = callback.from_user.id
-        lang = db.get_user_language(user_id)
+        lang = common.db.get_user_language(user_id)
 
         data = await state.get_data()
 
@@ -342,7 +343,7 @@ def register(router: Router) -> None:
 
     @router.callback_query(F.data.startswith("continue_shopping_"))
     async def continue_shopping(callback: types.CallbackQuery, state: FSMContext) -> None:
-        if not db or not callback.message or not callback.data:
+        if not common.db or not callback.message or not callback.data:
             await callback.answer()
             return
 
@@ -353,9 +354,9 @@ def register(router: Router) -> None:
             return
 
         user_id = callback.from_user.id
-        lang = db.get_user_language(user_id)
+        lang = common.db.get_user_language(user_id)
 
-        store = db.get_store(store_id)
+        store = common.db.get_store(store_id)
         if not store:
             await callback.answer(
                 "Магазин не найден" if lang == "ru" else "Do'kon topilmadi",
@@ -367,7 +368,7 @@ def register(router: Router) -> None:
 
         store_name = get_store_field(store, "name", "Магазин")
 
-        offers = db.get_active_offers(store_id)
+        offers = common.db.get_active_offers(store_id)
         if not offers:
             await callback.answer(
                 "Нет доступных товаров" if lang == "ru" else "Mahsulotlar yo'q",

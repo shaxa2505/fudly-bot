@@ -10,7 +10,8 @@ from aiogram.utils.keyboard import InlineKeyboardBuilder
 from app.services.unified_order_service import OrderItem, OrderResult, get_unified_order_service
 from handlers.common.states import OrderDelivery
 
-from .common import db, bot, esc
+from .common import esc
+from . import common
 
 
 class IsCartOrderFilter:
@@ -50,13 +51,13 @@ async def _cart_show_card_payment_details(
 
     payment_card = None
     try:
-        payment_card = db.get_payment_card(store_id)
+        payment_card = common.db.get_payment_card(store_id)
     except Exception:
         pass
 
     if not payment_card:
         try:
-            payment_card = db.get_platform_payment_card()
+            payment_card = common.db.get_platform_payment_card()
         except Exception:
             pass
 
@@ -107,12 +108,12 @@ def register(router: Router) -> None:
 
     @router.callback_query(F.data.startswith("cart_pay_click_"))
     async def cart_pay_click(callback: types.CallbackQuery, state: FSMContext) -> None:
-        if not db or not callback.message:
+        if not common.db or not callback.message:
             await callback.answer()
             return
 
         user_id = callback.from_user.id
-        lang = db.get_user_language(user_id)
+        lang = common.db.get_user_language(user_id)
 
         data = await state.get_data()
         cart_items_stored = data.get("cart_items", [])
@@ -231,12 +232,12 @@ def register(router: Router) -> None:
 
     @router.callback_query(F.data.startswith("cart_pay_card_"))
     async def cart_pay_card(callback: types.CallbackQuery, state: FSMContext) -> None:
-        if not db or not callback.message:
+        if not common.db or not callback.message:
             await callback.answer()
             return
 
         user_id = callback.from_user.id
-        lang = db.get_user_language(user_id)
+        lang = common.db.get_user_language(user_id)
 
         data = await state.get_data()
         cart_items_stored = data.get("cart_items", [])
@@ -326,11 +327,11 @@ def register(router: Router) -> None:
 
     @router.message(OrderDelivery.payment_proof, F.photo, IsCartOrderFilter())
     async def cart_payment_proof(message: types.Message, state: FSMContext) -> None:
-        if not db or not bot or not message.from_user:
+        if not common.db or not common.bot or not message.from_user:
             return
 
         user_id = message.from_user.id
-        lang = db.get_user_language(user_id)
+        lang = common.db.get_user_language(user_id)
         data = await state.get_data()
 
         order_id = data.get("order_id")
@@ -349,17 +350,17 @@ def register(router: Router) -> None:
 
         photo_id = message.photo[-1].file_id
 
-        db.update_payment_status(order_id, "pending", photo_id)
+        common.db.update_payment_status(order_id, "pending", photo_id)
 
         await state.clear()
 
-        store = db.get_store(store_id)
+        store = common.db.get_store(store_id)
         from handlers.bookings.utils import get_store_field
 
         store_name = get_store_field(store, "name", "Магазин")
         owner_id = get_store_field(store, "owner_id")
 
-        customer = db.get_user_model(user_id)
+        customer = common.db.get_user_model(user_id) if common.db else None
         customer_phone = customer.phone if customer else "—"
 
         total = sum(item["price"] * item["quantity"] for item in cart_items_stored)
@@ -422,11 +423,11 @@ def register(router: Router) -> None:
 
         sent_msg = await message.answer(confirm_text, parse_mode="HTML")
 
-        if sent_msg and order_id and hasattr(db, "set_order_customer_message_id"):
+        if sent_msg and order_id and hasattr(common.db, "set_order_customer_message_id"):
             from logging_config import logger
 
             try:
-                db.set_order_customer_message_id(order_id, sent_msg.message_id)
+                common.db.set_order_customer_message_id(order_id, sent_msg.message_id)
                 logger.info(
                     "Saved customer_message_id=%s for cart order #%s",
                     sent_msg.message_id,
@@ -442,7 +443,7 @@ def register(router: Router) -> None:
             return
 
         user_id = callback.from_user.id
-        lang = db.get_user_language(user_id) if db else "ru"
+        lang = common.db.get_user_language(user_id) if common.db else "ru"
 
         msg = (
             "❌ To'lov bekor qilindi" if lang == "uz" else "❌ Оплата отменена"
