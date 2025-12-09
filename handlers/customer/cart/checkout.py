@@ -250,47 +250,12 @@ def register(router: Router) -> None:
 
         cart_storage.clear_cart(user_id)
 
-        order_id = result.order_ids[0] if result.order_ids else None
+        # UnifiedOrderService уже отправил клиенту подробное сообщение
+        # "ЗАКАЗ ОФОРМЛЕН" с кодом и инструкциями.
+        # Здесь оставляем только короткий попап для ощущения завершённости.
 
         # Short popup for continuity
         await callback.answer("✅", show_alert=False)
-
-        # Send a clear confirmation message with basic summary
-        currency = "so'm" if lang == "uz" else "сум"
-        total = int(sum(item.price * item.quantity for item in items))
-
-        lines: list[str] = []
-        if lang == "uz":
-            lines.append("✅ <b>Buyurtma qabul qilindi!</b>")
-        else:
-            lines.append("✅ <b>Заказ принят!</b>")
-
-        if order_id:
-            lines.append("")
-            lines.append(f"📦 #{order_id}")
-
-        lines.append("")
-        lines.append(f"💵 {total:,} {currency}")
-
-        if lang == "uz":
-            lines.append("")
-            lines.append("📍 Mahsulotni do'kondan olib ketishingiz mumkin.")
-            lines.append(
-                "ℹ️ Batafsil ma'lumotni 'Mening buyurtmalarim' bo'limida ko'rishingiz mumkin."
-            )
-        else:
-            lines.append("")
-            lines.append("📍 Заказ ожидает вас в магазине.")
-            lines.append(
-                "ℹ️ Подробности доступны в разделе 'Мои заказы'."
-            )
-
-        text = "\n".join(lines)
-
-        try:
-            await callback.message.answer(text, parse_mode="HTML")
-        except Exception:
-            pass
 
     @router.callback_query(F.data == "back_to_menu")
     async def back_to_menu(callback: types.CallbackQuery, state: FSMContext) -> None:
