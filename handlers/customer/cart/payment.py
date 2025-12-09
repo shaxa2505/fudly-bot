@@ -436,7 +436,7 @@ def register(router: Router) -> None:
 
         from bot import ADMIN_ID
 
-        if ADMIN_ID > 0:
+        if ADMIN_ID > 0 and common.bot:
             kb = InlineKeyboardBuilder()
             kb.button(
                 text="✅ Tasdiqlash", callback_data=f"admin_confirm_payment_{order_id}"
@@ -451,7 +451,7 @@ def register(router: Router) -> None:
             )
 
             try:
-                await bot.send_photo(
+                await common.bot.send_photo(
                     chat_id=ADMIN_ID,
                     photo=photo_id,
                     caption=(
