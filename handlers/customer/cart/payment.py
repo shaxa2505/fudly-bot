@@ -4,6 +4,7 @@ from __future__ import annotations
 from typing import Any
 
 from aiogram import F, Router, types
+from aiogram.filters import BaseFilter
 from aiogram.fsm.context import FSMContext
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
@@ -14,12 +15,12 @@ from .common import esc
 from . import common
 
 
-class IsCartOrderFilter:
+class IsCartOrderFilter(BaseFilter):
     """Filter that checks if current FSM state data has is_cart_order=True."""
 
     async def __call__(self, message: types.Message, state: FSMContext) -> bool:  # type: ignore[override]
         data = await state.get_data()
-        return data.get("is_cart_order", False)
+        return bool(data.get("is_cart_order"))
 
 
 async def _cart_switch_to_card_payment(
