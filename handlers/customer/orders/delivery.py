@@ -1011,15 +1011,17 @@ async def dlv_payment_proof(
             pending_orders = db.get_user_orders(user_id)
             for o in pending_orders or []:
                 if isinstance(o, dict):
-                    status = o.get("order_status")
-                    payment_photo = o.get("payment_proof_photo_id")
-                    oid = o.get("order_id")
+                    status = o.get("order_status") or o.get("status")
+                    payment_photo = o.get("payment_proof_photo_id") or o.get(
+                        "payment_photo_id"
+                    )
+                    oid = o.get("order_id") or o.get("id")
                 else:
                     status = o[10] if len(o) > 10 else None
                     payment_photo = o[12] if len(o) > 12 else None  # payment_proof_photo_id
                     oid = o[0]
 
-                # Find pending order without payment screenshot
+                # Find pending delivery order without payment screenshot
                 if status == "pending" and not payment_photo:
                     order_id = oid
                     logger.info(f"✅ Found pending order #{order_id} for user {user_id}")
