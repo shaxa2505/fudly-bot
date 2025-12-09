@@ -685,17 +685,48 @@ async def dlv_pay_click(
     user_id = callback.from_user.id
     lang = db.get_user_language(user_id)
 
+    logger.info(f"🖱️ User {user_id} selected Click payment")
+    logger.info(f"📋 FSM data: {data}")
+
     # Order should already exist from address input
     order_id = data.get("order_id")
+    
+    # FALLBACK: If no order_id in FSM, try to find recent pending order
     if not order_id:
-        logger.error(f"❌ User {user_id} no order_id in FSM for Click payment")
+        logger.warning(f"⚠️ User {user_id} no order_id in FSM for Click, searching...")
+        try:
+            pending_orders = db.get_user_orders(user_id)
+            for o in pending_orders or []:
+                if isinstance(o, dict):
+                    status = o.get("order_status") or o.get("status")
+                    order_type = o.get("order_type")
+                    if status == "pending" and order_type == "delivery":
+                        order_id = o.get("id")
+                        # Restore data
+                        await state.update_data(
+                            order_id=order_id,
+                            store_id=o.get("store_id"),
+                            offer_id=o.get("offer_id"),
+                            quantity=o.get("quantity", 1),
+                            price=o.get("unit_price", 0),
+                            title=o.get("offer_title", ""),
+                            delivery_price=o.get("delivery_price", 0),
+                        )
+                        data = await state.get_data()
+                        logger.info(f"✅ FALLBACK: Found order #{order_id}")
+                        break
+        except Exception as e:
+            logger.error(f"Fallback search failed: {e}")
+    
+    if not order_id:
+        logger.error(f"❌ User {user_id} no order_id found")
         msg = "❌ Ma'lumotlar yo'qoldi" if lang == "uz" else "❌ Данные потеряны"
         await callback.message.answer(msg, reply_markup=get_appropriate_menu(user_id, lang))
         await state.clear()
         await callback.answer()
         return
 
-    logger.info(f"✅ Found order #{order_id} for Click payment")
+    logger.info(f"✅ Using order #{order_id} for Click payment")
 
     quantity = data.get("quantity", 1)
     price = data.get("price", 0)
@@ -758,19 +789,49 @@ async def dlv_pay_card(
     data = await state.get_data()
 
     logger.info(f"💳 User {user_id} selected card payment")
-    logger.info(f"📋 FSM data: {list(data.keys())}")
+    logger.info(f"📋 FSM data keys: {list(data.keys())}")
+    logger.info(f"📋 FSM data: {data}")
 
     # Order should already exist from address input
     order_id = data.get("order_id")
+    
+    # FALLBACK: If no order_id in FSM, try to find recent pending order for user
     if not order_id:
-        logger.error(f"❌ User {user_id} no order_id in FSM for card payment")
-        msg = "❌ Ma'lumotlar yo'qoldi" if lang == "uz" else "❌ Данные потеряны"
+        logger.warning(f"⚠️ User {user_id} no order_id in FSM, searching for pending order...")
+        try:
+            # Get recent pending delivery orders for this user
+            pending_orders = db.get_user_orders(user_id)
+            for o in pending_orders or []:
+                if isinstance(o, dict):
+                    status = o.get("order_status") or o.get("status")
+                    order_type = o.get("order_type")
+                    if status == "pending" and order_type == "delivery":
+                        order_id = o.get("id")
+                        logger.info(f"✅ FALLBACK: Found pending order #{order_id} for user {user_id}")
+                        # Restore FSM data from order
+                        await state.update_data(
+                            order_id=order_id,
+                            store_id=o.get("store_id"),
+                            offer_id=o.get("offer_id"),
+                            quantity=o.get("quantity", 1),
+                            address=o.get("delivery_address"),
+                            delivery_price=o.get("delivery_price", 0),
+                            price=o.get("unit_price", 0),
+                        )
+                        data = await state.get_data()
+                        break
+        except Exception as e:
+            logger.error(f"Fallback order search failed: {e}")
+    
+    if not order_id:
+        logger.error(f"❌ User {user_id} no order_id found anywhere")
+        msg = "❌ Ma'lumotlar yo'qoldi. Qaytadan buyurtma bering." if lang == "uz" else "❌ Данные потеряны. Оформите заказ заново."
         await callback.message.answer(msg, reply_markup=get_appropriate_menu(user_id, lang))
         await state.clear()
         await callback.answer()
         return
 
-    logger.info(f"✅ Found order #{order_id} for card payment")
+    logger.info(f"✅ Using order #{order_id} for card payment")
 
     # Save payment method and show card details
     await state.update_data(payment_method="card")
