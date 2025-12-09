@@ -97,7 +97,10 @@ async def _cart_show_card_payment_details(
         )
 
     kb = InlineKeyboardBuilder()
+    # Back to payment method selection + full cancel
+    back_text = "⬅️ Orqaga" if lang == "uz" else "⬅️ Назад"
     cancel_text = "❌ Bekor" if lang == "uz" else "❌ Отмена"
+    kb.button(text=back_text, callback_data="cart_back_to_payment")
     kb.button(text=cancel_text, callback_data="cart_cancel_payment")
 
     await message.answer(text, parse_mode="HTML", reply_markup=kb.as_markup())
@@ -227,6 +230,69 @@ def register(router: Router) -> None:
 
             logger.error(f"Click invoice error for cart: {e}")
             await _cart_switch_to_card_payment(callback.message, state, data, order_id, lang)
+
+        await callback.answer()
+
+    @router.callback_query(F.data == "cart_back_to_payment")
+    async def cart_back_to_payment(callback: types.CallbackQuery, state: FSMContext) -> None:
+        """Go back from card details to payment method selection for cart orders."""
+        if not common.db or not callback.message:
+            await callback.answer()
+            return
+
+        user_id = callback.from_user.id
+        lang = common.db.get_user_language(user_id)
+
+        data = await state.get_data()
+        cart_items_stored = data.get("cart_items", [])
+        store_id = data.get("store_id")
+        delivery_price = data.get("delivery_price", 0)
+        address = data.get("address", "")
+
+        # Rebuild payment summary card with Click / Card buttons
+        if not cart_items_stored or not store_id or not address:
+            await callback.answer(
+                "❌ Ошибка" if lang == "ru" else "❌ Xatolik", show_alert=True
+            )
+            return
+
+        currency = "so'm" if lang == "uz" else "сум"
+        total = sum(int(item["price"]) * int(item["quantity"]) for item in cart_items_stored)
+        total_with_delivery = total + int(delivery_price)
+
+        if lang == "uz":
+            text = (
+                f"💳 <b>To'lov usulini tanlang</b>\n\n"
+                f"💰 Summa: <b>{total_with_delivery:,} {currency}</b>\n"
+                f"📍 Manzil: {address}"
+            )
+        else:
+            text = (
+                f"💳 <b>Выберите способ оплаты</b>\n\n"
+                f"💰 Сумма: <b>{total_with_delivery:,} {currency}</b>\n"
+                f"📍 Адрес: {address}"
+            )
+
+        kb = InlineKeyboardBuilder()
+        kb.button(text="💳 Click", callback_data=f"cart_pay_click_{store_id}")
+        kb.button(
+            text=("💳 Карта" if lang == "ru" else "💳 Karta"),
+            callback_data=f"cart_pay_card_{store_id}",
+        )
+        kb.button(
+            text="⬅️ Назад" if lang == "ru" else "⬅️ Orqaga",
+            callback_data="cart_back_to_address",
+        )
+        kb.button(
+            text="❌ Отмена" if lang == "ru" else "❌ Bekor qilish",
+            callback_data="cart_cancel_payment",
+        )
+        kb.adjust(2, 2)
+
+        try:
+            await callback.message.edit_text(text, parse_mode="HTML", reply_markup=kb.as_markup())
+        except Exception:
+            await callback.message.answer(text, parse_mode="HTML", reply_markup=kb.as_markup())
 
         await callback.answer()
 

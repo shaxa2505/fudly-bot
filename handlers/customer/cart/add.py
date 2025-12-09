@@ -336,12 +336,28 @@ def register(router: Router) -> None:
             await callback.answer()
             return
 
+        user_id = callback.from_user.id
+        lang = common.db.get_user_language(user_id) if common.db else "ru"
+
+        data = await state.get_data()
+        store_id = data.get("store_id")
+
         await state.clear()
 
-        try:
-            await callback.message.delete()
-        except Exception:
-            pass
+        # If we know the store, return user to its offers list
+        if store_id is not None:
+            try:
+                await _show_store_offers(callback, state, int(store_id), lang)
+            except Exception:
+                try:
+                    await callback.message.delete()
+                except Exception:
+                    pass
+        else:
+            try:
+                await callback.message.delete()
+            except Exception:
+                pass
 
         await callback.answer()
 

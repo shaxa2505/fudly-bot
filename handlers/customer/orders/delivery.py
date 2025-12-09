@@ -559,7 +559,7 @@ async def dlv_new_address(
         offer_id = 0
 
     back_text = "⬅️ Orqaga" if lang == "uz" else "⬅️ Назад"
-    cancel_text = "❌ Bekor" if lang == "uz" else "❌ Отмена"
+    cancel_text = "❌ Bekor qilish" if lang == "uz" else "❌ Отмена"
     if offer_id:
         kb.button(text=back_text, callback_data=f"dlv_back_address_{offer_id}")
     kb.button(text=cancel_text, callback_data="dlv_cancel")
@@ -974,7 +974,7 @@ async def _show_card_payment_details(
 
     # Cancel button with order_id
     kb = InlineKeyboardBuilder()
-    cancel_text = "❌ Bekor" if lang == "uz" else "❌ Отмена"
+    cancel_text = "❌ Bekor qilish" if lang == "uz" else "❌ Отмена"
     oid = order_id or data.get("order_id", 0)
     kb.button(text=cancel_text, callback_data=f"dlv_cancel_{oid}")
 

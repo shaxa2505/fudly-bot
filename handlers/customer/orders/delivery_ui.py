@@ -102,7 +102,7 @@ def build_delivery_qty_keyboard(
     kb.button(text=next_text, callback_data=f"dlv_to_address_{offer_id}")
 
     # Row 3: Cancel
-    cancel_text = "❌ Bekor" if lang == "uz" else "❌ Отмена"
+    cancel_text = "❌ Bekor qilish" if lang == "uz" else "❌ Отмена"
     kb.button(text=cancel_text, callback_data="dlv_cancel")
 
     kb.adjust(3, 1, 1)
@@ -128,7 +128,7 @@ def build_delivery_address_keyboard(
 
     # Back and Cancel
     back_text = "⬅️ Orqaga" if lang == "uz" else "⬅️ Назад"
-    cancel_text = "❌ Bekor" if lang == "uz" else "❌ Отмена"
+    cancel_text = "❌ Bekor qilish" if lang == "uz" else "❌ Отмена"
     kb.button(text=back_text, callback_data=f"dlv_back_qty_{offer_id}")
     kb.button(text=cancel_text, callback_data="dlv_cancel")
 
@@ -156,7 +156,7 @@ def build_delivery_payment_keyboard(
 
     # Back and Cancel
     back_text = "⬅️ Orqaga" if lang == "uz" else "⬅️ Назад"
-    cancel_text = "❌ Bekor" if lang == "uz" else "❌ Отмена"
+    cancel_text = "❌ Bekor qilish" if lang == "uz" else "❌ Отмена"
     kb.button(text=back_text, callback_data=f"dlv_back_address_{offer_id}")
     kb.button(text=cancel_text, callback_data="dlv_cancel")
 

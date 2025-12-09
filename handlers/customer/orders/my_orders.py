@@ -664,7 +664,7 @@ async def order_received_handler(callback: types.CallbackQuery) -> None:
         kb.button(text="⭐⭐⭐⭐", callback_data=f"myorder_rate_{order_type}_{order_id}_4")
         kb.button(text="⭐⭐⭐", callback_data=f"myorder_rate_{order_type}_{order_id}_3")
         kb.button(
-            text="⬅️ {_t(lang, 'Пропустить', 'O''tkazib yuborish')}", callback_data="myorders_back"
+            text=f"⬅️ {_t(lang, 'Пропустить', 'O''tkazib yuborish')}", callback_data="myorders_back"
         )
         kb.adjust(1)
 
