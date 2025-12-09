@@ -578,7 +578,39 @@ async def dlv_address_input(
 
     data = await state.get_data()
     offer_id = data.get("offer_id")
+    store_id = data.get("store_id")
+    quantity = data.get("quantity", 1)
+    delivery_price = data.get("delivery_price", 0)
+    user_id = message.from_user.id
 
+    # CREATE ORDER NOW (before payment selection) - prevents FSM data loss
+    order_id = db.create_order(
+        user_id=user_id,
+        store_id=store_id,
+        offer_id=offer_id,
+        quantity=quantity,
+        order_type="delivery",
+        delivery_address=text,
+        delivery_price=delivery_price,
+        payment_method="pending",  # Will be updated when payment selected
+    )
+
+    if not order_id:
+        msg = "❌ Xatolik" if lang == "uz" else "❌ Ошибка создания заказа"
+        await message.answer(msg, reply_markup=main_menu_customer(lang))
+        await state.clear()
+        return
+
+    logger.info(f"✅ Created order #{order_id} after address input (before payment)")
+
+    # Decrement quantity immediately
+    try:
+        db.increment_offer_quantity_atomic(offer_id, -int(quantity))
+    except Exception as e:
+        logger.error(f"Failed to decrement offer: {e}")
+
+    # Save order_id in FSM
+    await state.update_data(order_id=order_id)
     await state.set_state(OrderDelivery.payment_method_select)
     logger.info(f"🔄 User {message.from_user.id} moved to payment method selection state")
 
@@ -644,52 +676,31 @@ async def dlv_back_to_address(
 async def dlv_pay_click(
     callback: types.CallbackQuery, state: FSMContext, db: DatabaseProtocol
 ) -> None:
-    """Process Click payment."""
+    """Process Click payment - order already created after address input."""
     if not callback.from_user:
         await callback.answer()
         return
 
     data = await state.get_data()
-    lang = db.get_user_language(callback.from_user.id)
+    user_id = callback.from_user.id
+    lang = db.get_user_language(user_id)
 
-    offer_id = data.get("offer_id")
-    store_id = data.get("store_id")
+    # Order should already exist from address input
+    order_id = data.get("order_id")
+    if not order_id:
+        logger.error(f"❌ User {user_id} no order_id in FSM for Click payment")
+        msg = "❌ Ma'lumotlar yo'qoldi" if lang == "uz" else "❌ Данные потеряны"
+        await callback.message.answer(msg, reply_markup=get_appropriate_menu(user_id, lang))
+        await state.clear()
+        await callback.answer()
+        return
+
+    logger.info(f"✅ Found order #{order_id} for Click payment")
+
     quantity = data.get("quantity", 1)
-    address = data.get("address", "")
     price = data.get("price", 0)
     title = data.get("title", "")
     delivery_price = data.get("delivery_price", 0)
-
-    # Create order
-    order_id = None
-    try:
-        order_id = db.create_order(
-            user_id=callback.from_user.id,
-            store_id=store_id,
-            offer_id=offer_id,
-            quantity=quantity,
-            order_type="delivery",
-            delivery_address=address,
-            delivery_price=delivery_price,
-            payment_method="click",
-        )
-        if order_id:
-            db.increment_offer_quantity_atomic(offer_id, -int(quantity))
-            logger.info(f"✅ Created delivery order {order_id} for Click")
-            # Structured logging
-            total_amount = (price * quantity) + delivery_price
-            logger.info(
-                f"ORDER_CREATED: id={order_id}, user={callback.from_user.id}, type=delivery, "
-                f"total={total_amount}, items=1, source=delivery_click"
-            )
-    except Exception as e:
-        logger.error(f"Failed to create order: {e}")
-
-    if not order_id:
-        msg = "❌ Xatolik" if lang == "uz" else "❌ Ошибка"
-        await callback.answer(msg, show_alert=True)
-        await state.clear()
-        return
 
     # Send Click invoice
     from handlers.customer.payments import send_payment_invoice_for_booking
@@ -737,7 +748,7 @@ async def _switch_to_card_payment(message, state, data, order_id, lang, db):
 async def dlv_pay_card(
     callback: types.CallbackQuery, state: FSMContext, db: DatabaseProtocol
 ) -> None:
-    """Process card payment - CREATE ORDER FIRST, then show card details."""
+    """Process card payment - order already created after address input."""
     if not callback.from_user:
         await callback.answer()
         return
@@ -749,52 +760,20 @@ async def dlv_pay_card(
     logger.info(f"💳 User {user_id} selected card payment")
     logger.info(f"📋 FSM data: {list(data.keys())}")
 
-    # Check required data
-    required = ["offer_id", "store_id", "quantity", "address"]
-    if not all(k in data for k in required):
-        missing = [k for k in required if k not in data]
-        logger.error(f"❌ User {user_id} missing data for card payment: {missing}")
+    # Order should already exist from address input
+    order_id = data.get("order_id")
+    if not order_id:
+        logger.error(f"❌ User {user_id} no order_id in FSM for card payment")
         msg = "❌ Ma'lumotlar yo'qoldi" if lang == "uz" else "❌ Данные потеряны"
         await callback.message.answer(msg, reply_markup=get_appropriate_menu(user_id, lang))
         await state.clear()
         await callback.answer()
         return
 
-    # CREATE ORDER NOW (before showing card details)
-    offer_id = data["offer_id"]
-    store_id = data["store_id"]
-    quantity = data["quantity"]
-    address = data["address"]
-    delivery_price = data.get("delivery_price", 0)
+    logger.info(f"✅ Found order #{order_id} for card payment")
 
-    order_id = db.create_order(
-        user_id=user_id,
-        store_id=store_id,
-        offer_id=offer_id,
-        quantity=quantity,
-        order_type="delivery",
-        delivery_address=address,
-        delivery_price=delivery_price,
-        payment_method="card",
-    )
-
-    if not order_id:
-        msg = "❌ Xatolik" if lang == "uz" else "❌ Ошибка"
-        await callback.message.answer(msg)
-        await state.clear()
-        await callback.answer()
-        return
-
-    logger.info(f"✅ Created order #{order_id} BEFORE payment screenshot")
-
-    # Decrement quantity
-    try:
-        db.increment_offer_quantity_atomic(offer_id, -int(quantity))
-    except Exception as e:
-        logger.error(f"Failed to decrement offer: {e}")
-
-    # Save order_id in FSM and show card details
-    await state.update_data(payment_method="card", order_id=order_id)
+    # Save payment method and show card details
+    await state.update_data(payment_method="card")
     await state.set_state(OrderDelivery.payment_proof)
 
     logger.info(f"🔄 User {user_id} state set to payment_proof for order #{order_id}")
@@ -805,7 +784,11 @@ async def dlv_pay_card(
 
 
 async def _show_card_payment_details(
-    message: types.Message, state: FSMContext, lang: str, db: DatabaseProtocol, order_id: int | None = None
+    message: types.Message,
+    state: FSMContext,
+    lang: str,
+    db: DatabaseProtocol,
+    order_id: int | None = None,
 ) -> None:
     """Show card payment details - compact version."""
     data = await state.get_data()
@@ -895,13 +878,13 @@ async def dlv_payment_proof(
 
     # Get order_id - ORDER ALREADY EXISTS
     order_id = data.get("order_id")
-    
+
     if not order_id:
         # Fallback: try to find pending order for this user (without payment screenshot)
         logger.warning(f"⚠️ User {user_id} has no order_id in FSM, checking for pending orders")
         try:
             pending_orders = db.get_user_orders(user_id)
-            for o in (pending_orders or []):
+            for o in pending_orders or []:
                 if isinstance(o, dict):
                     status = o.get("order_status")
                     payment_photo = o.get("payment_proof_photo_id")
@@ -910,7 +893,7 @@ async def dlv_payment_proof(
                     status = o[10] if len(o) > 10 else None
                     payment_photo = o[12] if len(o) > 12 else None  # payment_proof_photo_id
                     oid = o[0]
-                
+
                 # Find pending order without payment screenshot
                 if status == "pending" and not payment_photo:
                     order_id = oid
@@ -918,7 +901,7 @@ async def dlv_payment_proof(
                     break
         except Exception as e:
             logger.error(f"Failed to find pending order: {e}")
-    
+
     if not order_id:
         logger.error(f"❌ User {user_id} has no pending order for screenshot")
         msg = "❌ Ma'lumotlar yo'qoldi" if lang == "uz" else "❌ Данные потеряны"
