@@ -986,6 +986,62 @@ async def _show_card_payment_details(
     await message.answer(text, parse_mode="HTML", reply_markup=kb.as_markup())
 
 
+def _find_recent_unpaid_order(user_id: int, db: DatabaseProtocol) -> tuple[int | None, Any | None]:
+    """Find the most suitable unpaid order for attaching a payment screenshot.
+
+    Works with both Postgres (dict rows) and legacy SQLite (tuple rows).
+    Prefers orders with pending-like status and without payment proof.
+    """
+
+    try:
+        orders = db.get_user_orders(user_id) or []
+    except Exception as e:  # pragma: no cover - defensive logging
+        logger.error(f"Failed to load user orders for fallback (user={user_id}): {e}")
+        return None, None
+
+    if not orders:
+        return None, None
+
+    # Helper to normalize one row
+    def normalize(row: Any) -> tuple[int | None, str | None, bool]:
+        """Return (order_id, status, has_payment_proof)."""
+
+        if isinstance(row, dict):
+            oid = row.get("order_id") or row.get("id")
+            status = row.get("order_status") or row.get("status") or row.get("payment_status")
+            payment_photo = (
+                row.get("payment_proof_photo_id")
+                or row.get("payment_photo_id")
+                or row.get("payment_screenshot")
+            )
+            has_photo = bool(payment_photo)
+        else:
+            # SQLite schema: see CREATE TABLE orders + get_user_orders join
+            oid = row[0] if len(row) > 0 else None
+            status = row[10] if len(row) > 10 else None
+            payment_photo = row[9] if len(row) > 9 else None
+            has_photo = bool(payment_photo)
+
+        return oid, status, has_photo
+
+    # 1) Try to find a clear pending order without payment proof
+    pending_like = {"pending", "new", None}
+    for row in orders:
+        oid, status, has_photo = normalize(row)
+        if oid and not has_photo and status in pending_like:
+            return oid, row
+
+    # 2) Fallback: first order without payment proof, regardless of status
+    for row in orders:
+        oid, _status, has_photo = normalize(row)
+        if oid and not has_photo:
+            return oid, row
+
+    # 3) Last resort: just take the most recent order
+    oid, _status, _has_photo = normalize(orders[0])
+    return oid, orders[0] if oid else (None, None)
+
+
 @router.message(OrderDelivery.payment_proof, F.photo)
 async def dlv_payment_proof(
     message: types.Message, state: FSMContext, db: DatabaseProtocol
@@ -1005,32 +1061,14 @@ async def dlv_payment_proof(
     order_id = data.get("order_id")
 
     if not order_id:
-        # Fallback: try to find pending order for this user (without payment screenshot)
-        logger.warning(f"⚠️ User {user_id} has no order_id in FSM, checking for pending orders")
-        try:
-            pending_orders = db.get_user_orders(user_id)
-            for o in pending_orders or []:
-                if isinstance(o, dict):
-                    status = o.get("order_status") or o.get("status")
-                    payment_photo = o.get("payment_proof_photo_id") or o.get(
-                        "payment_photo_id"
-                    )
-                    oid = o.get("order_id") or o.get("id")
-                else:
-                    # Legacy SQLite schema: status column at fixed index, no explicit
-                    # payment_proof_photo_id field in this joined tuple. We rely only
-                    # on status here and assume first pending order is the current one.
-                    status = o[10] if len(o) > 10 else None
-                    payment_photo = None
-                    oid = o[0]
-
-                # Find pending delivery order without payment screenshot
-                if status == "pending" and not payment_photo:
-                    order_id = oid
-                    logger.info(f"✅ Found pending order #{order_id} for user {user_id}")
-                    break
-        except Exception as e:
-            logger.error(f"Failed to find pending order: {e}")
+        # Fallback: try to find recent unpaid order for this user (without payment screenshot)
+        logger.warning(
+            f"⚠️ User {user_id} has no order_id in FSM, searching for recent unpaid order"
+        )
+        fallback_order_id, _ = _find_recent_unpaid_order(user_id, db)
+        if fallback_order_id:
+            order_id = fallback_order_id
+            logger.info(f"✅ Fallback selected order #{order_id} for user {user_id}")
 
     if not order_id:
         logger.error(f"❌ User {user_id} has no pending order for screenshot")
