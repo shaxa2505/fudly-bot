@@ -1017,8 +1017,11 @@ async def dlv_payment_proof(
                     )
                     oid = o.get("order_id") or o.get("id")
                 else:
+                    # Legacy SQLite schema: status column at fixed index, no explicit
+                    # payment_proof_photo_id field in this joined tuple. We rely only
+                    # on status here and assume first pending order is the current one.
                     status = o[10] if len(o) > 10 else None
-                    payment_photo = o[12] if len(o) > 12 else None  # payment_proof_photo_id
+                    payment_photo = None
                     oid = o[0]
 
                 # Find pending delivery order without payment screenshot
