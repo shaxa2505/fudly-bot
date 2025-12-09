@@ -288,11 +288,11 @@ def store_reviews_keyboard(lang: str, store_id: int) -> InlineKeyboardMarkup:
 def search_results_compact_keyboard(
     lang: str, offers: Sequence[Any], page: int, total_pages: int, query: str
 ) -> InlineKeyboardMarkup:
-    """Compact keyboard for search results with item buttons and pagination."""
+    """Simple keyboard for search results - just clickable items."""
     builder = InlineKeyboardBuilder()
 
-    # Add buttons for each offer in 2-column layout (similar to cart)
-    for idx, offer in enumerate(offers[:5], start=1):
+    # Simple item buttons - one per row
+    for offer in offers[:5]:
         offer_id = offer.id if hasattr(offer, "id") else offer.get("offer_id", 0)
         title = offer.title if hasattr(offer, "title") else offer.get("title", "Товар")
         price = (
@@ -303,39 +303,29 @@ def search_results_compact_keyboard(
         if not price:
             price = offer.price if hasattr(offer, "price") else offer.get("price", 0)
 
-        # Row 1: Number button
-        builder.button(text=f"{idx}", callback_data="search_noop")
-
-        # Row 1: Title button (longer)
-        short_title = title[:30] + ".." if len(title) > 30 else title
-        builder.button(text=short_title, callback_data=f"search_select_{offer_id}")
-
-        # Row 2: Price button (full width)
+        # Single button with title and price
+        short_title = title[:25] + ".." if len(title) > 25 else title
         price_str = f"{int(price):,}".replace(",", " ")
-        builder.button(text=f"💰 {price_str}", callback_data=f"search_select_{offer_id}")
+        btn_text = f"{short_title} • {price_str}"
+        builder.button(text=btn_text, callback_data=f"search_select_{offer_id}")
 
-    # Adjust: 2 buttons (number + title), then 1 button (price), repeat
-    num_offers = len(offers[:5])
-    adjust_pattern = [2, 1] * num_offers
-    builder.adjust(*adjust_pattern)
-
-    # Pagination row
+    # Pagination (only if needed)
+    nav_buttons = []
     if page > 0:
-        builder.button(text="◀️", callback_data=f"search_page_{page - 1}")
-    builder.button(text=f"📄 {page + 1}/{total_pages}", callback_data="search_noop")
+        nav_buttons.append(("◀️", f"search_page_{page - 1}"))
+    if total_pages > 1:
+        nav_buttons.append((f"{page + 1}/{total_pages}", "search_noop"))
     if page < total_pages - 1:
-        builder.button(text="▶️", callback_data=f"search_page_{page + 1}")
+        nav_buttons.append(("▶️", f"search_page_{page + 1}"))
 
-    # New search button
-    new_search_text = "🔍 Янги қидирув" if lang == "uz" else "🔍 Новый поиск"
-    builder.button(text=new_search_text, callback_data="search_new")
+    for text, cb in nav_buttons:
+        builder.button(text=text, callback_data=cb)
 
-    # Adjust pagination: up to 3 buttons (back/page/forward) + 1 new search
-    nav_count = 1  # page indicator always
-    if page > 0:
-        nav_count += 1
-    if page < total_pages - 1:
-        nav_count += 1
-    builder.adjust(*adjust_pattern, nav_count, 1)
+    # Adjust: each item is 1 button, navigation row at the end
+    items_count = min(len(offers), 5)
+    if nav_buttons:
+        builder.adjust(*([1] * items_count), len(nav_buttons))
+    else:
+        builder.adjust(1)
 
     return builder.as_markup()

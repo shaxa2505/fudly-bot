@@ -500,34 +500,19 @@ def setup(
         end_idx = min(start_idx + ITEMS_PER_PAGE, total_count)
         page_offers = all_results[start_idx:end_idx]
 
-        # Build simple list
-        lines = []
-        for idx, offer in enumerate(page_offers, start=1):
-            title = offer.title if hasattr(offer, "title") else offer.get("title", "Товар")
-            price = getattr(offer, "discount_price", 0) or getattr(offer, "price", 0)
-            quantity = getattr(offer, "quantity", 0)
-
-            # Format price
-            price_str = f"{int(price):,}".replace(",", " ")
-            qty_icon = "✅" if quantity > 0 else "❌"
-
-            lines.append(f"{idx}. {title}\n💰 {price_str} | {qty_icon} {quantity}\n")
-
-        # Simple header
-        header = f"«{query}»\n📦 Topildi: {total_count}\n\n" if lang == "uz" else f"«{query}»\n📦 Найдено: {total_count}\n\n"
-
-        text = header + "\n".join(lines)
+        # Simple header - buttons will show details
+        text = f"«{query}» - {total_count}" if lang == "uz" else f"«{query}» - {total_count}"
 
         # Create keyboard with inline buttons
         keyboard = search_results_compact_keyboard(lang, page_offers, page, total_pages, query)
 
         if edit and isinstance(target, types.CallbackQuery) and target.message:
             try:
-                await target.message.edit_text(text, parse_mode="HTML", reply_markup=keyboard)
+                await target.message.edit_text(text, reply_markup=keyboard)
             except Exception:
-                await target.message.answer(text, parse_mode="HTML", reply_markup=keyboard)
+                await target.message.answer(text, reply_markup=keyboard)
         elif isinstance(target, types.Message):
-            await target.answer(text, parse_mode="HTML", reply_markup=keyboard)
+            await target.answer(text, reply_markup=keyboard)
         elif isinstance(target, types.CallbackQuery) and target.message:
             await target.message.answer(text, parse_mode="HTML", reply_markup=keyboard)
 
