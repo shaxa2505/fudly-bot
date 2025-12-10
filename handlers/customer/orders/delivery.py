@@ -947,6 +947,7 @@ async def dlv_payment_proof(
 
     total_products = price * quantity
     currency = "so'm" if lang == "uz" else "сум"
+    total = total_products + delivery_price
 
     # Build unified customer message (awaiting payment verification)
     items_for_template = [
@@ -1013,38 +1014,6 @@ async def dlv_payment_proof(
             )
         except Exception as e:
             logger.error(f"Failed to notify admin: {e}")
-
-    # Confirm to customer - single message
-    if lang == "uz":
-        confirm_text = (
-            f"✅ <b>Buyurtma qabul qilindi!</b>\n\n"
-            f"📦 #{order_id}\n"
-            f"🛒 {title} × {quantity}\n"
-            f"💵 {total:,} {currency}\n"
-            f"📍 {address}\n\n"
-            f"⏳ To'lov tasdiqlanishi kutilmoqda..."
-        )
-    else:
-        confirm_text = (
-            f"✅ <b>Заказ принят!</b>\n\n"
-            f"📦 #{order_id}\n"
-            f"🛒 {title} × {quantity}\n"
-            f"💵 {total:,} {currency}\n"
-            f"📍 {address}\n\n"
-            f"⏳ Ожидаем подтверждения оплаты..."
-        )
-
-    # IMPORTANT: Don't use reply_markup here! Messages with ReplyKeyboard can't be edited later.
-    # The keyboard is already shown to user, we just need an editable status message.
-    sent_msg = await message.answer(confirm_text, parse_mode="HTML")
-
-    # Save message_id for live status updates
-    if sent_msg and order_id and hasattr(db, "set_order_customer_message_id"):
-        try:
-            db.set_order_customer_message_id(order_id, sent_msg.message_id)
-            logger.info(f"Saved customer_message_id={sent_msg.message_id} for order #{order_id}")
-        except Exception as e:
-            logger.warning(f"Failed to save customer_message_id: {e}")
 
 
 @router.message(OrderDelivery.payment_proof)
