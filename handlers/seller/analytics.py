@@ -182,14 +182,26 @@ async def partner_today_stats(message: types.Message, state: FSMContext) -> None
         top_item = cursor.fetchone()
         top_item_text = f"\n🏆 ТОП товар: {top_item[0]} ({top_item[1]} заказов)" if top_item else ""
 
-    text = f"""📊 <b>СТАТИСТИКА СЕГОДНЯ</b>
-
-💰 Выручка: {revenue:,} сум
-📦 Товаров продано: {items_sold} шт
-🛒 Заказов: {orders_count}
-📋 Активных товаров: {active_offers}{top_item_text}
-
-Обновлено: {datetime.now().strftime('%H:%M')}
-"""
+    # Localized compact summary (RU / UZ)
+    if lang == "uz":
+        currency = "so'm"
+        text = (
+            "📊 <b>BUGUNGI STATISTIKA</b>\n\n"
+            f"💰 Tushum: {revenue:,} {currency}\n"
+            f"📦 Sotilgan mahsulotlar: {items_sold} ta\n"
+            f"🛒 Buyurtmalar: {orders_count}\n"
+            f"📋 Faol takliflar: {active_offers}{top_item_text}\n\n"
+            f"Yangilandi: {datetime.now().strftime('%H:%M')}"
+        )
+    else:
+        currency = "сум"
+        text = (
+            "📊 <b>СТАТИСТИКА СЕГОДНЯ</b>\n\n"
+            f"💰 Выручка: {revenue:,} {currency}\n"
+            f"📦 Товаров продано: {items_sold} шт\n"
+            f"🛒 Заказов: {orders_count}\n"
+            f"📋 Активных товаров: {active_offers}{top_item_text}\n\n"
+            f"Обновлено: {datetime.now().strftime('%H:%M')}"
+        )
 
     await message.answer(text, parse_mode="HTML")

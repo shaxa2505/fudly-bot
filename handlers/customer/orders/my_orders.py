@@ -16,6 +16,8 @@ from aiogram import F, Router, types
 from aiogram.fsm.context import FSMContext
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
+from app.services.unified_order_service import get_unified_order_service
+
 try:
     from logging_config import logger
 except ImportError:
@@ -651,12 +653,16 @@ async def order_received_handler(callback: types.CallbackQuery) -> None:
         return
 
     try:
-        if order_type == "b":
-            # Booking
-            db.update_booking_status(order_id, "completed")
-        else:
-            # Order
-            db.update_order_status(order_id, "completed")
+        service = get_unified_order_service()
+        if not service:
+            await callback.answer(_t(lang, "❌ Ошибка", "❌ Xatolik"), show_alert=True)
+            return
+
+        entity_type = "booking" if order_type == "b" else "order"
+        success = await service.complete_order(order_id, entity_type)
+        if not success:
+            await callback.answer(_t(lang, "❌ Ошибка", "❌ Xatolik"), show_alert=True)
+            return
 
         await callback.answer(
             _t(lang, "✅ Спасибо! Заказ завершён", "✅ Rahmat! Buyurtma yakunlandi"),
@@ -857,7 +863,11 @@ async def order_cancel_handler(callback: types.CallbackQuery) -> None:
             await callback.answer(_t(lang, "❌ Заказ не найден", "❌ Buyurtma topilmadi"))
             return
 
-        status = order.get("status") if hasattr(order, "get") else order[10]
+        status = (
+            order.get("status")
+            if hasattr(order, "get")
+            else order[10]
+        )
         if status != "pending":
             await callback.answer(
                 _t(
@@ -869,7 +879,15 @@ async def order_cancel_handler(callback: types.CallbackQuery) -> None:
             )
             return
 
-        db.update_order_status(order_id, "cancelled")
+        service = get_unified_order_service()
+        if not service:
+            await callback.answer(_t(lang, "❌ Ошибка", "❌ Xatolik"), show_alert=True)
+            return
+
+        success = await service.cancel_order(order_id, "order")
+        if not success:
+            await callback.answer(_t(lang, "❌ Ошибка", "❌ Xatolik"), show_alert=True)
+            return
 
         await callback.answer(
             _t(lang, "✅ Заказ отменён", "✅ Buyurtma bekor qilindi"), show_alert=True

@@ -208,8 +208,26 @@ async def seller_orders_main(message: types.Message, state: FSMContext) -> Any:
         if not stores:
             raise ValueError("No stores")
     except Exception as e:
+        # If seller has no accessible stores, show a friendly message instead of failing silently.
         logger.debug(f"seller_orders skipped: {e}")
-        raise
+        try:
+            lang = db.get_user_language(message.from_user.id)
+        except Exception:
+            lang = "ru"
+
+        if lang == "uz":
+            text = (
+                "Sizda hali tasdiqlangan do'kon yo'q.\n"
+                "Hamkor sifatida buyurtmalarni boshqarish uchun profil bo'limida ro'yxatdan o'tishni yakunlang."
+            )
+        else:
+            text = (
+                "У вас пока нет одобренного магазина.\n"
+                "Чтобы управлять заказами как партнёр, завершите регистрацию в разделе профиля."
+            )
+
+        await message.answer(text)
+        return
 
     lang = db.get_user_language(message.from_user.id)
     all_bookings, all_orders = _get_all_orders(db, message.from_user.id)
@@ -623,10 +641,8 @@ async def confirm_booking_handler(callback: types.CallbackQuery) -> None:
     # Update via UnifiedOrderService
     service = get_unified_order_service()
     if not service:
-        # Fallback to direct DB update
-        db.update_booking_status(booking_id, "confirmed")
-        await callback.answer("✅ Tasdiqlandi" if lang == "uz" else "✅ Подтверждено")
-        await seller_orders_refresh(callback)
+        logger.error("UnifiedOrderService is not initialized for booking_confirm handler")
+        await callback.answer(get_text(lang, "error") or "System error", show_alert=True)
         return
 
     try:
@@ -661,9 +677,8 @@ async def reject_booking_handler(callback: types.CallbackQuery) -> None:
 
     service = get_unified_order_service()
     if not service:
-        db.update_booking_status(booking_id, "cancelled")
-        await callback.answer("❌ Rad etildi" if lang == "uz" else "❌ Отклонено")
-        await seller_orders_refresh(callback)
+        logger.error("UnifiedOrderService is not initialized for booking_reject handler")
+        await callback.answer(get_text(lang, "error") or "System error", show_alert=True)
         return
 
     try:
@@ -692,9 +707,8 @@ async def cancel_booking_seller_handler(callback: types.CallbackQuery) -> None:
 
     service = get_unified_order_service()
     if not service:
-        db.update_booking_status(booking_id, "cancelled")
-        await callback.answer("❌ Bekor qilindi" if lang == "uz" else "❌ Отменено")
-        await seller_orders_refresh(callback)
+        logger.error("UnifiedOrderService is not initialized for booking_cancel_seller handler")
+        await callback.answer(get_text(lang, "error") or "System error", show_alert=True)
         return
 
     try:
@@ -728,9 +742,8 @@ async def confirm_order_handler(callback: types.CallbackQuery) -> None:
 
     service = get_unified_order_service()
     if not service:
-        db.update_order_status(order_id, "preparing")
-        await callback.answer("✅ Qabul qilindi" if lang == "uz" else "✅ Принято")
-        await seller_orders_refresh(callback)
+        logger.error("UnifiedOrderService is not initialized for order_confirm handler")
+        await callback.answer(get_text(lang, "error") or "System error", show_alert=True)
         return
 
     try:
@@ -759,9 +772,8 @@ async def reject_order_handler(callback: types.CallbackQuery) -> None:
 
     service = get_unified_order_service()
     if not service:
-        db.update_order_status(order_id, "cancelled")
-        await callback.answer("❌ Rad etildi" if lang == "uz" else "❌ Отклонено")
-        await seller_orders_refresh(callback)
+        logger.error("UnifiedOrderService is not initialized for order_reject handler")
+        await callback.answer(get_text(lang, "error") or "System error", show_alert=True)
         return
 
     try:
@@ -790,9 +802,8 @@ async def order_ready_handler(callback: types.CallbackQuery) -> None:
 
     service = get_unified_order_service()
     if not service:
-        db.update_order_status(order_id, "ready")
-        await callback.answer("📦 Tayyor!" if lang == "uz" else "📦 Готов!")
-        await seller_orders_refresh(callback)
+        logger.error("UnifiedOrderService is not initialized for order_ready handler")
+        await callback.answer(get_text(lang, "error") or "System error", show_alert=True)
         return
 
     try:
@@ -821,9 +832,8 @@ async def order_delivering_handler(callback: types.CallbackQuery) -> None:
 
     service = get_unified_order_service()
     if not service:
-        db.update_order_status(order_id, "delivering")
-        await callback.answer("🚚 Yo'lga chiqdi!" if lang == "uz" else "🚚 В пути!")
-        await seller_orders_refresh(callback)
+        logger.error("UnifiedOrderService is not initialized for order_delivering handler")
+        await callback.answer(get_text(lang, "error") or "System error", show_alert=True)
         return
 
     try:
@@ -852,9 +862,8 @@ async def cancel_order_seller_handler(callback: types.CallbackQuery) -> None:
 
     service = get_unified_order_service()
     if not service:
-        db.update_order_status(order_id, "cancelled")
-        await callback.answer("❌ Bekor qilindi" if lang == "uz" else "❌ Отменено")
-        await seller_orders_refresh(callback)
+        logger.error("UnifiedOrderService is not initialized for order_cancel_seller handler")
+        await callback.answer(get_text(lang, "error") or "System error", show_alert=True)
         return
 
     try:

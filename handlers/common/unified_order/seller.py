@@ -273,6 +273,44 @@ async def unified_confirm_handler(callback: types.CallbackQuery) -> None:
         currency=currency,
     )
 
+    # Add a short next-step hint so sellers clearly understand
+    # what to do after confirmation for each flow.
+    if entity_type == "booking":
+        if lang == "uz":
+            hint = (
+                "\n\n<i>Mijoz kelganda mahsulotni topshiring va “Topshirildi” "
+                "tugmasini bosing.</i>"
+            )
+        else:
+            hint = (
+                "\n\n<i>Когда клиент придёт, выдайте товар и нажмите "
+                "«Выдано».</i>"
+            )
+        seller_text += hint
+    elif entity_type == "order" and order_type != "delivery":
+        # Pickup order created через orders: сразу ждём фактической выдачи.
+        if lang == "uz":
+            hint = (
+                "\n\n<i>Mijoz buyurtmani olganda “Topshirildi” tugmasini bosing.</i>"
+            )
+        else:
+            hint = (
+                "\n\n<i>Когда клиент заберёт заказ, нажмите «Выдано».</i>"
+            )
+        seller_text += hint
+    else:
+        # Delivery flow: сначала готовим, потом передаём курьеру.
+        if lang == "uz":
+            hint = (
+                "\n\n<i>Buyurtma tayyor bo'lganda “Topshirishga tayyor” "
+                "tugmasini bosing.</i>"
+            )
+        else:
+            hint = (
+                "\n\n<i>Когда заказ будет готов, нажмите «Готов к передаче».</i>"
+            )
+        seller_text += hint
+
     kb = InlineKeyboardBuilder()
     if entity_type == "booking":
         # Classic pickup booking flow: after подтверждения сразу ждём выдачи
