@@ -469,6 +469,14 @@ class NotificationTemplates:
                         f"📦 #{order_id} • {_esc(store_name)}\n"
                         f"👨‍🍳 Tayyorlanmoqda..."
                     ),
+                    OrderStatus.READY: (
+                        f"✅ <b>Buyurtma tayyor!</b>\n\n"
+                        f"{progress_delivery(1)}\n"
+                        f"Qabul │ Yo'lda │ Yetkazildi\n\n"
+                        f"📦 #{order_id} • {_esc(store_name)}\n\n"
+                        f"📦 Qadoqlandi va kuryerga topshirishga tayyor\n"
+                        f"⏱ Kuryerni kuting"
+                    ),
                     OrderStatus.DELIVERING: (
                         f"🚚 <b>Buyurtma yo'lda!</b>\n\n"
                         f"{progress_delivery(2)}\n"
@@ -500,6 +508,14 @@ class NotificationTemplates:
                         f"Принят │ В пути │ Доставлен\n\n"
                         f"📦 #{order_id} • {_esc(store_name)}\n"
                         f"👨‍🍳 Готовится..."
+                    ),
+                    OrderStatus.READY: (
+                        f"✅ <b>Заказ готов!</b>\n\n"
+                        f"{progress_delivery(1)}\n"
+                        f"Принят │ В пути │ Доставлен\n\n"
+                        f"📦 #{order_id} • {_esc(store_name)}\n\n"
+                        f"📦 Упакован и готов к передаче курьеру\n"
+                        f"⏱ Ожидайте курьера"
                     ),
                     OrderStatus.DELIVERING: (
                         f"🚚 <b>Заказ в пути!</b>\n\n"
