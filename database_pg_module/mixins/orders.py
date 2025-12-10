@@ -387,7 +387,7 @@ class OrderMixin:
         with self.get_connection() as conn:
             cursor = conn.cursor()
             cursor.execute(
-                "UPDATE orders SET order_status = %s WHERE order_id = %s",
+                "UPDATE orders SET order_status = %s, updated_at = CURRENT_TIMESTAMP WHERE order_id = %s",
                 (order_status, order_id),
             )
             return True

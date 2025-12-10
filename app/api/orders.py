@@ -337,10 +337,36 @@ async def get_order_timeline(booking_id: int, db=Depends(get_db)):
             )
         )
 
-    # Estimate ready time (30 min from now for MVP)
+    # Estimate ready time based on status
     estimated_ready = None
-    if status == "confirmed":
-        estimated_ready = "через 20-30 мин"
+    if status == "confirmed" or status == "preparing":
+        # Calculate estimated time based on when order was confirmed
+        from datetime import datetime, timedelta
+        try:
+            updated_at = booking_dict.get("updated_at")
+            if updated_at:
+                if isinstance(updated_at, str):
+                    confirmed_time = datetime.fromisoformat(updated_at.replace('Z', '+00:00'))
+                else:
+                    confirmed_time = updated_at
+                
+                # Estimate 25 minutes from confirmation time
+                estimated_ready_dt = confirmed_time + timedelta(minutes=25)
+                now = datetime.now(confirmed_time.tzinfo) if confirmed_time.tzinfo else datetime.now()
+                
+                # If still in future, show time
+                if estimated_ready_dt > now:
+                    minutes_left = int((estimated_ready_dt - now).total_seconds() / 60)
+                    if minutes_left > 0:
+                        estimated_ready = f"через {minutes_left} мин"
+                    else:
+                        estimated_ready = "скоро готов"
+                else:
+                    estimated_ready = "скоро готов"
+            else:
+                estimated_ready = "через 20-30 мин"
+        except Exception:
+            estimated_ready = "через 20-30 мин"
 
     return OrderTimeline(
         booking_id=booking_id,

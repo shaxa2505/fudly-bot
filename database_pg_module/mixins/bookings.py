@@ -395,7 +395,7 @@ class BookingMixin:
         with self.get_connection() as conn:
             cursor = conn.cursor()
             cursor.execute(
-                "UPDATE bookings SET status = %s WHERE booking_id = %s", (status, booking_id)
+                "UPDATE bookings SET status = %s, updated_at = CURRENT_TIMESTAMP WHERE booking_id = %s", (status, booking_id)
             )
 
     def set_booking_customer_message_id(self, booking_id: int, message_id: int) -> bool:
