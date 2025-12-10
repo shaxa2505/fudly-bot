@@ -1060,12 +1060,12 @@ def register(router: Router) -> None:
     router.callback_query.register(unified_confirm_handler, F.data.regexp(CONFIRM_PATTERN))
     router.callback_query.register(unified_reject_handler, F.data.regexp(REJECT_PATTERN))
 
-    router.callback_query.register(order_ready_handler, F.data.regexp(r"^order_ready_(\\d+)$"))
+    router.callback_query.register(order_ready_handler, F.data.regexp(r"^order_ready_(\d+)$"))
     router.callback_query.register(
-        order_delivering_handler, F.data.regexp(r"^order_delivering_(\\d+)$")
+        order_delivering_handler, F.data.regexp(r"^order_delivering_(\d+)$")
     )
     router.callback_query.register(
-        skip_courier_phone_handler, F.data.regexp(r"^skip_courier_phone_(\\d+)$")
+        skip_courier_phone_handler, F.data.regexp(r"^skip_courier_phone_(\d+)$")
     )
 
     router.message.register(
@@ -1075,11 +1075,11 @@ def register(router: Router) -> None:
     )
 
     router.callback_query.register(
-        order_complete_handler, F.data.regexp(r"^order_complete_(\\d+)$")
+        order_complete_handler, F.data.regexp(r"^order_complete_(\d+)$")
     )
     router.callback_query.register(
-        complete_booking_handler, F.data.regexp(r"^complete_booking_(\\d+)$")
+        complete_booking_handler, F.data.regexp(r"^complete_booking_(\d+)$")
     )
     router.callback_query.register(
-        order_cancel_seller_handler, F.data.regexp(r"^order_cancel_seller_(\\d+)$")
+        order_cancel_seller_handler, F.data.regexp(r"^order_cancel_seller_(\d+)$")
     )
