@@ -442,7 +442,7 @@ class NotificationTemplates:
                     OrderStatus.COMPLETED: (
                         f"🎊 <b>Buyurtma topshirildi!</b>\n\n"
                         f"{progress_pickup(2)}\n\n"
-                        f"📦 #{order_id} • {_esc(store_name)}\n\n"
+                        f"📦 Buyurtma #{order_id} — {_esc(store_name)}\n\n"
                         f"Rahmat! Yoqdimi? ⭐"
                     ),
                     OrderStatus.REJECTED: (
@@ -466,7 +466,7 @@ class NotificationTemplates:
                     OrderStatus.COMPLETED: (
                         f"🎊 <b>Заказ выдан!</b>\n\n"
                         f"{progress_pickup(2)}\n\n"
-                        f"📦 #{order_id} • {_esc(store_name)}\n\n"
+                        f"📦 Заказ #{order_id} — {_esc(store_name)}\n\n"
                         f"Спасибо! Понравилось? ⭐"
                     ),
                     OrderStatus.REJECTED: (
@@ -484,14 +484,14 @@ class NotificationTemplates:
                         f"🎉 <b>Buyurtma qabul qilindi!</b>\n\n"
                         f"{progress_delivery(1)}\n"
                         f"Qabul │ Yo'lda │ Yetkazildi\n\n"
-                        f"📦 #{order_id} • {_esc(store_name)}\n"
+                        f"📦 Buyurtma #{order_id} — {_esc(store_name)}\n"
                         f"👨‍🍳 Tayyorlanmoqda..."
                     ),
                     OrderStatus.READY: (
                         f"✅ <b>Buyurtma tayyor!</b>\n\n"
                         f"{progress_delivery(1)}\n"
                         f"Qabul │ Yo'lda │ Yetkazildi\n\n"
-                        f"📦 #{order_id} • {_esc(store_name)}\n\n"
+                        f"📦 Buyurtma #{order_id} — {_esc(store_name)}\n\n"
                         f"📦 Qadoqlandi va kuryerga topshirishga tayyor\n"
                         f"⏱ Kuryerni kuting"
                     ),
@@ -510,7 +510,7 @@ class NotificationTemplates:
                     OrderStatus.COMPLETED: (
                         f"🎊 <b>Yetkazildi!</b>\n\n"
                         f"{progress_delivery(3)}\n\n"
-                        f"📦 #{order_id} • {_esc(store_name)}\n\n"
+                        f"📦 Buyurtma #{order_id} — {_esc(store_name)}\n\n"
                         f"Rahmat! ⭐"
                     ),
                     OrderStatus.REJECTED: (
@@ -524,14 +524,14 @@ class NotificationTemplates:
                         f"🎉 <b>Заказ принят!</b>\n\n"
                         f"{progress_delivery(1)}\n"
                         f"Принят │ В пути │ Доставлен\n\n"
-                        f"📦 #{order_id} • {_esc(store_name)}\n"
+                        f"📦 Заказ #{order_id} — {_esc(store_name)}\n"
                         f"👨‍🍳 Готовится..."
                     ),
                     OrderStatus.READY: (
                         f"✅ <b>Заказ готов!</b>\n\n"
                         f"{progress_delivery(1)}\n"
                         f"Принят │ В пути │ Доставлен\n\n"
-                        f"📦 #{order_id} • {_esc(store_name)}\n\n"
+                        f"📦 Заказ #{order_id} — {_esc(store_name)}\n\n"
                         f"📦 Упакован и готов к передаче курьеру\n"
                         f"⏱ Ожидайте курьера"
                     ),
@@ -550,7 +550,7 @@ class NotificationTemplates:
                     OrderStatus.COMPLETED: (
                         f"🎊 <b>Доставлено!</b>\n\n"
                         f"{progress_delivery(3)}\n\n"
-                        f"📦 #{order_id} • {_esc(store_name)}\n\n"
+                        f"📦 Заказ #{order_id} — {_esc(store_name)}\n\n"
                         f"Спасибо! ⭐"
                     ),
                     OrderStatus.REJECTED: (
@@ -642,11 +642,16 @@ class NotificationTemplates:
             order_type_text = "🏪 Самовывоз" if order_type == "pickup" else "🚚 Доставка"
 
         # Build message
+        if lang == "uz":
+            header_line = f"📦 Buyurtma #{order_id} │ {order_type_text}"
+        else:
+            header_line = f"📦 Заказ #{order_id} │ {order_type_text}"
+
         lines = [
             f"<b>{status_text}</b>",
             "━━━━━━━━━━━━━━━━━━",
             "",
-            f"📦 #{order_id} │ {order_type_text}",
+            header_line,
             "",
         ]
 
