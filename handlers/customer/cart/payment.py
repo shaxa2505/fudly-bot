@@ -23,25 +23,6 @@ class IsCartOrderFilter(BaseFilter):
         return bool(data.get("is_cart_order"))
 
 
-async def _cart_switch_to_card_payment(
-    message: types.Message,
-    state: FSMContext,
-    data: dict[str, Any],
-    order_id: int,
-    lang: str,
-) -> None:
-    msg = (
-        "⚠️ Click ishlamayapti. Karta orqali to'lang."
-        if lang == "uz"
-        else "⚠️ Click недоступен. Оплатите картой."
-    )
-    await message.answer(msg)
-
-    await state.update_data(order_id=order_id, payment_method="card")
-    await state.set_state(OrderDelivery.payment_proof)
-    await _cart_show_card_payment_details(message, state, lang)
-
-
 async def _cart_show_card_payment_details(
     message: types.Message, state: FSMContext, lang: str
 ) -> None:
@@ -131,107 +112,18 @@ def register(router: Router) -> None:
             )
             return
 
-        order_service = get_unified_order_service()
-        if not order_service:
-            await callback.answer(
-                (
-                    "❌ Система заказов недоступна"
-                    if lang == "ru"
-                    else "❌ Buyurtma xizmati mavjud emas"
-                ),
-                show_alert=True,
-            )
-            return
+        # TODO: Click payment not implemented - redirect to card payment
+        # Order will be created after screenshot
+        msg = (
+            "⚠️ Click недоступен. Оплатите картой."
+            if lang == "ru"
+            else "⚠️ Click ishlamayapti. Karta orqali to'lang."
+        )
+        await callback.message.answer(msg)
 
-        order_items: list[OrderItem] = []
-        for item in cart_items_stored:
-            order_items.append(
-                OrderItem(
-                    offer_id=int(item["offer_id"]),
-                    store_id=int(item["store_id"]),
-                    title=str(item["title"]),
-                    price=int(item["price"]),
-                    original_price=int(item["price"]),
-                    quantity=int(item["quantity"]),
-                    store_name=str(item.get("store_name", "")),
-                    store_address="",
-                    delivery_price=int(delivery_price),
-                )
-            )
-
-        try:
-            result: OrderResult = await order_service.create_order(
-                user_id=user_id,
-                items=order_items,
-                order_type="delivery",
-                delivery_address=address,
-                payment_method="click",
-                notify_customer=True,
-                notify_sellers=True,
-            )
-        except Exception as e:  # pragma: no cover - defensive logging
-            from logging_config import logger
-
-            logger.error(f"Failed to create unified delivery order from cart (click): {e}")
-            await callback.answer(
-                (
-                    "❌ Не удалось создать заказ"
-                    if lang == "ru"
-                    else "❌ Buyurtma yaratib bo'lmadi"
-                ),
-                show_alert=True,
-            )
-            return
-
-        if not result.success or not result.order_ids:
-            msg = result.error_message or (
-                "❌ Не удалось создать заказ"
-                if lang == "ru"
-                else "❌ Buyurtma yaratib bo'lmadi"
-            )
-            await callback.answer(msg, show_alert=True)
-            return
-
-        order_id = result.order_ids[0]
-
-        from .storage import cart_storage
-
-        cart_storage.clear_cart(user_id)
-
-        from handlers.customer.payments import send_payment_invoice_for_booking
-
-        try:
-            await callback.message.delete()
-
-            total = sum(item["price"] * item["quantity"] for item in cart_items_stored)
-            title_text = cart_items_stored[0]["title"]
-            if len(cart_items_stored) > 1:
-                title_text += " и др."
-
-            invoice_msg = await send_payment_invoice_for_booking(
-                user_id=user_id,
-                booking_id=order_id,
-                offer_title=title_text,
-                quantity=1,
-                unit_price=total,
-                delivery_cost=delivery_price,
-            )
-
-            if invoice_msg:
-                from logging_config import logger
-
-                logger.info(f"✅ Click invoice sent for cart order {order_id}")
-                await state.clear()
-            else:
-                await _cart_switch_to_card_payment(
-                    callback.message, state, data, order_id, lang
-                )
-        except Exception as e:  # pragma: no cover - defensive logging
-            from logging_config import logger
-
-            logger.error(f"Click invoice error for cart: {e}")
-            await _cart_switch_to_card_payment(callback.message, state, data, order_id, lang)
-
+        await state.update_data(payment_method="card")
+        await state.set_state(OrderDelivery.payment_proof)
+        await _cart_show_card_payment_details(callback.message, state, lang)
         await callback.answer()
 
     @router.callback_query(F.data == "cart_back_to_payment")
@@ -318,16 +210,47 @@ def register(router: Router) -> None:
             )
             return
 
+        # DON'T CREATE ORDER YET - wait for payment screenshot
+        # Order will be created in cart_payment_proof after screenshot is received
+        await state.update_data(payment_method="card")
+        await state.set_state(OrderDelivery.payment_proof)
+
+        await callback.message.delete()
+        await _cart_show_card_payment_details(callback.message, state, lang)
+        await callback.answer()
+
+    @router.message(OrderDelivery.payment_proof, F.photo, IsCartOrderFilter())
+    async def cart_payment_proof(message: types.Message, state: FSMContext) -> None:
+        if not common.db or not common.bot or not message.from_user:
+            return
+
+        user_id = message.from_user.id
+        lang = common.db.get_user_language(user_id)
+        data = await state.get_data()
+
+        cart_items_stored = data.get("cart_items", [])
+        store_id = data.get("store_id")
+        delivery_price = data.get("delivery_price", 0)
+        address = data.get("address", "")
+
+        if not cart_items_stored or not store_id or not address:
+            msg = (
+                "❌ Ma'lumotlar yo'qoldi" if lang == "uz" else "❌ Данные потеряны"
+            )
+            await message.answer(msg)
+            await state.clear()
+            return
+
+        # CREATE ORDER NOW (after screenshot received)
         order_service = get_unified_order_service()
         if not order_service:
-            await callback.answer(
-                (
-                    "❌ Система заказов недоступна"
-                    if lang == "ru"
-                    else "❌ Buyurtma xizmati mavjud emas"
-                ),
-                show_alert=True,
+            msg = (
+                "❌ Система заказов недоступна"
+                if lang == "ru"
+                else "❌ Buyurtma xizmati mavjud emas"
             )
+            await message.answer(msg)
+            await state.clear()
             return
 
         order_items: list[OrderItem] = []
@@ -353,21 +276,19 @@ def register(router: Router) -> None:
                 order_type="delivery",
                 delivery_address=address,
                 payment_method="card",
-                notify_customer=True,
-                notify_sellers=True,
+                notify_customer=False,  # We'll notify below
+                notify_sellers=False,   # We'll notify admin below
             )
-        except Exception as e:  # pragma: no cover - defensive logging
+        except Exception as e:
             from logging_config import logger
-
-            logger.error(f"Failed to create unified delivery order from cart (card): {e}")
-            await callback.answer(
-                (
-                    "❌ Не удалось создать заказ"
-                    if lang == "ru"
-                    else "❌ Buyurtma yaratib bo'lmadi"
-                ),
-                show_alert=True,
+            logger.error(f"Failed to create unified delivery order from cart (after screenshot): {e}")
+            msg = (
+                "❌ Не удалось создать заказ"
+                if lang == "ru"
+                else "❌ Buyurtma yaratib bo'lmadi"
             )
+            await message.answer(msg)
+            await state.clear()
             return
 
         if not result.success or not result.order_ids:
@@ -376,47 +297,18 @@ def register(router: Router) -> None:
                 if lang == "ru"
                 else "❌ Buyurtma yaratib bo'lmadi"
             )
-            await callback.answer(msg, show_alert=True)
+            await message.answer(msg)
+            await state.clear()
             return
 
         order_id = result.order_ids[0]
 
         from .storage import cart_storage
-
         cart_storage.clear_cart(user_id)
-
-        await state.update_data(order_id=order_id, payment_method="card")
-        await state.set_state(OrderDelivery.payment_proof)
-
-        await callback.message.delete()
-        await _cart_show_card_payment_details(callback.message, state, lang)
-        await callback.answer()
-
-    @router.message(OrderDelivery.payment_proof, F.photo, IsCartOrderFilter())
-    async def cart_payment_proof(message: types.Message, state: FSMContext) -> None:
-        if not common.db or not common.bot or not message.from_user:
-            return
-
-        user_id = message.from_user.id
-        lang = common.db.get_user_language(user_id)
-        data = await state.get_data()
-
-        order_id = data.get("order_id")
-        cart_items_stored = data.get("cart_items", [])
-        store_id = data.get("store_id")
-        delivery_price = data.get("delivery_price", 0)
-        address = data.get("address", "")
-
-        if not order_id or not cart_items_stored:
-            msg = (
-                "❌ Ma'lumotlar yo'qoldi" if lang == "uz" else "❌ Данные потеряны"
-            )
-            await message.answer(msg)
-            await state.clear()
-            return
 
         photo_id = message.photo[-1].file_id
 
+        # Update payment status with photo
         common.db.update_payment_status(order_id, "pending", photo_id)
 
         await state.clear()
