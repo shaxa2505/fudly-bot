@@ -23,7 +23,11 @@ from aiogram.utils.keyboard import InlineKeyboardBuilder
 from app.core.constants import OFFERS_PER_PAGE
 from app.core.utils import get_offer_field, get_store_field
 from app.keyboards import main_menu_customer
-from app.services.unified_order_service import OrderItem, get_unified_order_service
+from app.services.unified_order_service import (
+    NotificationTemplates,
+    OrderItem,
+    get_unified_order_service,
+)
 from database_protocol import DatabaseProtocol
 from handlers.common.states import OrderDelivery
 from handlers.common.utils import (
@@ -936,12 +940,53 @@ async def dlv_payment_proof(
     # Get store info
     store = db.get_store(store_id)
     store_name = get_store_field(store, "name", "Магазин")
+    store_address = get_store_field(store, "address", "")
 
     customer = db.get_user_model(user_id)
     customer_phone = customer.phone if customer else "—"
 
-    total = (price * quantity) + delivery_price
+    total_products = price * quantity
     currency = "so'm" if lang == "uz" else "сум"
+
+    # Build unified customer message (awaiting payment verification)
+    items_for_template = [
+        {"title": title, "price": int(price), "quantity": int(quantity)}
+    ]
+    order_type = data.get("order_type", "delivery")
+
+    customer_msg = NotificationTemplates.customer_order_created(
+        lang=lang,
+        order_ids=[str(order_id)],
+        pickup_codes=[],
+        items=items_for_template,
+        order_type=order_type,
+        delivery_address=address if order_type == "delivery" else None,
+        payment_method="card",
+        store_name=store_name,
+        store_address=store_address,
+        total=int(total_products),
+        delivery_price=int(delivery_price),
+        currency=currency,
+        awaiting_payment=True,
+    )
+
+    if lang == "uz":
+        customer_msg += "\n\n⏳ To'lov tasdiqlanishi kutilmoqda..."
+    else:
+        customer_msg += "\n\n⏳ Ожидаем подтверждения оплаты..."
+
+    # Confirm to customer - single unified message
+    sent_msg = await message.answer(customer_msg, parse_mode="HTML")
+
+    # Save message_id for live status updates
+    if sent_msg and order_id and hasattr(db, "set_order_customer_message_id"):
+        try:
+            db.set_order_customer_message_id(order_id, sent_msg.message_id)
+            logger.info(
+                f"Saved customer_message_id={sent_msg.message_id} for order #{order_id}"
+            )
+        except Exception as e:
+            logger.warning(f"Failed to save customer_message_id: {e}")
 
     # Notify ADMIN
     if ADMIN_ID > 0:
