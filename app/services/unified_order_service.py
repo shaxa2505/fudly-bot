@@ -1082,7 +1082,16 @@ class UnifiedOrderService:
                     order_type = entity.get(order_type_field)
                     if not order_type:
                         # Fallback: if has delivery_address → delivery, else pickup
-                        order_type = "delivery" if entity.get("delivery_address") else "pickup"
+                        delivery_addr = entity.get("delivery_address")
+                        order_type = "delivery" if delivery_addr else "pickup"
+                        logger.info(
+                            f"Order type fallback for {entity_type}#{entity_id}: "
+                            f"delivery_address={delivery_addr}, order_type={order_type}"
+                        )
+                    else:
+                        logger.info(
+                            f"Order type from DB for {entity_type}#{entity_id}: {order_type}"
+                        )
                 else:
                     order_type = "pickup"  # Bookings are always pickup
             else:
@@ -1140,9 +1149,17 @@ class UnifiedOrderService:
             # - Only important statuses: PREPARING (accepted), DELIVERING, COMPLETED, REJECTED, CANCELLED
             should_notify = notify_customer and user_id
 
+            logger.info(
+                f"Notification check for {entity_type}#{entity_id}: "
+                f"status={target_status}, order_type={order_type}, "
+                f"notify_customer={notify_customer}, user_id={user_id}, "
+                f"should_notify={should_notify}"
+            )
+
             # Skip READY notification for pickup - go directly from PREPARING to COMPLETED
             if order_type == "pickup" and target_status == OrderStatus.READY:
                 should_notify = False
+                logger.info(f"Skipping READY notification for pickup order#{entity_id}")
 
             if should_notify:
                 store = self.db.get_store(store_id) if store_id else None
@@ -1258,14 +1275,18 @@ class UnifiedOrderService:
                                 self.db.set_order_customer_message_id(
                                     entity_id, message_sent.message_id
                                 )
-                                logger.info(f"💾 Saved message_id={message_sent.message_id} for order#{entity_id}")
+                                logger.info(
+                                    f"💾 Saved message_id={message_sent.message_id} for order#{entity_id}"
+                                )
                             elif entity_type == "booking" and hasattr(
                                 self.db, "set_booking_customer_message_id"
                             ):
                                 self.db.set_booking_customer_message_id(
                                     entity_id, message_sent.message_id
                                 )
-                                logger.info(f"💾 Saved message_id={message_sent.message_id} for booking#{entity_id}")
+                                logger.info(
+                                    f"💾 Saved message_id={message_sent.message_id} for booking#{entity_id}"
+                                )
                     except Exception as e:
                         logger.error(f"Failed to notify customer {user_id}: {e}")
 
