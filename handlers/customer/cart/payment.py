@@ -8,7 +8,12 @@ from aiogram.filters import BaseFilter
 from aiogram.fsm.context import FSMContext
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
-from app.services.unified_order_service import OrderItem, OrderResult, get_unified_order_service
+from app.services.unified_order_service import (
+    NotificationTemplates,
+    OrderItem,
+    OrderResult,
+    get_unified_order_service,
+)
 from handlers.common.states import OrderDelivery
 
 from .common import esc
@@ -363,22 +368,41 @@ def register(router: Router) -> None:
 
                 logger.error(f"Failed to notify admin: {e}")
 
+        # Build unified customer-facing message using NotificationTemplates
+        items_for_template = [
+            {
+                "title": item["title"],
+                "price": int(item["price"]),
+                "quantity": int(item["quantity"]),
+            }
+            for item in cart_items_stored
+        ]
+
+        order_ids_for_template = [str(x) for x in result.order_ids]
+        delivery_price_int = int(delivery_price)
+
+        customer_msg = NotificationTemplates.customer_order_created(
+            lang=lang,
+            order_ids=order_ids_for_template,
+            pickup_codes=[],
+            items=items_for_template,
+            order_type="delivery",
+            delivery_address=address,
+            payment_method="card",
+            store_name=store_name,
+            store_address=get_store_field(store, "address", ""),
+            total=int(total),
+            delivery_price=delivery_price_int,
+            currency=currency,
+        )
+
+        # For card payments, explicitly highlight that payment confirmation is pending.
         if lang == "uz":
-            confirm_text = (
-                f"✅ <b>Buyurtma qabul qilindi!</b>\n\n"
-                f"📦 #{order_id}\n"
-                f"💵 {total_with_delivery:,} {currency}\n"
-                f"📍 {address}\n\n"
-                f"⏳ To'lov tasdiqlanishi kutilmoqda..."
-            )
+            tail = "\n\n⏳ To'lov tasdiqlanishi kutilmoqda..."
         else:
-            confirm_text = (
-                f"✅ <b>Заказ принят!</b>\n\n"
-                f"📦 #{order_id}\n"
-                f"💵 {total_with_delivery:,} {currency}\n"
-                f"📍 {address}\n\n"
-                f"⏳ Ожидаем подтверждения оплаты..."
-            )
+            tail = "\n\n⏳ Ожидаем подтверждения оплаты..."
+
+        confirm_text = customer_msg + tail
 
         sent_msg = await message.answer(confirm_text, parse_mode="HTML")
 

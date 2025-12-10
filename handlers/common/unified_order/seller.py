@@ -275,11 +275,20 @@ async def unified_confirm_handler(callback: types.CallbackQuery) -> None:
 
     kb = InlineKeyboardBuilder()
     if entity_type == "booking":
+        # Classic pickup booking flow: after подтверждения сразу ждём выдачи
         if lang == "uz":
             kb.button(text="✅ Topshirildi", callback_data=f"complete_booking_{entity_id}")
         else:
             kb.button(text="✅ Выдано", callback_data=f"complete_booking_{entity_id}")
+    elif entity_type == "order" and order_type != "delivery":
+        # Pickup‑заказ, оформленный через orders: не показываем этапы доставки,
+        # сразу даём кнопку "выдано" как для брони.
+        if lang == "uz":
+            kb.button(text="✅ Topshirildi", callback_data=f"order_complete_{entity_id}")
+        else:
+            kb.button(text="✅ Выдано", callback_data=f"order_complete_{entity_id}")
     else:
+        # Настоящая доставка: сначала "готов к передаче", затем курьер и т.д.
         if lang == "uz":
             kb.button(text="📦 Topshirishga tayyor", callback_data=f"order_ready_{entity_id}")
         else:
@@ -429,6 +438,12 @@ async def order_ready_handler(callback: types.CallbackQuery) -> None:
 
     order = db_instance.get_order(order_id)
     if not order:
+        await callback.answer("❌", show_alert=True)
+        return
+
+    # Only delivery orders should go through the courier flow.
+    order_type = _get_entity_field(order, "order_type", "delivery")
+    if order_type != "delivery":
         await callback.answer("❌", show_alert=True)
         return
 
@@ -673,6 +688,11 @@ async def _process_delivery_handover(
     if not order:
         return
 
+    order_type = _get_entity_field(order, "order_type", "delivery")
+    if order_type != "delivery":
+        # Safety guard: pickup orders should not hit courier flow
+        return
+
     store_id = _get_entity_field(order, "store_id")
     store = db_instance.get_store(store_id) if store_id else None
 
@@ -868,11 +888,15 @@ async def order_complete_handler(callback: types.CallbackQuery) -> None:
 
     currency = "so'm" if lang == "uz" else "сум"
 
+    # Respect actual order_type from DB so pickup orders don't
+    # render as delivery in seller/status templates.
+    order_type = _get_entity_field(order, "order_type", "delivery")
+
     seller_text = NotificationTemplates.seller_status_update(
         lang=lang,
         order_id=order_id,
         status=OrderStatus.COMPLETED,
-        order_type="delivery",
+        order_type=order_type,
         items=items,
         customer_name=customer_name,
         customer_phone=customer_phone,
