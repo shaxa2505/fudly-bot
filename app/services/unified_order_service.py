@@ -250,15 +250,27 @@ class NotificationTemplates:
         total: int,
         delivery_price: int,
         currency: str,
+        awaiting_payment: bool = False,
     ) -> str:
-        """Build customer notification for order creation."""
+        """Build customer notification for order creation.
+
+        When awaiting_payment is True (typically for card payments with manual
+        receipt review), the header makes it clear that the order is sent for
+        verification, not fully confirmed yet.
+        """
 
         def _esc(val: Any) -> str:
             return html.escape(str(val)) if val else ""
 
         if lang == "uz":
+            header = (
+                "⏳ <b>BUYURTMA TEKSHIRILMOQDA</b>"
+                if awaiting_payment and payment_method == "card"
+                else "✅ <b>BUYURTMA QABUL QILINDI!</b>"
+            )
+
             lines = [
-                "✅ <b>BUYURTMA QABUL QILINDI!</b>",
+                header,
                 "━━━━━━━━━━━━━━━━━━━━",
                 "",
                 f"📦 #{', #'.join(order_ids)}",
@@ -309,8 +321,14 @@ class NotificationTemplates:
                 lines.append("💡 <b>Maslahat:</b> olishda sotuvchiga kodni ko'rsating")
 
         else:  # Russian
+            header = (
+                "⏳ <b>ЗАКАЗ ОТПРАВЛЕН НА ПРОВЕРКУ</b>"
+                if awaiting_payment and payment_method == "card"
+                else "✅ <b>ЗАКАЗ ОФОРМЛЕН!</b>"
+            )
+
             lines = [
-                "✅ <b>ЗАКАЗ ОФОРМЛЕН!</b>",
+                header,
                 "━━━━━━━━━━━━━━━━━━━━",
                 "",
                 f"📦 #{', #'.join(order_ids)}",

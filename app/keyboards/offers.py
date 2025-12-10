@@ -124,6 +124,30 @@ def offer_details_with_back_keyboard(
     return builder.as_markup()
 
 
+def offer_details_search_keyboard(
+    lang: str, offer_id: int, store_id: int, delivery_enabled: bool
+) -> InlineKeyboardMarkup:
+    """Offer card keyboard for search results with back to search list."""
+    builder = InlineKeyboardBuilder()
+
+    # Main action: Add to cart
+    cart = "🛒 В корзину" if lang == "ru" else "🛒 Savatga qo'shish"
+    builder.button(text=cart, callback_data=f"add_to_cart_{offer_id}")
+
+    # Quick order
+    order = "⚡ Быстрый заказ" if lang == "ru" else "⚡ Tez buyurtma"
+    builder.button(text=order, callback_data=f"book_{offer_id}")
+
+    # Back to search results
+    back = (
+        "◀️ Назад к результатам" if lang == "ru" else "◀️ Natijalarga qaytish"
+    )
+    builder.button(text=back, callback_data="back_to_search_results")
+
+    builder.adjust(2, 1)
+    return builder.as_markup()
+
+
 def offer_quick_keyboard(
     lang: str, offer_id: int, store_id: int, delivery_enabled: bool = False
 ) -> InlineKeyboardMarkup:
@@ -138,6 +162,38 @@ def offer_quick_keyboard(
     builder.button(text=order, callback_data=f"book_{offer_id}")
 
     builder.adjust(2)
+    return builder.as_markup()
+
+
+def offer_in_cart_keyboard(lang: str, source: str = "generic") -> InlineKeyboardMarkup:
+    """Keyboard for offer card after item has been added to cart.
+
+    Source controls where the back button sends the user:
+    - "hot" -> back to hot offers list
+    - "search" -> back to search results
+    - other -> back to main menu
+    """
+    builder = InlineKeyboardBuilder()
+
+    # Open cart
+    open_cart = "🛒 Открыть корзину" if lang == "ru" else "🛒 Savatni ochish"
+    builder.button(text=open_cart, callback_data="view_cart")
+
+    # Context-aware back
+    if source == "hot":
+        back_text = "◀️ Назад к акциям" if lang == "ru" else "◀️ Aksiyalarga qaytish"
+        back_data = "back_to_hot"
+    elif source == "search":
+        back_text = (
+            "◀️ Назад к результатам" if lang == "ru" else "◀️ Natijalarga qaytish"
+        )
+        back_data = "back_to_search_results"
+    else:
+        back_text = "⬅️ Назад" if lang == "ru" else "⬅️ Orqaga"
+        back_data = "back_to_menu"
+
+    builder.button(text=back_text, callback_data=back_data)
+    builder.adjust(1, 1)
     return builder.as_markup()
 
 

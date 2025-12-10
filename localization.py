@@ -39,7 +39,9 @@ TEXTS = {
 💡 Совет: проверяйте "Акции" каждый день — товары обновляются!""",
         "welcome_back": """👋 <b>Привет, {name}!</b>
 
-📍 Город: {city}""",
+📍 Ваш город: {city}
+
+👇 Выберите раздел ниже, чтобы продолжить""",
         "registration_required": """⚠️ <b>Нужна регистрация</b>
 
 Нажмите /start чтобы начать""",
@@ -539,7 +541,9 @@ Endi siz:
 💡 Maslahat: har kuni "Aksiyalar" bo'limini tekshiring — mahsulotlar yangilanadi!""",
         "welcome_back": """👋 <b>Salom, {name}!</b>
 
-📍 Shahar: {city}""",
+📍 Shahringiz: {city}
+
+👇 Davom ettirish uchun pastdagi bo'limlardan birini tanlang""",
         "registration_required": """⚠️ <b>Ro'yxatdan o'tish kerak</b>
 
 Boshlash uchun /start bosing""",

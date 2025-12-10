@@ -394,6 +394,7 @@ def register(router: Router) -> None:
             total=int(total),
             delivery_price=delivery_price_int,
             currency=currency,
+            awaiting_payment=True,
         )
 
         # For card payments, explicitly highlight that payment confirmation is pending.

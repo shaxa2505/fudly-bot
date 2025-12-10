@@ -286,6 +286,7 @@ def register(router: Router) -> None:
         max_qty = int(data.get("max_quantity", 1))
         store_name = str(data.get("store_name", ""))
         store_address = str(data.get("store_address", ""))
+        description = str(data.get("offer_description", ""))
         delivery_enabled = bool(data.get("delivery_enabled", False))
         delivery_price = float(data.get("delivery_price", 0) or 0)
         offer_photo = data.get("offer_photo")
@@ -320,7 +321,71 @@ def register(router: Router) -> None:
         )
         await callback.answer(popup_text, show_alert=False)
 
-        # After adding, show the store's offer list again
+        # Decide what to show after adding based on source context
+        source = str(data.get("source", ""))
+
+        if source in {"hot", "search"}:
+            # For hot offers and search, keep the card and switch it to "in cart" state
+            from app.keyboards.offers import offer_in_cart_keyboard
+
+            text = build_cart_add_card_text(
+                lang,
+                offer_title,
+                offer_price,
+                quantity,
+                store_name,
+                max_qty,
+                original_price=original_price,
+                description=description,
+                expiry_date=expiry_date,
+                store_address=store_address,
+                unit=offer_unit,
+            )
+
+            # Append small hint about cart
+            if lang == "ru":
+                hint = (
+                    "\n\n✅ Товар добавлен в корзину.\n"
+                    + (
+                        "Можно открыть корзину или вернуться к акциям."
+                        if source == "hot"
+                        else "Можно открыть корзину или вернуться к результатам поиска."
+                    )
+                )
+            else:
+                hint = (
+                    "\n\n✅ Mahsulot savatga qo'shildi.\n"
+                    + (
+                        "Savatni ochishingiz yoki aksiyalarga qaytishingiz mumkin."
+                        if source == "hot"
+                        else "Savatni ochishingiz yoki natijalarga qaytishingiz mumkin."
+                    )
+                )
+
+            text += hint
+
+            kb = offer_in_cart_keyboard(lang, source)
+
+            try:
+                if callback.message.photo:
+                    await callback.message.edit_caption(
+                        caption=text,
+                        parse_mode="HTML",
+                        reply_markup=kb,
+                    )
+                else:
+                    await callback.message.edit_text(
+                        text,
+                        parse_mode="HTML",
+                        reply_markup=kb,
+                    )
+            except Exception:
+                # If we cannot edit, just leave the popup as feedback
+                pass
+            # Important: keep FSM state so back buttons (hot/search) can use stored context
+            return
+
+        # Default behaviour for store-based flows: return to store offers list
         if store_id is not None:
             try:
                 await _show_store_offers(callback, state, int(store_id), lang)

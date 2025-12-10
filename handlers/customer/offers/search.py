@@ -639,10 +639,10 @@ def setup(
 
             text = "\n".join(lines)
 
-            # Use new keyboard with cart buttons and back to search
-            from app.keyboards.offers import offer_details_keyboard
+            # Use keyboard with cart buttons and back to search
+            from app.keyboards.offers import offer_details_search_keyboard
 
-            kb = offer_details_keyboard(lang, offer_id, offer.store_id, delivery_enabled)
+            kb = offer_details_search_keyboard(lang, offer_id, offer.store_id, delivery_enabled)
 
             # Delete search results and send offer card with photo
             try:
@@ -689,6 +689,51 @@ def setup(
     @dp.callback_query(F.data == "search_noop")
     async def search_noop_handler(callback: types.CallbackQuery) -> None:
         """Handle no-op callback for page indicator."""
+        await callback.answer()
+
+    @dp.callback_query(F.data == "back_to_search_results")
+    async def back_to_search_results(callback: types.CallbackQuery, state: FSMContext) -> None:
+        """Return from offer card back to the last search results list."""
+        if not callback.from_user:
+            await callback.answer()
+            return
+
+        lang = db.get_user_language(callback.from_user.id)
+
+        # Restore search context from FSM
+        data = await state.get_data()
+        offer_ids = data.get("search_results", [])
+        query = data.get("search_query", "")
+        page = int(data.get("search_page", 0) or 0)
+
+        if not offer_ids:
+            await callback.answer(
+                "Результаты поиска устарели. Повторите поиск."
+                if lang == "ru"
+                else "Qidiruv natijalari eskirgan. Qayta qidiring.",
+                show_alert=True,
+            )
+            return
+
+        # Fetch offer objects again
+        all_results = []
+        for offer_id in offer_ids:
+            try:
+                offer = offer_service.get_offer_details(offer_id)
+                if offer:
+                    all_results.append(offer)
+            except Exception:
+                pass
+
+        # Delete current offer card and show the list
+        msg = callback.message
+        if msg:
+            try:
+                await msg.delete()
+            except Exception:
+                pass
+
+        await _send_search_results_page(callback, all_results, query, lang, page=page, edit=False)
         await callback.answer()
 
     @dp.callback_query(F.data.startswith("show_store_products_"))
@@ -1038,10 +1083,12 @@ def setup(
 
                 text = "\n".join(lines)
 
-                # Use new keyboard with cart buttons
-                from app.keyboards.offers import offer_details_keyboard
+                # Use keyboard with cart buttons and back to search
+                from app.keyboards.offers import offer_details_search_keyboard
 
-                kb = offer_details_keyboard(lang, offer_id, details.store_id, delivery_enabled)
+                kb = offer_details_search_keyboard(
+                    lang, offer_id, details.store_id, delivery_enabled
+                )
 
                 # Delete message and send offer card with photo
                 try:
