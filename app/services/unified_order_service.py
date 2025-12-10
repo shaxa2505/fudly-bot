@@ -1250,20 +1250,22 @@ class UnifiedOrderService:
                             user_id, msg, parse_mode="HTML", reply_markup=reply_markup
                         )
                         logger.info(f"📤 Sent NEW message for {entity_type}#{entity_id}")
-                        # Save message_id for future edits (only for first notification)
-                        if message_sent and target_status == OrderStatus.PREPARING:
+                        # Save message_id for future edits - ALWAYS save to maintain live update chain
+                        if message_sent:
                             if entity_type == "order" and hasattr(
                                 self.db, "set_order_customer_message_id"
                             ):
                                 self.db.set_order_customer_message_id(
                                     entity_id, message_sent.message_id
                                 )
+                                logger.info(f"💾 Saved message_id={message_sent.message_id} for order#{entity_id}")
                             elif entity_type == "booking" and hasattr(
                                 self.db, "set_booking_customer_message_id"
                             ):
                                 self.db.set_booking_customer_message_id(
                                     entity_id, message_sent.message_id
                                 )
+                                logger.info(f"💾 Saved message_id={message_sent.message_id} for booking#{entity_id}")
                     except Exception as e:
                         logger.error(f"Failed to notify customer {user_id}: {e}")
 
