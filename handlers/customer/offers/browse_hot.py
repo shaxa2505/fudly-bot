@@ -57,7 +57,11 @@ def register_hot(
         lang = db.get_user_language(user_id)
         user = db.get_user_model(user_id)
         if not user:
-            await message.answer(get_text(lang, "error"))
+            await message.answer(
+                "⚠️ Сессия устарела. Нажмите /start и откройте ‘🏪 Магазины и акции’ заново."
+                if lang == "ru"
+                else "⚠️ Sessiya eskirgan. /start ni bosing va ‘🏪 Do'konlar va aksiyalar’ ni qayta oching.",
+            )
             return
         city = user.city or "Ташкент"
         search_city = normalize_city(city)
@@ -82,7 +86,12 @@ def register_hot(
         lang = db.get_user_language(user_id)
         user = db.get_user_model(user_id)
         if not user:
-            await callback.answer(get_text(lang, "error"), show_alert=True)
+            await callback.answer(
+                "⚠️ Сессия устарела. Нажмите /start и откройте ‘🏪 Магазины и акции’ заново."
+                if lang == "ru"
+                else "⚠️ Sessiya eskirgan. /start ni bosing va ‘🏪 Do'konlar va aksiyalar’ ni qayta oching.",
+                show_alert=True,
+            )
             return
 
         city = user.city or "Ташкент"
@@ -107,7 +116,11 @@ def register_hot(
         lang = db.get_user_language(message.from_user.id)
         user = db.get_user_model(message.from_user.id)
         if not user:
-            await message.answer(get_text(lang, "error"))
+            await message.answer(
+                "⚠️ Сессия устарела. Нажмите /start и откройте ‘🏪 Магазины и акции’ заново."
+                if lang == "ru"
+                else "⚠️ Sessiya eskirgan. /start ni bosing va ‘🏪 Do'konlar va aksiyalar’ ni qayta oching.",
+            )
             return
         city = user.city or "Ташкент"
 
@@ -138,7 +151,12 @@ def register_hot(
         lang = db.get_user_language(user_id)
         user = db.get_user_model(user_id)
         if not user:
-            await callback.answer(get_text(lang, "error"), show_alert=True)
+            await callback.answer(
+                "⚠️ Сессия устарела. Нажмите /start и откройте ‘🏪 Магазины и акции’ заново."
+                if lang == "ru"
+                else "⚠️ Sessiya eskirgan. /start ni bosing va ‘🏪 Do'konlar va aksiyalar’ ni qayta oching.",
+                show_alert=True,
+            )
             return
         city = user.city or "Ташкент"
         search_city = normalize_city(city)
@@ -170,7 +188,12 @@ def register_hot(
         lang = db.get_user_language(user_id)
         user = db.get_user_model(user_id)
         if not user:
-            await callback.answer(get_text(lang, "error"), show_alert=True)
+            await callback.answer(
+                "⚠️ Сессия устарела. Нажмите /start и откройте ‘🏪 Магазины и акции’ заново."
+                if lang == "ru"
+                else "⚠️ Sessiya eskirgan. /start ni bosing va ‘🏪 Do'konlar va aksiyalar’ ni qayta oching.",
+                show_alert=True,
+            )
             return
 
         try:
@@ -362,12 +385,18 @@ def register_hot(
         logger.info(
             f"📥 select_offer_by_number triggered: user={message.from_user.id}, text={message.text}"
         )
-        lang = db.get_user_language(message.from_user.id)
+        user_id = message.from_user.id
+        lang = db.get_user_language(user_id)
         data = await state.get_data()
         offer_list: list[int] = data.get("offer_list", [])
         logger.info(f"📥 FSM data: offer_list={offer_list}, state={await state.get_state()}")
         if not offer_list:
-            await message.answer(get_text(lang, "error"))
+            # Friendly hint if session state lost or expired
+            await message.answer(
+                "⚠️ Список товаров устарел. Нажмите ‘🏪 Магазины и акции’ ещё раз."
+                if lang == "ru"
+                else "⚠️ Mahsulotlar ro'yxati eskirgan. ‘🏪 Do'konlar va aksiyalar’ tugmasini qayta bosing.",
+            )
             await state.clear()
             return
         try:
@@ -387,8 +416,12 @@ def register_hot(
             await message.answer(get_text(lang, "error"))
             await state.clear()
             return
-        await state.clear()
-        await _send_offer_details(message, details, lang)
+        # Save current page for back navigation (same as hot_offer_selected_handler)
+        current_page = data.get("hot_offers_page", 0)
+        await state.update_data(last_hot_page=current_page, source="hot")
+
+        # Show offer details with back-to-list button for consistent UX
+        await _send_offer_details(message, details, lang, with_back=True)
 
     @dp.callback_query(F.data == "offers_all")
     async def show_all_offers(callback: types.CallbackQuery) -> None:
@@ -597,9 +630,9 @@ def register_hot(
 
             # Hint at bottom - clearer call to action
             hint = (
-                "👆 Tanlang yoki raqam yozing"
+                "👆 Tanlang tugmani yoki raqam yozing"
                 if lang == "uz"
-                else "👆 Нажмите на товар или введите номер"
+                else "👆 Нажмите кнопку под списком или введите номер"
             )
             text += f"\n{hint}"
 
@@ -624,12 +657,18 @@ def register_hot(
         message: types.Message,
         offer: OfferDetails,
         lang: str,
+        with_back: bool = False,
     ) -> None:
         store = offer_service.get_store(offer.store_id)
         text = offer_templates.render_offer_details(lang, offer, store)
-        keyboard = offer_keyboards.offer_details_keyboard(
-            lang, offer.id, offer.store_id, store.delivery_enabled if store else False
-        )
+        if with_back:
+            keyboard = offer_keyboards.offer_details_with_back_keyboard(
+                lang, offer.id, offer.store_id, store.delivery_enabled if store else False
+            )
+        else:
+            keyboard = offer_keyboards.offer_details_keyboard(
+                lang, offer.id, offer.store_id, store.delivery_enabled if store else False
+            )
         if offer.photo:
             try:
                 await message.answer_photo(

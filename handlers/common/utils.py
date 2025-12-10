@@ -356,6 +356,10 @@ class RegistrationCheckMiddleware(BaseMiddleware):
         user = self.db.get_user_model(user_id)
         if not user:
             lang = "ru"
+            logger.debug(
+                "[Middleware] Blocking update for unregistered user %s (registration_required)",
+                user_id,
+            )
             if msg:
                 await msg.answer(
                     self.get_text(lang, "registration_required"),

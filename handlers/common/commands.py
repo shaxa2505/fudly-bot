@@ -451,32 +451,49 @@ async def cmd_start(message: types.Message, state: FSMContext, db: DatabaseProto
     if not message.from_user:
         return
 
+    user_id = message.from_user.id
+
     # Clear any active state
     await state.clear()
 
     # Check for deep link arguments (e.g., /start pickup_CODE)
     if message.text:
         args = message.text.split(maxsplit=1)
-        logger.info(f"🔗 /start command from user {message.from_user.id}: '{message.text}'")
+        logger.info(f"🔗 /start command from user {user_id}: '{message.text}'")
         if len(args) > 1:
             deep_link = args[1]
             if deep_link.startswith("pickup_"):
+                # Ensure user exists even for QR/deep-link starts
+                try:
+                    user = db.get_user_model(user_id)
+                except Exception as e:  # pragma: no cover - defensive logging
+                    logger.warning(f"Failed to load user {user_id} for pickup deep-link: {e}")
+                    user = None
+
+                if not user:
+                    try:
+                        db.add_user(user_id, message.from_user.username, message.from_user.first_name)
+                        logger.info(f"👤 Created new user {user_id} from pickup deep-link /start")
+                    except Exception as e:  # pragma: no cover - defensive logging
+                        logger.warning(f"Failed to create user {user_id} on pickup deep-link: {e}")
+
                 booking_code = deep_link.replace("pickup_", "")
                 await handle_qr_pickup(message, db, booking_code)
                 return
 
-    user = db.get_user_model(message.from_user.id)
+    user = db.get_user_model(user_id)
 
     # NEW USER - create immediately and show welcome card with language selection
     if not user:
         # Create user right away to avoid duplicate welcome on second /start
-        db.add_user(message.from_user.id, message.from_user.username, message.from_user.first_name)
+        db.add_user(user_id, message.from_user.username, message.from_user.first_name)
+        logger.info(f"👤 Created new user {user_id} from regular /start")
         await message.answer(
             build_welcome_card("ru"), parse_mode="HTML", reply_markup=build_welcome_keyboard()
         )
         return
 
-    lang = db.get_user_language(message.from_user.id)
+    lang = db.get_user_language(user_id)
     user_city = user.city
     user_role = user.role or "customer"
 
@@ -495,7 +512,7 @@ async def cmd_start(message: types.Message, state: FSMContext, db: DatabaseProto
     # Phone will be requested only when placing an order
 
     # Registered user - show menu
-    current_mode = get_user_view_mode(message.from_user.id, db)
+    current_mode = get_user_view_mode(user_id, db)
     if current_mode == "seller" and user_role == "seller":
         menu = main_menu_seller(lang)
     else:
