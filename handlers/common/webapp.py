@@ -17,6 +17,12 @@ router = Router(name="webapp")
 
 # URL вашего Mini App (из переменных окружения или дефолтный)
 WEBAPP_URL = os.getenv("WEBAPP_URL", "https://fudly-webapp.vercel.app")
+PARTNER_PANEL_URL = os.getenv("PARTNER_PANEL_URL", "https://fudly-partner-panel.vercel.app")
+
+
+def get_partner_panel_url() -> str:
+    """Get partner panel Mini App URL."""
+    return PARTNER_PANEL_URL
 
 
 def webapp_keyboard(lang: str = "ru") -> InlineKeyboardMarkup:

@@ -1,14 +1,14 @@
 """Seller/Partner-specific keyboards."""
 from __future__ import annotations
 
-from aiogram.types import InlineKeyboardMarkup, ReplyKeyboardMarkup
+from aiogram.types import InlineKeyboardMarkup, ReplyKeyboardMarkup, WebAppInfo
 from aiogram.utils.keyboard import InlineKeyboardBuilder, ReplyKeyboardBuilder
 
 from localization import get_text
 
 
-def main_menu_seller(lang: str = "ru") -> ReplyKeyboardMarkup:
-    """Simplified partner menu: Add, Products, Orders, Today, Bulk Import, Profile."""
+def main_menu_seller(lang: str = "ru", webapp_url: str = None) -> ReplyKeyboardMarkup:
+    """Simplified partner menu: Add, Products, Orders, Today, Bulk Import, Profile, Web Panel."""
     builder = ReplyKeyboardBuilder()
     builder.button(text=get_text(lang, "add_item"))
     builder.button(text=get_text(lang, "my_items"))
@@ -16,7 +16,15 @@ def main_menu_seller(lang: str = "ru") -> ReplyKeyboardMarkup:
     builder.button(text=get_text(lang, "today_stats"))
     builder.button(text=get_text(lang, "bulk_import"))
     builder.button(text=get_text(lang, "profile"))
-    builder.adjust(2, 2, 2)
+    
+    # Add Web Panel button if URL provided
+    if webapp_url:
+        builder.button(
+            text="🖥 Веб-панель",
+            web_app=WebAppInfo(url=webapp_url)
+        )
+    
+    builder.adjust(2, 2, 2, 1 if webapp_url else 2)
     return builder.as_markup(resize_keyboard=True)
 
 

@@ -50,55 +50,118 @@ async def admin_stats_command(message: types.Message):
         offers_total = offer_stats.active + offer_stats.inactive + offer_stats.deleted
 
         # Format dashboard
-        text = f"""
-📊 <b>Дашборд Fudly Bot</b>
+        text = (
+            "📊 <b>Дашборд Fudly Bot</b>\n\n"
+            "⏱ <b>Система:</b>\n"
+            f"├ Uptime: {summary['uptime_hours']} ч\n"
+            f"├ Запросов: {summary['total_requests']}\n"
+            f"├ Ошибок: {summary['total_errors']}\n"
+            f"├ Avg время: {summary['avg_request_duration_ms']} мс\n"
+            f"└ P95 время: {summary['p95_request_duration_ms']} мс\n\n"
+            "👥 <b>Пользователи:</b>\n"
+            f"├ Всего: {user_stats.total}\n"
+            f"├ Покупатели: {user_stats.customers}\n"
+            f"├ Продавцы: {user_stats.sellers}\n"
+            f"├ За неделю: {user_stats.week_users}\n"
+            f"└ Сегодня: {user_stats.today_users}\n\n"
+            "🏪 <b>Магазины:</b>\n"
+            f"├ Всего: {stores_total}\n"
+            f"├ Активных: {store_stats.active}\n"
+            f"├ На модерации: {store_stats.pending}\n"
+            f"└ Отклонённых: {store_stats.rejected}\n\n"
+            "📦 <b>Товары:</b>\n"
+            f"├ Всего: {offers_total}\n"
+            f"├ Активных: {offer_stats.active}\n"
+            f"├ Неактивных: {offer_stats.inactive}\n"
+            f"└ Удалённых: {offer_stats.deleted}\n\n"
+            "📋 <b>Бронирования:</b>\n"
+            f"├ Всего: {booking_stats.total}\n"
+            f"├ Ожидающих: {booking_stats.pending}\n"
+            f"├ Завершённых: {booking_stats.completed}\n"
+            f"├ Отменённых: {booking_stats.cancelled}\n"
+            f"├ Сегодня: {booking_stats.today_bookings}\n"
+            f"└ Выручка сегодня: {booking_stats.today_revenue:,.0f} сум\n\n"
+            "🔗 <b>API Endpoints:</b>\n"
+            "├ /health - проверка здоровья\n"
+            "├ /metrics - Prometheus метрики\n"
+            "└ /metrics/json - JSON метрики"
+        )
 
-⏱ <b>Система:</b>
-├ Uptime: {summary['uptime_hours']} ч
-├ Запросов: {summary['total_requests']}
-├ Ошибок: {summary['total_errors']}
-├ Avg время: {summary['avg_request_duration_ms']} мс
-└ P95 время: {summary['p95_request_duration_ms']} мс
-
-👥 <b>Пользователи:</b>
-├ Всего: {user_stats.total}
-├ Покупатели: {user_stats.customers}
-├ Продавцы: {user_stats.sellers}
-├ За неделю: {user_stats.week_users}
-└ Сегодня: {user_stats.today_users}
-
-🏪 <b>Магазины:</b>
-├ Всего: {stores_total}
-├ Активных: {store_stats.active}
-├ На модерации: {store_stats.pending}
-└ Отклонённых: {store_stats.rejected}
-
-📦 <b>Товары:</b>
-├ Всего: {offers_total}
-├ Активных: {offer_stats.active}
-├ Неактивных: {offer_stats.inactive}
-└ Удалённых: {offer_stats.deleted}
-
-📋 <b>Бронирования:</b>
-├ Всего: {booking_stats.total}
-├ Ожидающих: {booking_stats.pending}
-├ Завершённых: {booking_stats.completed}
-├ Отменённых: {booking_stats.cancelled}
-├ Сегодня: {booking_stats.today_bookings}
-└ Выручка сегодня: {booking_stats.today_revenue:,.0f} сум
-
-🔗 <b>API Endpoints:</b>
-├ /health - проверка здоровья
-├ /metrics - Prometheus метрики
-└ /metrics/json - JSON метрики
-"""
-
-        await message.answer(text.strip(), parse_mode="HTML")
+        await message.answer(text, parse_mode="HTML")
 
     except Exception as exc:
         if logger:
             logger.error("Admin stats command error: %s", exc)
         await message.answer("❌ Ошибка получения статистики")
+
+
+@router.message(F.text == "📊 Dashboard")
+async def admin_dashboard_button(message: types.Message):
+    """Handle Dashboard button in admin menu."""
+    if not admin_service or not message.from_user:
+        return
+    if not admin_service.is_admin(message.from_user.id):
+        await message.answer("⛔ Доступ запрещён")
+        return
+
+    try:
+        # Get metrics summary
+        summary = metrics.get_summary()
+
+        # Get business stats
+        user_stats = admin_service.get_user_stats()
+        store_stats = admin_service.get_store_stats()
+        offer_stats = admin_service.get_offer_stats()
+        booking_stats = admin_service.get_booking_stats()
+
+        # Calculate totals
+        stores_total = store_stats.active + store_stats.pending + store_stats.rejected
+        offers_total = offer_stats.active + offer_stats.inactive + offer_stats.deleted
+
+        # Format dashboard
+        text = (
+            "📊 <b>Дашборд Fudly Bot</b>\n\n"
+            "⏱ <b>Система:</b>\n"
+            f"├ Uptime: {summary['uptime_hours']} ч\n"
+            f"├ Запросов: {summary['total_requests']}\n"
+            f"├ Ошибок: {summary['total_errors']}\n"
+            f"├ Avg время: {summary['avg_request_duration_ms']} мс\n"
+            f"└ P95 время: {summary['p95_request_duration_ms']} мс\n\n"
+            "👥 <b>Пользователи:</b>\n"
+            f"├ Всего: {user_stats.total}\n"
+            f"├ Покупатели: {user_stats.customers}\n"
+            f"├ Продавцы: {user_stats.sellers}\n"
+            f"├ За неделю: {user_stats.week_users}\n"
+            f"└ Сегодня: {user_stats.today_users}\n\n"
+            "🏪 <b>Магазины:</b>\n"
+            f"├ Всего: {stores_total}\n"
+            f"├ Активных: {store_stats.active}\n"
+            f"├ На модерации: {store_stats.pending}\n"
+            f"└ Отклонённых: {store_stats.rejected}\n\n"
+            "📦 <b>Товары:</b>\n"
+            f"├ Всего: {offers_total}\n"
+            f"├ Активных: {offer_stats.active}\n"
+            f"├ Неактивных: {offer_stats.inactive}\n"
+            f"└ Удалённых: {offer_stats.deleted}\n\n"
+            "📋 <b>Бронирования:</b>\n"
+            f"├ Всего: {booking_stats.total}\n"
+            f"├ Ожидающих: {booking_stats.pending}\n"
+            f"├ Завершённых: {booking_stats.completed}\n"
+            f"├ Отменённых: {booking_stats.cancelled}\n"
+            f"├ Сегодня: {booking_stats.today_bookings}\n"
+            f"└ Выручка сегодня: {booking_stats.today_revenue:,.0f} сум\n\n"
+            "🔗 <b>API Endpoints:</b>\n"
+            "├ /health - проверка здоровья\n"
+            "├ /metrics - Prometheus метрики\n"
+            "└ /metrics/json - JSON метрики"
+        )
+
+        await message.answer(text, parse_mode="HTML")
+
+    except Exception as exc:
+        if logger:
+            logger.error("Admin dashboard button error: %s", exc)
+        await message.answer("❌ Ошибка получения дашборда")
 
 
 @router.message(F.text == "👥 Пользователи")

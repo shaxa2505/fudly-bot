@@ -80,3 +80,10 @@ To integrate a handler module into `bot.py`:
 3. Gradually migrate remaining handlers
 4. Remove duplicates from `bot.py`
 5. Eventually make `bot.py` just initialization code
+
+## Stats Integration (Partner & Admin)
+
+- Partner stats: the "Статистика сегодня" button in `handlers/seller/` should call `app/services/stats.py:get_partner_stats(...)` with proper timezone-aware period.
+- Admin stats: admin menu handlers in `handlers/admin/` should call `get_admin_stats(...)` and render totals with optional breakdowns (channels, top products/sellers).
+- Localization: use `localization.py` and `locales/` for all strings.
+- See detailed spec in `docs/STATS_SPEC.md`.

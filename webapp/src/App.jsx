@@ -7,7 +7,11 @@ import './App.css'
 
 // Lazy load pages for better initial load
 const CartPage = lazy(() => import('./pages/CartPage'))
+const CheckoutPage = lazy(() => import('./pages/CheckoutPage'))
 const YanaPage = lazy(() => import('./pages/YanaPage'))
+const ProfilePage = lazy(() => import('./pages/ProfilePage'))
+const ProfilePageNew = lazy(() => import('./pages/ProfilePageNew'))
+const ExplorePage = lazy(() => import('./pages/ExplorePage'))
 const OrderTrackingPage = lazy(() => import('./pages/OrderTrackingPage'))
 const ProductDetailPage = lazy(() => import('./pages/ProductDetailPage'))
 const StoresPage = lazy(() => import('./pages/StoresPage'))
@@ -146,12 +150,24 @@ function AppContent() {
             element={<CartPage user={user} />}
           />
           <Route
+            path="/checkout"
+            element={<CheckoutPage user={user} />}
+          />
+          <Route
             path="/profile"
             element={<YanaPage user={user} />}
           />
           <Route
-            path="/checkout"
-            element={<CartPage user={user} />}
+            path="/profile-old"
+            element={<ProfilePage user={user} />}
+          />
+          <Route
+            path="/profile-new"
+            element={<ProfilePageNew user={user} />}
+          />
+          <Route
+            path="/explore"
+            element={<ExplorePage user={user} />}
           />
           <Route
             path="/stores"

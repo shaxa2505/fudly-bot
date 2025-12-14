@@ -17,6 +17,8 @@ from types import FrameType
 from typing import Any
 
 from aiogram import F, Router, types
+from datetime import datetime
+from zoneinfo import ZoneInfo
 from aiogram.fsm.context import FSMContext
 
 from app.core.bootstrap import build_application
@@ -67,6 +69,16 @@ from app.services.unified_order_service import init_unified_order_service
 offer_service = OfferService(db, cache)
 admin_service = AdminService(db, bool(DATABASE_URL))
 unified_order_service = init_unified_order_service(db, bot)
+
+# =============================================================================
+# API SERVER (Mini App)
+# =============================================================================
+
+from app.api.api_server import run_api_server
+
+# API server configuration
+API_PORT = int(os.getenv("API_PORT", "8000"))
+ENABLE_API = os.getenv("ENABLE_API", "1").strip().lower() in {"1", "true", "yes"}
 
 # =============================================================================
 # METRICS
@@ -419,6 +431,7 @@ def _register_handlers() -> None:
     from handlers.seller import (
         registration as partner,
     )
+    from handlers.seller import stats as seller_stats
 
     # Setup dependencies for handler modules
     bookings.setup_dependencies(db, bot, cache, METRICS)
@@ -432,6 +445,7 @@ def _register_handlers() -> None:
     bulk_import.setup_dependencies(db, bot)
     import_products.setup_dependencies(db, bot)
     store_settings.setup_dependencies(db, bot)
+    seller_stats.setup_dependencies(db, bot)
     profile.setup_dependencies(db, bot, user_view_mode)
     favorites.setup_dependencies(db, bot, user_view_mode)
     order_management.setup(bot, db)
@@ -464,6 +478,7 @@ def _register_handlers() -> None:
     dp.include_router(unified_order_handlers.router)
 
     # 1. Seller-specific routers
+    dp.include_router(seller_stats.router)  # Stats before other seller handlers
     dp.include_router(bulk_import.router)
     dp.include_router(import_products.router)
     dp.include_router(create_offer.router)
@@ -687,6 +702,8 @@ async def main() -> None:
     logger.info("📊 Database: PostgreSQL" if DATABASE_URL else "📊 Database: Not configured")
     logger.info(f"🔄 Mode: {'Webhook' if USE_WEBHOOK else 'Polling'}")
     logger.info(f"👑 Admin ID: {ADMIN_ID}")
+    if ENABLE_API:
+        logger.info(f"🌐 API Server: Enabled on port {API_PORT}")
     logger.info("=" * 50)
 
     # Start background tasks
@@ -694,6 +711,15 @@ async def main() -> None:
     fsm_cleanup_task = asyncio.create_task(cleanup_expired_fsm_states())
     booking_task = await start_booking_worker()
     rating_task = await start_rating_reminder_worker_task()
+    
+    # Start API server if enabled
+    api_task = None
+    if ENABLE_API:
+        logger.info("🚀 Starting Mini App API server...")
+        api_task = asyncio.create_task(
+            run_api_server(db=db, offer_service=offer_service, bot_token=settings.bot_token, port=API_PORT)
+        )
+        logger.info(f"✅ API server started on http://0.0.0.0:{API_PORT}")
 
     if PRODUCTION_FEATURES:
         start_background_tasks(db)
@@ -729,6 +755,8 @@ async def main() -> None:
                 booking_task.cancel()
             if rating_task:
                 rating_task.cancel()
+            if api_task:
+                api_task.cancel()
             await runner.cleanup()
             await on_shutdown()
     else:
@@ -752,6 +780,8 @@ async def main() -> None:
             await shutdown_event.wait()
             logger.info("Shutting down...")
             polling_task.cancel()
+            if api_task:
+                api_task.cancel()
             try:
                 await polling_task
             except asyncio.CancelledError:

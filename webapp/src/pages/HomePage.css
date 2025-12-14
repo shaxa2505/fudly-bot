@@ -1,5 +1,5 @@
 /* Home page refinements using design tokens */
-@import url('../styles/tokens.css');
+@import url('../styles/design-tokens.css');
 
 html, body {
   background: var(--color-bg);

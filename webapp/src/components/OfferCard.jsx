@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { useFavorites } from '../context/FavoritesContext'
 import { getUnitLabel } from '../utils/helpers'
 import api from '../api/client'
-import './OfferCardNew.css'
+import './OfferCard.css'
 
 const OfferCard = memo(function OfferCard({ offer, cartQuantity = 0, onAddToCart, onRemoveFromCart }) {
   const navigate = useNavigate()

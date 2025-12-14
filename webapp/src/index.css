@@ -14,6 +14,13 @@
 @import './styles/shared-components.css';
 @import './styles/accessibility.css';
 
+/* Component Styles */
+@import './styles/components/badges.css';
+@import './styles/components/buttons.css';
+@import './styles/components/cards.css';
+@import './styles/components/inputs.css';
+@import './styles/components/navigation.css';
+
 /* ===== CSS RESET ===== */
 
 *,

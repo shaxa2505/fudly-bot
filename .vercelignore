@@ -1,0 +1,45 @@
+# Python files
+*.py
+*.pyc
+__pycache__/
+.venv/
+venv/
+
+# Database files
+*.sql
+*.db
+
+# Config files
+.env
+.env.*
+!.env.example
+
+# Bot specific
+handlers/
+app/
+migrations/
+tests/
+load_tests/
+scripts/
+
+# Build artifacts
+htmlcov/
+.pytest_cache/
+.coverage
+
+# Docs
+docs/
+*.md
+!webapp/README.md
+
+# Other
+alembic.ini
+docker-compose*.yml
+Dockerfile
+Procfile
+railway.toml
+requirements.txt
+runtime.txt
+
+# Node modules (will be installed during build)
+node_modules/
