@@ -1,0 +1,449 @@
+from __future__ import annotations
+
+import html
+from typing import Any
+
+from aiogram import Bot
+from aiogram.utils.keyboard import InlineKeyboardBuilder
+from fastapi import APIRouter, Depends, HTTPException
+
+from app.services.unified_order_service import OrderItem, get_unified_order_service
+
+from .common import (
+    CreateOrderRequest,
+    OrderResponse,
+    get_current_user,
+    get_db,
+    get_val,
+    logger,
+    settings,
+)
+
+router = APIRouter()
+
+
+@router.post("/orders", response_model=OrderResponse)
+async def create_order(
+    order: CreateOrderRequest, db=Depends(get_db), user: dict = Depends(get_current_user)
+):
+    """Create a new order from Mini App and notify partner."""
+
+    bot_instance: Bot | None = None
+
+    try:
+        user_id = order.user_id or user.get("id", 0)
+
+        if user_id == 0:
+            raise HTTPException(status_code=400, detail="User ID required")
+
+        try:
+            bot_instance = Bot(token=settings.bot_token)
+        except Exception as e:  # pragma: no cover - defensive
+            logger.warning(f"Could not create bot instance: {e}")
+
+        is_delivery = bool(order.delivery_address and order.delivery_address.strip())
+
+        if is_delivery:
+            total_check = 0.0
+            store_id_check: Any | None = None
+            for item in order.items:
+                offer = db.get_offer(item.offer_id) if hasattr(db, "get_offer") else None
+                if offer:
+                    price = float(get_val(offer, "discount_price", 0) or 0)
+                    total_check += price * item.quantity
+                    store_id_check = get_val(offer, "store_id")
+
+            if order.items:
+                first_offer = (
+                    db.get_offer(order.items[0].offer_id) if hasattr(db, "get_offer") else None
+                )
+                if first_offer:
+                    store_id_check = get_val(first_offer, "store_id")
+                    store_check = db.get_store(store_id_check) if hasattr(db, "get_store") else None
+                    if store_check:
+                        min_order = get_val(store_check, "min_order_amount", 0)
+                        if min_order > 0 and total_check < min_order:
+                            raise HTTPException(
+                                status_code=400,
+                                detail=f"Minimum order amount: {min_order}. Your total: {total_check}",
+                            )
+
+        created_items: list[dict[str, Any]] = []
+
+        order_service = get_unified_order_service()
+
+        # If unified service is available, use it as a single entry point
+        if order_service and hasattr(db, "create_cart_order"):
+            order_items: list[OrderItem] = []
+            for item in order.items:
+                offer = db.get_offer(item.offer_id) if hasattr(db, "get_offer") else None
+                if not offer:
+                    continue
+
+                price = int(get_val(offer, "discount_price", 0) or 0)
+                store_id = int(get_val(offer, "store_id"))
+                offer_title = get_val(offer, "title", "Товар")
+                store = db.get_store(store_id) if hasattr(db, "get_store") else None
+                store_name = get_val(store, "name", "") if store else ""
+                store_address = get_val(store, "address", "") if store else ""
+                delivery_price = 0
+                if is_delivery and store:
+                    delivery_price = int(get_val(store, "delivery_price", 15000) or 15000)
+
+                order_items.append(
+                    OrderItem(
+                        offer_id=item.offer_id,
+                        store_id=store_id,
+                        title=offer_title,
+                        price=price,
+                        original_price=price,
+                        quantity=item.quantity,
+                        store_name=store_name,
+                        store_address=store_address,
+                        delivery_price=delivery_price,
+                    )
+                )
+
+            try:
+                from app.services.unified_order_service import OrderResult  # type: ignore
+
+                result: OrderResult = await order_service.create_order(
+                    user_id=user_id,
+                    items=order_items,
+                    order_type="delivery" if is_delivery else "pickup",
+                    delivery_address=order.delivery_address if is_delivery else None,
+                    payment_method="card",
+                    notify_customer=False,
+                    notify_sellers=False,
+                )
+            except Exception as e:  # pragma: no cover - defensive
+                logger.error(f"Unified order service failed for webapp order: {e}")
+                result = None
+
+            if result and result.success:
+                # Map unified result back to old created_items shape
+                if is_delivery:
+                    for item_obj, oid in zip(order_items, result.order_ids):
+                        total = (item_obj.price * item_obj.quantity) + int(item_obj.delivery_price)
+                        created_items.append(
+                            {
+                                "id": oid,
+                                "type": "order",
+                                "offer_id": item_obj.offer_id,
+                                "quantity": item_obj.quantity,
+                                "total": total,
+                                "offer_title": item_obj.title,
+                                "store_id": item_obj.store_id,
+                            }
+                        )
+                        logger.info(f"✅ Created unified delivery ORDER {oid} for user {user_id}")
+                else:
+                    for item_obj, bid in zip(order_items, result.booking_ids):
+                        total = item_obj.price * item_obj.quantity
+                        created_items.append(
+                            {
+                                "id": bid,
+                                "type": "booking",
+                                "offer_id": item_obj.offer_id,
+                                "quantity": item_obj.quantity,
+                                "total": total,
+                                "offer_title": item_obj.title,
+                                "store_id": item_obj.store_id,
+                            }
+                        )
+                        logger.info(f"✅ Created unified pickup BOOKING {bid} for user {user_id}")
+            else:
+                logger.error(
+                    "Unified order service returned failure for webapp order: %s",
+                    result.error_message if result else "no result",
+                )
+
+        # Fallback: legacy per-item creation if unified service is unavailable
+        if not created_items:
+            for item in order.items:
+                offer = db.get_offer(item.offer_id) if hasattr(db, "get_offer") else None
+                if not offer:
+                    continue
+
+                price = float(get_val(offer, "discount_price", 0) or 0)
+                total = price * item.quantity
+                store_id = get_val(offer, "store_id")
+                offer_title = get_val(offer, "title", "Товар")
+
+                try:
+                    if is_delivery and hasattr(db, "create_order"):
+                        store = db.get_store(store_id) if hasattr(db, "get_store") else None
+                        delivery_price = get_val(store, "delivery_price", 15000) if store else 15000
+
+                        order_id = db.create_order(
+                            user_id=user_id,
+                            store_id=store_id,
+                            offer_id=item.offer_id,
+                            quantity=item.quantity,
+                            order_type="delivery",
+                            delivery_address=order.delivery_address,
+                            delivery_price=delivery_price,
+                            payment_method="card",
+                        )
+
+                        if order_id:
+                            created_items.append(
+                                {
+                                    "id": order_id,
+                                    "type": "order",
+                                    "offer_id": item.offer_id,
+                                    "quantity": item.quantity,
+                                    "total": total + float(delivery_price),
+                                    "offer_title": offer_title,
+                                    "store_id": store_id,
+                                }
+                            )
+                            logger.info(
+                                f"✅ Created legacy delivery ORDER {order_id} for user {user_id}"
+                            )
+
+                    elif hasattr(db, "create_booking_atomic"):
+                        ok, booking_id, booking_code = db.create_booking_atomic(
+                            offer_id=item.offer_id,
+                            user_id=user_id,
+                            quantity=item.quantity,
+                        )
+
+                        if ok and booking_id:
+                            created_items.append(
+                                {
+                                    "id": booking_id,
+                                    "type": "booking",
+                                    "offer_id": item.offer_id,
+                                    "quantity": item.quantity,
+                                    "total": total,
+                                    "offer_title": offer_title,
+                                    "store_id": store_id,
+                                }
+                            )
+                            logger.info(
+                                f"✅ Created legacy pickup BOOKING {booking_id} for user {user_id}"
+                            )
+
+                    if bot_instance and store_id and created_items:
+                        last_item = created_items[-1]
+                        store = db.get_store(store_id) if hasattr(db, "get_store") else None
+                        if store:
+                            owner_id = get_val(store, "owner_id")
+                            if owner_id:
+                                await notify_partner_webapp_order(
+                                    bot=bot_instance,
+                                    db=db,
+                                    owner_id=owner_id,
+                                    entity_id=last_item["id"],
+                                    offer_title=offer_title,
+                                    quantity=item.quantity,
+                                    total=last_item["total"],
+                                    user_id=user_id,
+                                    delivery_address=order.delivery_address
+                                    if is_delivery
+                                    else None,
+                                    phone=order.phone,
+                                    photo=get_val(offer, "photo"),
+                                    is_delivery=is_delivery,
+                                )
+
+                except Exception as e:  # pragma: no cover - defensive
+                    logger.error(f"Error creating order for offer {item.offer_id}: {e}")
+                    continue
+
+        order_id = created_items[0]["id"] if created_items else 0
+        total_amount = sum(b["total"] for b in created_items)
+        total_items = sum(b["quantity"] for b in created_items)
+
+        if bot_instance and created_items and user_id:
+            try:
+                customer_lang = (
+                    db.get_user_language(user_id) if hasattr(db, "get_user_language") else "ru"
+                )
+                currency = "so'm" if customer_lang == "uz" else "сум"
+
+                if customer_lang == "uz":
+                    order_type_uz = "🚚 Yetkazish" if is_delivery else "🏪 O'zi olib ketadi"
+                    confirm_msg = "✅ <b>Buyurtma qabul qilindi!</b>\n\n"
+                    confirm_msg += f"📦 #{order_id}\n"
+                    confirm_msg += f"{order_type_uz}\n\n"
+                    confirm_msg += "<b>Mahsulotlar:</b>\n"
+                    for item in created_items:
+                        confirm_msg += f"• {item['offer_title']} × {item['quantity']}\n"
+                    confirm_msg += f"\n💰 <b>Jami: {int(total_amount):,} {currency}</b>\n\n"
+                    if is_delivery and order.delivery_address:
+                        confirm_msg += f"📍 {order.delivery_address}\n\n"
+                    confirm_msg += "⏳ Sotuvchi tasdiqlashini kutamiz..."
+                else:
+                    order_type_ru = "🚚 Доставка" if is_delivery else "🏪 Самовывоз"
+                    confirm_msg = "✅ <b>Заказ оформлен!</b>\n\n"
+                    confirm_msg += f"📦 #{order_id}\n"
+                    confirm_msg += f"{order_type_ru}\n\n"
+                    confirm_msg += "<b>Товары:</b>\n"
+                    for item in created_items:
+                        confirm_msg += f"• {item['offer_title']} × {item['quantity']}\n"
+                    confirm_msg += f"\n💰 <b>Итого: {int(total_amount):,} {currency}</b>\n\n"
+                    if is_delivery and order.delivery_address:
+                        confirm_msg += f"📍 {order.delivery_address}\n\n"
+                    confirm_msg += "⏳ Ожидаем подтверждения продавца..."
+
+                await bot_instance.send_message(user_id, confirm_msg, parse_mode="HTML")
+                logger.info(f"✅ Sent order confirmation to customer {user_id}")
+            except Exception as e:  # pragma: no cover - defensive
+                logger.warning(f"Failed to send confirmation to customer: {e}")
+
+        logger.info(
+            "ORDER_CREATED: id=%s, user=%s, type=%s, total=%s, items=%s, source=webapp_api",
+            order_id,
+            user_id,
+            "delivery" if is_delivery else "pickup",
+            int(total_amount),
+            total_items,
+        )
+
+        return OrderResponse(
+            order_id=order_id, status="pending", total=total_amount, items_count=total_items
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:  # pragma: no cover - defensive
+        logger.error(f"Error creating order: {e}")
+        raise HTTPException(status_code=500, detail=str(e)) from e
+    finally:
+        if bot_instance:
+            try:
+                await bot_instance.session.close()
+            except Exception:  # pragma: no cover - defensive
+                pass
+
+
+async def notify_partner_webapp_order(
+    bot: Bot,
+    db: Any,
+    owner_id: int,
+    entity_id: int,
+    offer_title: str,
+    quantity: int,
+    total: float,
+    user_id: int,
+    delivery_address: str | None,
+    phone: str | None,
+    photo: str | None,
+    is_delivery: bool = False,
+) -> None:
+    """Send notification to partner about new webapp order."""
+
+    partner_lang = db.get_user_language(owner_id) if hasattr(db, "get_user_language") else "uz"
+    user = db.get_user(user_id) if hasattr(db, "get_user") else None
+
+    def get_user_val(obj: Any, key: str, default: Any | None = None) -> Any | None:
+        if isinstance(obj, dict):
+            return obj.get(key, default)
+        return getattr(obj, key, default) if obj else default
+
+    customer_name = get_user_val(user, "first_name", "Клиент")
+    customer_phone = phone or get_user_val(user, "phone", "Не указан")
+
+    def _esc(val: Any) -> str:
+        return html.escape(str(val)) if val is not None else ""
+
+    currency = "so'm" if partner_lang == "uz" else "сум"
+    unit_label = "dona" if partner_lang == "uz" else "шт"
+
+    if partner_lang == "uz":
+        text = (
+            f"🔔 <b>YANGI BUYURTMA (Mini App)!</b>\n"
+            f"━━━━━━━━━━━━━━━━━━━━\n\n"
+            f"🛒 <b>{_esc(offer_title)}</b>\n"
+            f"📦 Miqdor: <b>{quantity}</b> {unit_label}\n"
+            f"💰 Jami: <b>{int(total):,}</b> {currency}\n\n"
+            f"━━━━━━━━━━━━━━━━━━━━\n"
+            f"👤 <b>Xaridor:</b>\n"
+            f"   Ism: {_esc(customer_name)}\n"
+            f"   📱 <code>{_esc(customer_phone)}</code>\n"
+        )
+        if is_delivery:
+            text += "\n🚚 <b>Yetkazib berish</b>\n"
+            if delivery_address:
+                text += f"   📍 {_esc(delivery_address)}\n"
+        else:
+            text += "\n🏪 <b>O'zi olib ketadi</b>\n"
+        text += "━━━━━━━━━━━━━━━━━━━━"
+        confirm_text = "✅ Tasdiqlash"
+        reject_text = "❌ Rad etish"
+    else:
+        text = (
+            f"🔔 <b>НОВЫЙ ЗАКАЗ (Mini App)!</b>\n"
+            f"━━━━━━━━━━━━━━━━━━━━\n\n"
+            f"🛒 <b>{_esc(offer_title)}</b>\n"
+            f"📦 Количество: <b>{quantity}</b> {unit_label}\n"
+            f"💰 Итого: <b>{int(total):,}</b> {currency}\n\n"
+            f"━━━━━━━━━━━━━━━━━━━━\n"
+            f"👤 <b>Покупатель:</b>\n"
+            f"   Имя: {_esc(customer_name)}\n"
+            f"   📱 <code>{_esc(customer_phone)}</code>\n"
+        )
+        if is_delivery:
+            text += "\n🚚 <b>Доставка</b>\n"
+            if delivery_address:
+                text += f"   📍 {_esc(delivery_address)}\n"
+        else:
+            text += "\n🏪 <b>Самовывоз</b>\n"
+        text += "━━━━━━━━━━━━━━━━━━━━"
+        confirm_text = "✅ Подтвердить"
+        reject_text = "❌ Отклонить"
+
+    kb = InlineKeyboardBuilder()
+    if is_delivery:
+        kb.button(text=confirm_text, callback_data=f"order_confirm_{entity_id}")
+        kb.button(text=reject_text, callback_data=f"order_reject_{entity_id}")
+    else:
+        kb.button(text=confirm_text, callback_data=f"booking_confirm_{entity_id}")
+        kb.button(text=reject_text, callback_data=f"booking_reject_{entity_id}")
+    kb.adjust(2)
+
+    try:
+        sent_msg = None
+        if photo:
+            try:
+                sent_msg = await bot.send_photo(
+                    owner_id,
+                    photo=photo,
+                    caption=text,
+                    parse_mode="HTML",
+                    reply_markup=kb.as_markup(),
+                )
+            except Exception:  # pragma: no cover - fallback to text
+                sent_msg = None
+
+        if not sent_msg:
+            sent_msg = await bot.send_message(
+                owner_id, text, parse_mode="HTML", reply_markup=kb.as_markup()
+            )
+
+        if (
+            sent_msg
+            and hasattr(db, "set_order_seller_message_id")
+            and hasattr(db, "set_booking_seller_message_id")
+        ):
+            try:
+                if is_delivery:
+                    db.set_order_seller_message_id(entity_id, sent_msg.message_id)
+                    logger.info(
+                        "Saved seller_message_id=%s for order#%s",
+                        sent_msg.message_id,
+                        entity_id,
+                    )
+                else:
+                    db.set_booking_seller_message_id(entity_id, sent_msg.message_id)
+                    logger.info(
+                        "Saved seller_message_id=%s for booking#%s",
+                        sent_msg.message_id,
+                        entity_id,
+                    )
+            except Exception as save_err:  # pragma: no cover - defensive
+                logger.error(f"Failed to save seller_message_id: {save_err}")
+    except Exception as e:  # pragma: no cover - defensive
+        logger.error(f"Failed to notify partner {owner_id}: {e}")
