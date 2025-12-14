@@ -67,5 +67,4 @@ backup/
 *.tmp
 *.temp
 
-# Ignore the webapp directory (frontend only, not app/api/webapp/)
-/webapp/
+# webapp has its own .gitignore for node_modules, dist, etc.
