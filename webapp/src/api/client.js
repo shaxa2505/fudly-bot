@@ -4,9 +4,92 @@ import { LRUCache } from '../utils/lruCache'
 
 const API_BASE = import.meta.env.VITE_API_URL || 'https://fudly-bot-production.up.railway.app/api/v1'
 
+// Flag to track if API is available
+let apiAvailable = true
+let apiCheckTime = 0
+const API_CHECK_INTERVAL = 30000 // Re-check every 30 seconds
+
 // LRU cache for GET requests with automatic eviction
 const requestCache = new LRUCache(100, 30000) // 100 items, 30s TTL
 const CACHE_TTL = 30000 // 30 seconds cache
+
+// Demo data for when API is unavailable
+const DEMO_OFFERS = [
+  {
+    id: 1,
+    title: 'Olma (Demo)',
+    description: 'Yangi uzilgan olmalar',
+    price: 15000,
+    old_price: 20000,
+    discount_percent: 25,
+    quantity: 50,
+    unit: 'kg',
+    category: 'fruits',
+    city: 'Toshkent',
+    photo: null,
+    store_id: 1,
+    store_name: 'Demo Market',
+  },
+  {
+    id: 2,
+    title: 'Banan (Demo)',
+    description: 'Shirin bananlar',
+    price: 25000,
+    old_price: 30000,
+    discount_percent: 17,
+    quantity: 30,
+    unit: 'kg',
+    category: 'fruits',
+    city: 'Toshkent',
+    photo: null,
+    store_id: 1,
+    store_name: 'Demo Market',
+  },
+  {
+    id: 3,
+    title: 'Sut 1L (Demo)',
+    description: 'Yangi sut',
+    price: 12000,
+    old_price: 15000,
+    discount_percent: 20,
+    quantity: 100,
+    unit: 'dona',
+    category: 'dairy',
+    city: 'Toshkent',
+    photo: null,
+    store_id: 2,
+    store_name: 'Sut Mahsulotlari',
+  },
+  {
+    id: 4,
+    title: 'Non (Demo)',
+    description: 'Issiq non',
+    price: 5000,
+    old_price: 6000,
+    discount_percent: 17,
+    quantity: 200,
+    unit: 'dona',
+    category: 'bakery',
+    city: 'Toshkent',
+    photo: null,
+    store_id: 3,
+    store_name: 'Novvoyxona',
+  },
+]
+
+const DEMO_STORES = [
+  { id: 1, name: 'Demo Market', address: 'Toshkent, Chilonzor', rating: 4.5, photo: null },
+  { id: 2, name: 'Sut Mahsulotlari', address: 'Toshkent, Yunusobod', rating: 4.2, photo: null },
+  { id: 3, name: 'Novvoyxona', address: 'Toshkent, Mirzo Ulugbek', rating: 4.8, photo: null },
+]
+
+const DEMO_CATEGORIES = [
+  { id: 'fruits', name: 'Mevalar', icon: '🍎' },
+  { id: 'vegetables', name: 'Sabzavotlar', icon: '🥬' },
+  { id: 'dairy', name: 'Sut mahsulotlari', icon: '🥛' },
+  { id: 'bakery', name: 'Non mahsulotlari', icon: '🍞' },
+  { id: 'meat', name: "Go'sht", icon: '🥩' },
+]
 
 // Cleanup expired cache entries every 5 minutes
 setInterval(() => {
@@ -74,6 +157,48 @@ client.interceptors.response.use(
   }
 )
 
+// Check if API is available (with caching)
+const checkApiAvailable = async () => {
+  const now = Date.now()
+  if (now - apiCheckTime < API_CHECK_INTERVAL) {
+    return apiAvailable
+  }
+
+  try {
+    await client.get('/health', { timeout: 3000 })
+    apiAvailable = true
+  } catch (error) {
+    apiAvailable = false
+    console.warn('[API] Backend unavailable, using demo mode')
+  }
+
+  apiCheckTime = now
+  return apiAvailable
+}
+
+// Safe cached GET with fallback
+const safeCachedGet = async (url, params = {}, ttl = CACHE_TTL, fallback = null) => {
+  const cacheKey = `${url}?${JSON.stringify(params)}`
+
+  // Try to get from cache first
+  const cached = requestCache.get(cacheKey)
+  if (cached !== null) {
+    return cached
+  }
+
+  try {
+    const response = await client.get(url, { params })
+    const data = response.data
+    requestCache.set(cacheKey, data)
+    apiAvailable = true
+    return data
+  } catch (error) {
+    apiAvailable = false
+    console.warn(`[API] Request failed for ${url}, using fallback`)
+    return fallback
+  }
+}
+
 // Cached GET request helper with LRU cache
 const cachedGet = async (url, params = {}, ttl = CACHE_TTL) => {
   const cacheKey = `${url}?${JSON.stringify(params)}`
@@ -85,7 +210,8 @@ const cachedGet = async (url, params = {}, ttl = CACHE_TTL) => {
   }
 
   // Fetch from API
-  const { data } = await client.get(url, { params })
+  const response = await client.get(url, { params })
+  const data = response.data
 
   // Store in cache (LRU handles eviction automatically)
   requestCache.set(cacheKey, data)
@@ -133,18 +259,32 @@ const api = {
 
   // Auth endpoints
   async validateAuth(initData) {
-    const { data } = await client.post('/auth/validate', { init_data: initData })
-    return data
+    try {
+      const { data } = await client.post('/auth/validate', { init_data: initData })
+      return data
+    } catch (error) {
+      console.warn('[API] Auth validation failed')
+      return null
+    }
   },
 
   async getProfile(userId) {
-    return cachedGet('/user/profile', { user_id: userId }, 60000) // 1 min cache
+    try {
+      return await cachedGet('/user/profile', { user_id: userId }, 60000)
+    } catch (error) {
+      console.warn('[API] Profile fetch failed')
+      return null
+    }
   },
 
   async getUserOrders(userId, status = null) {
-    const params = { user_id: userId }
-    if (status) params.status = status
-    return cachedGet('/user/orders', params, 10000) // 10s cache
+    try {
+      const params = { user_id: userId }
+      if (status) params.status = status
+      return await cachedGet('/user/orders', params, 10000)
+    } catch (error) {
+      return []
+    }
   },
 
   async getUserBookings(userId, status = null) {
@@ -159,15 +299,21 @@ const api = {
   },
 
   async getStores(params = {}) {
-    return cachedGet('/stores', params, 60000) || [] // 1 min cache
+    const data = await safeCachedGet('/stores', params, 60000, DEMO_STORES)
+    return Array.isArray(data) ? data : DEMO_STORES
   },
 
   async getStore(storeId) {
-    return cachedGet(`/stores/${storeId}`, {}, 60000)
+    try {
+      return await cachedGet(`/stores/${storeId}`, {}, 60000)
+    } catch (error) {
+      return DEMO_STORES.find(s => s.id === storeId) || null
+    }
   },
 
   async getStoreOffers(storeId) {
-    return cachedGet('/offers', { store_id: storeId }, 30000) || []
+    const data = await safeCachedGet('/offers', { store_id: storeId }, 30000, DEMO_OFFERS.filter(o => o.store_id === storeId))
+    return Array.isArray(data) ? data : []
   },
 
   async getStoreReviews(storeId) {
@@ -180,7 +326,8 @@ const api = {
 
   // Offers endpoints - shorter cache for freshness
   async getOffers(params) {
-    return cachedGet('/offers', params, 20000) // 20s cache
+    const data = await safeCachedGet('/offers', params, 20000, DEMO_OFFERS)
+    return Array.isArray(data) ? data : DEMO_OFFERS
   },
 
   async getOfferById(offerId) {
@@ -188,12 +335,13 @@ const api = {
     try {
       return await cachedGet(`/offers/${offerId}`, {}, 20000)
     } catch (error) {
-      return null
+      return DEMO_OFFERS.find(o => o.id === offerId) || null
     }
   },
 
   async getFlashDeals(city = 'Ташкент', limit = 10) {
-    return cachedGet('/flash-deals', { city, limit }, 30000) // 30s cache
+    const data = await safeCachedGet('/flash-deals', { city, limit }, 30000, DEMO_OFFERS.slice(0, 2))
+    return Array.isArray(data) ? data : []
   },
 
   async getFavorites() {
@@ -353,6 +501,16 @@ const api = {
       console.warn('createPaymentLink error:', error)
       throw error
     }
+  },
+
+  // Check if API is available
+  isApiAvailable() {
+    return apiAvailable
+  },
+
+  // Force check API availability
+  async checkApi() {
+    return await checkApiAvailable()
   },
 }
 
