@@ -40,6 +40,7 @@ google-generativeai>=0.3.0       # For Google Gemini API
 
 # i18n / Localization
 babel>=2.14.0                    # For translations compilation
+pytz>=2023.3                     # For timezone handling in partner panel
 
 # Development Tools
 ruff>=0.1.7                      # Fast Python linter
