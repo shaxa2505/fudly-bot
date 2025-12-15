@@ -209,6 +209,22 @@ function CartPage({ user }) {
       // Get order ID from response
       const orderId = result.order_id || result.bookings?.[0]?.booking_id
 
+      // 🔴 NEW: Check if payment proof required (delivery + card)
+      if (result.awaiting_payment && orderId) {
+        // Order created but needs payment proof - show upload form
+        setOrderResult({
+          success: true,
+          orderId: orderId,
+          awaitingPayment: true,
+          orderType: orderType,
+          total: total,
+          message: result.message || 'Загрузите чек оплаты'
+        })
+        setCheckoutStep('payment_upload')  // New step for payment upload
+        // Don't clear cart yet - keep it for retry if needed
+        return
+      }
+
       // If delivery and we have payment proof - upload it
       if (orderType === 'delivery' && paymentProof && orderId) {
         try {
@@ -697,19 +713,63 @@ function CartPage({ user }) {
                   )}
                 </>
               )}
+
+              {checkoutStep === 'payment_upload' && (
+                <>
+                  <p className="upload-instruction">
+                    ✅ Buyurtma yaratildi! Endi to'lov chekini yuklang.
+                  </p>
+                  {!paymentProof ? (
+                    <button
+                      className="confirm-btn"
+                      onClick={() => document.getElementById('payment-proof-file-input')?.click()}
+                      disabled={orderLoading}
+                    >
+                      📸 Chekni yuklash
+                    </button>
+                  ) : (
+                    <button
+                      className="confirm-btn"
+                      onClick={async () => {
+                        setOrderLoading(true)
+                        try {
+                          await api.uploadPaymentProof(orderResult.orderId, paymentProof)
+                          clearCart()
+                          setShowCheckout(false)
+                          setCheckoutStep('details')
+                          setPaymentProof(null)
+                          setPaymentProofPreview(null)
+                          setOrderResult({
+                            ...orderResult,
+                            awaitingPayment: false,
+                            message: 'Chek yuklandi! Admin tekshiradi.'
+                          })
+                        } catch (error) {
+                          alert('Xatolik: ' + error.message)
+                        } finally {
+                          setOrderLoading(false)
+                        }
+                      }}
+                      disabled={orderLoading}
+                    >
+                      {orderLoading ? '⏳ Yuklanmoqda...' : '✅ Yuborish'}
+                    </button>
+                  )}
+                </>
+              )}
             </div>
           </div>
         </div>
       )}
 
       {/* Result Modal */}
-      {orderResult && (
+      {orderResult && !orderResult.awaitingPayment && (
         <div className="modal-overlay" onClick={() => setOrderResult(null)}>
           <div className="modal result-modal" onClick={e => e.stopPropagation()}>
             {orderResult.success ? (
               <>
                 <div className="result-icon success">✅</div>
-                <h2>Buyurtma qabul qilindi!</h2>
+                <h2>{orderResult.message || 'Buyurtma qabul qilindi!'}</h2>
                 {orderResult.bookingCode && (
                   <p className="booking-code-display">
                     🎫 Kod: <strong>{orderResult.bookingCode}</strong>
@@ -724,7 +784,9 @@ function CartPage({ user }) {
                 <p className="order-total-result">
                   💰 Jami: {Math.round(orderResult.total).toLocaleString()} so'm
                 </p>
-                <p className="order-note">Tez orada siz bilan bog'lanamiz</p>
+                <p className="order-note">
+                  {orderResult.message || 'Tez orada siz bilan bog\'lanamiz'}
+                </p>
                 <button className="primary-btn" onClick={() => {
                   setOrderResult(null)
                   navigate('/')
