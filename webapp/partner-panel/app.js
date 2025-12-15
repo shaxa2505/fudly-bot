@@ -39,18 +39,29 @@ const API_URL = (() => {
 
 // Auth
 const isDevMode = !tg.initData && window.location.hostname === 'localhost';
-const isTelegramWebApp = !!window.Telegram?.WebApp?.initData;
+// Check if running inside Telegram WebApp (WebApp object exists and has platform)
+const isTelegramWebApp = !!(window.Telegram?.WebApp && window.Telegram.WebApp.platform);
 let devTelegramId = null;
 
-// Check if opened outside Telegram
-if (!isTelegramWebApp && !isDevMode) {
+console.log('📱 Telegram WebApp check:', {
+    hasTelegram: !!window.Telegram,
+    hasWebApp: !!window.Telegram?.WebApp,
+    platform: window.Telegram?.WebApp?.platform,
+    initData: window.Telegram?.WebApp?.initData ? 'present' : 'empty',
+    isTelegramWebApp,
+    isDevMode
+});
+
+// Check if opened outside Telegram (but allow if initData is present even if platform check fails)
+const hasInitData = !!window.Telegram?.WebApp?.initData;
+if (!isTelegramWebApp && !hasInitData && !isDevMode) {
     console.error('❌ Partner Panel must be opened from Telegram');
     document.body.innerHTML = `
         <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100vh;text-align:center;padding:20px;background:#1a1a2e;color:white;font-family:system-ui">
             <div style="font-size:64px;margin-bottom:20px">🔐</div>
             <h1 style="margin:0 0 10px">Панель партнёра</h1>
             <p style="color:#aaa;margin:0 0 20px">Откройте через Telegram бот</p>
-            <a href="https://t.me/FudlyBot" style="background:#0088cc;color:white;padding:12px 24px;border-radius:8px;text-decoration:none">Открыть бот</a>
+            <a href="https://t.me/fudly_bot" style="background:#0088cc;color:white;padding:12px 24px;border-radius:8px;text-decoration:none">Открыть бот</a>
         </div>
     `;
     throw new Error('Not in Telegram WebApp');
