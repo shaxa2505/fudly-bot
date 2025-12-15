@@ -17,35 +17,17 @@ router = Router(name="webapp")
 
 # URL вашего Mini App (из переменных окружения или дефолтный)
 WEBAPP_URL = os.getenv("WEBAPP_URL", "https://fudly-webapp.vercel.app")
-# Partner Panel теперь на том же домене что и API
-PARTNER_PANEL_URL = os.getenv("PARTNER_PANEL_URL")
+# Partner Panel на Vercel (отдельный домен для надёжности)
+PARTNER_PANEL_URL = os.getenv("PARTNER_PANEL_URL", "https://partner-panel-ashen.vercel.app")
 
 
 def get_partner_panel_url() -> str:
     """Get partner panel Mini App URL.
 
-    If PARTNER_PANEL_URL is not set, constructs URL from Railway environment.
-    Partner Panel is served at /partner-panel on the same domain as API.
+    Partner Panel is hosted on Vercel for reliability.
+    Can be overridden via PARTNER_PANEL_URL environment variable.
     """
-    if PARTNER_PANEL_URL:
-        return PARTNER_PANEL_URL
-
-    # Try Railway's PUBLIC_URL или RAILWAY_PUBLIC_DOMAIN
-    public_url = os.getenv("PUBLIC_URL")
-    railway_domain = os.getenv("RAILWAY_PUBLIC_DOMAIN")
-
-    if railway_domain:
-        return f"https://{railway_domain}/partner-panel"
-
-    # Try to construct from API URL
-    api_url = os.getenv("API_URL")
-    if api_url:
-        # Remove /api suffix if present
-        base_url = api_url.replace("/api", "").rstrip("/")
-        return f"{base_url}/partner-panel"
-
-    # Fallback: return localhost for dev
-    return "http://localhost:8000/partner-panel"
+    return PARTNER_PANEL_URL
 
 
 def webapp_keyboard(lang: str = "ru") -> InlineKeyboardMarkup:
