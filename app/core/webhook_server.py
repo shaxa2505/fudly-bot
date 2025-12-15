@@ -532,6 +532,8 @@ async def create_webhook_app(
         try:
             from app.services.unified_order_service import (
                 OrderItem as UnifiedOrderItem,
+            )
+            from app.services.unified_order_service import (
                 OrderResult,
                 get_unified_order_service,
             )
@@ -579,9 +581,7 @@ async def create_webhook_app(
 
                     offer = db.get_offer(int(offer_id)) if hasattr(db, "get_offer") else None
                     if not offer:
-                        failed_items.append(
-                            {"offer_id": offer_id, "error": "Offer not found"}
-                        )
+                        failed_items.append({"offer_id": offer_id, "error": "Offer not found"})
                         continue
 
                     price = int(get_offer_value(offer, "discount_price", 0) or 0)
@@ -623,19 +623,23 @@ async def create_webhook_app(
                             order_type="delivery",
                             delivery_address=address,
                             payment_method="card",
-                            notify_customer=True,   # ✅ Tell customer order created
-                            notify_sellers=False,   # ❌ DON'T notify seller yet!
+                            notify_customer=True,  # ✅ Tell customer order created
+                            notify_sellers=False,  # ❌ DON'T notify seller yet!
                         )
-                        
+
                         if result and result.success and result.order_ids:
                             # Return special response indicating payment proof required
-                            return add_cors_headers(web.json_response({
-                                "success": True,
-                                "order_id": result.order_ids[0],
-                                "awaiting_payment": True,  # ✅ Client must upload photo
-                                "message": "Order created. Please upload payment proof.",
-                            }))
-                    
+                            return add_cors_headers(
+                                web.json_response(
+                                    {
+                                        "success": True,
+                                        "order_id": result.order_ids[0],
+                                        "awaiting_payment": True,  # ✅ Client must upload photo
+                                        "message": "Order created. Please upload payment proof.",
+                                    }
+                                )
+                            )
+
                     # For PICKUP or CASH delivery - normal flow
                     else:
                         result: OrderResult = await order_service.create_order(
@@ -647,7 +651,7 @@ async def create_webhook_app(
                             notify_customer=True,
                             notify_sellers=True,  # ✅ OK for pickup/cash
                         )
-                    
+
                     logger.info(
                         f"Mini App order created via unified_order_service: "
                         f"user={user_id}, type={delivery_type}, "
@@ -732,12 +736,8 @@ async def create_webhook_app(
                                                 store, "owner_id"
                                             ) or get_offer_value(store, "user_id")
                                             if seller_id:
-                                                title = get_offer_value(
-                                                    offer, "title", "Товар"
-                                                )
-                                                price = get_offer_value(
-                                                    offer, "discount_price", 0
-                                                )
+                                                title = get_offer_value(offer, "title", "Товар")
+                                                price = get_offer_value(offer, "discount_price", 0)
 
                                                 # Format notification message
                                                 msg = (
@@ -779,9 +779,7 @@ async def create_webhook_app(
                                                     f"Notification sent to seller {seller_id}"
                                                 )
                             except Exception as notify_err:
-                                logger.warning(
-                                    f"Failed to notify seller: {notify_err}"
-                                )
+                                logger.warning(f"Failed to notify seller: {notify_err}")
 
                         else:
                             failed_items.append(
@@ -971,14 +969,14 @@ async def create_webhook_app(
 
     async def api_upload_payment_proof(request: web.Request) -> web.Response:
         """POST /api/v1/orders/{order_id}/payment-proof - Upload payment screenshot.
-        
+
         For DELIVERY orders with CARD payment, this sends the payment proof to ADMIN
         for verification before notifying the seller.
         """
         order_id_str = request.match_info.get("order_id")
         try:
             order_id = int(order_id_str)
-            
+
             # Parse multipart form data
             reader = await request.multipart()
             photo_data = None
@@ -996,19 +994,32 @@ async def create_webhook_app(
 
             # Upload photo to Telegram
             from aiogram.types import BufferedInputFile
+
             photo_file = BufferedInputFile(photo_data, filename=filename)
 
             # Check if this is a DELIVERY ORDER (not booking)
             order = None
             if hasattr(db, "get_order"):
                 order = db.get_order(order_id)
-            
+
             if order:
                 # 🔴 DELIVERY ORDER - Send to ADMIN for confirmation
-                order_type = order.get("order_type") if isinstance(order, dict) else getattr(order, "order_type", None)
-                user_id = order.get("user_id") if isinstance(order, dict) else getattr(order, "user_id", None)
-                delivery_address = order.get("delivery_address") if isinstance(order, dict) else getattr(order, "delivery_address", None)
-                
+                order_type = (
+                    order.get("order_type")
+                    if isinstance(order, dict)
+                    else getattr(order, "order_type", None)
+                )
+                user_id = (
+                    order.get("user_id")
+                    if isinstance(order, dict)
+                    else getattr(order, "user_id", None)
+                )
+                delivery_address = (
+                    order.get("delivery_address")
+                    if isinstance(order, dict)
+                    else getattr(order, "delivery_address", None)
+                )
+
                 if order_type == "delivery":
                     # Get user info
                     user = db.get_user(user_id) if hasattr(db, "get_user") else None
@@ -1021,7 +1032,7 @@ async def create_webhook_app(
                         else:
                             customer_name = getattr(user, "first_name", "")
                             customer_phone = getattr(user, "phone", "")
-                    
+
                     # Build admin message
                     admin_msg = (
                         f"💳 <b>НОВАЯ ДОСТАВКА - ПРОВЕРЬТЕ ОПЛАТУ</b>\n\n"
@@ -1034,9 +1045,10 @@ async def create_webhook_app(
                     if delivery_address:
                         admin_msg += f"📍 {delivery_address}\n"
                     admin_msg += "\n⚠️ <b>ПРОВЕРЬТЕ ЧЕК И ПОДТВЕРДИТЕ ОПЛАТУ</b>"
-                    
+
                     # Buttons for admin
-                    from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
+                    from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
+
                     admin_keyboard = InlineKeyboardMarkup(
                         inline_keyboard=[
                             [
@@ -1053,7 +1065,7 @@ async def create_webhook_app(
                             ],
                         ]
                     )
-                    
+
                     # Send to ADMIN
                     admin_id = int(os.getenv("ADMIN_ID", "0"))
                     if admin_id:
@@ -1066,17 +1078,21 @@ async def create_webhook_app(
                                 reply_markup=admin_keyboard,
                             )
                             file_id = sent_msg.photo[-1].file_id
-                            logger.info(f"Payment proof for delivery order #{order_id} sent to admin {admin_id}")
-                            
+                            logger.info(
+                                f"Payment proof for delivery order #{order_id} sent to admin {admin_id}"
+                            )
+
                             # Update order status to awaiting_admin_confirmation
                             if hasattr(db, "update_order_status"):
                                 db.update_order_status(order_id, "awaiting_admin_confirmation")
-                            
+
                             return add_cors_headers(
-                                web.json_response({
-                                    "success": True,
-                                    "message": "Payment proof sent to admin for verification",
-                                })
+                                web.json_response(
+                                    {
+                                        "success": True,
+                                        "message": "Payment proof sent to admin for verification",
+                                    }
+                                )
                             )
                         except Exception as e:
                             logger.error(f"Failed to send payment proof to admin: {e}")
@@ -1087,82 +1103,10 @@ async def create_webhook_app(
                         return add_cors_headers(
                             web.json_response({"error": "Admin ID not configured"}, status=500)
                         )
-            
-            # If not a delivery order, this might be a booking (legacy flow)
-            # Keep old logic for backward compatibility
-            booking = None
-            seller_id = None
-            booking_code = None
-            
-            if hasattr(db, "get_booking"):
-                booking = db.get_booking(order_id)
-                if booking:
-                    booking_code = (
-                        booking.get("booking_code")
-                        if isinstance(booking, dict)
-                        else (booking[4] if len(booking) > 4 else None)
-                    )
-                    offer_id = (
-                        booking.get("offer_id")
-                        if isinstance(booking, dict)
-                        else (booking[1] if len(booking) > 1 else None)
-                    )
 
-                    if offer_id and hasattr(db, "get_offer"):
-                        offer = db.get_offer(offer_id)
-                        if offer:
-                            store_id = get_offer_value(offer, "store_id")
-                            if store_id and hasattr(db, "get_store"):
-                                store = db.get_store(store_id)
-                                if store:
-                                    seller_id = get_offer_value(
-                                        store, "owner_id"
-                                    ) or get_offer_value(store, "user_id")
-
-            # Send to seller for booking orders
-            if seller_id and booking_code:
-                from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
-                keyboard = InlineKeyboardMarkup(
-                    inline_keyboard=[
-                        [
-                            InlineKeyboardButton(
-                                text="✅ Принять",
-                                callback_data=f"booking_confirm_{order_id}",
-                            ),
-                            InlineKeyboardButton(
-                                text="❌ Отклонить",
-                                callback_data=f"booking_reject_{order_id}",
-                            ),
-                        ]
-                    ]
-                )
-                try:
-                    sent_msg = await bot.send_photo(
-                        chat_id=int(seller_id),
-                        photo=photo_file,
-                        caption=f"📸 <b>Чек оплаты для заказа</b>\n🎫 Код: <code>{booking_code}</code>",
-                        parse_mode="HTML",
-                        reply_markup=keyboard,
-                    )
-                    file_id = sent_msg.photo[-1].file_id
-                    logger.info(f"Payment proof sent to seller {seller_id}")
-                    
-                    return add_cors_headers(
-                        web.json_response({
-                            "success": True,
-                            "message": "Payment proof uploaded",
-                            "file_id": file_id,
-                        })
-                    )
-                except Exception as e:
-                    logger.error(f"Failed to send payment proof to seller: {e}")
-                    return add_cors_headers(
-                        web.json_response({"error": str(e)}, status=500)
-                    )
-            
-            # No valid order or booking found
+            # Order not found or not a delivery order
             return add_cors_headers(
-                web.json_response({"error": "Order not found"}, status=404)
+                web.json_response({"error": "Order not found or invalid order type"}, status=404)
             )
 
         except Exception as e:
