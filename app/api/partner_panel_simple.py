@@ -63,9 +63,10 @@ def get_partner_with_store(telegram_id: int) -> tuple[dict, dict]:
         
         logging.info(f"✅ Found user: user_id={user.get('user_id')}, name={user.get('first_name')}")
 
-        store = db.get_store_by_owner(user["user_id"])
+        # Note: owner_id in stores table contains telegram_id, not user_id
+        store = db.get_store_by_owner(telegram_id)
         if not store:
-            logging.error(f"❌ No store found for user_id={user['user_id']}")
+            logging.error(f"❌ No store found for telegram_id={telegram_id}")
             raise HTTPException(status_code=403, detail="Not a partner - no store found")
         
         logging.info(f"✅ Found store: store_id={store.get('store_id')}, name={store.get('name')}")
