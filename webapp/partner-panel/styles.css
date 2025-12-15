@@ -25,12 +25,35 @@
     --radius-lg: 16px;
 }
 
+/* Dark theme for Telegram */
+body.dark-theme {
+    --bg: #1a1a1a;
+    --surface: #2a2a2a;
+    --text: #ffffff;
+    --text-light: #8e8e93;
+    --border: #3a3a3a;
+    --shadow: 0 1px 3px 0 rgb(0 0 0 / 0.3);
+    --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.3);
+    --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.3);
+}
+
 body {
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
     background: var(--bg);
     color: var(--text);
     line-height: 1.5;
     -webkit-font-smoothing: antialiased;
+    -webkit-tap-highlight-color: transparent;
+    overflow-x: hidden;
+}
+
+/* Telegram Mini App adjustments */
+html, body {
+    margin: 0;
+    padding: 0;
+    width: 100%;
+    min-height: 100vh;
+    overscroll-behavior: none;
 }
 
 /* Header */
@@ -46,36 +69,37 @@ body {
 .header-content {
     max-width: 1400px;
     margin: 0 auto;
-    padding: 16px 20px;
+    padding: 12px 16px;
 }
 
 .header-title {
     display: flex;
     align-items: center;
-    gap: 12px;
+    gap: 10px;
 }
 
 .store-icon {
-    width: 44px;
-    height: 44px;
+    width: 36px;
+    height: 36px;
     background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
-    border-radius: 12px;
+    border-radius: 10px;
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 24px;
+    font-size: 20px;
     box-shadow: var(--shadow-md);
+    flex-shrink: 0;
 }
 
 .header h1 {
-    font-size: 20px;
+    font-size: 18px;
     font-weight: 700;
     color: var(--text);
     margin: 0;
 }
 
 .user-info {
-    font-size: 13px;
+    font-size: 12px;
     color: var(--text-light);
     font-weight: 500;
 }
@@ -86,9 +110,9 @@ body {
     background: var(--surface);
     border-bottom: 1px solid var(--border);
     position: sticky;
-    top: 77px;
+    top: 61px;
     z-index: 99;
-    padding: 4px 8px;
+    padding: 4px 6px;
     gap: 4px;
     overflow-x: auto;
     scrollbar-width: none;
@@ -101,11 +125,11 @@ body {
 .tab {
     flex: 1;
     min-width: fit-content;
-    padding: 10px 16px;
+    padding: 8px 12px;
     border: none;
     background: transparent;
     color: var(--text-light);
-    font-size: 14px;
+    font-size: 13px;
     font-weight: 500;
     cursor: pointer;
     transition: all 0.2s;
@@ -113,20 +137,22 @@ body {
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 4px;
+    gap: 3px;
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
 }
 
 .tab-icon {
-    font-size: 20px;
+    font-size: 18px;
 }
 
 .tab-label {
-    font-size: 12px;
+    font-size: 11px;
+    white-space: nowrap;
 }
 
-.tab:hover {
-    background: var(--bg);
-    color: var(--text);
+.tab:active {
+    transform: scale(0.95);
 }
 
 .tab.active {
@@ -139,7 +165,8 @@ body {
 .content {
     max-width: 1400px;
     margin: 0 auto;
-    padding: 20px;
+    padding: 16px;
+    padding-bottom: 60px;
 }
 
 .view {
@@ -148,6 +175,7 @@ body {
 
 .view.active {
     display: block;
+    animation: fadeIn 0.2s ease-in;
     animation: fadeIn 0.3s;
 }
 
@@ -1423,4 +1451,97 @@ body {
     background: var(--primary);
     border-radius: 50%;
     border: 2px solid var(--surface);
+}
+
+/* Fade in animation */
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* Dark theme card improvements */
+body.dark-theme .card {
+    background: var(--surface);
+    border-color: var(--border);
+}
+
+body.dark-theme .stats-card {
+    background: var(--surface);
+    border-color: var(--border);
+}
+
+body.dark-theme .product-card {
+    background: var(--surface);
+    border-color: var(--border);
+}
+
+body.dark-theme .order-card {
+    background: var(--surface);
+    border-color: var(--border);
+}
+
+body.dark-theme input,
+body.dark-theme select,
+body.dark-theme textarea {
+    background: var(--bg);
+    border-color: var(--border);
+    color: var(--text);
+}
+
+body.dark-theme input::placeholder,
+body.dark-theme textarea::placeholder {
+    color: var(--text-light);
+}
+
+body.dark-theme .modal {
+    background: rgba(0, 0, 0, 0.8);
+}
+
+body.dark-theme .modal-content {
+    background: var(--surface);
+}
+
+/* Compact mode for small screens */
+@media (max-width: 640px) {
+    .content {
+        padding: 12px;
+    }
+
+    .header-content {
+        padding: 10px 12px;
+    }
+
+    .card {
+        padding: 12px;
+    }
+
+    .stats-grid {
+        gap: 8px;
+    }
+
+    .products-grid {
+        gap: 8px;
+    }
+
+    .btn {
+        padding: 8px 12px;
+        font-size: 13px;
+    }
+
+    .form-group label {
+        font-size: 12px;
+    }
+
+    .form-group input,
+    .form-group select,
+    .form-group textarea {
+        font-size: 14px;
+        padding: 8px 10px;
+    }
 }
