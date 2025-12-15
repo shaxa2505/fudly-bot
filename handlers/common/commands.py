@@ -283,7 +283,11 @@ async def handle_city_selection(
 
     user = db.get_user_model(callback.from_user.id)
     user_role = user.role if user else "customer"
-    menu = main_menu_seller(lang, webapp_url=get_partner_panel_url()) if user_role == "seller" else main_menu_customer(lang)
+    menu = (
+        main_menu_seller(lang, webapp_url=get_partner_panel_url())
+        if user_role == "seller"
+        else main_menu_customer(lang)
+    )
 
     try:
         await callback.message.edit_text(
@@ -358,7 +362,11 @@ async def back_to_main_menu(callback: types.CallbackQuery, db: DatabaseProtocol)
         if current_mode != "seller":
             set_user_view_mode(callback.from_user.id, "seller", db)
 
-    menu = main_menu_seller(lang, webapp_url=get_partner_panel_url()) if user_role == "seller" else main_menu_customer(lang)
+    menu = (
+        main_menu_seller(lang, webapp_url=get_partner_panel_url())
+        if user_role == "seller"
+        else main_menu_customer(lang)
+    )
 
     if callback.message:
         try:
@@ -385,7 +393,11 @@ async def change_city_text(
     db.update_user_city(user_id, new_city)
 
     user_role = user.role or "customer" if user else "customer"
-    menu = main_menu_seller(lang, webapp_url=get_partner_panel_url()) if user_role == "seller" else main_menu_customer(lang)
+    menu = (
+        main_menu_seller(lang, webapp_url=get_partner_panel_url())
+        if user_role == "seller"
+        else main_menu_customer(lang)
+    )
 
     await message.answer(
         f"✅ Город изменён на <b>{new_city}</b>"
@@ -463,7 +475,7 @@ async def cmd_start(message: types.Message, state: FSMContext, db: DatabaseProto
         logger.info(f"🔗 /start command from user {user_id}: '{message.text}'")
         if len(args) > 1:
             deep_link = args[1]
-            
+
             # Handle pickup deep link
             if deep_link.startswith("pickup_"):
                 # Ensure user exists even for QR/deep-link starts
@@ -475,7 +487,9 @@ async def cmd_start(message: types.Message, state: FSMContext, db: DatabaseProto
 
                 if not user:
                     try:
-                        db.add_user(user_id, message.from_user.username, message.from_user.first_name)
+                        db.add_user(
+                            user_id, message.from_user.username, message.from_user.first_name
+                        )
                         logger.info(f"👤 Created new user {user_id} from pickup deep-link /start")
                     except Exception as e:  # pragma: no cover - defensive logging
                         logger.warning(f"Failed to create user {user_id} on pickup deep-link: {e}")
@@ -483,19 +497,23 @@ async def cmd_start(message: types.Message, state: FSMContext, db: DatabaseProto
                 booking_code = deep_link.replace("pickup_", "")
                 await handle_qr_pickup(message, db, booking_code)
                 return
-            
+
             # Handle payment proof upload deep link
             elif deep_link.startswith("upload_proof_"):
                 from aiogram.utils.keyboard import InlineKeyboardBuilder
-                
+
                 try:
                     order_id = int(deep_link.replace("upload_proof_", ""))
-                    
+
                     # Trigger payment proof upload flow via callback
                     kb = InlineKeyboardBuilder()
-                    kb.button(text="📸 Yuklash / Загрузить", callback_data=f"upload_proof_{order_id}")
-                    
-                    lang = db.get_user_language(user_id) if hasattr(db, "get_user_language") else "ru"
+                    kb.button(
+                        text="📸 Yuklash / Загрузить", callback_data=f"upload_proof_{order_id}"
+                    )
+
+                    lang = (
+                        db.get_user_language(user_id) if hasattr(db, "get_user_language") else "ru"
+                    )
                     if lang == "uz":
                         msg = (
                             f"📦 <b>Buyurtma #{order_id}</b>\n\n"
@@ -506,7 +524,7 @@ async def cmd_start(message: types.Message, state: FSMContext, db: DatabaseProto
                             f"📦 <b>Заказ #{order_id}</b>\n\n"
                             f"Нажмите кнопку ниже, чтобы загрузить чек об оплате."
                         )
-                    
+
                     await message.answer(msg, reply_markup=kb.as_markup(), parse_mode="HTML")
                     return
                 except ValueError:

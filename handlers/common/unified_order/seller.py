@@ -16,16 +16,15 @@ from aiogram.fsm.context import FSMContext
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
 from app.services.unified_order_service import (
+    NotificationTemplates,
     OrderStatus,
     get_unified_order_service,
-    NotificationTemplates,
 )
 from handlers.common.states import CourierHandover
 from handlers.common.utils import html_escape as _esc
 from localization import get_text
 
-from .common import _get_db, _get_store_field, _get_entity_field, logger
-
+from .common import _get_db, _get_entity_field, _get_store_field, logger
 
 # Regex patterns for all supported callback formats
 CONFIRM_PATTERN = re.compile(
@@ -228,9 +227,7 @@ async def unified_confirm_handler(callback: types.CallbackQuery) -> None:
                     else cart_items_json
                 )
                 items = cart_items
-                total = sum(
-                    item.get("price", 0) * item.get("quantity", 1) for item in cart_items
-                )
+                total = sum(item.get("price", 0) * item.get("quantity", 1) for item in cart_items)
             except Exception:  # pragma: no cover - defensive logging
                 pass
 
@@ -282,33 +279,21 @@ async def unified_confirm_handler(callback: types.CallbackQuery) -> None:
                 "tugmasini bosing.</i>"
             )
         else:
-            hint = (
-                "\n\n<i>Когда клиент придёт, выдайте товар и нажмите "
-                "«Выдано».</i>"
-            )
+            hint = "\n\n<i>Когда клиент придёт, выдайте товар и нажмите " "«Выдано».</i>"
         seller_text += hint
     elif entity_type == "order" and order_type != "delivery":
         # Pickup order created через orders: сразу ждём фактической выдачи.
         if lang == "uz":
-            hint = (
-                "\n\n<i>Mijoz buyurtmani olganda “Topshirildi” tugmasini bosing.</i>"
-            )
+            hint = "\n\n<i>Mijoz buyurtmani olganda “Topshirildi” tugmasini bosing.</i>"
         else:
-            hint = (
-                "\n\n<i>Когда клиент заберёт заказ, нажмите «Выдано».</i>"
-            )
+            hint = "\n\n<i>Когда клиент заберёт заказ, нажмите «Выдано».</i>"
         seller_text += hint
     else:
         # Delivery flow: сначала готовим, потом передаём курьеру.
         if lang == "uz":
-            hint = (
-                "\n\n<i>Buyurtma tayyor bo'lganda “Topshirishga tayyor” "
-                "tugmasini bosing.</i>"
-            )
+            hint = "\n\n<i>Buyurtma tayyor bo'lganda “Topshirishga tayyor” " "tugmasini bosing.</i>"
         else:
-            hint = (
-                "\n\n<i>Когда заказ будет готов, нажмите «Готов к передаче».</i>"
-            )
+            hint = "\n\n<i>Когда заказ будет готов, нажмите «Готов к передаче».</i>"
         seller_text += hint
 
     kb = InlineKeyboardBuilder()
@@ -357,27 +342,21 @@ async def unified_confirm_handler(callback: types.CallbackQuery) -> None:
             customer_lang = db_instance.get_user_language(customer_id)
             if customer_lang == "uz":
                 customer_msg = (
-                    f"✅ <b>Buyurtmangiz qabul qilindi!</b>\n\n"
-                    f"📦 Buyurtma #{entity_id}\n"
+                    f"✅ <b>Buyurtmangiz qabul qilindi!</b>\n\n" f"📦 Buyurtma #{entity_id}\n"
                 )
                 if entity_type == "order" and order_type == "delivery":
                     customer_msg += "\n🚚 Tayyor bo'lganda xabar beramiz!"
                 else:
                     customer_msg += "\n🏪 Tayyor bo'lganda olib ketishingiz mumkin!"
             else:
-                customer_msg = (
-                    f"✅ <b>Ваш заказ подтвержден!</b>\n\n"
-                    f"📦 Заказ #{entity_id}\n"
-                )
+                customer_msg = f"✅ <b>Ваш заказ подтвержден!</b>\n\n" f"📦 Заказ #{entity_id}\n"
                 if entity_type == "order" and order_type == "delivery":
                     customer_msg += "\n🚚 Сообщим, когда будет готов!"
                 else:
                     customer_msg += "\n🏪 Можете забрать, когда будет готов!"
-            
+
             await callback.bot.send_message(
-                chat_id=customer_id,
-                text=customer_msg,
-                parse_mode="HTML"
+                chat_id=customer_id, text=customer_msg, parse_mode="HTML"
             )
         except Exception as e:
             logger.warning(f"Failed to notify customer: {e}")
@@ -476,11 +455,9 @@ async def unified_reject_handler(callback: types.CallbackQuery) -> None:
                     f"К сожалению, заведение не смогло принять заказ.\n"
                     f"Пожалуйста, посмотрите другие предложения."
                 )
-            
+
             await callback.bot.send_message(
-                chat_id=customer_id,
-                text=customer_msg,
-                parse_mode="HTML"
+                chat_id=customer_id, text=customer_msg, parse_mode="HTML"
             )
         except Exception as e:
             logger.warning(f"Failed to notify customer about rejection: {e}")
@@ -1196,9 +1173,7 @@ def register(router: Router) -> None:
         StateFilter(CourierHandover.courier_phone),
     )
 
-    router.callback_query.register(
-        order_complete_handler, F.data.regexp(r"^order_complete_(\d+)$")
-    )
+    router.callback_query.register(order_complete_handler, F.data.regexp(r"^order_complete_(\d+)$"))
     router.callback_query.register(
         complete_booking_handler, F.data.regexp(r"^complete_booking_(\d+)$")
     )

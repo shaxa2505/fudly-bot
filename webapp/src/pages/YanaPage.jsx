@@ -37,7 +37,7 @@ function YanaPage() {
 
   useEffect(() => {
     loadOrders()
-    
+
     // Auto-refresh orders every 30 seconds when on orders section
     let interval
     if (activeSection === 'orders') {
@@ -45,7 +45,7 @@ function YanaPage() {
         loadOrders()
       }, 30000) // 30 seconds
     }
-    
+
     return () => {
       if (interval) clearInterval(interval)
     }

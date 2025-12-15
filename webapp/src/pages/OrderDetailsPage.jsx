@@ -22,21 +22,21 @@ export default function OrderDetailsPage() {
       setLoading(true)
       // Try to get delivery order first
       const response = await apiClient.getUserBookings()
-      
+
       // Find order by ID in both bookings and delivery orders
       let foundOrder = null
-      
+
       if (response.bookings) {
         foundOrder = response.bookings.find(
           b => b.booking_id === parseInt(orderId) || b.order_id === parseInt(orderId)
         )
       }
-      
+
       if (!foundOrder && response.delivery_orders) {
         foundOrder = response.delivery_orders.find(
           d => d.order_id === parseInt(orderId)
         )
-        
+
         // Normalize delivery order format
         if (foundOrder) {
           foundOrder = {
@@ -51,12 +51,12 @@ export default function OrderDetailsPage() {
           }
         }
       }
-      
+
       if (!foundOrder) {
         setError('Заказ не найден / Buyurtma topilmadi')
         return
       }
-      
+
       setOrder(foundOrder)
       setError(null)
     } catch (err) {

@@ -13,12 +13,12 @@ import asyncio
 import os
 import signal
 import sys
+from datetime import datetime
 from types import FrameType
 from typing import Any
+from zoneinfo import ZoneInfo
 
 from aiogram import F, Router, types
-from datetime import datetime
-from zoneinfo import ZoneInfo
 from aiogram.fsm.context import FSMContext
 
 from app.core.bootstrap import build_application
@@ -466,9 +466,10 @@ def _register_handlers() -> None:
     admin_delivery_orders.setup(db)  # Setup delivery order payment confirmation
     admin_legacy.setup(bot, db, get_text, moderation_keyboard, get_uzb_time, ADMIN_ID, DATABASE_URL)
     admin_stats.setup(admin_service, logger)
-    
+
     # Setup customer payment proof upload
     from handlers.customer import payment_proof as customer_payment_proof
+
     customer_payment_proof.setup(db, bot)
 
     # Setup search handler
@@ -719,13 +720,15 @@ async def main() -> None:
     fsm_cleanup_task = asyncio.create_task(cleanup_expired_fsm_states())
     booking_task = await start_booking_worker()
     rating_task = await start_rating_reminder_worker_task()
-    
+
     # Start API server if enabled
     api_task = None
     if ENABLE_API:
         logger.info("🚀 Starting Mini App API server...")
         api_task = asyncio.create_task(
-            run_api_server(db=db, offer_service=offer_service, bot_token=settings.bot_token, port=API_PORT)
+            run_api_server(
+                db=db, offer_service=offer_service, bot_token=settings.bot_token, port=API_PORT
+            )
         )
         logger.info(f"✅ API server started on http://0.0.0.0:{API_PORT}")
 
