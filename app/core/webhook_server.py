@@ -628,14 +628,29 @@ async def create_webhook_app(
                         )
 
                         if result and result.success and result.order_ids:
-                            # Return special response indicating payment proof required
+                            # Get payment card info
+                            payment_card_info = None
+                            if hasattr(db, "get_payment_card"):
+                                card = db.get_payment_card()
+                                if card:
+                                    payment_card_info = {
+                                        "card_number": card.get("card_number") or card[0]
+                                        if isinstance(card, tuple)
+                                        else None,
+                                        "card_holder": card.get("card_holder") or card[1]
+                                        if isinstance(card, tuple) and len(card) > 1
+                                        else None,
+                                    }
+
+                            # Return response with card info - user can pay and upload proof later
                             return add_cors_headers(
                                 web.json_response(
                                     {
                                         "success": True,
                                         "order_id": result.order_ids[0],
-                                        "awaiting_payment": True,  # ✅ Client must upload photo
-                                        "message": "Order created. Please upload payment proof.",
+                                        "awaiting_payment": True,  # Payment confirmation needed
+                                        "payment_card": payment_card_info,
+                                        "message": "Buyurtma yaratildi. Iltimos, to'lovni amalga oshiring va chekni yuklang.",
                                     }
                                 )
                             )

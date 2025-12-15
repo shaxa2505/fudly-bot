@@ -205,17 +205,21 @@ function CartPage({ user }) {
 
       // 🔴 NEW: Check if payment proof required (delivery + card)
       if (result.awaiting_payment && orderId) {
-        // Order created but needs payment proof - show upload form
+        // Order created successfully - show success with payment instructions
+        clearCart()
+        setShowCheckout(false)
+        setCheckoutStep('details')
+        setPaymentCard(result.payment_card || null)
+        setCreatedOrderId(orderId)
         setOrderResult({
           success: true,
           orderId: orderId,
           awaitingPayment: true,
           orderType: orderType,
           total: total,
-          message: result.message || 'Загрузите чек оплаты'
+          paymentCard: result.payment_card,
+          message: result.message || 'Buyurtma yaratildi! To\'lovni amalga oshiring.'
         })
-        setCheckoutStep('payment_upload')  // New step for payment upload
-        // Don't clear cart yet - keep it for retry if needed
         return
       }
 
@@ -773,13 +777,34 @@ function CartPage({ user }) {
       )}
 
       {/* Result Modal */}
-      {orderResult && !orderResult.awaitingPayment && (
+      {orderResult && (
         <div className="modal-overlay" onClick={() => setOrderResult(null)}>
           <div className="modal result-modal" onClick={e => e.stopPropagation()}>
             {orderResult.success ? (
               <>
                 <div className="result-icon success">✅</div>
                 <h2>{orderResult.message || 'Buyurtma qabul qilindi!'}</h2>
+
+                {/* Payment card info for awaiting payment orders */}
+                {orderResult.awaitingPayment && orderResult.paymentCard && (
+                  <div className="payment-instructions">
+                    <h3>💳 To'lov ma'lumotlari</h3>
+                    <div className="payment-card-info">
+                      <p><strong>Karta raqami:</strong></p>
+                      <p className="card-number">{orderResult.paymentCard.card_number}</p>
+                      <p><strong>Egasi:</strong> {orderResult.paymentCard.card_holder}</p>
+                    </div>
+                    <div className="payment-steps">
+                      <p>📋 <strong>Qadamlar:</strong></p>
+                      <ol>
+                        <li>Yuqoridagi kartaga pul o'tkazing</li>
+                        <li>"Buyurtmalarim" bo'limiga o'ting</li>
+                        <li>Buyurtmangizni toping va chekni yuklang</li>
+                      </ol>
+                    </div>
+                  </div>
+                )}
+
                 {orderResult.bookingCode && (
                   <p className="booking-code-display">
                     🎫 Kod: <strong>{orderResult.bookingCode}</strong>
@@ -794,15 +819,30 @@ function CartPage({ user }) {
                 <p className="order-total-result">
                   💰 Jami: {Math.round(orderResult.total).toLocaleString()} so'm
                 </p>
-                <p className="order-note">
-                  {orderResult.message || 'Tez orada siz bilan bog\'lanamiz'}
-                </p>
-                <button className="primary-btn" onClick={() => {
-                  setOrderResult(null)
-                  navigate('/')
-                }}>
-                  🏠 Bosh sahifaga
-                </button>
+
+                {orderResult.awaitingPayment ? (
+                  <>
+                    <button className="primary-btn" onClick={() => {
+                      setOrderResult(null)
+                      navigate('/profile')
+                    }}>
+                      📦 Buyurtmalarimga o'tish
+                    </button>
+                    <button className="secondary-btn" onClick={() => {
+                      setOrderResult(null)
+                      navigate('/')
+                    }}>
+                      🏠 Bosh sahifa
+                    </button>
+                  </>
+                ) : (
+                  <button className="primary-btn" onClick={() => {
+                    setOrderResult(null)
+                    navigate('/')
+                  }}>
+                    🏠 Bosh sahifaga
+                  </button>
+                )}
               </>
             ) : (
               <>
