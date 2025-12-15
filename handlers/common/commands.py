@@ -284,7 +284,7 @@ async def handle_city_selection(
     user = db.get_user_model(callback.from_user.id)
     user_role = user.role if user else "customer"
     menu = (
-        main_menu_seller(lang, webapp_url=get_partner_panel_url())
+        main_menu_seller(lang, webapp_url=get_partner_panel_url(), user_id=callback.from_user.id)
         if user_role == "seller"
         else main_menu_customer(lang)
     )
@@ -363,7 +363,7 @@ async def back_to_main_menu(callback: types.CallbackQuery, db: DatabaseProtocol)
             set_user_view_mode(callback.from_user.id, "seller", db)
 
     menu = (
-        main_menu_seller(lang, webapp_url=get_partner_panel_url())
+        main_menu_seller(lang, webapp_url=get_partner_panel_url(), user_id=callback.from_user.id)
         if user_role == "seller"
         else main_menu_customer(lang)
     )
@@ -394,7 +394,7 @@ async def change_city_text(
 
     user_role = user.role or "customer" if user else "customer"
     menu = (
-        main_menu_seller(lang, webapp_url=get_partner_panel_url())
+        main_menu_seller(lang, webapp_url=get_partner_panel_url(), user_id=user_id)
         if user_role == "seller"
         else main_menu_customer(lang)
     )
@@ -565,7 +565,7 @@ async def cmd_start(message: types.Message, state: FSMContext, db: DatabaseProto
     # Registered user - show menu
     current_mode = get_user_view_mode(user_id, db)
     if current_mode == "seller" and user_role == "seller":
-        menu = main_menu_seller(lang, webapp_url=get_partner_panel_url())
+        menu = main_menu_seller(lang, webapp_url=get_partner_panel_url(), user_id=user_id)
     else:
         if current_mode != "customer":
             set_user_view_mode(message.from_user.id, "customer", db)

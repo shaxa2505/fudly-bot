@@ -7,7 +7,9 @@ from aiogram.utils.keyboard import InlineKeyboardBuilder, ReplyKeyboardBuilder
 from localization import get_text
 
 
-def main_menu_seller(lang: str = "ru", webapp_url: str = None) -> ReplyKeyboardMarkup:
+def main_menu_seller(
+    lang: str = "ru", webapp_url: str = None, user_id: int = None
+) -> ReplyKeyboardMarkup:
     """Simplified partner menu: Add, Products, Orders, Today, Bulk Import, Profile, Web Panel."""
     builder = ReplyKeyboardBuilder()
     builder.button(text=get_text(lang, "add_item"))
@@ -16,14 +18,13 @@ def main_menu_seller(lang: str = "ru", webapp_url: str = None) -> ReplyKeyboardM
     builder.button(text=get_text(lang, "today_stats"))
     builder.button(text=get_text(lang, "bulk_import"))
     builder.button(text=get_text(lang, "profile"))
-    
+
     # Add Web Panel button if URL provided
     if webapp_url:
-        builder.button(
-            text="🖥 Веб-панель",
-            web_app=WebAppInfo(url=webapp_url)
-        )
-    
+        # Add user_id to URL for authentication fallback
+        url = f"{webapp_url}?uid={user_id}" if user_id else webapp_url
+        builder.button(text="🖥 Веб-панель", web_app=WebAppInfo(url=url))
+
     builder.adjust(2, 2, 2, 1 if webapp_url else 2)
     return builder.as_markup(resize_keyboard=True)
 
