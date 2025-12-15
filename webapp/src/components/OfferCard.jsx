@@ -15,8 +15,7 @@ const OfferCard = memo(function OfferCard({ offer, cartQuantity = 0, onAddToCart
   const isInFavorites = isFavorite(offer.id)
 
   const handleCardClick = () => {
-    const productPath = offer?.id ? `/product/${offer.id}` : '/product'
-    navigate(productPath, { state: { offer } })
+    navigate('/product', { state: { offer } })
   }
 
   // Get stock limit from offer
@@ -25,9 +24,9 @@ const OfferCard = memo(function OfferCard({ offer, cartQuantity = 0, onAddToCart
 
   // Stock progress calculation
   const stockProgress = useMemo(() => {
-    const maxStock = Math.max(10, Math.min(100, stockLimit))
+    const maxStock = 50 // Assume 50 is "full stock" for visual purposes
     const current = stockLimit
-    const percent = Math.min(100, Math.round((current / maxStock) * 100))
+    const percent = Math.min(100, (current / maxStock) * 100)
     let level = 'high'
     if (current <= 5) level = 'low'
     else if (current <= 15) level = 'medium'
@@ -63,12 +62,8 @@ const OfferCard = memo(function OfferCard({ offer, cartQuantity = 0, onAddToCart
     toggleFavorite(offer)
   }, [offer, toggleFavorite])
 
-  const hasPriceData = offer.original_price > 0 && offer.discount_price > 0
-  const discountPercent = offer.discount_percent != null
-    ? Math.round(offer.discount_percent)
-    : hasPriceData
-      ? Math.max(0, Math.round((1 - offer.discount_price / offer.original_price) * 100))
-      : 0
+  const discountPercent = Math.round(offer.discount_percent ||
+    ((offer.original_price - offer.discount_price) / offer.original_price * 100))
 
   const formatExpiry = (date) => {
     if (!date) return null
@@ -83,36 +78,51 @@ const OfferCard = memo(function OfferCard({ offer, cartQuantity = 0, onAddToCart
 
   const expiryText = formatExpiry(offer.expiry_date)
 
-  const storeName = offer.store_name || offer.store?.name || offer.storeName || ''
-  const storeAddress = offer.store_address || offer.store?.address || offer.address || ''
-  const showStoreMeta = Boolean(storeName || storeAddress)
-
-  // Get photo URL (handles Telegram file_id conversion) and also image_url field
-  const photoUrl = api.getPhotoUrl(offer.image_url || offer.photo)
-  // Better placeholder with dynamic initial
-  const fallbackInitial = encodeURIComponent((offer.title?.[0] || 'F').toUpperCase())
-  const fallbackUrl = `https://placehold.co/300x300/F0F4F8/C1CBD8?text=${fallbackInitial}`
+  // Get photo URL (handles Telegram file_id conversion)
+  const photoUrl = api.getPhotoUrl(offer.photo)
+  const fallbackUrl = 'https://placehold.co/300x300/F5F5F5/CCCCCC?text=📷'
 
   return (
-    <div className={`card card--product ${cartQuantity > 0 ? 'in-cart' : ''} ${isAdding ? 'adding' : ''}`} onClick={handleCardClick}>
+    <div className={`offer-card ${cartQuantity > 0 ? 'in-cart' : ''} ${isAdding ? 'adding' : ''}`} onClick={handleCardClick}>
       {/* Image Section */}
-      <div className="card__image">
+      <div className="card-image-container">
         {/* Discount Badge */}
         {discountPercent > 0 && (
-          <span className="badge--percentage">-{discountPercent}%</span>
+          <div className="discount-badge">-{discountPercent}%</div>
+        )}
+
+        {/* Favorite Button */}
+        <button
+          className={`favorite-btn ${isInFavorites ? 'active' : ''}`}
+          onClick={handleFavoriteClick}
+          aria-label={isInFavorites ? "Sevimlilardan o'chirish" : "Sevimlilarga qo'shish"}
+        >
+          {isInFavorites ? (
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="#E53935">
+              <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/>
+            </svg>
+          ) : (
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#999" strokeWidth="2">
+              <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/>
+            </svg>
+          )}
+        </button>
+
+        {/* Expiry Badge */}
+        {expiryText && (
+          <div className="expiry-badge">⏰ {expiryText}</div>
         )}
 
         {/* Image skeleton while loading */}
         {!imageLoaded && !imageError && (
-          <div className="skeleton skeleton--image animate-shimmer" />
+          <div className="image-skeleton shimmer" />
         )}
 
         <img
           src={photoUrl || fallbackUrl}
           alt={offer.title}
-          className={imageLoaded ? 'loaded' : ''}
+          className={`card-image ${imageLoaded ? 'loaded' : ''}`}
           loading="lazy"
-          decoding="async"
           onLoad={() => setImageLoaded(true)}
           onError={(e) => {
             if (!e.target.dataset.fallback) {
@@ -126,44 +136,60 @@ const OfferCard = memo(function OfferCard({ offer, cartQuantity = 0, onAddToCart
       </div>
 
       {/* Content Section */}
-      <div className="card__content">
-        <h3 className="card__title">{offer.title}</h3>
+      <div className="card-content">
+        {offer.store_name && <span className="store-name">{offer.store_name}</span>}
+        <h3 className="offer-title">{offer.title}</h3>
 
-        {/* Rating */}
-        <div className="card__rating">
-          <span className="card__rating-star">⭐</span>
-          <span>{offer.rating || '4.8'}</span>
-        </div>
+        {/* Stock Progress Bar */}
+        {stockLimit < 50 && (
+          <div className="stock-progress">
+            <div className="stock-progress-bar">
+              <div
+                className={`stock-progress-fill ${stockProgress.level}`}
+                style={{ width: `${stockProgress.percent}%` }}
+              />
+            </div>
+            <div className={`stock-label ${stockProgress.level === 'low' ? 'low' : ''}`}>
+              <span>{stockProgress.level === 'low' ? '🔥 Tez tugaydi!' : 'Qoldi'}</span>
+              <span>{stockProgress.current} {getUnitLabel(offer.unit)}</span>
+            </div>
+          </div>
+        )}
 
         {/* Prices */}
-        <div className="card__price">
-          <span className="card__price-current">
-            {Math.round(offer.discount_price).toLocaleString('ru-RU')} so'm
-          </span>
+        <div className="price-section">
+          <div className="price-main">
+            {Math.round(offer.discount_price).toLocaleString('ru-RU')}
+            <span className="currency"> so'm</span>
+          </div>
           {offer.original_price > offer.discount_price && (
-            <span className="card__price-old">
+            <div className="price-original">
               {Math.round(offer.original_price).toLocaleString('ru-RU')}
-            </span>
+            </div>
+          )}
+        </div>
+
+        {/* Add to Cart Button */}
+        <div className="cart-action">
+          {cartQuantity > 0 ? (
+            <div className="quantity-control">
+              <button className="qty-btn" onClick={handleRemoveClick}>−</button>
+              <span className="qty-num">{cartQuantity}{stockLimit < 99 ? `/${stockLimit}` : ''}</span>
+              <button
+                className={`qty-btn qty-plus ${isMaxReached ? 'disabled' : ''}`}
+                onClick={handleAddClick}
+                disabled={isMaxReached}
+              >+</button>
+            </div>
+          ) : (
+            <button className={`add-to-cart-btn ${isAdding ? 'pulse' : ''}`} onClick={handleAddClick}>
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+                <path d="M12 5v14M5 12h14" stroke="white" strokeWidth="2.5" strokeLinecap="round"/>
+              </svg>
+            </button>
           )}
         </div>
       </div>
-
-      {/* Add to Cart CTA - Circle Button */}
-      {cartQuantity > 0 ? (
-        <div className="card__quantity">
-          <button className="card__quantity-btn" onClick={handleRemoveClick}>−</button>
-          <span className="card__quantity-value">{cartQuantity}</span>
-          <button
-            className={`card__quantity-btn ${isMaxReached ? 'disabled' : ''}`}
-            onClick={handleAddClick}
-            disabled={isMaxReached}
-          >+</button>
-        </div>
-      ) : (
-        <button className={`card__cta ${isAdding ? 'adding' : ''}`} onClick={handleAddClick}>
-          +
-        </button>
-      )}
     </div>
   )
 })

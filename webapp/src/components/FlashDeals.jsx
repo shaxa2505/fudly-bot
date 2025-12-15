@@ -101,16 +101,13 @@ function FlashDeals({ city = 'Ташкент' }) {
               <div
                 key={deal.id}
                 className="flash-card"
-                onClick={() => navigate(`/product/${deal.id}`, { state: { offer: deal } })}
+                onClick={() => navigate('/product', { state: { offer: deal } })}
               >
                 <div className="flash-card-image">
                   <img
                     src={photoUrl}
                     alt={deal.title}
                     loading="lazy"
-                    decoding="async"
-                    width="120"
-                    height="120"
                     onError={(e) => {
                       e.target.src = 'https://placehold.co/120x120/F5F5F5/CCCCCC?text=📷'
                     }}

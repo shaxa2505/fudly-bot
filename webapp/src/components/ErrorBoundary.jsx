@@ -1,6 +1,5 @@
 import React from 'react';
 import { captureException } from '../utils/sentry';
-import ErrorFallback from './ErrorFallback';
 
 class ErrorBoundary extends React.Component {
   constructor(props) {
@@ -18,56 +17,21 @@ class ErrorBoundary extends React.Component {
     // Log error to console
     console.error('ErrorBoundary caught an error:', error, errorInfo);
 
-    // Send to Sentry with full context
+    // Send to Sentry
     captureException(error, {
       componentStack: errorInfo?.componentStack,
       url: window.location.href,
-      userAgent: navigator.userAgent,
-      timestamp: new Date().toISOString(),
     });
-
-    // Haptic feedback for error
-    window.Telegram?.WebApp?.HapticFeedback?.notificationOccurred?.('error');
   }
 
   handleRetry = () => {
     this.setState({ hasError: false, error: null, errorInfo: null });
   };
 
-  render() {
-    if (this.state.hasError) {
-      return (
-        <ErrorFallback
-          error={this.state.error}
-          resetErrorBoundary={this.handleRetry}
-        />
-      );
-    }
-
-    return this.props.children;
-  }
-}
-
-// Simplified fallback for legacy compatibility
-class LegacyErrorBoundary extends React.Component {
-  constructor(props) {
-    super(props);
-    this.state = { hasError: false, error: null };
-  }
-
-  static getDerivedStateFromError(error) {
-    return { hasError: true, error };
-  }
-
-  componentDidCatch(error, errorInfo) {
-    console.error('ErrorBoundary caught an error:', error, errorInfo);
-    captureException(error, {
-      componentStack: errorInfo?.componentStack,
-    });
-  }
-
-  handleRetry = () => {
-    this.setState({ hasError: false, error: null });
+  handleGoHome = () => {
+    this.setState({ hasError: false, error: null, errorInfo: null });
+    // Navigate to home - using window.location as fallback
+    window.location.reload();
   };
 
   render() {

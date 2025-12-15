@@ -49,18 +49,15 @@ function RecentlyViewed() {
           <div
             key={`rv-${offer.id}`}
             className="recently-viewed-card"
-            onClick={() => navigate(`/product/${offer.id}`, { state: { offer } })}
+            onClick={() => navigate('/product', { state: { offer } })}
           >
             <div className="recently-viewed-card-image">
               <img
-                src={api.getPhotoUrl(offer.photo) || offer.photo_id || 'https://placehold.co/120x120/F8F9FA/94A3B8?text=🛒'}
+                src={offer.photo || offer.photo_id || 'https://placehold.co/120x120/F5F5F5/CCCCCC?text=📷'}
                 alt={offer.name || offer.title}
                 loading="lazy"
-                decoding="async"
-                width="120"
-                height="120"
                 onError={(e) => {
-                  e.target.src = 'https://placehold.co/120x120/F8F9FA/94A3B8?text=🛒'
+                  e.target.src = 'https://placehold.co/120x120/F5F5F5/CCCCCC?text=📷'
                 }}
               />
             </div>

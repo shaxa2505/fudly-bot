@@ -35,13 +35,13 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  background: #F0F0F0;
+  background: var(--color-bg-tertiary);
   border: none;
   border-radius: var(--radius-full);
   cursor: pointer;
   transition: all var(--transition-normal);
   font-size: 20px;
-  color: #333;
+  color: var(--color-text-primary);
 }
 
 .favorites-header .back-btn:active {
@@ -179,7 +179,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  background: #FFF0F0;
+  background: var(--color-error-light);
   border: none;
   border-radius: var(--radius-full);
   cursor: pointer;
@@ -191,7 +191,7 @@
 }
 
 .remove-favorite-btn:focus-visible {
-  outline: 3px solid #FF4444;
+  outline: 3px solid var(--color-error);
   outline-offset: 2px;
 }
 

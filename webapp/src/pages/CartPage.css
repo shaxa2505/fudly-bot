@@ -75,25 +75,25 @@
 }
 
 .primary-btn {
-  padding: 16px 40px;
-  background: linear-gradient(135deg, #22C55E 0%, #16A34A 100%);
+  padding: var(--spacing-lg) var(--spacing-4xl);
+  background: var(--gradient-primary);
   color: var(--color-text-inverse);
   border: none;
-  border-radius: 50px;
+  border-radius: var(--radius-pill);
   font-size: var(--font-md);
   font-weight: var(--font-semibold);
   cursor: pointer;
-  box-shadow: 0 8px 24px rgba(34, 197, 94, 0.35);
+  box-shadow: var(--shadow-button);
   transition: all 0.2s ease;
 }
 
 .primary-btn:active {
   transform: scale(0.95);
-  box-shadow: 0 4px 16px rgba(34, 197, 94, 0.3);
+  box-shadow: var(--shadow-primary);
 }
 
 .primary-btn:focus-visible {
-  outline: 3px solid #16A34A;
+  outline: 3px solid var(--color-primary-dark);
   outline-offset: 2px;
 }
 
@@ -189,11 +189,11 @@
   width: 32px;
   height: 32px;
   border: none;
-  border-radius: 8px;
-  background: #E8E8E8;
-  font-size: 18px;
-  font-weight: 600;
-  color: #999999;
+  border-radius: var(--radius-sm);
+  background: var(--color-bg-tertiary);
+  font-size: var(--font-lg);
+  font-weight: var(--font-semibold);
+  color: var(--color-text-muted);
   cursor: pointer;
   display: flex;
   align-items: center;
@@ -202,8 +202,8 @@
 }
 
 .qty-btn.plus {
-  background: #E8F5E9;
-  color: #53B175;
+  background: var(--color-primary-bg);
+  color: var(--color-primary);
 }
 
 .qty-btn:active {
@@ -211,7 +211,7 @@
 }
 
 .qty-btn:focus-visible {
-  outline: 3px solid #22C55E;
+  outline: 3px solid var(--color-primary);
   outline-offset: 2px;
 }
 

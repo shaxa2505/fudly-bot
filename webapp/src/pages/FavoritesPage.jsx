@@ -55,11 +55,11 @@ function FavoritesPage() {
               src={offer.photo || 'https://placehold.co/100x100/F5F5F5/CCCCCC?text=📷'}
               alt={offer.title}
               className="favorite-image"
-              onClick={() => navigate(`/product/${offer.id}`, { state: { offer } })}
+              onClick={() => navigate('/product', { state: { offer } })}
               onError={(e) => { e.target.src = 'https://placehold.co/100x100/F5F5F5/CCCCCC?text=📷' }}
             />
 
-            <div className="favorite-info" onClick={() => navigate(`/product/${offer.id}`, { state: { offer } })}>
+            <div className="favorite-info" onClick={() => navigate('/product', { state: { offer } })}>
               <h3 className="favorite-title">{offer.title}</h3>
               {offer.store_name && (
                 <p className="favorite-store">🏪 {offer.store_name}</p>

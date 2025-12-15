@@ -1,43 +1,24 @@
 import { useState, useEffect, lazy, Suspense } from 'react'
-import { HashRouter, Routes, Route, useNavigate, useLocation } from 'react-router-dom'
+import { MemoryRouter, Routes, Route, useNavigate, useLocation } from 'react-router-dom'
 import { FavoritesProvider } from './context/FavoritesContext'
+import { ToastProvider } from './context/ToastContext'
 import api from './api/client'
 import HomePage from './pages/HomePage'
+import PageLoader, { LoadingScreen } from './components/PageLoader'
 import './App.css'
+import './styles/animations.css'
 
 // Lazy load pages for better initial load
 const CartPage = lazy(() => import('./pages/CartPage'))
-const CheckoutPage = lazy(() => import('./pages/CheckoutPage'))
 const YanaPage = lazy(() => import('./pages/YanaPage'))
-const ProfilePage = lazy(() => import('./pages/ProfilePage'))
-const ProfilePageNew = lazy(() => import('./pages/ProfilePageNew'))
-const ExplorePage = lazy(() => import('./pages/ExplorePage'))
 const OrderTrackingPage = lazy(() => import('./pages/OrderTrackingPage'))
+const CheckoutPage = lazy(() => import('./pages/CheckoutPage'))
 const ProductDetailPage = lazy(() => import('./pages/ProductDetailPage'))
 const StoresPage = lazy(() => import('./pages/StoresPage'))
 const CategoryProductsPage = lazy(() => import('./pages/CategoryProductsPage'))
 const FavoritesPage = lazy(() => import('./pages/FavoritesPage'))
 
-// Loading screen component
-function LoadingScreen() {
-  return (
-    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh' }}>
-      <div style={{ textAlign: 'center' }}>
-        <div style={{ fontSize: '32px', marginBottom: '16px' }}>🍽️</div>
-        <div style={{ color: '#999' }}>Yuklanmoqda...</div>
-      </div>
-    </div>
-  )
-}
-
-// Page loading fallback (smaller)
-function PageLoader() {
-  return (
-    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '50vh' }}>
-      <div className="spinner" style={{ width: '32px', height: '32px', border: '3px solid #f0f0f0', borderTopColor: '#53B175', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
-    </div>
-  )
-}
+// LoadingScreen and PageLoader are now imported from components/PageLoader
 
 // Main app content with routing
 function AppContent() {
@@ -150,24 +131,12 @@ function AppContent() {
             element={<CartPage user={user} />}
           />
           <Route
-            path="/checkout"
-            element={<CheckoutPage user={user} />}
-          />
-          <Route
             path="/profile"
             element={<YanaPage user={user} />}
           />
           <Route
-            path="/profile-old"
-            element={<ProfilePage user={user} />}
-          />
-          <Route
-            path="/profile-new"
-            element={<ProfilePageNew user={user} />}
-          />
-          <Route
-            path="/explore"
-            element={<ExplorePage user={user} />}
+            path="/checkout"
+            element={<CheckoutPage user={user} />}
           />
           <Route
             path="/stores"
@@ -180,10 +149,6 @@ function AppContent() {
           <Route
             path="/order/:bookingId"
             element={<OrderTrackingPage user={user} />}
-          />
-          <Route
-            path="/product/:id"
-            element={<ProductDetailPage />}
           />
           <Route
             path="/product"
@@ -203,11 +168,13 @@ function AppContent() {
 
 function App() {
   return (
-    <HashRouter>
-      <FavoritesProvider>
-        <AppContent />
-      </FavoritesProvider>
-    </HashRouter>
+    <MemoryRouter>
+      <ToastProvider>
+        <FavoritesProvider>
+          <AppContent />
+        </FavoritesProvider>
+      </ToastProvider>
+    </MemoryRouter>
   )
 }
 

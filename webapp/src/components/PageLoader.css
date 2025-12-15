@@ -1,0 +1,176 @@
+/**
+ * Page Loader & Loading Components
+ * Uses CSS Variables from design-tokens.css
+ */
+
+/* ===== PAGE LOADER ===== */
+.page-loader {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 60vh;
+  padding: var(--spacing-xl);
+  animation: fadeIn 0.3s ease;
+}
+
+.page-loader-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--spacing-lg);
+}
+
+.page-loader-spinner {
+  position: relative;
+  width: 60px;
+  height: 60px;
+}
+
+.spinner-ring {
+  position: absolute;
+  inset: 0;
+  border: 3px solid var(--color-bg-skeleton);
+  border-top-color: var(--color-primary);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+.spinner-icon {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 28px;
+  animation: pulse 1.5s ease-in-out infinite;
+}
+
+.page-loader-message {
+  font-size: var(--font-sm);
+  color: var(--color-text-secondary);
+  margin: 0;
+}
+
+/* ===== FULL SCREEN LOADING ===== */
+.loading-screen {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(180deg, var(--color-bg-primary) 0%, var(--color-bg-secondary) 100%);
+  z-index: 10000;
+}
+
+.loading-screen-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--spacing-2xl);
+  padding: var(--spacing-xl);
+}
+
+.loading-logo {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--spacing-sm);
+}
+
+.loading-logo-emoji {
+  font-size: 56px;
+  animation: bounce 1.5s ease-in-out infinite;
+}
+
+.loading-logo-text {
+  font-size: var(--font-3xl);
+  font-weight: var(--font-bold);
+  color: var(--color-primary);
+  margin: 0;
+  letter-spacing: -0.5px;
+}
+
+.loading-bar {
+  width: 180px;
+  height: 4px;
+  background: var(--color-bg-skeleton);
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.loading-bar-fill {
+  width: 40%;
+  height: 100%;
+  background: linear-gradient(90deg, var(--color-primary) 0%, var(--color-primary-dark) 100%);
+  border-radius: 2px;
+  animation: loadingProgress 1.5s ease-in-out infinite;
+}
+
+@keyframes loadingProgress {
+  0% {
+    width: 0%;
+    margin-left: 0;
+  }
+  50% {
+    width: 60%;
+    margin-left: 20%;
+  }
+  100% {
+    width: 0%;
+    margin-left: 100%;
+  }
+}
+
+.loading-hint {
+  font-size: var(--font-sm);
+  color: var(--color-text-secondary);
+  margin: 0;
+  animation: pulse 1.5s ease-in-out infinite;
+}
+
+/* ===== SKELETON BOX ===== */
+.skeleton-box {
+  background: linear-gradient(
+    90deg,
+    var(--color-bg-skeleton) 0%,
+    rgba(255, 255, 255, 0.1) 50%,
+    var(--color-bg-skeleton) 100%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.5s ease-in-out infinite;
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
+}
+
+/* ===== CONTENT LOADER ===== */
+.content-loader {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-md);
+  padding: var(--spacing-lg);
+}
+
+.content-loader-row {
+  display: flex;
+  gap: var(--spacing-md);
+}
+
+.content-loader-avatar {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+}
+
+.content-loader-lines {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+}

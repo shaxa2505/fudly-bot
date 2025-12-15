@@ -1,236 +1,11 @@
 import axios from 'axios'
 import { captureException } from '../utils/sentry'
-import { LRUCache } from '../utils/lruCache'
 
 const API_BASE = import.meta.env.VITE_API_URL || 'https://fudly-bot-production.up.railway.app/api/v1'
 
-// Flag to track if API is available - start as false for demo mode
-let apiAvailable = false
-let apiCheckTime = 0
-const API_CHECK_INTERVAL = 60000 // Re-check every 60 seconds
-
-// LRU cache for GET requests with automatic eviction
-const requestCache = new LRUCache(100, 30000) // 100 items, 30s TTL
+// In-memory cache for GET requests
+const requestCache = new Map()
 const CACHE_TTL = 30000 // 30 seconds cache
-
-// Demo data for when API is unavailable
-const DEMO_OFFERS = [
-  {
-    id: 1,
-    title: 'Olma - Qizil',
-    description: 'Yangi uzilgan olmalar, shirin va mazali',
-    discount_price: 15000,
-    original_price: 20000,
-    discount_percent: 25,
-    quantity: 50,
-    unit: 'kg',
-    category: 'fruits',
-    city: 'Toshkent',
-    photo: 'https://images.unsplash.com/photo-1560806887-1e4cd0b6cbd6?w=300',
-    store_id: 1,
-    store_name: 'Fresh Market',
-    rating: 4.5,
-  },
-  {
-    id: 2,
-    title: 'Banan',
-    description: 'Import bananlar, pishgan',
-    discount_price: 25000,
-    original_price: 32000,
-    discount_percent: 22,
-    quantity: 30,
-    unit: 'kg',
-    category: 'fruits',
-    city: 'Toshkent',
-    photo: 'https://images.unsplash.com/photo-1571771894821-ce9b6c11b08e?w=300',
-    store_id: 1,
-    store_name: 'Fresh Market',
-    rating: 4.7,
-  },
-  {
-    id: 3,
-    title: 'Sut 1L',
-    description: 'Yangi sut, tabiiy',
-    discount_price: 12000,
-    original_price: 15000,
-    discount_percent: 20,
-    quantity: 100,
-    unit: 'dona',
-    category: 'dairy',
-    city: 'Toshkent',
-    photo: 'https://images.unsplash.com/photo-1563636619-e9143da7973b?w=300',
-    store_id: 2,
-    store_name: 'Sut Mahsulotlari',
-    rating: 4.3,
-  },
-  {
-    id: 4,
-    title: 'Non - Obi non',
-    description: 'Issiq tandirda pishirilgan',
-    discount_price: 5000,
-    original_price: 7000,
-    discount_percent: 29,
-    quantity: 200,
-    unit: 'dona',
-    category: 'bakery',
-    city: 'Toshkent',
-    photo: 'https://images.unsplash.com/photo-1509440159596-0249088772ff?w=300',
-    store_id: 3,
-    store_name: 'Novvoyxona',
-    rating: 4.9,
-  },
-  {
-    id: 5,
-    title: 'Pomidor',
-    description: 'Mahalliy pomidor, yangi',
-    discount_price: 8000,
-    original_price: 12000,
-    discount_percent: 33,
-    quantity: 80,
-    unit: 'kg',
-    category: 'vegetables',
-    city: 'Toshkent',
-    photo: 'https://images.unsplash.com/photo-1546470427-227c7369a9b8?w=300',
-    store_id: 1,
-    store_name: 'Fresh Market',
-    rating: 4.4,
-  },
-  {
-    id: 6,
-    title: 'Bodring',
-    description: 'Yangi bodringlar',
-    discount_price: 6000,
-    original_price: 8000,
-    discount_percent: 25,
-    quantity: 60,
-    unit: 'kg',
-    category: 'vegetables',
-    city: 'Toshkent',
-    photo: 'https://images.unsplash.com/photo-1449300079323-02e209d9d3a6?w=300',
-    store_id: 1,
-    store_name: 'Fresh Market',
-    rating: 4.2,
-  },
-  {
-    id: 7,
-    title: "Mol go'shti",
-    description: "Yangi mol go'shti",
-    discount_price: 85000,
-    original_price: 100000,
-    discount_percent: 15,
-    quantity: 25,
-    unit: 'kg',
-    category: 'meat',
-    city: 'Toshkent',
-    photo: 'https://images.unsplash.com/photo-1603048297172-c92544798d5a?w=300',
-    store_id: 4,
-    store_name: "Go'sht Do'koni",
-    rating: 4.6,
-  },
-  {
-    id: 8,
-    title: 'Qatiq 500ml',
-    description: 'Tabiiy qatiq',
-    discount_price: 8000,
-    original_price: 10000,
-    discount_percent: 20,
-    quantity: 50,
-    unit: 'dona',
-    category: 'dairy',
-    city: 'Toshkent',
-    photo: 'https://images.unsplash.com/photo-1628088062854-d1870b4553da?w=300',
-    store_id: 2,
-    store_name: 'Sut Mahsulotlari',
-    rating: 4.1,
-  },
-  {
-    id: 9,
-    title: 'Apelsin',
-    description: 'Shirin apelsinlar',
-    discount_price: 22000,
-    original_price: 28000,
-    discount_percent: 21,
-    quantity: 40,
-    unit: 'kg',
-    category: 'fruits',
-    city: 'Toshkent',
-    photo: 'https://images.unsplash.com/photo-1547514701-42782101795e?w=300',
-    store_id: 1,
-    store_name: 'Fresh Market',
-    rating: 4.5,
-  },
-  {
-    id: 10,
-    title: 'Piyoz',
-    description: 'Mahalliy piyoz',
-    discount_price: 4000,
-    original_price: 6000,
-    discount_percent: 33,
-    quantity: 100,
-    unit: 'kg',
-    category: 'vegetables',
-    city: 'Toshkent',
-    photo: 'https://images.unsplash.com/photo-1518977956812-cd3dbadaaf31?w=300',
-    store_id: 1,
-    store_name: 'Fresh Market',
-    rating: 4.3,
-  },
-  {
-    id: 11,
-    title: 'Tuxum 30 dona',
-    description: 'Yangi tovuq tuxumi',
-    discount_price: 45000,
-    original_price: 55000,
-    discount_percent: 18,
-    quantity: 30,
-    unit: 'dona',
-    category: 'dairy',
-    city: 'Toshkent',
-    photo: 'https://images.unsplash.com/photo-1582722872445-44dc5f7e3c8f?w=300',
-    store_id: 2,
-    store_name: 'Sut Mahsulotlari',
-    rating: 4.4,
-  },
-  {
-    id: 12,
-    title: "Tovuq go'shti",
-    description: "Yangi tovuq go'shti",
-    discount_price: 38000,
-    original_price: 45000,
-    discount_percent: 16,
-    quantity: 35,
-    unit: 'kg',
-    category: 'meat',
-    city: 'Toshkent',
-    photo: 'https://images.unsplash.com/photo-1604503468506-a8da13d82791?w=300',
-    store_id: 4,
-    store_name: "Go'sht Do'koni",
-    rating: 4.7,
-  },
-]
-
-const DEMO_STORES = [
-  { id: 1, name: 'Fresh Market', address: 'Toshkent, Chilonzor 7-kvartal', rating: 4.5, photo: 'https://images.unsplash.com/photo-1604719312566-8912e9227c6a?w=300' },
-  { id: 2, name: 'Sut Mahsulotlari', address: 'Toshkent, Yunusobod', rating: 4.2, photo: 'https://images.unsplash.com/photo-1534723452862-4c874018d66d?w=300' },
-  { id: 3, name: 'Novvoyxona', address: 'Toshkent, Mirzo Ulugbek', rating: 4.8, photo: 'https://images.unsplash.com/photo-1517433670267-30f41c09aea8?w=300' },
-  { id: 4, name: "Go'sht Do'koni", address: 'Toshkent, Sergeli', rating: 4.6, photo: 'https://images.unsplash.com/photo-1588347818036-558601350947?w=300' },
-]
-
-const DEMO_CATEGORIES = [
-  { id: 'fruits', name: 'Mevalar', icon: '🍎' },
-  { id: 'vegetables', name: 'Sabzavotlar', icon: '🥬' },
-  { id: 'dairy', name: 'Sut mahsulotlari', icon: '🥛' },
-  { id: 'bakery', name: 'Non mahsulotlari', icon: '🍞' },
-  { id: 'meat', name: "Go'sht", icon: '🥩' },
-]
-
-// Cleanup expired cache entries every 5 minutes
-setInterval(() => {
-  const cleaned = requestCache.cleanup()
-  if (cleaned > 0) {
-    console.log(`[Cache] Cleaned ${cleaned} expired entries`)
-  }
-}, 5 * 60 * 1000)
 
 // Retry configuration
 const RETRY_CONFIG = {
@@ -290,87 +65,26 @@ client.interceptors.response.use(
   }
 )
 
-// Check if API is available (with caching)
-const checkApiAvailable = async () => {
-  const now = Date.now()
-  if (now - apiCheckTime < API_CHECK_INTERVAL) {
-    return apiAvailable
-  }
-
-  try {
-    await client.get('/health', { timeout: 3000 })
-    apiAvailable = true
-  } catch (error) {
-    apiAvailable = false
-    console.warn('[API] Backend unavailable, using demo mode')
-  }
-
-  apiCheckTime = now
-  return apiAvailable
-}
-
-// Safe cached GET with fallback
-const safeCachedGet = async (url, params = {}, ttl = CACHE_TTL, fallback = null) => {
-  const cacheKey = `${url}?${JSON.stringify(params)}`
-
-  // Try to get from cache first
-  const cached = requestCache.get(cacheKey)
-  if (cached !== null) {
-    return cached
-  }
-
-  try {
-    const response = await client.get(url, { params })
-    const data = response.data
-    requestCache.set(cacheKey, data)
-    apiAvailable = true
-    return data
-  } catch (error) {
-    apiAvailable = false
-    console.warn(`[API] Request failed for ${url}, using fallback`)
-    return fallback
-  }
-}
-
-// Cached GET request helper with LRU cache
+// Cached GET request helper
 const cachedGet = async (url, params = {}, ttl = CACHE_TTL) => {
   const cacheKey = `${url}?${JSON.stringify(params)}`
-
-  // Try to get from cache
   const cached = requestCache.get(cacheKey)
-  if (cached !== null) {
-    return cached
+
+  if (cached && Date.now() - cached.timestamp < ttl) {
+    return cached.data
   }
 
-  // Fetch from API
-  const response = await client.get(url, { params })
-  const data = response.data
+  const { data } = await client.get(url, { params })
+  requestCache.set(cacheKey, { data, timestamp: Date.now() })
 
-  // Store in cache (LRU handles eviction automatically)
-  requestCache.set(cacheKey, data)
+  // Clean old cache entries
+  if (requestCache.size > 100) {
+    const oldestKey = requestCache.keys().next().value
+    requestCache.delete(oldestKey)
+  }
 
   return data
 }
-
-// Clear cache for specific URL pattern
-const clearCache = (urlPattern) => {
-  const keys = requestCache.keys()
-  let cleared = 0
-
-  keys.forEach(key => {
-    if (key.includes(urlPattern)) {
-      requestCache.delete(key)
-      cleared++
-    }
-  })
-
-  if (cleared > 0) {
-    console.log(`[Cache] Cleared ${cleared} entries matching: ${urlPattern}`)
-  }
-}
-
-// Get cache statistics (for debugging)
-const getCacheStats = () => requestCache.getStats()
 
 const api = {
   // Helper to convert Telegram file_id to photo URL
@@ -392,32 +106,18 @@ const api = {
 
   // Auth endpoints
   async validateAuth(initData) {
-    try {
-      const { data } = await client.post('/auth/validate', { init_data: initData })
-      return data
-    } catch (error) {
-      console.warn('[API] Auth validation failed')
-      return null
-    }
+    const { data } = await client.post('/auth/validate', { init_data: initData })
+    return data
   },
 
   async getProfile(userId) {
-    try {
-      return await cachedGet('/user/profile', { user_id: userId }, 60000)
-    } catch (error) {
-      console.warn('[API] Profile fetch failed')
-      return null
-    }
+    return cachedGet('/user/profile', { user_id: userId }, 60000) // 1 min cache
   },
 
   async getUserOrders(userId, status = null) {
-    try {
-      const params = { user_id: userId }
-      if (status) params.status = status
-      return await cachedGet('/user/orders', params, 10000)
-    } catch (error) {
-      return []
-    }
+    const params = { user_id: userId }
+    if (status) params.status = status
+    return cachedGet('/user/orders', params, 10000) // 10s cache
   },
 
   async getUserBookings(userId, status = null) {
@@ -432,21 +132,15 @@ const api = {
   },
 
   async getStores(params = {}) {
-    const data = await safeCachedGet('/stores', params, 60000, DEMO_STORES)
-    return Array.isArray(data) ? data : DEMO_STORES
+    return cachedGet('/stores', params, 60000) || [] // 1 min cache
   },
 
   async getStore(storeId) {
-    try {
-      return await cachedGet(`/stores/${storeId}`, {}, 60000)
-    } catch (error) {
-      return DEMO_STORES.find(s => s.id === storeId) || null
-    }
+    return cachedGet(`/stores/${storeId}`, {}, 60000)
   },
 
   async getStoreOffers(storeId) {
-    const data = await safeCachedGet('/offers', { store_id: storeId }, 30000, DEMO_OFFERS.filter(o => o.store_id === storeId))
-    return Array.isArray(data) ? data : []
+    return cachedGet('/offers', { store_id: storeId }, 30000) || []
   },
 
   async getStoreReviews(storeId) {
@@ -459,22 +153,11 @@ const api = {
 
   // Offers endpoints - shorter cache for freshness
   async getOffers(params) {
-    const data = await safeCachedGet('/offers', params, 20000, DEMO_OFFERS)
-    return Array.isArray(data) ? data : DEMO_OFFERS
-  },
-
-  async getOfferById(offerId) {
-    if (!offerId) return null
-    try {
-      return await cachedGet(`/offers/${offerId}`, {}, 20000)
-    } catch (error) {
-      return DEMO_OFFERS.find(o => o.id === offerId) || null
-    }
+    return cachedGet('/offers', params, 20000) // 20s cache
   },
 
   async getFlashDeals(city = 'Ташкент', limit = 10) {
-    const data = await safeCachedGet('/flash-deals', { city, limit }, 30000, DEMO_OFFERS.slice(0, 2))
-    return Array.isArray(data) ? data : []
+    return cachedGet('/flash-deals', { city, limit }, 30000) // 30s cache
   },
 
   async getFavorites() {
@@ -635,20 +318,7 @@ const api = {
       throw error
     }
   },
-
-  // Check if API is available
-  isApiAvailable() {
-    return apiAvailable
-  },
-
-  // Force check API availability
-  async checkApi() {
-    return await checkApiAvailable()
-  },
 }
-
-// Export cache utilities for external use
-export { clearCache, getCacheStats }
 
 export default api
 export const API_BASE_URL = API_BASE

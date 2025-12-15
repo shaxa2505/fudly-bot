@@ -50,25 +50,24 @@
 
 .recently-viewed-card {
   flex-shrink: 0;
-  width: 130px;
+  width: 120px;
   background: #fff;
-  border-radius: 16px;
+  border-radius: 12px;
   overflow: hidden;
-  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
   scroll-snap-align: start;
   cursor: pointer;
-  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  transition: transform 0.2s ease;
 }
 
 .recently-viewed-card:active {
   transform: scale(0.97);
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
 }
 
 .recently-viewed-card-image {
-  width: 130px;
-  height: 110px;
-  background: linear-gradient(145deg, #F8F9FA 0%, #E9ECEF 100%);
+  width: 120px;
+  height: 100px;
+  background: #F5F5F5;
   display: flex;
   align-items: center;
   justify-content: center;

@@ -2,12 +2,14 @@ import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import api from '../api/client'
 import { useCart } from '../context/CartContext'
+import { useToast } from '../context/ToastContext'
 import { getUnitLabel } from '../utils/helpers'
 import BottomNav from '../components/BottomNav'
 import './CartPage.css'
 
 function CartPage({ user }) {
   const navigate = useNavigate()
+  const { toast } = useToast()
   // Use cart from context
   const {
     cartItems,
@@ -37,7 +39,6 @@ function CartPage({ user }) {
   const [deliveryFee, setDeliveryFee] = useState(0)
   const [minOrderAmount, setMinOrderAmount] = useState(0)
   const [storeDeliveryEnabled, setStoreDeliveryEnabled] = useState(false)
-  const [deliveryReason, setDeliveryReason] = useState('')
 
   // Payment step for delivery
   const [checkoutStep, setCheckoutStep] = useState('details') // 'details' | 'payment' | 'upload'
@@ -67,39 +68,27 @@ function CartPage({ user }) {
   // Check if stores in cart support delivery
   useEffect(() => {
     const checkDeliveryAvailability = async () => {
+      // Get unique store IDs from cart
       const storeIds = [...new Set(cartItems.map(item => item.offer?.store_id).filter(Boolean))]
 
       if (storeIds.length === 0) return
 
-      // If multiple stores in one cart, disable delivery to avoid wrong fee
-      if (storeIds.length > 1) {
-        setStoreDeliveryEnabled(false)
-        setDeliveryFee(0)
-        setMinOrderAmount(0)
-        setDeliveryReason('Bir nechta do\'konlardan mahsulotlar — yetkazib berish o\'chirilgan')
-        return
-      }
-
-      const storeId = storeIds[0]
       try {
-        const store = await api.getStore(storeId)
-        if (store?.delivery_enabled) {
-          setStoreDeliveryEnabled(true)
-          setDeliveryFee(store.delivery_price || 15000)
-          setMinOrderAmount(store.min_order_amount || 30000)
-          setDeliveryReason('')
-        } else {
-          setStoreDeliveryEnabled(false)
-          setDeliveryFee(0)
-          setMinOrderAmount(0)
-          setDeliveryReason('Ushbu do\'kon yetkazib berishni qo\'llab-quvvatlamaydi')
+        // Check first store for simplicity
+        const stores = await api.getStores({})
+        const cartStore = stores.find(s => storeIds.includes(s.id))
+
+        if (cartStore) {
+          setStoreDeliveryEnabled(cartStore.delivery_enabled || false)
+          setDeliveryFee(cartStore.delivery_price || 15000)
+          setMinOrderAmount(cartStore.min_order_amount || 30000)
         }
       } catch (e) {
         console.warn('Could not fetch store info:', e)
-        setStoreDeliveryEnabled(false)
-        setDeliveryFee(0)
-        setMinOrderAmount(0)
-        setDeliveryReason('Yetkazib berish ma\'lumoti olinmadi')
+        // Default values
+        setStoreDeliveryEnabled(true)
+        setDeliveryFee(15000)
+        setMinOrderAmount(30000)
       }
     }
 
@@ -157,11 +146,11 @@ function CartPage({ user }) {
   // Proceed to payment step (for delivery)
   const proceedToPayment = async () => {
     if (!phone.trim()) {
-      alert('Telefon raqamingizni kiriting')
+      toast.warning('Telefon raqamingizni kiriting')
       return
     }
     if (orderType === 'delivery' && !address.trim()) {
-      alert('Yetkazib berish manzilini kiriting')
+      toast.warning('Yetkazib berish manzilini kiriting')
       return
     }
 
@@ -180,7 +169,7 @@ function CartPage({ user }) {
       setCheckoutStep('payment')
     } catch (error) {
       console.error('Error fetching payment card:', error)
-      alert('To\'lov rekvizitlarini olishda xatolik')
+      toast.error('To\'lov rekvizitlarini olishda xatolik')
     } finally {
       setOrderLoading(false)
     }
@@ -481,12 +470,6 @@ function CartPage({ user }) {
                         </span>
                       </button>
                     </div>
-
-                    {!storeDeliveryEnabled && (
-                      <p className="delivery-hint">
-                        🚫 {deliveryReason || "Yetkazib berish mavjud emas"}
-                      </p>
-                    )}
 
                     {!canDelivery && storeDeliveryEnabled && (
                       <p className="delivery-hint">

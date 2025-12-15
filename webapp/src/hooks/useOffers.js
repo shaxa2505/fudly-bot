@@ -1,6 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import api from '../api/client';
-import { captureException } from '../utils/sentry';
 
 // Transliteration map for cities: Latin -> Cyrillic (for API)
 const CITY_TO_CYRILLIC = {
@@ -71,26 +70,16 @@ export function useOffers({
   const [showingAllCities, setShowingAllCities] = useState(false);
   const [error, setError] = useState(null);
 
-  // Refs for race condition prevention
+  // Ref to track if currently loading
   const loadingRef = useRef(false);
-  const abortControllerRef = useRef(null);
 
   // Transliterate city for API
   const cityForApi = transliterateCity(city);
 
-  // Load offers function with abort support
+  // Load offers function
   const loadOffers = useCallback(async (reset = false, forceAllCities = false) => {
     // Prevent duplicate requests
     if (loadingRef.current) return;
-
-    // Cancel previous request
-    if (abortControllerRef.current) {
-      abortControllerRef.current.abort();
-    }
-
-    // Create new abort controller
-    const abortController = new AbortController();
-    abortControllerRef.current = abortController;
 
     loadingRef.current = true;
     setLoading(true);
@@ -120,17 +109,11 @@ export function useOffers({
 
       const data = await api.getOffers(params);
 
-      // Check if request was aborted
-      if (abortController.signal.aborted) {
-        return;
-      }
-
       // If city is empty on first load, show all cities
       if (reset && (!data || data.length === 0) && !forceAllCities && !showingAllCities) {
         setShowingAllCities(true);
         loadingRef.current = false;
         setLoading(false);
-        abortControllerRef.current = null;
         return loadOffers(true, true);
       }
 
@@ -145,24 +128,11 @@ export function useOffers({
 
       setHasMore((data?.length || 0) === limit);
     } catch (err) {
-      // Ignore abort errors
-      if (err.name === 'AbortError' || abortController.signal.aborted) {
-        return;
-      }
-
       console.error('Error loading offers:', err);
-      const errorMsg = err.message || 'Mahsulotlar yuklanmadi';
-      setError(errorMsg);
-
-      // Log to Sentry
-      captureException(err, {
-        context: 'useOffers.loadOffers',
-        params: { city: cityForApi, category, searchQuery, offset },
-      });
+      setError(err.message || 'Failed to load offers');
     } finally {
       setLoading(false);
       loadingRef.current = false;
-      abortControllerRef.current = null;
     }
   }, [cityForApi, category, searchQuery, offset, limit, showingAllCities]);
 
@@ -175,13 +145,7 @@ export function useOffers({
       loadOffers(true);
     }, searchQuery ? 500 : 0); // Debounce search
 
-    // Cleanup: abort pending request and clear timer
-    return () => {
-      clearTimeout(timer);
-      if (abortControllerRef.current) {
-        abortControllerRef.current.abort();
-      }
-    };
+    return () => clearTimeout(timer);
   }, [category, searchQuery, cityForApi]); // Note: loadOffers intentionally excluded
 
   // Load more function for infinite scroll

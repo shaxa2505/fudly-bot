@@ -82,11 +82,8 @@ function BottomNav({ currentPage, cartCount }) {
         {menuItems.map(item => (
           <button
             key={item.id}
-            type="button"
             className={`nav-item ${activePage === item.id ? 'active' : ''}`}
             onClick={() => handleNavigate(item.id)}
-            aria-current={activePage === item.id ? 'page' : undefined}
-            aria-label={item.label}
           >
             <div className="nav-icon-container">
               <span className="nav-icon">{getIcon(item.id, activePage === item.id)}</span>

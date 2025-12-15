@@ -109,29 +109,29 @@
 .banner-dots {
   display: flex;
   justify-content: center;
-  gap: var(--spacing-sm);
-  padding: var(--spacing-md) 0 var(--spacing-xs);
+  gap: 6px;
+  padding: 8px 0;
 }
 
 .banner-dots .dot {
-  width: 8px;
-  height: 8px;
-  border-radius: var(--radius-full);
-  background: rgba(0, 0, 0, 0.2);
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--color-border);
   border: none;
   cursor: pointer;
-  transition: all var(--transition-slow);
+  transition: all 0.3s ease;
   padding: 0;
 }
 
 .banner-dots .dot.active {
-  width: 24px;
-  border-radius: var(--radius-xs);
+  width: 16px;
+  border-radius: 8px;
   background: var(--color-primary);
 }
 
 .banner-dots .dot:focus-visible {
-  outline: 3px solid var(--color-primary);
+  outline: 2px solid var(--color-primary);
   outline-offset: 2px;
 }
 

@@ -33,7 +33,6 @@ function StoresPage() {
   const [viewMode, setViewMode] = useState('list') // 'list' or 'map'
   const [userLocation, setUserLocation] = useState(null)
   const [locationLoading, setLocationLoading] = useState(false)
-  const [errorMessage, setErrorMessage] = useState('')
 
   const location = getSavedLocation()
   const cityLatin = getLatinCity(location)
@@ -50,7 +49,6 @@ function StoresPage() {
 
   const loadStores = async () => {
     setLoading(true)
-    setErrorMessage('')
     try {
       let params = { city: cityRaw }
       if (selectedType !== 'all') {
@@ -66,7 +64,6 @@ function StoresPage() {
       setStores(data || [])
     } catch (error) {
       console.error('Error loading stores:', error)
-      setErrorMessage('Do\'konlarni yuklashda muammo yuz berdi. Iltimos, qayta urinib ko\'ring.')
       setStores([])
     } finally {
       setLoading(false)
@@ -132,17 +129,8 @@ function StoresPage() {
 
   const handleOfferClick = (offer) => {
     closeModal()
-    navigate(`/product/${offer.id}`, { state: { offer } })
+    navigate('/product', { state: { offer } })
   }
-
-  const renderErrorState = () => (
-    <div className="sp-error">
-      <span>⚠️</span>
-      <h3>Do'konlarni yuklab bo'lmadi</h3>
-      <p>{errorMessage}</p>
-      <button onClick={loadStores}>Qayta urinish</button>
-    </div>
-  )
 
   return (
     <div className="sp">
@@ -227,16 +215,12 @@ function StoresPage() {
       {/* Content */}
       <div className="sp-content">
         {viewMode === 'map' ? (
-          errorMessage ? (
-            renderErrorState()
-          ) : (
-            <StoreMap
-              stores={filteredStores}
-              userLocation={userLocation}
-              onStoreSelect={loadStoreOffers}
-              lang="uz"
-            />
-          )
+          <StoreMap
+            stores={filteredStores}
+            userLocation={userLocation}
+            onStoreSelect={loadStoreOffers}
+            lang="uz"
+          />
         ) : loading ? (
           <div className="sp-grid">
             {[...Array(6)].map((_, i) => (
@@ -247,8 +231,6 @@ function StoresPage() {
               </div>
             ))}
           </div>
-        ) : errorMessage ? (
-          renderErrorState()
         ) : filteredStores.length === 0 ? (
           <div className="sp-empty">
             <span>🏪</span>
