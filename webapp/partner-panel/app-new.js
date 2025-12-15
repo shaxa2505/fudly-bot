@@ -73,13 +73,37 @@ async function apiRequest(endpoint, options = {}) {
         });
 
         if (!response.ok) {
+            // Handle specific error codes
+            if (response.status === 403) {
+                const errorData = await response.json().catch(() => ({}));
+                if (errorData.detail === 'Not a partner') {
+                    showToast('❌ Вы не являетесь партнёром');
+                    document.body.innerHTML = `
+                        <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100vh;text-align:center;padding:20px;background:#f8fafc;color:#1e293b;font-family:system-ui">
+                            <div style="font-size:64px;margin-bottom:20px">🏪</div>
+                            <h1 style="margin:0 0 10px;font-size:24px">Панель партнёра</h1>
+                            <p style="color:#64748b;margin:0 0 20px">Вы не являетесь партнёром Fudly</p>
+                            <p style="color:#64748b;margin:0 0 20px;font-size:14px">Чтобы стать партнёром, напишите нам</p>
+                            <a href="https://t.me/fudly_support" style="background:#6366f1;color:white;padding:12px 24px;border-radius:8px;text-decoration:none">Связаться с нами</a>
+                        </div>
+                    `;
+                    throw new Error('Not a partner');
+                }
+                throw new Error('Access denied');
+            }
+            if (response.status === 401) {
+                showToast('❌ Ошибка авторизации');
+                throw new Error('Unauthorized');
+            }
             throw new Error(`HTTP ${response.status}`);
         }
 
         return await response.json();
     } catch (error) {
         console.error('API Error:', error);
-        showToast('❌ Ошибка подключения');
+        if (!error.message.includes('Not a partner')) {
+            showToast('❌ Ошибка подключения');
+        }
         throw error;
     }
 }
