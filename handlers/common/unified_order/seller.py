@@ -350,6 +350,38 @@ async def unified_confirm_handler(callback: types.CallbackQuery) -> None:
     except Exception as e:  # pragma: no cover - defensive logging
         logger.warning(f"Failed to edit seller message: {e}")
 
+    # Notify customer about confirmation
+    customer_id = _get_entity_field(entity, "user_id")
+    if customer_id and callback.bot:
+        try:
+            customer_lang = db_instance.get_user_language(customer_id)
+            if customer_lang == "uz":
+                customer_msg = (
+                    f"✅ <b>Buyurtmangiz qabul qilindi!</b>\n\n"
+                    f"📦 Buyurtma #{entity_id}\n"
+                )
+                if entity_type == "order" and order_type == "delivery":
+                    customer_msg += "\n🚚 Tayyor bo'lganda xabar beramiz!"
+                else:
+                    customer_msg += "\n🏪 Tayyor bo'lganda olib ketishingiz mumkin!"
+            else:
+                customer_msg = (
+                    f"✅ <b>Ваш заказ подтвержден!</b>\n\n"
+                    f"📦 Заказ #{entity_id}\n"
+                )
+                if entity_type == "order" and order_type == "delivery":
+                    customer_msg += "\n🚚 Сообщим, когда будет готов!"
+                else:
+                    customer_msg += "\n🏪 Можете забрать, когда будет готов!"
+            
+            await callback.bot.send_message(
+                chat_id=customer_id,
+                text=customer_msg,
+                parse_mode="HTML"
+            )
+        except Exception as e:
+            logger.warning(f"Failed to notify customer: {e}")
+
     confirmed_msg = "Tasdiqlandi" if lang == "uz" else "Подтверждено"
     await callback.answer(f"✅ {confirmed_msg}")
 
@@ -424,6 +456,34 @@ async def unified_reject_handler(callback: types.CallbackQuery) -> None:
     if not success:
         await callback.answer(get_text(lang, "error") or "Error", show_alert=True)
         return
+
+    # Notify customer about rejection
+    customer_id = _get_entity_field(entity, "user_id")
+    if customer_id and callback.bot:
+        try:
+            customer_lang = db_instance.get_user_language(customer_id)
+            if customer_lang == "uz":
+                customer_msg = (
+                    f"❌ <b>Buyurtma rad etildi</b>\n\n"
+                    f"📦 Buyurtma #{entity_id}\n\n"
+                    f"Afsuski, do'kon buyurtmani qabul qila olmadi.\n"
+                    f"Iltimos, boshqa mahsulotlarni ko'rib chiqing."
+                )
+            else:
+                customer_msg = (
+                    f"❌ <b>Заказ отклонен</b>\n\n"
+                    f"📦 Заказ #{entity_id}\n\n"
+                    f"К сожалению, заведение не смогло принять заказ.\n"
+                    f"Пожалуйста, посмотрите другие предложения."
+                )
+            
+            await callback.bot.send_message(
+                chat_id=customer_id,
+                text=customer_msg,
+                parse_mode="HTML"
+            )
+        except Exception as e:
+            logger.warning(f"Failed to notify customer about rejection: {e}")
 
     # Update seller's message
     try:

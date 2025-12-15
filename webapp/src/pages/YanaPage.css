@@ -313,6 +313,36 @@
   color: var(--color-accent);
 }
 
+/* Upload Payment Proof Button */
+.upload-proof-btn {
+  width: 100%;
+  margin-top: var(--spacing-md);
+  padding: var(--spacing-md) var(--spacing-lg);
+  border: 2px solid var(--color-primary);
+  border-radius: var(--radius-xl);
+  background: linear-gradient(135deg, var(--color-primary) 0%, var(--color-accent) 100%);
+  font-size: var(--font-sm);
+  font-weight: var(--font-semibold);
+  color: var(--color-text-inverse);
+  cursor: pointer;
+  transition: all var(--transition-normal);
+  box-shadow: 0 4px 12px rgba(255, 107, 53, 0.3);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--spacing-sm);
+}
+
+.upload-proof-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(255, 107, 53, 0.4);
+}
+
+.upload-proof-btn:active {
+  transform: translateY(0);
+  box-shadow: 0 2px 8px rgba(255, 107, 53, 0.2);
+}
+
 /* Settings Section */
 .settings-section {
   display: flex;

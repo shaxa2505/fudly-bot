@@ -37,7 +37,19 @@ function YanaPage() {
 
   useEffect(() => {
     loadOrders()
-  }, [orderFilter])
+    
+    // Auto-refresh orders every 30 seconds when on orders section
+    let interval
+    if (activeSection === 'orders') {
+      interval = setInterval(() => {
+        loadOrders()
+      }, 30000) // 30 seconds
+    }
+    
+    return () => {
+      if (interval) clearInterval(interval)
+    }
+  }, [orderFilter, activeSection])
 
   const loadOrders = async () => {
     setLoading(true)
@@ -276,6 +288,25 @@ function YanaPage() {
                         <span className="booking-code">🎫 {order.booking_code}</span>
                       )}
                     </div>
+
+                    {/* Upload payment proof button for awaiting_payment orders */}
+                    {order.status === 'awaiting_payment' && (
+                      <button
+                        className="upload-proof-btn"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          const orderId = order.order_id || order.booking_id
+                          if (orderId && window.Telegram?.WebApp) {
+                            // Open bot in private messages with deep link
+                            window.Telegram.WebApp.openTelegramLink(
+                              `https://t.me/${window.Telegram.WebApp.initDataUnsafe?.bot?.username || 'fudlybot'}?start=upload_proof_${orderId}`
+                            )
+                          }
+                        }}
+                      >
+                        📸 Chekni yuklash / Загрузить чек
+                      </button>
+                    )}
                   </div>
                 )
               })}

@@ -12,6 +12,7 @@ import './styles/animations.css'
 const CartPage = lazy(() => import('./pages/CartPage'))
 const YanaPage = lazy(() => import('./pages/YanaPage'))
 const OrderTrackingPage = lazy(() => import('./pages/OrderTrackingPage'))
+const OrderDetailsPage = lazy(() => import('./pages/OrderDetailsPage'))
 const CheckoutPage = lazy(() => import('./pages/CheckoutPage'))
 const ProductDetailPage = lazy(() => import('./pages/ProductDetailPage'))
 const StoresPage = lazy(() => import('./pages/StoresPage'))
@@ -149,6 +150,10 @@ function AppContent() {
           <Route
             path="/order/:bookingId"
             element={<OrderTrackingPage user={user} />}
+          />
+          <Route
+            path="/order/:orderId"
+            element={<OrderDetailsPage user={user} />}
           />
           <Route
             path="/product"
