@@ -473,11 +473,7 @@
             // 2. From URL uid parameter (bot passes user_id)
             if (urlUserId) {
                 console.log('✅ Using uid from URL:', urlUserId);
-                const params = new URLSearchParams();
-                params.set('user', JSON.stringify({ id: parseInt(urlUserId) }));
-                params.set('auth_date', Math.floor(Date.now() / 1000).toString());
-                params.set('from_url', '1'); // Mark as URL-based auth
-                return { data: params.toString(), source: 'url', userId: urlUserId };
+                return { data: `uid=${urlUserId}`, source: 'url', userId: urlUserId };
             }
 
             // 3. Build from initDataUnsafe (fallback)
