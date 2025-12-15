@@ -77,7 +77,8 @@ def create_api_app(db: Any = None, offer_service: Any = None, bot_token: str = N
         allow_origins=[
             # Production domains
             "https://fudly-partner-panel.vercel.app",
-            "https://partner-panel-ga0n5wsg8-shaxbozs-projects-d385e345.vercel.app",  # Текущий деплой
+            "https://partner-panel-musofawxn-shaxbozs-projects-d385e345.vercel.app",  # Текущий деплой
+            "https://partner-panel-ga0n5wsg8-shaxbozs-projects-d385e345.vercel.app",
             "https://partner-panel-nyk9q0ttb-shaxbozs-projects-d385e345.vercel.app",
             "https://fudly-webapp.vercel.app",
             # Telegram
