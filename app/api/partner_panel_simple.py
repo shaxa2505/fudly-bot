@@ -95,15 +95,18 @@ def verify_telegram_webapp(authorization: str) -> int:
     try:
         parsed = dict(urllib.parse.parse_qsl(init_data))
         import logging
-        logging.info(f"🔍 Parsed init_data: {parsed}")
-
+        logging.info(f"🔍 Parsed init_data keys: {list(parsed.keys())}")
+        
         # Check if this is URL-based auth (uid passed by bot in WebApp URL)
         # Simple format: uid=123456
         if "uid" in parsed:
-            user_id = int(parsed.get("uid", 0))
-            if user_id > 0:
-                logging.info(f"✅ URL-based auth: user_id={user_id}")
-                return user_id
+            try:
+                user_id = int(parsed.get("uid", 0))
+                if user_id > 0:
+                    logging.info(f"✅ URL-based auth: user_id={user_id}")
+                    return user_id
+            except (ValueError, TypeError) as e:
+                logging.error(f"❌ Invalid uid format: {parsed.get('uid')} - {e}")
             raise HTTPException(status_code=401, detail="Invalid uid in URL")
 
         # Check if this is unsigned data (from initDataUnsafe)

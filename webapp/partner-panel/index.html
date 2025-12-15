@@ -464,37 +464,52 @@
 
         // Get initData - try multiple methods
         function getInitData() {
+            let finalData = '';
+            let source = 'none';
+
             // 1. From Telegram WebApp SDK (preferred)
             if (tg?.initData && tg.initData.length > 0) {
                 console.log('✅ initData from SDK');
-                return { data: tg.initData, source: 'sdk' };
+                finalData = tg.initData;
+                source = 'sdk';
             }
-
-            // 2. From URL uid parameter (bot passes user_id)
-            if (urlUserId) {
-                console.log('✅ Using uid from URL:', urlUserId);
-                return { data: `uid=${urlUserId}`, source: 'url', userId: urlUserId };
+            // 2. From URL hash
+            else if (window.location.hash.slice(1) && window.location.hash.slice(1).includes('user=')) {
+                console.log('✅ initData from hash');
+                finalData = window.location.hash.slice(1);
+                source = 'hash';
             }
-
             // 3. Build from initDataUnsafe (fallback)
-            if (tg?.initDataUnsafe?.user) {
+            else if (tg?.initDataUnsafe?.user) {
                 console.log('⚠️ Building initData from initDataUnsafe');
                 const user = tg.initDataUnsafe.user;
                 const params = new URLSearchParams();
                 params.set('user', JSON.stringify(user));
                 params.set('auth_date', Math.floor(Date.now() / 1000).toString());
-                return { data: params.toString(), source: 'unsafe' };
+                finalData = params.toString();
+                source = 'unsafe';
             }
 
-            // 4. From URL hash
-            const hash = window.location.hash.slice(1);
-            if (hash && hash.includes('user=')) {
-                console.log('✅ initData from hash');
-                return { data: hash, source: 'hash' };
+            // 4. Add uid from URL if available (bot passes user_id in URL)
+            if (urlUserId) {
+                console.log('✅ Adding uid from URL:', urlUserId);
+                if (finalData) {
+                    // Append uid to existing initData
+                    finalData = `${finalData}&uid=${urlUserId}`;
+                    source += '+url';
+                } else {
+                    // Use only uid if no other initData available
+                    finalData = `uid=${urlUserId}`;
+                    source = 'url-only';
+                }
             }
 
-            console.warn('❌ No initData found anywhere');
-            return { data: '', source: 'none' };
+            if (!finalData) {
+                console.warn('❌ No initData found anywhere');
+                return { data: '', source: 'none' };
+            }
+
+            return { data: finalData, source: source, userId: urlUserId };
         }
 
         const initResult = getInitData();
