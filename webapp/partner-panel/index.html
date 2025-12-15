@@ -458,27 +458,55 @@
         const tg = window.Telegram?.WebApp;
         if (tg) { tg.ready(); tg.expand(); }
         
+        // Parse initData from multiple sources
+        function getInitData() {
+            // 1. From Telegram WebApp SDK
+            if (tg?.initData) return tg.initData;
+            
+            // 2. From URL hash (Telegram sometimes passes it there)
+            const hash = window.location.hash.slice(1);
+            if (hash.includes('tgWebAppData=')) {
+                const params = new URLSearchParams(hash);
+                const data = params.get('tgWebAppData');
+                if (data) return decodeURIComponent(data);
+            }
+            
+            // 3. From URL query params
+            const urlParams = new URLSearchParams(window.location.search);
+            const queryData = urlParams.get('tgWebAppData');
+            if (queryData) return queryData;
+            
+            // 4. Parse hash as initData directly (some Telegram versions)
+            if (hash && hash.includes('user=')) {
+                return hash;
+            }
+            
+            return '';
+        }
+        
+        const initData = getInitData();
+        
         // Debug info
         const debugInfo = {
             hasTelegram: !!window.Telegram,
             hasWebApp: !!window.Telegram?.WebApp,
             platform: tg?.platform,
             version: tg?.version,
-            initDataLength: tg?.initData?.length || 0,
-            initDataPreview: tg?.initData?.substring(0, 50) || 'empty',
-            colorScheme: tg?.colorScheme
+            initDataLength: initData?.length || 0,
+            initDataSource: tg?.initData ? 'SDK' : (window.location.hash ? 'hash' : 'none'),
+            hash: window.location.hash?.substring(0, 100) || 'empty'
         };
         console.log('🔍 Telegram Debug:', debugInfo);
         
         // Show debug on screen for testing
-        if (!tg?.initData) {
+        if (!initData) {
             console.warn('⚠️ No initData - auth will fail');
         }
         
         const API = 'https://fudly-bot-production.up.railway.app/api/partner';
         const getAuth = () => {
-            const auth = tg?.initData ? `tma ${tg.initData}` : '';
-            console.log('🔑 Auth header:', auth ? `${auth.substring(0, 30)}...` : 'EMPTY');
+            const auth = initData ? `tma ${initData}` : '';
+            console.log('🔑 Auth header:', auth ? `${auth.substring(0, 50)}...` : 'EMPTY');
             return auth;
         };
         
@@ -747,18 +775,17 @@
         // ============================================
         // Init
         // ============================================
-        console.log('🚀 Partner Panel', { telegram: !!tg, initData: tg?.initData?.length || 0 });
+        console.log('🚀 Partner Panel', { telegram: !!tg, initData: initData?.length || 0, source: debugInfo.initDataSource });
         
         // DEBUG: Show init status on screen
         const debugDiv = document.createElement('div');
-        debugDiv.style.cssText = 'position:fixed;bottom:60px;left:10px;right:10px;background:#333;color:#0f0;font-family:monospace;font-size:10px;padding:8px;border-radius:8px;z-index:9999;max-height:100px;overflow:auto;';
+        debugDiv.style.cssText = 'position:fixed;bottom:60px;left:10px;right:10px;background:#222;color:#0f0;font-family:monospace;font-size:9px;padding:8px;border-radius:8px;z-index:9999;max-height:120px;overflow:auto;word-break:break-all;';
         debugDiv.innerHTML = `
-            <b>DEBUG:</b><br>
-            Telegram: ${!!tg}<br>
-            initData: ${tg?.initData?.length || 0} chars<br>
-            platform: ${tg?.platform || 'none'}<br>
-            hash: ${window.location.hash || 'none'}<br>
-            url: ${window.location.href.substring(0, 50)}...
+            <b>DEBUG v2:</b><br>
+            TG SDK: ${!!tg} | platform: ${tg?.platform || 'N/A'}<br>
+            initData: ${initData?.length || 0} chars (${debugInfo.initDataSource})<br>
+            hash: ${window.location.hash?.substring(0, 80) || 'empty'}<br>
+            URL: ${window.location.href.substring(0, 60)}...
         `;
         document.body.appendChild(debugDiv);
         
