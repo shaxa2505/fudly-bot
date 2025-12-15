@@ -1625,76 +1625,65 @@ async def create_webhook_app(
     app.router.add_post("/api/v1/payment/click/callback", api_click_callback)
     app.router.add_post("/api/v1/payment/payme/callback", api_payme_callback)
 
-    # Partner Panel API - FastAPI integration via a2wsgi
+    # Partner Panel API - FastAPI integration via direct ASGI
     if offer_service and bot_token:
         try:
-            from a2wsgi import ASGIMiddleware
-
             from app.api.api_server import create_api_app
 
             # Create FastAPI app with real Partner Panel endpoints
             fastapi_app = create_api_app(db, offer_service, bot_token)
 
-            # Wrap FastAPI in WSGI middleware
-            wsgi_app = ASGIMiddleware(fastapi_app)
-
-            # Create handler for /api/* routes
+            # Create ASGI handler that calls FastAPI directly
             async def fastapi_handler(request: web.Request) -> web.Response:
-                """Proxy requests to FastAPI app"""
-                # Build WSGI environ
-                environ = {
-                    "REQUEST_METHOD": request.method,
-                    "SCRIPT_NAME": "",
-                    "PATH_INFO": request.path,
-                    "QUERY_STRING": request.query_string,
-                    "CONTENT_TYPE": request.headers.get("Content-Type", ""),
-                    "CONTENT_LENGTH": request.headers.get("Content-Length", ""),
-                    "SERVER_NAME": request.host.split(":")[0],
-                    "SERVER_PORT": str(request.url.port or 80),
-                    "SERVER_PROTOCOL": "HTTP/1.1",
-                    "wsgi.version": (1, 0),
-                    "wsgi.url_scheme": request.url.scheme,
-                    "wsgi.input": request.content,
-                    "wsgi.errors": sys.stderr,
-                    "wsgi.multithread": True,
-                    "wsgi.multiprocess": False,
-                    "wsgi.run_once": False,
+                """Forward requests to FastAPI ASGI app"""
+                # Read body
+                body = await request.read()
+
+                # Build ASGI scope
+                scope = {
+                    "type": "http",
+                    "asgi": {"version": "3.0"},
+                    "http_version": "1.1",
+                    "method": request.method,
+                    "scheme": request.url.scheme,
+                    "path": request.path,
+                    "query_string": request.query_string.encode(),
+                    "root_path": "",
+                    "headers": [
+                        (k.encode().lower(), v.encode()) for k, v in request.headers.items()
+                    ],
+                    "server": (request.host.split(":")[0], request.url.port or 80),
                 }
 
-                # Add headers
-                for key, value in request.headers.items():
-                    key = key.upper().replace("-", "_")
-                    if key not in ("CONTENT_TYPE", "CONTENT_LENGTH"):
-                        environ[f"HTTP_{key}"] = value
-
-                # Call WSGI app
+                # Collect response
                 response_started = False
                 status_code = 200
-                headers_list = []
-
-                def start_response(status, response_headers):
-                    nonlocal response_started, status_code, headers_list
-                    response_started = True
-                    status_code = int(status.split(" ")[0])
-                    headers_list = response_headers
-
+                headers = []
                 body_parts = []
-                async for part in wsgi_app(environ, start_response):
-                    if isinstance(part, bytes):
-                        body_parts.append(part)
-                    else:
-                        body_parts.append(part.encode())
 
-                body = b"".join(body_parts)
-                return web.Response(body=body, status=status_code, headers=dict(headers_list))
+                async def receive():
+                    return {"type": "http.request", "body": body}
+
+                async def send(message):
+                    nonlocal response_started, status_code, headers, body_parts
+                    if message["type"] == "http.response.start":
+                        response_started = True
+                        status_code = message["status"]
+                        headers = [(k.decode(), v.decode()) for k, v in message.get("headers", [])]
+                    elif message["type"] == "http.response.body":
+                        body_parts.append(message.get("body", b""))
+
+                # Call FastAPI
+                await fastapi_app(scope, receive, send)
+
+                # Build response
+                response_body = b"".join(body_parts)
+                return web.Response(body=response_body, status=status_code, headers=dict(headers))
 
             # Register handler for all /api/* routes
             app.router.add_route("*", "/api/{path:.*}", fastapi_handler)
 
-            logger.info("✅ Partner Panel API endpoints registered (FastAPI via a2wsgi)")
-        except ImportError as e:
-            logger.error(f"❌ Failed to import a2wsgi: {e}")
-            logger.warning("⚠️ Partner Panel API will not be available - install a2wsgi")
+            logger.info("✅ Partner Panel API endpoints registered (FastAPI direct ASGI)")
         except Exception as e:
             logger.error(f"❌ Failed to mount FastAPI app: {e}", exc_info=True)
             logger.warning("⚠️ Partner Panel API will not be available")
