@@ -18,7 +18,7 @@ from app.services.unified_order_service import get_unified_order_service
 from database_protocol import DatabaseProtocol
 
 
-router = APIRouter(prefix="/api/partner", tags=["partner-panel"])
+router = APIRouter(tags=["partner-panel"])
 
 # Global database instance (set by api_server.py)
 _db: DatabaseProtocol | None = None
