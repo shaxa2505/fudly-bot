@@ -1622,6 +1622,26 @@ async def create_webhook_app(
     app.router.add_post("/api/v1/payment/click/callback", api_click_callback)
     app.router.add_post("/api/v1/payment/payme/callback", api_payme_callback)
 
+    # Mount FastAPI Partner Panel API
+    try:
+        from aiohttp_asgi import ASGIResource
+
+        from app.api.api_server import create_api_app
+
+        # Create FastAPI app with Partner Panel routes
+        fastapi_app = create_api_app(db=db)
+
+        # Mount FastAPI app to handle /api/partner/* requests
+        asgi_resource = ASGIResource(fastapi_app)
+        app.router.add_route("*", "/api/partner{path_info:.*}", asgi_resource)
+        app.router.add_route("*", "/api/debug{path_info:.*}", asgi_resource)
+
+        logger.info("✅ FastAPI Partner Panel API mounted")
+    except ImportError:
+        logger.warning("⚠️ aiohttp-asgi not installed, Partner Panel API unavailable")
+    except Exception as e:
+        logger.error(f"❌ Failed to mount Partner Panel API: {e}")
+
     # Setup WebSocket routes for real-time notifications
     setup_websocket_routes(app)
 
