@@ -2,6 +2,8 @@ import asyncio
 import logging
 from typing import Any
 
+from app.keyboards import main_menu_customer
+
 logger = logging.getLogger(__name__)
 
 
@@ -261,7 +263,11 @@ async def start_booking_expiry_worker(db: Any, bot: Any) -> None:
                                         "Количество товара возвращено в доступность."
                                     )
 
-                                await bot.send_message(user_id, text)
+                                await bot.send_message(
+                                    user_id, 
+                                    text,
+                                    reply_markup=main_menu_customer(lang)
+                                )
                             except Exception as e:
                                 logger.debug(
                                     f"Failed to notify user {user_id} about auto-cancel: {e}"

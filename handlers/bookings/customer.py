@@ -1571,6 +1571,14 @@ async def confirm_cancel_booking(callback: types.CallbackQuery) -> None:
             get_text(lang, "booking_cancelled") or "Бронирование отменено", show_alert=True
         )
         await safe_edit_reply_markup(callback.message)
+        
+        # Show main menu so user can continue
+        cancel_text = "✅ Бронирование отменено. Количество товара возвращено." if lang == "ru" else "✅ Bron bekor qilindi. Mahsulot miqdori qaytarildi."
+        await bot.send_message(
+            user_id,
+            cancel_text,
+            reply_markup=main_menu_customer(lang)
+        )
     else:
         await callback.answer(get_text(lang, "error"), show_alert=True)
 
