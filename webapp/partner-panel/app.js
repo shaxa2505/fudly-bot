@@ -85,19 +85,16 @@ function switchView(viewName) {
 async function loadDashboard() {
     try {
         // Load profile
-        const profileRes = await fetch(`${API_URL}/partner/profile`, {
-            headers: { 'Authorization': getAuthHeader() }
-        });
+        const [profileRes, statsRes, ordersRes] = await Promise.all([
+            fetch(`${API_URL}/partner/profile`, { headers: { 'Authorization': getAuthHeader() } }),
+            fetch(`${API_URL}/partner/stats?period=today`, { headers: { 'Authorization': getAuthHeader() } }),
+            fetch(`${API_URL}/partner/orders`, { headers: { 'Authorization': getAuthHeader() } })
+        ]);
 
         if (profileRes.ok) {
             const profile = await profileRes.json();
             document.getElementById('storeName').textContent = profile.name || 'Мой магазин';
         }
-
-        // Load stats
-        const statsRes = await fetch(`${API_URL}/partner/stats?period=today`, {
-            headers: { 'Authorization': getAuthHeader() }
-        });
 
         if (statsRes.ok) {
             const stats = await statsRes.json();
@@ -105,11 +102,6 @@ async function loadDashboard() {
             document.getElementById('todayRevenue').textContent = formatMoney(today.revenue || 0);
             document.getElementById('todayOrders').textContent = today.orders || 0;
         }
-
-        // Load recent orders
-        const ordersRes = await fetch(`${API_URL}/partner/orders`, {
-            headers: { 'Authorization': getAuthHeader() }
-        });
 
         if (ordersRes.ok) {
             const data = await ordersRes.json();
@@ -130,11 +122,12 @@ async function loadProducts() {
         });
 
         if (res.ok) {
-            const data = await profileRes.json();
+            const data = await res.json();
             renderProducts(data.products || []);
         }
     } catch (error) {
         console.error('Failed to load products:', error);
+        showToast('❌ Ошибка загрузки товаров');
     }
 }
 
