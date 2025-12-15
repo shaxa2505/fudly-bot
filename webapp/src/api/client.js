@@ -131,6 +131,16 @@ const api = {
     }
   },
 
+  async getDeliveryOrders(userId) {
+    try {
+      const data = await this.request('/orders', { user_id: userId })
+      return data.orders || data || []
+    } catch (error) {
+      console.error('Error fetching delivery orders:', error)
+      return []
+    }
+  },
+
   async getStores(params = {}) {
     return cachedGet('/stores', params, 60000) || [] // 1 min cache
   },

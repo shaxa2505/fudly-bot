@@ -48,21 +48,57 @@ function YanaPage() {
         return
       }
 
-      // Try to get bookings/orders
-      const bookings = await api.getUserBookings(userId)
+      // Fetch both bookings (old system) and delivery orders (new system)
+      const [bookings, deliveryOrders] = await Promise.all([
+        api.getUserBookings(userId),
+        api.getDeliveryOrders(userId)
+      ])
+
+      // Normalize delivery orders to match booking format
+      const normalizedDelivery = deliveryOrders.map(order => ({
+        booking_id: order.id || order.order_id,
+        order_id: order.id || order.order_id,
+        order_type: 'delivery',
+        status: order.status,
+        created_at: order.created_at,
+        delivery_address: order.delivery_address,
+        phone: order.phone,
+        payment_method: order.payment_method,
+        total_price: order.total_price,
+        items: order.items || [],
+        // Use first item for display
+        offer_title: order.items?.[0]?.title || 'Delivery buyurtma',
+        store_name: order.items?.[0]?.store_name || 'Do\'kon',
+        offer_photo: order.items?.[0]?.photo_url,
+        quantity: order.items?.reduce((sum, item) => sum + item.quantity, 0) || 1
+      }))
+
+      // Merge both lists
+      const allOrders = [...normalizedDelivery, ...bookings]
+        .sort((a, b) => {
+          const dateA = new Date(a.created_at || 0)
+          const dateB = new Date(b.created_at || 0)
+          return dateB - dateA // newest first
+        })
 
       // Filter based on selection
-      let filtered = bookings
+      let filtered = allOrders
       if (orderFilter === 'active') {
-        // Active = pending, confirmed, ready (waiting for completion)
-        filtered = bookings.filter(o =>
+        // Active = pending, confirmed, ready, awaiting_admin_confirmation, awaiting_payment
+        filtered = allOrders.filter(o =>
           o.status === 'pending' ||
           o.status === 'confirmed' ||
           o.status === 'ready' ||
+          o.status === 'awaiting_admin_confirmation' ||
+          o.status === 'awaiting_payment' ||
           !o.status // treat undefined as pending
         )
       } else if (orderFilter === 'completed') {
-        filtered = bookings.filter(o => o.status === 'completed' || o.status === 'cancelled')
+        filtered = allOrders.filter(o =>
+          o.status === 'completed' ||
+          o.status === 'cancelled' ||
+          o.status === 'rejected'
+        )
       }
 
       setOrders(filtered)
@@ -82,10 +118,13 @@ function YanaPage() {
   const getStatusInfo = (status) => {
     const statusMap = {
       pending: { text: '⏳ Kutilmoqda', color: '#FF9500', bg: '#FFF4E5' },
+      awaiting_payment: { text: '💳 To\'lov kutilmoqda', color: '#FF9500', bg: '#FFF4E5' },
+      awaiting_admin_confirmation: { text: '🔍 Tekshirilmoqda', color: '#FF9500', bg: '#FFF4E5' },
       confirmed: { text: '✅ Tasdiqlandi', color: '#34C759', bg: '#E8F8ED' },
       ready: { text: '📦 Tayyor', color: '#007AFF', bg: '#E5F2FF' },
       completed: { text: '🎉 Yakunlandi', color: '#53B175', bg: '#E8F5E9' },
-      cancelled: { text: '❌ Bekor', color: '#FF3B30', bg: '#FFEBEE' },
+      cancelled: { text: '❌ Bekor qilindi', color: '#FF3B30', bg: '#FFEBEE' },
+      rejected: { text: '❌ Rad etildi', color: '#FF3B30', bg: '#FFEBEE' },
     }
     return statusMap[status] || { text: status, color: '#999', bg: '#F5F5F5' }
   }
@@ -176,13 +215,16 @@ function YanaPage() {
                 const statusInfo = getStatusInfo(order.status)
                 return (
                   <div
-                    key={order.booking_id || idx}
+                    key={order.order_id || order.booking_id || idx}
                     className="order-card"
-                    onClick={() => navigate(`/order/${order.booking_id}`)}
+                    onClick={() => {
+                      const orderId = order.order_id || order.booking_id
+                      if (orderId) navigate(`/order/${orderId}`)
+                    }}
                     style={{ animationDelay: `${idx * 0.05}s` }}
                   >
                     <div className="order-header">
-                      <span className="order-id">#{order.booking_id}</span>
+                      <span className="order-id">#{order.order_id || order.booking_id}</span>
                       <span className="order-date">{formatDate(order.created_at)}</span>
                     </div>
 

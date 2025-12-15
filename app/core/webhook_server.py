@@ -813,7 +813,7 @@ async def create_webhook_app(
             )
 
     async def api_user_orders(request: web.Request) -> web.Response:
-        """GET /api/v1/orders - Get user's orders/bookings."""
+        """GET /api/v1/orders - Get user's orders/bookings and delivery orders."""
         try:
             user_id = request.query.get("user_id")
             if not user_id:
@@ -821,6 +821,48 @@ async def create_webhook_app(
                     web.json_response({"error": "user_id required"}, status=400)
                 )
 
+            # Get delivery orders (new system)
+            delivery_orders = []
+            if hasattr(db, "get_user_orders"):
+                raw_orders = db.get_user_orders(int(user_id)) or []
+                for order in raw_orders:
+                    if isinstance(order, dict):
+                        order_dict = {
+                            "id": order.get("id"),
+                            "order_id": order.get("id"),
+                            "user_id": order.get("user_id"),
+                            "status": order.get("status"),
+                            "order_type": order.get("order_type"),
+                            "payment_method": order.get("payment_method"),
+                            "delivery_address": order.get("delivery_address"),
+                            "phone": order.get("phone"),
+                            "total_price": order.get("total_price"),
+                            "created_at": order.get("created_at").isoformat()
+                            if hasattr(order.get("created_at"), "isoformat")
+                            else str(order.get("created_at")),
+                            "items": order.get("items", []),
+                        }
+                        delivery_orders.append(order_dict)
+                    else:
+                        # Handle tuple format if needed
+                        order_dict = {
+                            "id": getattr(order, "id", None),
+                            "order_id": getattr(order, "id", None),
+                            "user_id": getattr(order, "user_id", None),
+                            "status": getattr(order, "status", None),
+                            "order_type": getattr(order, "order_type", None),
+                            "payment_method": getattr(order, "payment_method", None),
+                            "delivery_address": getattr(order, "delivery_address", None),
+                            "phone": getattr(order, "phone", None),
+                            "total_price": getattr(order, "total_price", None),
+                            "created_at": getattr(order, "created_at", None),
+                            "items": [],
+                        }
+                        if hasattr(order_dict["created_at"], "isoformat"):
+                            order_dict["created_at"] = order_dict["created_at"].isoformat()
+                        delivery_orders.append(order_dict)
+
+            # Get bookings (old system)
             bookings = []
             if hasattr(db, "get_user_bookings"):
                 raw_bookings = db.get_user_bookings(int(user_id)) or []
@@ -877,7 +919,9 @@ async def create_webhook_app(
                                 booking[key] = value
                         bookings.append(booking)
 
-            return add_cors_headers(web.json_response({"bookings": bookings}))
+            return add_cors_headers(
+                web.json_response({"bookings": bookings, "orders": delivery_orders})
+            )
 
         except Exception as e:
             logger.error(f"API user orders error: {e}")
