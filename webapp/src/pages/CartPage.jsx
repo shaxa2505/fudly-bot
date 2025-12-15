@@ -632,9 +632,11 @@ function CartPage({ user }) {
                             <input
                               type="file"
                               id="payment-proof-input"
-                              accept="image/*"
+                              accept="image/*,image/jpeg,image/jpg,image/png"
+                              capture="environment"
                               onChange={handleFileSelect}
                               className="file-input-hidden"
+                              style={{ display: 'none' }}
                             />
                             <button
                               type="button"
@@ -716,13 +718,34 @@ function CartPage({ user }) {
 
               {checkoutStep === 'payment_upload' && (
                 <>
+                  <input
+                    type="file"
+                    id="payment-proof-upload-input"
+                    accept="image/*,image/jpeg,image/jpg,image/png"
+                    capture="environment"
+                    onChange={handleFileSelect}
+                    style={{ display: 'none' }}
+                  />
+
                   <p className="upload-instruction">
                     ✅ Buyurtma yaratildi! Endi to'lov chekini yuklang.
                   </p>
+
+                  {paymentProofPreview && (
+                    <div className="proof-preview" style={{ margin: '10px 0' }}>
+                      <img src={paymentProofPreview} alt="Chek" style={{ maxWidth: '200px', borderRadius: '8px' }} />
+                    </div>
+                  )}
+
                   {!paymentProof ? (
                     <button
                       className="confirm-btn"
-                      onClick={() => document.getElementById('payment-proof-file-input')?.click()}
+                      onClick={() => {
+                        const input = document.getElementById('payment-proof-upload-input')
+                        if (input) {
+                          input.click()
+                        }
+                      }}
                       disabled={orderLoading}
                     >
                       📸 Chekni yuklash
