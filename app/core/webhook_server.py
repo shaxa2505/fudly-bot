@@ -618,8 +618,13 @@ async def create_webhook_app(
                         order_type="delivery" if is_delivery else "pickup",
                         delivery_address=address if is_delivery else None,
                         payment_method="card",
-                        notify_customer=False,
-                        notify_sellers=False,
+                        notify_customer=True,  # ✅ Включаем уведомления клиенту
+                        notify_sellers=True,   # ✅ Включаем уведомления партнёрам
+                    )
+                    logger.info(
+                        f"Mini App order created via unified_order_service: "
+                        f"user={user_id}, type={delivery_type}, "
+                        f"items={len(order_items)}, success={result.success if result else False}"
                     )
                 except Exception as e:  # pragma: no cover - defensive
                     logger.error(f"Unified order service failed for mini app order: {e}")
