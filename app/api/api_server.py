@@ -15,17 +15,17 @@ from typing import Any
 import uvicorn
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
 
 from app.api.auth import router as auth_router
 from app.api.auth import set_auth_db
 from app.api.orders import router as orders_router
 from app.api.orders import set_orders_db
-from app.api.webapp_api import router as webapp_router
-from app.api.webapp_api import set_db_instance
 from app.api.partner_panel_simple import router as partner_panel_router
 from app.api.partner_panel_simple import set_partner_db
+from app.api.webapp_api import router as webapp_router
+from app.api.webapp_api import set_db_instance
 
 logger = logging.getLogger(__name__)
 
@@ -97,6 +97,10 @@ def create_api_app(db: Any = None, offer_service: Any = None, bot_token: str = N
         expose_headers=["*"],
     )
 
+    # Define static file paths (needed for debug endpoint)
+    webapp_dist_path = Path(__file__).parent.parent.parent / "webapp" / "dist"
+    partner_panel_path = Path(__file__).parent.parent.parent / "webapp" / "partner-panel"
+
     # Include routers
     app.include_router(auth_router)
     app.include_router(orders_router)
@@ -107,29 +111,72 @@ def create_api_app(db: Any = None, offer_service: Any = None, bot_token: str = N
     async def root():
         return {"service": "Fudly Mini App API", "version": "1.0.0", "docs": "/api/docs"}
 
+    @app.get("/api/debug/paths")
+    async def debug_paths():
+        """Debug endpoint to check file paths."""
+        return {
+            "partner_panel": {
+                "path": str(partner_panel_path.absolute()),
+                "exists": partner_panel_path.exists(),
+                "index_exists": (partner_panel_path / "index.html").exists()
+                if partner_panel_path.exists()
+                else False,
+                "files": [f.name for f in partner_panel_path.iterdir()][:10]
+                if partner_panel_path.exists()
+                else [],
+            },
+            "webapp": {
+                "path": str(webapp_dist_path.absolute()),
+                "exists": webapp_dist_path.exists(),
+                "index_exists": (webapp_dist_path / "index.html").exists()
+                if webapp_dist_path.exists()
+                else False,
+                "files": [f.name for f in webapp_dist_path.iterdir()][:10]
+                if webapp_dist_path.exists()
+                else [],
+            },
+            "cwd": os.getcwd(),
+            "file_location": str(Path(__file__).absolute()),
+        }
+
     # Serve static files (MUST be after all API routes)
-    webapp_dist_path = Path(__file__).parent.parent.parent / "webapp" / "dist"
-    partner_panel_path = Path(__file__).parent.parent.parent / "webapp" / "partner-panel"
-    
-    # Mount Partner Panel
+    logger.info(f"📁 Looking for Partner Panel at: {partner_panel_path.absolute()}")
+    logger.info(f"📁 Partner Panel exists: {partner_panel_path.exists()}")
     if partner_panel_path.exists():
-        app.mount("/partner-panel", StaticFiles(directory=str(partner_panel_path), html=True), name="partner-panel")
-        logger.info(f"✅ Partner Panel mounted from {partner_panel_path}")
+        logger.info(f"📁 Partner Panel contents: {list(partner_panel_path.iterdir())[:5]}")
+
+    logger.info(f"📁 Looking for Mini App at: {webapp_dist_path.absolute()}")
+    logger.info(f"📁 Mini App exists: {webapp_dist_path.exists()}")
+
+    # Mount Partner Panel FIRST (more specific path)
+    if partner_panel_path.exists() and (partner_panel_path / "index.html").exists():
+        app.mount(
+            "/partner-panel",
+            StaticFiles(directory=str(partner_panel_path), html=True),
+            name="partner-panel",
+        )
+        logger.info(f"✅ Partner Panel mounted at /partner-panel from {partner_panel_path}")
+        logger.info("   Access at: http://localhost:8000/partner-panel/")
     else:
-        logger.warning(f"⚠️ Partner Panel not found at {partner_panel_path}")
-    
+        logger.error(f"❌ Partner Panel not found or missing index.html at {partner_panel_path}")
+        logger.error(f"   Expected file: {partner_panel_path / 'index.html'}")
+
     # Mount Mini App (main webapp) - must be last to avoid conflicts
-    if webapp_dist_path.exists():
+    if webapp_dist_path.exists() and (webapp_dist_path / "index.html").exists():
         app.mount("/", StaticFiles(directory=str(webapp_dist_path), html=True), name="webapp")
-        logger.info(f"✅ Mini App mounted from {webapp_dist_path}")
+        logger.info(f"✅ Mini App mounted at / from {webapp_dist_path}")
     else:
-        logger.warning(f"⚠️ Mini App dist not found at {webapp_dist_path}")
+        logger.error(f"❌ Mini App dist not found or missing index.html at {webapp_dist_path}")
 
     return app
 
 
 async def run_api_server(
-    db: Any = None, offer_service: Any = None, bot_token: str = None, host: str = "0.0.0.0", port: int = 8000
+    db: Any = None,
+    offer_service: Any = None,
+    bot_token: str = None,
+    host: str = "0.0.0.0",
+    port: int = 8000,
 ):
     """
     Run FastAPI server as async task.
