@@ -8,10 +8,13 @@ FROM python:3.11-slim AS builder
 
 WORKDIR /build
 
-# Install build dependencies
+# Install build dependencies (add Node.js for frontend)
 RUN apt-get update && apt-get install -y --no-install-recommends \
     gcc \
     libpq-dev \
+    curl \
+    && curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
+    && apt-get install -y nodejs \
     && rm -rf /var/lib/apt/lists/*
 
 # Create virtual environment
@@ -22,6 +25,15 @@ ENV PATH="/opt/venv/bin:$PATH"
 COPY requirements.txt .
 RUN pip install --no-cache-dir --upgrade pip && \
     pip install --no-cache-dir -r requirements.txt
+
+# Build frontend
+COPY webapp/package*.json ./webapp/
+WORKDIR /build/webapp
+RUN npm ci --production=false
+COPY webapp/ .
+RUN npm run build
+
+WORKDIR /build
 
 
 # Stage 2: Runtime - Minimal production image
@@ -57,6 +69,9 @@ RUN groupadd -r botuser && useradd -r -g botuser -u 1000 botuser
 
 # Copy application code
 COPY --chown=botuser:botuser . .
+
+# Copy built frontend from builder
+COPY --from=builder --chown=botuser:botuser /build/webapp/dist ./webapp/dist
 
 # Remove unnecessary files
 RUN rm -rf tests/ htmlcov/ .git/ .pytest_cache/ __pycache__/ \
