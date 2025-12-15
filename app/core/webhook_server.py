@@ -823,44 +823,56 @@ async def create_webhook_app(
 
             # Get delivery orders (new system)
             delivery_orders = []
-            if hasattr(db, "get_user_orders"):
-                raw_orders = db.get_user_orders(int(user_id)) or []
-                for order in raw_orders:
-                    if isinstance(order, dict):
-                        order_dict = {
-                            "id": order.get("id"),
-                            "order_id": order.get("id"),
-                            "user_id": order.get("user_id"),
-                            "status": order.get("status"),
-                            "order_type": order.get("order_type"),
-                            "payment_method": order.get("payment_method"),
-                            "delivery_address": order.get("delivery_address"),
-                            "phone": order.get("phone"),
-                            "total_price": order.get("total_price"),
-                            "created_at": order.get("created_at").isoformat()
-                            if hasattr(order.get("created_at"), "isoformat")
-                            else str(order.get("created_at")),
-                            "items": order.get("items", []),
-                        }
-                        delivery_orders.append(order_dict)
-                    else:
-                        # Handle tuple format if needed
-                        order_dict = {
-                            "id": getattr(order, "id", None),
-                            "order_id": getattr(order, "id", None),
-                            "user_id": getattr(order, "user_id", None),
-                            "status": getattr(order, "status", None),
-                            "order_type": getattr(order, "order_type", None),
-                            "payment_method": getattr(order, "payment_method", None),
-                            "delivery_address": getattr(order, "delivery_address", None),
-                            "phone": getattr(order, "phone", None),
-                            "total_price": getattr(order, "total_price", None),
-                            "created_at": getattr(order, "created_at", None),
-                            "items": [],
-                        }
-                        if hasattr(order_dict["created_at"], "isoformat"):
-                            order_dict["created_at"] = order_dict["created_at"].isoformat()
-                        delivery_orders.append(order_dict)
+            if hasattr(db, "get_user_delivery_orders"):
+                raw_orders = db.get_user_delivery_orders(int(user_id)) or []
+                for order_row in raw_orders:
+                    # Parse order from tuple: (id, user_id, status, order_type, payment_method,
+                    # delivery_address, phone, total_price, created_at, ...)
+                    order_id = order_row[0] if len(order_row) > 0 else None
+
+                    # Get order items
+                    items = []
+                    if order_id and hasattr(db, "get_delivery_order_items"):
+                        raw_items = db.get_delivery_order_items(order_id) or []
+                        for item_row in raw_items:
+                            # Parse item: (offer_id, store_id, title, price, quantity, store_name, photo_id, ...)
+                            photo_url = None
+                            if len(item_row) > 6 and item_row[6]:
+                                try:
+                                    file = await bot.get_file(item_row[6])
+                                    if file and file.file_path:
+                                        photo_url = f"https://api.telegram.org/file/bot{bot.token}/{file.file_path}"
+                                except Exception:
+                                    pass
+
+                            items.append(
+                                {
+                                    "offer_id": item_row[0] if len(item_row) > 0 else None,
+                                    "store_id": item_row[1] if len(item_row) > 1 else None,
+                                    "title": item_row[2] if len(item_row) > 2 else "Mahsulot",
+                                    "price": item_row[3] if len(item_row) > 3 else 0,
+                                    "quantity": item_row[4] if len(item_row) > 4 else 1,
+                                    "store_name": item_row[5] if len(item_row) > 5 else "Do'kon",
+                                    "photo_url": photo_url,
+                                }
+                            )
+
+                    order_dict = {
+                        "id": order_id,
+                        "order_id": order_id,
+                        "user_id": order_row[1] if len(order_row) > 1 else None,
+                        "status": order_row[2] if len(order_row) > 2 else None,
+                        "order_type": order_row[3] if len(order_row) > 3 else None,
+                        "payment_method": order_row[4] if len(order_row) > 4 else None,
+                        "delivery_address": order_row[5] if len(order_row) > 5 else None,
+                        "phone": order_row[6] if len(order_row) > 6 else None,
+                        "total_price": order_row[7] if len(order_row) > 7 else 0,
+                        "created_at": str(order_row[8])
+                        if len(order_row) > 8 and order_row[8]
+                        else None,
+                        "items": items,
+                    }
+                    delivery_orders.append(order_dict)
 
             # Get bookings (old system)
             bookings = []

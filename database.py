@@ -2276,14 +2276,14 @@ class Database:
         self, order_id: int, user_id: int, store_id: int, rating: int, comment: str = None
     ) -> int | None:
         """Add rating for a delivery order.
-        
+
         Args:
             order_id: Order ID
             user_id: User ID who rated
             store_id: Store ID being rated
             rating: Rating value (1-5)
             comment: Optional comment
-            
+
         Returns:
             rating_id if successful, None otherwise
         """
@@ -3348,7 +3348,7 @@ class Database:
             conn.close()
 
     def get_user_orders(self, user_id: int, status: str = None) -> list[tuple]:
-        """Получить заказы пользователя"""
+        """Получить заказы пользователя (старая система - один offer)"""
         conn = self.get_connection()
         cursor = conn.cursor()
         try:
@@ -3377,6 +3377,62 @@ class Database:
                     (user_id,),
                 )
             return cursor.fetchall()
+        finally:
+            conn.close()
+
+    def get_user_delivery_orders(self, user_id: int, status: str = None) -> list[tuple]:
+        """Получить delivery заказы пользователя (новая система с множественными items)"""
+        conn = self.get_connection()
+        cursor = conn.cursor()
+        try:
+            if status:
+                cursor.execute(
+                    """
+                    SELECT id, user_id, status, order_type, payment_method,
+                           delivery_address, phone, total_price, created_at
+                    FROM delivery_orders
+                    WHERE user_id = ? AND status = ?
+                    ORDER BY created_at DESC
+                    """,
+                    (user_id, status),
+                )
+            else:
+                cursor.execute(
+                    """
+                    SELECT id, user_id, status, order_type, payment_method,
+                           delivery_address, phone, total_price, created_at
+                    FROM delivery_orders
+                    WHERE user_id = ?
+                    ORDER BY created_at DESC
+                    """,
+                    (user_id,),
+                )
+            return cursor.fetchall()
+        except Exception:
+            # Table might not exist in older DB
+            return []
+        finally:
+            conn.close()
+
+    def get_delivery_order_items(self, order_id: int) -> list[tuple]:
+        """Получить items для delivery заказа"""
+        conn = self.get_connection()
+        cursor = conn.cursor()
+        try:
+            cursor.execute(
+                """
+                SELECT oi.offer_id, oi.store_id, o.title, oi.price, oi.quantity,
+                       s.name as store_name, o.photo as photo_id
+                FROM delivery_order_items oi
+                JOIN offers o ON oi.offer_id = o.offer_id
+                JOIN stores s ON oi.store_id = s.store_id
+                WHERE oi.order_id = ?
+                """,
+                (order_id,),
+            )
+            return cursor.fetchall()
+        except Exception:
+            return []
         finally:
             conn.close()
 
