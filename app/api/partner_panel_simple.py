@@ -94,14 +94,17 @@ def verify_telegram_webapp(authorization: str) -> int:
 
     try:
         parsed = dict(urllib.parse.parse_qsl(init_data))
+        import logging
+        logging.info(f"🔍 Parsed init_data: {parsed}")
 
         # Check if this is URL-based auth (uid passed by bot in WebApp URL)
         # This is trusted because the bot creates the URL with the correct user_id
         if parsed.get("from_url") == "1":
             import json
-            import logging
 
-            user_data = json.loads(parsed.get("user", "{}"))
+            user_str = parsed.get("user", "{}")
+            logging.info(f"🔍 User string: {user_str}")
+            user_data = json.loads(user_str)
             user_id = int(user_data.get("id", 0))
             if user_id > 0:
                 logging.info(f"✅ URL-based auth: user_id={user_id}")
