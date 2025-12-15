@@ -1680,8 +1680,8 @@ async def create_webhook_app(
                 response_body = b"".join(body_parts)
                 return web.Response(body=response_body, status=status_code, headers=dict(headers))
 
-            # Register handler for all /api/* routes
-            app.router.add_route("*", "/api/{path:.*}", fastapi_handler)
+            # Register handler for all /api/* routes (including /api/partner/*)
+            app.router.add_route("*", "/api/partner{path:.*}", fastapi_handler)
 
             logger.info("✅ Partner Panel API endpoints registered (FastAPI direct ASGI)")
         except Exception as e:
