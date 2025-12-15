@@ -80,18 +80,10 @@ def create_api_app(db: Any = None, offer_service: Any = None, bot_token: str = N
         openapi_url="/api/openapi.json",
     )
 
-    # CORS for Mini App
+    # CORS for Mini App - allow all Vercel preview URLs
     app.add_middleware(
         CORSMiddleware,
         allow_origins=[
-            # Partner Panel Vercel domains (all variations)
-            "https://partner-panel-shaxbozs-projects-d385e345.vercel.app",
-            "https://partner-panel-ashen.vercel.app",
-            "https://partner-panel-c8nrjy2qb-shaxbozs-projects-d385e345.vercel.app",
-            "https://partner-panel-fudly.vercel.app",
-            "https://fudly-partner-panel.vercel.app",
-            # Main webapp
-            "https://fudly-webapp.vercel.app",
             # Telegram WebApp
             "https://web.telegram.org",
             "https://telegram.org",
@@ -104,6 +96,8 @@ def create_api_app(db: Any = None, offer_service: Any = None, bot_token: str = N
             "http://127.0.0.1:5500",
             "http://127.0.0.1:8080",
         ],
+        # Allow all Vercel preview/production URLs
+        allow_origin_regex=r"https://.*\.vercel\.app",
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],
