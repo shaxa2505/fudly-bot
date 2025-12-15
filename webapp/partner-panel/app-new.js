@@ -11,7 +11,7 @@ tg.ready();
 // API URL
 const API_URL = window.location.hostname === 'localhost'
     ? 'http://localhost:8000/api/partner'
-    : 'https://fudly-bot-main-production.up.railway.app/api/partner';
+    : 'https://fudly-bot-production.up.railway.app/api/partner';
 
 // Auth
 const isDevMode = !tg.initData && window.location.hostname === 'localhost';

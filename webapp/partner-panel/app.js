@@ -30,7 +30,7 @@ const API_URL = (() => {
 
     // Vercel - использует Railway API
     if (hostname.includes('vercel.app')) {
-        return 'https://fudly-bot-main-production.up.railway.app/api/partner';
+        return 'https://fudly-bot-production.up.railway.app/api/partner';
     }
 
     // По умолчанию - относительный путь
