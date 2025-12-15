@@ -458,8 +458,29 @@
         const tg = window.Telegram?.WebApp;
         if (tg) { tg.ready(); tg.expand(); }
         
+        // Debug info
+        const debugInfo = {
+            hasTelegram: !!window.Telegram,
+            hasWebApp: !!window.Telegram?.WebApp,
+            platform: tg?.platform,
+            version: tg?.version,
+            initDataLength: tg?.initData?.length || 0,
+            initDataPreview: tg?.initData?.substring(0, 50) || 'empty',
+            colorScheme: tg?.colorScheme
+        };
+        console.log('🔍 Telegram Debug:', debugInfo);
+        
+        // Show debug on screen for testing
+        if (!tg?.initData) {
+            console.warn('⚠️ No initData - auth will fail');
+        }
+        
         const API = 'https://fudly-bot-production.up.railway.app/api/partner';
-        const getAuth = () => tg?.initData ? `tma ${tg.initData}` : '';
+        const getAuth = () => {
+            const auth = tg?.initData ? `tma ${tg.initData}` : '';
+            console.log('🔑 Auth header:', auth ? `${auth.substring(0, 30)}...` : 'EMPTY');
+            return auth;
+        };
         
         let products = [];
         let orders = [];
