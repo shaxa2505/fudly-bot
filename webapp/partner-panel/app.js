@@ -1,73 +1,48 @@
-// Telegram WebApp
-const tg = window.Telegram?.WebApp || {
-    ready: () => {},
-    expand: () => {},
-    initData: '',
-    initDataUnsafe: { user: { id: 0 } }
-};
-tg.expand();
-tg.ready();
+// ============================================
+// Partner Panel - Simple & Clean Version
+// ============================================
 
-// API URL
-const API_URL = window.location.hostname === 'localhost'
-    ? 'http://localhost:8000/api/partner'
-    : 'https://fudly-bot-production.up.railway.app/api/partner';
+// Telegram WebApp SDK
+const tg = window.Telegram?.WebApp;
+if (tg) {
+    tg.ready();
+    tg.expand();
+}
 
-// Auth - check if we have valid Telegram auth
-const hasInitData = !!window.Telegram?.WebApp?.initData && window.Telegram.WebApp.initData.length > 0;
-const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
-const isDevMode = !hasInitData && isLocalhost;
-// Check if running inside Telegram WebApp with valid auth
-const isTelegramWebApp = !!(window.Telegram?.WebApp && window.Telegram.WebApp.platform && hasInitData);
-let devTelegramId = null;
+// API Configuration
+const API_URL = 'https://fudly-bot-production.up.railway.app/api/partner';
 
-console.log('📱 Telegram WebApp check:', {
-    hasTelegram: !!window.Telegram,
-    hasWebApp: !!window.Telegram?.WebApp,
-    platform: window.Telegram?.WebApp?.platform,
-    initData: hasInitData ? 'present' : 'empty',
-    initDataLength: window.Telegram?.WebApp?.initData?.length || 0,
-    isTelegramWebApp,
-    isDevMode,
-    isLocalhost,
-    hostname: window.location.hostname
+// Get authorization header from Telegram initData
+function getAuthHeader() {
+    if (tg?.initData) {
+        return `tma ${tg.initData}`;
+    }
+    // Fallback for testing - will fail auth on server but won't crash
+    return 'tma ';
+}
+
+console.log('🚀 Partner Panel loaded', {
+    telegram: !!tg,
+    initData: tg?.initData ? `${tg.initData.length} chars` : 'none',
+    platform: tg?.platform || 'unknown'
 });
 
-// Check if opened outside Telegram (no valid auth)
-if (!isTelegramWebApp && !isDevMode) {
-    console.error('❌ Partner Panel: No valid Telegram auth');
-    document.body.innerHTML = `
-        <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100vh;text-align:center;padding:20px;background:#1a1a2e;color:white;font-family:system-ui">
-            <div style="font-size:64px;margin-bottom:20px">🔐</div>
-            <h1 style="margin:0 0 10px">Панель партнёра</h1>
-            <p style="color:#aaa;margin:0 0 20px">Откройте через Telegram бот</p>
-            <a href="https://t.me/fudly_bot" style="background:#0088cc;color:white;padding:12px 24px;border-radius:8px;text-decoration:none">Открыть @fudly_bot</a>
-        </div>
-    `;
-    throw new Error('Not in Telegram WebApp');
-}
-
-if (isDevMode) {
-    devTelegramId = prompt('Введите ваш Telegram ID:', '253445521');
-}
-
-function getAuthHeader() {
-    if (isDevMode) {
-        return `dev_${devTelegramId}`;
-    }
-    return `tma ${tg.initData}`;
-}
-
+// ============================================
 // State
+// ============================================
 let currentView = 'dashboard';
 let productsData = [];
 let ordersData = [];
-let statsData = {};
 
-// API Request
+// ============================================
+// API Functions
+// ============================================
 async function apiRequest(endpoint, options = {}) {
+    const url = `${API_URL}${endpoint}`;
+    console.log(`📡 API: ${options.method || 'GET'} ${endpoint}`);
+    
     try {
-        const response = await fetch(`${API_URL}${endpoint}`, {
+        const response = await fetch(url, {
             ...options,
             headers: {
                 'Authorization': getAuthHeader(),
@@ -76,93 +51,78 @@ async function apiRequest(endpoint, options = {}) {
             }
         });
 
+        console.log(`📡 Response: ${response.status}`);
+
         if (!response.ok) {
-            // Handle specific error codes
-            if (response.status === 403) {
-                const errorData = await response.json().catch(() => ({}));
-                if (errorData.detail === 'Not a partner') {
-                    showToast('❌ Вы не являетесь партнёром');
-                    document.body.innerHTML = `
-                        <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100vh;text-align:center;padding:20px;background:#f8fafc;color:#1e293b;font-family:system-ui">
-                            <div style="font-size:64px;margin-bottom:20px">🏪</div>
-                            <h1 style="margin:0 0 10px;font-size:24px">Панель партнёра</h1>
-                            <p style="color:#64748b;margin:0 0 20px">Вы не являетесь партнёром Fudly</p>
-                            <p style="color:#64748b;margin:0 0 20px;font-size:14px">Чтобы стать партнёром, напишите нам</p>
-                            <a href="https://t.me/fudly_support" style="background:#6366f1;color:white;padding:12px 24px;border-radius:8px;text-decoration:none">Связаться с нами</a>
-                        </div>
-                    `;
-                    throw new Error('Not a partner');
-                }
-                throw new Error('Access denied');
-            }
+            const errorData = await response.json().catch(() => ({ detail: 'Unknown error' }));
+            console.error('API Error:', errorData);
+            
             if (response.status === 401) {
-                showToast('❌ Ошибка авторизации');
+                showError('Ошибка авторизации', 'Откройте панель через меню бота');
                 throw new Error('Unauthorized');
             }
-            throw new Error(`HTTP ${response.status}`);
+            
+            if (response.status === 403) {
+                showError('Доступ запрещён', errorData.detail || 'Вы не являетесь партнёром');
+                throw new Error('Forbidden');
+            }
+            
+            throw new Error(errorData.detail || `HTTP ${response.status}`);
         }
 
         return await response.json();
     } catch (error) {
-        console.error('API Error:', error);
-        if (!error.message.includes('Not a partner')) {
-            showToast('❌ Ошибка подключения');
+        if (error.message === 'Unauthorized' || error.message === 'Forbidden') {
+            throw error;
         }
+        console.error('Network error:', error);
+        showToast('❌ Ошибка сети');
         throw error;
     }
 }
 
-// Show Toast
+// ============================================
+// UI Helpers
+// ============================================
 function showToast(message) {
+    // Remove existing toasts
+    document.querySelectorAll('.toast').forEach(t => t.remove());
+    
     const toast = document.createElement('div');
     toast.className = 'toast';
     toast.textContent = message;
+    toast.style.cssText = 'position:fixed;bottom:80px;left:50%;transform:translateX(-50%);background:#333;color:white;padding:12px 24px;border-radius:8px;z-index:9999;animation:fadeIn 0.3s';
     document.body.appendChild(toast);
     setTimeout(() => toast.remove(), 3000);
 }
 
-// Format Money
+function showError(title, message) {
+    document.body.innerHTML = `
+        <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100vh;text-align:center;padding:20px;background:var(--bg, #f8fafc);color:var(--text, #1e293b);font-family:system-ui">
+            <div style="font-size:64px;margin-bottom:20px">⚠️</div>
+            <h1 style="margin:0 0 10px;font-size:24px">${title}</h1>
+            <p style="color:var(--text-secondary, #64748b);margin:0 0 20px">${message}</p>
+            <button onclick="location.reload()" style="background:var(--primary, #6366f1);color:white;padding:12px 24px;border-radius:8px;border:none;cursor:pointer">Попробовать снова</button>
+        </div>
+    `;
+}
+
 function formatMoney(amount) {
-    return new Intl.NumberFormat('ru-RU').format(amount) + ' сум';
+    return new Intl.NumberFormat('ru-RU').format(amount || 0) + ' сум';
 }
 
-// Switch View
-function switchView(view) {
-    currentView = view;
-
-    // Update sections
-    document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
-    document.getElementById(view).classList.add('active');
-
-    // Update nav
-    document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
-    event.target.closest('.nav-item').classList.add('active');
-
-    // Load data
-    loadView(view);
+function formatDate(dateStr) {
+    if (!dateStr) return '-';
+    const date = new Date(dateStr);
+    return date.toLocaleDateString('ru-RU', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
 }
 
-// Load View
-async function loadView(view) {
-    switch(view) {
-        case 'dashboard':
-            await loadDashboard();
-            break;
-        case 'products':
-            await loadProducts();
-            break;
-        case 'orders':
-            await loadOrders();
-            break;
-        case 'stats':
-            await loadStats();
-            break;
-    }
-}
-
-// Load Dashboard
+// ============================================
+// Dashboard
+// ============================================
 async function loadDashboard() {
     try {
+        // Load all data in parallel
         const [profile, products, orders, stats] = await Promise.all([
             apiRequest('/profile'),
             apiRequest('/products'),
@@ -170,125 +130,115 @@ async function loadDashboard() {
             apiRequest('/stats?period=today')
         ]);
 
-        // Update store name
-        document.getElementById('storeName').textContent = profile.store_name || 'Магазин';
+        console.log('✅ Dashboard data loaded', { profile, products: products?.length, orders: orders?.length });
 
-        // Update stats
-        document.getElementById('todayRevenue').textContent = formatMoney(stats.revenue || 0);
-        document.getElementById('todayOrders').textContent = stats.orders || 0;
-        document.getElementById('totalProducts').textContent = products.length;
+        // Update stats cards
+        document.getElementById('todayRevenue').textContent = formatMoney(stats?.revenue || 0);
+        document.getElementById('todayOrders').textContent = stats?.orders_count || 0;
+        document.getElementById('totalProducts').textContent = products?.length || 0;
+        document.getElementById('pendingOrders').textContent = orders?.filter(o => o.status === 'pending')?.length || 0;
 
-        const pending = orders.filter(o => o.status === 'pending').length;
-        document.getElementById('pendingOrders').textContent = pending;
+        // Store data
+        productsData = products || [];
+        ordersData = orders || [];
+
+        // Hide loading
+        document.querySelector('.loading')?.remove();
+        
     } catch (error) {
         console.error('Dashboard error:', error);
     }
 }
 
-// Load Products
+// ============================================
+// Products
+// ============================================
 async function loadProducts() {
-    const container = document.getElementById('productsContent');
-    container.innerHTML = '<div class="loading"><div class="spinner"></div></div>';
-
     try {
-        productsData = await apiRequest('/products');
+        const products = await apiRequest('/products');
+        productsData = products || [];
+        renderProducts();
+    } catch (error) {
+        console.error('Products error:', error);
+    }
+}
 
-        if (productsData.length === 0) {
-            container.innerHTML = `
-                <div class="empty-state">
-                    <div class="empty-icon">📦</div>
-                    <div class="empty-text">Нет товаров</div>
-                    <button class="btn btn-primary" onclick="openAddProductModal()">Добавить товар</button>
-                </div>
-            `;
-            return;
-        }
+function renderProducts() {
+    const container = document.getElementById('productsList');
+    if (!container) return;
 
-        container.innerHTML = productsData.map(product => `
-            <div class="card">
-                <div class="card-header">
-                    <div>
-                        <div class="card-title">${escapeHtml(product.title)}</div>
-                        <div class="card-info">${formatMoney(product.discount_price || product.original_price)}</div>
-                    </div>
-                    <span class="badge ${product.quantity > 0 ? 'success' : 'danger'}">
-                        ${product.quantity} шт
-                    </span>
-                </div>
-                ${product.description ? `<div class="card-info">${escapeHtml(product.description)}</div>` : ''}
-                <div class="btn-group">
-                    <button class="btn btn-primary btn-sm" onclick="editProduct(${product.offer_id})">✏️ Изменить</button>
-                    <button class="btn btn-danger btn-sm" onclick="deleteProduct(${product.offer_id})">🗑️ Удалить</button>
-                </div>
+    if (productsData.length === 0) {
+        container.innerHTML = '<div class="empty-state">Нет товаров. Нажмите + чтобы добавить.</div>';
+        return;
+    }
+
+    container.innerHTML = productsData.map(p => `
+        <div class="product-card" onclick="editProduct(${p.offer_id})">
+            <div class="product-image">${p.photo_id ? `<img src="https://fudly-bot-production.up.railway.app/api/partner/photo/${p.photo_id}" alt="">` : '📦'}</div>
+            <div class="product-info">
+                <div class="product-title">${escapeHtml(p.title || 'Без названия')}</div>
+                <div class="product-price">${formatMoney(p.discount_price)}</div>
+                <div class="product-stock ${p.quantity <= 0 ? 'out-of-stock' : ''}">${p.quantity} шт</div>
             </div>
-        `).join('');
-    } catch (error) {
-        container.innerHTML = '<div class="empty-state"><div class="empty-text">Ошибка загрузки</div></div>';
-    }
+            <div class="product-status ${p.status === 'active' ? 'active' : 'inactive'}">${p.status === 'active' ? '●' : '○'}</div>
+        </div>
+    `).join('');
 }
 
-// Load Orders
+function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+
+// ============================================
+// Orders
+// ============================================
 async function loadOrders() {
-    const container = document.getElementById('ordersContent');
-    container.innerHTML = '<div class="loading"><div class="spinner"></div></div>';
-
     try {
-        ordersData = await apiRequest('/orders');
-
-        if (ordersData.length === 0) {
-            container.innerHTML = `
-                <div class="empty-state">
-                    <div class="empty-icon">🎫</div>
-                    <div class="empty-text">Нет заказов</div>
-                </div>
-            `;
-            return;
-        }
-
-        const statusMap = {
-            pending: { text: 'Новый', badge: 'warning' },
-            confirmed: { text: 'Подтверждён', badge: 'success' },
-            ready: { text: 'Готов', badge: 'success' },
-            completed: { text: 'Завершён', badge: 'success' },
-            cancelled: { text: 'Отменён', badge: 'danger' }
-        };
-
-        container.innerHTML = ordersData.map(order => {
-            const status = statusMap[order.status] || { text: order.status, badge: 'warning' };
-            return `
-                <div class="card">
-                    <div class="card-header">
-                        <div>
-                            <div class="card-title">Заказ #${order.order_id}</div>
-                            <div class="card-info">${new Date(order.created_at).toLocaleString('ru-RU')}</div>
-                        </div>
-                        <span class="badge ${status.badge}">${status.text}</span>
-                    </div>
-                    <div class="card-info">
-                        <strong>${escapeHtml(order.offer_title || 'Товар')}</strong> × ${order.quantity}<br>
-                        💰 ${formatMoney(order.price)}<br>
-                        👤 ${escapeHtml(order.customer_name || 'Клиент')}<br>
-                        📞 ${escapeHtml(order.customer_phone || '-')}
-                    </div>
-                    ${order.status === 'pending' ? `
-                        <div class="btn-group">
-                            <button class="btn btn-success btn-sm" onclick="confirmOrder(${order.order_id})">✅ Подтвердить</button>
-                            <button class="btn btn-danger btn-sm" onclick="cancelOrder(${order.order_id})">❌ Отменить</button>
-                        </div>
-                    ` : ''}
-                </div>
-            `;
-        }).join('');
+        const orders = await apiRequest('/orders');
+        ordersData = orders || [];
+        renderOrders();
     } catch (error) {
-        container.innerHTML = '<div class="empty-state"><div class="empty-text">Ошибка загрузки</div></div>';
+        console.error('Orders error:', error);
     }
 }
 
-// Load Stats
-async function loadStats() {
-    const container = document.getElementById('statsContent');
-    container.innerHTML = '<div class="loading"><div class="spinner"></div></div>';
+function renderOrders() {
+    const container = document.getElementById('ordersList');
+    if (!container) return;
 
+    if (ordersData.length === 0) {
+        container.innerHTML = '<div class="empty-state">Нет заказов</div>';
+        return;
+    }
+
+    const statusLabels = {
+        pending: '⏳ Ожидает',
+        confirmed: '✅ Подтверждён',
+        completed: '🎉 Завершён',
+        cancelled: '❌ Отменён'
+    };
+
+    container.innerHTML = ordersData.map(o => `
+        <div class="order-card" onclick="viewOrder(${o.booking_id || o.order_id})">
+            <div class="order-header">
+                <span class="order-code">#${o.booking_code || o.order_id}</span>
+                <span class="order-status status-${o.status}">${statusLabels[o.status] || o.status}</span>
+            </div>
+            <div class="order-info">
+                <div class="order-customer">${escapeHtml(o.customer_name || 'Клиент')}</div>
+                <div class="order-total">${formatMoney(o.total_amount)}</div>
+            </div>
+            <div class="order-date">${formatDate(o.created_at)}</div>
+        </div>
+    `).join('');
+}
+
+// ============================================
+// Stats
+// ============================================
+async function loadStats() {
     try {
         const [today, week, month] = await Promise.all([
             apiRequest('/stats?period=today'),
@@ -296,139 +246,118 @@ async function loadStats() {
             apiRequest('/stats?period=month')
         ]);
 
-        container.innerHTML = `
-            <div class="card">
-                <div class="card-title">📅 Сегодня</div>
-                <div class="stats-grid">
-                    <div class="stat-card">
-                        <div class="stat-value">${formatMoney(today.revenue || 0)}</div>
-                        <div class="stat-label">Выручка</div>
-                    </div>
-                    <div class="stat-card">
-                        <div class="stat-value">${today.orders || 0}</div>
-                        <div class="stat-label">Заказов</div>
-                    </div>
-                </div>
+        document.getElementById('statsContent').innerHTML = `
+            <div class="stats-period">
+                <h3>Сегодня</h3>
+                <div class="stats-row"><span>Выручка:</span><span>${formatMoney(today?.revenue)}</span></div>
+                <div class="stats-row"><span>Заказов:</span><span>${today?.orders_count || 0}</span></div>
             </div>
-
-            <div class="card">
-                <div class="card-title">📅 Неделя</div>
-                <div class="stats-grid">
-                    <div class="stat-card">
-                        <div class="stat-value">${formatMoney(week.revenue || 0)}</div>
-                        <div class="stat-label">Выручка</div>
-                    </div>
-                    <div class="stat-card">
-                        <div class="stat-value">${week.orders || 0}</div>
-                        <div class="stat-label">Заказов</div>
-                    </div>
-                </div>
+            <div class="stats-period">
+                <h3>Неделя</h3>
+                <div class="stats-row"><span>Выручка:</span><span>${formatMoney(week?.revenue)}</span></div>
+                <div class="stats-row"><span>Заказов:</span><span>${week?.orders_count || 0}</span></div>
             </div>
-
-            <div class="card">
-                <div class="card-title">📅 Месяц</div>
-                <div class="stats-grid">
-                    <div class="stat-card">
-                        <div class="stat-value">${formatMoney(month.revenue || 0)}</div>
-                        <div class="stat-label">Выручка</div>
-                    </div>
-                    <div class="stat-card">
-                        <div class="stat-value">${month.orders || 0}</div>
-                        <div class="stat-label">Заказов</div>
-                    </div>
-                </div>
+            <div class="stats-period">
+                <h3>Месяц</h3>
+                <div class="stats-row"><span>Выручка:</span><span>${formatMoney(month?.revenue)}</span></div>
+                <div class="stats-row"><span>Заказов:</span><span>${month?.orders_count || 0}</span></div>
             </div>
         `;
     } catch (error) {
-        container.innerHTML = '<div class="empty-state"><div class="empty-text">Ошибка загрузки</div></div>';
+        console.error('Stats error:', error);
     }
 }
 
-// Modal functions
-function openAddProductModal() {
-    document.getElementById('addProductModal').classList.add('show');
+// ============================================
+// Navigation
+// ============================================
+function switchView(view) {
+    currentView = view;
+
+    // Update sections
+    document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+    const section = document.getElementById(view);
+    if (section) section.classList.add('active');
+
+    // Update nav
+    document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+    event?.target?.closest('.nav-item')?.classList.add('active');
+
+    // Load data
+    switch(view) {
+        case 'dashboard': loadDashboard(); break;
+        case 'products': loadProducts(); break;
+        case 'orders': loadOrders(); break;
+        case 'stats': loadStats(); break;
+    }
+}
+
+// ============================================
+// Product Form (Add/Edit)
+// ============================================
+function showAddProduct() {
+    document.getElementById('productModal').style.display = 'flex';
     document.getElementById('productForm').reset();
+    document.getElementById('productId').value = '';
 }
 
-function closeAddProductModal() {
-    document.getElementById('addProductModal').classList.remove('show');
+function closeModal() {
+    document.getElementById('productModal').style.display = 'none';
 }
 
-// Add Product
-async function addProduct(event) {
+async function editProduct(id) {
+    const product = productsData.find(p => p.offer_id === id);
+    if (!product) return;
+
+    document.getElementById('productId').value = id;
+    document.getElementById('productTitle').value = product.title || '';
+    document.getElementById('productCategory').value = product.category || '';
+    document.getElementById('productPrice').value = product.discount_price || '';
+    document.getElementById('productQuantity').value = product.quantity || 0;
+    document.getElementById('productDescription').value = product.description || '';
+    
+    document.getElementById('productModal').style.display = 'flex';
+}
+
+async function saveProduct(event) {
     event.preventDefault();
-
-    const product = {
-        title: document.getElementById('productTitle').value,
-        discount_price: parseInt(document.getElementById('productPrice').value),
-        quantity: parseInt(document.getElementById('productQuantity').value),
-        description: document.getElementById('productDescription').value,
-        category: 'other',
-        unit: 'шт'
-    };
+    
+    const id = document.getElementById('productId').value;
+    const formData = new FormData();
+    formData.append('title', document.getElementById('productTitle').value);
+    formData.append('category', document.getElementById('productCategory').value);
+    formData.append('discount_price', document.getElementById('productPrice').value);
+    formData.append('quantity', document.getElementById('productQuantity').value);
+    formData.append('description', document.getElementById('productDescription').value);
 
     try {
-        await apiRequest('/products', {
-            method: 'POST',
-            body: JSON.stringify(product)
+        const url = id ? `/products/${id}` : '/products';
+        const method = id ? 'PUT' : 'POST';
+        
+        await fetch(`${API_URL}${url}`, {
+            method,
+            headers: { 'Authorization': getAuthHeader() },
+            body: formData
         });
 
-        showToast('✅ Товар добавлен');
-        closeAddProductModal();
+        showToast(id ? '✅ Товар обновлён' : '✅ Товар добавлен');
+        closeModal();
         loadProducts();
-        loadDashboard();
     } catch (error) {
-        showToast('❌ Ошибка добавления');
+        showToast('❌ Ошибка сохранения');
     }
 }
 
-// Delete Product
-async function deleteProduct(id) {
-    if (!confirm('Удалить товар?')) return;
-
-    try {
-        await apiRequest(`/products/${id}`, { method: 'DELETE' });
-        showToast('✅ Товар удалён');
-        loadProducts();
-        loadDashboard();
-    } catch (error) {
-        showToast('❌ Ошибка удаления');
+// ============================================
+// Initialize
+// ============================================
+document.addEventListener('DOMContentLoaded', () => {
+    console.log('📱 DOM ready, loading dashboard...');
+    loadDashboard();
+    
+    // Setup form handler
+    const form = document.getElementById('productForm');
+    if (form) {
+        form.addEventListener('submit', saveProduct);
     }
-}
-
-// Confirm Order
-async function confirmOrder(id) {
-    try {
-        await apiRequest(`/orders/${id}/confirm`, { method: 'POST' });
-        showToast('✅ Заказ подтверждён');
-        loadOrders();
-        loadDashboard();
-    } catch (error) {
-        showToast('❌ Ошибка');
-    }
-}
-
-// Cancel Order
-async function cancelOrder(id) {
-    if (!confirm('Отменить заказ?')) return;
-
-    try {
-        await apiRequest(`/orders/${id}/cancel`, { method: 'POST' });
-        showToast('✅ Заказ отменён');
-        loadOrders();
-        loadDashboard();
-    } catch (error) {
-        showToast('❌ Ошибка');
-    }
-}
-
-// Escape HTML
-function escapeHtml(text) {
-    if (!text) return '';
-    const div = document.createElement('div');
-    div.textContent = text;
-    return div.innerHTML;
-}
-
-// Init
-loadDashboard();
+});
