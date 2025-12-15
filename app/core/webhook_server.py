@@ -1622,25 +1622,38 @@ async def create_webhook_app(
     app.router.add_post("/api/v1/payment/click/callback", api_click_callback)
     app.router.add_post("/api/v1/payment/payme/callback", api_payme_callback)
 
-    # Mount FastAPI Partner Panel API
-    try:
-        from aiohttp_asgi import ASGIResource
+    # Partner Panel API - simplified mock for now (will be implemented with real data later)
+    async def partner_profile(request):
+        """Partner profile endpoint"""
+        return web.json_response(
+            {"id": 123, "name": "Demo Store", "phone": "+998901234567", "status": "active"}
+        )
 
-        from app.api.api_server import create_api_app
+    async def partner_stats(request):
+        """Partner statistics endpoint"""
+        return web.json_response(
+            {
+                "today": {"revenue": 0, "orders": 0, "avg_check": 0},
+                "week": {"revenue": 0, "orders": 0, "avg_check": 0},
+                "month": {"revenue": 0, "orders": 0, "avg_check": 0},
+            }
+        )
 
-        # Create FastAPI app with Partner Panel routes
-        fastapi_app = create_api_app(db=db)
+    async def partner_products(request):
+        """Partner products list"""
+        return web.json_response({"products": []})
 
-        # Mount FastAPI app to handle /api/partner/* requests
-        asgi_resource = ASGIResource(fastapi_app)
-        app.router.add_route("*", "/api/partner{path_info:.*}", asgi_resource)
-        app.router.add_route("*", "/api/debug{path_info:.*}", asgi_resource)
+    async def partner_orders(request):
+        """Partner orders list"""
+        return web.json_response({"orders": []})
 
-        logger.info("✅ FastAPI Partner Panel API mounted")
-    except ImportError:
-        logger.warning("⚠️ aiohttp-asgi not installed, Partner Panel API unavailable")
-    except Exception as e:
-        logger.error(f"❌ Failed to mount Partner Panel API: {e}")
+    # Register Partner Panel API routes (mock for now)
+    app.router.add_get("/api/partner/profile", partner_profile)
+    app.router.add_get("/api/partner/stats", partner_stats)
+    app.router.add_get("/api/partner/products", partner_products)
+    app.router.add_get("/api/partner/orders", partner_orders)
+
+    logger.info("✅ Partner Panel API endpoints registered (mock data)")
 
     # Setup WebSocket routes for real-time notifications
     setup_websocket_routes(app)

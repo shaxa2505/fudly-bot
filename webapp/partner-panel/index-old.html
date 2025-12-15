@@ -1,0 +1,329 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Панель партнёра - Fudly</title>
+    <link rel="stylesheet" href="styles.css">
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+</head>
+<body>
+    <div id="app">
+        <!-- Header -->
+        <header class="header">
+            <div class="header-content">
+                <div class="header-title">
+                    <div class="store-icon">🏪</div>
+                    <div>
+                        <h1>Fudly Partner</h1>
+                        <div class="user-info" id="userInfo">Загрузка...</div>
+                    </div>
+                </div>
+            </div>
+        </header>
+
+        <!-- Navigation Tabs -->
+        <nav class="tabs">
+            <button class="tab active" data-view="products">
+                <span class="tab-icon">📦</span>
+                <span class="tab-label">Товары</span>
+            </button>
+            <button class="tab" data-view="orders">
+                <span class="tab-icon">🎫</span>
+                <span class="tab-label">Заказы</span>
+            </button>
+            <button class="tab" data-view="stats">
+                <span class="tab-icon">📊</span>
+                <span class="tab-label">Статистика</span>
+            </button>
+            <button class="tab" data-view="settings">
+                <span class="tab-icon">⚙️</span>
+                <span class="tab-label">Настройки</span>
+            </button>
+        </nav>
+
+        <!-- Quick Stats Bar -->
+        <div class="quick-stats" id="quickStats">
+            <div class="quick-stat">
+                <div class="quick-stat-value" id="todayOrders">-</div>
+                <div class="quick-stat-label">Сегодня</div>
+            </div>
+            <div class="quick-stat">
+                <div class="quick-stat-value" id="todayRevenue">-</div>
+                <div class="quick-stat-label">Выручка</div>
+            </div>
+            <div class="quick-stat">
+                <div class="quick-stat-value" id="activeProducts">-</div>
+                <div class="quick-stat-label">Товаров</div>
+            </div>
+            <div class="quick-stat">
+                <div class="quick-stat-value" id="avgTicket">-</div>
+                <div class="quick-stat-label">Средний чек</div>
+            </div>
+        </div>
+
+        <!-- Content Views -->
+        <main class="content">
+            <!-- Products View -->
+            <div id="products-view" class="view active">
+                <div class="view-header">
+                    <div class="view-title-section">
+                        <h2>Товары</h2>
+                        <button class="btn btn-primary btn-icon" id="addProductBtn">
+                            <span>➕</span>
+                            <span>Добавить</span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Compact Filter Bar -->
+                <div class="filter-section">
+                    <div class="search-box">
+                        <span class="search-icon">🔍</span>
+                        <input type="search" id="searchProducts" placeholder="Поиск по названию...">
+                    </div>
+
+                    <div class="filter-pills">
+                        <select id="filterStatus" class="filter-select">
+                            <option value="all">📋 Все</option>
+                            <option value="active">✅ Активные</option>
+                            <option value="inactive">⛔ Неактивные</option>
+                        </select>
+                        <select id="filterCategory" class="filter-select">
+                            <option value="all">🏷️ Категории</option>
+                            <option value="bakery">🥖 Выпечка</option>
+                            <option value="dairy">🥛 Молочные</option>
+                            <option value="meat">🥩 Мясо</option>
+                            <option value="produce">🥬 Овощи</option>
+                            <option value="prepared">🍱 Готовое</option>
+                            <option value="other">📦 Другое</option>
+                        </select>
+                        <select id="sortProducts" class="filter-select">
+                            <option value="date-desc">🆕 Новые</option>
+                            <option value="date-asc">🕐 Старые</option>
+                            <option value="price-asc">💵 Дешевле</option>
+                            <option value="price-desc">💰 Дороже</option>
+                            <option value="quantity-asc">⚠️ Мало</option>
+                            <option value="quantity-desc">📦 Много</option>
+                            <option value="name-asc">А→Я</option>
+                            <option value="name-desc">Я→А</option>
+                        </select>
+                        <button class="btn-icon-only" id="importCsvBtn" title="Импорт CSV">
+                            📥
+                        </button>
+                    </div>
+                </div>
+
+                <div class="bulk-actions" id="bulkActionsBar" style="display:none;">
+                    <div class="bulk-info">
+                        <span class="bulk-icon">☑️</span>
+                        <span id="selectedCount">0 выбрано</span>
+                    </div>
+                    <div class="bulk-buttons">
+                        <button class="btn-compact btn-secondary" onclick="bulkToggleStatus()">🔄 Статус</button>
+                        <button class="btn-compact btn-danger" onclick="bulkDelete()">🗑️ Удалить</button>
+                        <button class="btn-compact" onclick="clearSelection()">✖️</button>
+                    </div>
+                </div>
+                <div id="productsList" class="products-grid">
+                    <div class="loader">Загрузка товаров...</div>
+                </div>
+            </div>
+
+            <!-- Orders View -->
+            <div id="orders-view" class="view">
+                <div class="view-header">
+                    <h2>Заказы</h2>
+                    <select id="filterOrderStatus">
+                        <option value="all">Все</option>
+                        <option value="pending">Ожидают</option>
+                        <option value="confirmed">Подтверждены</option>
+                        <option value="completed">Завершены</option>
+                        <option value="cancelled">Отменены</option>
+                    </select>
+                </div>
+                <div id="ordersList" class="orders-list">
+                    <div class="loader">Загрузка заказов...</div>
+                </div>
+            </div>
+
+            <!-- Stats View -->
+            <div id="stats-view" class="view">
+                <div class="view-header">
+                    <h2>Статистика</h2>
+                    <select id="statsPeriod">
+                        <option value="today">Сегодня</option>
+                        <option value="yesterday">Вчера</option>
+                        <option value="week">Неделя</option>
+                        <option value="month">Месяц</option>
+                    </select>
+                </div>
+                <div id="statsContent" class="stats-container">
+                    <div class="loader">Загрузка статистики...</div>
+                </div>
+            </div>
+
+            <!-- Settings View -->
+            <div id="settings-view" class="view">
+                <div class="view-header">
+                    <h2>Настройки магазина</h2>
+                </div>
+                <form id="settingsForm" class="settings-form">
+                    <div class="form-group">
+                        <label>Название магазина</label>
+                        <input type="text" id="storeName" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Адрес</label>
+                        <input type="text" id="storeAddress">
+                    </div>
+                    <div class="form-group">
+                        <label>Телефон</label>
+                        <input type="tel" id="storePhone">
+                    </div>
+                    <div class="form-group">
+                        <label>Описание</label>
+                        <textarea id="storeDescription" rows="3"></textarea>
+                    </div>
+                    <button type="submit" class="btn btn-primary">💾 Сохранить</button>
+                </form>
+            </div>
+        </main>
+
+        <!-- Modals -->
+        <!-- Add/Edit Product Modal -->
+        <div id="productModal" class="modal">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h3 id="productModalTitle">Добавить товар</h3>
+                    <button class="modal-close">&times;</button>
+                </div>
+                <form id="productForm">
+                    <input type="hidden" id="productId">
+
+                    <!-- ОБЯЗАТЕЛЬНЫЕ ПОЛЯ -->
+                    <div class="form-section">
+                        <div class="form-section-title">📝 Основная информация</div>
+
+                        <div class="form-group">
+                            <label>Название * <small>(3-200 символов)</small></label>
+                            <input type="text" id="productTitle" required
+                                   minlength="3" maxlength="200"
+                                   placeholder="Например: Свежий хлеб">
+                        </div>
+
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>Цена со скидкой * <small>(сум)</small></label>
+                                <input type="number" id="productDiscountPrice" required step="1"
+                                       min="1" max="100000000"
+                                       placeholder="20000">
+                            </div>
+                            <div class="form-group">
+                                <label>Количество *</label>
+                                <input type="number" id="productQuantity" required
+                                       min="0" max="100000"
+                                       placeholder="50">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- ДОПОЛНИТЕЛЬНЫЕ ПОЛЯ -->
+                    <div class="form-section form-section-optional">
+                        <div class="form-section-title">🏷️ Дополнительно (необязательно)</div>
+
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>Категория</label>
+                                <select id="productCategory">
+                                    <option value="other">Другое</option>
+                                    <option value="bakery">🥖 Выпечка</option>
+                                    <option value="dairy">🥛 Молочные</option>
+                                    <option value="meat">🥩 Мясо</option>
+                                    <option value="produce">🥬 Овощи</option>
+                                    <option value="prepared">🍱 Готовое</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label>Единица</label>
+                                <select id="productUnit">
+                                    <option value="шт">шт</option>
+                                    <option value="кг">кг</option>
+                                    <option value="л">л</option>
+                                    <option value="г">г</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="form-group">
+                            <label>Старая цена <small>(для показа скидки, сум)</small></label>
+                            <input type="number" id="productOriginalPrice" step="1"
+                                   min="0" max="100000000"
+                                   placeholder="25000">
+                        </div>
+
+                        <div class="form-group">
+                            <label>Срок годности</label>
+                            <div class="expiry-quick-buttons">
+                                <button type="button" class="btn-quick-expiry" data-days="1">+1 день</button>
+                                <button type="button" class="btn-quick-expiry" data-days="3">+3 дня</button>
+                                <button type="button" class="btn-quick-expiry" data-days="7">+7 дней</button>
+                            </div>
+                            <input type="date" id="productExpiryDate">
+                        </div>
+
+                        <div class="form-group">
+                            <label>Описание <small>(до 2000 символов)</small></label>
+                            <textarea id="productDescription" rows="3"
+                                      maxlength="2000"
+                                      placeholder="Краткое описание товара..."></textarea>
+                        </div>
+
+                        <div class="form-group">
+                            <label>Фото <small>(макс. 10 МБ)</small></label>
+                            <input type="file" id="productPhoto"
+                                   accept="image/jpeg,image/png,image/gif,image/webp"
+                                   style="display:none">
+                            <button type="button" class="btn btn-secondary" onclick="document.getElementById('productPhoto').click()">📷 Выбрать фото</button>
+                            <div id="photoPreview"></div>
+                            <div id="photoProgress" class="photo-progress" style="display:none">
+                                <div class="photo-progress-bar"></div>
+                                <div class="photo-progress-text">Загрузка...</div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="modal-actions">
+                        <button type="button" class="btn btn-secondary" id="cancelProductBtn">Отмена</button>
+                        <button type="submit" class="btn btn-primary">💾 Сохранить</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- CSV Import Modal -->
+        <div id="csvModal" class="modal">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h3>Импорт товаров из CSV</h3>
+                    <button class="modal-close">&times;</button>
+                </div>
+                <div class="csv-import">
+                    <p>Загрузите CSV файл с колонками: название, категория, старая_цена, цена_со_скидкой, количество, единица, срок_годности, описание</p>
+                    <div class="drop-zone" id="dropZone">
+                        <p>📁 Перетащите CSV файл сюда или</p>
+                        <input type="file" id="csvFile" accept=".csv" style="display:none">
+                        <button type="button" class="btn btn-secondary" id="selectCsvBtn">Выбрать файл</button>
+                    </div>
+                    <div id="csvPreview"></div>
+                    <div class="modal-actions">
+                        <button type="button" class="btn btn-secondary" id="cancelCsvBtn">Отмена</button>
+                        <button type="button" class="btn btn-primary" id="importCsvConfirmBtn" disabled>📥 Импортировать</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
