@@ -50,33 +50,27 @@ def get_partner_with_store(telegram_id: int) -> tuple[dict, dict]:
     Raises HTTPException if user doesn't have a store.
     """
     import logging
-    import traceback
     
-    try:
-        db = get_db()
-        logging.info(f"🔍 Looking for user with telegram_id={telegram_id}")
-        
-        user = db.get_user(telegram_id)
-        if not user:
-            logging.error(f"❌ User not found: telegram_id={telegram_id}")
-            raise HTTPException(status_code=403, detail="User not found")
-        
-        logging.info(f"✅ Found user: user_id={user.get('user_id')}, name={user.get('first_name')}")
-
-        # Note: owner_id in stores table contains telegram_id, not user_id
-        store = db.get_store_by_owner(telegram_id)
-        if not store:
-            logging.error(f"❌ No store found for telegram_id={telegram_id}")
-            raise HTTPException(status_code=403, detail="Not a partner - no store found")
-        
-        logging.info(f"✅ Found store: store_id={store.get('store_id')}, name={store.get('name')}")
-        return user, store
-    except HTTPException:
-        raise
-    except Exception as e:
-        logging.error(f"❌ Error in get_partner_with_store: {e}")
-        logging.error(traceback.format_exc())
-        raise HTTPException(status_code=500, detail=f"Internal error: {str(e)}")
+    db = get_db()
+    logging.info(f"🔍 get_partner_with_store called for telegram_id={telegram_id}")
+    
+    user = db.get_user(telegram_id)
+    logging.info(f"📌 get_user returned: {type(user)} - {user}")
+    
+    if not user:
+        logging.error(f"❌ User not found: telegram_id={telegram_id}")
+        raise HTTPException(status_code=403, detail="User not found")
+    
+    # Note: owner_id in stores table contains telegram_id, not user_id
+    store = db.get_store_by_owner(telegram_id)
+    logging.info(f"📌 get_store_by_owner returned: {type(store)} - {store}")
+    
+    if not store:
+        logging.error(f"❌ No store found for telegram_id={telegram_id}")
+        raise HTTPException(status_code=403, detail="Not a partner - no store found")
+    
+    logging.info(f"✅ SUCCESS: user_id={user.get('user_id')}, store_id={store.get('store_id')}")
+    return user, store
 
 
 def verify_telegram_webapp(authorization: str) -> int:
