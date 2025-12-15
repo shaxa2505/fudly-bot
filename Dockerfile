@@ -67,11 +67,16 @@ ENV PYTHONUNBUFFERED=1 \
 # Create non-root user for security
 RUN groupadd -r botuser && useradd -r -g botuser -u 1000 botuser
 
-# Copy application code
+# Copy application code (includes webapp/partner-panel/)
 COPY --chown=botuser:botuser . .
 
 # Copy built frontend from builder
 COPY --from=builder --chown=botuser:botuser /build/webapp/dist ./webapp/dist
+
+# Verify critical files exist
+RUN test -d webapp/dist || (echo "ERROR: webapp/dist not found" && exit 1) && \
+    test -f webapp/partner-panel/index.html || (echo "ERROR: partner-panel not found" && exit 1) && \
+    echo "✅ Frontend files verified"
 
 # Remove unnecessary files
 RUN rm -rf tests/ htmlcov/ .git/ .pytest_cache/ __pycache__/ \

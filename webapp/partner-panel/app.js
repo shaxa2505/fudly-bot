@@ -40,11 +40,12 @@ const API_BASE_URL = (() => {
     
     // ngrok для локального тестирования
     if (hostname.includes('ngrok')) {
-        return 'https://unsplattered-cornelia-cymosely.ngrok-free.dev/api';
+        return `${window.location.origin}/api`;
     }
     
-    // Production Vercel - используем ngrok пока не будет Railway
-    return 'https://unsplattered-cornelia-cymosely.ngrok-free.dev/api';
+    // Production Railway - use relative path (same domain)
+    // Mini App и Partner Panel раздаются с одного сервера
+    return `${window.location.origin}/api`;
 })();
 
 // For development: show API URL in console

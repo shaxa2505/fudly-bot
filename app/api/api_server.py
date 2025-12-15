@@ -107,13 +107,23 @@ def create_api_app(db: Any = None, offer_service: Any = None, bot_token: str = N
     async def root():
         return {"service": "Fudly Mini App API", "version": "1.0.0", "docs": "/api/docs"}
 
-    # Serve static files for Partner Panel (MUST be after all routes)
+    # Serve static files (MUST be after all API routes)
+    webapp_dist_path = Path(__file__).parent.parent.parent / "webapp" / "dist"
     partner_panel_path = Path(__file__).parent.parent.parent / "webapp" / "partner-panel"
+    
+    # Mount Partner Panel
     if partner_panel_path.exists():
         app.mount("/partner-panel", StaticFiles(directory=str(partner_panel_path), html=True), name="partner-panel")
-        logger.info(f"✅ Partner Panel static files mounted from {partner_panel_path}")
+        logger.info(f"✅ Partner Panel mounted from {partner_panel_path}")
     else:
         logger.warning(f"⚠️ Partner Panel not found at {partner_panel_path}")
+    
+    # Mount Mini App (main webapp) - must be last to avoid conflicts
+    if webapp_dist_path.exists():
+        app.mount("/", StaticFiles(directory=str(webapp_dist_path), html=True), name="webapp")
+        logger.info(f"✅ Mini App mounted from {webapp_dist_path}")
+    else:
+        logger.warning(f"⚠️ Mini App dist not found at {webapp_dist_path}")
 
     return app
 
