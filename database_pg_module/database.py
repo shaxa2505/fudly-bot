@@ -61,6 +61,12 @@ class Database(
 
     def __init__(self, database_url=None):
         """Initialize database with connection pool and schema."""
+        import os
+
         super().__init__(database_url)
-        self.init_db()
-        logger.info("✅ Database initialized with all mixins")
+        # Skip init_db if SKIP_DB_INIT is set (for existing databases)
+        if not os.getenv("SKIP_DB_INIT"):
+            self.init_db()
+            logger.info("✅ Database initialized with all mixins")
+        else:
+            logger.info("⏭️  Skipping database initialization (SKIP_DB_INIT=1)")

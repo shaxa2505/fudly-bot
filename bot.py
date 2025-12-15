@@ -721,10 +721,11 @@ async def main() -> None:
     booking_task = await start_booking_worker()
     rating_task = await start_rating_reminder_worker_task()
 
-    # Start API server if enabled
+    # API server is now integrated into webhook server
     api_task = None
-    if ENABLE_API:
-        logger.info("🚀 Starting Mini App API server...")
+    # Standalone API server only for polling mode
+    if ENABLE_API and not USE_WEBHOOK:
+        logger.info("🚀 Starting Mini App API server (polling mode)...")
         api_task = asyncio.create_task(
             run_api_server(
                 db=db, offer_service=offer_service, bot_token=settings.bot_token, port=API_PORT
@@ -748,6 +749,8 @@ async def main() -> None:
             secret_token=SECRET_TOKEN,
             metrics=METRICS,
             db=db,
+            offer_service=offer_service,
+            bot_token=settings.bot_token,
         )
 
         # Start the server (health endpoint now accessible)

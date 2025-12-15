@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import asyncio
 import os
+import sys
 from datetime import datetime
 from typing import Any
 
@@ -129,6 +130,8 @@ async def create_webhook_app(
     secret_token: str | None,
     metrics: dict[str, int],
     db: Any,
+    offer_service: Any = None,
+    bot_token: str = None,
 ) -> web.Application:
     """Create aiohttp web application with webhook handlers."""
     app = web.Application()
@@ -1622,38 +1625,81 @@ async def create_webhook_app(
     app.router.add_post("/api/v1/payment/click/callback", api_click_callback)
     app.router.add_post("/api/v1/payment/payme/callback", api_payme_callback)
 
-    # Partner Panel API - simplified mock for now (will be implemented with real data later)
-    async def partner_profile(request):
-        """Partner profile endpoint"""
-        return web.json_response(
-            {"id": 123, "name": "Demo Store", "phone": "+998901234567", "status": "active"}
-        )
+    # Partner Panel API - FastAPI integration via a2wsgi
+    if offer_service and bot_token:
+        try:
+            from a2wsgi import ASGIMiddleware
 
-    async def partner_stats(request):
-        """Partner statistics endpoint"""
-        return web.json_response(
-            {
-                "today": {"revenue": 0, "orders": 0, "avg_check": 0},
-                "week": {"revenue": 0, "orders": 0, "avg_check": 0},
-                "month": {"revenue": 0, "orders": 0, "avg_check": 0},
-            }
-        )
+            from app.api.api_server import create_api_app
 
-    async def partner_products(request):
-        """Partner products list"""
-        return web.json_response({"products": []})
+            # Create FastAPI app with real Partner Panel endpoints
+            fastapi_app = create_api_app(db, offer_service, bot_token)
 
-    async def partner_orders(request):
-        """Partner orders list"""
-        return web.json_response({"orders": []})
+            # Wrap FastAPI in WSGI middleware
+            wsgi_app = ASGIMiddleware(fastapi_app)
 
-    # Register Partner Panel API routes (mock for now)
-    app.router.add_get("/api/partner/profile", partner_profile)
-    app.router.add_get("/api/partner/stats", partner_stats)
-    app.router.add_get("/api/partner/products", partner_products)
-    app.router.add_get("/api/partner/orders", partner_orders)
+            # Create handler for /api/* routes
+            async def fastapi_handler(request: web.Request) -> web.Response:
+                """Proxy requests to FastAPI app"""
+                # Build WSGI environ
+                environ = {
+                    "REQUEST_METHOD": request.method,
+                    "SCRIPT_NAME": "",
+                    "PATH_INFO": request.path,
+                    "QUERY_STRING": request.query_string,
+                    "CONTENT_TYPE": request.headers.get("Content-Type", ""),
+                    "CONTENT_LENGTH": request.headers.get("Content-Length", ""),
+                    "SERVER_NAME": request.host.split(":")[0],
+                    "SERVER_PORT": str(request.url.port or 80),
+                    "SERVER_PROTOCOL": "HTTP/1.1",
+                    "wsgi.version": (1, 0),
+                    "wsgi.url_scheme": request.url.scheme,
+                    "wsgi.input": request.content,
+                    "wsgi.errors": sys.stderr,
+                    "wsgi.multithread": True,
+                    "wsgi.multiprocess": False,
+                    "wsgi.run_once": False,
+                }
 
-    logger.info("✅ Partner Panel API endpoints registered (mock data)")
+                # Add headers
+                for key, value in request.headers.items():
+                    key = key.upper().replace("-", "_")
+                    if key not in ("CONTENT_TYPE", "CONTENT_LENGTH"):
+                        environ[f"HTTP_{key}"] = value
+
+                # Call WSGI app
+                response_started = False
+                status_code = 200
+                headers_list = []
+
+                def start_response(status, response_headers):
+                    nonlocal response_started, status_code, headers_list
+                    response_started = True
+                    status_code = int(status.split(" ")[0])
+                    headers_list = response_headers
+
+                body_parts = []
+                async for part in wsgi_app(environ, start_response):
+                    if isinstance(part, bytes):
+                        body_parts.append(part)
+                    else:
+                        body_parts.append(part.encode())
+
+                body = b"".join(body_parts)
+                return web.Response(body=body, status=status_code, headers=dict(headers_list))
+
+            # Register handler for all /api/* routes
+            app.router.add_route("*", "/api/{path:.*}", fastapi_handler)
+
+            logger.info("✅ Partner Panel API endpoints registered (FastAPI via a2wsgi)")
+        except ImportError as e:
+            logger.error(f"❌ Failed to import a2wsgi: {e}")
+            logger.warning("⚠️ Partner Panel API will not be available - install a2wsgi")
+        except Exception as e:
+            logger.error(f"❌ Failed to mount FastAPI app: {e}", exc_info=True)
+            logger.warning("⚠️ Partner Panel API will not be available")
+    else:
+        logger.warning("⚠️ Partner Panel API disabled (missing offer_service or bot_token)")
 
     # Setup WebSocket routes for real-time notifications
     setup_websocket_routes(app)

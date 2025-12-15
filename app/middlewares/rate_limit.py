@@ -44,14 +44,15 @@ class RedisRateLimiter:
             self._client = redis.from_url(
                 self.redis_url,
                 decode_responses=True,
-                socket_connect_timeout=2,
-                socket_timeout=2,
+                socket_connect_timeout=1,  # Reduced from 2 to 1 second
+                socket_timeout=1,
             )
             self._client.ping()
             logger.info("✅ Redis rate limiter connected")
-        except Exception as e:
+        except (Exception, KeyboardInterrupt) as e:
             logger.warning(f"⚠️ Redis connection failed: {e}")
             self._client = None
+            # Don't propagate KeyboardInterrupt during init
 
     def is_available(self) -> bool:
         """Check if Redis is available."""

@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>Партнёрская панель</title>
+    <link rel="stylesheet" href="styles.css">
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+</head>
+<body>
+    <!-- Header -->
+    <header class="header">
+        <div class="header-content">
+            <div class="store-avatar">🏪</div>
+            <div class="header-info">
+                <h1 class="store-name" id="storeName">Загрузка...</h1>
+                <div class="store-status">
+                    <span class="status-dot"></span>
+                    <span id="storeStatus">Активен</span>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Content -->
+    <div class="content">
+        <!-- Dashboard View -->
+        <div id="dashboardView" class="view active">
+            <!-- Stats -->
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-icon">💰</div>
+                    <div class="stat-value" id="todayRevenue">0 ₸</div>
+                    <div class="stat-label">Сегодня</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon">🎫</div>
+                    <div class="stat-value" id="todayOrders">0</div>
+                    <div class="stat-label">Заказов</div>
+                </div>
+            </div>
+
+            <!-- Recent Orders -->
+            <div class="section-header">
+                <h2 class="section-title">Заказы</h2>
+                <a href="#" class="section-action" onclick="switchView('orders'); return false;">Все</a>
+            </div>
+            <div id="recentOrders"></div>
+        </div>
+
+        <!-- Products View -->
+        <div id="productsView" class="view">
+            <div class="section-header">
+                <h2 class="section-title">Товары</h2>
+            </div>
+            <div id="productsList"></div>
+
+            <div class="empty-state">
+                <div class="empty-icon">📦</div>
+                <div class="empty-title">Нет товаров</div>
+                <div class="empty-text">Добавьте первый товар через бота</div>
+            </div>
+        </div>
+
+        <!-- Orders View -->
+        <div id="ordersView" class="view">
+            <div class="section-header">
+                <h2 class="section-title">Все заказы</h2>
+            </div>
+            <div id="allOrdersList"></div>
+        </div>
+
+        <!-- Stats View -->
+        <div id="statsView" class="view">
+            <div class="section-header">
+                <h2 class="section-title">Статистика</h2>
+            </div>
+
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-icon">📈</div>
+                    <div class="stat-value" id="weekRevenue">0 ₸</div>
+                    <div class="stat-label">За неделю</div>
+                    <div class="stat-change positive">+0%</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon">📊</div>
+                    <div class="stat-value" id="monthRevenue">0 ₸</div>
+                    <div class="stat-label">За месяц</div>
+                    <div class="stat-change positive">+0%</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon">🎯</div>
+                    <div class="stat-value" id="avgCheck">0 ₸</div>
+                    <div class="stat-label">Средний чек</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon">⭐</div>
+                    <div class="stat-value">0</div>
+                    <div class="stat-label">Рейтинг</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bottom Navigation -->
+    <nav class="tabs">
+        <button class="tab active" onclick="switchView('dashboard')">
+            <div class="tab-icon">🏠</div>
+            <div class="tab-label">Главная</div>
+        </button>
+        <button class="tab" onclick="switchView('products')">
+            <div class="tab-icon">📦</div>
+            <div class="tab-label">Товары</div>
+        </button>
+        <button class="tab" onclick="switchView('orders')">
+            <div class="tab-icon">🎫</div>
+            <div class="tab-label">Заказы</div>
+        </button>
+        <button class="tab" onclick="switchView('stats')">
+            <div class="tab-icon">📊</div>
+            <div class="tab-label">Статистика</div>
+        </button>
+    </nav>
+
+    <script src="app.js"></script>
+</body>
+</html>
