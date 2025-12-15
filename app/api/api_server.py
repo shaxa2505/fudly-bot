@@ -84,24 +84,25 @@ def create_api_app(db: Any = None, offer_service: Any = None, bot_token: str = N
     app.add_middleware(
         CORSMiddleware,
         allow_origins=[
-            # Production domains (постоянные URL)
-            "https://partner-panel-shaxbozs-projects-d385e345.vercel.app",  # Partner Panel постоянный URL
+            # Partner Panel Vercel domains (all variations)
+            "https://partner-panel-shaxbozs-projects-d385e345.vercel.app",
+            "https://partner-panel-ashen.vercel.app",
+            "https://partner-panel-c8nrjy2qb-shaxbozs-projects-d385e345.vercel.app",
+            "https://partner-panel-fudly.vercel.app",
             "https://fudly-partner-panel.vercel.app",
+            # Main webapp
             "https://fudly-webapp.vercel.app",
-            # Telegram
+            # Telegram WebApp
             "https://web.telegram.org",
             "https://telegram.org",
-            # Dev tools
-            "https://*.ngrok-free.dev",
-            "https://*.ngrok-free.app",
-            "https://*.ngrok.io",
-            "https://*.loca.lt",
-            # Local dev
+            # Local development
             "http://localhost:8080",
             "http://localhost:5173",
             "http://localhost:3000",
             "http://localhost:3001",
             "http://localhost:3002",
+            "http://127.0.0.1:5500",
+            "http://127.0.0.1:8080",
         ],
         allow_credentials=True,
         allow_methods=["*"],
