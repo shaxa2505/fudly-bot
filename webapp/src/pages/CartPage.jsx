@@ -135,11 +135,33 @@ function CartPage({ user }) {
     }
   }
 
-  // Open file picker using Telegram WebApp or native input
+  // Open file picker using Telegram WebApp API
   const openFilePicker = () => {
-    const input = document.getElementById('payment-proof-input')
-    if (input) {
-      input.click()
+    if (window.Telegram?.WebApp) {
+      // Use Telegram's native file picker
+      window.Telegram.WebApp.showPopup({
+        title: 'Rasm tanlash',
+        message: 'Chekni yuklash uchun rasmni tanlang',
+        buttons: [
+          { id: 'camera', type: 'default', text: '📷 Kamera' },
+          { id: 'gallery', type: 'default', text: '🖼 Galereya' },
+          { type: 'cancel' }
+        ]
+      }, (buttonId) => {
+        if (buttonId === 'camera' || buttonId === 'gallery') {
+          // Trigger native input after user choice
+          const input = document.getElementById('payment-proof-input')
+          if (input) {
+            input.click()
+          }
+        }
+      })
+    } else {
+      // Fallback for non-Telegram environment
+      const input = document.getElementById('payment-proof-input')
+      if (input) {
+        input.click()
+      }
     }
   }
 
@@ -634,7 +656,6 @@ function CartPage({ user }) {
                               id="payment-proof-input"
                               accept="image/*"
                               onChange={handleFileSelect}
-                              className="file-input-hidden"
                               style={{ display: 'none' }}
                             />
                             <button
