@@ -155,8 +155,14 @@ def verify_telegram_webapp(authorization: str) -> int:
 @router.get("/profile")
 async def get_profile(authorization: str = Header(None)):
     """Get partner profile"""
+    import logging
+    logging.info(f"📋 Profile request with auth: {authorization[:60] if authorization else 'None'}...")
+    
     telegram_id = verify_telegram_webapp(authorization)
+    logging.info(f"✅ Auth verified, telegram_id: {telegram_id}")
+    
     user, store_info = get_partner_with_store(telegram_id)
+    logging.info(f"✅ Got partner with store: {store_info.get('name') if store_info else 'None'}")
 
     return {
         "name": user.get("first_name") or user.get("username") or "Partner",
