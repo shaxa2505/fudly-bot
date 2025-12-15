@@ -515,9 +515,7 @@
             version: tg?.version || 'unknown',
             initDataLength: initData?.length || 0,
             source: initSource,
-            userId: userId
-            initDataUnsafe: !!tg?.initDataUnsafe?.user,
-            userId: tgUser?.id || 'none',
+            userId: userId,
             userName: tgUser?.first_name || 'none'
         };
         console.log('🔍 Telegram Debug:', debugInfo);
