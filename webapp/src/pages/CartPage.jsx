@@ -722,7 +722,6 @@ function CartPage({ user }) {
                     type="file"
                     id="payment-proof-upload-input"
                     accept="image/*,image/jpeg,image/jpg,image/png"
-                    capture="environment"
                     onChange={handleFileSelect}
                     style={{ display: 'none' }}
                   />
