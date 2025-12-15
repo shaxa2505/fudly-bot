@@ -50,12 +50,16 @@ def verify_telegram_webapp(authorization: str) -> int:
     if not authorization:
         raise HTTPException(status_code=401, detail="Missing authorization")
     
-    # Development mode bypass
+    # Development mode bypass - ONLY works in non-production environment
     if authorization.startswith("dev_"):
-        try:
-            return int(authorization.split("_")[1])
-        except:
-            raise HTTPException(status_code=401, detail="Invalid dev auth format")
+        environment = os.getenv("ENVIRONMENT", "production").lower()
+        if environment in ("development", "dev", "local", "test"):
+            try:
+                return int(authorization.split("_")[1])
+            except:
+                raise HTTPException(status_code=401, detail="Invalid dev auth format")
+        else:
+            raise HTTPException(status_code=401, detail="Dev auth not allowed in production")
     
     # Production: verify Telegram signature
     if not authorization.startswith("tma "):
