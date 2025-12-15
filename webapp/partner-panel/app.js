@@ -16,7 +16,7 @@ tg.ready();
 if (tg.themeParams) {
     const root = document.documentElement;
     const isDark = tg.colorScheme === 'dark';
-    
+
     // Set Telegram theme colors as CSS variables
     if (tg.themeParams.bg_color) root.style.setProperty('--tg-bg', tg.themeParams.bg_color);
     if (tg.themeParams.text_color) root.style.setProperty('--tg-text', tg.themeParams.text_color);
@@ -25,10 +25,10 @@ if (tg.themeParams) {
     if (tg.themeParams.button_color) root.style.setProperty('--tg-button', tg.themeParams.button_color);
     if (tg.themeParams.button_text_color) root.style.setProperty('--tg-button-text', tg.themeParams.button_text_color);
     if (tg.themeParams.secondary_bg_color) root.style.setProperty('--tg-secondary-bg', tg.themeParams.secondary_bg_color);
-    
+
     // Apply theme
     document.body.classList.add(isDark ? 'dark-theme' : 'light-theme');
-    
+
     // Override CSS variables to match Telegram theme
     if (isDark) {
         root.style.setProperty('--bg', tg.themeParams.bg_color || '#1a1a1a');
@@ -37,14 +37,14 @@ if (tg.themeParams) {
         root.style.setProperty('--text-light', tg.themeParams.hint_color || '#8e8e93');
         root.style.setProperty('--border', '#3a3a3a');
     }
-    
+
     console.log('🎨 Telegram theme applied:', tg.colorScheme);
 }
 
 // Enable pull-to-refresh
 if (tg.isVersionAtLeast && tg.isVersionAtLeast('7.7')) {
     let isRefreshing = false;
-    
+
     tg.onEvent('viewportChanged', async () => {
         if (!isRefreshing && tg.viewportStableHeight < window.innerHeight - 100) {
             isRefreshing = true;
@@ -61,19 +61,19 @@ const API_BASE_URL = (() => {
     if (typeof PARTNER_API_URL !== 'undefined') {
         return PARTNER_API_URL;
     }
-    
+
     // Auto-detect based on hostname
     const hostname = window.location.hostname;
-    
+
     if (hostname === 'localhost' || hostname === '127.0.0.1') {
         return 'http://localhost:8000/api';
     }
-    
+
     // ngrok для локального тестирования
     if (hostname.includes('ngrok')) {
         return `${window.location.origin}/api`;
     }
-    
+
     // Production Railway - use relative path (same domain)
     // Mini App и Partner Panel раздаются с одного сервера
     return `${window.location.origin}/api`;
@@ -120,7 +120,7 @@ function showToast(message, duration = 2000) {
     toast.className = 'toast';
     toast.textContent = message;
     document.body.appendChild(toast);
-    
+
     setTimeout(() => toast.classList.add('show'), 10);
     setTimeout(() => {
         toast.classList.remove('show');
@@ -150,7 +150,7 @@ async function loadQuickStats() {
             headers: { 'Authorization': getAuthHeader() }
         });
         const data = await response.json();
-        
+
         if (response.ok) {
             document.getElementById('todayOrders').textContent = data.orders || 0;
             document.getElementById('todayRevenue').textContent = formatCurrency(data.revenue || 0);
@@ -192,7 +192,7 @@ function setupEventListeners() {
     });
     document.getElementById('cancelProductBtn').addEventListener('click', () => closeProductModal());
     document.getElementById('productForm').addEventListener('submit', handleProductSubmit);
-    
+
     // Filter events
     document.getElementById('searchProducts').addEventListener('input', filterProducts);
     document.getElementById('filterStatus').addEventListener('change', filterProducts);
@@ -272,7 +272,7 @@ async function loadUserInfo() {
 // Switch view
 function switchView(view) {
     haptic('light'); // Вибрация при переключении вкладок
-    
+
     // Update tabs
     document.querySelectorAll('.tab').forEach(tab => {
         tab.classList.toggle('active', tab.dataset.view === view);
@@ -308,7 +308,7 @@ async function loadView(view) {
 // Load products
 async function loadProducts() {
     const container = document.getElementById('productsList');
-    
+
     // Show skeleton loading
     container.innerHTML = `
         <div class="skeleton skeleton-card"></div>
@@ -351,7 +351,7 @@ async function loadProducts() {
 // Render products
 function renderProducts(items) {
     const container = document.getElementById('productsList');
-    
+
     if (items.length === 0) {
         container.innerHTML = `
             <div class="empty-state">
@@ -367,10 +367,10 @@ function renderProducts(items) {
     }
 
     container.innerHTML = items.map(product => {
-        const discount = product.original_price > product.discount_price 
+        const discount = product.original_price > product.discount_price
             ? Math.round((1 - product.discount_price / product.original_price) * 100)
             : 0;
-        
+
         // Quantity indicator
         let qtyClass = 'quantity-high';
         let qtyIcon = '✅';
@@ -381,7 +381,7 @@ function renderProducts(items) {
             qtyClass = 'quantity-medium';
             qtyIcon = '📦';
         }
-        
+
         return `
         <div class="product-card ${product.status}" data-product-id="${product.offer_id}">
             <div class="card-header">
@@ -400,7 +400,7 @@ function renderProducts(items) {
                     <span class="badge status-badge status-${product.status}">${product.status === 'active' ? '●' : '○'}</span>
                 </div>
                 ${product.expiry_date ? `<div class="expiry-info">⏰ ${new Date(product.expiry_date).toLocaleDateString('ru')}</div>` : ''}
-                
+
                 <div class="quick-controls">
                     <div class="qty-control">
                         <button class="qty-btn" onclick="quickChangeQuantity(${product.offer_id}, -1)">−</button>
@@ -411,7 +411,7 @@ function renderProducts(items) {
                         ${product.status === 'active' ? '👁️' : '🚫'}
                     </button>
                 </div>
-                
+
                 <div class="card-actions">
                     <button class="action-btn primary" onclick="editProduct(${product.offer_id})">
                         <span>✏️</span><span>Изменить</span>
@@ -426,7 +426,7 @@ function renderProducts(items) {
             </div>
         </div>
     `}).join('');
-    
+
     // Load photos asynchronously
     loadProductPhotos();
 }
@@ -434,7 +434,7 @@ function renderProducts(items) {
 // Load product photos asynchronously
 async function loadProductPhotos() {
     const photoElements = document.querySelectorAll('.product-image[data-photo-id]');
-    
+
     for (const el of photoElements) {
         const photoId = el.getAttribute('data-photo-id');
         if (photoId && !photoId.startsWith('placeholder_')) {
@@ -458,7 +458,7 @@ function filterProducts() {
     const sort = document.getElementById('sortProducts').value;
 
     let filtered = products.filter(p => {
-        const matchSearch = p.title.toLowerCase().includes(search) || 
+        const matchSearch = p.title.toLowerCase().includes(search) ||
                           (p.description && p.description.toLowerCase().includes(search));
         const matchStatus = status === 'all' || p.status === status;
         const matchCategory = category === 'all' || p.category === category;
@@ -499,7 +499,7 @@ function openProductModal(product = null) {
     currentProduct = product;
     const modal = document.getElementById('productModal');
     const title = document.getElementById('productModalTitle');
-    
+
     if (product) {
         console.log('Editing existing product:', product.offer_id);
         title.textContent = 'Редактировать товар';
@@ -517,7 +517,7 @@ function openProductModal(product = null) {
         document.getElementById('productForm').reset();
         document.getElementById('photoPreview').innerHTML = '';
     }
-    
+
     modal.classList.add('active');
 }
 
@@ -530,7 +530,7 @@ function closeProductModal() {
 function previewPhoto(e) {
     const file = e.target.files[0];
     const preview = document.getElementById('photoPreview');
-    
+
     if (file) {
         const reader = new FileReader();
         reader.onload = (e) => {
@@ -546,14 +546,14 @@ function previewPhoto(e) {
 async function uploadPhotoToTelegram(file) {
     const formData = new FormData();
     formData.append('photo', file);
-    
+
     try {
         const response = await fetch(`${API_BASE_URL}/partner/upload-photo`, {
             method: 'POST',
             headers: { 'Authorization': getAuthHeader() },
             body: formData
         });
-        
+
         if (response.ok) {
             const result = await response.json();
             return result.file_id;
@@ -573,7 +573,7 @@ async function getPhotoUrl(fileId) {
     if (!fileId || fileId.startsWith('placeholder_')) {
         return null;
     }
-    
+
     try {
         const response = await fetch(`${API_BASE_URL}/partner/photo/${fileId}`);
         if (response.ok) {
@@ -589,7 +589,7 @@ async function getPhotoUrl(fileId) {
 // Validation helper
 function validateProduct(data) {
     const errors = [];
-    
+
     // Title validation
     if (!data.title || data.title.trim().length === 0) {
         errors.push('Название товара обязательно');
@@ -598,25 +598,25 @@ function validateProduct(data) {
     } else if (data.title.length > 200) {
         errors.push('Название не должно превышать 200 символов');
     }
-    
+
     // Price validation
     const discountPrice = parseFloat(data.discount_price);
     const originalPrice = parseFloat(data.original_price || 0);
-    
+
     if (isNaN(discountPrice) || discountPrice <= 0) {
         errors.push('Цена со скидкой должна быть больше 0');
     } else if (discountPrice > 100000000) {
         errors.push('Цена не должна превышать 100,000,000 сум');
     }
-    
+
     if (originalPrice > 0 && originalPrice < discountPrice) {
         errors.push('Оригинальная цена не может быть меньше цены со скидкой');
     }
-    
+
     if (originalPrice > 100000000) {
         errors.push('Оригинальная цена не должна превышать 100,000,000 сум');
     }
-    
+
     // Quantity validation
     const quantity = parseInt(data.quantity);
     if (isNaN(quantity) || quantity < 0) {
@@ -624,30 +624,30 @@ function validateProduct(data) {
     } else if (quantity > 100000) {
         errors.push('Количество не должно превышать 100,000');
     }
-    
+
     // Description validation
     if (data.description && data.description.length > 2000) {
         errors.push('Описание не должно превышать 2000 символов');
     }
-    
+
     // Expiry date validation
     if (data.expiry_date) {
         const expiryDate = new Date(data.expiry_date);
         const now = new Date();
         now.setHours(0, 0, 0, 0);
-        
+
         if (expiryDate < now) {
             errors.push('Срок годности не может быть в прошлом');
         }
     }
-    
+
     return errors;
 }
 
 // Handle product submit
 async function handleProductSubmit(e) {
     e.preventDefault();
-    
+
     // Get form data
     const data = {
         title: document.getElementById('productTitle').value.trim(),
@@ -659,7 +659,7 @@ async function handleProductSubmit(e) {
         expiry_date: document.getElementById('productExpiryDate').value,
         description: document.getElementById('productDescription').value.trim()
     };
-    
+
     // Validate
     const errors = validateProduct(data);
     if (errors.length > 0) {
@@ -668,12 +668,12 @@ async function handleProductSubmit(e) {
         showToast('❌ ' + errors[0]); // Show first error
         return;
     }
-    
+
     console.log('Form data validated successfully:', data);
-    
+
     const formData = new FormData();
     const productId = document.getElementById('productId').value;
-    
+
     formData.append('title', data.title);
     formData.append('category', data.category);
     formData.append('original_price', data.original_price || 0);
@@ -682,11 +682,11 @@ async function handleProductSubmit(e) {
     formData.append('unit', data.unit);
     formData.append('expiry_date', data.expiry_date);
     formData.append('description', data.description);
-    
+
     // Handle photo upload
     const photoFile = document.getElementById('productPhoto').files[0];
     const submitBtn = document.querySelector('#productForm button[type="submit"]');
-    
+
     if (photoFile) {
         // Validate photo size (max 10MB)
         if (photoFile.size > 10 * 1024 * 1024) {
@@ -694,17 +694,17 @@ async function handleProductSubmit(e) {
             showToast('❌ Размер фото не должен превышать 10 МБ');
             return;
         }
-        
+
         // Validate photo type
         if (!photoFile.type.startsWith('image/')) {
             haptic('error');
             showToast('❌ Можно загружать только изображения');
             return;
         }
-        
+
         // Show loading with progress bar
         setButtonLoading(submitBtn, true);
-        
+
         try {
             const fileId = await uploadPhotoWithProgress(photoFile);
             if (fileId) {
@@ -731,10 +731,10 @@ async function handleProductSubmit(e) {
     setButtonLoading(submitBtn, true);
 
     try {
-        const url = productId 
+        const url = productId
             ? `${API_BASE_URL}/partner/products/${productId}`
             : `${API_BASE_URL}/partner/products`;
-        
+
         const response = await fetch(url, {
             method: productId ? 'PUT' : 'POST',
             headers: { 'Authorization': getAuthHeader() },
@@ -779,7 +779,7 @@ window.editProduct = function(productId) {
 // Delete product
 window.deleteProduct = async function(productId) {
     if (!confirm('Удалить товар?')) return;
-    
+
     haptic('medium');
 
     try {
@@ -825,14 +825,14 @@ function handleCsvSelect(e) {
         const text = e.target.result;
         const lines = text.split('\n').filter(l => l.trim());
         const preview = document.getElementById('csvPreview');
-        
+
         preview.innerHTML = `
             <div style="margin:16px 0;padding:12px;background:var(--secondary-bg-color);border-radius:8px;">
                 <strong>📄 ${file.name}</strong><br>
                 <span style="color:var(--hint-color);">Строк: ${lines.length - 1}</span>
             </div>
         `;
-        
+
         document.getElementById('importCsvConfirmBtn').disabled = false;
     };
     reader.readAsText(file);
@@ -844,7 +844,7 @@ async function handleCsvImport() {
 
     const formData = new FormData();
     formData.append('file', file);
-    
+
     haptic('medium');
 
     try {
@@ -879,7 +879,7 @@ async function loadOrders() {
 
     try {
         const status = document.getElementById('filterOrderStatus').value;
-        const url = status === 'all' 
+        const url = status === 'all'
             ? `${API_BASE_URL}/partner/orders`
             : `${API_BASE_URL}/partner/orders?status=${status}`;
 
@@ -897,7 +897,7 @@ async function loadOrders() {
 // Render orders
 function renderOrders(items) {
     const container = document.getElementById('ordersList');
-    
+
     if (items.length === 0) {
         container.innerHTML = '<p style="text-align:center;padding:40px;color:var(--hint-color);">📋 Заказы не найдены</p>';
         return;
@@ -906,7 +906,7 @@ function renderOrders(items) {
     container.innerHTML = items.map(order => {
         const typeIcon = order.type === 'booking' ? '🏪' : '🚚';
         const typeLabel = order.type === 'booking' ? 'Самовывоз' : 'Доставка';
-        
+
         return `
         <div class="order-card">
             <div class="order-header">
@@ -962,7 +962,7 @@ function getOrderStatusText(status) {
 // Confirm order
 window.confirmOrder = async function(orderId, orderType = 'booking') {
     haptic('medium');
-    
+
     try {
         const response = await fetch(`${API_BASE_URL}/partner/orders/${orderId}/confirm?order_type=${orderType}`, {
             method: 'POST',
@@ -987,7 +987,7 @@ window.confirmOrder = async function(orderId, orderType = 'booking') {
 // Cancel order
 window.cancelOrder = async function(orderId, orderType = 'booking') {
     if (!confirm('Отменить заказ?')) return;
-    
+
     haptic('medium');
 
     try {
@@ -1014,7 +1014,7 @@ window.cancelOrder = async function(orderId, orderType = 'booking') {
 // Mark order as ready
 window.markReady = async function(orderId, orderType = 'booking') {
     haptic('medium');
-    
+
     try {
         const newStatus = 'ready';
         const response = await fetch(`${API_BASE_URL}/partner/orders/${orderId}/status?status=${newStatus}&order_type=${orderType}`, {
@@ -1042,7 +1042,7 @@ window.markReady = async function(orderId, orderType = 'booking') {
 // Mark order as delivering
 window.markDelivering = async function(orderId, orderType = 'order') {
     haptic('medium');
-    
+
     try {
         const response = await fetch(`${API_BASE_URL}/partner/orders/${orderId}/status?status=delivering&order_type=${orderType}`, {
             method: 'POST',
@@ -1096,20 +1096,20 @@ window.quickChangeQuantity = async function(offerId, delta) {
         console.error('Product not found:', offerId);
         return;
     }
-    
+
     const newQuantity = Math.max(0, product.quantity + delta);
     console.log('New quantity:', newQuantity);
-    
+
     try {
         const formData = new FormData();
         formData.append('quantity', newQuantity);
-        
+
         const response = await fetch(`${API_BASE_URL}/partner/products/${offerId}`, {
             method: 'PUT',
             headers: { 'Authorization': getAuthHeader() },
             body: formData
         });
-        
+
         if (response.ok) {
             haptic('light');
             product.quantity = newQuantity;
@@ -1144,19 +1144,19 @@ window.quickChangeQuantity = async function(offerId, delta) {
 window.quickToggleStatus = async function(offerId) {
     const product = products.find(p => p.offer_id === offerId);
     if (!product) return;
-    
+
     const newStatus = product.status === 'active' ? 'inactive' : 'active';
-    
+
     try {
         const formData = new FormData();
         formData.append('status', newStatus);
-        
+
         const response = await fetch(`${API_BASE_URL}/partner/products/${offerId}`, {
             method: 'PUT',
             headers: { 'Authorization': getAuthHeader() },
             body: formData
         });
-        
+
         if (response.ok) {
             haptic('light');
             product.status = newStatus;
@@ -1175,7 +1175,7 @@ window.quickToggleStatus = async function(offerId) {
 window.duplicateProduct = async function(offerId) {
     const product = products.find(p => p.offer_id === offerId);
     if (!product) return;
-    
+
     try {
         const formData = new FormData();
         formData.append('title', product.title + ' (копия)');
@@ -1189,13 +1189,13 @@ window.duplicateProduct = async function(offerId) {
         if (product.photo_id) {
             formData.append('photo_id', product.photo_id);
         }
-        
+
         const response = await fetch(`${API_BASE_URL}/partner/products`, {
             method: 'POST',
             headers: { 'Authorization': getAuthHeader() },
             body: formData
         });
-        
+
         if (response.ok) {
             haptic('success');
             showToast('✅ Товар скопирован');
@@ -1224,17 +1224,17 @@ window.toggleProductSelection = function(offerId) {
     } else {
         selectedProducts.add(offerId);
     }
-    
+
     // Update UI
     const card = document.querySelector(`[data-product-id="${offerId}"]`);
     if (card) {
         card.classList.toggle('selected', selectedProducts.has(offerId));
     }
-    
+
     // Show/hide bulk actions bar
     const bulkBar = document.getElementById('bulkActionsBar');
     const countEl = document.getElementById('selectedCount');
-    
+
     if (selectedProducts.size > 0) {
         bulkBar.style.display = 'flex';
         countEl.textContent = `${selectedProducts.size} выбрано`;
@@ -1254,23 +1254,23 @@ window.clearSelection = function() {
 
 window.bulkToggleStatus = async function() {
     if (selectedProducts.size === 0) return;
-    
+
     try {
         const promises = Array.from(selectedProducts).map(offerId => {
             const product = products.find(p => p.offer_id === offerId);
             if (!product) return null;
-            
+
             const newStatus = product.status === 'active' ? 'inactive' : 'active';
             const formData = new FormData();
             formData.append('status', newStatus);
-            
+
             return fetch(`${API_BASE_URL}/partner/products/${offerId}`, {
                 method: 'PUT',
                 headers: { 'Authorization': getAuthHeader() },
                 body: formData
             });
         }).filter(p => p !== null);
-        
+
         await Promise.all(promises);
         haptic('success');
         showToast(`✅ Статус изменён для ${selectedProducts.size} товаров`);
@@ -1286,17 +1286,17 @@ window.bulkToggleStatus = async function() {
 
 window.bulkDelete = async function() {
     if (selectedProducts.size === 0) return;
-    
+
     if (!confirm(`Удалить ${selectedProducts.size} товаров?`)) return;
-    
+
     try {
-        const promises = Array.from(selectedProducts).map(offerId => 
+        const promises = Array.from(selectedProducts).map(offerId =>
             fetch(`${API_BASE_URL}/partner/products/${offerId}`, {
                 method: 'DELETE',
                 headers: { 'Authorization': getAuthHeader() }
             })
         );
-        
+
         await Promise.all(promises);
         haptic('success');
         showToast(`✅ Удалено ${selectedProducts.size} товаров`);
@@ -1317,7 +1317,7 @@ window.bulkDelete = async function() {
 // Render stats
 function renderStats(stats) {
     const container = document.getElementById('statsContent');
-    
+
     container.innerHTML = `
         <div class="stats-grid">
             <div class="stat-card">
@@ -1457,7 +1457,7 @@ function loadFilters() {
 let autoRefreshInterval;
 function startAutoRefresh() {
     if (autoRefreshInterval) clearInterval(autoRefreshInterval);
-    
+
     autoRefreshInterval = setInterval(async () => {
         if (currentView === 'stats') {
             showRefreshIndicator();
@@ -1493,7 +1493,7 @@ function showSuccessIndicator() {
     indicator.className = 'success-indicator';
     indicator.textContent = '✓';
     document.body.appendChild(indicator);
-    
+
     setTimeout(() => {
         indicator.style.opacity = '0';
         indicator.style.transform = 'translate(-50%, -50%) scale(0)';
@@ -1509,19 +1509,19 @@ function addExpiryWarnings() {
     tomorrow.setDate(tomorrow.getDate() + 1);
     const threeDays = new Date(today);
     threeDays.setDate(threeDays.getDate() + 3);
-    
+
     products.forEach(product => {
         if (!product.expiry_date) return;
-        
+
         const expiryDate = new Date(product.expiry_date);
         expiryDate.setHours(0, 0, 0, 0);
-        
+
         const card = document.querySelector(`[data-product-id="${product.offer_id}"]`);
         if (!card) return;
-        
+
         // Удалить старые предупреждения
         card.querySelectorAll('.expiry-warning').forEach(el => el.remove());
-        
+
         if (expiryDate <= today) {
             const warning = document.createElement('div');
             warning.className = 'expiry-warning';
@@ -1546,13 +1546,13 @@ function addLowStockWarnings() {
     products.forEach(product => {
         const card = document.querySelector(`[data-product-id="${product.offer_id}"]`);
         if (!card) return;
-        
+
         const qtyBadge = card.querySelector('.quantity-badge');
         if (!qtyBadge) return;
-        
+
         // Удалить старые метки
         qtyBadge.querySelectorAll('.low-stock-badge, .medium-stock-badge').forEach(el => el.remove());
-        
+
         if (product.quantity === 0) {
             const badge = document.createElement('span');
             badge.className = 'low-stock-badge';
@@ -1577,20 +1577,20 @@ async function uploadPhotoWithProgress(file) {
     const progressEl = document.getElementById('photoProgress');
     const progressBar = progressEl.querySelector('.photo-progress-bar');
     const progressText = progressEl.querySelector('.photo-progress-text');
-    
+
     progressEl.style.display = 'block';
     progressText.textContent = 'Загрузка фото...';
-    
+
     const formData = new FormData();
     formData.append('photo', file);
-    
+
     try {
         const response = await fetch(`${API_BASE_URL}/partner/upload-photo`, {
             method: 'POST',
             headers: { 'Authorization': getAuthHeader() },
             body: formData
         });
-        
+
         if (response.ok) {
             progressText.textContent = '✅ Фото загружено!';
             const result = await response.json();
@@ -1633,7 +1633,7 @@ function setButtonLoading(button, loading) {
 // 9. Загрузка фильтров при инициализации
 setTimeout(() => {
     loadFilters();
-    if (document.getElementById('searchProducts').value || 
+    if (document.getElementById('searchProducts').value ||
         document.getElementById('filterStatus').value !== 'all' ||
         document.getElementById('filterCategory').value !== 'all') {
         filterProducts();
