@@ -82,10 +82,16 @@ def verify_telegram_webapp(authorization: str) -> int:
     3. Dev mode bypass for local development
     """
     import logging
-    logging.info(f"🔐 verify_telegram_webapp called, auth={authorization[:50] if authorization else 'NONE'}...")
+    import sys
+    
+    msg = f"🔐 VERIFY CALLED: auth={authorization[:50] if authorization else 'NONE'}..."
+    logging.info(msg)
+    print(msg, file=sys.stderr, flush=True)
     
     if not authorization:
-        logging.error("❌ No authorization header")
+        err_msg = "❌ No authorization header"
+        logging.error(err_msg)
+        print(err_msg, file=sys.stderr, flush=True)
         raise HTTPException(status_code=401, detail="Missing authorization")
 
     # Development mode bypass - ONLY works in non-production environment
@@ -111,8 +117,11 @@ def verify_telegram_webapp(authorization: str) -> int:
     try:
         parsed = dict(urllib.parse.parse_qsl(init_data))
         import logging
+        import sys
 
-        logging.info(f"🔍 Parsed init_data keys: {list(parsed.keys())}")
+        msg = f"🔍 PARSED KEYS: {list(parsed.keys())}"
+        logging.info(msg)
+        print(msg, file=sys.stderr, flush=True)
 
         # Check if this is URL-based auth (uid passed by bot in WebApp URL)
         # Simple format: uid=123456
@@ -120,7 +129,9 @@ def verify_telegram_webapp(authorization: str) -> int:
             try:
                 user_id = int(parsed.get("uid", 0))
                 if user_id > 0:
-                    logging.info(f"✅ URL-based auth: user_id={user_id}")
+                    msg = f"✅ URL AUTH SUCCESS: user_id={user_id}"
+                    logging.info(msg)
+                    print(msg, file=sys.stderr, flush=True)
                     return user_id
                 else:
                     raise ValueError("uid must be positive")
