@@ -5,10 +5,41 @@ const tg = window.Telegram?.WebApp || {
     initData: '',
     initDataUnsafe: { user: { id: 0 } },
     onEvent: () => {},
-    offEvent: () => {}
+    offEvent: () => {},
+    themeParams: {},
+    colorScheme: 'light'
 };
 tg.expand();
 tg.ready();
+
+// Apply Telegram theme colors
+if (tg.themeParams) {
+    const root = document.documentElement;
+    const isDark = tg.colorScheme === 'dark';
+    
+    // Set Telegram theme colors as CSS variables
+    if (tg.themeParams.bg_color) root.style.setProperty('--tg-bg', tg.themeParams.bg_color);
+    if (tg.themeParams.text_color) root.style.setProperty('--tg-text', tg.themeParams.text_color);
+    if (tg.themeParams.hint_color) root.style.setProperty('--tg-hint', tg.themeParams.hint_color);
+    if (tg.themeParams.link_color) root.style.setProperty('--tg-link', tg.themeParams.link_color);
+    if (tg.themeParams.button_color) root.style.setProperty('--tg-button', tg.themeParams.button_color);
+    if (tg.themeParams.button_text_color) root.style.setProperty('--tg-button-text', tg.themeParams.button_text_color);
+    if (tg.themeParams.secondary_bg_color) root.style.setProperty('--tg-secondary-bg', tg.themeParams.secondary_bg_color);
+    
+    // Apply theme
+    document.body.classList.add(isDark ? 'dark-theme' : 'light-theme');
+    
+    // Override CSS variables to match Telegram theme
+    if (isDark) {
+        root.style.setProperty('--bg', tg.themeParams.bg_color || '#1a1a1a');
+        root.style.setProperty('--surface', tg.themeParams.secondary_bg_color || '#2a2a2a');
+        root.style.setProperty('--text', tg.themeParams.text_color || '#ffffff');
+        root.style.setProperty('--text-light', tg.themeParams.hint_color || '#8e8e93');
+        root.style.setProperty('--border', '#3a3a3a');
+    }
+    
+    console.log('🎨 Telegram theme applied:', tg.colorScheme);
+}
 
 // Enable pull-to-refresh
 if (tg.isVersionAtLeast && tg.isVersionAtLeast('7.7')) {

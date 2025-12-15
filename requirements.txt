@@ -8,7 +8,7 @@ python-dotenv>=0.19.0
 
 # Web server for webhook mode (REQUIRED for Railway)
 aiohttp>=3.9.0
-aiohttp-asgi>=0.7.0              # For mounting FastAPI in aiohttp
+aiohttp-asgi>=0.6.0              # For mounting FastAPI in aiohttp
 
 # FastAPI for Mini App API
 fastapi>=0.109.0
