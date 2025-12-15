@@ -632,8 +632,7 @@ function CartPage({ user }) {
                             <input
                               type="file"
                               id="payment-proof-input"
-                              accept="image/*,image/jpeg,image/jpg,image/png"
-                              capture="environment"
+                              accept="image/*"
                               onChange={handleFileSelect}
                               className="file-input-hidden"
                               style={{ display: 'none' }}
