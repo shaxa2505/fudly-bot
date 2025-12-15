@@ -3,246 +3,163 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Панель партнёра</title>
+    <title>Fudly Partner</title>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        
         :root {
             --primary: #6366f1;
             --primary-dark: #4f46e5;
             --success: #10b981;
             --warning: #f59e0b;
             --danger: #ef4444;
-            --bg: #f8fafc;
-            --surface: #ffffff;
-            --text: #1e293b;
+            --bg: #f1f5f9;
+            --card: #ffffff;
+            --text: #0f172a;
             --text-secondary: #64748b;
             --border: #e2e8f0;
-            --shadow: rgba(0, 0, 0, 0.05);
+            --radius: 16px;
+            --shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1);
         }
-
+        
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
             background: var(--bg);
             color: var(--text);
+            min-height: 100vh;
             padding-bottom: 80px;
-            overflow-x: hidden;
-            transition: background 0.3s, color 0.3s;
         }
-
-        /* Плавные переходы */
-        * {
-            transition: opacity 0.2s, transform 0.2s;
-        }
-
-        /* Поиск */
-        .search-box {
-            padding: 0 0 16px 0;
-            position: sticky;
-            top: 0;
-            background: var(--bg);
-            z-index: 10;
-        }
-
-        .search-box input {
-            width: 100%;
-            padding: 12px 16px;
-            border: 2px solid var(--border);
-            border-radius: 12px;
-            font-size: 15px;
-            background: var(--surface);
-            color: var(--text);
-        }
-
-        .search-box input:focus {
-            outline: none;
-            border-color: var(--primary);
-        }
-
+        
         /* Header */
         .header {
             background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
             color: white;
             padding: 20px;
             text-align: center;
-            box-shadow: 0 4px 12px var(--shadow);
         }
-
-        .header h1 {
-            font-size: 24px;
-            font-weight: 700;
-            margin-bottom: 8px;
-        }
-
-        .header p {
-            opacity: 0.9;
-            font-size: 14px;
-        }
-
-        /* Stats Cards */
+        .header h1 { font-size: 20px; font-weight: 600; }
+        .header p { font-size: 14px; opacity: 0.9; margin-top: 4px; }
+        
+        /* Stats Grid */
         .stats-grid {
             display: grid;
             grid-template-columns: repeat(2, 1fr);
             gap: 12px;
             padding: 16px;
+            margin-top: -20px;
         }
-
         .stat-card {
-            background: var(--surface);
-            border-radius: 16px;
+            background: var(--card);
+            border-radius: var(--radius);
             padding: 16px;
-            box-shadow: 0 2px 8px var(--shadow);
-            border: 1px solid var(--border);
+            box-shadow: var(--shadow);
         }
-
-        .stat-icon {
-            font-size: 32px;
-            margin-bottom: 8px;
-        }
-
-        .stat-value {
-            font-size: 24px;
-            font-weight: 700;
-            color: var(--primary);
-            margin-bottom: 4px;
-        }
-
-        .stat-label {
-            font-size: 13px;
-            color: var(--text-secondary);
-        }
-
+        .stat-value { font-size: 24px; font-weight: 700; color: var(--text); }
+        .stat-label { font-size: 13px; color: var(--text-secondary); margin-top: 4px; }
+        .stat-card.primary { background: var(--primary); }
+        .stat-card.primary .stat-value,
+        .stat-card.primary .stat-label { color: white; }
+        
         /* Section */
-        .section {
-            padding: 16px;
-            display: none;
-        }
-
-        .section.active {
-            display: block;
-        }
-
+        .section { display: none; padding: 16px; }
+        .section.active { display: block; }
         .section-title {
-            font-size: 20px;
-            font-weight: 700;
+            font-size: 18px;
+            font-weight: 600;
             margin-bottom: 16px;
             display: flex;
+            justify-content: space-between;
             align-items: center;
-            gap: 8px;
         }
-
+        
         /* Cards */
         .card {
-            background: var(--surface);
-            border-radius: 16px;
+            background: var(--card);
+            border-radius: var(--radius);
             padding: 16px;
             margin-bottom: 12px;
-            box-shadow: 0 2px 8px var(--shadow);
-            border: 1px solid var(--border);
+            box-shadow: var(--shadow);
         }
-
         .card-header {
             display: flex;
             justify-content: space-between;
-            align-items: flex-start;
-            margin-bottom: 12px;
-        }
-
-        .card-title {
-            font-size: 16px;
-            font-weight: 600;
-            color: var(--text);
-        }
-
-        .card-info {
-            font-size: 14px;
-            color: var(--text-secondary);
+            align-items: center;
             margin-bottom: 8px;
         }
-
-        .badge {
-            display: inline-block;
-            padding: 4px 12px;
+        .card-title { font-weight: 600; font-size: 16px; }
+        .card-subtitle { color: var(--text-secondary); font-size: 14px; }
+        
+        /* Product Card */
+        .product-card {
+            display: flex;
+            gap: 12px;
+            align-items: center;
+        }
+        .product-image {
+            width: 60px;
+            height: 60px;
             border-radius: 12px;
+            background: var(--bg);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+            overflow: hidden;
+        }
+        .product-image img { width: 100%; height: 100%; object-fit: cover; }
+        .product-info { flex: 1; }
+        .product-name { font-weight: 600; margin-bottom: 4px; }
+        .product-price { color: var(--primary); font-weight: 600; }
+        .product-stock { font-size: 13px; color: var(--text-secondary); }
+        .product-status {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: var(--success);
+        }
+        .product-status.inactive { background: var(--text-secondary); }
+        
+        /* Order Card */
+        .order-card { cursor: pointer; }
+        .order-header { display: flex; justify-content: space-between; margin-bottom: 8px; }
+        .order-code { font-weight: 600; font-size: 15px; }
+        .order-status {
             font-size: 12px;
-            font-weight: 600;
+            padding: 4px 8px;
+            border-radius: 20px;
+            font-weight: 500;
         }
-
-        .badge.success {
-            background: #d1fae5;
-            color: var(--success);
-        }
-
-        .badge.warning {
-            background: #fef3c7;
-            color: var(--warning);
-        }
-
-        .badge.danger {
-            background: #fee2e2;
-            color: var(--danger);
-        }
-
+        .order-status.pending { background: #fef3c7; color: #92400e; }
+        .order-status.confirmed { background: #d1fae5; color: #065f46; }
+        .order-status.completed { background: #dbeafe; color: #1e40af; }
+        .order-status.cancelled { background: #fee2e2; color: #991b1b; }
+        .order-info { display: flex; justify-content: space-between; }
+        .order-customer { color: var(--text-secondary); font-size: 14px; }
+        .order-total { font-weight: 600; color: var(--primary); }
+        
         /* Buttons */
         .btn {
-            display: inline-block;
-            padding: 12px 24px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            padding: 12px 20px;
             border-radius: 12px;
-            border: none;
-            font-size: 14px;
+            font-size: 15px;
             font-weight: 600;
+            border: none;
             cursor: pointer;
             transition: all 0.2s;
-            text-decoration: none;
-            text-align: center;
         }
-
         .btn-primary {
             background: var(--primary);
             color: white;
         }
-
-        .btn-primary:active {
-            background: var(--primary-dark);
-            transform: scale(0.98);
-        }
-
-        .btn-success {
-            background: var(--success);
-            color: white;
-        }
-
-        .btn-danger {
-            background: var(--danger);
-            color: white;
-        }
-
-        .btn-sm {
-            padding: 8px 16px;
-            font-size: 13px;
-        }
-
-        .btn-block {
-            display: block;
-            width: 100%;
-        }
-
-        .btn-group {
-            display: flex;
-            gap: 8px;
-            margin-top: 12px;
-        }
-
-        .btn-group .btn {
-            flex: 1;
-        }
-
-        /* FAB Button */
+        .btn-primary:active { background: var(--primary-dark); }
+        .btn-sm { padding: 8px 12px; font-size: 13px; }
+        
+        /* FAB */
         .fab {
             position: fixed;
             bottom: 90px;
@@ -250,154 +167,45 @@
             width: 56px;
             height: 56px;
             border-radius: 50%;
-            background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
+            background: var(--primary);
             color: white;
+            font-size: 28px;
             border: none;
-            font-size: 24px;
-            cursor: pointer;
             box-shadow: 0 4px 12px rgba(99, 102, 241, 0.4);
-            transition: transform 0.2s;
+            cursor: pointer;
             z-index: 100;
         }
-
-        .fab:active {
-            transform: scale(0.95);
-        }
-
-        /* Bottom Navigation */
+        .fab:active { transform: scale(0.95); }
+        
+        /* Bottom Nav */
         .bottom-nav {
             position: fixed;
             bottom: 0;
             left: 0;
             right: 0;
-            background: var(--surface);
-            border-top: 1px solid var(--border);
+            background: var(--card);
             display: flex;
-            padding: 8px 0;
-            box-shadow: 0 -2px 12px var(--shadow);
-            z-index: 1000;
+            justify-content: space-around;
+            padding: 8px 0 12px;
+            border-top: 1px solid var(--border);
+            z-index: 100;
         }
-
         .nav-item {
-            flex: 1;
             display: flex;
             flex-direction: column;
             align-items: center;
             gap: 4px;
-            padding: 8px;
+            padding: 8px 16px;
             color: var(--text-secondary);
             text-decoration: none;
+            font-size: 12px;
             cursor: pointer;
-            transition: all 0.2s;
             border: none;
             background: none;
         }
-
-        .nav-item.active {
-            color: var(--primary);
-        }
-
-        .nav-icon {
-            font-size: 24px;
-        }
-
-        .nav-label {
-            font-size: 11px;
-            font-weight: 600;
-        }
-
-        /* Empty State */
-        .empty-state {
-            text-align: center;
-            padding: 60px 20px;
-        }
-
-        .empty-icon {
-            font-size: 64px;
-            opacity: 0.3;
-            margin-bottom: 16px;
-        }
-
-        .empty-text {
-            font-size: 16px;
-            color: var(--text-secondary);
-            margin-bottom: 20px;
-        }
-
-        /* Loading */
-        .loading {
-            text-align: center;
-            padding: 40px;
-            color: var(--text-secondary);
-        }
-
-        .spinner {
-            display: inline-block;
-            width: 40px;
-            height: 40px;
-            border: 4px solid var(--border);
-            border-top-color: var(--primary);
-            border-radius: 50%;
-            animation: spin 1s linear infinite;
-        }
-
-        @keyframes spin {
-            to { transform: rotate(360deg); }
-        }
-
-        /* Toast */
-        .toast {
-            position: fixed;
-            bottom: 100px;
-            left: 50%;
-            transform: translateX(-50%);
-            background: rgba(0, 0, 0, 0.85);
-            color: white;
-            padding: 12px 24px;
-            border-radius: 24px;
-            font-size: 14px;
-            z-index: 2000;
-            animation: slideUp 0.3s ease;
-        }
-
-        @keyframes slideUp {
-            from {
-                opacity: 0;
-                transform: translateX(-50%) translateY(20px);
-            }
-            to {
-                opacity: 1;
-                transform: translateX(-50%) translateY(0);
-            }
-        }
-
-        /* Form */
-        .form-group {
-            margin-bottom: 16px;
-        }
-
-        .form-label {
-            display: block;
-            font-size: 14px;
-            font-weight: 600;
-            color: var(--text);
-            margin-bottom: 8px;
-        }
-
-        .form-input {
-            width: 100%;
-            padding: 12px 16px;
-            border: 2px solid var(--border);
-            border-radius: 12px;
-            font-size: 14px;
-            transition: border-color 0.2s;
-        }
-
-        .form-input:focus {
-            outline: none;
-            border-color: var(--primary);
-        }
-
+        .nav-item.active { color: var(--primary); }
+        .nav-icon { font-size: 22px; }
+        
         /* Modal */
         .modal {
             display: none;
@@ -406,190 +214,520 @@
             left: 0;
             right: 0;
             bottom: 0;
-            background: rgba(0, 0, 0, 0.5);
-            z-index: 3000;
-            animation: fadeIn 0.2s;
+            background: rgba(0,0,0,0.5);
+            z-index: 200;
+            align-items: flex-end;
         }
-
-        .modal.show {
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            padding: 20px;
-        }
-
+        .modal.active { display: flex; }
         .modal-content {
-            background: var(--surface);
-            border-radius: 20px;
-            padding: 24px;
+            background: var(--card);
             width: 100%;
-            max-width: 400px;
-            max-height: 80vh;
+            max-height: 90vh;
+            border-radius: 20px 20px 0 0;
+            padding: 20px;
             overflow-y: auto;
-            animation: slideUpModal 0.3s;
+            animation: slideUp 0.3s ease;
         }
-
-        @keyframes fadeIn {
-            from { opacity: 0; }
-            to { opacity: 1; }
+        @keyframes slideUp {
+            from { transform: translateY(100%); }
+            to { transform: translateY(0); }
         }
-
-        @keyframes slideUpModal {
-            from {
-                opacity: 0;
-                transform: translateY(50px);
-            }
-            to {
-                opacity: 1;
-                transform: translateY(0);
-            }
-        }
-
         .modal-header {
             display: flex;
             justify-content: space-between;
             align-items: center;
             margin-bottom: 20px;
         }
-
-        .modal-title {
-            font-size: 20px;
-            font-weight: 700;
-        }
-
+        .modal-title { font-size: 18px; font-weight: 600; }
         .modal-close {
-            background: none;
-            border: none;
-            font-size: 28px;
-            color: var(--text-secondary);
-            cursor: pointer;
-            padding: 0;
             width: 32px;
             height: 32px;
+            border-radius: 50%;
+            background: var(--bg);
+            border: none;
+            font-size: 18px;
+            cursor: pointer;
         }
+        
+        /* Form */
+        .form-group { margin-bottom: 16px; }
+        .form-label {
+            display: block;
+            font-size: 14px;
+            font-weight: 500;
+            margin-bottom: 8px;
+            color: var(--text-secondary);
+        }
+        .form-input {
+            width: 100%;
+            padding: 14px 16px;
+            border: 2px solid var(--border);
+            border-radius: 12px;
+            font-size: 16px;
+            transition: border-color 0.2s;
+        }
+        .form-input:focus {
+            outline: none;
+            border-color: var(--primary);
+        }
+        
+        /* Empty State */
+        .empty-state {
+            text-align: center;
+            padding: 40px 20px;
+            color: var(--text-secondary);
+        }
+        .empty-state-icon { font-size: 48px; margin-bottom: 16px; }
+        
+        /* Toast */
+        .toast {
+            position: fixed;
+            bottom: 100px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: var(--text);
+            color: white;
+            padding: 12px 24px;
+            border-radius: 100px;
+            font-size: 14px;
+            z-index: 300;
+            animation: fadeIn 0.3s;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translate(-50%, 10px); }
+            to { opacity: 1; transform: translate(-50%, 0); }
+        }
+        
+        /* Loading */
+        .loading {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 40px;
+        }
+        .spinner {
+            width: 40px;
+            height: 40px;
+            border: 3px solid var(--border);
+            border-top-color: var(--primary);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        
+        /* Error State */
+        .error-state {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 80vh;
+            text-align: center;
+            padding: 20px;
+        }
+        .error-state-icon { font-size: 64px; margin-bottom: 20px; }
+        .error-state h2 { margin-bottom: 10px; }
+        .error-state p { color: var(--text-secondary); margin-bottom: 20px; }
     </style>
 </head>
 <body>
     <!-- Header -->
-    <div class="header">
-        <h1>👨‍💼 Панель партнёра</h1>
+    <header class="header">
+        <h1>🏪 Панель партнёра</h1>
         <p id="storeName">Загрузка...</p>
-    </div>
-
-    <!-- Dashboard Section -->
-    <div id="dashboard" class="section active">
+    </header>
+    
+    <!-- Dashboard -->
+    <section id="dashboard" class="section active">
         <div class="stats-grid">
-            <div class="stat-card">
-                <div class="stat-icon">💰</div>
+            <div class="stat-card primary">
                 <div class="stat-value" id="todayRevenue">-</div>
                 <div class="stat-label">Выручка сегодня</div>
             </div>
             <div class="stat-card">
-                <div class="stat-icon">🧾</div>
                 <div class="stat-value" id="todayOrders">-</div>
                 <div class="stat-label">Заказов сегодня</div>
             </div>
             <div class="stat-card">
-                <div class="stat-icon">📦</div>
                 <div class="stat-value" id="totalProducts">-</div>
                 <div class="stat-label">Всего товаров</div>
             </div>
             <div class="stat-card">
-                <div class="stat-icon">⏳</div>
                 <div class="stat-value" id="pendingOrders">-</div>
                 <div class="stat-label">Ждут обработки</div>
             </div>
         </div>
-    </div>
-
-    <!-- Products Section -->
-    <div id="products" class="section">
-        <div class="section-title">
-            📦 Товары
-        </div>
-        <div id="productsContent">
-            <div class="loading">
-                <div class="spinner"></div>
+        
+        <div style="padding: 0 16px;">
+            <div class="section-title">Последние заказы</div>
+            <div id="recentOrders">
+                <div class="loading"><div class="spinner"></div></div>
             </div>
         </div>
-    </div>
-
-    <!-- Orders Section -->
-    <div id="orders" class="section">
+    </section>
+    
+    <!-- Products -->
+    <section id="products" class="section">
         <div class="section-title">
-            🎫 Заказы
+            Мои товары
+            <button class="btn btn-primary btn-sm" onclick="showAddProduct()">+ Добавить</button>
         </div>
-        <div id="ordersContent">
-            <div class="loading">
-                <div class="spinner"></div>
-            </div>
+        <div id="productsList">
+            <div class="loading"><div class="spinner"></div></div>
         </div>
-    </div>
-
-    <!-- Stats Section -->
-    <div id="stats" class="section">
-        <div class="section-title">
-            📊 Статистика
+    </section>
+    
+    <!-- Orders -->
+    <section id="orders" class="section">
+        <div class="section-title">Все заказы</div>
+        <div id="ordersList">
+            <div class="loading"><div class="spinner"></div></div>
         </div>
+    </section>
+    
+    <!-- Stats -->
+    <section id="stats" class="section">
+        <div class="section-title">Статистика</div>
         <div id="statsContent">
-            <div class="loading">
-                <div class="spinner"></div>
-            </div>
+            <div class="loading"><div class="spinner"></div></div>
         </div>
-    </div>
-
-    <!-- FAB Button -->
-    <button class="fab" onclick="openAddProductModal()">+</button>
-
+    </section>
+    
+    <!-- FAB -->
+    <button class="fab" onclick="showAddProduct()" id="fab">+</button>
+    
     <!-- Bottom Navigation -->
     <nav class="bottom-nav">
-        <button class="nav-item active" onclick="switchView('dashboard')">
-            <div class="nav-icon">🏠</div>
-            <div class="nav-label">Главная</div>
+        <button class="nav-item active" onclick="switchView('dashboard', this)">
+            <span class="nav-icon">🏠</span>
+            <span>Главная</span>
         </button>
-        <button class="nav-item" onclick="switchView('products')">
-            <div class="nav-icon">📦</div>
-            <div class="nav-label">Товары</div>
+        <button class="nav-item" onclick="switchView('products', this)">
+            <span class="nav-icon">📦</span>
+            <span>Товары</span>
         </button>
-        <button class="nav-item" onclick="switchView('orders')">
-            <div class="nav-icon">🎫</div>
-            <div class="nav-label">Заказы</div>
+        <button class="nav-item" onclick="switchView('orders', this)">
+            <span class="nav-icon">📋</span>
+            <span>Заказы</span>
         </button>
-        <button class="nav-item" onclick="switchView('stats')">
-            <div class="nav-icon">📊</div>
-            <div class="nav-label">Статистика</div>
+        <button class="nav-item" onclick="switchView('stats', this)">
+            <span class="nav-icon">📊</span>
+            <span>Статистика</span>
         </button>
     </nav>
-
+    
     <!-- Add Product Modal -->
-    <div id="addProductModal" class="modal">
+    <div class="modal" id="productModal">
         <div class="modal-content">
             <div class="modal-header">
-                <div class="modal-title">➕ Добавить товар</div>
-                <button class="modal-close" onclick="closeAddProductModal()">&times;</button>
+                <h3 class="modal-title" id="modalTitle">Добавить товар</h3>
+                <button class="modal-close" onclick="closeModal()">✕</button>
             </div>
-            <form id="productForm" onsubmit="addProduct(event)">
+            <form id="productForm">
+                <input type="hidden" id="productId">
                 <div class="form-group">
-                    <label class="form-label">Название товара *</label>
-                    <input type="text" class="form-input" id="productTitle" required>
+                    <label class="form-label">Название *</label>
+                    <input type="text" class="form-input" id="productTitle" required placeholder="Например: Пицца Маргарита">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Категория</label>
+                    <input type="text" class="form-input" id="productCategory" placeholder="Например: Пицца">
                 </div>
                 <div class="form-group">
                     <label class="form-label">Цена (сум) *</label>
-                    <input type="number" class="form-input" id="productPrice" required min="0">
+                    <input type="number" class="form-input" id="productPrice" required placeholder="35000">
                 </div>
                 <div class="form-group">
                     <label class="form-label">Количество *</label>
-                    <input type="number" class="form-input" id="productQuantity" required min="1" value="1">
+                    <input type="number" class="form-input" id="productQuantity" required placeholder="10" value="10">
                 </div>
                 <div class="form-group">
                     <label class="form-label">Описание</label>
-                    <input type="text" class="form-input" id="productDescription">
+                    <input type="text" class="form-input" id="productDescription" placeholder="Краткое описание товара">
                 </div>
-                <button type="submit" class="btn btn-primary btn-block">Добавить товар</button>
+                <button type="submit" class="btn btn-primary" style="width: 100%;">Сохранить</button>
             </form>
         </div>
     </div>
 
-    <script src="app.js"></script>
+    <script>
+        // ============================================
+        // Fudly Partner Panel
+        // ============================================
+        
+        const tg = window.Telegram?.WebApp;
+        if (tg) { tg.ready(); tg.expand(); }
+        
+        const API = 'https://fudly-bot-production.up.railway.app/api/partner';
+        const getAuth = () => tg?.initData ? `tma ${tg.initData}` : '';
+        
+        let products = [];
+        let orders = [];
+        
+        // ============================================
+        // API
+        // ============================================
+        async function api(endpoint, options = {}) {
+            console.log(`📡 ${options.method || 'GET'} ${endpoint}`);
+            try {
+                const res = await fetch(`${API}${endpoint}`, {
+                    ...options,
+                    headers: { 'Authorization': getAuth(), 'Content-Type': 'application/json', ...options.headers }
+                });
+                
+                if (!res.ok) {
+                    const err = await res.json().catch(() => ({}));
+                    if (res.status === 401) return showError('Ошибка авторизации', 'Откройте через меню бота');
+                    if (res.status === 403) return showError('Нет доступа', err.detail || 'Вы не партнёр');
+                    throw new Error(err.detail || res.status);
+                }
+                return res.json();
+            } catch (e) {
+                console.error(e);
+                toast('❌ Ошибка сети');
+                throw e;
+            }
+        }
+        
+        // ============================================
+        // UI Helpers
+        // ============================================
+        function toast(msg) {
+            document.querySelectorAll('.toast').forEach(t => t.remove());
+            const t = document.createElement('div');
+            t.className = 'toast';
+            t.textContent = msg;
+            document.body.appendChild(t);
+            setTimeout(() => t.remove(), 3000);
+        }
+        
+        function showError(title, msg) {
+            document.body.innerHTML = `
+                <div class="error-state">
+                    <div class="error-state-icon">⚠️</div>
+                    <h2>${title}</h2>
+                    <p>${msg}</p>
+                    <button class="btn btn-primary" onclick="location.reload()">Попробовать снова</button>
+                </div>
+            `;
+        }
+        
+        function money(n) { return new Intl.NumberFormat('ru-RU').format(n || 0) + ' сум'; }
+        function date(d) { return d ? new Date(d).toLocaleDateString('ru-RU', {day:'numeric', month:'short', hour:'2-digit', minute:'2-digit'}) : '-'; }
+        function esc(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+        
+        // ============================================
+        // Views
+        // ============================================
+        function switchView(view, btn) {
+            document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+            document.getElementById(view)?.classList.add('active');
+            document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+            btn?.classList.add('active');
+            document.getElementById('fab').style.display = view === 'products' || view === 'dashboard' ? 'block' : 'none';
+            
+            if (view === 'dashboard') loadDashboard();
+            if (view === 'products') loadProducts();
+            if (view === 'orders') loadOrders();
+            if (view === 'stats') loadStats();
+        }
+        
+        // ============================================
+        // Dashboard
+        // ============================================
+        async function loadDashboard() {
+            try {
+                const [profile, prods, ords, stats] = await Promise.all([
+                    api('/profile'), api('/products'), api('/orders'), api('/stats?period=today')
+                ]);
+                
+                document.getElementById('storeName').textContent = profile?.store_name || 'Мой магазин';
+                document.getElementById('todayRevenue').textContent = money(stats?.revenue);
+                document.getElementById('todayOrders').textContent = stats?.orders_count || 0;
+                document.getElementById('totalProducts').textContent = prods?.length || 0;
+                document.getElementById('pendingOrders').textContent = ords?.filter(o => o.status === 'pending')?.length || 0;
+                
+                products = prods || [];
+                orders = ords || [];
+                
+                renderRecentOrders();
+            } catch (e) { console.error('Dashboard error:', e); }
+        }
+        
+        function renderRecentOrders() {
+            const c = document.getElementById('recentOrders');
+            const recent = orders.slice(0, 3);
+            if (!recent.length) {
+                c.innerHTML = '<div class="empty-state"><div class="empty-state-icon">📋</div><p>Нет заказов</p></div>';
+                return;
+            }
+            c.innerHTML = recent.map(o => orderCard(o)).join('');
+        }
+        
+        // ============================================
+        // Products
+        // ============================================
+        async function loadProducts() {
+            try {
+                products = await api('/products') || [];
+                renderProducts();
+            } catch (e) {}
+        }
+        
+        function renderProducts() {
+            const c = document.getElementById('productsList');
+            if (!products.length) {
+                c.innerHTML = '<div class="empty-state"><div class="empty-state-icon">📦</div><p>Нет товаров</p><p style="font-size:14px">Нажмите + чтобы добавить</p></div>';
+                return;
+            }
+            c.innerHTML = products.map(p => `
+                <div class="card product-card" onclick="editProduct(${p.offer_id})">
+                    <div class="product-image">${p.photo_id ? `<img src="${API}/photo/${p.photo_id}">` : '📦'}</div>
+                    <div class="product-info">
+                        <div class="product-name">${esc(p.title || 'Без названия')}</div>
+                        <div class="product-price">${money(p.discount_price)}</div>
+                        <div class="product-stock">${p.quantity} шт</div>
+                    </div>
+                    <div class="product-status ${p.status !== 'active' ? 'inactive' : ''}"></div>
+                </div>
+            `).join('');
+        }
+        
+        // ============================================
+        // Orders
+        // ============================================
+        async function loadOrders() {
+            try {
+                orders = await api('/orders') || [];
+                renderOrders();
+            } catch (e) {}
+        }
+        
+        function renderOrders() {
+            const c = document.getElementById('ordersList');
+            if (!orders.length) {
+                c.innerHTML = '<div class="empty-state"><div class="empty-state-icon">📋</div><p>Нет заказов</p></div>';
+                return;
+            }
+            c.innerHTML = orders.map(o => orderCard(o)).join('');
+        }
+        
+        function orderCard(o) {
+            const status = {pending:'Ожидает', confirmed:'Подтверждён', completed:'Завершён', cancelled:'Отменён'};
+            return `
+                <div class="card order-card">
+                    <div class="order-header">
+                        <span class="order-code">#${o.booking_code || o.order_id || '-'}</span>
+                        <span class="order-status ${o.status}">${status[o.status] || o.status}</span>
+                    </div>
+                    <div class="order-info">
+                        <span class="order-customer">${esc(o.customer_name || 'Клиент')}</span>
+                        <span class="order-total">${money(o.total_amount)}</span>
+                    </div>
+                </div>
+            `;
+        }
+        
+        // ============================================
+        // Stats
+        // ============================================
+        async function loadStats() {
+            try {
+                const [today, week, month] = await Promise.all([
+                    api('/stats?period=today'), api('/stats?period=week'), api('/stats?period=month')
+                ]);
+                
+                document.getElementById('statsContent').innerHTML = `
+                    <div class="card">
+                        <div class="card-header"><span class="card-title">📅 Сегодня</span></div>
+                        <div style="display:flex;justify-content:space-between;margin-top:8px">
+                            <span>Выручка</span><strong>${money(today?.revenue)}</strong>
+                        </div>
+                        <div style="display:flex;justify-content:space-between;margin-top:8px">
+                            <span>Заказов</span><strong>${today?.orders_count || 0}</strong>
+                        </div>
+                    </div>
+                    <div class="card">
+                        <div class="card-header"><span class="card-title">📆 Неделя</span></div>
+                        <div style="display:flex;justify-content:space-between;margin-top:8px">
+                            <span>Выручка</span><strong>${money(week?.revenue)}</strong>
+                        </div>
+                        <div style="display:flex;justify-content:space-between;margin-top:8px">
+                            <span>Заказов</span><strong>${week?.orders_count || 0}</strong>
+                        </div>
+                    </div>
+                    <div class="card">
+                        <div class="card-header"><span class="card-title">🗓 Месяц</span></div>
+                        <div style="display:flex;justify-content:space-between;margin-top:8px">
+                            <span>Выручка</span><strong>${money(month?.revenue)}</strong>
+                        </div>
+                        <div style="display:flex;justify-content:space-between;margin-top:8px">
+                            <span>Заказов</span><strong>${month?.orders_count || 0}</strong>
+                        </div>
+                    </div>
+                `;
+            } catch (e) {}
+        }
+        
+        // ============================================
+        // Product Modal
+        // ============================================
+        function showAddProduct() {
+            document.getElementById('modalTitle').textContent = 'Добавить товар';
+            document.getElementById('productForm').reset();
+            document.getElementById('productId').value = '';
+            document.getElementById('productModal').classList.add('active');
+        }
+        
+        function editProduct(id) {
+            const p = products.find(x => x.offer_id === id);
+            if (!p) return;
+            document.getElementById('modalTitle').textContent = 'Редактировать';
+            document.getElementById('productId').value = id;
+            document.getElementById('productTitle').value = p.title || '';
+            document.getElementById('productCategory').value = p.category || '';
+            document.getElementById('productPrice').value = p.discount_price || '';
+            document.getElementById('productQuantity').value = p.quantity || 0;
+            document.getElementById('productDescription').value = p.description || '';
+            document.getElementById('productModal').classList.add('active');
+        }
+        
+        function closeModal() {
+            document.getElementById('productModal').classList.remove('active');
+        }
+        
+        document.getElementById('productForm').onsubmit = async (e) => {
+            e.preventDefault();
+            const id = document.getElementById('productId').value;
+            const data = new FormData();
+            data.append('title', document.getElementById('productTitle').value);
+            data.append('category', document.getElementById('productCategory').value);
+            data.append('discount_price', document.getElementById('productPrice').value);
+            data.append('quantity', document.getElementById('productQuantity').value);
+            data.append('description', document.getElementById('productDescription').value);
+            
+            try {
+                await fetch(`${API}${id ? `/products/${id}` : '/products'}`, {
+                    method: id ? 'PUT' : 'POST',
+                    headers: { 'Authorization': getAuth() },
+                    body: data
+                });
+                toast(id ? '✅ Обновлено' : '✅ Добавлено');
+                closeModal();
+                loadProducts();
+            } catch (e) { toast('❌ Ошибка'); }
+        };
+        
+        // Close modal on backdrop click
+        document.getElementById('productModal').onclick = (e) => {
+            if (e.target.classList.contains('modal')) closeModal();
+        };
+        
+        // ============================================
+        // Init
+        // ============================================
+        console.log('🚀 Partner Panel', { telegram: !!tg, initData: tg?.initData?.length || 0 });
+        loadDashboard();
+    </script>
 </body>
 </html>
