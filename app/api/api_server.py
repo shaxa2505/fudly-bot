@@ -75,21 +75,25 @@ def create_api_app(db: Any = None, offer_service: Any = None, bot_token: str = N
     app.add_middleware(
         CORSMiddleware,
         allow_origins=[
+            # Production domains
             "https://fudly-partner-panel.vercel.app",
+            "https://partner-panel-ga0n5wsg8-shaxbozs-projects-d385e345.vercel.app",  # Текущий деплой
+            "https://partner-panel-nyk9q0ttb-shaxbozs-projects-d385e345.vercel.app",
             "https://fudly-webapp.vercel.app",
+            # Telegram
             "https://web.telegram.org",
             "https://telegram.org",
-            "https://*.ngrok-free.dev",  # ngrok для локального тестирования
-            "https://*.ngrok-free.app",  # ngrok для локального тестирования
-            "https://*.ngrok.io",  # ngrok альтернативный домен
-            "https://*.loca.lt",  # localtunnel для локального тестирования
-            "https://partner-panel-nyk9q0ttb-shaxbozs-projects-d385e345.vercel.app",  # Vercel production
-            "https://*.vercel.app",  # Все Vercel домены
-            "http://localhost:8080",  # Partner panel dev server
-            "http://localhost:5173",  # Vite dev server
-            "http://localhost:3000",  # Vite dev server
-            "http://localhost:3001",  # Vite dev server (alt port)
-            "http://localhost:3002",  # Vite dev server (current port)
+            # Dev tools
+            "https://*.ngrok-free.dev",
+            "https://*.ngrok-free.app",
+            "https://*.ngrok.io",
+            "https://*.loca.lt",
+            # Local dev
+            "http://localhost:8080",
+            "http://localhost:5173",
+            "http://localhost:3000",
+            "http://localhost:3001",
+            "http://localhost:3002",
         ],
         allow_credentials=True,
         allow_methods=["*"],
