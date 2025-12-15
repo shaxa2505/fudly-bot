@@ -15,7 +15,22 @@ const API_URL = window.location.hostname === 'localhost'
 
 // Auth
 const isDevMode = !tg.initData && window.location.hostname === 'localhost';
+const isTelegramWebApp = !!window.Telegram?.WebApp?.initData;
 let devTelegramId = null;
+
+// Check if opened outside Telegram
+if (!isTelegramWebApp && !isDevMode) {
+    console.error('❌ Partner Panel must be opened from Telegram');
+    document.body.innerHTML = `
+        <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100vh;text-align:center;padding:20px;background:#1a1a2e;color:white;font-family:system-ui">
+            <div style="font-size:64px;margin-bottom:20px">🔐</div>
+            <h1 style="margin:0 0 10px">Панель партнёра</h1>
+            <p style="color:#aaa;margin:0 0 20px">Откройте через Telegram бот</p>
+            <a href="https://t.me/FudlyBot" style="background:#0088cc;color:white;padding:12px 24px;border-radius:8px;text-decoration:none">Открыть бот</a>
+        </div>
+    `;
+    throw new Error('Not in Telegram WebApp');
+}
 
 if (isDevMode) {
     devTelegramId = prompt('Введите ваш Telegram ID:', '253445521');
