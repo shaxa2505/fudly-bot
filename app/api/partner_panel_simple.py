@@ -42,6 +42,25 @@ def get_db() -> DatabaseProtocol:
     return _db
 
 
+def get_partner_with_store(telegram_id: int) -> tuple[dict, dict]:
+    """
+    Get user and their store by telegram_id.
+    A partner is defined by having a store (in stores table), not by role in users table.
+    Returns (user, store) tuple.
+    Raises HTTPException if user doesn't have a store.
+    """
+    db = get_db()
+    user = db.get_user(telegram_id)
+    if not user:
+        raise HTTPException(status_code=403, detail="User not found")
+    
+    store = db.get_store_by_owner(user['user_id'])
+    if not store:
+        raise HTTPException(status_code=403, detail="Not a partner - no store found")
+    
+    return user, store
+
+
 def verify_telegram_webapp(authorization: str) -> int:
     """
     Verify Telegram WebApp auth and return telegram_id.
@@ -97,14 +116,7 @@ def verify_telegram_webapp(authorization: str) -> int:
 async def get_profile(authorization: str = Header(None)):
     """Get partner profile"""
     telegram_id = verify_telegram_webapp(authorization)
-    db = get_db()
-    
-    user = db.get_user(telegram_id)
-    if not user or user.get('role') != 'seller':
-        raise HTTPException(status_code=403, detail="Not a partner")
-    
-    # Get store info
-    store_info = db.get_store_by_owner(user['user_id'])
+    user, store_info = get_partner_with_store(telegram_id)
     
     return {
         "name": user.get('first_name') or user.get('username') or 'Partner',
@@ -127,16 +139,8 @@ async def list_products(
 ):
     """List partner's products"""
     telegram_id = verify_telegram_webapp(authorization)
+    user, store = get_partner_with_store(telegram_id)
     db = get_db()
-    
-    user = db.get_user(telegram_id)
-    if not user or user.get('role') != 'seller':
-        raise HTTPException(status_code=403, detail="Not a partner")
-    
-    # Get store and then offers
-    store = db.get_store_by_owner(user['user_id'])
-    if not store:
-        return []
     
     offers = db.get_offers_by_store(store['store_id'])
     
@@ -177,11 +181,8 @@ async def create_product(
 ):
     """Create new product"""
     telegram_id = verify_telegram_webapp(authorization)
+    user, store = get_partner_with_store(telegram_id)
     db = get_db()
-    
-    user = db.get_user(telegram_id)
-    if not user or user.get('role') != 'seller':
-        raise HTTPException(status_code=403, detail="Not a partner")
     
     # Parse expiry date
     expiry = None
@@ -190,11 +191,6 @@ async def create_product(
             expiry = datetime.fromisoformat(expiry_date)
         except ValueError:
             pass
-    
-    # Get store_id
-    store = db.get_store_by_owner(user['user_id'])
-    if not store:
-        raise HTTPException(status_code=404, detail="Store not found")
     
     # Create offer using add_offer
     now = datetime.now().isoformat()
@@ -235,16 +231,8 @@ async def update_product(
 ):
     """Update product (supports partial updates for quick actions)"""
     telegram_id = verify_telegram_webapp(authorization)
+    user, store = get_partner_with_store(telegram_id)
     db = get_db()
-    
-    user = db.get_user(telegram_id)
-    if not user or user.get('role') != 'seller':
-        raise HTTPException(status_code=403, detail="Not a partner")
-    
-    # Get partner's store
-    store = db.get_store_by_owner(user['user_id'])
-    if not store:
-        raise HTTPException(status_code=404, detail="Store not found")
     
     # Verify ownership
     offer = db.get_offer(product_id)
@@ -325,16 +313,8 @@ async def delete_product(
 ):
     """Delete product (soft delete)"""
     telegram_id = verify_telegram_webapp(authorization)
+    user, store = get_partner_with_store(telegram_id)
     db = get_db()
-    
-    user = db.get_user(telegram_id)
-    if not user or user.get('role') != 'seller':
-        raise HTTPException(status_code=403, detail="Not a partner")
-    
-    # Get partner's store
-    store = db.get_store_by_owner(user['user_id'])
-    if not store:
-        raise HTTPException(status_code=404, detail="Store not found")
     
     # Verify ownership
     offer = db.get_offer(product_id)
@@ -354,18 +334,13 @@ async def import_csv(
 ):
     """Import products from CSV"""
     telegram_id = verify_telegram_webapp(authorization)
+    user, store = get_partner_with_store(telegram_id)
     db = get_db()
-    
-    user = db.get_user(telegram_id)
-    if not user or user.get('role') != 'seller':
-        raise HTTPException(status_code=403, detail="Not a partner")
     
     if not file.filename.endswith('.csv'):
         raise HTTPException(status_code=400, detail="File must be CSV")
     
-    # Get store_id
-    store = db.get_store_by_owner(user['user_id'])
-    store_id = store['store_id'] if store else None
+    store_id = store['store_id']
     
     # Read CSV
     content = await file.read()
@@ -415,16 +390,8 @@ async def list_orders(
 ):
     """List partner's orders (both bookings and orders)"""
     telegram_id = verify_telegram_webapp(authorization)
+    user, store = get_partner_with_store(telegram_id)
     db = get_db()
-    
-    user = db.get_user(telegram_id)
-    if not user or user.get('role') != 'seller':
-        raise HTTPException(status_code=403, detail="Not a partner")
-    
-    # Get store
-    store = db.get_store_by_owner(user['user_id'])
-    if not store:
-        return []
     
     # Get both bookings (pickup) and orders (delivery)
     bookings = db.get_store_bookings(store['store_id'])
@@ -544,16 +511,9 @@ async def confirm_order(
 ):
     """Confirm order (booking or delivery order) with notifications"""
     telegram_id = verify_telegram_webapp(authorization)
+    user, store = get_partner_with_store(telegram_id)
     db = get_db()
     unified_service = get_unified_order_service()
-    
-    user = db.get_user(telegram_id)
-    if not user or user.get('role') != 'seller':
-        raise HTTPException(status_code=403, detail="Not a partner")
-    
-    store = db.get_store_by_owner(user['user_id'])
-    if not store:
-        raise HTTPException(status_code=404, detail="Store not found")
     
     # First try to find in bookings table
     booking = db.get_booking(order_id)
@@ -597,16 +557,9 @@ async def cancel_order(
 ):
     """Cancel order (booking or delivery order) with notifications"""
     telegram_id = verify_telegram_webapp(authorization)
+    user, store = get_partner_with_store(telegram_id)
     db = get_db()
     unified_service = get_unified_order_service()
-    
-    user = db.get_user(telegram_id)
-    if not user or user.get('role') != 'seller':
-        raise HTTPException(status_code=403, detail="Not a partner")
-    
-    store = db.get_store_by_owner(user['user_id'])
-    if not store:
-        raise HTTPException(status_code=404, detail="Store not found")
     
     # First try to find in bookings table
     booking = db.get_booking(order_id)
@@ -650,16 +603,9 @@ async def update_order_status(
 ):
     """Update order status (ready, delivering, etc) with notifications"""
     telegram_id = verify_telegram_webapp(authorization)
+    user, store = get_partner_with_store(telegram_id)
     db = get_db()
     unified_service = get_unified_order_service()
-    
-    user = db.get_user(telegram_id)
-    if not user or user.get('role') != 'seller':
-        raise HTTPException(status_code=403, detail="Not a partner")
-    
-    store = db.get_store_by_owner(user['user_id'])
-    if not store:
-        raise HTTPException(status_code=404, detail="Store not found")
     
     # First try to find in bookings table
     booking = db.get_booking(order_id)
@@ -715,15 +661,10 @@ async def get_stats(
 ):
     """Get partner statistics"""
     telegram_id = verify_telegram_webapp(authorization)
+    user, store = get_partner_with_store(telegram_id)
     db = get_db()
     
-    user = db.get_user(telegram_id)
-    if not user or user.get('role') != 'seller':
-        raise HTTPException(status_code=403, detail="Not a partner")
-    
-    # Get store_id
-    store = db.get_store_by_owner(user['user_id'])
-    store_id = store['store_id'] if store else None
+    store_id = store['store_id']
     
     # Calculate period
     tz = pytz.timezone("Asia/Tashkent")
@@ -781,39 +722,23 @@ async def update_store(
 ):
     """Update store settings"""
     telegram_id = verify_telegram_webapp(authorization)
+    user, store = get_partner_with_store(telegram_id)
     db = get_db()
     
-    user = db.get_user(telegram_id)
-    if not user or user.get('role') != 'seller':
-        raise HTTPException(status_code=403, detail="Not a partner")
-    
-    store = db.get_store_by_owner(user['user_id'])
-    
-    if store:
-        # Update existing store via SQL
-        with db.get_connection() as conn:
-            cursor = conn.cursor()
-            cursor.execute("""
-                UPDATE stores
-                SET name = %s, address = %s, phone = %s, description = %s
-                WHERE store_id = %s
-            """, (
-                settings.get('name', store.get('name')),
-                settings.get('address', store.get('address')),
-                settings.get('phone', store.get('phone')),
-                settings.get('description', store.get('description')),
-                store['store_id']
-            ))
-    else:
-        # Create new store
-        db.add_store(
-            owner_id=user['user_id'],
-            name=settings.get('name', 'Мой магазин'),
-            city=user.get('city', 'Ташкент'),
-            address=settings.get('address'),
-            phone=settings.get('phone'),
-            description=settings.get('description')
-        )
+    # Update existing store via SQL
+    with db.get_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute("""
+            UPDATE stores
+            SET name = %s, address = %s, phone = %s, description = %s
+            WHERE store_id = %s
+        """, (
+            settings.get('name', store.get('name')),
+            settings.get('address', store.get('address')),
+            settings.get('phone', store.get('phone')),
+            settings.get('description', store.get('description')),
+            store['store_id']
+        ))
     
     return {"status": "updated"}
 
@@ -831,11 +756,7 @@ async def upload_photo(
     import aiohttp
     
     telegram_id = verify_telegram_webapp(authorization)
-    db = get_db()
-    
-    user = db.get_user(telegram_id)
-    if not user or user.get('role') != 'seller':
-        raise HTTPException(status_code=403, detail="Not a partner")
+    user, store = get_partner_with_store(telegram_id)
     
     # Read photo content
     content = await photo.read()
