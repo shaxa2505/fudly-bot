@@ -458,55 +458,66 @@
         const tg = window.Telegram?.WebApp;
         if (tg) { tg.ready(); tg.expand(); }
         
-        // Parse initData from multiple sources
+        // Get initData - try multiple methods
         function getInitData() {
-            // 1. From Telegram WebApp SDK
-            if (tg?.initData) return tg.initData;
-            
-            // 2. From URL hash (Telegram sometimes passes it there)
-            const hash = window.location.hash.slice(1);
-            if (hash.includes('tgWebAppData=')) {
-                const params = new URLSearchParams(hash);
-                const data = params.get('tgWebAppData');
-                if (data) return decodeURIComponent(data);
+            // 1. From Telegram WebApp SDK (preferred)
+            if (tg?.initData && tg.initData.length > 0) {
+                console.log('✅ initData from SDK');
+                return tg.initData;
             }
             
-            // 3. From URL query params
-            const urlParams = new URLSearchParams(window.location.search);
-            const queryData = urlParams.get('tgWebAppData');
-            if (queryData) return queryData;
+            // 2. Build from initDataUnsafe (fallback for debugging)
+            if (tg?.initDataUnsafe?.user) {
+                console.log('⚠️ Building initData from initDataUnsafe');
+                const user = tg.initDataUnsafe.user;
+                // Create a minimal initData-like string
+                const params = new URLSearchParams();
+                params.set('user', JSON.stringify(user));
+                params.set('auth_date', Math.floor(Date.now() / 1000).toString());
+                return params.toString();
+            }
             
-            // 4. Parse hash as initData directly (some Telegram versions)
+            // 3. From URL hash
+            const hash = window.location.hash.slice(1);
             if (hash && hash.includes('user=')) {
+                console.log('✅ initData from hash');
                 return hash;
             }
             
+            // 4. From URL fragment (tgWebAppData)
+            if (hash.includes('tgWebAppData=')) {
+                const params = new URLSearchParams(hash);
+                const data = params.get('tgWebAppData');
+                if (data) {
+                    console.log('✅ initData from tgWebAppData');
+                    return decodeURIComponent(data);
+                }
+            }
+            
+            console.warn('❌ No initData found anywhere');
             return '';
         }
         
         const initData = getInitData();
+        const tgUser = tg?.initDataUnsafe?.user;
         
         // Debug info
         const debugInfo = {
             hasTelegram: !!window.Telegram,
-            hasWebApp: !!window.Telegram?.WebApp,
-            platform: tg?.platform,
-            version: tg?.version,
+            hasWebApp: !!tg,
+            platform: tg?.platform || 'unknown',
+            version: tg?.version || 'unknown',
             initDataLength: initData?.length || 0,
-            initDataSource: tg?.initData ? 'SDK' : (window.location.hash ? 'hash' : 'none'),
-            hash: window.location.hash?.substring(0, 100) || 'empty'
+            initDataUnsafe: !!tg?.initDataUnsafe?.user,
+            userId: tgUser?.id || 'none',
+            userName: tgUser?.first_name || 'none'
         };
         console.log('🔍 Telegram Debug:', debugInfo);
-        
-        // Show debug on screen for testing
-        if (!initData) {
-            console.warn('⚠️ No initData - auth will fail');
-        }
         
         const API = 'https://fudly-bot-production.up.railway.app/api/partner';
         const getAuth = () => {
             const auth = initData ? `tma ${initData}` : '';
-            console.log('🔑 Auth header:', auth ? `${auth.substring(0, 50)}...` : 'EMPTY');
+            console.log('🔑 Auth:', auth ? `${auth.substring(0, 60)}...` : 'EMPTY');
             return auth;
         };
         
@@ -775,17 +786,18 @@
         // ============================================
         // Init
         // ============================================
-        console.log('🚀 Partner Panel', { telegram: !!tg, initData: initData?.length || 0, source: debugInfo.initDataSource });
+        console.log('🚀 Partner Panel v3', debugInfo);
         
         // DEBUG: Show init status on screen
         const debugDiv = document.createElement('div');
-        debugDiv.style.cssText = 'position:fixed;bottom:60px;left:10px;right:10px;background:#222;color:#0f0;font-family:monospace;font-size:9px;padding:8px;border-radius:8px;z-index:9999;max-height:120px;overflow:auto;word-break:break-all;';
+        debugDiv.style.cssText = 'position:fixed;bottom:60px;left:10px;right:10px;background:#111;color:#0f0;font-family:monospace;font-size:9px;padding:10px;border-radius:8px;z-index:9999;max-height:140px;overflow:auto;word-break:break-all;border:1px solid #0f0;';
         debugDiv.innerHTML = `
-            <b>DEBUG v2:</b><br>
-            TG SDK: ${!!tg} | platform: ${tg?.platform || 'N/A'}<br>
-            initData: ${initData?.length || 0} chars (${debugInfo.initDataSource})<br>
-            hash: ${window.location.hash?.substring(0, 80) || 'empty'}<br>
-            URL: ${window.location.href.substring(0, 60)}...
+            <b>🔧 DEBUG v3</b><br>
+            TG: ${!!tg} | platform: ${debugInfo.platform} | ver: ${debugInfo.version}<br>
+            initData: <b>${initData?.length || 0}</b> chars<br>
+            initDataUnsafe: ${debugInfo.initDataUnsafe} | userId: <b>${debugInfo.userId}</b><br>
+            user: ${debugInfo.userName}<br>
+            auth: ${getAuth()?.substring(0,50) || 'NONE'}...
         `;
         document.body.appendChild(debugDiv);
         

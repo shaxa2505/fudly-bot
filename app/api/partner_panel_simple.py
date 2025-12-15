@@ -91,6 +91,21 @@ def verify_telegram_webapp(authorization: str) -> int:
     
     try:
         parsed = dict(urllib.parse.parse_qsl(init_data))
+        
+        # Check if this is unsigned data (from initDataUnsafe)
+        # Only allow if ALLOW_UNSAFE_AUTH is set (for debugging)
+        if 'hash' not in parsed:
+            allow_unsafe = os.getenv("ALLOW_UNSAFE_AUTH", "").lower() == "true"
+            if allow_unsafe:
+                import json
+                user_data = json.loads(parsed.get('user', '{}'))
+                user_id = int(user_data.get('id', 0))
+                if user_id > 0:
+                    import logging
+                    logging.warning(f"⚠️ UNSAFE AUTH: user_id={user_id} (no signature)")
+                    return user_id
+            raise HTTPException(status_code=401, detail="Missing signature hash")
+        
         data_check_string_parts = []
         
         for key in sorted(parsed.keys()):
