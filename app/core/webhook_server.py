@@ -1638,6 +1638,71 @@ async def create_webhook_app(
     app["notification_service"] = notification_service
     app["websocket_manager"] = ws_manager
 
+    # Serve static files for Partner Panel and Mini App
+    from pathlib import Path
+
+    webapp_dist_path = Path(__file__).parent.parent.parent / "webapp" / "dist"
+    partner_panel_path = Path(__file__).parent.parent.parent / "webapp" / "partner-panel"
+
+    logger.info(f"📁 Partner Panel path: {partner_panel_path.absolute()}")
+    logger.info(f"📁 Partner Panel exists: {partner_panel_path.exists()}")
+    logger.info(f"📁 Mini App path: {webapp_dist_path.absolute()}")
+    logger.info(f"📁 Mini App exists: {webapp_dist_path.exists()}")
+
+    # Add static file handlers (Partner Panel FIRST - more specific path)
+    if partner_panel_path.exists() and (partner_panel_path / "index.html").exists():
+
+        async def serve_partner_panel(request):
+            """Serve Partner Panel files."""
+            filename = request.match_info.get("filename", "")
+
+            # If no filename or ends with /, serve index.html
+            if not filename or filename.endswith("/"):
+                return web.FileResponse(partner_panel_path / "index.html")
+
+            full_path = partner_panel_path / filename
+
+            # Serve file if exists
+            if full_path.exists() and full_path.is_file():
+                return web.FileResponse(full_path)
+
+            # Otherwise serve index.html (for SPA routing)
+            return web.FileResponse(partner_panel_path / "index.html")
+
+        # Register Partner Panel routes
+        app.router.add_get("/partner-panel", serve_partner_panel)
+        app.router.add_get("/partner-panel/", serve_partner_panel)
+        app.router.add_get("/partner-panel/{filename:.*}", serve_partner_panel)
+
+        logger.info("✅ Partner Panel mounted at /partner-panel")
+        logger.info("   Access at: https://fudly-bot-production.up.railway.app/partner-panel/")
+    else:
+        logger.error(f"❌ Partner Panel not found at {partner_panel_path}")
+        if partner_panel_path.exists():
+            logger.error(f"   Files: {list(partner_panel_path.iterdir())[:5]}")
+
+    # Add Mini App static file handler (LAST - catches all remaining /)
+    if webapp_dist_path.exists() and (webapp_dist_path / "index.html").exists():
+
+        async def serve_webapp(request):
+            """Serve Mini App index.html for all /* routes not caught by other handlers."""
+            file_path = request.match_info.get("filename", "index.html")
+            full_path = webapp_dist_path / file_path
+
+            # Serve file if exists
+            if full_path.exists() and full_path.is_file():
+                return web.FileResponse(full_path)
+
+            # Otherwise serve index.html for SPA routing
+            return web.FileResponse(webapp_dist_path / "index.html")
+
+        # Register Mini App routes (will catch anything not matched above)
+        app.router.add_get("/{filename:.*\\..*}", serve_webapp)  # Files with extensions
+
+        logger.info("✅ Mini App mounted at /")
+    else:
+        logger.error(f"❌ Mini App not found at {webapp_dist_path}")
+
     return app
 
 
