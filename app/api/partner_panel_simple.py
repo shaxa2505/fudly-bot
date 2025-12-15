@@ -81,7 +81,11 @@ def verify_telegram_webapp(authorization: str) -> int:
     2. URL-based auth (uid passed by bot in WebApp URL)
     3. Dev mode bypass for local development
     """
+    import logging
+    logging.info(f"🔐 verify_telegram_webapp called, auth={authorization[:50] if authorization else 'NONE'}...")
+    
     if not authorization:
+        logging.error("❌ No authorization header")
         raise HTTPException(status_code=401, detail="Missing authorization")
 
     # Development mode bypass - ONLY works in non-production environment
