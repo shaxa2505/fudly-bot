@@ -3,65 +3,45 @@ const tg = window.Telegram?.WebApp || {
     ready: () => {},
     expand: () => {},
     initData: '',
-    initDataUnsafe: { user: { id: 0 } },
-    HapticFeedback: { impactOccurred: () => {}, notificationOccurred: () => {} },
-    showAlert: (msg) => alert(msg)
+    initDataUnsafe: { user: { id: 0 } }
 };
 tg.expand();
 tg.ready();
 
-// Применяем тему Telegram
-if (tg.colorScheme === 'dark') {
-    document.documentElement.style.setProperty('--bg', '#1a1a1a');
-    document.documentElement.style.setProperty('--surface', '#2a2a2a');
-    document.documentElement.style.setProperty('--text', '#ffffff');
-    document.documentElement.style.setProperty('--text-secondary', '#a0a0a0');
-    document.documentElement.style.setProperty('--border', '#3a3a3a');
-}
+// API URL
+const API_URL = window.location.hostname === 'localhost'
+    ? 'http://localhost:8000/api/partner'
+    : 'https://fudly-bot-production.up.railway.app/api/partner';
 
-// API URL - определяется автоматически
-const API_URL = (() => {
-    const hostname = window.location.hostname;
-
-    // Локальная разработка
-    if (hostname === 'localhost' || hostname === '127.0.0.1') {
-        return 'http://localhost:8000/api/partner';
-    }
-
-    // Vercel - использует Railway API
-    if (hostname.includes('vercel.app')) {
-        return 'https://fudly-bot-production.up.railway.app/api/partner';
-    }
-
-    // По умолчанию - относительный путь
-    return '/api/partner';
-})();
-
-// Auth
-const isDevMode = !tg.initData && window.location.hostname === 'localhost';
-// Check if running inside Telegram WebApp (WebApp object exists and has platform)
-const isTelegramWebApp = !!(window.Telegram?.WebApp && window.Telegram.WebApp.platform);
+// Auth - check if we have valid Telegram auth
+const hasInitData = !!window.Telegram?.WebApp?.initData && window.Telegram.WebApp.initData.length > 0;
+const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+const isDevMode = !hasInitData && isLocalhost;
+// Check if running inside Telegram WebApp with valid auth
+const isTelegramWebApp = !!(window.Telegram?.WebApp && window.Telegram.WebApp.platform && hasInitData);
 let devTelegramId = null;
 
 console.log('📱 Telegram WebApp check:', {
     hasTelegram: !!window.Telegram,
     hasWebApp: !!window.Telegram?.WebApp,
     platform: window.Telegram?.WebApp?.platform,
-    initData: window.Telegram?.WebApp?.initData ? 'present' : 'empty',
+    initData: hasInitData ? 'present' : 'empty',
+    initDataLength: window.Telegram?.WebApp?.initData?.length || 0,
     isTelegramWebApp,
-    isDevMode
+    isDevMode,
+    isLocalhost,
+    hostname: window.location.hostname
 });
 
-// Check if opened outside Telegram (but allow if initData is present even if platform check fails)
-const hasInitData = !!window.Telegram?.WebApp?.initData;
-if (!isTelegramWebApp && !hasInitData && !isDevMode) {
-    console.error('❌ Partner Panel must be opened from Telegram');
+// Check if opened outside Telegram (no valid auth)
+if (!isTelegramWebApp && !isDevMode) {
+    console.error('❌ Partner Panel: No valid Telegram auth');
     document.body.innerHTML = `
         <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100vh;text-align:center;padding:20px;background:#1a1a2e;color:white;font-family:system-ui">
             <div style="font-size:64px;margin-bottom:20px">🔐</div>
             <h1 style="margin:0 0 10px">Панель партнёра</h1>
             <p style="color:#aaa;margin:0 0 20px">Откройте через Telegram бот</p>
-            <a href="https://t.me/fudly_bot" style="background:#0088cc;color:white;padding:12px 24px;border-radius:8px;text-decoration:none">Открыть бот</a>
+            <a href="https://t.me/fudly_bot" style="background:#0088cc;color:white;padding:12px 24px;border-radius:8px;text-decoration:none">Открыть @fudly_bot</a>
         </div>
     `;
     throw new Error('Not in Telegram WebApp');
@@ -84,31 +64,8 @@ let productsData = [];
 let ordersData = [];
 let statsData = {};
 
-// Кэш для оптимизации
-const cache = {
-    profile: null,
-    products: { data: null, timestamp: 0 },
-    orders: { data: null, timestamp: 0 },
-    stats: { data: null, timestamp: 0 }
-};
-const CACHE_TTL = 30000; // 30 секунд
-
-// Проверка кэша
-function isCacheValid(key) {
-    return cache[key]?.timestamp && (Date.now() - cache[key].timestamp) < CACHE_TTL;
-}
-
-// API Request с кэшированием
+// API Request
 async function apiRequest(endpoint, options = {}) {
-    // Проверяем кэш для GET запросов
-    if (!options.method || options.method === 'GET') {
-        const cacheKey = endpoint.split('?')[0].replace('/', '');
-        if (isCacheValid(cacheKey)) {
-            console.log('📦 Cache hit:', cacheKey);
-            return cache[cacheKey].data;
-        }
-    }
-
     try {
         const response = await fetch(`${API_URL}${endpoint}`, {
             ...options,
@@ -120,42 +77,47 @@ async function apiRequest(endpoint, options = {}) {
         });
 
         if (!response.ok) {
-            const errorText = await response.text();
-            throw new Error(`HTTP ${response.status}: ${errorText}`);
+            // Handle specific error codes
+            if (response.status === 403) {
+                const errorData = await response.json().catch(() => ({}));
+                if (errorData.detail === 'Not a partner') {
+                    showToast('❌ Вы не являетесь партнёром');
+                    document.body.innerHTML = `
+                        <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100vh;text-align:center;padding:20px;background:#f8fafc;color:#1e293b;font-family:system-ui">
+                            <div style="font-size:64px;margin-bottom:20px">🏪</div>
+                            <h1 style="margin:0 0 10px;font-size:24px">Панель партнёра</h1>
+                            <p style="color:#64748b;margin:0 0 20px">Вы не являетесь партнёром Fudly</p>
+                            <p style="color:#64748b;margin:0 0 20px;font-size:14px">Чтобы стать партнёром, напишите нам</p>
+                            <a href="https://t.me/fudly_support" style="background:#6366f1;color:white;padding:12px 24px;border-radius:8px;text-decoration:none">Связаться с нами</a>
+                        </div>
+                    `;
+                    throw new Error('Not a partner');
+                }
+                throw new Error('Access denied');
+            }
+            if (response.status === 401) {
+                showToast('❌ Ошибка авторизации');
+                throw new Error('Unauthorized');
+            }
+            throw new Error(`HTTP ${response.status}`);
         }
 
-        const data = await response.json();
-
-        // Сохраняем в кэш GET запросы
-        if (!options.method || options.method === 'GET') {
-            const cacheKey = endpoint.split('?')[0].replace('/', '');
-            cache[cacheKey] = { data, timestamp: Date.now() };
-        }
-
-        return data;
+        return await response.json();
     } catch (error) {
         console.error('API Error:', error);
-        showToast('❌ ' + (error.message || 'Ошибка подключения'));
+        if (!error.message.includes('Not a partner')) {
+            showToast('❌ Ошибка подключения');
+        }
         throw error;
     }
 }
 
-// Show Toast с вибрацией
-function showToast(message, type = 'info') {
+// Show Toast
+function showToast(message) {
     const toast = document.createElement('div');
     toast.className = 'toast';
     toast.textContent = message;
     document.body.appendChild(toast);
-
-    // Тактильная обратная связь
-    if (type === 'success') {
-        tg.HapticFeedback?.notificationOccurred('success');
-    } else if (type === 'error') {
-        tg.HapticFeedback?.notificationOccurred('error');
-    } else {
-        tg.HapticFeedback?.impactOccurred('light');
-    }
-
     setTimeout(() => toast.remove(), 3000);
 }
 
@@ -164,11 +126,8 @@ function formatMoney(amount) {
     return new Intl.NumberFormat('ru-RU').format(amount) + ' сум';
 }
 
-// Switch View с анимацией
+// Switch View
 function switchView(view) {
-    if (currentView === view) return;
-
-    tg.HapticFeedback?.impactOccurred('light');
     currentView = view;
 
     // Update sections
@@ -178,14 +137,6 @@ function switchView(view) {
     // Update nav
     document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
     event.target.closest('.nav-item').classList.add('active');
-
-    // Показываем/скрываем FAB
-    const fab = document.querySelector('.fab');
-    if (view === 'products') {
-        fab.style.display = 'flex';
-    } else {
-        fab.style.display = 'none';
-    }
 
     // Load data
     loadView(view);
@@ -209,7 +160,7 @@ async function loadView(view) {
     }
 }
 
-// Load Dashboard с оптимизацией
+// Load Dashboard
 async function loadDashboard() {
     try {
         const [profile, products, orders, stats] = await Promise.all([
@@ -219,195 +170,60 @@ async function loadDashboard() {
             apiRequest('/stats?period=today')
         ]);
 
-        // Сохраняем профиль
-        cache.profile = profile;
+        // Update store name
+        document.getElementById('storeName').textContent = profile.store_name || 'Магазин';
 
-        // Update store name с анимацией
-        const storeNameEl = document.getElementById('storeName');
-        storeNameEl.style.opacity = '0';
-        setTimeout(() => {
-            storeNameEl.textContent = profile.store_name || 'Магазин';
-            storeNameEl.style.opacity = '1';
-        }, 150);
-
-        // Update stats с анимацией чисел
-        animateNumber('todayRevenue', stats.revenue || 0, formatMoney);
-        animateNumber('todayOrders', stats.orders || 0);
-        animateNumber('totalProducts', products.length);
+        // Update stats
+        document.getElementById('todayRevenue').textContent = formatMoney(stats.revenue || 0);
+        document.getElementById('todayOrders').textContent = stats.orders || 0;
+        document.getElementById('totalProducts').textContent = products.length;
 
         const pending = orders.filter(o => o.status === 'pending').length;
-        animateNumber('pendingOrders', pending);
-
-        // Проверяем новые заказы
-        checkNewOrders(orders);
+        document.getElementById('pendingOrders').textContent = pending;
     } catch (error) {
         console.error('Dashboard error:', error);
-        showToast('Ошибка загрузки данных', 'error');
     }
 }
 
-// Анимация чисел
-function animateNumber(elementId, targetValue, formatter) {
-    const el = document.getElementById(elementId);
-    const currentText = el.textContent;
-    const currentValue = parseInt(currentText.replace(/[^0-9]/g, '')) || 0;
-
-    if (currentValue === targetValue) return;
-
-    const duration = 500;
-    const steps = 20;
-    const increment = (targetValue - currentValue) / steps;
-    let current = currentValue;
-    let step = 0;
-
-    const timer = setInterval(() => {
-        step++;
-        current += increment;
-
-        if (step >= steps) {
-            clearInterval(timer);
-            current = targetValue;
-        }
-
-        el.textContent = formatter ? formatter(Math.round(current)) : Math.round(current);
-    }, duration / steps);
-}
-
-// Проверка новых заказов
-let lastOrderCount = 0;
-function checkNewOrders(orders) {
-    const pendingOrders = orders.filter(o => o.status === 'pending');
-
-    if (lastOrderCount > 0 && pendingOrders.length > lastOrderCount) {
-        tg.HapticFeedback?.notificationOccurred('success');
-        showToast('🔔 Новый заказ!', 'success');
-    }
-
-    lastOrderCount = pendingOrders.length;
-}
-
-// Load Products с поиском
-let productSearchQuery = '';
-async function loadProducts(forceRefresh = false) {
+// Load Products
+async function loadProducts() {
     const container = document.getElementById('productsContent');
-
-    if (!forceRefresh && productsData.length > 0) {
-        renderProducts();
-        return;
-    }
-
     container.innerHTML = '<div class="loading"><div class="spinner"></div></div>';
 
     try {
-        if (forceRefresh) {
-            cache.products = { data: null, timestamp: 0 };
-        }
         productsData = await apiRequest('/products');
-        renderProducts();
+
+        if (productsData.length === 0) {
+            container.innerHTML = `
+                <div class="empty-state">
+                    <div class="empty-icon">📦</div>
+                    <div class="empty-text">Нет товаров</div>
+                    <button class="btn btn-primary" onclick="openAddProductModal()">Добавить товар</button>
+                </div>
+            `;
+            return;
+        }
+
+        container.innerHTML = productsData.map(product => `
+            <div class="card">
+                <div class="card-header">
+                    <div>
+                        <div class="card-title">${escapeHtml(product.title)}</div>
+                        <div class="card-info">${formatMoney(product.discount_price || product.original_price)}</div>
+                    </div>
+                    <span class="badge ${product.quantity > 0 ? 'success' : 'danger'}">
+                        ${product.quantity} шт
+                    </span>
+                </div>
+                ${product.description ? `<div class="card-info">${escapeHtml(product.description)}</div>` : ''}
+                <div class="btn-group">
+                    <button class="btn btn-primary btn-sm" onclick="editProduct(${product.offer_id})">✏️ Изменить</button>
+                    <button class="btn btn-danger btn-sm" onclick="deleteProduct(${product.offer_id})">🗑️ Удалить</button>
+                </div>
+            </div>
+        `).join('');
     } catch (error) {
         container.innerHTML = '<div class="empty-state"><div class="empty-text">Ошибка загрузки</div></div>';
-    }
-}
-
-// Рендер товаров с фильтрацией
-function renderProducts() {
-    const container = document.getElementById('productsContent');
-
-    // Фильтруем товары по поисковому запросу
-    let filtered = productsData;
-    if (productSearchQuery) {
-        const query = productSearchQuery.toLowerCase();
-        filtered = productsData.filter(p =>
-            p.title.toLowerCase().includes(query) ||
-            (p.description && p.description.toLowerCase().includes(query))
-        );
-    }
-
-    if (filtered.length === 0) {
-        container.innerHTML = `
-            <div class="search-box">
-                <input type="search" class="form-input" placeholder="🔍 Поиск товаров..."
-                       value="${escapeHtml(productSearchQuery)}"
-                       oninput="searchProducts(this.value)">
-            </div>
-            <div class="empty-state">
-                <div class="empty-icon">📦</div>
-                <div class="empty-text">${productSearchQuery ? 'Ничего не найдено' : 'Нет товаров'}</div>
-                ${!productSearchQuery ? '<button class="btn btn-primary" onclick="openAddProductModal()">Добавить товар</button>' : ''}
-            </div>
-        `;
-        return;
-    }
-
-    container.innerHTML = `
-        <div class="search-box">
-            <input type="search" class="form-input" placeholder="🔍 Поиск товаров..."
-                   value="${escapeHtml(productSearchQuery)}"
-                   oninput="searchProducts(this.value)">
-        </div>
-    ` + filtered.map(product => `
-        <div class="card" data-id="${product.offer_id}">
-            <div class="card-header">
-                <div>
-                    <div class="card-title">${escapeHtml(product.title)}</div>
-                    <div class="card-info">${formatMoney(product.discount_price || product.original_price)}</div>
-                </div>
-                <span class="badge ${product.quantity > 0 ? 'success' : 'danger'}">
-                    ${product.quantity} шт
-                </span>
-            </div>
-            ${product.description ? `<div class="card-info">${escapeHtml(product.description)}</div>` : ''}
-            <div class="btn-group">
-                <button class="btn btn-primary btn-sm" onclick="quickEditQuantity(${product.offer_id}, ${product.quantity})">📝 Остаток</button>
-                <button class="btn btn-danger btn-sm" onclick="deleteProduct(${product.offer_id})">🗑️</button>
-            </div>
-        </div>
-    `).join('');
-}
-
-// Поиск товаров
-function searchProducts(query) {
-    productSearchQuery = query;
-    renderProducts();
-}
-
-// Быстрое редактирование количества
-function quickEditQuantity(productId, currentQty) {
-    tg.HapticFeedback?.impactOccurred('medium');
-    const newQty = prompt('Введите новое количество:', currentQty);
-    if (newQty === null) return;
-
-    const qty = parseInt(newQty);
-    if (isNaN(qty) || qty < 0) {
-        showToast('❌ Неверное количество', 'error');
-        return;
-    }
-
-    updateProductQuantity(productId, qty);
-}
-
-// Обновление количества товара
-async function updateProductQuantity(productId, quantity) {
-    try {
-        await apiRequest(`/products/${productId}`, {
-            method: 'PUT',
-            body: JSON.stringify({ quantity })
-        });
-
-        // Обновляем локальные данные
-        const product = productsData.find(p => p.offer_id === productId);
-        if (product) {
-            product.quantity = quantity;
-        }
-
-        // Инвалидируем кэш
-        cache.products = { data: null, timestamp: 0 };
-
-        showToast('✅ Обновлено', 'success');
-        renderProducts();
-        loadDashboard();
-    } catch (error) {
-        showToast('❌ Ошибка обновления', 'error');
     }
 }
 
@@ -614,85 +430,5 @@ function escapeHtml(text) {
     return div.innerHTML;
 }
 
-// Pull-to-refresh
-let startY = 0;
-let pulling = false;
-
-document.addEventListener('touchstart', (e) => {
-    if (window.scrollY === 0) {
-        startY = e.touches[0].pageY;
-        pulling = true;
-    }
-}, { passive: true });
-
-document.addEventListener('touchmove', (e) => {
-    if (!pulling) return;
-    const currentY = e.touches[0].pageY;
-    const diff = currentY - startY;
-
-    if (diff > 80) {
-        pulling = false;
-        refreshData();
-    }
-}, { passive: true });
-
-document.addEventListener('touchend', () => {
-    pulling = false;
-});
-
-// Обновление данных
-async function refreshData() {
-    tg.HapticFeedback?.impactOccurred('medium');
-    showToast('🔄 Обновление...');
-
-    // Очищаем кэш
-    cache.products = { data: null, timestamp: 0 };
-    cache.orders = { data: null, timestamp: 0 };
-    cache.stats = { data: null, timestamp: 0 };
-
-    await loadView(currentView);
-    showToast('✅ Обновлено', 'success');
-}
-
-// Автообновление каждые 30 секунд
-setInterval(() => {
-    if (currentView === 'dashboard' || currentView === 'orders') {
-        loadView(currentView);
-    }
-}, 30000);
-
-// Слушатель видимости вкладки
-document.addEventListener('visibilitychange', () => {
-    if (!document.hidden) {
-        // Обновляем при возврате на вкладку
-        loadView(currentView);
-    }
-});
-
 // Init
-console.log('🚀 Partner Panel v2.0 loaded');
-console.log('📱 Telegram WebApp:', !!window.Telegram?.WebApp?.initData);
-console.log('🎨 Theme:', tg.colorScheme);
-console.log('🔗 API URL:', API_URL);
-console.log('🔑 Auth:', isDevMode ? 'Development' : 'Production');
-console.log('🌐 Origin:', window.location.origin);
-
-// Тестируем соединение
-fetch(`${API_URL}/profile`, {
-    headers: {
-        'Authorization': getAuthHeader()
-    }
-})
-.then(response => {
-    console.log('✅ API Test:', response.status, response.statusText);
-    if (!response.ok) {
-        return response.text().then(text => {
-            console.error('❌ API Error:', text);
-        });
-    }
-})
-.catch(error => {
-    console.error('❌ Connection Error:', error);
-});
-
 loadDashboard();
