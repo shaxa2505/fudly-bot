@@ -13,31 +13,35 @@ const API_URL = window.location.hostname === 'localhost'
     ? 'http://localhost:8000/api/partner'
     : 'https://fudly-bot-production.up.railway.app/api/partner';
 
-// Auth
-const isDevMode = !tg.initData && window.location.hostname === 'localhost';
-// Check if running inside Telegram WebApp
-const isTelegramWebApp = !!(window.Telegram?.WebApp && window.Telegram.WebApp.platform);
+// Auth - check if we have valid Telegram auth
+const hasInitData = !!window.Telegram?.WebApp?.initData && window.Telegram.WebApp.initData.length > 0;
+const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+const isDevMode = !hasInitData && isLocalhost;
+// Check if running inside Telegram WebApp with valid auth
+const isTelegramWebApp = !!(window.Telegram?.WebApp && window.Telegram.WebApp.platform && hasInitData);
 let devTelegramId = null;
 
 console.log('📱 Telegram WebApp check:', {
     hasTelegram: !!window.Telegram,
     hasWebApp: !!window.Telegram?.WebApp,
     platform: window.Telegram?.WebApp?.platform,
-    initData: window.Telegram?.WebApp?.initData ? 'present' : 'empty',
+    initData: hasInitData ? 'present' : 'empty',
+    initDataLength: window.Telegram?.WebApp?.initData?.length || 0,
     isTelegramWebApp,
-    isDevMode
+    isDevMode,
+    isLocalhost,
+    hostname: window.location.hostname
 });
 
-// Check if opened outside Telegram
-const hasInitData = !!window.Telegram?.WebApp?.initData;
-if (!isTelegramWebApp && !hasInitData && !isDevMode) {
-    console.error('❌ Partner Panel must be opened from Telegram');
+// Check if opened outside Telegram (no valid auth)
+if (!isTelegramWebApp && !isDevMode) {
+    console.error('❌ Partner Panel: No valid Telegram auth');
     document.body.innerHTML = `
         <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100vh;text-align:center;padding:20px;background:#1a1a2e;color:white;font-family:system-ui">
             <div style="font-size:64px;margin-bottom:20px">🔐</div>
             <h1 style="margin:0 0 10px">Панель партнёра</h1>
             <p style="color:#aaa;margin:0 0 20px">Откройте через Telegram бот</p>
-            <a href="https://t.me/fudly_bot" style="background:#0088cc;color:white;padding:12px 24px;border-radius:8px;text-decoration:none">Открыть бот</a>
+            <a href="https://t.me/fudly_bot" style="background:#0088cc;color:white;padding:12px 24px;border-radius:8px;text-decoration:none">Открыть @fudly_bot</a>
         </div>
     `;
     throw new Error('Not in Telegram WebApp');
