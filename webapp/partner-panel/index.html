@@ -552,16 +552,19 @@
                     headers: { 'Authorization': getAuth(), 'Content-Type': 'application/json', ...options.headers }
                 });
 
+                console.log(`📥 Response ${endpoint}: status=${res.status}`);
+
                 if (!res.ok) {
                     const err = await res.json().catch(() => ({}));
-                    if (res.status === 401) return showError('Ошибка авторизации', 'Откройте через меню бота');
-                    if (res.status === 403) return showError('Нет доступа', err.detail || 'Вы не партнёр');
-                    throw new Error(err.detail || res.status);
+                    console.error(`❌ API Error ${endpoint}:`, res.status, err);
+                    if (res.status === 401) return showError('Ошибка авторизации', `Код 401: ${err.detail || 'Unauthorized'}`);
+                    if (res.status === 403) return showError('Нет доступа', `Код 403: ${err.detail || 'Вы не партнёр'}`);
+                    throw new Error(err.detail || `HTTP ${res.status}`);
                 }
                 return res.json();
             } catch (e) {
-                console.error(e);
-                toast('❌ Ошибка сети');
+                console.error(`❌ Network error ${endpoint}:`, e);
+                toast(`❌ Ошибка: ${e.message}`);
                 throw e;
             }
         }
