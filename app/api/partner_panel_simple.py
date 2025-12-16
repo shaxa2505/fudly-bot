@@ -50,25 +50,27 @@ def get_partner_with_store(telegram_id: int) -> tuple[dict, dict]:
     Raises HTTPException if user doesn't have a store.
     """
     import logging
-    
+
     db = get_db()
     logging.info(f"🔍 get_partner_with_store called for telegram_id={telegram_id}")
-    
+
     user = db.get_user(telegram_id)
     logging.info(f"📌 get_user returned: {type(user)} - {user}")
-    
+
     if not user:
         logging.error(f"❌ User not found: telegram_id={telegram_id}")
         raise HTTPException(status_code=403, detail="User not found")
-    
-    # Note: owner_id in stores table contains telegram_id, not user_id
-    store = db.get_store_by_owner(telegram_id)
-    logging.info(f"📌 get_store_by_owner returned: {type(store)} - {store}")
-    
+
+    # IMPORTANT: owner_id in stores table contains user_id, not telegram_id!
+    # So we need to use user_id from the user record
+    user_id = user.get("user_id")
+    store = db.get_store_by_owner(user_id)
+    logging.info(f"📌 get_store_by_owner({user_id}) returned: {type(store)} - {store}")
+
     if not store:
-        logging.error(f"❌ No store found for telegram_id={telegram_id}")
+        logging.error(f"❌ No store found for user_id={user_id} (telegram_id={telegram_id})")
         raise HTTPException(status_code=403, detail="Not a partner - no store found")
-    
+
     logging.info(f"✅ SUCCESS: user_id={user.get('user_id')}, store_id={store.get('store_id')}")
     return user, store
 
@@ -83,11 +85,11 @@ def verify_telegram_webapp(authorization: str) -> int:
     """
     import logging
     import sys
-    
+
     msg = f"🔐 VERIFY CALLED: auth={authorization[:50] if authorization else 'NONE'}..."
     logging.info(msg)
     print(msg, file=sys.stderr, flush=True)
-    
+
     if not authorization:
         err_msg = "❌ No authorization header"
         logging.error(err_msg)
@@ -183,11 +185,14 @@ def verify_telegram_webapp(authorization: str) -> int:
 async def get_profile(authorization: str = Header(None)):
     """Get partner profile"""
     import logging
-    logging.info(f"📋 Profile request with auth: {authorization[:60] if authorization else 'None'}...")
-    
+
+    logging.info(
+        f"📋 Profile request with auth: {authorization[:60] if authorization else 'None'}..."
+    )
+
     telegram_id = verify_telegram_webapp(authorization)
     logging.info(f"✅ Auth verified, telegram_id: {telegram_id}")
-    
+
     user, store_info = get_partner_with_store(telegram_id)
     logging.info(f"✅ Got partner with store: {store_info.get('name') if store_info else 'None'}")
 
