@@ -1830,46 +1830,30 @@
 
         async function loadProducts() {
             try {
-                // Mock data for now
-                allProducts = [
-                    {
-                        id: 1,
-                        name: 'Бургер классический',
-                        price: 350,
-                        stock: 25,
-                        status: 'active',
-                        image: 'https://via.placeholder.com/160'
-                    },
-                    {
-                        id: 2,
-                        name: 'Пицца Маргарита',
-                        price: 450,
-                        stock: 15,
-                        status: 'active',
-                        image: 'https://via.placeholder.com/160'
-                    },
-                    {
-                        id: 3,
-                        name: 'Суши сет',
-                        price: 890,
-                        stock: 0,
-                        status: 'out_of_stock',
-                        image: 'https://via.placeholder.com/160'
-                    },
-                    {
-                        id: 4,
-                        name: 'Салат Цезарь',
-                        price: 280,
-                        stock: 10,
-                        status: 'hidden',
-                        image: 'https://via.placeholder.com/160'
-                    }
-                ];
+                const products = await api('/products');
+                console.log('✅ Products loaded:', products?.length || 0, 'items');
+
+                // Transform API data to UI format
+                allProducts = products.map(p => ({
+                    id: p.offer_id,
+                    name: p.title,
+                    price: p.discount_price,
+                    stock: p.quantity,
+                    status: p.quantity > 0 ? (p.status || 'active') : 'out_of_stock',
+                    image: p.photo_id ? `https://fudly-bot-production.up.railway.app/photos/${p.photo_id}` : 'https://via.placeholder.com/160',
+                    category: p.category,
+                    unit: p.unit || 'шт',
+                    description: p.description,
+                    original_price: p.original_price,
+                    expiry_date: p.expiry_date
+                }));
 
                 renderProducts();
             } catch (error) {
-                console.error('Error loading products:', error);
+                console.error('❌ Error loading products:', error);
                 toast('Ошибка загрузки товаров', 'error');
+                allProducts = [];
+                renderProducts();
             }
         }
 
