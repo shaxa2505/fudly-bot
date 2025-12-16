@@ -1,4 +1,5 @@
 import { useNavigate } from 'react-router-dom'
+import { Heart, Home, Sparkles } from 'lucide-react'
 import { useFavorites } from '../context/FavoritesContext'
 import { useCart } from '../context/CartContext'
 import BottomNav from '../components/BottomNav'
@@ -25,11 +26,21 @@ function FavoritesPage() {
         </header>
 
         <div className="favorites-empty">
-          <div className="empty-icon">❤️</div>
+          <div className="empty-icon">
+            <Heart size={80} strokeWidth={1.5} color="#E53935" aria-hidden="true" />
+          </div>
           <h2>Sevimlilar bo'sh</h2>
-          <p>Mahsulotlarni saqlash uchun yurak belgisini bosing</p>
+          <p className="empty-description">
+            Yoqtirgan mahsulotlaringizni saqlash uchun yurak belgisini bosing.
+            Keyinroq ularni osongina topishingiz mumkin!
+          </p>
           <button className="primary-btn" onClick={() => navigate('/')}>
-            🏠 Bosh sahifaga
+            <Home size={20} strokeWidth={2} aria-hidden="true" />
+            <span>Bosh sahifaga o'tish</span>
+          </button>
+          <button className="secondary-btn" onClick={() => navigate('/stores')}>
+            <Sparkles size={20} strokeWidth={2} aria-hidden="true" />
+            <span>Yangi mahsulotlar</span>
           </button>
         </div>
 

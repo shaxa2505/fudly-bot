@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { ShoppingCart, Home, Sparkles } from 'lucide-react'
 import api from '../api/client'
 import { useCart } from '../context/CartContext'
 import { useToast } from '../context/ToastContext'
@@ -327,15 +328,25 @@ function CartPage({ user }) {
     return (
       <div className="cart-page">
         <header className="cart-header">
-          <h1>🛒 Savat</h1>
+          <h1><ShoppingCart size={24} strokeWidth={2} aria-hidden="true" /> Savat</h1>
         </header>
 
         <div className="empty-cart">
-          <div className="empty-icon">🛒</div>
+          <div className="empty-icon">
+            <ShoppingCart size={80} strokeWidth={1.5} color="#53B175" aria-hidden="true" />
+          </div>
           <h2>Savatingiz bo'sh</h2>
-          <p>Mahsulotlar qo'shish uchun bosh sahifaga o'ting</p>
+          <p className="empty-description">
+            Mahsulotlarni ko'rish va savatga qo'shish uchun bosh sahifaga o'ting.
+            Eng yaxshi takliflarni o'tkazib yubormang!
+          </p>
           <button className="primary-btn" onClick={() => navigate('/')}>
-            🏠 Bosh sahifa
+            <Home size={20} strokeWidth={2} aria-hidden="true" />
+            <span>Bosh sahifaga o'tish</span>
+          </button>
+          <button className="secondary-btn" onClick={() => navigate('/stores')}>
+            <Sparkles size={20} strokeWidth={2} aria-hidden="true" />
+            <span>Do'konlarni ko'rish</span>
           </button>
         </div>
 

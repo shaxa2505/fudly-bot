@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Flame, Milk, Cookie, Coffee as Beverage, Croissant, Beef, Apple, Salad, Package } from 'lucide-react'
+import { Flame, Milk, Cookie, Coffee as Beverage, Croissant, Beef, Apple, Salad, Package, Search } from 'lucide-react'
 import api from '../api/client'
 import { useCart } from '../context/CartContext'
 import { transliterateCity, getSavedLocation, saveLocation, DEFAULT_LOCATION } from '../utils/cityUtils'
@@ -634,9 +634,23 @@ function HomePage() {
           ))
         ) : offers.length === 0 ? (
           <div className="empty-state">
-            <div className="empty-state-icon">🔍</div>
+            <div className="empty-state-icon">
+              <Search size={80} strokeWidth={1.5} color="#7C7C7C" aria-hidden="true" />
+            </div>
             <h3 className="empty-state-title">Hech narsa topilmadi</h3>
-            <p className="empty-state-text">Boshqa so'z bilan qidiring</p>
+            <p className="empty-state-text">
+              "{searchQuery}" so'zi bilan hech qanday mahsulot topilmadi.
+              Boshqa so'z bilan qidirib ko'ring yoki filterni o'zgartiring.
+            </p>
+            <button
+              className="primary-btn"
+              onClick={() => {
+                setSearchQuery('')
+                setSelectedCategory('all')
+              }}
+            >
+              Filterni tozalash
+            </button>
           </div>
         ) : (
           offers.map((offer, index) => (

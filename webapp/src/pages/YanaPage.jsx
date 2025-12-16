@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Package, Settings, Info } from 'lucide-react'
+import { Package, Settings, Info, ShoppingCart, Home } from 'lucide-react'
 import api from '../api/client'
 import { useCart } from '../context/CartContext'
 import BottomNav from '../components/BottomNav'
@@ -218,11 +218,21 @@ function YanaPage() {
             </div>
           ) : orders.length === 0 ? (
             <div className="empty-state">
-              <div className="empty-icon">📦</div>
+              <div className="empty-icon">
+                <Package size={80} strokeWidth={1.5} color="#53B175" aria-hidden="true" />
+              </div>
               <h3>Buyurtmalar yo'q</h3>
-              <p>Birinchi buyurtmangizni bering!</p>
+              <p className="empty-description">
+                Hali hech qanday buyurtma bermadingiz.
+                Birinchi buyurtmangizni berib, tez yetkazib olishdan bahramand bo'ling!
+              </p>
               <button className="cta-btn" onClick={() => navigate('/')}>
-                🛒 Xarid qilish
+                <ShoppingCart size={20} strokeWidth={2} aria-hidden="true" />
+                <span>Xarid qilish</span>
+              </button>
+              <button className="secondary-btn" onClick={() => navigate('/stores')}>
+                <Home size={20} strokeWidth={2} aria-hidden="true" />
+                <span>Do'konlarni ko'rish</span>
               </button>
             </div>
           ) : (

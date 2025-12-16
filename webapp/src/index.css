@@ -7,6 +7,7 @@
  * 3. Shared components
  * 4. Accessibility
  * 5. Focus indicators (WCAG 2.4.7)
+ * 6. Empty states (improved UX)
  */
 
 /* Design System Imports */
@@ -15,6 +16,7 @@
 @import './styles/shared-components.css';
 @import './styles/accessibility.css';
 @import './styles/focus-indicators.css';
+@import './styles/empty-states.css';
 
 /* ===== CSS RESET ===== */
 
