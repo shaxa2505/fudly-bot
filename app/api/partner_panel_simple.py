@@ -48,6 +48,9 @@ def get_partner_with_store(telegram_id: int) -> tuple[dict, dict]:
     A partner is defined by having a store (in stores table), not by role in users table.
     Returns (user, store) tuple.
     Raises HTTPException if user doesn't have a store.
+    
+    Note: In DB schema, users.user_id IS the telegram_id (Primary Key).
+    stores.owner_id is FK to users.user_id, so it also contains telegram_id.
     """
     import logging
 
@@ -61,14 +64,12 @@ def get_partner_with_store(telegram_id: int) -> tuple[dict, dict]:
         logging.error(f"❌ User not found: telegram_id={telegram_id}")
         raise HTTPException(status_code=403, detail="User not found")
 
-    # IMPORTANT: owner_id in stores table contains user_id, not telegram_id!
-    # So we need to use user_id from the user record
-    user_id = user.get("user_id")
-    store = db.get_store_by_owner(user_id)
-    logging.info(f"📌 get_store_by_owner({user_id}) returned: {type(store)} - {store}")
+    # users.user_id = telegram_id, stores.owner_id = users.user_id = telegram_id
+    store = db.get_store_by_owner(telegram_id)
+    logging.info(f"📌 get_store_by_owner({telegram_id}) returned: {type(store)} - {store}")
 
     if not store:
-        logging.error(f"❌ No store found for user_id={user_id} (telegram_id={telegram_id})")
+        logging.error(f"❌ No store found for telegram_id={telegram_id}")
         raise HTTPException(status_code=403, detail="Not a partner - no store found")
 
     logging.info(f"✅ SUCCESS: user_id={user.get('user_id')}, store_id={store.get('store_id')}")
