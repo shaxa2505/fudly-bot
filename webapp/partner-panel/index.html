@@ -627,9 +627,9 @@
                     api('/profile'), api('/products'), api('/orders'), api('/stats?period=today')
                 ]);
 
-                document.getElementById('storeName').textContent = profile?.store_name || 'Мой магазин';
+                document.getElementById('storeName').textContent = profile?.store?.name || 'Мой магазин';
                 document.getElementById('todayRevenue').textContent = money(stats?.revenue);
-                document.getElementById('todayOrders').textContent = stats?.orders_count || 0;
+                document.getElementById('todayOrders').textContent = stats?.orders || 0;
                 document.getElementById('totalProducts').textContent = prods?.length || 0;
                 document.getElementById('pendingOrders').textContent = ords?.filter(o => o.status === 'pending')?.length || 0;
 
@@ -708,7 +708,7 @@
                     </div>
                     <div class="order-info">
                         <span class="order-customer">${esc(o.customer_name || 'Клиент')}</span>
-                        <span class="order-total">${money(o.total_amount)}</span>
+                        <span class="order-total">${money(o.price)}</span>
                     </div>
                 </div>
             `;
@@ -730,7 +730,7 @@
                             <span>Выручка</span><strong>${money(today?.revenue)}</strong>
                         </div>
                         <div style="display:flex;justify-content:space-between;margin-top:8px">
-                            <span>Заказов</span><strong>${today?.orders_count || 0}</strong>
+                            <span>Заказов</span><strong>${today?.orders || 0}</strong>
                         </div>
                     </div>
                     <div class="card">
@@ -739,7 +739,7 @@
                             <span>Выручка</span><strong>${money(week?.revenue)}</strong>
                         </div>
                         <div style="display:flex;justify-content:space-between;margin-top:8px">
-                            <span>Заказов</span><strong>${week?.orders_count || 0}</strong>
+                            <span>Заказов</span><strong>${week?.orders || 0}</strong>
                         </div>
                     </div>
                     <div class="card">
@@ -748,7 +748,7 @@
                             <span>Выручка</span><strong>${money(month?.revenue)}</strong>
                         </div>
                         <div style="display:flex;justify-content:space-between;margin-top:8px">
-                            <span>Заказов</span><strong>${month?.orders_count || 0}</strong>
+                            <span>Заказов</span><strong>${month?.orders || 0}</strong>
                         </div>
                     </div>
                 `;
