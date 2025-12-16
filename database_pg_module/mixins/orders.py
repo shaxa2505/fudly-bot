@@ -430,17 +430,36 @@ class OrderMixin:
             return [dict(row) for row in cursor.fetchall()]
 
     def get_store_orders(self, store_id: int, status: str = None):
-        """Get all orders for a store."""
+        """Get all orders for a store with customer and offer info."""
         with self.get_connection() as conn:
             cursor = conn.cursor(row_factory=dict_row)
             if status:
                 cursor.execute(
-                    "SELECT * FROM orders WHERE store_id = %s AND order_status = %s ORDER BY created_at DESC",
+                    """
+                    SELECT o.*, 
+                           u.first_name, u.last_name, u.phone, u.username,
+                           off.title as offer_title, off.discount_price
+                    FROM orders o
+                    LEFT JOIN users u ON o.user_id = u.user_id
+                    LEFT JOIN offers off ON o.offer_id = off.offer_id
+                    WHERE o.store_id = %s AND o.order_status = %s 
+                    ORDER BY o.created_at DESC
+                    """,
                     (store_id, status),
                 )
             else:
                 cursor.execute(
-                    "SELECT * FROM orders WHERE store_id = %s ORDER BY created_at DESC", (store_id,)
+                    """
+                    SELECT o.*, 
+                           u.first_name, u.last_name, u.phone, u.username,
+                           off.title as offer_title, off.discount_price
+                    FROM orders o
+                    LEFT JOIN users u ON o.user_id = u.user_id
+                    LEFT JOIN offers off ON o.offer_id = off.offer_id
+                    WHERE o.store_id = %s 
+                    ORDER BY o.created_at DESC
+                    """,
+                    (store_id,),
                 )
             return [dict(row) for row in cursor.fetchall()]
 

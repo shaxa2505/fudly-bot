@@ -595,8 +595,15 @@ async def list_orders(authorization: str = Header(None), status: Optional[str] =
             total_price = order.get("total_price", 0)
             delivery_address = order.get("delivery_address")
             created_at = order.get("created_at")
-            customer_name = order.get("full_name", "Unknown")
+            
+            # Customer info from JOIN
+            first_name = order.get("first_name", "")
+            last_name = order.get("last_name", "")
+            customer_name = f"{first_name} {last_name}".strip() or "Unknown"
             customer_phone = order.get("phone")
+            
+            # Offer info from JOIN
+            offer_title = order.get("offer_title", "Unknown")
         else:
             # Tuple format varies, try to extract what we can
             order_id = order[0]
@@ -611,13 +618,11 @@ async def list_orders(authorization: str = Header(None), status: Optional[str] =
             created_at = order[11] if len(order) > 11 else None
             customer_name = order[-2] if len(order) > 14 else "Unknown"
             customer_phone = order[-1] if len(order) > 15 else None
+            offer_title = "Unknown"
 
         # Filter by status if requested
         if status and status != "all" and order_status != status:
             continue
-
-        # Get offer and customer info
-        offer = db.get_offer(offer_id) if offer_id else None
 
         # Determine entity type for API - 'booking' for pickup, 'order' for delivery
         entity_type = "booking" if order_type == "pickup" else "order"
@@ -626,7 +631,7 @@ async def list_orders(authorization: str = Header(None), status: Optional[str] =
             {
                 "order_id": order_id,
                 "type": entity_type,  # 'booking' for pickup, 'order' for delivery
-                "offer_title": offer.get("title") if offer else "Unknown",
+                "offer_title": offer_title,
                 "quantity": quantity,
                 "price": total_price,
                 "order_type": order_type,  # 'pickup' or 'delivery'

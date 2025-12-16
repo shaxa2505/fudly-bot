@@ -1444,6 +1444,15 @@
                 try {
                     orders = await api('/orders');
                     console.log('✅ Orders loaded:', orders?.length || 0, 'items');
+                    // Debug: Log status distribution
+                    if (orders && orders.length > 0) {
+                        const statusCounts = {};
+                        orders.forEach(o => {
+                            const s = o.status || 'undefined';
+                            statusCounts[s] = (statusCounts[s] || 0) + 1;
+                        });
+                        console.log('📊 Status distribution:', statusCounts);
+                    }
                 } catch (e) {
                     console.error('❌ Orders load failed:', e);
                     // Continue without orders
