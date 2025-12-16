@@ -1297,17 +1297,41 @@
         const userId = urlUserId || tgUser?.id || 'none';
 
         const API = 'https://fudly-bot-production.up.railway.app/api/partner';
-        const getAuth = () => initData ? `tma ${initData}` : '';
+        const getAuth = () => {
+            if (!initData) {
+                console.warn('⚠️ No initData available. Source:', initSource);
+                console.warn('Telegram WebApp:', tg ? 'Available' : 'Not available');
+                console.warn('initDataUnsafe:', tg?.initDataUnsafe);
+            }
+            return initData ? `tma ${initData}` : '';
+        };
 
         let allOrders = [];
         let currentFilter = 'new';
 
         // ===== API HELPERS =====
         async function api(endpoint) {
+            const auth = getAuth();
+            console.log(`📡 API Call: ${endpoint}`);
+            console.log('Auth:', auth ? 'Present' : '❌ MISSING');
+
             const res = await fetch(`${API}${endpoint}`, {
-                headers: { 'Authorization': getAuth() }
+                headers: {
+                    'Authorization': auth,
+                    'Content-Type': 'application/json'
+                }
             });
-            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+
+            console.log(`Response: ${res.status} ${res.statusText}`);
+
+            if (!res.ok) {
+                if (res.status === 401) {
+                    console.error('❌ 401 Unauthorized - Check initData:', initData);
+                    toast('Ошибка авторизации. Откройте через Telegram бот.', 'error');
+                    throw new Error('Unauthorized');
+                }
+                throw new Error(`HTTP ${res.status}`);
+            }
             return res.json();
         }
 
@@ -1367,6 +1391,18 @@
 
         // ===== DATA LOADING =====
         async function loadDashboard() {
+            // Check if we have auth data
+            if (!initData && !urlUserId) {
+                document.getElementById('ordersList').innerHTML = `
+                    <div class="empty-state">
+                        <div class="empty-icon">🔒</div>
+                        <div class="empty-title">Требуется авторизация</div>
+                        <div class="empty-subtitle">Откройте панель через Telegram бот</div>
+                    </div>
+                `;
+                return;
+            }
+
             try {
                 const [profile, orders, stats] = await Promise.all([
                     api('/profile'),
