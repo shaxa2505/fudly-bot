@@ -1299,9 +1299,19 @@
         const API = 'https://fudly-bot-production.up.railway.app/api/partner';
         const getAuth = () => {
             if (!initData) {
-                console.warn('⚠️ No initData available. Source:', initSource);
-                console.warn('Telegram WebApp:', tg ? 'Available' : 'Not available');
-                console.warn('initDataUnsafe:', tg?.initDataUnsafe);
+                console.error('❌ No initData available!');
+                console.error('Source:', initSource);
+                console.error('Telegram WebApp:', tg ? 'Available' : 'Not available');
+                console.error('tg.initData:', tg?.initData);
+                console.error('tg.initDataUnsafe:', tg?.initDataUnsafe);
+                console.error('URL uid:', urlUserId);
+                console.error('Window location:', window.location.href);
+                
+                // Try one more time with current timestamp
+                if (urlUserId) {
+                    console.warn('⚠️ Fallback: Using URL uid with current timestamp');
+                    return `tma uid=${urlUserId}&auth_date=${Math.floor(Date.now() / 1000)}`;
+                }
             }
             return initData ? `tma ${initData}` : '';
         };

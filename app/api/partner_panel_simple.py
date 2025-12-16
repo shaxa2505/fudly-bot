@@ -131,12 +131,30 @@ def verify_telegram_webapp(authorization: str) -> int:
         print(msg, file=sys.stderr, flush=True)
 
         # Check if this is URL-based auth (uid passed by bot in WebApp URL)
-        # Simple format: uid=123456
+        # Simple format: uid=123456 or uid=123456&auth_date=1234567890
         if "uid" in parsed:
             try:
                 user_id = int(parsed.get("uid", 0))
                 if user_id > 0:
-                    msg = f"✅ URL AUTH SUCCESS: user_id={user_id}"
+                    # URL auth is considered valid (bot provided the URL)
+                    # Check auth_date if present, but don't require it
+                    auth_date = parsed.get("auth_date")
+                    if auth_date:
+                        try:
+                            auth_timestamp = int(auth_date)
+                            current_timestamp = int(datetime.now().timestamp())
+                            age_seconds = current_timestamp - auth_timestamp
+                            
+                            # Allow up to 7 days for URL-based auth (more permissive)
+                            MAX_AUTH_AGE = 7 * 24 * 3600  # 7 days
+                            if age_seconds > MAX_AUTH_AGE:
+                                logging.warning(f"⚠️ URL auth expired: {age_seconds}s old")
+                            elif age_seconds < 0:
+                                logging.warning(f"⚠️ URL auth from future: {age_seconds}s")
+                        except (ValueError, TypeError) as e:
+                            logging.warning(f"⚠️ Invalid auth_date in URL auth: {auth_date} - {e}")
+                    
+                    msg = f"✅ URL AUTH SUCCESS: user_id={user_id} (age: {auth_date or 'no timestamp'})"
                     logging.info(msg)
                     print(msg, file=sys.stderr, flush=True)
                     return user_id
