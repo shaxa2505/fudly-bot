@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, memo, useRef } from 'react'
+import { Milk, Croissant, Coffee as Beverage, Apple } from 'lucide-react'
 import './HeroBanner.css'
 
 const BANNERS = [
@@ -6,7 +7,7 @@ const BANNERS = [
     id: 1,
     title: '50% gacha chegirma',
     subtitle: 'Sut mahsulotlari',
-    icon: '🥛',
+    icon: Milk,
     gradient: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
     category: 'dairy'
   },
@@ -14,7 +15,7 @@ const BANNERS = [
     id: 2,
     title: "Yangi kelgan taomlar",
     subtitle: "Eng sara mahsulotlar",
-    icon: '🍞',
+    icon: Croissant,
     gradient: 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)',
     category: 'bakery'
   },
@@ -22,7 +23,7 @@ const BANNERS = [
     id: 3,
     title: "Ichimliklar aksiyasi",
     subtitle: "30% gacha chegirma",
-    icon: '🧃',
+    icon: Beverage,
     gradient: 'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)',
     category: 'drinks'
   },
@@ -30,7 +31,7 @@ const BANNERS = [
     id: 4,
     title: "Yangi mevalar",
     subtitle: "Har kuni yangilanadi",
-    icon: '🍎',
+    icon: Apple,
     gradient: 'linear-gradient(135deg, #43e97b 0%, #38f9d7 100%)',
     category: 'fruits'
   }
@@ -132,7 +133,12 @@ const HeroBanner = memo(function HeroBanner({ onCategorySelect }) {
             <p className="banner-subtitle">{currentBanner.subtitle}</p>
             <span className="banner-cta">Ko'rish →</span>
           </div>
-          <div className="banner-icon">{currentBanner.icon}</div>
+          <div className="banner-icon">
+            {(() => {
+              const IconComponent = currentBanner.icon
+              return <IconComponent size={80} strokeWidth={2} color="white" aria-hidden="true" />
+            })()}
+          </div>
         </div>
       </div>
 

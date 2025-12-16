@@ -1,4 +1,5 @@
 import React from 'react';
+import { Package, User, MapPin, CreditCard, Ticket, Bell, HelpCircle, Info } from 'lucide-react';
 import BottomNav from '../components/BottomNav';
 import './ProfilePageNew.css';
 
@@ -30,14 +31,14 @@ const ProfilePage = ({ onNavigate, user }) => {
     : `https://ui-avatars.com/api/?name=${encodeURIComponent(userName)}`;
 
   const menuItems = [
-    { icon: '📦', label: 'Orders', hasNew: false },
-    { icon: '👤', label: 'My Details', hasNew: false },
-    { icon: '📍', label: 'Delivery Address', hasNew: false },
-    { icon: '💳', label: 'Payment Methods', hasNew: false },
-    { icon: '🎟️', label: 'Promo Cord', hasNew: false },
-    { icon: '🔔', label: 'Notifications', hasNew: false },
-    { icon: '❓', label: 'Help', hasNew: false },
-    { icon: 'ℹ️', label: 'About', hasNew: false },
+    { icon: Package, label: 'Orders', hasNew: false },
+    { icon: User, label: 'My Details', hasNew: false },
+    { icon: MapPin, label: 'Delivery Address', hasNew: false },
+    { icon: CreditCard, label: 'Payment Methods', hasNew: false },
+    { icon: Ticket, label: 'Promo Cord', hasNew: false },
+    { icon: Bell, label: 'Notifications', hasNew: false },
+    { icon: HelpCircle, label: 'Help', hasNew: false },
+    { icon: Info, label: 'About', hasNew: false },
   ];
 
   const handleMenuClick = (label) => {
@@ -101,15 +102,18 @@ const ProfilePage = ({ onNavigate, user }) => {
       </div>
 
       <div className="profile-menu">
-        {menuItems.map((item, index) => (
-          <button key={index} className="profile-menu-item" onClick={() => handleMenuClick(item.label)}>
-            <span className="menu-item-icon">{item.icon}</span>
-            <span className="menu-item-label">{item.label}</span>
-            <svg className="menu-item-arrow" width="8" height="14" viewBox="0 0 8 14" fill="none">
-              <path d="M1 13L7 7L1 1" stroke="#181725" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-            </svg>
-          </button>
-        ))}
+        {menuItems.map((item, index) => {
+          const IconComponent = item.icon
+          return (
+            <button key={index} className="profile-menu-item" onClick={() => handleMenuClick(item.label)}>
+              <IconComponent size={24} strokeWidth={2} className="menu-item-icon" aria-hidden="true" />
+              <span className="menu-item-label">{item.label}</span>
+              <svg className="menu-item-arrow" width="8" height="14" viewBox="0 0 8 14" fill="none">
+                <path d="M1 13L7 7L1 1" stroke="#181725" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
+            </button>
+          )
+        })}
       </div>
 
       <button className="profile-logout-btn" onClick={handleLogout}>

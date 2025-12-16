@@ -1,5 +1,6 @@
 import { memo, useState, useCallback, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { Heart, Clock } from 'lucide-react'
 import { useFavorites } from '../context/FavoritesContext'
 import { getUnitLabel } from '../utils/helpers'
 import api from '../api/client'
@@ -97,20 +98,20 @@ const OfferCard = memo(function OfferCard({ offer, cartQuantity = 0, onAddToCart
           onClick={handleFavoriteClick}
           aria-label={isInFavorites ? "Sevimlilardan o'chirish" : "Sevimlilarga qo'shish"}
         >
-          {isInFavorites ? (
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="#E53935">
-              <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/>
-            </svg>
-          ) : (
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#999" strokeWidth="2">
-              <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/>
-            </svg>
-          )}
+          <Heart
+            size={20}
+            fill={isInFavorites ? '#E53935' : 'none'}
+            color={isInFavorites ? '#E53935' : '#999'}
+            strokeWidth={2}
+          />
         </button>
 
         {/* Expiry Badge */}
         {expiryText && (
-          <div className="expiry-badge">⏰ {expiryText}</div>
+          <div className="expiry-badge">
+            <Clock size={14} strokeWidth={2} aria-hidden="true" />
+            <span>{expiryText}</span>
+          </div>
         )}
 
         {/* Image skeleton while loading */}

@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { Flame, Milk, Cookie, Coffee as Beverage, Croissant, Beef, Apple, Salad, Package } from 'lucide-react'
 import api from '../api/client'
 import { useCart } from '../context/CartContext'
 import { transliterateCity, getSavedLocation, saveLocation, DEFAULT_LOCATION } from '../utils/cityUtils'
@@ -14,15 +15,15 @@ import { usePullToRefresh } from '../hooks/usePullToRefresh'
 import './HomePage.css'
 
 const CATEGORIES = [
-  { id: 'all', name: 'Barchasi', icon: '🔥', color: '#FF6B35' },
-  { id: 'dairy', name: 'Sut', icon: '🥛', color: '#2196F3' },
-  { id: 'snacks', name: 'Sneklar', icon: '🍪', color: '#FF9800' },
-  { id: 'drinks', name: 'Ichimlik', icon: '🧃', color: '#4CAF50' },
-  { id: 'bakery', name: 'Non', icon: '🍞', color: '#8D6E63' },
-  { id: 'meat', name: "Go'sht", icon: '🥩', color: '#E53935' },
-  { id: 'fruits', name: 'Meva', icon: '🍎', color: '#F44336' },
-  { id: 'vegetables', name: 'Sabzavot', icon: '🥬', color: '#43A047' },
-  { id: 'other', name: 'Boshqa', icon: '📦', color: '#78909C' },
+  { id: 'all', name: 'Barchasi', icon: Flame, color: '#FF6B35' },
+  { id: 'dairy', name: 'Sut', icon: Milk, color: '#2196F3' },
+  { id: 'snacks', name: 'Sneklar', icon: Cookie, color: '#FF9800' },
+  { id: 'drinks', name: 'Ichimlik', icon: Beverage, color: '#4CAF50' },
+  { id: 'bakery', name: 'Non', icon: Croissant, color: '#8D6E63' },
+  { id: 'meat', name: "Go'sht", icon: Beef, color: '#E53935' },
+  { id: 'fruits', name: 'Meva', icon: Apple, color: '#F44336' },
+  { id: 'vegetables', name: 'Sabzavot', icon: Salad, color: '#43A047' },
+  { id: 'other', name: 'Boshqa', icon: Package, color: '#78909C' },
 ]
 
 function HomePage() {
@@ -521,20 +522,28 @@ function HomePage() {
       <div className="filter-bar">
         {/* Categories Scroll */}
         <div className="filter-scroll">
-          {CATEGORIES.map(cat => (
-            <button
-              key={cat.id}
-              className={`filter-pill ${selectedCategory === cat.id ? 'active' : ''}`}
-              onClick={() => {
-                window.Telegram?.WebApp?.HapticFeedback?.impactOccurred?.('light')
-                setSelectedCategory(cat.id)
-              }}
-              style={{ '--pill-color': cat.color }}
-            >
-              <span className="filter-pill-icon">{cat.icon}</span>
-              <span className="filter-pill-text">{cat.name}</span>
-            </button>
-          ))}
+          {CATEGORIES.map(cat => {
+            const IconComponent = cat.icon
+            return (
+              <button
+                key={cat.id}
+                className={`filter-pill ${selectedCategory === cat.id ? 'active' : ''}`}
+                onClick={() => {
+                  window.Telegram?.WebApp?.HapticFeedback?.impactOccurred?.('light')
+                  setSelectedCategory(cat.id)
+                }}
+                style={{ '--pill-color': cat.color }}
+              >
+                <IconComponent
+                  size={18}
+                  strokeWidth={2}
+                  className="filter-pill-icon"
+                  aria-hidden="true"
+                />
+                <span className="filter-pill-text">{cat.name}</span>
+              </button>
+            )
+          })}
 
           {/* Divider */}
           <div className="filter-divider" />

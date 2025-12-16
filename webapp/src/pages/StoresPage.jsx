@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { Store, ShoppingCart, Coffee as CafeIcon, Utensils, Croissant, Salad, Star } from 'lucide-react'
 import api from '../api/client'
 import { useCart } from '../context/CartContext'
 import { getSavedLocation, getLatinCity, getCyrillicCity } from '../utils/cityUtils'
@@ -9,12 +10,12 @@ import StoreMap from '../components/StoreMap'
 import './StoresPage.css'
 
 const BUSINESS_TYPES = [
-  { id: 'all', label: 'Barchasi', icon: '🏪' },
-  { id: 'supermarket', label: 'Supermarket', icon: '🛒' },
-  { id: 'cafe', label: 'Kafe', icon: '☕' },
-  { id: 'restaurant', label: 'Restoran', icon: '🍽️' },
-  { id: 'bakery', label: 'Novvoyxona', icon: '🥖' },
-  { id: 'grocery', label: 'Oziq-ovqat', icon: '🥬' },
+  { id: 'all', label: 'Barchasi', icon: Store },
+  { id: 'supermarket', label: 'Supermarket', icon: ShoppingCart },
+  { id: 'cafe', label: 'Kafe', icon: CafeIcon },
+  { id: 'restaurant', label: 'Restoran', icon: Utensils },
+  { id: 'bakery', label: 'Novvoyxona', icon: Croissant },
+  { id: 'grocery', label: 'Oziq-ovqat', icon: Salad },
 ]
 
 function StoresPage() {
@@ -124,7 +125,7 @@ function StoresPage() {
   )
 
   const getTypeIcon = (type) => {
-    return BUSINESS_TYPES.find(t => t.id === type)?.icon || '🏪'
+    return BUSINESS_TYPES.find(t => t.id === type)?.icon || Store
   }
 
   const handleOfferClick = (offer) => {
@@ -308,13 +309,21 @@ function StoresPage() {
             {/* Header */}
             <div className="sp-sheet-header">
               <div className="sp-sheet-info">
-                <span className="sp-sheet-icon">{getTypeIcon(selectedStore.business_type)}</span>
+                {(() => {
+                  const IconComponent = getTypeIcon(selectedStore.business_type)
+                  return <IconComponent size={24} strokeWidth={2} className="sp-sheet-icon" aria-hidden="true" />
+                })()}
                 <div>
                   <h2>{selectedStore.name}</h2>
-                  {selectedStore.address && <p>📍 {selectedStore.address}</p>}
+                  {selectedStore.address && (
+                    <p>
+                      <span>📍</span> {selectedStore.address}
+                    </p>
+                  )}
                   {(storeReviews.average_rating > 0 || selectedStore.rating > 0) && (
                     <span className="sp-sheet-rating">
-                      ⭐ {(storeReviews.average_rating || selectedStore.rating).toFixed(1)}
+                      <Star size={16} fill="#FFB800" color="#FFB800" strokeWidth={0} aria-hidden="true" />
+                      <span>{(storeReviews.average_rating || selectedStore.rating).toFixed(1)}</span>
                       {storeReviews.total_reviews > 0 && (
                         <span className="sp-sheet-reviews-count"> ({storeReviews.total_reviews})</span>
                       )}
@@ -429,7 +438,7 @@ function StoresPage() {
                 // Reviews tab
                 storeReviews.reviews.length === 0 ? (
                   <div className="sp-sheet-empty">
-                    <span>⭐</span>
+                    <Star size={48} color="#FFB800" strokeWidth={2} aria-hidden="true" />
                     <p>Hali sharhlar yo'q</p>
                   </div>
                 ) : (
@@ -439,7 +448,9 @@ function StoresPage() {
                         <div className="sp-review-header">
                           <span className="sp-review-name">{review.user_name || 'Foydalanuvchi'}</span>
                           <span className="sp-review-stars">
-                            {'⭐'.repeat(review.rating)}
+                            {Array.from({ length: review.rating }).map((_, i) => (
+                              <Star key={i} size={14} fill="#FFB800" color="#FFB800" strokeWidth={0} aria-hidden="true" />
+                            ))}
                           </span>
                         </div>
                         {review.comment && (

@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { Apple, Droplet, Beef, Croissant, Milk, Coffee, Search } from 'lucide-react'
 import BottomNav from '../components/BottomNav'
 import './ExplorePage.css'
 
@@ -7,7 +8,7 @@ const CATEGORIES = [
     id: 'fruits-vegetables',
     name: "Mevalar va Sabzavotlar",
     nameEn: "Frash Fruits\n& Vegetable",
-    image: '🥬🍅🥕',
+    icon: Apple,
     color: 'linear-gradient(135deg, #E8F5E9 0%, #C8E6C9 100%)',
     borderColor: '#53B175'
   },
@@ -15,7 +16,7 @@ const CATEGORIES = [
     id: 'cooking-oil',
     name: "Yog' va Ghee",
     nameEn: "Cooking Oil\n& Ghee",
-    image: '🛢️',
+    icon: Droplet,
     color: 'linear-gradient(135deg, #FFF8E1 0%, #FFECB3 100%)',
     borderColor: '#F8A825'
   },
@@ -23,7 +24,7 @@ const CATEGORIES = [
     id: 'meat-fish',
     name: "Go'sht va Baliq",
     nameEn: "Meat & Fish",
-    image: '🥩🐟',
+    icon: Beef,
     color: 'linear-gradient(135deg, #FCE4EC 0%, #F8BBD0 100%)',
     borderColor: '#F06292'
   },
@@ -31,7 +32,7 @@ const CATEGORIES = [
     id: 'bakery',
     name: "Nonvoyxona va Shirinliklar",
     nameEn: "Bakery & Snacks",
-    image: '🍞🥖',
+    icon: Croissant,
     color: 'linear-gradient(135deg, #F3E5F5 0%, #E1BEE7 100%)',
     borderColor: '#BA68C8'
   },
@@ -39,7 +40,7 @@ const CATEGORIES = [
     id: 'dairy',
     name: "Sut va Tuxum",
     nameEn: "Dairy & Eggs",
-    image: '🥛🧀',
+    icon: Milk,
     color: 'linear-gradient(135deg, #FFF9C4 0%, #FFF59D 100%)',
     borderColor: '#FDD835'
   },
@@ -47,7 +48,7 @@ const CATEGORIES = [
     id: 'beverages',
     name: "Ichimliklar",
     nameEn: "Beverages",
-    image: '🥤🧃',
+    icon: Coffee,
     color: 'linear-gradient(135deg, #E1F5FE 0%, #B3E5FC 100%)',
     borderColor: '#29B6F6'
   }
@@ -85,10 +86,7 @@ function ExplorePage({ onNavigate }) {
       {/* Search */}
       <div className="search-section">
         <div className="search-box">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" className="search-icon">
-            <circle cx="11" cy="11" r="8" stroke="#7C7C7C" strokeWidth="2"/>
-            <path d="M21 21l-4.35-4.35" stroke="#7C7C7C" strokeWidth="2" strokeLinecap="round"/>
-          </svg>
+          <Search size={20} className="search-icon" color="#7C7C7C" strokeWidth={2} />
           <input
             type="text"
             className="search-input"
@@ -101,22 +99,30 @@ function ExplorePage({ onNavigate }) {
 
       {/* Categories Grid */}
       <div className="categories-grid">
-        {filteredCategories.map(category => (
-          <button
-            key={category.id}
-            className="category-card"
-            style={{
-              background: category.color,
-              borderColor: category.borderColor
-            }}
-            onClick={() => handleCategoryClick(category)}
-          >
-            <div className="category-image">
-              <span className="category-emoji">{category.image}</span>
-            </div>
-            <h3 className="category-name">{category.name}</h3>
-          </button>
-        ))}
+        {filteredCategories.map(category => {
+          const IconComponent = category.icon
+          return (
+            <button
+              key={category.id}
+              className="category-card"
+              style={{
+                background: category.color,
+                borderColor: category.borderColor
+              }}
+              onClick={() => handleCategoryClick(category)}
+            >
+              <div className="category-image">
+                <IconComponent
+                  size={48}
+                  color={category.borderColor}
+                  strokeWidth={2}
+                  aria-hidden="true"
+                />
+              </div>
+              <h3 className="category-name">{category.name}</h3>
+            </button>
+          )
+        })}
       </div>
 
       {/* Bottom Navigation */}

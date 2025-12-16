@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { Package, Settings, Info } from 'lucide-react'
 import api from '../api/client'
 import { useCart } from '../context/CartContext'
 import BottomNav from '../components/BottomNav'
@@ -162,9 +163,9 @@ function YanaPage() {
   }
 
   const menuItems = [
-    { id: 'orders', icon: '📦', label: 'Buyurtmalarim' },
-    { id: 'settings', icon: '⚙️', label: 'Sozlamalar' },
-    { id: 'about', icon: 'ℹ️', label: "Ilova haqida" },
+    { id: 'orders', icon: Package, label: 'Buyurtmalarim' },
+    { id: 'settings', icon: Settings, label: 'Sozlamalar' },
+    { id: 'about', icon: Info, label: "Ilova haqida" },
   ]
 
   return (
@@ -173,16 +174,19 @@ function YanaPage() {
       <header className="yana-header">
         <h1 className="yana-title">Yana</h1>
         <div className="yana-menu">
-          {menuItems.map(item => (
-            <button
-              key={item.id}
-              className={`yana-menu-item ${activeSection === item.id ? 'active' : ''}`}
-              onClick={() => setActiveSection(item.id)}
-            >
-              <span className="menu-icon">{item.icon}</span>
-              <span className="menu-label">{item.label}</span>
-            </button>
-          ))}
+          {menuItems.map(item => {
+            const IconComponent = item.icon
+            return (
+              <button
+                key={item.id}
+                className={`yana-menu-item ${activeSection === item.id ? 'active' : ''}`}
+                onClick={() => setActiveSection(item.id)}
+              >
+                <IconComponent size={20} strokeWidth={2} className="menu-icon" aria-hidden="true" />
+                <span className="menu-label">{item.label}</span>
+              </button>
+            )
+          })}
         </div>
       </header>
 
