@@ -9,537 +9,585 @@
         * { margin: 0; padding: 0; box-sizing: border-box; }
 
         :root {
-            --primary: #6366f1;
-            --primary-dark: #4f46e5;
-            --success: #10b981;
-            --success-light: #d1fae5;
-            --warning: #f59e0b;
-            --warning-light: #fef3c7;
-            --danger: #ef4444;
-            --danger-light: #fee2e2;
-            --info: #3b82f6;
-            --info-light: #dbeafe;
-            --bg: #f1f5f9;
-            --card: #ffffff;
-            --text: #0f172a;
-            --text-secondary: #64748b;
-            --text-muted: #94a3b8;
-            --border: #e2e8f0;
-            --radius: 16px;
-            --shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1);
+            /* Modern Food Delivery Colors */
+            --primary: #FF6B35;
+            --primary-dark: #E8551E;
+            --primary-light: #FFE5DE;
+            --success: #10B981;
+            --success-light: #D1FAE5;
+            --warning: #F59E0B;
+            --warning-light: #FEF3C7;
+            --danger: #EF4444;
+            --danger-light: #FEE2E2;
+            --info: #3B82F6;
+            --info-light: #DBEAFE;
+
+            /* Neutrals */
+            --bg: #F8FAFC;
+            --bg-secondary: #F1F5F9;
+            --card: #FFFFFF;
+            --text: #0F172A;
+            --text-secondary: #64748B;
+            --text-muted: #94A3B8;
+            --border: #E2E8F0;
+            --divider: #F1F5F9;
+
+            /* Spacing */
+            --space-xs: 4px;
+            --space-sm: 8px;
+            --space-md: 16px;
+            --space-lg: 24px;
+            --space-xl: 32px;
+
+            /* Radius */
+            --radius-sm: 8px;
+            --radius-md: 12px;
+            --radius-lg: 16px;
+            --radius-xl: 24px;
+            --radius-full: 9999px;
+
+            /* Shadows */
+            --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+            --shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1);
+            --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1);
             --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1);
+            --shadow-xl: 0 20px 25px -5px rgb(0 0 0 / 0.1);
         }
 
         body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', Roboto, sans-serif;
             background: var(--bg);
             color: var(--text);
             min-height: 100vh;
             padding-bottom: 80px;
-            overflow-x: hidden;
-            scroll-behavior: smooth;
-        }
-
-        * {
             -webkit-tap-highlight-color: transparent;
+            overflow-x: hidden;
         }
 
-        /* Header */
-        .header {
-            background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
-            color: white;
-            padding: 24px 20px;
-            text-align: center;
-            position: relative;
-            overflow: hidden;
-        }
-        .header::before {
-            content: '';
-            position: absolute;
-            top: -50%;
-            right: -50%;
-            width: 200%;
-            height: 200%;
-            background: radial-gradient(circle, rgba(255,255,255,0.1) 0%, transparent 70%);
-            animation: headerShine 10s linear infinite;
-        }
-        @keyframes headerShine {
-            0% { transform: translate(-50%, -50%) rotate(0deg); }
-            100% { transform: translate(-50%, -50%) rotate(360deg); }
-        }
-        .header h1 {
-            font-size: 22px;
-            font-weight: 700;
-            position: relative;
-            z-index: 1;
-        }
-        .header p {
-            font-size: 14px;
-            opacity: 0.9;
-            margin-top: 6px;
-            position: relative;
-            z-index: 1;
-            font-weight: 500;
-        }
-
-        /* Stats Grid */
-        .stats-grid {
-            display: grid;
-            grid-template-columns: repeat(2, 1fr);
-            gap: 12px;
-            padding: 16px;
-            margin-top: -20px;
-        }
-        .stat-card {
+        /* ===== HEADER ===== */
+        .app-header {
             background: var(--card);
-            border-radius: var(--radius);
-            padding: 16px;
-            box-shadow: var(--shadow);
-            position: relative;
-            overflow: hidden;
+            padding: var(--space-md) var(--space-lg);
+            border-bottom: 1px solid var(--border);
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            box-shadow: var(--shadow-sm);
         }
-        .stat-value {
-            font-size: 28px;
+
+        .header-content {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .store-info {
+            display: flex;
+            align-items: center;
+            gap: var(--space-md);
+        }
+
+        .store-avatar {
+            width: 48px;
+            height: 48px;
+            border-radius: var(--radius-md);
+            background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+        }
+
+        .store-details h1 {
+            font-size: 18px;
             font-weight: 700;
             color: var(--text);
-            line-height: 1.2;
-            display: flex;
-            align-items: baseline;
-            gap: 6px;
+            margin-bottom: 2px;
         }
-        .stat-label {
+
+        .store-status {
+            display: flex;
+            align-items: center;
+            gap: 6px;
             font-size: 13px;
             color: var(--text-secondary);
-            margin-top: 8px;
-            font-weight: 500;
-        }
-        .stat-trend {
-            font-size: 12px;
-            font-weight: 600;
-            padding: 2px 6px;
-            border-radius: 4px;
-            display: inline-flex;
-            align-items: center;
-            gap: 2px;
-        }
-        .stat-trend.up { color: var(--success); background: var(--success-light); }
-        .stat-trend.down { color: var(--danger); background: var(--danger-light); }
-        .stat-card.primary { background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%); }
-        .stat-card.primary .stat-value,
-        .stat-card.primary .stat-label,
-        .stat-card.primary .stat-trend { color: white; }
-        .stat-card.primary .stat-trend { background: rgba(255,255,255,0.2); }
-
-        /* Section */
-        .section {
-            display: none;
-            padding: 16px;
-            animation: fadeInSection 0.3s ease-in-out;
-        }
-        .section.active { display: block; }
-        @keyframes fadeInSection {
-            from { opacity: 0; transform: translateY(10px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
-        .section-title {
-            font-size: 18px;
-            font-weight: 600;
-            margin-bottom: 16px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
         }
 
-        /* Cards */
-        .card {
-            background: var(--card);
-            border-radius: var(--radius);
-            padding: 16px;
-            margin-bottom: 12px;
-            box-shadow: var(--shadow);
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: var(--success);
+            animation: pulse 2s infinite;
         }
-        .card-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 8px;
-        }
-        .card-title { font-weight: 600; font-size: 16px; }
-        .card-subtitle { color: var(--text-secondary); font-size: 14px; }
 
-        /* Product Card */
-        .product-card {
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        .header-actions {
             display: flex;
-            gap: 12px;
+            gap: var(--space-sm);
+        }
+
+        .icon-btn {
+            width: 40px;
+            height: 40px;
+            border-radius: var(--radius-md);
+            background: var(--bg);
+            border: none;
+            display: flex;
             align-items: center;
+            justify-content: center;
+            font-size: 20px;
             cursor: pointer;
             transition: all 0.2s;
-            border: 1px solid var(--border);
             position: relative;
         }
-        .product-card:hover {
-            transform: translateY(-2px);
-            box-shadow: var(--shadow-lg);
-            border-color: var(--primary);
+
+        .icon-btn:active {
+            transform: scale(0.95);
         }
-        .product-image {
-            width: 70px;
-            height: 70px;
-            border-radius: 12px;
-            background: var(--bg);
+
+        .notification-badge {
+            position: absolute;
+            top: -4px;
+            right: -4px;
+            width: 18px;
+            height: 18px;
+            background: var(--danger);
+            border-radius: 50%;
+            font-size: 11px;
+            font-weight: 700;
+            color: white;
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 28px;
-            overflow: hidden;
-            flex-shrink: 0;
-        }
-        .product-image img { width: 100%; height: 100%; object-fit: cover; }
-        .product-info {
-            flex: 1;
-            min-width: 0;
-        }
-        .product-name {
-            font-weight: 600;
-            margin-bottom: 4px;
-            font-size: 15px;
-            overflow: hidden;
-            text-overflow: ellipsis;
-            white-space: nowrap;
-        }
-        .product-price {
-            color: var(--primary);
-            font-weight: 700;
-            font-size: 18px;
-            margin-bottom: 4px;
-        }
-        .product-stock {
-            font-size: 12px;
-            color: var(--text-secondary);
-            display: inline-flex;
-            align-items: center;
-            gap: 4px;
-        }
-        .product-stock::before {
-            content: '📦';
-            font-size: 10px;
-        }
-        .product-badge {
-            position: absolute;
-            top: 12px;
-            right: 12px;
-            padding: 4px 10px;
-            border-radius: 12px;
-            font-size: 11px;
-            font-weight: 600;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-        }
-        .product-badge.active {
-            background: var(--success-light);
-            color: var(--success);
-        }
-        .product-badge.inactive {
-            background: var(--border);
-            color: var(--text-secondary);
-        }
-        .product-badge.low-stock {
-            background: var(--warning-light);
-            color: var(--warning);
+            border: 2px solid var(--card);
         }
 
-        /* Order Card */
-        .order-card {
-            cursor: pointer;
-            transition: all 0.2s;
-            border: 1px solid var(--border);
+        /* ===== STATS CARDS ===== */
+        .stats-section {
+            padding: var(--space-lg) var(--space-md);
+            max-width: 1200px;
+            margin: 0 auto;
         }
-        .order-card:hover {
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+            gap: var(--space-md);
+        }
+
+        .stat-card {
+            background: var(--card);
+            border-radius: var(--radius-lg);
+            padding: var(--space-lg);
+            box-shadow: var(--shadow);
+            transition: all 0.3s;
+        }
+
+        .stat-card:active {
             transform: translateY(-2px);
-            box-shadow: var(--shadow-lg);
-            border-color: var(--primary);
+            box-shadow: var(--shadow-md);
         }
-        .order-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
-        .order-code {
-            font-weight: 600;
+
+        .stat-card.primary {
+            background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
+            color: white;
+        }
+
+        .stat-icon {
+            width: 40px;
+            height: 40px;
+            border-radius: var(--radius-md);
+            background: rgba(255, 255, 255, 0.2);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 20px;
+            margin-bottom: var(--space-md);
+        }
+
+        .stat-card.primary .stat-icon {
+            background: rgba(255, 255, 255, 0.2);
+        }
+
+        .stat-value {
+            font-size: 32px;
+            font-weight: 700;
+            margin-bottom: var(--space-xs);
+            line-height: 1;
+        }
+
+        .stat-label {
+            font-size: 13px;
+            opacity: 0.8;
+            font-weight: 500;
+        }
+
+        /* ===== SECTION HEADER ===== */
+        .section {
+            padding: 0 var(--space-md) var(--space-lg);
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .section-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: var(--space-lg);
+        }
+
+        .section-title {
+            font-size: 20px;
+            font-weight: 700;
             color: var(--text);
-            font-family: 'Courier New', monospace;
-            font-size: 15px;
         }
-        .order-status {
-            padding: 6px 12px;
-            border-radius: 20px;
-            font-size: 12px;
+
+        .section-action {
+            font-size: 14px;
+            color: var(--primary);
+            text-decoration: none;
             font-weight: 600;
-            display: inline-flex;
+            display: flex;
             align-items: center;
             gap: 4px;
         }
-        .order-status::before { content: ''; }
-        .order-status.pending { background: var(--warning-light); color: #92400e; }
-        .order-status.pending::before { content: '⏱️'; }
-        .order-status.confirmed { background: var(--info-light); color: #1e40af; }
-        .order-status.confirmed::before { content: '✓'; }
-        .order-status.completed { background: var(--success-light); color: #065f46; }
-        .order-status.completed::before { content: '✓'; }
-        .order-status.cancelled { background: var(--danger-light); color: #991b1b; }
-        .order-status.cancelled::before { content: '✕'; }
-        .order-info { display: flex; justify-content: space-between; margin-top: 8px; }
-        .order-customer { color: var(--text-secondary); font-size: 14px; }
-        .order-total { font-weight: 600; color: var(--primary); font-size: 16px; }
 
-        /* Buttons */
-        .btn {
+        /* ===== TABS ===== */
+        .tabs {
+            display: flex;
+            gap: var(--space-sm);
+            padding: 0 var(--space-md) var(--space-md);
+            overflow-x: auto;
+            scrollbar-width: none;
+        }
+
+        .tabs::-webkit-scrollbar {
+            display: none;
+        }
+
+        .tab {
+            padding: var(--space-sm) var(--space-lg);
+            border-radius: var(--radius-full);
+            background: var(--card);
+            border: 2px solid var(--border);
+            font-size: 14px;
+            font-weight: 600;
+            color: var(--text-secondary);
+            cursor: pointer;
+            white-space: nowrap;
+            transition: all 0.2s;
+        }
+
+        .tab.active {
+            background: var(--primary);
+            border-color: var(--primary);
+            color: white;
+        }
+
+        .tab-badge {
             display: inline-flex;
             align-items: center;
             justify-content: center;
-            gap: 8px;
+            min-width: 20px;
+            height: 20px;
+            padding: 0 6px;
+            border-radius: var(--radius-full);
+            background: var(--bg);
+            color: var(--text);
+            font-size: 12px;
+            font-weight: 700;
+            margin-left: 6px;
+        }
+
+        .tab.active .tab-badge {
+            background: rgba(255, 255, 255, 0.3);
+            color: white;
+        }
+
+        /* ===== ORDER CARD ===== */
+        .order-card {
+            background: var(--card);
+            border-radius: var(--radius-lg);
+            padding: var(--space-lg);
+            margin-bottom: var(--space-md);
+            box-shadow: var(--shadow);
+            border-left: 4px solid var(--border);
+            transition: all 0.2s;
+        }
+
+        .order-card:active {
+            transform: scale(0.98);
+        }
+
+        .order-card.pending { border-left-color: var(--warning); }
+        .order-card.confirmed { border-left-color: var(--info); }
+        .order-card.preparing { border-left-color: var(--primary); }
+        .order-card.ready { border-left-color: var(--success); }
+        .order-card.delivering { border-left-color: var(--info); }
+        .order-card.completed { border-left-color: var(--text-muted); }
+        .order-card.cancelled { border-left-color: var(--danger); }
+
+        .order-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: var(--space-md);
+        }
+
+        .order-id {
+            font-size: 16px;
+            font-weight: 700;
+            color: var(--text);
+            font-family: 'SF Mono', 'Monaco', 'Courier New', monospace;
+        }
+
+        .order-status-badge {
+            padding: 6px 12px;
+            border-radius: var(--radius-full);
+            font-size: 12px;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .order-status-badge.pending { background: var(--warning-light); color: #92400E; }
+        .order-status-badge.confirmed { background: var(--info-light); color: #1E40AF; }
+        .order-status-badge.preparing { background: var(--primary-light); color: var(--primary-dark); }
+        .order-status-badge.ready { background: var(--success-light); color: #065F46; }
+        .order-status-badge.delivering { background: var(--info-light); color: #1E40AF; }
+        .order-status-badge.completed { background: var(--bg-secondary); color: var(--text-muted); }
+        .order-status-badge.cancelled { background: var(--danger-light); color: #991B1B; }
+
+        .order-content {
+            display: flex;
+            gap: var(--space-md);
+            margin-bottom: var(--space-md);
+        }
+
+        .order-image {
+            width: 64px;
+            height: 64px;
+            border-radius: var(--radius-md);
+            background: var(--bg);
+            object-fit: cover;
+            flex-shrink: 0;
+        }
+
+        .order-info {
+            flex: 1;
+        }
+
+        .order-title {
+            font-size: 16px;
+            font-weight: 600;
+            color: var(--text);
+            margin-bottom: var(--space-xs);
+        }
+
+        .order-meta {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+            font-size: 13px;
+            color: var(--text-secondary);
+        }
+
+        .order-meta-row {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .order-price {
+            font-size: 20px;
+            font-weight: 700;
+            color: var(--text);
+        }
+
+        .order-details {
+            padding: var(--space-md);
+            background: var(--bg);
+            border-radius: var(--radius-md);
+            margin-bottom: var(--space-md);
+        }
+
+        .detail-row {
+            display: flex;
+            align-items: center;
+            gap: var(--space-sm);
+            padding: var(--space-sm) 0;
+        }
+
+        .detail-row:not(:last-child) {
+            border-bottom: 1px solid var(--border);
+        }
+
+        .detail-icon {
+            font-size: 18px;
+        }
+
+        .detail-label {
+            font-size: 13px;
+            color: var(--text-secondary);
+            flex: 1;
+        }
+
+        .detail-value {
+            font-size: 14px;
+            font-weight: 600;
+            color: var(--text);
+            text-align: right;
+        }
+
+        .order-actions {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+            gap: var(--space-sm);
+        }
+
+        .btn {
             padding: 12px 20px;
-            border-radius: 12px;
+            border-radius: var(--radius-md);
             font-size: 15px;
             font-weight: 600;
             border: none;
             cursor: pointer;
-            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-            position: relative;
-            overflow: hidden;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
         }
-        .btn::before {
-            content: '';
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            width: 0;
-            height: 0;
-            border-radius: 50%;
-            background: rgba(255,255,255,0.3);
-            transform: translate(-50%, -50%);
-            transition: width 0.6s, height 0.6s;
+
+        .btn:active {
+            transform: scale(0.97);
         }
-        .btn:active::before {
-            width: 300px;
-            height: 300px;
-        }
+
         .btn-primary {
             background: var(--primary);
             color: white;
         }
-        .btn-primary:hover {
-            background: var(--primary-dark);
-            transform: translateY(-1px);
-            box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3);
-        }
-        .btn-primary:active {
-            background: var(--primary-dark);
-            transform: translateY(0);
-        }
-        .btn-sm { padding: 8px 12px; font-size: 13px; }
-        .btn:disabled {
-            opacity: 0.5;
-            cursor: not-allowed;
-            pointer-events: none;
-        }
 
-        /* FAB */
-        .fab {
-            position: fixed;
-            bottom: 90px;
-            right: 20px;
-            width: 56px;
-            height: 56px;
-            border-radius: 50%;
-            background: var(--primary);
+        .btn-success {
+            background: var(--success);
             color: white;
-            font-size: 28px;
-            border: none;
-            box-shadow: 0 4px 12px rgba(99, 102, 241, 0.4);
-            cursor: pointer;
-            z-index: 100;
-            transition: all 0.3s cubic-bezier(0.68, -0.55, 0.265, 1.55);
-        }
-        .fab:hover {
-            transform: scale(1.1) rotate(90deg);
-            box-shadow: 0 6px 20px rgba(99, 102, 241, 0.5);
-        }
-        .fab:active {
-            transform: scale(0.95) rotate(90deg);
-        }
-        @keyframes fabPulse {
-            0%, 100% { transform: scale(1); }
-            50% { transform: scale(1.05); }
         }
 
-        /* Bottom Nav */
+        .btn-danger {
+            background: var(--danger);
+            color: white;
+        }
+
+        .btn-outline {
+            background: white;
+            color: var(--text);
+            border: 2px solid var(--border);
+        }
+
+        .btn-outline:active {
+            background: var(--bg);
+        }
+
+        /* ===== EMPTY STATE ===== */
+        .empty-state {
+            text-align: center;
+            padding: var(--space-xl) var(--space-md);
+        }
+
+        .empty-icon {
+            font-size: 64px;
+            margin-bottom: var(--space-lg);
+            opacity: 0.3;
+        }
+
+        .empty-title {
+            font-size: 18px;
+            font-weight: 700;
+            color: var(--text);
+            margin-bottom: var(--space-sm);
+        }
+
+        .empty-text {
+            font-size: 14px;
+            color: var(--text-secondary);
+            line-height: 1.6;
+            max-width: 300px;
+            margin: 0 auto;
+        }
+
+        /* ===== BOTTOM NAV ===== */
         .bottom-nav {
             position: fixed;
             bottom: 0;
             left: 0;
             right: 0;
             background: var(--card);
-            display: flex;
-            justify-content: space-around;
-            padding: 8px 0 12px;
             border-top: 1px solid var(--border);
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            padding: var(--space-sm) 0;
             z-index: 100;
+            box-shadow: 0 -4px 6px -1px rgb(0 0 0 / 0.05);
         }
+
         .nav-item {
             display: flex;
             flex-direction: column;
             align-items: center;
             gap: 4px;
-            padding: 8px 16px;
-            color: var(--text-secondary);
+            padding: var(--space-sm);
+            color: var(--text-muted);
             text-decoration: none;
-            font-size: 12px;
+            font-size: 11px;
+            font-weight: 600;
             cursor: pointer;
             border: none;
             background: none;
-        }
-        .nav-item.active { color: var(--primary); }
-        .nav-icon { font-size: 22px; }
-
-        /* Modal */
-        .modal {
-            display: none;
-            position: fixed;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background: rgba(0,0,0,0.6);
-            backdrop-filter: blur(4px);
-            -webkit-backdrop-filter: blur(4px);
-            z-index: 200;
-            align-items: flex-end;
-            animation: fadeIn 0.2s;
-        }
-        .modal.active { display: flex; }
-        .modal-content {
-            background: var(--card);
-            width: 100%;
-            max-height: 90vh;
-            border-radius: 20px 20px 0 0;
-            padding: 24px;
-            overflow-y: auto;
-            animation: slideUp 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
-            box-shadow: 0 -4px 24px rgba(0,0,0,0.15);
-        }
-        @keyframes slideUp {
-            from { transform: translateY(100%); opacity: 0; }
-            to { transform: translateY(0); opacity: 1; }
-        }
-        .modal-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 24px;
-            padding-bottom: 16px;
-            border-bottom: 2px solid var(--border);
-        }
-        .modal-title {
-            font-size: 20px;
-            font-weight: 700;
-            color: var(--text);
-        }
-        .modal-close {
-            width: 36px;
-            height: 36px;
-            border-radius: 50%;
-            background: var(--bg);
-            border: none;
-            font-size: 20px;
-            cursor: pointer;
             transition: all 0.2s;
+        }
+
+        .nav-item.active {
+            color: var(--primary);
+        }
+
+        .nav-icon {
+            font-size: 24px;
+            transition: transform 0.2s;
+        }
+
+        .nav-item.active .nav-icon {
+            transform: scale(1.1);
+        }
+
+        /* ===== LOADING ===== */
+        .loading {
             display: flex;
-            align-items: center;
             justify-content: center;
-        }
-        .modal-close:hover {
-            background: var(--border);
-            transform: rotate(90deg);
-        }
-        .modal-close:active {
-            transform: rotate(90deg) scale(0.9);
+            padding: var(--space-xl);
         }
 
-        /* Form */
-        .form-group {
-            margin-bottom: 20px;
-            position: relative;
-        }
-        .form-label {
-            display: block;
-            font-size: 14px;
-            font-weight: 600;
-            margin-bottom: 8px;
-            color: var(--text);
-        }
-        .form-label .required {
-            color: var(--danger);
-        }
-        .form-input {
-            width: 100%;
-            padding: 14px 16px;
-            border: 2px solid var(--border);
-            border-radius: 12px;
-            font-size: 16px;
-            transition: all 0.2s;
-            background: var(--card);
-        }
-        .form-input:focus {
-            outline: none;
-            border-color: var(--primary);
-            box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
-        }
-        .form-input:invalid:not(:placeholder-shown) {
-            border-color: var(--danger);
-        }
-        .form-input.success {
-            border-color: var(--success);
-        }
-        .form-error {
-            display: none;
-            font-size: 12px;
-            color: var(--danger);
-            margin-top: 6px;
-        }
-        .form-error.visible {
-            display: block;
-        }
-        .form-hint {
-            font-size: 12px;
-            color: var(--text-muted);
-            margin-top: 6px;
+        .spinner {
+            width: 40px;
+            height: 40px;
+            border: 4px solid var(--border);
+            border-top-color: var(--primary);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
         }
 
-        /* Empty State */
-        .empty-state {
-            text-align: center;
-            padding: 80px 20px;
-            color: var(--text-secondary);
-        }
-        .empty-state-icon {
-            font-size: 72px;
-            margin-bottom: 16px;
-            opacity: 0.3;
-            filter: grayscale(1);
-        }
-        .empty-state-title {
-            font-size: 18px;
-            font-weight: 600;
-            color: var(--text);
-            margin-bottom: 8px;
-        }
-        .empty-state-text {
-            font-size: 14px;
-            color: var(--text-muted);
-            line-height: 1.5;
-        }
-        .empty-state-action {
-            margin-top: 20px;
+        @keyframes spin {
+            to { transform: rotate(360deg); }
         }
 
-        /* Toast */
+        /* ===== TOAST ===== */
         .toast {
             position: fixed;
             bottom: 100px;
@@ -548,291 +596,149 @@
             background: var(--text);
             color: white;
             padding: 14px 24px;
-            border-radius: 12px;
+            border-radius: var(--radius-full);
             font-size: 14px;
-            font-weight: 500;
+            font-weight: 600;
             z-index: 300;
             animation: toastIn 0.3s cubic-bezier(0.68, -0.55, 0.265, 1.55);
-            box-shadow: 0 8px 24px rgba(0,0,0,0.2);
-            min-width: 280px;
-            max-width: 90vw;
-            text-align: center;
+            box-shadow: var(--shadow-xl);
             display: flex;
             align-items: center;
-            gap: 8px;
-            justify-content: center;
-            overflow: hidden;
+            gap: var(--space-sm);
         }
+
         .toast.success { background: var(--success); }
         .toast.error { background: var(--danger); }
         .toast.warning { background: var(--warning); color: var(--text); }
-        .toast.info { background: var(--info); }
-        .toast-icon {
-            font-size: 18px;
-            flex-shrink: 0;
-        }
-        .toast-progress {
-            position: absolute;
-            bottom: 0;
-            left: 0;
-            height: 3px;
-            background: rgba(255,255,255,0.3);
-            animation: toastProgress 3s linear;
-        }
+
         @keyframes toastIn {
             from { opacity: 0; transform: translate(-50%, 20px) scale(0.9); }
             to { opacity: 1; transform: translate(-50%, 0) scale(1); }
         }
-        @keyframes toastOut {
-            from { opacity: 1; transform: translate(-50%, 0); }
-            to { opacity: 0; transform: translate(-50%, -20px); }
-        }
-        @keyframes toastProgress {
-            from { width: 100%; }
-            to { width: 0%; }
-        }
 
-        /* Loading */
-        .loading {
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            padding: 40px;
-        }
-        .spinner {
-            width: 40px;
-            height: 40px;
-            border: 3px solid var(--border);
-            border-top-color: var(--primary);
-            border-radius: 50%;
-            animation: spin 1s linear infinite;
-        }
-        @keyframes spin { to { transform: rotate(360deg); } }
-
-        /* Skeleton Loaders */
-        .skeleton {
-            background: linear-gradient(90deg, var(--border) 25%, #f0f0f0 50%, var(--border) 75%);
-            background-size: 200% 100%;
-            animation: shimmer 1.5s infinite;
-            border-radius: 8px;
-        }
-        @keyframes shimmer { 0% { background-position: -200% 0; } 100% { background-position: 200% 0; } }
-
-        .skeleton-card {
-            background: var(--card);
-            border-radius: var(--radius);
-            padding: 16px;
-            margin-bottom: 12px;
-            box-shadow: var(--shadow);
-        }
-        .skeleton-header {
-            display: flex;
-            gap: 12px;
-            margin-bottom: 12px;
-        }
-        .skeleton-avatar {
-            width: 60px;
-            height: 60px;
-            border-radius: 12px;
-        }
-        .skeleton-text {
-            flex: 1;
-            display: flex;
-            flex-direction: column;
-            gap: 8px;
-        }
-        .skeleton-line {
-            height: 16px;
-            border-radius: 4px;
-        }
-        .skeleton-line.short { width: 60%; }
-        .skeleton-line.medium { width: 80%; }
-
-        .skeleton-stat {
-            background: var(--card);
-            border-radius: var(--radius);
-            padding: 16px;
-            box-shadow: var(--shadow);
-        }
-        .skeleton-stat-value {
-            height: 32px;
-            width: 80px;
-            margin-bottom: 8px;
-            border-radius: 6px;
-        }
-        .skeleton-stat-label {
-            height: 14px;
-            width: 120px;
-            border-radius: 4px;
-        }
-
-        /* Error State */
-        .error-state {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            height: 80vh;
-            text-align: center;
-            padding: 20px;
-        }
-        .error-state-icon { font-size: 64px; margin-bottom: 20px; }
-        .error-state h2 { margin-bottom: 10px; }
-        .error-state p { color: var(--text-secondary); margin-bottom: 20px; }
+        /* ===== UTILITIES ===== */
+        .hide { display: none !important; }
+        .mt-lg { margin-top: var(--space-lg); }
+        .mb-lg { margin-bottom: var(--space-lg); }
     </style>
 </head>
 <body>
     <!-- Header -->
-    <header class="header">
-        <h1>🏪 Панель партнёра</h1>
-        <p id="storeName">Загрузка...</p>
+    <header class="app-header">
+        <div class="header-content">
+            <div class="store-info">
+                <div class="store-avatar">🏪</div>
+                <div class="store-details">
+                    <h1 id="storeName">Загрузка...</h1>
+                    <div class="store-status">
+                        <div class="status-dot"></div>
+                        <span>Открыто</span>
+                    </div>
+                </div>
+            </div>
+            <div class="header-actions">
+                <button class="icon-btn" onclick="refreshAll()">
+                    🔄
+                </button>
+                <button class="icon-btn">
+                    🔔
+                    <span class="notification-badge" id="notificationCount" style="display: none;">0</span>
+                </button>
+            </div>
+        </div>
     </header>
 
-    <!-- Dashboard -->
-    <section id="dashboard" class="section active">
+    <!-- Stats -->
+    <section class="stats-section">
         <div class="stats-grid">
             <div class="stat-card primary">
-                <div class="stat-value" id="todayRevenue">-</div>
+                <div class="stat-icon">💰</div>
+                <div class="stat-value" id="todayRevenue">0</div>
                 <div class="stat-label">Выручка сегодня</div>
             </div>
             <div class="stat-card">
-                <div class="stat-value" id="todayOrders">-</div>
-                <div class="stat-label">Заказов сегодня</div>
+                <div class="stat-icon">📦</div>
+                <div class="stat-value" id="todayOrders">0</div>
+                <div class="stat-label">Заказов</div>
             </div>
             <div class="stat-card">
-                <div class="stat-value" id="totalProducts">-</div>
-                <div class="stat-label">Всего товаров</div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-value" id="pendingOrders">-</div>
-                <div class="stat-label">Ждут обработки</div>
-            </div>
-        </div>
-
-        <div style="padding: 0 16px;">
-            <div class="section-title">Последние заказы</div>
-            <div id="recentOrders">
-                <div class="loading"><div class="spinner"></div></div>
+                <div class="stat-icon">⏰</div>
+                <div class="stat-value" id="pendingCount">0</div>
+                <div class="stat-label">Ожидают</div>
             </div>
         </div>
     </section>
 
-    <!-- Products -->
-    <section id="products" class="section">
-        <div class="section-title">
-            Мои товары
-            <button class="btn btn-primary btn-sm" onclick="showAddProduct()">+ Добавить</button>
+    <!-- Orders Section -->
+    <section class="section">
+        <div class="section-header">
+            <div class="section-title">Заказы</div>
+            <a href="#" class="section-action" onclick="showAllOrders(); return false;">
+                Все →
+            </a>
         </div>
-        <div id="productsList">
-            <div class="loading"><div class="spinner"></div></div>
-        </div>
-    </section>
 
-    <!-- Orders -->
-    <section id="orders" class="section">
-        <div class="section-title">Все заказы</div>
+        <!-- Order Status Tabs -->
+        <div class="tabs">
+            <button class="tab active" data-status="new" onclick="filterOrders('new')">
+                Новые <span class="tab-badge" id="newCount">0</span>
+            </button>
+            <button class="tab" data-status="preparing" onclick="filterOrders('preparing')">
+                Готовятся <span class="tab-badge" id="preparingCount">0</span>
+            </button>
+            <button class="tab" data-status="ready" onclick="filterOrders('ready')">
+                Готовы <span class="tab-badge" id="readyCount">0</span>
+            </button>
+            <button class="tab" data-status="completed" onclick="filterOrders('completed')">
+                История
+            </button>
+        </div>
+
+        <!-- Orders List -->
         <div id="ordersList">
             <div class="loading"><div class="spinner"></div></div>
         </div>
     </section>
 
-    <!-- Stats -->
-    <section id="stats" class="section">
-        <div class="section-title">Статистика</div>
-        <div id="statsContent">
-            <div class="loading"><div class="spinner"></div></div>
-        </div>
-    </section>
-
-    <!-- FAB -->
-    <button class="fab" onclick="showAddProduct()" id="fab">+</button>
-
     <!-- Bottom Navigation -->
     <nav class="bottom-nav">
-        <button class="nav-item active" onclick="switchView('dashboard', this)">
+        <button class="nav-item active" onclick="switchView('dashboard')">
             <span class="nav-icon">🏠</span>
             <span>Главная</span>
         </button>
-        <button class="nav-item" onclick="switchView('products', this)">
+        <button class="nav-item" onclick="switchView('products')">
             <span class="nav-icon">📦</span>
             <span>Товары</span>
         </button>
-        <button class="nav-item" onclick="switchView('orders', this)">
-            <span class="nav-icon">📋</span>
-            <span>Заказы</span>
-        </button>
-        <button class="nav-item" onclick="switchView('stats', this)">
+        <button class="nav-item" onclick="switchView('stats')">
             <span class="nav-icon">📊</span>
             <span>Статистика</span>
         </button>
+        <button class="nav-item" onclick="switchView('settings')">
+            <span class="nav-icon">⚙️</span>
+            <span>Еще</span>
+        </button>
     </nav>
 
-    <!-- Add Product Modal -->
-    <div class="modal" id="productModal">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h3 class="modal-title" id="modalTitle">Добавить товар</h3>
-                <button class="modal-close" onclick="closeModal()">✕</button>
-            </div>
-            <form id="productForm">
-                <input type="hidden" id="productId">
-                <div class="form-group">
-                    <label class="form-label">Название *</label>
-                    <input type="text" class="form-input" id="productTitle" required placeholder="Например: Пицца Маргарита">
-                </div>
-                <div class="form-group">
-                    <label class="form-label">Категория</label>
-                    <input type="text" class="form-input" id="productCategory" placeholder="Например: Пицца">
-                </div>
-                <div class="form-group">
-                    <label class="form-label">Цена (сум) *</label>
-                    <input type="number" class="form-input" id="productPrice" required placeholder="35000">
-                </div>
-                <div class="form-group">
-                    <label class="form-label">Количество *</label>
-                    <input type="number" class="form-input" id="productQuantity" required placeholder="10" value="10">
-                </div>
-                <div class="form-group">
-                    <label class="form-label">Описание</label>
-                    <input type="text" class="form-input" id="productDescription" placeholder="Краткое описание товара">
-                </div>
-                <button type="submit" class="btn btn-primary" style="width: 100%;">Сохранить</button>
-            </form>
-        </div>
-    </div>
-
     <script>
-        // ============================================
-        // Fudly Partner Panel
-        // ============================================
-
+        // ===== INITIALIZATION =====
         const tg = window.Telegram?.WebApp;
         if (tg) { tg.ready(); tg.expand(); }
 
-        // Get user ID from URL (passed by bot)
         const urlParams = new URLSearchParams(window.location.search);
         const urlUserId = urlParams.get('uid');
 
-        // Get initData - try multiple methods
         function getInitData() {
             let finalData = '';
             let source = 'none';
 
-            // 1. From Telegram WebApp SDK (preferred)
             if (tg?.initData && tg.initData.length > 0) {
-                console.log('✅ initData from SDK');
                 finalData = tg.initData;
                 source = 'sdk';
-            }
-            // 2. From URL hash
-            else if (window.location.hash.slice(1) && window.location.hash.slice(1).includes('user=')) {
-                console.log('✅ initData from hash');
+            } else if (window.location.hash.slice(1) && window.location.hash.slice(1).includes('user=')) {
                 finalData = window.location.hash.slice(1);
                 source = 'hash';
-            }
-            // 3. Build from initDataUnsafe (fallback)
-            else if (tg?.initDataUnsafe?.user) {
-                console.log('⚠️ Building initData from initDataUnsafe');
+            } else if (tg?.initDataUnsafe?.user) {
                 const user = tg.initDataUnsafe.user;
                 const params = new URLSearchParams();
                 params.set('user', JSON.stringify(user));
@@ -841,156 +747,37 @@
                 source = 'unsafe';
             }
 
-            // 4. Add uid from URL if available (bot passes user_id in URL)
             if (urlUserId) {
-                console.log('✅ Adding uid from URL:', urlUserId);
-                if (finalData) {
-                    // Append uid to existing initData
-                    finalData = `${finalData}&uid=${urlUserId}`;
-                    source += '+url';
-                } else {
-                    // Use only uid if no other initData available
-                    finalData = `uid=${urlUserId}`;
-                    source = 'url-only';
-                }
+                finalData = finalData ? `${finalData}&uid=${urlUserId}` : `uid=${urlUserId}`;
+                source += '+url';
             }
 
-            if (!finalData) {
-                console.warn('❌ No initData found anywhere');
-                return { data: '', source: 'none' };
-            }
-
-            return { data: finalData, source: source, userId: urlUserId };
+            return { data: finalData, source };
         }
 
-        const initResult = getInitData();
-        const initData = initResult.data;
-        const initSource = initResult.source;
+        const { data: initData, source: initSource } = getInitData();
         const tgUser = tg?.initDataUnsafe?.user;
         const userId = urlUserId || tgUser?.id || 'none';
-
-        // Debug info (kept for console debugging only)
-        const debugInfo = {
-            hasTelegram: !!window.Telegram,
-            hasWebApp: !!tg,
-            platform: tg?.platform || 'unknown',
-            version: tg?.version || 'unknown',
-            initDataLength: initData?.length || 0,
-            source: initSource,
-            userId: userId,
-            userName: tgUser?.first_name || 'none'
-        };
 
         const API = 'https://fudly-bot-production.up.railway.app/api/partner';
         const getAuth = () => initData ? `tma ${initData}` : '';
 
-        let products = [];
-        let orders = [];
+        let allOrders = [];
+        let currentFilter = 'new';
 
-        // ============================================
-        // API
-        // ============================================
-        async function api(endpoint, options = {}) {
-            console.log(`📡 ${options.method || 'GET'} ${endpoint}`);
-            try {
-                const res = await fetch(`${API}${endpoint}`, {
-                    ...options,
-                    headers: { 'Authorization': getAuth(), 'Content-Type': 'application/json', ...options.headers }
-                });
-
-                console.log(`📥 Response ${endpoint}: status=${res.status}`);
-
-                if (!res.ok) {
-                    const err = await res.json().catch(() => ({}));
-                    console.error(`❌ API Error ${endpoint}:`, res.status, err);
-                    if (res.status === 401) return showError('Ошибка авторизации', `Код 401: ${err.detail || 'Unauthorized'}`);
-                    if (res.status === 403) return showError('Нет доступа', `Код 403: ${err.detail || 'Вы не партнёр'}`);
-                    throw new Error(err.detail || `HTTP ${res.status}`);
-                }
-                return res.json();
-            } catch (e) {
-                console.error(`❌ Network error ${endpoint}:`, e);
-                toast(e.message || 'Ошибка сети', 'error');
-                throw e;
-            }
-        }
-
-        // ============================================
-        // Skeleton Loaders
-        // ============================================
-        function showSkeletonStats() {
-            return `
-                <div class="skeleton-stat">
-                    <div class="skeleton skeleton-stat-value"></div>
-                    <div class="skeleton skeleton-stat-label"></div>
-                </div>
-            `.repeat(4);
-        }
-
-        function showSkeletonCards(count = 3) {
-            return `
-                <div class="skeleton-card">
-                    <div class="skeleton-header">
-                        <div class="skeleton skeleton-avatar"></div>
-                        <div class="skeleton-text">
-                            <div class="skeleton skeleton-line"></div>
-                            <div class="skeleton skeleton-line short"></div>
-                        </div>
-                    </div>
-                </div>
-            `.repeat(count);
-        }
-
-        // ============================================
-        // Skeleton Loaders
-        // ============================================
-        function showSkeletonStats() {
-            return `
-                <div class="skeleton-stat">
-                    <div class="skeleton skeleton-stat-value"></div>
-                    <div class="skeleton skeleton-stat-label"></div>
-                </div>
-            `.repeat(4);
-        }
-
-        function showSkeletonCards(count = 3) {
-            return `
-                <div class="skeleton-card">
-                    <div class="skeleton-header">
-                        <div class="skeleton skeleton-avatar"></div>
-                        <div class="skeleton-text">
-                            <div class="skeleton skeleton-line"></div>
-                            <div class="skeleton skeleton-line short"></div>
-                        </div>
-                    </div>
-                </div>
-            `.repeat(count);
-        }
-
-        // ============================================
-        // UI Helpers
-        // ============================================
-        function toast(msg, type = 'default') {
-            document.querySelectorAll('.toast').forEach(t => {
-                t.style.animation = 'toastOut 0.2s forwards';
-                setTimeout(() => t.remove(), 200);
+        // ===== API HELPERS =====
+        async function api(endpoint) {
+            const res = await fetch(`${API}${endpoint}`, {
+                headers: { 'Authorization': getAuth() }
             });
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+            return res.json();
+        }
 
-            const icons = {
-                success: '✅',
-                error: '❌',
-                warning: '⚠️',
-                info: 'ℹ️',
-                default: '📦'
-            };
-
+        function toast(msg, type = 'success') {
             const t = document.createElement('div');
             t.className = `toast ${type}`;
-            t.innerHTML = `
-                <span class="toast-icon">${icons[type] || icons.default}</span>
-                <span>${msg}</span>
-                <div class="toast-progress"></div>
-            `;
+            t.innerHTML = `<span>${getStatusEmoji(type)}</span><span>${msg}</span>`;
             document.body.appendChild(t);
             setTimeout(() => {
                 t.style.animation = 'toastOut 0.2s forwards';
@@ -998,294 +785,323 @@
             }, 3000);
         }
 
-        function showError(title, msg) {
-            document.body.innerHTML = `
-                <div class="error-state">
-                    <div class="error-state-icon">⚠️</div>
-                    <h2>${title}</h2>
-                    <p>${msg}</p>
-                    <button class="btn btn-primary" onclick="location.reload()">Попробовать снова</button>
-                </div>
-            `;
+        function getStatusEmoji(status) {
+            const emojis = {
+                success: '✅',
+                error: '❌',
+                warning: '⚠️',
+                pending: '⏳',
+                confirmed: '✅',
+                preparing: '👨‍🍳',
+                ready: '✅',
+                delivering: '🚚',
+                completed: '🎉',
+                cancelled: '❌'
+            };
+            return emojis[status] || '📦';
         }
 
-        function money(n) { return new Intl.NumberFormat('ru-RU').format(n || 0) + ' сум'; }
-        function date(d) { return d ? new Date(d).toLocaleDateString('ru-RU', {day:'numeric', month:'short', hour:'2-digit', minute:'2-digit'}) : '-'; }
-        function esc(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
-
-        // ============================================
-        // Views
-        // ============================================
-        function switchView(view, btn) {
-            // Smooth scroll to top
-            window.scrollTo({ top: 0, behavior: 'smooth' });
-
-            document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
-            document.getElementById(view)?.classList.add('active');
-            document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
-            btn?.classList.add('active');
-
-            const fab = document.getElementById('fab');
-            if (view === 'products' || view === 'dashboard') {
-                fab.style.display = 'block';
-                fab.style.animation = 'fadeInSection 0.3s';
-            } else {
-                fab.style.display = 'none';
-            }
-
-            if (view === 'dashboard') loadDashboard();
-            if (view === 'products') loadProducts();
-            if (view === 'orders') loadOrders();
-            if (view === 'stats') loadStats();
+        function money(n) {
+            return new Intl.NumberFormat('ru-RU').format(n || 0) + ' сум';
         }
 
-        // ============================================
-        // Dashboard
-        // ============================================
+        function timeAgo(dateStr) {
+            if (!dateStr) return '';
+            const date = new Date(dateStr);
+            const now = new Date();
+            const diffMs = now - date;
+            const diffMins = Math.floor(diffMs / 60000);
+
+            if (diffMins < 1) return 'только что';
+            if (diffMins < 60) return `${diffMins} мин назад`;
+            const diffHours = Math.floor(diffMins / 60);
+            if (diffHours < 24) return `${diffHours} ч назад`;
+            const diffDays = Math.floor(diffHours / 24);
+            return `${diffDays} дн назад`;
+        }
+
+        // ===== DATA LOADING =====
         async function loadDashboard() {
             try {
-                const [profile, prods, ords, stats] = await Promise.all([
-                    api('/profile'), api('/products'), api('/orders'), api('/stats?period=today')
+                const [profile, orders, stats] = await Promise.all([
+                    api('/profile'),
+                    api('/orders'),
+                    api('/stats?period=today')
                 ]);
 
                 document.getElementById('storeName').textContent = profile?.store?.name || 'Мой магазин';
                 document.getElementById('todayRevenue').textContent = money(stats?.revenue);
                 document.getElementById('todayOrders').textContent = stats?.orders || 0;
-                document.getElementById('totalProducts').textContent = prods?.length || 0;
-                document.getElementById('pendingOrders').textContent = ords?.filter(o => o.status === 'pending')?.length || 0;
 
-                products = prods || [];
-                orders = ords || [];
-
-                renderRecentOrders();
-            } catch (e) { console.error('Dashboard error:', e); }
-        }
-
-        function renderRecentOrders() {
-            const c = document.getElementById('recentOrders');
-            const recent = orders.slice(0, 3);
-            if (!recent.length) {
-                c.innerHTML = `
-                    <div class="empty-state" style="padding: 40px 20px;">
-                        <div class="empty-state-icon" style="font-size: 48px;">📋</div>
-                        <div class="empty-state-text">Пока нет заказов</div>
-                    </div>`;
-                return;
+                allOrders = orders || [];
+                updateOrdersView();
+            } catch (e) {
+                console.error('Load error:', e);
+                toast('Ошибка загрузки данных', 'error');
             }
-            c.innerHTML = recent.map(o => orderCard(o)).join('');
         }
 
-        // ============================================
-        // Products
-        // ============================================
-        async function loadProducts() {
-            try {
-                products = await api('/products') || [];
-                renderProducts();
-            } catch (e) {}
-        }
+        function updateOrdersView() {
+            const pending = allOrders.filter(o => o.status === 'pending');
+            const preparing = allOrders.filter(o => o.status === 'preparing' || o.status === 'confirmed');
+            const ready = allOrders.filter(o => o.status === 'ready');
 
-        function renderProducts() {
-            const c = document.getElementById('productsList');
-            if (!products.length) {
-                c.innerHTML = `
-                    <div class="empty-state">
-                        <div class="empty-state-icon">📦</div>
-                        <div class="empty-state-title">Нет товаров</div>
-                        <div class="empty-state-text">Добавьте первый товар,<br>чтобы начать продажи</div>
-                        <div class="empty-state-action">
-                            <button class="btn btn-primary" onclick="showAddProduct()">+ Добавить товар</button>
-                        </div>
-                    </div>`;
-                return;
+            document.getElementById('pendingCount').textContent = pending.length;
+            document.getElementById('newCount').textContent = pending.length;
+            document.getElementById('preparingCount').textContent = preparing.length;
+            document.getElementById('readyCount').textContent = ready.length;
+
+            const notifCount = pending.length;
+            const badge = document.getElementById('notificationCount');
+            if (notifCount > 0) {
+                badge.textContent = notifCount;
+                badge.style.display = 'flex';
+            } else {
+                badge.style.display = 'none';
             }
-            c.innerHTML = products.map(p => `
-                <div class="card product-card" onclick="editProduct(${p.offer_id})">
-                    <div class="product-image">${p.photo_id ? `<img src="${API}/photo/${p.photo_id}">` : '📦'}</div>
-                    <div class="product-info">
-                        <div class="product-name">${esc(p.title || 'Без названия')}</div>
-                        <div class="product-price">${money(p.discount_price)}</div>
-                        <div class="product-stock">${p.quantity} шт</div>
-                    </div>
-                    <div class="product-status ${p.status !== 'active' ? 'inactive' : ''}"></div>
-                </div>
-            `).join('');
+
+            renderOrders();
         }
 
-        // ============================================
-        // Orders
-        // ============================================
-        async function loadOrders() {
-            try {
-                orders = await api('/orders') || [];
-                renderOrders();
-            } catch (e) {}
+        function filterOrders(status) {
+            currentFilter = status;
+
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            document.querySelector(`.tab[data-status="${status}"]`).classList.add('active');
+
+            renderOrders();
         }
 
         function renderOrders() {
-            const c = document.getElementById('ordersList');
-            if (!orders.length) {
-                c.innerHTML = `
+            const container = document.getElementById('ordersList');
+
+            let filtered = [];
+            if (currentFilter === 'new') {
+                filtered = allOrders.filter(o => o.status === 'pending');
+            } else if (currentFilter === 'preparing') {
+                filtered = allOrders.filter(o => o.status === 'preparing' || o.status === 'confirmed');
+            } else if (currentFilter === 'ready') {
+                filtered = allOrders.filter(o => o.status === 'ready' || o.status === 'delivering');
+            } else if (currentFilter === 'completed') {
+                filtered = allOrders.filter(o => o.status === 'completed' || o.status === 'cancelled');
+            }
+
+            if (filtered.length === 0) {
+                container.innerHTML = `
                     <div class="empty-state">
-                        <div class="empty-state-icon">📋</div>
-                        <div class="empty-state-title">Нет заказов</div>
-                        <div class="empty-state-text">Здесь появятся заказы<br>от ваших клиентов</div>
-                    </div>`;
+                        <div class="empty-icon">📦</div>
+                        <div class="empty-title">Нет заказов</div>
+                        <div class="empty-text">Здесь появятся заказы когда клиенты оформят покупку</div>
+                    </div>
+                `;
                 return;
             }
-            c.innerHTML = orders.map(o => orderCard(o)).join('');
+
+            container.innerHTML = filtered.map(order => renderOrderCard(order)).join('');
         }
 
-        function orderCard(o) {
-            const status = {pending:'Ожидает', confirmed:'Подтверждён', completed:'Завершён', cancelled:'Отменён'};
+        function renderOrderCard(order) {
+            const statusName = {
+                pending: 'Ожидает',
+                confirmed: 'Подтверждён',
+                preparing: 'Готовится',
+                ready: 'Готов',
+                delivering: 'В пути',
+                completed: 'Завершён',
+                cancelled: 'Отменён'
+            };
+
+            const isDelivery = order.order_type === 'delivery';
+            const typeIcon = isDelivery ? '🚚' : '🛍️';
+            const typeText = isDelivery ? 'Доставка' : 'Самовывоз';
+
+            const actions = getOrderActions(order);
+
             return `
-                <div class="card order-card">
+                <div class="order-card ${order.status}">
                     <div class="order-header">
-                        <span class="order-code">#${o.booking_code || o.order_id || '-'}</span>
-                        <span class="order-status ${o.status}">${status[o.status] || o.status}</span>
+                        <div class="order-id">#${order.booking_code || order.order_id}</div>
+                        <div class="order-status-badge ${order.status}">
+                            ${getStatusEmoji(order.status)} ${statusName[order.status] || order.status}
+                        </div>
                     </div>
-                    <div class="order-info">
-                        <span class="order-customer">${esc(o.customer_name || 'Клиент')}</span>
-                        <span class="order-total">${money(o.price)}</span>
+
+                    <div class="order-content">
+                        <img src="https://via.placeholder.com/64" alt="Product" class="order-image" />
+                        <div class="order-info">
+                            <div class="order-title">${order.offer_title || 'Товар'}</div>
+                            <div class="order-meta">
+                                <div class="order-meta-row">
+                                    <span>${typeIcon} ${typeText}</span>
+                                    <span>• ${order.quantity} шт</span>
+                                </div>
+                                <div class="order-meta-row">
+                                    <span>⏰ ${timeAgo(order.created_at)}</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="order-price">${money(order.price)}</div>
+                    </div>
+
+                    ${order.customer_name || order.delivery_address ? `
+                    <div class="order-details">
+                        ${order.customer_name ? `
+                        <div class="detail-row">
+                            <span class="detail-icon">👤</span>
+                            <span class="detail-label">Клиент</span>
+                            <span class="detail-value">${order.customer_name}</span>
+                        </div>
+                        ` : ''}
+                        ${order.customer_phone ? `
+                        <div class="detail-row">
+                            <span class="detail-icon">📞</span>
+                            <span class="detail-label">Телефон</span>
+                            <span class="detail-value">${order.customer_phone}</span>
+                        </div>
+                        ` : ''}
+                        ${order.delivery_address ? `
+                        <div class="detail-row">
+                            <span class="detail-icon">📍</span>
+                            <span class="detail-label">Адрес</span>
+                            <span class="detail-value">${order.delivery_address}</span>
+                        </div>
+                        ` : ''}
+                    </div>
+                    ` : ''}
+
+                    <div class="order-actions">
+                        ${actions}
                     </div>
                 </div>
             `;
         }
 
-        // ============================================
-        // Stats
-        // ============================================
-        async function loadStats() {
-            try {
-                const [today, week, month] = await Promise.all([
-                    api('/stats?period=today'), api('/stats?period=week'), api('/stats?period=month')
-                ]);
+        function getOrderActions(order) {
+            const id = order.order_id || order.booking_id;
+            const type = order.type || 'booking';
 
-                // Calculate average order value
-                const avgOrderToday = today?.orders > 0 ? today.revenue / today.orders : 0;
-                const avgOrderWeek = week?.orders > 0 ? week.revenue / week.orders : 0;
-                const avgOrderMonth = month?.orders > 0 ? month.revenue / month.orders : 0;
-
-                document.getElementById('statsContent').innerHTML = `
-                    <div class="card">
-                        <div class="card-header">
-                            <span class="card-title">📅 Сегодня</span>
-                        </div>
-                        <div style="display:flex;justify-content:space-between;margin-top:12px;padding:8px 0;border-bottom:1px solid var(--border)">
-                            <span style="color:var(--text-secondary)">Выручка</span>
-                            <strong style="font-size:18px;color:var(--primary)">${money(today?.revenue)}</strong>
-                        </div>
-                        <div style="display:flex;justify-content:space-between;margin-top:8px;padding:8px 0;border-bottom:1px solid var(--border)">
-                            <span style="color:var(--text-secondary)">Заказов</span>
-                            <strong style="font-size:18px">${today?.orders || 0}</strong>
-                        </div>
-                        <div style="display:flex;justify-content:space-between;margin-top:8px;padding:8px 0">
-                            <span style="color:var(--text-secondary)">Средний чек</span>
-                            <strong style="font-size:16px;color:var(--text-secondary)">${money(avgOrderToday)}</strong>
-                        </div>
-                    </div>
-                    <div class="card">
-                        <div class="card-header">
-                            <span class="card-title">📆 Неделя</span>
-                        </div>
-                        <div style="display:flex;justify-content:space-between;margin-top:12px;padding:8px 0;border-bottom:1px solid var(--border)">
-                            <span style="color:var(--text-secondary)">Выручка</span>
-                            <strong style="font-size:18px;color:var(--primary)">${money(week?.revenue)}</strong>
-                        </div>
-                        <div style="display:flex;justify-content:space-between;margin-top:8px;padding:8px 0;border-bottom:1px solid var(--border)">
-                            <span style="color:var(--text-secondary)">Заказов</span>
-                            <strong style="font-size:18px">${week?.orders || 0}</strong>
-                        </div>
-                        <div style="display:flex;justify-content:space-between;margin-top:8px;padding:8px 0">
-                            <span style="color:var(--text-secondary)">Средний чек</span>
-                            <strong style="font-size:16px;color:var(--text-secondary)">${money(avgOrderWeek)}</strong>
-                        </div>
-                    </div>
-                    <div class="card">
-                        <div class="card-header">
-                            <span class="card-title">🗓 Месяц</span>
-                        </div>
-                        <div style="display:flex;justify-content:space-between;margin-top:12px;padding:8px 0;border-bottom:1px solid var(--border)">
-                            <span style="color:var(--text-secondary)">Выручка</span>
-                            <strong style="font-size:18px;color:var(--primary)">${money(month?.revenue)}</strong>
-                        </div>
-                        <div style="display:flex;justify-content:space-between;margin-top:8px;padding:8px 0;border-bottom:1px solid var(--border)">
-                            <span style="color:var(--text-secondary)">Заказов</span>
-                            <strong style="font-size:18px">${month?.orders || 0}</strong>
-                        </div>
-                        <div style="display:flex;justify-content:space-between;margin-top:8px;padding:8px 0">
-                            <span style="color:var(--text-secondary)">Средний чек</span>
-                            <strong style="font-size:16px;color:var(--text-secondary)">${money(avgOrderMonth)}</strong>
-                        </div>
-                    </div>
+            if (order.status === 'pending') {
+                return `
+                    <button class="btn btn-success" onclick="confirmOrder(${id}, '${type}')">
+                        ✅ Подтвердить
+                    </button>
+                    <button class="btn btn-danger" onclick="cancelOrder(${id}, '${type}')">
+                        ❌ Отказать
+                    </button>
                 `;
-            } catch (e) {}
+            } else if (order.status === 'confirmed') {
+                return `
+                    <button class="btn btn-primary" onclick="updateOrderStatus(${id}, '${type}', 'preparing')">
+                        👨‍🍳 Готовится
+                    </button>
+                    <button class="btn btn-outline" onclick="cancelOrder(${id}, '${type}')">
+                        ❌ Отменить
+                    </button>
+                `;
+            } else if (order.status === 'preparing') {
+                return `
+                    <button class="btn btn-success" onclick="updateOrderStatus(${id}, '${type}', 'ready')">
+                        ✅ Готово
+                    </button>
+                    <button class="btn btn-outline" onclick="cancelOrder(${id}, '${type}')">
+                        ❌ Отменить
+                    </button>
+                `;
+            } else if (order.status === 'ready') {
+                return order.order_type === 'delivery' ? `
+                    <button class="btn btn-primary" onclick="updateOrderStatus(${id}, '${type}', 'delivering')">
+                        🚚 В пути
+                    </button>
+                    <button class="btn btn-success" onclick="completeOrder(${id}, '${type}')">
+                        ✅ Завершить
+                    </button>
+                ` : `
+                    <button class="btn btn-success" onclick="completeOrder(${id}, '${type}')">
+                        🎉 Выдано
+                    </button>
+                `;
+            } else if (order.status === 'delivering') {
+                return `
+                    <button class="btn btn-success" onclick="completeOrder(${id}, '${type}')">
+                        🎉 Доставлено
+                    </button>
+                `;
+            }
+
+            return '';
         }
 
-        // ============================================
-        // Product Modal
-        // ============================================
-        function showAddProduct() {
-            document.getElementById('modalTitle').textContent = 'Добавить товар';
-            document.getElementById('productForm').reset();
-            document.getElementById('productId').value = '';
-            document.getElementById('productModal').classList.add('active');
-        }
-
-        function editProduct(id) {
-            const p = products.find(x => x.offer_id === id);
-            if (!p) return;
-            document.getElementById('modalTitle').textContent = 'Редактировать';
-            document.getElementById('productId').value = id;
-            document.getElementById('productTitle').value = p.title || '';
-            document.getElementById('productCategory').value = p.category || '';
-            document.getElementById('productPrice').value = p.discount_price || '';
-            document.getElementById('productQuantity').value = p.quantity || 0;
-            document.getElementById('productDescription').value = p.description || '';
-            document.getElementById('productModal').classList.add('active');
-        }
-
-        function closeModal() {
-            document.getElementById('productModal').classList.remove('active');
-        }
-
-        document.getElementById('productForm').onsubmit = async (e) => {
-            e.preventDefault();
-            const id = document.getElementById('productId').value;
-            const data = new FormData();
-            data.append('title', document.getElementById('productTitle').value);
-            data.append('category', document.getElementById('productCategory').value);
-            data.append('discount_price', document.getElementById('productPrice').value);
-            data.append('quantity', document.getElementById('productQuantity').value);
-            data.append('description', document.getElementById('productDescription').value);
-
+        // ===== ORDER ACTIONS =====
+        async function confirmOrder(id, type) {
             try {
-                await fetch(`${API}${id ? `/products/${id}` : '/products'}`, {
-                    method: id ? 'PUT' : 'POST',
-                    headers: { 'Authorization': getAuth() },
-                    body: data
+                await fetch(`${API}/orders/${id}/confirm`, {
+                    method: 'POST',
+                    headers: { 'Authorization': getAuth() }
                 });
-                toast(id ? 'Товар обновлён' : 'Товар добавлен', 'success');
-                closeModal();
-                loadProducts();
-            } catch (e) { toast('Не удалось сохранить', 'error'); }
-        };
+                toast('Заказ подтверждён', 'success');
+                await loadDashboard();
+            } catch (e) {
+                toast('Ошибка подтверждения', 'error');
+            }
+        }
 
-        // Close modal on backdrop click
-        document.getElementById('productModal').onclick = (e) => {
-            if (e.target.classList.contains('modal')) closeModal();
-        };
+        async function cancelOrder(id, type) {
+            try {
+                await fetch(`${API}/orders/${id}/cancel`, {
+                    method: 'POST',
+                    headers: { 'Authorization': getAuth() }
+                });
+                toast('Заказ отменён', 'warning');
+                await loadDashboard();
+            } catch (e) {
+                toast('Ошибка отмены', 'error');
+            }
+        }
 
-        // ============================================
-        // Init
-        // ============================================
-        console.log('🚀 Partner Panel initialized', {
-            telegram: !!tg,
-            platform: debugInfo.platform,
-            userId: userId
-        });
+        async function updateOrderStatus(id, type, status) {
+            try {
+                await fetch(`${API}/orders/${id}/status?status=${status}&order_type=${type}`, {
+                    method: 'POST',
+                    headers: { 'Authorization': getAuth() }
+                });
+                toast('Статус обновлён', 'success');
+                await loadDashboard();
+            } catch (e) {
+                toast('Ошибка обновления', 'error');
+            }
+        }
 
+        async function completeOrder(id, type) {
+            await updateOrderStatus(id, type, 'completed');
+        }
+
+        // ===== NAVIGATION =====
+        function switchView(view) {
+            document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+            event.target.closest('.nav-item').classList.add('active');
+
+            if (view === 'dashboard') {
+                // Already on dashboard
+            } else {
+                toast('В разработке', 'warning');
+            }
+        }
+
+        function showAllOrders() {
+            // Show all orders view
+            toast('В разработке', 'warning');
+        }
+
+        async function refreshAll() {
+            await loadDashboard();
+            toast('Обновлено', 'success');
+        }
+
+        // ===== INIT =====
         loadDashboard();
+
+        // Auto-refresh every 30 seconds
+        setInterval(loadDashboard, 30000);
     </script>
 </body>
 </html>
