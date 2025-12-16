@@ -624,12 +624,47 @@
             gap: 8px;
         }
 
+        .search-container {
+            position: relative;
+            margin-bottom: 16px;
+        }
+
+        .search-input {
+            width: 100%;
+            padding: 12px 16px 12px 44px;
+            border: 2px solid var(--border);
+            border-radius: 12px;
+            font-size: 15px;
+            transition: all 0.2s;
+            background: white;
+        }
+
+        .search-input:focus {
+            outline: none;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
+        }
+
+        .search-icon {
+            position: absolute;
+            left: 14px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: var(--text-muted);
+            pointer-events: none;
+        }
+
         .products-filters {
             display: flex;
             gap: 8px;
             overflow-x: auto;
             margin-bottom: 16px;
             padding-bottom: 8px;
+            scrollbar-width: none;
+        }
+
+        .products-filters::-webkit-scrollbar {
+            display: none;
         }
 
         .filter-chip {
@@ -641,6 +676,9 @@
             white-space: nowrap;
             font-size: 14px;
             transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 6px;
         }
 
         .filter-chip.active {
@@ -649,10 +687,88 @@
             border-color: var(--primary);
         }
 
+        .filter-chip:hover:not(.active) {
+            background: var(--bg);
+            border-color: var(--primary);
+        }
+
+        .filter-count {
+            background: rgba(0, 0, 0, 0.1);
+            padding: 2px 6px;
+            border-radius: 10px;
+            font-size: 11px;
+            font-weight: 600;
+            min-width: 20px;
+            text-align: center;
+        }
+
+        .filter-chip.active .filter-count {
+            background: rgba(255, 255, 255, 0.25);
+        }
+
         .products-grid {
             display: grid;
             grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
             gap: 16px;
+        }
+
+        @media (max-width: 768px) {
+            .products-grid {
+                grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+                gap: 12px;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .products-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .skeleton-card {
+            background: white;
+            border-radius: 16px;
+            overflow: hidden;
+            box-shadow: var(--shadow-sm);
+            animation: pulse 1.5s ease-in-out infinite;
+        }
+
+        .skeleton-image {
+            width: 100%;
+            height: 120px;
+            background: linear-gradient(
+                90deg,
+                var(--bg) 0%,
+                #f0f0f0 50%,
+                var(--bg) 100%
+            );
+            background-size: 200% 100%;
+            animation: shimmer 1.5s infinite;
+        }
+
+        .skeleton-content {
+            padding: 12px;
+        }
+
+        .skeleton-line {
+            height: 12px;
+            background: var(--bg);
+            border-radius: 6px;
+            margin-bottom: 8px;
+        }
+
+        .skeleton-line.short {
+            width: 60%;
+        }
+
+        @keyframes shimmer {
+            0% { background-position: -200% 0; }
+            100% { background-position: 200% 0; }
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.8; }
         }
 
         .product-card {
@@ -673,6 +789,50 @@
         .product-image-wrapper {
             position: relative;
             background: var(--bg);
+        }
+
+        .product-actions {
+            position: absolute;
+            top: 8px;
+            left: 8px;
+            display: flex;
+            gap: 6px;
+            opacity: 0;
+            transition: opacity 0.2s;
+        }
+
+        .product-card:hover .product-actions {
+            opacity: 1;
+        }
+
+        .action-btn {
+            width: 32px;
+            height: 32px;
+            border-radius: 8px;
+            border: none;
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            color: var(--text);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.2s;
+            box-shadow: var(--shadow-sm);
+        }
+
+        .action-btn:hover {
+            transform: scale(1.1);
+            box-shadow: var(--shadow-md);
+        }
+
+        .action-btn.danger {
+            color: var(--danger);
+        }
+
+        .action-btn.danger:hover {
+            background: var(--danger);
+            color: white;
         }
 
         .product-image {
@@ -703,6 +863,63 @@
 
         .product-info {
             padding: 12px;
+        }
+
+        .product-stock-control {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-top: 8px;
+            padding: 6px;
+            background: var(--bg);
+            border-radius: 8px;
+        }
+
+        .stock-btn {
+            width: 28px;
+            height: 28px;
+            border-radius: 6px;
+            border: none;
+            background: white;
+            color: var(--primary);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            font-size: 16px;
+            transition: all 0.2s;
+            box-shadow: var(--shadow-sm);
+        }
+
+        .stock-btn:hover {
+            background: var(--primary);
+            color: white;
+            transform: scale(1.1);
+        }
+
+        .stock-btn:active {
+            transform: scale(0.95);
+        }
+
+        .stock-value {
+            flex: 1;
+            text-align: center;
+            font-weight: 600;
+            font-size: 14px;
+        }
+
+        .low-stock-warning {
+            background: #FEF3C7;
+            color: #92400E;
+            padding: 4px 8px;
+            border-radius: 6px;
+            font-size: 11px;
+            font-weight: 600;
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            margin-top: 4px;
         }
 
         .product-category {
@@ -1158,11 +1375,29 @@
             </button>
         </div>
 
+        <div class="search-container">
+            <i data-lucide="search" class="search-icon" style="width: 20px; height: 20px;"></i>
+            <input 
+                type="text" 
+                class="search-input" 
+                placeholder="Поиск товаров..." 
+                oninput="searchProducts(this.value)"
+            />
+        </div>
+
         <div class="products-filters">
-            <button class="filter-chip active" data-filter="all" onclick="filterProducts('all')">Все</button>
-            <button class="filter-chip" data-filter="active" onclick="filterProducts('active')">Активные</button>
-            <button class="filter-chip" data-filter="hidden" onclick="filterProducts('hidden')">Скрытые</button>
-            <button class="filter-chip" data-filter="out_of_stock" onclick="filterProducts('out_of_stock')">Нет в наличии</button>
+            <button class="filter-chip active" data-filter="all" onclick="filterProducts('all')">
+                Все <span class="filter-count" id="count-all">0</span>
+            </button>
+            <button class="filter-chip" data-filter="active" onclick="filterProducts('active')">
+                Активные <span class="filter-count" id="count-active">0</span>
+            </button>
+            <button class="filter-chip" data-filter="hidden" onclick="filterProducts('hidden')">
+                Скрытые <span class="filter-count" id="count-hidden">0</span>
+            </button>
+            <button class="filter-chip" data-filter="out_of_stock" onclick="filterProducts('out_of_stock')">
+                Нет в наличии <span class="filter-count" id="count-out_of_stock">0</span>
+            </button>
         </div>
 
         <div id="productsList" class="products-grid">
@@ -1888,6 +2123,8 @@
         // ===== PRODUCTS =====
         let allProducts = [];
         let productsFilter = 'all';
+        let searchQuery = '';
+        let isLoadingProducts = false;
 
         // Photo cache (24 hours)
         const photoCache = {
@@ -1920,8 +2157,12 @@
 
         async function loadProducts() {
             try {
+                isLoadingProducts = true;
+                renderProducts(); // Show skeleton
+
                 const products = await api('/products');
                 console.log('✅ Products loaded:', products?.length || 0, 'items');
+                isLoadingProducts = false;
 
                 // 🚀 PERFORMANCE: Show products immediately without waiting for photos
                 allProducts = products.map(p => ({
@@ -1979,11 +2220,22 @@
 
         // Update product image in DOM without re-rendering everything
         function updateProductImage(productId, imageUrl) {
-            const imgEl = document.querySelector(`[data-product-id="${productId}"] img`);
-            if (imgEl) {
-                imgEl.src = imageUrl;
-                imgEl.classList.add('loaded');
+            const card = document.querySelector(`[data-product-id="${productId}"]`);
+            if (card) {
+                const imgEl = card.querySelector('img');
+                if (imgEl) {
+                    imgEl.src = imageUrl;
+                    imgEl.classList.add('loaded');
+                    imgEl.onerror = () => {
+                        imgEl.src = 'https://via.placeholder.com/120?text=No+Photo';
+                    };
+                }
             }
+        }
+
+        function searchProducts(query) {
+            searchQuery = query.toLowerCase().trim();
+            renderProducts();
         }
 
         function filterProducts(filter) {
@@ -2001,10 +2253,76 @@
             renderProducts();
         }
 
+        function getFilterCounts() {
+            return {
+                all: allProducts.length,
+                active: allProducts.filter(p => p.status === 'active').length,
+                hidden: allProducts.filter(p => p.status === 'hidden').length,
+                out_of_stock: allProducts.filter(p => p.status === 'out_of_stock').length
+            };
+        }
+
+        async function adjustStock(productId, delta) {
+            try {
+                const product = allProducts.find(p => p.id === productId);
+                if (!product) return;
+
+                const newStock = Math.max(0, product.stock + delta);
+                
+                const response = await fetch(`${API}/products/${productId}`, {
+                    method: 'PATCH',
+                    headers: {
+                        'Authorization': getAuth(),
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ quantity: newStock })
+                });
+
+                if (!response.ok) throw new Error('Failed to update stock');
+
+                product.stock = newStock;
+                product.status = newStock > 0 ? 'active' : 'out_of_stock';
+                renderProducts();
+                toast(`Остаток: ${newStock} ${product.unit}`, 'success');
+            } catch (error) {
+                console.error('❌ Error adjusting stock:', error);
+                toast('Ошибка обновления остатка', 'error');
+            }
+        }
+
         function renderProducts() {
-            const filtered = productsFilter === 'all'
+            const productsListEl = document.getElementById('productsList');
+            if (!productsListEl) {
+                console.error('❌ Element #productsList not found');
+                return;
+            }
+
+            // Show skeleton while loading
+            if (isLoadingProducts) {
+                productsListEl.innerHTML = Array(6).fill(0).map(() => `
+                    <div class="skeleton-card">
+                        <div class="skeleton-image"></div>
+                        <div class="skeleton-content">
+                            <div class="skeleton-line"></div>
+                            <div class="skeleton-line short"></div>
+                            <div class="skeleton-line short"></div>
+                        </div>
+                    </div>
+                `).join('');
+                return;
+            }
+
+            // Apply filters and search
+            let filtered = productsFilter === 'all'
                 ? allProducts
                 : allProducts.filter(p => p.status === productsFilter);
+
+            if (searchQuery) {
+                filtered = filtered.filter(p => 
+                    p.name.toLowerCase().includes(searchQuery) ||
+                    (p.category && p.category.toLowerCase().includes(searchQuery))
+                );
+            }
 
             const html = filtered.length ? filtered.map(product => {
                 const hasDiscount = product.original_price && product.original_price > product.price;
@@ -2013,19 +2331,31 @@
                     : 0;
 
                 return `
-                <div class="product-card" data-product-id="${product.id}" onclick="editProduct(${product.id})">
+                <div class="product-card" data-product-id="${product.id}">
                     <div class="product-image-wrapper">
                         <img 
                             src="${product.image}" 
                             alt="${product.name}"
-                            class="product-image"
+                            class="product-image loaded"
                             loading="lazy"
                             width="120"
                             height="120"
+                            onerror="this.src='https://via.placeholder.com/120?text=No+Photo'"
                         />
                         ${hasDiscount ? `<div class="discount-badge">-${discountPercent}%</div>` : ''}
+                        <div class="product-actions">
+                            <button class="action-btn" onclick="event.stopPropagation(); editProduct(${product.id})" title="Редактировать">
+                                <i data-lucide="edit-2" style="width: 16px; height: 16px;"></i>
+                            </button>
+                            <button class="action-btn" onclick="event.stopPropagation(); toggleProductStatus(${product.id})" title="Скрыть/Показать">
+                                <i data-lucide="${product.status === 'hidden' ? 'eye' : 'eye-off'}" style="width: 16px; height: 16px;"></i>
+                            </button>
+                            <button class="action-btn danger" onclick="event.stopPropagation(); deleteProduct(${product.id})" title="Удалить">
+                                <i data-lucide="trash-2" style="width: 16px; height: 16px;"></i>
+                            </button>
+                        </div>
                     </div>
-                    <div class="product-info">
+                    <div class="product-info" onclick="editProduct(${product.id})">
                         ${product.category ? `<div class="product-category">${product.category}</div>` : ''}
                         <div class="product-name">${product.name}</div>
                         <div class="product-pricing">
@@ -2033,16 +2363,27 @@
                             <div class="product-price">${formatPrice(product.price)}</div>
                         </div>
                         <div class="product-meta">
-                            <div class="product-stock">
-                                <i data-lucide="package" style="width: 14px; height: 14px;"></i>
-                                В наличии: ${product.stock} ${product.unit}
-                            </div>
                             ${product.expiry_date ? `
                             <div class="product-expiry">
                                 <i data-lucide="calendar" style="width: 14px; height: 14px;"></i>
                                 Годен до: ${product.expiry_date}
                             </div>
                             ` : ''}
+                        </div>
+                        ${product.stock <= 5 && product.stock > 0 ? `
+                        <div class="low-stock-warning">
+                            <i data-lucide="alert-triangle" style="width: 12px; height: 12px;"></i>
+                            Мало товара!
+                        </div>
+                        ` : ''}
+                        <div class="product-stock-control">
+                            <button class="stock-btn" onclick="event.stopPropagation(); adjustStock(${product.id}, -1)" title="Уменьшить">
+                                −
+                            </button>
+                            <div class="stock-value">${product.stock} ${product.unit}</div>
+                            <button class="stock-btn" onclick="event.stopPropagation(); adjustStock(${product.id}, 1)" title="Увеличить">
+                                +
+                            </button>
                         </div>
                         <span class="product-status ${product.status}">
                             ${product.status === 'active' ? 'Активен' : product.status === 'hidden' ? 'Скрыт' : 'Нет в наличии'}
@@ -2062,15 +2403,18 @@
                 </div>
             `;
 
-            const productsListEl = document.getElementById('productsList');
-            if (productsListEl) {
-                productsListEl.innerHTML = html;
-                // Re-initialize Lucide icons for new content
-                if (typeof lucide !== 'undefined') {
-                    lucide.createIcons();
-                }
-            } else {
-                console.error('❌ Element #productsList not found');
+            productsListEl.innerHTML = html;
+
+            // Update filter counts
+            const counts = getFilterCounts();
+            Object.keys(counts).forEach(key => {
+                const countEl = document.getElementById(`count-${key}`);
+                if (countEl) countEl.textContent = counts[key];
+            });
+
+            // Re-initialize Lucide icons for new content
+            if (typeof lucide !== 'undefined') {
+                lucide.createIcons();
             }
         }
 
@@ -2197,6 +2541,53 @@
             } catch (error) {
                 console.error('❌ Error editing product:', error);
                 toast('Ошибка загрузки товара', 'error');
+            }
+        }
+
+        async function toggleProductStatus(id) {
+            try {
+                const product = allProducts.find(p => p.id === id);
+                if (!product) return;
+
+                const newStatus = product.status === 'hidden' ? 'active' : 'hidden';
+                
+                const response = await fetch(`${API}/products/${id}/status`, {
+                    method: 'PATCH',
+                    headers: {
+                        'Authorization': getAuth(),
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ status: newStatus })
+                });
+
+                if (!response.ok) throw new Error('Failed to update status');
+
+                toast(newStatus === 'hidden' ? 'Товар скрыт' : 'Товар показан', 'success');
+                await loadProducts();
+            } catch (error) {
+                console.error('❌ Error toggling status:', error);
+                toast('Ошибка изменения статуса', 'error');
+            }
+        }
+
+        async function deleteProduct(id) {
+            if (!confirm('Удалить товар?')) return;
+
+            try {
+                const response = await fetch(`${API}/products/${id}`, {
+                    method: 'DELETE',
+                    headers: {
+                        'Authorization': getAuth()
+                    }
+                });
+
+                if (!response.ok) throw new Error('Failed to delete');
+
+                toast('Товар удален', 'success');
+                await loadProducts();
+            } catch (error) {
+                console.error('❌ Error deleting product:', error);
+                toast('Ошибка удаления', 'error');
             }
         }
 
