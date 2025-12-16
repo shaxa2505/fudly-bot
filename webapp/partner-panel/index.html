@@ -649,9 +649,36 @@
             position: absolute;
             left: 14px;
             top: 50%;
-            transform: translateY(-50%);
+            transform: translateY(-50%);\
             color: var(--text-muted);
             pointer-events: none;
+        }
+
+        .search-clear {
+            position: absolute;
+            right: 12px;
+            top: 50%;
+            transform: translateY(-50%);
+            background: var(--text-muted);
+            color: white;
+            border: none;
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            cursor: pointer;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            font-size: 12px;
+            padding: 0;
+        }
+
+        .search-clear.visible {
+            display: flex;
+        }
+
+        .search-clear:hover {
+            background: var(--text);
         }
 
         .products-filters {
@@ -714,14 +741,38 @@
 
         @media (max-width: 768px) {
             .products-grid {
-                grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+                grid-template-columns: repeat(2, 1fr);
                 gap: 12px;
+            }
+
+            .product-card {
+                font-size: 13px;
+            }
+
+            .product-image {
+                height: 100px;
             }
         }
 
         @media (max-width: 480px) {
             .products-grid {
-                grid-template-columns: 1fr;
+                grid-template-columns: repeat(2, 1fr);
+                gap: 8px;
+            }
+
+            .product-info {
+                padding: 8px;
+            }
+
+            .product-name {
+                font-size: 13px;
+            }
+
+            .action-btn {
+                min-width: 36px;
+                min-height: 36px;
+                width: 36px;
+                height: 36px;
             }
         }
 
@@ -794,20 +845,18 @@
         .product-actions {
             position: absolute;
             top: 8px;
-            left: 8px;
+            right: 8px;
             display: flex;
             gap: 6px;
-            opacity: 0;
-            transition: opacity 0.2s;
-        }
-
-        .product-card:hover .product-actions {
             opacity: 1;
+            z-index: 2;
         }
 
         .action-btn {
-            width: 32px;
-            height: 32px;
+            min-width: 44px;
+            min-height: 44px;
+            width: 44px;
+            height: 44px;
             border-radius: 8px;
             border: none;
             background: rgba(255, 255, 255, 0.95);
@@ -876,9 +925,11 @@
         }
 
         .stock-btn {
-            width: 28px;
-            height: 28px;
-            border-radius: 6px;
+            min-width: 44px;
+            min-height: 44px;
+            width: 44px;
+            height: 44px;
+            border-radius: 8px;
             border: none;
             background: white;
             color: var(--primary);
@@ -920,6 +971,59 @@
             align-items: center;
             gap: 4px;
             margin-top: 4px;
+        }
+
+        .stock-btn:disabled,
+        .action-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            pointer-events: none;
+        }
+
+        .stock-btn.loading,
+        .action-btn.loading {
+            position: relative;
+            color: transparent;
+        }
+
+        .stock-btn.loading::after,
+        .action-btn.loading::after {
+            content: '';
+            position: absolute;
+            width: 16px;
+            height: 16px;
+            top: 50%;
+            left: 50%;
+            margin-left: -8px;
+            margin-top: -8px;
+            border: 2px solid currentColor;
+            border-radius: 50%;
+            border-top-color: transparent;
+            animation: spin 0.6s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .empty-search-state {
+            grid-column: 1 / -1;
+            text-align: center;
+            padding: 48px 24px;
+            color: var(--text-muted);
+        }
+
+        .empty-search-icon {
+            font-size: 48px;
+            margin-bottom: 16px;
+            opacity: 0.5;
+        }
+
+        .empty-search-title {
+            font-size: 18px;
+            font-weight: 600;
+            color: var(--text);
+            margin-bottom: 8px;
         }
 
         .product-category {
@@ -1381,8 +1485,10 @@
                 type="text" 
                 class="search-input" 
                 placeholder="Поиск товаров..." 
-                oninput="searchProducts(this.value)"
+                oninput="searchProducts(this.value, this)"
+                aria-label="Поиск товаров"
             />
+            <button class="search-clear" onclick="clearSearch()" aria-label="Очистить поиск" title="Очистить">✕</button>
         </div>
 
         <div class="products-filters">
@@ -2125,6 +2231,7 @@
         let productsFilter = 'all';
         let searchQuery = '';
         let isLoadingProducts = false;
+        let searchTimeout = null;
 
         // Photo cache (24 hours)
         const photoCache = {
@@ -2233,9 +2340,37 @@
             }
         }
 
-        function searchProducts(query) {
-            searchQuery = query.toLowerCase().trim();
-            renderProducts();
+        function searchProducts(query, inputEl) {
+            // Clear existing timeout
+            if (searchTimeout) clearTimeout(searchTimeout);
+            
+            // Update clear button visibility
+            const clearBtn = document.querySelector('.search-clear');
+            if (clearBtn) {
+                if (query.trim()) {
+                    clearBtn.classList.add('visible');
+                } else {
+                    clearBtn.classList.remove('visible');
+                }
+            }
+            
+            // Debounce search
+            searchTimeout = setTimeout(() => {
+                searchQuery = query.toLowerCase().trim();
+                renderProducts();
+            }, 300);
+        }
+
+        function clearSearch() {
+            const searchInput = document.querySelector('.search-input');
+            if (searchInput) {
+                searchInput.value = '';
+                searchQuery = '';
+                renderProducts();
+                
+                const clearBtn = document.querySelector('.search-clear');
+                if (clearBtn) clearBtn.classList.remove('visible');
+            }
         }
 
         function filterProducts(filter) {
@@ -2262,10 +2397,19 @@
             };
         }
 
-        async function adjustStock(productId, delta) {
+        async function adjustStock(productId, delta, event) {
+            const btn = event?.target?.closest('.stock-btn');
+            if (!btn) return;
+            
             try {
+                // Disable button and show loading
+                btn.disabled = true;
+                btn.classList.add('loading');
+                
                 const product = allProducts.find(p => p.id === productId);
-                if (!product) return;
+                if (!product) {
+                    throw new Error('Товар не найден');
+                }
 
                 const newStock = Math.max(0, product.stock + delta);
                 
@@ -2278,15 +2422,38 @@
                     body: JSON.stringify({ quantity: newStock })
                 });
 
-                if (!response.ok) throw new Error('Failed to update stock');
+                if (!response.ok) {
+                    const errorData = await response.json().catch(() => ({}));
+                    throw new Error(errorData.detail || 'Не удалось обновить остаток');
+                }
 
+                // Update local state
                 product.stock = newStock;
                 product.status = newStock > 0 ? 'active' : 'out_of_stock';
-                renderProducts();
-                toast(`Остаток: ${newStock} ${product.unit}`, 'success');
+                
+                // Update UI
+                const stockValueEl = btn.parentElement?.querySelector('.stock-value');
+                if (stockValueEl) {
+                    stockValueEl.textContent = `${newStock} ${product.unit}`;
+                }
+                
+                // Update counts
+                const counts = getFilterCounts();
+                Object.keys(counts).forEach(key => {
+                    const countEl = document.getElementById(`count-${key}`);
+                    if (countEl) countEl.textContent = counts[key];
+                });
+                
+                toast(`✓ Остаток: ${newStock} ${product.unit}`, 'success');
             } catch (error) {
                 console.error('❌ Error adjusting stock:', error);
-                toast('Ошибка обновления остатка', 'error');
+                toast(error.message || 'Ошибка обновления остатка', 'error');
+            } finally {
+                // Re-enable button
+                if (btn) {
+                    btn.disabled = false;
+                    btn.classList.remove('loading');
+                }
             }
         }
 
@@ -2340,18 +2507,18 @@
                             loading="lazy"
                             width="120"
                             height="120"
-                            onerror="this.src='https://via.placeholder.com/120?text=No+Photo'"
+                            onerror="this.onerror=null; this.src='https://via.placeholder.com/120/f0f0f0/666?text=Нет+фото';"
                         />
                         ${hasDiscount ? `<div class="discount-badge">-${discountPercent}%</div>` : ''}
                         <div class="product-actions">
-                            <button class="action-btn" onclick="event.stopPropagation(); editProduct(${product.id})" title="Редактировать">
-                                <i data-lucide="edit-2" style="width: 16px; height: 16px;"></i>
+                            <button class="action-btn" onclick="event.stopPropagation(); editProduct(${product.id})" title="Редактировать" aria-label="Редактировать товар">
+                                <i data-lucide="edit-2" style="width: 18px; height: 18px;"></i>
                             </button>
-                            <button class="action-btn" onclick="event.stopPropagation(); toggleProductStatus(${product.id})" title="Скрыть/Показать">
-                                <i data-lucide="${product.status === 'hidden' ? 'eye' : 'eye-off'}" style="width: 16px; height: 16px;"></i>
+                            <button class="action-btn" onclick="event.stopPropagation(); toggleProductStatus(${product.id}, event)" title="${product.status === 'hidden' ? 'Показать' : 'Скрыть'}" aria-label="${product.status === 'hidden' ? 'Показать товар' : 'Скрыть товар'}">
+                                <i data-lucide="${product.status === 'hidden' ? 'eye' : 'eye-off'}" style="width: 18px; height: 18px;"></i>
                             </button>
-                            <button class="action-btn danger" onclick="event.stopPropagation(); deleteProduct(${product.id})" title="Удалить">
-                                <i data-lucide="trash-2" style="width: 16px; height: 16px;"></i>
+                            <button class="action-btn danger" onclick="event.stopPropagation(); deleteProduct(${product.id}, event)" title="Удалить" aria-label="Удалить товар">
+                                <i data-lucide="trash-2" style="width: 18px; height: 18px;"></i>
                             </button>
                         </div>
                     </div>
@@ -2377,11 +2544,11 @@
                         </div>
                         ` : ''}
                         <div class="product-stock-control">
-                            <button class="stock-btn" onclick="event.stopPropagation(); adjustStock(${product.id}, -1)" title="Уменьшить">
+                            <button class="stock-btn" onclick="event.stopPropagation(); adjustStock(${product.id}, -1, event)" title="Уменьшить" aria-label="Уменьшить количество">
                                 −
                             </button>
                             <div class="stock-value">${product.stock} ${product.unit}</div>
-                            <button class="stock-btn" onclick="event.stopPropagation(); adjustStock(${product.id}, 1)" title="Увеличить">
+                            <button class="stock-btn" onclick="event.stopPropagation(); adjustStock(${product.id}, 1, event)" title="Увеличить" aria-label="Увеличить количество">
                                 +
                             </button>
                         </div>
@@ -2391,7 +2558,16 @@
                     </div>
                 </div>
             `;
-            }).join('') : `
+            }).join('') : searchQuery ? `
+                <div class="empty-search-state">
+                    <div class="empty-search-icon">🔍</div>
+                    <div class="empty-search-title">Ничего не найдено</div>
+                    <div style="color: var(--text-muted); margin-top: 8px;">Попробуйте изменить поисковый запрос</div>
+                    <button class="btn" onclick="clearSearch()" style="margin-top: 16px;">
+                        Очистить поиск
+                    </button>
+                </div>
+            ` : `
                 <div class="empty-state" style="grid-column: 1 / -1;">
                     <div class="empty-icon">📦</div>
                     <div class="empty-title">Нет товаров</div>
@@ -2544,10 +2720,16 @@
             }
         }
 
-        async function toggleProductStatus(id) {
+        async function toggleProductStatus(id, event) {
+            const btn = event?.target?.closest('.action-btn');
+            if (btn) {
+                btn.disabled = true;
+                btn.classList.add('loading');
+            }
+            
             try {
                 const product = allProducts.find(p => p.id === id);
-                if (!product) return;
+                if (!product) throw new Error('Товар не найден');
 
                 const newStatus = product.status === 'hidden' ? 'active' : 'hidden';
                 
@@ -2560,18 +2742,32 @@
                     body: JSON.stringify({ status: newStatus })
                 });
 
-                if (!response.ok) throw new Error('Failed to update status');
+                if (!response.ok) {
+                    const errorData = await response.json().catch(() => ({}));
+                    throw new Error(errorData.detail || 'Не удалось изменить статус');
+                }
 
-                toast(newStatus === 'hidden' ? 'Товар скрыт' : 'Товар показан', 'success');
+                toast(newStatus === 'hidden' ? '✓ Товар скрыт' : '✓ Товар показан', 'success');
                 await loadProducts();
             } catch (error) {
                 console.error('❌ Error toggling status:', error);
-                toast('Ошибка изменения статуса', 'error');
+                toast(error.message || 'Ошибка изменения статуса', 'error');
+            } finally {
+                if (btn) {
+                    btn.disabled = false;
+                    btn.classList.remove('loading');
+                }
             }
         }
 
-        async function deleteProduct(id) {
-            if (!confirm('Удалить товар?')) return;
+        async function deleteProduct(id, event) {
+            if (!confirm('Удалить товар? Это действие нельзя отменить.')) return;
+
+            const btn = event?.target?.closest('.action-btn');
+            if (btn) {
+                btn.disabled = true;
+                btn.classList.add('loading');
+            }
 
             try {
                 const response = await fetch(`${API}/products/${id}`, {
@@ -2581,13 +2777,21 @@
                     }
                 });
 
-                if (!response.ok) throw new Error('Failed to delete');
+                if (!response.ok) {
+                    const errorData = await response.json().catch(() => ({}));
+                    throw new Error(errorData.detail || 'Не удалось удалить товар');
+                }
 
-                toast('Товар удален', 'success');
+                toast('✓ Товар удален', 'success');
                 await loadProducts();
             } catch (error) {
                 console.error('❌ Error deleting product:', error);
-                toast('Ошибка удаления', 'error');
+                toast(error.message || 'Ошибка удаления', 'error');
+            } finally {
+                if (btn) {
+                    btn.disabled = false;
+                    btn.classList.remove('loading');
+                }
             }
         }
 
