@@ -1792,25 +1792,34 @@
         function switchView(view) {
             // Update nav buttons
             document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
-            event.target.closest('.nav-item').classList.add('active');
+            // Use event if available (onclick passes it automatically)
+            if (typeof event !== 'undefined' && event?.target) {
+                const navItem = event.target.closest('.nav-item');
+                if (navItem) navItem.classList.add('active');
+            }
 
-            // Hide all sections
-            document.getElementById('dashboardSection').classList.add('hidden');
-            document.getElementById('productsSection').classList.add('hidden');
-            document.getElementById('statsSection').classList.add('hidden');
-            document.getElementById('settingsSection').classList.add('hidden');
+            // Hide all sections with null checks
+            const dashboardEl = document.getElementById('dashboardSection');
+            const productsEl = document.getElementById('productsSection');
+            const statsEl = document.getElementById('statsSection');
+            const settingsEl = document.getElementById('settingsSection');
+
+            if (dashboardEl) dashboardEl.classList.add('hidden');
+            if (productsEl) productsEl.classList.add('hidden');
+            if (statsEl) statsEl.classList.add('hidden');
+            if (settingsEl) settingsEl.classList.add('hidden');
 
             // Show selected section
-            if (view === 'dashboard') {
-                document.getElementById('dashboardSection').classList.remove('hidden');
-            } else if (view === 'products') {
-                document.getElementById('productsSection').classList.remove('hidden');
+            if (view === 'dashboard' && dashboardEl) {
+                dashboardEl.classList.remove('hidden');
+            } else if (view === 'products' && productsEl) {
+                productsEl.classList.remove('hidden');
                 loadProducts();
-            } else if (view === 'stats') {
-                document.getElementById('statsSection').classList.remove('hidden');
+            } else if (view === 'stats' && statsEl) {
+                statsEl.classList.remove('hidden');
                 loadStatistics();
-            } else if (view === 'settings') {
-                document.getElementById('settingsSection').classList.remove('hidden');
+            } else if (view === 'settings' && settingsEl) {
+                settingsEl.classList.remove('hidden');
                 loadSettings();
             }
         }
@@ -1903,7 +1912,12 @@
                 </div>
             `;
 
-            document.getElementById('productsList').innerHTML = html;
+            const productsListEl = document.getElementById('productsList');
+            if (productsListEl) {
+                productsListEl.innerHTML = html;
+            } else {
+                console.error('❌ Element #productsList not found');
+            }
         }
 
         function openAddProductModal() {
