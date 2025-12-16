@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Fudly Partner</title>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
 
@@ -567,6 +568,356 @@
             transform: scale(1.1);
         }
 
+        /* ===== PRODUCTS SECTION ===== */
+        .products-section {
+            padding: 16px;
+            padding-bottom: 80px;
+        }
+
+        .products-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 16px;
+        }
+
+        .section-title {
+            font-size: 24px;
+            font-weight: 700;
+            color: var(--text);
+        }
+
+        .add-product-btn {
+            background: var(--primary);
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 12px;
+            font-weight: 600;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .products-filters {
+            display: flex;
+            gap: 8px;
+            overflow-x: auto;
+            margin-bottom: 16px;
+            padding-bottom: 8px;
+        }
+
+        .filter-chip {
+            padding: 8px 16px;
+            border-radius: 20px;
+            border: 1px solid var(--border);
+            background: white;
+            cursor: pointer;
+            white-space: nowrap;
+            font-size: 14px;
+            transition: all 0.2s;
+        }
+
+        .filter-chip.active {
+            background: var(--primary);
+            color: white;
+            border-color: var(--primary);
+        }
+
+        .products-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+            gap: 12px;
+        }
+
+        .product-card {
+            background: white;
+            border-radius: 16px;
+            overflow: hidden;
+            box-shadow: var(--shadow-sm);
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .product-card:hover {
+            transform: translateY(-2px);
+            box-shadow: var(--shadow-md);
+        }
+
+        .product-image {
+            width: 100%;
+            height: 160px;
+            object-fit: cover;
+            background: var(--bg);
+        }
+
+        .product-info {
+            padding: 12px;
+        }
+
+        .product-name {
+            font-weight: 600;
+            font-size: 14px;
+            margin-bottom: 4px;
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+        }
+
+        .product-price {
+            color: var(--primary);
+            font-weight: 700;
+            font-size: 16px;
+        }
+
+        .product-stock {
+            font-size: 12px;
+            color: var(--text-muted);
+            margin-top: 4px;
+        }
+
+        .product-status {
+            display: inline-block;
+            padding: 4px 8px;
+            border-radius: 6px;
+            font-size: 11px;
+            font-weight: 600;
+            margin-top: 8px;
+        }
+
+        .product-status.active {
+            background: #d4edda;
+            color: #155724;
+        }
+
+        .product-status.hidden {
+            background: #f8d7da;
+            color: #721c24;
+        }
+
+        /* ===== STATISTICS SECTION ===== */
+        .stats-section {
+            padding: 16px;
+            padding-bottom: 80px;
+        }
+
+        .period-tabs {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 24px;
+            background: var(--bg);
+            padding: 4px;
+            border-radius: 12px;
+        }
+
+        .period-tab {
+            flex: 1;
+            padding: 10px;
+            border: none;
+            background: transparent;
+            cursor: pointer;
+            border-radius: 8px;
+            font-weight: 500;
+            transition: all 0.2s;
+        }
+
+        .period-tab.active {
+            background: white;
+            box-shadow: var(--shadow-sm);
+        }
+
+        .chart-card {
+            background: white;
+            border-radius: 16px;
+            padding: 20px;
+            margin-bottom: 16px;
+            box-shadow: var(--shadow-sm);
+        }
+
+        .chart-title {
+            font-weight: 600;
+            font-size: 16px;
+            margin-bottom: 16px;
+        }
+
+        .chart-container {
+            position: relative;
+            height: 250px;
+        }
+
+        /* ===== SETTINGS SECTION ===== */
+        .settings-section {
+            padding: 16px;
+            padding-bottom: 80px;
+        }
+
+        .settings-group {
+            background: white;
+            border-radius: 16px;
+            padding: 20px;
+            margin-bottom: 16px;
+            box-shadow: var(--shadow-sm);
+        }
+
+        .settings-group-title {
+            font-weight: 600;
+            font-size: 16px;
+            margin-bottom: 16px;
+            color: var(--text);
+        }
+
+        .setting-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px 0;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .setting-item:last-child {
+            border-bottom: none;
+        }
+
+        .setting-label {
+            font-size: 14px;
+            color: var(--text);
+        }
+
+        .setting-value {
+            color: var(--text-muted);
+            font-size: 14px;
+        }
+
+        .toggle-switch {
+            position: relative;
+            width: 48px;
+            height: 28px;
+            background: var(--border);
+            border-radius: 14px;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+
+        .toggle-switch.active {
+            background: var(--primary);
+        }
+
+        .toggle-switch::after {
+            content: '';
+            position: absolute;
+            top: 2px;
+            left: 2px;
+            width: 24px;
+            height: 24px;
+            background: white;
+            border-radius: 50%;
+            transition: transform 0.3s;
+        }
+
+        .toggle-switch.active::after {
+            transform: translateX(20px);
+        }
+
+        .input-field {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            font-size: 14px;
+            margin-top: 8px;
+        }
+
+        .save-btn {
+            width: 100%;
+            padding: 14px;
+            background: var(--primary);
+            color: white;
+            border: none;
+            border-radius: 12px;
+            font-weight: 600;
+            cursor: pointer;
+            margin-top: 16px;
+        }
+
+        /* Modal */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 10000;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal.show {
+            display: flex;
+        }
+
+        .modal-content {
+            background: white;
+            border-radius: 20px;
+            padding: 24px;
+            max-width: 90%;
+            width: 400px;
+            max-height: 90vh;
+            overflow-y: auto;
+        }
+
+        .modal-header {
+            font-weight: 700;
+            font-size: 20px;
+            margin-bottom: 20px;
+        }
+
+        .form-group {
+            margin-bottom: 16px;
+        }
+
+        .form-label {
+            display: block;
+            font-size: 14px;
+            font-weight: 500;
+            margin-bottom: 8px;
+            color: var(--text);
+        }
+
+        .file-input-wrapper {
+            position: relative;
+            border: 2px dashed var(--border);
+            border-radius: 12px;
+            padding: 32px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .file-input-wrapper:hover {
+            border-color: var(--primary);
+            background: var(--bg);
+        }
+
+        .file-input-wrapper input[type="file"] {
+            display: none;
+        }
+
+        .image-preview {
+            width: 100%;
+            max-height: 200px;
+            object-fit: cover;
+            border-radius: 12px;
+            margin-top: 12px;
+        }
+
+        .hidden {
+            display: none !important;
+        }
+
         /* ===== LOADING ===== */
         .loading {
             display: flex;
@@ -648,29 +999,31 @@
         </div>
     </header>
 
-    <!-- Stats -->
-    <section class="stats-section">
-        <div class="stats-grid">
-            <div class="stat-card primary">
-                <div class="stat-icon">💰</div>
-                <div class="stat-value" id="todayRevenue">0</div>
-                <div class="stat-label">Выручка сегодня</div>
+    <!-- Dashboard Section -->
+    <div id="dashboardSection">
+        <!-- Stats -->
+        <section class="stats-section">
+            <div class="stats-grid">
+                <div class="stat-card primary">
+                    <div class="stat-icon">💰</div>
+                    <div class="stat-value" id="todayRevenue">0</div>
+                    <div class="stat-label">Выручка сегодня</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon">📦</div>
+                    <div class="stat-value" id="todayOrders">0</div>
+                    <div class="stat-label">Заказов</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon">⏰</div>
+                    <div class="stat-value" id="pendingCount">0</div>
+                    <div class="stat-label">Ожидают</div>
+                </div>
             </div>
-            <div class="stat-card">
-                <div class="stat-icon">📦</div>
-                <div class="stat-value" id="todayOrders">0</div>
-                <div class="stat-label">Заказов</div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-icon">⏰</div>
-                <div class="stat-value" id="pendingCount">0</div>
-                <div class="stat-label">Ожидают</div>
-            </div>
-        </div>
-    </section>
+        </section>
 
-    <!-- Orders Section -->
-    <section class="section">
+        <!-- Orders Section -->
+        <section class="section">
         <div class="section-header">
             <div class="section-title">Заказы</div>
             <a href="#" class="section-action" onclick="showAllOrders(); return false;">
@@ -699,6 +1052,157 @@
             <div class="loading"><div class="spinner"></div></div>
         </div>
     </section>
+    </div>
+    <!-- End Dashboard Section -->
+
+    <!-- Products Section -->
+    <section id="productsSection" class="products-section hidden">
+        <div class="products-header">
+            <h2 class="section-title">Товары</h2>
+            <button class="add-product-btn" onclick="openAddProductModal()">
+                ➕ Добавить
+            </button>
+        </div>
+
+        <div class="products-filters">
+            <button class="filter-chip active" data-filter="all" onclick="filterProducts('all')">Все</button>
+            <button class="filter-chip" data-filter="active" onclick="filterProducts('active')">Активные</button>
+            <button class="filter-chip" data-filter="hidden" onclick="filterProducts('hidden')">Скрытые</button>
+            <button class="filter-chip" data-filter="out_of_stock" onclick="filterProducts('out_of_stock')">Нет в наличии</button>
+        </div>
+
+        <div id="productsList" class="products-grid">
+            <div class="loading"><div class="spinner"></div></div>
+        </div>
+    </section>
+
+    <!-- Statistics Section -->
+    <section id="statsSection" class="stats-section hidden">
+        <h2 class="section-title">Статистика</h2>
+
+        <div class="period-tabs">
+            <button class="period-tab active" data-period="today" onclick="changePeriod('today')">Сегодня</button>
+            <button class="period-tab" data-period="week" onclick="changePeriod('week')">Неделя</button>
+            <button class="period-tab" data-period="month" onclick="changePeriod('month')">Месяц</button>
+        </div>
+
+        <div class="chart-card">
+            <div class="chart-title">Выручка</div>
+            <div class="chart-container">
+                <canvas id="revenueChart"></canvas>
+            </div>
+        </div>
+
+        <div class="chart-card">
+            <div class="chart-title">Заказы по часам</div>
+            <div class="chart-container">
+                <canvas id="ordersChart"></canvas>
+            </div>
+        </div>
+
+        <div class="chart-card">
+            <div class="chart-title">Топ товаров</div>
+            <div class="chart-container">
+                <canvas id="productsChart"></canvas>
+            </div>
+        </div>
+    </section>
+
+    <!-- Settings Section -->
+    <section id="settingsSection" class="settings-section hidden">
+        <h2 class="section-title">Настройки</h2>
+
+        <div class="settings-group">
+            <div class="settings-group-title">Магазин</div>
+            <div class="setting-item">
+                <span class="setting-label">Название</span>
+                <span class="setting-value" id="storeName">-</span>
+            </div>
+            <div class="setting-item">
+                <span class="setting-label">Адрес</span>
+                <span class="setting-value" id="storeAddress">-</span>
+            </div>
+            <div class="setting-item">
+                <span class="setting-label">Статус</span>
+                <div class="toggle-switch active" id="storeStatus" onclick="toggleStoreStatus()"></div>
+            </div>
+        </div>
+
+        <div class="settings-group">
+            <div class="settings-group-title">Режим работы</div>
+            <div class="setting-item">
+                <span class="setting-label">Пн-Пт</span>
+                <span class="setting-value">09:00 - 21:00</span>
+            </div>
+            <div class="setting-item">
+                <span class="setting-label">Сб-Вс</span>
+                <span class="setting-value">10:00 - 20:00</span>
+            </div>
+        </div>
+
+        <div class="settings-group">
+            <div class="settings-group-title">Доставка</div>
+            <div class="setting-item">
+                <span class="setting-label">Минимальный заказ</span>
+                <span class="setting-value">500 ₽</span>
+            </div>
+            <div class="setting-item">
+                <span class="setting-label">Стоимость доставки</span>
+                <span class="setting-value">150 ₽</span>
+            </div>
+            <div class="setting-item">
+                <span class="setting-label">Бесплатная доставка от</span>
+                <span class="setting-value">1500 ₽</span>
+            </div>
+        </div>
+
+        <div class="settings-group">
+            <div class="settings-group-title">Уведомления</div>
+            <div class="setting-item">
+                <span class="setting-label">Новые заказы</span>
+                <div class="toggle-switch active" onclick="toggleSetting(this)"></div>
+            </div>
+            <div class="setting-item">
+                <span class="setting-label">Отмены</span>
+                <div class="toggle-switch active" onclick="toggleSetting(this)"></div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Add Product Modal -->
+    <div id="addProductModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">Добавить товар</div>
+            <form id="addProductForm">
+                <div class="form-group">
+                    <label class="form-label">Фото</label>
+                    <div class="file-input-wrapper" onclick="document.getElementById('productPhoto').click()">
+                        <input type="file" id="productPhoto" accept="image/*" onchange="previewImage(event)">
+                        <div id="uploadPlaceholder">📷 Загрузить фото</div>
+                        <img id="imagePreview" class="image-preview hidden">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Название</label>
+                    <input type="text" class="input-field" id="productName" placeholder="Название товара" required>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Описание</label>
+                    <input type="text" class="input-field" id="productDescription" placeholder="Описание">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Цена, ₽</label>
+                    <input type="number" class="input-field" id="productPrice" placeholder="0" required>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Количество</label>
+                    <input type="number" class="input-field" id="productStock" placeholder="0">
+                </div>
+                <button type="submit" class="save-btn">Сохранить</button>
+                <button type="button" class="btn-outline" style="width: 100%; margin-top: 8px;" onclick="closeModal()">Отмена</button>
+            </form>
+        </div>
+    </div>
 
     <!-- Bottom Navigation -->
     <nav class="bottom-nav">
@@ -1077,19 +1581,329 @@
 
         // ===== NAVIGATION =====
         function switchView(view) {
+            // Update nav buttons
             document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
             event.target.closest('.nav-item').classList.add('active');
 
+            // Hide all sections
+            document.getElementById('dashboardSection').classList.add('hidden');
+            document.getElementById('productsSection').classList.add('hidden');
+            document.getElementById('statsSection').classList.add('hidden');
+            document.getElementById('settingsSection').classList.add('hidden');
+
+            // Show selected section
             if (view === 'dashboard') {
-                // Already on dashboard
-            } else {
-                toast('В разработке', 'warning');
+                document.getElementById('dashboardSection').classList.remove('hidden');
+            } else if (view === 'products') {
+                document.getElementById('productsSection').classList.remove('hidden');
+                loadProducts();
+            } else if (view === 'stats') {
+                document.getElementById('statsSection').classList.remove('hidden');
+                loadStatistics();
+            } else if (view === 'settings') {
+                document.getElementById('settingsSection').classList.remove('hidden');
+                loadSettings();
             }
         }
 
+        // ===== PRODUCTS =====
+        let allProducts = [];
+        let productsFilter = 'all';
+
+        async function loadProducts() {
+            try {
+                // Mock data for now
+                allProducts = [
+                    {
+                        id: 1,
+                        name: 'Бургер классический',
+                        price: 350,
+                        stock: 25,
+                        status: 'active',
+                        image: 'https://via.placeholder.com/160'
+                    },
+                    {
+                        id: 2,
+                        name: 'Пицца Маргарита',
+                        price: 450,
+                        stock: 15,
+                        status: 'active',
+                        image: 'https://via.placeholder.com/160'
+                    },
+                    {
+                        id: 3,
+                        name: 'Суши сет',
+                        price: 890,
+                        stock: 0,
+                        status: 'out_of_stock',
+                        image: 'https://via.placeholder.com/160'
+                    },
+                    {
+                        id: 4,
+                        name: 'Салат Цезарь',
+                        price: 280,
+                        stock: 10,
+                        status: 'hidden',
+                        image: 'https://via.placeholder.com/160'
+                    }
+                ];
+
+                renderProducts();
+            } catch (error) {
+                console.error('Error loading products:', error);
+                toast('Ошибка загрузки товаров', 'error');
+            }
+        }
+
+        function filterProducts(filter) {
+            productsFilter = filter;
+
+            // Update filter chips
+            document.querySelectorAll('.filter-chip').forEach(chip => {
+                chip.classList.remove('active');
+                if (chip.dataset.filter === filter) {
+                    chip.classList.add('active');
+                }
+            });
+
+            renderProducts();
+        }
+
+        function renderProducts() {
+            const filtered = productsFilter === 'all'
+                ? allProducts
+                : allProducts.filter(p => p.status === productsFilter);
+
+            const html = filtered.length ? filtered.map(product => `
+                <div class="product-card" onclick="editProduct(${product.id})">
+                    <img src="${product.image}" alt="${product.name}" class="product-image" />
+                    <div class="product-info">
+                        <div class="product-name">${product.name}</div>
+                        <div class="product-price">${money(product.price)}</div>
+                        <div class="product-stock">В наличии: ${product.stock} шт</div>
+                        <span class="product-status ${product.status}">
+                            ${product.status === 'active' ? 'Активен' : product.status === 'hidden' ? 'Скрыт' : 'Нет в наличии'}
+                        </span>
+                    </div>
+                </div>
+            `).join('') : `
+                <div class="empty-state" style="grid-column: 1 / -1;">
+                    <div class="empty-icon">📦</div>
+                    <div class="empty-title">Нет товаров</div>
+                    <div class="empty-subtitle">Добавьте первый товар</div>
+                </div>
+            `;
+
+            document.getElementById('productsList').innerHTML = html;
+        }
+
+        function openAddProductModal() {
+            document.getElementById('addProductModal').classList.add('show');
+        }
+
+        function closeModal() {
+            document.getElementById('addProductModal').classList.remove('show');
+            document.getElementById('addProductForm').reset();
+            document.getElementById('imagePreview').classList.add('hidden');
+            document.getElementById('uploadPlaceholder').style.display = 'block';
+        }
+
+        function previewImage(event) {
+            const file = event.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    const preview = document.getElementById('imagePreview');
+                    preview.src = e.target.result;
+                    preview.classList.remove('hidden');
+                    document.getElementById('uploadPlaceholder').style.display = 'none';
+                };
+                reader.readAsDataURL(file);
+            }
+        }
+
+        document.getElementById('addProductForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            const formData = {
+                name: document.getElementById('productName').value,
+                description: document.getElementById('productDescription').value,
+                price: parseFloat(document.getElementById('productPrice').value),
+                stock: parseInt(document.getElementById('productStock').value) || 0,
+                photo: document.getElementById('productPhoto').files[0]
+            };
+
+            // TODO: Send to API
+            console.log('Add product:', formData);
+
+            closeModal();
+            toast('Товар добавлен', 'success');
+
+            // Reload products
+            setTimeout(loadProducts, 500);
+        });
+
+        function editProduct(id) {
+            toast('Редактирование в разработке', 'warning');
+        }
+
+        // ===== STATISTICS =====
+        let currentPeriod = 'today';
+        let charts = {};
+
+        async function loadStatistics() {
+            try {
+                // Mock data
+                const data = {
+                    revenue: [1200, 2500, 1800, 3200, 2800, 4100, 3600],
+                    orders: [5, 12, 8, 15, 13, 18, 16],
+                    topProducts: ['Бургер', 'Пицца', 'Суши', 'Салат', 'Напитки']
+                };
+
+                renderCharts(data);
+            } catch (error) {
+                console.error('Error loading stats:', error);
+                toast('Ошибка загрузки статистики', 'error');
+            }
+        }
+
+        function changePeriod(period) {
+            currentPeriod = period;
+
+            document.querySelectorAll('.period-tab').forEach(tab => {
+                tab.classList.remove('active');
+                if (tab.dataset.period === period) {
+                    tab.classList.add('active');
+                }
+            });
+
+            loadStatistics();
+        }
+
+        function renderCharts(data) {
+            // Destroy existing charts
+            Object.values(charts).forEach(chart => chart?.destroy());
+
+            // Revenue Chart
+            const revenueCtx = document.getElementById('revenueChart').getContext('2d');
+            charts.revenue = new Chart(revenueCtx, {
+                type: 'line',
+                data: {
+                    labels: ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'],
+                    datasets: [{
+                        label: 'Выручка, ₽',
+                        data: data.revenue,
+                        borderColor: '#FF6B35',
+                        backgroundColor: 'rgba(255, 107, 53, 0.1)',
+                        tension: 0.4,
+                        fill: true
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            display: false
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true
+                        }
+                    }
+                }
+            });
+
+            // Orders Chart
+            const ordersCtx = document.getElementById('ordersChart').getContext('2d');
+            charts.orders = new Chart(ordersCtx, {
+                type: 'bar',
+                data: {
+                    labels: ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'],
+                    datasets: [{
+                        label: 'Заказы',
+                        data: data.orders,
+                        backgroundColor: '#FF6B35'
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            display: false
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            ticks: {
+                                stepSize: 5
+                            }
+                        }
+                    }
+                }
+            });
+
+            // Top Products Chart
+            const productsCtx = document.getElementById('productsChart').getContext('2d');
+            charts.products = new Chart(productsCtx, {
+                type: 'bar',
+                data: {
+                    labels: data.topProducts,
+                    datasets: [{
+                        label: 'Продано',
+                        data: [45, 38, 32, 28, 25],
+                        backgroundColor: '#FF6B35'
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    indexAxis: 'y',
+                    plugins: {
+                        legend: {
+                            display: false
+                        }
+                    },
+                    scales: {
+                        x: {
+                            beginAtZero: true
+                        }
+                    }
+                }
+            });
+        }
+
+        // ===== SETTINGS =====
+        async function loadSettings() {
+            try {
+                const profile = await fetchAPI('/profile');
+
+                document.getElementById('storeName').textContent = profile.store_name || '-';
+                document.getElementById('storeAddress').textContent = profile.address || '-';
+            } catch (error) {
+                console.error('Error loading settings:', error);
+            }
+        }
+
+        function toggleStoreStatus() {
+            const toggle = document.getElementById('storeStatus');
+            toggle.classList.toggle('active');
+
+            const isActive = toggle.classList.contains('active');
+            toast(isActive ? 'Магазин открыт' : 'Магазин закрыт', 'success');
+        }
+
+        function toggleSetting(element) {
+            element.classList.toggle('active');
+        }
+
+        // ===== UTILITIES =====
         function showAllOrders() {
-            // Show all orders view
-            toast('В разработке', 'warning');
+            switchView('dashboard');
+            filterOrders('new');
         }
 
         async function refreshAll() {
