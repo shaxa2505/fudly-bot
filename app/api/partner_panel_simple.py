@@ -12,13 +12,16 @@ from datetime import datetime, timedelta
 from typing import Optional
 
 import pytz
-from fastapi import APIRouter, File, Form, Header, HTTPException, Query, UploadFile
+from fastapi import APIRouter, File, Form, Header, HTTPException, Query, Request, UploadFile
+from slowapi import Limiter
+from slowapi.util import get_remote_address
 
 from app.services.stats import PartnerTotals, Period, get_partner_stats
 from app.services.unified_order_service import get_unified_order_service
 from database_protocol import DatabaseProtocol
 
 router = APIRouter(tags=["partner-panel"])
+limiter = Limiter(key_func=get_remote_address)
 
 # Global database instance (set by api_server.py)
 _db: DatabaseProtocol | None = None
@@ -159,6 +162,31 @@ def verify_telegram_webapp(authorization: str) -> int:
                     return user_id
             raise HTTPException(status_code=401, detail="Missing signature hash")
 
+        # ✅ SECURITY: Verify auth_date is not too old (prevent replay attacks)
+        auth_date = parsed.get("auth_date")
+        if auth_date:
+            try:
+                auth_timestamp = int(auth_date)
+                current_timestamp = int(datetime.now().timestamp())
+                age_seconds = current_timestamp - auth_timestamp
+
+                # Allow auth data up to 24 hours old (86400 seconds)
+                MAX_AUTH_AGE = 86400
+                if age_seconds > MAX_AUTH_AGE:
+                    logging.warning(f"⚠️ Auth data too old: {age_seconds}s (max {MAX_AUTH_AGE}s)")
+                    raise HTTPException(
+                        status_code=401, detail=f"Auth data expired (age: {age_seconds // 3600}h)"
+                    )
+                elif age_seconds < 0:
+                    logging.warning(f"⚠️ Auth data from future: {age_seconds}s")
+                    raise HTTPException(status_code=401, detail="Invalid auth timestamp")
+
+                logging.info(f"✅ Auth age valid: {age_seconds}s old")
+            except ValueError:
+                logging.error(f"❌ Invalid auth_date format: {auth_date}")
+                raise HTTPException(status_code=401, detail="Invalid auth_date format")
+
+        # ✅ SECURITY: Verify HMAC-SHA256 signature
         data_check_string_parts = []
 
         for key in sorted(parsed.keys()):
@@ -171,14 +199,28 @@ def verify_telegram_webapp(authorization: str) -> int:
             secret_key, data_check_string.encode(), hashlib.sha256
         ).hexdigest()
 
-        if calculated_hash != parsed.get("hash"):
+        received_hash = parsed.get("hash", "")
+        if calculated_hash != received_hash:
+            logging.error(
+                f"❌ Signature mismatch: calculated={calculated_hash[:16]}... received={received_hash[:16]}..."
+            )
             raise HTTPException(status_code=401, detail="Invalid signature")
+
+        logging.info("✅ Signature verified successfully")
 
         import json
 
         user_data = json.loads(parsed.get("user", "{}"))
-        return int(user_data.get("id", 0))
+        user_id = int(user_data.get("id", 0))
+
+        if user_id <= 0:
+            raise HTTPException(status_code=401, detail="Invalid user ID in token")
+
+        return user_id
+    except HTTPException:
+        raise
     except Exception as e:
+        logging.error(f"❌ Auth verification failed: {str(e)}")
         raise HTTPException(status_code=401, detail=f"Auth failed: {str(e)}")
 
 
@@ -246,7 +288,9 @@ async def list_products(authorization: str = Header(None), status: Optional[str]
 
 
 @router.post("/products")
+@limiter.limit("5/minute")
 async def create_product(
+    request: Request,
     authorization: str = Header(None),
     title: str = Form(...),
     category: str = Form("other"),
@@ -294,8 +338,10 @@ async def create_product(
 
 
 @router.put("/products/{product_id}")
+@limiter.limit("10/minute")
 async def update_product(
     product_id: int,
+    request: Request,
     authorization: str = Header(None),
     title: Optional[str] = Form(None),
     category: Optional[str] = Form(None),
@@ -404,7 +450,10 @@ async def delete_product(product_id: int, authorization: str = Header(None)):
 
 
 @router.post("/products/import")
-async def import_csv(file: UploadFile = File(...), authorization: str = Header(None)):
+@limiter.limit("2/minute")
+async def import_csv(
+    request: Request, file: UploadFile = File(...), authorization: str = Header(None)
+):
     """Import products from CSV"""
     telegram_id = verify_telegram_webapp(authorization)
     user, store = get_partner_with_store(telegram_id)
@@ -578,7 +627,9 @@ async def list_orders(authorization: str = Header(None), status: Optional[str] =
 
 
 @router.post("/orders/{order_id}/confirm")
+@limiter.limit("20/minute")
 async def confirm_order(
+    request: Request,
     order_id: int,
     order_type: str = "booking",  # For legacy compatibility, but we determine from DB
     authorization: str = Header(None),
@@ -628,7 +679,9 @@ async def confirm_order(
 
 
 @router.post("/orders/{order_id}/cancel")
+@limiter.limit("20/minute")
 async def cancel_order(
+    request: Request,
     order_id: int,
     order_type: str = "booking",  # For legacy compatibility, but we determine from DB
     authorization: str = Header(None),

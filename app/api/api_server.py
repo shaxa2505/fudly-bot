@@ -13,10 +13,13 @@ from pathlib import Path
 from typing import Any
 
 import uvicorn
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
+from slowapi.util import get_remote_address
 
 from app.api.auth import router as auth_router
 from app.api.auth import set_auth_db
@@ -32,6 +35,9 @@ logger = logging.getLogger(__name__)
 # Global reference to the bot's database
 _app_db = None
 _app_offer_service = None
+
+# Rate limiter configuration
+limiter = Limiter(key_func=get_remote_address, default_limits=["100/minute"])
 
 
 def create_api_app(db: Any = None, offer_service: Any = None, bot_token: str = None) -> FastAPI:
@@ -79,6 +85,10 @@ def create_api_app(db: Any = None, offer_service: Any = None, bot_token: str = N
         redoc_url="/api/redoc",
         openapi_url="/api/openapi.json",
     )
+
+    # Add rate limiter
+    app.state.limiter = limiter
+    app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
     # CORS for Mini App - allow all Vercel preview URLs
     app.add_middleware(
