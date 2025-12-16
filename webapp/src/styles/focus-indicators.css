@@ -1,0 +1,183 @@
+/**
+ * Focus Indicators - WCAG 2.4.7 Focus Visible Compliance
+ *
+ * Purpose: Provide clear, visible focus indicators for keyboard navigation
+ * Standards: WCAG 2.1 Level AA (Success Criterion 2.4.7)
+ *
+ * Design:
+ * - 3px solid outline with high contrast
+ * - 2px offset for better visibility
+ * - Smooth transitions for better UX
+ * - Brand color (#53B175) for consistency
+ *
+ * Usage: Import in main index.css or App.jsx
+ */
+
+/* ===== GLOBAL FOCUS STYLES ===== */
+
+/* Remove browser default focus */
+*:focus {
+  outline: none;
+}
+
+/* Add custom focus-visible indicator for keyboard navigation */
+*:focus-visible {
+  outline: 3px solid var(--color-primary, #53B175);
+  outline-offset: 2px;
+  transition: outline 0.2s ease;
+}
+
+/* ===== INTERACTIVE ELEMENTS ===== */
+
+/* Buttons */
+button:focus-visible,
+.button:focus-visible,
+[role="button"]:focus-visible {
+  outline: 3px solid var(--color-primary, #53B175);
+  outline-offset: 2px;
+}
+
+/* Links */
+a:focus-visible {
+  outline: 3px solid var(--color-primary, #53B175);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm, 4px);
+}
+
+/* Form Inputs */
+input:focus-visible,
+textarea:focus-visible,
+select:focus-visible {
+  outline: 3px solid var(--color-primary, #53B175);
+  outline-offset: 2px;
+  border-radius: inherit;
+}
+
+/* Radio buttons and checkboxes */
+input[type="radio"]:focus-visible,
+input[type="checkbox"]:focus-visible {
+  outline: 3px solid var(--color-primary, #53B175);
+  outline-offset: 2px;
+}
+
+/* ===== CUSTOM COMPONENTS ===== */
+
+/* Cards (clickable) */
+.offer-card:focus-visible,
+.category-card:focus-visible,
+.store-card:focus-visible {
+  outline: 3px solid var(--color-primary, #53B175);
+  outline-offset: 2px;
+  border-radius: inherit;
+}
+
+/* Navigation items */
+.nav-item:focus-visible,
+.filter-pill:focus-visible,
+.menu-item:focus-visible {
+  outline: 3px solid var(--color-primary, #53B175);
+  outline-offset: 2px;
+  border-radius: inherit;
+}
+
+/* Modal close buttons */
+.modal-close:focus-visible,
+.sheet-close:focus-visible,
+[aria-label*="close"]:focus-visible,
+[aria-label*="Close"]:focus-visible {
+  outline: 3px solid var(--color-primary, #53B175);
+  outline-offset: 2px;
+  border-radius: 50%;
+}
+
+/* Tabs */
+[role="tab"]:focus-visible {
+  outline: 3px solid var(--color-primary, #53B175);
+  outline-offset: 2px;
+}
+
+/* ===== SPECIAL CASES ===== */
+
+/* Icon buttons (small touch targets) */
+.icon-btn:focus-visible,
+.favorite-btn:focus-visible {
+  outline: 3px solid var(--color-primary, #53B175);
+  outline-offset: 2px;
+  border-radius: 50%;
+}
+
+/* Primary buttons (special color) */
+.btn-primary:focus-visible,
+.button-primary:focus-visible {
+  outline: 3px solid #FFFFFF;
+  outline-offset: 2px;
+}
+
+/* Danger/destructive buttons */
+.btn-danger:focus-visible,
+.button-danger:focus-visible {
+  outline: 3px solid #E53935;
+  outline-offset: 2px;
+}
+
+/* ===== HIGH CONTRAST MODE ===== */
+
+@media (prefers-contrast: high) {
+  *:focus-visible {
+    outline-width: 4px;
+    outline-offset: 3px;
+  }
+}
+
+/* ===== REDUCED MOTION ===== */
+
+@media (prefers-reduced-motion: reduce) {
+  *:focus-visible {
+    transition: none;
+  }
+}
+
+/* ===== DARK MODE SUPPORT ===== */
+
+@media (prefers-color-scheme: dark) {
+  .btn-primary:focus-visible,
+  .button-primary:focus-visible {
+    outline-color: #FFFFFF;
+  }
+
+  *:focus-visible {
+    outline-color: #66D97F; /* Lighter green for dark backgrounds */
+  }
+}
+
+/* ===== SKIP TO CONTENT LINK ===== */
+
+/* Hidden skip link for keyboard users */
+.skip-to-content {
+  position: absolute;
+  top: -100px;
+  left: 0;
+  background: var(--color-primary, #53B175);
+  color: white;
+  padding: 12px 20px;
+  border-radius: var(--radius-md, 8px);
+  font-weight: var(--font-semibold, 600);
+  z-index: 9999;
+  transition: top 0.3s ease;
+}
+
+.skip-to-content:focus {
+  top: 16px;
+  left: 16px;
+  outline: 3px solid white;
+  outline-offset: 2px;
+}
+
+/* ===== FOCUS WITHIN (Container has focused child) ===== */
+
+.search-box:focus-within,
+.form-group:focus-within {
+  outline: 2px solid var(--color-primary, #53B175);
+  outline-offset: 1px;
+  border-radius: inherit;
+}

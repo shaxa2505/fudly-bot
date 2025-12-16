@@ -6,6 +6,7 @@
  * 2. Animations
  * 3. Shared components
  * 4. Accessibility
+ * 5. Focus indicators (WCAG 2.4.7)
  */
 
 /* Design System Imports */
@@ -13,6 +14,7 @@
 @import './styles/animations.css';
 @import './styles/shared-components.css';
 @import './styles/accessibility.css';
+@import './styles/focus-indicators.css';
 
 /* ===== CSS RESET ===== */
 
