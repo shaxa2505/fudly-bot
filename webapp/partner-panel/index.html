@@ -1306,7 +1306,7 @@
                 console.error('tg.initDataUnsafe:', tg?.initDataUnsafe);
                 console.error('URL uid:', urlUserId);
                 console.error('Window location:', window.location.href);
-                
+
                 // Try one more time with current timestamp
                 if (urlUserId) {
                     console.warn('⚠️ Fallback: Using URL uid with current timestamp');
@@ -1325,24 +1325,34 @@
             console.log(`📡 API Call: ${endpoint}`);
             console.log('Auth:', auth ? 'Present' : '❌ MISSING');
 
-            const res = await fetch(`${API}${endpoint}`, {
-                headers: {
-                    'Authorization': auth,
-                    'Content-Type': 'application/json'
-                }
-            });
+            try {
+                const res = await fetch(`${API}${endpoint}`, {
+                    headers: {
+                        'Authorization': auth,
+                        'Content-Type': 'application/json'
+                    }
+                });
 
-            console.log(`Response: ${res.status} ${res.statusText}`);
+                console.log(`Response: ${res.status} ${res.statusText}`);
 
-            if (!res.ok) {
-                if (res.status === 401) {
-                    console.error('❌ 401 Unauthorized - Check initData:', initData);
-                    toast('Ошибка авторизации. Откройте через Telegram бот.', 'error');
-                    throw new Error('Unauthorized');
+                if (!res.ok) {
+                    if (res.status === 401) {
+                        console.error('❌ 401 Unauthorized - Check initData:', initData);
+                        toast('Ошибка авторизации. Откройте через Telegram бот.', 'error');
+                        throw new Error('Unauthorized');
+                    }
+                    const errorText = await res.text();
+                    console.error(`❌ API Error ${res.status}:`, errorText);
+                    throw new Error(`HTTP ${res.status}: ${errorText}`);
                 }
-                throw new Error(`HTTP ${res.status}`);
+
+                const data = await res.json();
+                console.log(`✅ Success ${endpoint}:`, data);
+                return data;
+            } catch (error) {
+                console.error(`❌ API Call Failed ${endpoint}:`, error);
+                throw error;
             }
-            return res.json();
         }
 
         function formatPrice(amount) {
@@ -1417,20 +1427,61 @@
             }
 
             try {
-                const [profile, orders, stats] = await Promise.all([
-                    api('/profile'),
-                    api('/orders'),
-                    api('/stats?period=today')
-                ]);
+                console.log('🔄 Loading dashboard data...');
 
+                // Load profile first
+                let profile = null;
+                try {
+                    profile = await api('/profile');
+                    console.log('✅ Profile loaded:', profile);
+                } catch (e) {
+                    console.error('❌ Profile load failed:', e);
+                    throw e;
+                }
+
+                // Load orders
+                let orders = [];
+                try {
+                    orders = await api('/orders');
+                    console.log('✅ Orders loaded:', orders?.length || 0, 'items');
+                } catch (e) {
+                    console.error('❌ Orders load failed:', e);
+                    // Continue without orders
+                    orders = [];
+                }
+
+                // Load stats
+                let stats = {};
+                try {
+                    stats = await api('/stats?period=today');
+                    console.log('✅ Stats loaded:', stats);
+                } catch (e) {
+                    console.error('❌ Stats load failed:', e);
+                    // Continue without stats
+                    stats = { revenue: 0, orders: 0 };
+                }
+
+                // Update UI
                 document.getElementById('storeName').textContent = profile?.store?.name || 'Мой магазин';
                 document.getElementById('todayRevenue').textContent = formatPrice(stats?.revenue || 0);
                 document.getElementById('todayOrders').textContent = stats?.orders || 0;
 
                 allOrders = orders || [];
                 updateOrdersView();
+
+                console.log('✅ Dashboard loaded successfully!');
             } catch (e) {
-                console.error('Load error:', e);
+                console.error('❌ Dashboard load error:', e);
+                document.getElementById('ordersList').innerHTML = `
+                    <div class="empty-state">
+                        <div class="empty-icon">⚠️</div>
+                        <div class="empty-title">Ошибка загрузки данных</div>
+                        <div class="empty-text">${e.message || 'Проверьте подключение к интернету'}</div>
+                        <button class="btn-primary" onclick="loadDashboard()" style="margin-top: 16px;">
+                            <span>Повторить попытку</span>
+                        </button>
+                    </div>
+                `;
                 toast('Ошибка загрузки данных', 'error');
             }
         }
