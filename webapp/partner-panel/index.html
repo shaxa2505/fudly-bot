@@ -651,8 +651,8 @@
 
         .products-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
-            gap: 12px;
+            grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+            gap: 16px;
         }
 
         .product-card {
@@ -662,6 +662,7 @@
             box-shadow: var(--shadow-sm);
             cursor: pointer;
             transition: all 0.2s;
+            position: relative;
         }
 
         .product-card:hover {
@@ -669,35 +670,95 @@
             box-shadow: var(--shadow-md);
         }
 
+        .product-image-wrapper {
+            position: relative;
+            background: var(--bg);
+        }
+
         .product-image {
             width: 100%;
-            height: 160px;
+            height: 120px;
             object-fit: cover;
-            background: var(--bg);
+            display: block;
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+
+        .product-image.loaded {
+            opacity: 1;
+        }
+
+        .discount-badge {
+            position: absolute;
+            top: 8px;
+            right: 8px;
+            background: var(--danger);
+            color: white;
+            padding: 4px 8px;
+            border-radius: 8px;
+            font-size: 11px;
+            font-weight: 700;
+            box-shadow: var(--shadow-md);
         }
 
         .product-info {
             padding: 12px;
         }
 
+        .product-category {
+            font-size: 11px;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 4px;
+            font-weight: 600;
+        }
+
         .product-name {
             font-weight: 600;
             font-size: 14px;
-            margin-bottom: 4px;
+            line-height: 1.3;
+            margin-bottom: 8px;
             display: -webkit-box;
             -webkit-line-clamp: 2;
             -webkit-box-orient: vertical;
             overflow: hidden;
+            min-height: 36px;
+        }
+
+        .product-pricing {
+            margin-bottom: 8px;
+        }
+
+        .original-price {
+            font-size: 12px;
+            color: var(--text-muted);
+            text-decoration: line-through;
+            margin-bottom: 2px;
         }
 
         .product-price {
             color: var(--primary);
             font-weight: 700;
-            font-size: 16px;
+            font-size: 18px;
+            line-height: 1;
         }
 
-        .product-stock {
+        .product-meta {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+            margin-bottom: 8px;
+        }
+
+        .product-stock,
+        .product-expiry {
             font-size: 12px;
+            color: var(--text-secondary);
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
             color: var(--text-muted);
             margin-top: 4px;
         }
@@ -1356,11 +1417,11 @@
         }
 
         function formatPrice(amount) {
-            return new Intl.NumberFormat('ru-UZ', {
-                style: 'decimal',
-                minimumFractionDigits: 0,
-                maximumFractionDigits: 0
-            }).format(amount) + ' сум';
+            if (!amount && amount !== 0) return '0 sům';
+            
+            // Format with spaces as thousand separators
+            const formatted = amount.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
+            return formatted + ' sům';
         }
 
         function toast(msg, type = 'success') {
@@ -1828,46 +1889,100 @@
         let allProducts = [];
         let productsFilter = 'all';
 
+        // Photo cache (24 hours)
+        const photoCache = {
+            get(id) {
+                try {
+                    const cached = localStorage.getItem(`photo_${id}`);
+                    if (!cached) return null;
+                    const {url, timestamp} = JSON.parse(cached);
+                    // Cache for 24 hours
+                    if (Date.now() - timestamp > 86400000) {
+                        localStorage.removeItem(`photo_${id}`);
+                        return null;
+                    }
+                    return url;
+                } catch (e) {
+                    return null;
+                }
+            },
+            set(id, url) {
+                try {
+                    localStorage.setItem(`photo_${id}`, JSON.stringify({
+                        url,
+                        timestamp: Date.now()
+                    }));
+                } catch (e) {
+                    console.warn('⚠️ Photo cache error:', e);
+                }
+            }
+        };
+
         async function loadProducts() {
             try {
                 const products = await api('/products');
                 console.log('✅ Products loaded:', products?.length || 0, 'items');
 
-                // Transform API data to UI format
-                allProducts = await Promise.all(products.map(async (p) => {
-                    let imageUrl = 'https://via.placeholder.com/160?text=No+Photo';
-                    
-                    // Get actual photo URL from Telegram
-                    if (p.photo_id) {
-                        try {
-                            const photoData = await api(`/photo/${p.photo_id}`);
-                            imageUrl = photoData.url;
-                        } catch (e) {
-                            console.warn(`⚠️ Failed to load photo for ${p.title}:`, e);
-                        }
-                    }
-
-                    return {
-                        id: p.offer_id,
-                        name: p.title,
-                        price: p.discount_price,
-                        stock: p.quantity,
-                        status: p.quantity > 0 ? (p.status || 'active') : 'out_of_stock',
-                        image: imageUrl,
-                        category: p.category,
-                        unit: p.unit || 'шт',
-                        description: p.description,
-                        original_price: p.original_price,
-                        expiry_date: p.expiry_date
-                    };
+                // 🚀 PERFORMANCE: Show products immediately without waiting for photos
+                allProducts = products.map(p => ({
+                    id: p.offer_id,
+                    name: p.title,
+                    price: p.discount_price,
+                    stock: p.quantity,
+                    status: p.quantity > 0 ? (p.status || 'active') : 'out_of_stock',
+                    image: 'https://via.placeholder.com/120?text=Loading...', // Placeholder
+                    category: p.category,
+                    unit: p.unit || 'шт',
+                    description: p.description,
+                    original_price: p.original_price,
+                    expiry_date: p.expiry_date,
+                    photo_id: p.photo_id
                 }));
 
+                // Render immediately
                 renderProducts();
+
+                // Load photos in background
+                products.forEach(async (p, index) => {
+                    if (!p.photo_id) return;
+
+                    // Check cache first
+                    const cachedUrl = photoCache.get(p.photo_id);
+                    if (cachedUrl) {
+                        allProducts[index].image = cachedUrl;
+                        updateProductImage(p.offer_id, cachedUrl);
+                        return;
+                    }
+
+                    // Load from API
+                    try {
+                        const photoData = await api(`/photo/${p.photo_id}`);
+                        if (photoData?.url) {
+                            allProducts[index].image = photoData.url;
+                            photoCache.set(p.photo_id, photoData.url);
+                            updateProductImage(p.offer_id, photoData.url);
+                        }
+                    } catch (e) {
+                        console.warn(`⚠️ Failed to load photo for ${p.title}:`, e);
+                        allProducts[index].image = 'https://via.placeholder.com/120?text=No+Photo';
+                        updateProductImage(p.offer_id, allProducts[index].image);
+                    }
+                });
+
             } catch (error) {
                 console.error('❌ Error loading products:', error);
                 toast('Ошибка загрузки товаров', 'error');
                 allProducts = [];
                 renderProducts();
+            }
+        }
+
+        // Update product image in DOM without re-rendering everything
+        function updateProductImage(productId, imageUrl) {
+            const imgEl = document.querySelector(`[data-product-id="${productId}"] img`);
+            if (imgEl) {
+                imgEl.src = imageUrl;
+                imgEl.classList.add('loaded');
             }
         }
 
@@ -1891,29 +2006,69 @@
                 ? allProducts
                 : allProducts.filter(p => p.status === productsFilter);
 
-            const html = filtered.length ? filtered.map(product => `
-                <div class="product-card" onclick="editProduct(${product.id})">
-                    <img src="${product.image}" alt="${product.name}" class="product-image" />
+            const html = filtered.length ? filtered.map(product => {
+                const hasDiscount = product.original_price && product.original_price > product.price;
+                const discountPercent = hasDiscount 
+                    ? Math.round((1 - product.price / product.original_price) * 100)
+                    : 0;
+
+                return `
+                <div class="product-card" data-product-id="${product.id}" onclick="editProduct(${product.id})">
+                    <div class="product-image-wrapper">
+                        <img 
+                            src="${product.image}" 
+                            alt="${product.name}"
+                            class="product-image"
+                            loading="lazy"
+                            width="120"
+                            height="120"
+                        />
+                        ${hasDiscount ? `<div class="discount-badge">-${discountPercent}%</div>` : ''}
+                    </div>
                     <div class="product-info">
+                        ${product.category ? `<div class="product-category">${product.category}</div>` : ''}
                         <div class="product-name">${product.name}</div>
-                        <div class="product-price">${formatPrice(product.price)}</div>
-                        <div class="product-stock">В наличии: ${product.stock} шт</div>
+                        <div class="product-pricing">
+                            ${hasDiscount ? `<div class="original-price">${formatPrice(product.original_price)}</div>` : ''}
+                            <div class="product-price">${formatPrice(product.price)}</div>
+                        </div>
+                        <div class="product-meta">
+                            <div class="product-stock">
+                                <i data-lucide="package" style="width: 14px; height: 14px;"></i>
+                                В наличии: ${product.stock} ${product.unit}
+                            </div>
+                            ${product.expiry_date ? `
+                            <div class="product-expiry">
+                                <i data-lucide="calendar" style="width: 14px; height: 14px;"></i>
+                                Годен до: ${product.expiry_date}
+                            </div>
+                            ` : ''}
+                        </div>
                         <span class="product-status ${product.status}">
                             ${product.status === 'active' ? 'Активен' : product.status === 'hidden' ? 'Скрыт' : 'Нет в наличии'}
                         </span>
                     </div>
                 </div>
-            `).join('') : `
+            `;
+            }).join('') : `
                 <div class="empty-state" style="grid-column: 1 / -1;">
                     <div class="empty-icon">📦</div>
                     <div class="empty-title">Нет товаров</div>
                     <div class="empty-subtitle">Добавьте первый товар</div>
+                    <button class="btn" onclick="openAddProductModal()" style="margin-top: 16px;">
+                        <i data-lucide="plus" style="width: 16px; height: 16px;"></i>
+                        Добавить
+                    </button>
                 </div>
             `;
 
             const productsListEl = document.getElementById('productsList');
             if (productsListEl) {
                 productsListEl.innerHTML = html;
+                // Re-initialize Lucide icons for new content
+                if (typeof lucide !== 'undefined') {
+                    lucide.createIcons();
+                }
             } else {
                 console.error('❌ Element #productsList not found');
             }
