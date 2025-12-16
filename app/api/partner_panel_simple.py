@@ -144,7 +144,7 @@ def verify_telegram_webapp(authorization: str) -> int:
                             auth_timestamp = int(auth_date)
                             current_timestamp = int(datetime.now().timestamp())
                             age_seconds = current_timestamp - auth_timestamp
-                            
+
                             # Allow up to 7 days for URL-based auth (more permissive)
                             MAX_AUTH_AGE = 7 * 24 * 3600  # 7 days
                             if age_seconds > MAX_AUTH_AGE:
@@ -153,7 +153,7 @@ def verify_telegram_webapp(authorization: str) -> int:
                                 logging.warning(f"⚠️ URL auth from future: {age_seconds}s")
                         except (ValueError, TypeError) as e:
                             logging.warning(f"⚠️ Invalid auth_date in URL auth: {auth_date} - {e}")
-                    
+
                     msg = f"✅ URL AUTH SUCCESS: user_id={user_id} (age: {auth_date or 'no timestamp'})"
                     logging.info(msg)
                     print(msg, file=sys.stderr, flush=True)
@@ -595,13 +595,12 @@ async def list_orders(authorization: str = Header(None), status: Optional[str] =
             total_price = order.get("total_price", 0)
             delivery_address = order.get("delivery_address")
             created_at = order.get("created_at")
-            
+
             # Customer info from JOIN
             first_name = order.get("first_name", "")
-            last_name = order.get("last_name", "")
-            customer_name = f"{first_name} {last_name}".strip() or "Unknown"
+            customer_name = first_name or "Unknown"
             customer_phone = order.get("phone")
-            
+
             # Offer info from JOIN
             offer_title = order.get("offer_title", "Unknown")
         else:

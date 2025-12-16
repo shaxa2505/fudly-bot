@@ -45,7 +45,7 @@ class OrderMixin:
 
         Returns:
             order_id if successful, None otherwise
-            
+
         TODO: This method has no transaction protection and no stock checking!
         Should use create_cart_order() instead which has atomic stock reservation.
         """
@@ -377,10 +377,10 @@ class OrderMixin:
 
     def update_order_status(self, order_id: int, order_status: str) -> bool:
         """Update order status.
-        
+
         NOTE: This method only updates order_status field.
         Use update_payment_status() to update payment_status separately.
-        
+
         Returns:
             True if update was successful
         """
@@ -436,13 +436,13 @@ class OrderMixin:
             if status:
                 cursor.execute(
                     """
-                    SELECT o.*, 
-                           u.first_name, u.last_name, u.phone, u.username,
+                    SELECT o.*,
+                           u.first_name, u.phone, u.username,
                            off.title as offer_title, off.discount_price
                     FROM orders o
                     LEFT JOIN users u ON o.user_id = u.user_id
                     LEFT JOIN offers off ON o.offer_id = off.offer_id
-                    WHERE o.store_id = %s AND o.order_status = %s 
+                    WHERE o.store_id = %s AND o.order_status = %s
                     ORDER BY o.created_at DESC
                     """,
                     (store_id, status),
@@ -450,13 +450,13 @@ class OrderMixin:
             else:
                 cursor.execute(
                     """
-                    SELECT o.*, 
-                           u.first_name, u.last_name, u.phone, u.username,
+                    SELECT o.*,
+                           u.first_name, u.phone, u.username,
                            off.title as offer_title, off.discount_price
                     FROM orders o
                     LEFT JOIN users u ON o.user_id = u.user_id
                     LEFT JOIN offers off ON o.offer_id = off.offer_id
-                    WHERE o.store_id = %s 
+                    WHERE o.store_id = %s
                     ORDER BY o.created_at DESC
                     """,
                     (store_id,),
