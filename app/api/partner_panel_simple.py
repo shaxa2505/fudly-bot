@@ -48,7 +48,7 @@ def get_partner_with_store(telegram_id: int) -> tuple[dict, dict]:
     A partner is defined by having a store (in stores table), not by role in users table.
     Returns (user, store) tuple.
     Raises HTTPException if user doesn't have a store.
-    
+
     Note: In DB schema, users.user_id IS the telegram_id (Primary Key).
     stores.owner_id is FK to users.user_id, so it also contains telegram_id.
     """
@@ -113,7 +113,8 @@ def verify_telegram_webapp(authorization: str) -> int:
         raise HTTPException(status_code=401, detail="Invalid authorization format")
 
     init_data = authorization[4:]
-    bot_token = os.getenv("BOT_TOKEN")
+    # Try BOT_TOKEN first, fallback to TELEGRAM_BOT_TOKEN
+    bot_token = os.getenv("BOT_TOKEN") or os.getenv("TELEGRAM_BOT_TOKEN")
     if not bot_token:
         raise HTTPException(status_code=500, detail="Bot token not configured")
 
@@ -218,19 +219,19 @@ async def list_products(authorization: str = Header(None), status: Optional[str]
     """List partner's products"""
     import logging
     import sys
-    
+
     try:
         logging.info("🔍 /products called")
         print("🔍 /products called", file=sys.stderr, flush=True)
-        
+
         telegram_id = verify_telegram_webapp(authorization)
         logging.info(f"✅ telegram_id: {telegram_id}")
         print(f"✅ telegram_id: {telegram_id}", file=sys.stderr, flush=True)
-        
+
         user, store = get_partner_with_store(telegram_id)
         logging.info(f"✅ store_id: {store.get('store_id')}")
         print(f"✅ store_id: {store.get('store_id')}", file=sys.stderr, flush=True)
-        
+
         db = get_db()
         logging.info("✅ db obtained")
         print("✅ db obtained", file=sys.stderr, flush=True)
@@ -242,6 +243,7 @@ async def list_products(authorization: str = Header(None), status: Optional[str]
         logging.error(f"❌ ERROR in /products: {type(e).__name__}: {e}", exc_info=True)
         print(f"❌ ERROR in /products: {type(e).__name__}: {e}", file=sys.stderr, flush=True)
         import traceback
+
         traceback.print_exc()
         raise
 
