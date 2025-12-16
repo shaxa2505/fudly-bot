@@ -130,30 +130,81 @@
             display: flex;
             gap: 12px;
             align-items: center;
+            cursor: pointer;
+            transition: all 0.2s;
+            border: 1px solid var(--border);
+            position: relative;
+        }
+        .product-card:hover {
+            transform: translateY(-2px);
+            box-shadow: var(--shadow-lg);
+            border-color: var(--primary);
         }
         .product-image {
-            width: 60px;
-            height: 60px;
+            width: 70px;
+            height: 70px;
             border-radius: 12px;
             background: var(--bg);
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 24px;
+            font-size: 28px;
             overflow: hidden;
+            flex-shrink: 0;
         }
         .product-image img { width: 100%; height: 100%; object-fit: cover; }
-        .product-info { flex: 1; }
-        .product-name { font-weight: 600; margin-bottom: 4px; }
-        .product-price { color: var(--primary); font-weight: 600; }
-        .product-stock { font-size: 13px; color: var(--text-secondary); }
-        .product-status {
-            width: 10px;
-            height: 10px;
-            border-radius: 50%;
-            background: var(--success);
+        .product-info {
+            flex: 1;
+            min-width: 0;
         }
-        .product-status.inactive { background: var(--text-secondary); }
+        .product-name {
+            font-weight: 600;
+            margin-bottom: 4px;
+            font-size: 15px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        .product-price {
+            color: var(--primary);
+            font-weight: 700;
+            font-size: 18px;
+            margin-bottom: 4px;
+        }
+        .product-stock {
+            font-size: 12px;
+            color: var(--text-secondary);
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+        }
+        .product-stock::before {
+            content: '📦';
+            font-size: 10px;
+        }
+        .product-badge {
+            position: absolute;
+            top: 12px;
+            right: 12px;
+            padding: 4px 10px;
+            border-radius: 12px;
+            font-size: 11px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        .product-badge.active {
+            background: var(--success-light);
+            color: var(--success);
+        }
+        .product-badge.inactive {
+            background: var(--border);
+            color: var(--text-secondary);
+        }
+        .product-badge.low-stock {
+            background: var(--warning-light);
+            color: var(--warning);
+        }
 
         /* Order Card */
         .order-card {
@@ -307,13 +358,19 @@
         }
 
         /* Form */
-        .form-group { margin-bottom: 16px; }
+        .form-group {
+            margin-bottom: 20px;
+            position: relative;
+        }
         .form-label {
             display: block;
             font-size: 14px;
-            font-weight: 500;
+            font-weight: 600;
             margin-bottom: 8px;
-            color: var(--text-secondary);
+            color: var(--text);
+        }
+        .form-label .required {
+            color: var(--danger);
         }
         .form-input {
             width: 100%;
@@ -321,11 +378,33 @@
             border: 2px solid var(--border);
             border-radius: 12px;
             font-size: 16px;
-            transition: border-color 0.2s;
+            transition: all 0.2s;
+            background: var(--card);
         }
         .form-input:focus {
             outline: none;
             border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
+        }
+        .form-input:invalid:not(:placeholder-shown) {
+            border-color: var(--danger);
+        }
+        .form-input.success {
+            border-color: var(--success);
+        }
+        .form-error {
+            display: none;
+            font-size: 12px;
+            color: var(--danger);
+            margin-top: 6px;
+        }
+        .form-error.visible {
+            display: block;
+        }
+        .form-hint {
+            font-size: 12px;
+            color: var(--text-muted);
+            margin-top: 6px;
         }
 
         /* Empty State */
@@ -390,6 +469,63 @@
             animation: spin 1s linear infinite;
         }
         @keyframes spin { to { transform: rotate(360deg); } }
+
+        /* Skeleton Loaders */
+        .skeleton {
+            background: linear-gradient(90deg, var(--border) 25%, #f0f0f0 50%, var(--border) 75%);
+            background-size: 200% 100%;
+            animation: shimmer 1.5s infinite;
+            border-radius: 8px;
+        }
+        @keyframes shimmer { 0% { background-position: -200% 0; } 100% { background-position: 200% 0; } }
+
+        .skeleton-card {
+            background: var(--card);
+            border-radius: var(--radius);
+            padding: 16px;
+            margin-bottom: 12px;
+            box-shadow: var(--shadow);
+        }
+        .skeleton-header {
+            display: flex;
+            gap: 12px;
+            margin-bottom: 12px;
+        }
+        .skeleton-avatar {
+            width: 60px;
+            height: 60px;
+            border-radius: 12px;
+        }
+        .skeleton-text {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+        .skeleton-line {
+            height: 16px;
+            border-radius: 4px;
+        }
+        .skeleton-line.short { width: 60%; }
+        .skeleton-line.medium { width: 80%; }
+
+        .skeleton-stat {
+            background: var(--card);
+            border-radius: var(--radius);
+            padding: 16px;
+            box-shadow: var(--shadow);
+        }
+        .skeleton-stat-value {
+            height: 32px;
+            width: 80px;
+            margin-bottom: 8px;
+            border-radius: 6px;
+        }
+        .skeleton-stat-label {
+            height: 14px;
+            width: 120px;
+            border-radius: 4px;
+        }
 
         /* Error State */
         .error-state {
@@ -646,6 +782,58 @@
         }
 
         // ============================================
+        // Skeleton Loaders
+        // ============================================
+        function showSkeletonStats() {
+            return `
+                <div class="skeleton-stat">
+                    <div class="skeleton skeleton-stat-value"></div>
+                    <div class="skeleton skeleton-stat-label"></div>
+                </div>
+            `.repeat(4);
+        }
+
+        function showSkeletonCards(count = 3) {
+            return `
+                <div class="skeleton-card">
+                    <div class="skeleton-header">
+                        <div class="skeleton skeleton-avatar"></div>
+                        <div class="skeleton-text">
+                            <div class="skeleton skeleton-line"></div>
+                            <div class="skeleton skeleton-line short"></div>
+                        </div>
+                    </div>
+                </div>
+            `.repeat(count);
+        }
+
+        // ============================================
+        // Skeleton Loaders
+        // ============================================
+        function showSkeletonStats() {
+            return `
+                <div class="skeleton-stat">
+                    <div class="skeleton skeleton-stat-value"></div>
+                    <div class="skeleton skeleton-stat-label"></div>
+                </div>
+            `.repeat(4);
+        }
+
+        function showSkeletonCards(count = 3) {
+            return `
+                <div class="skeleton-card">
+                    <div class="skeleton-header">
+                        <div class="skeleton skeleton-avatar"></div>
+                        <div class="skeleton-text">
+                            <div class="skeleton skeleton-line"></div>
+                            <div class="skeleton skeleton-line short"></div>
+                        </div>
+                    </div>
+                </div>
+            `.repeat(count);
+        }
+
+        // ============================================
         // UI Helpers
         // ============================================
         function toast(msg) {
@@ -816,32 +1004,61 @@
                     api('/stats?period=today'), api('/stats?period=week'), api('/stats?period=month')
                 ]);
 
+                // Calculate average order value
+                const avgOrderToday = today?.orders > 0 ? today.revenue / today.orders : 0;
+                const avgOrderWeek = week?.orders > 0 ? week.revenue / week.orders : 0;
+                const avgOrderMonth = month?.orders > 0 ? month.revenue / month.orders : 0;
+
                 document.getElementById('statsContent').innerHTML = `
                     <div class="card">
-                        <div class="card-header"><span class="card-title">📅 Сегодня</span></div>
-                        <div style="display:flex;justify-content:space-between;margin-top:8px">
-                            <span>Выручка</span><strong>${money(today?.revenue)}</strong>
+                        <div class="card-header">
+                            <span class="card-title">📅 Сегодня</span>
                         </div>
-                        <div style="display:flex;justify-content:space-between;margin-top:8px">
-                            <span>Заказов</span><strong>${today?.orders || 0}</strong>
+                        <div style="display:flex;justify-content:space-between;margin-top:12px;padding:8px 0;border-bottom:1px solid var(--border)">
+                            <span style="color:var(--text-secondary)">Выручка</span>
+                            <strong style="font-size:18px;color:var(--primary)">${money(today?.revenue)}</strong>
+                        </div>
+                        <div style="display:flex;justify-content:space-between;margin-top:8px;padding:8px 0;border-bottom:1px solid var(--border)">
+                            <span style="color:var(--text-secondary)">Заказов</span>
+                            <strong style="font-size:18px">${today?.orders || 0}</strong>
+                        </div>
+                        <div style="display:flex;justify-content:space-between;margin-top:8px;padding:8px 0">
+                            <span style="color:var(--text-secondary)">Средний чек</span>
+                            <strong style="font-size:16px;color:var(--text-secondary)">${money(avgOrderToday)}</strong>
                         </div>
                     </div>
                     <div class="card">
-                        <div class="card-header"><span class="card-title">📆 Неделя</span></div>
-                        <div style="display:flex;justify-content:space-between;margin-top:8px">
-                            <span>Выручка</span><strong>${money(week?.revenue)}</strong>
+                        <div class="card-header">
+                            <span class="card-title">📆 Неделя</span>
                         </div>
-                        <div style="display:flex;justify-content:space-between;margin-top:8px">
-                            <span>Заказов</span><strong>${week?.orders || 0}</strong>
+                        <div style="display:flex;justify-content:space-between;margin-top:12px;padding:8px 0;border-bottom:1px solid var(--border)">
+                            <span style="color:var(--text-secondary)">Выручка</span>
+                            <strong style="font-size:18px;color:var(--primary)">${money(week?.revenue)}</strong>
+                        </div>
+                        <div style="display:flex;justify-content:space-between;margin-top:8px;padding:8px 0;border-bottom:1px solid var(--border)">
+                            <span style="color:var(--text-secondary)">Заказов</span>
+                            <strong style="font-size:18px">${week?.orders || 0}</strong>
+                        </div>
+                        <div style="display:flex;justify-content:space-between;margin-top:8px;padding:8px 0">
+                            <span style="color:var(--text-secondary)">Средний чек</span>
+                            <strong style="font-size:16px;color:var(--text-secondary)">${money(avgOrderWeek)}</strong>
                         </div>
                     </div>
                     <div class="card">
-                        <div class="card-header"><span class="card-title">🗓 Месяц</span></div>
-                        <div style="display:flex;justify-content:space-between;margin-top:8px">
-                            <span>Выручка</span><strong>${money(month?.revenue)}</strong>
+                        <div class="card-header">
+                            <span class="card-title">🗓 Месяц</span>
                         </div>
-                        <div style="display:flex;justify-content:space-between;margin-top:8px">
-                            <span>Заказов</span><strong>${month?.orders || 0}</strong>
+                        <div style="display:flex;justify-content:space-between;margin-top:12px;padding:8px 0;border-bottom:1px solid var(--border)">
+                            <span style="color:var(--text-secondary)">Выручка</span>
+                            <strong style="font-size:18px;color:var(--primary)">${money(month?.revenue)}</strong>
+                        </div>
+                        <div style="display:flex;justify-content:space-between;margin-top:8px;padding:8px 0;border-bottom:1px solid var(--border)">
+                            <span style="color:var(--text-secondary)">Заказов</span>
+                            <strong style="font-size:18px">${month?.orders || 0}</strong>
+                        </div>
+                        <div style="display:flex;justify-content:space-between;margin-top:8px;padding:8px 0">
+                            <span style="color:var(--text-secondary)">Средний чек</span>
+                            <strong style="font-size:16px;color:var(--text-secondary)">${money(avgOrderMonth)}</strong>
                         </div>
                     </div>
                 `;
