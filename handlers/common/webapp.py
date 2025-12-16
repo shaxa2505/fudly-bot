@@ -17,8 +17,10 @@ router = Router(name="webapp")
 
 # URL вашего Mini App (из переменных окружения или дефолтный)
 WEBAPP_URL = os.getenv("WEBAPP_URL", "https://fudly-webapp.vercel.app")
-# Partner Panel на Vercel (обновлённая версия с исправлениями)
-PARTNER_PANEL_URL = os.getenv("PARTNER_PANEL_URL", "https://partner-panel-gmbb8u4b9-shaxbozs-projects-d385e345.vercel.app")
+# Partner Panel теперь размещён на Railway вместе с API (лучшая производительность)
+PARTNER_PANEL_URL = os.getenv(
+    "PARTNER_PANEL_URL", "https://fudly-bot-production.up.railway.app/partner-panel"
+)
 
 
 def get_partner_panel_url() -> str:
