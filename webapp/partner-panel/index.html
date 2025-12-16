@@ -1461,10 +1461,28 @@
                     stats = { revenue: 0, orders: 0 };
                 }
 
-                // Update UI
-                document.getElementById('storeName').textContent = profile?.store?.name || 'Мой магазин';
-                document.getElementById('todayRevenue').textContent = formatPrice(stats?.revenue || 0);
-                document.getElementById('todayOrders').textContent = stats?.orders || 0;
+                // Update UI (with null checks)
+                const storeNameEl = document.getElementById('storeName');
+                const todayRevenueEl = document.getElementById('todayRevenue');
+                const todayOrdersEl = document.getElementById('todayOrders');
+
+                if (storeNameEl) {
+                    storeNameEl.textContent = profile?.store?.name || 'Мой магазин';
+                } else {
+                    console.warn('⚠️ Element #storeName not found');
+                }
+
+                if (todayRevenueEl) {
+                    todayRevenueEl.textContent = formatPrice(stats?.revenue || 0);
+                } else {
+                    console.warn('⚠️ Element #todayRevenue not found');
+                }
+
+                if (todayOrdersEl) {
+                    todayOrdersEl.textContent = stats?.orders || 0;
+                } else {
+                    console.warn('⚠️ Element #todayOrders not found');
+                }
 
                 allOrders = orders || [];
                 updateOrdersView();
@@ -1472,16 +1490,19 @@
                 console.log('✅ Dashboard loaded successfully!');
             } catch (e) {
                 console.error('❌ Dashboard load error:', e);
-                document.getElementById('ordersList').innerHTML = `
-                    <div class="empty-state">
-                        <div class="empty-icon">⚠️</div>
-                        <div class="empty-title">Ошибка загрузки данных</div>
-                        <div class="empty-text">${e.message || 'Проверьте подключение к интернету'}</div>
-                        <button class="btn-primary" onclick="loadDashboard()" style="margin-top: 16px;">
-                            <span>Повторить попытку</span>
-                        </button>
-                    </div>
-                `;
+                const ordersListEl = document.getElementById('ordersList');
+                if (ordersListEl) {
+                    ordersListEl.innerHTML = `
+                        <div class="empty-state">
+                            <div class="empty-icon">⚠️</div>
+                            <div class="empty-title">Ошибка загрузки данных</div>
+                            <div class="empty-text">${e.message || 'Проверьте подключение к интернету'}</div>
+                            <button class="btn-primary" onclick="loadDashboard()" style="margin-top: 16px;">
+                                <span>Повторить попытку</span>
+                            </button>
+                        </div>
+                    `;
+                }
                 toast('Ошибка загрузки данных', 'error');
             }
         }
@@ -1491,18 +1512,26 @@
             const preparing = allOrders.filter(o => o.status === 'preparing' || o.status === 'confirmed');
             const ready = allOrders.filter(o => o.status === 'ready');
 
-            document.getElementById('pendingCount').textContent = pending.length;
-            document.getElementById('newCount').textContent = pending.length;
-            document.getElementById('preparingCount').textContent = preparing.length;
-            document.getElementById('readyCount').textContent = ready.length;
+            // Update counts with null checks
+            const pendingCountEl = document.getElementById('pendingCount');
+            const newCountEl = document.getElementById('newCount');
+            const preparingCountEl = document.getElementById('preparingCount');
+            const readyCountEl = document.getElementById('readyCount');
+
+            if (pendingCountEl) pendingCountEl.textContent = pending.length;
+            if (newCountEl) newCountEl.textContent = pending.length;
+            if (preparingCountEl) preparingCountEl.textContent = preparing.length;
+            if (readyCountEl) readyCountEl.textContent = ready.length;
 
             const notifCount = pending.length;
             const badge = document.getElementById('notificationCount');
-            if (notifCount > 0) {
-                badge.textContent = notifCount;
-                badge.style.display = 'flex';
-            } else {
-                badge.style.display = 'none';
+            if (badge) {
+                if (notifCount > 0) {
+                    badge.textContent = notifCount;
+                    badge.style.display = 'flex';
+                } else {
+                    badge.style.display = 'none';
+                }
             }
 
             renderOrders();
@@ -2083,10 +2112,20 @@
         }
 
         // ===== INIT =====
-        loadDashboard();
-
-        // Auto-refresh every 30 seconds
-        setInterval(loadDashboard, 30000);
+        // Wait for DOM to be fully loaded
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', () => {
+                console.log('✅ DOM loaded, starting Partner Panel...');
+                loadDashboard();
+                // Auto-refresh every 30 seconds
+                setInterval(loadDashboard, 30000);
+            });
+        } else {
+            console.log('✅ DOM already loaded, starting Partner Panel...');
+            loadDashboard();
+            // Auto-refresh every 30 seconds
+            setInterval(loadDashboard, 30000);
+        }
 
         // Initialize Lucide icons
         if (typeof lucide !== 'undefined') {
