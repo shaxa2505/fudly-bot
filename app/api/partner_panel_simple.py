@@ -217,35 +217,11 @@ async def get_profile(authorization: str = Header(None)):
 @router.get("/products")
 async def list_products(authorization: str = Header(None), status: Optional[str] = None):
     """List partner's products"""
-    import logging
-    import sys
+    telegram_id = verify_telegram_webapp(authorization)
+    user, store = get_partner_with_store(telegram_id)
+    db = get_db()
 
-    try:
-        logging.info("🔍 /products called")
-        print("🔍 /products called", file=sys.stderr, flush=True)
-
-        telegram_id = verify_telegram_webapp(authorization)
-        logging.info(f"✅ telegram_id: {telegram_id}")
-        print(f"✅ telegram_id: {telegram_id}", file=sys.stderr, flush=True)
-
-        user, store = get_partner_with_store(telegram_id)
-        logging.info(f"✅ store_id: {store.get('store_id')}")
-        print(f"✅ store_id: {store.get('store_id')}", file=sys.stderr, flush=True)
-
-        db = get_db()
-        logging.info("✅ db obtained")
-        print("✅ db obtained", file=sys.stderr, flush=True)
-
-        offers = db.get_offers_by_store(store["store_id"])
-        logging.info(f"✅ offers count: {len(offers)}")
-        print(f"✅ offers count: {len(offers)}", file=sys.stderr, flush=True)
-    except Exception as e:
-        logging.error(f"❌ ERROR in /products: {type(e).__name__}: {e}", exc_info=True)
-        print(f"❌ ERROR in /products: {type(e).__name__}: {e}", file=sys.stderr, flush=True)
-        import traceback
-
-        traceback.print_exc()
-        raise
+    offers = db.get_offers_by_store(store["store_id"])
 
     # Filter by status if provided
     if status and status != "all":
