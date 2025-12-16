@@ -90,14 +90,20 @@ def create_api_app(db: Any = None, offer_service: Any = None, bot_token: str = N
     app.state.limiter = limiter
     app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
-    # CORS for Mini App - allow all Vercel preview URLs
-    app.add_middleware(
-        CORSMiddleware,
-        allow_origins=[
-            # Telegram WebApp
-            "https://web.telegram.org",
-            "https://telegram.org",
-            # Local development
+    # ✅ SECURITY: Strict CORS - only allow specific origins
+    # In production, restrict to actual domains only
+    environment = os.getenv("ENVIRONMENT", "production").lower()
+    is_dev = environment in ("development", "dev", "local", "test")
+
+    allowed_origins = [
+        # Telegram WebApp
+        "https://web.telegram.org",
+        "https://telegram.org",
+    ]
+
+    # Only allow localhost in development
+    if is_dev:
+        allowed_origins.extend([
             "http://localhost:8080",
             "http://localhost:5173",
             "http://localhost:3000",
@@ -105,13 +111,19 @@ def create_api_app(db: Any = None, offer_service: Any = None, bot_token: str = N
             "http://localhost:3002",
             "http://127.0.0.1:5500",
             "http://127.0.0.1:8080",
-        ],
-        # Allow all Vercel preview/production URLs
-        allow_origin_regex=r"https://.*\.vercel\.app",
+        ])
+
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=allowed_origins,
+        # Allow all Vercel preview/production URLs (only for webapp)
+        allow_origin_regex=r"https://fudly-webapp.*\.vercel\.app",
         allow_credentials=True,
-        allow_methods=["*"],
-        allow_headers=["*"],
-        expose_headers=["*"],
+        # ✅ SECURITY: Restrict methods to only what's needed
+        allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+        # ✅ SECURITY: Restrict headers
+        allow_headers=["Content-Type", "Authorization", "X-Requested-With"],
+        expose_headers=["Content-Length", "Content-Type"],
     )
 
     # Define static file paths (needed for debug endpoint)
