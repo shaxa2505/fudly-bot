@@ -114,6 +114,10 @@ class DatabaseProtocol(Protocol):
     def get_store(self, store_id: int) -> RowType | None:
         ...
 
+    def get_store_by_owner(self, owner_id: int) -> RowType | None:
+        """Get store by owner ID (telegram_id)."""
+        ...
+
     def get_stores_by_city(self, city: str) -> RowList:
         ...
 
@@ -202,6 +206,10 @@ class DatabaseProtocol(Protocol):
         ...
 
     def get_store_offers(self, store_id: int) -> list[tuple[Any, ...]]:
+        ...
+
+    def get_offers_by_store(self, store_id: int) -> list[dict]:
+        """Get all offers for a store as list of dicts."""
         ...
 
     def update_offer_quantity(self, offer_id: int, new_quantity: int) -> None:
