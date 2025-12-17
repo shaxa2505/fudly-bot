@@ -83,8 +83,8 @@ def hybrid_row_factory(cursor):
 
 # Database connection configuration
 DATABASE_URL = os.environ.get("DATABASE_URL", "")
-MIN_CONNECTIONS = int(os.environ.get("DB_MIN_CONN", "1"))
-MAX_CONNECTIONS = int(os.environ.get("DB_MAX_CONN", "5"))
+MIN_CONNECTIONS = int(os.environ.get("DB_MIN_CONN", "5"))  # Увеличено с 1 до 5
+MAX_CONNECTIONS = int(os.environ.get("DB_MAX_CONN", "20"))  # Увеличено с 5 до 20
 POOL_WAIT_TIMEOUT = int(os.environ.get("DB_POOL_WAIT_TIMEOUT", "60"))
 
 # Booking configuration

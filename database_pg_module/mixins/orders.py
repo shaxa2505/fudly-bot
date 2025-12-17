@@ -498,105 +498,93 @@ class OrderMixin:
         if not cart_items:
             return (False, None, None, "empty_cart")
 
-        conn = None
         try:
-            conn = self.pool.getconn()
-            try:
-                conn.rollback()
-            except Exception:
-                pass
-            conn.autocommit = False
-            cursor = conn.cursor()
+            with self.get_connection() as conn:
+                cursor = conn.cursor()
 
-            # Ensure user exists
-            try:
-                cursor.execute(
-                    "INSERT INTO users (user_id) VALUES (%s) ON CONFLICT (user_id) DO NOTHING",
-                    (user_id,),
-                )
-            except Exception:
-                pass
-
-            # Check and reserve all items
-            total_price = 0
-            for item in cart_items:
-                offer_id = item["offer_id"]
-                quantity = item["quantity"]
-
-                cursor.execute(
-                    "SELECT quantity, status, discount_price FROM offers WHERE offer_id = %s AND status = 'active' FOR UPDATE",
-                    (offer_id,),
-                )
-                row = cursor.fetchone()
-                if not row:
-                    conn.rollback()
-                    logger.warning(f"🛒 Offer {offer_id} not found or inactive")
-                    return (False, None, None, f"offer_unavailable:{offer_id}")
-
-                available_qty = row[0] or 0
-                if available_qty < quantity:
-                    conn.rollback()
-                    logger.warning(
-                        f"🛒 Offer {offer_id}: requested {quantity}, available {available_qty}"
+                # Ensure user exists
+                try:
+                    cursor.execute(
+                        "INSERT INTO users (user_id) VALUES (%s) ON CONFLICT (user_id) DO NOTHING",
+                        (user_id,),
                     )
-                    return (False, None, None, f"insufficient_stock:{offer_id}")
+                except Exception:
+                    pass
 
-                # Reserve quantity
-                new_qty = available_qty - quantity
+                # Check and reserve all items
+                total_price = 0
+                for item in cart_items:
+                    offer_id = item["offer_id"]
+                    quantity = item["quantity"]
+
+                    cursor.execute(
+                        "SELECT quantity, status, discount_price FROM offers WHERE offer_id = %s AND status = 'active' FOR UPDATE",
+                        (offer_id,),
+                    )
+                    row = cursor.fetchone()
+                    if not row:
+                        logger.warning(f"🛒 Offer {offer_id} not found or inactive")
+                        raise ValueError(f"offer_unavailable:{offer_id}")
+
+                    available_qty = row[0] or 0
+                    if available_qty < quantity:
+                        logger.warning(
+                            f"🛒 Offer {offer_id}: requested {quantity}, available {available_qty}"
+                        )
+                        raise ValueError(f"insufficient_stock:{offer_id}")
+
+                    # Reserve quantity
+                    new_qty = available_qty - quantity
+                    cursor.execute(
+                        "UPDATE offers SET quantity = %s WHERE offer_id = %s",
+                        (new_qty, offer_id),
+                    )
+                    logger.info(
+                        f"🛒 Reserved offer {offer_id}: {quantity} units (new qty: {new_qty})"
+                    )
+
+                    price = item.get("price", row[2] or 0)
+                    total_price += price * quantity
+
+                # Add delivery price
+                total_price += delivery_price
+
+                # Generate pickup code
+                pickup_code = "".join(random.choices(string.ascii_uppercase + string.digits, k=6))
+
+                # Create order with cart_items
+                cart_items_json = json.dumps(cart_items, ensure_ascii=False)
+
                 cursor.execute(
-                    "UPDATE offers SET quantity = %s WHERE offer_id = %s",
-                    (new_qty, offer_id),
+                    """
+                    INSERT INTO orders (
+                        user_id, store_id, delivery_address, total_price,
+                        payment_method, payment_status, order_status, pickup_code,
+                        cart_items, is_cart_order, quantity
+                    )
+                    VALUES (%s, %s, %s, %s, %s, 'pending', 'pending', %s, %s, 1, %s)
+                    RETURNING order_id
+                    """,
+                    (
+                        user_id,
+                        store_id,
+                        delivery_address,
+                        total_price,
+                        payment_method,
+                        pickup_code,
+                        cart_items_json,
+                        len(cart_items),
+                    ),
                 )
-                logger.info(f"🛒 Reserved offer {offer_id}: {quantity} units (new qty: {new_qty})")
+                order_id = cursor.fetchone()[0]
 
-                price = item.get("price", row[2] or 0)
-                total_price += price * quantity
-
-            # Add delivery price
-            total_price += delivery_price
-
-            # Generate pickup code
-            pickup_code = "".join(random.choices(string.ascii_uppercase + string.digits, k=6))
-
-            # Create order with cart_items
-            cart_items_json = json.dumps(cart_items, ensure_ascii=False)
-
-            cursor.execute(
-                """
-                INSERT INTO orders (
-                    user_id, store_id, delivery_address, total_price,
-                    payment_method, payment_status, order_status, pickup_code,
-                    cart_items, is_cart_order, quantity
+                logger.info(
+                    f"🛒✅ Cart order created: id={order_id}, code={pickup_code}, items={len(cart_items)}, total={total_price}"
                 )
-                VALUES (%s, %s, %s, %s, %s, 'pending', 'pending', %s, %s, 1, %s)
-                RETURNING order_id
-                """,
-                (
-                    user_id,
-                    store_id,
-                    delivery_address,
-                    total_price,
-                    payment_method,
-                    pickup_code,
-                    cart_items_json,
-                    len(cart_items),
-                ),
-            )
-            order_id = cursor.fetchone()[0]
-
-            conn.commit()
-            logger.info(
-                f"🛒✅ Cart order created: id={order_id}, code={pickup_code}, items={len(cart_items)}, total={total_price}"
-            )
-            return (True, order_id, pickup_code, None)
+                return (True, order_id, pickup_code, None)
 
         except Exception as e:
             logger.error(f"🛒❌ Failed to create cart order: {e}", exc_info=True)
-            if conn:
-                try:
-                    conn.rollback()
-                except Exception:
-                    pass
             return (False, None, None, f"error:{str(e)}")
 
         finally:
