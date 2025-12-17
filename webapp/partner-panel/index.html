@@ -331,31 +331,45 @@
 
     <!-- JavaScript Modules -->
     <script type="module">
-        import { init } from './js/main.js';
+        console.log('🚀 Starting module initialization...');
 
-        // Initialize app when DOM is ready
-        if (document.readyState === 'loading') {
-            document.addEventListener('DOMContentLoaded', init);
-        } else {
-            init();
+        try {
+            const { init } = await import('./js/main.js');
+            console.log('✅ Modules loaded successfully');
+
+            // Initialize app when DOM is ready
+            if (document.readyState === 'loading') {
+                document.addEventListener('DOMContentLoaded', () => {
+                    console.log('📱 DOM ready, initializing app...');
+                    init();
+                });
+            } else {
+                console.log('📱 DOM already ready, initializing app...');
+                init();
+            }
+        } catch (error) {
+            console.error('❌ Failed to load modules:', error);
+            document.getElementById('storeName').textContent = 'Ошибка загрузки модулей';
+            document.body.innerHTML += `
+                <div style="position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: #fee2e2; padding: 20px; border-radius: 12px; text-align: center; max-width: 90%; z-index: 9999;">
+                    <h3 style="color: #991b1b; margin-bottom: 10px;">⚠️ Ошибка загрузки</h3>
+                    <p style="color: #7f1d1d; font-size: 14px;">${error.message}</p>
+                    <button onclick="location.reload()" style="margin-top: 15px; padding: 10px 20px; background: #dc2626; color: white; border: none; border-radius: 8px; cursor: pointer;">Обновить</button>
+                </div>
+            `;
         }
     </script>
 
     <!-- UX Improvements Phase 1 -->
     <script src="improvements.js"></script>
     <script>
-        // Initialize UX improvements when DOM is ready
-        if (typeof initUXImprovements === 'function') {
-            console.log('🎨 Initializing UX improvements...');
-            try {
-                initUXImprovements();
-                console.log('✅ UX improvements initialized');
-            } catch (error) {
-                console.error('❌ Error initializing UX improvements:', error);
+        // Initialize Lucide icons
+        document.addEventListener('DOMContentLoaded', () => {
+            if (typeof lucide !== 'undefined') {
+                console.log('🎨 Initializing Lucide icons...');
+                lucide.createIcons();
             }
-        } else {
-            console.warn('⚠️ initUXImprovements function not found');
-        }
+        });
     </script>
 </body>
 </html>
