@@ -1,22 +1,7 @@
 /* ================================================
    FUDLY PARTNER PANEL - MAIN STYLESHEET
-   Modular CSS Architecture
+   Additional Components & Layout
    ================================================ */
-
-/* 1. Design Tokens */
-@import url('variables.css');
-
-/* 2. Base Styles */
-@import url('base.css');
-
-/* 3. Components */
-@import url('header.css');
-@import url('navigation.css');
-@import url('buttons.css');
-@import url('products.css');
-
-/* 4. UX Improvements */
-@import url('../improvements.css');
 
 /* === ADDITIONAL COMPONENTS === */
 
