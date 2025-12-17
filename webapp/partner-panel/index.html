@@ -367,48 +367,407 @@
         </button>
     </nav>
 
-    <!-- JavaScript Modules -->
-    <script type="module">
-        console.log('🚀 Starting module initialization...');
+    <!-- Main Application JavaScript -->
+    <script>
+        // ============================================
+        // GLOBALS & STATE
+        // ============================================
+        const tg = window.Telegram?.WebApp;
+        const API_BASE = window.location.origin;
 
-        try {
-            // Use relative path from partner-panel directory
-            const { init } = await import('js/main.js');
-            console.log('✅ Modules loaded successfully');
+        const state = {
+            currentView: 'dashboard',
+            store: null,
+            products: [],
+            orders: [],
+            stats: null,
+            loading: false
+        };
 
-            // Initialize app when DOM is ready
-            if (document.readyState === 'loading') {
-                document.addEventListener('DOMContentLoaded', () => {
-                    console.log('📱 DOM ready, initializing app...');
-                    init();
-                });
-            } else {
-                console.log('📱 DOM already ready, initializing app...');
-                init();
+        // ============================================
+        // AUTH & API
+        // ============================================
+        function getAuth() {
+            const urlParams = new URLSearchParams(window.location.search);
+            const urlUserId = urlParams.get('uid');
+
+            let finalData = '';
+            let source = 'none';
+
+            if (tg?.initData && tg.initData.length > 0) {
+                finalData = tg.initData;
+                source = 'sdk';
+            } else if (window.location.hash.slice(1) && window.location.hash.slice(1).includes('user=')) {
+                finalData = window.location.hash.slice(1);
+                source = 'hash';
             }
-        } catch (error) {
-            console.error('❌ Failed to load modules:', error);
-            document.getElementById('storeName').textContent = 'Ошибка загрузки модулей';
-            document.body.innerHTML += `
-                <div style="position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: #fee2e2; padding: 20px; border-radius: 12px; text-align: center; max-width: 90%; z-index: 9999;">
-                    <h3 style="color: #991b1b; margin-bottom: 10px;">⚠️ Ошибка загрузки</h3>
-                    <p style="color: #7f1d1d; font-size: 14px;">${error.message}</p>
-                    <button onclick="location.reload()" style="margin-top: 15px; padding: 10px 20px; background: #dc2626; color: white; border: none; border-radius: 8px; cursor: pointer;">Обновить</button>
+
+            if (urlUserId) {
+                finalData = finalData ? `${finalData}&uid=${urlUserId}` : `uid=${urlUserId}`;
+                source += '+url';
+            }
+
+            const tgUser = tg?.initDataUnsafe?.user;
+            const userId = urlUserId || tgUser?.id || 'none';
+
+            return { data: finalData, userId, source };
+        }
+
+        async function apiFetch(endpoint, options = {}) {
+            const { data: initData } = getAuth();
+            const headers = {
+                'Content-Type': 'application/json',
+                'X-Telegram-Init-Data': initData || '',
+                ...options.headers
+            };
+
+            const response = await fetch(`${API_BASE}${endpoint}`, {
+                ...options,
+                headers
+            });
+
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+            }
+
+            return response.json();
+        }
+
+        // ============================================
+        // UI HELPERS
+        // ============================================
+        function toast(message, type = 'info') {
+            const toast = document.createElement('div');
+            toast.className = `toast ${type}`;
+            toast.textContent = message;
+            document.body.appendChild(toast);
+
+            setTimeout(() => {
+                toast.style.animation = 'toastOut 0.3s ease-out forwards';
+                setTimeout(() => toast.remove(), 300);
+            }, 3000);
+        }
+
+        function showLoading() {
+            document.querySelector('.content').innerHTML = `
+                <div class="loading">
+                    <div class="spinner"></div>
                 </div>
             `;
+        }
+
+        // ============================================
+        // VIEW SWITCHING
+        // ============================================
+        function switchView(view) {
+            console.log(`📍 Switching to view: ${view}`);
+            state.currentView = view;
+
+            // Update nav active state
+            document.querySelectorAll('.nav-item').forEach(item => {
+                item.classList.remove('active');
+            });
+            event?.target?.closest('.nav-item')?.classList.add('active');
+
+            // Load view
+            switch(view) {
+                case 'dashboard':
+                    loadDashboard();
+                    break;
+                case 'orders':
+                    loadOrders();
+                    break;
+                case 'products':
+                    loadProducts();
+                    break;
+                case 'stats':
+                    loadStats();
+                    break;
+                case 'settings':
+                    loadSettings();
+                    break;
+            }
+        }
+
+        // ============================================
+        // DASHBOARD
+        // ============================================
+        async function loadDashboard() {
+            showLoading();
+
+            try {
+                const [store, orders, products] = await Promise.all([
+                    apiFetch('/partner/store'),
+                    apiFetch('/partner/orders'),
+                    apiFetch('/partner/products')
+                ]);
+
+                state.store = store;
+                state.orders = orders;
+                state.products = products;
+
+                renderDashboard();
+            } catch (error) {
+                console.error('❌ Dashboard load error:', error);
+                toast('Ошибка загрузки данных', 'error');
+            }
+        }
+
+        function renderDashboard() {
+            const activeOrders = state.orders.filter(o => o.status !== 'completed' && o.status !== 'cancelled');
+            const todayRevenue = state.orders
+                .filter(o => o.status === 'completed' && isToday(o.created_at))
+                .reduce((sum, o) => sum + o.total, 0);
+
+            document.querySelector('.content').innerHTML = `
+                <div class="container">
+                    <div class="stats-grid">
+                        <div class="stat-card primary">
+                            <div class="stat-header">
+                                <div class="stat-icon">💰</div>
+                                <div class="stat-trend up">+15%</div>
+                            </div>
+                            <div class="stat-value">${formatPrice(todayRevenue)}</div>
+                            <div class="stat-label">Выручка сегодня</div>
+                        </div>
+
+                        <div class="stat-card success">
+                            <div class="stat-header">
+                                <div class="stat-icon">📦</div>
+                            </div>
+                            <div class="stat-value">${activeOrders.length}</div>
+                            <div class="stat-label">Активные заказы</div>
+                        </div>
+
+                        <div class="stat-card">
+                            <div class="stat-header">
+                                <div class="stat-icon">🍕</div>
+                            </div>
+                            <div class="stat-value">${state.products.length}</div>
+                            <div class="stat-label">Товары</div>
+                        </div>
+
+                        <div class="stat-card">
+                            <div class="stat-header">
+                                <div class="stat-icon">⭐</div>
+                            </div>
+                            <div class="stat-value">4.8</div>
+                            <div class="stat-label">Рейтинг</div>
+                        </div>
+                    </div>
+
+                    <div class="section">
+                        <div class="section-header">
+                            <h2 class="section-title">Активные заказы</h2>
+                            <button class="btn btn-sm btn-primary" onclick="switchView('orders')">Все заказы</button>
+                        </div>
+                        <div class="orders-list">
+                            ${activeOrders.slice(0, 5).map(order => `
+                                <div class="order-card">
+                                    <div class="order-header">
+                                        <div class="order-id">#${order.id}</div>
+                                        <div class="order-status status-${order.status}">${getStatusText(order.status)}</div>
+                                    </div>
+                                    <div class="order-footer">
+                                        <div class="order-time">${formatTime(order.created_at)}</div>
+                                        <div class="order-total">${formatPrice(order.total)}</div>
+                                    </div>
+                                </div>
+                            `).join('') || '<p class="empty-description">Нет активных заказов</p>'}
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        // ============================================
+        // ORDERS
+        // ============================================
+        async function loadOrders() {
+            showLoading();
+            try {
+                state.orders = await apiFetch('/partner/orders');
+                renderOrders();
+            } catch (error) {
+                toast('Ошибка загрузки заказов', 'error');
+            }
+        }
+
+        function renderOrders() {
+            document.querySelector('.content').innerHTML = `
+                <div class="container">
+                    <h2 class="section-title">Все заказы</h2>
+                    <div class="orders-list">
+                        ${state.orders.map(order => `
+                            <div class="order-card">
+                                <div class="order-header">
+                                    <div class="order-id">#${order.id}</div>
+                                    <div class="order-status status-${order.status}">${getStatusText(order.status)}</div>
+                                </div>
+                                <div class="order-items">
+                                    ${order.items?.map(item => `
+                                        <div class="order-item">
+                                            <span>${item.quantity}x ${item.name}</span>
+                                            <span>${formatPrice(item.price * item.quantity)}</span>
+                                        </div>
+                                    `).join('') || ''}
+                                </div>
+                                <div class="order-footer">
+                                    <div class="order-time">${formatTime(order.created_at)}</div>
+                                    <div class="order-total">${formatPrice(order.total)}</div>
+                                </div>
+                            </div>
+                        `).join('') || '<div class="empty-state"><p class="empty-title">Нет заказов</p></div>'}
+                    </div>
+                </div>
+            `;
+        }
+
+        // ============================================
+        // PRODUCTS
+        // ============================================
+        async function loadProducts() {
+            showLoading();
+            try {
+                state.products = await apiFetch('/partner/products');
+                renderProducts();
+            } catch (error) {
+                toast('Ошибка загрузки товаров', 'error');
+            }
+        }
+
+        function renderProducts() {
+            document.querySelector('.content').innerHTML = `
+                <div class="container">
+                    <div class="section-header">
+                        <h2 class="section-title">Товары</h2>
+                        <button class="btn btn-primary" onclick="addProduct()">+ Добавить</button>
+                    </div>
+                    <div class="products-grid">
+                        ${state.products.map(product => `
+                            <div class="product-card">
+                                <div class="product-image">
+                                    <img src="${product.photo_url || '/static/placeholder.jpg'}" alt="${product.name}">
+                                </div>
+                                <div class="product-info">
+                                    <h3 class="product-title">${product.name}</h3>
+                                    <p class="product-description">${product.description || ''}</p>
+                                    <div class="product-footer">
+                                        <div class="product-price">
+                                            <div class="price-current">${formatPrice(product.price)}</div>
+                                        </div>
+                                        <button class="product-cta" onclick="editProduct(${product.id})">Изменить</button>
+                                    </div>
+                                </div>
+                            </div>
+                        `).join('') || '<div class="empty-state"><p class="empty-title">Нет товаров</p></div>'}
+                    </div>
+                </div>
+            `;
+        }
+
+        // ============================================
+        // STATS
+        // ============================================
+        function loadStats() {
+            document.querySelector('.content').innerHTML = `
+                <div class="container">
+                    <h2 class="section-title">Статистика</h2>
+                    <p class="empty-description">Статистика в разработке</p>
+                </div>
+            `;
+        }
+
+        // ============================================
+        // SETTINGS
+        // ============================================
+        function loadSettings() {
+            document.querySelector('.content').innerHTML = `
+                <div class="container">
+                    <h2 class="section-title">Настройки</h2>
+                    <p class="empty-description">Настройки в разработке</p>
+                </div>
+            `;
+        }
+
+        // ============================================
+        // HELPERS
+        // ============================================
+        function formatPrice(price) {
+            return new Intl.NumberFormat('ru-RU', {
+                style: 'currency',
+                currency: 'UZS',
+                minimumFractionDigits: 0
+            }).format(price);
+        }
+
+        function formatTime(dateString) {
+            const date = new Date(dateString);
+            return date.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
+        }
+
+        function isToday(dateString) {
+            const date = new Date(dateString);
+            const today = new Date();
+            return date.toDateString() === today.toDateString();
+        }
+
+        function getStatusText(status) {
+            const statusMap = {
+                'new': 'Новый',
+                'preparing': 'Готовится',
+                'ready': 'Готов',
+                'completed': 'Завершен',
+                'cancelled': 'Отменен'
+            };
+            return statusMap[status] || status;
+        }
+
+        function addProduct() {
+            toast('Функция в разработке', 'info');
+        }
+
+        function editProduct(id) {
+            toast('Функция в разработке', 'info');
+        }
+
+        // ============================================
+        // INITIALIZATION
+        // ============================================
+        function init() {
+            console.log('🚀 Initializing Fudly Partner Panel...');
+
+            // Initialize Telegram WebApp
+            if (tg) {
+                tg.ready();
+                tg.expand();
+                console.log('✅ Telegram WebApp initialized');
+            }
+
+            // Update store info
+            const { userId } = getAuth();
+            document.getElementById('storeName').textContent = state.store?.name || 'Загрузка...';
+
+            // Initialize icons
+            if (typeof lucide !== 'undefined') {
+                lucide.createIcons();
+            }
+
+            // Load dashboard
+            loadDashboard();
+
+            console.log('✅ App initialized successfully');
+        }
+
+        // Start app when DOM is ready
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', init);
+        } else {
+            init();
         }
     </script>
 
     <!-- UX Improvements Phase 1 -->
     <script src="improvements.js"></script>
-    <script>
-        // Initialize Lucide icons
-        document.addEventListener('DOMContentLoaded', () => {
-            if (typeof lucide !== 'undefined') {
-                console.log('🎨 Initializing Lucide icons...');
-                lucide.createIcons();
-            }
-        });
-    </script>
 </body>
 </html>
