@@ -128,20 +128,35 @@ def create_api_app(db: Any = None, offer_service: Any = None, bot_token: str = N
         expose_headers=["Content-Length", "Content-Type"],
     )
 
-    # 🔥 CACHE FIX: Disable caching for Partner Panel static files
+    # 🔥 CACHE FIX: Prevent 304 responses by removing conditional headers BEFORE StaticFiles
     @app.middleware("http")
     async def disable_static_cache(request: Request, call_next):
+        # For Partner Panel static files, remove conditional headers to force fresh response
+        if (
+            request.url.path.startswith("/partner-panel/")
+            or request.url.path.startswith("/styles/")
+            or request.url.path.startswith("/js/")
+        ):
+            if any(ext in request.url.path for ext in [".css", ".js", ".html"]):
+                # Remove conditional request headers to prevent StaticFiles from returning 304
+                request._headers = [
+                    (name, value)
+                    for name, value in request._headers
+                    if name.lower() not in (b"if-none-match", b"if-modified-since")
+                ]
+
         response = await call_next(request)
 
-        # Disable cache for Partner Panel CSS/JS files
-        if request.url.path.startswith("/partner-panel/"):
+        # Set no-cache headers on response
+        if (
+            request.url.path.startswith("/partner-panel/")
+            or request.url.path.startswith("/styles/")
+            or request.url.path.startswith("/js/")
+        ):
             if any(ext in request.url.path for ext in [".css", ".js", ".html"]):
                 response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate, max-age=0"
                 response.headers["Pragma"] = "no-cache"
                 response.headers["Expires"] = "0"
-                # Remove ETag to prevent 304 responses
-                response.headers.pop("ETag", None)
-                response.headers.pop("Last-Modified", None)
 
         return response
 
