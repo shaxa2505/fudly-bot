@@ -11,8 +11,9 @@
 
 body {
     font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', Roboto, sans-serif;
-    background: var(--bg);
-    color: var(--text);
+    background: var(--bg) !important;
+    background-color: #F8FAFC !important; /* Fallback */
+    color: var(--text) !important;
     min-height: 100vh;
     padding-bottom: 80px;
     -webkit-tap-highlight-color: transparent;
