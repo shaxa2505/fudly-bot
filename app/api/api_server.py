@@ -103,15 +103,17 @@ def create_api_app(db: Any = None, offer_service: Any = None, bot_token: str = N
 
     # Only allow localhost in development
     if is_dev:
-        allowed_origins.extend([
-            "http://localhost:8080",
-            "http://localhost:5173",
-            "http://localhost:3000",
-            "http://localhost:3001",
-            "http://localhost:3002",
-            "http://127.0.0.1:5500",
-            "http://127.0.0.1:8080",
-        ])
+        allowed_origins.extend(
+            [
+                "http://localhost:8080",
+                "http://localhost:5173",
+                "http://localhost:3000",
+                "http://localhost:3001",
+                "http://localhost:3002",
+                "http://127.0.0.1:5500",
+                "http://127.0.0.1:8080",
+            ]
+        )
 
     app.add_middleware(
         CORSMiddleware,
@@ -179,6 +181,19 @@ def create_api_app(db: Any = None, offer_service: Any = None, bot_token: str = N
 
     # Mount Partner Panel FIRST (more specific path)
     if partner_panel_path.exists() and (partner_panel_path / "index.html").exists():
+        # Mount static assets (CSS, JS, images) separately for proper caching
+        app.mount(
+            "/partner-panel/styles",
+            StaticFiles(directory=str(partner_panel_path / "styles")),
+            name="partner-panel-styles",
+        )
+        app.mount(
+            "/partner-panel/js",
+            StaticFiles(directory=str(partner_panel_path / "js")),
+            name="partner-panel-js",
+        )
+
+        # Mount main app with HTML fallback
         app.mount(
             "/partner-panel",
             StaticFiles(directory=str(partner_panel_path), html=True),
@@ -186,6 +201,7 @@ def create_api_app(db: Any = None, offer_service: Any = None, bot_token: str = N
         )
         logger.info(f"✅ Partner Panel mounted at /partner-panel from {partner_panel_path}")
         logger.info("   Access at: http://localhost:8000/partner-panel/")
+        logger.info("   Static files: /partner-panel/styles/, /partner-panel/js/")
     else:
         logger.error(f"❌ Partner Panel not found or missing index.html at {partner_panel_path}")
         logger.error(f"   Expected file: {partner_panel_path / 'index.html'}")
