@@ -19,8 +19,8 @@ import sqlalchemy as sa
 
 
 # revision identifiers, used by Alembic.
-revision: str = '20251217_003'
-down_revision: Union[str, None] = '20251126_002'
+revision: str = '003_unified_schema'
+down_revision: Union[str, None] = '002_add_fts'
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
@@ -63,7 +63,7 @@ def upgrade() -> None:
             -- Convert date field (handles "YYYY-MM-DD" and "DD.MM.YYYY" and ISO)
             expiry_date_new = CASE
                 WHEN expiry_date ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}' THEN SUBSTRING(expiry_date FROM 1 FOR 10)::DATE
-                WHEN expiry_date ~ '^[0-9]{2}\.[0-9]{2}\.[0-9]{4}' THEN TO_DATE(expiry_date, 'DD.MM.YYYY')
+                WHEN expiry_date ~ '^[0-9]{2}\\.[0-9]{2}\\.[0-9]{4}' THEN TO_DATE(expiry_date, 'DD.MM.YYYY')
                 ELSE NULL
             END,
             -- Convert prices from rubles (FLOAT) to kopeks (INTEGER)
