@@ -9,16 +9,16 @@
     <script src="https://unpkg.com/lucide@latest"></script>
 
     <!-- Modular CSS Architecture -->
-    <link rel="stylesheet" href="styles/variables.css?v=3.0">
-    <link rel="stylesheet" href="styles/base.css?v=3.0">
-    <link rel="stylesheet" href="styles/header.css?v=3.0">
-    <link rel="stylesheet" href="styles/navigation.css?v=3.0">
-    <link rel="stylesheet" href="styles/buttons.css?v=3.0">
-    <link rel="stylesheet" href="styles/products.css?v=3.0">
-    <link rel="stylesheet" href="styles/main.css?v=3.0">
+    <link rel="stylesheet" href="styles/variables.css?v=4.1">
+    <link rel="stylesheet" href="styles/base.css?v=4.1">
+    <link rel="stylesheet" href="styles/header.css?v=4.1">
+    <link rel="stylesheet" href="styles/navigation.css?v=4.1">
+    <link rel="stylesheet" href="styles/buttons.css?v=4.1">
+    <link rel="stylesheet" href="styles/products.css?v=4.1">
+    <link rel="stylesheet" href="styles/main.css?v=4.1">
 
     <!-- UX Improvements Phase 1 -->
-    <link rel="stylesheet" href="improvements.css?v=3.0">
+    <link rel="stylesheet" href="improvements.css?v=4.1">
 
     <style>
         /* Modern Premium Design - Force Light Theme */
@@ -347,18 +347,22 @@
         }
 
         function renderDashboard() {
+            // Update store name in header
+            if (state.store?.name) {
+                document.getElementById('storeName').textContent = state.store.name;
+            }
+
             const activeOrders = state.orders.filter(o => o.status !== 'completed' && o.status !== 'cancelled');
             const todayRevenue = state.orders
                 .filter(o => o.status === 'completed' && isToday(o.created_at))
-                .reduce((sum, o) => sum + o.total, 0);
+                .reduce((sum, o) => sum + (o.price || 0), 0);
 
             document.querySelector('.content').innerHTML = `
                 <div class="container">
                     <div class="stats-grid">
                         <div class="stat-card primary">
                             <div class="stat-header">
-                                <div class="stat-icon">💰</div>
-                                <div class="stat-trend up">+15%</div>
+                                <div class="stat-icon"><i data-lucide="wallet"></i></div>
                             </div>
                             <div class="stat-value">${formatPrice(todayRevenue)}</div>
                             <div class="stat-label">Выручка сегодня</div>
@@ -366,7 +370,7 @@
 
                         <div class="stat-card success">
                             <div class="stat-header">
-                                <div class="stat-icon">📦</div>
+                                <div class="stat-icon"><i data-lucide="package"></i></div>
                             </div>
                             <div class="stat-value">${activeOrders.length}</div>
                             <div class="stat-label">Активные заказы</div>
@@ -374,7 +378,7 @@
 
                         <div class="stat-card">
                             <div class="stat-header">
-                                <div class="stat-icon">🍕</div>
+                                <div class="stat-icon"><i data-lucide="shopping-bag"></i></div>
                             </div>
                             <div class="stat-value">${state.products.length}</div>
                             <div class="stat-label">Товары</div>
@@ -382,7 +386,7 @@
 
                         <div class="stat-card">
                             <div class="stat-header">
-                                <div class="stat-icon">⭐</div>
+                                <div class="stat-icon"><i data-lucide="star"></i></div>
                             </div>
                             <div class="stat-value">4.8</div>
                             <div class="stat-label">Рейтинг</div>
@@ -392,25 +396,31 @@
                     <div class="section">
                         <div class="section-header">
                             <h2 class="section-title">Активные заказы</h2>
-                            <button class="btn btn-sm btn-primary" onclick="switchView('orders')">Все заказы</button>
+                            <button class="btn btn-sm btn-outline" onclick="switchView('orders')">Все заказы</button>
                         </div>
                         <div class="orders-list">
-                            ${activeOrders.slice(0, 5).map(order => `
+                            ${activeOrders.length > 0 ? activeOrders.slice(0, 5).map(order => `
                                 <div class="order-card">
                                     <div class="order-header">
-                                        <div class="order-id">#${order.id}</div>
+                                        <div class="order-id">#${order.order_id || order.id || '—'}</div>
                                         <div class="order-status status-${order.status}">${getStatusText(order.status)}</div>
+                                    </div>
+                                    <div class="order-meta">
+                                        <span class="order-type">${order.order_type === 'pickup' ? '🏃 Самовывоз' : '🚗 Доставка'}</span>
                                     </div>
                                     <div class="order-footer">
                                         <div class="order-time">${formatTime(order.created_at)}</div>
-                                        <div class="order-total">${formatPrice(order.total)}</div>
+                                        <div class="order-total">${formatPrice(order.price)}</div>
                                     </div>
                                 </div>
-                            `).join('') || '<p class="empty-description">Нет активных заказов</p>'}
+                            `).join('') : '<div class="empty-state"><p>Нет активных заказов</p></div>'}
                         </div>
                     </div>
                 </div>
             `;
+
+            // Initialize Lucide icons
+            if (typeof lucide !== 'undefined') lucide.createIcons();
         }
 
         // ============================================
@@ -469,47 +479,35 @@
 
             return `
                 <div class="orders-list">
-                    ${orders.map(order => `
-                        <div class="order-card" onclick="viewOrderDetails(${order.id})">
+                    ${orders.map(order => {
+                        const orderId = order.order_id || order.id;
+                        return `
+                        <div class="order-card" onclick="viewOrderDetails(${orderId})">
                             <div class="order-header">
-                                <div class="order-id">#${order.id}</div>
+                                <div class="order-id">#${orderId || '—'}</div>
                                 <div class="order-status status-${order.status}">${getStatusText(order.status)}</div>
                             </div>
-                            <div class="order-items">
-                                ${order.items?.slice(0, 2).map(item => `
-                                    <div class="order-item">
-                                        <span>${item.quantity}x ${item.name}</span>
-                                        <span>${formatPrice(item.price * item.quantity)}</span>
-                                    </div>
-                                `).join('') || ''}
-                                ${order.items?.length > 2 ? `<div class="order-item"><span>...еще ${order.items.length - 2}</span></div>` : ''}
+                            <div class="order-meta">
+                                <span>${order.order_type === 'pickup' ? '🏃 Самовывоз' : '🚗 Доставка'}</span>
+                                <span>${order.customer_name || ''}</span>
                             </div>
                             <div class="order-footer">
-                                <div class="order-time">
-                                    <i data-lucide="clock" style="width: 14px; height: 14px;"></i>
-                                    ${formatTime(order.created_at)}
-                                </div>
-                                <div class="order-total">${formatPrice(order.total)}</div>
+                                <span class="order-time">${formatTime(order.created_at)}</span>
+                                <span class="order-total">${formatPrice(order.price)}</span>
                             </div>
                             ${order.status === 'new' ? `
                                 <div class="order-actions" onclick="event.stopPropagation()">
-                                    <button class="btn btn-sm btn-success" onclick="updateOrderStatus(${order.id}, 'preparing')">
-                                        Принять
-                                    </button>
-                                    <button class="btn btn-sm btn-danger" onclick="cancelOrder(${order.id})">
-                                        Отменить
-                                    </button>
+                                    <button class="btn btn-sm btn-success" onclick="updateOrderStatus(${orderId}, 'preparing')">Принять</button>
+                                    <button class="btn btn-sm btn-danger" onclick="cancelOrder(${orderId})">Отменить</button>
                                 </div>
                             ` : ''}
                             ${order.status === 'preparing' ? `
                                 <div class="order-actions" onclick="event.stopPropagation()">
-                                    <button class="btn btn-sm btn-success" onclick="updateOrderStatus(${order.id}, 'ready')">
-                                        Готов
-                                    </button>
+                                    <button class="btn btn-sm btn-success" onclick="updateOrderStatus(${orderId}, 'ready')">Готов</button>
                                 </div>
                             ` : ''}
                         </div>
-                    `).join('')}
+                    `}).join('')}
                 </div>
             `;
         }
@@ -531,15 +529,16 @@
         }
 
         async function viewOrderDetails(orderId) {
-            const order = state.orders.find(o => o.id === orderId);
+            const order = state.orders.find(o => (o.order_id || o.id) === orderId);
             if (!order) return;
 
+            const oid = order.order_id || order.id;
             const modal = document.createElement('div');
             modal.className = 'modal-overlay';
             modal.innerHTML = `
                 <div class="modal-content" style="max-width: 500px;">
                     <div class="modal-header">
-                        <h3>Заказ #${order.id}</h3>
+                        <h3>Заказ #${oid}</h3>
                         <button class="btn-icon" onclick="this.closest('.modal-overlay').remove()">
                             <i data-lucide="x"></i>
                         </button>
@@ -550,13 +549,8 @@
                         </div>
 
                         <div class="order-detail-section">
-                            <h4>Товары</h4>
-                            ${order.items?.map(item => `
-                                <div class="order-item">
-                                    <span>${item.quantity}x ${item.name}</span>
-                                    <span>${formatPrice(item.price * item.quantity)}</span>
-                                </div>
-                            `).join('') || '<p>Нет товаров</p>'}
+                            <h4>Товар</h4>
+                            <p>${order.offer_title || 'Товар'} × ${order.quantity || 1}</p>
                         </div>
 
                         <div class="order-detail-section">
@@ -566,35 +560,36 @@
                         </div>
 
                         <div class="order-detail-section">
-                            <h4>Доставка</h4>
-                            <p>${order.delivery_address || 'Самовывоз'}</p>
+                            <h4>Тип заказа</h4>
+                            <p>${order.order_type === 'pickup' ? '🏃 Самовывоз' : '🚗 Доставка'}</p>
+                            ${order.delivery_address ? `<p>${order.delivery_address}</p>` : ''}
                         </div>
 
                         <div class="order-detail-section" style="border-top: 2px solid var(--border); padding-top: 16px; margin-top: 16px;">
                             <div style="display: flex; justify-content: space-between; font-size: 18px; font-weight: bold;">
                                 <span>Итого</span>
-                                <span>${formatPrice(order.total)}</span>
+                                <span>${formatPrice(order.price)}</span>
                             </div>
                         </div>
 
                         ${order.status !== 'completed' && order.status !== 'cancelled' ? `
                             <div style="margin-top: 24px; display: flex; gap: 12px;">
                                 ${order.status === 'new' ? `
-                                    <button class="btn btn-success" style="flex: 1;" onclick="updateOrderStatus(${order.id}, 'preparing'); this.closest('.modal-overlay').remove();">
+                                    <button class="btn btn-success" style="flex: 1;" onclick="updateOrderStatus(${oid}, 'preparing'); this.closest('.modal-overlay').remove();">
                                         Принять заказ
                                     </button>
                                 ` : ''}
                                 ${order.status === 'preparing' ? `
-                                    <button class="btn btn-success" style="flex: 1;" onclick="updateOrderStatus(${order.id}, 'ready'); this.closest('.modal-overlay').remove();">
+                                    <button class="btn btn-success" style="flex: 1;" onclick="updateOrderStatus(${oid}, 'ready'); this.closest('.modal-overlay').remove();">
                                         Заказ готов
                                     </button>
                                 ` : ''}
                                 ${order.status === 'ready' ? `
-                                    <button class="btn btn-success" style="flex: 1;" onclick="updateOrderStatus(${order.id}, 'completed'); this.closest('.modal-overlay').remove();">
+                                    <button class="btn btn-success" style="flex: 1;" onclick="updateOrderStatus(${oid}, 'completed'); this.closest('.modal-overlay').remove();">
                                         Выдан
                                     </button>
                                 ` : ''}
-                                <button class="btn btn-danger" onclick="cancelOrder(${order.id}); this.closest('.modal-overlay').remove();">
+                                <button class="btn btn-danger" onclick="cancelOrder(${oid}); this.closest('.modal-overlay').remove();">
                                     Отменить
                                 </button>
                             </div>
@@ -618,7 +613,7 @@
                 });
 
                 // Update local state
-                const order = state.orders.find(o => o.id === orderId);
+                const order = state.orders.find(o => (o.order_id || o.id) === orderId);
                 if (order) order.status = newStatus;
 
                 toast('Статус заказа обновлен', 'success');
@@ -1117,11 +1112,9 @@
         // HELPERS
         // ============================================
         function formatPrice(price) {
-            return new Intl.NumberFormat('ru-RU', {
-                style: 'currency',
-                currency: 'UZS',
-                minimumFractionDigits: 0
-            }).format(price);
+            if (price == null || price === '' || isNaN(price)) return '0 сум';
+            const num = Number(price);
+            return num.toLocaleString('ru-RU') + ' сум';
         }
 
         function formatTime(dateString) {
