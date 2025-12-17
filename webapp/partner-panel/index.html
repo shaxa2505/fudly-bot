@@ -840,6 +840,23 @@
         .product-image-wrapper {
             position: relative;
             background: var(--bg);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+        }
+
+        .product-image-wrapper::before {
+            content: '📦';
+            position: absolute;
+            font-size: 48px;
+            opacity: 0.15;
+            z-index: 0;
+        }
+
+        .product-image-wrapper img {
+            position: relative;
+            z-index: 1;
         }
 
         .product-actions {
@@ -912,24 +929,37 @@
 
         .product-info {
             padding: 12px;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .stock-label {
+            font-size: 11px;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 4px;
         }
 
         .product-stock-control {
             display: flex;
             align-items: center;
             gap: 8px;
-            margin-top: 8px;
             padding: 6px;
             background: var(--bg);
             border-radius: 8px;
         }
 
         .stock-btn {
-            min-width: 44px;
-            min-height: 44px;
-            width: 44px;
-            height: 44px;
-            border-radius: 8px;
+            min-width: 32px;
+            min-height: 32px;
+            width: 32px;
+            height: 32px;
+            border-radius: 6px;
             border: none;
             background: white;
             color: var(--primary);
@@ -963,14 +993,14 @@
         .low-stock-warning {
             background: #FEF3C7;
             color: #92400E;
-            padding: 4px 8px;
-            border-radius: 6px;
-            font-size: 11px;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-size: 10px;
             font-weight: 600;
             display: inline-flex;
             align-items: center;
-            gap: 4px;
-            margin-top: 4px;
+            gap: 2px;
+            white-space: nowrap;
         }
 
         .stock-btn:disabled,
@@ -2553,6 +2583,18 @@
                     ? Math.round((1 - product.price / product.original_price) * 100)
                     : 0;
 
+                // Localize category
+                const categoryMap = {
+                    'OTHER': 'Другое',
+                    'BAKERY': 'Выпечка',
+                    'DAIRY': 'Молочные',
+                    'MEAT': 'Мясное',
+                    'VEGETABLES': 'Овощи',
+                    'FRUITS': 'Фрукты',
+                    'DRINKS': 'Напитки'
+                };
+                const localCategory = categoryMap[product.category?.toUpperCase()] || product.category || 'Другое';
+
                 return `
                 <div class="product-card" data-product-id="${product.id}">
                     <div class="product-image-wrapper">
@@ -2563,7 +2605,7 @@
                             loading="lazy"
                             width="120"
                             height="120"
-                            onerror="this.onerror=null; this.src='https://via.placeholder.com/120/f0f0f0/666?text=Нет+фото';"
+                            onerror="this.onerror=null; this.parentElement.style.background='linear-gradient(135deg, #667eea 0%, #764ba2 100%)'; this.style.opacity='0';"
                         />
                         ${hasDiscount ? `<div class="discount-badge">-${discountPercent}%</div>` : ''}
                         <div class="product-actions">
@@ -2579,26 +2621,30 @@
                         </div>
                     </div>
                     <div class="product-info" onclick="editProduct(${product.id})">
-                        ${product.category ? `<div class="product-category">${product.category}</div>` : ''}
+                        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px;">
+                            ${product.category ? `<div class="product-category">${localCategory}</div>` : '<div></div>'}
+                            ${product.stock <= 5 && product.stock > 0 ? `
+                            <div class="low-stock-warning">
+                                <i data-lucide="alert-triangle" style="width: 10px; height: 10px;"></i>
+                                Мало!
+                            </div>
+                            ` : ''}
+                        </div>
                         <div class="product-name">${product.name}</div>
                         <div class="product-pricing">
                             ${hasDiscount ? `<div class="original-price">${formatPrice(product.original_price)}</div>` : ''}
                             <div class="product-price">${formatPrice(product.price)}</div>
                         </div>
-                        <div class="product-meta">
-                            ${product.expiry_date ? `
-                            <div class="product-expiry">
-                                <i data-lucide="calendar" style="width: 14px; height: 14px;"></i>
-                                Годен до: ${product.expiry_date}
-                            </div>
-                            ` : ''}
-                        </div>
-                        ${product.stock <= 5 && product.stock > 0 ? `
-                        <div class="low-stock-warning">
-                            <i data-lucide="alert-triangle" style="width: 12px; height: 12px;"></i>
-                            Мало товара!
+                        ${product.expiry_date ? `
+                        <div class="product-expiry" style="font-size: 11px; color: var(--text-muted); margin-top: 4px;">
+                            <i data-lucide="calendar" style="width: 12px; height: 12px;"></i>
+                            до ${product.expiry_date}
                         </div>
                         ` : ''}
+                        <div class="stock-label">
+                            <i data-lucide="package" style="width: 12px; height: 12px;"></i>
+                            Остаток
+                        </div>
                         <div class="product-stock-control">
                             <button class="stock-btn" onclick="event.stopPropagation(); adjustStock(${product.id}, -1, event)" title="Уменьшить" aria-label="Уменьшить количество">
                                 −
