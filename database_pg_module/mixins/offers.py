@@ -289,7 +289,7 @@ class OfferMixin:
             cursor.execute(
                 """
                 SELECT o.*, s.name, s.address, s.city, s.category,
-                       CAST((o.original_price - o.discount_price)::float / o.original_price * 100 AS INTEGER) as discount_percent
+                       CAST((o.original_price - o.discount_price) * 100.0 / o.original_price AS INTEGER) as discount_percent
                 FROM offers o
                 JOIN stores s ON o.store_id = s.store_id
                 WHERE s.city = %s AND s.status = 'active'
