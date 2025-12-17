@@ -73,9 +73,7 @@ class SearchMixin:
             params.extend([f"%{v}%" for v in city_variants])
 
         base_sql += """
-            AND (o.expiry_date IS NULL
-                 OR o.expiry_date !~ '[.]'
-                 OR (o.expiry_date ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}' AND o.expiry_date::date >= CURRENT_DATE))
+            AND (o.expiry_date IS NULL OR o.expiry_date >= CURRENT_DATE)
             AND (
                 LOWER(o.title) LIKE '%%' || LOWER(%s) || '%%' OR
                 LOWER(s.name) LIKE '%%' || LOWER(%s) || '%%' OR
