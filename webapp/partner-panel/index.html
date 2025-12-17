@@ -1698,7 +1698,36 @@
         const tgUser = tg?.initDataUnsafe?.user;
         const userId = urlUserId || tgUser?.id || 'none';
 
+        // Show debug info if no initData
+        if (!initData && !isDev) {
+            console.warn('⚠️ No initData - showing debug overlay');
+            setTimeout(() => {
+                const debugDiv = document.createElement('div');
+                debugDiv.style.cssText = 'position: fixed; bottom: 80px; left: 16px; right: 16px; background: rgba(239, 68, 68, 0.95); color: white; padding: 16px; border-radius: 12px; font-size: 13px; z-index: 999; box-shadow: 0 4px 12px rgba(0,0,0,0.3);';
+                debugDiv.innerHTML = `
+                    <div style="font-weight: 700; margin-bottom: 8px;">⚠️ Auth Debug Info</div>
+                    <div style="opacity: 0.9; line-height: 1.6;">
+                        <div>• Telegram SDK: ${tg ? '✅' : '❌'}</div>
+                        <div>• initData: ${tg?.initData ? '✅ Present' : '❌ Missing'}</div>
+                        <div>• User ID: ${userId}</div>
+                        <div>• Source: ${initSource}</div>
+                        <div style="margin-top: 8px; font-size: 11px;">
+                            Откройте через бота: /partner
+                        </div>
+                    </div>
+                    <button onclick="this.parentElement.remove()" style="margin-top: 12px; background: rgba(255,255,255,0.2); border: none; color: white; padding: 6px 12px; border-radius: 6px; font-size: 12px; cursor: pointer;">
+                        Закрыть
+                    </button>
+                `;
+                document.body.appendChild(debugDiv);
+            }, 1000);
+        }
+
         const API = 'https://fudly-bot-production.up.railway.app/api/partner';
+        
+        // Dev mode detection
+        const isDev = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+        
         const getAuth = () => {
             if (!initData) {
                 console.error('❌ No initData available!');
@@ -1709,11 +1738,21 @@
                 console.error('URL uid:', urlUserId);
                 console.error('Window location:', window.location.href);
 
-                // Try one more time with current timestamp
+                // Dev mode: use test uid
+                if (isDev) {
+                    console.warn('🔧 DEV MODE: Using test uid');
+                    return `tma uid=test_user&auth_date=${Math.floor(Date.now() / 1000)}`;
+                }
+
+                // Try fallback with URL uid
                 if (urlUserId) {
                     console.warn('⚠️ Fallback: Using URL uid with current timestamp');
                     return `tma uid=${urlUserId}&auth_date=${Math.floor(Date.now() / 1000)}`;
                 }
+                
+                // Last resort: show error to user
+                console.error('❌ No auth method available. User must open via Telegram bot.');
+                return '';
             }
             return initData ? `tma ${initData}` : '';
         };
@@ -1740,8 +1779,25 @@
                 if (!res.ok) {
                     if (res.status === 401) {
                         console.error('❌ 401 Unauthorized - Check initData:', initData);
-                        toast('Ошибка авторизации. Откройте через Telegram бот.', 'error');
-                        throw new Error('Unauthorized');
+                        console.error('📱 You must open Partner Panel via Telegram bot!');
+                        console.error('💡 Command: /partner or tap "Партнер-панель" button');
+                        
+                        // Show user-friendly error
+                        const errorDiv = document.createElement('div');
+                        errorDiv.style.cssText = 'position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: white; padding: 32px; border-radius: 16px; box-shadow: 0 4px 24px rgba(0,0,0,0.2); max-width: 400px; text-align: center; z-index: 9999;';
+                        errorDiv.innerHTML = `
+                            <div style="font-size: 48px; margin-bottom: 16px;">🔒</div>
+                            <h2 style="margin-bottom: 12px; color: #0F172A;">Требуется авторизация</h2>
+                            <p style="color: #64748B; margin-bottom: 24px;">
+                                Откройте Партнер-панель через Telegram бота командой <strong>/partner</strong>
+                            </p>
+                            <button onclick="window.close()" style="background: #FF6B35; color: white; border: none; padding: 12px 24px; border-radius: 12px; font-weight: 600; cursor: pointer;">
+                                Закрыть
+                            </button>
+                        `;
+                        document.body.appendChild(errorDiv);
+                        
+                        throw new Error('Unauthorized - Open via Telegram bot');
                     }
                     const errorText = await res.text();
                     console.error(`❌ API Error ${res.status}:`, errorText);
