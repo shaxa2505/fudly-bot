@@ -1,6 +1,5 @@
 /* ================================================
-   FUDLY PARTNER PANEL - MODERN BASE STYLES
-   Premium SaaS Design System
+   PREMIUM BASE STYLES - Visual Excellence
    ================================================ */
 
 * {
@@ -22,12 +21,29 @@ body {
     font-weight: var(--weight-normal) !important;
     line-height: var(--leading-normal) !important;
     color: var(--text) !important;
-    background: linear-gradient(135deg, #FAFBFC 0%, #F3F4F6 50%, #EEF2FF 100%) !important;
+    background: linear-gradient(135deg, #FAFBFC 0%, #F8F9FA 30%, #EEF2FF 60%, #E0E7FF 100%) !important;
     background-attachment: fixed !important;
     min-height: 100vh !important;
     overflow-x: hidden !important;
     padding-bottom: 80px !important;
     -webkit-tap-highlight-color: transparent !important;
+    position: relative;
+}
+
+/* Premium Background Pattern */
+body::before {
+    content: '';
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-image:
+        radial-gradient(circle at 20% 20%, rgba(99, 102, 241, 0.03) 0%, transparent 50%),
+        radial-gradient(circle at 80% 80%, rgba(236, 72, 153, 0.03) 0%, transparent 50%),
+        radial-gradient(circle at 50% 50%, rgba(16, 185, 129, 0.02) 0%, transparent 50%);
+    pointer-events: none;
+    z-index: 0;
 }
 
 /* === Modern Typography === */
@@ -196,14 +212,14 @@ a:hover {
 .p-lg { padding: var(--space-lg); }
 .p-xl { padding: var(--space-xl); }
 
-/* === Modern Card System === */
+/* === Premium Card System === */
 .card {
-    background: rgba(255, 255, 255, 0.95);
-    backdrop-filter: blur(20px);
-    -webkit-backdrop-filter: blur(20px);
-    border: 1px solid rgba(255, 255, 255, 0.3);
-    border-radius: var(--radius-lg);
-    box-shadow: var(--shadow-md);
+    background: rgba(255, 255, 255, 0.98);
+    backdrop-filter: blur(30px) saturate(180%);
+    -webkit-backdrop-filter: blur(30px) saturate(180%);
+    border: 1px solid rgba(255, 255, 255, 0.4);
+    border-radius: var(--radius-xl);
+    box-shadow: var(--shadow-md), inset 0 1px 0 0 rgba(255, 255, 255, 0.5);
     transition: all var(--transition-base);
     position: relative;
     overflow: hidden;
@@ -215,20 +231,39 @@ a:hover {
     top: 0;
     left: 0;
     right: 0;
-    height: 3px;
-    background: linear-gradient(90deg, var(--primary), var(--accent));
+    height: 2px;
+    background: linear-gradient(90deg, var(--primary), var(--accent), var(--success));
     opacity: 0;
     transition: opacity var(--transition-base);
 }
 
+.card::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 0;
+    height: 0;
+    border-radius: 50%;
+    background: radial-gradient(circle, rgba(99, 102, 241, 0.1) 0%, transparent 70%);
+    transform: translate(-50%, -50%);
+    transition: width 0.6s, height 0.6s;
+    pointer-events: none;
+}
+
 .card:hover {
-    transform: translateY(-4px);
-    box-shadow: var(--shadow-lg);
-    border-color: rgba(99, 102, 241, 0.2);
+    transform: translateY(-6px) scale(1.01);
+    box-shadow: var(--shadow-2xl), inset 0 1px 0 0 rgba(255, 255, 255, 0.8);
+    border-color: rgba(99, 102, 241, 0.3);
 }
 
 .card:hover::before {
     opacity: 1;
+}
+
+.card:hover::after {
+    width: 500px;
+    height: 500px;
 }
 
 /* === Glassmorphism === */

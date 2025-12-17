@@ -8,13 +8,24 @@
     left: 0;
     right: 0;
     height: 70px;
-    background: rgba(255, 255, 255, 0.85);
+    background: rgba(255, 255, 255, 0.9);
     backdrop-filter: blur(30px) saturate(180%);
     -webkit-backdrop-filter: blur(30px) saturate(180%);
-    border-bottom: 1px solid rgba(99, 102, 241, 0.1);
+    border-bottom: 1px solid rgba(99, 102, 241, 0.12);
     z-index: var(--z-sticky);
-    box-shadow: 0 4px 24px rgba(0, 0, 0, 0.04);
+    box-shadow: 0 4px 24px rgba(0, 0, 0, 0.04), 0 1px 0 0 rgba(255, 255, 255, 0.5) inset;
     animation: fadeInDown var(--transition-slow) ease-out;
+}
+
+.app-header::before {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 2px;
+    background: linear-gradient(90deg, transparent 0%, var(--primary) 50%, transparent 100%);
+    opacity: 0.5;
 }
 
 .header-content {
@@ -41,6 +52,21 @@
     -webkit-text-fill-color: transparent;
     background-clip: text;
     transition: var(--transition-fast);
+    position: relative;
+}
+
+.header-logo::before {
+    content: '';
+    position: absolute;
+    inset: -8px;
+    background: radial-gradient(circle at center, rgba(99, 102, 241, 0.08), transparent 70%);
+    border-radius: var(--radius-full);
+    opacity: 0;
+    transition: opacity var(--transition-base);
+}
+
+.header-logo:hover::before {
+    opacity: 1;
 }
 
 .header-logo:hover {
@@ -83,12 +109,29 @@
     color: var(--primary);
     transition: all var(--transition-fast);
     cursor: pointer;
+    position: relative;
+    overflow: hidden;
+}
+
+.stat-badge::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.3), transparent);
+    transition: left var(--transition-slow);
+}
+
+.stat-badge:hover::before {
+    left: 100%;
 }
 
 .stat-badge:hover {
-    background: rgba(99, 102, 241, 0.12);
-    transform: translateY(-2px);
-    box-shadow: var(--shadow-sm);
+    background: rgba(99, 102, 241, 0.15);
+    transform: translateY(-3px) scale(1.02);
+    box-shadow: var(--shadow-md), 0 0 0 1px rgba(99, 102, 241, 0.3) inset;
 }
 
 .stat-badge.success {
