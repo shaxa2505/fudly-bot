@@ -603,11 +603,50 @@
             justify-content: space-between;
             align-items: center;
             margin-bottom: 16px;
+            flex-wrap: wrap;
+            gap: 12px;
         }
 
         .section-title {
             font-size: 24px;
             font-weight: 700;
+            color: var(--text);
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .view-mode-toggle {
+            display: flex;
+            gap: 4px;
+            background: var(--bg);
+            padding: 4px;
+            border-radius: 10px;
+            border: 1px solid var(--border);
+        }
+
+        .view-mode-btn {
+            padding: 6px 12px;
+            border: none;
+            background: transparent;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.2s;
+            color: var(--text-muted);
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            font-size: 13px;
+            font-weight: 500;
+        }
+
+        .view-mode-btn.active {
+            background: white;
+            color: var(--primary);
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+        }
+
+        .view-mode-btn:hover:not(.active) {
             color: var(--text);
         }
 
@@ -622,6 +661,13 @@
             display: flex;
             align-items: center;
             gap: 8px;
+            transition: all 0.2s;
+        }
+
+        .add-product-btn:hover {
+            background: #4f46e5;
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3);
         }
 
         .search-container {
@@ -685,7 +731,7 @@
             display: flex;
             gap: 8px;
             overflow-x: auto;
-            margin-bottom: 16px;
+            margin-bottom: 20px;
             padding-bottom: 8px;
             scrollbar-width: none;
         }
@@ -697,7 +743,128 @@
         .filter-chip {
             padding: 8px 16px;
             border-radius: 20px;
-            border: 1px solid var(--border);
+            border: 2px solid var(--border);
+            background: white;
+            color: var(--text);
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
+            white-space: nowrap;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            user-select: none;
+        }
+
+        .filter-chip .count {
+            background: var(--bg);
+            color: var(--text-muted);
+            padding: 2px 8px;
+            border-radius: 10px;
+            font-size: 12px;
+            font-weight: 600;
+            min-width: 20px;
+            text-align: center;
+        }
+
+        .filter-chip:hover {
+            border-color: var(--primary);
+            transform: translateY(-1px);
+        }
+
+        .filter-chip.active {
+            background: var(--primary);
+            color: white;
+            border-color: var(--primary);
+            box-shadow: 0 2px 8px rgba(99, 102, 241, 0.3);
+        }
+
+        .filter-chip.active .count {
+            background: rgba(255, 255, 255, 0.2);
+            color: white;
+        }
+
+        /* Компактный список */
+        .products-grid.compact {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .product-card.compact {
+            display: flex;
+            flex-direction: row;
+            align-items: center;
+            padding: 12px 16px;
+            gap: 12px;
+            animation: none;
+        }
+
+        .product-card.compact:hover {
+            transform: translateX(4px);
+        }
+
+        .product-card.compact .product-image-wrapper {
+            width: 60px;
+            height: 60px;
+            min-width: 60px;
+            border-radius: 10px;
+            overflow: hidden;
+        }
+
+        .product-card.compact .product-image {
+            width: 60px;
+            height: 60px;
+            object-fit: cover;
+        }
+
+        .product-card.compact .product-info {
+            flex: 1;
+            padding: 0;
+            display: flex;
+            flex-direction: row;
+            align-items: center;
+            gap: 16px;
+            flex-wrap: wrap;
+        }
+
+        .product-card.compact .product-name {
+            min-width: 200px;
+            flex: 1;
+            margin: 0;
+            min-height: auto;
+            -webkit-line-clamp: 1;
+        }
+
+        .product-card.compact .product-pricing {
+            min-width: 120px;
+        }
+
+        .product-card.compact .product-stock-control {
+            min-width: 140px;
+        }
+
+        .product-card.compact .product-category,
+        .product-card.compact .product-expiry,
+        .product-card.compact .stock-label {
+            display: none;
+        }
+
+        .product-card.compact .product-status {
+            position: static;
+            margin: 0;
+        }
+
+        .product-card.compact .product-actions {
+            position: static;
+            opacity: 0;
+            transition: opacity 0.2s;
+        }
+
+        .product-card.compact:hover .product-actions {
+            opacity: 1;
+        }
             background: white;
             cursor: pointer;
             white-space: nowrap;
@@ -1648,6 +1815,9 @@
         .mt-lg { margin-top: var(--space-lg); }
         .mb-lg { margin-bottom: var(--space-lg); }
     </style>
+    
+    <!-- UX Improvements Phase 1 -->
+    <link rel="stylesheet" href="improvements.css">
 </head>
 <body>
     <!-- Header -->
@@ -3069,6 +3239,11 @@
             if (typeof lucide !== 'undefined') {
                 lucide.createIcons();
             }
+            
+            // Apply view mode if improvements loaded
+            if (typeof applyViewMode === 'function' && typeof viewMode !== 'undefined') {
+                applyViewMode(viewMode);
+            }
         }
 
         function openAddProductModal() {
@@ -3683,6 +3858,21 @@
         // Initialize Lucide icons
         if (typeof lucide !== 'undefined') {
             lucide.createIcons();
+        }
+    </script>
+    
+    <!-- UX Improvements Phase 1 -->
+    <script src="improvements.js"></script>
+    <script>
+        // Initialize UX improvements after main init
+        if (typeof initUXImprovements === 'function') {
+            // Wait for products to load first
+            const checkProductsLoaded = setInterval(() => {
+                if (allProducts && allProducts.length > 0) {
+                    clearInterval(checkProductsLoaded);
+                    initUXImprovements();
+                }
+            }, 100);
         }
     </script>
 </body>

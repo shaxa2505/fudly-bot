@@ -1178,8 +1178,9 @@ async def upload_photo(photo: UploadFile = File(...), authorization: str = Heade
 # Get photo URL endpoint
 @router.get("/photo/{file_id}")
 async def get_photo_url(file_id: str):
-    """Get direct URL for a Telegram photo by file_id"""
+    """Redirect to Telegram photo URL"""
     import aiohttp
+    from fastapi.responses import RedirectResponse
 
     if not _bot_token:
         raise HTTPException(status_code=500, detail="Bot token not configured")
@@ -1197,6 +1198,7 @@ async def get_photo_url(file_id: str):
                 file_path = result["result"]["file_path"]
                 photo_url = f"https://api.telegram.org/file/bot{_bot_token}/{file_path}"
 
-                return {"url": photo_url}
+                # Redirect to actual photo URL
+                return RedirectResponse(url=photo_url)
     except aiohttp.ClientError as e:
         raise HTTPException(status_code=500, detail=f"Network error: {str(e)}")
