@@ -181,60 +181,6 @@
     </main>
 
     <!-- Bottom Navigation -->
-        <!-- Stats -->
-        <section class="stats-section">
-            <div class="stats-grid">
-                <div class="stat-card primary">
-                <div class="stat-icon"><i data-lucide="dollar-sign"></i></div>
-                <div class="stat-value" id="todayRevenue">0</div>
-                <div class="stat-label">Выручка сегодня</div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-icon"><i data-lucide="package"></i></div>
-                <div class="stat-value" id="todayOrders">0</div>
-                <div class="stat-label">Заказов</div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-icon"><i data-lucide="clock"></i></div>
-                <div class="stat-value" id="pendingOrders">0</div>
-                <div class="stat-label">Ожидают</div>
-            </div>
-            </div>
-        </section>
-
-        <!-- Orders Section -->
-        <section class="section">
-        <div class="section-header">
-            <div class="section-title">Заказы</div>
-            <a href="#" class="section-action" onclick="showAllOrders(); return false;">
-                Все →
-            </a>
-        </div>
-
-        <!-- Order Status Tabs -->
-        <div class="tabs">
-            <button class="tab active" data-status="new" onclick="filterOrders('new')">
-                Новые <span class="tab-badge" id="newCount">0</span>
-            </button>
-            <button class="tab" data-status="preparing" onclick="filterOrders('preparing')">
-                Готовятся <span class="tab-badge" id="preparingCount">0</span>
-            </button>
-            <button class="tab" data-status="ready" onclick="filterOrders('ready')">
-                Готовы <span class="tab-badge" id="readyCount">0</span>
-            </button>
-            <button class="tab" data-status="completed" onclick="filterOrders('completed')">
-                История
-            </button>
-        </div>
-
-        <!-- Orders List -->
-        <div id="ordersList">
-            <div class="loading"><div class="spinner"></div></div>
-        </div>
-        </section>
-    </main>
-
-    <!-- Bottom Navigation -->
     <nav class="bottom-nav">
         <button class="nav-item active" onclick="switchView('dashboard')">
             <span class="nav-icon"><i data-lucide="home"></i></span>
@@ -304,7 +250,7 @@
             const { data: initData } = getAuth();
             const headers = {
                 'Content-Type': 'application/json',
-                'X-Telegram-Init-Data': initData || '',
+                'Authorization': initData ? `tma ${initData}` : '',
                 ...options.headers
             };
 
