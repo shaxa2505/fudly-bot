@@ -420,9 +420,14 @@ async def switch_to_seller_cb(callback: types.CallbackQuery) -> None:
 
         # Send new message with ReplyKeyboard
         try:
+            # Get partner panel URL
+            from handlers.common.webapp import get_partner_panel_url
+
+            webapp_url = get_partner_panel_url()
+
             await callback.message.answer(
                 "Переключено в режим партнера" if lang == "ru" else "Hamkor rejimiga o'tkazildi",
-                reply_markup=main_menu_seller(lang),
+                reply_markup=main_menu_seller(lang, webapp_url=webapp_url, user_id=user_id),
             )
             await callback.answer()
         except Exception as e:

@@ -22,6 +22,8 @@ from database_protocol import DatabaseProtocol
 from handlers.common.states import RegisterStore
 from handlers.common.utils import (
     get_appropriate_menu as _get_appropriate_menu,
+)
+from handlers.common.utils import (
     get_user_view_mode,
     has_approved_store,
     normalize_city,
@@ -113,9 +115,15 @@ async def become_partner(message: types.Message, state: FSMContext) -> None:
         if has_approved_store(message.from_user.id, db):
             # Remember seller view preference
             set_user_view_mode(message.from_user.id, "seller", db)
+
+            # Get partner panel URL
+            from handlers.common.webapp import get_partner_panel_url
+
+            webapp_url = get_partner_panel_url()
+
             await message.answer(
                 get_text(lang, "switched_to_seller"),
-                reply_markup=main_menu_seller(lang),
+                reply_markup=main_menu_seller(lang, webapp_url=webapp_url, user_id=message.from_user.id),
             )
             return
         else:
@@ -432,11 +440,9 @@ async def register_store_photo_text(message: types.Message, state: FSMContext) -
 
     # Any other text - require photo
     await message.answer(
-        "❌ Пожалуйста, отправьте фото магазина.\n\n"
-        "📸 Фото обязательно для подачи заявки."
+        "❌ Пожалуйста, отправьте фото магазина.\n\n" "📸 Фото обязательно для подачи заявки."
         if lang == "ru"
-        else "❌ Iltimos, do'kon fotosuratini yuboring.\n\n"
-        "📸 Fotosurat ariza uchun majburiy."
+        else "❌ Iltimos, do'kon fotosuratini yuboring.\n\n" "📸 Fotosurat ariza uchun majburiy."
     )
 
 
@@ -451,11 +457,9 @@ async def register_store_photo_invalid(message: types.Message, state: FSMContext
 
     # Show error - photo is required
     await message.answer(
-        "❌ Отправьте фото магазина (изображение).\n\n"
-        "📸 Это обязательный шаг."
+        "❌ Отправьте фото магазина (изображение).\n\n" "📸 Это обязательный шаг."
         if lang == "ru"
-        else "❌ Do'kon fotosuratini yuboring (rasm).\n\n"
-        "📸 Bu majburiy qadam."
+        else "❌ Do'kon fotosuratini yuboring (rasm).\n\n" "📸 Bu majburiy qadam."
     )
 
 

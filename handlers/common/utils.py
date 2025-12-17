@@ -16,7 +16,7 @@ logger = logging.getLogger("fudly")
 
 def html_escape(val: Any) -> str:
     """HTML-escape helper for safe rendering in Telegram messages.
-    
+
     Use this instead of defining _esc() in each module.
     """
     return html.escape(str(val)) if val else ""
@@ -241,15 +241,17 @@ def get_appropriate_menu(
     main_menu_customer: Callable[[str], Any] | None = None,
 ) -> Any:
     """Return appropriate menu for user based on their store approval status and current mode.
-    
+
     If main_menu_seller/main_menu_customer are not provided, imports them from app.keyboards.
     """
     # Import keyboards if not provided (avoids circular imports at module level)
     if main_menu_seller is None or main_menu_customer is None:
-        from app.keyboards import main_menu_customer as mmc, main_menu_seller as mms
+        from app.keyboards import main_menu_customer as mmc
+        from app.keyboards import main_menu_seller as mms
+
         main_menu_seller = main_menu_seller or mms
         main_menu_customer = main_menu_customer or mmc
-    
+
     user = db.get_user_model(user_id)
     if not user:
         return main_menu_customer(lang)
@@ -263,7 +265,11 @@ def get_appropriate_menu(
     if role == "seller":
         if has_approved_store(user_id, db):
             if current_mode == "seller":
-                return main_menu_seller(lang)
+                # Get partner panel URL from environment
+                from handlers.common.webapp import get_partner_panel_url
+
+                webapp_url = get_partner_panel_url()
+                return main_menu_seller(lang, webapp_url=webapp_url, user_id=user_id)
             else:
                 return main_menu_customer(lang)
         else:
@@ -379,10 +385,11 @@ class RegistrationCheckMiddleware(BaseMiddleware):
 
 async def safe_edit_reply_markup(msg_like, **kwargs) -> None:
     """Edit reply markup if message is accessible (Message), otherwise ignore.
-    
+
     Use this instead of defining _safe_edit_reply_markup() in each module.
     """
     from aiogram import types as _ai_types
+
     if isinstance(msg_like, _ai_types.Message):
         try:
             await msg_like.edit_reply_markup(**kwargs)
@@ -392,10 +399,11 @@ async def safe_edit_reply_markup(msg_like, **kwargs) -> None:
 
 async def safe_answer_or_send(msg_like, user_id: int, text: str, bot: Any = None, **kwargs) -> None:
     """Try to answer via message.answer, fallback to bot.send_message.
-    
+
     Use this instead of defining _safe_answer_or_send() in each module.
     """
     from aiogram import types as _ai_types
+
     if isinstance(msg_like, _ai_types.Message):
         try:
             await msg_like.answer(text, **kwargs)

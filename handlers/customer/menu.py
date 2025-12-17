@@ -101,9 +101,14 @@ async def switch_to_seller(message: types.Message):
 
     set_user_view_mode(user_id, "seller", db)
 
+    # Get partner panel URL
+    from handlers.common.webapp import get_partner_panel_url
+
+    webapp_url = get_partner_panel_url()
+
     await message.answer(
         "Переключено в режим партнера" if lang == "ru" else "Hamkor rejimiga o'tkazildi",
-        reply_markup=main_menu_seller(lang),
+        reply_markup=main_menu_seller(lang, webapp_url=webapp_url, user_id=user_id),
     )
 
     logger.info(f"✅ User {user_id} switched to seller mode successfully")

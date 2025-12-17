@@ -198,7 +198,7 @@ async def request_store_photo(callback: types.CallbackQuery, state: FSMContext) 
     lang = db.get_user_language(callback.from_user.id)
 
     store_id = int(callback.data.replace("store_change_photo_", ""))
-    
+
     # Verify store ownership
     if not verify_store_owner(callback.from_user.id, store_id):
         await callback.answer("❌", show_alert=True)
@@ -347,7 +347,7 @@ async def remove_store_photo(callback: types.CallbackQuery) -> None:
     lang = db.get_user_language(callback.from_user.id)
 
     store_id = int(callback.data.replace("store_remove_photo_", ""))
-    
+
     # Verify store ownership
     if not verify_store_owner(callback.from_user.id, store_id):
         await callback.answer("❌", show_alert=True)
@@ -410,16 +410,18 @@ async def back_from_settings(callback: types.CallbackQuery) -> None:
     lang = db.get_user_language(callback.from_user.id)
 
     from app.keyboards import main_menu_seller
+    from handlers.common.webapp import get_partner_panel_url
 
     try:
         await callback.message.delete()
     except Exception:
         pass
 
+    webapp_url = get_partner_panel_url()
     await bot.send_message(
         callback.from_user.id,
         "🏠 Главное меню" if lang == "ru" else "🏠 Asosiy menyu",
-        reply_markup=main_menu_seller(lang),
+        reply_markup=main_menu_seller(lang, webapp_url=webapp_url, user_id=callback.from_user.id),
     )
 
     await callback.answer()
@@ -440,7 +442,7 @@ async def setup_store_location(callback: types.CallbackQuery, state: FSMContext)
     lang = db.get_user_language(callback.from_user.id)
 
     store_id = int(callback.data.replace("store_location_setup_", ""))
-    
+
     # Verify store ownership
     if not verify_store_owner(callback.from_user.id, store_id):
         await callback.answer("❌", show_alert=True)
@@ -633,7 +635,7 @@ async def show_payment_settings(callback: types.CallbackQuery) -> None:
     lang = db.get_user_language(callback.from_user.id)
 
     store_id = int(callback.data.replace("store_payment_settings_", ""))
-    
+
     # Verify store ownership
     if not verify_store_owner(callback.from_user.id, store_id):
         await callback.answer("❌", show_alert=True)
@@ -686,7 +688,7 @@ async def setup_click_start(callback: types.CallbackQuery, state: FSMContext) ->
     lang = db.get_user_language(callback.from_user.id)
 
     store_id = int(callback.data.replace("store_click_setup_", ""))
-    
+
     # Verify store ownership
     if not verify_store_owner(callback.from_user.id, store_id):
         await callback.answer("❌", show_alert=True)
@@ -883,7 +885,7 @@ async def setup_payme_start(callback: types.CallbackQuery, state: FSMContext) ->
     lang = db.get_user_language(callback.from_user.id)
 
     store_id = int(callback.data.replace("store_payme_setup_", ""))
-    
+
     # Verify store ownership
     if not verify_store_owner(callback.from_user.id, store_id):
         await callback.answer("❌", show_alert=True)
@@ -1039,7 +1041,7 @@ async def view_click_integration(callback: types.CallbackQuery) -> None:
     lang = db.get_user_language(callback.from_user.id)
 
     store_id = int(callback.data.replace("store_click_view_", ""))
-    
+
     # Verify store ownership
     if not verify_store_owner(callback.from_user.id, store_id):
         await callback.answer("❌", show_alert=True)
@@ -1097,7 +1099,7 @@ async def view_payme_integration(callback: types.CallbackQuery) -> None:
     lang = db.get_user_language(callback.from_user.id)
 
     store_id = int(callback.data.replace("store_payme_view_", ""))
-    
+
     # Verify store ownership
     if not verify_store_owner(callback.from_user.id, store_id):
         await callback.answer("❌", show_alert=True)
@@ -1153,7 +1155,7 @@ async def disable_click_integration(callback: types.CallbackQuery) -> None:
     lang = db.get_user_language(callback.from_user.id)
 
     store_id = int(callback.data.replace("store_click_disable_", ""))
-    
+
     # Verify store ownership
     if not verify_store_owner(callback.from_user.id, store_id):
         await callback.answer("❌", show_alert=True)
@@ -1193,7 +1195,7 @@ async def disable_payme_integration(callback: types.CallbackQuery) -> None:
     lang = db.get_user_language(callback.from_user.id)
 
     store_id = int(callback.data.replace("store_payme_disable_", ""))
-    
+
     # Verify store ownership
     if not verify_store_owner(callback.from_user.id, store_id):
         await callback.answer("❌", show_alert=True)
@@ -1321,7 +1323,7 @@ async def start_add_admin(callback: types.CallbackQuery, state: FSMContext) -> N
     lang = db.get_user_language(callback.from_user.id)
 
     store_id = int(callback.data.replace("add_admin_", ""))
-    
+
     # Verify store ownership
     if not verify_store_owner(callback.from_user.id, store_id):
         await callback.answer("❌", show_alert=True)
