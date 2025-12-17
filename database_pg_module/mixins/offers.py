@@ -167,9 +167,7 @@ class OfferMixin:
                 SELECT * FROM offers
                 WHERE store_id = %s
                 AND status = %s
-                AND (expiry_date IS NULL
-                     OR expiry_date !~ '[.]'
-                     OR (expiry_date ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}' AND expiry_date::date >= CURRENT_DATE))
+                AND (expiry_date IS NULL OR expiry_date >= CURRENT_DATE)
                 ORDER BY created_at DESC
             """,
                 (store_id, status),
@@ -213,11 +211,7 @@ class OfferMixin:
                 WHERE o.status = 'active'
                 AND o.quantity > 0
                 AND (s.status = 'approved' OR s.status = 'active')
-                AND (o.available_until IS NULL OR LENGTH(o.available_until) < 6 OR
-                     (LENGTH(o.available_until) > 10 AND o.available_until::timestamp >= NOW()))
-                AND (o.expiry_date IS NULL
-                     OR o.expiry_date !~ '[.]'
-                     OR (o.expiry_date ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}' AND o.expiry_date::date >= CURRENT_DATE))
+                AND (o.expiry_date IS NULL OR o.expiry_date >= CURRENT_DATE)
             """
 
             params = []
@@ -283,9 +277,7 @@ class OfferMixin:
                 FROM offers o
                 JOIN stores s ON o.store_id = s.store_id
                 WHERE o.store_id = %s AND o.quantity > 0
-                AND (o.expiry_date IS NULL
-                     OR o.expiry_date !~ '[.]'
-                     OR (o.expiry_date ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}' AND o.expiry_date::date >= CURRENT_DATE))
+                AND (o.expiry_date IS NULL OR o.expiry_date >= CURRENT_DATE)
                 ORDER BY o.created_at DESC
             """,
                 (store_id,),
@@ -304,9 +296,7 @@ class OfferMixin:
                 JOIN stores s ON o.store_id = s.store_id
                 WHERE s.city = %s AND s.status = 'active'
                       AND o.status = 'active' AND o.quantity > 0
-                      AND (o.expiry_date IS NULL
-                           OR o.expiry_date !~ '[.]'
-                           OR (o.expiry_date ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}' AND o.expiry_date::date >= CURRENT_DATE))
+                      AND (o.expiry_date IS NULL OR o.expiry_date >= CURRENT_DATE)
                 ORDER BY discount_percent DESC, o.created_at DESC
                 LIMIT %s
             """,
@@ -436,8 +426,7 @@ class OfferMixin:
                 SET status = 'expired'
                 WHERE status = 'active'
                 AND expiry_date IS NOT NULL
-                AND expiry_date ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}'
-                AND expiry_date::date < CURRENT_DATE
+                AND expiry_date < CURRENT_DATE
                 RETURNING offer_id
             """
             )
