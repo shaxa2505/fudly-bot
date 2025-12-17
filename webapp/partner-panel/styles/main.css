@@ -1,0 +1,417 @@
+/* ================================================
+   FUDLY PARTNER PANEL - MAIN STYLESHEET
+   Modular CSS Architecture
+   ================================================ */
+
+/* 1. Design Tokens */
+@import url('variables.css');
+
+/* 2. Base Styles */
+@import url('base.css');
+
+/* 3. Components */
+@import url('header.css');
+@import url('navigation.css');
+@import url('buttons.css');
+@import url('products.css');
+
+/* 4. UX Improvements */
+@import url('../improvements.css');
+
+/* === ADDITIONAL COMPONENTS === */
+
+/* Stats Cards */
+.stats-section {
+    padding: var(--space-lg) var(--space-md);
+    max-width: 1200px;
+    margin: 0 auto;
+}
+
+.stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    gap: var(--space-md);
+}
+
+.stat-card {
+    background: var(--card);
+    border-radius: var(--radius-lg);
+    padding: var(--space-lg);
+    box-shadow: var(--shadow);
+    transition: all 0.3s;
+}
+
+.stat-card:active {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-md);
+}
+
+.stat-card.primary {
+    background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
+    color: white;
+}
+
+.stat-icon {
+    width: 40px;
+    height: 40px;
+    border-radius: var(--radius-md);
+    background: rgba(255, 255, 255, 0.2);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 20px;
+    margin-bottom: var(--space-md);
+}
+
+.stat-value {
+    font-size: 32px;
+    font-weight: 700;
+    margin-bottom: var(--space-xs);
+    line-height: 1;
+}
+
+.stat-label {
+    font-size: 13px;
+    opacity: 0.8;
+    font-weight: 500;
+}
+
+/* Sections */
+.section {
+    padding: 0 var(--space-md) var(--space-lg);
+    max-width: 1200px;
+    margin: 0 auto;
+}
+
+.section-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: var(--space-lg);
+}
+
+.section-title {
+    font-size: 20px;
+    font-weight: 700;
+    color: var(--text);
+}
+
+/* Products Section */
+.products-section {
+    padding: 16px;
+    padding-bottom: 80px;
+}
+
+.products-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 16px;
+    flex-wrap: wrap;
+    gap: 12px;
+}
+
+/* View Mode Toggle */
+.view-mode-toggle {
+    display: flex;
+    gap: 4px;
+    background: var(--bg);
+    padding: 4px;
+    border-radius: 10px;
+    border: 1px solid var(--border);
+}
+
+.view-mode-btn {
+    padding: 6px 12px;
+    border: none;
+    background: transparent;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.2s;
+    color: var(--text-muted);
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 13px;
+    font-weight: 500;
+}
+
+.view-mode-btn.active {
+    background: white;
+    color: var(--primary);
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.view-mode-btn:hover:not(.active) {
+    color: var(--text);
+}
+
+/* Search */
+.search-container {
+    position: relative;
+    margin-bottom: 16px;
+}
+
+.search-input {
+    width: 100%;
+    padding: 12px 16px 12px 44px;
+    border: 2px solid var(--border);
+    border-radius: 12px;
+    font-size: 15px;
+    transition: all 0.2s;
+    background: white;
+}
+
+.search-input:focus {
+    outline: none;
+    border-color: var(--primary);
+    box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
+}
+
+.search-icon {
+    position: absolute;
+    left: 14px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--text-muted);
+    pointer-events: none;
+}
+
+.search-clear {
+    position: absolute;
+    right: 12px;
+    top: 50%;
+    transform: translateY(-50%);
+    background: var(--text-muted);
+    color: white;
+    border: none;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    cursor: pointer;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
+    padding: 0;
+}
+
+.search-clear.visible {
+    display: flex;
+}
+
+.search-clear:hover {
+    background: var(--text);
+}
+
+/* Filters */
+.products-filters {
+    display: flex;
+    gap: 8px;
+    overflow-x: auto;
+    margin-bottom: 20px;
+    padding-bottom: 8px;
+    scrollbar-width: none;
+}
+
+.products-filters::-webkit-scrollbar {
+    display: none;
+}
+
+.filter-chip {
+    padding: 8px 16px;
+    border-radius: 20px;
+    border: 2px solid var(--border);
+    background: white;
+    color: var(--text);
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s;
+    white-space: nowrap;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    user-select: none;
+}
+
+.filter-chip .count {
+    background: var(--bg);
+    color: var(--text-muted);
+    padding: 2px 8px;
+    border-radius: 10px;
+    font-size: 12px;
+    font-weight: 600;
+    min-width: 20px;
+    text-align: center;
+}
+
+.filter-chip:hover {
+    border-color: var(--primary);
+    transform: translateY(-1px);
+}
+
+.filter-chip.active {
+    background: var(--primary);
+    color: white;
+    border-color: var(--primary);
+    box-shadow: 0 2px 8px rgba(99, 102, 241, 0.3);
+}
+
+.filter-chip.active .count {
+    background: rgba(255, 255, 255, 0.2);
+    color: white;
+}
+
+/* Tabs */
+.tabs {
+    display: flex;
+    gap: var(--space-sm);
+    padding: 0 var(--space-md) var(--space-md);
+    overflow-x: auto;
+    scrollbar-width: none;
+}
+
+.tabs::-webkit-scrollbar {
+    display: none;
+}
+
+.tab {
+    padding: var(--space-sm) var(--space-lg);
+    border-radius: var(--radius-full);
+    background: var(--card);
+    border: 2px solid var(--border);
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text-secondary);
+    cursor: pointer;
+    white-space: nowrap;
+    transition: all 0.2s;
+}
+
+.tab.active {
+    background: var(--primary);
+    border-color: var(--primary);
+    color: white;
+}
+
+.tab-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 20px;
+    height: 20px;
+    padding: 0 6px;
+    border-radius: var(--radius-full);
+    background: var(--bg);
+    color: var(--text);
+    font-size: 12px;
+    font-weight: 700;
+    margin-left: 6px;
+}
+
+.tab.active .tab-badge {
+    background: rgba(255, 255, 255, 0.3);
+    color: white;
+}
+
+/* Orders */
+.order-card {
+    background: var(--card);
+    border-radius: var(--radius-lg);
+    padding: var(--space-lg);
+    margin-bottom: var(--space-md);
+    box-shadow: var(--shadow);
+    border-left: 4px solid var(--border);
+    transition: all 0.2s;
+}
+
+.order-card:active {
+    transform: scale(0.98);
+}
+
+.order-card.pending { border-left-color: var(--warning); }
+.order-card.confirmed { border-left-color: var(--info); }
+.order-card.ready { border-left-color: var(--success); }
+
+/* Modal */
+.modal {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.5);
+    z-index: 10000;
+    align-items: center;
+    justify-content: center;
+}
+
+.modal.show {
+    display: flex;
+}
+
+.modal-content {
+    background: white;
+    border-radius: 20px;
+    padding: 24px;
+    max-width: 90%;
+    width: 400px;
+    max-height: 90vh;
+    overflow-y: auto;
+}
+
+.modal-header {
+    font-weight: 700;
+    font-size: 20px;
+    margin-bottom: 20px;
+}
+
+.form-group {
+    margin-bottom: 16px;
+}
+
+.form-label {
+    display: block;
+    font-size: 14px;
+    font-weight: 500;
+    margin-bottom: 8px;
+    color: var(--text);
+}
+
+.input-field {
+    width: 100%;
+    padding: 12px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    font-size: 14px;
+    margin-top: 8px;
+}
+
+/* Empty State */
+.empty-state {
+    text-align: center;
+    padding: var(--space-xl) var(--space-md);
+}
+
+.empty-icon {
+    font-size: 64px;
+    margin-bottom: var(--space-lg);
+    opacity: 0.3;
+}
+
+.empty-title {
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--text);
+    margin-bottom: var(--space-sm);
+}
+
+.empty-text {
+    font-size: 14px;
+    color: var(--text-secondary);
+    line-height: 1.6;
+    max-width: 300px;
+    margin: 0 auto;
+}

@@ -1,0 +1,47 @@
+/* ================================================
+   COMPONENT: Bottom Navigation
+   Fixed bottom navigation bar
+   ================================================ */
+
+.bottom-nav {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background: var(--card);
+    border-top: 1px solid var(--border);
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    padding: var(--space-sm) 0;
+    z-index: 100;
+    box-shadow: 0 -4px 6px -1px rgb(0 0 0 / 0.05);
+}
+
+.nav-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    padding: var(--space-sm);
+    color: var(--text-muted);
+    text-decoration: none;
+    font-size: 11px;
+    font-weight: 600;
+    cursor: pointer;
+    border: none;
+    background: none;
+    transition: all 0.2s;
+}
+
+.nav-item.active {
+    color: var(--primary);
+}
+
+.nav-icon {
+    font-size: 24px;
+    transition: transform 0.2s;
+}
+
+.nav-item.active .nav-icon {
+    transform: scale(1.1);
+}
