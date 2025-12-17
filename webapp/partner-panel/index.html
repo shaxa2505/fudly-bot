@@ -9,16 +9,16 @@
     <script src="https://unpkg.com/lucide@latest"></script>
 
     <!-- Modular CSS Architecture -->
-    <link rel="stylesheet" href="styles/variables.css">
-    <link rel="stylesheet" href="styles/base.css">
-    <link rel="stylesheet" href="styles/header.css">
-    <link rel="stylesheet" href="styles/navigation.css">
-    <link rel="stylesheet" href="styles/buttons.css">
-    <link rel="stylesheet" href="styles/products.css">
-    <link rel="stylesheet" href="styles/main.css">
+    <link rel="stylesheet" href="styles/variables.css?v=2.0">
+    <link rel="stylesheet" href="styles/base.css?v=2.0">
+    <link rel="stylesheet" href="styles/header.css?v=2.0">
+    <link rel="stylesheet" href="styles/navigation.css?v=2.0">
+    <link rel="stylesheet" href="styles/buttons.css?v=2.0">
+    <link rel="stylesheet" href="styles/products.css?v=2.0">
+    <link rel="stylesheet" href="styles/main.css?v=2.0">
 
     <!-- UX Improvements Phase 1 -->
-    <link rel="stylesheet" href="improvements.css">
+    <link rel="stylesheet" href="improvements.css?v=2.0">
 
     <style>
         /* Modern Premium Design - Force Light Theme */
@@ -86,8 +86,14 @@
         </div>
     </header>
 
-    <!-- Dashboard Section -->
-    <div id="dashboardSection">
+    <!-- Main Content Container -->
+    <main class="content" style="padding-top: 90px; padding-bottom: 90px; min-height: 100vh;">
+        <div class="loading">
+            <div class="spinner"></div>
+        </div>
+    </main>
+
+    <!-- Bottom Navigation -->
         <!-- Stats -->
         <section class="stats-section">
             <div class="stats-grid">
@@ -137,217 +143,10 @@
         <!-- Orders List -->
         <div id="ordersList">
             <div class="loading"><div class="spinner"></div></div>
-        </div>
-    </section>
-    </div>
-    <!-- End Dashboard Section -->
-
-    <!-- Products Section -->
-    <section id="productsSection" class="products-section hidden">
-        <div class="products-header">
-            <h2 class="section-title">Товары</h2>
-            <button class="add-product-btn" onclick="openAddProductModal()">
-                <i data-lucide="plus" style="width: 16px; height: 16px;"></i>
-                <span>Добавить</span>
-            </button>
-        </div>
-
-        <div class="search-container">
-            <i data-lucide="search" class="search-icon" style="width: 20px; height: 20px;"></i>
-            <input
-                type="text"
-                class="search-input"
-                placeholder="Поиск товаров..."
-                oninput="searchProducts(this.value, this)"
-                aria-label="Поиск товаров"
-            />
-            <button class="search-clear" onclick="clearSearch()" aria-label="Очистить поиск" title="Очистить">✕</button>
-        </div>
-
-        <div class="products-filters">
-            <button class="filter-chip active" data-filter="all" onclick="filterProducts('all')">
-                Все <span class="filter-count" id="count-all">0</span>
-            </button>
-            <button class="filter-chip" data-filter="active" onclick="filterProducts('active')">
-                Активные <span class="filter-count" id="count-active">0</span>
-            </button>
-            <button class="filter-chip" data-filter="hidden" onclick="filterProducts('hidden')">
-                Скрытые <span class="filter-count" id="count-hidden">0</span>
-            </button>
-            <button class="filter-chip" data-filter="out_of_stock" onclick="filterProducts('out_of_stock')">
-                Нет в наличии <span class="filter-count" id="count-out_of_stock">0</span>
-            </button>
-        </div>
-
-        <div id="productsList" class="products-grid">
-            <div class="loading"><div class="spinner"></div></div>
-        </div>
-    </section>
-
-    <!-- Statistics Section -->
-    <section id="statsSection" class="stats-section hidden">
-        <h2 class="section-title">Статистика</h2>
-
-        <div class="period-tabs">
-            <button class="period-tab active" data-period="today" onclick="changePeriod('today')">Сегодня</button>
-            <button class="period-tab" data-period="week" onclick="changePeriod('week')">Неделя</button>
-            <button class="period-tab" data-period="month" onclick="changePeriod('month')">Месяц</button>
-        </div>
-
-        <div class="chart-card">
-            <div class="chart-title">Выручка</div>
-            <div class="chart-container">
-                <canvas id="revenueChart"></canvas>
-            </div>
-        </div>
-
-        <div class="chart-card">
-            <div class="chart-title">Заказы по часам</div>
-            <div class="chart-container">
-                <canvas id="ordersChart"></canvas>
-            </div>
-        </div>
-
-        <div class="chart-card">
-            <div class="chart-title">Топ товаров</div>
-            <div class="chart-container">
-                <canvas id="productsChart"></canvas>
-            </div>
-        </div>
-    </section>
-
-    <!-- Settings Section -->
-    <section id="settingsSection" class="settings-section hidden">
-        <h2 class="section-title">Настройки</h2>
-
-        <div class="settings-group">
-            <div class="settings-group-title">Магазин</div>
-            <div class="setting-item">
-                <span class="setting-label">Название</span>
-                <span class="setting-value" id="storeName">-</span>
-            </div>
-            <div class="setting-item">
-                <span class="setting-label">Адрес</span>
-                <span class="setting-value" id="storeAddress">-</span>
-            </div>
-            <div class="setting-item">
-                <span class="setting-label">Статус</span>
-                <div class="toggle-switch active" id="storeStatus" onclick="toggleStoreStatus()"></div>
-            </div>
-        </div>
-
-        <div class="settings-group">
-            <div class="settings-group-title">Режим работы</div>
-            <div class="setting-item">
-                <span class="setting-label">Пн-Пт</span>
-                <span class="setting-value">09:00 - 21:00</span>
-            </div>
-            <div class="setting-item">
-                <span class="setting-label">Сб-Вс</span>
-                <span class="setting-value">10:00 - 20:00</span>
-            </div>
-        </div>
-
-        <div class="settings-group">
-            <div class="settings-group-title">Доставка</div>
-            <div class="setting-item">
-                <span class="setting-label">Минимальный заказ</span>
-                <span class="setting-value">500 ₽</span>
-            </div>
-            <div class="setting-item">
-                <span class="setting-label">Стоимость доставки</span>
-                <span class="setting-value">150 ₽</span>
-            </div>
-            <div class="setting-item">
-                <span class="setting-label">Бесплатная доставка от</span>
-                <span class="setting-value">1500 ₽</span>
-            </div>
-        </div>
-
-        <div class="settings-group">
-            <div class="settings-group-title">Уведомления</div>
-            <div class="setting-item">
-                <span class="setting-label">Новые заказы</span>
-                <div class="toggle-switch active" onclick="toggleSetting(this)"></div>
-            </div>
-            <div class="setting-item">
-                <span class="setting-label">Отмены</span>
-                <div class="toggle-switch active" onclick="toggleSetting(this)"></div>
-            </div>
-        </div>
-    </section>
-
-    <!-- Add Product Modal -->
-    <div id="addProductModal" class="modal">
-        <div class="modal-content">
-            <div class="modal-header">Добавить товар</div>
-            <form id="addProductForm">
-                <div class="form-group">
-                    <label class="form-label">Фото</label>
-                    <div class="file-input-wrapper" onclick="document.getElementById('productPhoto').click()">
-                        <input type="file" id="productPhoto" accept="image/*" onchange="previewImage(event)">
-                        <div id="uploadPlaceholder">📷 Загрузить фото</div>
-                        <img id="imagePreview" class="image-preview hidden">
-                    </div>
-                </div>
-                <div class="form-group">
-                    <label class="form-label">Категория *</label>
-                    <select class="input-field" id="productCategory" required>
-                        <option value="bakery">🥖 Выпечка</option>
-                        <option value="dairy">🥛 Молочные</option>
-                        <option value="meat">🥩 Мясные</option>
-                        <option value="fruits">🍎 Фрукты</option>
-                        <option value="vegetables">🥬 Овощи</option>
-                        <option value="drinks">🥤 Напитки</option>
-                        <option value="snacks">🍿 Снеки</option>
-                        <option value="frozen">🧊 Замороженное</option>
-                        <option value="other" selected>📦 Другое</option>
-                    </select>
-                </div>
-                <div class="form-group">
-                    <label class="form-label">Название *</label>
-                    <input type="text" class="input-field" id="productName" placeholder="Название товара" required>
-                </div>
-                <div class="form-group">
-                    <label class="form-label">Описание</label>
-                    <textarea class="input-field" id="productDescription" placeholder="Описание товара" rows="2"></textarea>
-                </div>
-                <div class="form-group">
-                    <label class="form-label">Цена без скидки, сум *</label>
-                    <input type="number" class="input-field" id="productOriginalPrice" placeholder="0" required min="0">
-                </div>
-                <div class="form-group">
-                    <label class="form-label">Скидка, %</label>
-                    <input type="number" class="input-field" id="productDiscount" placeholder="0" value="0" min="0" max="99" onchange="calculateDiscountPrice()">
-                </div>
-                <div class="form-group">
-                    <label class="form-label">Цена со скидкой, сум *</label>
-                    <input type="number" class="input-field" id="productPrice" placeholder="0" required min="0">
-                </div>
-                <div class="form-group">
-                    <label class="form-label">Единица измерения *</label>
-                    <select class="input-field" id="productUnit" required>
-                        <option value="шт" selected>шт (штуки)</option>
-                        <option value="кг">кг (килограммы)</option>
-                        <option value="л">л (литры)</option>
-                        <option value="уп">уп (упаковки)</option>
-                    </select>
-                </div>
-                <div class="form-group">
-                    <label class="form-label">Количество *</label>
-                    <input type="number" class="input-field" id="productStock" placeholder="0" required min="0">
-                </div>
-                <div class="form-group">
-                    <label class="form-label">Срок годности</label>
-                    <input type="date" class="input-field" id="productExpiry">
-                </div>
-                <button type="submit" class="save-btn">Сохранить</button>
-                <button type="button" class="btn-outline" style="width: 100%; margin-top: 8px;" onclick="closeModal()">Отмена</button>
-            </form>
-        </div>
-    </div>
+    </main>
 
     <!-- Bottom Navigation -->
+    <nav class="bottom-nav">
     <nav class="bottom-nav">
         <button class="nav-item active" onclick="switchView('dashboard')">
             <span class="nav-icon"><i data-lucide="home"></i></span>
