@@ -1,7 +1,7 @@
 import psycopg
 
 DB_URL = (
-    "postgresql://postgres:joXsidsEFuGPOyxZEVTcUMZcNuZtdknG@shuttle.proxy.rlwy.net:42576/railway"
+    "postgresql://postgres:AlIcvvweODzccngRJbskNqLIoyzxCtmS@tramway.proxy.rlwy.net:36557/railway"
 )
 
 try:

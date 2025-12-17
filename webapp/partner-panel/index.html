@@ -2003,7 +2003,7 @@
         // Show debug info ONLY in dev mode or if explicitly enabled
         // In production, users should not see technical auth details
         const showDebugOverlay = isDev || urlParams.get('debug') === 'true';
-        
+
         if (!initData && showDebugOverlay) {
             console.warn('⚠️ No initData - showing debug overlay (dev mode only)');
             setTimeout(() => {
@@ -2029,9 +2029,6 @@
         }
 
         const API = 'https://fudly-bot-production.up.railway.app/api/partner';
-
-        // Dev mode detection
-        const isDev = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
 
         const getAuth = () => {
             if (!initData) {
@@ -2258,6 +2255,16 @@
                     todayOrdersEl.textContent = stats?.orders || 0;
                 } else {
                     console.warn('⚠️ Element #todayOrders not found');
+                }
+
+                // ✅ FIX: Update pending orders count in stats card
+                const pending = orders.filter(o => o.status === 'pending');
+                const pendingOrdersEl = document.getElementById('pendingOrders');
+                if (pendingOrdersEl) {
+                    pendingOrdersEl.textContent = pending.length;
+                    console.log(`✅ Updated pendingOrders: ${pending.length}`);
+                } else {
+                    console.warn('⚠️ Element #pendingOrders not found');
                 }
 
                 allOrders = orders || [];
@@ -2492,7 +2499,7 @@
             // Find button from the order card
             const orderCard = document.querySelector(`.order-card:has([onclick*="confirmOrder(${id}"])`);
             const btn = orderCard?.querySelector('.btn-success');
-            
+
             if (btn) {
                 btn.disabled = true;
                 btn.innerHTML = '<div class="spinner-sm"></div> Обработка...';
@@ -2503,11 +2510,11 @@
                     method: 'POST',
                     headers: { 'Authorization': getAuth() }
                 });
-                
+
                 if (!response.ok) {
                     throw new Error(`HTTP ${response.status}`);
                 }
-                
+
                 toast('Заказ подтверждён', 'success');
                 await loadDashboard();
             } catch (e) {
@@ -2522,10 +2529,10 @@
 
         async function cancelOrder(id, type) {
             if (!confirm('Отменить заказ?')) return;
-            
+
             const orderCard = document.querySelector(`.order-card:has([onclick*="cancelOrder(${id}"])`);
             const btn = orderCard?.querySelector('.btn-danger, .btn-outline');
-            
+
             if (btn) {
                 btn.disabled = true;
                 btn.innerHTML = '<div class="spinner-sm"></div> Отмена...';
@@ -2536,11 +2543,11 @@
                     method: 'POST',
                     headers: { 'Authorization': getAuth() }
                 });
-                
+
                 if (!response.ok) {
                     throw new Error(`HTTP ${response.status}`);
                 }
-                
+
                 toast('Заказ отменён', 'warning');
                 await loadDashboard();
             } catch (e) {
@@ -2556,7 +2563,7 @@
         async function updateOrderStatus(id, type, status) {
             const orderCard = document.querySelector(`.order-card:has([onclick*="updateOrderStatus(${id}"])`);
             const btn = orderCard?.querySelector('.btn-primary, .btn-success');
-            
+
             if (btn) {
                 btn.disabled = true;
                 btn.innerHTML = '<div class="spinner-sm"></div>';
@@ -2567,11 +2574,11 @@
                     method: 'POST',
                     headers: { 'Authorization': getAuth() }
                 });
-                
+
                 if (!response.ok) {
                     throw new Error(`HTTP ${response.status}`);
                 }
-                
+
                 toast('Статус обновлён', 'success');
                 await loadDashboard();
             } catch (e) {
@@ -2795,7 +2802,7 @@
             if (!btn) {
                 // Fallback: find button in product card
                 const card = document.querySelector(`[data-product-id="${productId}"]`);
-                btn = delta > 0 
+                btn = delta > 0
                     ? card?.querySelector('.stock-btn:last-child')
                     : card?.querySelector('.stock-btn:first-child');
             }
@@ -2849,12 +2856,12 @@
                     if (stockValueEl) {
                         stockValueEl.textContent = `${newStock} ${product.unit}`;
                     }
-                    
+
                     // Update status badge
                     const statusEl = card.querySelector('.product-status');
                     if (statusEl) {
                         statusEl.className = `product-status ${product.status}`;
-                        statusEl.textContent = product.status === 'active' ? 'Активен' 
+                        statusEl.textContent = product.status === 'active' ? 'Активен'
                             : product.status === 'hidden' ? 'Скрыт' : 'Нет в наличии';
                     }
                 }
@@ -3043,7 +3050,7 @@
         function closeModal() {
             const modal = document.getElementById('addProductModal');
             modal.classList.remove('show');
-            
+
             // Clear edit state
             delete modal.dataset.editId;
             delete modal.dataset.currentPhotoId;
@@ -3052,7 +3059,7 @@
             document.getElementById('imagePreview').classList.add('hidden');
             document.getElementById('imagePreview').src = '';
             document.getElementById('uploadPlaceholder').style.display = 'block';
-            
+
             // Clear file input
             document.getElementById('productPhoto').value = '';
 
@@ -3096,7 +3103,7 @@
             const modal = document.getElementById('addProductModal');
             const editId = modal.dataset.editId;
             const isEdit = editId && editId !== 'undefined' && editId !== '';
-            
+
             console.log(`📝 Form submit: isEdit=${isEdit}, editId=${editId}`);
 
             try {
@@ -3176,7 +3183,7 @@
 
                 const endpoint = isEdit ? `/products/${editId}` : '/products';
                 const method = isEdit ? 'PATCH' : 'POST';
-                
+
                 console.log(`📤 Sending ${method} to ${endpoint}`);
                 console.log('📦 FormData entries:');
                 for (let [key, value] of formData.entries()) {
@@ -3216,13 +3223,13 @@
         async function editProduct(id) {
             try {
                 console.log(`✏️ Edit product: ${id}`);
-                
+
                 const product = allProducts.find(p => p.id === id);
                 if (!product) {
                     toast('Товар не найден', 'error');
                     return;
                 }
-                
+
                 console.log('📦 Product data:', product);
 
                 // Reset form first
@@ -3272,7 +3279,7 @@
                 modal.dataset.editId = String(id);  // Ensure it's a string
                 modal.dataset.currentPhotoId = product.photo_id || '';
                 modal.classList.add('show');
-                
+
                 console.log(`✅ Modal opened with editId: ${modal.dataset.editId}`);
 
                 // Change modal title
@@ -3375,15 +3382,15 @@
                     // Update revenue card
                     const revenueValue = statCards[0]?.querySelector('.stat-value');
                     if (revenueValue) revenueValue.textContent = formatPrice(stats.revenue || 0);
-                    
-                    // Update orders card  
+
+                    // Update orders card
                     const ordersValue = statCards[1]?.querySelector('.stat-value');
                     if (ordersValue) ordersValue.textContent = stats.orders || 0;
-                    
+
                     // Update items sold card
                     const itemsValue = statCards[2]?.querySelector('.stat-value');
                     if (itemsValue) itemsValue.textContent = stats.items_sold || 0;
-                    
+
                     // Update avg ticket card
                     const avgValue = statCards[3]?.querySelector('.stat-value');
                     if (avgValue) avgValue.textContent = formatPrice(stats.avg_ticket || 0);
@@ -3491,11 +3498,11 @@
 
             // Top Products Chart
             const productsCtx = document.getElementById('productsChart').getContext('2d');
-            
+
             // Extract product names and quantities from API data
             const productNames = data.topProducts.map(p => p.name || 'Unknown');
             const productQuantities = data.topProducts.map(p => p.qty || 0);
-            
+
             charts.products = new Chart(productsCtx, {
                 type: 'bar',
                 data: {
@@ -3540,13 +3547,13 @@
                 if (storeAddressEl && profile?.store?.address) {
                     storeAddressEl.textContent = profile.store.address;
                 }
-                
+
                 // Also update store phone if available
                 const storePhoneEl = document.getElementById('storePhone');
                 if (storePhoneEl && profile?.store?.phone) {
                     storePhoneEl.textContent = profile.store.phone;
                 }
-                
+
                 // Update store status toggle based on is_open from API
                 const storeStatusToggle = document.getElementById('storeStatus');
                 if (storeStatusToggle && profile?.store) {
@@ -3566,23 +3573,23 @@
             const toggle = document.getElementById('storeStatus');
             toggle.classList.toggle('active');
             const isActive = toggle.classList.contains('active');
-            
+
             try {
                 const formData = new FormData();
                 formData.append('is_open', isActive ? 'true' : 'false');
-                
+
                 const response = await fetch(`${API}/store/status`, {
                     method: 'PATCH',
                     headers: { 'Authorization': getAuth() },
                     body: formData
                 });
-                
+
                 if (!response.ok) {
                     // Revert toggle on error
                     toggle.classList.toggle('active');
                     throw new Error('Failed to update status');
                 }
-                
+
                 toast(isActive ? 'Магазин открыт' : 'Магазин закрыт', 'success');
             } catch (error) {
                 console.error('Error toggling store status:', error);
