@@ -383,9 +383,9 @@
 
             try {
                 const [store, orders, products] = await Promise.all([
-                    apiFetch('/partner/store'),
-                    apiFetch('/partner/orders'),
-                    apiFetch('/partner/products')
+                    apiFetch('/api/partner/store'),
+                    apiFetch('/api/partner/orders'),
+                    apiFetch('/api/partner/products')
                 ]);
 
                 state.store = store;
@@ -472,7 +472,7 @@
         async function loadOrders() {
             showLoading();
             try {
-                state.orders = await apiFetch('/partner/orders');
+                state.orders = await apiFetch('/api/partner/orders');
                 renderOrders();
             } catch (error) {
                 toast('Ошибка загрузки заказов', 'error');
@@ -693,7 +693,7 @@
         async function loadProducts() {
             showLoading();
             try {
-                state.products = await apiFetch('/partner/products');
+                state.products = await apiFetch('/api/partner/products');
                 renderProducts();
             } catch (error) {
                 toast('Ошибка загрузки товаров', 'error');
@@ -888,11 +888,7 @@
                     });
                     toast('Товар обновлен', 'success');
                 } else {
-                    await apiFetch('/partner/products', {
-                        method: 'POST',
-                        body: JSON.stringify(data)
-                    });
-                    toast('Товар добавлен', 'success');
+                await apiFetch('/api/partner/products', {
                 }
 
                 document.querySelector('.modal-overlay').remove();
@@ -1133,8 +1129,8 @@
             };
 
             try {
-                await apiFetch('/partner/store', {
-                    method: 'PATCH',
+                await apiFetch('/api/partner/store', {
+                    method: 'PUT',
                     body: JSON.stringify(data)
                 });
 
@@ -1153,8 +1149,8 @@
         async function toggleStoreStatus() {
             try {
                 const newStatus = !state.store?.is_open;
-                await apiFetch('/partner/store', {
-                    method: 'PATCH',
+                await apiFetch('/api/partner/store', {
+                    method: 'PUT',
                     body: JSON.stringify({ is_open: newStatus })
                 });
 
