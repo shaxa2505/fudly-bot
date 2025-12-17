@@ -23,7 +23,39 @@ __all__ = [
     "get_user_field",
     "format_booking_code",
     "calculate_total",
+    "format_price",
 ]
+
+
+def format_price(amount_in_kopeks: int | float, lang: str = "ru") -> str:
+    """
+    Format price from kopeks (stored in DB) to human-readable format.
+    
+    Args:
+        amount_in_kopeks: Price in kopeks (1 sum = 100 kopeks)
+        lang: Language code ('uz' or 'ru')
+    
+    Returns:
+        Formatted price string like "35 000 сум" or "35 000 so'm"
+    
+    Example:
+        >>> format_price(3500000, "ru")
+        '35 000 сум'
+        >>> format_price(3500000, "uz")
+        '35 000 so'm'
+    """
+    if not amount_in_kopeks and amount_in_kopeks != 0:
+        amount_in_kopeks = 0
+    
+    # Convert kopeks to sums
+    amount_in_sums = int(amount_in_kopeks) // 100
+    
+    # Format with spaces as thousand separators
+    formatted = f"{amount_in_sums:,}".replace(",", " ")
+    
+    # Add currency suffix
+    currency = "so'm" if lang == "uz" else "сум"
+    return f"{formatted} {currency}"
 
 
 async def safe_edit_reply_markup(message: types.Message | None, reply_markup: Any = None) -> None:

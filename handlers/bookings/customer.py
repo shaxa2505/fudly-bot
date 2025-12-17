@@ -15,6 +15,7 @@ from app.core.constants import OFFERS_PER_PAGE
 from app.keyboards import cancel_keyboard, main_menu_customer, phone_request_keyboard
 from handlers.common.states import BookOffer, OrderDelivery, Registration
 from handlers.common.utils import is_main_menu_button
+from handlers.bookings.utils import format_price
 from localization import get_text
 from logging_config import logger
 
@@ -100,13 +101,17 @@ def build_order_card_text(
     lines.append("─" * 25)
 
     # Price with discount - same style as product card
+    # Convert from kopeks to sums for display
+    price_sums = int(price) // 100
+    original_price_sums = int(original_price) // 100 if original_price else 0
+    
     if original_price and original_price > price:
         discount_pct = round((1 - price / original_price) * 100)
         lines.append(
-            f"<s>{int(original_price):,}</s> → <b>{int(price):,}</b> {currency} (-{discount_pct}%)"
+            f"<s>{original_price_sums:,}</s> → <b>{price_sums:,}</b> {currency} (-{discount_pct}%)"
         )
     else:
-        lines.append(f"💰 <b>{int(price):,}</b> {currency}")
+        lines.append(f"💰 <b>{price_sums:,}</b> {currency}")
 
     lines.append("─" * 25)
     lines.append("")
@@ -139,7 +144,8 @@ def build_order_card_text(
         lines.append("")
         # Show delivery price
         delivery_label = "Yetkazish" if lang == "uz" else "Доставка"
-        lines.append(f"🚚 {delivery_label}: {delivery_price:,} {currency}")
+        delivery_price_sums = int(delivery_price) // 100
+        lines.append(f"🚚 {delivery_label}: {delivery_price_sums:,} {currency}")
 
         # Pickup option
         pickup_label = "Olib ketish" if lang == "uz" else "Самовывоз"

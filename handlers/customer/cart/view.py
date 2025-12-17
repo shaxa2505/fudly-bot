@@ -45,11 +45,13 @@ async def _build_cart_view(user_id: int) -> tuple[str, InlineKeyboardBuilder] | 
 
     total = 0
     for i, item in enumerate(items, 1):
-        subtotal = int(item.price * item.quantity)
+        # Convert kopeks to sums for display
+        price_sums = int(item.price) // 100
+        subtotal = price_sums * item.quantity
         total += subtotal
         lines.append(f"\n<b>{i}. {esc(item.title)}</b>")
         lines.append(
-            f"   {item.quantity} × {int(item.price):,} = <b>{subtotal:,}</b> {currency}"
+            f"   {item.quantity} × {price_sums:,} = <b>{subtotal:,}</b> {currency}"
         )
         lines.append(f"   🏪 {esc(item.store_name)}")
 

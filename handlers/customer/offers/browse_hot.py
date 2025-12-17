@@ -298,10 +298,10 @@ def register_hot(
 
         if discount_pct > 0:
             lines.append(
-                f"<s>{int(offer.original_price):,}</s> → <b>{int(offer.discount_price):,} {currency}</b> (-{discount_pct}%)"
+                f"<s>{int(offer.original_price) // 100:,}</s> → <b>{int(offer.discount_price) // 100:,} {currency}</b> (-{discount_pct}%)"
             )
         else:
-            lines.append(f"💰 <b>{int(offer.discount_price):,} {currency}</b>")
+            lines.append(f"💰 <b>{int(offer.discount_price) // 100:,} {currency}</b>")
 
         # Use actual unit from offer, fallback to dona/шт
         unit_label = offer.unit if offer.unit else ("dona" if lang == "uz" else "шт")
@@ -324,7 +324,7 @@ def register_hot(
         # Delivery/pickup options
         lines.append("")
         if delivery_enabled:
-            lines.append(f"🚚 {delivery_label}: {int(delivery_price):,} {currency}")
+            lines.append(f"🚚 {delivery_label}: {int(delivery_price) // 100:,} {currency}")
             lines.append(f"🏪 {pickup_label}: {free_label}")
         else:
             lines.append(f"🏪 {pickup_only}")
