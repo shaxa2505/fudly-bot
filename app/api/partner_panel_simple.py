@@ -287,7 +287,8 @@ async def list_products(authorization: str = Header(None), status: Optional[str]
     """
     List partner's products with frontend-compatible field names.
 
-    Returns prices in RUBLES (converted from kopeks for display).
+    Returns prices in SUMS (converted from kopeks for display).
+    1 sum = 100 kopeks stored in DB.
     Maps DB fields to frontend expectations: offer_id→id, title→name, quantity→stock, etc.
     """
     telegram_id = verify_telegram_webapp(authorization)
@@ -343,8 +344,8 @@ async def create_product(
     authorization: str = Header(None),
     title: str = Form(...),
     category: str = Form("other"),
-    original_price: int = Form(...),  # Now required in rubles
-    discount_price: int = Form(...),  # In rubles
+    original_price: int = Form(...),  # Now required in SUMS
+    discount_price: int = Form(...),  # In SUMS
     quantity: int = Form(...),
     unit: str = Form("шт"),
     expiry_date: Optional[str] = Form(None),
@@ -354,7 +355,8 @@ async def create_product(
     """
     Create new product with unified schema.
 
-    Prices are accepted in RUBLES (user-friendly) and converted to kopeks internally.
+    Prices are accepted in SUMS (user-friendly) and converted to kopeks internally.
+    1 sum = 100 kopeks for precise calculation.
     Times are generated automatically (08:00 - 23:00).
     Validation happens via Pydantic models.
     """
@@ -390,13 +392,13 @@ async def create_product(
         expiry = (now + timedelta(days=7)).date()
 
     try:
-        # Validate with Pydantic model (converts rubles to kopeks)
+        # Validate with Pydantic model (converts sums to kopeks)
         offer_data = OfferCreate(
             store_id=store["store_id"],
             title=title,
             description=description or title,
-            original_price=original_price * 100,  # Convert rubles → kopeks
-            discount_price=discount_price * 100,  # Convert rubles → kopeks
+            original_price=original_price * 100,  # Convert sums → kopeks
+            discount_price=discount_price * 100,  # Convert sums → kopeks
             quantity=quantity,
             available_from=available_from,
             available_until=available_until,
@@ -437,8 +439,8 @@ async def update_product(
     authorization: str = Header(None),
     title: Optional[str] = Form(None),
     category: Optional[str] = Form(None),
-    original_price: Optional[int] = Form(None),  # In rubles
-    discount_price: Optional[int] = Form(None),  # In rubles
+    original_price: Optional[int] = Form(None),  # In SUMS
+    discount_price: Optional[int] = Form(None),  # In SUMS
     quantity: Optional[int] = Form(None),
     unit: Optional[str] = Form(None),
     expiry_date: Optional[str] = Form(None),
@@ -450,7 +452,8 @@ async def update_product(
     Update product (supports partial updates for quick actions).
     Accepts both PUT and PATCH methods.
 
-    Prices accepted in RUBLES and converted to kopeks internally.
+    Prices accepted in SUMS and converted to kopeks internally.
+    1 sum = 100 kopeks.
     """
     telegram_id = verify_telegram_webapp(authorization)
     user, store = get_partner_with_store(telegram_id)
@@ -475,12 +478,12 @@ async def update_product(
 
     if original_price is not None:
         update_fields.append("original_price = %s")
-        # Convert rubles → kopeks
+        # Convert sums → kopeks
         update_values.append(original_price * 100 if original_price > 0 else None)
 
     if discount_price is not None:
         update_fields.append("discount_price = %s")
-        # Convert rubles → kopeks
+        # Convert sums → kopeks
         update_values.append(discount_price * 100)
 
     if quantity is not None:

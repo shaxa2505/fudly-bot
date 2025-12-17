@@ -1900,7 +1900,7 @@
                     <textarea class="input-field" id="productDescription" placeholder="Описание товара" rows="2"></textarea>
                 </div>
                 <div class="form-group">
-                    <label class="form-label">Цена без скидки, ₽ *</label>
+                    <label class="form-label">Цена без скидки, сум *</label>
                     <input type="number" class="input-field" id="productOriginalPrice" placeholder="0" required min="0">
                 </div>
                 <div class="form-group">
@@ -1908,7 +1908,7 @@
                     <input type="number" class="input-field" id="productDiscount" placeholder="0" value="0" min="0" max="99" onchange="calculateDiscountPrice()">
                 </div>
                 <div class="form-group">
-                    <label class="form-label">Цена со скидкой, ₽ *</label>
+                    <label class="form-label">Цена со скидкой, сум *</label>
                     <input type="number" class="input-field" id="productPrice" placeholder="0" required min="0">
                 </div>
                 <div class="form-group">
@@ -3328,7 +3328,7 @@
                 data: {
                     labels: ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'],
                     datasets: [{
-                        label: 'Выручка, ₽',
+                        label: 'Выручка, сум',
                         data: data.revenue,
                         borderColor: '#FF6B35',
                         backgroundColor: 'rgba(255, 107, 53, 0.1)',
