@@ -45,7 +45,7 @@ class SearchMixin:
                 o.available_from, o.available_until, o.expiry_date,
                 o.status, o.photo_id as photo, o.created_at, o.unit,
                 s.name as store_name, s.address, s.category as store_category,
-                CAST((1.0 - o.discount_price::float / o.original_price::float) * 100 AS INTEGER) as discount_percent,
+                CASE WHEN o.original_price > 0 THEN CAST((1.0 - o.discount_price::numeric / o.original_price::numeric) * 100 AS INTEGER) ELSE 0 END as discount_percent,
                 s.delivery_enabled, s.delivery_price, s.min_order_amount,
                 (
                     CASE WHEN LOWER(o.title) = LOWER(%s) THEN 100 ELSE 0 END +

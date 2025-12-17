@@ -205,7 +205,7 @@ class OfferMixin:
             query = """
                 SELECT o.*, s.name as store_name, s.address, s.city, s.category as store_category,
                        s.delivery_enabled, s.delivery_price, s.min_order_amount,
-                       CAST((1.0 - o.discount_price::float / o.original_price::float) * 100 AS INTEGER) as discount_percent
+                       CASE WHEN o.original_price > 0 THEN CAST((1.0 - o.discount_price::numeric / o.original_price::numeric) * 100 AS INTEGER) ELSE 0 END as discount_percent
                 FROM offers o
                 JOIN stores s ON o.store_id = s.store_id
                 WHERE o.status = 'active'
