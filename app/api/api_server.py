@@ -15,11 +15,12 @@ from typing import Any
 import uvicorn
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, Response
 from fastapi.staticfiles import StaticFiles
 from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 from slowapi.util import get_remote_address
+from starlette.datastructures import Headers
 
 from app.api.auth import router as auth_router
 from app.api.auth import set_auth_db
@@ -31,6 +32,24 @@ from app.api.webapp_api import router as webapp_router
 from app.api.webapp_api import set_db_instance
 
 logger = logging.getLogger(__name__)
+
+
+# 🔥 Custom StaticFiles that ignores cache headers
+class NoCacheStaticFiles(StaticFiles):
+    """StaticFiles that always returns fresh files, ignoring If-None-Match/If-Modified-Since"""
+
+    async def __call__(self, scope, receive, send):
+        # Remove conditional cache headers from request
+        if scope["type"] == "http":
+            headers = dict(scope.get("headers", []))
+            # Remove cache validation headers
+            headers.pop(b"if-none-match", None)
+            headers.pop(b"if-modified-since", None)
+            scope["headers"] = list(headers.items())
+
+        # Call parent
+        await super().__call__(scope, receive, send)
+
 
 # Global reference to the bot's database
 _app_db = None
@@ -128,38 +147,6 @@ def create_api_app(db: Any = None, offer_service: Any = None, bot_token: str = N
         expose_headers=["Content-Length", "Content-Type"],
     )
 
-    # 🔥 CACHE FIX: Prevent 304 responses by removing conditional headers BEFORE StaticFiles
-    @app.middleware("http")
-    async def disable_static_cache(request: Request, call_next):
-        # For Partner Panel static files, remove conditional headers to force fresh response
-        if (
-            request.url.path.startswith("/partner-panel/")
-            or request.url.path.startswith("/styles/")
-            or request.url.path.startswith("/js/")
-        ):
-            if any(ext in request.url.path for ext in [".css", ".js", ".html"]):
-                # Remove conditional request headers to prevent StaticFiles from returning 304
-                request._headers = [
-                    (name, value)
-                    for name, value in request._headers
-                    if name.lower() not in (b"if-none-match", b"if-modified-since")
-                ]
-
-        response = await call_next(request)
-
-        # Set no-cache headers on response
-        if (
-            request.url.path.startswith("/partner-panel/")
-            or request.url.path.startswith("/styles/")
-            or request.url.path.startswith("/js/")
-        ):
-            if any(ext in request.url.path for ext in [".css", ".js", ".html"]):
-                response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate, max-age=0"
-                response.headers["Pragma"] = "no-cache"
-                response.headers["Expires"] = "0"
-
-        return response
-
     # Define static file paths (needed for debug endpoint)
     webapp_dist_path = Path(__file__).parent.parent.parent / "webapp" / "dist"
     partner_panel_path = Path(__file__).parent.parent.parent / "webapp" / "partner-panel"
@@ -213,22 +200,22 @@ def create_api_app(db: Any = None, offer_service: Any = None, bot_token: str = N
 
     # Mount Partner Panel FIRST (more specific path)
     if partner_panel_path.exists() and (partner_panel_path / "index.html").exists():
-        # Mount static assets (CSS, JS, images) separately for proper caching
+        # Mount static assets with NoCacheStaticFiles to prevent 304 responses
         app.mount(
             "/partner-panel/styles",
-            StaticFiles(directory=str(partner_panel_path / "styles")),
+            NoCacheStaticFiles(directory=str(partner_panel_path / "styles")),
             name="partner-panel-styles",
         )
         app.mount(
             "/partner-panel/js",
-            StaticFiles(directory=str(partner_panel_path / "js")),
+            NoCacheStaticFiles(directory=str(partner_panel_path / "js")),
             name="partner-panel-js",
         )
 
         # Mount main app with HTML fallback
         app.mount(
             "/partner-panel",
-            StaticFiles(directory=str(partner_panel_path), html=True),
+            NoCacheStaticFiles(directory=str(partner_panel_path), html=True),
             name="partner-panel",
         )
         logger.info(f"✅ Partner Panel mounted at /partner-panel from {partner_panel_path}")
