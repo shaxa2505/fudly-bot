@@ -67,35 +67,35 @@ export async function apiFetch(endpoint, options = {}) {
 // Products API
 export const productsAPI = {
     async getAll() {
-        return apiFetch('/api/seller/products');
+        return apiFetch('/api/partner/products');
     },
 
     async getById(id) {
-        return apiFetch(`/api/seller/products/${id}`);
+        return apiFetch(`/api/partner/products/${id}`);
     },
 
     async create(product) {
-        return apiFetch('/api/seller/products', {
+        return apiFetch('/api/partner/products', {
             method: 'POST',
             body: JSON.stringify(product)
         });
     },
 
     async update(id, product) {
-        return apiFetch(`/api/seller/products/${id}`, {
+        return apiFetch(`/api/partner/products/${id}`, {
             method: 'PUT',
             body: JSON.stringify(product)
         });
     },
 
     async delete(id) {
-        return apiFetch(`/api/seller/products/${id}`, {
+        return apiFetch(`/api/partner/products/${id}`, {
             method: 'DELETE'
         });
     },
 
     async updateStock(id, quantity) {
-        return apiFetch(`/api/seller/products/${id}/stock`, {
+        return apiFetch(`/api/partner/products/${id}`, {
             method: 'PATCH',
             body: JSON.stringify({ quantity })
         });
@@ -103,11 +103,11 @@ export const productsAPI = {
 
     async uploadImage(file) {
         const formData = new FormData();
-        formData.append('image', file);
+        formData.append('photo', file);
 
         const { data: initData } = getAuth();
 
-        const response = await fetch(`${API_BASE}/api/seller/products/upload-image`, {
+        const response = await fetch(`${API_BASE}/api/partner/upload-photo`, {
             method: 'POST',
             headers: {
                 'X-Telegram-Init-Data': initData || ''
@@ -127,24 +127,25 @@ export const productsAPI = {
 export const ordersAPI = {
     async getAll(status = null) {
         const url = status
-            ? `/api/seller/orders?status=${status}`
-            : '/api/seller/orders';
+            ? `/api/partner/orders?status=${status}`
+            : '/api/partner/orders';
         return apiFetch(url);
     },
 
     async getById(id) {
-        return apiFetch(`/api/seller/orders/${id}`);
+        return apiFetch(`/api/partner/orders/${id}`);
     },
 
     async updateStatus(id, status) {
-        return apiFetch(`/api/seller/orders/${id}/status`, {
-            method: 'PATCH',
-            body: JSON.stringify({ status })
+        return apiFetch(`/api/partner/orders/${id}/status?status=${status}`, {
+            method: 'POST'
         });
     },
 
     async confirm(id) {
-        return this.updateStatus(id, 'confirmed');
+        return apiFetch(`/api/partner/orders/${id}/confirm`, {
+            method: 'POST'
+        });
     },
 
     async ready(id) {
@@ -152,7 +153,7 @@ export const ordersAPI = {
     },
 
     async cancel(id, reason = '') {
-        return apiFetch(`/api/seller/orders/${id}/cancel`, {
+        return apiFetch(`/api/partner/orders/${id}/cancel`, {
             method: 'POST',
             body: JSON.stringify({ reason })
         });
@@ -162,33 +163,33 @@ export const ordersAPI = {
 // Statistics API
 export const statsAPI = {
     async getDashboard(period = 'today') {
-        return apiFetch(`/api/seller/stats/dashboard?period=${period}`);
+        return apiFetch(`/api/partner/stats?period=${period}`);
     },
 
     async getRevenue(period = 'week') {
-        return apiFetch(`/api/seller/stats/revenue?period=${period}`);
+        return apiFetch(`/api/partner/stats?period=${period}`);
     },
 
     async getProducts() {
-        return apiFetch('/api/seller/stats/products');
+        return apiFetch('/api/partner/stats?period=month');
     }
 };
 
 // Store API
 export const storeAPI = {
     async getInfo() {
-        return apiFetch('/api/seller/store/info');
+        return apiFetch('/api/partner/store');
     },
 
     async updateInfo(data) {
-        return apiFetch('/api/seller/store/info', {
+        return apiFetch('/api/partner/store', {
             method: 'PUT',
             body: JSON.stringify(data)
         });
     },
 
     async updateStatus(isOpen) {
-        return apiFetch('/api/seller/store/status', {
+        return apiFetch('/api/partner/store/status', {
             method: 'PATCH',
             body: JSON.stringify({ is_open: isOpen })
         });

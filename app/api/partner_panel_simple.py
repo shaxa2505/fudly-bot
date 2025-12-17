@@ -294,6 +294,27 @@ async def get_profile(authorization: str = Header(None)):
     }
 
 
+# Store info endpoint (для frontend storeAPI.getInfo())
+@router.get("/store")
+async def get_store_info(authorization: str = Header(None)):
+    """Get store information for partner panel"""
+    telegram_id = verify_telegram_webapp(authorization)
+    user, store = get_partner_with_store(telegram_id)
+
+    return {
+        "store_id": store.get("store_id"),
+        "name": store.get("name"),
+        "address": store.get("address"),
+        "phone": store.get("phone"),
+        "description": store.get("description"),
+        "status": store.get("status"),
+        "is_open": store.get("status") in ("approved", "active", "open"),
+        "working_hours": store.get("working_hours") or "09:00 - 21:00",
+        "min_order": store.get("min_order") or 0,
+        "delivery_cost": store.get("delivery_cost") or 0,
+    }
+
+
 # Products endpoints
 @router.get("/products")
 async def list_products(authorization: str = Header(None), status: Optional[str] = None):

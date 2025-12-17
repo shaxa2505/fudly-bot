@@ -230,10 +230,11 @@
         <!-- Orders List -->
         <div id="ordersList">
             <div class="loading"><div class="spinner"></div></div>
+        </div>
+        </section>
     </main>
 
     <!-- Bottom Navigation -->
-    <nav class="bottom-nav">
     <nav class="bottom-nav">
         <button class="nav-item active" onclick="switchView('dashboard')">
             <span class="nav-icon"><i data-lucide="home"></i></span>
@@ -666,9 +667,8 @@
 
         async function updateOrderStatus(orderId, newStatus) {
             try {
-                await apiFetch(`/partner/orders/${orderId}`, {
-                    method: 'PATCH',
-                    body: JSON.stringify({ status: newStatus })
+                await apiFetch(`/api/partner/orders/${orderId}/status?status=${newStatus}`, {
+                    method: 'POST'
                 });
 
                 // Update local state
@@ -882,18 +882,23 @@
 
             try {
                 if (productId) {
-                    await apiFetch(`/partner/products/${productId}`, {
+                    await apiFetch(`/api/partner/products/${productId}`, {
                         method: 'PUT',
                         body: JSON.stringify(data)
                     });
                     toast('Товар обновлен', 'success');
                 } else {
-                await apiFetch('/api/partner/products', {
+                    await apiFetch('/api/partner/products', {
+                        method: 'POST',
+                        body: JSON.stringify(data)
+                    });
+                    toast('Товар добавлен', 'success');
                 }
 
                 document.querySelector('.modal-overlay').remove();
                 loadProducts();
             } catch (error) {
+                console.error('Save product error:', error);
                 toast('Ошибка сохранения товара', 'error');
             }
         }
@@ -905,9 +910,9 @@
         async function toggleProductAvailability(id) {
             try {
                 const product = state.products.find(p => p.id === id);
-                await apiFetch(`/partner/products/${id}`, {
+                await apiFetch(`/api/partner/products/${id}/status`, {
                     method: 'PATCH',
-                    body: JSON.stringify({ is_available: !product.is_available })
+                    body: JSON.stringify({ status: product.is_available ? 'hidden' : 'active' })
                 });
 
                 product.is_available = !product.is_available;
@@ -922,7 +927,7 @@
             if (!confirm('Удалить товар?')) return;
 
             try {
-                await apiFetch(`/partner/products/${id}`, { method: 'DELETE' });
+                await apiFetch(`/api/partner/products/${id}`, { method: 'DELETE' });
                 state.products = state.products.filter(p => p.id !== id);
                 toast('Товар удален', 'success');
                 loadProducts();
