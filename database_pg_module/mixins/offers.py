@@ -265,21 +265,43 @@ class OfferMixin:
             cursor.execute(query, params)
             return cursor.fetchone()[0]
 
-    def get_offers_by_store(self, store_id: int):
-        """Get active offers for store with store info."""
+    def get_offers_by_store(self, store_id: int, include_all: bool = False):
+        """
+        Get offers for store with store info.
+        
+        Args:
+            store_id: The store ID
+            include_all: If True, includes out-of-stock and expired products (for partner panel).
+                        If False, only active products with stock (for customers).
+        """
         with self.get_connection() as conn:
             cursor = conn.cursor(row_factory=dict_row)
-            cursor.execute(
-                """
-                SELECT o.*, s.name, s.address, s.city, s.category as store_category, o.category as category
-                FROM offers o
-                JOIN stores s ON o.store_id = s.store_id
-                WHERE o.store_id = %s AND o.quantity > 0
-                AND (o.expiry_date IS NULL OR o.expiry_date >= CURRENT_DATE)
-                ORDER BY o.created_at DESC
-            """,
-                (store_id,),
-            )
+            
+            if include_all:
+                # Partner panel: show ALL products except deleted (inactive)
+                cursor.execute(
+                    """
+                    SELECT o.*, s.name, s.address, s.city, s.category as store_category, o.category as category
+                    FROM offers o
+                    JOIN stores s ON o.store_id = s.store_id
+                    WHERE o.store_id = %s AND o.status != 'inactive'
+                    ORDER BY o.created_at DESC
+                """,
+                    (store_id,),
+                )
+            else:
+                # Customer view: only active products with stock and not expired
+                cursor.execute(
+                    """
+                    SELECT o.*, s.name, s.address, s.city, s.category as store_category, o.category as category
+                    FROM offers o
+                    JOIN stores s ON o.store_id = s.store_id
+                    WHERE o.store_id = %s AND o.quantity > 0 AND o.status = 'active'
+                    AND (o.expiry_date IS NULL OR o.expiry_date >= CURRENT_DATE)
+                    ORDER BY o.created_at DESC
+                """,
+                    (store_id,),
+                )
             return [dict(row) for row in cursor.fetchall()]
 
     def get_top_offers_by_city(self, city: str, limit: int = 10):

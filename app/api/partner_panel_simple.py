@@ -145,7 +145,7 @@ def verify_telegram_webapp(authorization: str) -> int:
                 user_id = int(parsed.get("uid", 0))
                 if user_id > 0:
                     # URL auth is considered valid (bot provided the URL)
-                    # Check auth_date if present, but don't require it
+                    # Check auth_date if present for security
                     auth_date = parsed.get("auth_date")
                     if auth_date:
                         try:
@@ -153,12 +153,17 @@ def verify_telegram_webapp(authorization: str) -> int:
                             current_timestamp = int(datetime.now().timestamp())
                             age_seconds = current_timestamp - auth_timestamp
 
-                            # Allow up to 7 days for URL-based auth (more permissive)
-                            MAX_AUTH_AGE = 7 * 24 * 3600  # 7 days
+                            # Security: Allow up to 24 hours for URL-based auth
+                            MAX_AUTH_AGE = 24 * 3600  # 24 hours (reduced from 7 days)
                             if age_seconds > MAX_AUTH_AGE:
-                                logging.warning(f"⚠️ URL auth expired: {age_seconds}s old")
+                                logging.warning(f"⚠️ URL auth expired: {age_seconds}s old (max {MAX_AUTH_AGE}s)")
+                                raise HTTPException(
+                                    status_code=401,
+                                    detail=f"Session expired. Please reopen from Telegram bot."
+                                )
                             elif age_seconds < 0:
                                 logging.warning(f"⚠️ URL auth from future: {age_seconds}s")
+                                raise HTTPException(status_code=401, detail="Invalid auth timestamp")
                         except (ValueError, TypeError) as e:
                             logging.warning(f"⚠️ Invalid auth_date in URL auth: {auth_date} - {e}")
 
@@ -168,6 +173,8 @@ def verify_telegram_webapp(authorization: str) -> int:
                     return user_id
                 else:
                     raise ValueError("uid must be positive")
+            except HTTPException:
+                raise
             except (ValueError, TypeError) as e:
                 logging.error(f"❌ Invalid uid format: {parsed.get('uid')} - {e}")
                 raise HTTPException(status_code=401, detail=f"Invalid uid in URL: {e}")
@@ -275,6 +282,8 @@ async def get_profile(authorization: str = Header(None)):
             "phone": store_info.get("phone"),
             "description": store_info.get("description"),
             "store_id": store_info.get("store_id"),
+            "status": store_info.get("status"),
+            "is_open": store_info.get("status") in ("approved", "active", "open"),
         }
         if store_info
         else None,
@@ -295,7 +304,8 @@ async def list_products(authorization: str = Header(None), status: Optional[str]
     user, store = get_partner_with_store(telegram_id)
     db = get_db()
 
-    offers = db.get_offers_by_store(store["store_id"])
+    # Partner panel: show ALL products (including out-of-stock and expired)
+    offers = db.get_offers_by_store(store["store_id"], include_all=True)
 
     # Filter by status if provided
     if status and status != "all":
@@ -455,6 +465,9 @@ async def update_product(
     Prices accepted in SUMS and converted to kopeks internally.
     1 sum = 100 kopeks.
     """
+    import logging
+    logging.info(f"📦 Update product {product_id}: quantity={quantity}, title={title}, status={status}")
+    
     telegram_id = verify_telegram_webapp(authorization)
     user, store = get_partner_with_store(telegram_id)
     db = get_db()
@@ -489,10 +502,16 @@ async def update_product(
     if quantity is not None:
         update_fields.append("quantity = %s")
         update_values.append(quantity)
-        # Auto-update status based on quantity
+        # Auto-update status based on quantity (sync with frontend)
         if quantity <= 0 and status is None:
             update_fields.append("status = %s")
-            update_values.append("inactive")
+            update_values.append("out_of_stock")
+        elif quantity > 0 and status is None:
+            # Restore to active if was out_of_stock
+            current_offer = db.get_offer(product_id)
+            if current_offer and current_offer.get("status") == "out_of_stock":
+                update_fields.append("status = %s")
+                update_values.append("active")
 
     if unit is not None:
         update_fields.append("unit = %s")
@@ -934,7 +953,7 @@ async def update_order_status(
 # Stats endpoint
 @router.get("/stats")
 async def get_stats(authorization: str = Header(None), period: str = "today"):
-    """Get partner statistics"""
+    """Get partner statistics with daily breakdown for charts."""
     telegram_id = verify_telegram_webapp(authorization)
     user, store = get_partner_with_store(telegram_id)
     db = get_db()
@@ -973,6 +992,65 @@ async def get_stats(authorization: str = Header(None), period: str = "today"):
         offers = db.get_offers_by_store(store_id)
         active_products = len([o for o in offers if o.get("status") == "active"])
 
+    # Get daily breakdown for charts (last 7 days)
+    revenue_by_day = []
+    orders_by_day = []
+    top_products = []
+
+    try:
+        with db.get_connection() as conn:
+            cursor = conn.cursor()
+            
+            # Revenue and orders by day (last 7 days)
+            for i in range(6, -1, -1):
+                day_start = (now - timedelta(days=i)).replace(hour=0, minute=0, second=0, microsecond=0)
+                day_end = day_start.replace(hour=23, minute=59, second=59)
+                
+                cursor.execute(
+                    """
+                    SELECT 
+                        COALESCE(SUM(o.discount_price * b.quantity), 0) AS revenue,
+                        COUNT(DISTINCT b.booking_id) AS orders
+                    FROM bookings b
+                    JOIN offers o ON b.offer_id = o.offer_id
+                    WHERE o.store_id = %s
+                    AND b.status IN ('completed', 'confirmed')
+                    AND b.created_at >= %s AND b.created_at < %s
+                    """,
+                    (store_id, day_start, day_end)
+                )
+                row = cursor.fetchone()
+                revenue_by_day.append(float(row[0]) if row else 0)
+                orders_by_day.append(int(row[1]) if row else 0)
+            
+            # Top products (last 30 days)
+            cursor.execute(
+                """
+                SELECT o.title, SUM(b.quantity) as qty, SUM(o.discount_price * b.quantity) as revenue
+                FROM bookings b
+                JOIN offers o ON b.offer_id = o.offer_id
+                WHERE o.store_id = %s
+                AND b.status IN ('completed', 'confirmed')
+                AND b.created_at >= %s
+                GROUP BY o.offer_id, o.title
+                ORDER BY qty DESC
+                LIMIT 5
+                """,
+                (store_id, now - timedelta(days=30))
+            )
+            for row in cursor.fetchall():
+                top_products.append({
+                    "name": row[0],
+                    "qty": int(row[1]),
+                    "revenue": float(row[2])
+                })
+    except Exception as e:
+        import logging
+        logging.warning(f"Failed to get daily breakdown: {e}")
+        # Fallback to zeros
+        revenue_by_day = [0] * 7
+        orders_by_day = [0] * 7
+
     return {
         "period": period,
         "start": start.isoformat(),
@@ -982,6 +1060,10 @@ async def get_stats(authorization: str = Header(None), period: str = "today"):
         "items_sold": stats.totals.items_sold,
         "avg_ticket": float(stats.totals.avg_ticket) if stats.totals.avg_ticket else 0,
         "active_products": active_products,
+        # Daily breakdown for charts
+        "revenue_by_day": revenue_by_day,
+        "orders_by_day": orders_by_day,
+        "top_products": top_products,
     }
 
 
@@ -1012,6 +1094,25 @@ async def update_store(settings: dict, authorization: str = Header(None)):
         )
 
     return {"status": "updated"}
+
+
+@router.patch("/store/status")
+async def toggle_store_status(is_open: bool = Form(...), authorization: str = Header(None)):
+    """Toggle store open/closed status"""
+    telegram_id = verify_telegram_webapp(authorization)
+    user, store = get_partner_with_store(telegram_id)
+    db = get_db()
+
+    new_status = "approved" if is_open else "closed"
+    
+    with db.get_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute(
+            "UPDATE stores SET status = %s WHERE store_id = %s",
+            (new_status, store["store_id"])
+        )
+
+    return {"status": new_status, "is_open": is_open}
 
 
 # Photo upload endpoint
