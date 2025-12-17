@@ -2981,6 +2981,51 @@
             const isEdit = !!editId;
 
             try {
+                // Show loading
+                const submitBtn = e.target.querySelector('button[type="submit"]');
+                const originalText = submitBtn.textContent;
+                submitBtn.disabled = true;
+                submitBtn.innerHTML = '<div class="spinner-sm"></div> Сохранение...';
+
+                let photoId = null;
+
+                // Upload photo first if provided
+                const photoFile = document.getElementById('productPhoto').files[0];
+                if (photoFile) {
+                    try {
+                        submitBtn.innerHTML = '<div class="spinner-sm"></div> Загрузка фото...';
+                        
+                        const photoFormData = new FormData();
+                        photoFormData.append('photo', photoFile);
+
+                        const photoResponse = await fetch(`${API}/upload-photo`, {
+                            method: 'POST',
+                            headers: {
+                                'Authorization': getAuth()
+                            },
+                            body: photoFormData
+                        });
+
+                        if (!photoResponse.ok) {
+                            const error = await photoResponse.json().catch(() => ({}));
+                            throw new Error(error.detail || 'Ошибка загрузки фото');
+                        }
+
+                        const photoData = await photoResponse.json();
+                        photoId = photoData.file_id;
+                        console.log('✅ Photo uploaded, file_id:', photoId);
+                    } catch (photoError) {
+                        console.error('❌ Photo upload failed:', photoError);
+                        toast('Ошибка загрузки фото', 'error');
+                        submitBtn.disabled = false;
+                        submitBtn.textContent = originalText;
+                        return;
+                    }
+                }
+
+                // Now create/update product
+                submitBtn.innerHTML = '<div class="spinner-sm"></div> Сохранение товара...';
+
                 const formData = new FormData();
                 formData.append('title', document.getElementById('productName').value);
                 formData.append('description', document.getElementById('productDescription').value || '');
@@ -2989,16 +3034,12 @@
                 formData.append('category', 'other');
                 formData.append('unit', 'шт');
 
-                const photoFile = document.getElementById('productPhoto').files[0];
-                if (photoFile) {
-                    formData.append('photo', photoFile);
+                // Use new photo_id or keep existing one
+                if (photoId) {
+                    formData.append('photo_id', photoId);
+                } else if (isEdit && modal.dataset.currentPhotoId) {
+                    formData.append('photo_id', modal.dataset.currentPhotoId);
                 }
-
-                // Show loading
-                const submitBtn = e.target.querySelector('button[type="submit"]');
-                const originalText = submitBtn.textContent;
-                submitBtn.disabled = true;
-                submitBtn.innerHTML = '<div class="spinner-sm"></div> Сохранение...';
 
                 const endpoint = isEdit ? `/products/${editId}` : '/products';
                 const method = isEdit ? 'PATCH' : 'POST';
@@ -3012,18 +3053,19 @@
                 });
 
                 if (!response.ok) {
-                    throw new Error(`HTTP ${response.status}`);
+                    const errorData = await response.json().catch(() => ({}));
+                    throw new Error(errorData.detail || `HTTP ${response.status}`);
                 }
 
                 closeModal();
-                toast(isEdit ? 'Товар обновлен' : 'Товар добавлен', 'success');
+                toast(isEdit ? '✓ Товар обновлен' : '✓ Товар добавлен', 'success');
 
                 // Reload products
                 await loadProducts();
 
             } catch (error) {
                 console.error('❌ Error saving product:', error);
-                toast('Ошибка сохранения товара', 'error');
+                toast(error.message || 'Ошибка сохранения товара', 'error');
                 
                 // Restore button
                 const submitBtn = e.target.querySelector('button[type="submit"]');
@@ -3046,9 +3088,18 @@
                 document.getElementById('productPrice').value = product.price || 0;
                 document.getElementById('productStock').value = product.stock || 0;
 
-                // Store current product ID for update
+                // Show existing photo if available
+                if (product.image && product.image !== 'https://via.placeholder.com/120?text=Loading...') {
+                    const preview = document.getElementById('imagePreview');
+                    preview.src = product.image;
+                    preview.classList.remove('hidden');
+                    document.getElementById('uploadPlaceholder').style.display = 'none';
+                }
+
+                // Store current product ID and photo_id for update
                 const modal = document.getElementById('addProductModal');
                 modal.dataset.editId = id;
+                modal.dataset.currentPhotoId = product.photo_id || '';
                 modal.classList.add('show');
 
                 // Change modal title
