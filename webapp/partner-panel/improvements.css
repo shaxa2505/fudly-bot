@@ -535,11 +535,11 @@
     .products-grid {
         grid-template-columns: 1fr;
     }
-    
+
     .products-grid.compact .product-card.compact {
         flex-wrap: wrap;
     }
-    
+
     .quick-actions-bar {
         left: 0;
         padding: 12px;

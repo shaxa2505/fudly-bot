@@ -1815,7 +1815,7 @@
         .mt-lg { margin-top: var(--space-lg); }
         .mb-lg { margin-bottom: var(--space-lg); }
     </style>
-    
+
     <!-- UX Improvements Phase 1 -->
     <link rel="stylesheet" href="improvements.css">
 </head>
@@ -2826,6 +2826,11 @@
             } else if (view === 'products' && productsEl) {
                 productsEl.classList.remove('hidden');
                 loadProducts();
+
+                // Re-initialize view mode toggle when switching to products
+                if (typeof initViewModeToggle === 'function') {
+                    setTimeout(() => initViewModeToggle(), 100);
+                }
             } else if (view === 'stats' && statsEl) {
                 statsEl.classList.remove('hidden');
                 loadStatistics();
@@ -2906,6 +2911,14 @@
 
                 // Render immediately
                 renderProducts();
+
+                // Initialize/update UX improvements after products loaded
+                if (typeof updateFilterCounts === 'function') {
+                    updateFilterCounts();
+                }
+                if (typeof calculateProductMetrics === 'function') {
+                    calculateProductMetrics();
+                }
 
             } catch (error) {
                 console.error('❌ Error loading products:', error);
@@ -3239,7 +3252,7 @@
             if (typeof lucide !== 'undefined') {
                 lucide.createIcons();
             }
-            
+
             // Apply view mode if improvements loaded
             if (typeof applyViewMode === 'function' && typeof viewMode !== 'undefined') {
                 applyViewMode(viewMode);
@@ -3860,19 +3873,21 @@
             lucide.createIcons();
         }
     </script>
-    
+
     <!-- UX Improvements Phase 1 -->
     <script src="improvements.js"></script>
     <script>
-        // Initialize UX improvements after main init
+        // Initialize UX improvements when DOM is ready
         if (typeof initUXImprovements === 'function') {
-            // Wait for products to load first
-            const checkProductsLoaded = setInterval(() => {
-                if (allProducts && allProducts.length > 0) {
-                    clearInterval(checkProductsLoaded);
-                    initUXImprovements();
-                }
-            }, 100);
+            console.log('🎨 Initializing UX improvements...');
+            try {
+                initUXImprovements();
+                console.log('✅ UX improvements initialized');
+            } catch (error) {
+                console.error('❌ Error initializing UX improvements:', error);
+            }
+        } else {
+            console.warn('⚠️ initUXImprovements function not found');
         }
     </script>
 </body>

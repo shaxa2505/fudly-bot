@@ -139,9 +139,9 @@ return `
 ```javascript
 async function init() {
     // ... существующий код ...
-    
+
     await loadProducts(); // или другая функция загрузки
-    
+
     // ДОБАВИТЬ
     if (typeof initUXImprovements === 'function') {
         initUXImprovements();
@@ -156,11 +156,11 @@ async function init() {
 ```javascript
 function renderProducts() {
     // ... существующий код рендеринга ...
-    
+
     // ДОБАВИТЬ в конце
     updateFilterCounts();
     applyViewMode(viewMode);
-    
+
     // Делаем цены редактируемыми
     allProducts.forEach(p => makePriceEditable(p.id));
 }
@@ -176,7 +176,7 @@ function renderProducts() {
 
 ```html
 <div class="product-actions">
-    <button class="action-btn" onclick="event.stopPropagation(); showProductAnalytics(${product.id})" 
+    <button class="action-btn" onclick="event.stopPropagation(); showProductAnalytics(${product.id})"
             title="Аналитика">
         <i data-lucide="bar-chart-2" style="width: 18px; height: 18px;"></i>
     </button>
@@ -193,7 +193,7 @@ function renderProducts() {
 
 ```html
 <div class="product-card" data-product-id="${product.id}">
-    <input type="checkbox" class="select-checkbox" 
+    <input type="checkbox" class="select-checkbox"
            onchange="toggleProductSelection(${product.id})" />
     ...
 </div>

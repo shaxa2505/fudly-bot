@@ -156,14 +156,18 @@ def verify_telegram_webapp(authorization: str) -> int:
                             # Security: Allow up to 24 hours for URL-based auth
                             MAX_AUTH_AGE = 24 * 3600  # 24 hours (reduced from 7 days)
                             if age_seconds > MAX_AUTH_AGE:
-                                logging.warning(f"⚠️ URL auth expired: {age_seconds}s old (max {MAX_AUTH_AGE}s)")
+                                logging.warning(
+                                    f"⚠️ URL auth expired: {age_seconds}s old (max {MAX_AUTH_AGE}s)"
+                                )
                                 raise HTTPException(
                                     status_code=401,
-                                    detail=f"Session expired. Please reopen from Telegram bot."
+                                    detail="Session expired. Please reopen from Telegram bot.",
                                 )
                             elif age_seconds < 0:
                                 logging.warning(f"⚠️ URL auth from future: {age_seconds}s")
-                                raise HTTPException(status_code=401, detail="Invalid auth timestamp")
+                                raise HTTPException(
+                                    status_code=401, detail="Invalid auth timestamp"
+                                )
                         except (ValueError, TypeError) as e:
                             logging.warning(f"⚠️ Invalid auth_date in URL auth: {auth_date} - {e}")
 
@@ -466,8 +470,11 @@ async def update_product(
     1 sum = 100 kopeks.
     """
     import logging
-    logging.info(f"📦 Update product {product_id}: quantity={quantity}, title={title}, status={status}")
-    
+
+    logging.info(
+        f"📦 Update product {product_id}: quantity={quantity}, title={title}, status={status}"
+    )
+
     telegram_id = verify_telegram_webapp(authorization)
     user, store = get_partner_with_store(telegram_id)
     db = get_db()
@@ -1000,15 +1007,17 @@ async def get_stats(authorization: str = Header(None), period: str = "today"):
     try:
         with db.get_connection() as conn:
             cursor = conn.cursor()
-            
+
             # Revenue and orders by day (last 7 days)
             for i in range(6, -1, -1):
-                day_start = (now - timedelta(days=i)).replace(hour=0, minute=0, second=0, microsecond=0)
+                day_start = (now - timedelta(days=i)).replace(
+                    hour=0, minute=0, second=0, microsecond=0
+                )
                 day_end = day_start.replace(hour=23, minute=59, second=59)
-                
+
                 cursor.execute(
                     """
-                    SELECT 
+                    SELECT
                         COALESCE(SUM(o.discount_price * b.quantity), 0) AS revenue,
                         COUNT(DISTINCT b.booking_id) AS orders
                     FROM bookings b
@@ -1017,12 +1026,12 @@ async def get_stats(authorization: str = Header(None), period: str = "today"):
                     AND b.status IN ('completed', 'confirmed')
                     AND b.created_at >= %s AND b.created_at < %s
                     """,
-                    (store_id, day_start, day_end)
+                    (store_id, day_start, day_end),
                 )
                 row = cursor.fetchone()
                 revenue_by_day.append(float(row[0]) if row else 0)
                 orders_by_day.append(int(row[1]) if row else 0)
-            
+
             # Top products (last 30 days)
             cursor.execute(
                 """
@@ -1036,16 +1045,13 @@ async def get_stats(authorization: str = Header(None), period: str = "today"):
                 ORDER BY qty DESC
                 LIMIT 5
                 """,
-                (store_id, now - timedelta(days=30))
+                (store_id, now - timedelta(days=30)),
             )
             for row in cursor.fetchall():
-                top_products.append({
-                    "name": row[0],
-                    "qty": int(row[1]),
-                    "revenue": float(row[2])
-                })
+                top_products.append({"name": row[0], "qty": int(row[1]), "revenue": float(row[2])})
     except Exception as e:
         import logging
+
         logging.warning(f"Failed to get daily breakdown: {e}")
         # Fallback to zeros
         revenue_by_day = [0] * 7
@@ -1104,12 +1110,11 @@ async def toggle_store_status(is_open: bool = Form(...), authorization: str = He
     db = get_db()
 
     new_status = "approved" if is_open else "closed"
-    
+
     with db.get_connection() as conn:
         cursor = conn.cursor()
         cursor.execute(
-            "UPDATE stores SET status = %s WHERE store_id = %s",
-            (new_status, store["store_id"])
+            "UPDATE stores SET status = %s WHERE store_id = %s", (new_status, store["store_id"])
         )
 
     return {"status": new_status, "is_open": is_open}

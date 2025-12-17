@@ -23,7 +23,16 @@ function initUXImprovements() {
 function initViewModeToggle() {
     // Добавляем переключатель в заголовок
     const header = document.querySelector('.products-header .section-title');
-    if (!header) return;
+    if (!header) {
+        console.log('⏳ Products header not found yet, will retry later');
+        return;
+    }
+
+    // Проверяем, не добавлен ли уже переключатель
+    if (header.querySelector('.view-mode-toggle')) {
+        console.log('✅ View mode toggle already exists');
+        return;
+    }
 
     const toggle = document.createElement('div');
     toggle.className = 'view-mode-toggle';
@@ -39,6 +48,7 @@ function initViewModeToggle() {
     `;
 
     header.appendChild(toggle);
+    console.log('✅ View mode toggle added');
 
     // Инициализируем иконки Lucide
     if (typeof lucide !== 'undefined') {
@@ -162,11 +172,11 @@ function startPriceEdit(priceEl) {
     const currentPrice = product.price;
 
     priceEl.innerHTML = `
-        <input 
-            type="number" 
-            class="price-edit-input" 
-            value="${currentPrice}" 
-            min="0" 
+        <input
+            type="number"
+            class="price-edit-input"
+            value="${currentPrice}"
+            min="0"
             step="100"
             autofocus
         />
@@ -317,7 +327,7 @@ function updateFilterCounts() {
     document.querySelectorAll('.filter-chip').forEach(chip => {
         const filter = chip.dataset.filter;
         const count = counts[filter] || 0;
-        
+
         let countEl = chip.querySelector('.count');
         if (!countEl) {
             countEl = document.createElement('span');
@@ -347,13 +357,13 @@ function toggleProductSelection(productId) {
 
 function toggleQuickActionsBar() {
     let bar = document.querySelector('.quick-actions-bar');
-    
+
     if (selectedProducts.size > 0) {
         if (!bar) {
             bar = createQuickActionsBar();
             document.body.appendChild(bar);
         }
-        
+
         bar.querySelector('.selected-count').textContent = selectedProducts.size;
         bar.classList.add('visible');
     } else {
@@ -387,11 +397,11 @@ function createQuickActionsBar() {
             </button>
         </div>
     `;
-    
+
     if (typeof lucide !== 'undefined') {
         lucide.createIcons();
     }
-    
+
     return bar;
 }
 
@@ -410,14 +420,14 @@ async function bulkShowProducts() {
 async function bulkEditPrice() {
     const newPrice = prompt('Введите новую цену для выбранных товаров:');
     if (!newPrice) return;
-    
+
     console.log('Updating price for products:', Array.from(selectedProducts), 'to:', newPrice);
     // TODO: API call
 }
 
 async function bulkDeleteProducts() {
     if (!confirm(`Удалить ${selectedProducts.size} товаров?`)) return;
-    
+
     console.log('Deleting products:', Array.from(selectedProducts));
     // TODO: API call
 }
@@ -452,26 +462,26 @@ function showProductAnalytics(productId) {
                 <div class="analytics-title">📊 Аналитика: ${product.name}</div>
                 <button class="analytics-close" onclick="this.closest('.analytics-modal').remove()">✕</button>
             </div>
-            
+
             <div class="analytics-stat">
                 <div class="analytics-stat-label">Продажи за 30 дней</div>
                 <div class="analytics-stat-value">${formatPrice(analytics.revenue)}</div>
             </div>
-            
+
             <div class="analytics-stat">
                 <div class="analytics-stat-label">Тренд продаж</div>
                 <div class="analytics-stat-value" style="color: ${analytics.trend > 0 ? '#10b981' : '#ef4444'}">
                     ${analytics.trend > 0 ? '+' : ''}${analytics.trend}% ${analytics.trend > 0 ? '↗' : '↘'}
                 </div>
             </div>
-            
+
             <div class="analytics-chart">
                 ${Array.from({length: 7}, () => {
                     const height = Math.random() * 100 + 20;
                     return `<div class="chart-bar" style="height: ${height}px"></div>`;
                 }).join('')}
             </div>
-            
+
             <div class="recommendations-card">
                 <div class="recommendation-title">
                     💡 Рекомендации
@@ -512,7 +522,7 @@ function updateSelectionUI() {
         const card = document.querySelector(`[data-product-id="${id}"]`);
         card?.classList.add('selected');
     });
-    
+
     document.querySelectorAll('.product-card.selected').forEach(card => {
         if (!selectedProducts.has(parseInt(card.dataset.productId))) {
             card.classList.remove('selected');
