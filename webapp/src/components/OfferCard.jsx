@@ -86,7 +86,7 @@ const OfferCard = memo(function OfferCard({ offer, cartQuantity = 0, onAddToCart
   return (
     <div className={`offer-card ${cartQuantity > 0 ? 'in-cart' : ''} ${isAdding ? 'adding' : ''}`} onClick={handleCardClick}>
       {/* Image Section */}
-      <div className="card-image-container">
+      <div className={`card-image-container ${imageLoaded && !imageError ? 'has-image' : ''}`}>
         {/* Discount Badge */}
         {discountPercent > 0 && (
           <div className="discount-badge">-{discountPercent}%</div>
