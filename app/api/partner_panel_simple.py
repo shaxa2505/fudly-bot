@@ -27,6 +27,14 @@ limiter = Limiter(key_func=get_remote_address)
 _db: DatabaseProtocol | None = None
 _bot_token: str | None = None
 
+# Get base URL for photo links
+API_BASE_URL = os.getenv("RAILWAY_PUBLIC_DOMAIN") or os.getenv("PUBLIC_URL") or ""
+if API_BASE_URL and not API_BASE_URL.startswith("http"):
+    API_BASE_URL = f"https://{API_BASE_URL}"
+elif not API_BASE_URL:
+    # Fallback for local development
+    API_BASE_URL = "http://localhost:8000"
+
 
 def set_partner_db(db: DatabaseProtocol, bot_token: str = None):
     """Set database instance and bot token for partner panel."""
@@ -277,9 +285,10 @@ async def get_profile(authorization: str = Header(None)):
 @router.get("/products")
 async def list_products(authorization: str = Header(None), status: Optional[str] = None):
     """
-    List partner's products.
+    List partner's products with frontend-compatible field names.
 
     Returns prices in RUBLES (converted from kopeks for display).
+    Maps DB fields to frontend expectations: offer_id→id, title→name, quantity→stock, etc.
     """
     telegram_id = verify_telegram_webapp(authorization)
     user, store = get_partner_with_store(telegram_id)
@@ -291,23 +300,40 @@ async def list_products(authorization: str = Header(None), status: Optional[str]
     if status and status != "all":
         offers = [o for o in offers if o.get("status") == status]
 
-    return [
-        {
-            "offer_id": o["offer_id"],
-            "title": o["title"],
-            "category": o.get("category"),
-            # Convert kopeks → rubles for display
-            "original_price": o.get("original_price") / 100 if o.get("original_price") else None,
-            "discount_price": o["discount_price"] / 100 if o["discount_price"] else None,
-            "quantity": o["quantity"],
-            "unit": o.get("unit", "шт"),
-            "expiry_date": o.get("expiry_date"),
-            "description": o.get("description"),
+    # Map to frontend-expected format
+    products = []
+    for o in offers:
+        # Convert kopeks → rubles for display
+        discount_price_rubles = o["discount_price"] / 100 if o["discount_price"] else 0
+        original_price_rubles = o.get("original_price") / 100 if o.get("original_price") else None
+
+        # Build photo URL if photo_id exists
+        photo_url = None
+        if o.get("photo_id"):
+            photo_url = f"{API_BASE_URL}/photo/{o['photo_id']}"
+
+        product = {
+            "id": o["offer_id"],  # Frontend expects 'id'
+            "name": o["title"],  # Frontend expects 'name'
+            "title": o["title"],  # Keep for compatibility
+            "description": o.get("description") or "",
+            "category": o.get("category") or "other",
+            # Frontend expects 'price' as main price
+            "price": discount_price_rubles,
+            "discount_price": discount_price_rubles,  # Keep for compatibility
+            "original_price": original_price_rubles,
+            # Frontend expects 'stock'
+            "stock": o["quantity"],
+            "quantity": o["quantity"],  # Keep for compatibility
+            "unit": o.get("unit") or "шт",
+            "expiry_date": str(o.get("expiry_date")) if o.get("expiry_date") else None,
             "photo_id": o.get("photo_id"),
-            "status": o.get("status", "active"),
+            "image": photo_url or "https://via.placeholder.com/120?text=No+Photo",
+            "status": o.get("status") or "active",
         }
-        for o in offers
-    ]
+        products.append(product)
+
+    return products
 
 
 @router.post("/products")
