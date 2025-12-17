@@ -56,6 +56,93 @@
         @keyframes fadeOut {
             to { opacity: 0; visibility: hidden; }
         }
+
+        /* Modal Styles */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.5);
+            backdrop-filter: blur(4px);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+            padding: 20px;
+            animation: fadeIn 0.2s ease-out;
+        }
+
+        .modal-body {
+            padding: 24px;
+            max-height: 60vh;
+            overflow-y: auto;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 600;
+            color: var(--text);
+            font-size: 14px;
+        }
+
+        .order-detail-section {
+            margin-bottom: 20px;
+            padding-bottom: 16px;
+            border-bottom: 1px solid var(--border-light);
+        }
+
+        .order-detail-section:last-child {
+            border-bottom: none;
+            margin-bottom: 0;
+        }
+
+        .order-detail-section h4 {
+            font-size: 14px;
+            font-weight: 600;
+            color: var(--text-secondary);
+            margin-bottom: 8px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .order-actions {
+            display: flex;
+            gap: 8px;
+            margin-top: 12px;
+            padding-top: 12px;
+            border-top: 1px solid var(--border-light);
+        }
+
+        .badge {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            min-width: 20px;
+            height: 20px;
+            padding: 0 6px;
+            background: var(--primary);
+            color: white;
+            font-size: 11px;
+            font-weight: 700;
+            border-radius: 10px;
+            margin-left: 6px;
+        }
+
+        .badge-discount {
+            padding: 4px 8px;
+            background: linear-gradient(135deg, var(--danger), #DC2626);
+            color: white;
+            font-size: 11px;
+            font-weight: 700;
+            border-radius: 6px;
+        }
     </style>
 </head>
 <body>
@@ -393,33 +480,211 @@
         }
 
         function renderOrders() {
+            const grouped = groupOrdersByStatus(state.orders);
+
             document.querySelector('.content').innerHTML = `
                 <div class="container">
-                    <h2 class="section-title">Все заказы</h2>
-                    <div class="orders-list">
-                        ${state.orders.map(order => `
-                            <div class="order-card">
-                                <div class="order-header">
-                                    <div class="order-id">#${order.id}</div>
-                                    <div class="order-status status-${order.status}">${getStatusText(order.status)}</div>
-                                </div>
-                                <div class="order-items">
-                                    ${order.items?.map(item => `
-                                        <div class="order-item">
-                                            <span>${item.quantity}x ${item.name}</span>
-                                            <span>${formatPrice(item.price * item.quantity)}</span>
-                                        </div>
-                                    `).join('') || ''}
-                                </div>
-                                <div class="order-footer">
-                                    <div class="order-time">${formatTime(order.created_at)}</div>
-                                    <div class="order-total">${formatPrice(order.total)}</div>
-                                </div>
-                            </div>
-                        `).join('') || '<div class="empty-state"><p class="empty-title">Нет заказов</p></div>'}
+                    <h2 class="section-title">Заказы</h2>
+
+                    <div class="tabs">
+                        <button class="tab active" data-status="active" onclick="filterOrderTab('active')">
+                            Активные <span class="badge">${grouped.active.length}</span>
+                        </button>
+                        <button class="tab" data-status="completed" onclick="filterOrderTab('completed')">
+                            Завершенные
+                        </button>
+                        <button class="tab" data-status="cancelled" onclick="filterOrderTab('cancelled')">
+                            Отмененные
+                        </button>
+                    </div>
+
+                    <div id="ordersContainer">
+                        ${renderOrdersList(grouped.active)}
                     </div>
                 </div>
             `;
+
+            if (typeof lucide !== 'undefined') lucide.createIcons();
+        }
+
+        function groupOrdersByStatus(orders) {
+            return {
+                active: orders.filter(o => ['new', 'preparing', 'ready'].includes(o.status)),
+                completed: orders.filter(o => o.status === 'completed'),
+                cancelled: orders.filter(o => o.status === 'cancelled')
+            };
+        }
+
+        function renderOrdersList(orders) {
+            if (!orders.length) {
+                return '<div class="empty-state"><p class="empty-title">Нет заказов</p></div>';
+            }
+
+            return `
+                <div class="orders-list">
+                    ${orders.map(order => `
+                        <div class="order-card" onclick="viewOrderDetails(${order.id})">
+                            <div class="order-header">
+                                <div class="order-id">#${order.id}</div>
+                                <div class="order-status status-${order.status}">${getStatusText(order.status)}</div>
+                            </div>
+                            <div class="order-items">
+                                ${order.items?.slice(0, 2).map(item => `
+                                    <div class="order-item">
+                                        <span>${item.quantity}x ${item.name}</span>
+                                        <span>${formatPrice(item.price * item.quantity)}</span>
+                                    </div>
+                                `).join('') || ''}
+                                ${order.items?.length > 2 ? `<div class="order-item"><span>...еще ${order.items.length - 2}</span></div>` : ''}
+                            </div>
+                            <div class="order-footer">
+                                <div class="order-time">
+                                    <i data-lucide="clock" style="width: 14px; height: 14px;"></i>
+                                    ${formatTime(order.created_at)}
+                                </div>
+                                <div class="order-total">${formatPrice(order.total)}</div>
+                            </div>
+                            ${order.status === 'new' ? `
+                                <div class="order-actions" onclick="event.stopPropagation()">
+                                    <button class="btn btn-sm btn-success" onclick="updateOrderStatus(${order.id}, 'preparing')">
+                                        Принять
+                                    </button>
+                                    <button class="btn btn-sm btn-danger" onclick="cancelOrder(${order.id})">
+                                        Отменить
+                                    </button>
+                                </div>
+                            ` : ''}
+                            ${order.status === 'preparing' ? `
+                                <div class="order-actions" onclick="event.stopPropagation()">
+                                    <button class="btn btn-sm btn-success" onclick="updateOrderStatus(${order.id}, 'ready')">
+                                        Готов
+                                    </button>
+                                </div>
+                            ` : ''}
+                        </div>
+                    `).join('')}
+                </div>
+            `;
+        }
+
+        function filterOrderTab(status) {
+            document.querySelectorAll('.tab').forEach(tab => {
+                tab.classList.toggle('active', tab.dataset.status === status);
+            });
+
+            const grouped = groupOrdersByStatus(state.orders);
+            const ordersMap = {
+                'active': grouped.active,
+                'completed': grouped.completed,
+                'cancelled': grouped.cancelled
+            };
+
+            document.getElementById('ordersContainer').innerHTML = renderOrdersList(ordersMap[status]);
+            if (typeof lucide !== 'undefined') lucide.createIcons();
+        }
+
+        async function viewOrderDetails(orderId) {
+            const order = state.orders.find(o => o.id === orderId);
+            if (!order) return;
+
+            const modal = document.createElement('div');
+            modal.className = 'modal-overlay';
+            modal.innerHTML = `
+                <div class="modal-content" style="max-width: 500px;">
+                    <div class="modal-header">
+                        <h3>Заказ #${order.id}</h3>
+                        <button class="btn-icon" onclick="this.closest('.modal-overlay').remove()">
+                            <i data-lucide="x"></i>
+                        </button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="order-status status-${order.status}" style="display: inline-block; margin-bottom: 16px;">
+                            ${getStatusText(order.status)}
+                        </div>
+
+                        <div class="order-detail-section">
+                            <h4>Товары</h4>
+                            ${order.items?.map(item => `
+                                <div class="order-item">
+                                    <span>${item.quantity}x ${item.name}</span>
+                                    <span>${formatPrice(item.price * item.quantity)}</span>
+                                </div>
+                            `).join('') || '<p>Нет товаров</p>'}
+                        </div>
+
+                        <div class="order-detail-section">
+                            <h4>Клиент</h4>
+                            <p>${order.customer_name || 'Не указано'}</p>
+                            <p>${order.customer_phone || ''}</p>
+                        </div>
+
+                        <div class="order-detail-section">
+                            <h4>Доставка</h4>
+                            <p>${order.delivery_address || 'Самовывоз'}</p>
+                        </div>
+
+                        <div class="order-detail-section" style="border-top: 2px solid var(--border); padding-top: 16px; margin-top: 16px;">
+                            <div style="display: flex; justify-content: space-between; font-size: 18px; font-weight: bold;">
+                                <span>Итого</span>
+                                <span>${formatPrice(order.total)}</span>
+                            </div>
+                        </div>
+
+                        ${order.status !== 'completed' && order.status !== 'cancelled' ? `
+                            <div style="margin-top: 24px; display: flex; gap: 12px;">
+                                ${order.status === 'new' ? `
+                                    <button class="btn btn-success" style="flex: 1;" onclick="updateOrderStatus(${order.id}, 'preparing'); this.closest('.modal-overlay').remove();">
+                                        Принять заказ
+                                    </button>
+                                ` : ''}
+                                ${order.status === 'preparing' ? `
+                                    <button class="btn btn-success" style="flex: 1;" onclick="updateOrderStatus(${order.id}, 'ready'); this.closest('.modal-overlay').remove();">
+                                        Заказ готов
+                                    </button>
+                                ` : ''}
+                                ${order.status === 'ready' ? `
+                                    <button class="btn btn-success" style="flex: 1;" onclick="updateOrderStatus(${order.id}, 'completed'); this.closest('.modal-overlay').remove();">
+                                        Выдан
+                                    </button>
+                                ` : ''}
+                                <button class="btn btn-danger" onclick="cancelOrder(${order.id}); this.closest('.modal-overlay').remove();">
+                                    Отменить
+                                </button>
+                            </div>
+                        ` : ''}
+                    </div>
+                </div>
+            `;
+
+            document.body.appendChild(modal);
+            if (typeof lucide !== 'undefined') lucide.createIcons();
+
+            modal.addEventListener('click', (e) => {
+                if (e.target === modal) modal.remove();
+            });
+        }
+
+        async function updateOrderStatus(orderId, newStatus) {
+            try {
+                await apiFetch(`/partner/orders/${orderId}`, {
+                    method: 'PATCH',
+                    body: JSON.stringify({ status: newStatus })
+                });
+
+                // Update local state
+                const order = state.orders.find(o => o.id === orderId);
+                if (order) order.status = newStatus;
+
+                toast('Статус заказа обновлен', 'success');
+                loadOrders();
+            } catch (error) {
+                toast('Ошибка обновления статуса', 'error');
+            }
+        }
+
+        async function cancelOrder(orderId) {
+            if (!confirm('Отменить заказ?')) return;
+            await updateOrderStatus(orderId, 'cancelled');
         }
 
         // ============================================
@@ -439,30 +704,235 @@
             document.querySelector('.content').innerHTML = `
                 <div class="container">
                     <div class="section-header">
-                        <h2 class="section-title">Товары</h2>
-                        <button class="btn btn-primary" onclick="addProduct()">+ Добавить</button>
+                        <h2 class="section-title">Товары (${state.products.length})</h2>
+                        <button class="btn btn-primary" onclick="openProductModal()">
+                            <i data-lucide="plus" style="width: 18px; height: 18px;"></i>
+                            Добавить
+                        </button>
                     </div>
-                    <div class="products-grid">
+
+                    <div class="search-bar">
+                        <i data-lucide="search" class="search-icon"></i>
+                        <input type="text" class="search-input" placeholder="Поиск товаров..." oninput="searchProducts(this.value)">
+                    </div>
+
+                    <div class="products-grid" id="productsGrid">
                         ${state.products.map(product => `
-                            <div class="product-card">
+                            <div class="product-card" data-product-id="${product.id}">
                                 <div class="product-image">
-                                    <img src="${product.photo_url || '/static/placeholder.jpg'}" alt="${product.name}">
+                                    <img src="${product.photo_url || '/static/placeholder.jpg'}" alt="${product.name}" loading="lazy">
+                                    ${product.is_available ? '' : '<div class="product-overlay"><span style="color: white; font-weight: bold;">Нет в наличии</span></div>'}
+                                </div>
+                                <div class="product-actions">
+                                    <button class="action-btn" onclick="editProduct(${product.id})" title="Редактировать">
+                                        <i data-lucide="edit"></i>
+                                    </button>
+                                    <button class="action-btn" onclick="toggleProductAvailability(${product.id})" title="${product.is_available ? 'Скрыть' : 'Показать'}">
+                                        <i data-lucide="${product.is_available ? 'eye-off' : 'eye'}"></i>
+                                    </button>
+                                    <button class="action-btn" onclick="deleteProduct(${product.id})" title="Удалить">
+                                        <i data-lucide="trash-2"></i>
+                                    </button>
                                 </div>
                                 <div class="product-info">
-                                    <h3 class="product-title">${product.name}</h3>
+                                    <div class="product-header">
+                                        <h3 class="product-title">${product.name}</h3>
+                                        ${product.discount > 0 ? `<div class="badge-discount">-${product.discount}%</div>` : ''}
+                                    </div>
                                     <p class="product-description">${product.description || ''}</p>
+                                    <div class="product-meta">
+                                        <div class="meta-item">
+                                            <i data-lucide="package"></i>
+                                            <span class="meta-value">${product.stock || 0} ${product.unit || 'шт'}</span>
+                                        </div>
+                                        <div class="meta-item">
+                                            <i data-lucide="eye"></i>
+                                            <span class="meta-value">${product.views || 0}</span>
+                                        </div>
+                                    </div>
                                     <div class="product-footer">
                                         <div class="product-price">
+                                            ${product.discount > 0 ? `<div class="price-old">${formatPrice(product.original_price)}</div>` : ''}
                                             <div class="price-current">${formatPrice(product.price)}</div>
                                         </div>
-                                        <button class="product-cta" onclick="editProduct(${product.id})">Изменить</button>
+                                        <button class="product-cta" onclick="editProduct(${product.id})">
+                                            <i data-lucide="edit"></i>
+                                        </button>
                                     </div>
                                 </div>
                             </div>
-                        `).join('') || '<div class="empty-state"><p class="empty-title">Нет товаров</p></div>'}
+                        `).join('') || '<div class="empty-state"><div class="empty-icon">📦</div><p class="empty-title">Нет товаров</p><button class="btn btn-primary" onclick="openProductModal()">Добавить первый товар</button></div>'}
                     </div>
                 </div>
             `;
+
+            if (typeof lucide !== 'undefined') lucide.createIcons();
+        }
+
+        function searchProducts(query) {
+            const cards = document.querySelectorAll('.product-card');
+            cards.forEach(card => {
+                const title = card.querySelector('.product-title').textContent.toLowerCase();
+                const match = title.includes(query.toLowerCase());
+                card.style.display = match ? '' : 'none';
+            });
+        }
+
+        function openProductModal(productId = null) {
+            const product = productId ? state.products.find(p => p.id === productId) : null;
+            const isEdit = !!product;
+
+            const modal = document.createElement('div');
+            modal.className = 'modal-overlay';
+            modal.innerHTML = `
+                <div class="modal-content" style="max-width: 600px;">
+                    <div class="modal-header">
+                        <h3>${isEdit ? 'Редактировать товар' : 'Добавить товар'}</h3>
+                        <button class="btn-icon" onclick="this.closest('.modal-overlay').remove()">
+                            <i data-lucide="x"></i>
+                        </button>
+                    </div>
+                    <form id="productForm" onsubmit="saveProduct(event, ${productId})">
+                        <div class="modal-body">
+                            <div class="form-group">
+                                <label>Название *</label>
+                                <input type="text" name="name" value="${product?.name || ''}" required class="search-input">
+                            </div>
+
+                            <div class="form-group">
+                                <label>Описание</label>
+                                <textarea name="description" rows="3" class="search-input">${product?.description || ''}</textarea>
+                            </div>
+
+                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+                                <div class="form-group">
+                                    <label>Цена *</label>
+                                    <input type="number" name="price" value="${product?.price || ''}" required min="0" class="search-input">
+                                </div>
+
+                                <div class="form-group">
+                                    <label>Скидка (%)</label>
+                                    <input type="number" name="discount" value="${product?.discount || 0}" min="0" max="99" class="search-input">
+                                </div>
+                            </div>
+
+                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+                                <div class="form-group">
+                                    <label>Остаток</label>
+                                    <input type="number" name="stock" value="${product?.stock || 0}" min="0" class="search-input">
+                                </div>
+
+                                <div class="form-group">
+                                    <label>Единица</label>
+                                    <select name="unit" class="search-input">
+                                        <option value="шт" ${product?.unit === 'шт' ? 'selected' : ''}>шт</option>
+                                        <option value="кг" ${product?.unit === 'кг' ? 'selected' : ''}>кг</option>
+                                        <option value="л" ${product?.unit === 'л' ? 'selected' : ''}>л</option>
+                                    </select>
+                                </div>
+                            </div>
+
+                            <div class="form-group">
+                                <label>URL фото</label>
+                                <input type="url" name="photo_url" value="${product?.photo_url || ''}" placeholder="https://..." class="search-input">
+                            </div>
+
+                            <div class="form-group">
+                                <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+                                    <input type="checkbox" name="is_available" ${product?.is_available !== false ? 'checked' : ''}>
+                                    <span>Доступен для заказа</span>
+                                </label>
+                            </div>
+                        </div>
+
+                        <div style="display: flex; gap: 12px; padding: 16px; border-top: 1px solid var(--border);">
+                            <button type="submit" class="btn btn-primary" style="flex: 1;">
+                                ${isEdit ? 'Сохранить' : 'Добавить'}
+                            </button>
+                            <button type="button" class="btn btn-secondary" onclick="this.closest('.modal-overlay').remove()">
+                                Отмена
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            `;
+
+            document.body.appendChild(modal);
+            if (typeof lucide !== 'undefined') lucide.createIcons();
+
+            modal.addEventListener('click', (e) => {
+                if (e.target === modal) modal.remove();
+            });
+        }
+
+        async function saveProduct(event, productId) {
+            event.preventDefault();
+
+            const formData = new FormData(event.target);
+            const data = {
+                name: formData.get('name'),
+                description: formData.get('description'),
+                price: parseFloat(formData.get('price')),
+                discount: parseInt(formData.get('discount')) || 0,
+                stock: parseInt(formData.get('stock')) || 0,
+                unit: formData.get('unit'),
+                photo_url: formData.get('photo_url'),
+                is_available: formData.get('is_available') === 'on'
+            };
+
+            try {
+                if (productId) {
+                    await apiFetch(`/partner/products/${productId}`, {
+                        method: 'PUT',
+                        body: JSON.stringify(data)
+                    });
+                    toast('Товар обновлен', 'success');
+                } else {
+                    await apiFetch('/partner/products', {
+                        method: 'POST',
+                        body: JSON.stringify(data)
+                    });
+                    toast('Товар добавлен', 'success');
+                }
+
+                document.querySelector('.modal-overlay').remove();
+                loadProducts();
+            } catch (error) {
+                toast('Ошибка сохранения товара', 'error');
+            }
+        }
+
+        function editProduct(id) {
+            openProductModal(id);
+        }
+
+        async function toggleProductAvailability(id) {
+            try {
+                const product = state.products.find(p => p.id === id);
+                await apiFetch(`/partner/products/${id}`, {
+                    method: 'PATCH',
+                    body: JSON.stringify({ is_available: !product.is_available })
+                });
+
+                product.is_available = !product.is_available;
+                toast('Статус товара изменен', 'success');
+                loadProducts();
+            } catch (error) {
+                toast('Ошибка изменения статуса', 'error');
+            }
+        }
+
+        async function deleteProduct(id) {
+            if (!confirm('Удалить товар?')) return;
+
+            try {
+                await apiFetch(`/partner/products/${id}`, { method: 'DELETE' });
+                state.products = state.products.filter(p => p.id !== id);
+                toast('Товар удален', 'success');
+                loadProducts();
+            } catch (error) {
+                toast('Ошибка удаления товара', 'error');
+            }
         }
 
         // ============================================
@@ -484,9 +954,216 @@
             document.querySelector('.content').innerHTML = `
                 <div class="container">
                     <h2 class="section-title">Настройки</h2>
-                    <p class="empty-description">Настройки в разработке</p>
+
+                    <div class="dashboard-card" style="margin-bottom: 24px;">
+                        <h3 class="card-title">
+                            <i data-lucide="store" class="card-icon"></i>
+                            Профиль магазина
+                        </h3>
+                        <div class="list-item">
+                            <div class="list-content">
+                                <div class="list-info">
+                                    <div class="list-title">Название</div>
+                                    <div class="list-subtitle" id="settingsStoreName">${state.store?.name || 'Загрузка...'}</div>
+                                </div>
+                            </div>
+                            <button class="btn btn-sm btn-ghost" onclick="editStoreProfile()">
+                                <i data-lucide="edit"></i>
+                            </button>
+                        </div>
+
+                        <div class="list-item">
+                            <div class="list-content">
+                                <div class="list-info">
+                                    <div class="list-title">Адрес</div>
+                                    <div class="list-subtitle">${state.store?.address || 'Не указан'}</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="list-item">
+                            <div class="list-content">
+                                <div class="list-info">
+                                    <div class="list-title">Телефон</div>
+                                    <div class="list-subtitle">${state.store?.phone || 'Не указан'}</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="list-item">
+                            <div class="list-content">
+                                <div class="list-info">
+                                    <div class="list-title">Статус</div>
+                                    <div class="list-subtitle">${state.store?.is_open ? '🟢 Открыто' : '🔴 Закрыто'}</div>
+                                </div>
+                            </div>
+                            <button class="btn btn-sm ${state.store?.is_open ? 'btn-danger' : 'btn-success'}" onclick="toggleStoreStatus()">
+                                ${state.store?.is_open ? 'Закрыть' : 'Открыть'}
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="dashboard-card" style="margin-bottom: 24px;">
+                        <h3 class="card-title">
+                            <i data-lucide="clock" class="card-icon"></i>
+                            Режим работы
+                        </h3>
+                        <div class="list-item">
+                            <div class="list-content">
+                                <div class="list-info">
+                                    <div class="list-title">Понедельник - Пятница</div>
+                                    <div class="list-subtitle">09:00 - 21:00</div>
+                                </div>
+                            </div>
+                            <button class="btn btn-sm btn-ghost" onclick="toast('Функция в разработке', 'info')">
+                                <i data-lucide="edit"></i>
+                            </button>
+                        </div>
+                        <div class="list-item">
+                            <div class="list-content">
+                                <div class="list-info">
+                                    <div class="list-title">Суббота - Воскресенье</div>
+                                    <div class="list-subtitle">10:00 - 20:00</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="dashboard-card" style="margin-bottom: 24px;">
+                        <h3 class="card-title">
+                            <i data-lucide="truck" class="card-icon"></i>
+                            Доставка
+                        </h3>
+                        <div class="list-item">
+                            <span class="list-title">Минимальный заказ</span>
+                            <span class="list-value">${formatPrice(state.store?.min_order || 0)}</span>
+                        </div>
+                        <div class="list-item">
+                            <span class="list-title">Стоимость доставки</span>
+                            <span class="list-value">${formatPrice(state.store?.delivery_cost || 0)}</span>
+                        </div>
+                        <button class="btn btn-sm btn-primary" onclick="toast('Функция в разработке', 'info')" style="margin-top: 12px;">
+                            Изменить настройки
+                        </button>
+                    </div>
+
+                    <div class="dashboard-card">
+                        <h3 class="card-title">
+                            <i data-lucide="bell" class="card-icon"></i>
+                            Уведомления
+                        </h3>
+                        <div class="list-item">
+                            <span class="list-title">Новые заказы</span>
+                            <button class="btn btn-sm btn-success" onclick="toast('Уведомления включены', 'success')">
+                                Включено
+                            </button>
+                        </div>
+                        <div class="list-item">
+                            <span class="list-title">Отмены заказов</span>
+                            <button class="btn btn-sm btn-success" onclick="toast('Уведомления включены', 'success')">
+                                Включено
+                            </button>
+                        </div>
+                    </div>
                 </div>
             `;
+
+            if (typeof lucide !== 'undefined') lucide.createIcons();
+        }
+
+        function editStoreProfile() {
+            const modal = document.createElement('div');
+            modal.className = 'modal-overlay';
+            modal.innerHTML = `
+                <div class="modal-content" style="max-width: 500px;">
+                    <div class="modal-header">
+                        <h3>Редактировать профиль</h3>
+                        <button class="btn-icon" onclick="this.closest('.modal-overlay').remove()">
+                            <i data-lucide="x"></i>
+                        </button>
+                    </div>
+                    <form onsubmit="saveStoreProfile(event)">
+                        <div class="modal-body">
+                            <div class="form-group">
+                                <label>Название магазина *</label>
+                                <input type="text" name="name" value="${state.store?.name || ''}" required class="search-input">
+                            </div>
+
+                            <div class="form-group">
+                                <label>Адрес</label>
+                                <input type="text" name="address" value="${state.store?.address || ''}" class="search-input">
+                            </div>
+
+                            <div class="form-group">
+                                <label>Телефон</label>
+                                <input type="tel" name="phone" value="${state.store?.phone || ''}" placeholder="+998 XX XXX XX XX" class="search-input">
+                            </div>
+
+                            <div class="form-group">
+                                <label>Описание</label>
+                                <textarea name="description" rows="3" class="search-input">${state.store?.description || ''}</textarea>
+                            </div>
+                        </div>
+
+                        <div style="display: flex; gap: 12px; padding: 16px; border-top: 1px solid var(--border);">
+                            <button type="submit" class="btn btn-primary" style="flex: 1;">Сохранить</button>
+                            <button type="button" class="btn btn-secondary" onclick="this.closest('.modal-overlay').remove()">Отмена</button>
+                        </div>
+                    </form>
+                </div>
+            `;
+
+            document.body.appendChild(modal);
+            if (typeof lucide !== 'undefined') lucide.createIcons();
+
+            modal.addEventListener('click', (e) => {
+                if (e.target === modal) modal.remove();
+            });
+        }
+
+        async function saveStoreProfile(event) {
+            event.preventDefault();
+
+            const formData = new FormData(event.target);
+            const data = {
+                name: formData.get('name'),
+                address: formData.get('address'),
+                phone: formData.get('phone'),
+                description: formData.get('description')
+            };
+
+            try {
+                await apiFetch('/partner/store', {
+                    method: 'PATCH',
+                    body: JSON.stringify(data)
+                });
+
+                // Update local state
+                state.store = { ...state.store, ...data };
+                document.getElementById('storeName').textContent = data.name;
+
+                toast('Профиль обновлен', 'success');
+                document.querySelector('.modal-overlay').remove();
+                loadSettings();
+            } catch (error) {
+                toast('Ошибка сохранения', 'error');
+            }
+        }
+
+        async function toggleStoreStatus() {
+            try {
+                const newStatus = !state.store?.is_open;
+                await apiFetch('/partner/store', {
+                    method: 'PATCH',
+                    body: JSON.stringify({ is_open: newStatus })
+                });
+
+                state.store.is_open = newStatus;
+                toast(newStatus ? 'Магазин открыт' : 'Магазин закрыт', 'success');
+                loadSettings();
+            } catch (error) {
+                toast('Ошибка изменения статуса', 'error');
+            }
         }
 
         // ============================================
@@ -522,12 +1199,16 @@
             return statusMap[status] || status;
         }
 
-        function addProduct() {
-            toast('Функция в разработке', 'info');
-        }
-
-        function editProduct(id) {
-            toast('Функция в разработке', 'info');
+        function refreshAll() {
+            const view = state.currentView;
+            switch(view) {
+                case 'dashboard': loadDashboard(); break;
+                case 'orders': loadOrders(); break;
+                case 'products': loadProducts(); break;
+                case 'stats': loadStats(); break;
+                case 'settings': loadSettings(); break;
+            }
+            toast('Обновлено', 'success');
         }
 
         // ============================================
