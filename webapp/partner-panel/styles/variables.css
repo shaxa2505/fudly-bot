@@ -1,71 +1,126 @@
 /* ================================================
-   FUDLY PARTNER PANEL - CSS VARIABLES
-   Design Tokens & Theme Configuration
+   FUDLY PARTNER PANEL - MODERN DESIGN SYSTEM
+   Premium SaaS-Style Interface
    ================================================ */
 
 :root {
-    /* Modern Food Delivery Colors */
-    --primary: #FF6B35;
-    --primary-dark: #E8551E;
-    --primary-light: #FFE5DE;
+    /* Brand Colors - Vibrant & Modern */
+    --primary: #6366F1;
+    --primary-hover: #4F46E5;
+    --primary-light: #E0E7FF;
+    --primary-dark: #3730A3;
+
+    --accent: #EC4899;
+    --accent-light: #FCE7F3;
+
     --success: #10B981;
     --success-light: #D1FAE5;
+    --success-dark: #059669;
+
     --warning: #F59E0B;
     --warning-light: #FEF3C7;
+
     --danger: #EF4444;
     --danger-light: #FEE2E2;
-    --info: #3B82F6;
-    --info-light: #DBEAFE;
 
-    /* Neutrals */
-    --bg: #F8FAFC;
-    --bg-secondary: #F1F5F9;
+    --info: #06B6D4;
+    --info-light: #CFFAFE;
+
+    /* Modern Neutrals - Softer Grays */
+    --bg: #FAFBFC;
+    --bg-secondary: #F3F4F6;
+    --bg-tertiary: #E5E7EB;
+
     --card: #FFFFFF;
-    --text: #0F172A;
-    --text-secondary: #475569;  /* WCAG AA 7.02:1 */
-    --text-muted: #64748B;      /* WCAG AA 4.54:1 */
-    --border: #E2E8F0;
-    --divider: #F1F5F9;
+    --card-hover: #F9FAFB;
 
-    /* Spacing */
+    --text: #111827;
+    --text-secondary: #4B5563;
+    --text-muted: #9CA3AF;
+    --text-light: #D1D5DB;
+
+    --border: #E5E7EB;
+    --border-light: #F3F4F6;
+    --divider: #F3F4F6;
+
+    /* Spacing System - 8px grid */
     --space-xs: 4px;
     --space-sm: 8px;
     --space-md: 16px;
     --space-lg: 24px;
     --space-xl: 32px;
+    --space-2xl: 48px;
+    --space-3xl: 64px;
 
-    /* Radius */
-    --radius-sm: 8px;
-    --radius-md: 12px;
-    --radius-lg: 16px;
+    /* Border Radius - Softer */
+    --radius-xs: 6px;
+    --radius-sm: 10px;
+    --radius-md: 14px;
+    --radius-lg: 18px;
     --radius-xl: 24px;
+    --radius-2xl: 32px;
     --radius-full: 9999px;
 
-    /* Shadows */
-    --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
-    --shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1);
-    --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1);
-    --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1);
-    --shadow-xl: 0 20px 25px -5px rgb(0 0 0 / 0.1);
+    /* Modern Shadows - Layered */
+    --shadow-xs: 0 1px 2px 0 rgba(0, 0, 0, 0.03);
+    --shadow-sm: 0 1px 3px 0 rgba(0, 0, 0, 0.05), 0 1px 2px 0 rgba(0, 0, 0, 0.03);
+    --shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.06), 0 2px 4px -1px rgba(0, 0, 0, 0.04);
+    --shadow-md: 0 10px 15px -3px rgba(0, 0, 0, 0.08), 0 4px 6px -2px rgba(0, 0, 0, 0.03);
+    --shadow-lg: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+    --shadow-xl: 0 25px 50px -12px rgba(0, 0, 0, 0.15);
+    --shadow-2xl: 0 35px 60px -15px rgba(0, 0, 0, 0.20);
 
-    /* Typography Scale */
-    --font-xs: 11px;
-    --font-sm: 12px;
-    --font-base: 14px;
+    /* Colored Shadows */
+    --shadow-primary: 0 10px 30px -10px rgba(99, 102, 241, 0.3);
+    --shadow-success: 0 10px 30px -10px rgba(16, 185, 129, 0.3);
+    --shadow-danger: 0 10px 30px -10px rgba(239, 68, 68, 0.3);
+
+    /* Typography Scale - Perfect Fourth */
+    --font-xs: 12px;
+    --font-sm: 13px;
+    --font-base: 15px;
     --font-md: 16px;
     --font-lg: 18px;
     --font-xl: 20px;
     --font-2xl: 24px;
-    --font-3xl: 32px;
+    --font-3xl: 30px;
+    --font-4xl: 36px;
+    --font-5xl: 48px;
 
     /* Font Weights */
-    --weight-regular: 400;
+    --weight-normal: 400;
     --weight-medium: 500;
     --weight-semibold: 600;
     --weight-bold: 700;
+    --weight-extrabold: 800;
 
     /* Line Heights */
-    --leading-tight: 1.2;
+    --leading-none: 1;
+    --leading-tight: 1.25;
+    --leading-snug: 1.375;
     --leading-normal: 1.5;
-    --leading-relaxed: 1.75;
+    --leading-relaxed: 1.625;
+    --leading-loose: 2;
+
+    /* Letter Spacing */
+    --tracking-tighter: -0.05em;
+    --tracking-tight: -0.025em;
+    --tracking-normal: 0;
+    --tracking-wide: 0.025em;
+    --tracking-wider: 0.05em;
+
+    /* Transitions */
+    --transition-fast: 150ms cubic-bezier(0.4, 0, 0.2, 1);
+    --transition-base: 250ms cubic-bezier(0.4, 0, 0.2, 1);
+    --transition-slow: 350ms cubic-bezier(0.4, 0, 0.2, 1);
+
+    /* Z-index Scale */
+    --z-base: 1;
+    --z-dropdown: 100;
+    --z-sticky: 200;
+    --z-fixed: 300;
+    --z-modal-backdrop: 400;
+    --z-modal: 500;
+    --z-popover: 600;
+    --z-tooltip: 700;
 }

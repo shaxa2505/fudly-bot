@@ -21,18 +21,44 @@
     <link rel="stylesheet" href="improvements.css">
 
     <style>
-        /* Force light theme - override Telegram WebApp dark theme */
+        /* Modern Premium Design - Force Light Theme */
         body {
-            background: #F8FAFC !important;
-            color: #0F172A !important;
+            background: linear-gradient(135deg, #FAFBFC 0%, #F3F4F6 50%, #EEF2FF 100%) !important;
+            background-attachment: fixed !important;
+            color: #111827 !important;
+            font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif !important;
         }
         .app-header {
-            background: #FFFFFF !important;
-            color: #0F172A !important;
+            background: rgba(255, 255, 255, 0.85) !important;
+            backdrop-filter: blur(30px) saturate(180%) !important;
+            -webkit-backdrop-filter: blur(30px) saturate(180%) !important;
+            border-bottom: 1px solid rgba(99, 102, 241, 0.1) !important;
+            box-shadow: 0 4px 24px rgba(0, 0, 0, 0.04) !important;
+        }
+        /* Preload animation */
+        @keyframes shimmerPreload {
+            0% { background-position: -200% 0; }
+            100% { background-position: 200% 0; }
+        }
+        .loading-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: linear-gradient(135deg, #FAFBFC 0%, #EEF2FF 100%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 9999;
+            animation: fadeOut 0.5s ease-out 1s forwards;
+        }
+        @keyframes fadeOut {
+            to { opacity: 0; visibility: hidden; }
         }
     </style>
 </head>
-<body style="background: #F8FAFC !important;">
+<body>
     <!-- Header -->
     <header class="app-header">
         <div class="header-content">

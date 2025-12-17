@@ -1,102 +1,214 @@
 /* ================================================
-   COMPONENT: Header
-   Top navigation bar with store info
+   MODERN HEADER - Premium Glassmorphism Design
    ================================================ */
 
 .app-header {
-    background: var(--card);
-    padding: var(--space-md) var(--space-lg);
-    border-bottom: 1px solid var(--border);
-    position: sticky;
+    position: fixed;
     top: 0;
-    z-index: 100;
-    box-shadow: var(--shadow-sm);
+    left: 0;
+    right: 0;
+    height: 70px;
+    background: rgba(255, 255, 255, 0.85);
+    backdrop-filter: blur(30px) saturate(180%);
+    -webkit-backdrop-filter: blur(30px) saturate(180%);
+    border-bottom: 1px solid rgba(99, 102, 241, 0.1);
+    z-index: var(--z-sticky);
+    box-shadow: 0 4px 24px rgba(0, 0, 0, 0.04);
+    animation: fadeInDown var(--transition-slow) ease-out;
 }
 
 .header-content {
+    max-width: 1400px;
+    margin: 0 auto;
+    height: 100%;
+    padding: 0 var(--space-lg);
     display: flex;
     align-items: center;
     justify-content: space-between;
-    max-width: 1200px;
-    margin: 0 auto;
-}
-
-.store-info {
-    display: flex;
-    align-items: center;
     gap: var(--space-md);
 }
 
-.store-avatar {
-    width: 48px;
-    height: 48px;
-    border-radius: var(--radius-md);
-    background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
+/* === Logo === */
+.header-logo {
     display: flex;
     align-items: center;
-    justify-content: center;
-    font-size: 24px;
-}
-
-.store-details h1 {
-    font-size: 18px;
-    font-weight: 700;
-    color: var(--text);
-    margin-bottom: 2px;
-}
-
-.store-status {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    font-size: 13px;
-    color: var(--text-secondary);
-}
-
-.status-dot {
-    width: 8px;
-    height: 8px;
-    border-radius: 50%;
-    background: var(--success);
-    animation: pulse 2s infinite;
-}
-
-.header-actions {
-    display: flex;
     gap: var(--space-sm);
+    font-size: var(--font-xl);
+    font-weight: var(--weight-extrabold);
+    letter-spacing: var(--tracking-tight);
+    background: linear-gradient(135deg, var(--primary) 0%, var(--accent) 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    transition: var(--transition-fast);
 }
 
-.icon-btn {
-    min-width: 44px;
-    min-height: 44px;
+.header-logo:hover {
+    transform: scale(1.05);
+}
+
+.logo-icon {
+    width: 36px;
+    height: 36px;
+    background: linear-gradient(135deg, var(--primary) 0%, var(--accent) 100%);
     border-radius: var(--radius-md);
-    background: var(--bg);
-    border: none;
     display: flex;
     align-items: center;
     justify-content: center;
-    cursor: pointer;
-    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-    position: relative;
-}
-
-.icon-btn:active {
-    transform: scale(0.95);
-}
-
-.notification-badge {
-    position: absolute;
-    top: -4px;
-    right: -4px;
-    width: 18px;
-    height: 18px;
-    background: var(--danger);
-    border-radius: 50%;
-    font-size: 11px;
-    font-weight: 700;
     color: white;
+    font-size: var(--font-lg);
+    font-weight: var(--weight-bold);
+    box-shadow: var(--shadow-primary);
+}
+
+/* === Header Stats === */
+.header-stats {
+    display: flex;
+    align-items: center;
+    gap: var(--space-lg);
+    flex: 1;
+    justify-content: center;
+}
+
+.stat-badge {
+    display: flex;
+    align-items: center;
+    gap: var(--space-xs);
+    padding: var(--space-sm) var(--space-md);
+    background: rgba(99, 102, 241, 0.08);
+    border: 1px solid rgba(99, 102, 241, 0.15);
+    border-radius: var(--radius-full);
+    font-size: var(--font-sm);
+    font-weight: var(--weight-semibold);
+    color: var(--primary);
+    transition: all var(--transition-fast);
+    cursor: pointer;
+}
+
+.stat-badge:hover {
+    background: rgba(99, 102, 241, 0.12);
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-sm);
+}
+
+.stat-badge.success {
+    background: rgba(16, 185, 129, 0.08);
+    border-color: rgba(16, 185, 129, 0.15);
+    color: var(--success);
+}
+
+.stat-badge.warning {
+    background: rgba(245, 158, 11, 0.08);
+    border-color: rgba(245, 158, 11, 0.15);
+    color: var(--warning);
+}
+
+.stat-value {
+    font-size: var(--font-md);
+    font-weight: var(--weight-bold);
+}
+
+.stat-icon {
+    width: 20px;
+    height: 20px;
     display: flex;
     align-items: center;
     justify-content: center;
-    border: 2px solid var(--card);
+}
+
+/* === Profile Button === */
+.profile-button {
+    display: flex;
+    align-items: center;
+    gap: var(--space-sm);
+    padding: var(--space-sm) var(--space-md);
+    background: linear-gradient(135deg, var(--primary) 0%, var(--accent) 100%);
+    color: white;
+    border: none;
+    border-radius: var(--radius-full);
+    font-size: var(--font-sm);
+    font-weight: var(--weight-semibold);
+    cursor: pointer;
+    transition: all var(--transition-base);
+    box-shadow: var(--shadow-primary);
+    position: relative;
+    overflow: hidden;
+}
+
+.profile-button::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: linear-gradient(135deg, rgba(255, 255, 255, 0.2) 0%, transparent 100%);
+    opacity: 0;
+    transition: opacity var(--transition-fast);
+}
+
+.profile-button:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-lg), var(--shadow-primary);
+}
+
+.profile-button:hover::before {
+    opacity: 1;
+}
+
+.profile-button:active {
+    transform: translateY(0);
+}
+
+.profile-avatar {
+    width: 32px;
+    height: 32px;
+    border-radius: var(--radius-full);
+    background: rgba(255, 255, 255, 0.2);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: var(--weight-bold);
+    font-size: var(--font-sm);
+    border: 2px solid rgba(255, 255, 255, 0.3);
+}
+
+/* === Mobile Header === */
+@media (max-width: 768px) {
+    .app-header {
+        height: 60px;
+    }
+
+    .header-stats {
+        display: none;
+    }
+
+    .header-content {
+        padding: 0 var(--space-md);
+    }
+
+    .header-logo {
+        font-size: var(--font-lg);
+    }
+
+    .logo-icon {
+        width: 32px;
+        height: 32px;
+    }
+
+    .profile-button {
+        padding: var(--space-xs) var(--space-sm);
+        font-size: var(--font-xs);
+    }
+
+    .profile-button span {
+        display: none;
+    }
+}
+
+/* === Sticky Header Effect === */
+.app-header.scrolled {
+    background: rgba(255, 255, 255, 0.95);
+    border-bottom-color: rgba(99, 102, 241, 0.15);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.06);
 }
