@@ -278,7 +278,7 @@ async def get_profile(authorization: str = Header(None)):
 async def list_products(authorization: str = Header(None), status: Optional[str] = None):
     """
     List partner's products.
-    
+
     Returns prices in RUBLES (converted from kopeks for display).
     """
     telegram_id = verify_telegram_webapp(authorization)
@@ -327,14 +327,15 @@ async def create_product(
 ):
     """
     Create new product with unified schema.
-    
+
     Prices are accepted in RUBLES (user-friendly) and converted to kopeks internally.
     Times are generated automatically (08:00 - 23:00).
     Validation happens via Pydantic models.
     """
     from datetime import datetime, timedelta
+
     from app.domain.models import OfferCreate
-    
+
     telegram_id = verify_telegram_webapp(authorization)
     user, store = get_partner_with_store(telegram_id)
     db = get_db()
@@ -343,7 +344,7 @@ async def create_product(
     now = datetime.now()
     available_from = now.replace(hour=8, minute=0, second=0, microsecond=0).time()
     available_until = now.replace(hour=23, minute=0, second=0, microsecond=0).time()
-    
+
     # Parse expiry date (Pydantic will validate format)
     if expiry_date:
         try:
@@ -355,7 +356,9 @@ async def create_product(
                 expiry_dt = datetime.strptime(expiry_date, "%d.%m.%Y")
                 expiry = expiry_dt.date()
             except ValueError:
-                raise HTTPException(status_code=400, detail=f"Invalid expiry_date format: {expiry_date}")
+                raise HTTPException(
+                    status_code=400, detail=f"Invalid expiry_date format: {expiry_date}"
+                )
     else:
         # Default: 7 days from now
         expiry = (now + timedelta(days=7)).date()
@@ -376,7 +379,7 @@ async def create_product(
             category=category,
             photo_id=photo_id,
         )
-        
+
         # Save to database (Pydantic ensures correct types)
         offer_id = db.add_offer(
             store_id=offer_data.store_id,
@@ -392,14 +395,15 @@ async def create_product(
             category=offer_data.category,
             photo_id=offer_data.photo_id,
         )
-        
+
         return {"offer_id": offer_id, "status": "created"}
-    
+
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
 
 @router.put("/products/{product_id}")
+@router.patch("/products/{product_id}")  # Add PATCH support for frontend compatibility
 @limiter.limit("10/minute")
 async def update_product(
     product_id: int,
@@ -418,7 +422,8 @@ async def update_product(
 ):
     """
     Update product (supports partial updates for quick actions).
-    
+    Accepts both PUT and PATCH methods.
+
     Prices accepted in RUBLES and converted to kopeks internally.
     """
     telegram_id = verify_telegram_webapp(authorization)
@@ -497,6 +502,39 @@ async def update_product(
         cursor.execute(query, tuple(update_values))
 
     return {"offer_id": product_id, "status": "updated"}
+
+
+@router.patch("/products/{product_id}/status")
+async def update_product_status(
+    product_id: int, request: Request, authorization: str = Header(None)
+):
+    """Update product status (toggle active/hidden)"""
+    telegram_id = verify_telegram_webapp(authorization)
+    user, store = get_partner_with_store(telegram_id)
+    db = get_db()
+
+    # Parse request body
+    try:
+        body = await request.json()
+        new_status = body.get("status")
+        if not new_status:
+            raise HTTPException(status_code=400, detail="Missing 'status' field")
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Invalid request body: {e}")
+
+    # Verify ownership
+    offer = db.get_offer(product_id)
+    if not offer or offer.get("store_id") != store["store_id"]:
+        raise HTTPException(status_code=404, detail="Product not found")
+
+    # Update status
+    with db.get_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute(
+            "UPDATE offers SET status = %s WHERE offer_id = %s", (new_status, product_id)
+        )
+
+    return {"offer_id": product_id, "status": new_status}
 
 
 @router.delete("/products/{product_id}")
