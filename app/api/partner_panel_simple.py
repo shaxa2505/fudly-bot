@@ -276,7 +276,11 @@ async def get_profile(authorization: str = Header(None)):
 # Products endpoints
 @router.get("/products")
 async def list_products(authorization: str = Header(None), status: Optional[str] = None):
-    """List partner's products"""
+    """
+    List partner's products.
+    
+    Returns prices in RUBLES (converted from kopeks for display).
+    """
     telegram_id = verify_telegram_webapp(authorization)
     user, store = get_partner_with_store(telegram_id)
     db = get_db()
@@ -292,8 +296,9 @@ async def list_products(authorization: str = Header(None), status: Optional[str]
             "offer_id": o["offer_id"],
             "title": o["title"],
             "category": o.get("category"),
-            "original_price": o.get("original_price"),
-            "discount_price": o["discount_price"],
+            # Convert kopeks → rubles for display
+            "original_price": o.get("original_price") / 100 if o.get("original_price") else None,
+            "discount_price": o["discount_price"] / 100 if o["discount_price"] else None,
             "quantity": o["quantity"],
             "unit": o.get("unit", "шт"),
             "expiry_date": o.get("expiry_date"),
@@ -312,47 +317,86 @@ async def create_product(
     authorization: str = Header(None),
     title: str = Form(...),
     category: str = Form("other"),
-    original_price: int = Form(0),
-    discount_price: int = Form(...),
+    original_price: int = Form(...),  # Now required in rubles
+    discount_price: int = Form(...),  # In rubles
     quantity: int = Form(...),
     unit: str = Form("шт"),
     expiry_date: Optional[str] = Form(None),
     description: Optional[str] = Form(None),
     photo_id: Optional[str] = Form(None),
 ):
-    """Create new product"""
+    """
+    Create new product with unified schema.
+    
+    Prices are accepted in RUBLES (user-friendly) and converted to kopeks internally.
+    Times are generated automatically (08:00 - 23:00).
+    Validation happens via Pydantic models.
+    """
+    from datetime import datetime, timedelta
+    from app.domain.models import OfferCreate
+    
     telegram_id = verify_telegram_webapp(authorization)
     user, store = get_partner_with_store(telegram_id)
     db = get_db()
 
-    # Parse expiry date
-    expiry = None
+    # Prepare times (08:00 - 23:00)
+    now = datetime.now()
+    available_from = now.replace(hour=8, minute=0, second=0, microsecond=0).time()
+    available_until = now.replace(hour=23, minute=0, second=0, microsecond=0).time()
+    
+    # Parse expiry date (Pydantic will validate format)
     if expiry_date:
         try:
-            expiry = datetime.fromisoformat(expiry_date)
+            expiry_dt = datetime.fromisoformat(expiry_date)
+            expiry = expiry_dt.date()
         except ValueError:
-            pass
+            # Try alternative formats
+            try:
+                expiry_dt = datetime.strptime(expiry_date, "%d.%m.%Y")
+                expiry = expiry_dt.date()
+            except ValueError:
+                raise HTTPException(status_code=400, detail=f"Invalid expiry_date format: {expiry_date}")
+    else:
+        # Default: 7 days from now
+        expiry = (now + timedelta(days=7)).date()
 
-    # Create offer using add_offer
-    now = datetime.now().isoformat()
-    until = (datetime.now() + timedelta(days=7)).isoformat()
-
-    offer_id = db.add_offer(
-        store_id=store["store_id"],
-        title=title,
-        description=description or title,
-        original_price=original_price if original_price > 0 else None,
-        discount_price=discount_price,
-        quantity=quantity,
-        available_from=now,
-        available_until=until,
-        expiry_date=expiry.isoformat() if expiry else None,
-        unit=unit,
-        category=category,
-        photo_id=photo_id,
-    )
-
-    return {"offer_id": offer_id, "status": "created"}
+    try:
+        # Validate with Pydantic model (converts rubles to kopeks)
+        offer_data = OfferCreate(
+            store_id=store["store_id"],
+            title=title,
+            description=description or title,
+            original_price=original_price * 100,  # Convert rubles → kopeks
+            discount_price=discount_price * 100,  # Convert rubles → kopeks
+            quantity=quantity,
+            available_from=available_from,
+            available_until=available_until,
+            expiry_date=expiry,
+            unit=unit,
+            category=category,
+            photo_id=photo_id,
+        )
+        
+        # Save to database (Pydantic ensures correct types)
+        offer_id = db.add_offer(
+            store_id=offer_data.store_id,
+            title=offer_data.title,
+            description=offer_data.description,
+            original_price=offer_data.original_price,  # Already in kopeks
+            discount_price=offer_data.discount_price,  # Already in kopeks
+            quantity=offer_data.quantity,
+            available_from=offer_data.available_from.isoformat(),
+            available_until=offer_data.available_until.isoformat(),
+            expiry_date=offer_data.expiry_date.isoformat(),
+            unit=offer_data.unit,
+            category=offer_data.category,
+            photo_id=offer_data.photo_id,
+        )
+        
+        return {"offer_id": offer_id, "status": "created"}
+    
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
 
 @router.put("/products/{product_id}")
@@ -363,8 +407,8 @@ async def update_product(
     authorization: str = Header(None),
     title: Optional[str] = Form(None),
     category: Optional[str] = Form(None),
-    original_price: Optional[int] = Form(None),
-    discount_price: Optional[int] = Form(None),
+    original_price: Optional[int] = Form(None),  # In rubles
+    discount_price: Optional[int] = Form(None),  # In rubles
     quantity: Optional[int] = Form(None),
     unit: Optional[str] = Form(None),
     expiry_date: Optional[str] = Form(None),
@@ -372,7 +416,11 @@ async def update_product(
     photo_id: Optional[str] = Form(None),
     status: Optional[str] = Form(None),
 ):
-    """Update product (supports partial updates for quick actions)"""
+    """
+    Update product (supports partial updates for quick actions).
+    
+    Prices accepted in RUBLES and converted to kopeks internally.
+    """
     telegram_id = verify_telegram_webapp(authorization)
     user, store = get_partner_with_store(telegram_id)
     db = get_db()
@@ -396,11 +444,13 @@ async def update_product(
 
     if original_price is not None:
         update_fields.append("original_price = %s")
-        update_values.append(original_price if original_price > 0 else None)
+        # Convert rubles → kopeks
+        update_values.append(original_price * 100 if original_price > 0 else None)
 
     if discount_price is not None:
         update_fields.append("discount_price = %s")
-        update_values.append(discount_price)
+        # Convert rubles → kopeks
+        update_values.append(discount_price * 100)
 
     if quantity is not None:
         update_fields.append("quantity = %s")

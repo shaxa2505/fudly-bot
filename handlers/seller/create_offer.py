@@ -646,6 +646,8 @@ async def skip_photo(callback: types.CallbackQuery, state: FSMContext) -> None:
 
 async def _finalize_offer(target: types.Message, state: FSMContext, lang: str) -> None:
     """Save offer to database."""
+    from datetime import datetime, timedelta
+    
     data = await state.get_data()
 
     try:
@@ -661,17 +663,26 @@ async def _finalize_offer(target: types.Message, state: FSMContext, lang: str) -
         else:
             qty_display = f"{int(quantity)} шт"
 
+        # Prepare times in ISO format (will be parsed by Pydantic)
+        now = datetime.now()
+        available_from = now.replace(hour=8, minute=0, second=0, microsecond=0)
+        available_until = now.replace(hour=23, minute=0, second=0, microsecond=0)
+        
+        # Convert prices from rubles to kopeks (multiply by 100)
+        original_price_kopeks = int(data["original_price"] * 100)
+        discount_price_kopeks = int(data["discount_price"] * 100)
+
         offer_id = db.add_offer(
             store_id=data["store_id"],
             title=data["title"],
             description=data["title"],
-            original_price=data["original_price"],
-            discount_price=data["discount_price"],
+            original_price=original_price_kopeks,  # Now in kopeks
+            discount_price=discount_price_kopeks,  # Now in kopeks
             quantity=quantity,
-            available_from="08:00",
-            available_until="23:00",
-            photo=data.get("photo"),
-            expiry_date=data["expiry_date"],
+            available_from=available_from.time().isoformat(),  # ISO time format
+            available_until=available_until.time().isoformat(),  # ISO time format
+            photo_id=data.get("photo"),  # Unified parameter name
+            expiry_date=data["expiry_date"],  # Will be parsed by Pydantic
             unit=unit,
             category=data.get("category", "other"),
         )

@@ -83,30 +83,24 @@ class OfferMixin:
         store_id: int,
         title: str,
         description: str = None,
-        original_price: float = None,
-        discount_price: float = None,
+        original_price: int = None,  # Now in kopeks (INTEGER)
+        discount_price: int = None,  # Now in kopeks (INTEGER)
         quantity: int = 1,
-        available_from: str = None,
-        available_until: str = None,
-        photo_id: str = None,
-        expiry_date: str = None,
+        available_from: str = None,  # Will be converted to TIME by Pydantic
+        available_until: str = None,  # Will be converted to TIME by Pydantic
+        photo_id: str = None,  # Unified parameter name
+        expiry_date: str = None,  # Will be converted to DATE by Pydantic
         unit: str = "шт",
         category: str = "other",
-        photo: str = None,
     ):
-        """Add new offer."""
-        actual_photo_id = photo if photo is not None else photo_id
-
-        # Normalize expiry_date format
-        if expiry_date and "." in expiry_date:
-            try:
-                from datetime import datetime
-
-                dt = datetime.strptime(expiry_date, "%d.%m.%Y")
-                expiry_date = dt.strftime("%Y-%m-%d")
-            except ValueError:
-                pass
-
+        """
+        Add new offer with unified schema.
+        
+        Note: Prices should be in kopeks (INTEGER), not rubles.
+        Times and dates will be validated by Pydantic models before reaching here.
+        
+        Legacy 'photo' parameter removed - use 'photo_id' instead.
+        """
         with self.get_connection() as conn:
             cursor = conn.cursor()
             cursor.execute(
@@ -126,7 +120,7 @@ class OfferMixin:
                     available_from,
                     available_until,
                     expiry_date,
-                    actual_photo_id,
+                    photo_id,  # No more hack - direct parameter
                     unit,
                     category,
                 ),
