@@ -128,6 +128,23 @@ def create_api_app(db: Any = None, offer_service: Any = None, bot_token: str = N
         expose_headers=["Content-Length", "Content-Type"],
     )
 
+    # 🔥 CACHE FIX: Disable caching for Partner Panel static files
+    @app.middleware("http")
+    async def disable_static_cache(request: Request, call_next):
+        response = await call_next(request)
+
+        # Disable cache for Partner Panel CSS/JS files
+        if request.url.path.startswith("/partner-panel/"):
+            if any(ext in request.url.path for ext in [".css", ".js", ".html"]):
+                response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate, max-age=0"
+                response.headers["Pragma"] = "no-cache"
+                response.headers["Expires"] = "0"
+                # Remove ETag to prevent 304 responses
+                response.headers.pop("ETag", None)
+                response.headers.pop("Last-Modified", None)
+
+        return response
+
     # Define static file paths (needed for debug endpoint)
     webapp_dist_path = Path(__file__).parent.parent.parent / "webapp" / "dist"
     partner_panel_path = Path(__file__).parent.parent.parent / "webapp" / "partner-panel"
