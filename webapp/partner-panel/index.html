@@ -1608,26 +1608,26 @@
             max-width: 90%;
         }
 
-        .toast.success { 
+        .toast.success {
             background: linear-gradient(135deg, #10b981 0%, #059669 100%);
         }
-        
-        .toast.error { 
+
+        .toast.error {
             background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
         }
-        
-        .toast.warning { 
+
+        .toast.warning {
             background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
             color: white;
         }
 
         @keyframes toastIn {
-            from { 
-                opacity: 0; 
+            from {
+                opacity: 0;
                 transform: translate(-50%, 30px) scale(0.8);
             }
-            to { 
-                opacity: 1; 
+            to {
+                opacity: 1;
                 transform: translate(-50%, 0) scale(1);
             }
         }
@@ -1741,10 +1741,10 @@
 
         <div class="search-container">
             <i data-lucide="search" class="search-icon" style="width: 20px; height: 20px;"></i>
-            <input 
-                type="text" 
-                class="search-input" 
-                placeholder="Поиск товаров..." 
+            <input
+                type="text"
+                class="search-input"
+                placeholder="Поиск товаров..."
                 oninput="searchProducts(this.value, this)"
                 aria-label="Поиск товаров"
             />
@@ -1878,20 +1878,55 @@
                     </div>
                 </div>
                 <div class="form-group">
-                    <label class="form-label">Название</label>
+                    <label class="form-label">Категория *</label>
+                    <select class="input-field" id="productCategory" required>
+                        <option value="bakery">🥖 Выпечка</option>
+                        <option value="dairy">🥛 Молочные</option>
+                        <option value="meat">🥩 Мясные</option>
+                        <option value="fruits">🍎 Фрукты</option>
+                        <option value="vegetables">🥬 Овощи</option>
+                        <option value="drinks">🥤 Напитки</option>
+                        <option value="snacks">🍿 Снеки</option>
+                        <option value="frozen">🧊 Замороженное</option>
+                        <option value="other" selected>📦 Другое</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Название *</label>
                     <input type="text" class="input-field" id="productName" placeholder="Название товара" required>
                 </div>
                 <div class="form-group">
                     <label class="form-label">Описание</label>
-                    <input type="text" class="input-field" id="productDescription" placeholder="Описание">
+                    <textarea class="input-field" id="productDescription" placeholder="Описание товара" rows="2"></textarea>
                 </div>
                 <div class="form-group">
-                    <label class="form-label">Цена, ₽</label>
-                    <input type="number" class="input-field" id="productPrice" placeholder="0" required>
+                    <label class="form-label">Цена без скидки, ₽ *</label>
+                    <input type="number" class="input-field" id="productOriginalPrice" placeholder="0" required min="0">
                 </div>
                 <div class="form-group">
-                    <label class="form-label">Количество</label>
-                    <input type="number" class="input-field" id="productStock" placeholder="0">
+                    <label class="form-label">Скидка, %</label>
+                    <input type="number" class="input-field" id="productDiscount" placeholder="0" value="0" min="0" max="99" onchange="calculateDiscountPrice()">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Цена со скидкой, ₽ *</label>
+                    <input type="number" class="input-field" id="productPrice" placeholder="0" required min="0">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Единица измерения *</label>
+                    <select class="input-field" id="productUnit" required>
+                        <option value="шт" selected>шт (штуки)</option>
+                        <option value="кг">кг (килограммы)</option>
+                        <option value="л">л (литры)</option>
+                        <option value="уп">уп (упаковки)</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Количество *</label>
+                    <input type="number" class="input-field" id="productStock" placeholder="0" required min="0">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Срок годности</label>
+                    <input type="date" class="input-field" id="productExpiry">
                 </div>
                 <button type="submit" class="save-btn">Сохранить</button>
                 <button type="button" class="btn-outline" style="width: 100%; margin-top: 8px;" onclick="closeModal()">Отмена</button>
@@ -1984,10 +2019,10 @@
         }
 
         const API = 'https://fudly-bot-production.up.railway.app/api/partner';
-        
+
         // Dev mode detection
         const isDev = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
-        
+
         const getAuth = () => {
             if (!initData) {
                 console.error('❌ No initData available!');
@@ -2009,7 +2044,7 @@
                     console.warn('⚠️ Fallback: Using URL uid with current timestamp');
                     return `tma uid=${urlUserId}&auth_date=${Math.floor(Date.now() / 1000)}`;
                 }
-                
+
                 // Last resort: show error to user
                 console.error('❌ No auth method available. User must open via Telegram bot.');
                 return '';
@@ -2041,7 +2076,7 @@
                         console.error('❌ 401 Unauthorized - Check initData:', initData);
                         console.error('📱 You must open Partner Panel via Telegram bot!');
                         console.error('💡 Command: /partner or tap "Партнер-панель" button');
-                        
+
                         // Show user-friendly error
                         const errorDiv = document.createElement('div');
                         errorDiv.style.cssText = 'position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: white; padding: 32px; border-radius: 16px; box-shadow: 0 4px 24px rgba(0,0,0,0.2); max-width: 400px; text-align: center; z-index: 9999;';
@@ -2056,7 +2091,7 @@
                             </button>
                         `;
                         document.body.appendChild(errorDiv);
-                        
+
                         throw new Error('Unauthorized - Open via Telegram bot');
                     }
                     const errorText = await res.text();
@@ -2075,7 +2110,7 @@
 
         function formatPrice(amount) {
             if (!amount && amount !== 0) return '0 sům';
-            
+
             // Format with spaces as thousand separators
             const formatted = amount.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
             return formatted + ' sům';
@@ -2673,7 +2708,7 @@
         function searchProducts(query, inputEl) {
             // Clear existing timeout
             if (searchTimeout) clearTimeout(searchTimeout);
-            
+
             // Update clear button visibility
             const clearBtn = document.querySelector('.search-clear');
             if (clearBtn) {
@@ -2683,7 +2718,7 @@
                     clearBtn.classList.remove('visible');
                 }
             }
-            
+
             // Debounce search
             searchTimeout = setTimeout(() => {
                 searchQuery = query.toLowerCase().trim();
@@ -2697,7 +2732,7 @@
                 searchInput.value = '';
                 searchQuery = '';
                 renderProducts();
-                
+
                 const clearBtn = document.querySelector('.search-clear');
                 if (clearBtn) clearBtn.classList.remove('visible');
             }
@@ -2730,19 +2765,19 @@
         async function adjustStock(productId, delta, event) {
             const btn = event?.target?.closest('.stock-btn');
             if (!btn) return;
-            
+
             try {
                 // Disable button and show loading
                 btn.disabled = true;
                 btn.classList.add('loading');
-                
+
                 const product = allProducts.find(p => p.id === productId);
                 if (!product) {
                     throw new Error('Товар не найден');
                 }
 
                 const newStock = Math.max(0, product.stock + delta);
-                
+
                 const response = await fetch(`${API}/products/${productId}`, {
                     method: 'PATCH',
                     headers: {
@@ -2760,20 +2795,20 @@
                 // Update local state
                 product.stock = newStock;
                 product.status = newStock > 0 ? 'active' : 'out_of_stock';
-                
+
                 // Update UI
                 const stockValueEl = btn.parentElement?.querySelector('.stock-value');
                 if (stockValueEl) {
                     stockValueEl.textContent = `${newStock} ${product.unit}`;
                 }
-                
+
                 // Update counts
                 const counts = getFilterCounts();
                 Object.keys(counts).forEach(key => {
                     const countEl = document.getElementById(`count-${key}`);
                     if (countEl) countEl.textContent = counts[key];
                 });
-                
+
                 toast(`✓ Остаток: ${newStock} ${product.unit}`, 'success');
             } catch (error) {
                 console.error('❌ Error adjusting stock:', error);
@@ -2815,7 +2850,7 @@
                 : allProducts.filter(p => p.status === productsFilter);
 
             if (searchQuery) {
-                filtered = filtered.filter(p => 
+                filtered = filtered.filter(p =>
                     p.name.toLowerCase().includes(searchQuery) ||
                     (p.category && p.category.toLowerCase().includes(searchQuery))
                 );
@@ -2823,7 +2858,7 @@
 
             const html = filtered.length ? filtered.map(product => {
                 const hasDiscount = product.original_price && product.original_price > product.price;
-                const discountPercent = hasDiscount 
+                const discountPercent = hasDiscount
                     ? Math.round((1 - product.price / product.original_price) * 100)
                     : 0;
 
@@ -2842,8 +2877,8 @@
                 return `
                 <div class="product-card" data-product-id="${product.id}">
                     <div class="product-image-wrapper">
-                        <img 
-                            src="${product.image}" 
+                        <img
+                            src="${product.image}"
                             alt="${product.name}"
                             class="product-image loaded"
                             loading="lazy"
@@ -2944,7 +2979,7 @@
             const modal = document.getElementById('addProductModal');
             modal.classList.add('show');
             modal.removeAttribute('data-edit-id');
-            
+
             // Reset title
             const modalHeader = modal.querySelector('.modal-header');
             if (modalHeader) modalHeader.textContent = 'Добавить товар';
@@ -2954,7 +2989,7 @@
             const modal = document.getElementById('addProductModal');
             modal.classList.remove('show');
             modal.removeAttribute('data-edit-id');
-            
+
             document.getElementById('addProductForm').reset();
             document.getElementById('imagePreview').classList.add('hidden');
             document.getElementById('uploadPlaceholder').style.display = 'block';
@@ -2962,6 +2997,21 @@
             // Reset modal title
             const modalHeader = modal.querySelector('.modal-header');
             if (modalHeader) modalHeader.textContent = 'Добавить товар';
+        }
+
+        function calculateDiscountPrice() {
+            const originalPrice = parseFloat(document.getElementById('productOriginalPrice').value) || 0;
+            const discount = parseFloat(document.getElementById('productDiscount').value) || 0;
+
+            if (originalPrice > 0 && discount >= 0 && discount <= 99) {
+                const discountPrice = originalPrice * (1 - discount / 100);
+                document.getElementById('productPrice').value = Math.round(discountPrice);
+            }
+        }
+
+        // Auto-calculate discount price when original price or discount changes
+        if (document.getElementById('productOriginalPrice')) {
+            document.getElementById('productOriginalPrice').addEventListener('input', calculateDiscountPrice);
         }
 
         function previewImage(event) {
@@ -2999,7 +3049,7 @@
                 if (photoFile) {
                     try {
                         submitBtn.innerHTML = '<div class="spinner-sm"></div> Загрузка фото...';
-                        
+
                         const photoFormData = new FormData();
                         photoFormData.append('photo', photoFile);
 
@@ -3033,11 +3083,24 @@
 
                 const formData = new FormData();
                 formData.append('title', document.getElementById('productName').value);
-                formData.append('description', document.getElementById('productDescription').value || '');
-                formData.append('discount_price', parseInt(document.getElementById('productPrice').value));
+                formData.append('description', document.getElementById('productDescription').value || document.getElementById('productName').value);
+                formData.append('category', document.getElementById('productCategory').value);
+                formData.append('unit', document.getElementById('productUnit').value);
+
+                // Prices
+                const originalPrice = parseInt(document.getElementById('productOriginalPrice').value) || 0;
+                const discountPrice = parseInt(document.getElementById('productPrice').value) || 0;
+                formData.append('original_price', originalPrice);
+                formData.append('discount_price', discountPrice);
+
+                // Quantity
                 formData.append('quantity', parseInt(document.getElementById('productStock').value) || 0);
-                formData.append('category', 'other');
-                formData.append('unit', 'шт');
+
+                // Expiry date
+                const expiryDate = document.getElementById('productExpiry').value;
+                if (expiryDate) {
+                    formData.append('expiry_date', expiryDate);
+                }
 
                 // Use new photo_id or keep existing one
                 if (photoId) {
@@ -3071,7 +3134,7 @@
             } catch (error) {
                 console.error('❌ Error saving product:', error);
                 toast(error.message || 'Ошибка сохранения товара', 'error');
-                
+
                 // Restore button
                 const submitBtn = e.target.querySelector('button[type="submit"]');
                 submitBtn.disabled = false;
@@ -3090,11 +3153,30 @@
                 // Fill modal with product data
                 document.getElementById('productName').value = product.name || '';
                 document.getElementById('productDescription').value = product.description || '';
+                document.getElementById('productCategory').value = product.category || 'other';
+                document.getElementById('productUnit').value = product.unit || 'шт';
+
+                // Prices
+                document.getElementById('productOriginalPrice').value = product.original_price || product.price || 0;
                 document.getElementById('productPrice').value = product.price || 0;
+
+                // Calculate discount percentage if both prices available
+                if (product.original_price && product.price && product.original_price > product.price) {
+                    const discount = Math.round(((product.original_price - product.price) / product.original_price) * 100);
+                    document.getElementById('productDiscount').value = discount;
+                } else {
+                    document.getElementById('productDiscount').value = 0;
+                }
+
                 document.getElementById('productStock').value = product.stock || 0;
 
+                // Expiry date
+                if (product.expiry_date) {
+                    document.getElementById('productExpiry').value = product.expiry_date;
+                }
+
                 // Show existing photo if available
-                if (product.image && product.image !== 'https://via.placeholder.com/120?text=Loading...') {
+                if (product.image && product.image !== 'https://via.placeholder.com/120?text=Loading...' && product.image !== 'https://via.placeholder.com/120?text=No+Photo') {
                     const preview = document.getElementById('imagePreview');
                     preview.src = product.image;
                     preview.classList.remove('hidden');
@@ -3123,13 +3205,13 @@
                 btn.disabled = true;
                 btn.classList.add('loading');
             }
-            
+
             try {
                 const product = allProducts.find(p => p.id === id);
                 if (!product) throw new Error('Товар не найден');
 
                 const newStatus = product.status === 'hidden' ? 'active' : 'hidden';
-                
+
                 const response = await fetch(`${API}/products/${id}/status`, {
                     method: 'PATCH',
                     headers: {
@@ -3212,7 +3294,7 @@
             } catch (error) {
                 console.error('❌ Error loading stats:', error);
                 toast('Ошибка загрузки статистики', 'error');
-                
+
                 // Show empty charts on error
                 renderCharts({
                     revenue: [0, 0, 0, 0, 0, 0, 0],
@@ -3340,7 +3422,7 @@
                 // Update settings display
                 const storeNameEl = document.getElementById('settingsStoreName');
                 const storeAddressEl = document.getElementById('settingsStoreAddress');
-                
+
                 if (storeNameEl && profile?.store?.name) {
                     storeNameEl.textContent = profile.store.name;
                 }
