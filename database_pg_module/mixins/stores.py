@@ -7,12 +7,23 @@ from typing import Any
 
 from psycopg.rows import dict_row
 
+from database_pg_module.crypto import (
+    EncryptionError,
+    EncryptionNotConfiguredError,
+    decrypt_secret,
+    encrypt_secret,
+    is_dev_environment,
+    is_fernet_token,
+)
+
 try:
     from logging_config import logger
 except ImportError:
     import logging
 
     logger = logging.getLogger(__name__)
+
+_plaintext_payment_secret_warned = False
 
 
 class StoreMixin:
@@ -466,7 +477,23 @@ class StoreMixin:
             """,
                 (store_id,),
             )
-            return [dict(row) for row in cursor.fetchall()]
+            integrations: list[dict] = []
+            for row in cursor.fetchall():
+                item = dict(row)
+                secret_key = item.get("secret_key")
+                if isinstance(secret_key, str) and secret_key:
+                    if is_fernet_token(secret_key):
+                        item["secret_key"] = decrypt_secret(secret_key)
+                    else:
+                        global _plaintext_payment_secret_warned
+                        if not _plaintext_payment_secret_warned and not is_dev_environment():
+                            logger.warning(
+                                "Plaintext store payment secret detected in DB; "
+                                "set ENCRYPTION_KEY and run encrypt_credentials.py"
+                            )
+                            _plaintext_payment_secret_warned = True
+                integrations.append(item)
+            return integrations
 
     def get_store_payment_integration(self, store_id: int, provider: str) -> dict | None:
         """Get specific payment integration for a store."""
@@ -480,7 +507,23 @@ class StoreMixin:
                 (store_id, provider),
             )
             result = cursor.fetchone()
-            return dict(result) if result else None
+            if not result:
+                return None
+
+            item = dict(result)
+            secret_key = item.get("secret_key")
+            if isinstance(secret_key, str) and secret_key:
+                if is_fernet_token(secret_key):
+                    item["secret_key"] = decrypt_secret(secret_key)
+                else:
+                    global _plaintext_payment_secret_warned
+                    if not _plaintext_payment_secret_warned and not is_dev_environment():
+                        logger.warning(
+                            "Plaintext store payment secret detected in DB; "
+                            "set ENCRYPTION_KEY and run encrypt_credentials.py"
+                        )
+                        _plaintext_payment_secret_warned = True
+            return item
 
     def set_store_payment_integration(
         self,
@@ -491,6 +534,18 @@ class StoreMixin:
         service_id: str | None = None,
     ) -> bool:
         """Set or update payment integration for a store."""
+        encrypted_secret_key = secret_key
+        try:
+            encrypted_secret_key = encrypt_secret(
+                secret_key, allow_plaintext=is_dev_environment()
+            )
+        except (EncryptionNotConfiguredError, EncryptionError) as e:
+            logger.error(
+                "Failed to encrypt store payment secret_key. "
+                "Set ENCRYPTION_KEY in environment to enable encryption."
+            )
+            raise
+
         with self.get_connection() as conn:
             cursor = conn.cursor()
             cursor.execute(
@@ -506,7 +561,7 @@ class StoreMixin:
                     is_active = 1,
                     updated_at = CURRENT_TIMESTAMP
             """,
-                (store_id, provider, merchant_id, service_id, secret_key),
+                (store_id, provider, merchant_id, service_id, encrypted_secret_key),
             )
             logger.info(f"Payment integration {provider} set for store {store_id}")
             return True

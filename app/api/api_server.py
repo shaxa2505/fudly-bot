@@ -177,33 +177,36 @@ def create_api_app(db: Any = None, offer_service: Any = None, bot_token: str = N
     async def root():
         return {"service": "Fudly Mini App API", "version": "1.0.0", "docs": "/api/docs"}
 
-    @app.get("/api/debug/paths")
-    async def debug_paths():
-        """Debug endpoint to check file paths."""
-        return {
-            "partner_panel": {
-                "path": str(partner_panel_path.absolute()),
-                "exists": partner_panel_path.exists(),
-                "index_exists": (partner_panel_path / "index.html").exists()
-                if partner_panel_path.exists()
-                else False,
-                "files": [f.name for f in partner_panel_path.iterdir()][:10]
-                if partner_panel_path.exists()
-                else [],
-            },
-            "webapp": {
-                "path": str(webapp_dist_path.absolute()),
-                "exists": webapp_dist_path.exists(),
-                "index_exists": (webapp_dist_path / "index.html").exists()
-                if webapp_dist_path.exists()
-                else False,
-                "files": [f.name for f in webapp_dist_path.iterdir()][:10]
-                if webapp_dist_path.exists()
-                else [],
-            },
-            "cwd": os.getcwd(),
-            "file_location": str(Path(__file__).absolute()),
-        }
+    # Debug endpoint - DEV ONLY (leaks filesystem layout)
+    if is_dev:
+
+        @app.get("/api/debug/paths")
+        async def debug_paths():
+            """Debug endpoint to check file paths (development only)."""
+            return {
+                "partner_panel": {
+                    "path": str(partner_panel_path.absolute()),
+                    "exists": partner_panel_path.exists(),
+                    "index_exists": (partner_panel_path / "index.html").exists()
+                    if partner_panel_path.exists()
+                    else False,
+                    "files": [f.name for f in partner_panel_path.iterdir()][:10]
+                    if partner_panel_path.exists()
+                    else [],
+                },
+                "webapp": {
+                    "path": str(webapp_dist_path.absolute()),
+                    "exists": webapp_dist_path.exists(),
+                    "index_exists": (webapp_dist_path / "index.html").exists()
+                    if webapp_dist_path.exists()
+                    else False,
+                    "files": [f.name for f in webapp_dist_path.iterdir()][:10]
+                    if webapp_dist_path.exists()
+                    else [],
+                },
+                "cwd": os.getcwd(),
+                "file_location": str(Path(__file__).absolute()),
+            }
 
     # Serve static files (MUST be after all API routes)
     logger.info(f"📁 Looking for Partner Panel at: {partner_panel_path.absolute()}")

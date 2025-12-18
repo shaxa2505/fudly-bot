@@ -270,30 +270,68 @@
                 source += '+url';
             }
 
+            // ⚠️ TEMPORARY DEBUG: Allow without auth for testing
+            if (!finalData && urlUserId) {
+                finalData = `uid=${urlUserId}`;
+                source = 'debug-uid-only';
+                console.warn('⚠️ DEBUG MODE: Using UID-only auth (NOT SECURE)');
+            }
+
             const tgUser = tg?.initDataUnsafe?.user;
             const userId = urlUserId || tgUser?.id || 'none';
+
+            console.log('🔐 Auth Info:', { userId, source, hasData: !!finalData });
 
             return { data: finalData, userId, source };
         }
 
         async function apiFetch(endpoint, options = {}) {
-            const { data: initData } = getAuth();
+            const { data: initData, userId } = getAuth();
+            
+            // Determine authorization header
+            let authHeader = '';
+            if (initData) {
+                authHeader = `tma ${initData}`;
+            } else if (userId && userId !== 'none') {
+                // Fallback: use uid-only for testing/development
+                authHeader = `tma uid=${userId}`;
+                console.warn(`⚠️ Using UID-only auth: ${userId}`);
+            }
+
             const headers = {
                 'Content-Type': 'application/json',
-                'Authorization': initData ? `tma ${initData}` : '',
+                'Authorization': authHeader,
                 ...options.headers
             };
 
-            const response = await fetch(`${API_BASE}${endpoint}`, {
-                ...options,
-                headers
+            console.log(`🌐 API Request: ${endpoint}`, { 
+                hasAuth: !!authHeader,
+                userId,
+                endpoint
             });
 
-            if (!response.ok) {
-                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-            }
+            try {
+                const response = await fetch(`${API_BASE}${endpoint}`, {
+                    ...options,
+                    headers
+                });
 
-            return response.json();
+                console.log(`📥 API Response: ${endpoint}`, { 
+                    status: response.status, 
+                    ok: response.ok 
+                });
+
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    console.error(`❌ API Error ${response.status}:`, errorText);
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+
+                return response.json();
+            } catch (error) {
+                console.error(`❌ API Fetch Error (${endpoint}):`, error);
+                throw error;
+            }
         }
 
         // ============================================
@@ -507,7 +545,13 @@
                 renderDashboard();
             } catch (error) {
                 console.error('❌ Dashboard load error:', error);
-                toast('Ошибка загрузки данных', 'error');
+                console.error('Error details:', {
+                    message: error.message,
+                    stack: error.stack,
+                    API_BASE,
+                    auth: getAuth()
+                });
+                toast(`Ошибка загрузки данных: ${error.message}`, 'error');
             }
         }
 

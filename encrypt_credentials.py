@@ -1,68 +1,81 @@
-"""Encrypt plaintext credentials in store_payment_integrations."""
+"""Encrypt plaintext credentials in store_payment_integrations.
+
+This is a one-time maintenance script to move stored secrets to encrypted-at-rest
+format (Fernet). It updates `store_payment_integrations.secret_key` in-place.
+
+Usage (PowerShell):
+  $env:ENCRYPTION_KEY = "<base64-fernet-key>"  # optional; will be generated if missing
+  python .\\encrypt_credentials.py
+"""
+
+from __future__ import annotations
+
 import os
-os.environ['SKIP_DB_INIT'] = '1'
+
+os.environ["SKIP_DB_INIT"] = "1"
 
 from cryptography.fernet import Fernet
+
 from database_pg import Database
 
-def main():
-    print("="*80)
-    print("🔐 Encrypting payment credentials")
-    print("="*80)
-    
+
+def main() -> None:
+    print("=" * 80)
+    print("Encrypting payment credentials (store_payment_integrations.secret_key)")
+    print("=" * 80)
+
     # Generate or use existing encryption key
-    key = os.getenv('ENCRYPTION_KEY')
+    key = (os.getenv("ENCRYPTION_KEY") or "").strip()
     if not key:
-        key = Fernet.generate_key().decode()
-        print(f"\n⚠️  SAVE THIS KEY TO .env:")
+        key = Fernet.generate_key().decode("utf-8")
+        print("\nSAVE THIS KEY TO .env (and production environment):")
         print(f"ENCRYPTION_KEY={key}")
-        print("="*80)
-    else:
-        key = key.encode() if isinstance(key, str) else key
-        
-    fernet = Fernet(key)
+        print("=" * 80)
+
+    fernet = Fernet(key.encode("utf-8"))
     db = Database()
-    
+
     with db.get_connection() as conn:
         cursor = conn.cursor()
-        
-        # Get all payment integrations with plaintext credentials
-        cursor.execute("""
-            SELECT integration_id, store_id, provider, api_key, secret_key
+
+        cursor.execute(
+            """
+            SELECT id, store_id, provider, secret_key
             FROM store_payment_integrations
-            WHERE api_key IS NOT NULL OR secret_key IS NOT NULL
-        """)
-        
+            WHERE secret_key IS NOT NULL AND secret_key <> ''
+            """
+        )
+
         rows = cursor.fetchall()
-        print(f"\n📊 Found {len(rows)} integrations to encrypt")
-        
+        print(f"\nFound {len(rows)} integrations to check")
+
         encrypted_count = 0
-        for row in rows:
-            integration_id, store_id, provider, api_key, secret_key = row
-            
+        for integration_id, store_id, provider, secret_key in rows:
             # Skip already encrypted (starts with 'gAAAA' - Fernet signature)
-            if api_key and api_key.startswith('gAAAA'):
+            if isinstance(secret_key, str) and secret_key.startswith("gAAAA"):
                 continue
-            if secret_key and secret_key.startswith('gAAAA'):
-                continue
-                
-            # Encrypt credentials
-            encrypted_api = fernet.encrypt(api_key.encode()).decode() if api_key else None
-            encrypted_secret = fernet.encrypt(secret_key.encode()).decode() if secret_key else None
-            
-            cursor.execute("""
+
+            encrypted_secret = (
+                fernet.encrypt(secret_key.encode("utf-8")).decode("utf-8") if secret_key else None
+            )
+
+            cursor.execute(
+                """
                 UPDATE store_payment_integrations
-                SET api_key = %s, secret_key = %s
-                WHERE integration_id = %s
-            """, (encrypted_api, encrypted_secret, integration_id))
-            
+                SET secret_key = %s, updated_at = CURRENT_TIMESTAMP
+                WHERE id = %s
+                """,
+                (encrypted_secret, integration_id),
+            )
+
             encrypted_count += 1
-            print(f"  ✅ {provider} (store_id={store_id})")
-        
+            print(f"  - Encrypted {provider} (store_id={store_id})")
+
         conn.commit()
-        
-        print(f"\n✅ Encrypted {encrypted_count} integrations")
-        print("="*80)
+
+        print(f"\nEncrypted {encrypted_count} integrations")
+        print("=" * 80)
+
 
 if __name__ == "__main__":
     main()
