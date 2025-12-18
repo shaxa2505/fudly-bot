@@ -16,16 +16,18 @@
 }
 
 .section {
-    margin-bottom: 24px;
+    margin-bottom: 32px;
 }
 
 /* === Hero Section === */
 .hero-section {
     background: var(--card);
     border-radius: var(--radius-xl);
-    padding: var(--space-5) var(--space-4);
-    margin-bottom: var(--space-5);
-    box-shadow: var(--shadow-sm);
+    padding: var(--space-6) var(--space-5);
+    margin-bottom: var(--space-6);
+    box-shadow: var(--shadow-md);
+    border-top: 3px solid var(--primary);
+    position: relative;
 }
 
 .hero-greeting {
@@ -36,11 +38,11 @@
 }
 
 .hero-text h2 {
-    font-size: var(--text-2xl);
-    font-weight: var(--font-bold);
+    font-size: var(--text-3xl);
+    font-weight: 700;
     color: var(--text);
     margin: 0 0 var(--space-1) 0;
-    letter-spacing: -0.5px;
+    letter-spacing: -0.8px;
     line-height: var(--line-tight);
 }
 
@@ -131,7 +133,7 @@
 
 .goal-fill {
     height: 100%;
-    background: linear-gradient(90deg, #21A038 0%, #4CAF50 100%);
+    background: var(--success);
     border-radius: 3px;
     transition: width 0.5s ease;
 }
@@ -141,24 +143,26 @@
     align-items: center;
     gap: var(--space-2);
     background: var(--gray-100);
-    padding: var(--space-2) var(--space-4);
-    border-radius: var(--radius-md);
+    padding: var(--space-3) var(--space-5);
+    border-radius: var(--radius-lg);
     cursor: pointer;
     transition: all var(--duration-fast) var(--ease-out);
     border: none;
-    font-size: var(--text-sm);
-    font-weight: var(--font-semibold);
-    min-height: var(--touch-target-sm);
+    font-size: var(--text-base);
+    font-weight: 600;
+    min-height: var(--touch-target);
 }
 
 .status-toggle.open {
-    background: var(--success-light);
-    color: var(--success-dark);
+    background: #21A038;
+    color: white;
+    box-shadow: 0 2px 8px rgba(33, 160, 56, 0.3);
 }
 
 .status-toggle.closed {
-    background: var(--danger-light);
-    color: var(--danger-dark);
+    background: var(--danger);
+    color: white;
+    box-shadow: 0 2px 8px rgba(244, 67, 54, 0.3);
 }
 
 .status-toggle:active {
@@ -262,11 +266,11 @@
 }
 
 .section-title {
-    font-size: var(--text-xl);
-    font-weight: var(--font-bold);
+    font-size: 20px;
+    font-weight: 700;
     color: var(--text);
     margin: 0;
-    letter-spacing: -0.3px;
+    letter-spacing: -0.5px;
     line-height: var(--line-tight);
 }
 
@@ -281,8 +285,8 @@
 .stats-grid {
     display: grid;
     grid-template-columns: repeat(2, 1fr);
-    gap: var(--space-2);
-    margin-bottom: var(--space-5);
+    gap: var(--space-4);
+    margin-bottom: var(--space-8);
 }
 
 @media (max-width: 768px) {
@@ -294,20 +298,22 @@
 .stat-card {
     background: var(--card);
     border: none;
-    border-radius: var(--radius-md);
-    padding: var(--space-3) var(--space-4);
+    border-radius: var(--radius-lg);
+    padding: var(--space-4) var(--space-5);
     transition: box-shadow var(--duration-fast) var(--ease-out), transform var(--duration-fast) var(--ease-out);
     position: relative;
     overflow: hidden;
     box-shadow: var(--shadow-sm);
-    min-height: 72px;
+    min-height: 96px;
     display: flex;
     flex-direction: column;
     justify-content: center;
+    border-left: 4px solid transparent;
 }
 
 .stat-card:hover {
-    box-shadow: var(--shadow-md);
+    box-shadow: var(--shadow-lg);
+    transform: translateY(-3px);
 }
 
 .stat-card:active {
@@ -318,8 +324,9 @@
 /* Primary stat - bigger */
 .stat-card.primary {
     grid-column: span 2;
-    padding: var(--space-4) var(--space-5);
-    min-height: 88px;
+    padding: var(--space-6) var(--space-6);
+    min-height: 120px;
+    border-left-color: var(--primary);
 }
 
 .stat-card.primary {
@@ -330,6 +337,7 @@
 .stat-card.success {
     background: #FFFFFF;
     color: #000000;
+    border-left-color: var(--success);
 }
 
 .stat-card.success .stat-icon {
@@ -373,6 +381,7 @@
 .stat-card.warning {
     background: #FFFFFF;
     color: #000000;
+    border-left-color: var(--warning);
 }
 
 .stat-card.warning .stat-icon {
@@ -383,6 +392,7 @@
 .stat-card.danger {
     background: #FFFFFF;
     color: #000000;
+    border-left-color: var(--danger);
 }
 
 .stat-card.danger .stat-icon {
@@ -432,7 +442,7 @@
 }
 
 .stat-card:not(.primary):not(.success):not(.warning):not(.danger) .stat-icon {
-    background: linear-gradient(135deg, var(--primary-light), var(--accent-light));
+    background: var(--primary-light);
     color: var(--primary);
 }
 
@@ -458,17 +468,24 @@
 }
 
 .stat-value {
-    font-size: 32px;
+    font-size: 36px;
     font-weight: 700;
-    line-height: 1.2;
-    margin-bottom: 4px;
-    letter-spacing: -0.5px;
+    line-height: 1.1;
+    margin-bottom: 6px;
+    letter-spacing: -1px;
+}
+
+.stat-card.primary .stat-value {
+    font-size: 52px;
+    font-weight: 800;
+    letter-spacing: -1.5px;
 }
 
 .stat-label {
-    font-size: 13px;
+    font-size: 14px;
     font-weight: 500;
-    opacity: 0.85;
+    opacity: 0.7;
+    letter-spacing: -0.2px;
 }
 
 /* === Dashboard Cards === */
@@ -534,7 +551,7 @@
     top: 0;
     bottom: 0;
     width: 3px;
-    background: linear-gradient(180deg, var(--primary), var(--accent));
+    background: var(--primary);
     transform: scaleY(0);
     transition: transform var(--transition-base);
 }
@@ -562,7 +579,7 @@
     width: 48px;
     height: 48px;
     border-radius: var(--radius-md);
-    background: linear-gradient(135deg, var(--primary-light), var(--accent-light));
+    background: var(--primary-light);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -854,7 +871,7 @@
 
 .progress-bar {
     height: 100%;
-    background: linear-gradient(90deg, var(--primary), var(--accent));
+    background: var(--primary);
     border-radius: var(--radius-full);
     transition: width var(--transition-slow);
 }
@@ -1104,7 +1121,7 @@
     width: 120px;
     height: 120px;
     margin-bottom: var(--space-lg);
-    background: linear-gradient(135deg, var(--primary-light), var(--accent-light));
+    background: var(--primary-light);
     border-radius: var(--radius-2xl);
     display: flex;
     align-items: center;
@@ -1137,14 +1154,6 @@
         gap: 10px;
     }
 
-    .stat-card {
-        padding: 14px;
-    }
-
-    .stat-value {
-        font-size: 28px;
-    }
-
     .section-title {
         font-size: 20px;
     }
@@ -1158,14 +1167,6 @@
 @media (max-width: 375px) {
     .stats-grid {
         gap: 8px;
-    }
-
-    .stat-card {
-        padding: 12px;
-    }
-
-    .stat-value {
-        font-size: 24px;
     }
 
     .container {

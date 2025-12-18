@@ -92,14 +92,7 @@
 
 /* === Skeleton Loader === */
 .skeleton {
-    background: linear-gradient(
-        90deg,
-        var(--gray-100) 0%,
-        var(--gray-200) 20%,
-        var(--gray-100) 40%,
-        var(--gray-100) 100%
-    );
-    background-size: 200% 100%;
+    background: var(--gray-100);
     animation: shimmer 1.5s ease infinite;
     border-radius: var(--radius-sm);
 }

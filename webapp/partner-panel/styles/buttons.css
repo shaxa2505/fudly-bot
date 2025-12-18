@@ -254,17 +254,17 @@
     height: 60px;
     padding: 0;
     border-radius: var(--radius-full);
-    background: linear-gradient(135deg, var(--primary) 0%, var(--accent) 100%);
+    background: var(--primary-text);
     color: white;
     border: none;
-    box-shadow: var(--shadow-xl), var(--shadow-primary);
+    box-shadow: var(--shadow-lg);
     z-index: var(--z-fixed);
     animation: scaleIn var(--transition-slow) ease-out;
 }
 
 .fab:hover:not(:disabled) {
     transform: translateY(-4px) scale(1.05);
-    box-shadow: var(--shadow-2xl), var(--shadow-primary);
+    box-shadow: var(--shadow-xl);
 }
 
 .fab svg {
