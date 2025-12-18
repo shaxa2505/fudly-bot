@@ -767,7 +767,7 @@
                             Завершенные
                         </button>
                         <button class="tab" data-status="cancelled" onclick="filterOrderTab('cancelled')">
-                            Отмененные
+                            Отменённые
                         </button>
                     </div>
 
@@ -1363,21 +1363,9 @@
             showLoading('stats');
             
             try {
-                // Simulate loading (replace with actual API call)
-                await new Promise(resolve => setTimeout(resolve, 500));
-                
-                document.querySelector('.content').innerHTML = `
-                    <div class="container fade-in">
-                        <h2 class="section-title">Статистика</h2>
-                        
-                        <div class="empty-state">
-                            <div class="empty-icon">📊</div>
-                            <p class="empty-title">Статистика в разработке</p>
-                            <p class="empty-subtitle">Здесь будет детальная аналитика</p>
-                            <p class="empty-text">Графики продаж, популярные товары, выручка по дням</p>
-                        </div>
-                    </div>
-                `;
+                // Get stats data
+                const stats = await calculateStats();
+                renderStats(stats);
             } catch (error) {
                 document.querySelector('.content').innerHTML = `
                     <div class="container">
@@ -1392,6 +1380,238 @@
                     </div>
                 `;
             }
+        }
+
+        function calculateStats() {
+            // Calculate statistics from orders and products
+            const orders = state.orders || [];
+            const products = state.products || [];
+            
+            // Revenue by day (last 7 days)
+            const today = new Date();
+            const last7Days = Array.from({length: 7}, (_, i) => {
+                const date = new Date(today);
+                date.setDate(date.getDate() - (6 - i));
+                return {
+                    date: date,
+                    day: date.toLocaleDateString('ru-RU', { weekday: 'short' }),
+                    revenue: 0,
+                    orders: 0
+                };
+            });
+
+            // Group orders by date
+            orders.forEach(order => {
+                if (order.status === 'completed') {
+                    const orderDate = new Date(order.created_at);
+                    const dayIndex = last7Days.findIndex(d => 
+                        d.date.toDateString() === orderDate.toDateString()
+                    );
+                    if (dayIndex >= 0) {
+                        last7Days[dayIndex].revenue += Number(order.price) || 0;
+                        last7Days[dayIndex].orders += 1;
+                    }
+                }
+            });
+
+            // Top products (by order count)
+            const productStats = {};
+            orders.forEach(order => {
+                if (order.product_id) {
+                    if (!productStats[order.product_id]) {
+                        const product = products.find(p => p.id === order.product_id);
+                        productStats[order.product_id] = {
+                            name: product?.name || 'Товар',
+                            orders: 0,
+                            revenue: 0
+                        };
+                    }
+                    productStats[order.product_id].orders += 1;
+                    productStats[order.product_id].revenue += Number(order.price) || 0;
+                }
+            });
+
+            const topProducts = Object.values(productStats)
+                .sort((a, b) => b.orders - a.orders)
+                .slice(0, 5);
+
+            // Orders by status
+            const ordersByStatus = {
+                new: orders.filter(o => o.status === 'new').length,
+                preparing: orders.filter(o => o.status === 'preparing').length,
+                ready: orders.filter(o => o.status === 'ready').length,
+                completed: orders.filter(o => o.status === 'completed').length,
+                cancelled: orders.filter(o => o.status === 'cancelled').length
+            };
+
+            // Peak hours
+            const hourStats = Array(24).fill(0);
+            orders.forEach(order => {
+                const hour = new Date(order.created_at).getHours();
+                hourStats[hour]++;
+            });
+            const peakHour = hourStats.indexOf(Math.max(...hourStats));
+
+            // Total stats
+            const totalRevenue = orders
+                .filter(o => o.status === 'completed')
+                .reduce((sum, o) => sum + (Number(o.price) || 0), 0);
+            
+            const totalOrders = orders.length;
+            const avgOrderValue = totalOrders > 0 ? totalRevenue / totalOrders : 0;
+
+            return {
+                last7Days,
+                topProducts,
+                ordersByStatus,
+                peakHour,
+                totalRevenue,
+                totalOrders,
+                avgOrderValue
+            };
+        }
+
+        function renderStats(stats) {
+            const maxRevenue = Math.max(...stats.last7Days.map(d => d.revenue), 1);
+            
+            document.querySelector('.content').innerHTML = `
+                <div class="container fade-in">
+                    <h2 class="section-title">📊 Статистика</h2>
+
+                    <!-- Key Metrics -->
+                    <div class="stats-grid" style="margin-bottom: 32px;">
+                        <div class="stat-card primary">
+                            <div class="stat-value">${formatPrice(stats.totalRevenue)}</div>
+                            <div class="stat-label">Всего выручка</div>
+                        </div>
+                        
+                        <div class="stat-card">
+                            <div class="stat-value">${stats.totalOrders}</div>
+                            <div class="stat-label">Всего заказов</div>
+                        </div>
+                        
+                        <div class="stat-card">
+                            <div class="stat-value">${formatPrice(stats.avgOrderValue)}</div>
+                            <div class="stat-label">Средний чек</div>
+                        </div>
+                        
+                        <div class="stat-card success">
+                            <div class="stat-value">${stats.peakHour}:00</div>
+                            <div class="stat-label">Пик заказов</div>
+                        </div>
+                    </div>
+
+                    <!-- Revenue Chart -->
+                    <div class="dashboard-card" style="margin-bottom: 24px;">
+                        <h3 class="card-title">
+                            <i data-lucide="trending-up" class="card-icon"></i>
+                            Выручка за неделю
+                        </h3>
+                        <div class="chart-container" style="padding: 24px 0;">
+                            ${stats.last7Days.map(day => `
+                                <div class="chart-bar-wrapper" style="flex: 1;">
+                                    <div class="chart-bar-value" style="font-size: 13px; font-weight: 600; color: #21A038; margin-bottom: 8px;">
+                                        ${day.revenue > 0 ? formatPrice(day.revenue).replace(' сум', '') : '—'}
+                                    </div>
+                                    <div class="chart-bar-container" style="height: 120px; background: #F7F7F7; border-radius: 8px; display: flex; align-items: flex-end; padding: 4px;">
+                                        <div class="chart-bar" style="
+                                            width: 100%;
+                                            height: ${day.revenue > 0 ? (day.revenue / maxRevenue * 100) : 0}%;
+                                            background: linear-gradient(180deg, #21A038 0%, #1a7f2c 100%);
+                                            border-radius: 6px 6px 0 0;
+                                            min-height: ${day.revenue > 0 ? '4px' : '0'};
+                                            transition: height 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+                                        "></div>
+                                    </div>
+                                    <div class="chart-bar-label" style="font-size: 12px; color: #818C99; margin-top: 8px; text-align: center;">
+                                        ${day.day}
+                                    </div>
+                                    <div style="font-size: 11px; color: #9CA3AF; text-align: center; margin-top: 2px;">
+                                        ${day.orders} зак.
+                                    </div>
+                                </div>
+                            `).join('')}
+                        </div>
+                    </div>
+
+                    <!-- Top Products -->
+                    ${stats.topProducts.length > 0 ? `
+                        <div class="dashboard-card" style="margin-bottom: 24px;">
+                            <h3 class="card-title">
+                                <i data-lucide="trophy" class="card-icon"></i>
+                                Топ товаров
+                            </h3>
+                            <div class="list">
+                                ${stats.topProducts.map((product, index) => `
+                                    <div class="list-item" style="padding: 16px;">
+                                        <div style="display: flex; align-items: center; gap: 16px; flex: 1;">
+                                            <div style="
+                                                width: 40px;
+                                                height: 40px;
+                                                border-radius: 12px;
+                                                background: ${index === 0 ? '#FFD700' : index === 1 ? '#C0C0C0' : index === 2 ? '#CD7F32' : '#F7F7F7'};
+                                                display: flex;
+                                                align-items: center;
+                                                justify-content: center;
+                                                font-size: 18px;
+                                                font-weight: 700;
+                                                color: ${index < 3 ? '#FFFFFF' : '#818C99'};
+                                            ">
+                                                ${index + 1}
+                                            </div>
+                                            <div style="flex: 1;">
+                                                <div style="font-weight: 600; font-size: 16px; color: #000000; margin-bottom: 4px;">
+                                                    ${product.name}
+                                                </div>
+                                                <div style="font-size: 14px; color: #818C99;">
+                                                    ${product.orders} ${product.orders === 1 ? 'заказ' : product.orders < 5 ? 'заказа' : 'заказов'}
+                                                </div>
+                                            </div>
+                                            <div style="text-align: right;">
+                                                <div style="font-size: 18px; font-weight: 700; color: #21A038;">
+                                                    ${formatPrice(product.revenue)}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                `).join('')}
+                            </div>
+                        </div>
+                    ` : ''}
+
+                    <!-- Orders by Status -->
+                    <div class="dashboard-card">
+                        <h3 class="card-title">
+                            <i data-lucide="activity" class="card-icon"></i>
+                            Заказы по статусам
+                        </h3>
+                        <div class="stats-grid" style="margin-top: 16px;">
+                            <div class="stat-card" style="border-left: 4px solid #21A038;">
+                                <div class="stat-value">${stats.ordersByStatus.new}</div>
+                                <div class="stat-label">Новые</div>
+                            </div>
+                            <div class="stat-card" style="border-left: 4px solid #FF9800;">
+                                <div class="stat-value">${stats.ordersByStatus.preparing}</div>
+                                <div class="stat-label">В работе</div>
+                            </div>
+                            <div class="stat-card" style="border-left: 4px solid #2196F3;">
+                                <div class="stat-value">${stats.ordersByStatus.ready}</div>
+                                <div class="stat-label">Готовы</div>
+                            </div>
+                            <div class="stat-card" style="border-left: 4px solid #4CAF50;">
+                                <div class="stat-value">${stats.ordersByStatus.completed}</div>
+                                <div class="stat-label">Завершены</div>
+                            </div>
+                            <div class="stat-card" style="border-left: 4px solid #F44336;">
+                                <div class="stat-value">${stats.ordersByStatus.cancelled}</div>
+                                <div class="stat-label">Отменены</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            if (typeof lucide !== 'undefined') lucide.createIcons();
         }
 
         // ============================================
