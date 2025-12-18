@@ -34,21 +34,13 @@ from app.api.webapp_api import set_db_instance
 logger = logging.getLogger(__name__)
 
 
-# 🔥 Custom StaticFiles that ignores cache headers
+# 🔥 Custom StaticFiles that always returns 200, never 304
 class NoCacheStaticFiles(StaticFiles):
-    """StaticFiles that always returns fresh files, ignoring If-None-Match/If-Modified-Since"""
+    """StaticFiles that disables caching by overriding is_not_modified check"""
 
-    async def __call__(self, scope, receive, send):
-        # Remove conditional cache headers from request
-        if scope["type"] == "http":
-            headers = dict(scope.get("headers", []))
-            # Remove cache validation headers
-            headers.pop(b"if-none-match", None)
-            headers.pop(b"if-modified-since", None)
-            scope["headers"] = list(headers.items())
-
-        # Call parent
-        await super().__call__(scope, receive, send)
+    def is_not_modified(self, response_headers, request_headers):
+        """Always return False to prevent 304 responses"""
+        return False
 
 
 # Global reference to the bot's database
