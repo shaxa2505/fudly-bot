@@ -151,17 +151,51 @@ def verify_telegram_webapp(authorization: str) -> int:
         # IMPORTANT: Do not append extra params (like uid) to signed initData in production,
         # it invalidates the Telegram signature.
         if "uid" in parsed and "hash" not in parsed:
-            if not _is_dev_env():
-                raise HTTPException(
-                    status_code=401,
-                    detail="URL-based auth is not allowed in production. Please open from Telegram.",
-                )
+            # Signed URL auth fallback: uid + auth_date + sig.
+            # Used when Telegram initData isn't available (e.g. BotFather domain misconfigured).
             try:
                 user_id = int(parsed.get("uid", 0))
             except (ValueError, TypeError):
                 raise HTTPException(status_code=401, detail="Invalid uid in URL")
             if user_id <= 0:
                 raise HTTPException(status_code=401, detail="Invalid uid in URL")
+
+            sig = parsed.get("sig")
+            auth_date = parsed.get("auth_date")
+            if sig and auth_date:
+                try:
+                    auth_ts = int(auth_date)
+                except (ValueError, TypeError):
+                    raise HTTPException(status_code=401, detail="Invalid auth_date in URL")
+
+                now_ts = int(datetime.now().timestamp())
+                age_seconds = now_ts - auth_ts
+                if age_seconds < 0:
+                    raise HTTPException(status_code=401, detail="Invalid auth timestamp")
+
+                # Keep the fallback token short-lived but usable.
+                MAX_URL_AUTH_AGE = 24 * 3600
+                if age_seconds > MAX_URL_AUTH_AGE:
+                    raise HTTPException(
+                        status_code=401,
+                        detail="Session expired. Please reopen from Telegram bot.",
+                    )
+
+                msg = f"uid={user_id}\nauth_date={auth_ts}".encode("utf-8")
+                expected_sig = hmac.new(
+                    bot_token.encode("utf-8"), msg, hashlib.sha256
+                ).hexdigest()
+                if not hmac.compare_digest(str(sig), expected_sig):
+                    raise HTTPException(status_code=401, detail="Invalid URL signature")
+
+                return user_id
+
+            # Unsigned uid is allowed only for local development.
+            if not _is_dev_env():
+                raise HTTPException(
+                    status_code=401,
+                    detail="Missing Telegram signature. Please open from Telegram bot.",
+                )
             return user_id
 
         # Check if this is unsigned data (from initDataUnsafe)

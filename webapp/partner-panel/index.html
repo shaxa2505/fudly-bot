@@ -257,6 +257,8 @@
         function getAuth() {
             const urlParams = new URLSearchParams(window.location.search);
             const urlUserId = urlParams.get('uid');
+            const urlAuthDate = urlParams.get('auth_date');
+            const urlSig = urlParams.get('sig');
 
             let finalData = '';
             let source = 'none';
@@ -272,16 +274,18 @@
             const tgUser = tg?.initDataUnsafe?.user;
             const userId = tgUser?.id || urlUserId || 'none';
 
-            return { data: finalData, userId, urlUserId, source };
+            return { data: finalData, userId, urlUserId, urlAuthDate, urlSig, source };
         }
 
         async function apiFetch(endpoint, options = {}) {
-            const { data: initData, urlUserId } = getAuth();
+            const { data: initData, urlUserId, urlAuthDate, urlSig } = getAuth();
 
             // Determine authorization header
             let authHeader = '';
             if (initData) {
                 authHeader = `tma ${initData}`;
+            } else if (urlUserId && urlAuthDate && urlSig) {
+                authHeader = `tma uid=${urlUserId}&auth_date=${urlAuthDate}&sig=${urlSig}`;
             } else if (isLocalhost() && urlUserId) {
                 // Local development fallback ONLY (backend must also be in dev mode)
                 authHeader = `tma uid=${urlUserId}`;
@@ -2877,10 +2881,12 @@
             }
 
             const storeId = state.store.store_id;
-            const { data: initData, urlUserId } = getAuth();
+            const { data: initData, urlUserId, urlAuthDate, urlSig } = getAuth();
             let authHeader = '';
             if (initData) {
                 authHeader = `tma ${initData}`;
+            } else if (urlUserId && urlAuthDate && urlSig) {
+                authHeader = `tma uid=${urlUserId}&auth_date=${urlAuthDate}&sig=${urlSig}`;
             } else if (isLocalhost() && urlUserId) {
                 authHeader = `tma uid=${urlUserId}`;
             } else {

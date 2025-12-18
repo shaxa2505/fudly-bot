@@ -1,10 +1,42 @@
 """Seller/Partner-specific keyboards."""
 from __future__ import annotations
 
+import hashlib
+import hmac
+import os
+import time
+import urllib.parse
+
 from aiogram.types import InlineKeyboardMarkup, ReplyKeyboardMarkup, WebAppInfo
 from aiogram.utils.keyboard import InlineKeyboardBuilder, ReplyKeyboardBuilder
 
 from localization import get_text
+
+
+def _with_signed_uid(url: str, user_id: int | None) -> str:
+    """Attach a short-lived signed uid to a URL for fallback auth.
+
+    This is used only when Telegram WebApp initData isn't available (e.g. domain misconfigured).
+    """
+    if not user_id:
+        return url
+
+    bot_token = os.getenv("BOT_TOKEN") or os.getenv("TELEGRAM_BOT_TOKEN")
+    if not bot_token:
+        # Keep legacy (insecure) uid param only if token isn't available; backend may still reject in production.
+        sep = "&" if "?" in url else "?"
+        return f"{url}{sep}uid={user_id}"
+
+    auth_date = int(time.time())
+    msg = f"uid={user_id}\nauth_date={auth_date}".encode("utf-8")
+    sig = hmac.new(bot_token.encode("utf-8"), msg, hashlib.sha256).hexdigest()
+
+    split = urllib.parse.urlsplit(url)
+    query = urllib.parse.parse_qsl(split.query, keep_blank_values=True)
+    query = [(k, v) for (k, v) in query if k not in ("uid", "auth_date", "sig")]
+    query.extend([("uid", str(user_id)), ("auth_date", str(auth_date)), ("sig", sig)])
+    new_query = urllib.parse.urlencode(query)
+    return urllib.parse.urlunsplit((split.scheme, split.netloc, split.path, new_query, split.fragment))
 
 
 def main_menu_seller(
@@ -21,8 +53,8 @@ def main_menu_seller(
 
     # Add Web Panel button if URL provided
     if webapp_url:
-        # Add user_id to URL for authentication fallback
-        url = f"{webapp_url}?uid={user_id}" if user_id else webapp_url
+        # Prefer Telegram WebApp initData; keep a signed uid as a fallback.
+        url = _with_signed_uid(webapp_url, user_id)
         builder.button(text="🖥 Веб-панель", web_app=WebAppInfo(url=url))
 
     builder.adjust(2, 2, 2, 1 if webapp_url else 2)
