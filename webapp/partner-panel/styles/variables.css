@@ -4,29 +4,29 @@
    ================================================ */
 
 :root {
-    /* Professional Brand Colors - Elegant & Mature */
-    --primary: #1F2937;
-    --primary-hover: #111827;
-    --primary-light: #F3F4F6;
-    --primary-dark: #030712;
-    --primary-50: #F9FAFB;
+    /* Yandex.Lavka Style - Professional & Clean */
+    --primary: #FFCC00;
+    --primary-hover: #FFB800;
+    --primary-light: #FFF9E6;
+    --primary-dark: #E6B800;
+    --primary-50: #FFFEF5;
 
-    --accent: #3B82F6;
-    --accent-light: #DBEAFE;
-    --accent-dark: #1E40AF;
+    --accent: #000000;
+    --accent-light: #F5F5F5;
+    --accent-dark: #000000;
 
-    --success: #059669;
-    --success-light: #D1FAE5;
-    --success-dark: #047857;
+    --success: #21A038;
+    --success-light: #E8F5E9;
+    --success-dark: #1B8230;
 
-    --warning: #D97706;
-    --warning-light: #FEF3C7;
+    --warning: #FF6B00;
+    --warning-light: #FFF3E0;
 
-    --danger: #DC2626;
-    --danger-light: #FEE2E2;
+    --danger: #E63946;
+    --danger-light: #FFEBEE;
 
-    --info: #0891B2;
-    --info-light: #CFFAFE;
+    --info: #2196F3;
+    --info-light: #E3F2FD;
 
     /* Premium Neutrals - Perfect Contrast */
     --bg: #FAFBFC;

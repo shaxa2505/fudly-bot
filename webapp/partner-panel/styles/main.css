@@ -49,13 +49,13 @@
 
 .stat-card {
     background: #FFFFFF;
-    border: 1px solid #E5E7EB;
-    border-radius: 12px;
+    border: none;
+    border-radius: 16px;
     padding: 20px;
-    transition: all 0.2s;
+    transition: transform 0.15s;
     position: relative;
     overflow: hidden;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
 }
 
 .stat-card:active {
@@ -63,27 +63,23 @@
 }
 
 .stat-card.primary {
-    background: #1F2937;
-    color: white;
-    border-color: #1F2937;
+    background: #FFCC00;
+    color: #000000;
 }
 
 .stat-card.success {
-    background: #059669;
+    background: #21A038;
     color: white;
-    border-color: #059669;
 }
 
 .stat-card.warning {
-    background: #D97706;
+    background: #FF6B00;
     color: white;
-    border-color: #D97706;
 }
 
 .stat-card.danger {
-    background: #DC2626;
+    background: #E63946;
     color: white;
-    border-color: #DC2626;
 }
 
 .stat-header {

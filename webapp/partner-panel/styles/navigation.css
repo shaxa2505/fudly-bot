@@ -1,5 +1,5 @@
 /* ================================================
-   MODERN NAVIGATION - Bottom Tab Bar
+   YANDEX.LAVKA STYLE NAVIGATION
    ================================================ */
 
 .bottom-nav {
@@ -7,48 +7,61 @@
     bottom: 0;
     left: 0;
     right: 0;
-    height: 64px;
+    height: 56px;
     background: #FFFFFF;
-    border-top: 1px solid #E5E7EB;
-    z-index: var(--z-fixed);
-    box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.04);
-    padding-bottom: env(safe-area-inset-bottom);
-}
-
-.nav-content {
-    max-width: 1400px;
-    margin: 0 auto;
-    height: 100%;
+    border-top: 1px solid #E0E0E0;
+    z-index: 1000;
     display: flex;
     align-items: center;
     justify-content: space-around;
-    padding: 0 var(--space-md);
+    padding: 0;
+    padding-bottom: env(safe-area-inset-bottom);
 }
 
-/* === Nav Item === */
 .nav-item {
     flex: 1;
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    gap: 4px;
-    padding: 8px;
-    color: #6B7280;
+    gap: 2px;
+    padding: 6px 8px;
+    color: #999999;
     text-decoration: none;
-    font-size: 11px;
+    font-size: 10px;
     font-weight: 500;
     cursor: pointer;
-    transition: color 0.2s;
-    position: relative;
-    user-select: none;
+    transition: color 0.15s;
+    border: none;
+    background: none;
+    outline: none;
+}
+
+.nav-icon {
+    width: 24px;
+    height: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.nav-icon svg {
+    width: 24px;
+    height: 24px;
+    stroke-width: 2;
+}
+
+.nav-item.active {
+    color: #000000;
+}
+
+.nav-item.active .nav-icon {
+    color: #FFCC00;
 }
 
 .nav-item:active {
-    opacity: 0.6;
+    opacity: 0.5;
 }
-
-/* === Active State === */
 .nav-item.active {
     color: var(--primary);
     font-weight: var(--weight-semibold);
