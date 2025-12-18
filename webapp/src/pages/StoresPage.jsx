@@ -62,9 +62,13 @@ function StoresPage() {
         data = await api.getStores(paramsNoCity)
       }
 
-      setStores(data || [])
+      setStores(Array.isArray(data) ? data : [])
     } catch (error) {
       console.error('Error loading stores:', error)
+      // Show user-friendly error
+      if (window.Telegram?.WebApp) {
+        window.Telegram.WebApp.showAlert('Do\'konlarni yuklashda xatolik. Iltimos, qaytadan urinib ko\'ring.')
+      }
       setStores([])
     } finally {
       setLoading(false)
@@ -72,6 +76,11 @@ function StoresPage() {
   }
 
   const loadStoreOffers = async (store) => {
+    if (!store || !store.id) {
+      console.error('Invalid store data:', store)
+      return
+    }
+    
     setSelectedStore(store)
     setLoadingOffers(true)
     setActiveTab('offers')
@@ -80,10 +89,13 @@ function StoresPage() {
         api.getStoreOffers(store.id),
         api.getStoreReviews(store.id)
       ])
-      setStoreOffers(offers || [])
+      setStoreOffers(Array.isArray(offers) ? offers : [])
       setStoreReviews(reviews || { reviews: [], average_rating: 0, total_reviews: 0 })
     } catch (error) {
       console.error('Error loading store data:', error)
+      if (window.Telegram?.WebApp) {
+        window.Telegram.WebApp.showAlert('Ma\'lumotlarni yuklashda xatolik')
+      }
       setStoreOffers([])
       setStoreReviews({ reviews: [], average_rating: 0, total_reviews: 0 })
     } finally {

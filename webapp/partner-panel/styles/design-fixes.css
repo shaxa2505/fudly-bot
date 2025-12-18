@@ -3,6 +3,55 @@
    Critical improvements based on screenshots
    ================================================ */
 
+/* === FORM IMPROVEMENTS === */
+/* Green Checkbox to match primary color */
+input[type="checkbox"],
+input[type="radio"] {
+    width: 22px;
+    height: 22px;
+    accent-color: var(--primary);
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+input[type="checkbox"]:checked,
+input[type="radio"]:checked {
+    background: var(--primary);
+    border-color: var(--primary);
+}
+
+input[type="checkbox"]:hover,
+input[type="radio"]:hover {
+    transform: scale(1.1);
+}
+
+/* Form Validation States */
+input.error,
+textarea.error,
+select.error {
+    border-color: var(--danger);
+    background: var(--danger-light);
+}
+
+input.success {
+    border-color: var(--success);
+}
+
+.form-error {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    color: var(--danger);
+    font-size: 13px;
+    margin-top: 6px;
+    animation: slideUpSmooth 0.2s ease-out;
+}
+
+.form-error::before {
+    content: '⚠️';
+}
+
 /* === STATISTICS & CHARTS === */
 .chart-container {
     display: flex;
@@ -555,3 +604,179 @@ input[type="checkbox"]:hover {
         font-size: 20px !important;
     }
 }
+
+/* ================================================
+   FILTERS BAR - v22.0
+   ================================================ */
+.filters-bar {
+    background: white;
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 16px;
+    margin-bottom: 16px;
+}
+
+.filters-group {
+    display: flex;
+    gap: 12px;
+    align-items: center;
+    flex-wrap: wrap;
+}
+
+.filter-select {
+    flex: 1;
+    min-width: 160px;
+    height: 44px;
+    padding: 0 16px;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    font-size: 15px;
+    color: var(--text);
+    font-family: inherit;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.filter-select:hover {
+    border-color: var(--primary);
+    background: white;
+}
+
+.filter-select:focus {
+    outline: none;
+    border-color: var(--primary);
+    box-shadow: 0 0 0 3px rgba(33, 160, 56, 0.1);
+}
+
+.btn-icon-secondary {
+    min-width: 44px;
+    min-height: 44px;
+    padding: 0;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.btn-icon-secondary:hover {
+    background: white;
+    border-color: var(--primary);
+    color: var(--primary);
+    transform: scale(1.05);
+}
+
+.btn-icon-secondary:active {
+    transform: scale(0.95);
+}
+
+/* ================================================
+   CANCEL ORDER MODAL - v22.0
+   ================================================ */
+.cancel-reason-option {
+    display: flex;
+    align-items: center;
+    padding: 14px 16px;
+    background: var(--bg-secondary);
+    border: 2px solid transparent;
+    border-radius: 12px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    font-size: 15px;
+}
+
+.cancel-reason-option:hover {
+    background: white;
+    border-color: var(--border-hover);
+}
+
+.cancel-reason-option:has(input:checked) {
+    background: rgba(33, 160, 56, 0.08);
+    border-color: var(--primary);
+}
+
+.cancel-reason-option input[type="radio"] {
+    width: 20px;
+    height: 20px;
+    margin-right: 12px !important;
+}
+
+.cancel-reason-option span {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+/* ================================================
+   RESPONSIVE FILTERS - v22.0
+   ================================================ */
+@media (max-width: 768px) {
+    .filters-group {
+        flex-direction: column;
+    }
+    
+    .filter-select {
+        width: 100%;
+        min-width: 100%;
+    }
+    
+    .btn-icon-secondary {
+        width: 100%;
+    }
+}
+
+/* ================================================
+   ENHANCED TOAST NOTIFICATIONS - v22.0
+   ================================================ */
+.toast-action {
+    padding: 8px 16px;
+    background: rgba(255, 255, 255, 0.2);
+    border: none;
+    border-radius: 8px;
+    color: white;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    margin-left: 12px;
+}
+
+.toast-action:hover {
+    background: rgba(255, 255, 255, 0.3);
+    transform: scale(1.05);
+}
+
+.toast-action:active {
+    transform: scale(0.95);
+}
+
+/* ================================================
+   KEYBOARD NAVIGATION - v22.0
+   ================================================ */
+.keyboard-focus {
+    outline: 3px solid var(--primary) !important;
+    outline-offset: 2px;
+    box-shadow: 0 0 0 4px rgba(33, 160, 56, 0.2) !important;
+}
+
+/* Improve focus visibility for all interactive elements */
+button:focus-visible,
+a:focus-visible,
+input:focus-visible,
+textarea:focus-visible,
+select:focus-visible {
+    outline: 2px solid var(--primary);
+    outline-offset: 2px;
+}
+
+/* Remove default focus outline (but keep for keyboard users) */
+button:focus:not(:focus-visible),
+a:focus:not(:focus-visible) {
+    outline: none;
+}
+
+

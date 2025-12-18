@@ -329,7 +329,7 @@
             }
         }
 
-        function toast(message, type = 'info') {
+        function toast(message, type = 'info', options = {}) {
             haptic(type === 'success' ? 'success' : type === 'error' ? 'error' : 'light');
             
             const toast = document.createElement('div');
@@ -339,17 +339,45 @@
             icon.style.fontSize = '20px';
             icon.textContent = type === 'success' ? '✓' : type === 'error' ? '✕' : type === 'warning' ? '⚠' : 'ℹ';
             
+            const contentDiv = document.createElement('div');
+            contentDiv.style.flex = '1';
+            
             const text = document.createElement('span');
             text.textContent = message;
+            contentDiv.appendChild(text);
+            
+            // Add description if provided
+            if (options.description) {
+                const desc = document.createElement('div');
+                desc.style.fontSize = '13px';
+                desc.style.opacity = '0.8';
+                desc.style.marginTop = '4px';
+                desc.textContent = options.description;
+                contentDiv.appendChild(desc);
+            }
             
             toast.appendChild(icon);
-            toast.appendChild(text);
+            toast.appendChild(contentDiv);
+            
+            // Add action button if provided
+            if (options.action && options.actionLabel) {
+                const actionBtn = document.createElement('button');
+                actionBtn.textContent = options.actionLabel;
+                actionBtn.className = 'toast-action';
+                actionBtn.onclick = () => {
+                    options.action();
+                    toast.remove();
+                };
+                toast.appendChild(actionBtn);
+            }
+            
             document.body.appendChild(toast);
 
+            const duration = options.duration || 3000;
             setTimeout(() => {
                 toast.style.animation = 'toastOut 0.3s ease-out forwards';
                 setTimeout(() => toast.remove(), 300);
-            }, 3000);
+            }, duration);
         }
 
         function showLoading(type = 'default') {
@@ -710,7 +738,7 @@
                     ${order.status === 'new' ? `
                         <div class="order-actions" onclick="event.stopPropagation()">
                             <button class="btn btn-sm btn-success ripple" onclick="updateOrderStatus(${orderId}, 'preparing')">Принять</button>
-                            <button class="btn btn-sm btn-danger ripple" onclick="cancelOrder(${orderId})">Отменить</button>
+                            <button class="btn btn-sm btn-danger ripple" onclick="openCancelModal(${orderId})">Отменить</button>
                         </div>
                     ` : ''}
                     ${order.status === 'preparing' ? `
@@ -1023,6 +1051,144 @@
             haptic('heavy');
             await updateOrderStatus(orderId, 'cancelled');
         }
+
+        // Open cancel order modal with reason selection
+        function openCancelModal(orderId) {
+            haptic('light');
+            
+            const modal = document.createElement('div');
+            modal.className = 'modal-overlay scale-in';
+            modal.innerHTML = `
+                <div class="modal-content" style="max-width: 480px;">
+                    <div class="modal-header">
+                        <h3>Отмена заказа #${orderId}</h3>
+                        <button class="btn-icon ripple" onclick="this.closest('.modal-overlay').remove()">
+                            <i data-lucide="x"></i>
+                        </button>
+                    </div>
+                    <form onsubmit="submitCancelOrder(event, ${orderId})">
+                        <div class="modal-body">
+                            <p style="color: var(--text-secondary); margin-bottom: 20px;">
+                                Пожалуйста, укажите причину отмены заказа
+                            </p>
+                            
+                            <div class="form-group">
+                                <label style="margin-bottom: 12px; display: block; font-weight: 600;">Причина отмены *</label>
+                                <div style="display: flex; flex-direction: column; gap: 10px;">
+                                    <label class="cancel-reason-option">
+                                        <input type="radio" name="cancel_reason" value="out_of_stock" required style="margin-right: 10px;">
+                                        <span>🔴 Товар закончился</span>
+                                    </label>
+                                    <label class="cancel-reason-option">
+                                        <input type="radio" name="cancel_reason" value="cant_fulfill" style="margin-right: 10px;">
+                                        <span>⏱️ Не успеваем выполнить</span>
+                                    </label>
+                                    <label class="cancel-reason-option">
+                                        <input type="radio" name="cancel_reason" value="customer_request" style="margin-right: 10px;">
+                                        <span>📞 По просьбе клиента</span>
+                                    </label>
+                                    <label class="cancel-reason-option">
+                                        <input type="radio" name="cancel_reason" value="technical_issue" style="margin-right: 10px;">
+                                        <span>⚙️ Технические неполадки</span>
+                                    </label>
+                                    <label class="cancel-reason-option">
+                                        <input type="radio" name="cancel_reason" value="other" style="margin-right: 10px;">
+                                        <span>❓ Другая причина</span>
+                                    </label>
+                                </div>
+                            </div>
+                            
+                            <div class="form-group">
+                                <label>Комментарий (необязательно)</label>
+                                <textarea name="cancel_comment" rows="3" placeholder="Добавьте дополнительную информацию..." 
+                                          class="search-input" maxlength="200" style="resize: vertical; min-height: 80px;"></textarea>
+                                <div class="form-hint" style="text-align: right; font-size: 12px; color: var(--text-secondary); margin-top: 4px;">
+                                    <span id="commentCounter">0/200</span>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div style="display: flex; gap: 12px; padding: 16px; border-top: 1px solid var(--border);">
+                            <button type="button" class="btn btn-secondary ripple" onclick="this.closest('.modal-overlay').remove()" style="flex: 1;">
+                                Назад
+                            </button>
+                            <button type="submit" class="btn btn-danger ripple" style="flex: 1;">
+                                <i data-lucide="x-circle" style="width: 16px; height: 16px;"></i>
+                                Отменить заказ
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            `;
+            
+            document.body.appendChild(modal);
+            if (typeof lucide !== 'undefined') lucide.createIcons();
+            
+            // Character counter for comment
+            const textarea = modal.querySelector('textarea[name="cancel_comment"]');
+            const counter = modal.querySelector('#commentCounter');
+            if (textarea && counter) {
+                textarea.addEventListener('input', () => {
+                    counter.textContent = `${textarea.value.length}/200`;
+                });
+            }
+            
+            // Close on overlay click
+            modal.addEventListener('click', (e) => {
+                if (e.target === modal) modal.remove();
+            });
+        }
+
+        // Submit cancel order with reason
+        async function submitCancelOrder(event, orderId) {
+            event.preventDefault();
+            haptic('heavy');
+            
+            const formData = new FormData(event.target);
+            const reason = formData.get('cancel_reason');
+            const comment = formData.get('cancel_comment') || '';
+            
+            const submitBtn = event.target.querySelector('button[type="submit"]');
+            const originalText = submitBtn.innerHTML;
+            submitBtn.disabled = true;
+            submitBtn.innerHTML = '<span style="opacity: 0.6;">⏳ Отмена...</span>';
+            
+            try {
+                // Call API with cancel reason
+                await apiFetch(`/api/partner/orders/${orderId}/cancel`, {
+                    method: 'POST',
+                    body: JSON.stringify({ 
+                        reason: reason,
+                        comment: comment
+                    })
+                });
+                
+                // Update local state
+                const order = state.orders.find(o => (o.order_id || o.id) === orderId);
+                if (order) {
+                    order.status = 'cancelled';
+                    order.cancel_reason = reason;
+                    order.cancel_comment = comment;
+                }
+                
+                haptic('success');
+                toast('Заказ отменён', 'success');
+                
+                // Close modal
+                event.target.closest('.modal-overlay').remove();
+                
+                // Reload orders
+                if (state.currentView === 'orders') {
+                    setTimeout(() => loadOrders(), 500);
+                }
+            } catch (error) {
+                console.error('Cancel order error:', error);
+                haptic('error');
+                toast('Ошибка отмены заказа', 'error');
+                submitBtn.disabled = false;
+                submitBtn.innerHTML = originalText;
+            }
+        }
         
         async function handleCancelOrder(orderId, button) {
             if (!confirm('Вы уверены, что хотите отменить заказ?')) return;
@@ -1109,6 +1275,39 @@
                         </button>
                     </div>
 
+                    <div class="filters-bar">
+                        <div class="filters-group">
+                            <select class="filter-select" id="categoryFilter" onchange="filterProducts()">
+                                <option value="">Все категории</option>
+                                <option value="bakery">🥖 Хлеб и выпечка</option>
+                                <option value="dairy">🧈 Молочные продукты</option>
+                                <option value="meat">🥩 Мясо и птица</option>
+                                <option value="fruits">🍎 Фрукты</option>
+                                <option value="vegetables">🥕 Овощи</option>
+                                <option value="drinks">🥤 Напитки</option>
+                                <option value="snacks">🍿 Снеки</option>
+                                <option value="frozen">❄️ Замороженное</option>
+                                <option value="other">📦 Другое</option>
+                            </select>
+                            
+                            <select class="filter-select" id="statusFilter" onchange="filterProducts()">
+                                <option value="">Все статусы</option>
+                                <option value="available">✅ В наличии</option>
+                                <option value="unavailable">❌ Нет в наличии</option>
+                            </select>
+                            
+                            <select class="filter-select" id="discountFilter" onchange="filterProducts()">
+                                <option value="">Все товары</option>
+                                <option value="discount">🔥 Со скидкой</option>
+                                <option value="no-discount">Без скидки</option>
+                            </select>
+                            
+                            <button class="btn-icon-secondary" onclick="resetFilters()" title="Сбросить фильтры">
+                                <i data-lucide="x" style="width: 18px; height: 18px;"></i>
+                            </button>
+                        </div>
+                    </div>
+
                     <div class="search-bar">
                         <i data-lucide="search" class="search-icon"></i>
                         <input type="text" class="search-input" placeholder="Поиск товаров..." oninput="searchProducts(this.value)">
@@ -1184,6 +1383,70 @@
             });
         }
 
+        // Filter products by category, status, discount
+        function filterProducts() {
+            const categoryFilter = document.getElementById('categoryFilter')?.value || '';
+            const statusFilter = document.getElementById('statusFilter')?.value || '';
+            const discountFilter = document.getElementById('discountFilter')?.value || '';
+            
+            const cards = document.querySelectorAll('.product-card');
+            cards.forEach(card => {
+                const productId = parseInt(card.dataset.productId);
+                const product = state.products.find(p => p.id === productId);
+                if (!product) {
+                    card.style.display = 'none';
+                    return;
+                }
+                
+                let show = true;
+                
+                // Category filter
+                if (categoryFilter && product.category !== categoryFilter) {
+                    show = false;
+                }
+                
+                // Status filter
+                if (statusFilter === 'available' && !product.is_available) {
+                    show = false;
+                } else if (statusFilter === 'unavailable' && product.is_available) {
+                    show = false;
+                }
+                
+                // Discount filter
+                if (discountFilter === 'discount' && (!product.discount || product.discount <= 0)) {
+                    show = false;
+                } else if (discountFilter === 'no-discount' && product.discount > 0) {
+                    show = false;
+                }
+                
+                card.style.display = show ? '' : 'none';
+            });
+            
+            haptic('light');
+        }
+
+        // Reset all filters
+        function resetFilters() {
+            const categoryFilter = document.getElementById('categoryFilter');
+            const statusFilter = document.getElementById('statusFilter');
+            const discountFilter = document.getElementById('discountFilter');
+            const searchInput = document.querySelector('.search-input');
+            
+            if (categoryFilter) categoryFilter.value = '';
+            if (statusFilter) statusFilter.value = '';
+            if (discountFilter) discountFilter.value = '';
+            if (searchInput) searchInput.value = '';
+            
+            // Show all products
+            const cards = document.querySelectorAll('.product-card');
+            cards.forEach(card => {
+                card.style.display = '';
+            });
+            
+            haptic('light');
+            toast('Фильтры сброшены', 'info');
+        }
+
         function openProductModal(productId = null) {
             haptic('light');
             const product = productId ? state.products.find(p => p.id === productId) : null;
@@ -1201,6 +1464,23 @@
                     </div>
                     <form id="productForm" onsubmit="saveProduct(event, ${productId})">
                         <div class="modal-body">
+                            <!-- Category -->
+                            <div class="form-group">
+                                <label>Категория *</label>
+                                <select name="category" required class="search-input">
+                                    <option value="">Выберите категорию</option>
+                                    <option value="bakery" ${product?.category === 'bakery' ? 'selected' : ''}>🥖 Выпечка</option>
+                                    <option value="dairy" ${product?.category === 'dairy' ? 'selected' : ''}>🥛 Молочные продукты</option>
+                                    <option value="meat" ${product?.category === 'meat' ? 'selected' : ''}>🥩 Мясо и птица</option>
+                                    <option value="fruits" ${product?.category === 'fruits' ? 'selected' : ''}>🍎 Фрукты</option>
+                                    <option value="vegetables" ${product?.category === 'vegetables' ? 'selected' : ''}>🥬 Овощи</option>
+                                    <option value="drinks" ${product?.category === 'drinks' ? 'selected' : ''}>🥤 Напитки</option>
+                                    <option value="snacks" ${product?.category === 'snacks' ? 'selected' : ''}>🍿 Закуски</option>
+                                    <option value="frozen" ${product?.category === 'frozen' ? 'selected' : ''}>🧊 Замороженное</option>
+                                    <option value="other" ${product?.category === 'other' ? 'selected' : ''}>📦 Другое</option>
+                                </select>
+                            </div>
+
                             <!-- Photo Upload -->
                             <div class="form-group">
                                 <label>Фото товара</label>
@@ -1242,34 +1522,80 @@
 
                             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
                                 <div class="form-group">
-                                    <label>Цена *</label>
-                                    <input type="number" name="price" value="${product?.price || ''}" required min="1" step="0.01" class="search-input"
-                                           oninput="validateField(this)" placeholder="0.00">
+                                    <label>Оригинальная цена *</label>
+                                    <input type="number" name="original_price" id="originalPrice" value="${product?.original_price || product?.price || ''}" 
+                                           required min="1" step="1" class="search-input"
+                                           oninput="validateField(this); calculateFinalPrice()" placeholder="15000">
                                     <div class="form-error" style="display: none;">Цена должна быть > 0</div>
                                 </div>
 
                                 <div class="form-group">
                                     <label>Скидка (%)</label>
-                                    <input type="number" name="discount" value="${product?.discount || 0}" min="0" max="99" class="search-input"
-                                           oninput="validateField(this)" placeholder="0">
+                                    <input type="number" name="discount" id="discountPercent" value="${product?.discount || 0}" 
+                                           min="0" max="90" class="search-input"
+                                           oninput="validateField(this); calculateFinalPrice()" placeholder="0">
+                                </div>
+                            </div>
+
+                            <!-- Price Preview -->
+                            <div class="price-preview-box" id="pricePreview" style="display: none; background: linear-gradient(135deg, #E8F5E9 0%, #C8E6C9 100%); padding: 16px; border-radius: 12px; margin-bottom: 16px;">
+                                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                                    <span style="color: #818C99; font-size: 14px;">Было:</span>
+                                    <span id="priceOriginal" style="color: #818C99; text-decoration: line-through;">15,000 сум</span>
+                                </div>
+                                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                                    <span style="color: #000; font-size: 16px; font-weight: 600;">Стало:</span>
+                                    <span id="priceFinal" style="color: #21A038; font-size: 20px; font-weight: 700;">10,500 сум</span>
+                                </div>
+                                <div style="display: flex; justify-content: space-between; align-items: center; padding-top: 8px; border-top: 1px solid rgba(33, 160, 56, 0.2);">
+                                    <span style="color: #21A038; font-size: 14px; font-weight: 600;">🎉 Экономия:</span>
+                                    <span id="priceSavings" style="color: #21A038; font-size: 16px; font-weight: 700;">4,500 сум (30%)</span>
                                 </div>
                             </div>
 
                             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
                                 <div class="form-group">
-                                    <label>Остаток</label>
-                                    <input type="number" name="stock" value="${product?.stock || 0}" min="0" class="search-input" placeholder="0">
+                                    <label>Единица измерения *</label>
+                                    <select name="unit" required class="search-input">
+                                        <option value="шт" ${product?.unit === 'шт' ? 'selected' : ''}>Штук (шт)</option>
+                                        <option value="кг" ${product?.unit === 'кг' ? 'selected' : ''}>Килограмм (кг)</option>
+                                        <option value="л" ${product?.unit === 'л' ? 'selected' : ''}>Литры (л)</option>
+                                        <option value="г" ${product?.unit === 'г' ? 'selected' : ''}>Грамм (г)</option>
+                                        <option value="мл" ${product?.unit === 'мл' ? 'selected' : ''}>Миллилитры (мл)</option>
+                                        <option value="упак" ${product?.unit === 'упак' ? 'selected' : ''}>Упаковка (упак)</option>
+                                    </select>
                                 </div>
 
                                 <div class="form-group">
-                                    <label>Единица</label>
-                                    <select name="unit" class="search-input">
-                                        <option value="шт" ${product?.unit === 'шт' ? 'selected' : ''}>шт</option>
-                                        <option value="кг" ${product?.unit === 'кг' ? 'selected' : ''}>кг</option>
-                                        <option value="л" ${product?.unit === 'л' ? 'selected' : ''}>л</option>
-                                        <option value="г" ${product?.unit === 'г' ? 'selected' : ''}>г</option>
-                                        <option value="мл" ${product?.unit === 'мл' ? 'selected' : ''}>мл</option>
-                                    </select>
+                                    <label>
+                                        Количество в наличии *
+                                        <span style="font-size: 12px; color: #818C99; font-weight: 400;">Автоматически уменьшается при продаже</span>
+                                    </label>
+                                    <div style="display: flex; gap: 8px; align-items: center;">
+                                        <button type="button" class="btn btn-sm btn-secondary" onclick="changeQuantity(-1)" style="width: 40px; height: 40px; padding: 0;">−</button>
+                                        <input type="number" name="stock_quantity" id="stockQuantity" value="${product?.stock_quantity || product?.stock || 0}" 
+                                               required min="0" max="9999" class="search-input" placeholder="0" style="text-align: center; flex: 1;">
+                                        <button type="button" class="btn btn-sm btn-secondary" onclick="changeQuantity(1)" style="width: 40px; height: 40px; padding: 0;">+</button>
+                                    </div>
+                                    <div style="display: flex; gap: 8px; margin-top: 8px;">
+                                        <button type="button" class="btn btn-sm btn-ghost" onclick="setQuantity(5)" style="flex: 1;">5</button>
+                                        <button type="button" class="btn btn-sm btn-ghost" onclick="setQuantity(10)" style="flex: 1;">10</button>
+                                        <button type="button" class="btn btn-sm btn-ghost" onclick="setQuantity(20)" style="flex: 1;">20</button>
+                                        <button type="button" class="btn btn-sm btn-ghost" onclick="setQuantity(50)" style="flex: 1;">50</button>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Expiry Date -->
+                            <div class="form-group">
+                                <label>Срок годности *</label>
+                                <input type="date" name="expiry_date" id="expiryDate" value="${product?.expiry_date ? product.expiry_date.split('T')[0] : ''}" 
+                                       required min="${new Date().toISOString().split('T')[0]}" class="search-input">
+                                <div style="display: flex; gap: 8px; margin-top: 8px;">
+                                    <button type="button" class="btn btn-sm btn-ghost" onclick="setExpiry(0)" style="flex: 1;">Сегодня</button>
+                                    <button type="button" class="btn btn-sm btn-ghost" onclick="setExpiry(1)" style="flex: 1;">Завтра</button>
+                                    <button type="button" class="btn btn-sm btn-ghost" onclick="setExpiry(2)" style="flex: 1;">2 дня</button>
+                                    <button type="button" class="btn btn-sm btn-ghost" onclick="setExpiry(3)" style="flex: 1;">3 дня</button>
                                 </div>
                             </div>
 
@@ -1436,25 +1762,92 @@
             if (typeof lucide !== 'undefined') lucide.createIcons();
         }
 
+        // Helper: Calculate final price with discount
+        function calculateFinalPrice() {
+            const originalInput = document.getElementById('originalPrice');
+            const discountInput = document.getElementById('discountPercent');
+            const previewBox = document.getElementById('pricePreview');
+            
+            if (!originalInput || !discountInput || !previewBox) return;
+            
+            const original = parseFloat(originalInput.value) || 0;
+            const discount = parseInt(discountInput.value) || 0;
+            
+            if (original <= 0) {
+                previewBox.style.display = 'none';
+                return;
+            }
+            
+            const final = Math.round(original * (1 - discount / 100));
+            const savings = original - final;
+            
+            // Show preview
+            previewBox.style.display = 'block';
+            document.getElementById('priceOriginal').textContent = formatPrice(original);
+            document.getElementById('priceFinal').textContent = formatPrice(final);
+            document.getElementById('priceSavings').textContent = `${formatPrice(savings)} (${discount}%)`;
+        }
+
+        // Helper: Change quantity
+        function changeQuantity(delta) {
+            const input = document.getElementById('stockQuantity');
+            if (!input) return;
+            
+            const current = parseInt(input.value) || 0;
+            const newValue = Math.max(0, Math.min(9999, current + delta));
+            input.value = newValue;
+            haptic('light');
+        }
+
+        // Helper: Set quantity
+        function setQuantity(value) {
+            const input = document.getElementById('stockQuantity');
+            if (!input) return;
+            
+            input.value = value;
+            haptic('light');
+        }
+
+        // Helper: Set expiry date
+        function setExpiry(daysFromNow) {
+            const input = document.getElementById('expiryDate');
+            if (!input) return;
+            
+            const date = new Date();
+            date.setDate(date.getDate() + daysFromNow);
+            input.value = date.toISOString().split('T')[0];
+            haptic('light');
+        }
+
         async function saveProduct(event, productId) {
             event.preventDefault();
             haptic('medium');
 
             const formData = new FormData(event.target);
+            
+            // Calculate final price from original price and discount
+            const originalPrice = parseFloat(formData.get('original_price'));
+            const discountPercent = parseInt(formData.get('discount')) || 0;
+            const finalPrice = Math.round(originalPrice * (1 - discountPercent / 100));
+            
             const data = {
+                category: formData.get('category'),
                 name: formData.get('name'),
                 description: formData.get('description'),
-                price: parseFloat(formData.get('price')),
-                discount: parseInt(formData.get('discount')) || 0,
-                stock: parseInt(formData.get('stock')) || 0,
+                original_price: originalPrice,
+                price: finalPrice,
+                discount: discountPercent,
                 unit: formData.get('unit'),
+                stock_quantity: parseInt(formData.get('stock_quantity')) || 0,
+                stock: parseInt(formData.get('stock_quantity')) || 0, // Backwards compatibility
+                expiry_date: formData.get('expiry_date'),
                 photo_url: formData.get('photo_url'),
                 is_available: formData.get('is_available') === 'on'
             };
 
             // Show loading state on submit button
             const submitBtn = event.target.querySelector('button[type="submit"]');
-            const originalText = submitBtn.textContent;
+            const originalText = submitBtn.innerHTML;
             submitBtn.disabled = true;
             submitBtn.innerHTML = '<div class="spinner spinner-small" style="margin: 0 auto;"></div>';
 
@@ -2163,9 +2556,20 @@
         // HELPERS
         // ============================================
         function formatPrice(price) {
-            if (price == null || price === '' || isNaN(price)) return '0 сум';
-            const num = Number(price);
-            return num.toLocaleString('ru-RU') + ' сум';
+            if (price == null || price === '' || isNaN(price)) {
+                return '0 сум';
+            }
+            
+            // Convert to number and round (no decimals for uzbek som)
+            const num = Math.round(Number(price));
+            
+            // Format with thousand separators
+            const formatted = num.toLocaleString('ru-RU', {
+                minimumFractionDigits: 0,
+                maximumFractionDigits: 0
+            });
+            
+            return `${formatted} сум`;
         }
 
         function formatTime(dateString) {
@@ -2244,6 +2648,129 @@
         });
 
         // ============================================
+        // KEYBOARD NAVIGATION - v22.0
+        // ============================================
+        function setupKeyboardNavigation() {
+            document.addEventListener('keydown', (e) => {
+                // Ignore if typing in input/textarea
+                if (e.target.matches('input, textarea, select')) {
+                    // ESC to blur input
+                    if (e.key === 'Escape') {
+                        e.target.blur();
+                        haptic('light');
+                    }
+                    return;
+                }
+                
+                // Close modal with ESC
+                if (e.key === 'Escape') {
+                    const modal = document.querySelector('.modal-overlay');
+                    if (modal) {
+                        modal.remove();
+                        haptic('light');
+                        e.preventDefault();
+                    }
+                }
+                
+                // Navigate views with Alt + Number
+                if (e.altKey && !e.ctrlKey && !e.shiftKey) {
+                    switch(e.key) {
+                        case '1':
+                            switchView('dashboard');
+                            e.preventDefault();
+                            break;
+                        case '2':
+                            switchView('products');
+                            e.preventDefault();
+                            break;
+                        case '3':
+                            switchView('stats');
+                            e.preventDefault();
+                            break;
+                        case '4':
+                            switchView('settings');
+                            e.preventDefault();
+                            break;
+                    }
+                }
+                
+                // Quick actions with Ctrl/Cmd
+                if ((e.ctrlKey || e.metaKey) && !e.altKey && !e.shiftKey) {
+                    switch(e.key.toLowerCase()) {
+                        case 'n':
+                            // New product
+                            if (state.currentView === 'products') {
+                                openProductModal();
+                                e.preventDefault();
+                            }
+                            break;
+                        case 'f':
+                            // Focus search
+                            const searchInput = document.querySelector('.search-input');
+                            if (searchInput) {
+                                searchInput.focus();
+                                e.preventDefault();
+                            }
+                            break;
+                        case 'r':
+                            // Refresh current view
+                            switch(state.currentView) {
+                                case 'dashboard':
+                                    loadDashboard();
+                                    break;
+                                case 'products':
+                                    loadProducts();
+                                    break;
+                                case 'orders':
+                                    loadOrders();
+                                    break;
+                                case 'stats':
+                                    loadStats();
+                                    break;
+                            }
+                            toast('Обновлено', 'info');
+                            e.preventDefault();
+                            break;
+                    }
+                }
+                
+                // Tab navigation enhancement
+                if (e.key === 'Tab') {
+                    // Let default Tab behavior work, but add visual feedback
+                    const focusableElements = document.querySelectorAll(
+                        'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
+                    );
+                    
+                    // Add keyboard-focus class to focused element
+                    setTimeout(() => {
+                        focusableElements.forEach(el => el.classList.remove('keyboard-focus'));
+                        if (document.activeElement) {
+                            document.activeElement.classList.add('keyboard-focus');
+                        }
+                    }, 0);
+                }
+            });
+            
+            // Show keyboard shortcuts hint
+            const showKeyboardHints = () => {
+                toast('Горячие клавиши', 'info', {
+                    description: 'Alt+1-4: Навигация | Ctrl+N: Новый товар | Ctrl+F: Поиск | Ctrl+R: Обновить',
+                    duration: 5000
+                });
+            };
+            
+            // Show hints on Ctrl+?
+            document.addEventListener('keydown', (e) => {
+                if ((e.ctrlKey || e.metaKey) && e.key === '/') {
+                    showKeyboardHints();
+                    e.preventDefault();
+                }
+            });
+            
+            console.log('⌨️ Keyboard navigation enabled');
+        }
+
+        // ============================================
         // INITIALIZATION
         // ============================================
         function init() {
@@ -2255,6 +2782,9 @@
                 tg.expand();
                 console.log('✅ Telegram WebApp initialized');
             }
+
+            // Setup keyboard navigation
+            setupKeyboardNavigation();
 
             // Update store info
             const { userId } = getAuth();

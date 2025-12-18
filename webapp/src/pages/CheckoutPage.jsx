@@ -180,6 +180,24 @@ function CheckoutPage({ user }) {
 
       // Handle online payment if selected
       if (paymentMethod === PAYMENT_METHOD.CLICK || paymentMethod === PAYMENT_METHOD.PAYME) {
+        // Check if provider is available
+        const isProviderAvailable = paymentProviders.includes(paymentMethod);
+        
+        if (!isProviderAvailable) {
+          // Payment provider not integrated - show error
+          if (window.Telegram?.WebApp) {
+            window.Telegram.WebApp.showAlert(
+              t('Этот способ оплаты временно недоступен. Выберите другой способ оплаты.',
+                'Bu to\'lov usuli vaqtincha mavjud emas. Boshqa to\'lov usulini tanlang.'),
+              () => navigate('/cart')
+            );
+          } else {
+            alert(t('Этот способ оплаты временно недоступен', 'Bu to\'lov usuli vaqtincha mavjud emas'));
+            navigate('/cart');
+          }
+          return;
+        }
+        
         try {
           const returnUrl = window.location.origin + '/profile';
           // Get store_id from cart items (assuming single store checkout)

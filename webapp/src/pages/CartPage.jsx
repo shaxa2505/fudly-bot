@@ -270,6 +270,14 @@ function CartPage({ user }) {
 
   // Handle Click payment
   const handleClickPayment = async () => {
+    // Check if Click is available
+    const isClickAvailable = paymentProviders.includes('click');
+    
+    if (!isClickAvailable) {
+      toast.error('Click to\'lov vaqtincha mavjud emas. Boshqa to\'lov usulini tanlang.');
+      return;
+    }
+    
     setOrderLoading(true)
     try {
       const userId = window.Telegram?.WebApp?.initDataUnsafe?.user?.id || user?.id || 1
@@ -317,7 +325,7 @@ function CartPage({ user }) {
       }
     } catch (error) {
       console.error('Click payment error:', error)
-      alert('Click to\'lovda xatolik: ' + (error.message || 'Noma\'lum xatolik'))
+      toast.error('Click to\'lovda xatolik: ' + (error.message || 'Noma\'lum xatolik'))
     } finally {
       setOrderLoading(false)
     }
@@ -568,13 +576,24 @@ function CartPage({ user }) {
                       >
                         💳 Kartaga o'tkazish
                       </button>
-                      <button
-                        className={`payment-option ${selectedPaymentMethod === 'click' ? 'active' : ''}`}
-                        onClick={() => setSelectedPaymentMethod('click')}
-                      >
-                        <img src="https://click.uz/favicon.ico" alt="Click" style={{width: 20, height: 20, marginRight: 8}} onError={(e) => e.target.style.display = 'none'} />
-                        Click
-                      </button>
+                      {paymentProviders.includes('click') ? (
+                        <button
+                          className={`payment-option ${selectedPaymentMethod === 'click' ? 'active' : ''}`}
+                          onClick={() => setSelectedPaymentMethod('click')}
+                        >
+                          <img src="https://click.uz/favicon.ico" alt="Click" style={{width: 20, height: 20, marginRight: 8}} onError={(e) => e.target.style.display = 'none'} />
+                          Click
+                        </button>
+                      ) : (
+                        <button
+                          className="payment-option disabled"
+                          disabled
+                          title="Click vaqtincha mavjud emas"
+                        >
+                          <img src="https://click.uz/favicon.ico" alt="Click" style={{width: 20, height: 20, marginRight: 8, opacity: 0.5}} onError={(e) => e.target.style.display = 'none'} />
+                          Click (mavjud emas)
+                        </button>
+                      )}
                     </div>
                   </div>
 
