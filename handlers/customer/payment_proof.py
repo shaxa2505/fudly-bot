@@ -255,6 +255,13 @@ async def receive_payment_proof(message: types.Message, state: FSMContext) -> No
 
         # Send photo to all admins
         photo = message.photo[-1]
+
+        # Persist payment proof in DB for audit trail and later access
+        if hasattr(db, "update_payment_status"):
+            db.update_payment_status(order_id, "pending", photo.file_id)
+        elif hasattr(db, "update_order_payment_proof"):
+            db.update_order_payment_proof(order_id, photo.file_id)
+
         sent_count = 0
         for admin_id in admin_ids:
             try:

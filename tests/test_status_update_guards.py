@@ -21,21 +21,27 @@ ROOT = Path(__file__).resolve().parents[1]
 # consciously or prefer going through UnifiedOrderService.
 
 UPDATE_ORDER_ALLOWED = {
+    "app/services/unified_order_service.py",
+    "app/core/webhook_server.py",
+    "app/api/partner_panel_simple.py",
     "handlers/customer/orders/delivery.py",
     "handlers/common/unified_order/seller.py",
     "handlers/common/unified_order/customer.py",
     "handlers/customer/orders/my_orders.py",
     "handlers/customer/payments.py",
+    "handlers/customer/payment_proof.py",
     "handlers/seller/order_management.py",
     "handlers/customer/orders/delivery_partner.py",
     "handlers/seller/management/orders.py",
     "handlers/customer/orders/delivery_admin.py",
+    "handlers/admin/delivery_orders.py",
     "database_protocol.py",
     "database.py",
     "database_pg_module/mixins/orders.py",
 }
 
 UPDATE_BOOKING_ALLOWED = {
+    "app/services/unified_order_service.py",
     "handlers/common/unified_order/seller.py",
     "handlers/common/unified_order/customer.py",
     "handlers/customer/orders/my_orders.py",

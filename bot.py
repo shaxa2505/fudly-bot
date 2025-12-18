@@ -394,7 +394,6 @@ def _register_handlers() -> None:
     # Import handler modules
     from handlers import bookings
     from handlers.admin import dashboard as admin_dashboard
-    from handlers.admin import delivery_orders as admin_delivery_orders
     from handlers.admin import legacy as admin_legacy
     from handlers.admin import panel as admin_panel
     from handlers.admin import stats as admin_stats
@@ -426,7 +425,6 @@ def _register_handlers() -> None:
         create_offer,
         import_products,
         management,
-        order_management,
         store_settings,
     )
     from handlers.seller import (
@@ -449,7 +447,6 @@ def _register_handlers() -> None:
     seller_stats.setup_dependencies(db, bot)
     profile.setup_dependencies(db, bot, user_view_mode)
     favorites.setup_dependencies(db, bot, user_view_mode)
-    order_management.setup(bot, db)
     telegram_payments.setup(db, bot, get_text)
     cart_setup(db, bot)  # Setup cart dependencies
     customer_menu.setup(
@@ -463,7 +460,6 @@ def _register_handlers() -> None:
     )
     user_features.setup(dp, db, get_text, booking_filters_keyboard, settings_keyboard)
     admin_dashboard.setup(bot, db, get_text, moderation_keyboard, get_uzb_time)
-    admin_delivery_orders.setup(db)  # Setup delivery order payment confirmation
     admin_legacy.setup(bot, db, get_text, moderation_keyboard, get_uzb_time, ADMIN_ID, DATABASE_URL)
     admin_stats.setup(admin_service, logger)
 
@@ -491,7 +487,6 @@ def _register_handlers() -> None:
     dp.include_router(create_offer.router)
     dp.include_router(management.router)
     dp.include_router(analytics.router)
-    dp.include_router(order_management.router)
     dp.include_router(store_settings.router)
 
     # 2. Customer routers
@@ -506,7 +501,6 @@ def _register_handlers() -> None:
     dp.include_router(partner.router)
 
     # 3. Admin routers
-    dp.include_router(admin_delivery_orders.router)  # MUST be before other admin routers
     dp.include_router(admin_dashboard.router)
     dp.include_router(admin_legacy.router)
     dp.include_router(admin_panel.router)

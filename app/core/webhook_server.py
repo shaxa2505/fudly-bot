@@ -329,6 +329,34 @@ async def create_webhook_app(
         response.headers["Access-Control-Allow-Headers"] = "Content-Type, X-Telegram-Init-Data"
         return response
 
+    def _get_authenticated_user_id(request: web.Request) -> int | None:
+        """Validate Telegram initData and return authenticated user_id.
+
+        Mini App must send `X-Telegram-Init-Data` header.
+        """
+        init_data = request.headers.get("X-Telegram-Init-Data")
+        if not init_data:
+            return None
+
+        try:
+            from app.api.webapp.common import validate_init_data
+
+            validated = validate_init_data(init_data, bot.token)
+        except Exception:
+            return None
+
+        if not validated:
+            return None
+
+        user = validated.get("user")
+        if not isinstance(user, dict):
+            return None
+
+        try:
+            return int(user.get("id"))
+        except Exception:
+            return None
+
     async def api_categories(request: web.Request) -> web.Response:
         """GET /api/v1/categories - List categories."""
         city = request.query.get("city", "Ташкент")
@@ -551,7 +579,13 @@ async def create_webhook_app(
 
             # Extract order data
             items = data.get("items", [])
-            user_id = data.get("user_id")
+            authenticated_user_id = _get_authenticated_user_id(request)
+            if not authenticated_user_id:
+                return add_cors_headers(
+                    web.json_response({"error": "Authentication required"}, status=401)
+                )
+
+            user_id = authenticated_user_id
             # Support both order_type and delivery_type field names
             delivery_type = data.get("order_type") or data.get("delivery_type", "pickup")
             phone = data.get("phone", "")
@@ -562,11 +596,6 @@ async def create_webhook_app(
             if not items:
                 return add_cors_headers(
                     web.json_response({"error": "No items in order"}, status=400)
-                )
-
-            if not user_id:
-                return add_cors_headers(
-                    web.json_response({"error": "User ID required"}, status=400)
                 )
 
             is_delivery = delivery_type == "delivery"
@@ -838,11 +867,13 @@ async def create_webhook_app(
     async def api_user_orders(request: web.Request) -> web.Response:
         """GET /api/v1/orders - Get user's orders/bookings and delivery orders."""
         try:
-            user_id = request.query.get("user_id")
-            if not user_id:
+            authenticated_user_id = _get_authenticated_user_id(request)
+            if not authenticated_user_id:
                 return add_cors_headers(
-                    web.json_response({"error": "user_id required"}, status=400)
+                    web.json_response({"error": "Authentication required"}, status=401)
                 )
+
+            user_id = authenticated_user_id
 
             # Get delivery orders (new system)
             delivery_orders = []
@@ -1054,6 +1085,12 @@ async def create_webhook_app(
         """
         order_id_str = request.match_info.get("order_id")
         try:
+            authenticated_user_id = _get_authenticated_user_id(request)
+            if not authenticated_user_id:
+                return add_cors_headers(
+                    web.json_response({"error": "Authentication required"}, status=401)
+                )
+
             order_id = int(order_id_str)
 
             # Parse multipart form data
@@ -1149,6 +1186,23 @@ async def create_webhook_app(
                     admin_id = int(os.getenv("ADMIN_ID", "0"))
                     if admin_id:
                         try:
+                            # SECURITY: user can only upload proof for their own order
+                            try:
+                                order_user_id_int = int(user_id) if user_id is not None else None
+                            except Exception:
+                                order_user_id_int = None
+
+                            if order_user_id_int != authenticated_user_id:
+                                logger.warning(
+                                    "IDOR attempt: user %s tried to upload payment proof for order #%s (owner=%s)",
+                                    authenticated_user_id,
+                                    order_id,
+                                    order_user_id_int,
+                                )
+                                return add_cors_headers(
+                                    web.json_response({"error": "Access denied"}, status=403)
+                                )
+
                             sent_msg = await bot.send_photo(
                                 chat_id=admin_id,
                                 photo=photo_file,
@@ -1160,6 +1214,12 @@ async def create_webhook_app(
                             logger.info(
                                 f"Payment proof for delivery order #{order_id} sent to admin {admin_id}"
                             )
+
+                            # Persist payment proof in DB for audit trail and later access
+                            if hasattr(db, "update_payment_status"):
+                                db.update_payment_status(order_id, "pending", file_id)
+                            elif hasattr(db, "update_order_payment_proof"):
+                                db.update_order_payment_proof(order_id, file_id)
 
                             # Update order status to awaiting_admin_confirmation
                             if hasattr(db, "update_order_status"):
@@ -1208,7 +1268,13 @@ async def create_webhook_app(
         """POST /api/v1/user/recently-viewed - Add offer to recently viewed."""
         try:
             data = await request.json()
-            user_id = data.get("user_id")
+            authenticated_user_id = _get_authenticated_user_id(request)
+            if not authenticated_user_id:
+                return add_cors_headers(
+                    web.json_response({"error": "Authentication required"}, status=401)
+                )
+
+            user_id = authenticated_user_id
             offer_id = data.get("offer_id")
 
             if not user_id or not offer_id:
@@ -1230,7 +1296,13 @@ async def create_webhook_app(
     async def api_get_recently_viewed(request: web.Request) -> web.Response:
         """GET /api/v1/user/recently-viewed - Get user's recently viewed offers."""
         try:
-            user_id = request.query.get("user_id")
+            authenticated_user_id = _get_authenticated_user_id(request)
+            if not authenticated_user_id:
+                return add_cors_headers(
+                    web.json_response({"error": "Authentication required"}, status=401)
+                )
+
+            user_id = authenticated_user_id
             limit = int(request.query.get("limit", "20"))
 
             if not user_id:
@@ -1286,7 +1358,13 @@ async def create_webhook_app(
         """POST /api/v1/user/search-history - Add search query to history."""
         try:
             data = await request.json()
-            user_id = data.get("user_id")
+            authenticated_user_id = _get_authenticated_user_id(request)
+            if not authenticated_user_id:
+                return add_cors_headers(
+                    web.json_response({"error": "Authentication required"}, status=401)
+                )
+
+            user_id = authenticated_user_id
             query = data.get("query", "").strip()
 
             if not user_id or not query:
@@ -1311,7 +1389,13 @@ async def create_webhook_app(
     async def api_get_search_history(request: web.Request) -> web.Response:
         """GET /api/v1/user/search-history - Get user's search history."""
         try:
-            user_id = request.query.get("user_id")
+            authenticated_user_id = _get_authenticated_user_id(request)
+            if not authenticated_user_id:
+                return add_cors_headers(
+                    web.json_response({"error": "Authentication required"}, status=401)
+                )
+
+            user_id = authenticated_user_id
             limit = int(request.query.get("limit", "10"))
 
             if not user_id:

@@ -797,6 +797,69 @@ class UnifiedOrderService:
     ) -> dict:
         """Create delivery orders."""
         try:
+            # Cart delivery must be a SINGLE order row (per store) to keep payment/proof/admin flow consistent.
+            if (
+                len(items) > 1
+                and hasattr(self.db, "create_cart_order_atomic")
+                and items
+                and items[0].get("store_id")
+            ):
+                store_id = int(items[0]["store_id"])
+                delivery_price = int(items[0].get("delivery_price") or 0)
+
+                cart_items = [
+                    {
+                        "offer_id": int(item["offer_id"]),
+                        "quantity": int(item.get("quantity", 1)),
+                        "price": int(item.get("price", 0)),
+                        "title": item.get("title", ""),
+                    }
+                    for item in items
+                ]
+
+                ok, order_id, _pickup_code, error_reason = self.db.create_cart_order_atomic(
+                    user_id=user_id,
+                    store_id=store_id,
+                    cart_items=cart_items,
+                    delivery_address=delivery_address,
+                    delivery_price=delivery_price,
+                    payment_method=payment_method,
+                )
+
+                if not ok or not order_id:
+                    return {
+                        "success": False,
+                        "error": error_reason or "Failed to create cart delivery order",
+                    }
+
+                store_orders: list[dict[str, Any]] = []
+                for item in items:
+                    qty = int(item.get("quantity", 1))
+                    price = int(item.get("price", 0))
+                    store_orders.append(
+                        {
+                            "order_id": int(order_id),
+                            "offer_id": int(item.get("offer_id") or 0),
+                            "store_id": store_id,
+                            "quantity": qty,
+                            "price": price,
+                            "total": price * qty,
+                            "pickup_code": None,  # delivery
+                            "title": item.get("title", ""),
+                            "store_name": item.get("store_name", ""),
+                            "store_address": item.get("store_address", ""),
+                            "delivery_price": delivery_price,
+                        }
+                    )
+
+                return {
+                    "success": True,
+                    "order_ids": [int(order_id)],
+                    "booking_ids": [],
+                    "pickup_codes": [],
+                    "stores_orders": {store_id: store_orders},
+                }
+
             result = self.db.create_cart_order(
                 user_id=user_id,
                 items=items,
@@ -852,8 +915,26 @@ class UnifiedOrderService:
                 )
 
                 # Build notification
-                order_ids = [str(o["order_id"]) for o in store_orders]
-                pickup_codes = [o["pickup_code"] for o in store_orders if o.get("pickup_code")]
+                order_ids: list[str] = []
+                seen_order_ids: set[int] = set()
+                for o in store_orders:
+                    oid = o.get("order_id")
+                    if not oid:
+                        continue
+                    oid_int = int(oid)
+                    if oid_int in seen_order_ids:
+                        continue
+                    seen_order_ids.add(oid_int)
+                    order_ids.append(str(oid_int))
+
+                pickup_codes: list[str] = []
+                seen_codes: set[str] = set()
+                for o in store_orders:
+                    code = o.get("pickup_code")
+                    if not code or code in seen_codes:
+                        continue
+                    seen_codes.add(code)
+                    pickup_codes.append(code)
 
                 seller_text = NotificationTemplates.seller_new_order(
                     lang=seller_lang,
@@ -951,42 +1032,76 @@ class UnifiedOrderService:
             True if successful
         """
         try:
-            # Get entity from unified orders table (v24+ all orders in one table)
-            # entity_type kept for backward compatibility but always "order" now
-            entity = self.db.get_order(entity_id)
-            if not entity:
-                logger.warning(f"Order not found: #{entity_id}")
-                return False
+            # IMPORTANT: orders and bookings may still live in different tables at runtime.
+            # Respect entity_type to avoid updating a wrong record on id collision.
+            if entity_type == "booking":
+                if not hasattr(self.db, "get_booking"):
+                    logger.warning("DB layer does not support bookings")
+                    return False
+
+                entity = self.db.get_booking(entity_id)
+                if not entity:
+                    logger.warning(f"Booking not found: #{entity_id}")
+                    return False
+            else:
+                if not hasattr(self.db, "get_order"):
+                    logger.warning("DB layer does not support orders")
+                    return False
+
+                entity = self.db.get_order(entity_id)
+                if not entity:
+                    logger.warning(f"Order not found: #{entity_id}")
+                    return False
 
             # Get entity fields
-            if isinstance(entity, dict):
-                user_id = entity.get("user_id")
-                store_id = entity.get("store_id")
-                pickup_code = entity.get("pickup_code")
-                current_status_raw = entity.get("order_status")
-                order_type = entity.get("order_type")
-                
-                # Fallback: if order_type not set, determine from delivery_address
-                if not order_type:
-                    delivery_addr = entity.get("delivery_address")
-                    order_type = "delivery" if delivery_addr else "pickup"
-                    logger.info(
-                        f"Order type fallback for #{entity_id}: "
-                        f"delivery_address={delivery_addr}, order_type={order_type}"
-                    )
+            if entity_type == "booking":
+                if isinstance(entity, dict):
+                    user_id = entity.get("user_id")
+                    store_id = entity.get("store_id")
+                    pickup_code = entity.get("booking_code") or entity.get("pickup_code")
+                    current_status_raw = entity.get("status") or entity.get("order_status")
                 else:
-                    logger.info(f"Order type from DB for #{entity_id}: {order_type}")
-            else:
-                # Tuple format
-                user_id = getattr(entity, "user_id", None)
-                store_id = getattr(entity, "store_id", None)
-                pickup_code = getattr(entity, "pickup_code", None)
-                current_status_raw = getattr(entity, "order_status", None)
-                order_type = getattr(entity, "order_type", None)
-                if not order_type:
-                    order_type = (
-                        "delivery" if getattr(entity, "delivery_address", None) else "pickup"
+                    user_id = getattr(entity, "user_id", None)
+                    store_id = getattr(entity, "store_id", None)
+                    pickup_code = getattr(entity, "booking_code", None) or getattr(
+                        entity, "pickup_code", None
                     )
+                    current_status_raw = getattr(entity, "status", None) or getattr(
+                        entity, "order_status", None
+                    )
+
+                order_type = "pickup"
+            else:
+                if isinstance(entity, dict):
+                    user_id = entity.get("user_id")
+                    store_id = entity.get("store_id")
+                    pickup_code = entity.get("pickup_code")
+                    current_status_raw = entity.get("order_status")
+                    order_type = entity.get("order_type")
+
+                    # Fallback: if order_type not set, determine from delivery_address
+                    if not order_type:
+                        delivery_addr = entity.get("delivery_address")
+                        order_type = "delivery" if delivery_addr else "pickup"
+                        logger.info(
+                            f"Order type fallback for #{entity_id}: "
+                            f"delivery_address={delivery_addr}, order_type={order_type}"
+                        )
+                    else:
+                        logger.info(f"Order type from DB for #{entity_id}: {order_type}")
+                else:
+                    # Tuple format
+                    user_id = getattr(entity, "user_id", None)
+                    store_id = getattr(entity, "store_id", None)
+                    pickup_code = getattr(entity, "pickup_code", None)
+                    current_status_raw = getattr(entity, "order_status", None)
+                    order_type = getattr(entity, "order_type", None)
+                    if not order_type:
+                        order_type = (
+                            "delivery"
+                            if getattr(entity, "delivery_address", None)
+                            else "pickup"
+                        )
 
             # Normalize statuses and enforce safe transitions/idempotence
             current_status = (
@@ -1012,8 +1127,17 @@ class UnifiedOrderService:
                 )
                 return True
 
-            # Update status in DB (unified orders table)
-            self.db.update_order_status(entity_id, target_status)
+            # Update status in DB
+            if entity_type == "booking":
+                if not hasattr(self.db, "update_booking_status"):
+                    logger.warning("DB layer does not support update_booking_status")
+                    return False
+                self.db.update_booking_status(entity_id, target_status)
+            else:
+                if not hasattr(self.db, "update_order_status"):
+                    logger.warning("DB layer does not support update_order_status")
+                    return False
+                self.db.update_order_status(entity_id, target_status)
 
             # Restore quantity if rejected or cancelled
             if target_status in [OrderStatus.REJECTED, OrderStatus.CANCELLED] and (
@@ -1155,6 +1279,15 @@ class UnifiedOrderService:
                                 )
                                 logger.info(
                                     f"💾 Saved message_id={message_sent.message_id} for order#{entity_id}"
+                                )
+                            elif entity_type == "booking" and hasattr(
+                                self.db, "set_booking_customer_message_id"
+                            ):
+                                self.db.set_booking_customer_message_id(
+                                    entity_id, message_sent.message_id
+                                )
+                                logger.info(
+                                    f"💾 Saved message_id={message_sent.message_id} for booking#{entity_id}"
                                 )
                     except Exception as e:
                         logger.error(f"Failed to notify customer {user_id}: {e}")

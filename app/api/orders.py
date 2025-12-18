@@ -199,42 +199,119 @@ def format_booking_to_order_status(booking: Any, db) -> OrderStatus:
     Returns:
         OrderStatus model
     """
+    import json
+
     # Convert to dict if needed
     booking_dict = dict(booking) if not isinstance(booking, dict) else booking
 
-    booking_id = booking_dict["id"]
-    offer_id = booking_dict["offer_id"]
+    # v24+: unified orders use `order_id`; legacy bookings use `booking_id` (or sometimes `id`)
+    booking_id = (
+        booking_dict.get("order_id")
+        or booking_dict.get("booking_id")
+        or booking_dict.get("id")
+    )
+    if booking_id is None:
+        raise ValueError("Missing order_id/booking_id")
 
-    # Get offer details
-    offer = db.get_offer(offer_id)
-    offer_dict = dict(offer) if offer and not isinstance(offer, dict) else offer or {}
+    status = booking_dict.get("order_status") or booking_dict.get("status") or "pending"
 
-    # Get store details
-    store_id = offer_dict.get("store_id", 0)
-    store = db.get_store(store_id)
-    store_dict = dict(store) if store and not isinstance(store, dict) else store or {}
+    # Best-effort order_type detection (unified table vs legacy booking)
+    delivery_address = booking_dict.get("delivery_address")
+    order_type = booking_dict.get("order_type") or ("delivery" if delivery_address else "pickup")
 
-    # Calculate total price
-    quantity = booking_dict.get("quantity", 1)
-    discount_price = offer_dict.get("discount_price", 0)
+    booking_code = booking_dict.get("pickup_code") or booking_dict.get("booking_code") or ""
+
+    # Store details: prefer explicit store_id on the row, fallback to offer.store_id
+    store_id = int(booking_dict.get("store_id") or 0)
+
+    # Cart order support (delivery cart = 1 row with cart_items)
+    is_cart = int(booking_dict.get("is_cart_order") or booking_dict.get("is_cart_booking") or 0)
+    cart_items_json = booking_dict.get("cart_items")
+    cart_items: list[dict[str, Any]] = []
+    if is_cart and cart_items_json:
+        try:
+            cart_items = (
+                json.loads(cart_items_json) if isinstance(cart_items_json, str) else cart_items_json
+            )
+        except Exception:
+            cart_items = []
+
+    offer_id = booking_dict.get("offer_id")
+    quantity = int(booking_dict.get("quantity") or 1)
     delivery_cost = booking_dict.get("delivery_cost", 0) or 0
-    total_price = (discount_price * quantity) + delivery_cost
 
-    # Generate QR code for pickup orders
-    booking_code = booking_dict.get("booking_code", "")
-    status = booking_dict.get("status", "pending")
+    offer_dict: dict[str, Any] = {}
+    store_dict: dict[str, Any] = {}
+
+    if cart_items:
+        # Use first cart item as representative
+        first_item = cart_items[0]
+        first_offer_id = first_item.get("offer_id")
+        if not store_id:
+            store_id = int(first_item.get("store_id") or 0)
+
+        try:
+            # Prefer total_price from DB row (includes delivery)
+            total_price = float(booking_dict.get("total_price") or 0)
+        except Exception:
+            total_price = 0.0
+
+        # Calculate delivery_cost if possible (total - items)
+        items_total = 0
+        qty_total = 0
+        for item in cart_items:
+            item_qty = int(item.get("quantity") or 1)
+            item_price = int(item.get("price") or 0)
+            qty_total += item_qty
+            items_total += item_price * item_qty
+        quantity = qty_total if qty_total > 0 else quantity
+
+        if total_price and items_total and not delivery_cost:
+            try:
+                derived_delivery = float(total_price) - float(items_total)
+                delivery_cost = derived_delivery if derived_delivery > 0 else 0
+            except Exception:
+                pass
+
+        if first_offer_id:
+            offer = db.get_offer(int(first_offer_id))
+            offer_dict = dict(offer) if offer and not isinstance(offer, dict) else offer or {}
+    else:
+        # Single-item booking/order
+        if offer_id:
+            offer = db.get_offer(int(offer_id))
+            offer_dict = dict(offer) if offer and not isinstance(offer, dict) else offer or {}
+
+        # If total_price is stored on orders table, prefer it
+        if booking_dict.get("total_price") is not None:
+            try:
+                total_price = float(booking_dict.get("total_price") or 0)
+            except Exception:
+                total_price = 0.0
+        else:
+            discount_price = int(offer_dict.get("discount_price") or 0)
+            total_price = float((discount_price * quantity) + (delivery_cost or 0))
+
+        if not store_id:
+            store_id = int(offer_dict.get("store_id") or 0)
+
+    if store_id:
+        store = db.get_store(store_id)
+        store_dict = dict(store) if store and not isinstance(store, dict) else store or {}
+
+    # Generate QR code only for pickup orders when the code is available
     qr_code = None
-    if status in ["confirmed", "ready"] and booking_code:
+    if order_type == "pickup" and status in ["preparing", "confirmed", "ready"] and booking_code:
         qr_code = generate_qr_code(booking_code)
 
     return OrderStatus(
-        booking_id=booking_id,
+        booking_id=int(booking_id),
         booking_code=booking_code,
         status=status,
         created_at=str(booking_dict.get("created_at", "")),
         updated_at=str(booking_dict.get("updated_at")) if booking_dict.get("updated_at") else None,
         offer_title=offer_dict.get("title", "Товар"),
-        offer_photo=offer_dict.get("photo"),
+        offer_photo=offer_dict.get("photo") or offer_dict.get("photo_id"),
         quantity=quantity,
         total_price=total_price,
         store_id=store_id,
@@ -464,7 +541,7 @@ async def get_order_qr_code(booking_id: int, db=Depends(get_db)):
 
     return {
         "booking_id": booking_id,
-        "booking_code": booking_code,
+        "booking_code": pickup_code,
         "qr_code": qr_code,
         "message": "Покажите этот QR код в магазине",
     }

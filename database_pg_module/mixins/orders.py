@@ -498,6 +498,7 @@ class OrderMixin:
         if not cart_items:
             return (False, None, None, "empty_cart")
 
+        conn = None
         try:
             with self.get_connection() as conn:
                 cursor = conn.cursor()
@@ -536,8 +537,13 @@ class OrderMixin:
                     # Reserve quantity
                     new_qty = available_qty - quantity
                     cursor.execute(
-                        "UPDATE offers SET quantity = %s WHERE offer_id = %s",
-                        (new_qty, offer_id),
+                        """
+                        UPDATE offers
+                        SET quantity = %s,
+                            status = CASE WHEN %s <= 0 THEN 'inactive' ELSE status END
+                        WHERE offer_id = %s
+                        """,
+                        (new_qty, new_qty, offer_id),
                     )
                     logger.info(
                         f"🛒 Reserved offer {offer_id}: {quantity} units (new qty: {new_qty})"
@@ -549,33 +555,64 @@ class OrderMixin:
                 # Add delivery price
                 total_price += delivery_price
 
-                # Generate pickup code
-                pickup_code = "".join(random.choices(string.ascii_uppercase + string.digits, k=6))
+                order_type = "delivery" if delivery_address else "pickup"
+                pickup_code = None
+                if order_type == "pickup":
+                    pickup_code = "".join(
+                        random.choices(string.ascii_uppercase + string.digits, k=6)
+                    )
 
                 # Create order with cart_items
                 cart_items_json = json.dumps(cart_items, ensure_ascii=False)
 
-                cursor.execute(
-                    """
-                    INSERT INTO orders (
-                        user_id, store_id, delivery_address, total_price,
-                        payment_method, payment_status, order_status, pickup_code,
-                        cart_items, is_cart_order, quantity
+                try:
+                    cursor.execute(
+                        """
+                        INSERT INTO orders (
+                            user_id, store_id, delivery_address, total_price,
+                            payment_method, payment_status, order_status, pickup_code,
+                            order_type, cart_items, is_cart_order, quantity
+                        )
+                        VALUES (%s, %s, %s, %s, %s, 'pending', 'pending', %s, %s, %s, 1, %s)
+                        RETURNING order_id
+                        """,
+                        (
+                            user_id,
+                            store_id,
+                            delivery_address,
+                            total_price,
+                            payment_method,
+                            pickup_code,
+                            order_type,
+                            cart_items_json,
+                            len(cart_items),
+                        ),
                     )
-                    VALUES (%s, %s, %s, %s, %s, 'pending', 'pending', %s, %s, 1, %s)
-                    RETURNING order_id
-                    """,
-                    (
-                        user_id,
-                        store_id,
-                        delivery_address,
-                        total_price,
-                        payment_method,
-                        pickup_code,
-                        cart_items_json,
-                        len(cart_items),
-                    ),
-                )
+                except Exception as e:
+                    # Fallback: older schemas without order_type
+                    if "order_type" not in str(e):
+                        raise
+                    cursor.execute(
+                        """
+                        INSERT INTO orders (
+                            user_id, store_id, delivery_address, total_price,
+                            payment_method, payment_status, order_status, pickup_code,
+                            cart_items, is_cart_order, quantity
+                        )
+                        VALUES (%s, %s, %s, %s, %s, 'pending', 'pending', %s, %s, 1, %s)
+                        RETURNING order_id
+                        """,
+                        (
+                            user_id,
+                            store_id,
+                            delivery_address,
+                            total_price,
+                            payment_method,
+                            pickup_code,
+                            cart_items_json,
+                            len(cart_items),
+                        ),
+                    )
                 order_id = cursor.fetchone()[0]
 
                 logger.info(

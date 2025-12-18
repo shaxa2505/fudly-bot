@@ -28,6 +28,7 @@ ALLOWED_FILES = {
     # Unified templates (source of truth)
     "app/services/unified_order_service.py",
     "app/services/order_service.py",  # legacy
+    "app/services/notification_builder.py",
     # Customer flows that show payment / immediate confirmation
     "handlers/customer/cart/payment.py",
     "handlers/customer/cart/checkout.py",  # mentions text only in comment
