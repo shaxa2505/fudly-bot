@@ -1,5 +1,5 @@
 /* ================================================
-   YANDEX.LAVKA STYLE NAVIGATION
+   YANDEX.LAVKA STYLE NAVIGATION - CLEAN & MINIMAL
    ================================================ */
 
 .bottom-nav {
@@ -66,87 +66,6 @@
 
 .nav-item:active {
     opacity: 0.5;
-}
-.nav-item.active {
-    color: var(--primary);
-    font-weight: var(--weight-semibold);
-}
-
-.nav-item.active::before {
-    width: 50px;
-}
-
-.nav-item.active::after {
-    opacity: 0.6;
-}
-
-.nav-item.active .nav-icon {
-    background: linear-gradient(135deg, var(--primary) 0%, var(--accent) 100%);
-    color: white;
-    box-shadow: var(--shadow-lg), var(--shadow-primary), 0 0 0 2px rgba(255, 255, 255, 0.5) inset;
-    transform: translateY(-6px) scale(1.05);
-}
-
-/* === Nav Icon === */
-.nav-icon {
-    width: 44px;
-    height: 44px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    border-radius: var(--radius-md);
-    background: transparent;
-    transition: all var(--transition-base);
-    position: relative;
-}
-
-.nav-icon svg,
-.nav-icon i {
-    width: 24px;
-    height: 24px;
-    transition: transform var(--transition-fast);
-}
-
-.nav-item:hover .nav-icon svg,
-.nav-item:hover .nav-icon i {
-    transform: scale(1.1);
-}
-
-.nav-item.active .nav-icon svg,
-.nav-item.active .nav-icon i {
-    animation: bounce 0.6s ease-out;
-}
-
-/* === Badge === */
-.nav-badge {
-    position: absolute;
-    top: -4px;
-    right: -4px;
-    min-width: 20px;
-    height: 20px;
-    padding: 0 6px;
-    background: linear-gradient(135deg, var(--danger) 0%, #DC2626 100%);
-    color: white;
-    font-size: 11px;
-    font-weight: var(--weight-bold);
-    border-radius: var(--radius-full);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    border: 2px solid white;
-    box-shadow: var(--shadow-sm);
-    animation: scaleIn 0.3s cubic-bezier(0.68, -0.55, 0.265, 1.55);
-}
-
-.nav-badge.pulse {
-    animation: pulse 2s infinite, scaleIn 0.3s cubic-bezier(0.68, -0.55, 0.265, 1.55);
-}
-
-/* === Nav Label === */
-.nav-label {
-    font-size: var(--font-xs);
-    letter-spacing: 0.3px;
-    transition: all var(--transition-fast);
 }
 
 .nav-item:hover .nav-label {
