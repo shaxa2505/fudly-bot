@@ -493,7 +493,7 @@ class OrderMixin:
                     """
                     SELECT o.*,
                            u.first_name, u.phone, u.username,
-                           off.title as offer_title, off.discount_price
+                           off.title as offer_title, off.discount_price, off.photo_id as offer_photo_id
                     FROM orders o
                     LEFT JOIN users u ON o.user_id = u.user_id
                     LEFT JOIN offers off ON o.offer_id = off.offer_id
@@ -507,7 +507,7 @@ class OrderMixin:
                     """
                     SELECT o.*,
                            u.first_name, u.phone, u.username,
-                           off.title as offer_title, off.discount_price
+                           off.title as offer_title, off.discount_price, off.photo_id as offer_photo_id
                     FROM orders o
                     LEFT JOIN users u ON o.user_id = u.user_id
                     LEFT JOIN offers off ON o.offer_id = off.offer_id

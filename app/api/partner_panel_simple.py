@@ -145,55 +145,30 @@ def verify_telegram_webapp(authorization: str) -> int:
         if _is_dev_env():
             logging.debug(f"PARSED KEYS: {list(parsed.keys())}")
 
-        # Check if this is URL-based auth (uid passed by bot in WebApp URL)
-        # Simple format: uid=123456 or uid=123456&auth_date=1234567890
-        if "uid" in parsed:
+        # URL-based auth (uid passed in the WebApp URL) is NOT secure on its own.
+        # Allow it only in non-production environments for local testing.
+        #
+        # IMPORTANT: Do not append extra params (like uid) to signed initData in production,
+        # it invalidates the Telegram signature.
+        if "uid" in parsed and "hash" not in parsed:
+            if not _is_dev_env():
+                raise HTTPException(
+                    status_code=401,
+                    detail="URL-based auth is not allowed in production. Please open from Telegram.",
+                )
             try:
                 user_id = int(parsed.get("uid", 0))
-                if user_id > 0:
-                    # URL auth is considered valid (bot provided the URL)
-                    # Check auth_date if present for security
-                    auth_date = parsed.get("auth_date")
-                    if auth_date:
-                        try:
-                            auth_timestamp = int(auth_date)
-                            current_timestamp = int(datetime.now().timestamp())
-                            age_seconds = current_timestamp - auth_timestamp
-
-                            # Security: Allow up to 24 hours for URL-based auth
-                            MAX_AUTH_AGE = 24 * 3600  # 24 hours (reduced from 7 days)
-                            if age_seconds > MAX_AUTH_AGE:
-                                logging.warning(
-                                    f"⚠️ URL auth expired: {age_seconds}s old (max {MAX_AUTH_AGE}s)"
-                                )
-                                raise HTTPException(
-                                    status_code=401,
-                                    detail="Session expired. Please reopen from Telegram bot.",
-                                )
-                            elif age_seconds < 0:
-                                logging.warning(f"⚠️ URL auth from future: {age_seconds}s")
-                                raise HTTPException(
-                                    status_code=401, detail="Invalid auth timestamp"
-                                )
-                        except (ValueError, TypeError) as e:
-                            logging.warning(f"⚠️ Invalid auth_date in URL auth: {auth_date} - {e}")
-
-                    msg = f"✅ URL AUTH SUCCESS: user_id={user_id} (age: {auth_date or 'no timestamp'})"
-                    logging.info(msg)
-                    return user_id
-                else:
-                    raise ValueError("uid must be positive")
-            except HTTPException:
-                raise
-            except (ValueError, TypeError) as e:
-                logging.error(f"❌ Invalid uid format: {parsed.get('uid')} - {e}")
-                raise HTTPException(status_code=401, detail=f"Invalid uid in URL: {e}")
+            except (ValueError, TypeError):
+                raise HTTPException(status_code=401, detail="Invalid uid in URL")
+            if user_id <= 0:
+                raise HTTPException(status_code=401, detail="Invalid uid in URL")
+            return user_id
 
         # Check if this is unsigned data (from initDataUnsafe)
         # Only allow if ALLOW_UNSAFE_AUTH is set (for debugging)
         if "hash" not in parsed:
             allow_unsafe = os.getenv("ALLOW_UNSAFE_AUTH", "").lower() == "true"
-            if allow_unsafe:
+            if allow_unsafe and _is_dev_env():
                 import json
 
                 user_data = json.loads(parsed.get("user", "{}"))
@@ -304,7 +279,7 @@ async def get_profile(authorization: str = Header(None)):
 # ============================================
 
 @router.websocket("/ws/partner/{store_id}")
-async def websocket_partner(websocket: WebSocket, store_id: int):
+async def websocket_partner(websocket: WebSocket, store_id: int, authorization: str | None = Query(None)):
     """
     WebSocket endpoint for real-time partner notifications.
     
@@ -326,6 +301,24 @@ async def websocket_partner(websocket: WebSocket, store_id: int):
     logging.info(f"🔌 WebSocket connection attempt for store {store_id}")
     
     manager = get_connection_manager()
+    try:
+        if not authorization:
+            await websocket.accept()
+            await websocket.close(code=1008)
+            return
+        telegram_id = verify_telegram_webapp(authorization)
+        _, store = get_partner_with_store(telegram_id)
+        if int(store.get("store_id", 0) or 0) != int(store_id):
+            await websocket.accept()
+            await websocket.close(code=1008)
+            return
+    except Exception as e:
+        logging.warning(f"WebSocket auth failed for store {store_id}: {e}")
+        try:
+            await websocket.accept()
+            await websocket.close(code=1008)
+        finally:
+            return
     
     try:
         await manager.connect(store_id, websocket)
@@ -635,7 +628,7 @@ async def update_product(
         expiry = None
         if expiry_date:
             try:
-                expiry = datetime.fromisoformat(expiry_date).isoformat()
+                expiry = datetime.fromisoformat(expiry_date).date().isoformat()
             except ValueError:
                 pass
         update_fields.append("expiry_date = %s")
@@ -903,6 +896,8 @@ async def list_orders(authorization: str = Header(None), status: Optional[str] =
 
             # Offer info from JOIN
             offer_title = order.get("offer_title", "Unknown")
+            offer_photo_id = order.get("offer_photo_id")
+            offer_photo_url = f"{API_BASE_URL}/photo/{offer_photo_id}" if offer_photo_id else None
 
             # Only show orders that are paid (or cash)
             if not PaymentStatus.is_cleared(
@@ -926,6 +921,7 @@ async def list_orders(authorization: str = Header(None), status: Optional[str] =
             customer_name = order[-2] if len(order) > 14 else "Unknown"
             customer_phone = order[-1] if len(order) > 15 else None
             offer_title = "Unknown"
+            offer_photo_url = None
 
         # Filter by status if requested
         if status and status != "all" and order_status != status:
@@ -939,6 +935,8 @@ async def list_orders(authorization: str = Header(None), status: Optional[str] =
                 "order_id": order_id,
                 "type": entity_type,  # 'booking' for pickup, 'order' for delivery
                 "offer_title": offer_title,
+                "offer_photo_url": offer_photo_url,
+                "photo_url": offer_photo_url,
                 "quantity": quantity,
                 "price": total_price,
                 "order_type": order_type,  # 'pickup' or 'delivery'

@@ -250,6 +250,10 @@
         // ============================================
         // AUTH & API
         // ============================================
+        function isLocalhost() {
+            return window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+        }
+
         function getAuth() {
             const urlParams = new URLSearchParams(window.location.search);
             const urlUserId = urlParams.get('uid');
@@ -265,50 +269,31 @@
                 source = 'hash';
             }
 
-            if (urlUserId) {
-                finalData = finalData ? `${finalData}&uid=${urlUserId}` : `uid=${urlUserId}`;
-                source += '+url';
-            }
-
-            // ⚠️ TEMPORARY DEBUG: Allow without auth for testing
-            if (!finalData && urlUserId) {
-                finalData = `uid=${urlUserId}`;
-                source = 'debug-uid-only';
-                console.warn('⚠️ DEBUG MODE: Using UID-only auth (NOT SECURE)');
-            }
-
             const tgUser = tg?.initDataUnsafe?.user;
-            const userId = urlUserId || tgUser?.id || 'none';
+            const userId = tgUser?.id || urlUserId || 'none';
 
-            console.log('🔐 Auth Info:', { userId, source, hasData: !!finalData });
-
-            return { data: finalData, userId, source };
+            return { data: finalData, userId, urlUserId, source };
         }
 
         async function apiFetch(endpoint, options = {}) {
-            const { data: initData, userId } = getAuth();
+            const { data: initData, urlUserId } = getAuth();
 
             // Determine authorization header
             let authHeader = '';
             if (initData) {
                 authHeader = `tma ${initData}`;
-            } else if (userId && userId !== 'none') {
-                // Fallback: use uid-only for testing/development
-                authHeader = `tma uid=${userId}`;
-                console.warn(`⚠️ Using UID-only auth: ${userId}`);
+            } else if (isLocalhost() && urlUserId) {
+                // Local development fallback ONLY (backend must also be in dev mode)
+                authHeader = `tma uid=${urlUserId}`;
+            } else {
+                throw new Error('Missing Telegram authorization. Please open this panel from the Telegram bot.');
             }
 
-            const headers = {
-                'Content-Type': 'application/json',
-                'Authorization': authHeader,
-                ...options.headers
-            };
-
-            console.log(`🌐 API Request: ${endpoint}`, {
-                hasAuth: !!authHeader,
-                userId,
-                endpoint
-            });
+            const headers = { 'Authorization': authHeader, ...options.headers };
+            const isFormData = typeof FormData !== 'undefined' && options.body instanceof FormData;
+            if (!isFormData && !headers['Content-Type']) {
+                headers['Content-Type'] = 'application/json';
+            }
 
             try {
                 const response = await fetch(`${API_BASE}${endpoint}`, {
@@ -316,20 +301,13 @@
                     headers
                 });
 
-                console.log(`📥 API Response: ${endpoint}`, {
-                    status: response.status,
-                    ok: response.ok
-                });
-
                 if (!response.ok) {
-                    const errorText = await response.text();
-                    console.error(`❌ API Error ${response.status}:`, errorText);
-                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                    const err = await response.json().catch(() => ({ detail: `HTTP ${response.status}` }));
+                    throw new Error(err.detail || `HTTP ${response.status}`);
                 }
 
                 return response.json();
             } catch (error) {
-                console.error(`❌ API Fetch Error (${endpoint}):`, error);
                 throw error;
             }
         }
@@ -535,7 +513,7 @@
 
                 state.store = store;
                 state.orders = orders;
-                state.products = products;
+                state.products = normalizeProducts(products);
 
                 // Connect WebSocket after store info is loaded
                 if (!websocket && store.store_id) {
@@ -548,8 +526,7 @@
                 console.error('Error details:', {
                     message: error.message,
                     stack: error.stack,
-                    API_BASE,
-                    auth: getAuth()
+                    API_BASE
                 });
                 toast(`Ошибка загрузки данных: ${error.message}`, 'error');
             }
@@ -797,15 +774,6 @@
                     ` : ''}
                 </div>
             `;
-        }
-
-        function toggleStoreStatus() {
-            // TODO: API call to toggle store status
-            if (state.store) {
-                state.store.is_open = !state.store.is_open;
-                renderDashboard();
-                toast(state.store.is_open ? 'Магазин открыт' : 'Магазин закрыт', 'success');
-            }
         }
 
         function toggleOrderSection(sectionId) {
@@ -1304,10 +1272,41 @@
         // ============================================
         // PRODUCTS
         // ============================================
+        function normalizeProducts(products) {
+            if (!Array.isArray(products)) return [];
+
+            return products.map((p) => {
+                const stock = Number(p.stock ?? p.stock_quantity ?? p.quantity ?? 0) || 0;
+                const price = Number(p.price ?? p.discount_price ?? 0) || 0;
+                const originalPrice = Number(p.original_price ?? 0) || 0;
+
+                const discount =
+                    originalPrice > 0 && price > 0
+                        ? Math.max(0, Math.min(99, Math.round((1 - price / originalPrice) * 100)))
+                        : 0;
+
+                const status = p.status || (stock > 0 ? 'active' : 'out_of_stock');
+                const photoUrl = p.photo_url || p.image || '';
+
+                return {
+                    ...p,
+                    stock,
+                    stock_quantity: p.stock_quantity ?? stock,
+                    quantity: p.quantity ?? stock,
+                    price,
+                    discount,
+                    status,
+                    is_available: status === 'active',
+                    photo_url: photoUrl,
+                };
+            });
+        }
+
         async function loadProducts() {
             showLoading('products');
             try {
-                state.products = await apiFetch('/api/partner/products');
+                const products = await apiFetch('/api/partner/products');
+                state.products = normalizeProducts(products);
                 renderProducts();
             } catch (error) {
                 toast('Ошибка загрузки товаров', 'error');
@@ -1535,7 +1534,7 @@
                             <div class="form-group">
                                 <label>Фото товара</label>
                                 <input type="file" id="photoFile" accept="image/*" style="display: none;" onchange="handlePhotoUpload(this, event)">
-                                <input type="hidden" name="photo_url" value="${product?.photo_url || ''}">
+                                <input type="hidden" name="photo_id" value="${product?.photo_id || ''}">
                                 <div class="photo-upload-area ${product?.photo_url ? 'has-photo' : ''}" onclick="document.getElementById('photoFile').click()">
                                     ${product?.photo_url ? `
                                         <div class="photo-preview">
@@ -1548,7 +1547,7 @@
                                         <div class="upload-placeholder">
                                             <i data-lucide="image"></i>
                                             <div class="upload-placeholder-text">Загрузить фото</div>
-                                            <div class="upload-placeholder-hint">или введите URL ниже</div>
+                                            <div class="upload-placeholder-hint">или вставьте URL ниже (не сохраняется)</div>
                                         </div>
                                     `}
                                 </div>
@@ -1719,8 +1718,8 @@
             reader.onload = (e) => {
                 const photoUrl = e.target.result;
 
-                // Update hidden input
-                document.querySelector('input[name="photo_url"]').value = photoUrl;
+                // Clear photo_id - new file will be uploaded on save
+                document.querySelector('input[name="photo_id"]').value = '';
                 document.querySelector('input[name="photo_url_input"]').value = '';
 
                 // Show preview
@@ -1735,7 +1734,7 @@
                 if (typeof lucide !== 'undefined') lucide.createIcons();
 
                 haptic('light');
-                toast('Фото загружено', 'success');
+                toast('Фото выбрано (загрузится при сохранении)', 'success');
             };
 
             reader.onerror = () => {
@@ -1745,7 +1744,7 @@
                     <div class="upload-placeholder">
                         <i data-lucide="image"></i>
                         <div class="upload-placeholder-text">Загрузить фото</div>
-                        <div class="upload-placeholder-hint">или введите URL ниже</div>
+                        <div class="upload-placeholder-hint">или вставьте URL ниже (не сохраняется)</div>
                     </div>
                 `;
                 if (typeof lucide !== 'undefined') lucide.createIcons();
@@ -1757,7 +1756,7 @@
         function handlePhotoUrlInput(input) {
             const url = input.value.trim();
             const uploadArea = document.querySelector('.photo-upload-area');
-            const hiddenInput = document.querySelector('input[name="photo_url"]');
+            const photoIdInput = document.querySelector('input[name="photo_id"]');
 
             if (!url) {
                 uploadArea.classList.remove('has-photo');
@@ -1765,17 +1764,17 @@
                     <div class="upload-placeholder">
                         <i data-lucide="image"></i>
                         <div class="upload-placeholder-text">Загрузить фото</div>
-                        <div class="upload-placeholder-hint">или введите URL ниже</div>
+                        <div class="upload-placeholder-hint">или вставьте URL ниже (не сохраняется)</div>
                     </div>
                 `;
-                hiddenInput.value = '';
+                photoIdInput.value = '';
                 if (typeof lucide !== 'undefined') lucide.createIcons();
                 return;
             }
 
             // Validate URL
             if (url.match(/^https?:\/\/.+/)) {
-                hiddenInput.value = url;
+                photoIdInput.value = '';
                 uploadArea.classList.add('has-photo');
                 uploadArea.innerHTML = `
                     <div class="photo-preview">
@@ -1792,7 +1791,7 @@
         function removePhoto() {
             haptic('light');
             const uploadArea = document.querySelector('.photo-upload-area');
-            const hiddenInput = document.querySelector('input[name="photo_url"]');
+            const photoIdInput = document.querySelector('input[name="photo_id"]');
             const urlInput = document.querySelector('input[name="photo_url_input"]');
             const fileInput = document.getElementById('photoFile');
 
@@ -1801,11 +1800,11 @@
                 <div class="upload-placeholder">
                     <i data-lucide="image"></i>
                     <div class="upload-placeholder-text">Загрузить фото</div>
-                    <div class="upload-placeholder-hint">или введите URL ниже</div>
+                    <div class="upload-placeholder-hint">или вставьте URL ниже (не сохраняется)</div>
                 </div>
             `;
 
-            hiddenInput.value = '';
+            photoIdInput.value = '';
             urlInput.value = '';
             fileInput.value = '';
 
@@ -1875,26 +1874,6 @@
 
             const formData = new FormData(event.target);
 
-            // Calculate final price from original price and discount
-            const originalPrice = parseFloat(formData.get('original_price'));
-            const discountPercent = parseInt(formData.get('discount')) || 0;
-            const finalPrice = Math.round(originalPrice * (1 - discountPercent / 100));
-
-            const data = {
-                category: formData.get('category'),
-                name: formData.get('name'),
-                description: formData.get('description'),
-                original_price: originalPrice,
-                price: finalPrice,
-                discount: discountPercent,
-                unit: formData.get('unit'),
-                stock_quantity: parseInt(formData.get('stock_quantity')) || 0,
-                stock: parseInt(formData.get('stock_quantity')) || 0, // Backwards compatibility
-                expiry_date: formData.get('expiry_date'),
-                photo_url: formData.get('photo_url'),
-                is_available: formData.get('is_available') === 'on'
-            };
-
             // Show loading state on submit button
             const submitBtn = event.target.querySelector('button[type="submit"]');
             const originalText = submitBtn.innerHTML;
@@ -1902,18 +1881,58 @@
             submitBtn.innerHTML = '<div class="spinner spinner-small" style="margin: 0 auto;"></div>';
 
             try {
+                const title = String(formData.get('name') || '').trim();
+                const category = String(formData.get('category') || 'other').trim() || 'other';
+                const description = String(formData.get('description') || '').trim();
+                const unit = String(formData.get('unit') || 'шт').trim() || 'шт';
+                const stockQty = parseInt(formData.get('stock_quantity'), 10) || 0;
+
+                const originalPrice = parseInt(formData.get('original_price'), 10);
+                if (!Number.isFinite(originalPrice) || originalPrice <= 0) {
+                    throw new Error('Оригинальная цена обязательна');
+                }
+
+                const discountPercent = Math.max(0, Math.min(90, parseInt(formData.get('discount'), 10) || 0));
+                const discountPrice = Math.max(0, Math.round(originalPrice * (1 - discountPercent / 100)));
+                const expiryDate = String(formData.get('expiry_date') || '');
+                const isAvailable = formData.get('is_available') === 'on';
+                const desiredStatus = stockQty <= 0 ? 'out_of_stock' : (isAvailable ? 'active' : 'hidden');
+
+                let photoId = String(formData.get('photo_id') || '').trim();
+                const fileInput = document.getElementById('photoFile');
+                const photoFile = fileInput?.files?.[0] || null;
+
+                if (photoFile) {
+                    const uploadForm = new FormData();
+                    uploadForm.append('photo', photoFile, photoFile.name || 'photo.jpg');
+                    const uploaded = await apiFetch('/api/partner/upload-photo', { method: 'POST', body: uploadForm });
+                    if (!uploaded?.file_id) {
+                        throw new Error('Не удалось загрузить фото');
+                    }
+                    photoId = uploaded.file_id;
+                    const photoIdInput = document.querySelector('input[name="photo_id"]');
+                    if (photoIdInput) photoIdInput.value = photoId;
+                }
+
+                const payload = new FormData();
+                payload.append('title', title);
+                payload.append('category', category);
+                payload.append('original_price', String(originalPrice));
+                payload.append('discount_price', String(discountPrice));
+                payload.append('quantity', String(stockQty));
+                payload.append('stock_quantity', String(stockQty));
+                payload.append('unit', unit);
+                payload.append('expiry_date', expiryDate);
+                payload.append('description', description);
+                if (photoId) payload.append('photo_id', photoId);
+                if (productId) payload.append('status', desiredStatus);
+
                 if (productId) {
-                    await apiFetch(`/api/partner/products/${productId}`, {
-                        method: 'PUT',
-                        body: JSON.stringify(data)
-                    });
+                    await apiFetch(`/api/partner/products/${productId}`, { method: 'PUT', body: payload });
                     haptic('success');
                     toast('Товар обновлен', 'success');
                 } else {
-                    await apiFetch('/api/partner/products', {
-                        method: 'POST',
-                        body: JSON.stringify(data)
-                    });
+                    await apiFetch('/api/partner/products', { method: 'POST', body: payload });
                     haptic('success');
                     toast('Товар добавлен', 'success');
                 }
@@ -1927,7 +1946,7 @@
 
                 // Restore button
                 submitBtn.disabled = false;
-                submitBtn.textContent = originalText;
+                submitBtn.innerHTML = originalText;
             }
         }
 
@@ -1992,13 +2011,15 @@
                 if (!product) return;
 
                 // Optimistic UI update
-                product.is_available = !product.is_available;
+                const newStatus = product.is_available ? 'hidden' : 'active';
+                product.status = newStatus;
+                product.is_available = newStatus === 'active';
                 const card = document.querySelector(`[data-product-id="${id}"]`);
                 if (card) card.classList.add('optimistic-update');
 
-                await apiFetch(`/api/partner/products/${id}/availability`, {
-                    method: 'POST',
-                    body: JSON.stringify({ is_available: product.is_available })
+                await apiFetch(`/api/partner/products/${id}/status`, {
+                    method: 'PATCH',
+                    body: JSON.stringify({ status: newStatus })
                 });
 
                 haptic('success');
@@ -2584,21 +2605,41 @@
                 const newStatus = !state.store?.is_open;
 
                 // Optimistic UI update
-                const oldStatus = state.store.is_open;
                 state.store.is_open = newStatus;
+                if (state.currentView === 'dashboard') {
+                    renderDashboard();
+                }
 
-                await apiFetch('/api/partner/store', {
-                    method: 'PUT',
-                    body: JSON.stringify({ is_open: newStatus })
+                const form = new FormData();
+                form.append('is_open', newStatus ? 'true' : 'false');
+                await apiFetch('/api/partner/store/status', {
+                    method: 'PATCH',
+                    body: form
                 });
 
                 haptic('success');
                 toast(newStatus ? 'Магазин открыт' : 'Магазин закрыт', 'success');
-                loadSettings();
+
+                // Refresh store info
+                state.store = await apiFetch('/api/partner/store');
+                document.getElementById('storeName').textContent = state.store?.name || 'Загрузка...';
+
+                if (state.currentView === 'settings') {
+                    loadSettings();
+                }
             } catch (error) {
                 haptic('error');
                 toast('Ошибка изменения статуса', 'error');
-                loadSettings(); // Revert on error
+                try {
+                    state.store = await apiFetch('/api/partner/store');
+                    document.getElementById('storeName').textContent = state.store?.name || 'Загрузка...';
+                } catch (_) {}
+
+                if (state.currentView === 'dashboard') {
+                    renderDashboard();
+                } else if (state.currentView === 'settings') {
+                    loadSettings();
+                }
             }
         }
 
@@ -2826,6 +2867,7 @@
         let autoRefreshInterval = null;
         let websocket = null;
         let wsReconnectTimeout = null;
+        let wsPingInterval = null;
 
         function connectWebSocket() {
             // Skip if no store info yet
@@ -2835,11 +2877,21 @@
             }
 
             const storeId = state.store.store_id;
-            const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-            // Use window.location.host instead of API_HOST
-            const wsUrl = `${protocol}//${window.location.host}/api/partner/ws/partner/${storeId}`;
+            const { data: initData, urlUserId } = getAuth();
+            let authHeader = '';
+            if (initData) {
+                authHeader = `tma ${initData}`;
+            } else if (isLocalhost() && urlUserId) {
+                authHeader = `tma uid=${urlUserId}`;
+            } else {
+                console.warn('⚠️ Missing Telegram authorization for WebSocket');
+                return;
+            }
 
-            console.log(`🔌 Connecting to WebSocket: ${wsUrl}`);
+            const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+            const wsUrl = `${protocol}//${window.location.host}/api/partner/ws/partner/${storeId}?authorization=${encodeURIComponent(authHeader)}`;
+
+            console.log(`🔌 Connecting to WebSocket for store ${storeId}`);
 
             try {
                 websocket = new WebSocket(wsUrl);
@@ -2851,6 +2903,14 @@
                         clearTimeout(wsReconnectTimeout);
                         wsReconnectTimeout = null;
                     }
+                    if (wsPingInterval) {
+                        clearInterval(wsPingInterval);
+                    }
+                    wsPingInterval = setInterval(() => {
+                        if (websocket && websocket.readyState === WebSocket.OPEN) {
+                            websocket.send('ping');
+                        }
+                    }, 30000);
                 };
 
                 websocket.onmessage = (event) => {
@@ -2879,6 +2939,10 @@
                 websocket.onclose = () => {
                     console.log('🔌 WebSocket disconnected');
                     websocket = null;
+                    if (wsPingInterval) {
+                        clearInterval(wsPingInterval);
+                        wsPingInterval = null;
+                    }
 
                     // Reconnect after 5 seconds
                     wsReconnectTimeout = setTimeout(() => {
@@ -2886,13 +2950,6 @@
                         connectWebSocket();
                     }, 5000);
                 };
-
-                // Send ping every 30 seconds to keep connection alive
-                setInterval(() => {
-                    if (websocket && websocket.readyState === WebSocket.OPEN) {
-                        websocket.send('ping');
-                    }
-                }, 30000);
 
             } catch (error) {
                 console.error('❌ Failed to connect WebSocket:', error);
@@ -2907,6 +2964,10 @@
             if (wsReconnectTimeout) {
                 clearTimeout(wsReconnectTimeout);
                 wsReconnectTimeout = null;
+            }
+            if (wsPingInterval) {
+                clearInterval(wsPingInterval);
+                wsPingInterval = null;
             }
         }
 
