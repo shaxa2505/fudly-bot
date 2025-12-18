@@ -313,6 +313,52 @@ input[type="checkbox"]:hover {
     box-shadow: 0 0 0 1px rgba(33, 160, 56, 0.1);
 }
 
+/* === 3.1 OPTIMISTIC UPDATE STATE === */
+.order-card.optimistic-update {
+    opacity: 0.6;
+    pointer-events: none;
+    position: relative;
+    transition: opacity 0.3s ease;
+}
+
+.order-card.optimistic-update::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(
+        135deg, 
+        rgba(255, 255, 255, 0.9) 0%, 
+        rgba(255, 255, 255, 0.7) 100%
+    );
+    border-radius: var(--radius-lg);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    animation: pulse-overlay 1.5s ease-in-out infinite;
+}
+
+@keyframes pulse-overlay {
+    0%, 100% { opacity: 0.8; }
+    50% { opacity: 1; }
+}
+
+.order-card.optimistic-update .order-actions {
+    display: none !important;
+}
+
+/* === 3.2 STATUS-SPECIFIC BORDERS === */
+.order-card[data-status="preparing"] {
+    border-left: 3px solid #2196F3;
+}
+
+.order-card[data-status="ready"] {
+    border-left: 3px solid #4CAF50;
+}
+
+.order-card[data-status="completed"] {
+    border-left: 3px solid #9E9E9E;
+}
+
 /* === 4. PRODUCT PLACEHOLDER === */
 .product-placeholder {
     width: 100%;

@@ -9,16 +9,16 @@
     <script src="https://unpkg.com/lucide@latest"></script>
 
     <!-- Modular CSS Architecture -->
-    <link rel="stylesheet" href="/partner-panel/styles/variables.css?v=16.0">
-    <link rel="stylesheet" href="/partner-panel/styles/base.css?v=16.0">
-    <link rel="stylesheet" href="/partner-panel/styles/header.css?v=16.0">
-    <link rel="stylesheet" href="/partner-panel/styles/navigation.css?v=16.0">
-    <link rel="stylesheet" href="/partner-panel/styles/buttons.css?v=16.0">
-    <link rel="stylesheet" href="/partner-panel/styles/products.css?v=16.0">
-    <link rel="stylesheet" href="/partner-panel/styles/main.css?v=16.0">
-    <link rel="stylesheet" href="/partner-panel/styles/utilities.css?v=16.0">
-    <link rel="stylesheet" href="/partner-panel/styles/states.css?v=16.0">
-    <link rel="stylesheet" href="/partner-panel/styles/design-fixes.css?v=17.0">
+    <link rel="stylesheet" href="/partner-panel/styles/variables.css?v=18.0">
+    <link rel="stylesheet" href="/partner-panel/styles/base.css?v=18.0">
+    <link rel="stylesheet" href="/partner-panel/styles/header.css?v=18.0">
+    <link rel="stylesheet" href="/partner-panel/styles/navigation.css?v=18.0">
+    <link rel="stylesheet" href="/partner-panel/styles/buttons.css?v=18.0">
+    <link rel="stylesheet" href="/partner-panel/styles/products.css?v=18.0">
+    <link rel="stylesheet" href="/partner-panel/styles/main.css?v=18.0">
+    <link rel="stylesheet" href="/partner-panel/styles/utilities.css?v=18.0">
+    <link rel="stylesheet" href="/partner-panel/styles/states.css?v=18.0">
+    <link rel="stylesheet" href="/partner-panel/styles/design-fixes.css?v=18.0">
 
     <style>
         /* Yandex.Lavka Style + Telegram WebApp Optimizations */
@@ -806,7 +806,10 @@
                     ${orders.map(order => {
                         const orderId = order.order_id || order.id;
                         return `
-                        <div class="order-card" onclick="viewOrderDetails(${orderId})">
+                        <div class="order-card ripple" 
+                             data-order-id="${orderId}"
+                             data-status="${order.status}"
+                             onclick="viewOrderDetails(${orderId})">
                             <div class="order-header">
                                 <div class="order-id">#${orderId || '—'}</div>
                                 <div class="order-status status-${order.status}">${getStatusText(order.status)}</div>
@@ -821,13 +824,18 @@
                             </div>
                             ${order.status === 'new' ? `
                                 <div class="order-actions" onclick="event.stopPropagation()">
-                                    <button class="btn btn-sm btn-success" onclick="updateOrderStatus(${orderId}, 'preparing')">Принять</button>
-                                    <button class="btn btn-sm btn-danger" onclick="cancelOrder(${orderId})">Отменить</button>
+                                    <button class="btn btn-sm btn-success ripple" onclick="handleStatusUpdate(${orderId}, 'preparing', this)">✓ Принять</button>
+                                    <button class="btn btn-sm btn-danger ripple" onclick="handleCancelOrder(${orderId}, this)">✕ Отменить</button>
                                 </div>
                             ` : ''}
                             ${order.status === 'preparing' ? `
                                 <div class="order-actions" onclick="event.stopPropagation()">
-                                    <button class="btn btn-sm btn-success" onclick="updateOrderStatus(${orderId}, 'ready')">Готов</button>
+                                    <button class="btn btn-sm btn-success ripple" onclick="handleStatusUpdate(${orderId}, 'ready', this)">✓ Заказ готов</button>
+                                </div>
+                            ` : ''}
+                            ${order.status === 'ready' ? `
+                                <div class="order-actions" onclick="event.stopPropagation()">
+                                    <button class="btn btn-sm btn-success ripple" onclick="handleStatusUpdate(${orderId}, 'completed', this)">✓ Выдан клиенту</button>
                                 </div>
                             ` : ''}
                         </div>
@@ -899,22 +907,22 @@
                         ${order.status !== 'completed' && order.status !== 'cancelled' ? `
                             <div style="margin-top: 24px; display: flex; gap: 12px;">
                                 ${order.status === 'new' ? `
-                                    <button class="btn btn-success" style="flex: 1;" onclick="updateOrderStatus(${oid}, 'preparing'); this.closest('.modal-overlay').remove();">
-                                        Принять заказ
+                                    <button class="btn btn-success ripple" style="flex: 1;" onclick="handleModalStatusUpdate(${oid}, 'preparing', this)">
+                                        ✓ Принять заказ
                                     </button>
                                 ` : ''}
                                 ${order.status === 'preparing' ? `
-                                    <button class="btn btn-success" style="flex: 1;" onclick="updateOrderStatus(${oid}, 'ready'); this.closest('.modal-overlay').remove();">
-                                        Заказ готов
+                                    <button class="btn btn-success ripple" style="flex: 1;" onclick="handleModalStatusUpdate(${oid}, 'ready', this)">
+                                        ✓ Заказ готов
                                     </button>
                                 ` : ''}
                                 ${order.status === 'ready' ? `
-                                    <button class="btn btn-success" style="flex: 1;" onclick="updateOrderStatus(${oid}, 'completed'); this.closest('.modal-overlay').remove();">
-                                        Выдан
+                                    <button class="btn btn-success ripple" style="flex: 1;" onclick="handleModalStatusUpdate(${oid}, 'completed', this)">
+                                        ✓ Выдан клиенту
                                     </button>
                                 ` : ''}
-                                <button class="btn btn-danger" onclick="cancelOrder(${oid}); this.closest('.modal-overlay').remove();">
-                                    Отменить
+                                <button class="btn btn-danger ripple" onclick="handleModalCancelOrder(${oid}, this)">
+                                    ✕ Отменить заказ
                                 </button>
                             </div>
                         ` : ''}
@@ -931,19 +939,35 @@
         }
 
         async function updateOrderStatus(orderId, newStatus) {
+            let order = null;
+            let oldStatus = null;
+            
             try {
                 haptic('medium');
 
                 // Optimistic UI update
-                const order = state.orders.find(o => (o.order_id || o.id) === orderId);
+                order = state.orders.find(o => (o.order_id || o.id) === orderId);
+                oldStatus = order?.status;
+                
                 if (order) {
-                    const oldStatus = order.status;
                     order.status = newStatus;
                     
-                    // Re-render with optimistic update
-                    if (state.currentView === 'orders') {
-                        const orderCard = document.querySelector(`[data-order-id="${orderId}"]`);
-                        if (orderCard) orderCard.classList.add('optimistic-update');
+                    // Update UI immediately
+                    const orderCard = document.querySelector(`[data-order-id="${orderId}"]`);
+                    if (orderCard) {
+                        orderCard.classList.add('optimistic-update');
+                        orderCard.setAttribute('data-status', newStatus);
+                        
+                        // Update status badge
+                        const statusBadge = orderCard.querySelector('.order-status');
+                        if (statusBadge) {
+                            statusBadge.className = `order-status status-${newStatus}`;
+                            statusBadge.textContent = getStatusText(newStatus);
+                        }
+                        
+                        // Hide action buttons during update
+                        const actions = orderCard.querySelector('.order-actions');
+                        if (actions) actions.style.display = 'none';
                     }
                 }
 
@@ -952,18 +976,37 @@
                 });
 
                 haptic('success');
-                toast('Статус заказа обновлен', 'success');
+                toast('Статус обновлен', 'success');
                 
-                // Reload to get fresh data
+                // Reload to get fresh data and correct button states
                 if (state.currentView === 'orders') {
-                    loadOrders();
+                    setTimeout(() => loadOrders(), 500);
                 }
             } catch (error) {
+                console.error('Status update error:', error);
                 haptic('error');
-                toast('Ошибка обновления статуса', 'error');
+                toast('Ошибка обновления', 'error');
                 
-                // Revert optimistic update on error
+                // Revert optimistic update
+                if (order && oldStatus) {
+                    order.status = oldStatus;
+                }
                 loadOrders();
+            }
+        }
+        
+        async function handleStatusUpdate(orderId, newStatus, button) {
+            if (!button) return updateOrderStatus(orderId, newStatus);
+            
+            const originalText = button.innerHTML;
+            button.disabled = true;
+            button.innerHTML = '<span style="opacity: 0.6;">⏳ Обновление...</span>';
+            
+            try {
+                await updateOrderStatus(orderId, newStatus);
+            } catch (error) {
+                button.disabled = false;
+                button.innerHTML = originalText;
             }
         }
 
@@ -973,12 +1016,65 @@
             haptic('heavy');
             await updateOrderStatus(orderId, 'cancelled');
         }
+        
+        async function handleCancelOrder(orderId, button) {
+            if (!confirm('Вы уверены, что хотите отменить заказ?')) return;
+            
+            if (!button) return cancelOrder(orderId);
+            
+            const originalText = button.innerHTML;
+            button.disabled = true;
+            button.innerHTML = '<span style="opacity: 0.6;">⏳ Отмена...</span>';
+            
+            try {
+                haptic('heavy');
+                await updateOrderStatus(orderId, 'cancelled');
+            } catch (error) {
+                button.disabled = false;
+                button.innerHTML = originalText;
+            }
+        }
 
         function toggleOrderSection(sectionId) {
             const section = document.getElementById(sectionId);
             if (section) {
                 section.classList.toggle('collapsed');
                 if (typeof lucide !== 'undefined') lucide.createIcons();
+            }
+        }
+        
+        async function handleModalStatusUpdate(orderId, newStatus, button) {
+            const modal = button.closest('.modal-overlay');
+            const originalText = button.innerHTML;
+            
+            button.disabled = true;
+            button.innerHTML = '<span style="opacity: 0.6;">⏳ Обновление...</span>';
+            
+            try {
+                await updateOrderStatus(orderId, newStatus);
+                if (modal) modal.remove();
+            } catch (error) {
+                button.disabled = false;
+                button.innerHTML = originalText;
+            }
+        }
+        
+        async function handleModalCancelOrder(orderId, button) {
+            if (!confirm('Вы уверены, что хотите отменить заказ?')) return;
+            
+            const modal = button.closest('.modal-overlay');
+            const originalText = button.innerHTML;
+            
+            button.disabled = true;
+            button.innerHTML = '<span style="opacity: 0.6;">⏳ Отмена...</span>';
+            
+            try {
+                haptic('heavy');
+                await updateOrderStatus(orderId, 'cancelled');
+                if (modal) modal.remove();
+            } catch (error) {
+                button.disabled = false;
+                button.innerHTML = originalText;
             }
         }
 
