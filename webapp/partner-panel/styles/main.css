@@ -4,54 +4,55 @@
 
 /* === Container & Layout === */
 .container {
-    max-width: 1400px;
+    max-width: 1200px;
     margin: 0 auto;
-    padding: var(--space-lg);
+    padding: 16px;
 }
 
 .page {
-    padding-top: 90px;
+    padding-top: 80px;
+    padding-bottom: 80px;
     min-height: 100vh;
-    animation: fadeIn var(--transition-slow) ease-out;
 }
 
 .section {
-    margin-bottom: var(--space-2xl);
+    margin-bottom: 24px;
 }
 
 .section-header {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    margin-bottom: var(--space-lg);
+    margin-bottom: 16px;
 }
 
 .section-title {
-    font-size: var(--font-2xl);
-    font-weight: var(--weight-bold);
-    color: var(--text);
+    font-size: 22px;
+    font-weight: 700;
+    color: #000000;
     margin: 0;
+    letter-spacing: -0.3px;
 }
 
 .section-subtitle {
-    font-size: var(--font-sm);
-    color: var(--text-secondary);
-    margin-top: var(--space-xs);
+    font-size: 14px;
+    color: #818C99;
+    margin-top: 4px;
 }
 
 /* === Stats Grid === */
 .stats-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-    gap: var(--space-lg);
-    margin-bottom: var(--space-2xl);
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    gap: 12px;
+    margin-bottom: 24px;
 }
 
 .stat-card {
     background: #FFFFFF;
     border: none;
     border-radius: 16px;
-    padding: 20px;
+    padding: 16px;
     transition: transform 0.15s;
     position: relative;
     overflow: hidden;
@@ -150,16 +151,17 @@
 }
 
 .stat-value {
-    font-size: var(--font-3xl);
-    font-weight: var(--weight-extrabold);
-    line-height: 1;
-    margin-bottom: var(--space-xs);
+    font-size: 32px;
+    font-weight: 700;
+    line-height: 1.2;
+    margin-bottom: 4px;
+    letter-spacing: -0.5px;
 }
 
 .stat-label {
-    font-size: var(--font-sm);
-    font-weight: var(--weight-medium);
-    opacity: 0.9;
+    font-size: 13px;
+    font-weight: 500;
+    opacity: 0.85;
 }
 
 /* === Dashboard Cards === */
@@ -170,32 +172,16 @@
 }
 
 .dashboard-card {
-    background: rgba(255, 255, 255, 0.98);
-    backdrop-filter: blur(30px) saturate(180%);
-    border: 1px solid rgba(255, 255, 255, 0.5);
-    border-radius: var(--radius-xl);
-    padding: var(--space-xl);
-    box-shadow: var(--shadow-md), 0 0 0 1px rgba(255, 255, 255, 0.5) inset;
-    transition: all var(--transition-base);
-    position: relative;
-    overflow: hidden;
+    background: #FFFFFF;
+    border: none;
+    border-radius: 16px;
+    padding: 20px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+    transition: transform 0.15s;
 }
 
-.dashboard-card::before {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    height: 3px;
-    background: linear-gradient(90deg, var(--primary), var(--accent));
-    transform: scaleX(0);
-    transition: transform var(--transition-base);
-}
-
-.dashboard-card:hover {
-    transform: translateY(-6px) scale(1.01);
-    box-shadow: var(--shadow-xl), var(--shadow-primary), 0 0 0 2px rgba(255, 255, 255, 0.8) inset;
+.dashboard-card:active {
+    transform: scale(0.98);
 }
 
 .dashboard-card:hover::before {
@@ -203,13 +189,13 @@
 }
 
 .card-title {
-    font-size: var(--font-lg);
-    font-weight: var(--weight-bold);
-    color: var(--text);
-    margin-bottom: var(--space-md);
+    font-size: 18px;
+    font-weight: 700;
+    color: #000000;
+    margin-bottom: 16px;
     display: flex;
     align-items: center;
-    gap: var(--space-sm);
+    gap: 8px;
 }
 
 .card-icon {
@@ -307,18 +293,18 @@
 }
 
 .order-card {
-    background: rgba(255, 255, 255, 0.95);
-    backdrop-filter: blur(20px);
-    border: 1px solid rgba(255, 255, 255, 0.3);
-    border-radius: var(--radius-lg);
-    padding: var(--space-lg);
-    transition: all var(--transition-base);
+    background: #FFFFFF;
+    border: 1px solid #E8E8E8;\n    border-radius: 16px;
+    padding: 16px;
+    transition: transform 0.15s, border-color 0.15s;
+}
+
+.order-card:active {
+    transform: scale(0.98);
 }
 
 .order-card:hover {
-    transform: translateX(4px);
-    box-shadow: var(--shadow-md);
-    border-color: var(--primary);
+    border-color: #21A038;
 }
 
 .order-header {
@@ -329,37 +315,37 @@
 }
 
 .order-id {
-    font-size: var(--font-base);
-    font-weight: var(--weight-bold);
-    color: var(--text);
+    font-size: 15px;
+    font-weight: 700;
+    color: #000000;
 }
 
 .order-status {
     padding: 6px 12px;
-    border-radius: var(--radius-full);
-    font-size: var(--font-xs);
-    font-weight: var(--weight-bold);
-    text-transform: uppercase;
+    border-radius: 12px;
+    font-size: 12px;
+    font-weight: 600;
+    text-transform: capitalize;
 }
 
 .status-new {
-    background: var(--info-light);
-    color: var(--info);
+    background: #E3F2FD;
+    color: #2196F3;
 }
 
 .status-preparing {
-    background: var(--warning-light);
-    color: var(--warning);
+    background: #FFF3E0;
+    color: #FF9800;
 }
 
 .status-ready {
-    background: var(--success-light);
-    color: var(--success);
+    background: #E8F5E9;
+    color: #21A038;
 }
 
 .status-completed {
-    background: var(--bg-tertiary);
-    color: var(--text-secondary);
+    background: #F0F0F0;
+    color: #818C99;
 }
 
 .status-cancelled {
