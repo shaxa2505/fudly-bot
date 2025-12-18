@@ -21,6 +21,9 @@
     height: 80px;
     margin-bottom: 16px;
     opacity: 0.3;
+    display: flex;
+    align-items: center;
+    justify-content: center;
 }
 
 .empty-title {
@@ -28,6 +31,12 @@
     font-weight: 700;
     color: #000000;
     margin: 0 0 8px 0;
+}
+
+.empty-subtitle {
+    font-size: 14px;
+    color: #818C99;
+    margin: 0;
 }
 
 .empty-text {

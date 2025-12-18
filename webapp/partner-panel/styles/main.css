@@ -19,6 +19,141 @@
     margin-bottom: 24px;
 }
 
+/* === Hero Section === */
+.hero-section {
+    background: #FFFFFF;
+    border-radius: 20px;
+    padding: 20px;
+    margin-bottom: 20px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+.hero-greeting {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 12px;
+}
+
+.hero-text h2 {
+    font-size: 24px;
+    font-weight: 700;
+    color: #000000;
+    margin: 0 0 4px 0;
+    letter-spacing: -0.5px;
+}
+
+.hero-text p {
+    font-size: 14px;
+    color: #818C99;
+    margin: 0;
+}
+
+.status-toggle {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: #F7F7F7;
+    padding: 8px 16px;
+    border-radius: 12px;
+    cursor: pointer;
+    transition: all 0.2s;
+    border: none;
+    font-size: 14px;
+    font-weight: 600;
+}
+
+.status-toggle.open {
+    background: #E8F5E9;
+    color: #21A038;
+}
+
+.status-toggle.closed {
+    background: #FFEBEE;
+    color: #D32F2F;
+}
+
+.status-toggle:active {
+    transform: scale(0.95);
+}
+
+.status-indicator {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: currentColor;
+}
+
+/* === Quick Actions === */
+.quick-actions {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 12px;
+    margin-bottom: 24px;
+}
+
+.quick-action {
+    background: #FFFFFF;
+    border: 1px solid #E8E8E8;
+    border-radius: 16px;
+    padding: 16px 12px;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.15s;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+}
+
+.quick-action:active {
+    transform: scale(0.95);
+    background: #F7F7F7;
+}
+
+.quick-action-icon {
+    width: 40px;
+    height: 40px;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #F7F7F7;
+    color: #21A038;
+}
+
+.quick-action-icon svg {
+    width: 20px;
+    height: 20px;
+}
+
+.quick-action-label {
+    font-size: 12px;
+    font-weight: 600;
+    color: #000000;
+    line-height: 1.2;
+}
+
+@media (max-width: 768px) {
+    .quick-actions {
+        grid-template-columns: repeat(4, 1fr);
+        gap: 8px;
+    }
+    
+    .quick-action {
+        padding: 12px 8px;
+    }
+    
+    .quick-action-icon {
+        width: 36px;
+        height: 36px;
+    }
+    
+    .quick-action-label {
+        font-size: 11px;
+    }
+}
+
 .section-header {
     display: flex;
     align-items: center;
@@ -80,6 +215,33 @@
 
 .stat-card.success .stat-value {
     color: #21A038;
+}
+
+/* Stat Card Trend */
+.stat-trend {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 12px;
+    font-weight: 600;
+    margin-top: 4px;
+    padding: 2px 6px;
+    border-radius: 6px;
+}
+
+.stat-trend.up {
+    color: #21A038;
+    background: #E8F5E9;
+}
+
+.stat-trend.down {
+    color: #D32F2F;
+    background: #FFEBEE;
+}
+
+.stat-trend svg {
+    width: 12px;
+    height: 12px;
 }
 
 .stat-card.warning {

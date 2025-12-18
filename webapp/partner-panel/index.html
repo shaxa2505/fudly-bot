@@ -414,19 +414,81 @@
             }
 
             const activeOrders = state.orders.filter(o => o.status !== 'completed' && o.status !== 'cancelled');
+            const newOrders = activeOrders.filter(o => o.status === 'new');
+            const preparingOrders = activeOrders.filter(o => ['preparing', 'ready'].includes(o.status));
+            
             const todayRevenue = state.orders
                 .filter(o => o.status === 'completed' && isToday(o.created_at))
                 .reduce((sum, o) => sum + (o.price || 0), 0);
+            
+            const yesterdayRevenue = state.orders
+                .filter(o => o.status === 'completed' && isYesterday(o.created_at))
+                .reduce((sum, o) => sum + (o.price || 0), 0);
+            
+            const revenueTrend = yesterdayRevenue ? ((todayRevenue - yesterdayRevenue) / yesterdayRevenue * 100).toFixed(0) : 0;
+            
+            const currentHour = new Date().getHours();
+            const greeting = currentHour < 12 ? 'Доброе утро' : currentHour < 18 ? 'Добрый день' : 'Добрый вечер';
+            const currentDate = new Date().toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' });
 
             document.querySelector('.content').innerHTML = `
                 <div class="container">
+                    <!-- Hero Section -->
+                    <div class="hero-section">
+                        <div class="hero-greeting">
+                            <div class="hero-text">
+                                <h2>${greeting}!</h2>
+                                <p>${currentDate} • ${state.store?.name || 'Мой магазин'}</p>
+                            </div>
+                            <button class="status-toggle ${state.store?.is_open ? 'open' : 'closed'}" onclick="toggleStoreStatus()">
+                                <span class="status-indicator"></span>
+                                ${state.store?.is_open ? 'Открыто' : 'Закрыто'}
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Quick Actions -->
+                    <div class="quick-actions">
+                        <button class="quick-action" onclick="switchView('products'); setTimeout(() => document.getElementById('addProductBtn')?.click(), 100)">
+                            <div class="quick-action-icon">
+                                <i data-lucide="plus"></i>
+                            </div>
+                            <span class="quick-action-label">Добавить товар</span>
+                        </button>
+                        <button class="quick-action" onclick="switchView('orders')">
+                            <div class="quick-action-icon">
+                                <i data-lucide="shopping-cart"></i>
+                            </div>
+                            <span class="quick-action-label">Заказы</span>
+                        </button>
+                        <button class="quick-action" onclick="switchView('stats')">
+                            <div class="quick-action-icon">
+                                <i data-lucide="bar-chart-3"></i>
+                            </div>
+                            <span class="quick-action-label">Отчёт</span>
+                        </button>
+                        <button class="quick-action" onclick="switchView('settings')">
+                            <div class="quick-action-icon">
+                                <i data-lucide="settings"></i>
+                            </div>
+                            <span class="quick-action-label">Настройки</span>
+                        </button>
+                    </div>
+
+                    <!-- Stats Grid -->
                     <div class="stats-grid">
                         <div class="stat-card primary">
                             <div class="stat-header">
                                 <div class="stat-icon"><i data-lucide="wallet"></i></div>
                             </div>
                             <div class="stat-value">${formatPrice(todayRevenue)}</div>
-                            <div class="stat-label">Выручка сегодня</div>
+                            <div class="stat-label">
+                                Выручка сегодня
+                                ${revenueTrend != 0 ? `<span class="stat-trend ${revenueTrend > 0 ? 'up' : 'down'}">
+                                    <i data-lucide="${revenueTrend > 0 ? 'trending-up' : 'trending-down'}"></i>
+                                    ${Math.abs(revenueTrend)}%
+                                </span>` : ''}
+                            </div>
                         </div>
 
                         <div class="stat-card success">
@@ -454,34 +516,89 @@
                         </div>
                     </div>
 
+                    <!-- Active Orders with Grouping -->
                     <div class="section">
                         <div class="section-header">
                             <h2 class="section-title">Активные заказы</h2>
                             <button class="btn btn-sm btn-outline" onclick="switchView('orders')">Все заказы</button>
                         </div>
-                        <div class="orders-list">
-                            ${activeOrders.length > 0 ? activeOrders.slice(0, 5).map(order => `
-                                <div class="order-card">
-                                    <div class="order-header">
-                                        <div class="order-id">#${order.order_id || order.id || '—'}</div>
-                                        <div class="order-status status-${order.status}">${getStatusText(order.status)}</div>
-                                    </div>
-                                    <div class="order-meta">
-                                        <span class="order-type">${order.order_type === 'pickup' ? '🏃 Самовывоз' : '🚗 Доставка'}</span>
-                                    </div>
-                                    <div class="order-footer">
-                                        <div class="order-time">${formatTime(order.created_at)}</div>
-                                        <div class="order-total">${formatPrice(order.price)}</div>
+                        
+                        ${activeOrders.length > 0 ? `
+                            ${newOrders.length > 0 ? `
+                                <div style="margin-bottom: 16px;">
+                                    <h3 style="font-size: 14px; font-weight: 600; color: #818C99; margin: 0 0 12px 0; text-transform: uppercase; letter-spacing: 0.5px;">
+                                        Новые (${newOrders.length})
+                                    </h3>
+                                    <div class="orders-list">
+                                        ${newOrders.map(order => renderOrderCard(order)).join('')}
                                     </div>
                                 </div>
-                            `).join('') : '<div class="empty-state"><p>Нет активных заказов</p></div>'}
-                        </div>
+                            ` : ''}
+                            
+                            ${preparingOrders.length > 0 ? `
+                                <div>
+                                    <h3 style="font-size: 14px; font-weight: 600; color: #818C99; margin: 0 0 12px 0; text-transform: uppercase; letter-spacing: 0.5px;">
+                                        В работе (${preparingOrders.length})
+                                    </h3>
+                                    <div class="orders-list">
+                                        ${preparingOrders.map(order => renderOrderCard(order)).join('')}
+                                    </div>
+                                </div>
+                            ` : ''}
+                        ` : `
+                            <div class="empty-state">
+                                <div class="empty-icon">
+                                    <i data-lucide="inbox" style="width: 48px; height: 48px; color: #C4C4C4;"></i>
+                                </div>
+                                <p class="empty-title">Нет активных заказов</p>
+                                <p class="empty-subtitle">Новые заказы появятся здесь</p>
+                            </div>
+                        `}
                     </div>
                 </div>
             `;
 
             // Initialize Lucide icons
             if (typeof lucide !== 'undefined') lucide.createIcons();
+        }
+
+        function renderOrderCard(order) {
+            const orderId = order.order_id || order.id;
+            return `
+                <div class="order-card" onclick="viewOrderDetails(${orderId})">
+                    <div class="order-header">
+                        <div class="order-id">#${orderId || '—'}</div>
+                        <div class="order-status status-${order.status}">${getStatusText(order.status)}</div>
+                    </div>
+                    <div class="order-meta">
+                        <span class="order-type">${order.order_type === 'pickup' ? '🏃 Самовывоз' : '🚗 Доставка'}</span>
+                    </div>
+                    <div class="order-footer">
+                        <div class="order-time">${formatTime(order.created_at)}</div>
+                        <div class="order-total">${formatPrice(order.price)}</div>
+                    </div>
+                    ${order.status === 'new' ? `
+                        <div class="order-actions" onclick="event.stopPropagation()">
+                            <button class="btn btn-sm btn-success" onclick="updateOrderStatus(${orderId}, 'preparing')">Принять</button>
+                            <button class="btn btn-sm btn-danger" onclick="cancelOrder(${orderId})">Отменить</button>
+                        </div>
+                    ` : ''}
+                    ${order.status === 'preparing' ? `
+                        <div class="order-actions" onclick="event.stopPropagation()">
+                            <button class="btn btn-sm btn-success" onclick="updateOrderStatus(${orderId}, 'ready')">Готов</button>
+                        </div>
+                    ` : ''}
+                </div>
+            `;
+        }
+
+        function toggleStoreStatus() {
+            // TODO: API call to toggle store status
+            if (state.store) {
+                state.store.is_open = !state.store.is_open;
+                renderDashboard();
+                toast(state.store.is_open ? 'Магазин открыт' : 'Магазин закрыт', 'success');
+            }
         }
 
         // ============================================
@@ -1187,6 +1304,13 @@
             const date = new Date(dateString);
             const today = new Date();
             return date.toDateString() === today.toDateString();
+        }
+
+        function isYesterday(dateString) {
+            const date = new Date(dateString);
+            const yesterday = new Date();
+            yesterday.setDate(yesterday.getDate() - 1);
+            return date.toDateString() === yesterday.toDateString();
         }
 
         function getStatusText(status) {
