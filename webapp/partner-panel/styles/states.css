@@ -94,18 +94,19 @@
 .skeleton {
     background: linear-gradient(
         90deg,
-        #F0F0F0 0%,
-        #FAFAFA 50%,
-        #F0F0F0 100%
+        var(--gray-100) 0%,
+        var(--gray-200) 20%,
+        var(--gray-100) 40%,
+        var(--gray-100) 100%
     );
     background-size: 200% 100%;
-    animation: shimmer 1.5s ease-in-out infinite;
-    border-radius: 8px;
+    animation: shimmer 1.5s ease infinite;
+    border-radius: var(--radius-sm);
 }
 
 @keyframes shimmer {
-    0% { background-position: -200% 0; }
-    100% { background-position: 200% 0; }
+    0% { background-position: 200% 0; }
+    100% { background-position: -200% 0; }
 }
 
 .skeleton-card {

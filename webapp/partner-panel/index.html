@@ -9,18 +9,18 @@
     <script src="https://unpkg.com/lucide@latest"></script>
 
     <!-- Modular CSS Architecture -->
-    <link rel="stylesheet" href="/partner-panel/styles/variables.css?v=8.1">
-    <link rel="stylesheet" href="/partner-panel/styles/base.css?v=8.1">
-    <link rel="stylesheet" href="/partner-panel/styles/header.css?v=8.1">
-    <link rel="stylesheet" href="/partner-panel/styles/navigation.css?v=8.1">
-    <link rel="stylesheet" href="/partner-panel/styles/buttons.css?v=8.1">
-    <link rel="stylesheet" href="/partner-panel/styles/products.css?v=8.1">
-    <link rel="stylesheet" href="/partner-panel/styles/main.css?v=8.1">
-    <link rel="stylesheet" href="/partner-panel/styles/utilities.css?v=8.1">
-    <link rel="stylesheet" href="/partner-panel/styles/states.css?v=8.1">
+    <link rel="stylesheet" href="/partner-panel/styles/variables.css?v=10.0">
+    <link rel="stylesheet" href="/partner-panel/styles/base.css?v=10.0">
+    <link rel="stylesheet" href="/partner-panel/styles/header.css?v=10.0">
+    <link rel="stylesheet" href="/partner-panel/styles/navigation.css?v=10.0">
+    <link rel="stylesheet" href="/partner-panel/styles/buttons.css?v=10.0">
+    <link rel="stylesheet" href="/partner-panel/styles/products.css?v=10.0">
+    <link rel="stylesheet" href="/partner-panel/styles/main.css?v=10.0">
+    <link rel="stylesheet" href="/partner-panel/styles/utilities.css?v=10.0">
+    <link rel="stylesheet" href="/partner-panel/styles/states.css?v=10.0">
 
     <!-- UX Improvements Phase 1 -->
-    <link rel="stylesheet" href="/partner-panel/improvements.css?v=8.1">
+    <link rel="stylesheet" href="/partner-panel/improvements.css?v=10.0">
 
     <style>
         /* Yandex.Lavka Style + Telegram WebApp Optimizations */
@@ -416,20 +416,30 @@
             const activeOrders = state.orders.filter(o => o.status !== 'completed' && o.status !== 'cancelled');
             const newOrders = activeOrders.filter(o => o.status === 'new');
             const preparingOrders = activeOrders.filter(o => ['preparing', 'ready'].includes(o.status));
-            
+
             const todayRevenue = state.orders
                 .filter(o => o.status === 'completed' && isToday(o.created_at))
                 .reduce((sum, o) => sum + (o.price || 0), 0);
-            
+
             const yesterdayRevenue = state.orders
                 .filter(o => o.status === 'completed' && isYesterday(o.created_at))
                 .reduce((sum, o) => sum + (o.price || 0), 0);
-            
+
             const revenueTrend = yesterdayRevenue ? ((todayRevenue - yesterdayRevenue) / yesterdayRevenue * 100).toFixed(0) : 0;
-            
+
             const currentHour = new Date().getHours();
             const greeting = currentHour < 12 ? 'Доброе утро' : currentHour < 18 ? 'Добрый день' : 'Добрый вечер';
             const currentDate = new Date().toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' });
+
+            // Smart insights
+            const dailyGoal = 11000;
+            const goalProgress = (todayRevenue / dailyGoal * 100).toFixed(0);
+            const lowStockProducts = state.products.filter(p => p.stock_quantity < 5 && p.stock_quantity > 0);
+            const outOfStockProducts = state.products.filter(p => p.stock_quantity === 0);
+
+            // Peak hours logic (11-14, 18-21)
+            const isPeakHour = (currentHour >= 11 && currentHour < 14) || (currentHour >= 18 && currentHour < 21);
+            const hoursUntilPeak = currentHour < 11 ? 11 - currentHour : currentHour < 18 ? 18 - currentHour : null;
 
             document.querySelector('.content').innerHTML = `
                 <div class="container">
@@ -445,74 +455,102 @@
                                 ${state.store?.is_open ? 'Открыто' : 'Закрыто'}
                             </button>
                         </div>
+
+                        <!-- Smart Insights -->
+                        ${hoursUntilPeak && hoursUntilPeak <= 2 ? `
+                            <div class="smart-insight">
+                                <div class="smart-insight-icon">🔥</div>
+                                <div class="smart-insight-content">
+                                    <div class="smart-insight-title">Пик заказов через ${hoursUntilPeak}ч</div>
+                                    <div class="smart-insight-text">Проверьте остатки популярных товаров</div>
+                                </div>
+                            </div>
+                        ` : ''}
+
+                        ${outOfStockProducts.length > 0 ? `
+                            <div class="smart-insight warning">
+                                <div class="smart-insight-icon">⚠️</div>
+                                <div class="smart-insight-content">
+                                    <div class="smart-insight-title">Товары закончились (${outOfStockProducts.length})</div>
+                                    <div class="smart-insight-text">${outOfStockProducts[0]?.name || 'Товар'} и еще ${outOfStockProducts.length - 1}</div>
+                                </div>
+                            </div>
+                        ` : lowStockProducts.length > 0 ? `
+                            <div class="smart-insight warning">
+                                <div class="smart-insight-icon">📦</div>
+                                <div class="smart-insight-content">
+                                    <div class="smart-insight-title">Низкий остаток (${lowStockProducts.length})</div>
+                                    <div class="smart-insight-text">${lowStockProducts.map(p => p.name).join(', ')}</div>
+                                </div>
+                            </div>
+                        ` : ''}
+
+                        ${goalProgress < 100 && todayRevenue > 0 ? `
+                            <div class="goal-progress">
+                                <div class="goal-header">
+                                    <span class="goal-label">Цель на день</span>
+                                    <span class="goal-values">${formatPrice(todayRevenue)} / ${formatPrice(dailyGoal)}</span>
+                                </div>
+                                <div class="goal-bar">
+                                    <div class="goal-fill" style="width: ${Math.min(goalProgress, 100)}%"></div>
+                                </div>
+                            </div>
+                        ` : goalProgress >= 100 ? `
+                            <div class="smart-insight success">
+                                <div class="smart-insight-icon">🎉</div>
+                                <div class="smart-insight-content">
+                                    <div class="smart-insight-title">Цель достигнута!</div>
+                                    <div class="smart-insight-text">Выручка превысила ${formatPrice(dailyGoal)}</div>
+                                </div>
+                            </div>
+                        ` : ''}
                     </div>
 
-                    <!-- Quick Actions -->
-                    <div class="quick-actions">
-                        <button class="quick-action" onclick="switchView('products'); setTimeout(() => document.getElementById('addProductBtn')?.click(), 100)">
-                            <div class="quick-action-icon">
-                                <i data-lucide="plus"></i>
-                            </div>
-                            <span class="quick-action-label">Добавить товар</span>
-                        </button>
-                        <button class="quick-action" onclick="switchView('orders')">
-                            <div class="quick-action-icon">
-                                <i data-lucide="shopping-cart"></i>
-                            </div>
-                            <span class="quick-action-label">Заказы</span>
-                        </button>
-                        <button class="quick-action" onclick="switchView('stats')">
-                            <div class="quick-action-icon">
-                                <i data-lucide="bar-chart-3"></i>
-                            </div>
-                            <span class="quick-action-label">Отчёт</span>
-                        </button>
-                        <button class="quick-action" onclick="switchView('settings')">
-                            <div class="quick-action-icon">
-                                <i data-lucide="settings"></i>
-                            </div>
-                            <span class="quick-action-label">Настройки</span>
-                        </button>
-                    </div>
+                    <!-- Urgent Orders -->
+                    ${newOrders.length > 0 ? `
+                        <div class="urgent-section">
+                            ${newOrders.map(order => `
+                                <div class="urgent-order" onclick="viewOrderDetails(${order.order_id || order.id})">
+                                    <div class="urgent-header">
+                                        <h3 class="urgent-title">🔔 Новый заказ #${order.order_id || order.id}</h3>
+                                        <span class="urgent-badge">${formatTime(order.created_at)}</span>
+                                    </div>
+                                    <div style="padding-left: 16px;">
+                                        <p style="margin: 0 0 4px; font-size: 14px; color: #000;">${order.order_type === 'pickup' ? '🏃 Самовывоз' : '🚗 Доставка'} • ${formatPrice(order.price)}</p>
+                                    </div>
+                                    <div class="urgent-actions" onclick="event.stopPropagation()">
+                                        <button class="btn btn-success" onclick="updateOrderStatus(${order.order_id || order.id}, 'preparing')">✓ Принять заказ</button>
+                                        <button class="btn btn-outline" onclick="cancelOrder(${order.order_id || order.id})">Отклонить</button>
+                                    </div>
+                                </div>
+                            `).join('')}
+                        </div>
+                    ` : ''}
 
                     <!-- Stats Grid -->
                     <div class="stats-grid">
                         <div class="stat-card primary">
-                            <div class="stat-header">
-                                <div class="stat-icon"><i data-lucide="wallet"></i></div>
-                            </div>
+                            ${revenueTrend != 0 ? `<span class="stat-trend ${revenueTrend > 0 ? 'up' : 'down'}">
+                                <i data-lucide="${revenueTrend > 0 ? 'trending-up' : 'trending-down'}"></i>
+                                ${Math.abs(revenueTrend)}%
+                            </span>` : ''}
                             <div class="stat-value">${formatPrice(todayRevenue)}</div>
-                            <div class="stat-label">
-                                Выручка сегодня
-                                ${revenueTrend != 0 ? `<span class="stat-trend ${revenueTrend > 0 ? 'up' : 'down'}">
-                                    <i data-lucide="${revenueTrend > 0 ? 'trending-up' : 'trending-down'}"></i>
-                                    ${Math.abs(revenueTrend)}%
-                                </span>` : ''}
-                            </div>
+                            <div class="stat-label">Выручка сегодня</div>
                         </div>
 
                         <div class="stat-card success">
-                            <div class="stat-header">
-                                <div class="stat-icon"><i data-lucide="package"></i></div>
-                            </div>
                             <div class="stat-value">${activeOrders.length}</div>
                             <div class="stat-label">Активные заказы</div>
                         </div>
 
                         <div class="stat-card">
-                            <div class="stat-header">
-                                <div class="stat-icon"><i data-lucide="shopping-bag"></i></div>
-                            </div>
                             <div class="stat-value">${state.products.length}</div>
-                            <div class="stat-label">Товары</div>
+                            <div class="stat-label">Товаров в каталоге</div>
                         </div>
 
                         <div class="stat-card">
-                            <div class="stat-header">
-                                <div class="stat-icon"><i data-lucide="star"></i></div>
-                            </div>
                             <div class="stat-value">4.8</div>
-                            <div class="stat-label">Рейтинг</div>
+                            <div class="stat-label">Средний рейтинг</div>
                         </div>
                     </div>
 
@@ -522,26 +560,42 @@
                             <h2 class="section-title">Активные заказы</h2>
                             <button class="btn btn-sm btn-outline" onclick="switchView('orders')">Все заказы</button>
                         </div>
-                        
+
                         ${activeOrders.length > 0 ? `
                             ${newOrders.length > 0 ? `
-                                <div style="margin-bottom: 16px;">
-                                    <h3 style="font-size: 14px; font-weight: 600; color: #818C99; margin: 0 0 12px 0; text-transform: uppercase; letter-spacing: 0.5px;">
-                                        Новые (${newOrders.length})
-                                    </h3>
-                                    <div class="orders-list">
-                                        ${newOrders.map(order => renderOrderCard(order)).join('')}
+                                <div class="order-section" id="newOrdersSection">
+                                    <div class="order-section-header" onclick="toggleOrderSection('newOrdersSection')">
+                                        <h3 class="order-section-title">
+                                            ⚡ Требуют действия
+                                            <span class="order-section-badge">${newOrders.length}</span>
+                                        </h3>
+                                        <div class="order-section-toggle">
+                                            <i data-lucide="chevron-down" style="width: 16px; height: 16px;"></i>
+                                        </div>
+                                    </div>
+                                    <div class="order-section-content">
+                                        <div class="orders-list">
+                                            ${newOrders.map(order => renderOrderCard(order)).join('')}
+                                        </div>
                                     </div>
                                 </div>
                             ` : ''}
-                            
+
                             ${preparingOrders.length > 0 ? `
-                                <div>
-                                    <h3 style="font-size: 14px; font-weight: 600; color: #818C99; margin: 0 0 12px 0; text-transform: uppercase; letter-spacing: 0.5px;">
-                                        В работе (${preparingOrders.length})
-                                    </h3>
-                                    <div class="orders-list">
-                                        ${preparingOrders.map(order => renderOrderCard(order)).join('')}
+                                <div class="order-section collapsed" id="preparingOrdersSection">
+                                    <div class="order-section-header" onclick="toggleOrderSection('preparingOrdersSection')">
+                                        <h3 class="order-section-title">
+                                            📦 В работе
+                                            <span class="order-section-badge" style="background: #4A5568;">${preparingOrders.length}</span>
+                                        </h3>
+                                        <div class="order-section-toggle">
+                                            <i data-lucide="chevron-down" style="width: 16px; height: 16px;"></i>
+                                        </div>
+                                    </div>
+                                    <div class="order-section-content">
+                                        <div class="orders-list">
+                                            ${preparingOrders.map(order => renderOrderCard(order)).join('')}
+                                        </div>
                                     </div>
                                 </div>
                             ` : ''}
@@ -598,6 +652,14 @@
                 state.store.is_open = !state.store.is_open;
                 renderDashboard();
                 toast(state.store.is_open ? 'Магазин открыт' : 'Магазин закрыт', 'success');
+            }
+        }
+
+        function toggleOrderSection(sectionId) {
+            const section = document.getElementById(sectionId);
+            if (section) {
+                section.classList.toggle('collapsed');
+                if (typeof lucide !== 'undefined') lucide.createIcons();
             }
         }
 
@@ -786,6 +848,11 @@
 
         async function updateOrderStatus(orderId, newStatus) {
             try {
+                // Haptic feedback
+                if (tg?.HapticFeedback) {
+                    tg.HapticFeedback.impactOccurred('medium');
+                }
+
                 await apiFetch(`/api/partner/orders/${orderId}/status?status=${newStatus}`, {
                     method: 'POST'
                 });
@@ -794,16 +861,39 @@
                 const order = state.orders.find(o => (o.order_id || o.id) === orderId);
                 if (order) order.status = newStatus;
 
+                // Success haptic
+                if (tg?.HapticFeedback) {
+                    tg.HapticFeedback.notificationOccurred('success');
+                }
+
                 toast('Статус заказа обновлен', 'success');
                 loadOrders();
             } catch (error) {
+                // Error haptic
+                if (tg?.HapticFeedback) {
+                    tg.HapticFeedback.notificationOccurred('error');
+                }
                 toast('Ошибка обновления статуса', 'error');
             }
         }
 
         async function cancelOrder(orderId) {
             if (!confirm('Отменить заказ?')) return;
+
+            // Heavy haptic for destructive action
+            if (tg?.HapticFeedback) {
+                tg.HapticFeedback.impactOccurred('heavy');
+            }
+
             await updateOrderStatus(orderId, 'cancelled');
+        }
+
+        function toggleOrderSection(sectionId) {
+            const section = document.getElementById(sectionId);
+            if (section) {
+                section.classList.toggle('collapsed');
+                if (typeof lucide !== 'undefined') lucide.createIcons();
+            }
         }
 
         // ============================================
