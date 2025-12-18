@@ -731,24 +731,49 @@
     margin-bottom: var(--space-lg);
 }
 
-/* === Mobile Responsiveness === */
+/* === Mobile Responsiveness - Yandex.Lavka === */
 @media (max-width: 768px) {
     .container {
-        padding: var(--space-md);
+        padding: 12px;
     }
 
     .stats-grid {
         grid-template-columns: repeat(2, 1fr);
-        gap: var(--space-md);
+        gap: 10px;
+    }
+
+    .stat-card {
+        padding: 14px;
+    }
+
+    .stat-value {
+        font-size: 28px;
+    }
+
+    .section-title {
+        font-size: 20px;
     }
 
     .dashboard-grid {
         grid-template-columns: 1fr;
+        gap: 12px;
+    }
+}
+
+@media (max-width: 375px) {
+    .stats-grid {
+        gap: 8px;
     }
 
-    .section-header {
-        flex-direction: column;
-        align-items: flex-start;
-        gap: var(--space-sm);
+    .stat-card {
+        padding: 12px;
+    }
+
+    .stat-value {
+        font-size: 24px;
+    }
+
+    .container {
+        padding: 8px;
     }
 }

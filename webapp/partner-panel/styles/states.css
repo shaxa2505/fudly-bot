@@ -1,0 +1,255 @@
+/* ================================================
+   UX STATES - Yandex.Lavka Style
+   Empty, Loading, Error states
+   ================================================ */
+
+/* === Empty State === */
+.empty-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 48px 24px;
+    text-align: center;
+    background: #FFFFFF;
+    border-radius: 16px;
+    margin: 16px 0;
+}
+
+.empty-icon {
+    width: 80px;
+    height: 80px;
+    margin-bottom: 16px;
+    opacity: 0.3;
+}
+
+.empty-title {
+    font-size: 18px;
+    font-weight: 700;
+    color: #000000;
+    margin: 0 0 8px 0;
+}
+
+.empty-text {
+    font-size: 14px;
+    color: #818C99;
+    margin: 0 0 24px 0;
+    max-width: 300px;
+}
+
+.empty-action {
+    background: #21A038;
+    color: #FFFFFF;
+    padding: 12px 24px;
+    border-radius: 12px;
+    font-weight: 600;
+    border: none;
+    cursor: pointer;
+    transition: transform 0.15s, background 0.15s;
+}
+
+.empty-action:active {
+    transform: scale(0.96);
+    background: #1B8230;
+}
+
+/* === Loading State === */
+.loading-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 40px 24px;
+}
+
+.loading-spinner {
+    width: 40px;
+    height: 40px;
+    border: 3px solid #E8E8E8;
+    border-top-color: #21A038;
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
+
+.loading-text {
+    margin-top: 16px;
+    font-size: 14px;
+    color: #818C99;
+}
+
+/* === Skeleton Loader === */
+.skeleton {
+    background: linear-gradient(
+        90deg,
+        #F0F0F0 0%,
+        #FAFAFA 50%,
+        #F0F0F0 100%
+    );
+    background-size: 200% 100%;
+    animation: shimmer 1.5s ease-in-out infinite;
+    border-radius: 8px;
+}
+
+@keyframes shimmer {
+    0% { background-position: -200% 0; }
+    100% { background-position: 200% 0; }
+}
+
+.skeleton-card {
+    background: #FFFFFF;
+    border-radius: 16px;
+    padding: 16px;
+    margin-bottom: 12px;
+}
+
+.skeleton-header {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 12px;
+}
+
+.skeleton-title {
+    width: 120px;
+    height: 20px;
+    background: #F0F0F0;
+}
+
+.skeleton-badge {
+    width: 60px;
+    height: 24px;
+    background: #F0F0F0;
+    border-radius: 12px;
+}
+
+.skeleton-text {
+    width: 100%;
+    height: 16px;
+    background: #F0F0F0;
+    margin-bottom: 8px;
+}
+
+.skeleton-text.short {
+    width: 60%;
+}
+
+/* === Error State === */
+.error-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 48px 24px;
+    text-align: center;
+    background: #FFFFFF;
+    border-radius: 16px;
+    margin: 16px 0;
+    border: 2px solid #FFEBEE;
+}
+
+.error-icon {
+    width: 64px;
+    height: 64px;
+    margin-bottom: 16px;
+    color: #F44336;
+}
+
+.error-title {
+    font-size: 18px;
+    font-weight: 700;
+    color: #000000;
+    margin: 0 0 8px 0;
+}
+
+.error-text {
+    font-size: 14px;
+    color: #818C99;
+    margin: 0 0 24px 0;
+    max-width: 300px;
+}
+
+.error-action {
+    background: #F44336;
+    color: #FFFFFF;
+    padding: 12px 24px;
+    border-radius: 12px;
+    font-weight: 600;
+    border: none;
+    cursor: pointer;
+    transition: transform 0.15s, background 0.15s;
+}
+
+.error-action:active {
+    transform: scale(0.96);
+    background: #D32F2F;
+}
+
+/* === Pull to Refresh === */
+.pull-to-refresh {
+    position: fixed;
+    top: 56px;
+    left: 0;
+    right: 0;
+    height: 60px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #FFFFFF;
+    transform: translateY(-100%);
+    transition: transform 0.3s;
+    z-index: 100;
+}
+
+.pull-to-refresh.active {
+    transform: translateY(0);
+}
+
+.pull-icon {
+    width: 24px;
+    height: 24px;
+    color: #21A038;
+    animation: spin 1s linear infinite;
+}
+
+/* === Toast Notifications === */
+.toast {
+    position: fixed;
+    bottom: 80px;
+    left: 16px;
+    right: 16px;
+    background: #000000;
+    color: #FFFFFF;
+    padding: 16px;
+    border-radius: 12px;
+    font-size: 14px;
+    font-weight: 500;
+    z-index: 2000;
+    animation: slideUp 0.3s ease-out;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+@keyframes slideUp {
+    from {
+        transform: translateY(100%);
+        opacity: 0;
+    }
+    to {
+        transform: translateY(0);
+        opacity: 1;
+    }
+}
+
+.toast.success {
+    background: #21A038;
+}
+
+.toast.error {
+    background: #F44336;
+}
+
+.toast.warning {
+    background: #FF9800;
+}

@@ -9,29 +9,63 @@
     <script src="https://unpkg.com/lucide@latest"></script>
 
     <!-- Modular CSS Architecture -->
-    <link rel="stylesheet" href="/partner-panel/styles/variables.css?v=7.0">
-    <link rel="stylesheet" href="/partner-panel/styles/base.css?v=7.0">
-    <link rel="stylesheet" href="/partner-panel/styles/header.css?v=7.0">
-    <link rel="stylesheet" href="/partner-panel/styles/navigation.css?v=7.0">
-    <link rel="stylesheet" href="/partner-panel/styles/buttons.css?v=7.0">
-    <link rel="stylesheet" href="/partner-panel/styles/products.css?v=7.0">
-    <link rel="stylesheet" href="/partner-panel/styles/main.css?v=7.0">
-    <link rel="stylesheet" href="/partner-panel/styles/utilities.css?v=7.0">
+    <link rel="stylesheet" href="/partner-panel/styles/variables.css?v=7.1">
+    <link rel="stylesheet" href="/partner-panel/styles/base.css?v=7.1">
+    <link rel="stylesheet" href="/partner-panel/styles/header.css?v=7.1">
+    <link rel="stylesheet" href="/partner-panel/styles/navigation.css?v=7.1">
+    <link rel="stylesheet" href="/partner-panel/styles/buttons.css?v=7.1">
+    <link rel="stylesheet" href="/partner-panel/styles/products.css?v=7.1">
+    <link rel="stylesheet" href="/partner-panel/styles/main.css?v=7.1">
+    <link rel="stylesheet" href="/partner-panel/styles/utilities.css?v=7.1">
+    <link rel="stylesheet" href="/partner-panel/styles/states.css?v=7.1">
 
     <!-- UX Improvements Phase 1 -->
-    <link rel="stylesheet" href="/partner-panel/improvements.css?v=7.0">
+    <link rel="stylesheet" href="/partner-panel/improvements.css?v=7.1">
 
     <style>
-        /* Yandex.Lavka Style */
+        /* Yandex.Lavka Style + Telegram WebApp Optimizations */
+        :root {
+            /* Telegram safe areas */
+            --safe-area-top: env(safe-area-inset-top, 0);
+            --safe-area-bottom: env(safe-area-inset-bottom, 0);
+            --header-height: 56px;
+            --nav-height: 56px;
+        }
+
+        * {
+            -webkit-tap-highlight-color: transparent;
+            -webkit-touch-callout: none;
+        }
+
         body {
             background: #F7F7F7 !important;
             color: #000000 !important;
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;
+            overscroll-behavior-y: contain;
+            overflow-x: hidden;
         }
+
         .app-header {
             background: #FFFFFF !important;
             border-bottom: 1px solid #E8E8E8 !important;
             box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06) !important;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: var(--header-height);
+            padding-top: var(--safe-area-top);
+            z-index: 100;
+        }
+
+        .bottom-nav {
+            padding-bottom: calc(var(--safe-area-bottom) + 8px) !important;
+            height: calc(var(--nav-height) + var(--safe-area-bottom)) !important;
+        }
+
+        main {
+            padding-top: calc(var(--header-height) + 16px) !important;
+            padding-bottom: calc(var(--nav-height) + var(--safe-area-bottom) + 16px) !important;
         }
         /* Preload animation */
         @keyframes shimmerPreload {
