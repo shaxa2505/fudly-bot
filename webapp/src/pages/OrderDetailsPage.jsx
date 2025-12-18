@@ -68,7 +68,7 @@ export default function OrderDetailsPage() {
       pending: { text: '⏳ Kutilmoqda / Ожидание', color: '#FF6B35', bg: '#FFF4F0' },
       preparing: { text: '👨‍🍳 Tayyorlanmoqda / Готовится', color: '#10B981', bg: '#ECFDF5' },
       ready: { text: '📦 Tayyor / Готов', color: '#8B5CF6', bg: '#FAF5FF' },
-      delivering: { text: '🚚 Yo\\'lda / В пути', color: '#3B82F6', bg: '#EFF6FF' },
+      delivering: { text: "🚚 Yo'lda / В пути", color: '#3B82F6', bg: '#EFF6FF' },
       completed: { text: '✅ Bajarildi / Выполнен', color: '#10B981', bg: '#ECFDF5' },
       cancelled: { text: '❌ Bekor qilindi / Отменён', color: '#EF4444', bg: '#FEF2F2' },
       rejected: { text: '❌ Rad etildi / Отклонён', color: '#EF4444', bg: '#FEF2F2' },
