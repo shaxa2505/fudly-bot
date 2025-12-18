@@ -884,7 +884,7 @@ async def dlv_payment_proof(
                 items=[order_item],
                 order_type=order_type,
                 delivery_address=address if order_type == "delivery" else None,
-                payment_method="pending",
+                payment_method="card",
                 notify_customer=False,
                 notify_sellers=False,
             )
@@ -906,7 +906,7 @@ async def dlv_payment_proof(
                 order_type=order_type,
                 delivery_address=address if order_type == "delivery" else None,
                 delivery_price=delivery_price if order_type == "delivery" else 0,
-                payment_method="pending",
+                payment_method="card",
             )
             logger.info(f"✅ Created order #{order_id} after screenshot via legacy create_order")
         except Exception as e:
@@ -927,7 +927,7 @@ async def dlv_payment_proof(
     photo_id = message.photo[-1].file_id
 
     # Update payment status with photo
-    db.update_payment_status(order_id, "pending", photo_id)
+    db.update_payment_status(order_id, "proof_submitted", photo_id)
 
     logger.info(f"✅ Attached screenshot to order #{order_id}")
 

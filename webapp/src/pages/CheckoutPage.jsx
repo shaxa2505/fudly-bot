@@ -223,7 +223,7 @@ function CheckoutPage({ user }) {
           const storeId = cartItems[0]?.store_id || null;
 
           const paymentData = await api.createPaymentLink(
-            orderResult.booking_id || orderResult.id,
+            orderResult.order_id || orderResult.booking_id || orderResult.id || orderResult.bookings?.[0]?.booking_id,
             paymentMethod,
             returnUrl,
             storeId,

@@ -13,6 +13,7 @@ from aiogram.fsm.state import State, StatesGroup
 from aiogram.types import BufferedInputFile
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
+from app.services.unified_order_service import PaymentStatus
 from localization import get_text
 
 try:
@@ -71,18 +72,62 @@ async def start_upload_proof(callback: types.CallbackQuery, state: FSMContext) -
             await callback.answer("❌ Bu buyurtma sizniki emas / Это не ваш заказ", show_alert=True)
             return
 
-        # Check order status
-        order_status = (
-            order.get("order_status")
+        payment_method = (
+            order.get("payment_method")
             if isinstance(order, dict)
-            else getattr(order, "order_status", None)
+            else getattr(order, "payment_method", None)
         )
-        if order_status not in ["awaiting_payment", "awaiting_admin_confirmation"]:
-            lang = db.get_user_language(user_id) if hasattr(db, "get_user_language") else "ru"
+        payment_status_raw = (
+            order.get("payment_status")
+            if isinstance(order, dict)
+            else getattr(order, "payment_status", None)
+        )
+        payment_proof_photo_id = (
+            order.get("payment_proof_photo_id")
+            if isinstance(order, dict)
+            else getattr(order, "payment_proof_photo_id", None)
+        )
+
+        payment_status = PaymentStatus.normalize(
+            payment_status_raw,
+            payment_method=payment_method,
+            payment_proof_photo_id=payment_proof_photo_id,
+        )
+
+        lang = db.get_user_language(user_id) if hasattr(db, "get_user_language") else "ru"
+
+        if payment_status == PaymentStatus.PROOF_SUBMITTED:
+            msg = (
+                "Chek allaqachon yuborilgan. Tasdiqlanishini kuting."
+                if lang == "uz"
+                else "Чек уже отправлен. Ожидайте подтверждения."
+            )
+            await callback.answer(f"⏳ {msg}", show_alert=True)
+            return
+
+        if payment_status == PaymentStatus.CONFIRMED:
+            msg = (
+                "To'lov allaqachon tasdiqlangan"
+                if lang == "uz"
+                else "Оплата уже подтверждена"
+            )
+            await callback.answer(f"✅ {msg}", show_alert=True)
+            return
+
+        if payment_status == PaymentStatus.NOT_REQUIRED:
             msg = (
                 "Bu buyurtma uchun to'lov kerak emas"
                 if lang == "uz"
                 else "Для этого заказа не требуется оплата"
+            )
+            await callback.answer(f"ℹ️ {msg}", show_alert=True)
+            return
+
+        if payment_status not in (PaymentStatus.AWAITING_PROOF, PaymentStatus.REJECTED):
+            msg = (
+                "Bu buyurtma uchun chek yuborish kerak emas"
+                if lang == "uz"
+                else "Для этого заказа не требуется отправлять чек"
             )
             await callback.answer(f"⚠️ {msg}", show_alert=True)
             return
@@ -214,9 +259,17 @@ async def receive_payment_proof(message: types.Message, state: FSMContext) -> No
                     else getattr(store, "name", "Магазин")
                 )
 
-        # Update order status
-        if hasattr(db, "update_order_status"):
-            db.update_order_status(order_id, "awaiting_admin_confirmation")
+        # Keep order_status as fulfillment-only; fix legacy statuses if present
+        current_order_status = (
+            order.get("order_status")
+            if isinstance(order, dict)
+            else getattr(order, "order_status", None)
+        )
+        if (
+            current_order_status in ("awaiting_payment", "awaiting_admin_confirmation")
+            and hasattr(db, "update_order_status")
+        ):
+            db.update_order_status(order_id, "pending")
 
         # Get admin IDs
         admin_ids = []
@@ -258,7 +311,7 @@ async def receive_payment_proof(message: types.Message, state: FSMContext) -> No
 
         # Persist payment proof in DB for audit trail and later access
         if hasattr(db, "update_payment_status"):
-            db.update_payment_status(order_id, "pending", photo.file_id)
+            db.update_payment_status(order_id, "proof_submitted", photo.file_id)
         elif hasattr(db, "update_order_payment_proof"):
             db.update_order_payment_proof(order_id, photo.file_id)
 

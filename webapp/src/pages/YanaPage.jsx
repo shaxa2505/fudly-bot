@@ -61,33 +61,49 @@ function YanaPage() {
         return
       }
 
-      // Fetch both bookings (old system) and delivery orders (new system)
-      const [bookings, deliveryOrders] = await Promise.all([
-        api.getUserBookings(userId),
-        api.getDeliveryOrders(userId)
-      ])
+      const { bookings = [], orders = [] } = await api.getOrders()
 
-      // Normalize delivery orders to match booking format
-      const normalizedDelivery = deliveryOrders.map(order => ({
-        booking_id: order.id || order.order_id,
-        order_id: order.id || order.order_id,
-        order_type: 'delivery',
-        status: order.status,
-        created_at: order.created_at,
-        delivery_address: order.delivery_address,
-        phone: order.phone,
-        payment_method: order.payment_method,
-        total_price: order.total_price,
-        items: order.items || [],
-        // Use first item for display
-        offer_title: order.items?.[0]?.title || 'Delivery buyurtma',
-        store_name: order.items?.[0]?.store_name || 'Do\'kon',
-        offer_photo: order.items?.[0]?.photo_url,
-        quantity: order.items?.reduce((sum, item) => sum + item.quantity, 0) || 1
+      const deriveDisplayStatus = (o) => {
+        const ps = o?.payment_status
+        if (ps === 'awaiting_payment') return 'awaiting_payment'
+        if (ps === 'awaiting_proof') return 'awaiting_proof'
+        if (ps === 'proof_submitted') return 'proof_submitted'
+        if (ps === 'rejected') return 'payment_rejected'
+        return o?.order_status || o?.status || 'pending'
+      }
+
+      // Normalize unified orders to match booking format (used by UI components)
+      const normalizedOrders = orders.map(o => ({
+        booking_id: o.order_id || o.id,
+        order_id: o.order_id || o.id,
+        order_type: o.order_type,
+        status: deriveDisplayStatus(o),
+        order_status: o.order_status || o.status,
+        payment_status: o.payment_status,
+        payment_method: o.payment_method,
+        created_at: o.created_at,
+        delivery_address: o.delivery_address,
+        total_price: o.total_price,
+        items: o.items || [],
+        offer_title: o.items?.[0]?.offer_title || o.items?.[0]?.title || 'Buyurtma',
+        store_name: o.store_name || o.items?.[0]?.store_name || 'Do\'kon',
+        offer_photo: api.getPhotoUrl(o.items?.[0]?.photo) || null,
+        quantity: o.quantity || o.items?.reduce((sum, it) => sum + (it.quantity || 0), 0) || 1,
+        booking_code: o.booking_code,
+      }))
+
+      const normalizedBookings = bookings.map(b => ({
+        ...b,
+        order_id: b.booking_id,
+        order_type: 'pickup',
+        status: b.status === 'confirmed' ? 'preparing' : (b.status || 'pending'),
+        order_status: b.status === 'confirmed' ? 'preparing' : (b.status || 'pending'),
+        payment_status: null,
+        payment_method: b.payment_method || 'cash',
       }))
 
       // Merge both lists
-      const allOrders = [...normalizedDelivery, ...bookings]
+      const allOrders = [...normalizedOrders, ...normalizedBookings]
         .sort((a, b) => {
           const dateA = new Date(a.created_at || 0)
           const dateB = new Date(b.created_at || 0)
@@ -97,14 +113,8 @@ function YanaPage() {
       // Filter based on selection
       let filtered = allOrders
       if (orderFilter === 'active') {
-        // Active = pending, confirmed, ready, awaiting_admin_confirmation, awaiting_payment
         filtered = allOrders.filter(o =>
-          o.status === 'pending' ||
-          o.status === 'confirmed' ||
-          o.status === 'ready' ||
-          o.status === 'awaiting_admin_confirmation' ||
-          o.status === 'awaiting_payment' ||
-          !o.status // treat undefined as pending
+          !['completed', 'cancelled', 'rejected'].includes(o.order_status || o.status)
         )
       } else if (orderFilter === 'completed') {
         filtered = allOrders.filter(o =>
@@ -131,13 +141,17 @@ function YanaPage() {
   const getStatusInfo = (status) => {
     const statusMap = {
       pending: { text: '⏳ Kutilmoqda', color: '#FF9500', bg: '#FFF4E5' },
-      awaiting_payment: { text: '💳 To\'lov kutilmoqda', color: '#FF9500', bg: '#FFF4E5' },
-      awaiting_admin_confirmation: { text: '🔍 Tekshirilmoqda', color: '#FF9500', bg: '#FFF4E5' },
-      confirmed: { text: '✅ Tasdiqlandi', color: '#34C759', bg: '#E8F8ED' },
+      preparing: { text: '👨‍🍳 Tayyorlanmoqda', color: '#34C759', bg: '#E8F8ED' },
       ready: { text: '📦 Tayyor', color: '#007AFF', bg: '#E5F2FF' },
+      delivering: { text: '🚚 Yo\'lda', color: '#007AFF', bg: '#E5F2FF' },
       completed: { text: '🎉 Yakunlandi', color: '#53B175', bg: '#E8F5E9' },
       cancelled: { text: '❌ Bekor qilindi', color: '#FF3B30', bg: '#FFEBEE' },
       rejected: { text: '❌ Rad etildi', color: '#FF3B30', bg: '#FFEBEE' },
+
+      awaiting_payment: { text: '💳 To\'lov kutilmoqda', color: '#FF9500', bg: '#FFF4E5' },
+      awaiting_proof: { text: '📸 Chek kutilmoqda', color: '#FF9500', bg: '#FFF4E5' },
+      proof_submitted: { text: '🔍 Tekshirilmoqda', color: '#FF9500', bg: '#FFF4E5' },
+      payment_rejected: { text: '❌ To\'lov rad etildi', color: '#FF3B30', bg: '#FFEBEE' },
     }
     return statusMap[status] || { text: status, color: '#999', bg: '#F5F5F5' }
   }
@@ -303,8 +317,8 @@ function YanaPage() {
                       )}
                     </div>
 
-                    {/* Upload payment proof button for awaiting_payment orders */}
-                    {order.status === 'awaiting_payment' && (
+                    {/* Upload payment proof button for card-transfer orders */}
+                    {['awaiting_proof', 'payment_rejected'].includes(order.status) && (
                       <button
                         className="upload-proof-btn"
                         onClick={(e) => {

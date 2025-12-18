@@ -380,7 +380,7 @@ async def partner_confirm_batch_bookings(callback: types.CallbackQuery) -> None:
                 continue
 
             # Confirm booking
-            db.update_booking_status(booking_id, "confirmed")
+            db.update_booking_status(booking_id, "preparing")
             db.mark_reminder_sent(booking_id)
             confirmed_count += 1
 

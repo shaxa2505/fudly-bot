@@ -1174,61 +1174,42 @@ async def create_booking(
         await state.clear()
         return
 
-    # Create booking atomically
-    error_reason = None
+    # Create pickup order in unified orders table (v24+)
     try:
-        result = db.create_booking_atomic(offer_id, user_id, quantity)
-        # Handle both 3-tuple and 4-tuple returns for backward compatibility
-        if len(result) == 4:
-            ok, booking_id, code, error_reason = result
-        else:
-            ok, booking_id, code = result
-    except Exception as e:
-        logger.error(f"Booking creation failed: {e}")
-        ok, booking_id, code, error_reason = False, None, None, f"exception:{e}"
+        unit_price = int(get_offer_field(offer, "discount_price", offer_price) or offer_price or 0)
+    except Exception:
+        unit_price = int(offer_price or 0)
 
-    if not ok or not booking_id:
-        # Log for debugging with reason
-        logger.warning(
-            f"create_booking_atomic returned False: offer_id={offer_id}, user_id={user_id}, qty={quantity}, reason={error_reason}"
+    try:
+        store_id_int = int(store_id or get_offer_field(offer, "store_id") or 0)
+        result = db.create_cart_order(
+            user_id=user_id,
+            items=[
+                {
+                    "offer_id": int(offer_id),
+                    "store_id": store_id_int,
+                    "quantity": int(quantity),
+                    "price": unit_price,
+                    "title": offer_title,
+                }
+            ],
+            order_type="pickup",
+            delivery_address=None,
+            payment_method="cash",
         )
+        created_orders = result.get("created_orders", [])
+    except Exception as e:
+        logger.error(f"Order creation failed: {e}")
+        created_orders = []
 
-        # Show specific error message based on reason
-        if error_reason and error_reason.startswith("booking_limit:"):
-            count = error_reason.split(":")[1]
-            error_msg_uz = f"❌ Sizda allaqachon {count} ta faol bron bor (limit: 3)"
-            error_msg_ru = f"❌ У вас уже {count} активных бронирований (лимит: 3)"
-        elif error_reason and error_reason.startswith("offer_not_found"):
-            error_msg_uz = "❌ Taklif topilmadi yoki faol emas"
-            error_msg_ru = "❌ Предложение не найдено или неактивно"
-        elif error_reason and error_reason.startswith("insufficient_qty:"):
-            qty = error_reason.split(":")[1]
-            error_msg_uz = f"❌ Yetarli miqdor yo'q. Qolgan: {qty} dona"
-            error_msg_ru = f"❌ Недостаточно товара. Осталось: {qty} шт"
-        elif error_reason and error_reason.startswith("offer_inactive:"):
-            error_msg_uz = "❌ Taklif hozirda faol emas"
-            error_msg_ru = "❌ Предложение сейчас неактивно"
-        elif error_reason and error_reason.startswith("exception:"):
-            error_msg_uz = f"❌ Xatolik yuz berdi: {error_reason}"
-            error_msg_ru = f"❌ Произошла ошибка: {error_reason}"
-        else:
-            error_msg_uz = (
-                "❌ Bronlash amalga oshmadi.\n\n"
-                "Mumkin sabablar:\n"
-                "• Sizda allaqachon 3 ta faol bron bor\n"
-                "• Mahsulot allaqachon sotib olingan"
-            )
-            error_msg_ru = (
-                "❌ Не удалось создать бронь.\n\n"
-                "Возможные причины:\n"
-                "• У вас уже есть 3 активных бронирования\n"
-                "• Товар уже забронирован другим покупателем"
-            )
+    order_id = created_orders[0].get("order_id") if created_orders else None
+    code = created_orders[0].get("pickup_code") if created_orders else None
 
+    if not order_id:
         if lang == "uz":
-            await message.answer(error_msg_uz)
+            await message.answer("❌ Buyurtma yaratib bo'lmadi. Keyinroq urinib ko'ring.")
         else:
-            await message.answer(error_msg_ru)
+            await message.answer("❌ Не удалось создать заказ. Попробуйте позже.")
         await state.clear()
         return
 
@@ -1236,13 +1217,13 @@ async def create_booking(
     if METRICS:
         METRICS["bookings_created"] = METRICS.get("bookings_created", 0) + 1
 
-    logger.info(f"✅ Booking created: id={booking_id}, code={code}, user={user_id}")
+    logger.info(f"✅ Pickup order created: id={order_id}, code={code}, user={user_id}")
 
     # Structured logging
     total = calculate_total(offer_price, quantity, 0)
     logger.info(
-        f"ORDER_CREATED: id={booking_id}, user={user_id}, type=pickup, "
-        f"total={total}, items=1, source=booking_bot, pickup_code={code}"
+        f"ORDER_CREATED: id={order_id}, user={user_id}, type=pickup, "
+        f"total={total}, items=1, source=pickup_bot, pickup_code={code}"
     )
 
     await state.clear()
@@ -1260,8 +1241,10 @@ async def create_booking(
     # Beautiful customer notification with photo
     if lang == "uz":
         customer_msg = (
-            f"✅ <b>BRON YUBORILDI!</b>\n"
+            f"✅ <b>BUYURTMA YARATILDI!</b>\n"
             f"━━━━━━━━━━━━━━━━━━\n\n"
+            f"📦 Buyurtma: <b>#{order_id}</b>\n"
+            f"🔑 Kod: <code>{_esc(code) if code else '-'}</code>\n\n"
             f"🛒 <b>{_esc(offer_title)}</b>\n"
             f"📦 Miqdor: <b>{quantity}</b> dona\n"
             f"💰 Jami: <b>{total:,}</b> {currency}\n\n"
@@ -1270,12 +1253,14 @@ async def create_booking(
             f"━━━━━━━━━━━━━━━━━━\n"
             f"⏳ <i>Sotuvchi tasdig'ini kutmoqda...</i>\n"
             f"━━━━━━━━━━━━━━━━━━\n\n"
-            f"💡 Tasdiqlangandan so'ng sizga bron kodi va QR kod yuboriladi."
+            f"💡 Olishda sotuvchiga kodni ko'rsating."
         )
     else:
         customer_msg = (
-            f"✅ <b>БРОНЬ ОТПРАВЛЕНА!</b>\n"
+            f"✅ <b>Заказ создан!</b>\n"
             f"━━━━━━━━━━━━━━━━━━\n\n"
+            f"📦 Заказ: <b>#{order_id}</b>\n"
+            f"🔑 Код: <code>{_esc(code) if code else '-'}</code>\n\n"
             f"🛒 <b>{_esc(offer_title)}</b>\n"
             f"📦 Количество: <b>{quantity}</b> шт\n"
             f"💰 Итого: <b>{total:,}</b> {currency}\n\n"
@@ -1284,7 +1269,7 @@ async def create_booking(
             f"━━━━━━━━━━━━━━━━━━\n"
             f"⏳ <i>Ожидаем подтверждения продавца...</i>\n"
             f"━━━━━━━━━━━━━━━━━━\n\n"
-            f"💡 После подтверждения вы получите код бронирования и QR-код."
+            f"💡 Покажите код продавцу при получении."
         )
 
     # Try to send with photo for beautiful notification
@@ -1306,20 +1291,21 @@ async def create_booking(
         sent_message = await message.answer(customer_msg, parse_mode="HTML")
 
     # Save message_id for live editing (status updates will edit this message)
-    if sent_message and hasattr(db, "set_booking_customer_message_id"):
+    if sent_message and hasattr(db, "set_order_customer_message_id"):
         try:
-            db.set_booking_customer_message_id(booking_id, sent_message.message_id)
+            db.set_order_customer_message_id(int(order_id), sent_message.message_id)
             logger.info(
-                f"Saved customer_message_id={sent_message.message_id} for booking #{booking_id}"
+                f"Saved customer_message_id={sent_message.message_id} for order #{order_id}"
             )
         except Exception as e:
             logger.warning(f"Failed to save customer_message_id: {e}")
 
     # Notify partner
     if owner_id:
-        await notify_partner_new_booking(
+        await notify_partner_new_pickup_order(
             owner_id=owner_id,
-            booking_id=booking_id,
+            order_id=int(order_id),
+            pickup_code=code,
             offer_title=offer_title,
             quantity=quantity,
             total=total,
@@ -1327,6 +1313,113 @@ async def create_booking(
             customer_name=message.from_user.first_name,
             offer_photo=offer_photo,
         )
+
+
+async def notify_partner_new_pickup_order(
+    owner_id: int,
+    order_id: int,
+    pickup_code: str | None,
+    offer_title: str,
+    quantity: int,
+    total: int,
+    customer_id: int,
+    customer_name: str,
+    offer_photo: str | None = None,
+) -> None:
+    """Send pickup order notification to partner (unified orders table)."""
+    if not db or not bot:
+        return
+
+    partner_lang = db.get_user_language(owner_id)
+    customer = get_user_safe(db, customer_id)
+
+    # Use get_user_field for dict/model compatible access
+    from .utils import get_user_field
+
+    customer_phone = get_user_field(customer, "phone") or "Не указан"
+    customer_username = get_user_field(customer, "username")
+
+    # Contact info
+    contact_info = f"@{customer_username}" if customer_username else customer_phone
+    currency = "so'm" if partner_lang == "uz" else "сум"
+
+    code_line = f"<code>{_esc(pickup_code)}</code>" if pickup_code else "—"
+
+    if partner_lang == "uz":
+        text = (
+            f"🔔 <b>YANGI BUYURTMA!</b>\n"
+            f"━━━━━━━━━━━━━━━━━━\n\n"
+            f"📦 <b>#{order_id}</b>\n"
+            f"🔑 Kod: {code_line}\n\n"
+            f"🛒 <b>{_esc(offer_title)}</b>\n"
+            f"📦 Miqdor: <b>{quantity}</b> dona\n"
+            f"💰 Jami: <b>{total:,}</b> {currency}\n\n"
+            f"━━━━━━━━━━━━━━━━━━\n"
+            f"👤 <b>Xaridor:</b>\n"
+            f"   Ism: {_esc(customer_name)}\n"
+            f"   📱 <code>{_esc(customer_phone)}</code>\n"
+            f"   💬 {_esc(contact_info)}\n\n"
+            f"🏪 <b>O'zi olib ketadi</b>\n"
+            f"━━━━━━━━━━━━━━━━━━\n"
+            f"⏳ <b>Buyurtmani tasdiqlang!</b>"
+        )
+        confirm_text = "✅ Tasdiqlash"
+        reject_text = "❌ Rad etish"
+    else:
+        text = (
+            f"🔔 <b>НОВЫЙ ЗАКАЗ!</b>\n"
+            f"━━━━━━━━━━━━━━━━━━\n\n"
+            f"📦 <b>#{order_id}</b>\n"
+            f"🔑 Код: {code_line}\n\n"
+            f"🛒 <b>{_esc(offer_title)}</b>\n"
+            f"📦 Количество: <b>{quantity}</b> шт\n"
+            f"💰 Итого: <b>{total:,}</b> {currency}\n\n"
+            f"━━━━━━━━━━━━━━━━━━\n"
+            f"👤 <b>Покупатель:</b>\n"
+            f"   Имя: {_esc(customer_name)}\n"
+            f"   📱 <code>{_esc(customer_phone)}</code>\n"
+            f"   💬 {_esc(contact_info)}\n\n"
+            f"🏪 <b>Самовывоз</b>\n"
+            f"━━━━━━━━━━━━━━━━━━\n"
+            f"⏳ <b>Подтвердите заказ!</b>"
+        )
+        confirm_text = "✅ Принять"
+        reject_text = "❌ Отклонить"
+
+    kb = InlineKeyboardBuilder()
+    kb.button(text=confirm_text, callback_data=f"order_confirm_{order_id}")
+    kb.button(text=reject_text, callback_data=f"order_reject_{order_id}")
+    kb.adjust(2)
+
+    try:
+        sent_msg = None
+        if offer_photo:
+            try:
+                sent_msg = await bot.send_photo(
+                    owner_id,
+                    photo=offer_photo,
+                    caption=text,
+                    parse_mode="HTML",
+                    reply_markup=kb.as_markup(),
+                )
+            except Exception as photo_err:
+                logger.warning(f"Failed to send photo to partner: {photo_err}")
+
+        if not sent_msg:
+            sent_msg = await bot.send_message(
+                owner_id, text, parse_mode="HTML", reply_markup=kb.as_markup()
+            )
+
+        if sent_msg and hasattr(db, "set_order_seller_message_id"):
+            try:
+                db.set_order_seller_message_id(order_id, sent_msg.message_id)
+                logger.info(
+                    f"Saved seller_message_id={sent_msg.message_id} for order#{order_id}"
+                )
+            except Exception as save_err:
+                logger.error(f"Failed to save seller_message_id: {save_err}")
+    except Exception as e:
+        logger.error(f"Failed to notify partner {owner_id}: {e}")
 
 
 async def notify_partner_new_booking(

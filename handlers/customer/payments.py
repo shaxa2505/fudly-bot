@@ -256,11 +256,12 @@ async def process_successful_payment(message: types.Message) -> None:
             address = order.get("delivery_address") if isinstance(order, dict) else None
             delivery_price = order.get("delivery_price", 0) if isinstance(order, dict) else 0
 
-            # Update order status
-            if hasattr(db, "update_order_status"):
-                db.update_order_status(order_id, "confirmed")
+            # Payment is confirmed by Telegram provider (Click)
             if hasattr(db, "update_payment_status"):
-                db.update_payment_status(order_id, "paid")
+                db.update_payment_status(order_id, "confirmed")
+            if hasattr(db, "update_order_status"):
+                # Keep fulfillment status separate from payment
+                db.update_order_status(order_id, "pending")
         else:
             # Try bookings table (pickup from hot_offer flow)
             if hasattr(db, "get_booking"):
@@ -278,9 +279,9 @@ async def process_successful_payment(message: types.Message) -> None:
                     else (booking[3] if len(booking) > 3 else 1)
                 )
 
-                # Update booking status
+                # Keep booking status separate from payment confirmation
                 if hasattr(db, "update_booking_status"):
-                    db.update_booking_status(order_id, "confirmed")
+                    db.update_booking_status(order_id, "pending")
 
         # Get offer and store details
         offer = db.get_offer(offer_id) if offer_id else None

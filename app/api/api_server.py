@@ -135,7 +135,12 @@ def create_api_app(db: Any = None, offer_service: Any = None, bot_token: str = N
         # ✅ SECURITY: Restrict methods to only what's needed
         allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
         # ✅ SECURITY: Restrict headers
-        allow_headers=["Content-Type", "Authorization", "X-Requested-With"],
+        allow_headers=[
+            "Content-Type",
+            "Authorization",
+            "X-Requested-With",
+            "X-Telegram-Init-Data",
+        ],
         expose_headers=["Content-Length", "Content-Type"],
     )
 

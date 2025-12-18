@@ -64,8 +64,90 @@ class OrderStatus:
         """Normalize status from old system."""
         mapping = {
             "confirmed": cls.PREPARING,  # Old booking "confirmed" = now "preparing"
+            "new": cls.PENDING,
+            # Legacy/temporary order_status values used during payment flows.
+            "awaiting_payment": cls.PENDING,
+            "awaiting_admin_confirmation": cls.PENDING,
+            "paid": cls.PENDING,
         }
         return mapping.get(status, status)
+
+
+# =============================================================================
+# PAYMENT STATUSES
+# =============================================================================
+
+
+class PaymentStatus:
+    """Payment lifecycle status stored in orders.payment_status."""
+
+    NOT_REQUIRED = "not_required"  # cash payments
+    AWAITING_PAYMENT = "awaiting_payment"  # online providers (click/payme)
+    AWAITING_PROOF = "awaiting_proof"  # manual card transfer (screenshot)
+    PROOF_SUBMITTED = "proof_submitted"  # proof uploaded, waiting for admin review
+    CONFIRMED = "confirmed"  # payment confirmed (admin or provider)
+    REJECTED = "rejected"  # payment rejected by admin
+
+    @classmethod
+    def normalize_method(cls, payment_method: str | None) -> str:
+        if not payment_method:
+            return "cash"
+        method = str(payment_method).strip().lower()
+        return "card" if method == "pending" else method
+
+    @classmethod
+    def initial_for_method(cls, payment_method: str | None) -> str:
+        method = cls.normalize_method(payment_method)
+        if method == "cash":
+            return cls.NOT_REQUIRED
+        if method in ("click", "payme"):
+            return cls.AWAITING_PAYMENT
+        return cls.AWAITING_PROOF
+
+    @classmethod
+    def normalize(
+        cls,
+        payment_status: str | None,
+        *,
+        payment_method: str | None = None,
+        payment_proof_photo_id: str | None = None,
+    ) -> str | None:
+        """Normalize legacy payment_status values to the target model."""
+        if payment_status is None:
+            return None
+
+        status = str(payment_status).strip().lower()
+        method = cls.normalize_method(payment_method)
+
+        # Legacy "pending" was overloaded; infer from method and proof presence.
+        if status in ("pending", ""):
+            if method == "cash":
+                return cls.NOT_REQUIRED
+            if payment_proof_photo_id:
+                return cls.PROOF_SUBMITTED
+            if method in ("click", "payme"):
+                return cls.AWAITING_PAYMENT
+            return cls.AWAITING_PROOF
+
+        if status == "paid":
+            return cls.CONFIRMED
+
+        return status
+
+    @classmethod
+    def is_cleared(
+        cls,
+        payment_status: str | None,
+        *,
+        payment_method: str | None = None,
+        payment_proof_photo_id: str | None = None,
+    ) -> bool:
+        normalized = cls.normalize(
+            payment_status,
+            payment_method=payment_method,
+            payment_proof_photo_id=payment_proof_photo_id,
+        )
+        return normalized in (cls.NOT_REQUIRED, cls.CONFIRMED)
 
 
 # =============================================================================
@@ -640,6 +722,14 @@ class UnifiedOrderService:
                 ),
             )
 
+        # Normalize and enforce: sellers should only see paid/cash orders
+        payment_method = PaymentStatus.normalize_method(payment_method)
+        if not PaymentStatus.is_cleared(
+            PaymentStatus.initial_for_method(payment_method),
+            payment_method=payment_method,
+        ):
+            notify_sellers = False
+
         # Prepare items for database
         db_items = [
             {
@@ -764,9 +854,74 @@ class UnifiedOrderService:
     async def _create_pickup_orders(
         self, user_id: int, items: list[dict], payment_method: str
     ) -> dict:
-        """Create pickup orders using booking system."""
+        """Create pickup orders.
+
+        Target model (v24+): pickup orders live in the unified `orders` table.
+        """
         try:
-            # Use cart order creation for consistency
+            # Cart pickup must be a SINGLE order row (per store) to keep status/payment/proof consistent.
+            if (
+                len(items) > 1
+                and hasattr(self.db, "create_cart_order_atomic")
+                and items
+                and items[0].get("store_id")
+            ):
+                store_id = int(items[0]["store_id"])
+
+                cart_items = [
+                    {
+                        "offer_id": int(item["offer_id"]),
+                        "quantity": int(item.get("quantity", 1)),
+                        "price": int(item.get("price", 0)),
+                        "title": item.get("title", ""),
+                    }
+                    for item in items
+                ]
+
+                ok, order_id, pickup_code, error_reason = self.db.create_cart_order_atomic(
+                    user_id=user_id,
+                    store_id=store_id,
+                    cart_items=cart_items,
+                    delivery_address=None,
+                    delivery_price=0,
+                    payment_method=payment_method,
+                )
+
+                if not ok or not order_id:
+                    return {
+                        "success": False,
+                        "error": error_reason or "Failed to create cart pickup order",
+                    }
+
+                store_orders: list[dict[str, Any]] = []
+                for item in items:
+                    qty = int(item.get("quantity", 1))
+                    price = int(item.get("price", 0))
+                    store_orders.append(
+                        {
+                            "order_id": int(order_id),
+                            "offer_id": int(item.get("offer_id") or 0),
+                            "store_id": store_id,
+                            "quantity": qty,
+                            "price": price,
+                            "total": price * qty,
+                            "pickup_code": pickup_code,
+                            "title": item.get("title", ""),
+                            "store_name": item.get("store_name", ""),
+                            "store_address": item.get("store_address", ""),
+                            "delivery_price": 0,
+                        }
+                    )
+
+                return {
+                    "success": True,
+                    "order_ids": [int(order_id)],
+                    "booking_ids": [],
+                    "pickup_codes": [pickup_code] if pickup_code else [],
+                    "stores_orders": {store_id: store_orders},
+                }
+
+            # Single-item pickup: regular order row is fine
             result = self.db.create_cart_order(
                 user_id=user_id,
                 items=items,

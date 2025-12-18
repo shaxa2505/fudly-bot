@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from aiogram import F, Router, types
 
-from handlers.bookings.utils import safe_answer_or_send as _safe_answer_or_send
+from app.services.unified_order_service import get_unified_order_service, init_unified_order_service
 from logging_config import logger
 
 from .utils import get_db, get_store_field
@@ -35,22 +35,35 @@ async def seller_check_pickup_code(message: types.Message) -> None:
         return
 
     code = parts[1].strip()
+
+    entity_type = "booking"
+    entity = None
+
     try:
-        booking = db.get_booking_by_code(code)
+        # Prefer unified pickup orders by pickup_code (v24+)
+        if hasattr(db, "get_order_by_pickup_code"):
+            entity = db.get_order_by_pickup_code(code)
+            if isinstance(entity, dict) and (entity.get("order_type") or "pickup") == "pickup":
+                entity_type = "order"
+            else:
+                entity = None
+
+        if not entity:
+            entity = db.get_booking_by_code(code)
     except Exception as e:
-        logger.error(f"Error fetching booking by code: {e}")
+        logger.error(f"Error fetching by code: {e}")
         await message.answer("⚠️ Error checking code")
         return
 
-    if not booking:
-        await message.answer("❌ Booking not found or already used")
+    if not entity:
+        await message.answer("❌ Booking/order not found or already used")
         return
 
     # Validate that seller owns the store for this booking
-    store_id = (
-        booking.get("store_id")
-        if isinstance(booking, dict)
-        else (booking[1] if len(booking) > 1 else None)
+    store_id = entity.get("store_id") if (entity_type == "order" and isinstance(entity, dict)) else (
+        entity.get("store_id")
+        if isinstance(entity, dict)
+        else (entity[1] if len(entity) > 1 else None)
     )
     owner_ok = False
     for s in stores:
@@ -64,29 +77,25 @@ async def seller_check_pickup_code(message: types.Message) -> None:
         return
 
     try:
-        booking_id = (
-            booking.get("booking_id")
-            if isinstance(booking, dict)
-            else (booking[0] if len(booking) > 0 else None)
-        )
-        if booking_id is None:
-            await message.answer("❌ Invalid booking record")
-            return
-        db.complete_booking(booking_id)
-        await message.answer(f"✅ Booking {booking_id} marked as completed")
-        # Notify customer optionally
-        try:
-            user_id = (
-                booking.get("user_id")
-                if isinstance(booking, dict)
-                else (booking[2] if len(booking) > 2 else None)
+        entity_id = (
+            entity.get("order_id")
+            if entity_type == "order" and isinstance(entity, dict)
+            else (
+                entity.get("booking_id")
+                if isinstance(entity, dict)
+                else (entity[0] if len(entity) > 0 else None)
             )
-            if user_id:
-                await _safe_answer_or_send(
-                    None, user_id, f"🎉 Ваш заказ {booking_id} выдан. Спасибо!"
-                )
-        except Exception:
-            pass
+        )
+        if entity_id is None:
+            await message.answer("❌ Invalid record")
+            return
+
+        unified = get_unified_order_service() or init_unified_order_service(db, message.bot)
+        await unified.complete_order(int(entity_id), entity_type)  # type: ignore[arg-type]
+
+        await message.answer(
+            f"✅ {'Order' if entity_type == 'order' else 'Booking'} {entity_id} marked as completed"
+        )
     except Exception as e:
         logger.error(f"Error completing booking by code: {e}")
         await message.answer("❌ Failed to complete booking")

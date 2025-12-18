@@ -88,7 +88,10 @@ async def admin_confirm_payment(
     customer = db.get_user_model(customer_id)
 
     owner_id = get_store_field(store, "owner_id") if store else None
-    delivery_price = get_store_field(store, "delivery_price", 0) if store else 0
+    delivery_price = (
+        get_store_field(store, "delivery_price", 0) if store and order_type == "delivery" else 0
+    )
+    order_total_price = order.get("total_price") if isinstance(order, dict) else None
 
     customer_name = customer.first_name if customer else "—"
     customer_phone = customer.phone if customer else "—"
@@ -105,14 +108,18 @@ async def admin_confirm_payment(
             cart_items = []
 
         items_list = "\n".join([f"• {item['title']} × {item['quantity']}" for item in cart_items])
-        total = sum(item["price"] * item["quantity"] for item in cart_items) + delivery_price
+        total = int(order_total_price) if order_total_price is not None else (
+            sum(item["price"] * item["quantity"] for item in cart_items) + delivery_price
+        )
     else:
         # Single item order
         offer = db.get_offer(offer_id)
         offer_title = get_offer_field(offer, "title", "Товар") if offer else "Товар"
         offer_price = get_offer_field(offer, "discount_price", 0) if offer else 0
         items_list = f"• {offer_title} × {quantity}"
-        total = (offer_price * quantity) + delivery_price
+        total = int(order_total_price) if order_total_price is not None else (
+            (offer_price * quantity) + delivery_price
+        )
 
     # Update admin message
     try:
@@ -175,8 +182,8 @@ async def admin_confirm_payment(
 
         # Partner confirmation keyboard
         partner_kb = InlineKeyboardBuilder()
-        partner_kb.button(text=confirm_text, callback_data=f"partner_confirm_order_{order_id}")
-        partner_kb.button(text=reject_text, callback_data=f"partner_reject_order_{order_id}")
+        partner_kb.button(text=confirm_text, callback_data=f"order_confirm_{order_id}")
+        partner_kb.button(text=reject_text, callback_data=f"order_reject_{order_id}")
         partner_kb.adjust(2)
 
         try:
@@ -251,18 +258,10 @@ async def admin_reject_payment(
         return
 
     db.update_payment_status(order_id, "rejected")
-    db.update_order_status(order_id, "cancelled")
+    # Keep order_status as fulfillment-only and allow customer to re-upload proof
+    db.update_order_status(order_id, "pending")
 
-    # Restore quantity
-    offer_id = _get_order_field(order, "offer_id", 3)
-    quantity = _get_order_field(order, "quantity", 4)
     customer_id = _get_order_field(order, "user_id", 1)
-
-    if offer_id:
-        try:
-            db.increment_offer_quantity_atomic(offer_id, int(quantity))
-        except Exception:
-            pass
 
     # Update admin message
     try:
@@ -278,11 +277,11 @@ async def admin_reject_payment(
         cust_lang = db.get_user_language(customer_id)
         if cust_lang == "uz":
             text = (
-                f"❌ <b>To'lov tasdiqlanmadi</b>\n\n📦 #{order_id}\nIltimos, qayta urinib ko'ring."
+                f"❌ <b>To'lov tasdiqlanmadi</b>\n\n📦 #{order_id}\nIltimos, chekni qayta yuboring."
             )
         else:
             text = (
-                f"❌ <b>Оплата не подтверждена</b>\n\n📦 #{order_id}\nПожалуйста, попробуйте снова."
+                f"❌ <b>Оплата не подтверждена</b>\n\n📦 #{order_id}\nПожалуйста, отправьте чек ещё раз."
             )
 
         try:

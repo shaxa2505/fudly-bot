@@ -120,13 +120,15 @@ const api = {
     return cachedGet('/user/orders', params, 10000) // 10s cache
   },
 
+  async getOrders() {
+    // Unified endpoint for both legacy bookings and orders (aiohttp Mini App API)
+    return cachedGet('/orders', {}, 10000)
+  },
+
   async getUserBookings(userId, status = null) {
     try {
-      const params = { user_id: userId }
-      if (status) params.status = status
-      const data = await cachedGet('/orders', params, 10000)
-      // v24+ unified orders table - use 'orders' field
-      return data.orders || data || []
+      const data = await this.getOrders()
+      return data.bookings || []
     } catch (error) {
       return []
     }
@@ -134,8 +136,8 @@ const api = {
 
   async getDeliveryOrders(userId) {
     try {
-      const data = await this.request('/orders', { user_id: userId })
-      return data.orders || data || []
+      const data = await this.getOrders()
+      return data.orders || []
     } catch (error) {
       console.error('Error fetching delivery orders:', error)
       return []

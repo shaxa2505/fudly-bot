@@ -171,6 +171,20 @@ class DatabaseCore:
                 logger.error(f"Database error: {e}")
                 raise
 
+    def execute(self, query: str, params: tuple[Any, ...] | None = None) -> list[Any]:
+        """Execute a SQL query and return fetched rows (if any).
+
+        This is primarily used by API layers for lightweight reads where a
+        dedicated DB method doesn't exist yet.
+        """
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(query, params or ())
+            try:
+                return list(cursor.fetchall())
+            except Exception:
+                return []
+
     def close(self):
         """Close all connections in the pool."""
         if hasattr(self, "pool") and self.pool:

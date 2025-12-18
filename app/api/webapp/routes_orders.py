@@ -107,14 +107,15 @@ async def create_order(
             try:
                 from app.services.unified_order_service import OrderResult  # type: ignore
 
+                payment_method = "card" if is_delivery else "cash"
                 result: OrderResult = await order_service.create_order(
                     user_id=user_id,
                     items=order_items,
                     order_type="delivery" if is_delivery else "pickup",
                     delivery_address=order.delivery_address if is_delivery else None,
-                    payment_method="card",
+                    payment_method=payment_method,
                     notify_customer=False,
-                    notify_sellers=False,
+                    notify_sellers=True,
                 )
             except Exception as e:  # pragma: no cover - defensive
                 logger.error(f"Unified order service failed for webapp order: {e}")
@@ -123,8 +124,10 @@ async def create_order(
             if result and result.success:
                 # Map unified result back to old created_items shape
                 if is_delivery:
-                    for item_obj, oid in zip(order_items, result.order_ids):
-                        total = (item_obj.price * item_obj.quantity) + int(item_obj.delivery_price)
+                    oid = result.order_ids[0] if result.order_ids else 0
+                    delivery_price = int(order_items[0].delivery_price) if order_items else 0
+                    for idx, item_obj in enumerate(order_items):
+                        total = (item_obj.price * item_obj.quantity) + (delivery_price if idx == 0 else 0)
                         created_items.append(
                             {
                                 "id": oid,
@@ -138,20 +141,23 @@ async def create_order(
                         )
                         logger.info(f"✅ Created unified delivery ORDER {oid} for user {user_id}")
                 else:
-                    for item_obj, bid in zip(order_items, result.booking_ids):
+                    pickup_code = result.pickup_codes[0] if result.pickup_codes else None
+                    oid = result.order_ids[0] if result.order_ids else 0
+                    for item_obj in order_items:
                         total = item_obj.price * item_obj.quantity
                         created_items.append(
                             {
-                                "id": bid,
-                                "type": "booking",
+                                "id": oid,
+                                "type": "order",
                                 "offer_id": item_obj.offer_id,
                                 "quantity": item_obj.quantity,
                                 "total": total,
                                 "offer_title": item_obj.title,
                                 "store_id": item_obj.store_id,
+                                "pickup_code": pickup_code,
                             }
                         )
-                        logger.info(f"✅ Created unified pickup BOOKING {bid} for user {user_id}")
+                        logger.info(f"✅ Created unified pickup ORDER {oid} for user {user_id}")
             else:
                 logger.error(
                     "Unified order service returned failure for webapp order: %s",
@@ -202,27 +208,41 @@ async def create_order(
                                 f"✅ Created legacy delivery ORDER {order_id} for user {user_id}"
                             )
 
-                    elif hasattr(db, "create_booking_atomic"):
-                        ok, booking_id, booking_code = db.create_booking_atomic(
-                            offer_id=item.offer_id,
+                    elif hasattr(db, "create_cart_order"):
+                        cart_result = db.create_cart_order(
                             user_id=user_id,
-                            quantity=item.quantity,
+                            items=[
+                                {
+                                    "offer_id": item.offer_id,
+                                    "store_id": store_id,
+                                    "quantity": item.quantity,
+                                    "price": int(price),
+                                    "title": offer_title,
+                                }
+                            ],
+                            order_type="pickup",
+                            delivery_address=None,
+                            payment_method="cash",
                         )
 
-                        if ok and booking_id:
+                        created_orders = cart_result.get("created_orders", []) if cart_result else []
+                        if created_orders:
+                            oid = created_orders[0].get("order_id")
+                            pickup_code = created_orders[0].get("pickup_code")
                             created_items.append(
                                 {
-                                    "id": booking_id,
-                                    "type": "booking",
+                                    "id": oid,
+                                    "type": "order",
                                     "offer_id": item.offer_id,
                                     "quantity": item.quantity,
                                     "total": total,
                                     "offer_title": offer_title,
                                     "store_id": store_id,
+                                    "pickup_code": pickup_code,
                                 }
                             )
                             logger.info(
-                                f"✅ Created legacy pickup BOOKING {booking_id} for user {user_id}"
+                                f"✅ Created legacy pickup ORDER {oid} for user {user_id}"
                             )
 
                     if bot_instance and store_id and created_items:

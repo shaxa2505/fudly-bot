@@ -50,7 +50,7 @@ class BookingService:
     # -------------------- Status transitions --------------------
     def confirm(self, booking_id: int) -> bool:
         try:
-            self.db.update_booking_status(booking_id, "confirmed")
+            self.db.update_booking_status(booking_id, "preparing")
             return True
         except Exception as e:
             logger.error(f"Failed to confirm booking {booking_id}: {e}")

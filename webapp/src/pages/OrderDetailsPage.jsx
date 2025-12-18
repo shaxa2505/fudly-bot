@@ -20,35 +20,31 @@ export default function OrderDetailsPage() {
   const loadOrderDetails = async () => {
     try {
       setLoading(true)
-      // Try to get delivery order first
-      const response = await apiClient.getUserBookings()
+      const response = await apiClient.getOrders()
 
-      // Find order by ID in both bookings and delivery orders
+      const all = [...(response.orders || []), ...(response.bookings || [])]
       let foundOrder = null
+      const raw = all.find(o => (o.order_id || o.booking_id) === parseInt(orderId))
 
-      if (response.bookings) {
-        foundOrder = response.bookings.find(
-          b => b.booking_id === parseInt(orderId) || b.order_id === parseInt(orderId)
-        )
-      }
+      if (raw) {
+        const ps = raw.payment_status
+        const displayStatus =
+          ps === 'awaiting_payment' ? 'awaiting_payment' :
+          ps === 'awaiting_proof' ? 'awaiting_proof' :
+          ps === 'proof_submitted' ? 'proof_submitted' :
+          ps === 'rejected' ? 'payment_rejected' :
+          (raw.order_status || raw.status || 'pending')
 
-      if (!foundOrder && response.delivery_orders) {
-        foundOrder = response.delivery_orders.find(
-          d => d.order_id === parseInt(orderId)
-        )
-
-        // Normalize delivery order format
-        if (foundOrder) {
-          foundOrder = {
-            ...foundOrder,
-            order_id: foundOrder.order_id,
-            status: foundOrder.order_status || foundOrder.status,
-            offer_title: foundOrder.items?.[0]?.offer_title || 'Заказ',
-            offer_photo: foundOrder.items?.[0]?.photo,
-            store_name: foundOrder.items?.[0]?.store_name,
-            quantity: foundOrder.items?.reduce((sum, item) => sum + (item.quantity || 0), 0) || 1,
-            items: foundOrder.items || []
-          }
+        foundOrder = {
+          ...raw,
+          order_id: raw.order_id || raw.booking_id,
+          status: displayStatus,
+          offer_title: raw.items?.[0]?.offer_title || raw.offer_title || 'Заказ',
+          offer_photo: apiClient.getPhotoUrl(raw.items?.[0]?.photo) || raw.offer_photo,
+          store_name: raw.store_name || raw.items?.[0]?.store_name,
+          quantity: raw.quantity || raw.items?.reduce((sum, item) => sum + (item.quantity || 0), 0) || 1,
+          items: raw.items || [],
+          booking_code: raw.booking_code || raw.pickup_code || raw.booking_code,
         }
       }
 
@@ -70,13 +66,16 @@ export default function OrderDetailsPage() {
   const getStatusInfo = (status) => {
     const statusMap = {
       pending: { text: '⏳ Kutilmoqda / Ожидание', color: '#FF6B35', bg: '#FFF4F0' },
-      confirmed: { text: '✅ Tasdiqlandi / Подтверждён', color: '#10B981', bg: '#ECFDF5' },
-      ready_for_pickup: { text: '📦 Tayyor / Готов к выдаче', color: '#8B5CF6', bg: '#FAF5FF' },
+      preparing: { text: '👨‍🍳 Tayyorlanmoqda / Готовится', color: '#10B981', bg: '#ECFDF5' },
+      ready: { text: '📦 Tayyor / Готов', color: '#8B5CF6', bg: '#FAF5FF' },
+      delivering: { text: '🚚 Yo\\'lda / В пути', color: '#3B82F6', bg: '#EFF6FF' },
       completed: { text: '✅ Bajarildi / Выполнен', color: '#10B981', bg: '#ECFDF5' },
       cancelled: { text: '❌ Bekor qilindi / Отменён', color: '#EF4444', bg: '#FEF2F2' },
       rejected: { text: '❌ Rad etildi / Отклонён', color: '#EF4444', bg: '#FEF2F2' },
       awaiting_payment: { text: '💳 To\'lov kutilmoqda / Ожидание оплаты', color: '#F59E0B', bg: '#FFFBEB' },
-      awaiting_admin_confirmation: { text: '⏳ Admin tekshiruvi / Проверка админом', color: '#3B82F6', bg: '#EFF6FF' },
+      awaiting_proof: { text: '📸 Chek kutilmoqda / Ожидание чека', color: '#F59E0B', bg: '#FFFBEB' },
+      proof_submitted: { text: '🔍 Tekshirilmoqda / Проверка', color: '#3B82F6', bg: '#EFF6FF' },
+      payment_rejected: { text: '❌ To\'lov rad etildi / Оплата отклонена', color: '#EF4444', bg: '#FEF2F2' },
     }
     return statusMap[status] || { text: status, color: '#6B7280', bg: '#F3F4F6' }
   }
@@ -128,7 +127,7 @@ export default function OrderDetailsPage() {
 
   const statusInfo = getStatusInfo(order.status)
   const isDelivery = order.order_type === 'delivery' || order.delivery_address
-  const needsPayment = order.status === 'awaiting_payment'
+  const needsPayment = ['awaiting_proof', 'payment_rejected'].includes(order.status)
 
   return (
     <div className="order-details-page">

@@ -570,6 +570,7 @@ async def create_webhook_app(
                 OrderItem as UnifiedOrderItem,
             )
             from app.services.unified_order_service import (
+                PaymentStatus,
                 OrderResult,
                 get_unified_order_service,
             )
@@ -649,60 +650,19 @@ async def create_webhook_app(
                     )
 
                 try:
-                    # 🔴 CRITICAL: DELIVERY + CARD orders must wait for payment proof
-                    # They should NOT notify sellers until admin confirms payment
-                    if is_delivery and data.get("payment_method") == "card":
-                        # Create order with awaiting_payment status
-                        # Seller will be notified ONLY after admin confirms payment
-                        result: OrderResult = await order_service.create_order(
-                            user_id=int(user_id),
-                            items=order_items,
-                            order_type="delivery",
-                            delivery_address=address,
-                            payment_method="card",
-                            notify_customer=True,  # ✅ Tell customer order created
-                            notify_sellers=False,  # ❌ DON'T notify seller yet!
-                        )
+                    payment_method = data.get("payment_method")
+                    if not payment_method:
+                        payment_method = "card" if is_delivery else "cash"
 
-                        if result and result.success and result.order_ids:
-                            # Get payment card info
-                            payment_card_info = None
-                            if hasattr(db, "get_payment_card"):
-                                card = db.get_payment_card()
-                                if card:
-                                    payment_card_info = {
-                                        "card_number": card.get("card_number") or card[0]
-                                        if isinstance(card, tuple)
-                                        else None,
-                                        "card_holder": card.get("card_holder") or card[1]
-                                        if isinstance(card, tuple) and len(card) > 1
-                                        else None,
-                                    }
-
-                            # Return response with card info - user can pay and upload proof later
-                            return add_cors_headers(
-                                web.json_response(
-                                    {
-                                        "success": True,
-                                        "order_id": result.order_ids[0],
-                                        "awaiting_payment": True,  # Payment confirmation needed
-                                        "payment_card": payment_card_info,
-                                        "message": "Buyurtma yaratildi. Iltimos, to'lovni amalga oshiring va chekni yuklang.",
-                                    }
-                                )
-                            )
-
-                    # For PICKUP or CASH delivery - normal flow
-                    else:
-                        result: OrderResult = await order_service.create_order(
-                            user_id=int(user_id),
-                            items=order_items,
-                            order_type="delivery" if is_delivery else "pickup",
-                            delivery_address=address if is_delivery else None,
-                            payment_method=data.get("payment_method", "card"),
-                            notify_customer=True,
-                            notify_sellers=True,  # ✅ OK for pickup/cash
-                        )
+                    result: OrderResult = await order_service.create_order(
+                        user_id=int(user_id),
+                        items=order_items,
+                        order_type="delivery" if is_delivery else "pickup",
+                        delivery_address=address if is_delivery else None,
+                        payment_method=payment_method,
+                        notify_customer=True,
+                        notify_sellers=True,
+                    )
 
                     logger.info(
                         f"Mini App order created via unified_order_service: "
@@ -714,136 +674,138 @@ async def create_webhook_app(
                     result = None
 
                 if result and result.success:
-                    # For compatibility this endpoint still returns bookings-style data
-                    if is_delivery:
-                        for item_obj, oid in zip(order_items, result.order_ids):
-                            created_bookings.append(
-                                {
-                                    "booking_id": oid,
-                                    "booking_code": None,
-                                    "offer_id": item_obj.offer_id,
-                                    "quantity": item_obj.quantity,
-                                }
-                            )
-                    else:
-                        for item_obj, bid in zip(order_items, result.booking_ids):
-                            created_bookings.append(
-                                {
-                                    "booking_id": bid,
-                                    "booking_code": None,
-                                    "offer_id": item_obj.offer_id,
-                                    "quantity": item_obj.quantity,
-                                }
-                            )
+                    order_id = result.order_ids[0] if result.order_ids else None
+                    pickup_code = result.pickup_codes[0] if result.pickup_codes else None
+                    total_qty = sum(int(getattr(i, "quantity", 1) or 1) for i in order_items)
+                    first_offer_id = order_items[0].offer_id if order_items else None
 
-            # Fallback: legacy per-item booking creation
-            if not created_bookings and not failed_items:
-                for item in items:
-                    offer_id = item.get("id") or item.get("offer_id")
-                    quantity = item.get("quantity", 1)
-
-                    if not offer_id:
-                        failed_items.append({"item": item, "error": "Missing offer_id"})
-                        continue
-
-                    try:
-                        result = db.create_booking_atomic(
-                            offer_id=int(offer_id),
-                            user_id=int(user_id),
-                            quantity=int(quantity),
-                            pickup_time=None,
-                            pickup_address=address if delivery_type == "pickup" else None,
+                    if order_id:
+                        created_bookings.append(
+                            {
+                                "booking_id": order_id,
+                                "booking_code": pickup_code if not is_delivery else None,
+                                "offer_id": first_offer_id,
+                                "quantity": total_qty,
+                                "items_count": len(order_items),
+                            }
                         )
 
-                        # Handle result (3 or 4 tuple)
-                        if len(result) == 4:
-                            ok, booking_id, booking_code, error_reason = result
-                        else:
-                            ok, booking_id, booking_code = result
-                            error_reason = None
+                    initial_payment_status = PaymentStatus.initial_for_method(payment_method)
+                    awaiting_payment = initial_payment_status in (
+                        PaymentStatus.AWAITING_PAYMENT,
+                        PaymentStatus.AWAITING_PROOF,
+                    )
 
-                        if ok and booking_id:
+                    payment_card_info = None
+                    if payment_method == "card" and hasattr(db, "get_payment_card") and order_items:
+                        try:
+                            store_id = int(order_items[0].store_id)
+                            card = db.get_payment_card(store_id)
+                            if card:
+                                payment_card_info = {
+                                    "card_number": card.get("card_number") if isinstance(card, dict) else None,
+                                    "card_holder": card.get("card_holder") if isinstance(card, dict) else None,
+                                    "payment_instructions": card.get("payment_instructions")
+                                    if isinstance(card, dict)
+                                    else None,
+                                }
+                        except Exception:
+                            payment_card_info = None
+
+                    response = {
+                        "success": True,
+                        "order_id": order_id,
+                        "order_ids": result.order_ids,
+                        "pickup_code": pickup_code,
+                        "pickup_codes": result.pickup_codes,
+                        "payment_method": payment_method,
+                        "payment_status": initial_payment_status,
+                        "awaiting_payment": awaiting_payment,
+                        "payment_card": payment_card_info,
+                        "bookings": created_bookings,
+                        "failed": failed_items,
+                        "message": result.error_message or "OK",
+                    }
+                    return add_cors_headers(web.json_response(response, status=201))
+
+            # Fallback: create an order row directly (no new bookings for Mini App)
+            if not created_bookings and not failed_items and order_items and hasattr(db, "create_cart_order"):
+                payment_method = data.get("payment_method")
+                if not payment_method:
+                    payment_method = "card" if is_delivery else "cash"
+
+                db_items = [
+                    {
+                        "offer_id": int(i.offer_id),
+                        "store_id": int(i.store_id),
+                        "quantity": int(i.quantity),
+                        "price": int(i.price),
+                        "delivery_price": int(i.delivery_price) if is_delivery else 0,
+                        "title": i.title,
+                        "store_name": i.store_name,
+                        "store_address": i.store_address,
+                    }
+                    for i in order_items
+                ]
+
+                try:
+                    if len(db_items) > 1 and hasattr(db, "create_cart_order_atomic"):
+                        store_id = int(db_items[0]["store_id"])
+                        delivery_price = int(db_items[0].get("delivery_price") or 0)
+                        cart_items = [
+                            {
+                                "offer_id": int(x["offer_id"]),
+                                "quantity": int(x["quantity"]),
+                                "price": int(x.get("price") or 0),
+                                "title": x.get("title") or "",
+                            }
+                            for x in db_items
+                        ]
+                        ok, order_id, pickup_code, error_reason = db.create_cart_order_atomic(
+                            user_id=int(user_id),
+                            store_id=store_id,
+                            cart_items=cart_items,
+                            delivery_address=address if is_delivery else None,
+                            delivery_price=delivery_price if is_delivery else 0,
+                            payment_method=payment_method,
+                        )
+                        if ok and order_id:
                             created_bookings.append(
                                 {
-                                    "booking_id": booking_id,
-                                    "booking_code": booking_code,
-                                    "offer_id": offer_id,
-                                    "quantity": quantity,
+                                    "booking_id": order_id,
+                                    "booking_code": pickup_code if not is_delivery else None,
+                                    "offer_id": cart_items[0]["offer_id"] if cart_items else None,
+                                    "quantity": sum(x["quantity"] for x in cart_items),
+                                    "items_count": len(cart_items),
                                 }
                             )
-
-                            # Send notification to seller
-                            try:
-                                offer = (
-                                    db.get_offer(int(offer_id))
-                                    if hasattr(db, "get_offer")
-                                    else None
-                                )
-                                if offer:
-                                    store_id = get_offer_value(offer, "store_id")
-                                    if store_id and hasattr(db, "get_store"):
-                                        store = db.get_store(store_id)
-                                        if store:
-                                            seller_id = get_offer_value(
-                                                store, "owner_id"
-                                            ) or get_offer_value(store, "user_id")
-                                            if seller_id:
-                                                title = get_offer_value(offer, "title", "Товар")
-                                                price = get_offer_value(offer, "discount_price", 0)
-
-                                                # Format notification message
-                                                msg = (
-                                                    f"🛒 <b>Новый заказ из Mini App!</b>\n\n"
-                                                    f"📦 Товар: {title}\n"
-                                                    f"🔢 Количество: {quantity}\n"
-                                                    f"💰 Сумма: {int(price * quantity):,} сум\n"
-                                                    f"🎫 Код: <code>{booking_code}</code>\n\n"
-                                                    f"📱 Телефон: {phone or 'не указан'}\n"
-                                                    f"🚚 Тип: {'Самовывоз' if delivery_type == 'pickup' else 'Доставка'}\n"
-                                                )
-                                                if address:
-                                                    msg += f"📍 Адрес: {address}\n"
-                                                if notes:
-                                                    msg += f"📝 Примечание: {notes}\n"
-
-                                                keyboard = InlineKeyboardMarkup(
-                                                    inline_keyboard=[
-                                                        [
-                                                            InlineKeyboardButton(
-                                                                text="✅ Принять",
-                                                                callback_data=f"booking_confirm_{booking_id}",
-                                                            ),
-                                                            InlineKeyboardButton(
-                                                                text="❌ Отклонить",
-                                                                callback_data=f"booking_reject_{booking_id}",
-                                                            ),
-                                                        ]
-                                                    ]
-                                                )
-
-                                                await bot.send_message(
-                                                    chat_id=int(seller_id),
-                                                    text=msg,
-                                                    parse_mode="HTML",
-                                                    reply_markup=keyboard,
-                                                )
-                                                logger.info(
-                                                    f"Notification sent to seller {seller_id}"
-                                                )
-                            except Exception as notify_err:
-                                logger.warning(f"Failed to notify seller: {notify_err}")
-
                         else:
                             failed_items.append(
+                                {"error": error_reason or "Failed to create order"}
+                            )
+                    else:
+                        result = db.create_cart_order(
+                            user_id=int(user_id),
+                            items=db_items,
+                            order_type="delivery" if is_delivery else "pickup",
+                            delivery_address=address if is_delivery else None,
+                            payment_method=payment_method,
+                        )
+                        created_orders = result.get("created_orders", [])
+                        if created_orders:
+                            order_id = created_orders[0].get("order_id")
+                            pickup_code = created_orders[0].get("pickup_code")
+                            created_bookings.append(
                                 {
-                                    "offer_id": offer_id,
-                                    "error": error_reason or "Booking failed",
+                                    "booking_id": order_id,
+                                    "booking_code": pickup_code if not is_delivery else None,
+                                    "offer_id": created_orders[0].get("offer_id"),
+                                    "quantity": sum(int(o.get("quantity") or 1) for o in created_orders),
+                                    "items_count": len(created_orders),
                                 }
                             )
-
-                    except Exception as item_err:
-                        logger.error(f"Error processing item {offer_id}: {item_err}")
-                        failed_items.append({"offer_id": offer_id, "error": str(item_err)})
+                except Exception as e:
+                    failed_items.append({"error": str(e)})
 
             # Return result
             response = {
@@ -875,58 +837,155 @@ async def create_webhook_app(
 
             user_id = authenticated_user_id
 
-            # Get delivery orders (new system)
-            delivery_orders = []
-            if hasattr(db, "get_user_delivery_orders"):
-                raw_orders = db.get_user_delivery_orders(int(user_id)) or []
-                for order_row in raw_orders:
-                    # Parse order from tuple: (id, user_id, status, order_type, payment_method,
-                    # delivery_address, phone, total_price, created_at, ...)
-                    order_id = order_row[0] if len(order_row) > 0 else None
+            # Unified orders list (pickup + delivery) from orders table
+            orders: list[dict[str, Any]] = []
+            raw_orders: list[Any] = []
 
-                    # Get order items
-                    items = []
-                    if order_id and hasattr(db, "get_delivery_order_items"):
-                        raw_items = db.get_delivery_order_items(order_id) or []
-                        for item_row in raw_items:
-                            # Parse item: (offer_id, store_id, title, price, quantity, store_name, photo_id, ...)
-                            photo_url = None
-                            if len(item_row) > 6 and item_row[6]:
-                                try:
-                                    file = await bot.get_file(item_row[6])
-                                    if file and file.file_path:
-                                        photo_url = f"https://api.telegram.org/file/bot{bot.token}/{file.file_path}"
-                                except Exception:
-                                    pass
+            try:
+                with db.get_connection() as conn:
+                    cursor = conn.cursor()
+                    cursor.execute(
+                        """
+                        SELECT
+                            o.order_id,
+                            o.order_status,
+                            o.order_type,
+                            o.pickup_code,
+                            o.delivery_address,
+                            o.total_price,
+                            o.quantity,
+                            o.payment_method,
+                            o.payment_status,
+                            o.payment_proof_photo_id,
+                            o.is_cart_order,
+                            o.cart_items,
+                            o.created_at,
+                            o.updated_at,
+                            o.store_id,
+                            s.name AS store_name,
+                            s.address AS store_address,
+                            s.phone AS store_phone,
+                            off.offer_id AS offer_id,
+                            off.title AS offer_title,
+                            off.discount_price AS offer_price,
+                            off.photo AS offer_photo,
+                            off.photo_id AS offer_photo_id
+                        FROM orders o
+                        LEFT JOIN stores s ON o.store_id = s.store_id
+                        LEFT JOIN offers off ON o.offer_id = off.offer_id
+                        WHERE o.user_id = %s
+                        ORDER BY o.created_at DESC
+                        LIMIT 100
+                        """,
+                        (int(user_id),),
+                    )
+                    raw_orders = cursor.fetchall() or []
+            except Exception as e:
+                logger.warning(f"API user orders: failed to fetch orders: {e}")
+                raw_orders = []
 
-                            items.append(
-                                {
-                                    "offer_id": item_row[0] if len(item_row) > 0 else None,
-                                    "store_id": item_row[1] if len(item_row) > 1 else None,
-                                    "title": item_row[2] if len(item_row) > 2 else "Mahsulot",
-                                    "price": item_row[3] if len(item_row) > 3 else 0,
-                                    "quantity": item_row[4] if len(item_row) > 4 else 1,
-                                    "store_name": item_row[5] if len(item_row) > 5 else "Do'kon",
-                                    "photo_url": photo_url,
-                                }
-                            )
+            import json
 
-                    order_dict = {
+            for r in raw_orders:
+                if not hasattr(r, "get"):
+                    continue
+
+                order_id = r.get("order_id")
+                if not order_id:
+                    continue
+
+                order_type = r.get("order_type") or ("delivery" if r.get("delivery_address") else "pickup")
+                order_status = r.get("order_status") or "pending"
+
+                payment_method = r.get("payment_method") or "cash"
+                payment_status = r.get("payment_status")
+
+                is_cart = int(r.get("is_cart_order") or 0) == 1
+                cart_items_json = r.get("cart_items")
+
+                items: list[dict[str, Any]] = []
+                items_total = 0
+                qty_total = 0
+
+                if is_cart and cart_items_json:
+                    try:
+                        cart_items = (
+                            json.loads(cart_items_json)
+                            if isinstance(cart_items_json, str)
+                            else cart_items_json
+                        )
+                    except Exception:
+                        cart_items = []
+
+                    for it in cart_items or []:
+                        title = it.get("title") or "Товар"
+                        qty = int(it.get("quantity") or 1)
+                        price = int(it.get("price") or 0)
+                        items_total += price * qty
+                        qty_total += qty
+                        items.append(
+                            {
+                                "offer_id": it.get("offer_id"),
+                                "store_id": r.get("store_id"),
+                                "offer_title": title,
+                                "title": title,
+                                "price": price,
+                                "quantity": qty,
+                                "store_name": r.get("store_name"),
+                                "photo": None,
+                            }
+                        )
+                else:
+                    qty = int(r.get("quantity") or 1)
+                    price = int(r.get("offer_price") or 0)
+                    title = r.get("offer_title") or "Товар"
+                    photo = r.get("offer_photo") or r.get("offer_photo_id")
+                    items_total = price * qty
+                    qty_total = qty
+                    items.append(
+                        {
+                            "offer_id": r.get("offer_id"),
+                            "store_id": r.get("store_id"),
+                            "offer_title": title,
+                            "title": title,
+                            "price": price,
+                            "quantity": qty,
+                            "store_name": r.get("store_name"),
+                            "photo": photo,
+                        }
+                    )
+
+                total_price = int(r.get("total_price") or 0)
+                delivery_fee = 0
+                if order_type == "delivery":
+                    delivery_fee = max(0, total_price - items_total)
+
+                orders.append(
+                    {
                         "id": order_id,
                         "order_id": order_id,
-                        "user_id": order_row[1] if len(order_row) > 1 else None,
-                        "status": order_row[2] if len(order_row) > 2 else None,
-                        "order_type": order_row[3] if len(order_row) > 3 else None,
-                        "payment_method": order_row[4] if len(order_row) > 4 else None,
-                        "delivery_address": order_row[5] if len(order_row) > 5 else None,
-                        "phone": order_row[6] if len(order_row) > 6 else None,
-                        "total_price": order_row[7] if len(order_row) > 7 else 0,
-                        "created_at": str(order_row[8])
-                        if len(order_row) > 8 and order_row[8]
-                        else None,
+                        "booking_id": order_id,  # legacy field used by UI
+                        "status": order_status,
+                        "order_status": order_status,
+                        "order_type": order_type,
+                        "pickup_code": r.get("pickup_code"),
+                        "booking_code": r.get("pickup_code"),
+                        "payment_method": payment_method,
+                        "payment_status": payment_status,
+                        "payment_proof_photo_id": r.get("payment_proof_photo_id"),
+                        "delivery_address": r.get("delivery_address"),
+                        "delivery_fee": delivery_fee,
+                        "total_price": total_price,
+                        "quantity": qty_total,
+                        "created_at": str(r.get("created_at") or ""),
+                        "updated_at": str(r.get("updated_at") or "") if r.get("updated_at") else None,
+                        "store_id": r.get("store_id"),
+                        "store_name": r.get("store_name"),
+                        "store_address": r.get("store_address"),
+                        "store_phone": r.get("store_phone"),
                         "items": items,
                     }
-                    delivery_orders.append(order_dict)
+                )
 
             # Get bookings (old system)
             bookings = []
@@ -985,12 +1044,478 @@ async def create_webhook_app(
                                 booking[key] = value
                         bookings.append(booking)
 
-            return add_cors_headers(
-                web.json_response({"bookings": bookings, "orders": delivery_orders})
-            )
+            return add_cors_headers(web.json_response({"bookings": bookings, "orders": orders}))
 
         except Exception as e:
             logger.error(f"API user orders error: {e}")
+            return add_cors_headers(web.json_response({"error": str(e)}, status=500))
+
+    async def api_order_status(request: web.Request) -> web.Response:
+        """GET /api/v1/orders/{order_id}/status - Order tracking status payload."""
+        try:
+            authenticated_user_id = _get_authenticated_user_id(request)
+            if not authenticated_user_id:
+                return add_cors_headers(
+                    web.json_response({"error": "Authentication required"}, status=401)
+                )
+
+            order_id_str = request.match_info.get("order_id")
+            if not order_id_str:
+                return add_cors_headers(web.json_response({"error": "order_id required"}, status=400))
+
+            order_id = int(order_id_str)
+
+            order = db.get_order(order_id) if hasattr(db, "get_order") else None
+            if not order and hasattr(db, "get_booking"):
+                booking = db.get_booking(order_id)
+                if booking:
+                    if int(booking.get("user_id") or 0) != int(authenticated_user_id):
+                        return add_cors_headers(
+                            web.json_response({"error": "Access denied"}, status=403)
+                        )
+
+                    from urllib.parse import quote
+
+                    status = booking.get("status") or "pending"
+                    status = "preparing" if status == "confirmed" else status
+                    booking_code = booking.get("booking_code") or ""
+                    quantity = int(booking.get("quantity") or 1)
+
+                    offer = (
+                        db.get_offer(int(booking.get("offer_id")))
+                        if booking.get("offer_id") and hasattr(db, "get_offer")
+                        else None
+                    )
+                    offer_title = get_offer_value(offer, "title", "Товар") if offer else "Товар"
+                    price = int(get_offer_value(offer, "discount_price", 0) or 0) if offer else 0
+                    total_price = price * quantity
+                    photo_id = (
+                        get_offer_value(offer, "photo") or get_offer_value(offer, "photo_id")
+                        if offer
+                        else None
+                    )
+                    offer_photo = (
+                        f"/api/v1/photo/{quote(str(photo_id), safe='')}" if photo_id else None
+                    )
+
+                    store_id = int(booking.get("store_id") or get_offer_value(offer, "store_id", 0) or 0)
+                    store = db.get_store(store_id) if store_id and hasattr(db, "get_store") else None
+
+                    qr_code = None
+                    if booking_code and status in ("preparing", "confirmed", "ready"):
+                        try:
+                            from app.api.orders import generate_qr_code
+
+                            qr_code = generate_qr_code(booking_code)
+                        except Exception:
+                            qr_code = None
+
+                    return add_cors_headers(
+                        web.json_response(
+                            {
+                                "booking_id": int(order_id),
+                                "booking_code": booking_code or str(order_id),
+                                "status": status,
+                                "created_at": str(booking.get("created_at") or ""),
+                                "updated_at": None,
+                                "offer_title": offer_title,
+                                "offer_photo": offer_photo,
+                                "quantity": quantity,
+                                "total_price": float(total_price),
+                                "store_id": store_id,
+                                "store_name": get_offer_value(store, "name", "Магазин") if store else "Магазин",
+                                "store_address": get_offer_value(store, "address") if store else None,
+                                "store_phone": get_offer_value(store, "phone") if store else None,
+                                "pickup_time": str(booking.get("pickup_time")) if booking.get("pickup_time") else None,
+                                "pickup_address": get_offer_value(store, "address") if store else None,
+                                "delivery_address": None,
+                                "delivery_cost": None,
+                                "qr_code": qr_code,
+                            }
+                        )
+                    )
+
+            if not order:
+                return add_cors_headers(web.json_response({"error": "Order not found"}, status=404))
+
+            order_dict = dict(order) if not isinstance(order, dict) else order
+            if int(order_dict.get("user_id") or 0) != int(authenticated_user_id):
+                return add_cors_headers(web.json_response({"error": "Access denied"}, status=403))
+
+            order_status = order_dict.get("order_status") or "pending"
+            order_type = order_dict.get("order_type") or (
+                "delivery" if order_dict.get("delivery_address") else "pickup"
+            )
+
+            store_id = int(order_dict.get("store_id") or 0)
+            store = db.get_store(store_id) if store_id and hasattr(db, "get_store") else None
+            store_name = get_offer_value(store, "name", "Магазин") if store else "Магазин"
+            store_address = get_offer_value(store, "address") if store else None
+            store_phone = get_offer_value(store, "phone") if store else None
+
+            is_cart = int(order_dict.get("is_cart_order") or 0) == 1
+            cart_items_json = order_dict.get("cart_items")
+
+            import json
+            from urllib.parse import quote
+
+            items_total = 0
+            qty_total = 0
+            offer_title = "Заказ"
+            offer_photo = None
+
+            if is_cart and cart_items_json:
+                try:
+                    cart_items = (
+                        json.loads(cart_items_json)
+                        if isinstance(cart_items_json, str)
+                        else cart_items_json
+                    )
+                except Exception:
+                    cart_items = []
+
+                if cart_items:
+                    offer_title = cart_items[0].get("title") or "Заказ"
+                    qty_total = sum(int(it.get("quantity") or 1) for it in cart_items)
+                    items_total = sum(
+                        int(it.get("price") or 0) * int(it.get("quantity") or 1) for it in cart_items
+                    )
+
+                    first_offer_id = cart_items[0].get("offer_id")
+                    if first_offer_id and hasattr(db, "get_offer"):
+                        offer = db.get_offer(int(first_offer_id))
+                        photo_id = (
+                            get_offer_value(offer, "photo")
+                            or get_offer_value(offer, "photo_id")
+                            if offer
+                            else None
+                        )
+                        if photo_id:
+                            offer_photo = f"/api/v1/photo/{quote(str(photo_id), safe='')}"
+            else:
+                offer_id = order_dict.get("offer_id")
+                qty_total = int(order_dict.get("quantity") or 1)
+                if offer_id and hasattr(db, "get_offer"):
+                    offer = db.get_offer(int(offer_id))
+                    offer_title = get_offer_value(offer, "title", "Товар") if offer else "Товар"
+                    price = int(get_offer_value(offer, "discount_price", 0) or 0) if offer else 0
+                    items_total = price * qty_total
+                    photo_id = (
+                        get_offer_value(offer, "photo") or get_offer_value(offer, "photo_id")
+                        if offer
+                        else None
+                    )
+                    if photo_id:
+                        offer_photo = f"/api/v1/photo/{quote(str(photo_id), safe='')}"
+
+            total_price = int(order_dict.get("total_price") or 0)
+            delivery_cost = None
+            if order_type == "delivery":
+                delivery_cost = float(max(0, total_price - items_total))
+
+            pickup_code = order_dict.get("pickup_code") or ""
+            qr_code = None
+            if order_type == "pickup" and pickup_code and order_status in ("preparing", "confirmed", "ready"):
+                try:
+                    from app.api.orders import generate_qr_code
+
+                    qr_code = generate_qr_code(pickup_code)
+                except Exception:
+                    qr_code = None
+
+            result = {
+                "booking_id": int(order_id),
+                "booking_code": pickup_code or str(order_id),
+                "status": order_status,
+                "created_at": str(order_dict.get("created_at") or ""),
+                "updated_at": str(order_dict.get("updated_at") or "")
+                if order_dict.get("updated_at")
+                else None,
+                "offer_title": offer_title,
+                "offer_photo": offer_photo,
+                "quantity": qty_total or 1,
+                "total_price": float(total_price),
+                "store_id": store_id,
+                "store_name": store_name,
+                "store_address": store_address,
+                "store_phone": store_phone,
+                "pickup_time": None,
+                "pickup_address": store_address if order_type == "pickup" else None,
+                "delivery_address": order_dict.get("delivery_address"),
+                "delivery_cost": delivery_cost,
+                "qr_code": qr_code,
+            }
+            return add_cors_headers(web.json_response(result))
+        except Exception as e:
+            logger.error(f"API order status error: {e}")
+            return add_cors_headers(web.json_response({"error": str(e)}, status=500))
+
+    async def api_order_timeline(request: web.Request) -> web.Response:
+        """GET /api/v1/orders/{order_id}/timeline - Order tracking timeline payload."""
+        try:
+            authenticated_user_id = _get_authenticated_user_id(request)
+            if not authenticated_user_id:
+                return add_cors_headers(
+                    web.json_response({"error": "Authentication required"}, status=401)
+                )
+
+            order_id_str = request.match_info.get("order_id")
+            if not order_id_str:
+                return add_cors_headers(web.json_response({"error": "order_id required"}, status=400))
+
+            order_id = int(order_id_str)
+            order = db.get_order(order_id) if hasattr(db, "get_order") else None
+            if not order and hasattr(db, "get_booking"):
+                booking = db.get_booking(order_id)
+                if booking:
+                    if int(booking.get("user_id") or 0) != int(authenticated_user_id):
+                        return add_cors_headers(
+                            web.json_response({"error": "Access denied"}, status=403)
+                        )
+
+                    status = booking.get("status") or "pending"
+                    status = "preparing" if status == "confirmed" else status
+                    created_at = str(booking.get("created_at") or "")
+                    updated_at = created_at
+
+                    timeline = [{"status": "pending", "timestamp": created_at, "message": "Заказ создан"}]
+                    if status in ("preparing", "confirmed", "ready", "completed"):
+                        timeline.append(
+                            {
+                                "status": "preparing",
+                                "timestamp": updated_at,
+                                "message": "Заказ принят и готовится",
+                            }
+                        )
+                    if status in ("ready", "completed"):
+                        timeline.append(
+                            {"status": "ready", "timestamp": updated_at, "message": "Заказ готов"}
+                        )
+                    if status == "completed":
+                        timeline.append(
+                            {
+                                "status": "completed",
+                                "timestamp": updated_at,
+                                "message": "Заказ завершен",
+                            }
+                        )
+                    if status == "cancelled":
+                        timeline.append(
+                            {
+                                "status": "cancelled",
+                                "timestamp": updated_at,
+                                "message": "Заказ отменен",
+                            }
+                        )
+                    if status == "rejected":
+                        timeline.append(
+                            {
+                                "status": "rejected",
+                                "timestamp": updated_at,
+                                "message": "Заказ отклонен",
+                            }
+                        )
+
+                    return add_cors_headers(
+                        web.json_response(
+                            {
+                                "booking_id": int(order_id),
+                                "current_status": status,
+                                "timeline": timeline,
+                                "estimated_ready_time": None,
+                            }
+                        )
+                    )
+
+            if not order:
+                return add_cors_headers(web.json_response({"error": "Order not found"}, status=404))
+
+            order_dict = dict(order) if not isinstance(order, dict) else order
+            if int(order_dict.get("user_id") or 0) != int(authenticated_user_id):
+                return add_cors_headers(web.json_response({"error": "Access denied"}, status=403))
+
+            status = order_dict.get("order_status") or "pending"
+            created_at = str(order_dict.get("created_at") or "")
+            updated_at = str(order_dict.get("updated_at") or created_at)
+
+            timeline = [{"status": "pending", "timestamp": created_at, "message": "Заказ создан"}]
+
+            if status in ("preparing", "confirmed", "ready", "delivering", "completed"):
+                timeline.append(
+                    {
+                        "status": "preparing",
+                        "timestamp": updated_at,
+                        "message": "Заказ принят и готовится",
+                    }
+                )
+
+            if status in ("ready", "delivering", "completed"):
+                timeline.append(
+                    {"status": "ready", "timestamp": updated_at, "message": "Заказ готов"}
+                )
+
+            if status in ("delivering", "completed"):
+                timeline.append(
+                    {
+                        "status": "delivering",
+                        "timestamp": updated_at,
+                        "message": "Заказ передан курьеру",
+                    }
+                )
+
+            if status == "completed":
+                timeline.append(
+                    {
+                        "status": "completed",
+                        "timestamp": updated_at,
+                        "message": "Заказ завершен",
+                    }
+                )
+
+            if status == "cancelled":
+                timeline.append(
+                    {
+                        "status": "cancelled",
+                        "timestamp": updated_at,
+                        "message": "Заказ отменен",
+                    }
+                )
+
+            if status == "rejected":
+                timeline.append(
+                    {
+                        "status": "rejected",
+                        "timestamp": updated_at,
+                        "message": "Заказ отклонен",
+                    }
+                )
+
+            estimated_ready = None
+            if status in ("preparing", "confirmed"):
+                try:
+                    from datetime import datetime, timedelta
+
+                    updated_dt = order_dict.get("updated_at")
+                    if hasattr(updated_dt, "isoformat"):
+                        confirmed_time = updated_dt
+                    else:
+                        confirmed_time = datetime.fromisoformat(str(updated_at).replace("Z", "+00:00"))
+
+                    estimated_ready_dt = confirmed_time + timedelta(minutes=25)
+                    now = datetime.now(confirmed_time.tzinfo) if confirmed_time.tzinfo else datetime.now()
+                    if estimated_ready_dt > now:
+                        minutes_left = int((estimated_ready_dt - now).total_seconds() / 60)
+                        estimated_ready = f"через {minutes_left} мин" if minutes_left > 0 else "скоро готов"
+                    else:
+                        estimated_ready = "скоро готов"
+                except Exception:
+                    estimated_ready = "через 20-30 мин"
+
+            return add_cors_headers(
+                web.json_response(
+                    {
+                        "booking_id": int(order_id),
+                        "current_status": status,
+                        "timeline": timeline,
+                        "estimated_ready_time": estimated_ready,
+                    }
+                )
+            )
+        except Exception as e:
+            logger.error(f"API order timeline error: {e}")
+            return add_cors_headers(web.json_response({"error": str(e)}, status=500))
+
+    async def api_order_qr(request: web.Request) -> web.Response:
+        """GET /api/v1/orders/{order_id}/qr - Standalone QR endpoint."""
+        try:
+            authenticated_user_id = _get_authenticated_user_id(request)
+            if not authenticated_user_id:
+                return add_cors_headers(
+                    web.json_response({"error": "Authentication required"}, status=401)
+                )
+
+            order_id_str = request.match_info.get("order_id")
+            if not order_id_str:
+                return add_cors_headers(web.json_response({"error": "order_id required"}, status=400))
+
+            order_id = int(order_id_str)
+            order = db.get_order(order_id) if hasattr(db, "get_order") else None
+            if not order and hasattr(db, "get_booking"):
+                booking = db.get_booking(order_id)
+                if booking:
+                    if int(booking.get("user_id") or 0) != int(authenticated_user_id):
+                        return add_cors_headers(
+                            web.json_response({"error": "Access denied"}, status=403)
+                        )
+
+                    status = booking.get("status") or "pending"
+                    status = "preparing" if status == "confirmed" else status
+                    booking_code = booking.get("booking_code") or ""
+
+                    if status not in ("preparing", "confirmed", "ready"):
+                        return add_cors_headers(
+                            web.json_response({"error": "QR not available for this status"}, status=400)
+                        )
+                    if not booking_code:
+                        return add_cors_headers(
+                            web.json_response({"error": "booking_code missing"}, status=400)
+                        )
+
+                    from app.api.orders import generate_qr_code
+
+                    qr_code = generate_qr_code(booking_code)
+                    return add_cors_headers(
+                        web.json_response(
+                            {
+                                "booking_id": int(order_id),
+                                "booking_code": booking_code,
+                                "qr_code": qr_code,
+                                "message": "Покажите этот QR код в магазине",
+                            }
+                        )
+                    )
+
+            if not order:
+                return add_cors_headers(web.json_response({"error": "Order not found"}, status=404))
+
+            order_dict = dict(order) if not isinstance(order, dict) else order
+            if int(order_dict.get("user_id") or 0) != int(authenticated_user_id):
+                return add_cors_headers(web.json_response({"error": "Access denied"}, status=403))
+
+            status = order_dict.get("order_status") or "pending"
+            pickup_code = order_dict.get("pickup_code") or ""
+            order_type = order_dict.get("order_type") or (
+                "delivery" if order_dict.get("delivery_address") else "pickup"
+            )
+
+            if order_type != "pickup":
+                return add_cors_headers(
+                    web.json_response({"error": "QR is only available for pickup orders"}, status=400)
+                )
+
+            if status not in ("preparing", "confirmed", "ready"):
+                return add_cors_headers(
+                    web.json_response({"error": "QR not available for this status"}, status=400)
+                )
+
+            if not pickup_code:
+                return add_cors_headers(web.json_response({"error": "pickup_code missing"}, status=400))
+
+            from app.api.orders import generate_qr_code
+
+            qr_code = generate_qr_code(pickup_code)
+            return add_cors_headers(
+                web.json_response(
+                    {
+                        "booking_id": int(order_id),
+                        "booking_code": pickup_code,
+                        "qr_code": qr_code,
+                        "message": "Покажите этот QR код в магазине",
+                    }
+                )
+            )
+        except Exception as e:
+            logger.error(f"API order qr error: {e}")
             return add_cors_headers(web.json_response({"error": str(e)}, status=500))
 
     async def api_get_photo(request: web.Request) -> web.Response:
@@ -1217,13 +1742,9 @@ async def create_webhook_app(
 
                             # Persist payment proof in DB for audit trail and later access
                             if hasattr(db, "update_payment_status"):
-                                db.update_payment_status(order_id, "pending", file_id)
+                                db.update_payment_status(order_id, "proof_submitted", file_id)
                             elif hasattr(db, "update_order_payment_proof"):
                                 db.update_order_payment_proof(order_id, file_id)
-
-                            # Update order status to awaiting_admin_confirmation
-                            if hasattr(db, "update_order_status"):
-                                db.update_order_status(order_id, "awaiting_admin_confirmation")
 
                             return add_cors_headers(
                                 web.json_response(
@@ -1681,6 +2202,12 @@ async def create_webhook_app(
     app.router.add_options("/api/v1/orders", cors_preflight)
     app.router.add_post("/api/v1/orders", api_create_order)
     app.router.add_get("/api/v1/orders", api_user_orders)
+    app.router.add_options("/api/v1/orders/{order_id}/status", cors_preflight)
+    app.router.add_get("/api/v1/orders/{order_id}/status", api_order_status)
+    app.router.add_options("/api/v1/orders/{order_id}/timeline", cors_preflight)
+    app.router.add_get("/api/v1/orders/{order_id}/timeline", api_order_timeline)
+    app.router.add_options("/api/v1/orders/{order_id}/qr", cors_preflight)
+    app.router.add_get("/api/v1/orders/{order_id}/qr", api_order_qr)
     # Alias for compatibility
     app.router.add_options("/api/v1/user/bookings", cors_preflight)
     app.router.add_get("/api/v1/user/bookings", api_user_orders)

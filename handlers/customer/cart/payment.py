@@ -314,7 +314,7 @@ def register(router: Router) -> None:
         photo_id = message.photo[-1].file_id
 
         # Update payment status with photo
-        common.db.update_payment_status(order_id, "pending", photo_id)
+        common.db.update_payment_status(order_id, "proof_submitted", photo_id)
 
         await state.clear()
 

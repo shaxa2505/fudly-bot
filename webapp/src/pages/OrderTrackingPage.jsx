@@ -8,9 +8,11 @@ import './OrderTrackingPage.css';
 
 const STATUS_STEPS = {
   'pending': { order: 1, label: { ru: 'Создан', uz: 'Yaratildi' } },
-  'confirmed': { order: 2, label: { ru: 'Подтвержден', uz: 'Tasdiqlandi' } },
+  'confirmed': { order: 2, label: { ru: 'Принят', uz: 'Qabul qilindi' } }, // legacy
+  'preparing': { order: 2, label: { ru: 'Принят', uz: 'Qabul qilindi' } },
   'ready': { order: 3, label: { ru: 'Готов', uz: 'Tayyor' } },
-  'completed': { order: 4, label: { ru: 'Завершен', uz: 'Yakunlandi' } },
+  'delivering': { order: 4, label: { ru: 'В пути', uz: 'Yo\'lda' } },
+  'completed': { order: 5, label: { ru: 'Завершен', uz: 'Yakunlandi' } },
   'cancelled': { order: -1, label: { ru: 'Отменен', uz: 'Bekor qilindi' } }
 };
 
@@ -90,8 +92,10 @@ function OrderTrackingPage({ user }) {
   const getStatusColor = (status) => {
     switch (status) {
       case 'pending': return '#FFA500';
-      case 'confirmed': return '#4CAF50';
+      case 'confirmed':
+      case 'preparing': return '#4CAF50';
       case 'ready': return '#2196F3';
+      case 'delivering': return '#2196F3';
       case 'completed': return '#9E9E9E';
       case 'cancelled': return '#F44336';
       default: return '#9E9E9E';
@@ -101,8 +105,10 @@ function OrderTrackingPage({ user }) {
   const getStatusIcon = (status) => {
     switch (status) {
       case 'pending': return '⏳';
-      case 'confirmed': return '✅';
+      case 'confirmed':
+      case 'preparing': return '✅';
       case 'ready': return '🎁';
+      case 'delivering': return '🚚';
       case 'completed': return '✓';
       case 'cancelled': return '❌';
       default: return '•';
@@ -136,7 +142,7 @@ function OrderTrackingPage({ user }) {
 
   const currentStatusOrder = STATUS_STEPS[order.status]?.order || 0;
   const isCancelled = order.status === 'cancelled';
-  const canShowQR = ['confirmed', 'ready'].includes(order.status) && order.qr_code;
+  const canShowQR = ['confirmed', 'preparing', 'ready'].includes(order.status) && order.qr_code;
 
   return (
     <div className="order-tracking-page">
@@ -153,7 +159,7 @@ function OrderTrackingPage({ user }) {
           {getStatusIcon(order.status)} {STATUS_STEPS[order.status]?.label[lang] || order.status}
         </div>
 
-        {timeline?.estimated_ready_time && order.status === 'confirmed' && (
+        {timeline?.estimated_ready_time && ['confirmed', 'preparing'].includes(order.status) && (
           <div className="estimated-time">
             ⏱️ {t('Будет готов', 'Tayyor bo\'ladi')}: {timeline.estimated_ready_time}
           </div>

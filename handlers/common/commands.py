@@ -41,87 +41,157 @@ router = Router(name="commands")
 
 
 async def handle_qr_pickup(message: types.Message, db: DatabaseProtocol, booking_code: str):
-    """Handle QR code scan for pickup confirmation."""
-    logger.info(f"🔗 handle_qr_pickup called: booking_code='{booking_code}'")
+    """Handle QR/code scan for pickup confirmation (orders + legacy bookings)."""
+    logger.info(f"🔗 handle_qr_pickup called: code='{booking_code}'")
+
     if not message.from_user:
         return
+
+    import json
+
     user_id = message.from_user.id
     lang = db.get_user_language(user_id)
     logger.info(f"🔗 handle_qr_pickup: user={user_id}, lang={lang}")
 
-    # Find booking by code
-    booking = db.get_booking_by_code(booking_code)
-    logger.info(f"🔗 handle_qr_pickup: get_booking_by_code result: {booking}")
+    code_input = (booking_code or "").strip().upper()
+    if code_input.startswith("FUDLY-"):
+        code_input = code_input.replace("FUDLY-", "")
 
-    if not booking:
-        # Try numeric ID
+    entity_type: str | None = None
+    entity_id: int | None = None
+    status: str | None = None
+    store_id: int | None = None
+    customer_id: int | None = None
+    pickup_code: str | None = None
+    store_name: str = "Магазин"
+    customer_name: str = "Клиент"
+    customer_phone: str = ""
+
+    offer_title: str = "Товар"
+    quantity: int = 1
+    items_lines: str = ""
+
+    # Prefer unified pickup orders by pickup_code (v24+)
+    order = None
+    if hasattr(db, "get_order_by_pickup_code"):
         try:
-            booking_id = int(booking_code)
-            booking = db.get_booking(booking_id)
-        except ValueError:
-            pass
+            order = db.get_order_by_pickup_code(code_input)
+        except Exception:
+            order = None
 
-    if not booking:
-        await message.answer("❌ Бронирование не найдено" if lang == "ru" else "❌ Bron topilmadi")
+    if not order:
+        try:
+            numeric_id = int(code_input)
+            order = db.get_order(numeric_id) if hasattr(db, "get_order") else None
+        except Exception:
+            order = None
+
+    if isinstance(order, dict) and (order.get("order_type") or "pickup") == "pickup":
+        entity_type = "order"
+        entity_id = order.get("order_id")
+        status = order.get("order_status")
+        store_id = order.get("store_id")
+        customer_id = order.get("user_id")
+        pickup_code = order.get("pickup_code") or code_input
+
+        if int(order.get("is_cart_order") or 0) == 1 and order.get("cart_items"):
+            try:
+                cart_items = (
+                    json.loads(order["cart_items"])
+                    if isinstance(order["cart_items"], str)
+                    else order["cart_items"]
+                )
+            except Exception:
+                cart_items = []
+
+            if cart_items:
+                offer_title = "Корзина"
+                items_lines = "\n".join(
+                    [f"• {it.get('title', 'Товар')} × {it.get('quantity', 1)}" for it in cart_items]
+                )
+                quantity = len(cart_items)
+        else:
+            offer_id = order.get("offer_id")
+            quantity = int(order.get("quantity") or 1)
+            if offer_id:
+                offer = db.get_offer(offer_id)
+                if isinstance(offer, dict):
+                    offer_title = offer.get("title", offer_title)
+                elif offer and len(offer) > 2:
+                    offer_title = offer[2] if len(offer) > 2 else offer_title
+
+    # Fallback: legacy bookings by code/id
+    booking = None
+    if not entity_type:
+        booking = db.get_booking_by_code(code_input) if hasattr(db, "get_booking_by_code") else None
+        if not booking:
+            try:
+                booking_id = int(code_input)
+                booking = db.get_booking(booking_id) if hasattr(db, "get_booking") else None
+            except Exception:
+                booking = None
+
+        if not booking:
+            await message.answer(
+                "❌ Бронирование/заказ не найдено" if lang == "ru" else "❌ Buyurtma topilmadi"
+            )
+            return
+
+        entity_type = "booking"
+        if isinstance(booking, dict):
+            entity_id = booking.get("booking_id")
+            status = booking.get("status")
+            offer_id = booking.get("offer_id")
+            customer_id = booking.get("user_id")
+            quantity = int(booking.get("quantity", 1) or 1)
+            pickup_code = booking.get("code") or code_input
+        else:
+            entity_id = booking[0] if len(booking) > 0 else None
+            status = booking[3] if len(booking) > 3 else None
+            offer_id = booking[1] if len(booking) > 1 else None
+            customer_id = booking[2] if len(booking) > 2 else None
+            quantity = int(booking[4] if len(booking) > 4 else 1)
+            pickup_code = booking[9] if len(booking) > 9 else code_input
+
+        offer = db.get_offer(offer_id) if offer_id else None
+        if isinstance(offer, dict):
+            store_id = offer.get("store_id")
+            offer_title = offer.get("title", offer_title)
+        elif offer and len(offer) > 2:
+            store_id = offer[1]
+            offer_title = offer[2] if len(offer) > 2 else offer_title
+
+    if not entity_id or not store_id:
+        await message.answer("❌ Неверные данные заказа" if lang == "ru" else "❌ Noto'g'ri buyurtma")
         return
-
-    # Get booking details
-    if isinstance(booking, dict):
-        booking_id = booking.get("booking_id")
-        status = booking.get("status")
-        offer_id = booking.get("offer_id")
-        customer_id = booking.get("user_id")
-        quantity = booking.get("quantity", 1)
-        code = booking.get("code", "")
-    else:
-        booking_id = booking[0] if len(booking) > 0 else None
-        status = booking[3] if len(booking) > 3 else None
-        offer_id = booking[1] if len(booking) > 1 else None
-        customer_id = booking[2] if len(booking) > 2 else None
-        quantity = booking[4] if len(booking) > 4 else 1
-        code = booking[9] if len(booking) > 9 else ""
-
-    # Check if user is the store owner
-    offer = db.get_offer(offer_id) if offer_id else None
-    store_id = None
-    offer_title = "Товар"
-    if isinstance(offer, dict):
-        store_id = offer.get("store_id")
-        offer_title = offer.get("title", "Товар")
-    elif offer and len(offer) > 1:
-        store_id = offer[1]
-        offer_title = offer[2] if len(offer) > 2 else "Товар"
 
     store = db.get_store(store_id) if store_id else None
     owner_id = None
-    store_name = "Магазин"
     if isinstance(store, dict):
         owner_id = store.get("owner_id")
-        store_name = store.get("name", "Магазин")
-    elif store and len(store) > 1:
+        store_name = store.get("name", store_name)
+    elif store and len(store) > 2:
         owner_id = store[1]
-        store_name = store[2] if len(store) > 2 else "Магазин"
+        store_name = store[2] if len(store) > 2 else store_name
 
-    # Get customer info
     customer = db.get_user_model(customer_id) if customer_id else None
-    customer_name = "Клиент"
-    customer_phone = ""
     if customer:
-        customer_name = customer.name or "Клиент"
-        customer_phone = customer.phone or ""
+        customer_name = getattr(customer, "name", None) or getattr(customer, "first_name", None) or customer_name
+        customer_phone = getattr(customer, "phone", None) or ""
 
-    # Check permissions
     is_owner = user_id == owner_id
     is_customer = user_id == customer_id
 
-    # Status emoji and text
     status_info = {
         "pending": ("⏳", "Ожидает подтверждения" if lang == "ru" else "Tasdiqlash kutilmoqda"),
         "confirmed": ("✅", "Подтверждён" if lang == "ru" else "Tasdiqlangan"),
+        "preparing": ("👨‍🍳", "Готовится" if lang == "ru" else "Tayyorlanmoqda"),
+        "ready": ("📦", "Готово" if lang == "ru" else "Tayyor"),
         "completed": ("🎉", "Выдан" if lang == "ru" else "Berilgan"),
+        "rejected": ("❌", "Отклонён" if lang == "ru" else "Rad etildi"),
         "cancelled": ("❌", "Отменён" if lang == "ru" else "Bekor qilingan"),
     }
-    status_emoji, status_text = status_info.get(status, ("📦", status))
+    status_emoji, status_text = status_info.get(status, ("📦", str(status)))
 
     if status == "completed":
         await message.answer(
@@ -129,80 +199,86 @@ async def handle_qr_pickup(message: types.Message, db: DatabaseProtocol, booking
         )
         return
 
-    if status == "cancelled":
+    if status in ("cancelled", "rejected"):
         await message.answer(
             f"❌ {'Этот заказ отменён' if lang == 'ru' else 'Bu buyurtma bekor qilingan'}"
         )
         return
 
+    label_ru = "Заказ" if entity_type == "order" else "Бронь"
+    label_uz = "Buyurtma" if entity_type == "order" else "Bron"
+
     if is_owner:
-        # Owner scanned - show order details and complete button
         kb = InlineKeyboardBuilder()
         kb.button(
             text="✅ Выдать заказ" if lang == "ru" else "✅ Buyurtmani berish",
-            callback_data=f"complete_booking_{booking_id}",
+            callback_data=f"complete_booking_{entity_id}",
         )
         kb.adjust(1)
 
         if lang == "ru":
             text = (
-                f"📦 <b>СКАНИРОВАНИЕ QR-КОДА</b>\n"
+                f"📦 <b>СКАНИРОВАНИЕ КОДА</b>\n"
                 f"━━━━━━━━━━━━━━━━━━\n\n"
-                f"🎫 Бронь: <b>#{booking_id}</b>\n"
-                f"📝 Код: <code>{code or booking_code}</code>\n"
+                f"📦 {label_ru}: <b>#{entity_id}</b>\n"
+                f"📝 Код: <code>{pickup_code or code_input}</code>\n"
                 f"{status_emoji} Статус: <b>{status_text}</b>\n\n"
                 f"📦 Товар: <b>{offer_title}</b>\n"
-                f"🔢 Количество: <b>{quantity} шт.</b>\n\n"
-                f"👤 Клиент: {customer_name}\n"
             )
+            if items_lines:
+                text += f"{items_lines}\n"
+            text += f"🔢 Количество: <b>{quantity}</b>\n\n"
+            text += f"👤 Клиент: {customer_name}\n"
             if customer_phone:
                 text += f"📱 Телефон: <code>{customer_phone}</code>\n"
             text += "\n━━━━━━━━━━━━━━━━━━\n"
             text += "👆 Нажмите кнопку для подтверждения выдачи"
         else:
             text = (
-                f"📦 <b>QR-KOD SKANERLASH</b>\n"
+                f"📦 <b>KOD SKANERLASH</b>\n"
                 f"━━━━━━━━━━━━━━━━━━\n\n"
-                f"🎫 Bron: <b>#{booking_id}</b>\n"
-                f"📝 Kod: <code>{code or booking_code}</code>\n"
+                f"📦 {label_uz}: <b>#{entity_id}</b>\n"
+                f"📝 Kod: <code>{pickup_code or code_input}</code>\n"
                 f"{status_emoji} Holat: <b>{status_text}</b>\n\n"
                 f"📦 Mahsulot: <b>{offer_title}</b>\n"
-                f"🔢 Miqdor: <b>{quantity} dona</b>\n\n"
-                f"👤 Mijoz: {customer_name}\n"
             )
+            if items_lines:
+                text += f"{items_lines}\n"
+            text += f"🔢 Miqdor: <b>{quantity}</b>\n\n"
+            text += f"👤 Mijoz: {customer_name}\n"
             if customer_phone:
                 text += f"📱 Telefon: <code>{customer_phone}</code>\n"
             text += "\n━━━━━━━━━━━━━━━━━━\n"
             text += "👆 Berilganini tasdiqlash uchun tugmani bosing"
 
         await message.answer(text, parse_mode="HTML", reply_markup=kb.as_markup())
+        return
 
-    elif is_customer:
-        # Customer scanned their own QR - just show status
+    if is_customer:
         if lang == "ru":
             text = (
-                f"📦 <b>Ваша бронь #{booking_id}</b>\n\n"
+                f"📦 <b>Ваш {label_ru.lower()} #{entity_id}</b>\n\n"
                 f"{status_emoji} Статус: <b>{status_text}</b>\n"
                 f"📦 Товар: {offer_title}\n"
                 f"🏪 Магазин: {store_name}\n\n"
-                f"💡 Покажите этот QR-код продавцу для получения заказа."
+                f"💡 Покажите этот код продавцу для получения заказа."
             )
         else:
             text = (
-                f"📦 <b>Sizning broningiz #{booking_id}</b>\n\n"
+                f"📦 <b>Sizning {label_uz.lower()} #{entity_id}</b>\n\n"
                 f"{status_emoji} Holat: <b>{status_text}</b>\n"
                 f"📦 Mahsulot: {offer_title}\n"
                 f"🏪 Do'kon: {store_name}\n\n"
-                f"💡 Buyurtmani olish uchun bu QR kodni sotuvchiga ko'rsating."
+                f"💡 Kodni sotuvchiga ko'rsating."
             )
         await message.answer(text, parse_mode="HTML")
-    else:
-        # Someone else scanned
-        await message.answer(
-            "⚠️ Вы не являетесь владельцем этого заказа или магазина"
-            if lang == "ru"
-            else "⚠️ Siz bu buyurtma yoki do'kon egasi emassiz"
-        )
+        return
+
+    await message.answer(
+        "⚠️ Вы не являетесь владельцем этого заказа или магазина"
+        if lang == "ru"
+        else "⚠️ Siz bu buyurtma yoki do'kon egasi emassiz"
+    )
 
 
 @router.message(F.text.in_([get_text("ru", "my_city"), get_text("uz", "my_city")]))

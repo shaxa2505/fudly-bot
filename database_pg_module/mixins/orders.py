@@ -20,6 +20,35 @@ except ImportError:
 class OrderMixin:
     """Mixin for order-related database operations."""
 
+    @staticmethod
+    def _normalize_payment_method(payment_method: str | None) -> str:
+        """Normalize payment_method to supported values.
+
+        Legacy code sometimes passes incorrect values (e.g. "pending").
+        """
+        if not payment_method:
+            return "cash"
+
+        method = str(payment_method).strip().lower()
+        if method == "pending":
+            return "card"
+
+        return method
+
+    @classmethod
+    def _initial_payment_status(cls, payment_method: str | None) -> str:
+        """Initial payment_status derived from payment_method."""
+        method = cls._normalize_payment_method(payment_method)
+
+        if method == "cash":
+            return "not_required"
+
+        if method in ("click", "payme"):
+            return "awaiting_payment"
+
+        # card / card_transfer / unknown
+        return "awaiting_proof"
+
     def create_order(
         self,
         user_id: int,
@@ -65,6 +94,9 @@ class OrderMixin:
             if order_type == "pickup":
                 pickup_code = "".join(random.choices(string.ascii_uppercase + string.digits, k=6))
 
+            payment_method_norm = self._normalize_payment_method(payment_method)
+            payment_status = self._initial_payment_status(payment_method_norm)
+
             try:
                 # Try with pickup_code and order_type columns
                 cursor.execute(
@@ -81,8 +113,8 @@ class OrderMixin:
                         quantity,
                         delivery_address,
                         total_amount,
-                        payment_method or "cash",
-                        "pending",
+                        payment_method_norm,
+                        payment_status,
                         "pending",
                         pickup_code,
                         order_type,
@@ -112,8 +144,8 @@ class OrderMixin:
                             quantity,
                             delivery_address,
                             total_amount,
-                            payment_method or "cash",
-                            "pending",
+                            payment_method_norm,
+                            payment_status,
                             "pending",
                             pickup_code,
                         ),
@@ -144,8 +176,8 @@ class OrderMixin:
                                 quantity,
                                 delivery_address,
                                 total_amount,
-                                payment_method or "cash",
-                                "pending",
+                                payment_method_norm,
+                                payment_status,
                                 "pending",
                             ),
                         )
@@ -186,6 +218,9 @@ class OrderMixin:
 
         # Group items by store for single notification per store
         stores_orders: dict[int, list[dict]] = {}
+
+        payment_method_norm = self._normalize_payment_method(payment_method)
+        payment_status = self._initial_payment_status(payment_method_norm)
 
         with self.get_connection() as conn:
             cursor = conn.cursor()
@@ -247,8 +282,8 @@ class OrderMixin:
                                 quantity,
                                 delivery_address,
                                 total_amount,
-                                payment_method,
-                                "pending",
+                                payment_method_norm,
+                                payment_status,
                                 "pending",
                                 pickup_code,
                                 order_type,
@@ -274,8 +309,8 @@ class OrderMixin:
                                     quantity,
                                     delivery_address,
                                     total_amount,
-                                    payment_method,
-                                    "pending",
+                                    payment_method_norm,
+                                    payment_status,
                                     "pending",
                                 ),
                             )
@@ -429,6 +464,26 @@ class OrderMixin:
             )
             return [dict(row) for row in cursor.fetchall()]
 
+    def get_order_by_pickup_code(self, pickup_code: str):
+        """Get pickup order by pickup_code (used for QR/code verification)."""
+        if not pickup_code:
+            return None
+
+        with self.get_connection() as conn:
+            cursor = conn.cursor(row_factory=dict_row)
+            cursor.execute(
+                """
+                SELECT *
+                FROM orders
+                WHERE pickup_code = %s
+                ORDER BY created_at DESC
+                LIMIT 1
+                """,
+                (pickup_code,),
+            )
+            row = cursor.fetchone()
+            return dict(row) if row else None
+
     def get_store_orders(self, store_id: int, status: str = None):
         """Get all orders for a store with customer and offer info."""
         with self.get_connection() as conn:
@@ -475,7 +530,7 @@ class OrderMixin:
         user_id: int,
         store_id: int,
         cart_items: list[dict[str, Any]],
-        delivery_address: str,
+        delivery_address: str | None = None,
         delivery_price: int = 0,
         payment_method: str = "cash",
     ):
@@ -565,6 +620,9 @@ class OrderMixin:
                 # Create order with cart_items
                 cart_items_json = json.dumps(cart_items, ensure_ascii=False)
 
+                payment_method_norm = self._normalize_payment_method(payment_method)
+                payment_status = self._initial_payment_status(payment_method_norm)
+
                 try:
                     cursor.execute(
                         """
@@ -573,7 +631,7 @@ class OrderMixin:
                             payment_method, payment_status, order_status, pickup_code,
                             order_type, cart_items, is_cart_order, quantity
                         )
-                        VALUES (%s, %s, %s, %s, %s, 'pending', 'pending', %s, %s, %s, 1, %s)
+                        VALUES (%s, %s, %s, %s, %s, %s, 'pending', %s, %s, %s, 1, %s)
                         RETURNING order_id
                         """,
                         (
@@ -581,7 +639,8 @@ class OrderMixin:
                             store_id,
                             delivery_address,
                             total_price,
-                            payment_method,
+                            payment_method_norm,
+                            payment_status,
                             pickup_code,
                             order_type,
                             cart_items_json,
@@ -599,7 +658,7 @@ class OrderMixin:
                             payment_method, payment_status, order_status, pickup_code,
                             cart_items, is_cart_order, quantity
                         )
-                        VALUES (%s, %s, %s, %s, %s, 'pending', 'pending', %s, %s, 1, %s)
+                        VALUES (%s, %s, %s, %s, %s, %s, 'pending', %s, %s, 1, %s)
                         RETURNING order_id
                         """,
                         (
@@ -607,7 +666,8 @@ class OrderMixin:
                             store_id,
                             delivery_address,
                             total_price,
-                            payment_method,
+                            payment_method_norm,
+                            payment_status,
                             pickup_code,
                             cart_items_json,
                             len(cart_items),

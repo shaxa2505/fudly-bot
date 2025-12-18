@@ -10,6 +10,8 @@ import qrcode
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
+from app.api.webapp.common import get_current_user
+
 router = APIRouter(prefix="/api/v1/orders", tags=["orders"])
 
 # Global database instance (set by api_server.py)
@@ -332,7 +334,11 @@ def format_booking_to_order_status(booking: Any, db) -> OrderStatus:
 
 
 @router.get("/{booking_id}/status", response_model=OrderStatus)
-async def get_order_status(booking_id: int, db=Depends(get_db)):
+async def get_order_status(
+    booking_id: int,
+    db=Depends(get_db),
+    user: dict = Depends(get_current_user),
+):
     """Get current order status with all details including QR code.
 
     Args:
@@ -347,6 +353,9 @@ async def get_order_status(booking_id: int, db=Depends(get_db)):
     # v24+: try unified orders table first
     order = db.get_order(booking_id)
     if order:
+        order_dict = dict(order) if not isinstance(order, dict) else order
+        if order_dict.get("user_id") != user.get("id"):
+            raise HTTPException(status_code=403, detail="Access denied")
         # Convert order to booking format for compatibility
         return format_booking_to_order_status(order, db)
     
@@ -357,6 +366,9 @@ async def get_order_status(booking_id: int, db=Depends(get_db)):
             (booking_id,)
         )
         if booking:
+            booking_dict = dict(booking[0]) if not isinstance(booking[0], dict) else booking[0]
+            if booking_dict.get("user_id") != user.get("id"):
+                raise HTTPException(status_code=403, detail="Access denied")
             return format_booking_to_order_status(booking[0], db)
     except:
         pass
@@ -365,7 +377,11 @@ async def get_order_status(booking_id: int, db=Depends(get_db)):
 
 
 @router.get("/{booking_id}/timeline", response_model=OrderTimeline)
-async def get_order_timeline(booking_id: int, db=Depends(get_db)):
+async def get_order_timeline(
+    booking_id: int,
+    db=Depends(get_db),
+    user: dict = Depends(get_current_user),
+):
     """Get order status timeline/history.
 
     Args:
@@ -395,6 +411,8 @@ async def get_order_timeline(booking_id: int, db=Depends(get_db)):
         raise HTTPException(status_code=404, detail="Заказ не найден")
 
     order_dict = dict(order) if not isinstance(order, dict) else order
+    if order_dict.get("user_id") != user.get("id"):
+        raise HTTPException(status_code=403, detail="Access denied")
     status = order_dict.get("order_status", order_dict.get("status", "pending"))
     created_at = str(order_dict.get("created_at", ""))
 
@@ -494,7 +512,11 @@ async def calculate_delivery(request: DeliveryCalculation, db=Depends(get_db)):
 
 
 @router.get("/{booking_id}/qr")
-async def get_order_qr_code(booking_id: int, db=Depends(get_db)):
+async def get_order_qr_code(
+    booking_id: int,
+    db=Depends(get_db),
+    user: dict = Depends(get_current_user),
+):
     """Get QR code for order pickup (standalone endpoint).
 
     Args:
@@ -525,6 +547,8 @@ async def get_order_qr_code(booking_id: int, db=Depends(get_db)):
         raise HTTPException(status_code=404, detail="Заказ не найден")
 
     order_dict = dict(order) if not isinstance(order, dict) else order
+    if order_dict.get("user_id") != user.get("id"):
+        raise HTTPException(status_code=403, detail="Access denied")
     status = order_dict.get("order_status", order_dict.get("status", "pending"))
     pickup_code = order_dict.get("pickup_code", order_dict.get("booking_code", ""))
 

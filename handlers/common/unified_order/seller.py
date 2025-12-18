@@ -181,7 +181,7 @@ async def unified_confirm_handler(callback: types.CallbackQuery) -> None:
             if entity_type == "order":
                 db_instance.update_order_status(entity_id, OrderStatus.PREPARING)
             else:
-                db_instance.update_booking_status(entity_id, "confirmed")
+                db_instance.update_booking_status(entity_id, OrderStatus.PREPARING)
             success = True
         except Exception as e:  # pragma: no cover - defensive logging
             logger.error(f"Failed to confirm: {e}")
@@ -1017,20 +1017,28 @@ async def complete_booking_handler(callback: types.CallbackQuery) -> None:
     lang = db_instance.get_user_language(partner_id)
 
     try:
-        booking_id = int(callback.data.split("_")[-1])
+        entity_id = int(callback.data.split("_")[-1])
     except ValueError:
         await callback.answer("❌", show_alert=True)
         return
 
-    booking = db_instance.get_booking(booking_id)
-    if not booking:
-        msg = "Bron topilmadi" if lang == "uz" else "Бронь не найдена"
+    entity_type = "booking"
+    entity = db_instance.get_booking(entity_id)
+
+    # v24+: pickup orders live in `orders` table (use pickup_code for verification)
+    order = db_instance.get_order(entity_id)
+    if order and _get_entity_field(order, "order_type") == "pickup":
+        entity_type = "order"
+        entity = order
+
+    if not entity:
+        msg = "Bron/Buyurtma topilmadi" if lang == "uz" else "Бронь/заказ не найден"
         await callback.answer(f"❌ {msg}", show_alert=True)
         return
 
-    store_id = _get_entity_field(booking, "store_id")
-    if not store_id:
-        offer_id = _get_entity_field(booking, "offer_id")
+    store_id = _get_entity_field(entity, "store_id")
+    if not store_id and entity_type == "booking":
+        offer_id = _get_entity_field(entity, "offer_id")
         if offer_id:
             offer = db_instance.get_offer(offer_id)
             if offer:
@@ -1044,13 +1052,16 @@ async def complete_booking_handler(callback: types.CallbackQuery) -> None:
         return
 
     if order_service:
-        success = await order_service.complete_order(booking_id, "booking")
+        success = await order_service.complete_order(entity_id, entity_type)  # type: ignore[arg-type]
     else:
         try:
-            db_instance.complete_booking(booking_id)
+            if entity_type == "order":
+                db_instance.update_order_status(entity_id, OrderStatus.COMPLETED)
+            else:
+                db_instance.complete_booking(entity_id)
             success = True
         except Exception as e:  # pragma: no cover
-            logger.error(f"Failed to complete booking: {e}")
+            logger.error(f"Failed to complete {entity_type}: {e}")
             success = False
 
     if not success:
@@ -1068,9 +1079,17 @@ async def complete_booking_handler(callback: types.CallbackQuery) -> None:
         pass
 
     if lang == "uz":
-        text = f"✅ Bron #{booking_id} yakunlandi!"
+        text = (
+            f"✅ Buyurtma #{entity_id} yakunlandi!"
+            if entity_type == "order"
+            else f"✅ Bron #{entity_id} yakunlandi!"
+        )
     else:
-        text = f"✅ Бронь #{booking_id} завершена!"
+        text = (
+            f"✅ Заказ #{entity_id} выдан!"
+            if entity_type == "order"
+            else f"✅ Бронь #{entity_id} завершена!"
+        )
 
     try:
         if callback.message:

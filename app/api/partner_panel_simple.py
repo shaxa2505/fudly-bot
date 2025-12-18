@@ -17,7 +17,7 @@ from slowapi import Limiter
 from slowapi.util import get_remote_address
 
 from app.services.stats import PartnerTotals, Period, get_partner_stats
-from app.services.unified_order_service import get_unified_order_service
+from app.services.unified_order_service import PaymentStatus, get_unified_order_service
 from app.api.websocket_manager import get_connection_manager
 from database_protocol import DatabaseProtocol
 
@@ -892,6 +892,9 @@ async def list_orders(authorization: str = Header(None), status: Optional[str] =
             total_price = order.get("total_price", 0)
             delivery_address = order.get("delivery_address")
             created_at = order.get("created_at")
+            payment_method = order.get("payment_method")
+            payment_status = order.get("payment_status")
+            payment_proof_photo_id = order.get("payment_proof_photo_id")
 
             # Customer info from JOIN
             first_name = order.get("first_name", "")
@@ -900,6 +903,14 @@ async def list_orders(authorization: str = Header(None), status: Optional[str] =
 
             # Offer info from JOIN
             offer_title = order.get("offer_title", "Unknown")
+
+            # Only show orders that are paid (or cash)
+            if not PaymentStatus.is_cleared(
+                payment_status,
+                payment_method=payment_method,
+                payment_proof_photo_id=payment_proof_photo_id,
+            ):
+                continue
         else:
             # Tuple format varies, try to extract what we can
             order_id = order[0]

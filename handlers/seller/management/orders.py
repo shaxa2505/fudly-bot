@@ -11,7 +11,7 @@ from aiogram import F, Router, types
 from aiogram.fsm.context import FSMContext
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
-from app.services.unified_order_service import get_unified_order_service
+from app.services.unified_order_service import PaymentStatus, get_unified_order_service
 from localization import get_text
 from logging_config import logger
 
@@ -54,7 +54,7 @@ def _format_order_line(item: Any, is_booking: bool, lang: str, idx: int) -> str:
         status = _get_field(item, "order_status") or (
             item[10] if isinstance(item, (list, tuple)) and len(item) > 10 else "pending"
         )
-        title = _get_field(item, "title") or "Товар"
+        title = _get_field(item, "offer_title") or _get_field(item, "title") or "Товар"
         quantity = _get_field(item, "quantity") or 1
 
         status_emoji = {
@@ -94,7 +94,7 @@ def _build_list_text(
 
     idx = 1
     for order in pickup_orders[:5]:
-        lines.append(_format_order_line(order, True, lang, idx))
+        lines.append(_format_order_line(order, False, lang, idx))
         idx += 1
 
     for order in delivery_orders[:5]:
@@ -188,9 +188,22 @@ def _get_all_orders(db, user_id: int) -> tuple[list, list]:
 
         # v24+: all orders in unified table
         orders = db.get_store_orders(store_id) or []
+
+        visible_orders = []
+        for order in orders:
+            payment_method = _get_field(order, "payment_method")
+            payment_status = _get_field(order, "payment_status")
+            payment_proof_photo_id = _get_field(order, "payment_proof_photo_id")
+
+            if PaymentStatus.is_cleared(
+                payment_status,
+                payment_method=payment_method,
+                payment_proof_photo_id=payment_proof_photo_id,
+            ):
+                visible_orders.append(order)
         
         # Split by order_type for display compatibility
-        for order in orders:
+        for order in visible_orders:
             order_type = order.get("order_type") if isinstance(order, dict) else None
             if order_type == "pickup":
                 pickup_orders.append(order)
