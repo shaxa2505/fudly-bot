@@ -419,7 +419,12 @@ async def create_webhook_app(
             return add_cors_headers(web.json_response({"error": str(e)}, status=500))
 
     async def api_debug(request: web.Request) -> web.Response:
-        """GET /api/v1/debug - Debug database info."""
+        """GET /api/v1/debug - Debug database info (dev only)."""
+        # Security: only allow in non-production environments
+        environment = os.getenv("ENVIRONMENT", "production").lower()
+        if environment not in ("development", "dev", "local", "test"):
+            return web.json_response({"error": "Not available"}, status=404)
+            
         try:
             info = {
                 "db_type": type(db).__name__,

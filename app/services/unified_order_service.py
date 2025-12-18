@@ -11,17 +11,17 @@ This service handles:
 Status Flow:
     PENDING     → Waiting for seller confirmation
     PREPARING   → Seller accepted, preparing order
-    READY       → Ready for pickup/delivery
+    READY       → Ready for pickup/delivery (internal state, no customer notification)
     DELIVERING  → In transit (delivery only)
     COMPLETED   → Order completed
     REJECTED    → Rejected by seller
     CANCELLED   → Cancelled by customer
 
-NOTIFICATION STRATEGY:
-    - Minimize spam by sending fewer, more meaningful notifications
+NOTIFICATION STRATEGY (Optimized v2):
+    - Minimize spam by skipping READY notifications
     - Use visual progress bars for better UX
-    - Pickup: only PREPARING and COMPLETED notifications
-    - Delivery: PREPARING, DELIVERING, COMPLETED notifications
+    - Pickup: PREPARING → COMPLETED (2 notifications)
+    - Delivery: PREPARING → DELIVERING → COMPLETED (3 notifications)
 """
 from __future__ import annotations
 
@@ -31,6 +31,8 @@ from typing import Any, Literal
 
 from aiogram import Bot
 from aiogram.utils.keyboard import InlineKeyboardBuilder
+
+from app.services.notification_builder import NotificationBuilder
 
 try:
     from logging_config import logger
@@ -392,177 +394,22 @@ class NotificationTemplates:
         reject_reason: str | None = None,
         courier_phone: str | None = None,
     ) -> str:
-        """Build customer notification for status update with visual progress."""
-
-        def _esc(val: Any) -> str:
-            return html.escape(str(val)) if val else ""
-
-        # Visual progress bars
-        def progress_pickup(step: int) -> str:
-            """Progress for pickup: 1=accepted, 2=completed"""
-            if step == 1:
-                return (
-                    "🟢 Qabul qilindi ━━━ ⚪ Topshirildi"
-                    if lang == "uz"
-                    else "🟢 Принят ━━━━━━ ⚪ Выдан"
-                )
-            return (
-                "🟢 Qabul qilindi ━━━ 🟢 Topshirildi ✓"
-                if lang == "uz"
-                else "🟢 Принят ━━━━━━ 🟢 Выдан ✓"
-            )
-
-        def progress_delivery(step: int) -> str:
-            """Progress for delivery: 1=accepted, 2=delivering, 3=completed"""
-            if step == 1:
-                return "🟢━━⚪━━⚪" if lang == "uz" else "🟢━━⚪━━⚪"
-            elif step == 2:
-                return "🟢━━🟢━━⚪" if lang == "uz" else "🟢━━🟢━━⚪"
-            return "🟢━━🟢━━🟢 ✓"
-
-        # Build templates based on order type
-        if order_type == "pickup":
-            # PICKUP: Clear instructions - where to go, what code, deadline
-            templates = {
-                "uz": {
-                    OrderStatus.PREPARING: (
-                        f"✅ <b>BRON TASDIQLANDI!</b>\n\n"
-                        f"{progress_pickup(1)}\n\n"
-                        f"📦 #{order_id}\n"
-                        f"🏪 {_esc(store_name)}\n"
-                        + (f"📍 {_esc(store_address)}\n\n" if store_address else "\n")
-                        + (
-                            f"🎫 <b>SIZNING KODINGIZ: {pickup_code}</b>\n\n"
-                            if pickup_code
-                            else "\n"
-                        )
-                        + "⏰ <b>2 SOAT ICHIDA OLIB KETING</b>\n"
-                        + "❗ Muddati o'tsa bron bekor bo'ladi"
-                    ),
-                    OrderStatus.COMPLETED: (
-                        f"🎊 <b>Buyurtma topshirildi!</b>\n\n"
-                        f"{progress_pickup(2)}\n\n"
-                        f"📦 Buyurtma #{order_id} — {_esc(store_name)}\n\n"
-                        f"Rahmat! Yoqdimi? ⭐"
-                    ),
-                    OrderStatus.REJECTED: (
-                        f"😔 <b>Bron rad etildi</b>\n\n"
-                        f"📦 #{order_id}\n"
-                        + (f"📝 Sabab: {_esc(reject_reason)}" if reject_reason else "")
-                    ),
-                    OrderStatus.CANCELLED: (f"❌ <b>Bron bekor qilindi</b>\n📦 #{order_id}"),
-                },
-                "ru": {
-                    OrderStatus.PREPARING: (
-                        f"✅ <b>БРОНЬ ПОДТВЕРЖДЕНА!</b>\n\n"
-                        f"{progress_pickup(1)}\n\n"
-                        f"📦 #{order_id}\n"
-                        f"🏪 {_esc(store_name)}\n"
-                        + (f"📍 {_esc(store_address)}\n\n" if store_address else "\n")
-                        + (f"🎫 <b>ВАШ КОД: {pickup_code}</b>\n\n" if pickup_code else "\n")
-                        + "⏰ <b>ЗАБЕРИТЕ В ТЕЧЕНИЕ 2 ЧАСОВ</b>\n"
-                        + "❗ По истечении срока бронь отменится"
-                    ),
-                    OrderStatus.COMPLETED: (
-                        f"🎊 <b>Заказ выдан!</b>\n\n"
-                        f"{progress_pickup(2)}\n\n"
-                        f"📦 Заказ #{order_id} — {_esc(store_name)}\n\n"
-                        f"Спасибо! Понравилось? ⭐"
-                    ),
-                    OrderStatus.REJECTED: (
-                        f"😔 <b>Бронь отклонена</b>\n\n"
-                        f"📦 #{order_id}\n"
-                        + (f"📝 Причина: {_esc(reject_reason)}" if reject_reason else "")
-                    ),
-                    OrderStatus.CANCELLED: (f"❌ <b>Бронь отменена</b>\n📦 #{order_id}"),
-                },
-            }
-        else:  # delivery
-            templates = {
-                "uz": {
-                    OrderStatus.PREPARING: (
-                        f"🎉 <b>Buyurtma qabul qilindi!</b>\n\n"
-                        f"{progress_delivery(1)}\n"
-                        f"Qabul │ Yo'lda │ Yetkazildi\n\n"
-                        f"📦 Buyurtma #{order_id} — {_esc(store_name)}\n"
-                        f"👨‍🍳 Tayyorlanmoqda..."
-                    ),
-                    OrderStatus.READY: (
-                        f"✅ <b>Buyurtma tayyor!</b>\n\n"
-                        f"{progress_delivery(1)}\n"
-                        f"Qabul │ Yo'lda │ Yetkazildi\n\n"
-                        f"📦 Buyurtma #{order_id} — {_esc(store_name)}\n\n"
-                        f"📦 Qadoqlandi va kuryerga topshirishga tayyor\n"
-                        f"⏱ Kuryerni kuting"
-                    ),
-                    OrderStatus.DELIVERING: (
-                        f"🚚 <b>Buyurtma yo'lda!</b>\n\n"
-                        f"{progress_delivery(2)}\n"
-                        f"Qabul │ Yo'lda │ Yetkazildi\n\n"
-                        f"📦 #{order_id}\n"
-                        f"⏱ ~30-60 daqiqa\n"
-                        + (
-                            f"\n📞 Kuryer: <code>{_esc(courier_phone)}</code>"
-                            if courier_phone
-                            else ""
-                        )
-                    ),
-                    OrderStatus.COMPLETED: (
-                        f"🎊 <b>Yetkazildi!</b>\n\n"
-                        f"{progress_delivery(3)}\n\n"
-                        f"📦 Buyurtma #{order_id} — {_esc(store_name)}\n\n"
-                        f"Rahmat! ⭐"
-                    ),
-                    OrderStatus.REJECTED: (
-                        f"😔 <b>Rad etildi</b>\n\n"
-                        f"📦 #{order_id}\n" + (f"📝 {_esc(reject_reason)}" if reject_reason else "")
-                    ),
-                    OrderStatus.CANCELLED: (f"❌ <b>Bekor qilindi</b>\n📦 #{order_id}"),
-                },
-                "ru": {
-                    OrderStatus.PREPARING: (
-                        f"🎉 <b>Заказ принят!</b>\n\n"
-                        f"{progress_delivery(1)}\n"
-                        f"Принят │ В пути │ Доставлен\n\n"
-                        f"📦 Заказ #{order_id} — {_esc(store_name)}\n"
-                        f"👨‍🍳 Готовится..."
-                    ),
-                    OrderStatus.READY: (
-                        f"✅ <b>Заказ готов!</b>\n\n"
-                        f"{progress_delivery(1)}\n"
-                        f"Принят │ В пути │ Доставлен\n\n"
-                        f"📦 Заказ #{order_id} — {_esc(store_name)}\n\n"
-                        f"📦 Упакован и готов к передаче курьеру\n"
-                        f"⏱ Ожидайте курьера"
-                    ),
-                    OrderStatus.DELIVERING: (
-                        f"🚚 <b>Заказ в пути!</b>\n\n"
-                        f"{progress_delivery(2)}\n"
-                        f"Принят │ В пути │ Доставлен\n\n"
-                        f"📦 #{order_id}\n"
-                        f"⏱ ~30-60 мин\n"
-                        + (
-                            f"\n📞 Курьер: <code>{_esc(courier_phone)}</code>"
-                            if courier_phone
-                            else ""
-                        )
-                    ),
-                    OrderStatus.COMPLETED: (
-                        f"🎊 <b>Доставлено!</b>\n\n"
-                        f"{progress_delivery(3)}\n\n"
-                        f"📦 Заказ #{order_id} — {_esc(store_name)}\n\n"
-                        f"Спасибо! ⭐"
-                    ),
-                    OrderStatus.REJECTED: (
-                        f"😔 <b>Отклонён</b>\n\n"
-                        f"📦 #{order_id}\n" + (f"📝 {_esc(reject_reason)}" if reject_reason else "")
-                    ),
-                    OrderStatus.CANCELLED: (f"❌ <b>Отменён</b>\n📦 #{order_id}"),
-                },
-            }
-
-        lang_templates = templates.get(lang, templates["ru"])
-        return lang_templates.get(status, f"📦 #{order_id} - {status}")
+        """
+        Build customer notification for status update with visual progress.
+        
+        Uses NotificationBuilder to eliminate code duplication.
+        """
+        builder = NotificationBuilder(order_type)  # type: ignore
+        return builder.build(
+            status=status,
+            lang=lang,
+            order_id=int(order_id) if isinstance(order_id, str) else order_id,
+            store_name=store_name or "",
+            store_address=store_address,
+            pickup_code=pickup_code,
+            reject_reason=reject_reason,
+            courier_phone=courier_phone,
+        )
 
     @staticmethod
     def seller_status_update(
@@ -1176,7 +1023,7 @@ class UnifiedOrderService:
 
             # Send notification to customer - SMART FILTERING
             # Skip redundant notifications to avoid spam:
-            # - READY status for pickup (they already know it's being prepared)
+            # - READY status (internal state, customer doesn't need notification)
             # - Only important statuses: PREPARING (accepted), DELIVERING, COMPLETED, REJECTED, CANCELLED
             should_notify = notify_customer and user_id
 
@@ -1187,10 +1034,14 @@ class UnifiedOrderService:
                 f"should_notify={should_notify}"
             )
 
-            # Skip READY notification for pickup - go directly from PREPARING to COMPLETED
-            if order_type == "pickup" and target_status == OrderStatus.READY:
+            # OPTIMIZATION: Skip READY notification for ALL orders
+            # READY is an internal state (order packed, waiting for pickup/courier)
+            # Customer only needs: PREPARING (accepted) → DELIVERING (in transit) → COMPLETED
+            if target_status == OrderStatus.READY:
                 should_notify = False
-                logger.info(f"Skipping READY notification for pickup order#{entity_id}")
+                logger.info(
+                    f"⚡ Skipping READY notification (internal state) for {order_type} order#{entity_id}"
+                )
 
             if should_notify:
                 store = self.db.get_store(store_id) if store_id else None

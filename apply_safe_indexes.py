@@ -96,8 +96,8 @@ def main():
             try:
                 cursor.execute(f"ANALYZE {table}")
                 print(f"  ✅ {table}")
-            except:
-                pass
+            except Exception as e:
+                print(f"  ⚠️  {table}: {e}")
         
         conn.commit()
         

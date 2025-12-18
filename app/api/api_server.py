@@ -139,6 +139,30 @@ def create_api_app(db: Any = None, offer_service: Any = None, bot_token: str = N
         expose_headers=["Content-Length", "Content-Type"],
     )
 
+    # ✅ SECURITY: Add security headers middleware
+    @app.middleware("http")
+    async def add_security_headers(request: Request, call_next):
+        response = await call_next(request)
+        # Content Security Policy
+        response.headers["Content-Security-Policy"] = (
+            "default-src 'self'; "
+            "script-src 'self' 'unsafe-inline' https://telegram.org https://web.telegram.org; "
+            "style-src 'self' 'unsafe-inline'; "
+            "img-src 'self' data: https:; "
+            "font-src 'self' data:; "
+            "connect-src 'self' https://api.telegram.org; "
+            "frame-ancestors 'self' https://web.telegram.org"
+        )
+        # Prevent clickjacking
+        response.headers["X-Frame-Options"] = "SAMEORIGIN"
+        # Prevent MIME sniffing
+        response.headers["X-Content-Type-Options"] = "nosniff"
+        # XSS Protection (legacy but still useful)
+        response.headers["X-XSS-Protection"] = "1; mode=block"
+        # Referrer Policy
+        response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+        return response
+
     # Define static file paths (needed for debug endpoint)
     webapp_dist_path = Path(__file__).parent.parent.parent / "webapp" / "dist"
     partner_panel_path = Path(__file__).parent.parent.parent / "webapp" / "partner-panel"
