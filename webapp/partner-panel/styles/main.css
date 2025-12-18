@@ -69,18 +69,37 @@
 }
 
 .stat-card.success {
-    background: #21A038;
-    color: white;
+    background: #FFFFFF;
+    color: #000000;
+}
+
+.stat-card.success .stat-icon {
+    background: #E8F5E9;
+    color: #21A038;
+}
+
+.stat-card.success .stat-value {
+    color: #21A038;
 }
 
 .stat-card.warning {
-    background: #FF6B00;
-    color: white;
+    background: #FFFFFF;
+    color: #000000;
+}
+
+.stat-card.warning .stat-icon {
+    background: #FFF3E0;
+    color: #FF9800;
 }
 
 .stat-card.danger {
-    background: #E63946;
-    color: white;
+    background: #FFFFFF;
+    color: #000000;
+}
+
+.stat-card.danger .stat-icon {
+    background: #FFEBEE;
+    color: #F44336;
 }
 
 .stat-header {
@@ -344,18 +363,18 @@
 }
 
 .status-new {
-    background: #E3F2FD;
-    color: #2196F3;
+    background: #F0F4F8;
+    color: #4A5568;
 }
 
 .status-preparing {
-    background: #FFF3E0;
-    color: #FF9800;
+    background: #FFF8E1;
+    color: #B76E00;
 }
 
 .status-ready {
     background: #E8F5E9;
-    color: #21A038;
+    color: #1B7A2F;
 }
 
 .status-completed {
@@ -365,8 +384,8 @@
 
 .status-cancelled,
 .status-rejected {
-    background: #FFEBEE;
-    color: #F44336;
+    background: #FFF5F5;
+    color: #C53030;
 }
 
 .order-items {
