@@ -1012,17 +1012,22 @@
 /* === Search Bar === */
 .search-bar {
     position: relative;
-    margin-bottom: var(--space-lg);
+    margin-bottom: var(--space-6);
 }
 
 .search-input {
     width: 100%;
-    padding: 14px 48px 14px var(--space-md);
+    padding: 16px 56px 16px var(--space-5);
     border: 2px solid var(--border);
     border-radius: var(--radius-lg);
-    font-size: var(--font-base);
+    font-size: 15px;
     background: white;
     transition: all var(--transition-fast);
+    color: var(--text);
+}
+
+.search-input::placeholder {
+    color: var(--text-muted);
 }
 
 .search-input:focus {
@@ -1033,10 +1038,12 @@
 
 .search-icon {
     position: absolute;
-    right: var(--space-md);
+    right: var(--space-5);
     top: 50%;
     transform: translateY(-50%);
-    color: var(--text-muted);
+    color: var(--text-secondary);
+    width: 20px;
+    height: 20px;
     pointer-events: none;
 }
 
@@ -1047,20 +1054,20 @@
     left: 0;
     right: 0;
     bottom: 0;
-    background: rgba(0, 0, 0, 0.6);
-    backdrop-filter: blur(8px);
+    background: rgba(0, 0, 0, 0.7);
+    backdrop-filter: blur(4px);
     display: flex;
     align-items: center;
     justify-content: center;
     z-index: var(--z-modal);
-    padding: var(--space-lg);
+    padding: var(--space-5);
     animation: fadeIn 0.2s ease-out;
 }
 
 .modal-content {
     background: white;
-    border-radius: var(--radius-xl);
-    box-shadow: var(--shadow-2xl);
+    border-radius: var(--radius-2xl);
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
     max-width: 600px;
     width: 100%;
     max-height: 90vh;
@@ -1074,54 +1081,57 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: var(--space-lg);
-    border-bottom: 1px solid var(--border-light);
+    padding: var(--space-6) var(--space-6) var(--space-5);
+    border-bottom: 1px solid var(--border);
 }
 
 .modal-header h3 {
-    font-size: var(--font-xl);
-    font-weight: var(--weight-bold);
+    font-size: 22px;
+    font-weight: 700;
     color: var(--text);
     margin: 0;
+    letter-spacing: -0.5px;
 }
 
 .modal-body {
-    padding: var(--space-lg);
+    padding: var(--space-6);
     overflow-y: auto;
     flex: 1;
 }
 
 .modal-footer {
     display: flex;
-    gap: var(--space-sm);
-    padding: var(--space-lg);
-    border-top: 1px solid var(--border-light);
+    gap: var(--space-3);
+    padding: var(--space-5) var(--space-6) var(--space-6);
+    border-top: 1px solid var(--border);
+    background: var(--gray-50);
 }
 
 /* === Form Elements === */
 .form-group {
-    margin-bottom: var(--space-lg);
+    margin-bottom: var(--space-5);
 }
 
 .form-group label {
     display: block;
-    margin-bottom: var(--space-sm);
-    font-weight: var(--weight-semibold);
+    margin-bottom: var(--space-2);
+    font-weight: 600;
     color: var(--text);
-    font-size: var(--font-sm);
+    font-size: 14px;
 }
 
 .form-group input,
 .form-group textarea,
 .form-group select {
     width: 100%;
-    padding: 12px var(--space-md);
+    padding: 14px var(--space-4);
     border: 2px solid var(--border);
-    border-radius: var(--radius-md);
-    font-size: var(--font-base);
+    border-radius: var(--radius-lg);
+    font-size: 15px;
     font-family: inherit;
     transition: all var(--transition-fast);
     background: white;
+    color: var(--text);
 }
 
 .form-group input:focus,
@@ -1135,6 +1145,7 @@
 .form-group textarea {
     resize: vertical;
     min-height: 100px;
+    line-height: 1.5;
 }
 
 /* === Toast Notifications === */
