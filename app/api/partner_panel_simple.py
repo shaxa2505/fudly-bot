@@ -37,6 +37,10 @@ elif not API_BASE_URL:
     API_BASE_URL = "http://localhost:8000"
 
 
+def _is_dev_env() -> bool:
+    return os.getenv("ENVIRONMENT", "production").lower() in ("development", "dev", "local", "test")
+
+
 def set_partner_db(db: DatabaseProtocol, bot_token: str = None):
     """Set database instance and bot token for partner panel."""
     global _db, _bot_token
@@ -67,10 +71,10 @@ def get_partner_with_store(telegram_id: int) -> tuple[dict, dict]:
     import logging
 
     db = get_db()
-    logging.info(f"🔍 get_partner_with_store called for telegram_id={telegram_id}")
+    if _is_dev_env():
+        logging.debug(f"get_partner_with_store called for telegram_id={telegram_id}")
 
     user = db.get_user(telegram_id)
-    logging.info(f"📌 get_user returned: {type(user)} - {user}")
 
     if not user:
         logging.error(f"❌ User not found: telegram_id={telegram_id}")
@@ -78,13 +82,15 @@ def get_partner_with_store(telegram_id: int) -> tuple[dict, dict]:
 
     # users.user_id = telegram_id, stores.owner_id = users.user_id = telegram_id
     store = db.get_store_by_owner(telegram_id)
-    logging.info(f"📌 get_store_by_owner({telegram_id}) returned: {type(store)} - {store}")
 
     if not store:
         logging.error(f"❌ No store found for telegram_id={telegram_id}")
         raise HTTPException(status_code=403, detail="Not a partner - no store found")
 
-    logging.info(f"✅ SUCCESS: user_id={user.get('user_id')}, store_id={store.get('store_id')}")
+    if _is_dev_env():
+        logging.debug(
+            f"Partner resolved: user_id={user.get('user_id')}, store_id={store.get('store_id')}"
+        )
     return user, store
 
 
@@ -97,17 +103,20 @@ def verify_telegram_webapp(authorization: str) -> int:
     3. Dev mode bypass for local development
     """
     import logging
-    import sys
-
-    msg = f"🔐 VERIFY CALLED: auth={authorization[:50] if authorization else 'NONE'}..."
-    logging.info(msg)
-    print(msg, file=sys.stderr, flush=True)
 
     if not authorization:
-        err_msg = "❌ No authorization header"
-        logging.error(err_msg)
-        print(err_msg, file=sys.stderr, flush=True)
+        logging.warning("Missing authorization header")
         raise HTTPException(status_code=401, detail="Missing authorization")
+
+    if _is_dev_env():
+        auth_kind = (
+            "dev"
+            if authorization.startswith("dev_")
+            else "tma"
+            if authorization.startswith("tma ")
+            else "other"
+        )
+        logging.debug(f"verify_telegram_webapp called: kind={auth_kind}")
 
     # Development mode bypass - ONLY works in non-production environment
     if authorization.startswith("dev_"):
@@ -115,7 +124,7 @@ def verify_telegram_webapp(authorization: str) -> int:
         if environment in ("development", "dev", "local", "test"):
             try:
                 return int(authorization.split("_")[1])
-            except:
+            except (IndexError, ValueError):
                 raise HTTPException(status_code=401, detail="Invalid dev auth format")
         else:
             raise HTTPException(status_code=401, detail="Dev auth not allowed in production")
@@ -133,11 +142,8 @@ def verify_telegram_webapp(authorization: str) -> int:
     try:
         parsed = dict(urllib.parse.parse_qsl(init_data))
         import logging
-        import sys
-
-        msg = f"🔍 PARSED KEYS: {list(parsed.keys())}"
-        logging.info(msg)
-        print(msg, file=sys.stderr, flush=True)
+        if _is_dev_env():
+            logging.debug(f"PARSED KEYS: {list(parsed.keys())}")
 
         # Check if this is URL-based auth (uid passed by bot in WebApp URL)
         # Simple format: uid=123456 or uid=123456&auth_date=1234567890
@@ -174,7 +180,6 @@ def verify_telegram_webapp(authorization: str) -> int:
 
                     msg = f"✅ URL AUTH SUCCESS: user_id={user_id} (age: {auth_date or 'no timestamp'})"
                     logging.info(msg)
-                    print(msg, file=sys.stderr, flush=True)
                     return user_id
                 else:
                     raise ValueError("uid must be positive")
@@ -268,9 +273,8 @@ async def get_profile(authorization: str = Header(None)):
     """Get partner profile"""
     import logging
 
-    logging.info(
-        f"📋 Profile request with auth: {authorization[:60] if authorization else 'None'}..."
-    )
+    if _is_dev_env():
+        logging.debug("Profile request")
 
     telegram_id = verify_telegram_webapp(authorization)
     logging.info(f"✅ Auth verified, telegram_id: {telegram_id}")
