@@ -67,37 +67,6 @@
 .nav-item:active {
     opacity: 0.5;
 }
-
-.nav-item:hover .nav-label {
-    transform: translateY(-1px);
-}
-
-/* === Floating Nav Item (Center) === */
-.nav-item.floating {
-    position: relative;
-    top: -20px;
-}
-
-.nav-item.floating .nav-icon {
-    width: 56px;
-    height: 56px;
-    background: linear-gradient(135deg, var(--primary) 0%, var(--accent) 100%);
-    color: white;
-    box-shadow: var(--shadow-xl), var(--shadow-primary);
-    border: 4px solid white;
-}
-
-.nav-item.floating .nav-icon svg {
-    width: 28px;
-    height: 28px;
-}
-
-.nav-item.floating:hover .nav-icon {
-    transform: translateY(-4px) rotate(15deg);
-}
-
-/* === Mobile Responsiveness === */
-@media (max-width: 768px) {
     .bottom-nav {
         height: 65px;
     }
