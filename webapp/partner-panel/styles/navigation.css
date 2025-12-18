@@ -59,6 +59,10 @@
     color: #21A038;
 }
 
+.nav-item.active .nav-icon svg {
+    stroke-width: 2.5;
+}
+
 .nav-item:active {
     opacity: 0.5;
 }

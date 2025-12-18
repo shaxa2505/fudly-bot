@@ -64,7 +64,7 @@
 }
 
 .stat-card.primary {
-    background: #FFCC00;
+    background: #FFFFFF;
     color: #000000;
 }
 
@@ -294,9 +294,11 @@
 
 .order-card {
     background: #FFFFFF;
-    border: 1px solid #E8E8E8;\n    border-radius: 16px;
+    border: 1px solid #E8E8E8;
+    border-radius: 16px;
     padding: 16px;
-    transition: transform 0.15s, border-color 0.15s;
+    transition: transform 0.15s, border-color 0.15s, box-shadow 0.15s;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
 }
 
 .order-card:active {
@@ -305,6 +307,7 @@
 
 .order-card:hover {
     border-color: #21A038;
+    box-shadow: 0 2px 8px rgba(33, 160, 56, 0.15);
 }
 
 .order-header {
@@ -318,6 +321,18 @@
     font-size: 15px;
     font-weight: 700;
     color: #000000;
+}
+
+.order-total {
+    font-size: 18px;
+    font-weight: 700;
+    color: #21A038;
+    margin-top: 8px;
+}
+
+.order-time {
+    font-size: 13px;
+    color: #818C99;
 }
 
 .order-status {
@@ -348,9 +363,10 @@
     color: #818C99;
 }
 
-.status-cancelled {
-    background: var(--danger-light);
-    color: var(--danger);
+.status-cancelled,
+.status-rejected {
+    background: #FFEBEE;
+    color: #F44336;
 }
 
 .order-items {
