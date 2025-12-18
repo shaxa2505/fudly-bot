@@ -1,5 +1,5 @@
 /* ================================================
-   MODERN HEADER - Premium Glassmorphism Design
+   MODERN HEADER - Clean Yandex.Lavka Style
    ================================================ */
 
 .app-header {
@@ -7,117 +7,177 @@
     top: 0;
     left: 0;
     right: 0;
-    height: 70px;
-    background: rgba(255, 255, 255, 0.9);
-    backdrop-filter: blur(30px) saturate(180%);
-    -webkit-backdrop-filter: blur(30px) saturate(180%);
-    border-bottom: 1px solid rgba(99, 102, 241, 0.12);
+    height: 64px;
+    background: white;
+    border-bottom: 1px solid var(--border);
     z-index: var(--z-sticky);
-    box-shadow: 0 4px 24px rgba(0, 0, 0, 0.04), 0 1px 0 0 rgba(255, 255, 255, 0.5) inset;
-    animation: fadeInDown var(--transition-slow) ease-out;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
 }
 
 .app-header::before {
-    content: '';
-    position: absolute;
-    bottom: 0;
-    left: 0;
-    right: 0;
-    height: 2px;
-    background: var(--primary);
-    opacity: 0.3;
+    display: none;
 }
 
 .header-content {
     max-width: 1400px;
     margin: 0 auto;
     height: 100%;
-    padding: 0 var(--space-lg);
+    padding: 0 var(--space-4);
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: var(--space-md);
+    gap: var(--space-4);
+}
+
+/* === Store Info === */
+.store-info {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    flex: 1;
+}
+
+.store-avatar {
+    width: 44px;
+    height: 44px;
+    background: var(--primary-light);
+    border-radius: var(--radius-md);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--primary);
+    flex-shrink: 0;
+}
+
+.store-details {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+}
+
+.store-details h1 {
+    font-size: 17px;
+    font-weight: 700;
+    color: var(--text);
+    margin: 0;
+    letter-spacing: -0.3px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.store-status {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 13px;
+    color: var(--text-secondary);
+}
+
+.status-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--success);
+    animation: pulse 2s ease infinite;
+}
+
+@keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.5; }
 }
 
 /* === Logo === */
 .header-logo {
     display: flex;
     align-items: center;
-    gap: var(--space-sm);
-    font-size: var(--font-xl);
-    font-weight: var(--weight-extrabold);
-    letter-spacing: var(--tracking-tight);
-    color: var(--primary);
-    transition: var(--transition-fast);
-    position: relative;
+    gap: var(--space-2);
+    font-size: 18px;
+    font-weight: 700;
+    letter-spacing: -0.5px;
+    color: var(--text);
+    transition: opacity var(--transition-fast);
 }
 
 .header-logo::before {
-    content: '';
-    position: absolute;
-    inset: -8px;
-    background: radial-gradient(circle at center, rgba(99, 102, 241, 0.08), transparent 70%);
-    border-radius: var(--radius-full);
-    opacity: 0;
-    transition: opacity var(--transition-base);
-}
-
-.header-logo:hover::before {
-    opacity: 1;
+    display: none;
 }
 
 .header-logo:hover {
-    transform: scale(1.05);
+    opacity: 0.7;
 }
 
 .logo-icon {
-    width: 36px;
-    height: 36px;
+    width: 32px;
+    height: 32px;
     background: var(--primary);
-    border-radius: var(--radius-md);
+    border-radius: var(--radius-sm);
     display: flex;
     align-items: center;
     justify-content: center;
     color: white;
-    font-size: var(--font-lg);
-    font-weight: var(--weight-bold);
-    box-shadow: var(--shadow-sm);
+    font-size: 16px;
+    font-weight: 700;
+}
+
+/* === Header Actions === */
+.header-actions {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+}
+
+.icon-btn {
+    position: relative;
+    width: 44px;
+    height: 44px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--gray-50);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    cursor: pointer;
+    transition: all var(--transition-fast);
+    color: var(--text);
+}
+
+.icon-btn:hover {
+    background: var(--gray-100);
+    border-color: var(--primary);
+    color: var(--primary);
+}
+
+.icon-btn:active {
+    transform: scale(0.95);
+}
+
+.notification-badge {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    min-width: 18px;
+    height: 18px;
+    padding: 0 5px;
+    background: var(--danger);
+    color: white;
+    font-size: 11px;
+    font-weight: 700;
+    border-radius: 9px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 2px solid white;
 }
 
 /* === Header Stats === */
 .header-stats {
-    display: flex;
-    align-items: center;
-    gap: var(--space-lg);
-    flex: 1;
-    justify-content: center;
-}
-
-.stat-badge {
-    display: flex;
-    align-items: center;
-    gap: var(--space-xs);
-    padding: var(--space-sm) var(--space-md);
-    background: rgba(99, 102, 241, 0.08);
-    border: 1px solid rgba(99, 102, 241, 0.15);
-    border-radius: var(--radius-full);
-    font-size: var(--font-sm);
-    font-weight: var(--weight-semibold);
-    color: var(--primary);
-    transition: all var(--transition-fast);
-    cursor: pointer;
-    position: relative;
-    overflow: hidden;
-}
-
-.stat-badge::before {
     display: none;
 }
 
-.stat-badge:hover {
-    background: rgba(99, 102, 241, 0.15);
-    transform: translateY(-3px) scale(1.02);
-    box-shadow: var(--shadow-md), 0 0 0 1px rgba(99, 102, 241, 0.3) inset;
+.stat-badge {
+    display: none;
 }
 
 .stat-badge.success {
@@ -193,39 +253,33 @@
 /* === Mobile Header === */
 @media (max-width: 768px) {
     .app-header {
-        height: 60px;
-    }
-
-    .header-stats {
-        display: none;
+        height: 56px;
     }
 
     .header-content {
-        padding: 0 var(--space-md);
+        padding: 0 var(--space-3);
     }
 
-    .header-logo {
-        font-size: var(--font-lg);
+    .store-avatar {
+        width: 40px;
+        height: 40px;
     }
 
-    .logo-icon {
-        width: 32px;
-        height: 32px;
+    .store-details h1 {
+        font-size: 15px;
     }
 
-    .profile-button {
-        padding: var(--space-xs) var(--space-sm);
-        font-size: var(--font-xs);
+    .store-status {
+        font-size: 12px;
     }
 
-    .profile-button span {
-        display: none;
+    .icon-btn {
+        width: 40px;
+        height: 40px;
     }
 }
 
 /* === Sticky Header Effect === */
 .app-header.scrolled {
-    background: rgba(255, 255, 255, 0.95);
-    border-bottom-color: rgba(99, 102, 241, 0.15);
-    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.06);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
 }
