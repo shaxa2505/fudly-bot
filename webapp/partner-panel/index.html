@@ -9,16 +9,16 @@
     <script src="https://unpkg.com/lucide@latest"></script>
 
     <!-- Modular CSS Architecture -->
-    <link rel="stylesheet" href="/partner-panel/styles/variables.css?v=18.0">
-    <link rel="stylesheet" href="/partner-panel/styles/base.css?v=18.0">
-    <link rel="stylesheet" href="/partner-panel/styles/header.css?v=18.0">
-    <link rel="stylesheet" href="/partner-panel/styles/navigation.css?v=18.0">
-    <link rel="stylesheet" href="/partner-panel/styles/buttons.css?v=18.0">
-    <link rel="stylesheet" href="/partner-panel/styles/products.css?v=18.0">
-    <link rel="stylesheet" href="/partner-panel/styles/main.css?v=18.0">
-    <link rel="stylesheet" href="/partner-panel/styles/utilities.css?v=18.0">
-    <link rel="stylesheet" href="/partner-panel/styles/states.css?v=18.0">
-    <link rel="stylesheet" href="/partner-panel/styles/design-fixes.css?v=18.0">
+    <link rel="stylesheet" href="/partner-panel/styles/variables.css?v=19.0">
+    <link rel="stylesheet" href="/partner-panel/styles/base.css?v=19.0">
+    <link rel="stylesheet" href="/partner-panel/styles/header.css?v=19.0">
+    <link rel="stylesheet" href="/partner-panel/styles/navigation.css?v=19.0">
+    <link rel="stylesheet" href="/partner-panel/styles/buttons.css?v=19.0">
+    <link rel="stylesheet" href="/partner-panel/styles/products.css?v=19.0">
+    <link rel="stylesheet" href="/partner-panel/styles/main.css?v=19.0">
+    <link rel="stylesheet" href="/partner-panel/styles/utilities.css?v=19.0">
+    <link rel="stylesheet" href="/partner-panel/styles/states.css?v=19.0">
+    <link rel="stylesheet" href="/partner-panel/styles/design-fixes.css?v=19.0">
 
     <style>
         /* Yandex.Lavka Style + Telegram WebApp Optimizations */
@@ -1194,17 +1194,42 @@
                     </div>
                     <form id="productForm" onsubmit="saveProduct(event, ${productId})">
                         <div class="modal-body">
+                            <!-- Photo Upload -->
+                            <div class="form-group">
+                                <label>Фото товара</label>
+                                <input type="file" id="photoFile" accept="image/*" style="display: none;" onchange="handlePhotoUpload(this, event)">
+                                <input type="hidden" name="photo_url" value="${product?.photo_url || ''}">
+                                <div class="photo-upload-area ${product?.photo_url ? 'has-photo' : ''}" onclick="document.getElementById('photoFile').click()">
+                                    ${product?.photo_url ? `
+                                        <div class="photo-preview">
+                                            <img src="${product.photo_url}" alt="Preview">
+                                            <button type="button" class="photo-preview-remove" onclick="event.stopPropagation(); removePhoto()">
+                                                <i data-lucide="x" style="width: 16px; height: 16px;"></i>
+                                            </button>
+                                        </div>
+                                    ` : `
+                                        <div class="upload-placeholder">
+                                            <i data-lucide="image"></i>
+                                            <div class="upload-placeholder-text">Загрузить фото</div>
+                                            <div class="upload-placeholder-hint">или введите URL ниже</div>
+                                        </div>
+                                    `}
+                                </div>
+                                <input type="url" name="photo_url_input" value="${product?.photo_url || ''}" placeholder="https://... (или загрузите файл)" 
+                                       class="search-input" style="margin-top: 12px;" oninput="handlePhotoUrlInput(this)">
+                            </div>
+
                             <div class="form-group">
                                 <label>Название *</label>
                                 <input type="text" name="name" value="${product?.name || ''}" required class="search-input" 
-                                       oninput="validateField(this)" minlength="3" maxlength="100">
+                                       oninput="validateField(this)" minlength="3" maxlength="100" placeholder="Например: Молоко 3.2%">
                                 <div class="form-error" style="display: none;">Минимум 3 символа</div>
                             </div>
 
                             <div class="form-group">
                                 <label>Описание</label>
                                 <textarea name="description" rows="3" class="search-input" 
-                                          oninput="validateField(this)" maxlength="500">${product?.description || ''}</textarea>
+                                          oninput="validateField(this)" maxlength="500" placeholder="Краткое описание товара">${product?.description || ''}</textarea>
                                 <div style="font-size: 12px; color: var(--text-muted); margin-top: 4px;">0/500</div>
                             </div>
 
@@ -1212,21 +1237,21 @@
                                 <div class="form-group">
                                     <label>Цена *</label>
                                     <input type="number" name="price" value="${product?.price || ''}" required min="1" step="0.01" class="search-input"
-                                           oninput="validateField(this)">
+                                           oninput="validateField(this)" placeholder="0.00">
                                     <div class="form-error" style="display: none;">Цена должна быть > 0</div>
                                 </div>
 
                                 <div class="form-group">
                                     <label>Скидка (%)</label>
                                     <input type="number" name="discount" value="${product?.discount || 0}" min="0" max="99" class="search-input"
-                                           oninput="validateField(this)">
+                                           oninput="validateField(this)" placeholder="0">
                                 </div>
                             </div>
 
                             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
                                 <div class="form-group">
                                     <label>Остаток</label>
-                                    <input type="number" name="stock" value="${product?.stock || 0}" min="0" class="search-input">
+                                    <input type="number" name="stock" value="${product?.stock || 0}" min="0" class="search-input" placeholder="0">
                                 </div>
 
                                 <div class="form-group">
@@ -1235,15 +1260,10 @@
                                         <option value="шт" ${product?.unit === 'шт' ? 'selected' : ''}>шт</option>
                                         <option value="кг" ${product?.unit === 'кг' ? 'selected' : ''}>кг</option>
                                         <option value="л" ${product?.unit === 'л' ? 'selected' : ''}>л</option>
+                                        <option value="г" ${product?.unit === 'г' ? 'selected' : ''}>г</option>
+                                        <option value="мл" ${product?.unit === 'мл' ? 'selected' : ''}>мл</option>
                                     </select>
                                 </div>
-                            </div>
-
-                            <div class="form-group">
-                                <label>URL фото</label>
-                                <input type="url" name="photo_url" value="${product?.photo_url || ''}" placeholder="https://..." class="search-input"
-                                       oninput="validateField(this)">
-                                <div class="form-error" style="display: none;">Некорректный URL</div>
                             </div>
 
                             <div class="form-group">
@@ -1256,6 +1276,7 @@
 
                         <div style="display: flex; gap: 12px; padding: 16px; border-top: 1px solid var(--border);">
                             <button type="submit" class="btn btn-primary ripple" style="flex: 1;">
+                                <i data-lucide="check" style="width: 16px; height: 16px;"></i>
                                 ${isEdit ? 'Сохранить' : 'Добавить'}
                             </button>
                             <button type="button" class="btn btn-secondary ripple" onclick="this.closest('.modal-overlay').remove()">
@@ -1286,6 +1307,126 @@
                     modal.remove();
                 }
             });
+        }
+
+        function handlePhotoUpload(input, event) {
+            const file = input.files[0];
+            if (!file) return;
+
+            // Validate file type
+            if (!file.type.startsWith('image/')) {
+                toast('Пожалуйста, выберите изображение', 'error');
+                return;
+            }
+
+            // Validate file size (max 5MB)
+            if (file.size > 5 * 1024 * 1024) {
+                toast('Размер файла не должен превышать 5MB', 'error');
+                return;
+            }
+
+            // Show loading
+            const uploadArea = document.querySelector('.photo-upload-area');
+            uploadArea.classList.add('has-photo');
+            uploadArea.innerHTML = '<div class="upload-placeholder"><i data-lucide="loader" style="animation: spin 1s linear infinite;"></i><div>Загрузка...</div></div>';
+            if (typeof lucide !== 'undefined') lucide.createIcons();
+
+            // Convert to base64 for preview (real upload would go to server)
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                const photoUrl = e.target.result;
+                
+                // Update hidden input
+                document.querySelector('input[name="photo_url"]').value = photoUrl;
+                document.querySelector('input[name="photo_url_input"]').value = '';
+                
+                // Show preview
+                uploadArea.innerHTML = `
+                    <div class="photo-preview">
+                        <img src="${photoUrl}" alt="Preview">
+                        <button type="button" class="photo-preview-remove" onclick="event.stopPropagation(); removePhoto()">
+                            <i data-lucide="x" style="width: 16px; height: 16px;"></i>
+                        </button>
+                    </div>
+                `;
+                if (typeof lucide !== 'undefined') lucide.createIcons();
+                
+                haptic('light');
+                toast('Фото загружено', 'success');
+            };
+            
+            reader.onerror = () => {
+                toast('Ошибка загрузки фото', 'error');
+                uploadArea.classList.remove('has-photo');
+                uploadArea.innerHTML = `
+                    <div class="upload-placeholder">
+                        <i data-lucide="image"></i>
+                        <div class="upload-placeholder-text">Загрузить фото</div>
+                        <div class="upload-placeholder-hint">или введите URL ниже</div>
+                    </div>
+                `;
+                if (typeof lucide !== 'undefined') lucide.createIcons();
+            };
+            
+            reader.readAsDataURL(file);
+        }
+
+        function handlePhotoUrlInput(input) {
+            const url = input.value.trim();
+            const uploadArea = document.querySelector('.photo-upload-area');
+            const hiddenInput = document.querySelector('input[name="photo_url"]');
+
+            if (!url) {
+                uploadArea.classList.remove('has-photo');
+                uploadArea.innerHTML = `
+                    <div class="upload-placeholder">
+                        <i data-lucide="image"></i>
+                        <div class="upload-placeholder-text">Загрузить фото</div>
+                        <div class="upload-placeholder-hint">или введите URL ниже</div>
+                    </div>
+                `;
+                hiddenInput.value = '';
+                if (typeof lucide !== 'undefined') lucide.createIcons();
+                return;
+            }
+
+            // Validate URL
+            if (url.match(/^https?:\/\/.+/)) {
+                hiddenInput.value = url;
+                uploadArea.classList.add('has-photo');
+                uploadArea.innerHTML = `
+                    <div class="photo-preview">
+                        <img src="${url}" alt="Preview" onerror="this.src=''; this.parentElement.innerHTML='<div style=\\'padding: 24px; text-align: center; color: var(--danger);\\'>Ошибка загрузки изображения</div>'">
+                        <button type="button" class="photo-preview-remove" onclick="event.stopPropagation(); removePhoto()">
+                            <i data-lucide="x" style="width: 16px; height: 16px;"></i>
+                        </button>
+                    </div>
+                `;
+                if (typeof lucide !== 'undefined') lucide.createIcons();
+            }
+        }
+
+        function removePhoto() {
+            haptic('light');
+            const uploadArea = document.querySelector('.photo-upload-area');
+            const hiddenInput = document.querySelector('input[name="photo_url"]');
+            const urlInput = document.querySelector('input[name="photo_url_input"]');
+            const fileInput = document.getElementById('photoFile');
+
+            uploadArea.classList.remove('has-photo');
+            uploadArea.innerHTML = `
+                <div class="upload-placeholder">
+                    <i data-lucide="image"></i>
+                    <div class="upload-placeholder-text">Загрузить фото</div>
+                    <div class="upload-placeholder-hint">или введите URL ниже</div>
+                </div>
+            `;
+            
+            hiddenInput.value = '';
+            urlInput.value = '';
+            fileInput.value = '';
+            
+            if (typeof lucide !== 'undefined') lucide.createIcons();
         }
 
         async function saveProduct(event, productId) {
