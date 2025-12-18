@@ -12,6 +12,19 @@ from aiogram.utils.keyboard import InlineKeyboardBuilder
 
 from app.core.utils import get_field, get_store_field
 from app.services.unified_order_service import get_unified_order_service
+from handlers.common.states import CourierHandover
+from localization import get_text
+
+logger = logging.getLogger(__name__)
+
+# Router for seller order management
+router = Router(name="seller_order_management")
+
+
+def setup(bot_instance, db_instance):
+    """Initialize module with bot and database instances"""
+    global bot, db
+    bot = bot_instance
     db = db_instance
 
 
