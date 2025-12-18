@@ -1542,39 +1542,30 @@
                                 Топ товаров
                             </h3>
                             <div class="list">
-                                ${stats.topProducts.map((product, index) => `
-                                    <div class="list-item" style="padding: 16px;">
+                                ${stats.topProducts.map((product, index) => {
+                                    const medalClass = index === 0 ? 'gold' : index === 1 ? 'silver' : index === 2 ? 'bronze' : 'default';
+                                    return `
+                                    <div class="list-item ripple" style="padding: 18px; cursor: pointer;">
                                         <div style="display: flex; align-items: center; gap: 16px; flex: 1;">
-                                            <div style="
-                                                width: 40px;
-                                                height: 40px;
-                                                border-radius: 12px;
-                                                background: ${index === 0 ? '#FFD700' : index === 1 ? '#C0C0C0' : index === 2 ? '#CD7F32' : '#F7F7F7'};
-                                                display: flex;
-                                                align-items: center;
-                                                justify-content: center;
-                                                font-size: 18px;
-                                                font-weight: 700;
-                                                color: ${index < 3 ? '#FFFFFF' : '#818C99'};
-                                            ">
+                                            <div class="top-product-medal ${medalClass}">
                                                 ${index + 1}
                                             </div>
                                             <div style="flex: 1;">
-                                                <div style="font-weight: 600; font-size: 16px; color: #000000; margin-bottom: 4px;">
+                                                <div style="font-weight: 700; font-size: 17px; color: #000000; margin-bottom: 4px; letter-spacing: -0.3px;">
                                                     ${product.name}
                                                 </div>
-                                                <div style="font-size: 14px; color: #818C99;">
-                                                    ${product.orders} ${product.orders === 1 ? 'заказ' : product.orders < 5 ? 'заказа' : 'заказов'}
+                                                <div style="font-size: 14px; color: #818C99; display: flex; align-items: center; gap: 8px;">
+                                                    <span>📦 ${product.orders} ${product.orders === 1 ? 'заказ' : product.orders < 5 ? 'заказа' : 'заказов'}</span>
                                                 </div>
                                             </div>
                                             <div style="text-align: right;">
-                                                <div style="font-size: 18px; font-weight: 700; color: #21A038;">
+                                                <div style="font-size: 20px; font-weight: 800; color: #21A038; letter-spacing: -0.5px;">
                                                     ${formatPrice(product.revenue)}
                                                 </div>
                                             </div>
                                         </div>
                                     </div>
-                                `).join('')}
+                                `}).join('')}
                             </div>
                         </div>
                     ` : ''}
@@ -1585,26 +1576,51 @@
                             <i data-lucide="activity" class="card-icon"></i>
                             Заказы по статусам
                         </h3>
-                        <div class="stats-grid" style="margin-top: 16px;">
-                            <div class="stat-card" style="border-left: 4px solid #21A038;">
-                                <div class="stat-value">${stats.ordersByStatus.new}</div>
-                                <div class="stat-label">Новые</div>
+                        <div class="stats-grid" style="margin-top: 20px; gap: 16px;">
+                            <div class="status-stat-card new ripple">
+                                <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 12px;">
+                                    <div style="width: 36px; height: 36px; background: rgba(33, 160, 56, 0.1); border-radius: 10px; display: flex; align-items: center; justify-content: center;">
+                                        <span style="font-size: 18px;">🆕</span>
+                                    </div>
+                                    <div class="stat-label" style="margin: 0; font-size: 14px;">Новые</div>
+                                </div>
+                                <div class="stat-value" style="color: #21A038;">${stats.ordersByStatus.new}</div>
                             </div>
-                            <div class="stat-card" style="border-left: 4px solid #FF9800;">
-                                <div class="stat-value">${stats.ordersByStatus.preparing}</div>
-                                <div class="stat-label">В работе</div>
+                            <div class="status-stat-card preparing ripple">
+                                <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 12px;">
+                                    <div style="width: 36px; height: 36px; background: rgba(255, 152, 0, 0.1); border-radius: 10px; display: flex; align-items: center; justify-content: center;">
+                                        <span style="font-size: 18px;">👨‍🍳</span>
+                                    </div>
+                                    <div class="stat-label" style="margin: 0; font-size: 14px;">В работе</div>
+                                </div>
+                                <div class="stat-value" style="color: #FF9800;">${stats.ordersByStatus.preparing}</div>
                             </div>
-                            <div class="stat-card" style="border-left: 4px solid #2196F3;">
-                                <div class="stat-value">${stats.ordersByStatus.ready}</div>
-                                <div class="stat-label">Готовы</div>
+                            <div class="status-stat-card ready ripple">
+                                <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 12px;">
+                                    <div style="width: 36px; height: 36px; background: rgba(33, 150, 243, 0.1); border-radius: 10px; display: flex; align-items: center; justify-content: center;">
+                                        <span style="font-size: 18px;">✅</span>
+                                    </div>
+                                    <div class="stat-label" style="margin: 0; font-size: 14px;">Готовы</div>
+                                </div>
+                                <div class="stat-value" style="color: #2196F3;">${stats.ordersByStatus.ready}</div>
                             </div>
-                            <div class="stat-card" style="border-left: 4px solid #4CAF50;">
-                                <div class="stat-value">${stats.ordersByStatus.completed}</div>
-                                <div class="stat-label">Завершены</div>
+                            <div class="status-stat-card completed ripple">
+                                <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 12px;">
+                                    <div style="width: 36px; height: 36px; background: rgba(76, 175, 80, 0.1); border-radius: 10px; display: flex; align-items: center; justify-content: center;">
+                                        <span style="font-size: 18px;">🎉</span>
+                                    </div>
+                                    <div class="stat-label" style="margin: 0; font-size: 14px;">Завершены</div>
+                                </div>
+                                <div class="stat-value" style="color: #4CAF50;">${stats.ordersByStatus.completed}</div>
                             </div>
-                            <div class="stat-card" style="border-left: 4px solid #F44336;">
-                                <div class="stat-value">${stats.ordersByStatus.cancelled}</div>
-                                <div class="stat-label">Отменены</div>
+                            <div class="status-stat-card cancelled ripple">
+                                <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 12px;">
+                                    <div style="width: 36px; height: 36px; background: rgba(244, 67, 54, 0.1); border-radius: 10px; display: flex; align-items: center; justify-content: center;">
+                                        <span style="font-size: 18px;">❌</span>
+                                    </div>
+                                    <div class="stat-label" style="margin: 0; font-size: 14px;">Отменены</div>
+                                </div>
+                                <div class="stat-value" style="color: #F44336;">${stats.ordersByStatus.cancelled}</div>
                             </div>
                         </div>
                     </div>
