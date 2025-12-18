@@ -3,22 +3,22 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Fudly Partner</title>
+    <title>Fudly Partner v20.0</title>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
     <script src="https://unpkg.com/lucide@latest"></script>
 
     <!-- Modular CSS Architecture -->
-    <link rel="stylesheet" href="/partner-panel/styles/variables.css?v=19.0">
-    <link rel="stylesheet" href="/partner-panel/styles/base.css?v=19.0">
-    <link rel="stylesheet" href="/partner-panel/styles/header.css?v=19.0">
-    <link rel="stylesheet" href="/partner-panel/styles/navigation.css?v=19.0">
-    <link rel="stylesheet" href="/partner-panel/styles/buttons.css?v=19.0">
-    <link rel="stylesheet" href="/partner-panel/styles/products.css?v=19.0">
-    <link rel="stylesheet" href="/partner-panel/styles/main.css?v=19.0">
-    <link rel="stylesheet" href="/partner-panel/styles/utilities.css?v=19.0">
-    <link rel="stylesheet" href="/partner-panel/styles/states.css?v=19.0">
-    <link rel="stylesheet" href="/partner-panel/styles/design-fixes.css?v=19.0">
+    <link rel="stylesheet" href="/partner-panel/styles/variables.css?v=20.0">
+    <link rel="stylesheet" href="/partner-panel/styles/base.css?v=20.0">
+    <link rel="stylesheet" href="/partner-panel/styles/header.css?v=20.0">
+    <link rel="stylesheet" href="/partner-panel/styles/navigation.css?v=20.0">
+    <link rel="stylesheet" href="/partner-panel/styles/buttons.css?v=20.0">
+    <link rel="stylesheet" href="/partner-panel/styles/products.css?v=20.0">
+    <link rel="stylesheet" href="/partner-panel/styles/main.css?v=20.0">
+    <link rel="stylesheet" href="/partner-panel/styles/utilities.css?v=20.0">
+    <link rel="stylesheet" href="/partner-panel/styles/states.css?v=20.0">
+    <link rel="stylesheet" href="/partner-panel/styles/design-fixes.css?v=20.0"
 
     <style>
         /* Yandex.Lavka Style + Telegram WebApp Optimizations */
@@ -782,7 +782,7 @@
 
         function groupOrdersByStatus(orders) {
             return {
-                active: orders.filter(o => ['new', 'preparing', 'ready'].includes(o.status)),
+                active: orders.filter(o => ['pending', 'new', 'preparing', 'ready'].includes(o.status)),
                 completed: orders.filter(o => o.status === 'completed'),
                 cancelled: orders.filter(o => o.status === 'cancelled')
             };
@@ -805,11 +805,18 @@
                 <div class="orders-list">
                     ${orders.map(order => {
                         const orderId = order.order_id || order.id;
+                        const photoUrl = order.offer_photo_url || order.photo_url;
                         return `
                         <div class="order-card ripple" 
                              data-order-id="${orderId}"
                              data-status="${order.status}"
                              onclick="viewOrderDetails(${orderId})">
+                            ${photoUrl ? `
+                                <div class="order-image">
+                                    <img src="${photoUrl}" alt="${order.offer_title || 'Товар'}" loading="lazy"
+                                         onerror="this.parentElement.innerHTML=''; this.remove();">
+                                </div>
+                            ` : ''}
                             <div class="order-header">
                                 <div class="order-id">#${orderId || '—'}</div>
                                 <div class="order-status status-${order.status}">${getStatusText(order.status)}</div>
@@ -822,7 +829,7 @@
                                 <span class="order-time">${formatTime(order.created_at)}</span>
                                 <span class="order-total">${formatPrice(order.price)}</span>
                             </div>
-                            ${order.status === 'new' ? `
+                            ${order.status === 'pending' || order.status === 'new' ? `
                                 <div class="order-actions" onclick="event.stopPropagation()">
                                     <button class="btn btn-sm btn-success ripple" onclick="handleStatusUpdate(${orderId}, 'preparing', this)">✓ Принять</button>
                                     <button class="btn btn-sm btn-danger ripple" onclick="handleCancelOrder(${orderId}, this)">✕ Отменить</button>
@@ -906,7 +913,7 @@
 
                         ${order.status !== 'completed' && order.status !== 'cancelled' ? `
                             <div style="margin-top: 24px; display: flex; gap: 12px;">
-                                ${order.status === 'new' ? `
+                                ${order.status === 'pending' || order.status === 'new' ? `
                                     <button class="btn btn-success ripple" style="flex: 1;" onclick="handleModalStatusUpdate(${oid}, 'preparing', this)">
                                         ✓ Принять заказ
                                     </button>
@@ -2181,6 +2188,7 @@
 
         function getStatusText(status) {
             const statusMap = {
+                'pending': 'Ожидает',
                 'new': 'Новый',
                 'preparing': 'Готовится',
                 'ready': 'Готов',
