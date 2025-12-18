@@ -31,12 +31,16 @@
 
 /* === Primary Button === */
 .btn-primary {
-    background: #FFCC00;
-    color: #000000;
+    background: #21A038;
+    color: #FFFFFF;
 }
 
 .btn-primary:hover:not(:disabled) {
-    background: #FFB800;
+    background: #1B8230;
+}
+
+.btn-primary:active:not(:disabled) {
+    background: #186329;
 }
 
 /* === Secondary Button === */
