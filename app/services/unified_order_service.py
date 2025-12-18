@@ -1104,64 +1104,42 @@ class UnifiedOrderService:
             True if successful
         """
         try:
-            # Get entity
-            if entity_type == "order":
-                entity = self.db.get_order(entity_id)
-                update_func = self.db.update_order_status
-                user_id_field = "user_id"
-                store_id_field = "store_id"
-                code_field = "pickup_code"
-                order_type_field = "order_type"
-                status_field = "order_status"
-            else:
-                entity = self.db.get_booking(entity_id)
-                update_func = self.db.update_booking_status
-                user_id_field = "user_id"
-                store_id_field = "store_id"
-                code_field = "code"
-                order_type_field = None  # Bookings are always pickup
-                status_field = "status"
-
+            # Get entity from unified orders table (v24+ all orders in one table)
+            # entity_type kept for backward compatibility but always "order" now
+            entity = self.db.get_order(entity_id)
             if not entity:
-                logger.warning(f"Entity not found: {entity_type}#{entity_id}")
+                logger.warning(f"Order not found: #{entity_id}")
                 return False
 
             # Get entity fields
             if isinstance(entity, dict):
-                user_id = entity.get(user_id_field)
-                store_id = entity.get(store_id_field)
-                pickup_code = entity.get(code_field)
-                current_status_raw = entity.get(status_field)
-                # For orders, check delivery_address to determine type if order_type not set
-                if order_type_field:
-                    order_type = entity.get(order_type_field)
-                    if not order_type:
-                        # Fallback: if has delivery_address → delivery, else pickup
-                        delivery_addr = entity.get("delivery_address")
-                        order_type = "delivery" if delivery_addr else "pickup"
-                        logger.info(
-                            f"Order type fallback for {entity_type}#{entity_id}: "
-                            f"delivery_address={delivery_addr}, order_type={order_type}"
-                        )
-                    else:
-                        logger.info(
-                            f"Order type from DB for {entity_type}#{entity_id}: {order_type}"
-                        )
+                user_id = entity.get("user_id")
+                store_id = entity.get("store_id")
+                pickup_code = entity.get("pickup_code")
+                current_status_raw = entity.get("order_status")
+                order_type = entity.get("order_type")
+                
+                # Fallback: if order_type not set, determine from delivery_address
+                if not order_type:
+                    delivery_addr = entity.get("delivery_address")
+                    order_type = "delivery" if delivery_addr else "pickup"
+                    logger.info(
+                        f"Order type fallback for #{entity_id}: "
+                        f"delivery_address={delivery_addr}, order_type={order_type}"
+                    )
                 else:
-                    order_type = "pickup"  # Bookings are always pickup
+                    logger.info(f"Order type from DB for #{entity_id}: {order_type}")
             else:
-                user_id = getattr(entity, user_id_field, None)
-                store_id = getattr(entity, store_id_field, None)
-                pickup_code = getattr(entity, code_field, None)
-                current_status_raw = getattr(entity, status_field, None)
-                if order_type_field:
-                    order_type = getattr(entity, order_type_field, None)
-                    if not order_type:
-                        order_type = (
-                            "delivery" if getattr(entity, "delivery_address", None) else "pickup"
-                        )
-                else:
-                    order_type = "pickup"
+                # Tuple format
+                user_id = getattr(entity, "user_id", None)
+                store_id = getattr(entity, "store_id", None)
+                pickup_code = getattr(entity, "pickup_code", None)
+                current_status_raw = getattr(entity, "order_status", None)
+                order_type = getattr(entity, "order_type", None)
+                if not order_type:
+                    order_type = (
+                        "delivery" if getattr(entity, "delivery_address", None) else "pickup"
+                    )
 
             # Normalize statuses and enforce safe transitions/idempotence
             current_status = (
@@ -1176,21 +1154,19 @@ class UnifiedOrderService:
 
             # Idempotent update: requested status already set
             if current_status == target_status:
-                logger.info(
-                    f"STATUS_UPDATE no-op (already {target_status}): " f"{entity_type}#{entity_id}"
-                )
+                logger.info(f"STATUS_UPDATE no-op (already {target_status}): #{entity_id}")
                 return True
 
             # Do not move away from terminal statuses (completed/cancelled/rejected)
             if current_status in terminal_statuses and target_status != current_status:
                 logger.info(
-                    "STATUS_UPDATE ignored for terminal entity: "
-                    f"{entity_type}#{entity_id} status={current_status} -> {target_status}"
+                    f"STATUS_UPDATE ignored for terminal entity: #{entity_id} "
+                    f"status={current_status} -> {target_status}"
                 )
                 return True
 
-            # Update status in DB
-            update_func(entity_id, target_status)
+            # Update status in DB (unified orders table)
+            self.db.update_order_status(entity_id, target_status)
 
             # Restore quantity if rejected or cancelled
             if target_status in [OrderStatus.REJECTED, OrderStatus.CANCELLED] and (
@@ -1205,7 +1181,7 @@ class UnifiedOrderService:
             should_notify = notify_customer and user_id
 
             logger.info(
-                f"Notification check for {entity_type}#{entity_id}: "
+                f"Notification check for #{entity_id}: "
                 f"status={target_status}, order_type={order_type}, "
                 f"notify_customer={notify_customer}, user_id={user_id}, "
                 f"should_notify={should_notify}"
@@ -1255,15 +1231,11 @@ class UnifiedOrderService:
                     kb.button(text=received_text, callback_data=f"customer_received_{entity_id}")
                     reply_markup = kb.as_markup()
                 elif target_status == OrderStatus.PREPARING and order_type == "pickup":
-                    # "Received" button for pickup orders/bookings when preparing
-                    # For legacy bookings we keep booking_received_, for cart orders
-                    # we use customer_received_ so the handler reads from orders table.
+                    # "Received" button for pickup orders when preparing
+                    # v24+: all orders in unified table, use customer_received_
                     kb = InlineKeyboardBuilder()
                     received_text = "✅ Oldim" if customer_lang == "uz" else "✅ Получил"
-                    callback_prefix = (
-                        "booking_received_" if entity_type == "booking" else "customer_received_"
-                    )
-                    kb.button(text=received_text, callback_data=f"{callback_prefix}{entity_id}")
+                    kb.button(text=received_text, callback_data=f"customer_received_{entity_id}")
                     reply_markup = kb.as_markup()
 
                 # Try to EDIT existing message first (live status update)
@@ -1279,7 +1251,7 @@ class UnifiedOrderService:
 
                 if existing_message_id:
                     logger.info(
-                        f"Trying to edit message {existing_message_id} for {entity_type}#{entity_id}"
+                        f"Trying to edit message {existing_message_id} for #{entity_id}"
                     )
 
                     # Try BOTH methods - caption first (for photos), then text
@@ -1333,19 +1305,10 @@ class UnifiedOrderService:
                                 logger.info(
                                     f"💾 Saved message_id={message_sent.message_id} for order#{entity_id}"
                                 )
-                            elif entity_type == "booking" and hasattr(
-                                self.db, "set_booking_customer_message_id"
-                            ):
-                                self.db.set_booking_customer_message_id(
-                                    entity_id, message_sent.message_id
-                                )
-                                logger.info(
-                                    f"💾 Saved message_id={message_sent.message_id} for booking#{entity_id}"
-                                )
                     except Exception as e:
                         logger.error(f"Failed to notify customer {user_id}: {e}")
 
-            logger.info(f"STATUS_UPDATE: {entity_type}#{entity_id} -> {target_status}")
+            logger.info(f"STATUS_UPDATE: #{entity_id} -> {target_status}")
             return True
 
         except Exception as e:

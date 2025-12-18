@@ -68,8 +68,10 @@ def _format_order_line(item: Any, is_booking: bool, lang: str, idx: int) -> str:
         return f"{idx}. {status_emoji} 🚚 #{order_id} • {title[:20]} ×{quantity}"
 
 
-def _build_list_text(bookings: list, orders: list, lang: str, filter_type: str = "all") -> str:
-    """Build orders list text."""
+def _build_list_text(
+    pickup_orders: list, delivery_orders: list, lang: str, filter_type: str = "all"
+) -> str:
+    """Build orders list text (v24+ unified orders)."""
     lines = []
 
     if filter_type == "pending":
@@ -86,20 +88,20 @@ def _build_list_text(bookings: list, orders: list, lang: str, filter_type: str =
 
     pickup_label = "Olib ketish" if lang == "uz" else "Самовывоз"
     delivery_label = "Yetkazish" if lang == "uz" else "Доставка"
-    lines.append(f"🏪 {pickup_label}: <b>{len(bookings)}</b>")
-    lines.append(f"🚚 {delivery_label}: <b>{len(orders)}</b>")
+    lines.append(f"🏪 {pickup_label}: <b>{len(pickup_orders)}</b>")
+    lines.append(f"🚚 {delivery_label}: <b>{len(delivery_orders)}</b>")
     lines.append("─" * 25)
 
     idx = 1
-    for b in bookings[:5]:
-        lines.append(_format_order_line(b, True, lang, idx))
+    for order in pickup_orders[:5]:
+        lines.append(_format_order_line(order, True, lang, idx))
         idx += 1
 
-    for o in orders[:5]:
-        lines.append(_format_order_line(o, False, lang, idx))
+    for order in delivery_orders[:5]:
+        lines.append(_format_order_line(order, False, lang, idx))
         idx += 1
 
-    if not bookings and not orders:
+    if not pickup_orders and not delivery_orders:
         empty = "Buyurtmalar yo'q" if lang == "uz" else "Заказов нет"
         lines.append(f"\n<i>{empty}</i>")
     else:
@@ -110,20 +112,23 @@ def _build_list_text(bookings: list, orders: list, lang: str, filter_type: str =
 
 
 def _build_keyboard(
-    bookings: list, orders: list, lang: str, filter_type: str = "all"
+    pickup_orders: list, delivery_orders: list, lang: str, filter_type: str = "all"
 ) -> InlineKeyboardBuilder:
-    """Build keyboard with order buttons and filters."""
+    """Build keyboard with order buttons and filters (v24+ unified orders)."""
     kb = InlineKeyboardBuilder()
 
-    for b in bookings[:5]:
-        booking_id = _get_field(b, "booking_id") or (b[0] if isinstance(b, (list, tuple)) else 0)
-        status = _get_field(b, "status") or "pending"
-        emoji = {"pending": "⏳", "confirmed": "✅", "preparing": "👨‍🍳"}.get(status, "📦")
-        kb.button(text=f"{emoji} 🏪#{booking_id}", callback_data=f"seller_view_b_{booking_id}")
+    # Pickup orders buttons (from unified orders table)
+    for order in pickup_orders[:5]:
+        order_id = _get_field(order, "order_id") or (order[0] if isinstance(order, (list, tuple)) else 0)
+        status = _get_field(order, "order_status") or "pending"
+        emoji = {"pending": "⏳", "preparing": "✅", "ready": "👨‍🍳"}.get(status, "📦")
+        # Use "o_" prefix for all orders (unified table)
+        kb.button(text=f"{emoji} 🏪#{order_id}", callback_data=f"seller_view_o_{order_id}")
 
-    for o in orders[:5]:
-        order_id = _get_field(o, "order_id") or (o[0] if isinstance(o, (list, tuple)) else 0)
-        status = _get_field(o, "order_status") or "pending"
+    # Delivery orders buttons
+    for order in delivery_orders[:5]:
+        order_id = _get_field(order, "order_id") or (order[0] if isinstance(order, (list, tuple)) else 0)
+        status = _get_field(order, "order_status") or "pending"
         emoji = {"pending": "⏳", "preparing": "👨‍🍳", "delivering": "🚚"}.get(status, "📦")
         kb.button(text=f"{emoji} 🚚#{order_id}", callback_data=f"seller_view_o_{order_id}")
 
@@ -153,42 +158,46 @@ def _build_keyboard(
     return kb
 
 
-def _filter_by_status(items: list, statuses: list, is_booking: bool) -> list:
-    """Filter items by status."""
+def _filter_by_status(items: list, statuses: list, is_pickup: bool = False) -> list:
+    """Filter items by status (v24+ unified orders - all use order_status field)."""
     result = []
     for item in items:
-        if is_booking:
-            status = _get_field(item, "status") or (
-                item[3] if isinstance(item, (list, tuple)) and len(item) > 3 else None
-            )
-        else:
-            status = _get_field(item, "order_status") or (
-                item[10] if isinstance(item, (list, tuple)) and len(item) > 10 else None
-            )
+        # v24+: all orders use order_status field
+        status = _get_field(item, "order_status") or (
+            item[10] if isinstance(item, (list, tuple)) and len(item) > 10 else None
+        )
         if status in statuses:
             result.append(item)
     return result
 
 
 def _get_all_orders(db, user_id: int) -> tuple[list, list]:
-    """Get all bookings and orders for seller's stores."""
+    """
+    Get all pickup and delivery orders for seller's stores (v24+ unified orders).
+    Returns (pickup_orders, delivery_orders) for compatibility with existing code.
+    """
     stores = db.get_user_accessible_stores(user_id) or []
 
-    all_bookings = []
-    all_orders = []
+    pickup_orders = []
+    delivery_orders = []
 
     for store in stores:
         store_id = get_store_field(store, "store_id")
         if not store_id:
             continue
 
-        bookings = db.get_store_bookings(store_id) or []
-        all_bookings.extend(bookings)
-
+        # v24+: all orders in unified table
         orders = db.get_store_orders(store_id) or []
-        all_orders.extend(orders)
+        
+        # Split by order_type for display compatibility
+        for order in orders:
+            order_type = order.get("order_type") if isinstance(order, dict) else None
+            if order_type == "pickup":
+                pickup_orders.append(order)
+            else:
+                delivery_orders.append(order)
 
-    return all_bookings, all_orders
+    return pickup_orders, delivery_orders
 
 
 # =============================================================================
@@ -230,29 +239,30 @@ async def seller_orders_main(message: types.Message, state: FSMContext) -> Any:
         return
 
     lang = db.get_user_language(message.from_user.id)
-    all_bookings, all_orders = _get_all_orders(db, message.from_user.id)
+    pickup_orders, delivery_orders = _get_all_orders(db, message.from_user.id)
 
-    pending_bookings = _filter_by_status(all_bookings, ["pending"], True)
-    pending_orders = _filter_by_status(all_orders, ["pending", "preparing"], False)
+    # Filter pending/preparing orders
+    pending_pickup = _filter_by_status(pickup_orders, ["pending", "preparing"], is_pickup=True)
+    pending_delivery = _filter_by_status(delivery_orders, ["pending", "preparing"], is_pickup=False)
 
-    text = _build_list_text(pending_bookings, pending_orders, lang, "pending")
-    kb = _build_keyboard(pending_bookings, pending_orders, lang, "pending")
+    text = _build_list_text(pending_pickup, pending_delivery, lang, "pending")
+    kb = _build_keyboard(pending_pickup, pending_delivery, lang, "pending")
 
     await message.answer(text, parse_mode="HTML", reply_markup=kb.as_markup())
 
 
 @router.callback_query(F.data == "seller_orders_refresh")
 async def seller_orders_refresh(callback: types.CallbackQuery) -> None:
-    """Refresh orders list."""
+    """Refresh orders list (v24+ unified orders)."""
     db = get_db()
     lang = db.get_user_language(callback.from_user.id)
 
-    all_bookings, all_orders = _get_all_orders(db, callback.from_user.id)
-    pending_bookings = _filter_by_status(all_bookings, ["pending"], True)
-    pending_orders = _filter_by_status(all_orders, ["pending", "preparing"], False)
+    pickup_orders, delivery_orders = _get_all_orders(db, callback.from_user.id)
+    pending_pickup = _filter_by_status(pickup_orders, ["pending", "preparing"], is_pickup=True)
+    pending_delivery = _filter_by_status(delivery_orders, ["pending", "preparing"], is_pickup=False)
 
-    text = _build_list_text(pending_bookings, pending_orders, lang, "pending")
-    kb = _build_keyboard(pending_bookings, pending_orders, lang, "pending")
+    text = _build_list_text(pending_pickup, pending_delivery, lang, "pending")
+    kb = _build_keyboard(pending_pickup, pending_delivery, lang, "pending")
 
     try:
         await callback.message.edit_text(text, parse_mode="HTML", reply_markup=kb.as_markup())

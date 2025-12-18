@@ -862,64 +862,20 @@ async def import_csv(
 # Orders endpoints
 @router.get("/orders")
 async def list_orders(authorization: str = Header(None), status: Optional[str] = None):
-    """List partner's orders (both bookings and orders)"""
+    """
+    List partner's orders (unified from orders table).
+    After v24 migration, all orders (pickup + delivery) are in orders table.
+    """
     telegram_id = verify_telegram_webapp(authorization)
     user, store = get_partner_with_store(telegram_id)
     db = get_db()
 
-    # Get both bookings (pickup) and orders (delivery)
-    bookings = db.get_store_bookings(store["store_id"])
+    # Get all orders from unified orders table
     orders = db.get_store_orders(store["store_id"])
 
     result = []
 
-    # Process bookings (pickup orders)
-    for booking in bookings:
-        # Handle both dict and tuple formats
-        if isinstance(booking, dict):
-            booking_id = booking.get("booking_id")
-            offer_id = booking.get("offer_id")
-            user_id = booking.get("user_id")
-            booking_status = booking.get("status")
-            quantity = booking.get("quantity", 1)
-            created_at = booking.get("created_at")
-            customer_name = booking.get("first_name", "Unknown")
-            customer_phone = booking.get("phone")
-        else:
-            # Tuple format: booking_id, offer_id, user_id, status, booking_code, pickup_time, quantity, created_at, title, first_name, username, phone
-            booking_id = booking[0]
-            offer_id = booking[1]
-            user_id = booking[2]
-            booking_status = booking[3]
-            quantity = booking[6] if len(booking) > 6 else 1
-            created_at = booking[7] if len(booking) > 7 else None
-            customer_name = booking[9] if len(booking) > 9 else "Unknown"
-            customer_phone = booking[11] if len(booking) > 11 else None
-
-        # Filter by status if requested
-        if status and status != "all" and booking_status != status:
-            continue
-
-        # Get offer info
-        offer = db.get_offer(offer_id) if offer_id else None
-
-        result.append(
-            {
-                "order_id": booking_id,
-                "type": "booking",  # Distinguish from delivery orders
-                "offer_title": offer.get("title") if offer else "Unknown",
-                "quantity": quantity,
-                "price": offer.get("discount_price") * quantity if offer else 0,
-                "order_type": "pickup",
-                "status": booking_status,
-                "delivery_address": None,
-                "created_at": str(created_at) if created_at else None,
-                "customer_name": customer_name,
-                "customer_phone": customer_phone,
-            }
-        )
-
-    # Process orders (both pickup and delivery from orders table)
+    # Process all orders from unified table
     for order in orders:
         # Handle both dict and tuple formats
         if isinstance(order, dict):
@@ -947,7 +903,7 @@ async def list_orders(authorization: str = Header(None), status: Optional[str] =
             store_id = order[2]
             offer_id = order[3]
             quantity = order[4]
-            order_type = order[5]
+            order_type = order[5] if len(order) > 5 else "delivery"
             order_status = order[6] if len(order) > 6 else "pending"
             total_price = order[7] if len(order) > 7 else 0
             delivery_address = order[8] if len(order) > 8 else None
@@ -990,29 +946,18 @@ async def list_orders(authorization: str = Header(None), status: Optional[str] =
 async def confirm_order(
     request: Request,
     order_id: int,
-    order_type: str = "booking",  # For legacy compatibility, but we determine from DB
     authorization: str = Header(None),
 ):
-    """Confirm order (booking or delivery order) with notifications"""
+    """
+    Confirm order with notifications (v24+ unified orders).
+    Works for both pickup and delivery orders.
+    """
     telegram_id = verify_telegram_webapp(authorization)
     user, store = get_partner_with_store(telegram_id)
     db = get_db()
     unified_service = get_unified_order_service()
 
-    # First try to find in bookings table
-    booking = db.get_booking(order_id)
-    if booking:
-        # Verify it's partner's order via store
-        offer_id = booking.get("offer_id") if isinstance(booking, dict) else booking[1]
-        offer = db.get_offer(offer_id)
-        if not offer or offer.get("store_id") != store["store_id"]:
-            raise HTTPException(status_code=403, detail="Not your order")
-
-        # Use unified service to update status with notifications
-        await unified_service.confirm_order(order_id, "booking")
-        return {"order_id": order_id, "status": "confirmed", "type": "booking"}
-
-    # Try orders table
+    # Get order from unified orders table
     order = db.get_order(order_id)
     if not order:
         raise HTTPException(status_code=404, detail="Order not found")
@@ -1022,8 +967,7 @@ async def confirm_order(
     if order_store_id != store["store_id"]:
         raise HTTPException(status_code=403, detail="Not your order")
 
-    # entity_type='order' for orders table (regardless of pickup/delivery)
-    # UnifiedOrderService will determine actual order_type from DB
+    # Use unified service to update status with notifications
     await unified_service.confirm_order(order_id, "order")
 
     # Return type based on order_type for frontend
@@ -1034,7 +978,7 @@ async def confirm_order(
     )
     frontend_type = "booking" if db_order_type == "pickup" else "order"
 
-    return {"order_id": order_id, "status": "confirmed", "type": frontend_type}
+    return {"order_id": order_id, "status": "preparing", "type": frontend_type}
 
 
 # REMOVED: Duplicate cancel endpoint without reason - use v22.0 endpoint above with cancel_reason
@@ -1045,33 +989,17 @@ async def update_order_status(
     order_id: int,
     authorization: str = Header(None),
     status: str = Query(...),
-    order_type: str = Query("booking"),  # For legacy compatibility, but we determine from DB
 ):
-    """Update order status (ready, delivering, etc) with notifications"""
+    """
+    Update order status (ready, delivering, etc) with notifications (v24+ unified orders).
+    Works for both pickup and delivery orders.
+    """
     telegram_id = verify_telegram_webapp(authorization)
     user, store = get_partner_with_store(telegram_id)
     db = get_db()
     unified_service = get_unified_order_service()
 
-    # First try to find in bookings table
-    booking = db.get_booking(order_id)
-    if booking:
-        # Verify it's partner's order via store
-        offer_id = booking.get("offer_id") if isinstance(booking, dict) else booking[1]
-        offer = db.get_offer(offer_id)
-        if not offer or offer.get("store_id") != store["store_id"]:
-            raise HTTPException(status_code=403, detail="Not your order")
-
-        # Use unified service based on status
-        if status == "ready":
-            await unified_service.mark_ready(order_id, "booking")
-        elif status == "completed":
-            await unified_service.complete_order(order_id, "booking")
-        else:
-            db.update_booking_status(order_id, status)
-        return {"order_id": order_id, "status": status, "type": "booking"}
-
-    # Try orders table
+    # Get order from unified orders table
     order = db.get_order(order_id)
     if not order:
         raise HTTPException(status_code=404, detail="Order not found")
@@ -1081,8 +1009,7 @@ async def update_order_status(
     if order_store_id != store["store_id"]:
         raise HTTPException(status_code=403, detail="Not your order")
 
-    # entity_type='order' for orders table (regardless of pickup/delivery)
-    # UnifiedOrderService will read order_type from DB to handle correctly
+    # Use unified service based on status
     if status == "ready":
         await unified_service.mark_ready(order_id, "order")
     elif status == "delivering":

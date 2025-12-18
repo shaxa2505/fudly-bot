@@ -259,19 +259,32 @@ async def get_order_status(booking_id: int, db=Depends(get_db)):
     """Get current order status with all details including QR code.
 
     Args:
-        booking_id: Booking ID
+        booking_id: Booking ID (v24+ order_id from unified orders table)
 
     Returns:
         OrderStatus with full order details and QR code (if applicable)
 
     Raises:
-        404: Booking not found
+        404: Order not found
     """
-    booking = db.get_booking(booking_id)
-    if not booking:
-        raise HTTPException(status_code=404, detail="Заказ не найден")
-
-    return format_booking_to_order_status(booking, db)
+    # v24+: try unified orders table first
+    order = db.get_order(booking_id)
+    if order:
+        # Convert order to booking format for compatibility
+        return format_booking_to_order_status(order, db)
+    
+    # Fallback: check archived bookings for old orders
+    try:
+        booking = db.execute(
+            "SELECT * FROM bookings_archive WHERE booking_id = %s",
+            (booking_id,)
+        )
+        if booking:
+            return format_booking_to_order_status(booking[0], db)
+    except:
+        pass
+    
+    raise HTTPException(status_code=404, detail="Заказ не найден")
 
 
 @router.get("/{booking_id}/timeline", response_model=OrderTimeline)
@@ -279,21 +292,34 @@ async def get_order_timeline(booking_id: int, db=Depends(get_db)):
     """Get order status timeline/history.
 
     Args:
-        booking_id: Booking ID
+        booking_id: Booking ID (v24+ order_id from unified orders table)
 
     Returns:
         OrderTimeline with status change history
 
     Raises:
-        404: Booking not found
+        404: Order not found
     """
-    booking = db.get_booking(booking_id)
-    if not booking:
+    # v24+: try unified orders table first
+    order = db.get_order(booking_id)
+    if not order:
+        # Fallback: check archived bookings
+        try:
+            result = db.execute(
+                "SELECT * FROM bookings_archive WHERE booking_id = %s",
+                (booking_id,)
+            )
+            if result:
+                order = result[0]
+        except:
+            pass
+    
+    if not order:
         raise HTTPException(status_code=404, detail="Заказ не найден")
 
-    booking_dict = dict(booking) if not isinstance(booking, dict) else booking
-    status = booking_dict.get("status", "pending")
-    created_at = str(booking_dict.get("created_at", ""))
+    order_dict = dict(order) if not isinstance(order, dict) else order
+    status = order_dict.get("order_status", order_dict.get("status", "pending"))
+    created_at = str(order_dict.get("created_at", ""))
 
     # Build timeline based on status
     timeline = []
@@ -301,11 +327,12 @@ async def get_order_timeline(booking_id: int, db=Depends(get_db)):
     # Always have "created" status
     timeline.append(StatusUpdate(status="pending", timestamp=created_at, message="Заказ создан"))
 
-    if status in ["confirmed", "ready", "completed"]:
+    # v23+ statuses: pending, preparing, ready, delivering, completed, rejected, cancelled
+    if status in ["preparing", "confirmed", "ready", "completed"]:
         timeline.append(
             StatusUpdate(
-                status="confirmed",
-                timestamp=str(booking_dict.get("updated_at", created_at)),
+                status="preparing",
+                timestamp=str(order_dict.get("updated_at", created_at)),
                 message="Заказ подтвержден магазином",
             )
         )
@@ -314,7 +341,7 @@ async def get_order_timeline(booking_id: int, db=Depends(get_db)):
         timeline.append(
             StatusUpdate(
                 status="ready",
-                timestamp=str(booking_dict.get("updated_at", created_at)),
+                timestamp=str(order_dict.get("updated_at", created_at)),
                 message="Заказ готов к выдаче",
             )
         )
@@ -323,7 +350,7 @@ async def get_order_timeline(booking_id: int, db=Depends(get_db)):
         timeline.append(
             StatusUpdate(
                 status="completed",
-                timestamp=str(booking_dict.get("updated_at", created_at)),
+                timestamp=str(order_dict.get("updated_at", created_at)),
                 message="Заказ завершен",
             )
         )
@@ -332,18 +359,18 @@ async def get_order_timeline(booking_id: int, db=Depends(get_db)):
         timeline.append(
             StatusUpdate(
                 status="cancelled",
-                timestamp=str(booking_dict.get("updated_at", created_at)),
+                timestamp=str(order_dict.get("updated_at", created_at)),
                 message="Заказ отменен",
             )
         )
 
     # Estimate ready time based on status
     estimated_ready = None
-    if status == "confirmed" or status == "preparing":
+    if status in ["preparing", "confirmed"]:
         # Calculate estimated time based on when order was confirmed
         from datetime import datetime, timedelta
         try:
-            updated_at = booking_dict.get("updated_at")
+            updated_at = order_dict.get("updated_at")
             if updated_at:
                 if isinstance(updated_at, str):
                     confirmed_time = datetime.fromisoformat(updated_at.replace('Z', '+00:00'))
@@ -394,32 +421,46 @@ async def get_order_qr_code(booking_id: int, db=Depends(get_db)):
     """Get QR code for order pickup (standalone endpoint).
 
     Args:
-        booking_id: Booking ID
+        booking_id: Booking ID (v24+ order_id from unified orders table)
 
     Returns:
         JSON with base64 QR code
 
     Raises:
-        404: Booking not found
+        404: Order not found
         400: QR code not available for this status
     """
-    booking = db.get_booking(booking_id)
-    if not booking:
+    # v24+: try unified orders table first
+    order = db.get_order(booking_id)
+    if not order:
+        # Fallback: check archived bookings
+        try:
+            result = db.execute(
+                "SELECT * FROM bookings_archive WHERE booking_id = %s",
+                (booking_id,)
+            )
+            if result:
+                order = result[0]
+        except:
+            pass
+    
+    if not order:
         raise HTTPException(status_code=404, detail="Заказ не найден")
 
-    booking_dict = dict(booking) if not isinstance(booking, dict) else booking
-    status = booking_dict.get("status", "pending")
-    booking_code = booking_dict.get("booking_code", "")
+    order_dict = dict(order) if not isinstance(order, dict) else order
+    status = order_dict.get("order_status", order_dict.get("status", "pending"))
+    pickup_code = order_dict.get("pickup_code", order_dict.get("booking_code", ""))
 
-    if status not in ["confirmed", "ready"]:
+    # v23+ statuses: preparing, ready
+    if status not in ["preparing", "confirmed", "ready"]:
         raise HTTPException(
             status_code=400, detail="QR код доступен только для подтвержденных заказов"
         )
 
-    if not booking_code:
+    if not pickup_code:
         raise HTTPException(status_code=400, detail="Код заказа не найден")
 
-    qr_code = generate_qr_code(booking_code)
+    qr_code = generate_qr_code(pickup_code)
 
     return {
         "booking_id": booking_id,

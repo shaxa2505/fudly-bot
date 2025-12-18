@@ -317,8 +317,18 @@ class OfferService:
         address = get_store_field(store, "address", get_field(store, 4, ""))
         business_type = get_store_field(store, "business_type", get_field(store, 11, "supermarket"))
         offers_count = self._extract_offers_count(store)
-        rating = float(self._db.get_store_average_rating(store_id) or 0.0)
-        ratings = self._db.get_store_ratings(store_id) or []
+        
+        # Try to get pre-joined rating fields to avoid N+1
+        rating = float(get_store_field(store, "avg_rating", get_field(store, "rating", 0.0)) or 0.0)
+        ratings_count = int(get_store_field(store, "ratings_count", get_field(store, "total_ratings", 0)) or 0)
+        
+        # Fallback to DB queries only if not available in joined data
+        if rating == 0.0:
+            rating = float(self._db.get_store_average_rating(store_id) or 0.0)
+        if ratings_count == 0:
+            ratings = self._db.get_store_ratings(store_id) or []
+            ratings_count = len(ratings)
+            
         return StoreSummary(
             id=store_id,
             name=name,
@@ -327,7 +337,7 @@ class OfferService:
             business_type=business_type,
             offers_count=offers_count,
             rating=rating,
-            ratings_count=len(ratings),
+            ratings_count=ratings_count,
         )
 
     def _extract_offers_count(self, store: Any) -> int:
