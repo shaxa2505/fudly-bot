@@ -499,6 +499,11 @@
                 state.orders = orders;
                 state.products = products;
 
+                // Connect WebSocket after store info is loaded
+                if (!websocket && store.store_id) {
+                    connectWebSocket();
+                }
+
                 renderDashboard();
             } catch (error) {
                 console.error('❌ Dashboard load error:', error);
@@ -775,6 +780,7 @@
             try {
                 state.orders = await apiFetch('/api/partner/orders');
                 renderOrders();
+                updateNotificationBadge(); // Update badge with new orders count
             } catch (error) {
                 toast('Ошибка загрузки заказов', 'error');
             }
@@ -2771,6 +2777,181 @@
         }
 
         // ============================================
+        // AUTO-REFRESH & NOTIFICATIONS
+        // ============================================
+        let autoRefreshInterval = null;
+        let websocket = null;
+        let wsReconnectTimeout = null;
+
+        function connectWebSocket() {
+            // Skip if no store info yet
+            if (!state.store || !state.store.store_id) {
+                console.log('⏸️ Waiting for store info before connecting WebSocket');
+                return;
+            }
+
+            const storeId = state.store.store_id;
+            const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+            const wsUrl = `${protocol}//${API_HOST}/api/partner/ws/partner/${storeId}`;
+            
+            console.log(`🔌 Connecting to WebSocket: ${wsUrl}`);
+            
+            try {
+                websocket = new WebSocket(wsUrl);
+                
+                websocket.onopen = () => {
+                    console.log('✅ WebSocket connected');
+                    // Clear reconnect timeout
+                    if (wsReconnectTimeout) {
+                        clearTimeout(wsReconnectTimeout);
+                        wsReconnectTimeout = null;
+                    }
+                };
+                
+                websocket.onmessage = (event) => {
+                    try {
+                        const data = JSON.parse(event.data);
+                        console.log('📥 WebSocket message:', data);
+                        
+                        if (data.type === 'new_order') {
+                            handleNewOrderNotification(data.data);
+                        } else if (data.type === 'order_status_changed') {
+                            handleOrderStatusChanged(data.data);
+                        } else if (data.type === 'order_cancelled') {
+                            handleOrderCancelled(data.data);
+                        } else if (data.type === 'connected') {
+                            console.log('✅ WebSocket connection confirmed');
+                        }
+                    } catch (err) {
+                        console.error('❌ Failed to parse WebSocket message:', err);
+                    }
+                };
+                
+                websocket.onerror = (error) => {
+                    console.error('❌ WebSocket error:', error);
+                };
+                
+                websocket.onclose = () => {
+                    console.log('🔌 WebSocket disconnected');
+                    websocket = null;
+                    
+                    // Reconnect after 5 seconds
+                    wsReconnectTimeout = setTimeout(() => {
+                        console.log('🔄 Reconnecting WebSocket...');
+                        connectWebSocket();
+                    }, 5000);
+                };
+                
+                // Send ping every 30 seconds to keep connection alive
+                setInterval(() => {
+                    if (websocket && websocket.readyState === WebSocket.OPEN) {
+                        websocket.send('ping');
+                    }
+                }, 30000);
+                
+            } catch (error) {
+                console.error('❌ Failed to connect WebSocket:', error);
+            }
+        }
+
+        function disconnectWebSocket() {
+            if (websocket) {
+                websocket.close();
+                websocket = null;
+            }
+            if (wsReconnectTimeout) {
+                clearTimeout(wsReconnectTimeout);
+                wsReconnectTimeout = null;
+            }
+        }
+
+        function handleNewOrderNotification(orderData) {
+            console.log('🔔 NEW ORDER:', orderData);
+            
+            // Play sound if supported
+            try {
+                if (window.Telegram?.WebApp?.HapticFeedback) {
+                    window.Telegram.WebApp.HapticFeedback.notificationOccurred('success');
+                }
+            } catch (e) {}
+            
+            // Show toast notification
+            toast(`🔔 Новый заказ #${orderData.order_ids[0]}`, 'info', {
+                description: `${orderData.customer_name} • ${formatPrice(orderData.total)}`
+            });
+            
+            // Reload orders if on orders page
+            if (state.currentView === 'orders') {
+                setTimeout(() => loadOrders(), 500);
+            }
+            
+            // Update badge
+            updateNotificationBadge();
+        }
+
+        function handleOrderStatusChanged(data) {
+            console.log('📊 Order status changed:', data);
+            
+            // Reload orders if on orders page
+            if (state.currentView === 'orders') {
+                setTimeout(() => loadOrders(), 500);
+            }
+        }
+
+        function handleOrderCancelled(data) {
+            console.log('❌ Order cancelled:', data);
+            
+            toast(`Заказ #${data.order_id} отменён`, 'warning');
+            
+            // Reload orders if on orders page
+            if (state.currentView === 'orders') {
+                setTimeout(() => loadOrders(), 500);
+            }
+        }
+
+        function startAutoRefresh() {
+            // Clear existing interval
+            if (autoRefreshInterval) {
+                clearInterval(autoRefreshInterval);
+            }
+
+            // Auto-refresh orders every 30 seconds
+            autoRefreshInterval = setInterval(() => {
+                if (state.currentView === 'orders') {
+                    console.log('🔄 Auto-refreshing orders...');
+                    loadOrders();
+                }
+            }, 30000); // 30 seconds
+
+            console.log('✅ Auto-refresh started (30s interval)');
+        }
+
+        function stopAutoRefresh() {
+            if (autoRefreshInterval) {
+                clearInterval(autoRefreshInterval);
+                autoRefreshInterval = null;
+                console.log('⏹️ Auto-refresh stopped');
+            }
+        }
+
+        function updateNotificationBadge() {
+            if (!state.orders) return;
+
+            // Count new/pending orders
+            const newOrdersCount = state.orders.filter(o => 
+                o.status === 'pending' || o.status === 'new'
+            ).length;
+
+            const badge = document.getElementById('notificationCount');
+            if (newOrdersCount > 0) {
+                badge.textContent = newOrdersCount;
+                badge.style.display = 'flex';
+            } else {
+                badge.style.display = 'none';
+            }
+        }
+
+        // ============================================
         // INITIALIZATION
         // ============================================
         function init() {
@@ -2785,6 +2966,12 @@
 
             // Setup keyboard navigation
             setupKeyboardNavigation();
+
+            // Start auto-refresh for orders
+            startAutoRefresh();
+
+            // Connect WebSocket for real-time notifications
+            connectWebSocket();
 
             // Update store info
             const { userId } = getAuth();
@@ -2813,6 +3000,12 @@
 
             console.log('✅ App initialized successfully');
         }
+
+        // Cleanup on page unload
+        window.addEventListener('beforeunload', () => {
+            stopAutoRefresh();
+            disconnectWebSocket();
+        });
 
         // Start app when DOM is ready
         if (document.readyState === 'loading') {

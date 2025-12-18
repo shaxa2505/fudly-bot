@@ -1036,10 +1036,42 @@ class UnifiedOrderService:
                     kb.button(text="❌ Отклонить", callback_data=f"order_reject_{first_order_id}")
                 kb.adjust(2)
 
+                # Send Telegram notification
                 await self.bot.send_message(
                     owner_id, seller_text, parse_mode="HTML", reply_markup=kb.as_markup()
                 )
                 logger.info(f"Sent order notification to seller {owner_id} for orders {order_ids}")
+                
+                # Send WebSocket notification to web panel (real-time)
+                try:
+                    from app.api.websocket_manager import get_connection_manager
+                    manager = get_connection_manager()
+                    
+                    # Prepare order data for WebSocket
+                    order_data = {
+                        "order_ids": order_ids,
+                        "order_type": order_type,
+                        "customer_name": customer_name,
+                        "total": store_total,
+                        "items": [
+                            {
+                                "title": o.get("title", ""),
+                                "quantity": o.get("quantity", 1),
+                                "price": o.get("price", 0)
+                            }
+                            for o in store_orders
+                        ],
+                        "delivery_address": delivery_address,
+                        "timestamp": str(datetime.now())
+                    }
+                    
+                    sent = await manager.notify_new_order(store_id, order_data)
+                    if sent > 0:
+                        logger.info(f"📤 Sent WebSocket notification to {sent} web panels for store {store_id}")
+                    
+                except Exception as ws_error:
+                    logger.warning(f"⚠️ Failed to send WebSocket notification: {ws_error}")
+                    # Don't fail if WebSocket fails - Telegram notification still sent
 
             except Exception as e:
                 logger.error(f"Failed to notify seller for store {store_id}: {e}")

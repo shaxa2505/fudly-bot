@@ -12,12 +12,13 @@ from datetime import datetime, timedelta
 from typing import Optional
 
 import pytz
-from fastapi import APIRouter, File, Form, Header, HTTPException, Query, Request, UploadFile
+from fastapi import APIRouter, File, Form, Header, HTTPException, Query, Request, UploadFile, WebSocket, WebSocketDisconnect
 from slowapi import Limiter
 from slowapi.util import get_remote_address
 
 from app.services.stats import PartnerTotals, Period, get_partner_stats
 from app.services.unified_order_service import get_unified_order_service
+from app.api.websocket_manager import get_connection_manager
 from database_protocol import DatabaseProtocol
 
 router = APIRouter(tags=["partner-panel"])
@@ -292,6 +293,69 @@ async def get_profile(authorization: str = Header(None)):
         if store_info
         else None,
     }
+
+
+# ============================================
+# WEBSOCKET - Real-time notifications
+# ============================================
+
+@router.websocket("/ws/partner/{store_id}")
+async def websocket_partner(websocket: WebSocket, store_id: int):
+    """
+    WebSocket endpoint for real-time partner notifications.
+    
+    Messages sent to partner:
+    - {"type": "new_order", "data": {...}}
+    - {"type": "order_status_changed", "data": {"order_id": 123, "status": "preparing"}}
+    - {"type": "order_cancelled", "data": {"order_id": 123, "reason": "..."}}
+    
+    Usage (frontend):
+        const ws = new WebSocket('wss://api.example.com/api/partner/ws/partner/123');
+        ws.onmessage = (event) => {
+            const data = JSON.parse(event.data);
+            if (data.type === 'new_order') {
+                // Show notification, reload orders
+            }
+        };
+    """
+    import logging
+    logging.info(f"🔌 WebSocket connection attempt for store {store_id}")
+    
+    manager = get_connection_manager()
+    
+    try:
+        await manager.connect(store_id, websocket)
+        logging.info(f"✅ WebSocket connected: store_id={store_id}")
+        
+        # Send connection confirmation
+        await websocket.send_json({
+            "type": "connected",
+            "data": {
+                "store_id": store_id,
+                "timestamp": datetime.now().isoformat()
+            }
+        })
+        
+        # Keep connection alive and handle ping/pong
+        while True:
+            try:
+                # Wait for client messages (ping/pong)
+                data = await websocket.receive_text()
+                
+                # Handle ping
+                if data == "ping":
+                    await websocket.send_json({"type": "pong"})
+                
+            except WebSocketDisconnect:
+                logging.info(f"🔌 Client disconnected: store_id={store_id}")
+                break
+            except Exception as e:
+                logging.error(f"❌ WebSocket error for store {store_id}: {e}")
+                break
+    
+    finally:
+        manager.disconnect(store_id, websocket)
+        logging.info(f"🔌 WebSocket closed: store_id={store_id}")
 
 
 # Store info endpoint (для frontend storeAPI.getInfo())
@@ -973,55 +1037,7 @@ async def confirm_order(
     return {"order_id": order_id, "status": "confirmed", "type": frontend_type}
 
 
-@router.post("/orders/{order_id}/cancel")
-@limiter.limit("20/minute")
-async def cancel_order(
-    request: Request,
-    order_id: int,
-    order_type: str = "booking",  # For legacy compatibility, but we determine from DB
-    authorization: str = Header(None),
-):
-    """Cancel order (booking or delivery order) with notifications"""
-    telegram_id = verify_telegram_webapp(authorization)
-    user, store = get_partner_with_store(telegram_id)
-    db = get_db()
-    unified_service = get_unified_order_service()
-
-    # First try to find in bookings table
-    booking = db.get_booking(order_id)
-    if booking:
-        # Verify it's partner's order via store
-        offer_id = booking.get("offer_id") if isinstance(booking, dict) else booking[1]
-        offer = db.get_offer(offer_id)
-        if not offer or offer.get("store_id") != store["store_id"]:
-            raise HTTPException(status_code=403, detail="Not your order")
-
-        # Use unified service to cancel with notifications
-        await unified_service.cancel_order(order_id, "booking")
-        return {"order_id": order_id, "status": "cancelled", "type": "booking"}
-
-    # Try orders table
-    order = db.get_order(order_id)
-    if not order:
-        raise HTTPException(status_code=404, detail="Order not found")
-
-    # Verify it's partner's order
-    order_store_id = order.get("store_id") if isinstance(order, dict) else order[2]
-    if order_store_id != store["store_id"]:
-        raise HTTPException(status_code=403, detail="Not your order")
-
-    # entity_type='order' for orders table (regardless of pickup/delivery)
-    await unified_service.cancel_order(order_id, "order")
-
-    # Return type based on order_type for frontend
-    db_order_type = (
-        order.get("order_type")
-        if isinstance(order, dict)
-        else (order[5] if len(order) > 5 else "delivery")
-    )
-    frontend_type = "booking" if db_order_type == "pickup" else "order"
-
-    return {"order_id": order_id, "status": "cancelled", "type": frontend_type}
+# REMOVED: Duplicate cancel endpoint without reason - use v22.0 endpoint above with cancel_reason
 
 
 @router.post("/orders/{order_id}/status")
