@@ -287,7 +287,7 @@
 
         async function apiFetch(endpoint, options = {}) {
             const { data: initData, userId } = getAuth();
-            
+
             // Determine authorization header
             let authHeader = '';
             if (initData) {
@@ -304,7 +304,7 @@
                 ...options.headers
             };
 
-            console.log(`🌐 API Request: ${endpoint}`, { 
+            console.log(`🌐 API Request: ${endpoint}`, {
                 hasAuth: !!authHeader,
                 userId,
                 endpoint
@@ -316,9 +316,9 @@
                     headers
                 });
 
-                console.log(`📥 API Response: ${endpoint}`, { 
-                    status: response.status, 
-                    ok: response.ok 
+                console.log(`📥 API Response: ${endpoint}`, {
+                    status: response.status,
+                    ok: response.ok
                 });
 
                 if (!response.ok) {
@@ -369,21 +369,21 @@
 
         function toast(message, type = 'info', options = {}) {
             haptic(type === 'success' ? 'success' : type === 'error' ? 'error' : 'light');
-            
+
             const toast = document.createElement('div');
             toast.className = `toast ${type} slide-up`;
-            
+
             const icon = document.createElement('span');
             icon.style.fontSize = '20px';
             icon.textContent = type === 'success' ? '✓' : type === 'error' ? '✕' : type === 'warning' ? '⚠' : 'ℹ';
-            
+
             const contentDiv = document.createElement('div');
             contentDiv.style.flex = '1';
-            
+
             const text = document.createElement('span');
             text.textContent = message;
             contentDiv.appendChild(text);
-            
+
             // Add description if provided
             if (options.description) {
                 const desc = document.createElement('div');
@@ -393,10 +393,10 @@
                 desc.textContent = options.description;
                 contentDiv.appendChild(desc);
             }
-            
+
             toast.appendChild(icon);
             toast.appendChild(contentDiv);
-            
+
             // Add action button if provided
             if (options.action && options.actionLabel) {
                 const actionBtn = document.createElement('button');
@@ -408,7 +408,7 @@
                 };
                 toast.appendChild(actionBtn);
             }
-            
+
             document.body.appendChild(toast);
 
             const duration = options.duration || 3000;
@@ -492,10 +492,10 @@
             // Smooth transition
             const content = document.querySelector('.content');
             content.classList.add('fade-out');
-            
+
             setTimeout(() => {
                 content.classList.remove('fade-out');
-                
+
                 // Load view
                 switch(view) {
                     case 'dashboard':
@@ -514,7 +514,7 @@
                         loadSettings();
                         break;
                 }
-                
+
                 // Scroll to top smoothly
                 content.scrollTo({ top: 0, behavior: 'smooth' });
             }, 150);
@@ -885,7 +885,7 @@
                         const orderId = order.order_id || order.id;
                         const photoUrl = order.offer_photo_url || order.photo_url;
                         return `
-                        <div class="order-card ripple" 
+                        <div class="order-card ripple"
                              data-order-id="${orderId}"
                              data-status="${order.status}"
                              onclick="viewOrderDetails(${orderId})">
@@ -1026,30 +1026,30 @@
         async function updateOrderStatus(orderId, newStatus) {
             let order = null;
             let oldStatus = null;
-            
+
             try {
                 haptic('medium');
 
                 // Optimistic UI update
                 order = state.orders.find(o => (o.order_id || o.id) === orderId);
                 oldStatus = order?.status;
-                
+
                 if (order) {
                     order.status = newStatus;
-                    
+
                     // Update UI immediately
                     const orderCard = document.querySelector(`[data-order-id="${orderId}"]`);
                     if (orderCard) {
                         orderCard.classList.add('optimistic-update');
                         orderCard.setAttribute('data-status', newStatus);
-                        
+
                         // Update status badge
                         const statusBadge = orderCard.querySelector('.order-status');
                         if (statusBadge) {
                             statusBadge.className = `order-status status-${newStatus}`;
                             statusBadge.textContent = getStatusText(newStatus);
                         }
-                        
+
                         // Hide action buttons during update
                         const actions = orderCard.querySelector('.order-actions');
                         if (actions) actions.style.display = 'none';
@@ -1062,7 +1062,7 @@
 
                 haptic('success');
                 toast('Статус обновлен', 'success');
-                
+
                 // Reload to get fresh data and correct button states
                 if (state.currentView === 'orders') {
                     setTimeout(() => loadOrders(), 500);
@@ -1071,7 +1071,7 @@
                 console.error('Status update error:', error);
                 haptic('error');
                 toast('Ошибка обновления', 'error');
-                
+
                 // Revert optimistic update
                 if (order && oldStatus) {
                     order.status = oldStatus;
@@ -1079,14 +1079,14 @@
                 loadOrders();
             }
         }
-        
+
         async function handleStatusUpdate(orderId, newStatus, button) {
             if (!button) return updateOrderStatus(orderId, newStatus);
-            
+
             const originalText = button.innerHTML;
             button.disabled = true;
             button.innerHTML = '<span style="opacity: 0.6;">⏳ Обновление...</span>';
-            
+
             try {
                 await updateOrderStatus(orderId, newStatus);
             } catch (error) {
@@ -1097,7 +1097,7 @@
 
         async function cancelOrder(orderId) {
             if (!confirm('Отменить заказ?')) return;
-            
+
             haptic('heavy');
             await updateOrderStatus(orderId, 'cancelled');
         }
@@ -1105,7 +1105,7 @@
         // Open cancel order modal with reason selection
         function openCancelModal(orderId) {
             haptic('light');
-            
+
             const modal = document.createElement('div');
             modal.className = 'modal-overlay scale-in';
             modal.innerHTML = `
@@ -1121,7 +1121,7 @@
                             <p style="color: var(--text-secondary); margin-bottom: 20px;">
                                 Пожалуйста, укажите причину отмены заказа
                             </p>
-                            
+
                             <div class="form-group">
                                 <label style="margin-bottom: 12px; display: block; font-weight: 600;">Причина отмены *</label>
                                 <div style="display: flex; flex-direction: column; gap: 10px;">
@@ -1147,17 +1147,17 @@
                                     </label>
                                 </div>
                             </div>
-                            
+
                             <div class="form-group">
                                 <label>Комментарий (необязательно)</label>
-                                <textarea name="cancel_comment" rows="3" placeholder="Добавьте дополнительную информацию..." 
+                                <textarea name="cancel_comment" rows="3" placeholder="Добавьте дополнительную информацию..."
                                           class="search-input" maxlength="200" style="resize: vertical; min-height: 80px;"></textarea>
                                 <div class="form-hint" style="text-align: right; font-size: 12px; color: var(--text-secondary); margin-top: 4px;">
                                     <span id="commentCounter">0/200</span>
                                 </div>
                             </div>
                         </div>
-                        
+
                         <div style="display: flex; gap: 12px; padding: 16px; border-top: 1px solid var(--border);">
                             <button type="button" class="btn btn-secondary ripple" onclick="this.closest('.modal-overlay').remove()" style="flex: 1;">
                                 Назад
@@ -1170,10 +1170,10 @@
                     </form>
                 </div>
             `;
-            
+
             document.body.appendChild(modal);
             if (typeof lucide !== 'undefined') lucide.createIcons();
-            
+
             // Character counter for comment
             const textarea = modal.querySelector('textarea[name="cancel_comment"]');
             const counter = modal.querySelector('#commentCounter');
@@ -1182,7 +1182,7 @@
                     counter.textContent = `${textarea.value.length}/200`;
                 });
             }
-            
+
             // Close on overlay click
             modal.addEventListener('click', (e) => {
                 if (e.target === modal) modal.remove();
@@ -1193,26 +1193,26 @@
         async function submitCancelOrder(event, orderId) {
             event.preventDefault();
             haptic('heavy');
-            
+
             const formData = new FormData(event.target);
             const reason = formData.get('cancel_reason');
             const comment = formData.get('cancel_comment') || '';
-            
+
             const submitBtn = event.target.querySelector('button[type="submit"]');
             const originalText = submitBtn.innerHTML;
             submitBtn.disabled = true;
             submitBtn.innerHTML = '<span style="opacity: 0.6;">⏳ Отмена...</span>';
-            
+
             try {
                 // Call API with cancel reason
                 await apiFetch(`/api/partner/orders/${orderId}/cancel`, {
                     method: 'POST',
-                    body: JSON.stringify({ 
+                    body: JSON.stringify({
                         reason: reason,
                         comment: comment
                     })
                 });
-                
+
                 // Update local state
                 const order = state.orders.find(o => (o.order_id || o.id) === orderId);
                 if (order) {
@@ -1220,13 +1220,13 @@
                     order.cancel_reason = reason;
                     order.cancel_comment = comment;
                 }
-                
+
                 haptic('success');
                 toast('Заказ отменён', 'success');
-                
+
                 // Close modal
                 event.target.closest('.modal-overlay').remove();
-                
+
                 // Reload orders
                 if (state.currentView === 'orders') {
                     setTimeout(() => loadOrders(), 500);
@@ -1239,16 +1239,16 @@
                 submitBtn.innerHTML = originalText;
             }
         }
-        
+
         async function handleCancelOrder(orderId, button) {
             if (!confirm('Вы уверены, что хотите отменить заказ?')) return;
-            
+
             if (!button) return cancelOrder(orderId);
-            
+
             const originalText = button.innerHTML;
             button.disabled = true;
             button.innerHTML = '<span style="opacity: 0.6;">⏳ Отмена...</span>';
-            
+
             try {
                 haptic('heavy');
                 await updateOrderStatus(orderId, 'cancelled');
@@ -1265,14 +1265,14 @@
                 if (typeof lucide !== 'undefined') lucide.createIcons();
             }
         }
-        
+
         async function handleModalStatusUpdate(orderId, newStatus, button) {
             const modal = button.closest('.modal-overlay');
             const originalText = button.innerHTML;
-            
+
             button.disabled = true;
             button.innerHTML = '<span style="opacity: 0.6;">⏳ Обновление...</span>';
-            
+
             try {
                 await updateOrderStatus(orderId, newStatus);
                 if (modal) modal.remove();
@@ -1281,16 +1281,16 @@
                 button.innerHTML = originalText;
             }
         }
-        
+
         async function handleModalCancelOrder(orderId, button) {
             if (!confirm('Вы уверены, что хотите отменить заказ?')) return;
-            
+
             const modal = button.closest('.modal-overlay');
             const originalText = button.innerHTML;
-            
+
             button.disabled = true;
             button.innerHTML = '<span style="opacity: 0.6;">⏳ Отмена...</span>';
-            
+
             try {
                 haptic('heavy');
                 await updateOrderStatus(orderId, 'cancelled');
@@ -1339,19 +1339,19 @@
                                 <option value="frozen">❄️ Замороженное</option>
                                 <option value="other">📦 Другое</option>
                             </select>
-                            
+
                             <select class="filter-select" id="statusFilter" onchange="filterProducts()">
                                 <option value="">Все статусы</option>
                                 <option value="available">✅ В наличии</option>
                                 <option value="unavailable">❌ Нет в наличии</option>
                             </select>
-                            
+
                             <select class="filter-select" id="discountFilter" onchange="filterProducts()">
                                 <option value="">Все товары</option>
                                 <option value="discount">🔥 Со скидкой</option>
                                 <option value="no-discount">Без скидки</option>
                             </select>
-                            
+
                             <button class="btn-icon-secondary" onclick="resetFilters()" title="Сбросить фильтры">
                                 <i data-lucide="x" style="width: 18px; height: 18px;"></i>
                             </button>
@@ -1368,7 +1368,7 @@
                             <div class="product-card" data-product-id="${product.id}">
                                 <div class="product-image">
                                     ${product.photo_url ? `
-                                        <img src="${product.photo_url}" alt="${product.name}" loading="lazy" 
+                                        <img src="${product.photo_url}" alt="${product.name}" loading="lazy"
                                              onerror="this.parentElement.innerHTML='<div class=\\'product-placeholder\\'><i data-lucide=\\'image\\'></i><span>Нет фото</span></div>'; lucide.createIcons();">
                                     ` : `
                                         <div class="product-placeholder">
@@ -1438,7 +1438,7 @@
             const categoryFilter = document.getElementById('categoryFilter')?.value || '';
             const statusFilter = document.getElementById('statusFilter')?.value || '';
             const discountFilter = document.getElementById('discountFilter')?.value || '';
-            
+
             const cards = document.querySelectorAll('.product-card');
             cards.forEach(card => {
                 const productId = parseInt(card.dataset.productId);
@@ -1447,31 +1447,31 @@
                     card.style.display = 'none';
                     return;
                 }
-                
+
                 let show = true;
-                
+
                 // Category filter
                 if (categoryFilter && product.category !== categoryFilter) {
                     show = false;
                 }
-                
+
                 // Status filter
                 if (statusFilter === 'available' && !product.is_available) {
                     show = false;
                 } else if (statusFilter === 'unavailable' && product.is_available) {
                     show = false;
                 }
-                
+
                 // Discount filter
                 if (discountFilter === 'discount' && (!product.discount || product.discount <= 0)) {
                     show = false;
                 } else if (discountFilter === 'no-discount' && product.discount > 0) {
                     show = false;
                 }
-                
+
                 card.style.display = show ? '' : 'none';
             });
-            
+
             haptic('light');
         }
 
@@ -1481,18 +1481,18 @@
             const statusFilter = document.getElementById('statusFilter');
             const discountFilter = document.getElementById('discountFilter');
             const searchInput = document.querySelector('.search-input');
-            
+
             if (categoryFilter) categoryFilter.value = '';
             if (statusFilter) statusFilter.value = '';
             if (discountFilter) discountFilter.value = '';
             if (searchInput) searchInput.value = '';
-            
+
             // Show all products
             const cards = document.querySelectorAll('.product-card');
             cards.forEach(card => {
                 card.style.display = '';
             });
-            
+
             haptic('light');
             toast('Фильтры сброшены', 'info');
         }
@@ -1552,20 +1552,20 @@
                                         </div>
                                     `}
                                 </div>
-                                <input type="url" name="photo_url_input" value="${product?.photo_url || ''}" placeholder="https://... (или загрузите файл)" 
+                                <input type="url" name="photo_url_input" value="${product?.photo_url || ''}" placeholder="https://... (или загрузите файл)"
                                        class="search-input" style="margin-top: 12px;" oninput="handlePhotoUrlInput(this)">
                             </div>
 
                             <div class="form-group">
                                 <label>Название *</label>
-                                <input type="text" name="name" value="${product?.name || ''}" required class="search-input" 
+                                <input type="text" name="name" value="${product?.name || ''}" required class="search-input"
                                        oninput="validateField(this)" minlength="3" maxlength="100" placeholder="Например: Молоко 3.2%">
                                 <div class="form-error" style="display: none;">Минимум 3 символа</div>
                             </div>
 
                             <div class="form-group">
                                 <label>Описание</label>
-                                <textarea name="description" rows="3" class="search-input" 
+                                <textarea name="description" rows="3" class="search-input"
                                           oninput="validateField(this)" maxlength="500" placeholder="Краткое описание товара">${product?.description || ''}</textarea>
                                 <div style="font-size: 12px; color: var(--text-muted); margin-top: 4px;">0/500</div>
                             </div>
@@ -1573,7 +1573,7 @@
                             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
                                 <div class="form-group">
                                     <label>Оригинальная цена *</label>
-                                    <input type="number" name="original_price" id="originalPrice" value="${product?.original_price || product?.price || ''}" 
+                                    <input type="number" name="original_price" id="originalPrice" value="${product?.original_price || product?.price || ''}"
                                            required min="1" step="1" class="search-input"
                                            oninput="validateField(this); calculateFinalPrice()" placeholder="15000">
                                     <div class="form-error" style="display: none;">Цена должна быть > 0</div>
@@ -1581,7 +1581,7 @@
 
                                 <div class="form-group">
                                     <label>Скидка (%)</label>
-                                    <input type="number" name="discount" id="discountPercent" value="${product?.discount || 0}" 
+                                    <input type="number" name="discount" id="discountPercent" value="${product?.discount || 0}"
                                            min="0" max="90" class="search-input"
                                            oninput="validateField(this); calculateFinalPrice()" placeholder="0">
                                 </div>
@@ -1623,7 +1623,7 @@
                                     </label>
                                     <div style="display: flex; gap: 8px; align-items: center;">
                                         <button type="button" class="btn btn-sm btn-secondary" onclick="changeQuantity(-1)" style="width: 40px; height: 40px; padding: 0;">−</button>
-                                        <input type="number" name="stock_quantity" id="stockQuantity" value="${product?.stock_quantity || product?.stock || 0}" 
+                                        <input type="number" name="stock_quantity" id="stockQuantity" value="${product?.stock_quantity || product?.stock || 0}"
                                                required min="0" max="9999" class="search-input" placeholder="0" style="text-align: center; flex: 1;">
                                         <button type="button" class="btn btn-sm btn-secondary" onclick="changeQuantity(1)" style="width: 40px; height: 40px; padding: 0;">+</button>
                                     </div>
@@ -1639,7 +1639,7 @@
                             <!-- Expiry Date -->
                             <div class="form-group">
                                 <label>Срок годности *</label>
-                                <input type="date" name="expiry_date" id="expiryDate" value="${product?.expiry_date ? product.expiry_date.split('T')[0] : ''}" 
+                                <input type="date" name="expiry_date" id="expiryDate" value="${product?.expiry_date ? product.expiry_date.split('T')[0] : ''}"
                                        required min="${new Date().toISOString().split('T')[0]}" class="search-input">
                                 <div style="display: flex; gap: 8px; margin-top: 8px;">
                                     <button type="button" class="btn btn-sm btn-ghost" onclick="setExpiry(0)" style="flex: 1;">Сегодня</button>
@@ -1718,11 +1718,11 @@
             const reader = new FileReader();
             reader.onload = (e) => {
                 const photoUrl = e.target.result;
-                
+
                 // Update hidden input
                 document.querySelector('input[name="photo_url"]').value = photoUrl;
                 document.querySelector('input[name="photo_url_input"]').value = '';
-                
+
                 // Show preview
                 uploadArea.innerHTML = `
                     <div class="photo-preview">
@@ -1733,11 +1733,11 @@
                     </div>
                 `;
                 if (typeof lucide !== 'undefined') lucide.createIcons();
-                
+
                 haptic('light');
                 toast('Фото загружено', 'success');
             };
-            
+
             reader.onerror = () => {
                 toast('Ошибка загрузки фото', 'error');
                 uploadArea.classList.remove('has-photo');
@@ -1750,7 +1750,7 @@
                 `;
                 if (typeof lucide !== 'undefined') lucide.createIcons();
             };
-            
+
             reader.readAsDataURL(file);
         }
 
@@ -1804,11 +1804,11 @@
                     <div class="upload-placeholder-hint">или введите URL ниже</div>
                 </div>
             `;
-            
+
             hiddenInput.value = '';
             urlInput.value = '';
             fileInput.value = '';
-            
+
             if (typeof lucide !== 'undefined') lucide.createIcons();
         }
 
@@ -1817,20 +1817,20 @@
             const originalInput = document.getElementById('originalPrice');
             const discountInput = document.getElementById('discountPercent');
             const previewBox = document.getElementById('pricePreview');
-            
+
             if (!originalInput || !discountInput || !previewBox) return;
-            
+
             const original = parseFloat(originalInput.value) || 0;
             const discount = parseInt(discountInput.value) || 0;
-            
+
             if (original <= 0) {
                 previewBox.style.display = 'none';
                 return;
             }
-            
+
             const final = Math.round(original * (1 - discount / 100));
             const savings = original - final;
-            
+
             // Show preview
             previewBox.style.display = 'block';
             document.getElementById('priceOriginal').textContent = formatPrice(original);
@@ -1842,7 +1842,7 @@
         function changeQuantity(delta) {
             const input = document.getElementById('stockQuantity');
             if (!input) return;
-            
+
             const current = parseInt(input.value) || 0;
             const newValue = Math.max(0, Math.min(9999, current + delta));
             input.value = newValue;
@@ -1853,7 +1853,7 @@
         function setQuantity(value) {
             const input = document.getElementById('stockQuantity');
             if (!input) return;
-            
+
             input.value = value;
             haptic('light');
         }
@@ -1862,7 +1862,7 @@
         function setExpiry(daysFromNow) {
             const input = document.getElementById('expiryDate');
             if (!input) return;
-            
+
             const date = new Date();
             date.setDate(date.getDate() + daysFromNow);
             input.value = date.toISOString().split('T')[0];
@@ -1874,12 +1874,12 @@
             haptic('medium');
 
             const formData = new FormData(event.target);
-            
+
             // Calculate final price from original price and discount
             const originalPrice = parseFloat(formData.get('original_price'));
             const discountPercent = parseInt(formData.get('discount')) || 0;
             const finalPrice = Math.round(originalPrice * (1 - discountPercent / 100));
-            
+
             const data = {
                 category: formData.get('category'),
                 name: formData.get('name'),
@@ -1924,7 +1924,7 @@
                 console.error('Save product error:', error);
                 haptic('error');
                 toast('Ошибка сохранения товара', 'error');
-                
+
                 // Restore button
                 submitBtn.disabled = false;
                 submitBtn.textContent = originalText;
@@ -1987,7 +1987,7 @@
         async function toggleProductAvailability(id) {
             try {
                 haptic('light');
-                
+
                 const product = state.products.find(p => p.id === id);
                 if (!product) return;
 
@@ -2003,10 +2003,10 @@
 
                 haptic('success');
                 toast(
-                    product.is_available ? 'Товар доступен' : 'Товар скрыт', 
+                    product.is_available ? 'Товар доступен' : 'Товар скрыт',
                     'success'
                 );
-                
+
                 if (state.currentView === 'products') {
                     loadProducts();
                 }
@@ -2019,7 +2019,7 @@
 
         async function deleteProduct(id) {
             if (!confirm('Удалить товар?')) return;
-            
+
             haptic('heavy');
 
             try {
@@ -2031,7 +2031,7 @@
                 }
 
                 await apiFetch(`/api/partner/products/${id}`, { method: 'DELETE' });
-                
+
                 state.products = state.products.filter(p => p.id !== id);
                 haptic('success');
                 toast('Товар удален', 'success');
@@ -2048,7 +2048,7 @@
         // ============================================
         async function loadStats() {
             showLoading('stats');
-            
+
             try {
                 // Get stats data
                 const stats = await calculateStats();
@@ -2073,7 +2073,7 @@
             // Calculate statistics from orders and products
             const orders = state.orders || [];
             const products = state.products || [];
-            
+
             // Revenue by day (last 7 days)
             const today = new Date();
             const last7Days = Array.from({length: 7}, (_, i) => {
@@ -2091,7 +2091,7 @@
             orders.forEach(order => {
                 if (order.status === 'completed') {
                     const orderDate = new Date(order.created_at);
-                    const dayIndex = last7Days.findIndex(d => 
+                    const dayIndex = last7Days.findIndex(d =>
                         d.date.toDateString() === orderDate.toDateString()
                     );
                     if (dayIndex >= 0) {
@@ -2143,7 +2143,7 @@
             const totalRevenue = orders
                 .filter(o => o.status === 'completed')
                 .reduce((sum, o) => sum + (Number(o.price) || 0), 0);
-            
+
             const totalOrders = orders.length;
             const avgOrderValue = totalOrders > 0 ? totalRevenue / totalOrders : 0;
 
@@ -2160,7 +2160,7 @@
 
         function renderStats(stats) {
             const maxRevenue = Math.max(...stats.last7Days.map(d => d.revenue), 1);
-            
+
             document.querySelector('.content').innerHTML = `
                 <div class="container fade-in">
                     <h2 class="section-title">📊 Статистика</h2>
@@ -2171,17 +2171,17 @@
                             <div class="stat-value">${formatPrice(stats.totalRevenue)}</div>
                             <div class="stat-label">Всего выручка</div>
                         </div>
-                        
+
                         <div class="stat-card">
                             <div class="stat-value">${stats.totalOrders}</div>
                             <div class="stat-label">Всего заказов</div>
                         </div>
-                        
+
                         <div class="stat-card">
                             <div class="stat-value">${formatPrice(stats.avgOrderValue)}</div>
                             <div class="stat-label">Средний чек</div>
                         </div>
-                        
+
                         <div class="stat-card success">
                             <div class="stat-value">${stats.peakHour}:00</div>
                             <div class="stat-label">Пик заказов</div>
@@ -2322,13 +2322,13 @@
         // ============================================
         async function loadSettings() {
             showLoading('settings');
-            
+
             try {
                 // Load fresh store data if needed
                 if (!state.store) {
                     state.store = await apiFetch('/api/partner/store');
                 }
-                
+
                 document.querySelector('.content').innerHTML = `
                     <div class="container fade-in">
                         <h2 class="section-title">Настройки</h2>
@@ -2479,27 +2479,27 @@
                         <div class="modal-body">
                             <div class="form-group">
                                 <label>Название магазина *</label>
-                                <input type="text" name="name" value="${state.store?.name || ''}" required class="search-input" 
+                                <input type="text" name="name" value="${state.store?.name || ''}" required class="search-input"
                                        minlength="3" maxlength="50" oninput="validateField(this)">
                                 <div class="form-error" style="display: none;">Минимум 3 символа</div>
                             </div>
 
                             <div class="form-group">
                                 <label>Адрес</label>
-                                <input type="text" name="address" value="${state.store?.address || ''}" class="search-input" 
+                                <input type="text" name="address" value="${state.store?.address || ''}" class="search-input"
                                        maxlength="200" oninput="validateField(this)">
                             </div>
 
                             <div class="form-group">
                                 <label>Телефон</label>
-                                <input type="tel" name="phone" value="${state.store?.phone || ''}" placeholder="+998 XX XXX XX XX" 
+                                <input type="tel" name="phone" value="${state.store?.phone || ''}" placeholder="+998 XX XXX XX XX"
                                        class="search-input" pattern="\+998\s?\d{2}\s?\d{3}\s?\d{2}\s?\d{2}" oninput="validateField(this)">
                                 <div class="form-error" style="display: none;">Некорректный формат</div>
                             </div>
 
                             <div class="form-group">
                                 <label>Описание</label>
-                                <textarea name="description" rows="3" class="search-input" maxlength="300" 
+                                <textarea name="description" rows="3" class="search-input" maxlength="300"
                                           oninput="validateField(this)">${state.store?.description || ''}</textarea>
                                 <div style="font-size: 12px; color: var(--text-muted); margin-top: 4px;">0/300</div>
                             </div>
@@ -2570,7 +2570,7 @@
             } catch (error) {
                 haptic('error');
                 toast('Ошибка сохранения', 'error');
-                
+
                 // Restore button
                 submitBtn.disabled = false;
                 submitBtn.textContent = originalText;
@@ -2580,13 +2580,13 @@
         async function toggleStoreStatus() {
             try {
                 haptic('medium');
-                
+
                 const newStatus = !state.store?.is_open;
-                
+
                 // Optimistic UI update
                 const oldStatus = state.store.is_open;
                 state.store.is_open = newStatus;
-                
+
                 await apiFetch('/api/partner/store', {
                     method: 'PUT',
                     body: JSON.stringify({ is_open: newStatus })
@@ -2609,16 +2609,16 @@
             if (price == null || price === '' || isNaN(price)) {
                 return '0 сум';
             }
-            
+
             // Convert to number and round (no decimals for uzbek som)
             const num = Math.round(Number(price));
-            
+
             // Format with thousand separators
             const formatted = num.toLocaleString('ru-RU', {
                 minimumFractionDigits: 0,
                 maximumFractionDigits: 0
             });
-            
+
             return `${formatted} сум`;
         }
 
@@ -2711,7 +2711,7 @@
                     }
                     return;
                 }
-                
+
                 // Close modal with ESC
                 if (e.key === 'Escape') {
                     const modal = document.querySelector('.modal-overlay');
@@ -2721,7 +2721,7 @@
                         e.preventDefault();
                     }
                 }
-                
+
                 // Navigate views with Alt + Number
                 if (e.altKey && !e.ctrlKey && !e.shiftKey) {
                     switch(e.key) {
@@ -2743,7 +2743,7 @@
                             break;
                     }
                 }
-                
+
                 // Quick actions with Ctrl/Cmd
                 if ((e.ctrlKey || e.metaKey) && !e.altKey && !e.shiftKey) {
                     switch(e.key.toLowerCase()) {
@@ -2783,14 +2783,14 @@
                             break;
                     }
                 }
-                
+
                 // Tab navigation enhancement
                 if (e.key === 'Tab') {
                     // Let default Tab behavior work, but add visual feedback
                     const focusableElements = document.querySelectorAll(
                         'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
                     );
-                    
+
                     // Add keyboard-focus class to focused element
                     setTimeout(() => {
                         focusableElements.forEach(el => el.classList.remove('keyboard-focus'));
@@ -2800,7 +2800,7 @@
                     }, 0);
                 }
             });
-            
+
             // Show keyboard shortcuts hint
             const showKeyboardHints = () => {
                 toast('Горячие клавиши', 'info', {
@@ -2808,7 +2808,7 @@
                     duration: 5000
                 });
             };
-            
+
             // Show hints on Ctrl+?
             document.addEventListener('keydown', (e) => {
                 if ((e.ctrlKey || e.metaKey) && e.key === '/') {
@@ -2816,7 +2816,7 @@
                     e.preventDefault();
                 }
             });
-            
+
             console.log('⌨️ Keyboard navigation enabled');
         }
 
@@ -2836,13 +2836,14 @@
 
             const storeId = state.store.store_id;
             const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-            const wsUrl = `${protocol}//${API_HOST}/api/partner/ws/partner/${storeId}`;
-            
+            // Use window.location.host instead of API_HOST
+            const wsUrl = `${protocol}//${window.location.host}/api/partner/ws/partner/${storeId}`;
+
             console.log(`🔌 Connecting to WebSocket: ${wsUrl}`);
-            
+
             try {
                 websocket = new WebSocket(wsUrl);
-                
+
                 websocket.onopen = () => {
                     console.log('✅ WebSocket connected');
                     // Clear reconnect timeout
@@ -2851,12 +2852,12 @@
                         wsReconnectTimeout = null;
                     }
                 };
-                
+
                 websocket.onmessage = (event) => {
                     try {
                         const data = JSON.parse(event.data);
                         console.log('📥 WebSocket message:', data);
-                        
+
                         if (data.type === 'new_order') {
                             handleNewOrderNotification(data.data);
                         } else if (data.type === 'order_status_changed') {
@@ -2870,29 +2871,29 @@
                         console.error('❌ Failed to parse WebSocket message:', err);
                     }
                 };
-                
+
                 websocket.onerror = (error) => {
                     console.error('❌ WebSocket error:', error);
                 };
-                
+
                 websocket.onclose = () => {
                     console.log('🔌 WebSocket disconnected');
                     websocket = null;
-                    
+
                     // Reconnect after 5 seconds
                     wsReconnectTimeout = setTimeout(() => {
                         console.log('🔄 Reconnecting WebSocket...');
                         connectWebSocket();
                     }, 5000);
                 };
-                
+
                 // Send ping every 30 seconds to keep connection alive
                 setInterval(() => {
                     if (websocket && websocket.readyState === WebSocket.OPEN) {
                         websocket.send('ping');
                     }
                 }, 30000);
-                
+
             } catch (error) {
                 console.error('❌ Failed to connect WebSocket:', error);
             }
@@ -2911,31 +2912,31 @@
 
         function handleNewOrderNotification(orderData) {
             console.log('🔔 NEW ORDER:', orderData);
-            
+
             // Play sound if supported
             try {
                 if (window.Telegram?.WebApp?.HapticFeedback) {
                     window.Telegram.WebApp.HapticFeedback.notificationOccurred('success');
                 }
             } catch (e) {}
-            
+
             // Show toast notification
             toast(`🔔 Новый заказ #${orderData.order_ids[0]}`, 'info', {
                 description: `${orderData.customer_name} • ${formatPrice(orderData.total)}`
             });
-            
+
             // Reload orders if on orders page
             if (state.currentView === 'orders') {
                 setTimeout(() => loadOrders(), 500);
             }
-            
+
             // Update badge
             updateNotificationBadge();
         }
 
         function handleOrderStatusChanged(data) {
             console.log('📊 Order status changed:', data);
-            
+
             // Reload orders if on orders page
             if (state.currentView === 'orders') {
                 setTimeout(() => loadOrders(), 500);
@@ -2944,9 +2945,9 @@
 
         function handleOrderCancelled(data) {
             console.log('❌ Order cancelled:', data);
-            
+
             toast(`Заказ #${data.order_id} отменён`, 'warning');
-            
+
             // Reload orders if on orders page
             if (state.currentView === 'orders') {
                 setTimeout(() => loadOrders(), 500);
@@ -2982,7 +2983,7 @@
             if (!state.orders) return;
 
             // Count new/pending orders
-            const newOrdersCount = state.orders.filter(o => 
+            const newOrdersCount = state.orders.filter(o =>
                 o.status === 'pending' || o.status === 'new'
             ).length;
 
