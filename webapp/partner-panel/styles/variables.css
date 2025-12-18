@@ -4,28 +4,28 @@
    ================================================ */
 
 :root {
-    /* Premium Brand Colors - Sophisticated Palette */
-    --primary: #6366F1;
-    --primary-hover: #4F46E5;
-    --primary-light: #E0E7FF;
-    --primary-dark: #3730A3;
-    --primary-50: #EEF2FF;
+    /* Professional Brand Colors - Elegant & Mature */
+    --primary: #1F2937;
+    --primary-hover: #111827;
+    --primary-light: #F3F4F6;
+    --primary-dark: #030712;
+    --primary-50: #F9FAFB;
 
-    --accent: #EC4899;
-    --accent-light: #FCE7F3;
-    --accent-dark: #DB2777;
+    --accent: #3B82F6;
+    --accent-light: #DBEAFE;
+    --accent-dark: #1E40AF;
 
-    --success: #10B981;
+    --success: #059669;
     --success-light: #D1FAE5;
-    --success-dark: #059669;
+    --success-dark: #047857;
 
-    --warning: #F59E0B;
+    --warning: #D97706;
     --warning-light: #FEF3C7;
 
-    --danger: #EF4444;
+    --danger: #DC2626;
     --danger-light: #FEE2E2;
 
-    --info: #06B6D4;
+    --info: #0891B2;
     --info-light: #CFFAFE;
 
     /* Premium Neutrals - Perfect Contrast */
