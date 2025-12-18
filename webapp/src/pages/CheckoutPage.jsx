@@ -40,11 +40,30 @@ function CheckoutPage({ user }) {
   const [loading, setLoading] = useState(false);
   const [calculatingDelivery, setCalculatingDelivery] = useState(false);
   const [error, setError] = useState(null);
+  const [phoneError, setPhoneError] = useState('');
+  const [addressError, setAddressError] = useState('');
   const [paymentProviders, setPaymentProviders] = useState([]);
 
   const lang = user?.language || 'uz';
   const t = (ru, uz) => (lang === 'uz' ? uz : ru);
   const city = getUserCity() || 'Toshkent';
+
+  // Phone validation
+  const validatePhone = (value) => {
+    if (!value) return t('Телефон обязателен', 'Telefon majburiy');
+    const phoneRegex = /^\+998\d{9}$/;
+    const digitsOnly = value.replace(/\D/g, '');
+    if (digitsOnly.length < 9) return t('Минимум 9 цифр', 'Kamida 9 raqam');
+    if (digitsOnly.length > 12) return t('Слишком длинный', 'Juda uzun');
+    return '';
+  };
+
+  // Address validation
+  const validateAddress = (value) => {
+    if (!value) return t('Адрес обязателен', 'Manzil majburiy');
+    if (value.length < 10) return t('Введите полный адрес (мин. 10 символов)', 'To\'liq manzilni kiriting (kamida 10 ta belgi)');
+    return '';
+  };
 
   // Convert cart object to items array
   const cartItems = useMemo(() => {
@@ -308,9 +327,19 @@ function CheckoutPage({ user }) {
                 type="text"
                 placeholder={t('Улица, дом, квартира...', 'Ko\'cha, uy, xonadon...')}
                 value={address}
-                onChange={(e) => setAddress(e.target.value)}
-                className="address-input"
+                onChange={(e) => {
+                  setAddress(e.target.value);
+                  if (addressError) setAddressError('');
+                }}
+                onBlur={() => validateAddress()}
+                className={`address-input ${addressError ? 'error' : ''}`}
               />
+              {addressError && (
+                <div className="error-message">
+                  <span>⚠️</span>
+                  <span>{addressError}</span>
+                </div>
+              )}
               <p className="city-label">📍 {city}</p>
             </div>
 

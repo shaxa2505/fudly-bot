@@ -60,8 +60,24 @@ const OfferCard = memo(function OfferCard({ offer, cartQuantity = 0, onAddToCart
   const handleFavoriteClick = useCallback((e) => {
     e.stopPropagation()
     window.Telegram?.WebApp?.HapticFeedback?.impactOccurred?.('medium')
+    
+    // Optimistic update - update UI immediately
     toggleFavorite(offer)
-  }, [offer, toggleFavorite])
+    
+    // Sync with backend in background
+    const userId = window.Telegram?.WebApp?.initDataUnsafe?.user?.id
+    if (userId) {
+      const isCurrentlyFavorite = isFavorite(offer.id)
+      const apiCall = isCurrentlyFavorite ? api.removeFavorite : api.addFavorite
+      
+      apiCall(offer.id).catch((error) => {
+        // Rollback on error
+        console.error('Failed to sync favorite:', error)
+        toggleFavorite(offer)
+        window.Telegram?.WebApp?.HapticFeedback?.notificationOccurred?.('error')
+      })
+    }
+  }, [offer, toggleFavorite, isFavorite])
 
   const discountPercent = Math.round(offer.discount_percent ||
     ((offer.original_price - offer.discount_price) / offer.original_price * 100))

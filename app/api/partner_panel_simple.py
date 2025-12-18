@@ -382,6 +382,7 @@ async def create_product(
     original_price: int = Form(...),  # Now required in SUMS
     discount_price: int = Form(...),  # In SUMS
     quantity: int = Form(...),
+    stock_quantity: int = Form(None),  # NEW: Stock quantity (v22.0)
     unit: str = Form("шт"),
     expiry_date: Optional[str] = Form(None),
     description: Optional[str] = Form(None),
@@ -394,6 +395,8 @@ async def create_product(
     1 sum = 100 kopeks for precise calculation.
     Times are generated automatically (08:00 - 23:00).
     Validation happens via Pydantic models.
+    
+    v22.0: Added stock_quantity support.
     """
     from datetime import datetime, timedelta
 
@@ -402,6 +405,9 @@ async def create_product(
     telegram_id = verify_telegram_webapp(authorization)
     user, store = get_partner_with_store(telegram_id)
     db = get_db()
+    
+    # Use stock_quantity if provided, otherwise use quantity
+    actual_stock = stock_quantity if stock_quantity is not None else quantity
 
     # Prepare times (08:00 - 23:00)
     now = datetime.now()
@@ -451,6 +457,7 @@ async def create_product(
             original_price=offer_data.original_price,  # Already in kopeks
             discount_price=offer_data.discount_price,  # Already in kopeks
             quantity=offer_data.quantity,
+            stock_quantity=actual_stock,  # NEW: v22.0 field
             available_from=offer_data.available_from.isoformat(),
             available_until=offer_data.available_until.isoformat(),
             expiry_date=offer_data.expiry_date.isoformat(),
@@ -477,6 +484,7 @@ async def update_product(
     original_price: Optional[int] = Form(None),  # In SUMS
     discount_price: Optional[int] = Form(None),  # In SUMS
     quantity: Optional[int] = Form(None),
+    stock_quantity: Optional[int] = Form(None),  # NEW: v22.0
     unit: Optional[str] = Form(None),
     expiry_date: Optional[str] = Form(None),
     description: Optional[str] = Form(None),
@@ -489,6 +497,8 @@ async def update_product(
 
     Prices accepted in SUMS and converted to kopeks internally.
     1 sum = 100 kopeks.
+    
+    v22.0: Added stock_quantity support.
     """
     import logging
 
@@ -540,6 +550,14 @@ async def update_product(
             if current_offer and current_offer.get("status") == "out_of_stock":
                 update_fields.append("status = %s")
                 update_values.append("active")
+    
+    if stock_quantity is not None:
+        update_fields.append("stock_quantity = %s")
+        update_values.append(stock_quantity)
+        # Sync quantity field if not explicitly set
+        if quantity is None:
+            update_fields.append("quantity = %s")
+            update_values.append(stock_quantity)
 
     if unit is not None:
         update_fields.append("unit = %s")
@@ -629,6 +647,97 @@ async def delete_product(product_id: int, authorization: str = Header(None)):
     db.deactivate_offer(product_id)
 
     return {"offer_id": product_id, "status": "deleted"}
+
+
+@router.post("/orders/{order_id}/cancel")
+@limiter.limit("10/minute")
+async def cancel_order(
+    order_id: int,
+    request: Request,
+    authorization: str = Header(None),
+):
+    """
+    Cancel order with reason (v22.0).
+    
+    Valid reasons:
+    - out_of_stock: Товар закончился
+    - cant_fulfill: Не могу выполнить
+    - customer_request: По просьбе клиента
+    - technical_issue: Технические проблемы
+    - other: Другая причина
+    """
+    telegram_id = verify_telegram_webapp(authorization)
+    user, store = get_partner_with_store(telegram_id)
+    db = get_db()
+    
+    # Parse request body
+    try:
+        body = await request.json()
+        cancel_reason = body.get("reason")
+        cancel_comment = body.get("comment", "")
+        
+        if not cancel_reason:
+            raise HTTPException(status_code=400, detail="Missing 'reason' field")
+            
+        # Validate reason
+        valid_reasons = ["out_of_stock", "cant_fulfill", "customer_request", "technical_issue", "other"]
+        if cancel_reason not in valid_reasons:
+            raise HTTPException(
+                status_code=400, 
+                detail=f"Invalid reason. Must be one of: {', '.join(valid_reasons)}"
+            )
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Invalid request body: {e}")
+    
+    # Get order and verify ownership
+    with db.get_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute(
+            """
+            SELECT o.order_id, o.user_id, o.order_status, o.store_id
+            FROM orders o
+            WHERE o.order_id = %s
+            """,
+            (order_id,)
+        )
+        order = cursor.fetchone()
+        
+        if not order:
+            raise HTTPException(status_code=404, detail="Order not found")
+        
+        # Verify store ownership
+        if order[3] != store["store_id"]:
+            raise HTTPException(status_code=403, detail="Not your order")
+        
+        # Check if already cancelled
+        if order[2] == "cancelled":
+            raise HTTPException(status_code=400, detail="Order already cancelled")
+        
+        # Update order status with cancellation details
+        cursor.execute(
+            """
+            UPDATE orders 
+            SET order_status = 'cancelled',
+                cancel_reason = %s,
+                cancel_comment = %s
+            WHERE order_id = %s
+            """,
+            (cancel_reason, cancel_comment, order_id)
+        )
+        conn.commit()
+    
+    # TODO: Send notification to customer via bot
+    # This would require bot instance which we don't have in API context
+    # For now, customer will see updated status in their orders list
+    
+    return {
+        "order_id": order_id,
+        "status": "cancelled",
+        "reason": cancel_reason,
+        "comment": cancel_comment
+    }
 
 
 @router.post("/products/import")

@@ -1,6 +1,29 @@
-// Форматирование цены
+// Форматирование цены с улучшенной читаемостью
 export const formatPrice = (price, currency = "so'm") => {
-  return `${Math.round(price).toLocaleString()} ${currency}`
+  const rounded = Math.round(price)
+  
+  // Для больших сумм показываем сокращенно
+  if (rounded >= 1000000) {
+    const millions = (rounded / 1000000).toFixed(1)
+    return `${millions} mln ${currency}`
+  }
+  
+  // Для обычных сумм - с разделителями
+  return `${rounded.toLocaleString('uz-UZ')} ${currency}`
+}
+
+// Компактное форматирование для маленьких пространств
+export const formatPriceCompact = (price, currency = "so'm") => {
+  const rounded = Math.round(price)
+  
+  if (rounded >= 1000000) {
+    return `${(rounded / 1000000).toFixed(1)}M`
+  }
+  if (rounded >= 1000) {
+    return `${(rounded / 1000).toFixed(0)}K`
+  }
+  
+  return `${rounded}`
 }
 
 // Форматирование даты

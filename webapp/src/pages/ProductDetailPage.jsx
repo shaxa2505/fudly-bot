@@ -42,8 +42,10 @@ function ProductDetailPage() {
       addToCart(offer)
     }
     setAddedToCart(true)
-    setTimeout(() => setAddedToCart(false), 2000)
     window.Telegram?.WebApp?.HapticFeedback?.notificationOccurred?.('success')
+    
+    // Show success feedback for 3 seconds
+    setTimeout(() => setAddedToCart(false), 3000)
   }
 
   const handleFavorite = (e) => {

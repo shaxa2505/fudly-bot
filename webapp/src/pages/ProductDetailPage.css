@@ -431,3 +431,44 @@
     font-size: 20px;
   }
 }
+
+/* View Cart Button */
+.pdp-view-cart {
+  width: 100%;
+  background: var(--color-bg-secondary);
+  color: var(--color-primary);
+  border: 2px solid var(--color-primary);
+  border-radius: var(--radius-lg);
+  padding: var(--spacing-md) var(--spacing-xl);
+  font-size: var(--font-base);
+  font-weight: var(--font-semibold);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--spacing-sm);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  animation: slideUp 0.3s ease;
+  margin-top: var(--spacing-md);
+}
+
+.pdp-view-cart:active {
+  transform: scale(0.98);
+  background: var(--color-primary-light);
+}
+
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.pdp-add-btn.added {
+  cursor: default;
+  pointer-events: none;
+}

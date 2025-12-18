@@ -833,6 +833,18 @@
   color: var(--color-primary);
 }
 
+.payment-option.disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  border-color: var(--color-border);
+  background: var(--color-bg-tertiary);
+}
+
+.payment-option.disabled:hover {
+  border-color: var(--color-border);
+  background: var(--color-bg-tertiary);
+}
+
 .click-payment-info {
   text-align: center;
   padding: var(--spacing-lg);
