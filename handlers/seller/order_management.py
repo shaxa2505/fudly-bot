@@ -11,19 +11,7 @@ from aiogram.fsm.context import FSMContext
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
 from app.core.utils import get_field, get_store_field
-from handlers.common.states import CourierHandover
-from localization import get_text
-
-logger = logging.getLogger(__name__)
-
-# Router for seller order management
-router = Router(name="seller_order_management")
-
-
-def setup(bot_instance, db_instance):
-    """Initialize module with bot and database instances"""
-    global bot, db
-    bot = bot_instance
+from app.services.unified_order_service import get_unified_order_service
     db = db_instance
 
 
@@ -64,29 +52,15 @@ async def confirm_order(callback: types.CallbackQuery):
         await callback.answer("❌", show_alert=True)
         return
 
-    # Обновляем статус
-    db.update_order_status(order_id, "confirmed")
+    # Используем UnifiedOrderService для обновления статуса
+    service = get_unified_order_service()
+    await service.confirm_order(order_id, "order")
 
     # Уведомляем продавца
     await callback.message.edit_text(
         callback.message.text
         + f"\n\n✅ {'Заказ подтверждён!' if lang == 'ru' else 'Buyurtma tasdiqlandi!'}"
     )
-
-    # Уведомляем покупателя
-    customer_lang = db.get_user_language(get_order_field(order, "user_id", 1))
-    preparing_ru = "Магазин начинает подготовку вашего заказа"
-    preparing_uz = "Do'kon buyurtmangizni tayyorlaydi"
-    try:
-        await bot.send_message(
-            get_order_field(order, "user_id", 1),  # user_id
-            f"✅ <b>{'Заказ подтверждён!' if customer_lang == 'ru' else 'Buyurtma tasdiqlandi!'}</b>\n\n"
-            f"📦 {'Заказ' if customer_lang == 'ru' else 'Buyurtma'} #{order_id}\n"
-            f"{preparing_ru if customer_lang == 'ru' else preparing_uz}",
-            parse_mode="HTML",
-        )
-    except Exception as e:
-        logger.error(f"Failed to notify customer {get_order_field(order, 'user_id', 1)}: {e}")
 
     await callback.answer()
 
@@ -119,39 +93,15 @@ async def cancel_order(callback: types.CallbackQuery):
         await callback.answer("❌", show_alert=True)
         return
 
-    # Обновляем статус
-    db.update_order_status(order_id, "cancelled")
-
-    # Возвращаем товар в наличие
-    offer_id = get_field(order, "offer_id", 3)
-    quantity = get_field(order, "quantity", 4)
-    offer = db.get_offer(offer_id)
-    if offer:
-        try:
-            db.increment_offer_quantity_atomic(offer_id, quantity)
-        except Exception as e:
-            logger.error(f"Failed to restore quantity for offer {offer_id}: {e}")
+    # Используем UnifiedOrderService для отмены заказа
+    service = get_unified_order_service()
+    await service.cancel_order(order_id, "Отменено продавцом", "Seller cancelled")
 
     # Уведомляем продавца
     await callback.message.edit_text(
         callback.message.text
         + f"\n\n❌ {'Заказ отменён' if lang == 'ru' else 'Buyurtma bekor qilindi'}"
     )
-
-    # Уведомляем покупателя
-    customer_lang = db.get_user_language(get_order_field(order, "user_id", 1))
-    cancelled_ru = "К сожалению, магазин отменил ваш заказ"
-    cancelled_uz = "Afsuski, do'kon buyurtmangizni bekor qildi"
-    try:
-        await bot.send_message(
-            get_order_field(order, "user_id", 1),  # user_id
-            f"❌ <b>{'Заказ отменён' if customer_lang == 'ru' else 'Buyurtma bekor qilindi'}</b>\n\n"
-            f"📦 {'Заказ' if customer_lang == 'ru' else 'Buyurtma'} #{order_id}\n"
-            f"{cancelled_ru if customer_lang == 'ru' else cancelled_uz}",
-            parse_mode="HTML",
-        )
-    except Exception as e:
-        logger.error(f"Failed to notify customer {get_order_field(order, 'user_id', 1)}: {e}")
 
     await callback.answer()
 
@@ -184,10 +134,9 @@ async def confirm_payment(callback: types.CallbackQuery):
         await callback.answer("❌", show_alert=True)
         return
 
-    # Обновляем статус оплаты
-    db.update_payment_status(order_id, "confirmed")
-    # Обновляем статус заказа на "preparing" (готовится)
-    db.update_order_status(order_id, "preparing")
+    # Используем UnifiedOrderService для подтверждения заказа
+    service = get_unified_order_service()
+    await service.confirm_order(order_id, "order")
 
     # Создаём кнопку "Передать курьеру"
     kb = InlineKeyboardBuilder()
@@ -214,24 +163,6 @@ async def confirm_payment(callback: types.CallbackQuery):
             callback.message.text + f"\n\n✅ {payment_confirmed_text}\n\n📝 {next_step_text}",
             reply_markup=kb.as_markup(),
         )
-
-    # Уведомляем покупателя
-    customer_lang = db.get_user_language(get_order_field(order, "user_id", 1))
-    preparing_ru = (
-        "Магазин начинает подготовку вашего заказа. Ожидайте уведомление о передаче курьеру!"
-    )
-    preparing_uz = "Do'kon buyurtmangizni tayyorlaydi. Kuryerga topshirish haqida xabar kuting!"
-    payment_confirmed_uz = "To'lov tasdiqlandi!"
-    try:
-        await bot.send_message(
-            get_order_field(order, "user_id", 1),  # user_id
-            f"✅ <b>{'Оплата подтверждена!' if customer_lang == 'ru' else payment_confirmed_uz}</b>\n\n"
-            f"📦 {'Заказ' if customer_lang == 'ru' else 'Buyurtma'} #{order_id}\n"
-            f"👨‍🍳 {preparing_ru if customer_lang == 'ru' else preparing_uz}",
-            parse_mode="HTML",
-        )
-    except Exception as e:
-        logger.error(f"Failed to notify customer {get_order_field(order, 'user_id', 1)}: {e}")
 
     await callback.answer()
 
@@ -264,19 +195,12 @@ async def reject_payment(callback: types.CallbackQuery):
         await callback.answer("❌", show_alert=True)
         return
 
-    # Обновляем статусы
-    db.update_payment_status(order_id, "pending")
-    db.update_order_status(order_id, "cancelled")
-
-    # Возвращаем товар в наличие
-    offer_id = get_field(order, "offer_id", 3)
-    quantity = get_field(order, "quantity", 4)
-    offer = db.get_offer(offer_id)
-    if offer:
-        try:
-            db.increment_offer_quantity_atomic(offer_id, quantity)
-        except Exception as e:
-            logger.error(f"Failed to restore quantity for offer {offer_id}: {e}")
+    # Используем UnifiedOrderService для отклонения (отмены)
+    service = get_unified_order_service()
+    await service.reject_order(
+        order_id, 
+        "Оплата не подтверждена" if lang == "ru" else "To'lov tasdiqlanmadi"
+    )
 
     # Уведомляем продавца
     payment_rejected_text = (
@@ -287,25 +211,6 @@ async def reject_payment(callback: types.CallbackQuery):
     await callback.message.edit_caption(
         caption=callback.message.caption + f"\n\n❌ {payment_rejected_text}"
     )
-
-    # Уведомляем покупателя
-    customer_lang = db.get_user_language(get_order_field(order, "user_id", 1))
-    payment_failed_ru = "Магазин не смог подтвердить вашу оплату. Заказ отменён."
-    payment_failed_uz = "Do'kon to'lovingizni tasdiqlay olmadi. Buyurtma bekor qilindi."
-    check_payment_ru = "Пожалуйста, проверьте правильность перевода или свяжитесь с магазином"
-    check_payment_uz = "Iltimos, o'tkazma to'g'riligini tekshiring yoki do'kon bilan bog'laning"
-    payment_rejected_uz = "To'lov tasdiqlanmadi"
-    try:
-        await bot.send_message(
-            get_order_field(order, "user_id", 1),  # user_id
-            f"❌ <b>{'Оплата не подтверждена' if customer_lang == 'ru' else payment_rejected_uz}</b>\n\n"
-            f"📦 {'Заказ' if customer_lang == 'ru' else 'Buyurtma'} #{order_id}\n"
-            f"{payment_failed_ru if customer_lang == 'ru' else payment_failed_uz}\n"
-            f"{check_payment_ru if customer_lang == 'ru' else check_payment_uz}",
-            parse_mode="HTML",
-        )
-    except Exception as e:
-        logger.error(f"Failed to notify customer {get_order_field(order, 'user_id', 1)}: {e}")
 
     await callback.answer()
 
@@ -401,45 +306,41 @@ async def process_courier_phone(message: types.Message, state: FSMContext):
         await message.answer(error_text)
         return
 
-    # Обновляем статус заказа на "delivering"
-    db.update_order_status(order_id, "delivering")
-
-    # Получаем данные для уведомлений
-    customer_id = get_order_field(order, "user_id", 1)
-    customer_lang = db.get_user_language(customer_id)
-    delivery_address = get_order_field(order, "delivery_address", 6)
+    # Используем UnifiedOrderService для начала доставки
+    service = get_unified_order_service()
+    await service.start_delivery(order_id)
 
     # Уведомляем продавца об успешной передаче
     success_ru = f"✅ Заказ #{order_id} передан курьеру!\n\n🚕 Курьер: {courier_name}\n📱 Телефон: {courier_phone}"
     success_uz = f"✅ Buyurtma #{order_id} kuryerga topshirildi!\n\n🚕 Kuryer: {courier_name}\n📱 Telefon: {courier_phone}"
     await message.answer(success_ru if lang == "ru" else success_uz)
 
-    # Уведомляем клиента с кнопкой "Получил заказ"
+    # Дополнительное сообщение клиенту с информацией о курьере
+    customer_id = get_order_field(order, "user_id", 1)
+    customer_lang = db.get_user_language(customer_id)
+    delivery_address = get_order_field(order, "delivery_address", 6)
+
     kb = InlineKeyboardBuilder()
     received_btn_text = "✅ Получил заказ" if customer_lang == "ru" else "✅ Buyurtmani oldim"
     kb.button(text=received_btn_text, callback_data=f"order_received_{order_id}")
 
-    customer_msg_ru = (
-        f"🚕 <b>Ваш заказ передан курьеру!</b>\n\n"
-        f"📦 Заказ #{order_id}\n"
-        f"👤 Курьер: {courier_name}\n"
-        f"📱 Телефон: {courier_phone}\n\n"
-        f"📍 Адрес доставки: {delivery_address}\n\n"
-        f"Когда получите заказ, нажмите кнопку ниже:"
+    courier_info_ru = (
+        f"\n\n👤 Курьер: {courier_name}\n"
+        f"📱 Телефон: {courier_phone}\n"
+        f"📍 Адрес: {delivery_address}"
     )
-    customer_msg_uz = (
-        f"🚕 <b>Buyurtmangiz kuryerga topshirildi!</b>\n\n"
-        f"📦 Buyurtma #{order_id}\n"
-        f"👤 Kuryer: {courier_name}\n"
-        f"📱 Telefon: {courier_phone}\n\n"
-        f"📍 Yetkazib berish manzili: {delivery_address}\n\n"
-        f"Buyurtmani olganingizda, quyidagi tugmani bosing:"
+    courier_info_uz = (
+        f"\n\n👤 Kuryer: {courier_name}\n"
+        f"📱 Telefon: {courier_phone}\n"
+        f"📍 Manzil: {delivery_address}"
     )
 
     try:
         await bot.send_message(
             customer_id,
-            customer_msg_ru if customer_lang == "ru" else customer_msg_uz,
+            (courier_info_ru if customer_lang == "ru" else courier_info_uz) + 
+            ("\n\nКогда получите заказ, нажмите кнопку ниже:" if customer_lang == "ru" 
+             else "\n\nBuyurtmani olganingizda, quyidagi tugmani bosing:"),
             parse_mode="HTML",
             reply_markup=kb.as_markup(),
         )
@@ -474,8 +375,9 @@ async def order_received_by_customer(callback: types.CallbackQuery):
         )
         return
 
-    # Обновляем статус на "completed"
-    db.update_order_status(order_id, "completed")
+    # Используем UnifiedOrderService для завершения заказа
+    service = get_unified_order_service()
+    await service.complete_order(order_id)
 
     # Обновляем сообщение клиенту
     completed_text_ru = "✅ Заказ успешно доставлен!\n\nСпасибо за покупку! 🎉"
@@ -503,32 +405,6 @@ async def order_received_by_customer(callback: types.CallbackQuery):
     await callback.message.answer(
         rate_prompt_ru if lang == "ru" else rate_prompt_uz, reply_markup=kb.as_markup()
     )
-
-    # Уведомляем продавца
-    offer_id = get_order_field(order, "offer_id", 2)
-    offer = db.get_offer(offer_id)
-    if offer:
-        store_id = offer.get("store_id") if isinstance(offer, dict) else offer[2]
-        store = db.get_store(store_id)
-        if store:
-            seller_id = store.get("owner_id") if isinstance(store, dict) else store[2]
-            seller_lang = db.get_user_language(seller_id)
-
-            seller_msg_ru = (
-                f"✅ <b>Заказ #{order_id} доставлен!</b>\n\nКлиент подтвердил получение."
-            )
-            seller_msg_uz = (
-                f"✅ <b>Buyurtma #{order_id} yetkazildi!</b>\n\nMijoz qabul qilganini tasdiqladi."
-            )
-
-            try:
-                await bot.send_message(
-                    seller_id,
-                    seller_msg_ru if seller_lang == "ru" else seller_msg_uz,
-                    parse_mode="HTML",
-                )
-            except Exception as e:
-                logger.error(f"Failed to notify seller {seller_id}: {e}")
 
     await callback.answer("✅")
 

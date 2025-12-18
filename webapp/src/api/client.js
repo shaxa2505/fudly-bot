@@ -125,7 +125,8 @@ const api = {
       const params = { user_id: userId }
       if (status) params.status = status
       const data = await cachedGet('/orders', params, 10000)
-      return data.bookings || data.orders || data || []
+      // v24+ unified orders table - use 'orders' field
+      return data.orders || data || []
     } catch (error) {
       return []
     }
@@ -208,19 +209,19 @@ const api = {
     }
   },
 
-  // Order tracking endpoints (Week 2)
-  async getOrderStatus(bookingId) {
-    const { data } = await client.get(`/orders/${bookingId}/status`)
+  // Order tracking endpoints (v24+ unified orders)
+  async getOrderStatus(orderId) {
+    const { data } = await client.get(`/orders/${orderId}/status`)
     return data
   },
 
-  async getOrderTimeline(bookingId) {
-    const { data } = await client.get(`/orders/${bookingId}/timeline`)
+  async getOrderTimeline(orderId) {
+    const { data } = await client.get(`/orders/${orderId}/timeline`)
     return data
   },
 
-  async getOrderQR(bookingId) {
-    const { data } = await client.get(`/orders/${bookingId}/qr`)
+  async getOrderQR(orderId) {
+    const { data } = await client.get(`/orders/${orderId}/qr`)
     return data
   },
 
