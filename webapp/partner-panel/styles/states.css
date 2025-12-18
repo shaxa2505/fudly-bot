@@ -17,33 +17,47 @@
 }
 
 .empty-icon {
-    width: 80px;
-    height: 80px;
-    margin-bottom: 16px;
-    opacity: 0.3;
+    width: 120px;
+    height: 120px;
+    margin-bottom: 28px;
+    opacity: 0.6;
     display: flex;
     align-items: center;
     justify-content: center;
+    background: var(--gray-50);
+    border-radius: var(--radius-xl);
+    color: var(--primary);
+    font-size: 56px;
+}
+
+.empty-icon i,
+.empty-icon svg {
+    width: 64px !important;
+    height: 64px !important;
 }
 
 .empty-title {
-    font-size: 18px;
+    font-size: 20px;
     font-weight: 700;
-    color: #000000;
-    margin: 0 0 8px 0;
+    color: var(--text);
+    margin: 0 0 12px 0;
+    letter-spacing: -0.3px;
 }
 
 .empty-subtitle {
-    font-size: 14px;
-    color: #818C99;
-    margin: 0;
+    font-size: 16px;
+    color: var(--text-secondary);
+    margin: 0 0 12px 0;
+    line-height: 1.5;
+    font-weight: 500;
 }
 
 .empty-text {
-    font-size: 14px;
-    color: #818C99;
-    margin: 0 0 24px 0;
-    max-width: 300px;
+    font-size: 15px;
+    color: var(--text-muted);
+    margin: 0 0 36px 0;
+    max-width: 360px;
+    line-height: 1.65;
 }
 
 .empty-action {
@@ -92,9 +106,30 @@
 
 /* === Skeleton Loader === */
 .skeleton {
-    background: var(--gray-100);
+    background: linear-gradient(
+        90deg,
+        var(--gray-100) 0%,
+        var(--gray-200) 20%,
+        var(--gray-100) 40%,
+        var(--gray-100) 100%
+    );
+    background-size: 200% 100%;
     animation: shimmer 1.5s ease infinite;
     border-radius: var(--radius-sm);
+}
+
+.skeleton-line {
+    background: linear-gradient(
+        90deg,
+        var(--gray-100) 0%,
+        var(--gray-200) 50%,
+        var(--gray-100) 100%
+    );
+    background-size: 200% 100%;
+    animation: shimmer 1.5s ease infinite;
+    border-radius: 6px;
+    height: 16px;
+    margin-bottom: 8px;
 }
 
 @keyframes shimmer {
@@ -145,33 +180,52 @@
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    padding: 48px 24px;
+    padding: 56px 24px;
     text-align: center;
     background: #FFFFFF;
-    border-radius: 16px;
+    border-radius: 20px;
     margin: 16px 0;
-    border: 2px solid #FFEBEE;
+    border: 2px solid var(--danger-light);
+    position: relative;
+}
+
+.error-state::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 4px;
+    background: var(--danger);
+    border-radius: 20px 20px 0 0;
 }
 
 .error-icon {
-    width: 64px;
-    height: 64px;
-    margin-bottom: 16px;
-    color: #F44336;
+    width: 80px;
+    height: 80px;
+    margin-bottom: 24px;
+    color: var(--danger);
+    background: var(--danger-light);
+    border-radius: var(--radius-xl);
+    display: flex;
+    align-items: center;
+    justify-content: center;
 }
 
 .error-title {
-    font-size: 18px;
+    font-size: 20px;
     font-weight: 700;
-    color: #000000;
-    margin: 0 0 8px 0;
+    color: var(--text);
+    margin: 0 0 12px 0;
+    letter-spacing: -0.3px;
 }
 
 .error-text {
-    font-size: 14px;
-    color: #818C99;
-    margin: 0 0 24px 0;
-    max-width: 300px;
+    font-size: 15px;
+    color: var(--text-secondary);
+    margin: 0 0 32px 0;
+    max-width: 320px;
+    line-height: 1.6;
 }
 
 .error-action {
@@ -188,6 +242,88 @@
 .error-action:active {
     transform: scale(0.96);
     background: #D32F2F;
+}
+
+/* === Form Validation === */
+.form-error {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    color: var(--danger);
+    font-size: 13px;
+    margin-top: 6px;
+    animation: slideUpSmooth 0.2s ease-out;
+}
+
+.form-error::before {
+    content: '⚠️';
+    font-size: 14px;
+}
+
+.form-success {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    color: var(--success);
+    font-size: 13px;
+    margin-top: 6px;
+    animation: slideUpSmooth 0.2s ease-out;
+}
+
+.form-success::before {
+    content: '✓';
+    font-size: 16px;
+    font-weight: bold;
+}
+
+input.error,
+textarea.error,
+select.error {
+    border-color: var(--danger) !important;
+    background: var(--danger-light);
+}
+
+input.success,
+textarea.success,
+select.success {
+    border-color: var(--success) !important;
+}
+
+/* === Loading Spinner Enhancement === */
+.spinner {
+    width: 40px;
+    height: 40px;
+    border: 3px solid var(--gray-200);
+    border-top-color: var(--primary);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+}
+
+.spinner-small {
+    width: 20px;
+    height: 20px;
+    border-width: 2px;
+}
+
+/* === Optimistic UI === */
+.optimistic-update {
+    opacity: 0.6;
+    pointer-events: none;
+    position: relative;
+}
+
+.optimistic-update::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: var(--gray-50);
+    border-radius: inherit;
+    animation: pulse 1.5s ease infinite;
+}
+
+@keyframes pulse {
+    0%, 100% { opacity: 0.3; }
+    50% { opacity: 0.6; }
 }
 
 /* === Pull to Refresh === */
@@ -217,31 +353,91 @@
     animation: spin 1s linear infinite;
 }
 
+/* === Ripple Effect === */
+.ripple {
+    position: relative;
+    overflow: hidden;
+}
+
+.ripple::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 0;
+    height: 0;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.5);
+    transform: translate(-50%, -50%);
+    transition: width 0.6s, height 0.6s;
+}
+
+.ripple:active::after {
+    width: 300px;
+    height: 300px;
+}
+
+/* === Focus States === */
+*:focus-visible {
+    outline: 2px solid var(--primary);
+    outline-offset: 2px;
+}
+
+button:focus-visible,
+.btn:focus-visible {
+    outline: 3px solid var(--primary-light);
+    outline-offset: 2px;
+}
+
+input:focus-visible,
+textarea:focus-visible,
+select:focus-visible {
+    outline: none;
+    border-color: var(--primary);
+    box-shadow: 0 0 0 4px var(--primary-light);
+}
+
 /* === Toast Notifications === */
 .toast {
     position: fixed;
-    bottom: 80px;
+    bottom: 96px;
     left: 16px;
     right: 16px;
     background: #000000;
     color: #FFFFFF;
-    padding: 16px;
-    border-radius: 12px;
-    font-size: 14px;
+    padding: 16px 20px;
+    border-radius: 16px;
+    font-size: 15px;
     font-weight: 500;
     z-index: 2000;
-    animation: slideUp 0.3s ease-out;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+    animation: toastIn 0.3s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+    backdrop-filter: blur(10px);
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    min-height: 52px;
 }
 
-@keyframes slideUp {
+@keyframes toastIn {
     from {
-        transform: translateY(100%);
+        transform: translateY(100%) scale(0.9);
         opacity: 0;
     }
     to {
-        transform: translateY(0);
+        transform: translateY(0) scale(1);
         opacity: 1;
+    }
+}
+
+@keyframes toastOut {
+    from {
+        transform: translateY(0) scale(1);
+        opacity: 1;
+    }
+    to {
+        transform: translateY(20px) scale(0.95);
+        opacity: 0;
     }
 }
 
@@ -255,4 +451,64 @@
 
 .toast.warning {
     background: #FF9800;
+}
+
+.toast::before {
+    content: '';
+    width: 4px;
+    height: 100%;
+    position: absolute;
+    left: 0;
+    top: 0;
+    background: rgba(255, 255, 255, 0.3);
+    border-radius: 16px 0 0 16px;
+}
+
+/* === Smooth Transitions === */
+.fade-in {
+    animation: fadeIn 0.3s ease-out;
+}
+
+.fade-out {
+    animation: fadeOut 0.2s ease-out;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+@keyframes fadeOut {
+    from { opacity: 1; }
+    to { opacity: 0; }
+}
+
+.slide-up {
+    animation: slideUpSmooth 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes slideUpSmooth {
+    from {
+        transform: translateY(30px);
+        opacity: 0;
+    }
+    to {
+        transform: translateY(0);
+        opacity: 1;
+    }
+}
+
+.scale-in {
+    animation: scaleIn 0.3s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+}
+
+@keyframes scaleIn {
+    from {
+        transform: scale(0.8);
+        opacity: 0;
+    }
+    to {
+        transform: scale(1);
+        opacity: 1;
+    }
 }

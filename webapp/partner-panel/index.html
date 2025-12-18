@@ -9,15 +9,16 @@
     <script src="https://unpkg.com/lucide@latest"></script>
 
     <!-- Modular CSS Architecture -->
-    <link rel="stylesheet" href="/partner-panel/styles/variables.css?v=15.0">
-    <link rel="stylesheet" href="/partner-panel/styles/base.css?v=15.0">
-    <link rel="stylesheet" href="/partner-panel/styles/header.css?v=15.0">
-    <link rel="stylesheet" href="/partner-panel/styles/navigation.css?v=15.0">
-    <link rel="stylesheet" href="/partner-panel/styles/buttons.css?v=15.0">
-    <link rel="stylesheet" href="/partner-panel/styles/products.css?v=15.0">
-    <link rel="stylesheet" href="/partner-panel/styles/main.css?v=15.0">
-    <link rel="stylesheet" href="/partner-panel/styles/utilities.css?v=15.0">
-    <link rel="stylesheet" href="/partner-panel/styles/states.css?v=15.0">
+    <link rel="stylesheet" href="/partner-panel/styles/variables.css?v=16.0">
+    <link rel="stylesheet" href="/partner-panel/styles/base.css?v=16.0">
+    <link rel="stylesheet" href="/partner-panel/styles/header.css?v=16.0">
+    <link rel="stylesheet" href="/partner-panel/styles/navigation.css?v=16.0">
+    <link rel="stylesheet" href="/partner-panel/styles/buttons.css?v=16.0">
+    <link rel="stylesheet" href="/partner-panel/styles/products.css?v=16.0">
+    <link rel="stylesheet" href="/partner-panel/styles/main.css?v=16.0">
+    <link rel="stylesheet" href="/partner-panel/styles/utilities.css?v=16.0">
+    <link rel="stylesheet" href="/partner-panel/styles/states.css?v=16.0">
+    <link rel="stylesheet" href="/partner-panel/styles/design-fixes.css?v=17.0">
 
     <style>
         /* Yandex.Lavka Style + Telegram WebApp Optimizations */
@@ -298,10 +299,51 @@
         // ============================================
         // UI HELPERS
         // ============================================
+        // HAPTIC FEEDBACK
+        // ============================================
+        function haptic(type = 'light') {
+            if (window.Telegram?.WebApp?.HapticFeedback) {
+                switch(type) {
+                    case 'light':
+                        window.Telegram.WebApp.HapticFeedback.impactOccurred('light');
+                        break;
+                    case 'medium':
+                        window.Telegram.WebApp.HapticFeedback.impactOccurred('medium');
+                        break;
+                    case 'heavy':
+                        window.Telegram.WebApp.HapticFeedback.impactOccurred('heavy');
+                        break;
+                    case 'success':
+                        window.Telegram.WebApp.HapticFeedback.notificationOccurred('success');
+                        break;
+                    case 'error':
+                        window.Telegram.WebApp.HapticFeedback.notificationOccurred('error');
+                        break;
+                    case 'warning':
+                        window.Telegram.WebApp.HapticFeedback.notificationOccurred('warning');
+                        break;
+                    case 'selection':
+                        window.Telegram.WebApp.HapticFeedback.selectionChanged();
+                        break;
+                }
+            }
+        }
+
         function toast(message, type = 'info') {
+            haptic(type === 'success' ? 'success' : type === 'error' ? 'error' : 'light');
+            
             const toast = document.createElement('div');
-            toast.className = `toast ${type}`;
-            toast.textContent = message;
+            toast.className = `toast ${type} slide-up`;
+            
+            const icon = document.createElement('span');
+            icon.style.fontSize = '20px';
+            icon.textContent = type === 'success' ? '✓' : type === 'error' ? '✕' : type === 'warning' ? '⚠' : 'ℹ';
+            
+            const text = document.createElement('span');
+            text.textContent = message;
+            
+            toast.appendChild(icon);
+            toast.appendChild(text);
             document.body.appendChild(toast);
 
             setTimeout(() => {
@@ -312,9 +354,9 @@
 
         function showLoading(type = 'default') {
             const loaders = {
-                default: `<div class="loading"><div class="spinner"></div></div>`,
+                default: `<div class="loading fade-in"><div class="spinner"></div></div>`,
                 dashboard: `
-                    <div class="container">
+                    <div class="container fade-in">
                         <div class="stats-grid">
                             ${[1,2,3,4].map(() => `
                                 <div class="stat-card skeleton">
@@ -328,7 +370,7 @@
                     </div>
                 `,
                 products: `
-                    <div class="container">
+                    <div class="container fade-in">
                         <div class="products-grid">
                             ${[1,2,3,4,5,6].map(() => `
                                 <div class="product-card skeleton">
@@ -342,6 +384,26 @@
                             `).join('')}
                         </div>
                     </div>
+                `,
+                stats: `
+                    <div class="container fade-in">
+                        <div class="skeleton" style="height: 300px; margin-bottom: 24px; border-radius: 20px;"></div>
+                        <div class="stats-grid">
+                            ${[1,2,3,4].map(() => `
+                                <div class="stat-card skeleton">
+                                    <div class="skeleton-line" style="width: 60%; height: 18px; margin-bottom: 10px;"></div>
+                                    <div class="skeleton-line" style="width: 50%; height: 28px;"></div>
+                                </div>
+                            `).join('')}
+                        </div>
+                    </div>
+                `,
+                settings: `
+                    <div class="container fade-in">
+                        ${[1,2,3,4,5].map(() => `
+                            <div class="skeleton" style="height: 72px; margin-bottom: 12px; border-radius: 16px;"></div>
+                        `).join('')}
+                    </div>
                 `
             };
             document.querySelector('.content').innerHTML = loaders[type] || loaders.default;
@@ -352,6 +414,7 @@
         // ============================================
         function switchView(view) {
             console.log(`📍 Switching to view: ${view}`);
+            haptic('selection');
             state.currentView = view;
 
             // Update nav active state
@@ -360,24 +423,35 @@
             });
             event?.target?.closest('.nav-item')?.classList.add('active');
 
-            // Load view
-            switch(view) {
-                case 'dashboard':
-                    loadDashboard();
-                    break;
-                case 'orders':
-                    loadOrders();
-                    break;
-                case 'products':
-                    loadProducts();
-                    break;
-                case 'stats':
-                    loadStats();
-                    break;
-                case 'settings':
-                    loadSettings();
-                    break;
-            }
+            // Smooth transition
+            const content = document.querySelector('.content');
+            content.classList.add('fade-out');
+            
+            setTimeout(() => {
+                content.classList.remove('fade-out');
+                
+                // Load view
+                switch(view) {
+                    case 'dashboard':
+                        loadDashboard();
+                        break;
+                    case 'orders':
+                        loadOrders();
+                        break;
+                    case 'products':
+                        loadProducts();
+                        break;
+                    case 'stats':
+                        loadStats();
+                        break;
+                    case 'settings':
+                        loadSettings();
+                        break;
+                }
+                
+                // Scroll to top smoothly
+                content.scrollTo({ top: 0, behavior: 'smooth' });
+            }, 150);
         }
 
         // ============================================
@@ -531,8 +605,13 @@
                                 <i data-lucide="${revenueTrend > 0 ? 'trending-up' : 'trending-down'}"></i>
                                 ${Math.abs(revenueTrend)}%
                             </span>` : ''}
-                            <div class="stat-value">${formatPrice(todayRevenue)}</div>
-                            <div class="stat-label">Выручка сегодня</div>
+                            ${todayRevenue > 0 ? `
+                                <div class="stat-value">${formatPrice(todayRevenue)}</div>
+                                <div class="stat-label">Выручка сегодня</div>
+                            ` : `
+                                <div class="stat-value empty-revenue">Первый заказ скоро! 🚀</div>
+                                <div class="stat-hint">Начните с добавления товаров</div>
+                            `}
                         </div>
 
                         <div class="stat-card success">
@@ -616,7 +695,7 @@
         function renderOrderCard(order) {
             const orderId = order.order_id || order.id;
             return `
-                <div class="order-card" onclick="viewOrderDetails(${orderId})">
+                <div class="order-card ripple" data-order-id="${orderId}" data-status="${order.status}" onclick="haptic('light'); viewOrderDetails(${orderId})">
                     <div class="order-header">
                         <div class="order-id">#${orderId || '—'}</div>
                         <div class="order-status status-${order.status}">${getStatusText(order.status)}</div>
@@ -630,13 +709,13 @@
                     </div>
                     ${order.status === 'new' ? `
                         <div class="order-actions" onclick="event.stopPropagation()">
-                            <button class="btn btn-sm btn-success" onclick="updateOrderStatus(${orderId}, 'preparing')">Принять</button>
-                            <button class="btn btn-sm btn-danger" onclick="cancelOrder(${orderId})">Отменить</button>
+                            <button class="btn btn-sm btn-success ripple" onclick="updateOrderStatus(${orderId}, 'preparing')">Принять</button>
+                            <button class="btn btn-sm btn-danger ripple" onclick="cancelOrder(${orderId})">Отменить</button>
                         </div>
                     ` : ''}
                     ${order.status === 'preparing' ? `
                         <div class="order-actions" onclick="event.stopPropagation()">
-                            <button class="btn btn-sm btn-success" onclick="updateOrderStatus(${orderId}, 'ready')">Готов</button>
+                            <button class="btn btn-sm btn-success ripple" onclick="updateOrderStatus(${orderId}, 'ready')">Готов</button>
                         </div>
                     ` : ''}
                 </div>
@@ -853,43 +932,45 @@
 
         async function updateOrderStatus(orderId, newStatus) {
             try {
-                // Haptic feedback
-                if (tg?.HapticFeedback) {
-                    tg.HapticFeedback.impactOccurred('medium');
+                haptic('medium');
+
+                // Optimistic UI update
+                const order = state.orders.find(o => (o.order_id || o.id) === orderId);
+                if (order) {
+                    const oldStatus = order.status;
+                    order.status = newStatus;
+                    
+                    // Re-render with optimistic update
+                    if (state.currentView === 'orders') {
+                        const orderCard = document.querySelector(`[data-order-id="${orderId}"]`);
+                        if (orderCard) orderCard.classList.add('optimistic-update');
+                    }
                 }
 
                 await apiFetch(`/api/partner/orders/${orderId}/status?status=${newStatus}`, {
                     method: 'POST'
                 });
 
-                // Update local state
-                const order = state.orders.find(o => (o.order_id || o.id) === orderId);
-                if (order) order.status = newStatus;
-
-                // Success haptic
-                if (tg?.HapticFeedback) {
-                    tg.HapticFeedback.notificationOccurred('success');
-                }
-
+                haptic('success');
                 toast('Статус заказа обновлен', 'success');
-                loadOrders();
-            } catch (error) {
-                // Error haptic
-                if (tg?.HapticFeedback) {
-                    tg.HapticFeedback.notificationOccurred('error');
+                
+                // Reload to get fresh data
+                if (state.currentView === 'orders') {
+                    loadOrders();
                 }
+            } catch (error) {
+                haptic('error');
                 toast('Ошибка обновления статуса', 'error');
+                
+                // Revert optimistic update on error
+                loadOrders();
             }
         }
 
         async function cancelOrder(orderId) {
             if (!confirm('Отменить заказ?')) return;
-
-            // Heavy haptic for destructive action
-            if (tg?.HapticFeedback) {
-                tg.HapticFeedback.impactOccurred('heavy');
-            }
-
+            
+            haptic('heavy');
             await updateOrderStatus(orderId, 'cancelled');
         }
 
@@ -934,17 +1015,25 @@
                         ${state.products.map(product => `
                             <div class="product-card" data-product-id="${product.id}">
                                 <div class="product-image">
-                                    <img src="${product.photo_url || '/static/placeholder.jpg'}" alt="${product.name}" loading="lazy">
+                                    ${product.photo_url ? `
+                                        <img src="${product.photo_url}" alt="${product.name}" loading="lazy" 
+                                             onerror="this.parentElement.innerHTML='<div class=\\'product-placeholder\\'><i data-lucide=\\'image\\'></i><span>Нет фото</span></div>'; lucide.createIcons();">
+                                    ` : `
+                                        <div class="product-placeholder">
+                                            <i data-lucide="image"></i>
+                                            <span>Нет фото</span>
+                                        </div>
+                                    `}
                                     ${product.is_available ? '' : '<div class="product-overlay"><span style="color: white; font-weight: bold;">Нет в наличии</span></div>'}
                                 </div>
                                 <div class="product-actions">
-                                    <button class="action-btn" onclick="editProduct(${product.id})" title="Редактировать">
+                                    <button class="product-action-btn ripple" onclick="editProduct(${product.id})" title="Редактировать">
                                         <i data-lucide="edit"></i>
                                     </button>
-                                    <button class="action-btn" onclick="toggleProductAvailability(${product.id})" title="${product.is_available ? 'Скрыть' : 'Показать'}">
+                                    <button class="product-action-btn ripple" onclick="toggleProductAvailability(${product.id})" title="${product.is_available ? 'Скрыть' : 'Показать'}">
                                         <i data-lucide="${product.is_available ? 'eye-off' : 'eye'}"></i>
                                     </button>
-                                    <button class="action-btn" onclick="deleteProduct(${product.id})" title="Удалить">
+                                    <button class="product-action-btn ripple" onclick="deleteProduct(${product.id})" title="Удалить">
                                         <i data-lucide="trash-2"></i>
                                     </button>
                                 </div>
@@ -993,16 +1082,17 @@
         }
 
         function openProductModal(productId = null) {
+            haptic('light');
             const product = productId ? state.products.find(p => p.id === productId) : null;
             const isEdit = !!product;
 
             const modal = document.createElement('div');
-            modal.className = 'modal-overlay';
+            modal.className = 'modal-overlay scale-in';
             modal.innerHTML = `
                 <div class="modal-content" style="max-width: 600px;">
                     <div class="modal-header">
                         <h3>${isEdit ? 'Редактировать товар' : 'Добавить товар'}</h3>
-                        <button class="btn-icon" onclick="this.closest('.modal-overlay').remove()">
+                        <button class="btn-icon ripple" onclick="this.closest('.modal-overlay').remove()">
                             <i data-lucide="x"></i>
                         </button>
                     </div>
@@ -1010,23 +1100,30 @@
                         <div class="modal-body">
                             <div class="form-group">
                                 <label>Название *</label>
-                                <input type="text" name="name" value="${product?.name || ''}" required class="search-input">
+                                <input type="text" name="name" value="${product?.name || ''}" required class="search-input" 
+                                       oninput="validateField(this)" minlength="3" maxlength="100">
+                                <div class="form-error" style="display: none;">Минимум 3 символа</div>
                             </div>
 
                             <div class="form-group">
                                 <label>Описание</label>
-                                <textarea name="description" rows="3" class="search-input">${product?.description || ''}</textarea>
+                                <textarea name="description" rows="3" class="search-input" 
+                                          oninput="validateField(this)" maxlength="500">${product?.description || ''}</textarea>
+                                <div style="font-size: 12px; color: var(--text-muted); margin-top: 4px;">0/500</div>
                             </div>
 
                             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
                                 <div class="form-group">
                                     <label>Цена *</label>
-                                    <input type="number" name="price" value="${product?.price || ''}" required min="0" class="search-input">
+                                    <input type="number" name="price" value="${product?.price || ''}" required min="1" step="0.01" class="search-input"
+                                           oninput="validateField(this)">
+                                    <div class="form-error" style="display: none;">Цена должна быть > 0</div>
                                 </div>
 
                                 <div class="form-group">
                                     <label>Скидка (%)</label>
-                                    <input type="number" name="discount" value="${product?.discount || 0}" min="0" max="99" class="search-input">
+                                    <input type="number" name="discount" value="${product?.discount || 0}" min="0" max="99" class="search-input"
+                                           oninput="validateField(this)">
                                 </div>
                             </div>
 
@@ -1048,7 +1145,9 @@
 
                             <div class="form-group">
                                 <label>URL фото</label>
-                                <input type="url" name="photo_url" value="${product?.photo_url || ''}" placeholder="https://..." class="search-input">
+                                <input type="url" name="photo_url" value="${product?.photo_url || ''}" placeholder="https://..." class="search-input"
+                                       oninput="validateField(this)">
+                                <div class="form-error" style="display: none;">Некорректный URL</div>
                             </div>
 
                             <div class="form-group">
@@ -1060,10 +1159,10 @@
                         </div>
 
                         <div style="display: flex; gap: 12px; padding: 16px; border-top: 1px solid var(--border);">
-                            <button type="submit" class="btn btn-primary" style="flex: 1;">
+                            <button type="submit" class="btn btn-primary ripple" style="flex: 1;">
                                 ${isEdit ? 'Сохранить' : 'Добавить'}
                             </button>
-                            <button type="button" class="btn btn-secondary" onclick="this.closest('.modal-overlay').remove()">
+                            <button type="button" class="btn btn-secondary ripple" onclick="this.closest('.modal-overlay').remove()">
                                 Отмена
                             </button>
                         </div>
@@ -1074,13 +1173,28 @@
             document.body.appendChild(modal);
             if (typeof lucide !== 'undefined') lucide.createIcons();
 
+            // Setup character counter for description
+            const textarea = modal.querySelector('textarea[name="description"]');
+            const counter = textarea.nextElementSibling;
+            textarea.addEventListener('input', () => {
+                counter.textContent = `${textarea.value.length}/500`;
+            });
+            counter.textContent = `${textarea.value.length}/500`;
+
+            // Auto-focus first input
+            setTimeout(() => modal.querySelector('input[name="name"]').focus(), 100);
+
             modal.addEventListener('click', (e) => {
-                if (e.target === modal) modal.remove();
+                if (e.target === modal) {
+                    haptic('light');
+                    modal.remove();
+                }
             });
         }
 
         async function saveProduct(event, productId) {
             event.preventDefault();
+            haptic('medium');
 
             const formData = new FormData(event.target);
             const data = {
@@ -1094,18 +1208,26 @@
                 is_available: formData.get('is_available') === 'on'
             };
 
+            // Show loading state on submit button
+            const submitBtn = event.target.querySelector('button[type="submit"]');
+            const originalText = submitBtn.textContent;
+            submitBtn.disabled = true;
+            submitBtn.innerHTML = '<div class="spinner spinner-small" style="margin: 0 auto;"></div>';
+
             try {
                 if (productId) {
                     await apiFetch(`/api/partner/products/${productId}`, {
                         method: 'PUT',
                         body: JSON.stringify(data)
                     });
+                    haptic('success');
                     toast('Товар обновлен', 'success');
                 } else {
                     await apiFetch('/api/partner/products', {
                         method: 'POST',
                         body: JSON.stringify(data)
                     });
+                    haptic('success');
                     toast('Товар добавлен', 'success');
                 }
 
@@ -1113,145 +1235,263 @@
                 loadProducts();
             } catch (error) {
                 console.error('Save product error:', error);
+                haptic('error');
                 toast('Ошибка сохранения товара', 'error');
+                
+                // Restore button
+                submitBtn.disabled = false;
+                submitBtn.textContent = originalText;
+            }
+        }
+
+        // Inline validation helper
+        function validateField(input) {
+            const errorDiv = input.parentElement.querySelector('.form-error');
+            if (!errorDiv) return;
+
+            let isValid = true;
+            let errorMsg = '';
+
+            // Required field
+            if (input.required && !input.value) {
+                isValid = false;
+                errorMsg = 'Обязательное поле';
+            }
+            // Min length
+            else if (input.minLength && input.value.length > 0 && input.value.length < input.minLength) {
+                isValid = false;
+                errorMsg = `Минимум ${input.minLength} символа`;
+            }
+            // URL validation
+            else if (input.type === 'url' && input.value && !input.value.match(/^https?:\/\/.+/)) {
+                isValid = false;
+                errorMsg = 'Некорректный URL';
+            }
+            // Number validation
+            else if (input.type === 'number' && input.value) {
+                const num = parseFloat(input.value);
+                if (input.min && num < parseFloat(input.min)) {
+                    isValid = false;
+                    errorMsg = `Минимум ${input.min}`;
+                }
+                if (input.max && num > parseFloat(input.max)) {
+                    isValid = false;
+                    errorMsg = `Максимум ${input.max}`;
+                }
+            }
+
+            if (isValid) {
+                input.classList.remove('error');
+                input.classList.add('success');
+                errorDiv.style.display = 'none';
+            } else {
+                input.classList.add('error');
+                input.classList.remove('success');
+                errorDiv.textContent = errorMsg;
+                errorDiv.style.display = 'flex';
             }
         }
 
         function editProduct(id) {
+            haptic('light');
             openProductModal(id);
         }
 
         async function toggleProductAvailability(id) {
             try {
+                haptic('light');
+                
                 const product = state.products.find(p => p.id === id);
-                await apiFetch(`/api/partner/products/${id}/status`, {
-                    method: 'PATCH',
-                    body: JSON.stringify({ status: product.is_available ? 'hidden' : 'active' })
+                if (!product) return;
+
+                // Optimistic UI update
+                product.is_available = !product.is_available;
+                const card = document.querySelector(`[data-product-id="${id}"]`);
+                if (card) card.classList.add('optimistic-update');
+
+                await apiFetch(`/api/partner/products/${id}/availability`, {
+                    method: 'POST',
+                    body: JSON.stringify({ is_available: product.is_available })
                 });
 
-                product.is_available = !product.is_available;
-                toast('Статус товара изменен', 'success');
-                loadProducts();
+                haptic('success');
+                toast(
+                    product.is_available ? 'Товар доступен' : 'Товар скрыт', 
+                    'success'
+                );
+                
+                if (state.currentView === 'products') {
+                    loadProducts();
+                }
             } catch (error) {
-                toast('Ошибка изменения статуса', 'error');
+                haptic('error');
+                toast('Ошибка обновления', 'error');
+                loadProducts(); // Revert on error
             }
         }
 
         async function deleteProduct(id) {
             if (!confirm('Удалить товар?')) return;
+            
+            haptic('heavy');
 
             try {
+                // Optimistic UI - fade out card
+                const card = document.querySelector(`[data-product-id="${id}"]`);
+                if (card) {
+                    card.style.opacity = '0.5';
+                    card.style.pointerEvents = 'none';
+                }
+
                 await apiFetch(`/api/partner/products/${id}`, { method: 'DELETE' });
+                
                 state.products = state.products.filter(p => p.id !== id);
+                haptic('success');
                 toast('Товар удален', 'success');
                 loadProducts();
             } catch (error) {
+                haptic('error');
                 toast('Ошибка удаления товара', 'error');
+                loadProducts(); // Restore on error
             }
         }
 
         // ============================================
         // STATS
         // ============================================
-        function loadStats() {
-            document.querySelector('.content').innerHTML = `
-                <div class="container">
-                    <h2 class="section-title">Статистика</h2>
-                    <p class="empty-description">Статистика в разработке</p>
-                </div>
-            `;
+        async function loadStats() {
+            showLoading('stats');
+            
+            try {
+                // Simulate loading (replace with actual API call)
+                await new Promise(resolve => setTimeout(resolve, 500));
+                
+                document.querySelector('.content').innerHTML = `
+                    <div class="container fade-in">
+                        <h2 class="section-title">Статистика</h2>
+                        
+                        <div class="empty-state">
+                            <div class="empty-icon">📊</div>
+                            <p class="empty-title">Статистика в разработке</p>
+                            <p class="empty-subtitle">Здесь будет детальная аналитика</p>
+                            <p class="empty-text">Графики продаж, популярные товары, выручка по дням</p>
+                        </div>
+                    </div>
+                `;
+            } catch (error) {
+                document.querySelector('.content').innerHTML = `
+                    <div class="container">
+                        <div class="error-state">
+                            <div class="error-icon">🚨</div>
+                            <p class="error-title">Ошибка загрузки</p>
+                            <p class="error-text">Не удалось загрузить статистику</p>
+                            <button class="btn btn-primary error-action ripple" onclick="loadStats()">
+                                Повторить
+                            </button>
+                        </div>
+                    </div>
+                `;
+            }
         }
 
         // ============================================
         // SETTINGS
         // ============================================
-        function loadSettings() {
-            document.querySelector('.content').innerHTML = `
-                <div class="container">
-                    <h2 class="section-title">Настройки</h2>
+        async function loadSettings() {
+            showLoading('settings');
+            
+            try {
+                // Load fresh store data if needed
+                if (!state.store) {
+                    state.store = await apiFetch('/api/partner/store');
+                }
+                
+                document.querySelector('.content').innerHTML = `
+                    <div class="container fade-in">
+                        <h2 class="section-title">Настройки</h2>
 
-                    <div class="dashboard-card" style="margin-bottom: 24px;">
-                        <h3 class="card-title">
-                            <i data-lucide="store" class="card-icon"></i>
-                            Профиль магазина
-                        </h3>
-                        <div class="list-item">
-                            <div class="list-content">
-                                <div class="list-info">
-                                    <div class="list-title">Название</div>
-                                    <div class="list-subtitle" id="settingsStoreName">${state.store?.name || 'Загрузка...'}</div>
+                        <div class="dashboard-card" style="margin-bottom: 24px;">
+                            <h3 class="card-title">
+                                <i data-lucide="store" class="card-icon"></i>
+                                Профиль магазина
+                            </h3>
+                            <div class="list-item">
+                                <div class="list-content">
+                                    <div class="list-info">
+                                        <div class="list-title">Название</div>
+                                        <div class="list-subtitle" id="settingsStoreName">${state.store?.name || 'Загрузка...'}</div>
+                                    </div>
+                                </div>
+                                <button class="btn btn-sm btn-ghost ripple" onclick="editStoreProfile()">
+                                    <i data-lucide="edit"></i>
+                                </button>
+                            </div>
+
+                            <div class="list-item">
+                                <div class="list-content">
+                                    <div class="list-info">
+                                        <div class="list-title">Адрес</div>
+                                        <div class="list-subtitle">${state.store?.address || 'Не указан'}</div>
+                                    </div>
                                 </div>
                             </div>
-                            <button class="btn btn-sm btn-ghost" onclick="editStoreProfile()">
-                                <i data-lucide="edit"></i>
-                            </button>
+
+                            <div class="list-item">
+                                <div class="list-content">
+                                    <div class="list-info">
+                                        <div class="list-title">Телефон</div>
+                                        <div class="list-subtitle">${state.store?.phone || 'Не указан'}</div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="list-item">
+                                <div class="list-content">
+                                    <div class="list-info">
+                                        <div class="list-title">Статус</div>
+                                        <div class="list-subtitle">${state.store?.is_open ? '🟢 Открыто' : '🔴 Закрыто'}</div>
+                                    </div>
+                                </div>
+                                <button class="btn btn-sm ${state.store?.is_open ? 'btn-danger' : 'btn-success'} ripple" onclick="toggleStoreStatus()">
+                                    ${state.store?.is_open ? 'Закрыть' : 'Открыть'}
+                                </button>
+                            </div>
                         </div>
 
-                        <div class="list-item">
-                            <div class="list-content">
-                                <div class="list-info">
-                                    <div class="list-title">Адрес</div>
-                                    <div class="list-subtitle">${state.store?.address || 'Не указан'}</div>
+                        <div class="dashboard-card" style="margin-bottom: 24px;">
+                            <h3 class="card-title">
+                                <i data-lucide="clock" class="card-icon"></i>
+                                Режим работы
+                            </h3>
+                            <div class="list-item">
+                                <div class="list-content">
+                                    <div class="list-info">
+                                        <div class="list-title">Понедельник - Пятница</div>
+                                        <div class="list-subtitle">09:00 - 21:00</div>
+                                    </div>
+                                </div>
+                                <button class="btn btn-sm btn-ghost ripple" onclick="haptic('light'); toast('Функция в разработке', 'info')">
+                                    <i data-lucide="edit"></i>
+                                </button>
+                            </div>
+                            <div class="list-item">
+                                <div class="list-content">
+                                    <div class="list-info">
+                                        <div class="list-title">Суббота - Воскресенье</div>
+                                        <div class="list-subtitle">10:00 - 20:00</div>
+                                    </div>
                                 </div>
                             </div>
                         </div>
 
-                        <div class="list-item">
-                            <div class="list-content">
-                                <div class="list-info">
-                                    <div class="list-title">Телефон</div>
-                                    <div class="list-subtitle">${state.store?.phone || 'Не указан'}</div>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div class="list-item">
-                            <div class="list-content">
-                                <div class="list-info">
-                                    <div class="list-title">Статус</div>
-                                    <div class="list-subtitle">${state.store?.is_open ? '🟢 Открыто' : '🔴 Закрыто'}</div>
-                                </div>
-                            </div>
-                            <button class="btn btn-sm ${state.store?.is_open ? 'btn-danger' : 'btn-success'}" onclick="toggleStoreStatus()">
-                                ${state.store?.is_open ? 'Закрыть' : 'Открыть'}
-                            </button>
-                        </div>
-                    </div>
-
-                    <div class="dashboard-card" style="margin-bottom: 24px;">
-                        <h3 class="card-title">
-                            <i data-lucide="clock" class="card-icon"></i>
-                            Режим работы
-                        </h3>
-                        <div class="list-item">
-                            <div class="list-content">
-                                <div class="list-info">
-                                    <div class="list-title">Понедельник - Пятница</div>
-                                    <div class="list-subtitle">09:00 - 21:00</div>
-                                </div>
-                            </div>
-                            <button class="btn btn-sm btn-ghost" onclick="toast('Функция в разработке', 'info')">
-                                <i data-lucide="edit"></i>
-                            </button>
-                        </div>
-                        <div class="list-item">
-                            <div class="list-content">
-                                <div class="list-info">
-                                    <div class="list-title">Суббота - Воскресенье</div>
-                                    <div class="list-subtitle">10:00 - 20:00</div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="dashboard-card" style="margin-bottom: 24px;">
-                        <h3 class="card-title">
-                            <i data-lucide="truck" class="card-icon"></i>
-                            Доставка
-                        </h3>
-                        <div class="list-item">
-                            <span class="list-title">Минимальный заказ</span>
-                            <span class="list-value">${formatPrice(state.store?.min_order || 0)}</span>
+                        <div class="dashboard-card" style="margin-bottom: 24px;">
+                            <h3 class="card-title">
+                                <i data-lucide="truck" class="card-icon"></i>
+                                Доставка
+                            </h3>
+                            <div class="list-item">
+                                <span class="list-title">Минимальный заказ</span>
+                                <span class="list-value">${formatPrice(state.store?.min_order || 0)}</span>
                         </div>
                         <div class="list-item">
                             <span class="list-title">Стоимость доставки</span>
@@ -1269,13 +1509,13 @@
                         </h3>
                         <div class="list-item">
                             <span class="list-title">Новые заказы</span>
-                            <button class="btn btn-sm btn-success" onclick="toast('Уведомления включены', 'success')">
+                            <button class="btn btn-sm btn-success ripple" onclick="haptic('light'); toast('Уведомления включены', 'success')">
                                 Включено
                             </button>
                         </div>
                         <div class="list-item">
                             <span class="list-title">Отмены заказов</span>
-                            <button class="btn btn-sm btn-success" onclick="toast('Уведомления включены', 'success')">
+                            <button class="btn btn-sm btn-success ripple" onclick="haptic('light'); toast('Уведомления включены', 'success')">
                                 Включено
                             </button>
                         </div>
@@ -1284,16 +1524,31 @@
             `;
 
             if (typeof lucide !== 'undefined') lucide.createIcons();
+            } catch (error) {
+                document.querySelector('.content').innerHTML = `
+                    <div class="container">
+                        <div class="error-state">
+                            <div class="error-icon">🚨</div>
+                            <p class="error-title">Ошибка загрузки</p>
+                            <p class="error-text">Не удалось загрузить настройки</p>
+                            <button class="btn btn-primary error-action ripple" onclick="loadSettings()">
+                                Повторить
+                            </button>
+                        </div>
+                    </div>
+                `;
+            }
         }
 
         function editStoreProfile() {
+            haptic('light');
             const modal = document.createElement('div');
-            modal.className = 'modal-overlay';
+            modal.className = 'modal-overlay scale-in';
             modal.innerHTML = `
                 <div class="modal-content" style="max-width: 500px;">
                     <div class="modal-header">
                         <h3>Редактировать профиль</h3>
-                        <button class="btn-icon" onclick="this.closest('.modal-overlay').remove()">
+                        <button class="btn-icon ripple" onclick="this.closest('.modal-overlay').remove()">
                             <i data-lucide="x"></i>
                         </button>
                     </div>
@@ -1301,27 +1556,34 @@
                         <div class="modal-body">
                             <div class="form-group">
                                 <label>Название магазина *</label>
-                                <input type="text" name="name" value="${state.store?.name || ''}" required class="search-input">
+                                <input type="text" name="name" value="${state.store?.name || ''}" required class="search-input" 
+                                       minlength="3" maxlength="50" oninput="validateField(this)">
+                                <div class="form-error" style="display: none;">Минимум 3 символа</div>
                             </div>
 
                             <div class="form-group">
                                 <label>Адрес</label>
-                                <input type="text" name="address" value="${state.store?.address || ''}" class="search-input">
+                                <input type="text" name="address" value="${state.store?.address || ''}" class="search-input" 
+                                       maxlength="200" oninput="validateField(this)">
                             </div>
 
                             <div class="form-group">
                                 <label>Телефон</label>
-                                <input type="tel" name="phone" value="${state.store?.phone || ''}" placeholder="+998 XX XXX XX XX" class="search-input">
+                                <input type="tel" name="phone" value="${state.store?.phone || ''}" placeholder="+998 XX XXX XX XX" 
+                                       class="search-input" pattern="\+998\s?\d{2}\s?\d{3}\s?\d{2}\s?\d{2}" oninput="validateField(this)">
+                                <div class="form-error" style="display: none;">Некорректный формат</div>
                             </div>
 
                             <div class="form-group">
                                 <label>Описание</label>
-                                <textarea name="description" rows="3" class="search-input">${state.store?.description || ''}</textarea>
+                                <textarea name="description" rows="3" class="search-input" maxlength="300" 
+                                          oninput="validateField(this)">${state.store?.description || ''}</textarea>
+                                <div style="font-size: 12px; color: var(--text-muted); margin-top: 4px;">0/300</div>
                             </div>
                         </div>
 
                         <div style="display: flex; gap: 12px; padding: 16px; border-top: 1px solid var(--border);">
-                            <button type="submit" class="btn btn-primary" style="flex: 1;">Сохранить</button>
+                            <button type="submit" class="btn btn-primary ripple" style="flex: 1;">Сохранить</button>
                             <button type="button" class="btn btn-secondary" onclick="this.closest('.modal-overlay').remove()">Отмена</button>
                         </div>
                     </form>
@@ -1331,13 +1593,28 @@
             document.body.appendChild(modal);
             if (typeof lucide !== 'undefined') lucide.createIcons();
 
+            // Setup character counter for description
+            const textarea = modal.querySelector('textarea[name="description"]');
+            const counter = textarea.nextElementSibling;
+            textarea.addEventListener('input', () => {
+                counter.textContent = `${textarea.value.length}/300`;
+            });
+            counter.textContent = `${textarea.value.length}/300`;
+
+            // Auto-focus first input
+            setTimeout(() => modal.querySelector('input[name="name"]').focus(), 100);
+
             modal.addEventListener('click', (e) => {
-                if (e.target === modal) modal.remove();
+                if (e.target === modal) {
+                    haptic('light');
+                    modal.remove();
+                }
             });
         }
 
         async function saveStoreProfile(event) {
             event.preventDefault();
+            haptic('medium');
 
             const formData = new FormData(event.target);
             const data = {
@@ -1346,6 +1623,12 @@
                 phone: formData.get('phone'),
                 description: formData.get('description')
             };
+
+            // Show loading state
+            const submitBtn = event.target.querySelector('button[type="submit"]');
+            const originalText = submitBtn.textContent;
+            submitBtn.disabled = true;
+            submitBtn.innerHTML = '<div class="spinner spinner-small" style="margin: 0 auto;"></div>';
 
             try {
                 await apiFetch('/api/partner/store', {
@@ -1357,27 +1640,42 @@
                 state.store = { ...state.store, ...data };
                 document.getElementById('storeName').textContent = data.name;
 
+                haptic('success');
                 toast('Профиль обновлен', 'success');
                 document.querySelector('.modal-overlay').remove();
                 loadSettings();
             } catch (error) {
+                haptic('error');
                 toast('Ошибка сохранения', 'error');
+                
+                // Restore button
+                submitBtn.disabled = false;
+                submitBtn.textContent = originalText;
             }
         }
 
         async function toggleStoreStatus() {
             try {
+                haptic('medium');
+                
                 const newStatus = !state.store?.is_open;
+                
+                // Optimistic UI update
+                const oldStatus = state.store.is_open;
+                state.store.is_open = newStatus;
+                
                 await apiFetch('/api/partner/store', {
                     method: 'PUT',
                     body: JSON.stringify({ is_open: newStatus })
                 });
 
-                state.store.is_open = newStatus;
+                haptic('success');
                 toast(newStatus ? 'Магазин открыт' : 'Магазин закрыт', 'success');
                 loadSettings();
             } catch (error) {
+                haptic('error');
                 toast('Ошибка изменения статуса', 'error');
+                loadSettings(); // Revert on error
             }
         }
 

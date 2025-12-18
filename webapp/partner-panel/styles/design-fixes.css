@@ -1,0 +1,238 @@
+/* ================================================
+   YANDEX.LAVKA DESIGN FIXES - v17.0
+   Critical improvements based on screenshots
+   ================================================ */
+
+/* === 1. GREEN CHECKBOX (CONSISTENCY) === */
+input[type="checkbox"] {
+    width: 22px;
+    height: 22px;
+    cursor: pointer;
+    accent-color: #21A038; /* Primary green */
+    border-radius: 6px;
+    transition: all 0.2s ease;
+}
+
+input[type="checkbox"]:hover {
+    transform: scale(1.05);
+}
+
+/* === 2. CANCELLED ORDER STYLING === */
+.order-card[data-status="cancelled"] {
+    opacity: 0.7;
+    border-left: 3px solid #E5E5E5;
+}
+
+.order-card[data-status="cancelled"] .order-total {
+    color: #818C99 !important;
+    text-decoration: line-through;
+    opacity: 0.6;
+}
+
+.order-card[data-status="cancelled"] .order-status {
+    background: #F5F5F5;
+    color: #818C99;
+}
+
+/* === 3. NEW ORDER HIGHLIGHT === */
+.order-card[data-status="new"] {
+    border-left: 3px solid #21A038;
+    box-shadow: 0 0 0 1px rgba(33, 160, 56, 0.1);
+}
+
+/* === 4. PRODUCT PLACEHOLDER === */
+.product-placeholder {
+    width: 100%;
+    height: 200px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    background: #F7F7F7;
+    color: #818C99;
+    gap: 12px;
+    border-radius: 12px 12px 0 0;
+}
+
+.product-placeholder i,
+.product-placeholder svg {
+    width: 64px !important;
+    height: 64px !important;
+    opacity: 0.4;
+}
+
+.product-placeholder span {
+    font-size: 14px;
+    font-weight: 500;
+    color: #9CA3AF;
+}
+
+/* === 5. LARGER TOUCH TARGETS === */
+.product-action-btn {
+    width: 48px !important;
+    height: 48px !important;
+    min-width: 48px !important;
+    min-height: 48px !important;
+    border-radius: 12px;
+    background: #FFFFFF;
+    border: 1.5px solid #E5E5E5;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    color: #000000;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+.product-action-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
+    border-color: #21A038;
+}
+
+.product-action-btn:active {
+    transform: translateY(0);
+}
+
+.product-action-btn i,
+.product-action-btn svg {
+    width: 22px !important;
+    height: 22px !important;
+}
+
+.product-actions {
+    gap: 10px !important;
+    top: 12px !important;
+    right: 12px !important;
+}
+
+/* === 6. BETTER EMPTY STATES === */
+.empty-icon {
+    width: 120px !important;
+    height: 120px !important;
+    margin-bottom: 28px !important;
+    opacity: 0.6 !important;
+    font-size: 56px;
+}
+
+.empty-icon i,
+.empty-icon svg {
+    width: 64px !important;
+    height: 64px !important;
+}
+
+.empty-title {
+    font-size: 22px !important;
+    font-weight: 700 !important;
+}
+
+.empty-subtitle {
+    font-size: 16px !important;
+    font-weight: 500 !important;
+    margin-bottom: 12px !important;
+}
+
+.empty-text {
+    font-size: 15px !important;
+    line-height: 1.65 !important;
+    max-width: 360px !important;
+    margin-bottom: 36px !important;
+}
+
+/* === 7. IMPROVED TYPOGRAPHY === */
+.order-id {
+    font-size: 18px !important;
+    font-weight: 700 !important;
+}
+
+.order-time {
+    font-size: 14px !important;
+}
+
+.product-title {
+    font-size: 17px !important;
+    line-height: 1.4 !important;
+}
+
+.product-price {
+    font-size: 22px !important;
+}
+
+/* === 8. BETTER CARD HOVER === */
+.order-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08) !important;
+}
+
+.product-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08) !important;
+}
+
+/* === 9. MOTIVATING EMPTY REVENUE === */
+.stat-value.empty-revenue {
+    font-size: 28px !important;
+    font-weight: 700 !important;
+    line-height: 1.3 !important;
+    color: #21A038 !important;
+}
+
+.stat-hint {
+    font-size: 14px;
+    color: #818C99;
+    margin-top: 8px;
+    font-weight: 400;
+}
+
+/* === 10. NUMBER ANIMATION === */
+@keyframes number-pop {
+    0% { transform: scale(1); }
+    50% { transform: scale(1.1); }
+    100% { transform: scale(1); }
+}
+
+.stat-value.updated {
+    animation: number-pop 0.4s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+}
+
+/* === 11. SUCCESS FEEDBACK === */
+@keyframes success-pulse {
+    0%, 100% { 
+        box-shadow: 0 0 0 0 rgba(33, 160, 56, 0.4);
+    }
+    50% { 
+        box-shadow: 0 0 0 8px rgba(33, 160, 56, 0);
+    }
+}
+
+.success-feedback {
+    animation: success-pulse 0.6s ease-out;
+}
+
+/* === 12. MOBILE OPTIMIZATIONS === */
+@media (max-width: 480px) {
+    .modal-content {
+        max-width: 100% !important;
+        margin: 0 8px;
+        border-radius: 20px 20px 0 0;
+    }
+    
+    .products-grid {
+        grid-template-columns: 1fr !important;
+    }
+    
+    .product-card {
+        max-width: 100%;
+    }
+    
+    .empty-icon {
+        width: 100px !important;
+        height: 100px !important;
+        font-size: 48px;
+    }
+    
+    .empty-title {
+        font-size: 20px !important;
+    }
+}
