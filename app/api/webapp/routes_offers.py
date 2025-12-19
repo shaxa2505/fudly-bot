@@ -18,6 +18,65 @@ from .common import (
 router = APIRouter()
 
 
+def _calc_discount_percent(original_price: float, discount_price: float) -> float:
+    try:
+        if original_price and original_price > 0 and discount_price >= 0 and original_price > discount_price:
+            return float(round((1.0 - (discount_price / original_price)) * 100.0, 1))
+    except Exception:  # pragma: no cover - defensive
+        pass
+    return 0.0
+
+
+def _to_offer_response(offer: Any, store_fallback: dict | None = None) -> OfferResponse:
+    offer_id = int(get_val(offer, "id", 0) or get_val(offer, "offer_id", 0) or 0)
+    store_id = int(get_val(offer, "store_id", 0) or 0)
+
+    title = get_val(offer, "title", "Р‘РµР· РЅР°Р·РІР°РЅРёСЏ")
+    description = get_val(offer, "description")
+
+    original_price = float(get_val(offer, "original_price", 0) or 0)
+    discount_price = float(get_val(offer, "discount_price", 0) or 0)
+
+    discount_percent_val = get_val(offer, "discount_percent")
+    discount_percent = float(discount_percent_val or 0)
+    if not discount_percent:
+        discount_percent = _calc_discount_percent(original_price, discount_price)
+
+    store_name = (
+        get_val(offer, "store_name")
+        or get_val(offer, "name")
+        or (get_val(store_fallback, "name") if store_fallback else "")
+        or ""
+    )
+    store_address = (
+        get_val(offer, "store_address")
+        or get_val(offer, "address")
+        or (get_val(store_fallback, "address") if store_fallback else None)
+    )
+
+    photo = get_val(offer, "photo") or get_val(offer, "photo_id")
+
+    expiry_raw = get_val(offer, "expiry_date")
+    expiry_date = str(expiry_raw) if expiry_raw else None
+
+    return OfferResponse(
+        id=offer_id,
+        title=title,
+        description=description,
+        original_price=original_price,
+        discount_price=discount_price,
+        discount_percent=discount_percent,
+        quantity=int(get_val(offer, "quantity", 0) or 0),
+        unit=get_val(offer, "unit", "С€С‚") or "С€С‚",
+        category=get_val(offer, "category", "other") or "other",
+        store_id=store_id,
+        store_name=store_name,
+        store_address=store_address,
+        photo=photo,
+        expiry_date=expiry_date,
+    )
+
+
 @router.get("/categories", response_model=list[CategoryResponse])
 async def get_categories(
     city: str = Query("Ташкент", description="City to filter by"), db=Depends(get_db)
@@ -69,9 +128,12 @@ async def get_offers(
     try:
         _ = user  # explicitly mark dependency as used
         offers: list[OfferResponse] = []
+        store_fallback: dict | None = None
 
         if store_id:
             raw_offers = db.get_store_offers(store_id) if hasattr(db, "get_store_offers") else []
+            if hasattr(db, "get_store"):
+                store_fallback = db.get_store(store_id)
         elif search:
             raw_offers = db.search_offers(search, city) if hasattr(db, "search_offers") else []
         elif category and category != "all":
@@ -94,19 +156,28 @@ async def get_offers(
             try:
                 offers.append(
                     OfferResponse(
-                        id=get_val(offer, "id", 0),
+                        id=int(get_val(offer, "id", 0) or get_val(offer, "offer_id", 0) or 0),
                         title=get_val(offer, "title", "Без названия"),
                         description=get_val(offer, "description"),
                         original_price=float(get_val(offer, "original_price", 0) or 0),
                         discount_price=float(get_val(offer, "discount_price", 0) or 0),
-                        discount_percent=float(get_val(offer, "discount_percent", 0) or 0),
+                        discount_percent=float(get_val(offer, "discount_percent", 0) or 0)
+                        or _calc_discount_percent(
+                            float(get_val(offer, "original_price", 0) or 0),
+                            float(get_val(offer, "discount_price", 0) or 0),
+                        ),
                         quantity=int(get_val(offer, "quantity", 0) or 0),
                         unit=get_val(offer, "unit", "шт") or "шт",
                         category=get_val(offer, "category", "other") or "other",
                         store_id=int(get_val(offer, "store_id", 0) or 0),
-                        store_name=get_val(offer, "store_name", "") or "",
-                        store_address=get_val(offer, "store_address"),
-                        photo=get_val(offer, "photo"),
+                        store_name=get_val(offer, "store_name")
+                        or get_val(offer, "name")
+                        or (get_val(store_fallback, "name") if store_fallback else "")
+                        or "",
+                        store_address=get_val(offer, "store_address")
+                        or get_val(offer, "address")
+                        or (get_val(store_fallback, "address") if store_fallback else None),
+                        photo=get_val(offer, "photo") or get_val(offer, "photo_id"),
                         expiry_date=str(get_val(offer, "expiry_date", ""))
                         if get_val(offer, "expiry_date")
                         else None,
@@ -150,20 +221,33 @@ async def get_offer(offer_id: int, db=Depends(get_db)):
         if not offer:
             raise HTTPException(status_code=404, detail="Offer not found")
 
+        store_fallback = (
+            db.get_store(get_val(offer, "store_id")) if hasattr(db, "get_store") else None
+        )
+
         return OfferResponse(
-            id=get_val(offer, "id", 0),
+            id=int(get_val(offer, "id", 0) or get_val(offer, "offer_id", 0) or 0),
             title=get_val(offer, "title", "Без названия"),
             description=get_val(offer, "description"),
             original_price=float(get_val(offer, "original_price", 0) or 0),
             discount_price=float(get_val(offer, "discount_price", 0) or 0),
-            discount_percent=float(get_val(offer, "discount_percent", 0) or 0),
+            discount_percent=float(get_val(offer, "discount_percent", 0) or 0)
+            or _calc_discount_percent(
+                float(get_val(offer, "original_price", 0) or 0),
+                float(get_val(offer, "discount_price", 0) or 0),
+            ),
             quantity=int(get_val(offer, "quantity", 0) or 0),
             unit=get_val(offer, "unit", "шт") or "шт",
             category=get_val(offer, "category", "other") or "other",
             store_id=int(get_val(offer, "store_id", 0) or 0),
-            store_name=get_val(offer, "store_name", "") or "",
-            store_address=get_val(offer, "store_address"),
-            photo=get_val(offer, "photo"),
+            store_name=get_val(offer, "store_name")
+            or get_val(offer, "name")
+            or (get_val(store_fallback, "name") if store_fallback else "")
+            or "",
+            store_address=get_val(offer, "store_address")
+            or get_val(offer, "address")
+            or (get_val(store_fallback, "address") if store_fallback else None),
+            photo=get_val(offer, "photo") or get_val(offer, "photo_id"),
             expiry_date=str(get_val(offer, "expiry_date", ""))
             if get_val(offer, "expiry_date")
             else None,
@@ -213,7 +297,7 @@ async def get_flash_deals(
                 if is_high_discount or is_expiring_soon:
                     offers.append(
                         OfferResponse(
-                            id=get_val(offer, "id", 0),
+                            id=int(get_val(offer, "id", 0) or get_val(offer, "offer_id", 0) or 0),
                             title=get_val(offer, "title", "Без названия"),
                             description=get_val(offer, "description"),
                             original_price=float(get_val(offer, "original_price", 0) or 0),
@@ -223,9 +307,9 @@ async def get_flash_deals(
                             unit=get_val(offer, "unit", "шт") or "шт",
                             category=get_val(offer, "category", "other") or "other",
                             store_id=int(get_val(offer, "store_id", 0) or 0),
-                            store_name=get_val(offer, "store_name", "") or "",
-                            store_address=get_val(offer, "store_address"),
-                            photo=get_val(offer, "photo"),
+                            store_name=get_val(offer, "store_name") or get_val(offer, "name") or "",
+                            store_address=get_val(offer, "store_address") or get_val(offer, "address"),
+                            photo=get_val(offer, "photo") or get_val(offer, "photo_id"),
                             expiry_date=str(expiry_str) if expiry_str else None,
                         )
                     )

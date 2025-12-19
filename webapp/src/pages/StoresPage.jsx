@@ -179,7 +179,14 @@ function StoresPage() {
             className={`sp-filter ${selectedType === type.id ? 'active' : ''}`}
             onClick={() => setSelectedType(type.id)}
           >
-            <span>{type.icon}</span>
+            {(() => {
+              const IconComponent = type.icon
+              return (
+                <span aria-hidden="true">
+                  <IconComponent size={18} strokeWidth={2} />
+                </span>
+              )
+            })()}
             <span>{type.label}</span>
           </button>
         ))}
@@ -261,9 +268,9 @@ function StoresPage() {
               >
                 {/* Store Image */}
                 <div className="sp-card-image">
-                  {store.photo_url && (
+                  {api.getPhotoUrl(store.photo_url) && (
                     <img
-                      src={store.photo_url}
+                      src={api.getPhotoUrl(store.photo_url)}
                       alt={store.name}
                       className="sp-card-img"
                       onError={(e) => {
@@ -272,7 +279,7 @@ function StoresPage() {
                       }}
                     />
                   )}
-                  <div className="sp-card-placeholder" style={{ display: store.photo_url ? 'none' : 'flex' }}>
+                  <div className="sp-card-placeholder" style={{ display: api.getPhotoUrl(store.photo_url) ? 'none' : 'flex' }}>
                     <svg width="40" height="40" viewBox="0 0 24 24" fill="none">
                       <path d="M3 21h18M3 7v14M21 7v14M6 7V4a1 1 0 011-1h10a1 1 0 011 1v3M12 11v6M9 14h6" stroke="#bbb" strokeWidth="1.5" strokeLinecap="round"/>
                     </svg>

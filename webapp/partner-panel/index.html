@@ -1578,7 +1578,7 @@
                                     <label>Оригинальная цена *</label>
                                     <input type="number" name="original_price" id="originalPrice" value="${product?.original_price || product?.price || ''}"
                                            required min="1" step="1" class="search-input"
-                                           oninput="validateField(this); calculateFinalPrice()" placeholder="15000">
+                                           oninput="validateField(this); calculateFinalPrice('percent')" placeholder="15000">
                                     <div class="form-error" style="display: none;">Цена должна быть > 0</div>
                                 </div>
 
@@ -1586,8 +1586,15 @@
                                     <label>Скидка (%)</label>
                                     <input type="number" name="discount" id="discountPercent" value="${product?.discount || 0}"
                                            min="0" max="90" class="search-input"
-                                           oninput="validateField(this); calculateFinalPrice()" placeholder="0">
+                                           oninput="validateField(this); calculateFinalPrice('percent')" placeholder="0">
                                 </div>
+                            </div>
+
+                            <div class="form-group">
+                                <label>Цена со скидкой</label>
+                                <input type="number" name="discount_price" id="discountPrice" value="${product?.price || ''}"
+                                       min="0" step="1" class="search-input"
+                                       oninput="validateField(this); calculateFinalPrice('price')" placeholder="10500">
                             </div>
 
                             <!-- Price Preview -->
@@ -1675,6 +1682,9 @@
 
             document.body.appendChild(modal);
             if (typeof lucide !== 'undefined') lucide.createIcons();
+
+            // Initialize price preview and keep percent/price in sync
+            calculateFinalPrice('percent');
 
             // Setup character counter for description
             const textarea = modal.querySelector('textarea[name="description"]');
@@ -1816,29 +1826,46 @@
         }
 
         // Helper: Calculate final price with discount
-        function calculateFinalPrice() {
+        function calculateFinalPrice(source = 'percent') {
             const originalInput = document.getElementById('originalPrice');
             const discountInput = document.getElementById('discountPercent');
+            const discountPriceInput = document.getElementById('discountPrice');
             const previewBox = document.getElementById('pricePreview');
 
             if (!originalInput || !discountInput || !previewBox) return;
 
             const original = parseFloat(originalInput.value) || 0;
-            const discount = parseInt(discountInput.value) || 0;
-
             if (original <= 0) {
                 previewBox.style.display = 'none';
                 return;
             }
 
-            const final = Math.round(original * (1 - discount / 100));
-            const savings = original - final;
+            const clampPercent = (v) => Math.max(0, Math.min(90, Number.isFinite(v) ? v : 0));
+
+            let discountPercent = clampPercent(parseInt(discountInput.value, 10) || 0);
+            let finalPrice = 0;
+
+            if (source === 'price' && discountPriceInput) {
+                const rawFinal = parseFloat(discountPriceInput.value);
+                if (Number.isFinite(rawFinal) && rawFinal > 0) {
+                    finalPrice = Math.max(0, Math.min(original, Math.round(rawFinal)));
+                    discountPercent = clampPercent(Math.round((1 - finalPrice / original) * 100));
+                    discountInput.value = String(discountPercent);
+                }
+            }
+
+            if (!finalPrice) {
+                finalPrice = Math.round(original * (1 - discountPercent / 100));
+                if (discountPriceInput) discountPriceInput.value = String(finalPrice);
+            }
+
+            const savings = Math.max(0, original - finalPrice);
 
             // Show preview
             previewBox.style.display = 'block';
             document.getElementById('priceOriginal').textContent = formatPrice(original);
-            document.getElementById('priceFinal').textContent = formatPrice(final);
-            document.getElementById('priceSavings').textContent = `${formatPrice(savings)} (${discount}%)`;
+            document.getElementById('priceFinal').textContent = formatPrice(finalPrice);
+            document.getElementById('priceSavings').textContent = `${formatPrice(savings)} (${discountPercent}%)`;
         }
 
         // Helper: Change quantity
@@ -1897,7 +1924,17 @@
                 }
 
                 const discountPercent = Math.max(0, Math.min(90, parseInt(formData.get('discount'), 10) || 0));
-                const discountPrice = Math.max(0, Math.round(originalPrice * (1 - discountPercent / 100)));
+                const discountPriceInput = parseInt(formData.get('discount_price'), 10);
+                let discountPrice = 0;
+
+                if (Number.isFinite(discountPriceInput) && discountPriceInput > 0) {
+                    if (discountPriceInput > originalPrice) {
+                        throw new Error('Цена со скидкой не может быть больше оригинальной цены');
+                    }
+                    discountPrice = discountPriceInput;
+                } else {
+                    discountPrice = Math.max(0, Math.round(originalPrice * (1 - discountPercent / 100)));
+                }
                 const expiryDate = String(formData.get('expiry_date') || '');
                 const isAvailable = formData.get('is_available') === 'on';
                 const desiredStatus = stockQty <= 0 ? 'out_of_stock' : (isAvailable ? 'active' : 'hidden');

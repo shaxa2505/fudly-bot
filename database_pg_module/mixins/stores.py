@@ -127,19 +127,35 @@ class StoreMixin:
             return [dict(row) for row in cursor.fetchall()]
 
     def get_stores_by_city(self, city: str):
-        """Return active stores for a given city."""
+        """Return public stores for a given city.
+
+        Includes both `active` and `approved` stores, plus computed fields used by the webapp:
+        - `offers_count` (active, non-expired offers)
+        - `avg_rating` / `ratings_count`
+        """
         with self.get_connection() as conn:
             cursor = conn.cursor(row_factory=dict_row)
             cursor.execute(
                 """
-                SELECT store_id, name, address, category, city
-                FROM stores
-                WHERE city = %s AND status = 'active'
-                ORDER BY created_at DESC
+                SELECT s.*,
+                       COALESCE(AVG(r.rating), 0) as avg_rating,
+                       COUNT(DISTINCT r.rating_id) as ratings_count,
+                       (SELECT COUNT(*)
+                        FROM offers o
+                        WHERE o.store_id = s.store_id
+                          AND o.status = 'active'
+                          AND (o.expiry_date IS NULL OR o.expiry_date >= CURRENT_DATE)
+                       ) as offers_count
+                FROM stores s
+                LEFT JOIN ratings r ON s.store_id = r.store_id
+                WHERE s.city ILIKE %s
+                  AND (s.status = 'active' OR s.status = 'approved')
+                GROUP BY s.store_id
+                ORDER BY avg_rating DESC, s.created_at DESC
             """,
                 (city,),
             )
-            return list(cursor.fetchall())
+            return [dict(row) for row in cursor.fetchall()]
 
     def get_approved_stores(self, city: str = None):
         """Get approved stores, optionally filtered by city."""

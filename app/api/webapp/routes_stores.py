@@ -33,12 +33,14 @@ async def get_stores(
         for store in raw_stores:
             stores.append(
                 StoreResponse(
-                    id=get_val(store, "id", 0),
+                    id=int(get_val(store, "id", 0) or get_val(store, "store_id", 0) or 0),
                     name=get_val(store, "name", ""),
                     address=get_val(store, "address"),
                     city=get_val(store, "city"),
-                    business_type=get_val(store, "business_type", "supermarket"),
-                    rating=float(get_val(store, "rating", 0) or 0),
+                    business_type=get_val(store, "business_type")
+                    or get_val(store, "category")
+                    or "supermarket",
+                    rating=float(get_val(store, "avg_rating", 0) or get_val(store, "rating", 0) or 0),
                     offers_count=int(get_val(store, "offers_count", 0) or 0),
                     delivery_enabled=bool(get_val(store, "delivery_enabled", False)),
                     delivery_price=float(get_val(store, "delivery_price", 0) or 0)
@@ -55,6 +57,85 @@ async def get_stores(
 
     except Exception as e:  # pragma: no cover - defensive
         logger.error(f"Error getting stores: {e}")
+        raise HTTPException(status_code=500, detail=str(e)) from e
+
+
+@router.get("/stores/{store_id}", response_model=StoreResponse)
+async def get_store(store_id: int, db=Depends(get_db)):
+    """Get store details by ID."""
+    try:
+        store = db.get_store(store_id) if hasattr(db, "get_store") else None
+        if not store:
+            raise HTTPException(status_code=404, detail="Store not found")
+
+        offers_count = int(get_val(store, "offers_count", 0) or 0)
+        if offers_count == 0 and hasattr(db, "get_store_offers"):
+            try:
+                offers_count = len(db.get_store_offers(store_id) or [])
+            except Exception:  # pragma: no cover - defensive
+                offers_count = 0
+
+        rating = float(get_val(store, "avg_rating", 0) or get_val(store, "rating", 0) or 0)
+        if rating == 0.0 and hasattr(db, "get_store_average_rating"):
+            try:
+                rating = float(db.get_store_average_rating(store_id) or 0)
+            except Exception:  # pragma: no cover - defensive
+                rating = 0.0
+
+        return StoreResponse(
+            id=int(get_val(store, "id", 0) or get_val(store, "store_id", 0) or 0),
+            name=get_val(store, "name", ""),
+            address=get_val(store, "address"),
+            city=get_val(store, "city"),
+            business_type=get_val(store, "business_type") or get_val(store, "category") or "supermarket",
+            rating=rating,
+            offers_count=offers_count,
+            delivery_enabled=bool(get_val(store, "delivery_enabled", False)),
+            delivery_price=float(get_val(store, "delivery_price", 0) or 0)
+            if get_val(store, "delivery_price")
+            else None,
+            min_order_amount=float(get_val(store, "min_order_amount", 0) or 0)
+            if get_val(store, "min_order_amount")
+            else None,
+            photo_url=get_val(store, "photo"),
+        )
+    except HTTPException:
+        raise
+    except Exception as e:  # pragma: no cover - defensive
+        logger.error(f"Error getting store {store_id}: {e}")
+        raise HTTPException(status_code=500, detail=str(e)) from e
+
+
+@router.get("/stores/{store_id}/reviews")
+async def get_store_reviews(store_id: int, db=Depends(get_db)):
+    """Get store reviews and rating summary."""
+    try:
+        if not hasattr(db, "get_store_ratings"):
+            return {"reviews": [], "average_rating": 0.0, "total_reviews": 0}
+
+        reviews = db.get_store_ratings(store_id) or []
+
+        average_rating = 0.0
+        total_reviews = len(reviews)
+        if hasattr(db, "get_store_rating_summary"):
+            try:
+                average_rating, total_reviews = db.get_store_rating_summary(store_id)
+            except Exception:  # pragma: no cover - defensive
+                average_rating = 0.0
+                total_reviews = len(reviews)
+        elif hasattr(db, "get_store_average_rating"):
+            try:
+                average_rating = float(db.get_store_average_rating(store_id) or 0.0)
+            except Exception:  # pragma: no cover - defensive
+                average_rating = 0.0
+
+        return {
+            "reviews": reviews,
+            "average_rating": float(average_rating or 0.0),
+            "total_reviews": int(total_reviews or 0),
+        }
+    except Exception as e:  # pragma: no cover - defensive
+        logger.error(f"Error getting store reviews {store_id}: {e}")
         raise HTTPException(status_code=500, detail=str(e)) from e
 
 
@@ -92,12 +173,14 @@ async def get_nearby_stores(
 
             if distance <= radius_km:
                 store_data = StoreResponse(
-                    id=get_val(store, "id", 0),
+                    id=int(get_val(store, "id", 0) or get_val(store, "store_id", 0) or 0),
                     name=get_val(store, "name", ""),
                     address=get_val(store, "address"),
                     city=get_val(store, "city"),
-                    business_type=get_val(store, "business_type", "supermarket"),
-                    rating=float(get_val(store, "rating", 0) or 0),
+                    business_type=get_val(store, "business_type")
+                    or get_val(store, "category")
+                    or "supermarket",
+                    rating=float(get_val(store, "avg_rating", 0) or get_val(store, "rating", 0) or 0),
                     offers_count=int(get_val(store, "offers_count", 0) or 0),
                 )
                 stores_with_distance.append(

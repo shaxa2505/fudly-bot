@@ -25,9 +25,12 @@ async def get_favorites(db=Depends(get_db), user: dict = Depends(get_current_use
             try:
                 offer = db.get_offer(offer_id) if hasattr(db, "get_offer") else None
                 if offer:
+                    store = (
+                        db.get_store(get_val(offer, "store_id")) if hasattr(db, "get_store") else None
+                    )
                     offers.append(
                         OfferResponse(
-                            id=get_val(offer, "id", 0),
+                            id=int(get_val(offer, "id", 0) or get_val(offer, "offer_id", 0) or 0),
                             title=get_val(offer, "title", "Без названия"),
                             description=get_val(offer, "description"),
                             original_price=float(get_val(offer, "original_price", 0) or 0),
@@ -37,9 +40,13 @@ async def get_favorites(db=Depends(get_db), user: dict = Depends(get_current_use
                             unit=get_val(offer, "unit", "шт") or "шт",
                             category=get_val(offer, "category", "other") or "other",
                             store_id=int(get_val(offer, "store_id", 0) or 0),
-                            store_name=get_val(offer, "store_name", "") or "",
-                            store_address=get_val(offer, "store_address"),
-                            photo=get_val(offer, "photo"),
+                            store_name=get_val(offer, "store_name")
+                            or (get_val(store, "name") if store else "")
+                            or "",
+                            store_address=get_val(offer, "store_address")
+                            or get_val(offer, "address")
+                            or (get_val(store, "address") if store else None),
+                            photo=get_val(offer, "photo") or get_val(offer, "photo_id"),
                             expiry_date=str(get_val(offer, "expiry_date", ""))
                             if get_val(offer, "expiry_date")
                             else None,

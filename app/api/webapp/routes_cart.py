@@ -36,7 +36,7 @@ async def calculate_cart(
                         quantity=quantity,
                         title=get_val(offer, "title", ""),
                         price=price,
-                        photo=get_val(offer, "photo"),
+                        photo=get_val(offer, "photo") or get_val(offer, "photo_id"),
                     )
                 )
                 total += price * quantity
