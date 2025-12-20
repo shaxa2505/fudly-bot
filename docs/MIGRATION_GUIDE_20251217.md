@@ -7,15 +7,15 @@ This guide explains how to apply the unified offers schema migration that fixes 
 ## What Changed
 
 ### Database Schema
-- `available_from`, `available_until`: `VARCHAR(50)` → `TIME`
-- `expiry_date`: `VARCHAR(50)` → `DATE`
-- `original_price`, `discount_price`: `FLOAT` → `INTEGER` (stored in kopeks, not rubles)
+- `available_from`, `available_until`: `VARCHAR(50)` в†’ `TIME`
+- `expiry_date`: `VARCHAR(50)` в†’ `DATE`
+- `original_price`, `discount_price`: `FLOAT` в†’ `INTEGER` (stored in kopeks, not rubles)
 - Added CHECK constraints for data validation
 
 ### Application Code
 - **Database Layer**: Removed `photo`/`photo_id` hack, unified to `photo_id`
 - **Bot Handlers**: Convert prices to kopeks, use ISO time format
-- **API Endpoints**: Use Pydantic models, convert rubles↔kopeks
+- **API Endpoints**: Use Pydantic models, convert rublesв†”kopeks
 - **Pydantic Models**: Added flexible parsers for multiple date/time formats
 
 ## Migration Steps
@@ -34,7 +34,7 @@ pg_dump -U postgres fudly_db > backup_before_migration_$(date +%Y%m%d_%H%M%S).sq
 
 ```bash
 # Set DATABASE_URL environment variable
-export DATABASE_URL="postgresql://user:password@host:port/database"
+export DATABASE_URL="postgresql://user:<REDACTED>@host:port/database"
 
 # Check current version
 alembic current
@@ -49,9 +49,9 @@ Review [migrations_alembic/versions/20251217_003_unified_offers_schema.py](migra
 
 1. **Add temporary columns** with correct types
 2. **Migrate data** with type conversions:
-   - Times: "08:00" → TIME, ISO timestamps → TIME
-   - Dates: "YYYY-MM-DD" → DATE, "DD.MM.YYYY" → DATE
-   - Prices: rubles (FLOAT) → kopeks (INTEGER) by multiplying by 100
+   - Times: "08:00" в†’ TIME, ISO timestamps в†’ TIME
+   - Dates: "YYYY-MM-DD" в†’ DATE, "DD.MM.YYYY" в†’ DATE
+   - Prices: rubles (FLOAT) в†’ kopeks (INTEGER) by multiplying by 100
 3. **Drop old columns**
 4. **Rename temporary columns** to original names
 5. **Add CHECK constraints** for validation
@@ -87,9 +87,9 @@ psql $DATABASE_URL -c "\d offers"
 
 ### Step 6: Test Application
 
-1. **Test Bot**: Create offer via bot → check prices in kopeks
-2. **Test Panel**: Create offer via Partner Panel → check prices converted
-3. **Test Compatibility**: Create in bot → edit in panel (should work now!)
+1. **Test Bot**: Create offer via bot в†’ check prices in kopeks
+2. **Test Panel**: Create offer via Partner Panel в†’ check prices converted
+3. **Test Compatibility**: Create in bot в†’ edit in panel (should work now!)
 
 ## Rollback Instructions
 
@@ -179,3 +179,4 @@ If you encounter issues:
 **Migration Author**: GitHub Copilot  
 **Date**: 2025-12-17  
 **Status**: Ready for production
+

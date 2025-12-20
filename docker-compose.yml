@@ -114,3 +114,4 @@ volumes:
 networks:
   fudly-network:
     driver: bridge
+

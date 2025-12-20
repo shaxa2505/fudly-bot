@@ -1,11 +1,12 @@
+import os
 import psycopg
 
-DB_URL = (
-    "postgresql://postgres:AlIcvvweODzccngRJbskNqLIoyzxCtmS@tramway.proxy.rlwy.net:36557/railway"
-)
+DB_URL = os.getenv("DATABASE_URL")
+if not DB_URL:
+    raise SystemExit("DATABASE_URL env var is required (e.g. Railway DATABASE_URL).")
 
 try:
-    print("🔌 Connecting to Railway PostgreSQL...")
+    print("рџ”Њ Connecting to Railway PostgreSQL...")
     conn = psycopg.connect(DB_URL, connect_timeout=10)
     cur = conn.cursor()
 
@@ -19,7 +20,7 @@ try:
     """
     )
 
-    print("\n📊 offers table schema:")
+    print("\nрџ“Љ offers table schema:")
     print(f"{'Column':<30} {'Type':<20} {'Length':<10}")
     print("=" * 60)
     for row in cur.fetchall():
@@ -30,7 +31,8 @@ try:
     conn.close()
 
 except Exception as e:
-    print(f"\n❌ Error: {e}")
+    print(f"\nвќЊ Error: {e}")
     import traceback
 
     traceback.print_exc()
+

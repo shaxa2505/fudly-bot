@@ -2,6 +2,8 @@
 
 # ВАЖНО: Переменные окружения (ТОКЕНЫ И ПАРОЛИ!)
 .env
+.env.*
+!.env.example
 
 # База данных (локальная)
 *.db
@@ -62,6 +64,8 @@ Thumbs.db
 *~
 .backup/
 backup/
+backup*.sql
+prod_backup*.sql
 
 # Temporary files
 *.tmp

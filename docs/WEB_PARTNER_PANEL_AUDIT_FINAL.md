@@ -1,44 +1,44 @@
-# WEB PARTNER PANEL - ПОЛНЫЙ АУДИТ
-**Дата:** 2024-12-25
-**Версия:** 1.0
-**Статус:** Готово к production
+# WEB PARTNER PANEL - РџРћР›РќР«Р™ РђРЈР”РРў
+**Р”Р°С‚Р°:** 2024-12-25
+**Р’РµСЂСЃРёСЏ:** 1.0
+**РЎС‚Р°С‚СѓСЃ:** Р“РѕС‚РѕРІРѕ Рє production
 
 ---
 
-## 📊 EXECUTIVE SUMMARY
+## рџ“Љ EXECUTIVE SUMMARY
 
-### ✅ Что работает:
-- ✅ **База данных на Railway:** Все таблицы созданы, 3 users, 1 store, 1 offer, 2 orders
-- ✅ **Alembic миграции:** Актуальная версия 003_unified_schema
-- ✅ **API endpoints:** Все 17 endpoints функционируют корректно
-- ✅ **Telegram WebApp auth:** Поддержка initData + URL auth (uid)
-- ✅ **Products section:** Полностью переработан (все функции работают)
-- ✅ **Frontend code:** Современный дизайн с Lucide icons, Chart.js
-- ✅ **Database schema:** Правильные типы данных (TIME, DATE, INTEGER kopeks)
+### вњ… Р§С‚Рѕ СЂР°Р±РѕС‚Р°РµС‚:
+- вњ… **Р‘Р°Р·Р° РґР°РЅРЅС‹С… РЅР° Railway:** Р’СЃРµ С‚Р°Р±Р»РёС†С‹ СЃРѕР·РґР°РЅС‹, 3 users, 1 store, 1 offer, 2 orders
+- вњ… **Alembic РјРёРіСЂР°С†РёРё:** РђРєС‚СѓР°Р»СЊРЅР°СЏ РІРµСЂСЃРёСЏ 003_unified_schema
+- вњ… **API endpoints:** Р’СЃРµ 17 endpoints С„СѓРЅРєС†РёРѕРЅРёСЂСѓСЋС‚ РєРѕСЂСЂРµРєС‚РЅРѕ
+- вњ… **Telegram WebApp auth:** РџРѕРґРґРµСЂР¶РєР° initData + URL auth (uid)
+- вњ… **Products section:** РџРѕР»РЅРѕСЃС‚СЊСЋ РїРµСЂРµСЂР°Р±РѕС‚Р°РЅ (РІСЃРµ С„СѓРЅРєС†РёРё СЂР°Р±РѕС‚Р°СЋС‚)
+- вњ… **Frontend code:** РЎРѕРІСЂРµРјРµРЅРЅС‹Р№ РґРёР·Р°Р№РЅ СЃ Lucide icons, Chart.js
+- вњ… **Database schema:** РџСЂР°РІРёР»СЊРЅС‹Рµ С‚РёРїС‹ РґР°РЅРЅС‹С… (TIME, DATE, INTEGER kopeks)
 
-### ⚠️ Что нужно исправить:
-- ⚠️ **Dashboard:** Не обновляется `pendingOrders` counter
-- ⚠️ **Orders section:** Нужна проверка всех action functions
-- ⚠️ **Settings section:** Требуется валидация формы
-
----
-
-## 🔍 ДЕТАЛЬНЫЙ АУДИТ ПО СЕКЦИЯМ
+### вљ пёЏ Р§С‚Рѕ РЅСѓР¶РЅРѕ РёСЃРїСЂР°РІРёС‚СЊ:
+- вљ пёЏ **Dashboard:** РќРµ РѕР±РЅРѕРІР»СЏРµС‚СЃСЏ `pendingOrders` counter
+- вљ пёЏ **Orders section:** РќСѓР¶РЅР° РїСЂРѕРІРµСЂРєР° РІСЃРµС… action functions
+- вљ пёЏ **Settings section:** РўСЂРµР±СѓРµС‚СЃСЏ РІР°Р»РёРґР°С†РёСЏ С„РѕСЂРјС‹
 
 ---
 
-## 1️⃣ DATABASE STATUS
+## рџ”Ќ Р”Р•РўРђР›Р¬РќР«Р™ РђРЈР”РРў РџРћ РЎР•РљР¦РРЇРњ
 
-### ✅ Успешное подключение к Railway PostgreSQL
+---
+
+## 1пёЏвѓЈ DATABASE STATUS
+
+### вњ… РЈСЃРїРµС€РЅРѕРµ РїРѕРґРєР»СЋС‡РµРЅРёРµ Рє Railway PostgreSQL
 ```
-DB URL: postgresql://postgres:AlIcvvweODzccngRJbskNqLIoyzxCtmS@tramway.proxy.rlwy.net:36557/railway
+DB URL: postgresql://postgres:<REDACTED>@tramway.proxy.rlwy.net:36557/railway
 ```
 
-### ✅ Все таблицы существуют (19 tables):
+### вњ… Р’СЃРµ С‚Р°Р±Р»РёС†С‹ СЃСѓС‰РµСЃС‚РІСѓСЋС‚ (19 tables):
 ```
 - users (3 rows)
 - stores (1 row)
-- offers (1 row) ✅ правильная схема (TIME, DATE, INTEGER kopeks)
+- offers (1 row) вњ… РїСЂР°РІРёР»СЊРЅР°СЏ СЃС…РµРјР° (TIME, DATE, INTEGER kopeks)
 - orders (2 rows)
 - bookings
 - favorites
@@ -57,47 +57,47 @@ DB URL: postgresql://postgres:AlIcvvweODzccngRJbskNqLIoyzxCtmS@tramway.proxy.rlw
 - store_payment_integrations
 ```
 
-### ✅ Alembic миграции:
+### вњ… Alembic РјРёРіСЂР°С†РёРё:
 ```
-Текущая версия: 003_unified_schema (latest)
+РўРµРєСѓС‰Р°СЏ РІРµСЂСЃРёСЏ: 003_unified_schema (latest)
 
-История миграций:
-  001_initial → 002_add_fts → 003_unified_schema
+РСЃС‚РѕСЂРёСЏ РјРёРіСЂР°С†РёР№:
+  001_initial в†’ 002_add_fts в†’ 003_unified_schema
 ```
 
-**Статус:** ✅ База полностью готова к работе
+**РЎС‚Р°С‚СѓСЃ:** вњ… Р‘Р°Р·Р° РїРѕР»РЅРѕСЃС‚СЊСЋ РіРѕС‚РѕРІР° Рє СЂР°Р±РѕС‚Рµ
 
 ---
 
-## 2️⃣ BACKEND API - PARTNER PANEL ENDPOINTS
+## 2пёЏвѓЈ BACKEND API - PARTNER PANEL ENDPOINTS
 
-### Файл: `app/api/partner_panel_simple.py`
+### Р¤Р°Р№Р»: `app/api/partner_panel_simple.py`
 
-### ✅ Authentication:
+### вњ… Authentication:
 ```python
 def verify_telegram_webapp(authorization: str) -> int
 ```
-**Возможности:**
-- ✅ Standard Telegram WebApp signature verification (HMAC-SHA256)
-- ✅ URL-based auth (uid parameter, 24h expiry)
-- ✅ Dev mode bypass (`dev_123456`) for local development
-- ✅ Auth age validation (max 24 hours)
+**Р’РѕР·РјРѕР¶РЅРѕСЃС‚Рё:**
+- вњ… Standard Telegram WebApp signature verification (HMAC-SHA256)
+- вњ… URL-based auth (uid parameter, 24h expiry)
+- вњ… Dev mode bypass (`dev_123456`) for local development
+- вњ… Auth age validation (max 24 hours)
 
-**Статус:** ✅ Работает идеально
+**РЎС‚Р°С‚СѓСЃ:** вњ… Р Р°Р±РѕС‚Р°РµС‚ РёРґРµР°Р»СЊРЅРѕ
 
 ---
 
-### ✅ Endpoints (17 total):
+### вњ… Endpoints (17 total):
 
 #### Profile:
 ```
 GET /profile
 ```
-**Возвращает:**
+**Р’РѕР·РІСЂР°С‰Р°РµС‚:**
 ```json
 {
   "name": "Partner Name",
-  "city": "Ташкент",
+  "city": "РўР°С€РєРµРЅС‚",
   "store": {
     "name": "Store Name",
     "address": "Address",
@@ -109,26 +109,26 @@ GET /profile
   }
 }
 ```
-**Статус:** ✅ Работает
+**РЎС‚Р°С‚СѓСЃ:** вњ… Р Р°Р±РѕС‚Р°РµС‚
 
 ---
 
 #### Products:
 ```
-GET    /products              - List all products (include_all=True для партнёра)
+GET    /products              - List all products (include_all=True РґР»СЏ РїР°СЂС‚РЅС‘СЂР°)
 POST   /products              - Create product
 PUT    /products/{id}         - Update product (full)
-PATCH  /products/{id}         - Update product (partial) ⭐ предпочтительный
+PATCH  /products/{id}         - Update product (partial) в­ђ РїСЂРµРґРїРѕС‡С‚РёС‚РµР»СЊРЅС‹Р№
 PATCH  /products/{id}/status  - Toggle status (active/hidden)
 DELETE /products/{id}         - Soft delete
 POST   /products/import       - CSV import
 ```
 
-**Конвертация цен:**
-- Frontend → Backend: SUMS × 100 = KOPEKS
-- Backend → Frontend: KOPEKS ÷ 100 = SUMS
+**РљРѕРЅРІРµСЂС‚Р°С†РёСЏ С†РµРЅ:**
+- Frontend в†’ Backend: SUMS Г— 100 = KOPEKS
+- Backend в†’ Frontend: KOPEKS Г· 100 = SUMS
 
-**Mapping полей (frontend ← backend):**
+**Mapping РїРѕР»РµР№ (frontend в†ђ backend):**
 ```javascript
 {
   id: offer_id,
@@ -147,31 +147,31 @@ elif quantity > 0 and current_status == "out_of_stock":
     status = "active"
 ```
 
-**Статус:** ✅ Все endpoints работают идеально
+**РЎС‚Р°С‚СѓСЃ:** вњ… Р’СЃРµ endpoints СЂР°Р±РѕС‚Р°СЋС‚ РёРґРµР°Р»СЊРЅРѕ
 
 ---
 
 #### Orders:
 ```
 GET  /orders                      - List orders (default: pending)
-POST /orders/{id}/confirm         - Confirm order (status → confirmed)
-POST /orders/{id}/cancel          - Cancel order (status → cancelled)
+POST /orders/{id}/confirm         - Confirm order (status в†’ confirmed)
+POST /orders/{id}/cancel          - Cancel order (status в†’ cancelled)
 POST /orders/{id}/status          - Update status (general)
 ```
 
-**Статусы заказов:**
+**РЎС‚Р°С‚СѓСЃС‹ Р·Р°РєР°Р·РѕРІ:**
 ```
-pending → confirmed → preparing → ready → completed
-                  ↘ cancelled
+pending в†’ confirmed в†’ preparing в†’ ready в†’ completed
+                  в† cancelled
 ```
 
 **Frontend mapping:**
-- `pending` → "Новые"
-- `confirmed/preparing` → "Готовятся"
-- `ready/delivering` → "Готовы"
-- `completed/cancelled` → "История"
+- `pending` в†’ "РќРѕРІС‹Рµ"
+- `confirmed/preparing` в†’ "Р“РѕС‚РѕРІСЏС‚СЃСЏ"
+- `ready/delivering` в†’ "Р“РѕС‚РѕРІС‹"
+- `completed/cancelled` в†’ "РСЃС‚РѕСЂРёСЏ"
 
-**Статус:** ✅ Backend готов, нужно проверить frontend actions
+**РЎС‚Р°С‚СѓСЃ:** вњ… Backend РіРѕС‚РѕРІ, РЅСѓР¶РЅРѕ РїСЂРѕРІРµСЂРёС‚СЊ frontend actions
 
 ---
 
@@ -180,7 +180,7 @@ pending → confirmed → preparing → ready → completed
 GET /stats?period=today|yesterday|week|month
 ```
 
-**Возвращает:**
+**Р’РѕР·РІСЂР°С‰Р°РµС‚:**
 ```json
 {
   "period": "today",
@@ -197,7 +197,7 @@ GET /stats?period=today|yesterday|week|month
 }
 ```
 
-**Статус:** ✅ Готов для Chart.js графиков
+**РЎС‚Р°С‚СѓСЃ:** вњ… Р“РѕС‚РѕРІ РґР»СЏ Chart.js РіСЂР°С„РёРєРѕРІ
 
 ---
 
@@ -209,17 +209,17 @@ POST  /upload-photo  - Upload product photo
 GET   /photo/{id}    - Get photo by file_id
 ```
 
-**Статус:** ✅ Все работает
+**РЎС‚Р°С‚СѓСЃ:** вњ… Р’СЃРµ СЂР°Р±РѕС‚Р°РµС‚
 
 ---
 
-## 3️⃣ FRONTEND - WEB PARTNER PANEL
+## 3пёЏвѓЈ FRONTEND - WEB PARTNER PANEL
 
-### Файл: `webapp/partner-panel/index.html` (3649 lines)
+### Р¤Р°Р№Р»: `webapp/partner-panel/index.html` (3649 lines)
 
 ---
 
-### ✅ DASHBOARD SECTION
+### вњ… DASHBOARD SECTION
 
 #### HTML Structure:
 ```html
@@ -227,17 +227,17 @@ GET   /photo/{id}    - Get photo by file_id
   <section class="stats-section">
     <div class="stats-grid">
       <div class="stat-card">
-        <div id="todayRevenue">0</div>      <!-- ✅ обновляется -->
-        <div id="todayOrders">0</div>       <!-- ✅ обновляется -->
-        <div id="pendingOrders">0</div>     <!-- ⚠️ НЕ обновляется! -->
+        <div id="todayRevenue">0</div>      <!-- вњ… РѕР±РЅРѕРІР»СЏРµС‚СЃСЏ -->
+        <div id="todayOrders">0</div>       <!-- вњ… РѕР±РЅРѕРІР»СЏРµС‚СЃСЏ -->
+        <div id="pendingOrders">0</div>     <!-- вљ пёЏ РќР• РѕР±РЅРѕРІР»СЏРµС‚СЃСЏ! -->
       </div>
     </div>
   </section>
 
   <div class="tabs">
-    <button id="newCount">0</button>          <!-- ✅ обновляется -->
-    <button id="preparingCount">0</button>    <!-- ✅ обновляется -->
-    <button id="readyCount">0</button>        <!-- ✅ обновляется -->
+    <button id="newCount">0</button>          <!-- вњ… РѕР±РЅРѕРІР»СЏРµС‚СЃСЏ -->
+    <button id="preparingCount">0</button>    <!-- вњ… РѕР±РЅРѕРІР»СЏРµС‚СЃСЏ -->
+    <button id="readyCount">0</button>        <!-- вњ… РѕР±РЅРѕРІР»СЏРµС‚СЃСЏ -->
   </div>
 
   <div id="ordersList"><!-- orders list --></div>
@@ -247,22 +247,22 @@ GET   /photo/{id}    - Get photo by file_id
 #### loadDashboard() Function:
 ```javascript
 async function loadDashboard() {
-  // ✅ Loads profile
+  // вњ… Loads profile
   const profile = await api('/profile');
 
-  // ✅ Loads orders
+  // вњ… Loads orders
   const orders = await api('/orders');
 
-  // ✅ Loads stats
+  // вњ… Loads stats
   const stats = await api('/stats?period=today');
 
-  // ✅ Updates UI
+  // вњ… Updates UI
   document.getElementById('storeName').textContent = profile?.store?.name;
   document.getElementById('todayRevenue').textContent = formatPrice(stats?.revenue);
   document.getElementById('todayOrders').textContent = stats?.orders;
 
-  // ❌ BUG: pendingOrders не обновляется!
-  // НУЖНО ДОБАВИТЬ:
+  // вќЊ BUG: pendingOrders РЅРµ РѕР±РЅРѕРІР»СЏРµС‚СЃСЏ!
+  // РќРЈР–РќРћ Р”РћР‘РђР’РРўР¬:
   // document.getElementById('pendingOrders').textContent = pending.length;
 
   allOrders = orders;
@@ -270,13 +270,13 @@ async function loadDashboard() {
 }
 ```
 
-**🐛 НАЙДЕННАЯ ПРОБЛЕМА:**
+**рџђ› РќРђР™Р”Р•РќРќРђРЇ РџР РћР‘Р›Р•РњРђ:**
 ```javascript
-// ❌ В loadDashboard() отсутствует обновление pendingOrders
-// Элемент существует в HTML, но не обновляется из JS
+// вќЊ Р’ loadDashboard() РѕС‚СЃСѓС‚СЃС‚РІСѓРµС‚ РѕР±РЅРѕРІР»РµРЅРёРµ pendingOrders
+// Р­Р»РµРјРµРЅС‚ СЃСѓС‰РµСЃС‚РІСѓРµС‚ РІ HTML, РЅРѕ РЅРµ РѕР±РЅРѕРІР»СЏРµС‚СЃСЏ РёР· JS
 ```
 
-**✅ ИСПРАВЛЕНИЕ:**
+**вњ… РРЎРџР РђР’Р›Р•РќРР•:**
 ```javascript
 async function loadDashboard() {
     // ... existing code ...
@@ -288,7 +288,7 @@ async function loadDashboard() {
     if (todayRevenueEl) todayRevenueEl.textContent = formatPrice(stats?.revenue || 0);
     if (todayOrdersEl) todayOrdersEl.textContent = stats?.orders || 0;
 
-    // ✅ FIX: Update pending orders count
+    // вњ… FIX: Update pending orders count
     const pendingOrdersEl = document.getElementById('pendingOrders');
     if (pendingOrdersEl) {
         pendingOrdersEl.textContent = pending.length;
@@ -300,114 +300,114 @@ async function loadDashboard() {
 
 ---
 
-### ✅ PRODUCTS SECTION
+### вњ… PRODUCTS SECTION
 
-**Статус:** ✅ Полностью переработан в предыдущих сессиях
+**РЎС‚Р°С‚СѓСЃ:** вњ… РџРѕР»РЅРѕСЃС‚СЊСЋ РїРµСЂРµСЂР°Р±РѕС‚Р°РЅ РІ РїСЂРµРґС‹РґСѓС‰РёС… СЃРµСЃСЃРёСЏС…
 
-#### Функции (все работают):
+#### Р¤СѓРЅРєС†РёРё (РІСЃРµ СЂР°Р±РѕС‚Р°СЋС‚):
 ```javascript
-✅ loadProducts()      - Загружает все товары (include_all=True)
-✅ adjustStock(id, d)  - Изменяет количество (+/- buttons)
-✅ editProduct(id)     - Открывает modal с данными товара
-✅ deleteProduct(id)   - Удаляет товар
-✅ Form submit         - Создаёт/обновляет товар
-✅ Filters             - all/active/hidden фильтры
-✅ Photo upload        - Загрузка фото товара
+вњ… loadProducts()      - Р—Р°РіСЂСѓР¶Р°РµС‚ РІСЃРµ С‚РѕРІР°СЂС‹ (include_all=True)
+вњ… adjustStock(id, d)  - РР·РјРµРЅСЏРµС‚ РєРѕР»РёС‡РµСЃС‚РІРѕ (+/- buttons)
+вњ… editProduct(id)     - РћС‚РєСЂС‹РІР°РµС‚ modal СЃ РґР°РЅРЅС‹РјРё С‚РѕРІР°СЂР°
+вњ… deleteProduct(id)   - РЈРґР°Р»СЏРµС‚ С‚РѕРІР°СЂ
+вњ… Form submit         - РЎРѕР·РґР°С‘С‚/РѕР±РЅРѕРІР»СЏРµС‚ С‚РѕРІР°СЂ
+вњ… Filters             - all/active/hidden С„РёР»СЊС‚СЂС‹
+вњ… Photo upload        - Р—Р°РіСЂСѓР·РєР° С„РѕС‚Рѕ С‚РѕРІР°СЂР°
 ```
 
-#### Исправленные баги:
-- ✅ Товары с quantity=0 теперь видны (include_all=True)
-- ✅ Просроченные товары не исчезают
-- ✅ adjustStock() работает без полной перезагрузки
-- ✅ editProduct() правильно заполняет форму
-- ✅ categoryMap использует lowercase
-- ✅ closeModal() полностью очищает форму
-- ✅ FormData конвертирует числа в строки
+#### РСЃРїСЂР°РІР»РµРЅРЅС‹Рµ Р±Р°РіРё:
+- вњ… РўРѕРІР°СЂС‹ СЃ quantity=0 С‚РµРїРµСЂСЊ РІРёРґРЅС‹ (include_all=True)
+- вњ… РџСЂРѕСЃСЂРѕС‡РµРЅРЅС‹Рµ С‚РѕРІР°СЂС‹ РЅРµ РёСЃС‡РµР·Р°СЋС‚
+- вњ… adjustStock() СЂР°Р±РѕС‚Р°РµС‚ Р±РµР· РїРѕР»РЅРѕР№ РїРµСЂРµР·Р°РіСЂСѓР·РєРё
+- вњ… editProduct() РїСЂР°РІРёР»СЊРЅРѕ Р·Р°РїРѕР»РЅСЏРµС‚ С„РѕСЂРјСѓ
+- вњ… categoryMap РёСЃРїРѕР»СЊР·СѓРµС‚ lowercase
+- вњ… closeModal() РїРѕР»РЅРѕСЃС‚СЊСЋ РѕС‡РёС‰Р°РµС‚ С„РѕСЂРјСѓ
+- вњ… FormData РєРѕРЅРІРµСЂС‚РёСЂСѓРµС‚ С‡РёСЃР»Р° РІ СЃС‚СЂРѕРєРё
 
-**Статус:** ✅ Идеально работает
+**РЎС‚Р°С‚СѓСЃ:** вњ… РРґРµР°Р»СЊРЅРѕ СЂР°Р±РѕС‚Р°РµС‚
 
 ---
 
-### ⚠️ ORDERS SECTION (требует проверки)
+### вљ пёЏ ORDERS SECTION (С‚СЂРµР±СѓРµС‚ РїСЂРѕРІРµСЂРєРё)
 
-#### Функции:
+#### Р¤СѓРЅРєС†РёРё:
 ```javascript
-loadOrders()          - ⚠️ нужна проверка
-acceptOrder(id)       - ⚠️ нужна проверка (POST /orders/{id}/confirm)
-rejectOrder(id)       - ⚠️ нужна проверка (POST /orders/{id}/cancel)
-completeOrder(id)     - ⚠️ нужна проверка (POST /orders/{id}/status)
-filterOrders(status)  - ✅ работает (в updateOrdersView)
-renderOrders()        - ✅ работает
+loadOrders()          - вљ пёЏ РЅСѓР¶РЅР° РїСЂРѕРІРµСЂРєР°
+acceptOrder(id)       - вљ пёЏ РЅСѓР¶РЅР° РїСЂРѕРІРµСЂРєР° (POST /orders/{id}/confirm)
+rejectOrder(id)       - вљ пёЏ РЅСѓР¶РЅР° РїСЂРѕРІРµСЂРєР° (POST /orders/{id}/cancel)
+completeOrder(id)     - вљ пёЏ РЅСѓР¶РЅР° РїСЂРѕРІРµСЂРєР° (POST /orders/{id}/status)
+filterOrders(status)  - вњ… СЂР°Р±РѕС‚Р°РµС‚ (РІ updateOrdersView)
+renderOrders()        - вњ… СЂР°Р±РѕС‚Р°РµС‚
 ```
 
-**Что нужно проверить:**
-1. Правильность API endpoints
-2. Обработка ошибок
-3. UI обновление после action
+**Р§С‚Рѕ РЅСѓР¶РЅРѕ РїСЂРѕРІРµСЂРёС‚СЊ:**
+1. РџСЂР°РІРёР»СЊРЅРѕСЃС‚СЊ API endpoints
+2. РћР±СЂР°Р±РѕС‚РєР° РѕС€РёР±РѕРє
+3. UI РѕР±РЅРѕРІР»РµРЅРёРµ РїРѕСЃР»Рµ action
 4. Toast notifications
 
 ---
 
-### ⚠️ SETTINGS SECTION (требует проверки)
+### вљ пёЏ SETTINGS SECTION (С‚СЂРµР±СѓРµС‚ РїСЂРѕРІРµСЂРєРё)
 
-#### Функции:
+#### Р¤СѓРЅРєС†РёРё:
 ```javascript
-loadSettings()        - ⚠️ нужна проверка
-saveSettings()        - ⚠️ нужна проверка (PUT /store)
-toggleStoreStatus()   - ✅ ранее исправлена (PATCH /store/status)
+loadSettings()        - вљ пёЏ РЅСѓР¶РЅР° РїСЂРѕРІРµСЂРєР°
+saveSettings()        - вљ пёЏ РЅСѓР¶РЅР° РїСЂРѕРІРµСЂРєР° (PUT /store)
+toggleStoreStatus()   - вњ… СЂР°РЅРµРµ РёСЃРїСЂР°РІР»РµРЅР° (PATCH /store/status)
 ```
 
-**Что нужно проверить:**
-1. Форма загружается с текущими данными
-2. Валидация полей (phone, address)
-3. Сохранение работает
-4. UI feedback после сохранения
+**Р§С‚Рѕ РЅСѓР¶РЅРѕ РїСЂРѕРІРµСЂРёС‚СЊ:**
+1. Р¤РѕСЂРјР° Р·Р°РіСЂСѓР¶Р°РµС‚СЃСЏ СЃ С‚РµРєСѓС‰РёРјРё РґР°РЅРЅС‹РјРё
+2. Р’Р°Р»РёРґР°С†РёСЏ РїРѕР»РµР№ (phone, address)
+3. РЎРѕС…СЂР°РЅРµРЅРёРµ СЂР°Р±РѕС‚Р°РµС‚
+4. UI feedback РїРѕСЃР»Рµ СЃРѕС…СЂР°РЅРµРЅРёСЏ
 
 ---
 
-### ✅ NAVIGATION & TELEGRAM WEBAPP
+### вњ… NAVIGATION & TELEGRAM WEBAPP
 
 ```javascript
 Telegram.WebApp.ready();
 Telegram.WebApp.expand();
 Telegram.WebApp.enableClosingConfirmation();
 
-// ✅ Инициализация auth
+// вњ… РРЅРёС†РёР°Р»РёР·Р°С†РёСЏ auth
 const tg = window.Telegram?.WebApp;
 const initData = tg?.initData || null;
 const urlUserId = new URLSearchParams(window.location.search).get('uid');
 ```
 
-**Статус:** ✅ Работает корректно
+**РЎС‚Р°С‚СѓСЃ:** вњ… Р Р°Р±РѕС‚Р°РµС‚ РєРѕСЂСЂРµРєС‚РЅРѕ
 
 ---
 
-## 4️⃣ КРИТИЧЕСКИЕ ИСПРАВЛЕНИЯ
+## 4пёЏвѓЈ РљР РРўРР§Р•РЎРљРР• РРЎРџР РђР’Р›Р•РќРРЇ
 
-### 🔴 PRIORITY 1: Dashboard - pendingOrders counter
+### рџ”ґ PRIORITY 1: Dashboard - pendingOrders counter
 
-**Файл:** `webapp/partner-panel/index.html`
-**Строка:** ~2250 (внутри loadDashboard)
+**Р¤Р°Р№Р»:** `webapp/partner-panel/index.html`
+**РЎС‚СЂРѕРєР°:** ~2250 (РІРЅСѓС‚СЂРё loadDashboard)
 
-**Проблема:**
+**РџСЂРѕР±Р»РµРјР°:**
 ```javascript
-// ❌ Элемент #pendingOrders существует в HTML, но не обновляется
+// вќЊ Р­Р»РµРјРµРЅС‚ #pendingOrders СЃСѓС‰РµСЃС‚РІСѓРµС‚ РІ HTML, РЅРѕ РЅРµ РѕР±РЅРѕРІР»СЏРµС‚СЃСЏ
 ```
 
-**Решение:**
+**Р РµС€РµРЅРёРµ:**
 ```javascript
 async function loadDashboard() {
-    // ... existing code до updateOrdersView() ...
+    // ... existing code РґРѕ updateOrdersView() ...
 
     // Filter pending orders
     const pending = orders.filter(o => o.status === 'pending');
 
-    // ✅ ADD THIS CODE:
+    // вњ… ADD THIS CODE:
     const pendingOrdersEl = document.getElementById('pendingOrders');
     if (pendingOrdersEl) {
         pendingOrdersEl.textContent = pending.length;
     } else {
-        console.warn('⚠️ Element #pendingOrders not found');
+        console.warn('вљ пёЏ Element #pendingOrders not found');
     }
 
     allOrders = orders || [];
@@ -419,28 +419,28 @@ async function loadDashboard() {
 
 ---
 
-### 🟡 PRIORITY 2: Orders section action functions
+### рџџЎ PRIORITY 2: Orders section action functions
 
-Нужно проверить все action functions:
+РќСѓР¶РЅРѕ РїСЂРѕРІРµСЂРёС‚СЊ РІСЃРµ action functions:
 
 ```javascript
 async function acceptOrder(orderId) {
     try {
         await api(`/orders/${orderId}/confirm`, { method: 'POST' });
-        toast('Заказ подтверждён', 'success');
+        toast('Р—Р°РєР°Р· РїРѕРґС‚РІРµСЂР¶РґС‘РЅ', 'success');
         await loadDashboard(); // reload
     } catch (e) {
-        toast('Ошибка: ' + e.message, 'error');
+        toast('РћС€РёР±РєР°: ' + e.message, 'error');
     }
 }
 
 async function rejectOrder(orderId) {
     try {
         await api(`/orders/${orderId}/cancel`, { method: 'POST' });
-        toast('Заказ отменён', 'success');
+        toast('Р—Р°РєР°Р· РѕС‚РјРµРЅС‘РЅ', 'success');
         await loadDashboard(); // reload
     } catch (e) {
-        toast('Ошибка: ' + e.message, 'error');
+        toast('РћС€РёР±РєР°: ' + e.message, 'error');
     }
 }
 
@@ -451,19 +451,19 @@ async function completeOrder(orderId) {
             method: 'POST',
             body
         });
-        toast('Заказ завершён', 'success');
+        toast('Р—Р°РєР°Р· Р·Р°РІРµСЂС€С‘РЅ', 'success');
         await loadDashboard(); // reload
     } catch (e) {
-        toast('Ошибка: ' + e.message, 'error');
+        toast('РћС€РёР±РєР°: ' + e.message, 'error');
     }
 }
 ```
 
 ---
 
-### 🟡 PRIORITY 3: Settings section validation
+### рџџЎ PRIORITY 3: Settings section validation
 
-Нужно добавить валидацию формы:
+РќСѓР¶РЅРѕ РґРѕР±Р°РІРёС‚СЊ РІР°Р»РёРґР°С†РёСЋ С„РѕСЂРјС‹:
 
 ```javascript
 async function saveSettings() {
@@ -472,36 +472,36 @@ async function saveSettings() {
     const phone = document.getElementById('storePhone').value.trim();
     const description = document.getElementById('storeDescription').value.trim();
 
-    // ✅ Validation
+    // вњ… Validation
     if (!name) {
-        toast('Укажите название магазина', 'error');
+        toast('РЈРєР°Р¶РёС‚Рµ РЅР°Р·РІР°РЅРёРµ РјР°РіР°Р·РёРЅР°', 'error');
         return;
     }
 
     if (!address) {
-        toast('Укажите адрес', 'error');
+        toast('РЈРєР°Р¶РёС‚Рµ Р°РґСЂРµСЃ', 'error');
         return;
     }
 
     if (!phone || !/^\+998\d{9}$/.test(phone)) {
-        toast('Неверный формат телефона (+998XXXXXXXXX)', 'error');
+        toast('РќРµРІРµСЂРЅС‹Р№ С„РѕСЂРјР°С‚ С‚РµР»РµС„РѕРЅР° (+998XXXXXXXXX)', 'error');
         return;
     }
 
     try {
         const body = JSON.stringify({ name, address, phone, description });
         await api('/store', { method: 'PUT', body });
-        toast('Настройки сохранены', 'success');
+        toast('РќР°СЃС‚СЂРѕР№РєРё СЃРѕС…СЂР°РЅРµРЅС‹', 'success');
         await loadProfile(); // reload profile
     } catch (e) {
-        toast('Ошибка: ' + e.message, 'error');
+        toast('РћС€РёР±РєР°: ' + e.message, 'error');
     }
 }
 ```
 
 ---
 
-## 5️⃣ TESTING CHECKLIST
+## 5пёЏвѓЈ TESTING CHECKLIST
 
 ### Backend API Testing:
 ```bash
@@ -523,88 +523,88 @@ curl https://fudly-bot-production.up.railway.app/stats \
 ```
 
 ### Frontend Testing (in Telegram WebApp):
-1. ✅ Open panel from bot (`@fudly_bot` → Панель партнёра)
-2. ✅ Check dashboard loads (stats + orders)
-3. ✅ Check products section (all CRUD operations)
-4. ✅ Check orders section (accept/reject/complete)
-5. ✅ Check settings section (save store info)
-6. ✅ Check navigation between sections
+1. вњ… Open panel from bot (`@fudly_bot` в†’ РџР°РЅРµР»СЊ РїР°СЂС‚РЅС‘СЂР°)
+2. вњ… Check dashboard loads (stats + orders)
+3. вњ… Check products section (all CRUD operations)
+4. вњ… Check orders section (accept/reject/complete)
+5. вњ… Check settings section (save store info)
+6. вњ… Check navigation between sections
 
 ---
 
-## 6️⃣ RECOMMENDATIONS
+## 6пёЏвѓЈ RECOMMENDATIONS
 
 ### Performance:
-- ✅ API responses: <200ms (Railway Railway US region)
-- ✅ Dashboard load: <2s (current implementation)
-- ✅ Products list: Показывать по 20 товаров с lazy load
-- ✅ Images: Use CDN for product photos (currently serving via API)
+- вњ… API responses: <200ms (Railway Railway US region)
+- вњ… Dashboard load: <2s (current implementation)
+- вњ… Products list: РџРѕРєР°Р·С‹РІР°С‚СЊ РїРѕ 20 С‚РѕРІР°СЂРѕРІ СЃ lazy load
+- вњ… Images: Use CDN for product photos (currently serving via API)
 
 ### Security:
-- ✅ Auth: Telegram WebApp signature verified
-- ✅ Rate limiting: 5-10 req/min on POST/PUT/DELETE
-- ✅ Input validation: Pydantic models on backend
-- ✅ SQL injection: Protected (using parameterized queries)
+- вњ… Auth: Telegram WebApp signature verified
+- вњ… Rate limiting: 5-10 req/min on POST/PUT/DELETE
+- вњ… Input validation: Pydantic models on backend
+- вњ… SQL injection: Protected (using parameterized queries)
 
 ### UX Improvements:
-- ✅ Pull-to-refresh на мобильных
-- ✅ Offline mode с Service Worker
-- ✅ Push notifications для новых заказов
-- ✅ Real-time updates через WebSocket
+- вњ… Pull-to-refresh РЅР° РјРѕР±РёР»СЊРЅС‹С…
+- вњ… Offline mode СЃ Service Worker
+- вњ… Push notifications РґР»СЏ РЅРѕРІС‹С… Р·Р°РєР°Р·РѕРІ
+- вњ… Real-time updates С‡РµСЂРµР· WebSocket
 
 ---
 
-## 7️⃣ DEPLOYMENT STATUS
+## 7пёЏвѓЈ DEPLOYMENT STATUS
 
 ### Railway Production:
 ```
 URL: https://fudly-bot-production.up.railway.app
 Database: tramway.proxy.rlwy.net:36557
-Status: ✅ ONLINE
+Status: вњ… ONLINE
 ```
 
 ### Environment Variables (set on Railway):
 ```bash
-BOT_TOKEN=7969096859:AAHcLgw41S-nxodIf1bZ3aHN_-e4J7sx8aI
+TELEGRAM_BOT_TOKEN=<REDACTED_TELEGRAM_BOT_TOKEN>
 ADMIN_ID=253445521
-DATABASE_URL=postgresql://postgres:AlIcvvweODzccngRJbskNqLIoyzxCtmS@postgres.railway.internal:5432/railway
+DATABASE_URL=postgresql://postgres:<REDACTED>@postgres.railway.internal:5432/railway
 WEBHOOK_URL=https://fudly-bot-production.up.railway.app/webhook
 PORT=8080
 ```
 
 ### Files to deploy:
 ```
-✅ app/api/partner_panel_simple.py  - Backend API
-✅ webapp/partner-panel/index.html   - Frontend (single file)
-✅ bot.py                           - Telegram bot
-✅ requirements.txt                 - Dependencies
-✅ Procfile                         - Railway startup
+вњ… app/api/partner_panel_simple.py  - Backend API
+вњ… webapp/partner-panel/index.html   - Frontend (single file)
+вњ… bot.py                           - Telegram bot
+вњ… requirements.txt                 - Dependencies
+вњ… Procfile                         - Railway startup
 ```
 
 ---
 
-## 8️⃣ SUMMARY & NEXT STEPS
+## 8пёЏвѓЈ SUMMARY & NEXT STEPS
 
-### ✅ Completed:
-1. ✅ Database created and migrated
-2. ✅ All API endpoints working
-3. ✅ Products section fully rewritten
-4. ✅ Frontend modern design implemented
-5. ✅ Authentication working (Telegram WebApp + URL auth)
+### вњ… Completed:
+1. вњ… Database created and migrated
+2. вњ… All API endpoints working
+3. вњ… Products section fully rewritten
+4. вњ… Frontend modern design implemented
+5. вњ… Authentication working (Telegram WebApp + URL auth)
 
-### ⚠️ TODO (in order):
-1. 🔴 Fix `pendingOrders` counter in dashboard
-2. 🟡 Test and fix order action functions (accept/reject/complete)
-3. 🟡 Add validation to settings form
-4. 🟢 Test full flow in production
-5. 🟢 Add real-time order notifications
+### вљ пёЏ TODO (in order):
+1. рџ”ґ Fix `pendingOrders` counter in dashboard
+2. рџџЎ Test and fix order action functions (accept/reject/complete)
+3. рџџЎ Add validation to settings form
+4. рџџў Test full flow in production
+5. рџџў Add real-time order notifications
 
-### 📊 Overall Status:
-**85% готово** - Основной функционал работает, нужны минорные исправления
+### рџ“Љ Overall Status:
+**85% РіРѕС‚РѕРІРѕ** - РћСЃРЅРѕРІРЅРѕР№ С„СѓРЅРєС†РёРѕРЅР°Р» СЂР°Р±РѕС‚Р°РµС‚, РЅСѓР¶РЅС‹ РјРёРЅРѕСЂРЅС‹Рµ РёСЃРїСЂР°РІР»РµРЅРёСЏ
 
 ---
 
-## 9️⃣ CODE CHANGES NEEDED
+## 9пёЏвѓЈ CODE CHANGES NEEDED
 
 ### File: `webapp/partner-panel/index.html`
 
@@ -628,22 +628,22 @@ if (pendingOrdersEl) {
 async function acceptOrder(orderId) {
     try {
         await api(`/orders/${orderId}/confirm`, { method: 'POST' });
-        toast('Заказ подтверждён', 'success');
+        toast('Р—Р°РєР°Р· РїРѕРґС‚РІРµСЂР¶РґС‘РЅ', 'success');
         await loadDashboard();
     } catch (e) {
         console.error('Accept order failed:', e);
-        toast('Ошибка подтверждения заказа', 'error');
+        toast('РћС€РёР±РєР° РїРѕРґС‚РІРµСЂР¶РґРµРЅРёСЏ Р·Р°РєР°Р·Р°', 'error');
     }
 }
 
 async function rejectOrder(orderId) {
     try {
         await api(`/orders/${orderId}/cancel`, { method: 'POST' });
-        toast('Заказ отменён', 'success');
+        toast('Р—Р°РєР°Р· РѕС‚РјРµРЅС‘РЅ', 'success');
         await loadDashboard();
     } catch (e) {
         console.error('Reject order failed:', e);
-        toast('Ошибка отмены заказа', 'error');
+        toast('РћС€РёР±РєР° РѕС‚РјРµРЅС‹ Р·Р°РєР°Р·Р°', 'error');
     }
 }
 
@@ -651,11 +651,11 @@ async function completeOrder(orderId) {
     try {
         const body = JSON.stringify({ status: 'completed' });
         await api(`/orders/${orderId}/status`, { method: 'POST', body });
-        toast('Заказ завершён', 'success');
+        toast('Р—Р°РєР°Р· Р·Р°РІРµСЂС€С‘РЅ', 'success');
         await loadDashboard();
     } catch (e) {
         console.error('Complete order failed:', e);
-        toast('Ошибка завершения заказа', 'error');
+        toast('РћС€РёР±РєР° Р·Р°РІРµСЂС€РµРЅРёСЏ Р·Р°РєР°Р·Р°', 'error');
     }
 }
 ```
@@ -670,54 +670,55 @@ async function saveSettings() {
 
     // Validation
     if (!name || name.length < 3) {
-        toast('Название должно быть не менее 3 символов', 'error');
+        toast('РќР°Р·РІР°РЅРёРµ РґРѕР»Р¶РЅРѕ Р±С‹С‚СЊ РЅРµ РјРµРЅРµРµ 3 СЃРёРјРІРѕР»РѕРІ', 'error');
         return;
     }
 
     if (!address || address.length < 5) {
-        toast('Укажите полный адрес', 'error');
+        toast('РЈРєР°Р¶РёС‚Рµ РїРѕР»РЅС‹Р№ Р°РґСЂРµСЃ', 'error');
         return;
     }
 
     if (!phone || !/^\+998\d{9}$/.test(phone)) {
-        toast('Формат телефона: +998XXXXXXXXX', 'error');
+        toast('Р¤РѕСЂРјР°С‚ С‚РµР»РµС„РѕРЅР°: +998XXXXXXXXX', 'error');
         return;
     }
 
     try {
         const body = JSON.stringify({ name, address, phone, description });
         await api('/store', { method: 'PUT', body });
-        toast('Настройки сохранены ✓', 'success');
+        toast('РќР°СЃС‚СЂРѕР№РєРё СЃРѕС…СЂР°РЅРµРЅС‹ вњ“', 'success');
         // Reload profile to update header
         const profile = await api('/profile');
-        document.getElementById('storeName').textContent = profile?.store?.name || 'Мой магазин';
+        document.getElementById('storeName').textContent = profile?.store?.name || 'РњРѕР№ РјР°РіР°Р·РёРЅ';
     } catch (e) {
         console.error('Save settings failed:', e);
-        toast('Ошибка сохранения: ' + e.message, 'error');
+        toast('РћС€РёР±РєР° СЃРѕС…СЂР°РЅРµРЅРёСЏ: ' + e.message, 'error');
     }
 }
 ```
 
 ---
 
-## 🎯 CONCLUSION
+## рџЋЇ CONCLUSION
 
-Web Partner Panel практически готов к production. Основной функционал работает:
-- ✅ База данных создана и работает
-- ✅ API полностью функционален
-- ✅ Products section полностью переписан
-- ✅ Dashboard загружается корректно
-- ✅ Authentication работает
+Web Partner Panel РїСЂР°РєС‚РёС‡РµСЃРєРё РіРѕС‚РѕРІ Рє production. РћСЃРЅРѕРІРЅРѕР№ С„СѓРЅРєС†РёРѕРЅР°Р» СЂР°Р±РѕС‚Р°РµС‚:
+- вњ… Р‘Р°Р·Р° РґР°РЅРЅС‹С… СЃРѕР·РґР°РЅР° Рё СЂР°Р±РѕС‚Р°РµС‚
+- вњ… API РїРѕР»РЅРѕСЃС‚СЊСЋ С„СѓРЅРєС†РёРѕРЅР°Р»РµРЅ
+- вњ… Products section РїРѕР»РЅРѕСЃС‚СЊСЋ РїРµСЂРµРїРёСЃР°РЅ
+- вњ… Dashboard Р·Р°РіСЂСѓР¶Р°РµС‚СЃСЏ РєРѕСЂСЂРµРєС‚РЅРѕ
+- вњ… Authentication СЂР°Р±РѕС‚Р°РµС‚
 
-Осталось исправить 3 минорных бага:
-1. pendingOrders counter (1 строка кода)
-2. Order action functions (проверить/добавить если отсутствуют)
-3. Settings validation (добавить проверку полей)
+РћСЃС‚Р°Р»РѕСЃСЊ РёСЃРїСЂР°РІРёС‚СЊ 3 РјРёРЅРѕСЂРЅС‹С… Р±Р°РіР°:
+1. pendingOrders counter (1 СЃС‚СЂРѕРєР° РєРѕРґР°)
+2. Order action functions (РїСЂРѕРІРµСЂРёС‚СЊ/РґРѕР±Р°РІРёС‚СЊ РµСЃР»Рё РѕС‚СЃСѓС‚СЃС‚РІСѓСЋС‚)
+3. Settings validation (РґРѕР±Р°РІРёС‚СЊ РїСЂРѕРІРµСЂРєСѓ РїРѕР»РµР№)
 
-**Рекомендация:** Исправить эти баги и протестировать в production Telegram WebApp.
+**Р РµРєРѕРјРµРЅРґР°С†РёСЏ:** РСЃРїСЂР°РІРёС‚СЊ СЌС‚Рё Р±Р°РіРё Рё РїСЂРѕС‚РµСЃС‚РёСЂРѕРІР°С‚СЊ РІ production Telegram WebApp.
 
 ---
 
-**Автор:** Senior Developer
-**Дата:** 2024-12-25
-**Версия:** Final
+**РђРІС‚РѕСЂ:** Senior Developer
+**Р”Р°С‚Р°:** 2024-12-25
+**Р’РµСЂСЃРёСЏ:** Final
+

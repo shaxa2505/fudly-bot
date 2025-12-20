@@ -39,3 +39,12 @@ repos:
           - pydantic>=2.0
         args: [--ignore-missing-imports, --no-strict-optional]
         exclude: ^(tests/|migrations_alembic/|htmlcov/)
+
+  # Secret scanning (prevents committing tokens/passwords)
+  - repo: https://github.com/gitleaks/gitleaks
+    rev: v8.18.1
+    hooks:
+      - id: gitleaks
+        args: [--redact]
+        pass_filenames: false
+        exclude: ^(\.venv/|\.mypy_cache/|\.pytest_cache/|\.ruff_cache/|__pycache__/|htmlcov/|webapp/node_modules/|webapp/dist/)
