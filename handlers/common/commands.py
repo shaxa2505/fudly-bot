@@ -753,6 +753,17 @@ async def choose_language(callback: types.CallbackQuery, state: FSMContext, db: 
     except Exception as e:
         logger.debug("Could not edit language confirmation: %s", e)
 
+    user_phone = user.phone if user else None
+    if not user_phone:
+        await callback.message.answer(
+            get_text(lang, "welcome_phone_step"),
+            parse_mode="HTML",
+            reply_markup=phone_request_keyboard(lang),
+        )
+        await state.set_state(Registration.phone)
+        await callback.answer()
+        return
+
     user_city = user.city
     user_role = user.role or "customer"
     menu = main_menu_seller(lang) if user_role == "seller" else main_menu_customer(lang)
