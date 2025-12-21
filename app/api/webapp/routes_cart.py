@@ -29,7 +29,9 @@ async def calculate_cart(
 
             offer = db.get_offer(offer_id) if hasattr(db, "get_offer") else None
             if offer:
-                price = float(get_val(offer, "discount_price", 0) or 0)
+                # Convert kopeks to sums for display (1 sum = 100 kopeks)
+                price_kopeks = float(get_val(offer, "discount_price", 0) or 0)
+                price = price_kopeks / 100
                 items.append(
                     CartItem(
                         offer_id=offer_id,

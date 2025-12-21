@@ -206,7 +206,11 @@ const api = {
       return data
     } catch (error) {
       // Extract error message from response
-      const errorMsg = error.response?.data?.error || error.response?.data?.message || error.message
+      const errorMsg =
+        error.response?.data?.detail ||
+        error.response?.data?.error ||
+        error.response?.data?.message ||
+        error.message
       throw new Error(errorMsg || 'Order creation failed')
     }
   },

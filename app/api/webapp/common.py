@@ -80,7 +80,7 @@ class OrderItem(BaseModel):
 
 class CreateOrderRequest(BaseModel):
     items: list[OrderItem]
-    user_id: int
+    user_id: int | None = None
     delivery_address: str | None = None
     phone: str | None = None
     comment: str | None = None

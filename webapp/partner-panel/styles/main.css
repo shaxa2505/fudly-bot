@@ -63,6 +63,18 @@
     display: flex;
     align-items: center;
     gap: var(--space-3);
+    animation: slideInRight 0.5s ease-out;
+}
+
+@keyframes slideInRight {
+    from {
+        opacity: 0;
+        transform: translateX(-20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateX(0);
+    }
 }
 
 .smart-insight.success {

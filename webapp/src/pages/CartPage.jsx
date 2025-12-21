@@ -119,6 +119,11 @@ function CartPage({ user }) {
 
   const handleCheckout = () => {
     if (isEmpty) return
+    const storeIds = new Set(cartItems.map(item => item.offer?.store_id).filter(Boolean))
+    if (storeIds.size > 1) {
+      toast.error('Checkout supports only one store. Clear the cart and try again.')
+      return
+    }
     setCheckoutStep('details')
     setShowCheckout(true)
   }
@@ -196,9 +201,9 @@ function CartPage({ user }) {
 
       const result = await api.createOrder(orderData)
 
-      // Check if order was successful
-      if (!result.success && !result.bookings?.length) {
-        throw new Error(result.message || result.error || 'Order failed')
+      const isSuccess = !!(result?.success || result?.order_id)
+      if (!isSuccess) {
+        throw new Error(result?.message || result?.error || 'Order failed')
       }
 
       // Get order ID from response
@@ -300,8 +305,9 @@ function CartPage({ user }) {
       localStorage.setItem('fudly_phone', phone.trim())
       const result = await api.createOrder(orderData)
 
-      if (!result.success && !result.bookings?.length) {
-        throw new Error(result.message || result.error || 'Order failed')
+      const isSuccess = !!(result?.success || result?.order_id)
+      if (!isSuccess) {
+        throw new Error(result?.message || result?.error || 'Order failed')
       }
 
       const orderId = result.order_id || result.bookings?.[0]?.booking_id

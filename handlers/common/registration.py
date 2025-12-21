@@ -167,133 +167,30 @@ async def process_phone(message: types.Message, state: FSMContext, db: DatabaseP
         return
 
     db.update_user_phone(message.from_user.id, phone)
+    await _after_phone_saved(message, state, db, lang)
 
-    # Check if there was a pending order (Tez buyurtma) or cart checkout
-    data = await state.get_data()
-    pending_order = data.get("pending_order")
-    pending_cart_checkout = data.get("pending_cart_checkout")
 
-    from aiogram.types import ReplyKeyboardRemove
-
-    # 1) Pending cart checkout: user started cart checkout without phone
-    if pending_cart_checkout:
-        # Confirm phone saved and hide contact keyboard
-        await message.answer(
-            "✅ Телефон сохранён!" if lang == "ru" else "✅ Telefon saqlandi!",
-            reply_markup=ReplyKeyboardRemove(),
-        )
-
-        # Try to show cart again so user can continue checkout
-        try:
-            from handlers.customer.cart.router import show_cart
-
-            await show_cart(message, state, is_callback=False)
-        except Exception as e:  # pragma: no cover - defensive logging
-            logger.warning(f"Failed to resume cart after phone: {e}")
-            from app.keyboards import main_menu_customer
-
-            await message.answer(
-                (
-                    "Теперь откройте 🛒 Корзина и нажмите «Оформить заказ» заново."
-                    if lang == "ru"
-                    else "Endi 🛒 Savat ni ochib, qayta ‘Buyurtma berish’ ni bosing."
-                ),
-                reply_markup=main_menu_customer(lang),
-            )
-
-        # Clear state – cart flow will set its own FSM state again
-        await state.clear()
+@router.message(Registration.phone, F.text)
+async def process_phone_text(message: types.Message, state: FSMContext, db: DatabaseProtocol):
+    """Process typed phone number - save and continue."""
+    if not db:
+        await message.answer("System error")
+        return
+    if not message.text:
         return
 
-    # 2) Pending single-order / Tez buyurtma flow
-    if pending_order:
+    lang = db.get_user_language(message.from_user.id)
+    phone = sanitize_phone(message.text)
+
+    if not validator.validate_phone(phone):
         await message.answer(
-            "✅ Телефон сохранён!" if lang == "ru" else "✅ Telefon saqlandi!",
-            reply_markup=ReplyKeyboardRemove(),
-        )
-
-        # Get order data to show confirmation button
-        data = await state.get_data()
-        offer_id = data.get("offer_id")
-        store_id = data.get("store_id")
-        delivery_method = data.get("selected_delivery")
-
-        # Check if we have minimum required data
-        if not offer_id or not store_id or not delivery_method:
-            # Data incomplete - show menu
-            await state.clear()
-            from app.keyboards import main_menu_customer
-
-            await message.answer(
-                "⚠️ Продолжите оформление через 🔥 Акции"
-                if lang == "ru"
-                else "⚠️ 🔥 Aksiyalar orqali davom eting",
-                reply_markup=main_menu_customer(lang),
-            )
-            return
-
-        # Show confirmation button to continue Tez buyurtma
-        from aiogram.utils.keyboard import InlineKeyboardBuilder
-
-        kb = InlineKeyboardBuilder()
-        kb.button(
-            text="✅ Продолжить оформление" if lang == "ru" else "✅ Davom ettirish",
-            callback_data=f"pbook_confirm_{offer_id}",
-        )
-
-        await message.answer(
-            "👇 Нажмите кнопку ниже для продолжения:"
-            if lang == "ru"
-            else "👇 Davom etish uchun tugmani bosing:",
-            reply_markup=kb.as_markup(),
+            get_text(lang, "error_invalid_number"),
+            reply_markup=phone_request_keyboard(lang),
         )
         return
 
-    # Check if user already has a city set - skip city selection
-    user = db.get_user_model(message.from_user.id)
-    if user and user.city:
-        # User already has city, complete registration
-        await state.clear()
-
-        from aiogram.types import ReplyKeyboardRemove
-
-        from app.keyboards import main_menu_customer
-
-        await message.answer(
-            "✅ Телефон сохранён!" if lang == "ru" else "✅ Telefon saqlandi!",
-            reply_markup=ReplyKeyboardRemove(),
-        )
-
-        # Send main menu
-        await message.answer(
-            f"👇 {'Tanlang' if lang == 'uz' else 'Выберите'}:",
-            reply_markup=main_menu_customer(lang),
-        )
-        return
-
-    # Normal registration flow - show city selection
-    city_text = (
-        f"✅ {'Telefon saqlandi!' if lang == 'uz' else 'Телефон сохранён!'}\n\n"
-        f"📍 <b>{'Shahringizni tanlang' if lang == 'uz' else 'Выберите ваш город'}</b>\n\n"
-        f"{'Yaqin takliflarni koʻrsatamiz' if lang == 'uz' else 'Покажем предложения рядом с вами'}"
-    )
-
-    await state.set_state(Registration.city)
-
-    # Remove reply keyboard and show inline cities
-    from aiogram.types import ReplyKeyboardRemove
-
-    await message.answer(
-        city_text,
-        parse_mode="HTML",
-        reply_markup=ReplyKeyboardRemove(),
-    )
-    await message.answer(
-        f"👇 {'Tanlang' if lang == 'uz' else 'Выберите'}:",
-        reply_markup=city_inline_keyboard(lang),
-    )
-
-
+    db.update_user_phone(message.from_user.id, phone)
+    await _after_phone_saved(message, state, db, lang)
 @router.callback_query(F.data.startswith("reg_city_"), StateFilter(Registration.city, None))
 async def registration_city_callback(
     callback: types.CallbackQuery, state: FSMContext, db: DatabaseProtocol

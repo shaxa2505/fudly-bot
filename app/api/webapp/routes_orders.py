@@ -92,7 +92,9 @@ async def create_order(
             for item in order.items:
                 offer = offers_by_id.get(item.offer_id)
                 if offer:
-                    price = float(get_val(offer, "discount_price", 0) or 0)
+                    # Convert kopeks to sums for display (1 sum = 100 kopeks)
+                    price_kopeks = float(get_val(offer, "discount_price", 0) or 0)
+                    price = price_kopeks / 100
                     total_check += price * item.quantity
                     store_id_check = get_val(offer, "store_id")
 
@@ -102,7 +104,9 @@ async def create_order(
                     store_id_check = get_val(first_offer, "store_id")
                     store_check = db.get_store(store_id_check) if hasattr(db, "get_store") else None
                     if store_check:
-                        min_order = get_val(store_check, "min_order_amount", 0)
+                        # Convert min_order from kopeks to sums
+                        min_order_kopeks = get_val(store_check, "min_order_amount", 0)
+                        min_order = min_order_kopeks / 100 if min_order_kopeks else 0
                         if min_order > 0 and total_check < min_order:
                             raise HTTPException(
                                 status_code=400,
@@ -121,7 +125,9 @@ async def create_order(
                 if not offer:
                     continue
 
-                price = int(get_val(offer, "discount_price", 0) or 0)
+                # Convert kopeks to sums for display (1 sum = 100 kopeks)
+                price_kopeks = int(get_val(offer, "discount_price", 0) or 0)
+                price = price_kopeks // 100
                 store_id = int(get_val(offer, "store_id"))
                 offer_title = get_val(offer, "title", "Товар")
                 store = db.get_store(store_id) if hasattr(db, "get_store") else None
@@ -129,7 +135,9 @@ async def create_order(
                 store_address = get_val(store, "address", "") if store else ""
                 delivery_price = 0
                 if is_delivery and store:
-                    delivery_price = int(get_val(store, "delivery_price", 15000) or 15000)
+                    # Convert delivery price from kopeks to sums
+                    delivery_price_kopeks = int(get_val(store, "delivery_price", 1500000) or 1500000)
+                    delivery_price = delivery_price_kopeks // 100
 
                 order_items.append(
                     OrderItem(

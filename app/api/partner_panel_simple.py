@@ -1275,7 +1275,7 @@ async def upload_photo(photo: UploadFile = File(...), authorization: str = Heade
             form_data.add_field(
                 "photo", content, filename=photo.filename, content_type=photo.content_type
             )
-            form_data.add_field("caption", "📷 Фото товара загружено через панель партнера")
+            # No caption - send photo silently without text
 
             async with session.post(
                 f"https://api.telegram.org/bot{_bot_token}/sendPhoto", data=form_data

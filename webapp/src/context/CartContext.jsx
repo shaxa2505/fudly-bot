@@ -36,6 +36,19 @@ export function CartProvider({ children }) {
   // Add item to cart
   const addToCart = useCallback((offer) => {
     setCart((prev) => {
+      const newStoreId = offer.store_id || offer.storeId || offer.store?.id
+      const existingStoreId = Object.values(prev).find(item => item.offer?.store_id)?.offer?.store_id
+      if (existingStoreId && newStoreId && existingStoreId !== newStoreId) {
+        window.Telegram?.WebApp?.HapticFeedback?.notificationOccurred?.('warning')
+        if (window.Telegram?.WebApp?.showAlert) {
+          window.Telegram.WebApp.showAlert('Cart supports only one store. Clear cart to add items from another store.')
+        } else {
+          // eslint-disable-next-line no-alert
+          alert('Cart supports only one store. Clear cart to add items from another store.')
+        }
+        return prev
+      }
+
       const key = String(offer.id);
       const existing = prev[key];
       const currentQty = existing?.quantity || 0;

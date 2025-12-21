@@ -43,10 +43,11 @@ async def get_stores(
                     rating=float(get_val(store, "avg_rating", 0) or get_val(store, "rating", 0) or 0),
                     offers_count=int(get_val(store, "offers_count", 0) or 0),
                     delivery_enabled=bool(get_val(store, "delivery_enabled", False)),
-                    delivery_price=float(get_val(store, "delivery_price", 0) or 0)
+                    # Convert kopeks to sums for display (1 sum = 100 kopeks)
+                    delivery_price=float(get_val(store, "delivery_price", 0) or 0) / 100
                     if get_val(store, "delivery_price")
                     else None,
-                    min_order_amount=float(get_val(store, "min_order_amount", 0) or 0)
+                    min_order_amount=float(get_val(store, "min_order_amount", 0) or 0) / 100
                     if get_val(store, "min_order_amount")
                     else None,
                     photo_url=get_val(store, "photo"),
@@ -91,10 +92,11 @@ async def get_store(store_id: int, db=Depends(get_db)):
             rating=rating,
             offers_count=offers_count,
             delivery_enabled=bool(get_val(store, "delivery_enabled", False)),
-            delivery_price=float(get_val(store, "delivery_price", 0) or 0)
+            # Convert kopeks to sums for display (1 sum = 100 kopeks)
+            delivery_price=float(get_val(store, "delivery_price", 0) or 0) / 100
             if get_val(store, "delivery_price")
             else None,
-            min_order_amount=float(get_val(store, "min_order_amount", 0) or 0)
+            min_order_amount=float(get_val(store, "min_order_amount", 0) or 0) / 100
             if get_val(store, "min_order_amount")
             else None,
             photo_url=get_val(store, "photo"),
