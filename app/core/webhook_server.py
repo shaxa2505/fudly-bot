@@ -1729,17 +1729,71 @@ async def create_webhook_app(
                             customer_name = getattr(user, "first_name", "")
                             customer_phone = getattr(user, "phone", "")
 
-                    # Build admin message
-                    admin_msg = (
-                        f"💳 <b>НОВАЯ ДОСТАВКА - ПРОВЕРЬТЕ ОПЛАТУ</b>\n\n"
-                        f"📦 Заказ #{order_id}\n"
-                        f"👤 {customer_name or 'Клиент'}\n"
-                    )
+                    # Get order details (items, store, total)
+                    import json
+                    cart_items = []
+                    store_name = ""
+                    total_price = 0
+                    delivery_fee = 0
+                    
+                    if isinstance(order, dict):
+                        cart_items_json = order.get("cart_items")
+                        store_name = order.get("store_name", "")
+                        total_price = order.get("total_price", 0)
+                        delivery_fee = order.get("delivery_fee", 0)
+                    else:
+                        cart_items_json = getattr(order, "cart_items", None)
+                        store_name = getattr(order, "store_name", "")
+                        total_price = getattr(order, "total_price", 0)
+                        delivery_fee = getattr(order, "delivery_fee", 0)
+                    
+                    if cart_items_json:
+                        try:
+                            cart_items = json.loads(cart_items_json) if isinstance(cart_items_json, str) else cart_items_json
+                        except Exception:
+                            pass
+
+                    # Build admin message with progress bar
+                    admin_msg = f"💳 <b>НОВАЯ ДОСТАВКА - ЧЕК НА ПРОВЕРКЕ</b>\n\n"
+                    
+                    # Progress bar: ● ● ● ○ ○
+                    admin_msg += "🔄 <b>Статус:</b> ● ● ● ○ ○\n"
+                    admin_msg += "   <i>Ожидает подтверждения оплаты</i>\n\n"
+                    
+                    admin_msg += f"📦 <b>Заказ #{order_id}</b>\n"
+                    admin_msg += f"👤 {customer_name or 'Клиент'}\n"
+                    
                     if customer_phone:
                         phone_display = customer_phone if customer_phone else "не указан"
                         admin_msg += f"📱 <code>{phone_display}</code>\n"
+                    
+                    if store_name:
+                        admin_msg += f"🏪 {store_name}\n"
+                    
                     if delivery_address:
                         admin_msg += f"📍 {delivery_address}\n"
+                    
+                    # Items list
+                    if cart_items:
+                        admin_msg += f"\n📋 <b>Товары ({len(cart_items)}):</b>\n"
+                        for idx, item in enumerate(cart_items[:5], 1):  # Max 5 items to show
+                            title = item.get("title", "Товар")
+                            qty = item.get("quantity", 1)
+                            price = item.get("price", 0)
+                            item_total = price * qty
+                            admin_msg += f"{idx}. {title} × {qty} = {int(item_total):,} сум\n"
+                        
+                        if len(cart_items) > 5:
+                            admin_msg += f"   ... и ещё {len(cart_items) - 5}\n"
+                    
+                    # Total
+                    subtotal = total_price - delivery_fee if delivery_fee else total_price
+                    admin_msg += f"\n💰 <b>Итого:</b>\n"
+                    admin_msg += f"   Товары: {int(subtotal):,} сум\n"
+                    if delivery_fee:
+                        admin_msg += f"   Доставка: {int(delivery_fee):,} сум\n"
+                    admin_msg += f"   <b>Всего: {int(total_price):,} сум</b>\n"
+                    
                     admin_msg += "\n⚠️ <b>ПРОВЕРЬТЕ ЧЕК И ПОДТВЕРДИТЕ ОПЛАТУ</b>"
 
                     # Buttons for admin
