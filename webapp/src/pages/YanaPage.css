@@ -310,7 +310,7 @@
 .booking-code {
   font-size: var(--font-xs);
   font-weight: var(--font-semibold);
-  color: var(--color-accent);
+  color: var(--color-primary);
 }
 
 /* Upload Payment Proof Button */
@@ -320,13 +320,13 @@
   padding: var(--spacing-md) var(--spacing-lg);
   border: 2px solid var(--color-primary);
   border-radius: var(--radius-xl);
-  background: linear-gradient(135deg, var(--color-primary) 0%, var(--color-accent) 100%);
+  background: var(--color-primary-gradient);
   font-size: var(--font-sm);
   font-weight: var(--font-semibold);
   color: var(--color-text-inverse);
   cursor: pointer;
   transition: all var(--transition-normal);
-  box-shadow: 0 4px 12px rgba(255, 107, 53, 0.3);
+  box-shadow: var(--shadow-primary);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -335,7 +335,7 @@
 
 .upload-proof-btn:hover {
   transform: translateY(-2px);
-  box-shadow: 0 6px 16px rgba(255, 107, 53, 0.4);
+  box-shadow: 0 6px 16px rgba(15, 118, 110, 0.35);
 }
 
 .upload-proof-btn:active {

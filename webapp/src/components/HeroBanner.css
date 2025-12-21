@@ -4,16 +4,16 @@
  */
 
 .hero-banner-container {
-  padding: 16px 16px 8px;
+  padding: 14px 16px 6px;
 }
 
 .hero-banner {
   position: relative;
   border-radius: 22px;
-  padding: 20px;
-  height: 138px;
-  min-height: 138px;
-  max-height: 138px;
+  padding: 18px;
+  height: 126px;
+  min-height: 126px;
+  max-height: 126px;
   display: flex;
   align-items: center;
   cursor: pointer;
@@ -60,7 +60,7 @@
 
 .banner-title {
   font-family: var(--font-display);
-  font-size: 22px;
+  font-size: 20px;
   font-weight: 700;
   color: #FFFFFF;
   margin: 0 0 6px;
@@ -69,7 +69,7 @@
 }
 
 .banner-subtitle {
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 600;
   color: rgba(255, 255, 255, 0.9);
   margin: 0 0 12px;
@@ -77,7 +77,7 @@
 
 .banner-cta {
   display: inline-block;
-  font-size: 10px;
+  font-size: 9px;
   font-weight: 700;
   color: #FFFFFF;
   background: rgba(255, 255, 255, 0.24);
@@ -91,7 +91,7 @@
 }
 
 .banner-icon {
-  font-size: 54px;
+  font-size: 48px;
   line-height: 1;
   opacity: 0.95;
   filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.1));
@@ -140,7 +140,7 @@
 @media (max-width: 360px) {
   .hero-banner {
     padding: 16px;
-    min-height: 108px;
+    min-height: 104px;
   }
 
   .banner-title {
@@ -148,10 +148,10 @@
   }
 
   .banner-subtitle {
-    font-size: 12px;
+    font-size: 11px;
   }
 
   .banner-icon {
-    font-size: 44px;
+    font-size: 40px;
   }
 }

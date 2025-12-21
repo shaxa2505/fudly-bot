@@ -7,4 +7,5 @@
   min-height: 100vh;
   background: var(--color-bg-secondary);
   position: relative;
+  padding-bottom: calc(var(--bottom-nav-height) + 28px);
 }

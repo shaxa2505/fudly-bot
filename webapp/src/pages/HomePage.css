@@ -6,7 +6,7 @@
 
 .home-page {
   min-height: 100vh;
-  padding-bottom: var(--bottom-nav-height, 80px);
+  padding-bottom: var(--spacing-xl);
   background:
     radial-gradient(1000px 420px at 10% -10%, rgba(249, 115, 22, 0.18) 0%, transparent 60%),
     radial-gradient(900px 500px at 95% 0%, rgba(15, 118, 110, 0.16) 0%, transparent 55%),
@@ -462,15 +462,15 @@
    ============================================================================= */
 
 .filter-bar {
-  display: flex;
-  flex-direction: column;
-  align-items: stretch;
-  gap: 8px;
-  padding: 10px 12px 12px;
-  margin: 8px 16px 10px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  margin: 10px 16px 12px;
   background: rgba(255, 252, 248, 0.95);
   border: 1px solid rgba(15, 118, 110, 0.12);
-  border-radius: 18px;
+  border-radius: 16px;
   box-shadow: var(--shadow-sm);
 }
 
@@ -478,6 +478,7 @@
   display: flex;
   align-items: center;
   gap: 8px;
+  min-width: 0;
 }
 
 .filter-scroll {
@@ -488,7 +489,7 @@
   scrollbar-width: none;
   -webkit-overflow-scrolling: touch;
   flex: 1;
-  padding: 4px 0;
+  padding: 2px 0;
 }
 
 .filter-scroll::-webkit-scrollbar {
@@ -501,7 +502,7 @@
   align-items: center;
   justify-content: center;
   gap: 4px;
-  padding: 7px 12px;
+  padding: 6px 12px;
   background: var(--color-bg-primary);
   border: 1px solid var(--color-border);
   border-radius: 999px;
@@ -513,7 +514,7 @@
   white-space: nowrap;
   flex-shrink: 0;
   min-width: auto;
-  min-height: 32px;
+  min-height: 30px;
   box-shadow: none;
 }
 
@@ -538,6 +539,7 @@
   background: var(--color-primary);
   color: #fff;
   border-color: transparent;
+  box-shadow: 0 6px 12px rgba(15, 118, 110, 0.2);
 }
 
 /* Discount Pills - Active State */
@@ -575,7 +577,7 @@
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  padding: 7px 12px;
+  padding: 6px 12px;
   background: var(--color-bg-primary);
   border: 1px solid var(--color-border);
   border-radius: 999px;
@@ -585,7 +587,8 @@
   cursor: pointer;
   transition: all 0.15s ease;
   min-width: auto;
-  min-height: 32px;
+  min-height: 30px;
+  white-space: nowrap;
 }
 
 .sort-btn:active {
@@ -597,6 +600,7 @@
   background: var(--color-primary);
   color: #fff;
   border-color: transparent;
+  box-shadow: 0 6px 12px rgba(15, 118, 110, 0.2);
 }
 
 .sort-btn-icon {
@@ -750,12 +754,12 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 20px var(--spacing-xl) 12px;
+  padding: 16px var(--spacing-xl) 10px;
   background: transparent;
 }
 
 .section-title {
-  font-size: var(--font-2xl);
+  font-size: var(--font-xl);
   font-weight: var(--font-bold);
   color: var(--color-text-primary);
   margin: 0;
@@ -814,8 +818,8 @@
 .offers-grid {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
-  gap: 16px;
-  padding: 8px 16px 110px;
+  gap: 14px;
+  padding: 8px 16px 24px;
   background: transparent;
   align-items: start;
 }

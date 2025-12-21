@@ -144,7 +144,7 @@
 
   /* ===== LAYOUT ===== */
 
-  --bottom-nav-height: 72px;
+  --bottom-nav-height: 84px;
   --header-height: 64px;
   --safe-area-bottom: env(safe-area-inset-bottom, 20px);
   --container-padding: 20px;
