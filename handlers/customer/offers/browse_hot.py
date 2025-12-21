@@ -623,7 +623,7 @@ def register_hot(
                 else:
                     text += f"<b>{idx}.</b> {title}\n"
                 # Price + store on second line
-                text += f"    💰 <b>{int(offer.discount_price):,}</b> {currency}"
+                text += f"    💰 <b>{int(offer.discount_price // 100):,}</b> {currency}"
                 if store_name:
                     text += f" • 🏪 {store_name}"
                 text += "\n\n"
@@ -710,10 +710,10 @@ def register_hot(
         if offer.original_price and offer.discount_price:
             discount_pct = round((1 - offer.discount_price / offer.original_price) * 100)
             lines.append(
-                f"<s>{int(offer.original_price):,}</s> → <b>{int(offer.discount_price):,}</b> {currency} <b>(-{discount_pct}%)</b>"
+                f"<s>{int(offer.original_price // 100):,}</s> → <b>{int(offer.discount_price // 100):,}</b> {currency} <b>(-{discount_pct}%)</b>"
             )
         else:
-            lines.append(f"💰 <b>{int(offer.discount_price):,}</b> {currency}")
+            lines.append(f"💰 <b>{int(offer.discount_price // 100):,}</b> {currency}")
 
         lines.append("─" * 25)
         lines.append("")

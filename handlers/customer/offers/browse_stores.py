@@ -577,10 +577,10 @@ def register_stores(
 
         if discount_pct > 0:
             lines.append(
-                f"<s>{int(offer.original_price):,}</s> → <b>{int(offer.discount_price):,} {currency}</b> (-{discount_pct}%)"
+                f"<s>{int(offer.original_price // 100):,}</s> → <b>{int(offer.discount_price // 100):,} {currency}</b> (-{discount_pct}%)"
             )
         else:
-            lines.append(f"💰 <b>{int(offer.discount_price):,} {currency}</b>")
+            lines.append(f"💰 <b>{int(offer.discount_price // 100):,} {currency}</b>")
 
         # Use actual unit from offer, fallback to dona/шт
         unit_label = offer.unit if offer.unit else ("dona" if lang == "uz" else "шт")
@@ -931,10 +931,11 @@ def register_stores(
                 text += f"<b>{idx}.</b> {title}\n"
                 # Price on second line - compact
                 if offer.original_price and discount_pct > 0:
-                    text += f"    <s>{int(offer.original_price):,}</s> → <b>{int(offer.discount_price):,}</b> {currency} <i>(-{discount_pct}%)</i>\n"
+                    text += f"    <s>{int(offer.original_price // 100):,}</s> → <b>{int(offer.discount_price // 100):,}</b> {currency} <i>(-{discount_pct}%)</i>\n"
                 else:
+                    price_kopeks = getattr(offer, 'discount_price', 0) or getattr(offer, 'price', 0) or 0
                     text += (
-                        f"    <b>{int(getattr(offer, 'discount_price', 0) or getattr(offer, 'price', 0) or 0):,}</b> {currency}\n"
+                        f"    <b>{int(price_kopeks // 100):,}</b> {currency}\n"
                     )
 
             # Hint at bottom

@@ -25,20 +25,20 @@ function FavoritesPage() {
           <div style={{ width: 44 }} />
         </header>
 
-        <div className="favorites-empty">
-          <div className="empty-icon">
+        <div className="favorites-empty empty-state">
+          <div className="empty-state-icon">
             <Heart size={80} strokeWidth={1.5} color="#E53935" aria-hidden="true" />
           </div>
-          <h2>Sevimlilar bo'sh</h2>
-          <p className="empty-description">
+          <h3 className="empty-state-title">Sevimlilar bo'sh</h3>
+          <p className="empty-state-description">
             Yoqtirgan mahsulotlaringizni saqlash uchun yurak belgisini bosing.
             Keyinroq ularni osongina topishingiz mumkin!
           </p>
-          <button className="primary-btn" onClick={() => navigate('/')}>
+          <button className="btn-primary" onClick={() => navigate('/')}>
             <Home size={20} strokeWidth={2} aria-hidden="true" />
             <span>Bosh sahifaga o'tish</span>
           </button>
-          <button className="secondary-btn" onClick={() => navigate('/stores')}>
+          <button className="btn-secondary" onClick={() => navigate('/stores')}>
             <Sparkles size={20} strokeWidth={2} aria-hidden="true" />
             <span>Yangi mahsulotlar</span>
           </button>

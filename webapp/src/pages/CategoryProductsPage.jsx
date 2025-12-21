@@ -218,15 +218,28 @@ function CategoryProductsPage() {
             </div>
           ))
         ) : filteredOffers.length === 0 ? (
-          <div style={{ gridColumn: '1 / -1', textAlign: 'center', padding: '60px 20px' }}>
-            <div style={{ fontSize: '64px', marginBottom: '16px' }}>📦</div>
-            <h3 style={{ fontSize: '20px', color: '#181725', marginBottom: '8px' }}>Mahsulotlar yo'q</h3>
-            <p style={{ color: '#7C7C7C' }}>
-              {hasActiveFilters
-                ? "Tanlangan filtrlar bo'yicha natija topilmadi"
-                : "Bu kategoriyada hozircha mahsulot yo'q"}
-            </p>
+          <div className="category-empty">
+            <div className="empty-state">
+              <div className="empty-state-icon" aria-hidden="true">
+                <svg width="64" height="64" viewBox="0 0 24 24" fill="none">
+                  <circle cx="11" cy="11" r="7" stroke="currentColor" strokeWidth="1.8" />
+                  <path d="M21 21l-4.2-4.2" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+                </svg>
+              </div>
+              <h3 className="empty-state-title">Mahsulotlar yo'q</h3>
+              <p className="empty-state-description">
+                {hasActiveFilters
+                  ? "Tanlangan filtrlar bo'yicha natija topilmadi"
+                  : "Bu kategoriyada hozircha mahsulot yo'q"}
+              </p>
+              {hasActiveFilters && (
+                <button className="btn-secondary" onClick={clearAllFilters}>
+                  Filtrlarni tozalash
+                </button>
+              )}
+            </div>
           </div>
+
         ) : (
           filteredOffers.map(offer => (
             <OfferCard
@@ -253,3 +266,4 @@ function CategoryProductsPage() {
 }
 
 export default CategoryProductsPage
+

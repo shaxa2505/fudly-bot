@@ -614,9 +614,10 @@ async def pbook_cancel(callback: types.CallbackQuery, state: FSMContext) -> None
                             )
                         text += f"<b>{idx}.</b> {title}\n"
                         if offer.original_price and discount_pct > 0:
-                            text += f"    <s>{int(offer.original_price):,}</s> → <b>{int(offer.discount_price):,}</b> {currency} <i>(-{discount_pct}%)</i>\n"
+                            text += f"    <s>{int(offer.original_price // 100):,}</s> → <b>{int(offer.discount_price // 100):,}</b> {currency} <i>(-{discount_pct}%)</i>\n"
                         else:
-                            text += f"    <b>{int(offer.discount_price or offer.price or 0):,}</b> {currency}\n"
+                            price_kopeks = offer.discount_price or offer.price or 0
+                            text += f"    <b>{int(price_kopeks // 100):,}</b> {currency}\n"
 
                     hint = "👆 Tanlang" if lang == "uz" else "👆 Выберите товар"
                     text += f"\n{hint}"
