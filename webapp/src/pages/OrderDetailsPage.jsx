@@ -117,9 +117,9 @@ export default function OrderDetailsPage() {
         <div className="error-container">
           <div className="error-icon">!</div>
           <p>{error || 'Xatolik yuz berdi'}</p>
-          <button className="back-btn" onClick={() => navigate('/yana')}>
-            <- Orqaga
-          </button>
+            <button className="back-btn" onClick={() => navigate('/yana')}>
+              {'<- Orqaga'}
+            </button>
         </div>
       </div>
     )
