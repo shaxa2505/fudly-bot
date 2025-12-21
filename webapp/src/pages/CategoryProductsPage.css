@@ -197,6 +197,23 @@
   padding: var(--spacing-xl);
 }
 
+.category-empty {
+  grid-column: 1 / -1;
+}
+
+.category-empty .empty-state {
+  padding: var(--spacing-5xl) var(--spacing-xl);
+}
+
+.category-empty .empty-state-icon {
+  color: var(--color-text-muted);
+}
+
+.category-empty .btn-secondary {
+  width: min(100%, 320px);
+  margin-top: var(--spacing-md);
+}
+
 /* Skeleton */
 .skeleton-image {
   width: 100%;

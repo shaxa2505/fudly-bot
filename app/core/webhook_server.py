@@ -1717,6 +1717,25 @@ async def create_webhook_app(
                 )
 
                 if order_type == "delivery":
+                    logger.info(f"📸 Payment proof uploaded for delivery order #{order_id} by user {authenticated_user_id}")
+                    
+                    # SECURITY: user can only upload proof for their own order
+                    try:
+                        order_user_id_int = int(user_id) if user_id is not None else None
+                    except Exception:
+                        order_user_id_int = None
+
+                    if order_user_id_int != authenticated_user_id:
+                        logger.warning(
+                            "🚨 IDOR attempt: user %s tried to upload payment proof for order #%s (owner=%s)",
+                            authenticated_user_id,
+                            order_id,
+                            order_user_id_int,
+                        )
+                        return add_cors_headers(
+                            web.json_response({"error": "Access denied"}, status=403)
+                        )
+                    
                     # Get user info
                     user = db.get_user(user_id) if hasattr(db, "get_user") else None
                     customer_name = ""
@@ -1814,27 +1833,36 @@ async def create_webhook_app(
                         ]
                     )
 
-                    # Send to ADMIN
-                    admin_id = int(os.getenv("ADMIN_ID", "0"))
-                    if admin_id:
+                    # Get all admins from database (like in bot handler)
+                    admin_ids = []
+                    if hasattr(db, "get_all_users"):
+                        all_users = db.get_all_users()
+                        for u in all_users:
+                            role = u.get("role") if isinstance(u, dict) else getattr(u, "role", None)
+                            u_id = u.get("user_id") if isinstance(u, dict) else getattr(u, "user_id", None)
+                            if role == "admin" and u_id:
+                                admin_ids.append(u_id)
+                    
+                    # Fallback to ADMIN_ID from env
+                    if not admin_ids:
+                        admin_id_env = int(os.getenv("ADMIN_ID", "0"))
+                        if admin_id_env:
+                            admin_ids.append(admin_id_env)
+                            logger.info(f"Using ADMIN_ID from env: {admin_id_env}")
+                    
+                    if not admin_ids:
+                        logger.error("❌ No admin users found - cannot send payment proof!")
+                        return add_cors_headers(
+                            web.json_response({"error": "No admin configured"}, status=500)
+                        )
+                    
+                    logger.info(f"📤 Sending payment proof to {len(admin_ids)} admin(s): {admin_ids}")
+                    
+                    # Send to all admins
+                    sent_count = 0
+                    file_id = None
+                    for admin_id in admin_ids:
                         try:
-                            # SECURITY: user can only upload proof for their own order
-                            try:
-                                order_user_id_int = int(user_id) if user_id is not None else None
-                            except Exception:
-                                order_user_id_int = None
-
-                            if order_user_id_int != authenticated_user_id:
-                                logger.warning(
-                                    "IDOR attempt: user %s tried to upload payment proof for order #%s (owner=%s)",
-                                    authenticated_user_id,
-                                    order_id,
-                                    order_user_id_int,
-                                )
-                                return add_cors_headers(
-                                    web.json_response({"error": "Access denied"}, status=403)
-                                )
-
                             sent_msg = await bot.send_photo(
                                 chat_id=admin_id,
                                 photo=photo_file,
@@ -1842,33 +1870,35 @@ async def create_webhook_app(
                                 parse_mode="HTML",
                                 reply_markup=admin_keyboard,
                             )
-                            file_id = sent_msg.photo[-1].file_id
-                            logger.info(
-                                f"Payment proof for delivery order #{order_id} sent to admin {admin_id}"
-                            )
-
-                            # Persist payment proof in DB for audit trail and later access
+                            if not file_id:
+                                file_id = sent_msg.photo[-1].file_id
+                            sent_count += 1
+                            logger.info(f"✅ Payment proof sent to admin {admin_id}")
+                        except Exception as e:
+                            logger.error(f"❌ Failed to send payment proof to admin {admin_id}: {e}")
+                    
+                    if sent_count > 0:
+                        logger.info(f"✅ Payment proof for order #{order_id} sent to {sent_count}/{len(admin_ids)} admins")
+                        
+                        # Persist payment proof in DB for audit trail and later access
+                        if file_id:
                             if hasattr(db, "update_payment_status"):
                                 db.update_payment_status(order_id, "proof_submitted", file_id)
                             elif hasattr(db, "update_order_payment_proof"):
                                 db.update_order_payment_proof(order_id, file_id)
-
-                            return add_cors_headers(
-                                web.json_response(
-                                    {
-                                        "success": True,
-                                        "message": "Payment proof sent to admin for verification",
-                                    }
-                                )
-                            )
-                        except Exception as e:
-                            logger.error(f"Failed to send payment proof to admin: {e}")
-                            return add_cors_headers(
-                                web.json_response({"error": "Failed to send to admin"}, status=500)
-                            )
-                    else:
+                        
                         return add_cors_headers(
-                            web.json_response({"error": "Admin ID not configured"}, status=500)
+                            web.json_response(
+                                {
+                                    "success": True,
+                                    "message": f"Payment proof sent to {sent_count} admin(s) for verification",
+                                }
+                            )
+                        )
+                    else:
+                        logger.error(f"❌ Failed to send payment proof to any admin!")
+                        return add_cors_headers(
+                            web.json_response({"error": "Failed to send to admins"}, status=500)
                         )
 
             # Order not found or not a delivery order

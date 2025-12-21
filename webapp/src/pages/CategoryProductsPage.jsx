@@ -239,7 +239,6 @@ function CategoryProductsPage() {
               )}
             </div>
           </div>
-
         ) : (
           filteredOffers.map(offer => (
             <OfferCard
