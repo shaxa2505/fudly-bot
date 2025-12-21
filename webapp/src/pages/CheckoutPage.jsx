@@ -282,7 +282,7 @@ function CheckoutPage({ user }) {
     <div className="checkout-page">
       <div className="checkout-header">
         <button onClick={() => navigate('/cart')} className="back-button">
-          <- {t('Назад', 'Orqaga')}
+          {'<- '} {t('Назад', 'Orqaga')}
         </button>
         <h1>{t('Оформление заказа', 'Buyurtmani rasmiylashtirish')}</h1>
       </div>
