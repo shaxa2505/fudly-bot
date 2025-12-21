@@ -17,16 +17,16 @@ function YanaPage() {
   // Settings state - load from user profile first, then localStorage
   const [phone, setPhone] = useState(() => {
     const user = getCurrentUser()
-    if (userx.phone) return user.phone
+    if (user?.phone) return user.phone
     // Try Telegram WebApp contact
-    const tgPhone = window.Telegramx.WebAppx.initDataUnsafex.userx.phone_number
+    const tgPhone = window.Telegram?.WebApp?.initDataUnsafe?.user?.phone_number
     if (tgPhone) return tgPhone
     return localStorage.getItem('fudly_phone') || ''
   })
   const [location, setLocation] = useState(() => {
     try {
       const user = getCurrentUser()
-      if (userx.city) return { city: user.city }
+      if (user?.city) return { city: user.city }
       return JSON.parse(localStorage.getItem('fudly_location') || '{}')
     } catch { return {} }
   })
@@ -76,7 +76,7 @@ function YanaPage() {
 
   const saveSettings = () => {
     localStorage.setItem('fudly_phone', phone)
-    window.Telegramx.WebAppx.showAlertx.('Sozlamalar saqlandi!')
+    window.Telegram?.WebApp?.showAlert?.('Sozlamalar saqlandi!')
   }
 
   const getStatusInfo = (status) => {
@@ -125,7 +125,7 @@ function YanaPage() {
           {menuItems.map(item => (
             <button
               key={item.id}
-              className={`yana-menu-item ${activeSection === item.id x 'active' : ''}`}
+              className={`yana-menu-item ${activeSection === item.id ? 'active' : ''}`}
               onClick={() => setActiveSection(item.id)}
             >
               <span className="menu-icon">{item.icon}</span>
@@ -147,7 +147,7 @@ function YanaPage() {
             ].map(filter => (
               <button
                 key={filter.id}
-                className={`filter-chip ${orderFilter === filter.id x 'active' : ''}`}
+                className={`filter-chip ${orderFilter === filter.id ? 'active' : ''}`}
                 onClick={() => setOrderFilter(filter.id)}
               >
                 {filter.label}
@@ -156,12 +156,12 @@ function YanaPage() {
           </div>
 
           {/* Orders List */}
-          {loading x (
+          {loading ? (
             <div className="loading-state">
               <div className="spinner"></div>
               <p>Yuklanmoqda...</p>
             </div>
-          ) : orders.length === 0 x (
+          ) : orders.length === 0 ? (
             <div className="empty-state">
               <div className="empty-icon">IMG</div>
               <h3>Buyurtmalar yo'q</h3>
@@ -188,7 +188,7 @@ function YanaPage() {
 
                     <div className="order-content">
                       <div className="order-image-wrapper">
-                        {order.offer_photo x (
+                        {order.offer_photo ? (
                           <img
                             src={order.offer_photo}
                             alt={order.offer_title}
@@ -208,12 +208,12 @@ function YanaPage() {
                         <div className="order-meta">
                           <span>
                             {order.quantity || 1} x {order.total_price && order.quantity
-                              x Math.round(order.total_price / order.quantity).toLocaleString()
+                              ? Math.round(order.total_price / order.quantity).toLocaleString()
                               : '-'} so'm
                           </span>
                           <span className="order-total">
                             {order.total_price
-                              x Math.round(order.total_price).toLocaleString()
+                              ? Math.round(order.total_price).toLocaleString()
                               : '-'} so'm
                           </span>
                         </div>
@@ -281,7 +281,7 @@ function YanaPage() {
             <div className="setting-item toggle-item">
               <span className="setting-label">Yangi takliflar</span>
               <button
-                className={`toggle ${notifications x 'on' : ''}`}
+                className={`toggle ${notifications ? 'on' : ''}`}
                 onClick={() => setNotifications(!notifications)}
               >
                 <span className="toggle-knob"></span>
@@ -295,9 +295,9 @@ function YanaPage() {
             <button
               className="danger-btn"
               onClick={() => {
-                if (confirm('Savatni tozalashni xohlaysizmix')) {
+                if (confirm('Savatni tozalashni xohlaysizmi?')) {
                   clearCart()
-                  window.Telegramx.WebAppx.showAlertx.('Savat tozalandi')
+                  window.Telegram?.WebApp?.showAlert?.('Savat tozalandi')
                 }
               }}
             >

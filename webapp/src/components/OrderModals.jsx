@@ -13,7 +13,7 @@ export function OrderFailedModal({ onClose, onRetry }) {
         <div className="modal-illustration">
           <div className="illustration-circle error">
             <div className="grocery-bag">
-              🛒🥬🥕🍅
+              ORDER
             </div>
           </div>
         </div>
@@ -45,10 +45,10 @@ export function OrderSuccessModal({ onClose, onTrack }) {
             </svg>
           </div>
           <div className="success-confetti">
-            <span className="confetti" style={{top: '20%', left: '10%'}}>🔴</span>
-            <span className="confetti" style={{top: '30%', right: '15%'}}>🟠</span>
-            <span className="confetti" style={{top: '60%', left: '20%'}}>🔵</span>
-            <span className="confetti" style={{bottom: '20%', right: '10%'}}>🟢</span>
+            <span className="confetti" style={{top: '20%', left: '10%'}}>*</span>
+            <span className="confetti" style={{top: '30%', right: '15%'}}>*</span>
+            <span className="confetti" style={{top: '60%', left: '20%'}}>*</span>
+            <span className="confetti" style={{bottom: '20%', right: '10%'}}>*</span>
             <span className="confetti-line" style={{top: '15%', left: '25%', rotate: '45deg'}}>~</span>
             <span className="confetti-line" style={{top: '25%', right: '20%', rotate: '-45deg'}}>~</span>
           </div>
@@ -97,7 +97,7 @@ export function CheckoutModal({ onClose, onPlaceOrder, totalCost, loading }) {
           <div className="checkout-row">
             <span className="checkout-label">To'lov</span>
             <button className="checkout-value">
-              <span className="payment-icon">💳</span>
+              <span className="payment-icon">CARD</span>
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
                 <path d="M9 18l6-6-6-6" stroke="#181725" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
               </svg>
@@ -137,7 +137,7 @@ export function CheckoutModal({ onClose, onPlaceOrder, totalCost, loading }) {
             disabled={loading}
             style={{ opacity: loading ? 0.7 : 1, cursor: loading ? 'wait' : 'pointer' }}
           >
-            {loading ? '⏳ Yuklanmoqda...' : 'Buyurtma Berish'}
+            {loading ? 'Yuklanmoqda...' : 'Buyurtma Berish'}
           </button>
         </div>
       </div>
