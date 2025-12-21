@@ -277,12 +277,12 @@ function CartPage({ user }) {
   const handleClickPayment = async () => {
     // Check if Click is available
     const isClickAvailable = paymentProviders.includes('click');
-    
+
     if (!isClickAvailable) {
       toast.error('Click to\'lov vaqtincha mavjud emas. Boshqa to\'lov usulini tanlang.');
       return;
     }
-    
+
     setOrderLoading(true)
     try {
       const userId = window.Telegram?.WebApp?.initDataUnsafe?.user?.id || user?.id || 1
@@ -354,11 +354,11 @@ function CartPage({ user }) {
             Mahsulotlarni ko'rish va savatga qo'shish uchun bosh sahifaga o'ting.
             Eng yaxshi takliflarni o'tkazib yubormang!
           </p>
-          <button className="primary-btn" onClick={() => navigate('/')}>
+          <button className="btn-primary" onClick={() => navigate('/')}>
             <Home size={20} strokeWidth={2} aria-hidden="true" />
             <span>Bosh sahifaga o'tish</span>
           </button>
-          <button className="secondary-btn" onClick={() => navigate('/stores')}>
+          <button className="btn-secondary" onClick={() => navigate('/stores')}>
             <Sparkles size={20} strokeWidth={2} aria-hidden="true" />
             <span>Do'konlarni ko'rish</span>
           </button>
@@ -454,7 +454,7 @@ function CartPage({ user }) {
         </div>
       </div>
 
-      <button className="checkout-btn" onClick={handleCheckout}>
+      <button className="btn-primary checkout-btn" onClick={handleCheckout}>
         Buyurtma berish →
       </button>
 
@@ -858,13 +858,13 @@ function CartPage({ user }) {
 
                 {orderResult.awaitingPayment ? (
                   <>
-                    <button className="primary-btn" onClick={() => {
+                    <button className="btn-primary" onClick={() => {
                       setOrderResult(null)
                       navigate('/profile')
                     }}>
                       📦 Buyurtmalarimga o'tish
                     </button>
-                    <button className="secondary-btn" onClick={() => {
+                    <button className="btn-secondary" onClick={() => {
                       setOrderResult(null)
                       navigate('/')
                     }}>
@@ -872,7 +872,7 @@ function CartPage({ user }) {
                     </button>
                   </>
                 ) : (
-                  <button className="primary-btn" onClick={() => {
+                  <button className="btn-primary" onClick={() => {
                     setOrderResult(null)
                     navigate('/')
                   }}>
@@ -885,7 +885,7 @@ function CartPage({ user }) {
                 <div className="result-icon error">❌</div>
                 <h2>Xatolik yuz berdi</h2>
                 <p>{orderResult.error || 'Iltimos, qaytadan urinib ko\'ring'}</p>
-                <button className="primary-btn" onClick={() => setOrderResult(null)}>
+                <button className="btn-primary" onClick={() => setOrderResult(null)}>
                   Yopish
                 </button>
               </>

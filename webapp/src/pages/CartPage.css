@@ -74,28 +74,6 @@
   max-width: 280px;
 }
 
-.primary-btn {
-  padding: var(--spacing-lg) var(--spacing-4xl);
-  background: var(--gradient-primary);
-  color: var(--color-text-inverse);
-  border: none;
-  border-radius: var(--radius-pill);
-  font-size: var(--font-md);
-  font-weight: var(--font-semibold);
-  cursor: pointer;
-  box-shadow: var(--shadow-button);
-  transition: all 0.2s ease;
-}
-
-.primary-btn:active {
-  transform: scale(0.95);
-  box-shadow: var(--shadow-primary);
-}
-
-.primary-btn:focus-visible {
-  outline: 3px solid var(--color-primary-dark);
-  outline-offset: 2px;
-}
 
 /* Cart Loading */
 .cart-loading {
@@ -275,18 +253,9 @@
 /* Checkout Button */
 .checkout-btn {
   position: fixed;
-  bottom: 80px;
+  bottom: calc(var(--bottom-nav-height, 70px) + var(--spacing-md));
   left: var(--spacing-lg);
   right: var(--spacing-lg);
-  padding: var(--spacing-lg);
-  background: var(--color-primary);
-  color: var(--color-text-inverse);
-  border: none;
-  border-radius: var(--radius-xl);
-  font-size: var(--font-lg);
-  font-weight: var(--font-semibold);
-  cursor: pointer;
-  box-shadow: var(--shadow-primary);
   z-index: var(--z-sticky);
 }
 
@@ -295,7 +264,7 @@
 }
 
 .checkout-btn:focus-visible {
-  outline: 3px solid #16A34A;
+  outline: 3px solid var(--color-primary-light);
   outline-offset: 2px;
 }
 

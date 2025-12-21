@@ -15,7 +15,6 @@ from app.core.metrics import metrics as app_metrics
 from app.core.notifications import get_notification_service
 from app.core.websocket import get_websocket_manager, setup_websocket_routes
 from app.integrations.payment_service import get_payment_service
-from app.services.unified_order_service import get_unified_order_service, OrderItem
 from logging_config import logger
 
 # =============================================================================
@@ -453,7 +452,7 @@ async def create_webhook_app(
         environment = os.getenv("ENVIRONMENT", "production").lower()
         if environment not in ("development", "dev", "local", "test"):
             return web.json_response({"error": "Not available"}, status=404)
-            
+
         try:
             info = {
                 "db_type": type(db).__name__,
@@ -569,10 +568,8 @@ async def create_webhook_app(
         try:
             from app.services.unified_order_service import (
                 OrderItem as UnifiedOrderItem,
-            )
-            from app.services.unified_order_service import (
-                PaymentStatus,
                 OrderResult,
+                PaymentStatus,
                 get_unified_order_service,
             )
 
@@ -704,8 +701,12 @@ async def create_webhook_app(
                             card = db.get_payment_card(store_id)
                             if card:
                                 payment_card_info = {
-                                    "card_number": card.get("card_number") if isinstance(card, dict) else None,
-                                    "card_holder": card.get("card_holder") if isinstance(card, dict) else None,
+                                    "card_number": card.get("card_number")
+                                    if isinstance(card, dict)
+                                    else None,
+                                    "card_holder": card.get("card_holder")
+                                    if isinstance(card, dict)
+                                    else None,
                                     "payment_instructions": card.get("payment_instructions")
                                     if isinstance(card, dict)
                                     else None,
@@ -730,7 +731,12 @@ async def create_webhook_app(
                     return add_cors_headers(web.json_response(response, status=201))
 
             # Fallback: create an order row directly (no new bookings for Mini App)
-            if not created_bookings and not failed_items and order_items and hasattr(db, "create_cart_order"):
+            if (
+                not created_bookings
+                and not failed_items
+                and order_items
+                and hasattr(db, "create_cart_order")
+            ):
                 payment_method = data.get("payment_method")
                 if not payment_method:
                     payment_method = "card" if is_delivery else "cash"
@@ -757,11 +763,11 @@ async def create_webhook_app(
                         failed_items.append({"error": "Order service not available"})
                         return add_cors_headers(
                             web.json_response(
-                                {"success": False, "error": "Order service not available"}, 
-                                status=500
+                                {"success": False, "error": "Order service not available"},
+                                status=500,
                             )
                         )
-                    
+
                     # Convert db_items to OrderItem format
                     order_items_list = [
                         OrderItem(
@@ -777,7 +783,7 @@ async def create_webhook_app(
                         )
                         for item in db_items
                     ]
-                    
+
                     result = await order_service.create_order(
                         user_id=int(user_id),
                         items=order_items_list,
@@ -787,22 +793,32 @@ async def create_webhook_app(
                         notify_customer=True,
                         notify_sellers=True,
                     )
-                    
+
                     if result.success and result.order_ids:
                         # Map result to expected format
                         for idx, order_id in enumerate(result.order_ids):
-                            created_bookings.append({
-                                "booking_id": order_id,
-                                "booking_code": result.pickup_codes[idx] if result.pickup_codes and idx < len(result.pickup_codes) else None,
-                                "offer_id": order_items_list[0].offer_id if order_items_list else None,
-                                "quantity": result.total_items,
-                                "items_count": len(order_items_list),
-                            })
+                            created_bookings.append(
+                                {
+                                    "booking_id": order_id,
+                                    "booking_code": result.pickup_codes[idx]
+                                    if result.pickup_codes and idx < len(result.pickup_codes)
+                                    else None,
+                                    "offer_id": order_items_list[0].offer_id
+                                    if order_items_list
+                                    else None,
+                                    "quantity": result.total_items,
+                                    "items_count": len(order_items_list),
+                                }
+                            )
                     else:
-                        failed_items.append({"error": result.error_message or "Failed to create order"})
-                        
+                        failed_items.append(
+                            {"error": result.error_message or "Failed to create order"}
+                        )
+
                 except Exception as e:
-                    logger.error(f"Error creating order via UnifiedOrderService: {e}", exc_info=True)
+                    logger.error(
+                        f"Error creating order via UnifiedOrderService: {e}", exc_info=True
+                    )
                     failed_items.append({"error": str(e)})
 
             # Return result
@@ -892,7 +908,9 @@ async def create_webhook_app(
                 if not order_id:
                     continue
 
-                order_type = r.get("order_type") or ("delivery" if r.get("delivery_address") else "pickup")
+                order_type = r.get("order_type") or (
+                    "delivery" if r.get("delivery_address") else "pickup"
+                )
                 order_status = r.get("order_status") or "pending"
 
                 payment_method = r.get("payment_method") or "cash"
@@ -976,7 +994,9 @@ async def create_webhook_app(
                         "total_price": total_price,
                         "quantity": qty_total,
                         "created_at": str(r.get("created_at") or ""),
-                        "updated_at": str(r.get("updated_at") or "") if r.get("updated_at") else None,
+                        "updated_at": str(r.get("updated_at") or "")
+                        if r.get("updated_at")
+                        else None,
                         "store_id": r.get("store_id"),
                         "store_name": r.get("store_name"),
                         "store_address": r.get("store_address"),
@@ -1059,7 +1079,9 @@ async def create_webhook_app(
 
             order_id_str = request.match_info.get("order_id")
             if not order_id_str:
-                return add_cors_headers(web.json_response({"error": "order_id required"}, status=400))
+                return add_cors_headers(
+                    web.json_response({"error": "order_id required"}, status=400)
+                )
 
             order_id = int(order_id_str)
 
@@ -1096,8 +1118,12 @@ async def create_webhook_app(
                         f"/api/v1/photo/{quote(str(photo_id), safe='')}" if photo_id else None
                     )
 
-                    store_id = int(booking.get("store_id") or get_offer_value(offer, "store_id", 0) or 0)
-                    store = db.get_store(store_id) if store_id and hasattr(db, "get_store") else None
+                    store_id = int(
+                        booking.get("store_id") or get_offer_value(offer, "store_id", 0) or 0
+                    )
+                    store = (
+                        db.get_store(store_id) if store_id and hasattr(db, "get_store") else None
+                    )
 
                     qr_code = None
                     if booking_code and status in ("preparing", "confirmed", "ready"):
@@ -1121,11 +1147,19 @@ async def create_webhook_app(
                                 "quantity": quantity,
                                 "total_price": float(total_price),
                                 "store_id": store_id,
-                                "store_name": get_offer_value(store, "name", "Магазин") if store else "Магазин",
-                                "store_address": get_offer_value(store, "address") if store else None,
+                                "store_name": get_offer_value(store, "name", "Магазин")
+                                if store
+                                else "Магазин",
+                                "store_address": get_offer_value(store, "address")
+                                if store
+                                else None,
                                 "store_phone": get_offer_value(store, "phone") if store else None,
-                                "pickup_time": str(booking.get("pickup_time")) if booking.get("pickup_time") else None,
-                                "pickup_address": get_offer_value(store, "address") if store else None,
+                                "pickup_time": str(booking.get("pickup_time"))
+                                if booking.get("pickup_time")
+                                else None,
+                                "pickup_address": get_offer_value(store, "address")
+                                if store
+                                else None,
                                 "delivery_address": None,
                                 "delivery_cost": None,
                                 "qr_code": qr_code,
@@ -1176,15 +1210,15 @@ async def create_webhook_app(
                     offer_title = cart_items[0].get("title") or "Заказ"
                     qty_total = sum(int(it.get("quantity") or 1) for it in cart_items)
                     items_total = sum(
-                        int(it.get("price") or 0) * int(it.get("quantity") or 1) for it in cart_items
+                        int(it.get("price") or 0) * int(it.get("quantity") or 1)
+                        for it in cart_items
                     )
 
                     first_offer_id = cart_items[0].get("offer_id")
                     if first_offer_id and hasattr(db, "get_offer"):
                         offer = db.get_offer(int(first_offer_id))
                         photo_id = (
-                            get_offer_value(offer, "photo")
-                            or get_offer_value(offer, "photo_id")
+                            get_offer_value(offer, "photo") or get_offer_value(offer, "photo_id")
                             if offer
                             else None
                         )
@@ -1213,7 +1247,11 @@ async def create_webhook_app(
 
             pickup_code = order_dict.get("pickup_code") or ""
             qr_code = None
-            if order_type == "pickup" and pickup_code and order_status in ("preparing", "confirmed", "ready"):
+            if (
+                order_type == "pickup"
+                and pickup_code
+                and order_status in ("preparing", "confirmed", "ready")
+            ):
                 try:
                     from app.api.orders import generate_qr_code
 
@@ -1259,7 +1297,9 @@ async def create_webhook_app(
 
             order_id_str = request.match_info.get("order_id")
             if not order_id_str:
-                return add_cors_headers(web.json_response({"error": "order_id required"}, status=400))
+                return add_cors_headers(
+                    web.json_response({"error": "order_id required"}, status=400)
+                )
 
             order_id = int(order_id_str)
             order = db.get_order(order_id) if hasattr(db, "get_order") else None
@@ -1276,7 +1316,9 @@ async def create_webhook_app(
                     created_at = str(booking.get("created_at") or "")
                     updated_at = created_at
 
-                    timeline = [{"status": "pending", "timestamp": created_at, "message": "Заказ создан"}]
+                    timeline = [
+                        {"status": "pending", "timestamp": created_at, "message": "Заказ создан"}
+                    ]
                     if status in ("preparing", "confirmed", "ready", "completed"):
                         timeline.append(
                             {
@@ -1397,13 +1439,21 @@ async def create_webhook_app(
                     if hasattr(updated_dt, "isoformat"):
                         confirmed_time = updated_dt
                     else:
-                        confirmed_time = datetime.fromisoformat(str(updated_at).replace("Z", "+00:00"))
+                        confirmed_time = datetime.fromisoformat(
+                            str(updated_at).replace("Z", "+00:00")
+                        )
 
                     estimated_ready_dt = confirmed_time + timedelta(minutes=25)
-                    now = datetime.now(confirmed_time.tzinfo) if confirmed_time.tzinfo else datetime.now()
+                    now = (
+                        datetime.now(confirmed_time.tzinfo)
+                        if confirmed_time.tzinfo
+                        else datetime.now()
+                    )
                     if estimated_ready_dt > now:
                         minutes_left = int((estimated_ready_dt - now).total_seconds() / 60)
-                        estimated_ready = f"через {minutes_left} мин" if minutes_left > 0 else "скоро готов"
+                        estimated_ready = (
+                            f"через {minutes_left} мин" if minutes_left > 0 else "скоро готов"
+                        )
                     else:
                         estimated_ready = "скоро готов"
                 except Exception:
@@ -1434,7 +1484,9 @@ async def create_webhook_app(
 
             order_id_str = request.match_info.get("order_id")
             if not order_id_str:
-                return add_cors_headers(web.json_response({"error": "order_id required"}, status=400))
+                return add_cors_headers(
+                    web.json_response({"error": "order_id required"}, status=400)
+                )
 
             order_id = int(order_id_str)
             order = db.get_order(order_id) if hasattr(db, "get_order") else None
@@ -1452,7 +1504,9 @@ async def create_webhook_app(
 
                     if status not in ("preparing", "confirmed", "ready"):
                         return add_cors_headers(
-                            web.json_response({"error": "QR not available for this status"}, status=400)
+                            web.json_response(
+                                {"error": "QR not available for this status"}, status=400
+                            )
                         )
                     if not booking_code:
                         return add_cors_headers(
@@ -1488,7 +1542,9 @@ async def create_webhook_app(
 
             if order_type != "pickup":
                 return add_cors_headers(
-                    web.json_response({"error": "QR is only available for pickup orders"}, status=400)
+                    web.json_response(
+                        {"error": "QR is only available for pickup orders"}, status=400
+                    )
                 )
 
             if status not in ("preparing", "confirmed", "ready"):
@@ -1497,7 +1553,9 @@ async def create_webhook_app(
                 )
 
             if not pickup_code:
-                return add_cors_headers(web.json_response({"error": "pickup_code missing"}, status=400))
+                return add_cors_headers(
+                    web.json_response({"error": "pickup_code missing"}, status=400)
+                )
 
             from app.api.orders import generate_qr_code
 
@@ -1686,8 +1744,6 @@ async def create_webhook_app(
                     admin_msg += "\n⚠️ <b>ПРОВЕРЬТЕ ЧЕК И ПОДТВЕРДИТЕ ОПЛАТУ</b>"
 
                     # Buttons for admin
-                    from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
-
                     admin_keyboard = InlineKeyboardMarkup(
                         inline_keyboard=[
                             [

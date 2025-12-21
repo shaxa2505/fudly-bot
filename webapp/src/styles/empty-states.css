@@ -71,8 +71,11 @@
 
 /* Primary CTA */
 .empty-state .primary-btn,
+.empty-state .btn-primary,
 .empty-cart .primary-btn,
+.empty-cart .btn-primary,
 .favorites-empty .primary-btn,
+.favorites-empty .btn-primary,
 .empty-orders .cta-btn {
   display: flex;
   align-items: center;
@@ -92,8 +95,11 @@
 }
 
 .empty-state .primary-btn:hover,
+.empty-state .btn-primary:hover,
 .empty-cart .primary-btn:hover,
+.empty-cart .btn-primary:hover,
 .favorites-empty .primary-btn:hover,
+.favorites-empty .btn-primary:hover,
 .empty-orders .cta-btn:hover {
   background: #45A166;
   transform: translateY(-2px);
@@ -101,16 +107,22 @@
 }
 
 .empty-state .primary-btn:active,
+.empty-state .btn-primary:active,
 .empty-cart .primary-btn:active,
+.empty-cart .btn-primary:active,
 .favorites-empty .primary-btn:active,
+.favorites-empty .btn-primary:active,
 .empty-orders .cta-btn:active {
   transform: translateY(0);
 }
 
 /* Secondary action */
 .empty-state .secondary-btn,
+.empty-state .btn-secondary,
 .empty-cart .secondary-btn,
+.empty-cart .btn-secondary,
 .favorites-empty .secondary-btn,
+.favorites-empty .btn-secondary,
 .empty-orders .secondary-btn {
   display: flex;
   align-items: center;
@@ -130,8 +142,11 @@
 }
 
 .empty-state .secondary-btn:hover,
+.empty-state .btn-secondary:hover,
 .empty-cart .secondary-btn:hover,
+.empty-cart .btn-secondary:hover,
 .favorites-empty .secondary-btn:hover,
+.favorites-empty .btn-secondary:hover,
 .empty-orders .secondary-btn:hover {
   background: var(--color-primary-bg, rgba(83, 177, 117, 0.1));
   transform: translateY(-2px);
