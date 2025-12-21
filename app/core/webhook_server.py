@@ -1697,6 +1697,9 @@ async def create_webhook_app(
             order = None
             if hasattr(db, "get_order"):
                 order = db.get_order(order_id)
+                logger.info(f"📦 Order lookup for #{order_id}: found={order is not None}")
+            else:
+                logger.warning(f"⚠️ Database doesn't have get_order method!")
 
             if order:
                 # 🔴 DELIVERY ORDER - Send to ADMIN for confirmation
@@ -1715,6 +1718,8 @@ async def create_webhook_app(
                     if isinstance(order, dict)
                     else getattr(order, "delivery_address", None)
                 )
+                
+                logger.info(f"📋 Order #{order_id} details: type={order_type}, user_id={user_id}, delivery={delivery_address is not None}")
 
                 if order_type == "delivery":
                     logger.info(f"📸 Payment proof uploaded for delivery order #{order_id} by user {authenticated_user_id}")
@@ -1900,11 +1905,16 @@ async def create_webhook_app(
                         return add_cors_headers(
                             web.json_response({"error": "Failed to send to admins"}, status=500)
                         )
-
-            # Order not found or not a delivery order
-            return add_cors_headers(
-                web.json_response({"error": "Order not found or invalid order type"}, status=404)
-            )
+                else:
+                    logger.warning(f"⚠️ Order #{order_id} is not delivery type: {order_type}")
+                    return add_cors_headers(
+                        web.json_response({"error": f"Order type is '{order_type}', not 'delivery'"}, status=400)
+                    )
+            else:
+                logger.error(f"❌ Order #{order_id} not found in database!")
+                return add_cors_headers(
+                    web.json_response({"error": "Order not found"}, status=404)
+                )
 
         except Exception as e:
             logger.error(f"API upload payment proof error: {e}")
