@@ -524,65 +524,67 @@ function HomePage() {
 
       {/* Unified Filter Bar */}
       <div className="filter-bar">
-        {/* Categories Scroll */}
-        <div className="filter-scroll">
-          {CATEGORIES.map(cat => {
-            const IconComponent = cat.icon
-            return (
-              <button
-                key={cat.id}
-                className={`filter-pill ${selectedCategory === cat.id ? 'active' : ''}`}
-                onClick={() => {
-                  window.Telegram?.WebApp?.HapticFeedback?.impactOccurred?.('light')
-                  setSelectedCategory(cat.id)
-                }}
-                style={{ '--pill-color': cat.color }}
-              >
-                <IconComponent
-                  size={18}
-                  strokeWidth={2}
-                  className="filter-pill-icon"
-                  aria-hidden="true"
-                />
-                <span className="filter-pill-text">{cat.name}</span>
-              </button>
-            )
-          })}
+        <div className="filter-row">
+          {/* Categories Scroll */}
+          <div className="filter-scroll">
+            {CATEGORIES.map(cat => {
+              const IconComponent = cat.icon
+              return (
+                <button
+                  key={cat.id}
+                  className={`filter-pill ${selectedCategory === cat.id ? 'active' : ''}`}
+                  onClick={() => {
+                    window.Telegram?.WebApp?.HapticFeedback?.impactOccurred?.('light')
+                    setSelectedCategory(cat.id)
+                  }}
+                  style={{ '--pill-color': cat.color }}
+                >
+                  <IconComponent
+                    size={18}
+                    strokeWidth={2}
+                    className="filter-pill-icon"
+                    aria-hidden="true"
+                  />
+                  <span className="filter-pill-text">{cat.name}</span>
+                </button>
+              )
+            })}
 
-          {/* Divider */}
-          <div className="filter-divider" />
+            {/* Divider */}
+            <div className="filter-divider" />
 
-          {/* Discount Filters */}
-          <button
-            className={`filter-pill discount ${minDiscount === 20 ? 'active' : ''}`}
-            onClick={() => {
-              window.Telegram?.WebApp?.HapticFeedback?.selectionChanged?.()
-              setMinDiscount(minDiscount === 20 ? null : 20)
-            }}
-          >
-            <span className="filter-pill-icon">%</span>
-            <span className="filter-pill-text">20%+</span>
-          </button>
-          <button
-            className={`filter-pill discount ${minDiscount === 30 ? 'active' : ''}`}
-            onClick={() => {
-              window.Telegram?.WebApp?.HapticFeedback?.selectionChanged?.()
-              setMinDiscount(minDiscount === 30 ? null : 30)
-            }}
-          >
-            <span className="filter-pill-icon">%</span>
-            <span className="filter-pill-text">30%+</span>
-          </button>
-          <button
-            className={`filter-pill discount ${minDiscount === 50 ? 'active' : ''}`}
-            onClick={() => {
-              window.Telegram?.WebApp?.HapticFeedback?.selectionChanged?.()
-              setMinDiscount(minDiscount === 50 ? null : 50)
-            }}
-          >
-            <span className="filter-pill-icon">%</span>
-            <span className="filter-pill-text">50%+</span>
-          </button>
+            {/* Discount Filters */}
+            <button
+              className={`filter-pill discount ${minDiscount === 20 ? 'active' : ''}`}
+              onClick={() => {
+                window.Telegram?.WebApp?.HapticFeedback?.selectionChanged?.()
+                setMinDiscount(minDiscount === 20 ? null : 20)
+              }}
+            >
+              <span className="filter-pill-icon">%</span>
+              <span className="filter-pill-text">20%+</span>
+            </button>
+            <button
+              className={`filter-pill discount ${minDiscount === 30 ? 'active' : ''}`}
+              onClick={() => {
+                window.Telegram?.WebApp?.HapticFeedback?.selectionChanged?.()
+                setMinDiscount(minDiscount === 30 ? null : 30)
+              }}
+            >
+              <span className="filter-pill-icon">%</span>
+              <span className="filter-pill-text">30%+</span>
+            </button>
+            <button
+              className={`filter-pill discount ${minDiscount === 50 ? 'active' : ''}`}
+              onClick={() => {
+                window.Telegram?.WebApp?.HapticFeedback?.selectionChanged?.()
+                setMinDiscount(minDiscount === 50 ? null : 50)
+              }}
+            >
+              <span className="filter-pill-icon">%</span>
+              <span className="filter-pill-text">50%+</span>
+            </button>
+          </div>
         </div>
 
         {/* Sort Button */}

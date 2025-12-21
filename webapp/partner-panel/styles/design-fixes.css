@@ -591,11 +591,11 @@ input[type="checkbox"]:hover {
    FILTERS BAR - v22.0
    ================================================ */
 .filters-bar {
-    background: white;
+    background: var(--card);
     border: 1px solid var(--border);
-    border-radius: 16px;
-    padding: 16px;
-    margin-bottom: 16px;
+    border-radius: 12px;
+    padding: 12px;
+    margin-bottom: 12px;
 }
 
 .filters-group {
@@ -612,8 +612,8 @@ input[type="checkbox"]:hover {
     padding: 0 16px;
     background: var(--bg-secondary);
     border: 1px solid var(--border);
-    border-radius: 12px;
-    font-size: 15px;
+    border-radius: 10px;
+    font-size: 14px;
     color: var(--text);
     font-family: inherit;
     cursor: pointer;
@@ -637,7 +637,7 @@ input[type="checkbox"]:hover {
     padding: 0;
     background: var(--bg-secondary);
     border: 1px solid var(--border);
-    border-radius: 12px;
+    border-radius: 10px;
     display: flex;
     align-items: center;
     justify-content: center;

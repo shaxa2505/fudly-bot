@@ -61,15 +61,15 @@
 
 /* Smart Insights */
 .smart-insight {
-    background: var(--warning-light);
-    border-left: 3px solid var(--warning);
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border);
     padding: var(--space-3) var(--space-4);
     border-radius: var(--radius-sm);
     margin-top: var(--space-3);
     display: flex;
     align-items: center;
     gap: var(--space-3);
-    animation: slideInRight 0.5s ease-out;
+    animation: none;
 }
 
 @keyframes slideInRight {
@@ -84,13 +84,13 @@
 }
 
 .smart-insight.success {
-    background: var(--success-light);
-    border-left-color: var(--success);
+    background: var(--bg-tertiary);
+    border-color: var(--border);
 }
 
 .smart-insight.warning {
-    background: var(--danger-light);
-    border-left-color: var(--danger);
+    background: var(--bg-tertiary);
+    border-color: var(--border);
 }
 
 .smart-insight-icon {
@@ -242,9 +242,9 @@
 }
 
 .urgent-order {
-    background: #FFF7F7;
-    border: 1px solid var(--danger-light);
-    border-left: 4px solid var(--danger);
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--primary);
     border-radius: var(--radius-lg);
     padding: var(--space-4);
     margin-bottom: var(--space-3);
@@ -270,17 +270,17 @@
 }
 
 .urgent-title {
-    font-size: 15px;
-    font-weight: 700;
-    color: var(--danger-dark);
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text);
     margin: 0;
 }
 
 .urgent-badge {
-    background: #D32F2F;
-    color: white;
+    background: var(--gray-100);
+    color: var(--text-secondary);
     font-size: 11px;
-    font-weight: 700;
+    font-weight: 600;
     padding: 4px 8px;
     border-radius: 6px;
 }
