@@ -42,8 +42,8 @@
 
   /* Background Colors */
   --color-bg-primary: #FFFFFF;
-  --color-bg-secondary: #FAFAFA;
-  --color-bg-tertiary: #F7F8F7;
+  --color-bg-secondary: #F6F4F0;
+  --color-bg-tertiary: #EFEDEA;
   --color-bg-card: #FFFFFF;
   --color-bg-input: #FAFAFA;
   --color-bg-overlay: rgba(0, 0, 0, 0.5);
@@ -55,14 +55,14 @@
   --gradient-accent: linear-gradient(135deg, #FF6B35 0%, #E55A2B 100%);
 
   /* Border Colors */
-  --color-border: #E5E5E5;
-  --color-border-light: #F2F3F2;
+  --color-border: #E6E2DA;
+  --color-border-light: #F1EDE6;
   --color-border-focus: var(--color-primary);
 
   /* ===== TYPOGRAPHY ===== */
 
   /* Font Family */
-  --font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+  --font-family: 'Manrope', 'Segoe UI', system-ui, sans-serif;
 
   /* Font Sizes (1.25 ratio type scale) */
   --font-2xs: 10px;
@@ -122,9 +122,9 @@
   --shadow-xl: 0 6px 24px rgba(0, 0, 0, 0.12);
   --shadow-primary: 0 4px 16px rgba(83, 177, 117, 0.3);
   --shadow-accent: 0 4px 16px rgba(255, 107, 53, 0.4);
-  --shadow-card: 0 2px 12px rgba(0, 0, 0, 0.04);
-  --shadow-header: 0 2px 12px rgba(0, 0, 0, 0.04);
-  --shadow-button: 0 6px 24px rgba(83, 177, 117, 0.4);
+  --shadow-card: 0 6px 16px rgba(15, 23, 42, 0.08);
+  --shadow-header: 0 8px 20px rgba(15, 23, 42, 0.06);
+  --shadow-button: 0 10px 24px rgba(255, 107, 53, 0.35);
 
   /* ===== TRANSITIONS ===== */
 
@@ -143,7 +143,7 @@
 
   /* ===== LAYOUT ===== */
 
-  --bottom-nav-height: 70px;
+  --bottom-nav-height: 64px;
   --header-height: 60px;
   --safe-area-bottom: env(safe-area-inset-bottom, 20px);
   --container-padding: 20px;

@@ -113,6 +113,26 @@ def validate_telegram_webapp_data(init_data: str, bot_token: str) -> dict[str, A
         return None
 
 
+def _require_valid_init_data(init_data: str | None) -> dict[str, Any]:
+    if not init_data:
+        raise HTTPException(status_code=401, detail="Authentication required")
+    validated_data = validate_telegram_webapp_data(init_data, settings.telegram_bot_token)
+    if not validated_data or "user" not in validated_data:
+        raise HTTPException(status_code=401, detail="Invalid authentication data")
+    return validated_data
+
+
+def _ensure_self_access(authenticated_user_id: int, target_user_id: int, scope: str) -> None:
+    if authenticated_user_id != target_user_id:
+        logger.warning(
+            "IDOR attempt: user %s tried to access %s of user %s",
+            authenticated_user_id,
+            scope,
+            target_user_id,
+        )
+        raise HTTPException(status_code=403, detail="Access denied")
+
+
 @router.post("/auth/validate", response_model=UserProfile)
 async def validate_auth(request: AuthRequest, db=Depends(get_db)) -> UserProfile:
     """
@@ -175,24 +195,11 @@ async def get_profile(
     db=Depends(get_db),
 ) -> UserProfile:
     """Get user profile by ID. Requires authentication - user can only access their own profile."""
-    # Validate authentication
-    if not x_telegram_init_data:
-        raise HTTPException(status_code=401, detail="Authentication required")
-
-    validated_data = validate_telegram_webapp_data(
-        x_telegram_init_data, settings.telegram_bot_token
-    )
-
-    if not validated_data or "user" not in validated_data:
-        raise HTTPException(status_code=401, detail="Invalid authentication data")
+    validated_data = _require_valid_init_data(x_telegram_init_data)
 
     # SECURITY: User can only access their own profile (prevent IDOR)
     authenticated_user_id = validated_data["user"]["id"]
-    if authenticated_user_id != user_id:
-        logger.warning(
-            f"IDOR attempt: user {authenticated_user_id} tried to access profile of user {user_id}"
-        )
-        raise HTTPException(status_code=403, detail="Access denied")
+    _ensure_self_access(authenticated_user_id, user_id, "profile")
 
     user = db.get_user_model(user_id)
 
@@ -259,24 +266,11 @@ async def get_user_orders(
         status: Filter by status (pending, confirmed, completed, cancelled)
         limit: Maximum number of orders to return
     """
-    # Validate authentication
-    if not x_telegram_init_data:
-        raise HTTPException(status_code=401, detail="Authentication required")
-
-    validated_data = validate_telegram_webapp_data(
-        x_telegram_init_data, settings.telegram_bot_token
-    )
-
-    if not validated_data or "user" not in validated_data:
-        raise HTTPException(status_code=401, detail="Invalid authentication data")
+    validated_data = _require_valid_init_data(x_telegram_init_data)
 
     # SECURITY: User can only access their own orders (prevent IDOR)
     authenticated_user_id = validated_data["user"]["id"]
-    if authenticated_user_id != user_id:
-        logger.warning(
-            f"IDOR attempt: user {authenticated_user_id} tried to access orders of user {user_id}"
-        )
-        raise HTTPException(status_code=403, detail="Access denied")
+    _ensure_self_access(authenticated_user_id, user_id, "orders")
     try:
         # Get all bookings
         if status:

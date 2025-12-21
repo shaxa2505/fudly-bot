@@ -147,6 +147,29 @@ async def _after_phone_saved(
     )
 
 
+async def _save_phone(
+    message: types.Message,
+    db: DatabaseProtocol,
+    lang: str,
+    raw_phone: str | None,
+    error_text: str,
+) -> str | None:
+    if not raw_phone:
+        await message.answer("System error")
+        return None
+
+    phone = sanitize_phone(raw_phone)
+    if not validator.validate_phone(phone):
+        await message.answer(
+            error_text,
+            reply_markup=phone_request_keyboard(lang),
+        )
+        return None
+
+    db.update_user_phone(message.from_user.id, phone)
+    return phone
+
+
 @router.message(Registration.phone, F.contact)
 async def process_phone(message: types.Message, state: FSMContext, db: DatabaseProtocol):
     """Process phone number - save and continue (order or city selection)."""
@@ -155,18 +178,16 @@ async def process_phone(message: types.Message, state: FSMContext, db: DatabaseP
         return
 
     lang = db.get_user_language(message.from_user.id)
-    phone = message.contact.phone_number
-
-    if not validator.validate_phone(phone):
-        await message.answer(
-            "❌ Неверный формат номера. Используйте кнопку ниже."
-            if lang == "ru"
-            else "❌ Telefon raqami noto'g'ri. Quyidagi tugmadan foydalaning.",
-            reply_markup=phone_request_keyboard(lang),
-        )
+    phone = await _save_phone(
+        message,
+        db,
+        lang,
+        message.contact.phone_number,
+        get_text(lang, "error_invalid_number"),
+    )
+    if not phone:
         return
 
-    db.update_user_phone(message.from_user.id, phone)
     await _after_phone_saved(message, state, db, lang)
 
 
@@ -180,17 +201,19 @@ async def process_phone_text(message: types.Message, state: FSMContext, db: Data
         return
 
     lang = db.get_user_language(message.from_user.id)
-    phone = sanitize_phone(message.text)
-
-    if not validator.validate_phone(phone):
-        await message.answer(
-            get_text(lang, "error_invalid_number"),
-            reply_markup=phone_request_keyboard(lang),
-        )
+    phone = await _save_phone(
+        message,
+        db,
+        lang,
+        message.text,
+        get_text(lang, "error_invalid_number"),
+    )
+    if not phone:
         return
 
-    db.update_user_phone(message.from_user.id, phone)
     await _after_phone_saved(message, state, db, lang)
+
+
 @router.callback_query(F.data.startswith("reg_city_"), StateFilter(Registration.city, None))
 async def registration_city_callback(
     callback: types.CallbackQuery, state: FSMContext, db: DatabaseProtocol
@@ -251,3 +274,6 @@ async def registration_city_callback(
 # OLD TEXT-BASED CITY HANDLER REMOVED
 # City is now selected ONLY via inline buttons (select_city:) in commands.py
 # This prevents accidental triggering when user types numbers during registration
+
+
+

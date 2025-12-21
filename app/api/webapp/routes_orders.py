@@ -24,6 +24,94 @@ from .common import (
 router = APIRouter()
 
 
+def _require_user_id(user: dict[str, Any]) -> int:
+    user_id = int(user.get("id") or 0)
+    if user_id == 0:
+        raise HTTPException(status_code=401, detail="Authentication required")
+    return user_id
+
+
+def _update_phone_if_valid(db: Any, user_id: int, raw_phone: str | None) -> None:
+    if not raw_phone:
+        return
+    sanitized_phone = sanitize_phone(raw_phone)
+    if not sanitized_phone or not validator.validate_phone(sanitized_phone):
+        return
+    try:
+        if hasattr(db, "update_user_phone"):
+            user_model = db.get_user_model(user_id)
+            current_phone = get_val(user_model, "phone") if user_model else None
+            if not current_phone or current_phone != sanitized_phone:
+                db.update_user_phone(user_id, sanitized_phone)
+    except Exception as e:  # pragma: no cover - defensive
+        logger.warning(f"Could not update user phone for {user_id}: {e}")
+
+
+def _resolve_required_phone(db: Any, user_id: int, raw_phone: str | None) -> str:
+    candidate = (raw_phone or "").strip()
+    if candidate:
+        _update_phone_if_valid(db, user_id, candidate)
+        return candidate
+    user_model = db.get_user_model(user_id) if hasattr(db, "get_user_model") else None
+    stored_phone = (get_val(user_model, "phone") if user_model else None) or ""
+    stored_phone = str(stored_phone).strip()
+    if not stored_phone:
+        raise HTTPException(status_code=400, detail="Phone is required")
+    return stored_phone
+
+
+def _load_offers_and_store(
+    items: list[Any], db: Any
+) -> tuple[dict[int, Any], int]:
+    if not items:
+        raise HTTPException(status_code=400, detail="No items provided")
+    offers_by_id: dict[int, Any] = {}
+    store_ids: set[int] = set()
+    for item in items:
+        offer = db.get_offer(item.offer_id) if hasattr(db, "get_offer") else None
+        if not offer:
+            raise HTTPException(
+                status_code=400, detail=f"Offer not found: {item.offer_id}"
+            )
+        offers_by_id[item.offer_id] = offer
+        store_id = int(get_val(offer, "store_id") or 0)
+        if store_id:
+            store_ids.add(store_id)
+
+    if len(store_ids) > 1:
+        raise HTTPException(status_code=400, detail="Only one store per order is supported")
+    if not store_ids:
+        raise HTTPException(status_code=400, detail="Invalid store data")
+
+    return offers_by_id, next(iter(store_ids))
+
+
+def _validate_min_order(
+    db: Any,
+    store_id: int,
+    items: list[Any],
+    offers_by_id: dict[int, Any],
+) -> None:
+    total_check = 0.0
+    for item in items:
+        offer = offers_by_id.get(item.offer_id)
+        if not offer:
+            continue
+        price_kopeks = float(get_val(offer, "discount_price", 0) or 0)
+        total_check += (price_kopeks / 100) * item.quantity
+
+    store_check = db.get_store(store_id) if hasattr(db, "get_store") else None
+    if not store_check:
+        return
+    min_order_kopeks = get_val(store_check, "min_order_amount", 0)
+    min_order = min_order_kopeks / 100 if min_order_kopeks else 0
+    if min_order > 0 and total_check < min_order:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Minimum order amount: {min_order}. Your total: {total_check}",
+        )
+
+
 @router.post("/orders", response_model=OrderResponse)
 async def create_order(
     order: CreateOrderRequest, db=Depends(get_db), user: dict = Depends(get_current_user)
@@ -33,10 +121,7 @@ async def create_order(
     bot_instance: Bot | None = None
 
     try:
-        user_id = user.get("id", 0)
-
-        if user_id == 0:
-            raise HTTPException(status_code=401, detail="Authentication required")
+        user_id = _require_user_id(user)
         if order.user_id and order.user_id != user_id:
             logger.warning(
                 "create_order user mismatch: initData=%s payload=%s", user_id, order.user_id
@@ -48,70 +133,14 @@ async def create_order(
         except Exception as e:  # pragma: no cover - defensive
             logger.warning(f"Could not create bot instance: {e}")
 
-        raw_phone = order.phone or ""
-        if raw_phone:
-            sanitized_phone = sanitize_phone(raw_phone)
-            if sanitized_phone and validator.validate_phone(sanitized_phone):
-                try:
-                    if hasattr(db, "update_user_phone"):
-                        user_model = db.get_user_model(user_id)
-                        current_phone = get_val(user_model, "phone") if user_model else None
-                        if not current_phone or current_phone != sanitized_phone:
-                            db.update_user_phone(user_id, sanitized_phone)
-                except Exception as e:  # pragma: no cover - defensive
-                    logger.warning(f"Could not update user phone for {user_id}: {e}")
+        resolved_phone = _resolve_required_phone(db, user_id, order.phone)
 
-        if not order.items:
-            raise HTTPException(status_code=400, detail="No items provided")
-
-        offers_by_id: dict[int, Any] = {}
-        store_ids: set[int] = set()
-        for item in order.items:
-            offer = db.get_offer(item.offer_id) if hasattr(db, "get_offer") else None
-            if not offer:
-                raise HTTPException(
-                    status_code=400, detail=f"Offer not found: {item.offer_id}"
-                )
-            offers_by_id[item.offer_id] = offer
-            store_id = int(get_val(offer, "store_id") or 0)
-            if store_id:
-                store_ids.add(store_id)
-
-        if len(store_ids) > 1:
-            raise HTTPException(
-                status_code=400, detail="Only one store per order is supported"
-            )
-        if not store_ids:
-            raise HTTPException(status_code=400, detail="Invalid store data")
+        offers_by_id, store_id = _load_offers_and_store(order.items, db)
 
         is_delivery = bool(order.delivery_address and order.delivery_address.strip())
 
         if is_delivery:
-            total_check = 0.0
-            store_id_check: Any | None = next(iter(store_ids), None)
-            for item in order.items:
-                offer = offers_by_id.get(item.offer_id)
-                if offer:
-                    # Convert kopeks to sums for display (1 sum = 100 kopeks)
-                    price_kopeks = float(get_val(offer, "discount_price", 0) or 0)
-                    price = price_kopeks / 100
-                    total_check += price * item.quantity
-                    store_id_check = get_val(offer, "store_id")
-
-            if order.items:
-                first_offer = offers_by_id.get(order.items[0].offer_id)
-                if first_offer:
-                    store_id_check = get_val(first_offer, "store_id")
-                    store_check = db.get_store(store_id_check) if hasattr(db, "get_store") else None
-                    if store_check:
-                        # Convert min_order from kopeks to sums
-                        min_order_kopeks = get_val(store_check, "min_order_amount", 0)
-                        min_order = min_order_kopeks / 100 if min_order_kopeks else 0
-                        if min_order > 0 and total_check < min_order:
-                            raise HTTPException(
-                                status_code=400,
-                                detail=f"Minimum order amount: {min_order}. Your total: {total_check}",
-                            )
+            _validate_min_order(db, store_id, order.items, offers_by_id)
 
         created_items: list[dict[str, Any]] = []
 
@@ -128,9 +157,9 @@ async def create_order(
                 # Convert kopeks to sums for display (1 sum = 100 kopeks)
                 price_kopeks = int(get_val(offer, "discount_price", 0) or 0)
                 price = price_kopeks // 100
-                store_id = int(get_val(offer, "store_id"))
+                offer_store_id = int(get_val(offer, "store_id"))
                 offer_title = get_val(offer, "title", "Товар")
-                store = db.get_store(store_id) if hasattr(db, "get_store") else None
+                store = db.get_store(offer_store_id) if hasattr(db, "get_store") else None
                 store_name = get_val(store, "name", "") if store else ""
                 store_address = get_val(store, "address", "") if store else ""
                 delivery_price = 0
@@ -142,7 +171,7 @@ async def create_order(
                 order_items.append(
                     OrderItem(
                         offer_id=item.offer_id,
-                        store_id=store_id,
+                        store_id=offer_store_id,
                         title=offer_title,
                         price=price,
                         original_price=price,
@@ -222,7 +251,9 @@ async def create_order(
         if created_items:
             try:
                 last_item = created_items[-1]
-                store = db.get_store(store_id) if hasattr(db, "get_store") else None
+                store = (
+                    db.get_store(last_item["store_id"]) if hasattr(db, "get_store") else None
+                )
                 if store:
                     owner_id = get_val(store, "owner_id")
                     if owner_id:
@@ -231,15 +262,17 @@ async def create_order(
                             db=db,
                             owner_id=owner_id,
                             entity_id=last_item["id"],
-                            offer_title=offer_title,
-                            quantity=item.quantity,
+                            offer_title=last_item["offer_title"],
+                            quantity=last_item["quantity"],
                             total=last_item["total"],
                             user_id=user_id,
                             delivery_address=order.delivery_address
                             if is_delivery
                             else None,
-                            phone=order.phone,
-                            photo=get_val(offer, "photo"),
+                            phone=resolved_phone,
+                            photo=get_val(
+                                offers_by_id.get(last_item["offer_id"]), "photo"
+                            ),
                             is_delivery=is_delivery,
                         )
             except Exception as e:  # pragma: no cover - defensive
@@ -440,3 +473,4 @@ async def notify_partner_webapp_order(
                 logger.error(f"Failed to save seller_message_id: {save_err}")
     except Exception as e:  # pragma: no cover - defensive
         logger.error(f"Failed to notify partner {owner_id}: {e}")
+
