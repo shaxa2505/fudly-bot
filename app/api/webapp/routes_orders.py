@@ -220,31 +220,30 @@ async def create_order(
 
         # Notify sellers via WebSocket (UnifiedOrderService already notified via Telegram)
         if created_items:
-                        last_item = created_items[-1]
-                        store = db.get_store(store_id) if hasattr(db, "get_store") else None
-                        if store:
-                            owner_id = get_val(store, "owner_id")
-                            if owner_id:
-                                await notify_partner_webapp_order(
-                                    bot=bot_instance,
-                                    db=db,
-                                    owner_id=owner_id,
-                                    entity_id=last_item["id"],
-                                    offer_title=offer_title,
-                                    quantity=item.quantity,
-                                    total=last_item["total"],
-                                    user_id=user_id,
-                                    delivery_address=order.delivery_address
-                                    if is_delivery
-                                    else None,
-                                    phone=order.phone,
-                                    photo=get_val(offer, "photo"),
-                                    is_delivery=is_delivery,
-                                )
-
-                except Exception as e:  # pragma: no cover - defensive
-                    logger.error(f"Error creating order for offer {item.offer_id}: {e}")
-                    continue
+            try:
+                last_item = created_items[-1]
+                store = db.get_store(store_id) if hasattr(db, "get_store") else None
+                if store:
+                    owner_id = get_val(store, "owner_id")
+                    if owner_id:
+                        await notify_partner_webapp_order(
+                            bot=bot_instance,
+                            db=db,
+                            owner_id=owner_id,
+                            entity_id=last_item["id"],
+                            offer_title=offer_title,
+                            quantity=item.quantity,
+                            total=last_item["total"],
+                            user_id=user_id,
+                            delivery_address=order.delivery_address
+                            if is_delivery
+                            else None,
+                            phone=order.phone,
+                            photo=get_val(offer, "photo"),
+                            is_delivery=is_delivery,
+                        )
+            except Exception as e:  # pragma: no cover - defensive
+                logger.error(f"Error notifying partner for order: {e}")
 
         order_id = created_items[0]["id"] if created_items else 0
         total_amount = sum(b["total"] for b in created_items)
