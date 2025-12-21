@@ -643,7 +643,7 @@ function HomePage() {
               Boshqa so'z bilan qidirib ko'ring yoki filterni o'zgartiring.
             </p>
             <button
-              className="primary-btn"
+              className="btn-primary"
               onClick={() => {
                 setSearchQuery('')
                 setSelectedCategory('all')

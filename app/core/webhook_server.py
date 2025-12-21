@@ -755,7 +755,12 @@ async def create_webhook_app(
                     if not order_service:
                         logger.error("UnifiedOrderService not available in webhook_server")
                         failed_items.append({"error": "Order service not available"})
-                        continue
+                        return add_cors_headers(
+                            web.json_response(
+                                {"success": False, "error": "Order service not available"}, 
+                                status=500
+                            )
+                        )
                     
                     # Convert db_items to OrderItem format
                     order_items_list = [
