@@ -33,10 +33,15 @@ async def create_order(
     bot_instance: Bot | None = None
 
     try:
-        user_id = order.user_id or user.get("id", 0)
+        user_id = user.get("id", 0)
 
         if user_id == 0:
-            raise HTTPException(status_code=400, detail="User ID required")
+            raise HTTPException(status_code=401, detail="Authentication required")
+        if order.user_id and order.user_id != user_id:
+            logger.warning(
+                "create_order user mismatch: initData=%s payload=%s", user_id, order.user_id
+            )
+            raise HTTPException(status_code=403, detail="User mismatch")
 
         try:
             bot_instance = Bot(token=settings.bot_token)
@@ -51,27 +56,48 @@ async def create_order(
                     if hasattr(db, "update_user_phone"):
                         user_model = db.get_user_model(user_id)
                         current_phone = get_val(user_model, "phone") if user_model else None
-                        if not current_phone:
+                        if not current_phone or current_phone != sanitized_phone:
                             db.update_user_phone(user_id, sanitized_phone)
                 except Exception as e:  # pragma: no cover - defensive
                     logger.warning(f"Could not update user phone for {user_id}: {e}")
+
+        if not order.items:
+            raise HTTPException(status_code=400, detail="No items provided")
+
+        offers_by_id: dict[int, Any] = {}
+        store_ids: set[int] = set()
+        for item in order.items:
+            offer = db.get_offer(item.offer_id) if hasattr(db, "get_offer") else None
+            if not offer:
+                raise HTTPException(
+                    status_code=400, detail=f"Offer not found: {item.offer_id}"
+                )
+            offers_by_id[item.offer_id] = offer
+            store_id = int(get_val(offer, "store_id") or 0)
+            if store_id:
+                store_ids.add(store_id)
+
+        if len(store_ids) > 1:
+            raise HTTPException(
+                status_code=400, detail="Only one store per order is supported"
+            )
+        if not store_ids:
+            raise HTTPException(status_code=400, detail="Invalid store data")
 
         is_delivery = bool(order.delivery_address and order.delivery_address.strip())
 
         if is_delivery:
             total_check = 0.0
-            store_id_check: Any | None = None
+            store_id_check: Any | None = next(iter(store_ids), None)
             for item in order.items:
-                offer = db.get_offer(item.offer_id) if hasattr(db, "get_offer") else None
+                offer = offers_by_id.get(item.offer_id)
                 if offer:
                     price = float(get_val(offer, "discount_price", 0) or 0)
                     total_check += price * item.quantity
                     store_id_check = get_val(offer, "store_id")
 
             if order.items:
-                first_offer = (
-                    db.get_offer(order.items[0].offer_id) if hasattr(db, "get_offer") else None
-                )
+                first_offer = offers_by_id.get(order.items[0].offer_id)
                 if first_offer:
                     store_id_check = get_val(first_offer, "store_id")
                     store_check = db.get_store(store_id_check) if hasattr(db, "get_store") else None
@@ -91,7 +117,7 @@ async def create_order(
         if order_service and hasattr(db, "create_cart_order"):
             order_items: list[OrderItem] = []
             for item in order.items:
-                offer = db.get_offer(item.offer_id) if hasattr(db, "get_offer") else None
+                offer = offers_by_id.get(item.offer_id)
                 if not offer:
                     continue
 

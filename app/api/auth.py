@@ -36,6 +36,12 @@ def set_auth_db(db):
     _db_instance = db
 
 
+def _get_user_id(user: Any) -> int | None:
+    return getattr(user, "telegram_id", None) or getattr(user, "user_id", None) or getattr(
+        user, "id", None
+    )
+
+
 class AuthRequest(BaseModel):
     """Telegram WebApp initData for validation."""
 
@@ -150,7 +156,7 @@ async def validate_auth(request: AuthRequest, db=Depends(get_db)) -> UserProfile
 
     # Return existing user profile
     return UserProfile(
-        user_id=user.telegram_id,
+        user_id=_get_user_id(user) or user_id,
         username=user.username,
         first_name=user.first_name or telegram_user.get("first_name", ""),
         last_name=user.last_name or telegram_user.get("last_name"),
@@ -194,7 +200,7 @@ async def get_profile(
         raise HTTPException(status_code=404, detail="User not found")
 
     return UserProfile(
-        user_id=user.telegram_id,
+        user_id=_get_user_id(user) or user_id,
         username=user.username,
         first_name=user.first_name or "",
         last_name=user.last_name,
