@@ -882,7 +882,6 @@ async def create_webhook_app(
                             off.offer_id AS offer_id,
                             off.title AS offer_title,
                             off.discount_price AS offer_price,
-                            off.photo AS offer_photo,
                             off.photo_id AS offer_photo_id
                         FROM orders o
                         LEFT JOIN stores s ON o.store_id = s.store_id
