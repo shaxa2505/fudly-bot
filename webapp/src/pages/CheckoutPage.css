@@ -410,20 +410,6 @@
 /* Place Order Button */
 .place-order-button {
   width: 100%;
-  background: var(--color-accent);
-  color: var(--color-text-inverse);
-  border: none;
-  padding: var(--spacing-xl);
-  border-radius: var(--radius-xl);
-  font-size: var(--font-lg);
-  font-weight: var(--font-semibold);
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: var(--spacing-md);
-  box-shadow: 0 4px 16px rgba(255, 107, 53, 0.4);
-  transition: all var(--transition-normal);
 }
 
 .place-order-button:hover:not(:disabled) {
@@ -433,11 +419,6 @@
 
 .place-order-button:active:not(:disabled) {
   transform: scale(0.98);
-}
-
-.place-order-button:focus-visible {
-  outline: 3px solid rgba(255, 107, 53, 0.5);
-  outline-offset: 2px;
 }
 
 .place-order-button:disabled {

@@ -70,7 +70,7 @@ function CheckoutPage({ user }) {
     return Object.values(cart).map(item => ({
       offer_id: item.offer.id,
       title: item.offer.title,
-      price: item.offer.discount_price,
+      price: item.offer.discount_price / 100,  // Convert kopeks to sums
       quantity: item.quantity,
       store_id: item.offer.store_id,
       store_name: item.offer.store_name,

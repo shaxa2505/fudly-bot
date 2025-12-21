@@ -13,10 +13,10 @@ const CartItem = memo(function CartItem({
   const { offer, quantity } = item
 
   const formatPrice = (price) => {
-    return price.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ' ')
+    return Math.round(price / 100).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ' ')
   }
 
-  const itemTotal = (offer.discount_price || 0) * quantity
+  const itemTotal = ((offer.discount_price || 0) / 100) * quantity
 
   const stockLimit = offer.stock || offer.quantity || 99
   const isMaxReached = quantity >= stockLimit
