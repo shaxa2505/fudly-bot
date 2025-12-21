@@ -547,7 +547,7 @@ select:focus-visible {
         opacity: 1;
     }
     to {
-        transform: translateY(20px) scale(0.95);
+        transform: translateY(0) scale(0.95);
         opacity: 0;
     }
 }
