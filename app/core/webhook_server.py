@@ -15,6 +15,7 @@ from app.core.metrics import metrics as app_metrics
 from app.core.notifications import get_notification_service
 from app.core.websocket import get_websocket_manager, setup_websocket_routes
 from app.integrations.payment_service import get_payment_service
+from app.services.unified_order_service import get_unified_order_service, OrderItem
 from logging_config import logger
 
 # =============================================================================
@@ -749,62 +750,54 @@ async def create_webhook_app(
                 ]
 
                 try:
-                    if len(db_items) > 1 and hasattr(db, "create_cart_order_atomic"):
-                        store_id = int(db_items[0]["store_id"])
-                        delivery_price = int(db_items[0].get("delivery_price") or 0)
-                        cart_items = [
-                            {
-                                "offer_id": int(x["offer_id"]),
-                                "quantity": int(x["quantity"]),
-                                "price": int(x.get("price") or 0),
-                                "title": x.get("title") or "",
-                            }
-                            for x in db_items
-                        ]
-                        ok, order_id, pickup_code, error_reason = db.create_cart_order_atomic(
-                            user_id=int(user_id),
-                            store_id=store_id,
-                            cart_items=cart_items,
-                            delivery_address=address if is_delivery else None,
-                            delivery_price=delivery_price if is_delivery else 0,
-                            payment_method=payment_method,
+                    # Use UnifiedOrderService for consistent order creation and notifications
+                    order_service = get_unified_order_service()
+                    if not order_service:
+                        logger.error("UnifiedOrderService not available in webhook_server")
+                        failed_items.append({"error": "Order service not available"})
+                        continue
+                    
+                    # Convert db_items to OrderItem format
+                    order_items_list = [
+                        OrderItem(
+                            offer_id=int(item["offer_id"]),
+                            store_id=int(item["store_id"]),
+                            title=item.get("title", ""),
+                            price=int(item.get("price", 0)),
+                            original_price=int(item.get("price", 0)),
+                            quantity=int(item.get("quantity", 1)),
+                            store_name=item.get("store_name", ""),
+                            store_address=item.get("store_address", ""),
+                            delivery_price=int(item.get("delivery_price", 0)) if is_delivery else 0,
                         )
-                        if ok and order_id:
-                            created_bookings.append(
-                                {
-                                    "booking_id": order_id,
-                                    "booking_code": pickup_code if not is_delivery else None,
-                                    "offer_id": cart_items[0]["offer_id"] if cart_items else None,
-                                    "quantity": sum(x["quantity"] for x in cart_items),
-                                    "items_count": len(cart_items),
-                                }
-                            )
-                        else:
-                            failed_items.append(
-                                {"error": error_reason or "Failed to create order"}
-                            )
+                        for item in db_items
+                    ]
+                    
+                    result = await order_service.create_order(
+                        user_id=int(user_id),
+                        items=order_items_list,
+                        order_type="delivery" if is_delivery else "pickup",
+                        delivery_address=address if is_delivery else None,
+                        payment_method=payment_method,
+                        notify_customer=True,
+                        notify_sellers=True,
+                    )
+                    
+                    if result.success and result.order_ids:
+                        # Map result to expected format
+                        for idx, order_id in enumerate(result.order_ids):
+                            created_bookings.append({
+                                "booking_id": order_id,
+                                "booking_code": result.pickup_codes[idx] if result.pickup_codes and idx < len(result.pickup_codes) else None,
+                                "offer_id": order_items_list[0].offer_id if order_items_list else None,
+                                "quantity": result.total_items,
+                                "items_count": len(order_items_list),
+                            })
                     else:
-                        result = db.create_cart_order(
-                            user_id=int(user_id),
-                            items=db_items,
-                            order_type="delivery" if is_delivery else "pickup",
-                            delivery_address=address if is_delivery else None,
-                            payment_method=payment_method,
-                        )
-                        created_orders = result.get("created_orders", [])
-                        if created_orders:
-                            order_id = created_orders[0].get("order_id")
-                            pickup_code = created_orders[0].get("pickup_code")
-                            created_bookings.append(
-                                {
-                                    "booking_id": order_id,
-                                    "booking_code": pickup_code if not is_delivery else None,
-                                    "offer_id": created_orders[0].get("offer_id"),
-                                    "quantity": sum(int(o.get("quantity") or 1) for o in created_orders),
-                                    "items_count": len(created_orders),
-                                }
-                            )
+                        failed_items.append({"error": result.error_message or "Failed to create order"})
+                        
                 except Exception as e:
+                    logger.error(f"Error creating order via UnifiedOrderService: {e}", exc_info=True)
                     failed_items.append({"error": str(e)})
 
             # Return result

@@ -178,89 +178,14 @@ async def create_order(
                     "Unified order service returned failure for webapp order: %s",
                     result.error_message if result else "no result",
                 )
+                # No fallback - UnifiedOrderService is the only way
+                raise HTTPException(
+                    status_code=500, 
+                    detail=result.error_message or "Failed to create order"
+                )
 
-        # Fallback: legacy per-item creation if unified service is unavailable
-        if not created_items:
-            for item in order.items:
-                offer = db.get_offer(item.offer_id) if hasattr(db, "get_offer") else None
-                if not offer:
-                    continue
-
-                price = float(get_val(offer, "discount_price", 0) or 0)
-                total = price * item.quantity
-                store_id = get_val(offer, "store_id")
-                offer_title = get_val(offer, "title", "Товар")
-
-                try:
-                    if is_delivery and hasattr(db, "create_order"):
-                        store = db.get_store(store_id) if hasattr(db, "get_store") else None
-                        delivery_price = get_val(store, "delivery_price", 15000) if store else 15000
-
-                        order_id = db.create_order(
-                            user_id=user_id,
-                            store_id=store_id,
-                            offer_id=item.offer_id,
-                            quantity=item.quantity,
-                            order_type="delivery",
-                            delivery_address=order.delivery_address,
-                            delivery_price=delivery_price,
-                            payment_method="card",
-                        )
-
-                        if order_id:
-                            created_items.append(
-                                {
-                                    "id": order_id,
-                                    "type": "order",
-                                    "offer_id": item.offer_id,
-                                    "quantity": item.quantity,
-                                    "total": total + float(delivery_price),
-                                    "offer_title": offer_title,
-                                    "store_id": store_id,
-                                }
-                            )
-                            logger.info(
-                                f"✅ Created legacy delivery ORDER {order_id} for user {user_id}"
-                            )
-
-                    elif hasattr(db, "create_cart_order"):
-                        cart_result = db.create_cart_order(
-                            user_id=user_id,
-                            items=[
-                                {
-                                    "offer_id": item.offer_id,
-                                    "store_id": store_id,
-                                    "quantity": item.quantity,
-                                    "price": int(price),
-                                    "title": offer_title,
-                                }
-                            ],
-                            order_type="pickup",
-                            delivery_address=None,
-                            payment_method="cash",
-                        )
-
-                        created_orders = cart_result.get("created_orders", []) if cart_result else []
-                        if created_orders:
-                            oid = created_orders[0].get("order_id")
-                            pickup_code = created_orders[0].get("pickup_code")
-                            created_items.append(
-                                {
-                                    "id": oid,
-                                    "type": "order",
-                                    "offer_id": item.offer_id,
-                                    "quantity": item.quantity,
-                                    "total": total,
-                                    "offer_title": offer_title,
-                                    "store_id": store_id,
-                                    "pickup_code": pickup_code,
-                                }
-                            )
-                            logger.info(
-                                f"✅ Created legacy pickup ORDER {oid} for user {user_id}"
-                            )
-
-                    if bot_instance and store_id and created_items:
+        # Notify sellers via WebSocket (UnifiedOrderService already notified via Telegram)
+        if created_items:
                         last_item = created_items[-1]
                         store = db.get_store(store_id) if hasattr(db, "get_store") else None
                         if store:

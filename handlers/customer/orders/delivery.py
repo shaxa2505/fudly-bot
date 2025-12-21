@@ -891,26 +891,11 @@ async def dlv_payment_proof(
             if result.success and result.order_ids:
                 order_id = result.order_ids[0]
                 logger.info(f"✅ Created order #{order_id} after screenshot via unified service")
+            else:
+                logger.error(f"Failed to create order via UnifiedOrderService: {result.error_message}")
+                order_id = None
         except Exception as e:
             logger.error(f"Error creating unified delivery order after screenshot: {e}", exc_info=True)
-
-    if not order_id:
-        # Fallback to legacy single-order creation
-        try:
-            order_type = data.get("order_type", "delivery")
-            order_id = db.create_order(
-                user_id=user_id,
-                store_id=store_id,
-                offer_id=offer_id,
-                quantity=quantity,
-                order_type=order_type,
-                delivery_address=address if order_type == "delivery" else None,
-                delivery_price=delivery_price if order_type == "delivery" else 0,
-                payment_method="card",
-            )
-            logger.info(f"✅ Created order #{order_id} after screenshot via legacy create_order")
-        except Exception as e:
-            logger.error(f"Error creating delivery order after screenshot: {e}", exc_info=True)
             order_id = None
 
     if not order_id:
