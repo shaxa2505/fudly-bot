@@ -80,7 +80,7 @@ function StoreMap({ stores = [], userLocation = null, onStoreSelect, lang = 'uz'
     if (userLocation) {
       const userIcon = L.divIcon({
         className: 'user-marker',
-        html: '<div class="user-marker-inner">📍</div>',
+        html: '<div class="user-marker-inner">YOU</div>',
         iconSize: [30, 30],
         iconAnchor: [15, 30],
       });
@@ -96,7 +96,7 @@ function StoreMap({ stores = [], userLocation = null, onStoreSelect, lang = 'uz'
 
       const storeIcon = L.divIcon({
         className: 'store-marker',
-        html: `<div class="store-marker-inner">🏪</div>`,
+        html: `<div class="store-marker-inner">SHOP</div>`,
         iconSize: [36, 36],
         iconAnchor: [18, 36],
       });
@@ -109,7 +109,7 @@ function StoreMap({ stores = [], userLocation = null, onStoreSelect, lang = 'uz'
         <div class="store-popup">
           <strong>${store.name}</strong>
           <p>${store.address || ''}</p>
-          ${distance ? `<p class="distance">📏 ${distance}</p>` : ''}
+          ${distance ? `<p class="distance">Masofa: ${distance}</p>` : ''}
           <button class="popup-btn" onclick="window.selectStore(${store.id})">${t('Выбрать', 'Tanlash')}</button>
         </div>
       `;
@@ -166,7 +166,7 @@ function StoreMap({ stores = [], userLocation = null, onStoreSelect, lang = 'uz'
 
       const storeIcon = L.divIcon({
         className: 'store-marker',
-        html: `<div class="store-marker-inner">🏪</div>`,
+        html: `<div class="store-marker-inner">SHOP</div>`,
         iconSize: [36, 36],
         iconAnchor: [18, 36],
       });
@@ -179,7 +179,7 @@ function StoreMap({ stores = [], userLocation = null, onStoreSelect, lang = 'uz'
         <div class="store-popup">
           <strong>${store.name}</strong>
           <p>${store.address || ''}</p>
-          ${distance ? `<p class="distance">📏 ${distance}</p>` : ''}
+          ${distance ? `<p class="distance">Masofa: ${distance}</p>` : ''}
           <button class="popup-btn" onclick="window.selectStore(${store.id})">${t('Выбрать', 'Tanlash')}</button>
         </div>
       `;
@@ -196,7 +196,7 @@ function StoreMap({ stores = [], userLocation = null, onStoreSelect, lang = 'uz'
   if (error) {
     return (
       <div className="store-map-error">
-        <p>⚠️ {error}</p>
+        <p>{error}</p>
       </div>
     );
   }
@@ -214,7 +214,7 @@ function StoreMap({ stores = [], userLocation = null, onStoreSelect, lang = 'uz'
       {/* No stores with coordinates message */}
       {mapLoaded && storesWithCoords.length === 0 && stores.length > 0 && (
         <div className="store-map-no-coords">
-          <p>📍 {t('Магазины не указали координаты', 'Do\'konlar koordinatalarini ko\'rsatmagan')}</p>
+          <p>{t('Магазины не указали координаты', 'Do\'konlar koordinatalarini ko\'rsatmagan')}</p>
           <p className="store-map-hint">{t('Используйте список для просмотра', 'Ro\'yxatdan foydalaning')}</p>
         </div>
       )}
@@ -237,7 +237,7 @@ function StoreMap({ stores = [], userLocation = null, onStoreSelect, lang = 'uz'
                   if (onStoreSelect) onStoreSelect(store);
                 }}
               >
-                <div className="store-list-icon">🏪</div>
+                <div className="store-list-icon">SHOP</div>
                 <div className="store-list-info">
                   <h4>{store.name}</h4>
                   <p>{store.address || t('Адрес не указан', 'Manzil ko\'rsatilmagan')}</p>

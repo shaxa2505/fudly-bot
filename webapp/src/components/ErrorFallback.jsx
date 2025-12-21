@@ -16,7 +16,7 @@ function ErrorFallback({ error, resetErrorBoundary }) {
   return (
     <div className="error-fallback">
       <div className="error-fallback-content">
-        <div className="error-fallback-icon">⚠️</div>
+        <div className="error-fallback-icon">!</div>
 
         <h2 className="error-fallback-title">
           Xatolik yuz berdi
@@ -42,7 +42,7 @@ function ErrorFallback({ error, resetErrorBoundary }) {
             className="error-fallback-btn primary"
             onClick={resetErrorBoundary}
           >
-            🔄 Qayta yuklash
+            Qayta yuklash
           </button>
 
           <button
@@ -55,7 +55,7 @@ function ErrorFallback({ error, resetErrorBoundary }) {
               }
             }}
           >
-            🏠 Bosh sahifa
+            Bosh sahifa
           </button>
         </div>
 
@@ -67,7 +67,7 @@ function ErrorFallback({ error, resetErrorBoundary }) {
             target="_blank"
             rel="noopener noreferrer"
           >
-            💬 Qo'llab-quvvatlash
+            Qo'llab-quvvatlash
           </a>
         </div>
       </div>
@@ -84,7 +84,7 @@ export function InlineError({ error, onRetry, onDismiss }) {
   return (
     <div className="inline-error">
       <div className="inline-error-content">
-        <span className="inline-error-icon">⚠️</span>
+        <span className="inline-error-icon">!</span>
         <p className="inline-error-message">{error}</p>
       </div>
 
@@ -102,7 +102,7 @@ export function InlineError({ error, onRetry, onDismiss }) {
             className="inline-error-btn dismiss"
             onClick={onDismiss}
           >
-            ✕
+            x
           </button>
         )}
       </div>

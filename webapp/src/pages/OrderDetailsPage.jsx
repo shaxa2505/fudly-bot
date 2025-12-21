@@ -39,7 +39,7 @@ export default function OrderDetailsPage() {
           ...raw,
           order_id: raw.order_id || raw.booking_id,
           status: displayStatus,
-          offer_title: raw.items?.[0]?.offer_title || raw.offer_title || 'Заказ',
+          offer_title: raw.items?.[0]?.offer_title || raw.offer_title || 'Buyurtma',
           offer_photo: apiClient.getPhotoUrl(raw.items?.[0]?.photo) || raw.offer_photo,
           store_name: raw.store_name || raw.items?.[0]?.store_name,
           quantity: raw.quantity || raw.items?.reduce((sum, item) => sum + (item.quantity || 0), 0) || 1,
@@ -49,7 +49,7 @@ export default function OrderDetailsPage() {
       }
 
       if (!foundOrder) {
-        setError('Заказ не найден / Buyurtma topilmadi')
+        setError('Buyurtma topilmadi')
         return
       }
 
@@ -57,7 +57,7 @@ export default function OrderDetailsPage() {
       setError(null)
     } catch (err) {
       console.error('Failed to load order details:', err)
-      setError('Не удалось загрузить детали заказа / Buyurtma ma\'lumotlarini yuklab bo\'lmadi')
+      setError('Buyurtma ma\'lumotlarini yuklab bo\'lmadi')
     } finally {
       setLoading(false)
     }
@@ -65,23 +65,23 @@ export default function OrderDetailsPage() {
 
   const getStatusInfo = (status) => {
     const statusMap = {
-      pending: { text: '⏳ Kutilmoqda / Ожидание', color: '#FF6B35', bg: '#FFF4F0' },
-      preparing: { text: '👨‍🍳 Tayyorlanmoqda / Готовится', color: '#10B981', bg: '#ECFDF5' },
-      ready: { text: '📦 Tayyor / Готов', color: '#8B5CF6', bg: '#FAF5FF' },
-      delivering: { text: "🚚 Yo'lda / В пути", color: '#3B82F6', bg: '#EFF6FF' },
-      completed: { text: '✅ Bajarildi / Выполнен', color: '#10B981', bg: '#ECFDF5' },
-      cancelled: { text: '❌ Bekor qilindi / Отменён', color: '#EF4444', bg: '#FEF2F2' },
-      rejected: { text: '❌ Rad etildi / Отклонён', color: '#EF4444', bg: '#FEF2F2' },
-      awaiting_payment: { text: '💳 To\'lov kutilmoqda / Ожидание оплаты', color: '#F59E0B', bg: '#FFFBEB' },
-      awaiting_proof: { text: '📸 Chek kutilmoqda / Ожидание чека', color: '#F59E0B', bg: '#FFFBEB' },
-      proof_submitted: { text: '🔍 Tekshirilmoqda / Проверка', color: '#3B82F6', bg: '#EFF6FF' },
-      payment_rejected: { text: '❌ To\'lov rad etildi / Оплата отклонена', color: '#EF4444', bg: '#FEF2F2' },
+      pending: { text: 'Kutilmoqda', color: '#FF6B35', bg: '#FFF4F0' },
+      preparing: { text: 'Tayyorlanmoqda', color: '#10B981', bg: '#ECFDF5' },
+      ready: { text: 'Tayyor', color: '#8B5CF6', bg: '#FAF5FF' },
+      delivering: { text: "Yo'lda", color: '#3B82F6', bg: '#EFF6FF' },
+      completed: { text: 'Bajarildi', color: '#10B981', bg: '#ECFDF5' },
+      cancelled: { text: 'Bekor qilindi', color: '#EF4444', bg: '#FEF2F2' },
+      rejected: { text: 'Rad etildi', color: '#EF4444', bg: '#FEF2F2' },
+      awaiting_payment: { text: 'To\'lov kutilmoqda', color: '#F59E0B', bg: '#FFFBEB' },
+      awaiting_proof: { text: 'Chek kutilmoqda', color: '#F59E0B', bg: '#FFFBEB' },
+      proof_submitted: { text: 'Tekshirilmoqda', color: '#3B82F6', bg: '#EFF6FF' },
+      payment_rejected: { text: 'To\'lov rad etildi', color: '#EF4444', bg: '#FEF2F2' },
     }
     return statusMap[status] || { text: status, color: '#6B7280', bg: '#F3F4F6' }
   }
 
   const formatDate = (dateString) => {
-    if (!dateString) return '—'
+    if (!dateString) return '-'
     const date = new Date(dateString)
     return date.toLocaleString('ru-RU', {
       day: '2-digit',
@@ -115,10 +115,10 @@ export default function OrderDetailsPage() {
     return (
       <div className="order-details-page">
         <div className="error-container">
-          <div className="error-icon">😕</div>
-          <p>{error || 'Xatolik yuz berdi / Произошла ошибка'}</p>
+          <div className="error-icon">!</div>
+          <p>{error || 'Xatolik yuz berdi'}</p>
           <button className="back-btn" onClick={() => navigate('/yana')}>
-            ← Orqaga / Назад
+            <- Orqaga
           </button>
         </div>
       </div>
@@ -134,9 +134,9 @@ export default function OrderDetailsPage() {
       {/* Header */}
       <div className="details-header">
         <button className="back-button" onClick={() => navigate('/yana')}>
-          ←
+          <-
         </button>
-        <h1 className="details-title">Buyurtma / Заказ #{orderId}</h1>
+        <h1 className="details-title">Buyurtma #{orderId}</h1>
       </div>
 
       {/* Status Banner */}
@@ -150,21 +150,20 @@ export default function OrderDetailsPage() {
       {/* Upload Payment Proof Button */}
       {needsPayment && (
         <div className="payment-notice">
-          <div className="notice-icon">💳</div>
+          <div className="notice-icon">!</div>
           <div className="notice-content">
-            <h3>To'lov talab qilinadi / Требуется оплата</h3>
+            <h3>To'lov talab qilinadi</h3>
             <p>To'lovni amalga oshiring va chekni yuklang</p>
-            <p>Совершите оплату и загрузите чек</p>
           </div>
           <button className="upload-btn" onClick={handleUploadProof}>
-            📸 Yuklash
+            Yuklash
           </button>
         </div>
       )}
 
       {/* Order Items */}
       <div className="details-section">
-        <h2 className="section-title">📦 Mahsulotlar / Товары</h2>
+        <h2 className="section-title">Mahsulotlar</h2>
         <div className="items-list">
           {order.items && order.items.length > 0 ? (
             order.items.map((item, idx) => (
@@ -181,9 +180,9 @@ export default function OrderDetailsPage() {
                 )}
                 <div className="item-info">
                   <h3 className="item-title">{item.offer_title}</h3>
-                  <p className="item-store">🏪 {item.store_name}</p>
+                  <p className="item-store">Do'kon: {item.store_name}</p>
                   <div className="item-meta">
-                    <span className="item-quantity">{item.quantity} × {Math.round(item.price).toLocaleString()} so'm</span>
+                    <span className="item-quantity">{item.quantity} x {Math.round(item.price).toLocaleString()} so'm</span>
                     <span className="item-total">{Math.round(item.quantity * item.price).toLocaleString()} so'm</span>
                   </div>
                 </div>
@@ -203,7 +202,7 @@ export default function OrderDetailsPage() {
               )}
               <div className="item-info">
                 <h3 className="item-title">{order.offer_title}</h3>
-                <p className="item-store">🏪 {order.store_name}</p>
+                <p className="item-store">Do'kon: {order.store_name}</p>
                 <div className="item-meta">
                   <span className="item-quantity">{order.quantity || 1} dona</span>
                   <span className="item-total">{Math.round(order.total_price || 0).toLocaleString()} so'm</span>
@@ -217,21 +216,21 @@ export default function OrderDetailsPage() {
       {/* Delivery Info */}
       {isDelivery && order.delivery_address && (
         <div className="details-section">
-          <h2 className="section-title">🚚 Yetkazib berish / Доставка</h2>
+          <h2 className="section-title">Yetkazib berish</h2>
           <div className="info-card">
             <div className="info-row">
-              <span className="info-label">📍 Manzil / Адрес:</span>
+              <span className="info-label">Manzil:</span>
               <span className="info-value">{order.delivery_address}</span>
             </div>
             {order.phone && (
               <div className="info-row">
-                <span className="info-label">📱 Telefon:</span>
+                <span className="info-label">Telefon:</span>
                 <span className="info-value">{order.phone}</span>
               </div>
             )}
             {order.delivery_notes && (
               <div className="info-row">
-                <span className="info-label">📝 Izoh / Примечание:</span>
+                <span className="info-label">Izoh:</span>
                 <span className="info-value">{order.delivery_notes}</span>
               </div>
             )}
@@ -242,34 +241,34 @@ export default function OrderDetailsPage() {
       {/* Pickup Info */}
       {!isDelivery && order.booking_code && (
         <div className="details-section">
-          <h2 className="section-title">🎫 Olib ketish / Самовывоз</h2>
-          <div className="info-card">
-            <div className="info-row">
-              <span className="info-label">Kod / Код:</span>
-              <span className="info-value booking-code">{order.booking_code}</span>
-            </div>
-            {order.pickup_time && (
-              <div className="info-row">
-                <span className="info-label">⏰ Vaqt:</span>
-                <span className="info-value">{formatDate(order.pickup_time)}</span>
-              </div>
-            )}
+        <h2 className="section-title">Olib ketish</h2>
+        <div className="info-card">
+          <div className="info-row">
+              <span className="info-label">Kod:</span>
+            <span className="info-value booking-code">{order.booking_code}</span>
           </div>
+          {order.pickup_time && (
+            <div className="info-row">
+                <span className="info-label">Vaqt:</span>
+              <span className="info-value">{formatDate(order.pickup_time)}</span>
+            </div>
+          )}
         </div>
+      </div>
       )}
 
       {/* Payment Info */}
       <div className="details-section">
-        <h2 className="section-title">💰 To'lov / Оплата</h2>
+        <h2 className="section-title">To'lov</h2>
         <div className="info-card">
           <div className="info-row">
-            <span className="info-label">Usul / Способ:</span>
+            <span className="info-label">Usul:</span>
             <span className="info-value">
-              {order.payment_method === 'card' ? '💳 Karta / Карта' : '💵 Naqd / Наличные'}
+              {order.payment_method === 'card' ? 'Karta' : 'Naqd'}
             </span>
           </div>
           <div className="info-row total-row">
-            <span className="info-label">Jami / Итого:</span>
+            <span className="info-label">Jami:</span>
             <span className="info-value total-price">
               {Math.round(order.total_price || 0).toLocaleString()} so'm
             </span>
@@ -279,7 +278,7 @@ export default function OrderDetailsPage() {
 
       {/* Contact Support */}
       <div className="support-section">
-        <p className="support-text">Savollar bormi? / Есть вопросы?</p>
+        <p className="support-text">Savollar bormi?</p>
         <button
           className="support-btn"
           onClick={() => {
@@ -288,7 +287,7 @@ export default function OrderDetailsPage() {
             }
           }}
         >
-          💬 Qo'llab-quvvatlash / Поддержка
+          Qo'llab-quvvatlash
         </button>
       </div>
     </div>

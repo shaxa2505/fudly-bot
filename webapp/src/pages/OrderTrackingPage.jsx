@@ -32,7 +32,7 @@ function OrderTrackingPage({ user }) {
   const [showQR, setShowQR] = useState(false);
 
   const lang = user?.language || 'ru';
-  const t = (ru, uz) => (lang === 'uz' ? uz : ru);
+  const t = (ru, uz) => (lang === 'uz' Vaqt: uz : ru);
 
   useEffect(() => {
     loadOrderData(true);
@@ -104,14 +104,14 @@ function OrderTrackingPage({ user }) {
 
   const getStatusIcon = (status) => {
     switch (status) {
-      case 'pending': return '⏳';
+      case 'pending': return '...';
       case 'confirmed':
-      case 'preparing': return '✅';
-      case 'ready': return '🎁';
-      case 'delivering': return '🚚';
-      case 'completed': return '✓';
-      case 'cancelled': return '❌';
-      default: return '•';
+      case 'preparing': return 'OK';
+      case 'ready': return 'RDY';
+      case 'delivering': return 'WAY';
+      case 'completed': return 'OK';
+      case 'cancelled': return 'X';
+      default: return '.';
     }
   };
 
@@ -130,7 +130,7 @@ function OrderTrackingPage({ user }) {
     return (
       <div className="order-tracking-page">
         <div className="error-container">
-          <p className="error-icon">⚠️</p>
+          <p className="error-icon">!</p>
           <p className="error-message">{error || t('Заказ не найден', 'Buyurtma topilmadi')}</p>
           <button onClick={() => navigate('/profile')} className="btn-accent back-btn">
             {t('Вернуться', 'Qaytish')}
@@ -148,7 +148,7 @@ function OrderTrackingPage({ user }) {
     <div className="order-tracking-page">
       <div className="tracking-header">
         <button onClick={() => navigate('/profile')} className="back-button">
-          ← {t('Назад', 'Orqaga')}
+          <- {t('Назад', 'Orqaga')}
         </button>
         <h1>{t('Заказ', 'Buyurtma')} #{order.booking_code}</h1>
       </div>
@@ -161,7 +161,7 @@ function OrderTrackingPage({ user }) {
 
         {timeline?.estimated_ready_time && ['confirmed', 'preparing'].includes(order.status) && (
           <div className="estimated-time">
-            ⏱️ {t('Будет готов', 'Tayyor bo\'ladi')}: {timeline.estimated_ready_time}
+            {t('Будет готов', 'Tayyor bo\'ladi')}: {timeline.estimated_ready_time}
           </div>
         )}
 
@@ -190,7 +190,7 @@ function OrderTrackingPage({ user }) {
               const isCurrent = item.status === order.status;
 
               return (
-                <div key={index} className={`timeline-item ${isActive ? 'active' : ''} ${isCurrent ? 'current' : ''}`}>
+                <div key={index} className={`timeline-item ${isActive Vaqt: 'active' : ''} ${isCurrent Vaqt: 'current' : ''}`}>
                   <div className="timeline-marker">
                     <div className="timeline-dot"></div>
                     {index < timeline.timeline.length - 1 && <div className="timeline-line"></div>}
@@ -212,11 +212,11 @@ function OrderTrackingPage({ user }) {
         <h3>{t('Магазин', 'Do\'kon')}</h3>
         <p className="store-name">{order.store_name}</p>
         {order.store_address && (
-          <p className="store-address">📍 {order.store_address}</p>
+          <p className="store-address">Manzil: {order.store_address}</p>
         )}
         {order.store_phone && (
           <p className="store-phone">
-            <a href={`tel:${order.store_phone}`}>📞 {order.store_phone}</a>
+            <a href={`tel:${order.store_phone}`}>Tel: {order.store_phone}</a>
           </p>
         )}
       </div>
@@ -227,7 +227,7 @@ function OrderTrackingPage({ user }) {
           <h3>{order.delivery_address ? t('Доставка', 'Yetkazib berish') : t('Самовывоз', 'Olib ketish')}</h3>
           {order.delivery_address && (
             <>
-              <p className="delivery-address">📍 {order.delivery_address}</p>
+              <p className="delivery-address">Manzil: {order.delivery_address}</p>
               {order.delivery_cost && (
                 <p className="delivery-cost">
                   {t('Стоимость доставки', 'Yetkazib berish narxi')}: {order.delivery_cost.toLocaleString()} {t('сум', 'so\'m')}
@@ -236,10 +236,10 @@ function OrderTrackingPage({ user }) {
             </>
           )}
           {order.pickup_address && (
-            <p className="pickup-address">📍 {order.pickup_address}</p>
+            <p className="pickup-address">Manzil: {order.pickup_address}</p>
           )}
           {order.pickup_time && (
-            <p className="pickup-time">⏰ {order.pickup_time}</p>
+            <p className="pickup-time">Vaqt: {order.pickup_time}</p>
           )}
         </div>
       )}
@@ -247,7 +247,7 @@ function OrderTrackingPage({ user }) {
       {/* QR Code Button */}
       {canShowQR && (
         <button onClick={handleShowQR} className="btn-accent qr-button">
-          📱 {t('Показать QR код', 'QR kodni ko\'rsatish')}
+          {t('Показать QR код', 'QR kodni ko\'rsatish')}
         </button>
       )}
 
@@ -255,7 +255,7 @@ function OrderTrackingPage({ user }) {
       {showQR && order.qr_code && (
         <div className="qr-modal" onClick={handleCloseQR}>
           <div className="qr-modal-content" onClick={(e) => e.stopPropagation()}>
-            <button onClick={handleCloseQR} className="close-btn">✕</button>
+            <button onClick={handleCloseQR} className="close-btn">x</button>
             <h2>{t('QR код для выдачи', 'Olib ketish uchun QR kod')}</h2>
             <p className="qr-instruction">
               {t('Покажите этот код в магазине', 'Bu kodni do\'konda ko\'rsating')}

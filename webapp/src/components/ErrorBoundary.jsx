@@ -39,7 +39,7 @@ class ErrorBoundary extends React.Component {
       return (
         <div style={styles.container}>
           <div style={styles.content}>
-            <div style={styles.icon}>😔</div>
+            <div style={styles.icon}>!</div>
             <h1 style={styles.title}>Xatolik yuz berdi</h1>
             <p style={styles.message}>
               Ilovada kutilmagan xatolik yuz berdi. Iltimos, qaytadan urinib ko'ring.
@@ -57,10 +57,10 @@ class ErrorBoundary extends React.Component {
 
             <div style={styles.buttons}>
               <button style={styles.primaryButton} onClick={this.handleRetry}>
-                🔄 Qaytadan urinish
+                Qaytadan urinish
               </button>
               <button style={styles.secondaryButton} onClick={this.handleGoHome}>
-                🏠 Bosh sahifa
+                Bosh sahifa
               </button>
             </div>
           </div>

@@ -14,10 +14,10 @@ const Toast = memo(function Toast({ message, type = 'info', isVisible, onClose, 
   if (!isVisible) return null
 
   const icons = {
-    success: '✓',
-    error: '✕',
-    info: 'ℹ',
-    warning: '⚠'
+    success: 'OK',
+    error: 'ERR',
+    info: 'i',
+    warning: '!'
   }
 
   return (

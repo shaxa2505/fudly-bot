@@ -33,7 +33,7 @@ function RecentlyViewed() {
   return (
     <div className="recently-viewed-section">
       <div className="recently-viewed-header">
-        <h3 className="recently-viewed-title">⏱ So'nggi ko'rilgan</h3>
+        <h3 className="recently-viewed-title">So'nggi ko'rilgan</h3>
         <button
           className="recently-viewed-see-all"
           onClick={() => navigate('/recently-viewed')}
@@ -53,11 +53,11 @@ function RecentlyViewed() {
           >
             <div className="recently-viewed-card-image">
               <img
-                src={offer.photo || offer.photo_id || 'https://placehold.co/120x120/F5F5F5/CCCCCC?text=📷'}
+                src={offer.photo || offer.photo_id || 'https://placehold.co/120x120/F5F5F5/CCCCCC?text=IMG'}
                 alt={offer.name || offer.title}
                 loading="lazy"
                 onError={(e) => {
-                  e.target.src = 'https://placehold.co/120x120/F5F5F5/CCCCCC?text=📷'
+                  e.target.src = 'https://placehold.co/120x120/F5F5F5/CCCCCC?text=IMG'
                 }}
               />
             </div>

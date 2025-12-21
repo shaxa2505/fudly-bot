@@ -15,7 +15,7 @@ const PageLoader = memo(function PageLoader({ message }) {
       <div className="page-loader-content">
         <div className="page-loader-spinner">
           <div className="spinner-ring"></div>
-          <div className="spinner-icon">🍽️</div>
+          <div className="spinner-icon">F</div>
         </div>
         {message && <p className="page-loader-message">{message}</p>}
       </div>
@@ -31,7 +31,7 @@ export const LoadingScreen = memo(function LoadingScreen() {
     <div className="loading-screen">
       <div className="loading-screen-content">
         <div className="loading-logo">
-          <span className="loading-logo-emoji">🍽️</span>
+          <span className="loading-logo-emoji">F</span>
           <h1 className="loading-logo-text">Fudly</h1>
         </div>
         <div className="loading-bar">

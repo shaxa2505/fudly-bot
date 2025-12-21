@@ -126,7 +126,7 @@ function CategoryProductsPage() {
           onClick={() => removeFilterValue('categories', id)}
         >
           <span>{categoryDictionary[id]?.name || id}</span>
-          <span aria-hidden className="chip-close">×</span>
+          <span aria-hidden className="chip-close">x</span>
         </button>
       ))}
       {selectedFilters.brands.map(id => (
@@ -136,7 +136,7 @@ function CategoryProductsPage() {
           onClick={() => removeFilterValue('brands', id)}
         >
           <span>{brandDictionary[id]?.name || id}</span>
-          <span aria-hidden className="chip-close">×</span>
+          <span aria-hidden className="chip-close">x</span>
         </button>
       ))}
       <button className="clear-filters-btn" onClick={clearAllFilters}>

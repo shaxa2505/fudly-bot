@@ -207,14 +207,14 @@ function YanaPage() {
                         <p className="order-store">Do'kon: {order.store_name || 'Do\'kon'}</p>
                         <div className="order-meta">
                           <span>
-                            {order.quantity || 1} × {order.total_price && order.quantity
+                            {order.quantity || 1} x {order.total_price && order.quantity
                               x Math.round(order.total_price / order.quantity).toLocaleString()
-                              : '—'} so'm
+                              : '-'} so'm
                           </span>
                           <span className="order-total">
                             {order.total_price
                               x Math.round(order.total_price).toLocaleString()
-                              : '—'} so'm
+                              : '-'} so'm
                           </span>
                         </div>
                       </div>
@@ -341,7 +341,7 @@ function YanaPage() {
               </div>
             </div>
             <div className="feature-item">
-              <span className="feature-icon">🚚</span>
+              <span className="feature-icon">3</span>
               <div>
                 <h4>Yetkazib berish</h4>
                 <p>Tez va qulay</p>
@@ -358,7 +358,7 @@ function YanaPage() {
             </a>
           </div>
 
-          <p className="copyright">© 2024 Fudly. Barcha huquqlar himoyalangan.</p>
+          <p className="copyright">(c) 2024 Fudly. Barcha huquqlar himoyalangan.</p>
         </div>
       )}
 

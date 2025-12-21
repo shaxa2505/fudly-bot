@@ -151,7 +151,7 @@ function StoresPage() {
       <header className="sp-header">
         <div className="sp-header-top">
           <h1 className="sp-title">Do'konlar</h1>
-          <span className="sp-city">📍 {cityLatin}</span>
+          <span className="sp-city">Shahar: {cityLatin}</span>
         </div>
 
         <div className="sp-search">
@@ -166,7 +166,7 @@ function StoresPage() {
             onChange={(e) => setSearchQuery(e.target.value)}
           />
           {searchQuery && (
-            <button onClick={() => setSearchQuery('')}>✕</button>
+            <button onClick={() => setSearchQuery('')} aria-label="Qidiruvni tozalash">x</button>
           )}
         </div>
       </header>
@@ -228,7 +228,7 @@ function StoresPage() {
               <path d="M12 2v4M12 18v4M2 12h4M18 12h4" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
             </svg>
           )}
-          {userLocation ? 'Joylashuv ✓' : 'Joylashuv'}
+          {userLocation ? 'Joylashuv: faol' : 'Joylashuv'}
         </button>
       </div>
 
@@ -253,7 +253,7 @@ function StoresPage() {
           </div>
         ) : filteredStores.length === 0 ? (
           <div className="sp-empty">
-            <span>🏪</span>
+            <span>INFO</span>
             <h3>Do'konlar topilmadi</h3>
             <p>Bu shaharda hali do'konlar yo'q</p>
           </div>
@@ -293,22 +293,22 @@ function StoresPage() {
                   <h3 className="sp-card-name">{store.name}</h3>
 
                   {store.address && (
-                    <p className="sp-card-addr">📍 {store.address}</p>
+                    <p className="sp-card-addr">Manzil: {store.address}</p>
                   )}
 
                   <div className="sp-card-footer">
                     {store.distance != null && (
                       <span className="sp-card-distance">
-                        📏 {store.distance.toFixed(1)} km
+                        Masofa: {store.distance.toFixed(1)} km
                       </span>
                     )}
                     {store.rating > 0 && (
                       <span className="sp-card-rating">
-                        ⭐ {store.rating.toFixed(1)}
+                        Reyting: {store.rating.toFixed(1)}
                       </span>
                     )}
                     {store.delivery_enabled && (
-                      <span className="sp-card-delivery">🚚</span>
+                      <span className="sp-card-delivery">Yetkazib</span>
                     )}
                   </div>
                 </div>
@@ -335,9 +335,7 @@ function StoresPage() {
                 <div>
                   <h2>{selectedStore.name}</h2>
                   {selectedStore.address && (
-                    <p>
-                      <span>📍</span> {selectedStore.address}
-                    </p>
+                    <p>Manzil: {selectedStore.address}</p>
                   )}
                   {(storeReviews.average_rating > 0 || selectedStore.rating > 0) && (
                     <span className="sp-sheet-rating">
@@ -363,13 +361,13 @@ function StoresPage() {
                 className={`sp-sheet-tab ${activeTab === 'offers' ? 'active' : ''}`}
                 onClick={() => setActiveTab('offers')}
               >
-                📦 Takliflar ({storeOffers.length})
+                Takliflar ({storeOffers.length})
               </button>
               <button
                 className={`sp-sheet-tab ${activeTab === 'reviews' ? 'active' : ''}`}
                 onClick={() => setActiveTab('reviews')}
               >
-                ⭐ Sharhlar ({storeReviews.total_reviews})
+                Sharhlar ({storeReviews.total_reviews})
               </button>
             </div>
 
@@ -383,7 +381,7 @@ function StoresPage() {
               ) : activeTab === 'offers' ? (
                 storeOffers.length === 0 ? (
                   <div className="sp-sheet-empty">
-                    <span>📦</span>
+                    <span>INFO</span>
                     <p>Hozirda takliflar yo'q</p>
                   </div>
                 ) : (

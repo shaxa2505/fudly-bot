@@ -19,7 +19,7 @@ function FavoritesPage() {
       <div className="favorites-page">
         <header className="favorites-header">
           <button className="back-btn" onClick={() => navigate(-1)} aria-label="Orqaga">
-            ←
+            <-
           </button>
           <h1>Sevimlilar</h1>
           <div style={{ width: 44 }} />
@@ -53,7 +53,7 @@ function FavoritesPage() {
     <div className="favorites-page">
       <header className="favorites-header">
         <button className="back-btn" onClick={() => navigate(-1)} aria-label="Orqaga">
-          ←
+          <-
         </button>
         <h1>Sevimlilar ({favoritesCount})</h1>
         <div style={{ width: 44 }} />
@@ -63,17 +63,17 @@ function FavoritesPage() {
         {favorites.map(offer => (
           <div key={offer.id} className="favorite-card">
             <img
-              src={offer.photo || 'https://placehold.co/100x100/F5F5F5/CCCCCC?text=📷'}
+              src={offer.photo || 'https://placehold.co/100x100/F5F5F5/CCCCCC?text=IMG'}
               alt={offer.title}
               className="favorite-image"
               onClick={() => navigate('/product', { state: { offer } })}
-              onError={(e) => { e.target.src = 'https://placehold.co/100x100/F5F5F5/CCCCCC?text=📷' }}
+              onError={(e) => { e.target.src = 'https://placehold.co/100x100/F5F5F5/CCCCCC?text=IMG' }}
             />
 
             <div className="favorite-info" onClick={() => navigate('/product', { state: { offer } })}>
               <h3 className="favorite-title">{offer.title}</h3>
               {offer.store_name && (
-                <p className="favorite-store">🏪 {offer.store_name}</p>
+                <p className="favorite-store">Do'kon: {offer.store_name}</p>
               )}
               <div className="favorite-prices">
                 <span className="favorite-price">
@@ -100,7 +100,7 @@ function FavoritesPage() {
 
               {getQuantity(offer.id) > 0 ? (
                 <span className="in-cart-badge">
-                  ✓ Savatda ({getQuantity(offer.id)})
+                  Savatda ({getQuantity(offer.id)})
                 </span>
               ) : (
                 <button
