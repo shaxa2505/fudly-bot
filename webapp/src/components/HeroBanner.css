@@ -4,21 +4,21 @@
  */
 
 .hero-banner-container {
-  padding: 16px 16px 8px;
+  padding: 12px 16px 6px;
 }
 
 .hero-banner {
   position: relative;
-  border-radius: 20px;
-  padding: 24px;
-  height: 140px;
-  min-height: 140px;
-  max-height: 140px;
+  border-radius: 18px;
+  padding: 18px;
+  height: 120px;
+  min-height: 120px;
+  max-height: 120px;
   display: flex;
   align-items: center;
   cursor: pointer;
   overflow: hidden;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+  box-shadow: var(--shadow-card);
   transition: transform 0.2s ease, box-shadow 0.2s ease;
   -webkit-tap-highlight-color: transparent;
 }
@@ -46,8 +46,8 @@
 }
 
 .banner-title {
-  font-size: 22px;
-  font-weight: 800;
+  font-size: 20px;
+  font-weight: 700;
   color: #FFFFFF;
   margin: 0 0 6px;
   line-height: 1.2;
@@ -55,7 +55,7 @@
 }
 
 .banner-subtitle {
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 500;
   color: rgba(255, 255, 255, 0.9);
   margin: 0 0 12px;
@@ -63,18 +63,18 @@
 
 .banner-cta {
   display: inline-block;
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 600;
   color: #FFFFFF;
   background: rgba(255, 255, 255, 0.2);
   backdrop-filter: blur(4px);
   -webkit-backdrop-filter: blur(4px);
-  padding: 8px 16px;
-  border-radius: 20px;
+  padding: 6px 12px;
+  border-radius: 999px;
 }
 
 .banner-icon {
-  font-size: 64px;
+  font-size: 54px;
   line-height: 1;
   opacity: 0.9;
   filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.1));
@@ -122,12 +122,12 @@
 /* Mobile optimizations */
 @media (max-width: 360px) {
   .hero-banner {
-    padding: 20px;
-    min-height: 120px;
+    padding: 16px;
+    min-height: 108px;
   }
 
   .banner-title {
-    font-size: 18px;
+    font-size: 16px;
   }
 
   .banner-subtitle {
@@ -135,6 +135,6 @@
   }
 
   .banner-icon {
-    font-size: 48px;
+    font-size: 44px;
   }
 }

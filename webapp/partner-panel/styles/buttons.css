@@ -128,19 +128,9 @@
 }
 
 .btn-outline:hover:not(:disabled) {
-    background: var(--gray-50);
-    border-color: var(--gray-300);
-}
-    background: transparent;
-    color: var(--text);
-    border: 2px solid var(--border);
-}
-
-.btn-outline:hover:not(:disabled) {
     border-color: var(--primary);
     color: var(--primary);
     background: var(--primary-light);
-    transform: translateY(-2px);
 }
 
 /* === Icon Button === */

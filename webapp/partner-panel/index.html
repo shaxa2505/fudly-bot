@@ -193,10 +193,10 @@
                 </div>
             </div>
             <div class="header-actions">
-                <button class="icon-btn" onclick="refreshAll()">
+                <button class="icon-btn" onclick="refreshAll()" aria-label="Обновить данные">
                     <i data-lucide="refresh-cw" style="width: 20px; height: 20px;"></i>
                 </button>
-                <button class="icon-btn">
+                <button class="icon-btn" aria-label="Уведомления">
                     <i data-lucide="bell" style="width: 20px; height: 20px;"></i>
                     <span class="notification-badge" id="notificationCount" style="display: none;">0</span>
                 </button>
@@ -205,7 +205,7 @@
     </header>
 
     <!-- Main Content Container -->
-    <main class="content" style="padding-top: 80px; padding-bottom: 80px; min-height: 100vh;">
+    <main class="content">
         <div class="loading">
             <div class="spinner"></div>
         </div>
@@ -215,19 +215,19 @@
     <nav class="bottom-nav">
         <button class="nav-item active" onclick="switchView('dashboard')">
             <span class="nav-icon"><i data-lucide="home"></i></span>
-            <span>Главная</span>
+            <span class="nav-label">Главная</span>
         </button>
         <button class="nav-item" onclick="switchView('products')">
             <span class="nav-icon"><i data-lucide="package"></i></span>
-            <span>Товары</span>
+            <span class="nav-label">Товары</span>
         </button>
         <button class="nav-item" onclick="switchView('stats')">
             <span class="nav-icon"><i data-lucide="bar-chart-3"></i></span>
-            <span>Статистика</span>
+            <span class="nav-label">Статистика</span>
         </button>
         <button class="nav-item" onclick="switchView('settings')">
             <span class="nav-icon"><i data-lucide="settings"></i></span>
-            <span>Еще</span>
+            <span class="nav-label">Еще</span>
         </button>
     </nav>
 
@@ -749,6 +749,9 @@
 
             // Initialize Lucide icons
             if (typeof lucide !== 'undefined') lucide.createIcons();
+            if (typeof window.initUXImprovements === 'function') {
+                window.initUXImprovements();
+            }
         }
 
         function renderOrderCard(order) {
@@ -843,11 +846,11 @@
             if (!orders.length) {
                 return `
                     <div class="empty-state">
-                        <div class="empty-state-icon">
+                        <div class="empty-icon">
                             <i data-lucide="package-x" style="width: 96px; height: 96px;"></i>
                         </div>
                         <p class="empty-title">Нет заказов</p>
-                        <p class="empty-description">Когда появятся новые заказы, они отобразятся здесь</p>
+                        <p class="empty-subtitle">Когда появятся новые заказы, они отобразятся здесь</p>
                     </div>
                 `;
             }
@@ -1228,14 +1231,6 @@
             } catch (error) {
                 button.disabled = false;
                 button.innerHTML = originalText;
-            }
-        }
-
-        function toggleOrderSection(sectionId) {
-            const section = document.getElementById(sectionId);
-            if (section) {
-                section.classList.toggle('collapsed');
-                if (typeof lucide !== 'undefined') lucide.createIcons();
             }
         }
 

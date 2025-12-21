@@ -1,6 +1,6 @@
 .recently-viewed-section {
   padding: 0 16px;
-  margin-bottom: 24px;
+  margin-bottom: 18px;
 }
 
 .recently-viewed-header {
@@ -11,9 +11,9 @@
 }
 
 .recently-viewed-title {
-  font-size: 18px;
-  font-weight: 600;
-  color: #1A1A1A;
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--color-text-primary);
   margin: 0;
 }
 
@@ -21,11 +21,11 @@
   display: flex;
   align-items: center;
   gap: 4px;
-  color: #22C55E;
+  color: var(--color-primary);
   background: none;
   border: none;
-  font-size: 14px;
-  font-weight: 500;
+  font-size: 13px;
+  font-weight: 600;
   cursor: pointer;
   padding: 0;
 }
@@ -36,12 +36,12 @@
 
 .recently-viewed-scroll {
   display: flex;
-  gap: 12px;
+  gap: 10px;
   overflow-x: auto;
   scroll-snap-type: x mandatory;
   scrollbar-width: none;
   -webkit-overflow-scrolling: touch;
-  padding-bottom: 4px;
+  padding-bottom: 6px;
 }
 
 .recently-viewed-scroll::-webkit-scrollbar {
@@ -50,11 +50,12 @@
 
 .recently-viewed-card {
   flex-shrink: 0;
-  width: 120px;
-  background: #fff;
-  border-radius: 12px;
+  width: 128px;
+  background: var(--color-bg-primary);
+  border-radius: 14px;
   overflow: hidden;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  border: 1px solid var(--color-border-light);
+  box-shadow: 0 8px 16px rgba(15, 23, 42, 0.08);
   scroll-snap-align: start;
   cursor: pointer;
   transition: transform 0.2s ease;
@@ -65,9 +66,9 @@
 }
 
 .recently-viewed-card-image {
-  width: 120px;
-  height: 100px;
-  background: #F5F5F5;
+  width: 128px;
+  height: 96px;
+  background: var(--color-bg-secondary);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -84,18 +85,18 @@
   padding: 8px;
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 4px;
 }
 
 .recently-viewed-card-price {
   font-size: 13px;
-  font-weight: 600;
-  color: #22C55E;
+  font-weight: 700;
+  color: var(--color-text-primary);
 }
 
 .recently-viewed-card-title {
   font-size: 12px;
-  color: #666;
+  color: var(--color-text-tertiary);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;

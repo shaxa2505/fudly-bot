@@ -7,16 +7,21 @@
 let viewMode = localStorage.getItem('viewMode') || 'grid'; // 'grid' | 'compact'
 let selectedProducts = new Set();
 let productAnalytics = {}; // Кэш аналитики
+let uxBootstrapped = false;
 
 // === 1. ИНИЦИАЛИЗАЦИЯ ===
 function initUXImprovements() {
     initViewModeToggle();
     initSmartBadges();
-    initInlinePriceEdit();
-    initKeyboardShortcuts();
     initQuickFilters();
     initBulkActions();
     calculateProductMetrics();
+
+    if (!uxBootstrapped) {
+        initInlinePriceEdit();
+        initKeyboardShortcuts();
+        uxBootstrapped = true;
+    }
 }
 
 // === 2. ПЕРЕКЛЮЧЕНИЕ РЕЖИМОВ ОТОБРАЖЕНИЯ ===

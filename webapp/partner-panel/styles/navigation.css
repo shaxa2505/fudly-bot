@@ -7,35 +7,42 @@
     bottom: 0;
     left: 0;
     right: 0;
-    height: 56px;
-    background: #FFFFFF;
-    border-top: 1px solid #E8E8E8;
+    height: var(--nav-height);
+    background: var(--bg-secondary);
+    border-top: 1px solid var(--border);
     z-index: 1000;
     display: flex;
     align-items: center;
     justify-content: space-around;
     padding: 0;
     padding-bottom: env(safe-area-inset-bottom);
-    box-shadow: 0 -1px 3px rgba(0, 0, 0, 0.04);
+    box-shadow: var(--shadow-sm);
 }
 
 .nav-item {
+    position: relative;
     flex: 1;
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    gap: 2px;
+    gap: 4px;
     padding: 6px 8px;
-    color: #999999;
+    color: var(--text-secondary);
     text-decoration: none;
-    font-size: 10px;
-    font-weight: 500;
+    font-size: 12px;
+    font-weight: 600;
     cursor: pointer;
-    transition: color 0.15s;
+    transition: color var(--duration-fast) var(--ease-out);
     border: none;
     background: none;
     outline: none;
+}
+
+.nav-label {
+    font-size: 12px;
+    line-height: 1.1;
+    letter-spacing: 0.2px;
 }
 
 .nav-icon {
@@ -46,18 +53,19 @@
     justify-content: center;
 }
 
-.nav-icon svg {
+.nav-icon svg,
+.nav-icon i {
     width: 24px;
     height: 24px;
     stroke-width: 2;
 }
 
 .nav-item.active {
-    color: #000000;
+    color: var(--text);
 }
 
 .nav-item.active .nav-icon {
-    color: #21A038;
+    color: var(--primary);
 }
 
 .nav-item.active .nav-icon svg {
@@ -65,54 +73,53 @@
 }
 
 .nav-item:active {
-    opacity: 0.5;
+    opacity: 0.6;
 }
+
+@media (min-width: 768px) {
     .bottom-nav {
-        height: 65px;
+        height: 68px;
     }
 
     .nav-item {
-        gap: 2px;
+        gap: 6px;
+        padding: 8px 12px;
     }
 
     .nav-icon {
-        width: 40px;
-        height: 40px;
+        width: 28px;
+        height: 28px;
     }
 
     .nav-icon svg,
     .nav-icon i {
-        width: 22px;
-        height: 22px;
+        width: 26px;
+        height: 26px;
     }
 
     .nav-label {
-        font-size: 10px;
+        font-size: 12px;
     }
 
     .nav-item.floating {
-        top: -16px;
+        top: -12px;
     }
 
     .nav-item.floating .nav-icon {
-        width: 52px;
-        height: 52px;
+        width: 48px;
+        height: 48px;
     }
 }
 
 /* === Compact Mode === */
-@media (max-width: 480px) {
+@media (max-width: 360px) {
     .nav-label {
         display: none;
     }
 
-    .nav-item::before {
-        display: none;
-    }
-
     .nav-icon {
-        width: 48px;
-        height: 48px;
+        width: 26px;
+        height: 26px;
     }
 
     .nav-item.active .nav-icon {
