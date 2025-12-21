@@ -6,7 +6,7 @@
 
 .home-page {
   min-height: 100vh;
-  padding-bottom: var(--spacing-xl);
+  padding-bottom: calc(var(--bottom-nav-height) + var(--spacing-xl));
   background:
     radial-gradient(1000px 420px at 10% -10%, rgba(249, 115, 22, 0.18) 0%, transparent 60%),
     radial-gradient(900px 500px at 95% 0%, rgba(15, 118, 110, 0.16) 0%, transparent 55%),

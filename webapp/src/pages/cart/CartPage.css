@@ -6,7 +6,7 @@
 .cart-page {
   min-height: 100vh;
   background: var(--color-bg-secondary);
-  padding-bottom: 100px;
+  padding-bottom: calc(var(--bottom-nav-height) + 64px);
 }
 
 /* Header */
@@ -275,7 +275,7 @@
 /* Checkout Button */
 .checkout-btn {
   position: fixed;
-  bottom: 80px;
+  bottom: calc(var(--bottom-nav-height) + var(--spacing-md));
   left: var(--spacing-lg);
   right: var(--spacing-lg);
   padding: var(--spacing-lg);

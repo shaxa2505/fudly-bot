@@ -6,7 +6,7 @@
 .checkout-page {
   min-height: 100vh;
   background: linear-gradient(135deg, #FFFCF8 0%, #F6EFE7 100%);
-  padding: 0 0 80px 0;
+  padding: 0 0 calc(var(--bottom-nav-height) + var(--spacing-xl)) 0;
 }
 
 .checkout-header {

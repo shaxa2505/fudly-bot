@@ -6,7 +6,7 @@
 .favorites-page {
   min-height: 100vh;
   background: var(--color-bg-secondary);
-  padding-bottom: 90px;
+  padding-bottom: calc(var(--bottom-nav-height) + var(--spacing-xl));
 }
 
 /* Header */

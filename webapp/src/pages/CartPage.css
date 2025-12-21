@@ -8,7 +8,7 @@
   background:
     radial-gradient(900px 360px at 12% -10%, rgba(249, 115, 22, 0.12) 0%, transparent 60%),
     linear-gradient(180deg, #FFFCF8 0%, var(--color-bg-secondary) 100%);
-  padding-bottom: 100px;
+  padding-bottom: calc(var(--bottom-nav-height) + 64px);
 }
 
 /* Header */
