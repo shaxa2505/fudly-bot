@@ -350,117 +350,97 @@ class NotificationTemplates:
             header = (
                 "⏳ <b>BUYURTMA TEKSHIRILMOQDA</b>"
                 if awaiting_payment and payment_method == "card"
-                else "✅ <b>BUYURTMA QABUL QILINDI!</b>"
+                else "✅ <b>BUYURTMA YUBORILDI</b>"
             )
 
             lines = [
                 header,
-                "━━━━━━━━━━━━━━━━━━━━",
                 "",
                 f"📦 #{', #'.join(order_ids)}",
                 f"🏪 {_esc(store_name)}",
             ]
 
             if order_type == "pickup":
-                lines.append("📋 🏪 O'zim olib ketaman")
+                lines.append("🏪 Самовывоз")
                 lines.append(f"📍 {_esc(store_address)}")
                 if pickup_codes:
-                    lines.append("")
-                    lines.append(f"🎫 <b>Kod: {', '.join(pickup_codes)}</b>")
+                    lines.append(f"🎫 Kod: <b>{', '.join(pickup_codes)}</b>")
             else:
-                lines.append("📋 🚚 Yetkazib berish")
+                lines.append("🚚 Yetkazib berish")
                 if delivery_address:
                     lines.append(f"📍 {_esc(delivery_address)}")
 
             lines.append("")
-            lines.append("<b>Mahsulotlar:</b>")
             for item in items:
                 subtotal = item["price"] * item["quantity"]
                 lines.append(
-                    f"• {_esc(item['title'])} × {item['quantity']} = {int(subtotal):,} {currency}"
+                    f"• {_esc(item['title'])} × {item['quantity']} — {int(subtotal):,} {currency}"
                 )
 
             lines.append("")
-            lines.append("━━━━━━━━━━━━━━━━━━━━")
-            lines.append(f"💵 Mahsulotlar: {int(total):,} {currency}")
 
             if order_type == "delivery":
                 lines.append(f"🚚 Yetkazish: {int(delivery_price):,} {currency}")
 
-            lines.append(f"💰 <b>JAMI: {int(total + delivery_price):,} {currency}</b>")
+            lines.append(f"💰 <b>Jami: {int(total + delivery_price):,} {currency}</b>")
 
             payment_text = "💵 Naqd" if payment_method == "cash" else "💳 Karta"
-            lines.extend(["", payment_text, ""])
+            lines.append(payment_text)
 
             lines.append("")
-            lines.append("━━━━━━━━━━━━━━━━━━━━")
-            lines.append("⏰ <b>KEYINGI QADAM?</b>")
-            lines.append("Do'kon tasdiqlashini kuting")
-            lines.append("(odatda 5-10 daqiqa)")
-            lines.append("")
-            lines.append("✨ Buyurtma tayyor bo'lganda yozamiz!")
+            lines.append("⏳ Do'kon tasdiqlashini kuting (5-10 min)")
 
             if order_type == "pickup" and pickup_codes:
                 lines.append("")
-                lines.append("💡 <b>Maslahat:</b> olishda sotuvchiga kodni ko'rsating")
+                lines.append("💡 Kodni sotuvchiga ko'rsating")
 
         else:  # Russian
             header = (
                 "⏳ <b>ЗАКАЗ ОТПРАВЛЕН НА ПРОВЕРКУ</b>"
                 if awaiting_payment and payment_method == "card"
-                else "✅ <b>ЗАКАЗ ОФОРМЛЕН!</b>"
+                else "✅ <b>ЗАКАЗ ОТПРАВЛЕН</b>"
             )
 
             lines = [
                 header,
-                "━━━━━━━━━━━━━━━━━━━━",
                 "",
                 f"📦 #{', #'.join(order_ids)}",
                 f"🏪 {_esc(store_name)}",
             ]
 
             if order_type == "pickup":
-                lines.append("📋 🏪 Самовывоз")
+                lines.append("🏪 Самовывоз")
                 lines.append(f"📍 {_esc(store_address)}")
                 if pickup_codes:
-                    lines.append("")
-                    lines.append(f"🎫 <b>Код: {', '.join(pickup_codes)}</b>")
+                    lines.append(f"🎫 Код: <b>{', '.join(pickup_codes)}</b>")
             else:
-                lines.append("📋 🚚 Доставка")
+                lines.append("🚚 Доставка")
                 if delivery_address:
                     lines.append(f"📍 {_esc(delivery_address)}")
 
             lines.append("")
-            lines.append("<b>Товары:</b>")
             for item in items:
                 subtotal = item["price"] * item["quantity"]
                 lines.append(
-                    f"• {_esc(item['title'])} × {item['quantity']} = {int(subtotal):,} {currency}"
+                    f"• {_esc(item['title'])} × {item['quantity']} — {int(subtotal):,} {currency}"
                 )
 
             lines.append("")
-            lines.append("━━━━━━━━━━━━━━━━━━━━")
-            lines.append(f"💵 Товары: {int(total):,} {currency}")
 
             if order_type == "delivery":
                 lines.append(f"🚚 Доставка: {int(delivery_price):,} {currency}")
 
-            lines.append(f"💰 <b>ИТОГО: {int(total + delivery_price):,} {currency}</b>")
+            lines.append(f"💰 <b>Итого: {int(total + delivery_price):,} {currency}</b>")
 
             payment_text = "💵 Наличные" if payment_method == "cash" else "💳 Карта"
-            lines.extend(["", payment_text, ""])
+            lines.append(payment_text)
 
             lines.append("")
-            lines.append("━━━━━━━━━━━━━━━━━━━━")
-            lines.append("⏰ <b>ЧТО ДАЛЬШЕ?</b>")
-            lines.append("Ожидайте подтверждения от заведения")
-            lines.append("(обычно 5-10 минут)")
-            lines.append("")
-            lines.append("✨ Мы напишем, когда заказ будет готов!")
+            lines.append("⏳ Ожидайте подтверждения (5-10 мин)")
 
             if order_type == "pickup" and pickup_codes:
                 lines.append("")
-                lines.append("💡 <b>Совет:</b> покажите код продавцу при получении")
+                lines.append("💡 Покажите код продавцу при получении")
 
         return "\n".join(lines)
 

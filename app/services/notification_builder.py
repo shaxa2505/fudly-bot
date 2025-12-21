@@ -96,10 +96,9 @@ class NotificationBuilder:
                     f"{ProgressBar.pickup(1, lang)}\n\n"
                     f"📦 #{order_id}\n"
                     f"🏪 {self._esc(store_name)}\n"
-                    + (f"📍 {self._esc(store_address)}\n\n" if store_address else "\n")
-                    + (f"🎫 <b>SIZNING KODINGIZ: {pickup_code}</b>\n\n" if pickup_code else "\n")
-                    + "⏰ <b>2 SOAT ICHIDA OLIB KETING</b>\n"
-                    + "❗ Muddati o'tsa bron bekor bo'ladi"
+                    + (f"📍 {self._esc(store_address)}\n" if store_address else "")
+                    + (f"🎫 <b>Kod: {pickup_code}</b>\n" if pickup_code else "")
+                    + "\n👉 Tayyor bo'lganda xabar beramiz!"
                 )
             else:  # ru
                 return (
@@ -107,10 +106,9 @@ class NotificationBuilder:
                     f"{ProgressBar.pickup(1, lang)}\n\n"
                     f"📦 #{order_id}\n"
                     f"🏪 {self._esc(store_name)}\n"
-                    + (f"📍 {self._esc(store_address)}\n\n" if store_address else "\n")
-                    + (f"🎫 <b>ВАШ КОД: {pickup_code}</b>\n\n" if pickup_code else "\n")
-                    + "⏰ <b>ЗАБЕРИТЕ В ТЕЧЕНИЕ 2 ЧАСОВ</b>\n"
-                    + "❗ По истечении срока бронь отменится"
+                    + (f"📍 {self._esc(store_address)}\n" if store_address else "")
+                    + (f"🎫 <b>Код: {pickup_code}</b>\n" if pickup_code else "")
+                    + "\n👉 Сообщим, когда будет готов!"
                 )
         else:  # delivery
             if lang == "uz":
@@ -118,7 +116,7 @@ class NotificationBuilder:
                     f"🎉 <b>Buyurtma qabul qilindi!</b>\n\n"
                     f"{ProgressBar.delivery(1, lang)}\n"
                     f"{ProgressBar.delivery_labels(lang)}\n\n"
-                    f"📦 Buyurtma #{order_id} — {self._esc(store_name)}\n"
+                    f"📦 #{order_id} — {self._esc(store_name)}\n"
                     f"👨‍🍳 Tayyorlanmoqda..."
                 )
             else:  # ru
@@ -126,7 +124,7 @@ class NotificationBuilder:
                     f"🎉 <b>Заказ принят!</b>\n\n"
                     f"{ProgressBar.delivery(1, lang)}\n"
                     f"{ProgressBar.delivery_labels(lang)}\n\n"
-                    f"📦 Заказ #{order_id} — {self._esc(store_name)}\n"
+                    f"📦 #{order_id} — {self._esc(store_name)}\n"
                     f"👨‍🍳 Готовится..."
                 )
     
@@ -142,11 +140,11 @@ class NotificationBuilder:
         "Заказ в пути! ~30-60 мин"
         """
         courier_text = (
-            f"\n📞 Kuryer: <code>{self._esc(courier_phone)}</code>"
+            f"\n📞 {self._esc(courier_phone)}"
             if courier_phone
             else ""
         ) if lang == "uz" else (
-            f"\n📞 Курьер: <code>{self._esc(courier_phone)}</code>"
+            f"\n📞 {self._esc(courier_phone)}"
             if courier_phone
             else ""
         )
@@ -187,29 +185,29 @@ class NotificationBuilder:
                 return (
                     f"🎊 <b>Buyurtma topshirildi!</b>\n\n"
                     f"{ProgressBar.pickup(2, lang)}\n\n"
-                    f"📦 Buyurtma #{order_id} — {self._esc(store_name)}\n\n"
-                    f"Rahmat! Yoqdimi? ⭐"
+                    f"📦 #{order_id} — {self._esc(store_name)}\n\n"
+                    f"Rahmat! ⭐"
                 )
             else:  # ru
                 return (
                     f"🎊 <b>Заказ выдан!</b>\n\n"
                     f"{ProgressBar.pickup(2, lang)}\n\n"
-                    f"📦 Заказ #{order_id} — {self._esc(store_name)}\n\n"
-                    f"Спасибо! Понравилось? ⭐"
+                    f"📦 #{order_id} — {self._esc(store_name)}\n\n"
+                    f"Спасибо! ⭐"
                 )
         else:  # delivery
             if lang == "uz":
                 return (
                     f"🎊 <b>Yetkazildi!</b>\n\n"
                     f"{ProgressBar.delivery(3, lang)}\n\n"
-                    f"📦 Buyurtma #{order_id} — {self._esc(store_name)}\n\n"
+                    f"📦 #{order_id} — {self._esc(store_name)}\n\n"
                     f"Rahmat! ⭐"
                 )
             else:  # ru
                 return (
                     f"🎊 <b>Доставлено!</b>\n\n"
                     f"{ProgressBar.delivery(3, lang)}\n\n"
-                    f"📦 Заказ #{order_id} — {self._esc(store_name)}\n\n"
+                    f"📦 #{order_id} — {self._esc(store_name)}\n\n"
                     f"Спасибо! ⭐"
                 )
     
