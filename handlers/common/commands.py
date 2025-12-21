@@ -162,7 +162,9 @@ async def handle_qr_pickup(message: types.Message, db: DatabaseProtocol, booking
             offer_title = offer[2] if len(offer) > 2 else offer_title
 
     if not entity_id or not store_id:
-        await message.answer("❌ Неверные данные заказа" if lang == "ru" else "❌ Noto'g'ri buyurtma")
+        await message.answer(
+            "❌ Неверные данные заказа" if lang == "ru" else "❌ Noto'g'ri buyurtma"
+        )
         return
 
     store = db.get_store(store_id) if store_id else None
@@ -176,7 +178,11 @@ async def handle_qr_pickup(message: types.Message, db: DatabaseProtocol, booking
 
     customer = db.get_user_model(customer_id) if customer_id else None
     if customer:
-        customer_name = getattr(customer, "name", None) or getattr(customer, "first_name", None) or customer_name
+        customer_name = (
+            getattr(customer, "name", None)
+            or getattr(customer, "first_name", None)
+            or customer_name
+        )
         customer_phone = getattr(customer, "phone", None) or ""
 
     is_owner = user_id == owner_id
@@ -727,9 +733,7 @@ async def choose_language(callback: types.CallbackQuery, state: FSMContext, db: 
         db.update_user_language(callback.from_user.id, lang)
 
         try:
-            await callback.message.edit_text(
-                get_text(lang, "language_changed"), parse_mode="HTML"
-            )
+            await callback.message.edit_text(get_text(lang, "language_changed"), parse_mode="HTML")
         except Exception as e:
             logger.debug("Could not edit language confirmation: %s", e)
 

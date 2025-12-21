@@ -1235,68 +1235,12 @@ async def create_booking(
     store_address = get_store_field(store, "address", "")
     owner_id = get_store_field(store, "owner_id")
 
-    # Calculate total (no delivery cost for pickup)
-    total = calculate_total(offer_price, quantity, 0)
-    currency = "so'm" if lang == "uz" else "сум"
-
-    # Beautiful customer notification with photo
-    if lang == "uz":
-        customer_msg = (
-            f"✅ <b>BUYURTMA YARATILDI!</b>\n"
-            f"━━━━━━━━━━━━━━━━━━\n\n"
-            f"📦 Buyurtma: <b>#{order_id}</b>\n"
-            f"🔑 Kod: <code>{_esc(code) if code else '-'}</code>\n\n"
-            f"🛒 <b>{_esc(offer_title)}</b>\n"
-            f"📦 Miqdor: <b>{quantity}</b> dona\n"
-            f"💰 Jami: <b>{total:,}</b> {currency}\n\n"
-            f"🏪 {_esc(store_name)}\n"
-            f"📍 {_esc(store_address)}\n\n"
-            f"━━━━━━━━━━━━━━━━━━\n"
-            f"⏳ <i>Sotuvchi tasdig'ini kutmoqda...</i>\n"
-            f"━━━━━━━━━━━━━━━━━━\n\n"
-            f"💡 Olishda sotuvchiga kodni ko'rsating."
-        )
-    else:
-        customer_msg = (
-            f"✅ <b>Заказ создан!</b>\n"
-            f"━━━━━━━━━━━━━━━━━━\n\n"
-            f"📦 Заказ: <b>#{order_id}</b>\n"
-            f"🔑 Код: <code>{_esc(code) if code else '-'}</code>\n\n"
-            f"🛒 <b>{_esc(offer_title)}</b>\n"
-            f"📦 Количество: <b>{quantity}</b> шт\n"
-            f"💰 Итого: <b>{total:,}</b> {currency}\n\n"
-            f"🏪 {_esc(store_name)}\n"
-            f"📍 {_esc(store_address)}\n\n"
-            f"━━━━━━━━━━━━━━━━━━\n"
-            f"⏳ <i>Ожидаем подтверждения продавца...</i>\n"
-            f"━━━━━━━━━━━━━━━━━━\n\n"
-            f"💡 Покажите код продавцу при получении."
-        )
-
-    # Try to send with photo for beautiful notification
-    # IMPORTANT: Don't use reply_markup here! Messages with ReplyKeyboard can't be edited later.
-    # The keyboard is already shown to user, we just need an editable status message.
-    # 
-    # ✅ FIX: Notification already sent by UnifiedOrderService in create_cart_order()
-    # We only need to save the message_id for status updates
-    offer_photo = get_offer_field(offer, "photo") if offer else None
-    sent_message = None
+    # NOTE: Customer notification is sent by UnifiedOrderService in create_cart_order()
+    # No need to send duplicate notification here
     
-    # NOTE: UnifiedOrderService.create_cart_order() already sent the notification to customer
-    # This is a placeholder for future message_id tracking from UnifiedOrderService
-    # For now, we skip sending duplicate notification here
-    
-    # TODO: Get message_id from UnifiedOrderService response or track it differently
-
-    # Save message_id for live editing (status updates will edit this message)
-    if sent_message and hasattr(db, "set_order_customer_message_id"):
-        try:
-            db.set_order_customer_message_id(int(order_id), sent_message.message_id)
-            logger.info(
-                f"Saved customer_message_id={sent_message.message_id} for order #{order_id}"
-            )
-        except Exception as e:
-            logger.warning(f"Failed to save customer_message_id: {e}")
+    # TODO: Get message_id from UnifiedOrderService response for status tracking
+    # Currently UnifiedOrderService sends the notification but doesn't return message_id
+    # For live status updates, we need to track the message_id
 
     # Notify partner
     if owner_id:

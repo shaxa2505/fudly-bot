@@ -200,6 +200,7 @@ class OrderMixin:
         order_type: str,
         delivery_address: str = None,
         payment_method: str = "cash",
+        notify_customer: bool = True,
     ) -> dict[str, Any]:
         """Create orders for multiple cart items, grouped by store.
 
@@ -209,9 +210,14 @@ class OrderMixin:
             order_type: 'pickup' or 'delivery'
             delivery_address: Delivery address (for delivery orders)
             payment_method: 'cash' or 'card'
+            notify_customer: Whether to send notification (deprecated, handled by UnifiedOrderService)
 
         Returns:
             Dictionary with created_orders list and total info
+            
+        Note:
+            The notify_customer parameter is accepted for backward compatibility
+            but ignored. Notifications are now handled by UnifiedOrderService.
         """
         created_orders = []
         failed_items = []
