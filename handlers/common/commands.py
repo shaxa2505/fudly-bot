@@ -623,13 +623,12 @@ async def cmd_start(message: types.Message, state: FSMContext, db: DatabaseProto
     lang = db.get_user_language(user_id)
     user_phone = user.phone if user else None
     if not user_phone:
-        await callback.message.answer(
+        await message.answer(
             get_text(lang, "welcome_phone_step"),
             parse_mode="HTML",
             reply_markup=phone_request_keyboard(lang),
         )
         await state.set_state(Registration.phone)
-        await callback.answer()
         return
 
     user_city = user.city
