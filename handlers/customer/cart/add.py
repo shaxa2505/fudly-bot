@@ -5,8 +5,8 @@ from aiogram import F, Router, types
 from aiogram.fsm.context import FSMContext
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
-from .common import esc
 from . import common
+from .common import esc
 from .storage import cart_storage
 
 
@@ -34,17 +34,15 @@ def build_cart_add_card_text(
     if original_price and original_price > price:
         discount_pct = int(((original_price - price) / original_price) * 100)
         text_parts.append(
-            f"<s>{original_price // 100:,.0f}</s> → <b>{price // 100:,.0f} сум</b> <code>(-{discount_pct}%)</code>"
+            f"<s>{original_price:,.0f}</s> → <b>{price:,.0f} сум</b> <code>(-{discount_pct}%)</code>"
         )
     else:
-        text_parts.append(f"💰 <b>{price // 100:,.0f} сум</b>")
+        text_parts.append(f"💰 <b>{price:,.0f} сум</b>")
 
     text_parts.append(
-        (
-            f"📦 Количество: <b>{quantity} {unit}</b>"
-            if lang == "ru"
-            else f"📦 Miqdor: <b>{quantity} {unit}</b>"
-        )
+        f"📦 Количество: <b>{quantity} {unit}</b>"
+        if lang == "ru"
+        else f"📦 Miqdor: <b>{quantity} {unit}</b>"
     )
 
     stock_label = "В наличии" if lang == "ru" else "Omborda"
@@ -64,11 +62,9 @@ def build_cart_add_card_text(
 
     total = price * quantity
     text_parts.append(
-        (
-            f"💳 <b>ИТОГО: {total:,.0f} сум</b>"
-            if lang == "ru"
-            else f"💳 <b>JAMI: {total:,.0f} so'm</b>"
-        )
+        f"💳 <b>ИТОГО: {total:,.0f} сум</b>"
+        if lang == "ru"
+        else f"💳 <b>JAMI: {total:,.0f} so'm</b>"
     )
 
     return "\n".join(text_parts)
@@ -344,22 +340,16 @@ def register(router: Router) -> None:
 
             # Append small hint about cart
             if lang == "ru":
-                hint = (
-                    "\n\n✅ Товар добавлен в корзину.\n"
-                    + (
-                        "Можно открыть корзину или вернуться к акциям."
-                        if source == "hot"
-                        else "Можно открыть корзину или вернуться к результатам поиска."
-                    )
+                hint = "\n\n✅ Товар добавлен в корзину.\n" + (
+                    "Можно открыть корзину или вернуться к акциям."
+                    if source == "hot"
+                    else "Можно открыть корзину или вернуться к результатам поиска."
                 )
             else:
-                hint = (
-                    "\n\n✅ Mahsulot savatga qo'shildi.\n"
-                    + (
-                        "Savatni ochishingiz yoki aksiyalarga qaytishingiz mumkin."
-                        if source == "hot"
-                        else "Savatni ochishingiz yoki natijalarga qaytishingiz mumkin."
-                    )
+                hint = "\n\n✅ Mahsulot savatga qo'shildi.\n" + (
+                    "Savatni ochishingiz yoki aksiyalarga qaytishingiz mumkin."
+                    if source == "hot"
+                    else "Savatni ochishingiz yoki natijalarga qaytishingiz mumkin."
                 )
 
             text += hint
@@ -462,9 +452,7 @@ def register(router: Router) -> None:
 
         text_lines: list[str] = []
         text_lines.append(f"🏪 <b>{esc(store_name)}</b>\n")
-        text_lines.append(
-            f"{'Mahsulotlar:' if lang == 'uz' else 'Товары:'}\n"
-        )
+        text_lines.append(f"{'Mahsulotlar:' if lang == 'uz' else 'Товары:'}\n")
 
         ITEMS_PER_PAGE = 5
         page = 0
@@ -483,18 +471,14 @@ def register(router: Router) -> None:
             price = get_offer_field(offer, "discount_price", 0)
             qty = get_offer_field(offer, "quantity", 0)
 
-            text_lines.append(
-                f"{i}. {esc(title)} - {price:,} сум (в наличии: {qty})"
-            )
+            text_lines.append(f"{i}. {esc(title)} - {price:,} сум (в наличии: {qty})")
 
         text = "\n".join(text_lines)
 
         kb = InlineKeyboardBuilder()
 
         for offer in page_offers:
-            offer_id = get_offer_field(offer, "id", 0) or get_offer_field(
-                offer, "offer_id", 0
-            )
+            offer_id = get_offer_field(offer, "id", 0) or get_offer_field(offer, "offer_id", 0)
             title = get_offer_field(offer, "title", "Товар")
 
             kb.button(
@@ -532,11 +516,7 @@ def register(router: Router) -> None:
         cart_count = cart_storage.get_cart_count(user_id)
         if cart_count > 0:
             kb.button(
-                text=(
-                    f"🛒 Корзина ({cart_count})"
-                    if lang == "ru"
-                    else f"🛒 Savat ({cart_count})"
-                ),
+                text=(f"🛒 Корзина ({cart_count})" if lang == "ru" else f"🛒 Savat ({cart_count})"),
                 callback_data="view_cart",
             )
             kb.adjust(1)

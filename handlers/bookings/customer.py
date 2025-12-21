@@ -13,9 +13,9 @@ from aiogram.utils.keyboard import InlineKeyboardBuilder
 
 from app.core.constants import OFFERS_PER_PAGE
 from app.keyboards import cancel_keyboard, main_menu_customer, phone_request_keyboard
+from handlers.bookings.utils import format_price
 from handlers.common.states import BookOffer, OrderDelivery, Registration
 from handlers.common.utils import is_main_menu_button
-from handlers.bookings.utils import format_price
 from localization import get_text
 from logging_config import logger
 
@@ -101,10 +101,10 @@ def build_order_card_text(
     lines.append("─" * 25)
 
     # Price with discount - same style as product card
-    # Convert from kopeks to sums for display
-    price_sums = int(price) // 100
-    original_price_sums = int(original_price) // 100 if original_price else 0
-    
+    # Use prices directly from database
+    price_sums = int(price)
+    original_price_sums = int(original_price) if original_price else 0
+
     if original_price and original_price > price:
         discount_pct = round((1 - price / original_price) * 100)
         lines.append(
@@ -614,10 +614,10 @@ async def pbook_cancel(callback: types.CallbackQuery, state: FSMContext) -> None
                             )
                         text += f"<b>{idx}.</b> {title}\n"
                         if offer.original_price and discount_pct > 0:
-                            text += f"    <s>{int(offer.original_price // 100):,}</s> → <b>{int(offer.discount_price // 100):,}</b> {currency} <i>(-{discount_pct}%)</i>\n"
+                            text += f"    <s>{int(offer.original_price):,}</s> → <b>{int(offer.discount_price):,}</b> {currency} <i>(-{discount_pct}%)</i>\n"
                         else:
                             price_kopeks = offer.discount_price or offer.price or 0
-                            text += f"    <b>{int(price_kopeks // 100):,}</b> {currency}\n"
+                            text += f"    <b>{int(price_kopeks):,}</b> {currency}\n"
 
                     hint = "👆 Tanlang" if lang == "uz" else "👆 Выберите товар"
                     text += f"\n{hint}"
@@ -1235,10 +1235,14 @@ async def create_booking(
     store_name = get_store_field(store, "name", "Магазин")
     store_address = get_store_field(store, "address", "")
     owner_id = get_store_field(store, "owner_id")
+    
+    # Get offer photo
+    offer_photo_val = get_offer_field(offer, "photo")
+    offer_photo = str(offer_photo_val) if offer_photo_val else None
 
     # NOTE: Customer notification is sent by UnifiedOrderService in create_cart_order()
     # No need to send duplicate notification here
-    
+
     # TODO: Get message_id from UnifiedOrderService response for status tracking
     # Currently UnifiedOrderService sends the notification but doesn't return message_id
     # For live status updates, we need to track the message_id
@@ -1356,9 +1360,7 @@ async def notify_partner_new_pickup_order(
         if sent_msg and hasattr(db, "set_order_seller_message_id"):
             try:
                 db.set_order_seller_message_id(order_id, sent_msg.message_id)
-                logger.info(
-                    f"Saved seller_message_id={sent_msg.message_id} for order#{order_id}"
-                )
+                logger.info(f"Saved seller_message_id={sent_msg.message_id} for order#{order_id}")
             except Exception as save_err:
                 logger.error(f"Failed to save seller_message_id: {save_err}")
     except Exception as e:
@@ -1613,14 +1615,14 @@ async def confirm_cancel_booking(callback: types.CallbackQuery) -> None:
             get_text(lang, "booking_cancelled") or "Бронирование отменено", show_alert=True
         )
         await safe_edit_reply_markup(callback.message)
-        
+
         # Show main menu so user can continue
-        cancel_text = "✅ Бронирование отменено. Количество товара возвращено." if lang == "ru" else "✅ Bron bekor qilindi. Mahsulot miqdori qaytarildi."
-        await bot.send_message(
-            user_id,
-            cancel_text,
-            reply_markup=main_menu_customer(lang)
+        cancel_text = (
+            "✅ Бронирование отменено. Количество товара возвращено."
+            if lang == "ru"
+            else "✅ Bron bekor qilindi. Mahsulot miqdori qaytarildi."
         )
+        await bot.send_message(user_id, cancel_text, reply_markup=main_menu_customer(lang))
     else:
         await callback.answer(get_text(lang, "error"), show_alert=True)
 

@@ -121,7 +121,7 @@ async def add_offer_start(message: types.Message, state: FSMContext) -> None:
     """Start offer creation - select store and category."""
     # Clear any previous FSM state
     await state.clear()
-    
+
     if not db:
         await message.answer("System error")
         return
@@ -647,7 +647,7 @@ async def skip_photo(callback: types.CallbackQuery, state: FSMContext) -> None:
 async def _finalize_offer(target: types.Message, state: FSMContext, lang: str) -> None:
     """Save offer to database."""
     from datetime import datetime, timedelta
-    
+
     data = await state.get_data()
 
     try:
@@ -667,17 +667,17 @@ async def _finalize_offer(target: types.Message, state: FSMContext, lang: str) -
         now = datetime.now()
         available_from = now.replace(hour=8, minute=0, second=0, microsecond=0)
         available_until = now.replace(hour=23, minute=0, second=0, microsecond=0)
-        
-        # Convert prices from rubles to kopeks (multiply by 100)
-        original_price_kopeks = int(data["original_price"] * 100)
-        discount_price_kopeks = int(data["discount_price"] * 100)
+
+        # Store prices directly as entered
+        original_price_value = int(data["original_price"])
+        discount_price_value = int(data["discount_price"])
 
         offer_id = db.add_offer(
             store_id=data["store_id"],
             title=data["title"],
             description=data["title"],
-            original_price=original_price_kopeks,  # Now in kopeks
-            discount_price=discount_price_kopeks,  # Now in kopeks
+            original_price=original_price_value,
+            discount_price=discount_price_value,
             quantity=quantity,
             available_from=available_from.time().isoformat(),  # ISO time format
             available_until=available_until.time().isoformat(),  # ISO time format

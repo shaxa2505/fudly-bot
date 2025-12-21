@@ -171,7 +171,7 @@ function OrderTrackingPage({ user }) {
             {t('Количество', 'Miqdor')}: {order.quantity} {t('шт', 'dona')}
           </p>
           <p className="price">
-            {t('Сумма', 'Summa')}: {Math.round(order.total_price / 100).toLocaleString()} {t('сум', 'so\'m')}
+            {t('Сумма', 'Summa')}: {Math.round(order.total_price).toLocaleString()} {t('сум', 'so\'m')}
           </p>
         </div>
 

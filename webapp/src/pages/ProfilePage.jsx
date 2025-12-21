@@ -205,10 +205,10 @@ function ProfilePage({ onNavigate }) {
                     )}
                     <div className="order-meta">
                       <span className="order-quantity">
-                        {order.quantity} × {Math.round(order.total_price / order.quantity / 100).toLocaleString()} {lang === 'uz' ? 'so\'m' : 'сум'}
+                        {order.quantity} × {Math.round(order.total_price / order.quantity).toLocaleString()} {lang === 'uz' ? 'so\'m' : 'сум'}
                       </span>
                       <span className="order-total">
-                        {Math.round(order.total_price / 100).toLocaleString()} {lang === 'uz' ? 'so\'m' : 'сум'}
+                        {Math.round(order.total_price).toLocaleString()} {lang === 'uz' ? 'so\'m' : 'сум'}
                       </span>
                     </div>
                     <div className="order-footer">

@@ -176,12 +176,12 @@ const OfferCard = memo(function OfferCard({ offer, cartQuantity = 0, onAddToCart
         {/* Prices */}
         <div className="price-section">
           <div className="price-main">
-            {Math.round(offer.discount_price / 100).toLocaleString('ru-RU')}
+            {Math.round(offer.discount_price).toLocaleString('ru-RU')}
             <span className="currency"> so'm</span>
           </div>
           {offer.original_price > offer.discount_price && (
             <div className="price-original">
-              {Math.round(offer.original_price / 100).toLocaleString('ru-RU')}
+              {Math.round(offer.original_price).toLocaleString('ru-RU')}
             </div>
           )}
         </div>

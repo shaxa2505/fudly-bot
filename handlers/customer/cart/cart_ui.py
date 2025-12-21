@@ -35,10 +35,10 @@ def build_cart_add_card_text(
     if original_price and original_price > price:
         discount_pct = int(((original_price - price) / original_price) * 100)
         text_parts.append(
-            f"<s>{original_price // 100:,.0f}</s> → <b>{price // 100:,.0f} сум</b> <code>(-{discount_pct}%)</code>"
+            f"<s>{original_price:,.0f}</s> → <b>{price:,.0f} сум</b> <code>(-{discount_pct}%)</code>"
         )
     else:
-        text_parts.append(f"💰 <b>{price // 100:,.0f} сум</b>")
+        text_parts.append(f"💰 <b>{price:,.0f} сум</b>")
 
     # Quantity
     text_parts.append(

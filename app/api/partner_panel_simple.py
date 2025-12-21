@@ -12,13 +12,24 @@ from datetime import datetime, timedelta
 from typing import Optional
 
 import pytz
-from fastapi import APIRouter, File, Form, Header, HTTPException, Query, Request, UploadFile, WebSocket, WebSocketDisconnect
+from fastapi import (
+    APIRouter,
+    File,
+    Form,
+    Header,
+    HTTPException,
+    Query,
+    Request,
+    UploadFile,
+    WebSocket,
+    WebSocketDisconnect,
+)
 from slowapi import Limiter
 from slowapi.util import get_remote_address
 
+from app.api.websocket_manager import get_connection_manager
 from app.services.stats import PartnerTotals, Period, get_partner_stats
 from app.services.unified_order_service import PaymentStatus, get_unified_order_service
-from app.api.websocket_manager import get_connection_manager
 from database_protocol import DatabaseProtocol
 
 router = APIRouter(tags=["partner-panel"])
@@ -142,6 +153,7 @@ def verify_telegram_webapp(authorization: str) -> int:
     try:
         parsed = dict(urllib.parse.parse_qsl(init_data))
         import logging
+
         if _is_dev_env():
             logging.debug(f"PARSED KEYS: {list(parsed.keys())}")
 
@@ -181,10 +193,8 @@ def verify_telegram_webapp(authorization: str) -> int:
                         detail="Session expired. Please reopen from Telegram bot.",
                     )
 
-                msg = f"uid={user_id}\nauth_date={auth_ts}".encode("utf-8")
-                expected_sig = hmac.new(
-                    bot_token.encode("utf-8"), msg, hashlib.sha256
-                ).hexdigest()
+                msg = f"uid={user_id}\nauth_date={auth_ts}".encode()
+                expected_sig = hmac.new(bot_token.encode("utf-8"), msg, hashlib.sha256).hexdigest()
                 if not hmac.compare_digest(str(sig), expected_sig):
                     raise HTTPException(status_code=401, detail="Invalid URL signature")
 
@@ -312,16 +322,19 @@ async def get_profile(authorization: str = Header(None)):
 # WEBSOCKET - Real-time notifications
 # ============================================
 
+
 @router.websocket("/ws/partner/{store_id}")
-async def websocket_partner(websocket: WebSocket, store_id: int, authorization: str | None = Query(None)):
+async def websocket_partner(
+    websocket: WebSocket, store_id: int, authorization: str | None = Query(None)
+):
     """
     WebSocket endpoint for real-time partner notifications.
-    
+
     Messages sent to partner:
     - {"type": "new_order", "data": {...}}
     - {"type": "order_status_changed", "data": {"order_id": 123, "status": "preparing"}}
     - {"type": "order_cancelled", "data": {"order_id": 123, "reason": "..."}}
-    
+
     Usage (frontend):
         const ws = new WebSocket('wss://api.example.com/api/partner/ws/partner/123');
         ws.onmessage = (event) => {
@@ -332,8 +345,9 @@ async def websocket_partner(websocket: WebSocket, store_id: int, authorization: 
         };
     """
     import logging
+
     logging.info(f"🔌 WebSocket connection attempt for store {store_id}")
-    
+
     manager = get_connection_manager()
     try:
         if not authorization:
@@ -353,37 +367,36 @@ async def websocket_partner(websocket: WebSocket, store_id: int, authorization: 
             await websocket.close(code=1008)
         finally:
             return
-    
+
     try:
         await manager.connect(store_id, websocket)
         logging.info(f"✅ WebSocket connected: store_id={store_id}")
-        
+
         # Send connection confirmation
-        await websocket.send_json({
-            "type": "connected",
-            "data": {
-                "store_id": store_id,
-                "timestamp": datetime.now().isoformat()
+        await websocket.send_json(
+            {
+                "type": "connected",
+                "data": {"store_id": store_id, "timestamp": datetime.now().isoformat()},
             }
-        })
-        
+        )
+
         # Keep connection alive and handle ping/pong
         while True:
             try:
                 # Wait for client messages (ping/pong)
                 data = await websocket.receive_text()
-                
+
                 # Handle ping
                 if data == "ping":
                     await websocket.send_json({"type": "pong"})
-                
+
             except WebSocketDisconnect:
                 logging.info(f"🔌 Client disconnected: store_id={store_id}")
                 break
             except Exception as e:
                 logging.error(f"❌ WebSocket error for store {store_id}: {e}")
                 break
-    
+
     finally:
         manager.disconnect(store_id, websocket)
         logging.info(f"🔌 WebSocket closed: store_id={store_id}")
@@ -434,9 +447,9 @@ async def list_products(authorization: str = Header(None), status: Optional[str]
     # Map to frontend-expected format
     products = []
     for o in offers:
-        # Convert kopeks → rubles for display
-        discount_price_rubles = o["discount_price"] / 100 if o["discount_price"] else 0
-        original_price_rubles = o.get("original_price") / 100 if o.get("original_price") else None
+        # Use prices directly from database
+        discount_price = o["discount_price"] if o["discount_price"] else 0
+        original_price = o.get("original_price") if o.get("original_price") else None
 
         # Build photo URL if photo_id exists
         photo_url = None
@@ -450,9 +463,9 @@ async def list_products(authorization: str = Header(None), status: Optional[str]
             "description": o.get("description") or "",
             "category": o.get("category") or "other",
             # Frontend expects 'price' as main price
-            "price": discount_price_rubles,
-            "discount_price": discount_price_rubles,  # Keep for compatibility
-            "original_price": original_price_rubles,
+            "price": discount_price,
+            "discount_price": discount_price,  # Keep for compatibility
+            "original_price": original_price,
             # Frontend expects 'stock'
             "stock": o["quantity"],
             "quantity": o["quantity"],  # Keep for compatibility
@@ -490,7 +503,7 @@ async def create_product(
     1 sum = 100 kopeks for precise calculation.
     Times are generated automatically (08:00 - 23:00).
     Validation happens via Pydantic models.
-    
+
     v22.0: Added stock_quantity support.
     """
     from datetime import datetime, timedelta
@@ -500,7 +513,7 @@ async def create_product(
     telegram_id = verify_telegram_webapp(authorization)
     user, store = get_partner_with_store(telegram_id)
     db = get_db()
-    
+
     # Use stock_quantity if provided, otherwise use quantity
     actual_stock = stock_quantity if stock_quantity is not None else quantity
 
@@ -528,13 +541,13 @@ async def create_product(
         expiry = (now + timedelta(days=7)).date()
 
     try:
-        # Validate with Pydantic model (converts sums to kopeks)
+        # Validate with Pydantic model (store prices as entered)
         offer_data = OfferCreate(
             store_id=store["store_id"],
             title=title,
             description=description or title,
-            original_price=original_price * 100,  # Convert sums → kopeks
-            discount_price=discount_price * 100,  # Convert sums → kopeks
+            original_price=original_price,
+            discount_price=discount_price,
             quantity=quantity,
             available_from=available_from,
             available_until=available_until,
@@ -592,7 +605,7 @@ async def update_product(
 
     Prices accepted in SUMS and converted to kopeks internally.
     1 sum = 100 kopeks.
-    
+
     v22.0: Added stock_quantity support.
     """
     import logging
@@ -645,7 +658,7 @@ async def update_product(
             if current_offer and current_offer.get("status") == "out_of_stock":
                 update_fields.append("status = %s")
                 update_values.append("active")
-    
+
     if stock_quantity is not None:
         update_fields.append("stock_quantity = %s")
         update_values.append(stock_quantity)
@@ -753,7 +766,7 @@ async def cancel_order(
 ):
     """
     Cancel order with reason (v22.0).
-    
+
     Valid reasons:
     - out_of_stock: Товар закончился
     - cant_fulfill: Не могу выполнить
@@ -764,28 +777,34 @@ async def cancel_order(
     telegram_id = verify_telegram_webapp(authorization)
     user, store = get_partner_with_store(telegram_id)
     db = get_db()
-    
+
     # Parse request body
     try:
         body = await request.json()
         cancel_reason = body.get("reason")
         cancel_comment = body.get("comment", "")
-        
+
         if not cancel_reason:
             raise HTTPException(status_code=400, detail="Missing 'reason' field")
-            
+
         # Validate reason
-        valid_reasons = ["out_of_stock", "cant_fulfill", "customer_request", "technical_issue", "other"]
+        valid_reasons = [
+            "out_of_stock",
+            "cant_fulfill",
+            "customer_request",
+            "technical_issue",
+            "other",
+        ]
         if cancel_reason not in valid_reasons:
             raise HTTPException(
-                status_code=400, 
-                detail=f"Invalid reason. Must be one of: {', '.join(valid_reasons)}"
+                status_code=400,
+                detail=f"Invalid reason. Must be one of: {', '.join(valid_reasons)}",
             )
     except HTTPException:
         raise
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"Invalid request body: {e}")
-    
+
     # Get order and verify ownership
     with db.get_connection() as conn:
         cursor = conn.cursor()
@@ -795,43 +814,43 @@ async def cancel_order(
             FROM orders o
             WHERE o.order_id = %s
             """,
-            (order_id,)
+            (order_id,),
         )
         order = cursor.fetchone()
-        
+
         if not order:
             raise HTTPException(status_code=404, detail="Order not found")
-        
+
         # Verify store ownership
         if order[3] != store["store_id"]:
             raise HTTPException(status_code=403, detail="Not your order")
-        
+
         # Check if already cancelled
         if order[2] == "cancelled":
             raise HTTPException(status_code=400, detail="Order already cancelled")
-        
+
         # Update order status with cancellation details
         cursor.execute(
             """
-            UPDATE orders 
+            UPDATE orders
             SET order_status = 'cancelled',
                 cancel_reason = %s,
                 cancel_comment = %s
             WHERE order_id = %s
             """,
-            (cancel_reason, cancel_comment, order_id)
+            (cancel_reason, cancel_comment, order_id),
         )
         conn.commit()
-    
+
     # TODO: Send notification to customer via bot
     # This would require bot instance which we don't have in API context
     # For now, customer will see updated status in their orders list
-    
+
     return {
         "order_id": order_id,
         "status": "cancelled",
         "reason": cancel_reason,
-        "comment": cancel_comment
+        "comment": cancel_comment,
     }
 
 

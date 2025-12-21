@@ -622,10 +622,10 @@ def setup(
 
             if discount_pct > 0:
                 lines.append(
-                    f"<s>{offer.original_price // 100:,.0f}</s> → <b>{offer.discount_price // 100:,.0f} сум</b> (-{discount_pct}%)"
+                    f"<s>{offer.original_price:,.0f}</s> → <b>{offer.discount_price:,.0f} сум</b> (-{discount_pct}%)"
                 )
             else:
-                lines.append(f"💰 <b>{offer.discount_price // 100:,.0f} сум</b>")
+                lines.append(f"💰 <b>{offer.discount_price:,.0f} сум</b>")
 
             lines.append(f"📦 В наличии: {max_quantity} шт")
             if offer.expiry_date:
@@ -1066,10 +1066,10 @@ def setup(
 
                 if discount_pct > 0:
                     lines.append(
-                        f"<s>{details.original_price // 100:,.0f}</s> → <b>{details.discount_price // 100:,.0f} сум</b> (-{discount_pct}%)"
+                        f"<s>{details.original_price:,.0f}</s> → <b>{details.discount_price:,.0f} сум</b> (-{discount_pct}%)"
                     )
                 else:
-                    lines.append(f"💰 <b>{details.discount_price // 100:,.0f} сум</b>")
+                    lines.append(f"💰 <b>{details.discount_price:,.0f} сум</b>")
 
                 lines.append(f"📦 В наличии: {max_quantity} шт")
                 if details.expiry_date:

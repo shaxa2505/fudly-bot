@@ -89,10 +89,10 @@ def format_offer_line(
     lines = [f"<b>{idx}.</b> {title}"]
     if discount_pct > 0:
         lines.append(
-            f"    <s>{int(original_price) // 100:,}</s> → <b>{int(discount_price) // 100:,}</b> {currency} <i>(-{discount_pct}%)</i>"
+            f"    <s>{int(original_price):,}</s> → <b>{int(discount_price):,}</b> {currency} <i>(-{discount_pct}%)</i>"
         )
     else:
-        lines.append(f"    💰 <b>{int(discount_price) // 100:,}</b> {currency}")
+        lines.append(f"    💰 <b>{int(discount_price):,}</b> {currency}")
     return "\n".join(lines)
 
 
@@ -142,10 +142,10 @@ def format_offer_card_text(
     if original_price and original_price > discount_price:
         discount_pct = round((1 - discount_price / original_price) * 100)
         lines.append(
-            f"<s>{int(original_price) // 100:,}</s> → <b>{int(discount_price) // 100:,} {currency}</b> (-{discount_pct}%)"
+            f"<s>{int(original_price):,}</s> → <b>{int(discount_price):,} {currency}</b> (-{discount_pct}%)"
         )
     else:
-        lines.append(f"💰 <b>{int(discount_price) // 100:,} {currency}</b>")
+        lines.append(f"💰 <b>{int(discount_price):,} {currency}</b>")
 
     stock_label = "В наличии" if lang == "ru" else "Mavjud"
     lines.append(f"📦 {stock_label}: {quantity} шт")

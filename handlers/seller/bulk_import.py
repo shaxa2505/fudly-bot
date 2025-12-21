@@ -420,16 +420,16 @@ async def confirm_bulk_import(callback: types.CallbackQuery, state: FSMContext):
 
     for offer in offers:
         try:
-            # Convert prices from sums to kopeks (multiply by 100)
-            original_price_kopeks = int(offer["original_price"] * 100)
-            discount_price_kopeks = int(offer["discount_price"] * 100)
-            
+            # Store prices directly as entered
+            original_price_value = int(offer["original_price"])
+            discount_price_value = int(offer["discount_price"])
+
             db.add_offer(
                 store_id=store_id,
                 title=offer["title"],
                 description=offer.get("description", ""),
-                original_price=original_price_kopeks,
-                discount_price=discount_price_kopeks,
+                original_price=original_price_value,
+                discount_price=discount_price_value,
                 quantity=offer["quantity"],
                 available_from=available_from,
                 available_until=available_until,
@@ -721,16 +721,16 @@ async def receive_zip(message: types.Message, state: FSMContext):
                 available_from = now.strftime("%Y-%m-%d %H:%M:%S")
                 available_until = (now + timedelta(days=30)).strftime("%Y-%m-%d %H:%M:%S")
 
-                # Convert prices from sums to kopeks (multiply by 100)
-                original_price_kopeks = int(original_price * 100)
-                discount_price_kopeks = int(discount_price * 100)
+                # Store prices directly as entered
+                original_price_value = int(original_price)
+                discount_price_value = int(discount_price)
 
                 db.add_offer(
                     store_id=store_id,
                     title=title,
                     description=description,
-                    original_price=original_price_kopeks,
-                    discount_price=discount_price_kopeks,
+                    original_price=original_price_value,
+                    discount_price=discount_price_value,
                     quantity=quantity,
                     available_from=available_from,
                     available_until=available_until,

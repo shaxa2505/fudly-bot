@@ -9,8 +9,8 @@ from aiogram import Dispatcher, F, types
 from aiogram.fsm.context import FSMContext
 
 from app.core.utils import normalize_city
-from app.keyboards import offers_category_filter
 from app.keyboards import offers as offer_keyboards
+from app.keyboards import offers_category_filter
 from app.services.offer_service import OfferDetails, OfferListItem, OfferService
 from app.templates import offers as offer_templates
 from handlers.common import BrowseOffers
@@ -18,7 +18,11 @@ from localization import get_product_categories, get_text, normalize_category
 
 from .browse_helpers import (
     callback_message as _callback_message,
+)
+from .browse_helpers import (
     invalid_number_text as _invalid_number_text,
+)
+from .browse_helpers import (
     range_text as _range_text,
 )
 
@@ -298,10 +302,10 @@ def register_hot(
 
         if discount_pct > 0:
             lines.append(
-                f"<s>{int(offer.original_price) // 100:,}</s> → <b>{int(offer.discount_price) // 100:,} {currency}</b> (-{discount_pct}%)"
+                f"<s>{int(offer.original_price):,}</s> → <b>{int(offer.discount_price):,} {currency}</b> (-{discount_pct}%)"
             )
         else:
-            lines.append(f"💰 <b>{int(offer.discount_price) // 100:,} {currency}</b>")
+            lines.append(f"💰 <b>{int(offer.discount_price):,} {currency}</b>")
 
         # Use actual unit from offer, fallback to dona/шт
         unit_label = offer.unit if offer.unit else ("dona" if lang == "uz" else "шт")
@@ -623,7 +627,7 @@ def register_hot(
                 else:
                     text += f"<b>{idx}.</b> {title}\n"
                 # Price + store on second line
-                text += f"    💰 <b>{int(offer.discount_price // 100):,}</b> {currency}"
+                text += f"    💰 <b>{int(offer.discount_price):,}</b> {currency}"
                 if store_name:
                     text += f" • 🏪 {store_name}"
                 text += "\n\n"
@@ -710,10 +714,10 @@ def register_hot(
         if offer.original_price and offer.discount_price:
             discount_pct = round((1 - offer.discount_price / offer.original_price) * 100)
             lines.append(
-                f"<s>{int(offer.original_price // 100):,}</s> → <b>{int(offer.discount_price // 100):,}</b> {currency} <b>(-{discount_pct}%)</b>"
+                f"<s>{int(offer.original_price):,}</s> → <b>{int(offer.discount_price):,}</b> {currency} <b>(-{discount_pct}%)</b>"
             )
         else:
-            lines.append(f"💰 <b>{int(offer.discount_price // 100):,}</b> {currency}")
+            lines.append(f"💰 <b>{int(offer.discount_price):,}</b> {currency}")
 
         lines.append("─" * 25)
         lines.append("")

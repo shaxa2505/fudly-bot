@@ -16,8 +16,14 @@ from localization import get_text
 
 from .browse_helpers import (
     callback_message as _callback_message,
+)
+from .browse_helpers import (
     invalid_number_text as _invalid_number_text,
+)
+from .browse_helpers import (
     no_stores_text as _no_stores_text,
+)
+from .browse_helpers import (
     range_text as _range_text,
 )
 
@@ -38,9 +44,7 @@ def register_stores(
         lang = db.get_user_language(message.from_user.id)
 
         await message.answer(
-            get_text(
-                lang, "choose_category"
-            ),  # Reuse existing text key for now
+            get_text(lang, "choose_category"),  # Reuse existing text key for now
             reply_markup=business_type_keyboard(lang),
         )
 
@@ -577,10 +581,10 @@ def register_stores(
 
         if discount_pct > 0:
             lines.append(
-                f"<s>{int(offer.original_price // 100):,}</s> → <b>{int(offer.discount_price // 100):,} {currency}</b> (-{discount_pct}%)"
+                f"<s>{int(offer.original_price):,}</s> → <b>{int(offer.discount_price):,} {currency}</b> (-{discount_pct}%)"
             )
         else:
-            lines.append(f"💰 <b>{int(offer.discount_price // 100):,} {currency}</b>")
+            lines.append(f"💰 <b>{int(offer.discount_price):,} {currency}</b>")
 
         # Use actual unit from offer, fallback to dona/шт
         unit_label = offer.unit if offer.unit else ("dona" if lang == "uz" else "шт")
@@ -931,12 +935,12 @@ def register_stores(
                 text += f"<b>{idx}.</b> {title}\n"
                 # Price on second line - compact
                 if offer.original_price and discount_pct > 0:
-                    text += f"    <s>{int(offer.original_price // 100):,}</s> → <b>{int(offer.discount_price // 100):,}</b> {currency} <i>(-{discount_pct}%)</i>\n"
+                    text += f"    <s>{int(offer.original_price):,}</s> → <b>{int(offer.discount_price):,}</b> {currency} <i>(-{discount_pct}%)</i>\n"
                 else:
-                    price_kopeks = getattr(offer, 'discount_price', 0) or getattr(offer, 'price', 0) or 0
-                    text += (
-                        f"    <b>{int(price_kopeks // 100):,}</b> {currency}\n"
+                    price_kopeks = (
+                        getattr(offer, "discount_price", 0) or getattr(offer, "price", 0) or 0
                     )
+                    text += f"    <b>{int(price_kopeks):,}</b> {currency}\n"
 
             # Hint at bottom
             hint = "👆 Tanlang" if lang == "uz" else "👆 Выберите товар"
