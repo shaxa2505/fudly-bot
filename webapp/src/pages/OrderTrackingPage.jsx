@@ -132,7 +132,7 @@ function OrderTrackingPage({ user }) {
         <div className="error-container">
           <p className="error-icon">⚠️</p>
           <p className="error-message">{error || t('Заказ не найден', 'Buyurtma topilmadi')}</p>
-          <button onClick={() => navigate('/profile')} className="back-btn">
+          <button onClick={() => navigate('/profile')} className="btn-accent back-btn">
             {t('Вернуться', 'Qaytish')}
           </button>
         </div>
@@ -171,7 +171,7 @@ function OrderTrackingPage({ user }) {
             {t('Количество', 'Miqdor')}: {order.quantity} {t('шт', 'dona')}
           </p>
           <p className="price">
-            {t('Сумма', 'Summa')}: {order.total_price.toLocaleString()} {t('сум', 'so\'m')}
+            {t('Сумма', 'Summa')}: {Math.round(order.total_price / 100).toLocaleString()} {t('сум', 'so\'m')}
           </p>
         </div>
 
@@ -246,7 +246,7 @@ function OrderTrackingPage({ user }) {
 
       {/* QR Code Button */}
       {canShowQR && (
-        <button onClick={handleShowQR} className="qr-button">
+        <button onClick={handleShowQR} className="btn-accent qr-button">
           📱 {t('Показать QR код', 'QR kodni ko\'rsatish')}
         </button>
       )}

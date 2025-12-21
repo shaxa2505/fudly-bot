@@ -80,7 +80,7 @@ function StoresPage() {
       console.error('Invalid store data:', store)
       return
     }
-    
+
     setSelectedStore(store)
     setLoadingOffers(true)
     setActiveTab('offers')
@@ -432,11 +432,11 @@ function StoresPage() {
                             <h4>{offer.title}</h4>
                             <div className="sp-offer-price">
                               <span className="sp-offer-current">
-                                {Math.round(offer.discount_price).toLocaleString()} so'm
+                                {Math.round(offer.discount_price / 100).toLocaleString()} so'm
                               </span>
                               {offer.original_price > offer.discount_price && (
                                 <span className="sp-offer-old">
-                                  {Math.round(offer.original_price).toLocaleString()}
+                                  {Math.round(offer.original_price / 100).toLocaleString()}
                                 </span>
                               )}
                               {discountPercent > 0 && (

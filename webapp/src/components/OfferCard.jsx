@@ -60,16 +60,16 @@ const OfferCard = memo(function OfferCard({ offer, cartQuantity = 0, onAddToCart
   const handleFavoriteClick = useCallback((e) => {
     e.stopPropagation()
     window.Telegram?.WebApp?.HapticFeedback?.impactOccurred?.('medium')
-    
+
     // Optimistic update - update UI immediately
     toggleFavorite(offer)
-    
+
     // Sync with backend in background
     const userId = window.Telegram?.WebApp?.initDataUnsafe?.user?.id
     if (userId) {
       const isCurrentlyFavorite = isFavorite(offer.id)
       const apiCall = isCurrentlyFavorite ? api.removeFavorite : api.addFavorite
-      
+
       apiCall(offer.id).catch((error) => {
         // Rollback on error
         console.error('Failed to sync favorite:', error)
@@ -176,12 +176,12 @@ const OfferCard = memo(function OfferCard({ offer, cartQuantity = 0, onAddToCart
         {/* Prices */}
         <div className="price-section">
           <div className="price-main">
-            {Math.round(offer.discount_price).toLocaleString('ru-RU')}
+            {Math.round(offer.discount_price / 100).toLocaleString('ru-RU')}
             <span className="currency"> so'm</span>
           </div>
           {offer.original_price > offer.discount_price && (
             <div className="price-original">
-              {Math.round(offer.original_price).toLocaleString('ru-RU')}
+              {Math.round(offer.original_price / 100).toLocaleString('ru-RU')}
             </div>
           )}
         </div>

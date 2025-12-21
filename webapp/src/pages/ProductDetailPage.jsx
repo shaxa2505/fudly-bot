@@ -43,7 +43,7 @@ function ProductDetailPage() {
     }
     setAddedToCart(true)
     window.Telegram?.WebApp?.HapticFeedback?.notificationOccurred?.('success')
-    
+
     // Show success feedback for 3 seconds
     setTimeout(() => setAddedToCart(false), 3000)
   }
@@ -55,7 +55,7 @@ function ProductDetailPage() {
   }
 
   const handleShare = () => {
-    const text = `${offer.title}\n💰 ${Math.round(offer.discount_price).toLocaleString()} so'm\n🏪 ${offer.store_name || ''}`
+    const text = `${offer.title}\n💰 ${Math.round(offer.discount_price / 100).toLocaleString()} so'm\n🏪 ${offer.store_name || ''}`
     if (navigator.share) {
       navigator.share({ title: offer.title, text }).catch(() => {})
     }
@@ -88,8 +88,8 @@ function ProductDetailPage() {
   }
 
   const expiryInfo = getExpiryInfo()
-  const totalPrice = offer.discount_price * quantity
-  const savings = (offer.original_price - offer.discount_price) * quantity
+  const totalPrice = (offer.discount_price / 100) * quantity
+  const savings = ((offer.original_price - offer.discount_price) / 100) * quantity
   const hasDiscount = offer.original_price > offer.discount_price
   // Calculate discount percent if not provided
   const discountPercent = offer.discount_percent
@@ -181,11 +181,11 @@ function ProductDetailPage() {
           <div className="pdp-price-row">
             <div className="pdp-prices">
               <span className="pdp-current-price">
-                {Math.round(offer.discount_price).toLocaleString()} so'm
+                {Math.round(offer.discount_price / 100).toLocaleString()} so'm
               </span>
               {hasDiscount && (
                 <span className="pdp-old-price">
-                  {Math.round(offer.original_price).toLocaleString()}
+                  {Math.round(offer.original_price / 100).toLocaleString()}
                 </span>
               )}
             </div>

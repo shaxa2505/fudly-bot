@@ -43,15 +43,15 @@ function ProfilePage({ onNavigate }) {
     try {
       const userId = getUserId()
       const statusFilter = activeTab === 'active' ? null : activeTab === 'completed' ? 'completed' : null
-      
+
       const data = await api.getUserOrders(userId, statusFilter)
-      
+
       // Filter based on tab
       let filtered = data.orders
       if (activeTab === 'active') {
         filtered = data.orders.filter(o => ['pending', 'confirmed'].includes(o.status))
       }
-      
+
       setOrders(filtered)
     } catch (error) {
       console.error('Error loading orders:', error)
@@ -175,16 +175,16 @@ function ProfilePage({ onNavigate }) {
           <div className="empty-orders">
             <div className="empty-icon">📦</div>
             <p>
-              {lang === 'uz' 
-                ? 'Buyurtmalar yo\'q' 
+              {lang === 'uz'
+                ? 'Buyurtmalar yo\'q'
                 : 'Нет заказов'}
             </p>
           </div>
         ) : (
           <div className="orders-list">
             {orders.map((order) => (
-              <div 
-                key={order.booking_id} 
+              <div
+                key={order.booking_id}
                 className="order-card"
                 onClick={() => onNavigate('order-tracking', { bookingId: order.booking_id })}
                 style={{ cursor: 'pointer' }}
@@ -205,14 +205,14 @@ function ProfilePage({ onNavigate }) {
                     )}
                     <div className="order-meta">
                       <span className="order-quantity">
-                        {order.quantity} × {Math.round(order.total_price / order.quantity).toLocaleString()} {lang === 'uz' ? 'so\'m' : 'сум'}
+                        {order.quantity} × {Math.round(order.total_price / order.quantity / 100).toLocaleString()} {lang === 'uz' ? 'so\'m' : 'сум'}
                       </span>
                       <span className="order-total">
-                        {order.total_price.toLocaleString()} {lang === 'uz' ? 'so\'m' : 'сум'}
+                        {Math.round(order.total_price / 100).toLocaleString()} {lang === 'uz' ? 'so\'m' : 'сум'}
                       </span>
                     </div>
                     <div className="order-footer">
-                      <span 
+                      <span
                         className="order-status"
                         style={{ color: getStatusColor(order.status) }}
                       >

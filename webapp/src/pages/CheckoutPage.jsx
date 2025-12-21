@@ -201,7 +201,7 @@ function CheckoutPage({ user }) {
       if (paymentMethod === PAYMENT_METHOD.CLICK || paymentMethod === PAYMENT_METHOD.PAYME) {
         // Check if provider is available
         const isProviderAvailable = paymentProviders.includes(paymentMethod);
-        
+
         if (!isProviderAvailable) {
           // Payment provider not integrated - show error
           if (window.Telegram?.WebApp) {
@@ -216,7 +216,7 @@ function CheckoutPage({ user }) {
           }
           return;
         }
-        
+
         try {
           const returnUrl = window.location.origin + '/profile';
           // Get store_id from cart items (assuming single store checkout)
@@ -490,7 +490,7 @@ function CheckoutPage({ user }) {
         <button
           onClick={handlePlaceOrder}
           disabled={loading || (deliveryType === DELIVERY_TYPE.DELIVERY && !deliveryInfo?.can_deliver)}
-          className="place-order-button"
+          className="btn-accent place-order-button"
         >
           {loading ? (
             <>

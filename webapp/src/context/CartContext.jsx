@@ -157,7 +157,7 @@ export function CartProvider({ children }) {
 
   const cartTotal = useMemo(() => {
     return cartItems.reduce(
-      (sum, item) => sum + item.offer.discount_price * item.quantity,
+      (sum, item) => sum + (item.offer.discount_price / 100) * item.quantity,
       0
     );
   }, [cartItems]);
