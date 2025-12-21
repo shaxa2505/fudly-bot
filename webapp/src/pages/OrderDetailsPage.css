@@ -117,14 +117,14 @@
   padding: var(--spacing-md) var(--spacing-lg);
   border: none;
   border-radius: 14px;
-  background: var(--color-accent-gradient);
+  background: var(--color-primary-gradient);
   color: var(--color-text-inverse);
   font-size: var(--font-sm);
   font-weight: var(--font-semibold);
   cursor: pointer;
   transition: all var(--transition-normal);
   white-space: nowrap;
-  box-shadow: var(--shadow-accent);
+  box-shadow: var(--shadow-primary);
 }
 
 .upload-btn:active {

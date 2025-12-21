@@ -4,6 +4,17 @@
 Write-Host "🚀 Fudly WebApp Deploy Script" -ForegroundColor Green
 Write-Host "================================" -ForegroundColor Green
 
+# Bump partner panel static version to bust WebView cache
+$panelIndex = "partner-panel/index.html"
+if (Test-Path $panelIndex) {
+    $version = Get-Date -Format "yyyyMMddHHmmss"
+    $content = Get-Content $panelIndex -Raw
+    $content = $content -replace "\?v=[0-9.]+", "?v=$version"
+    Set-Content -Path $panelIndex -Value $content
+    Write-Host "Updated partner panel asset version to $version" -ForegroundColor Cyan
+}
+
+
 # Проверка директории
 if (-not (Test-Path "package.json")) {
     Write-Host "❌ Ошибка: Запустите скрипт из папки webapp/" -ForegroundColor Red

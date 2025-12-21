@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Flame, Milk, Cookie, Coffee as Beverage, Croissant, Beef, Apple, Salad, Package, Search } from 'lucide-react'
+import { Flame, Milk, Cookie, Coffee as Beverage, Croissant, Beef, Apple, Salad, Package, Search, Info } from 'lucide-react'
 import api from '../api/client'
 import { useCart } from '../context/CartContext'
 import { transliterateCity, getSavedLocation, saveLocation, DEFAULT_LOCATION } from '../utils/cityUtils'
@@ -625,7 +625,9 @@ function HomePage() {
       {/* Info banner if showing all cities */}
       {showingAllCities && offers.length > 0 && (
         <div className="all-cities-banner">
-          <span className="all-cities-icon">i</span>
+          <span className="all-cities-icon" aria-hidden="true">
+            <Info size={16} strokeWidth={2.2} />
+          </span>
           <span className="all-cities-text">
             {cityRaw} da mahsulot yo'q. Barcha shaharlardan ko'rsatilmoqda
           </span>

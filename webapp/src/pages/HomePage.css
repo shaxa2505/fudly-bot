@@ -786,7 +786,15 @@
 }
 
 .all-cities-icon {
-  font-size: var(--font-xl);
+  width: 28px;
+  height: 28px;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: #FFFCF8;
+  color: var(--color-primary);
+  border: 1px solid rgba(15, 118, 110, 0.18);
 }
 
 .all-cities-text {

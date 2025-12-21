@@ -422,8 +422,8 @@
 }
 
 .place-order-button:hover:not(:disabled) {
-  background: var(--color-accent-dark, #EA580C);
-  box-shadow: 0 6px 20px rgba(249, 115, 22, 0.5);
+  background: var(--color-primary-dark);
+  box-shadow: 0 6px 20px rgba(15, 118, 110, 0.45);
 }
 
 .place-order-button:active:not(:disabled) {

@@ -490,7 +490,7 @@ function CheckoutPage({ user }) {
         <button
           onClick={handlePlaceOrder}
           disabled={loading || (deliveryType === DELIVERY_TYPE.DELIVERY && !deliveryInfo?.can_deliver)}
-          className="btn-accent place-order-button"
+          className="btn-primary place-order-button"
         >
           {loading ? (
             <>

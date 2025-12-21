@@ -79,6 +79,16 @@ function YanaPage() {
     window.Telegram?.WebApp?.showAlert?.('Sozlamalar saqlandi!')
   }
 
+  const handleChangePhone = () => {
+    const botUsername = window.Telegram?.WebApp?.initDataUnsafe?.bot?.username || 'fudlybot'
+    const link = `https://t.me/${botUsername}`
+    if (window.Telegram?.WebApp?.openTelegramLink) {
+      window.Telegram.WebApp.openTelegramLink(link)
+      return
+    }
+    window.open(link, '_blank', 'noopener,noreferrer')
+  }
+
   const getStatusInfo = (status) => {
     const statusMap = {
       pending: { text: 'Kutilmoqda', color: '#FF9500', bg: '#FFF4E5' },
@@ -256,7 +266,14 @@ function YanaPage() {
                 placeholder="+998 90 123 45 67"
                 value={phone}
                 onChange={e => setPhone(e.target.value)}
+                readOnly
               />
+              <div className="setting-note">
+                Telefon raqam bot orqali o'zgartiriladi.
+              </div>
+              <button type="button" className="change-btn" onClick={handleChangePhone}>
+                Telegram orqali o'zgartirish
+              </button>
             </label>
 
             <label className="setting-item">

@@ -390,6 +390,12 @@
   transition: all var(--transition-normal);
 }
 
+.setting-input[readonly] {
+  background: #F8F5F1;
+  color: var(--color-text-secondary);
+  cursor: default;
+}
+
 .setting-input:focus {
   outline: none;
   border-color: var(--color-primary);
@@ -398,6 +404,29 @@
 
 .setting-input::placeholder {
   color: var(--color-text-muted);
+}
+
+.setting-note {
+  font-size: var(--font-xs);
+  color: var(--color-text-tertiary);
+}
+
+.change-btn {
+  align-self: flex-start;
+  padding: 6px 12px;
+  border-radius: 999px;
+  border: 1px solid rgba(15, 118, 110, 0.2);
+  background: #FFFCF8;
+  color: var(--color-primary);
+  font-size: var(--font-xs);
+  font-weight: var(--font-semibold);
+  cursor: pointer;
+  transition: all var(--transition-normal);
+}
+
+.change-btn:active {
+  transform: scale(0.98);
+  background: #E7F5F3;
 }
 
 .toggle-item {
