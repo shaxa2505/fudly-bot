@@ -75,6 +75,34 @@ class NotificationBuilder:
         import html
         return html.escape(str(text)) if text else ""
     
+    def build_pending(
+        self,
+        lang: str,
+        order_id: int,
+        store_name: str,
+    ) -> str:
+        """
+        Build PENDING status notification (waiting for partner confirmation).
+        
+        Simple message without progress bar - progress bar appears only after confirmation.
+        """
+        if lang == "uz":
+            entity = "Bron" if self.order_type == "pickup" else "Buyurtma"
+            return (
+                f"⏳ <b>{entity.upper()} YUBORILDI</b>\n\n"
+                f"📦 #{order_id}\n"
+                f"🏪 {self._esc(store_name)}\n\n"
+                f"⏰ Do'kon tasdiqlashini kuting (5-10 min)"
+            )
+        else:  # ru
+            entity = "Бронь" if self.order_type == "pickup" else "Заказ"
+            return (
+                f"⏳ <b>{entity.upper()} ОТПРАВЛЕН</b>\n\n"
+                f"📦 #{order_id}\n"
+                f"🏪 {self._esc(store_name)}\n\n"
+                f"⏰ Ожидайте подтверждения (5-10 мин)"
+            )
+
     def build_preparing(
         self,
         lang: str,
@@ -264,7 +292,9 @@ class NotificationBuilder:
         
         This is the main entry point - routes to specific builders.
         """
-        if status == "preparing":
+        if status == "pending":
+            return self.build_pending(lang, order_id, store_name)
+        elif status == "preparing":
             return self.build_preparing(lang, order_id, store_name, store_address, pickup_code)
         elif status == "delivering":
             return self.build_delivering(lang, order_id, courier_phone)

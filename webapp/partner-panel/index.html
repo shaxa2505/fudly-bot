@@ -1517,24 +1517,7 @@
                     </div>
                     <form id="productForm" onsubmit="saveProduct(event, ${productId})">
                         <div class="modal-body">
-                            <!-- Category -->
-                            <div class="form-group">
-                                <label>Категория *</label>
-                                <select name="category" required class="search-input">
-                                    <option value="">Выберите категорию</option>
-                                    <option value="bakery" ${product?.category === 'bakery' ? 'selected' : ''}>🥖 Выпечка</option>
-                                    <option value="dairy" ${product?.category === 'dairy' ? 'selected' : ''}>🥛 Молочные продукты</option>
-                                    <option value="meat" ${product?.category === 'meat' ? 'selected' : ''}>🥩 Мясо и птица</option>
-                                    <option value="fruits" ${product?.category === 'fruits' ? 'selected' : ''}>🍎 Фрукты</option>
-                                    <option value="vegetables" ${product?.category === 'vegetables' ? 'selected' : ''}>🥬 Овощи</option>
-                                    <option value="drinks" ${product?.category === 'drinks' ? 'selected' : ''}>🥤 Напитки</option>
-                                    <option value="snacks" ${product?.category === 'snacks' ? 'selected' : ''}>🍿 Закуски</option>
-                                    <option value="frozen" ${product?.category === 'frozen' ? 'selected' : ''}>🧊 Замороженное</option>
-                                    <option value="other" ${product?.category === 'other' ? 'selected' : ''}>📦 Другое</option>
-                                </select>
-                            </div>
-
-                            <!-- Photo Upload -->
+                            <!-- Photo Upload (Moved to top) -->
                             <div class="form-group">
                                 <label>Фото товара</label>
                                 <input type="file" id="photoFile" accept="image/*" style="display: none;" onchange="handlePhotoUpload(this, event)">
@@ -1561,9 +1544,30 @@
 
                             <div class="form-group">
                                 <label>Название *</label>
-                                <input type="text" name="name" value="${product?.name || ''}" required class="search-input"
-                                       oninput="validateField(this)" minlength="3" maxlength="100" placeholder="Например: Молоко 3.2%">
+                                <input type="text" name="name" id="productName" value="${product?.name || ''}" required class="search-input"
+                                       oninput="validateField(this); showNameSuggestions(this)" 
+                                       onfocus="showNameSuggestions(this)"
+                                       minlength="3" maxlength="100" placeholder="Например: Молоко 3.2%">
+                                <div id="nameSuggestions" class="autocomplete-suggestions" style="display: none;"></div>
                                 <div class="form-error" style="display: none;">Минимум 3 символа</div>
+                            </div>
+
+                            <!-- Category with smart defaults -->
+                            <div class="form-group">
+                                <label>Категория *</label>
+                                <select name="category" id="productCategory" required class="search-input" onchange="applyCategoryDefaults()">
+                                    <option value="">Выберите категорию</option>
+                                    <option value="bakery" ${product?.category === 'bakery' ? 'selected' : ''}>🥖 Выпечка</option>
+                                    <option value="dairy" ${product?.category === 'dairy' ? 'selected' : ''}>🥛 Молочные продукты</option>
+                                    <option value="meat" ${product?.category === 'meat' ? 'selected' : ''}>🥩 Мясо и птица</option>
+                                    <option value="fruits" ${product?.category === 'fruits' ? 'selected' : ''}>🍎 Фрукты</option>
+                                    <option value="vegetables" ${product?.category === 'vegetables' ? 'selected' : ''}>🥬 Овощи</option>
+                                    <option value="drinks" ${product?.category === 'drinks' ? 'selected' : ''}>🥤 Напитки</option>
+                                    <option value="snacks" ${product?.category === 'snacks' ? 'selected' : ''}>🍿 Закуски</option>
+                                    <option value="frozen" ${product?.category === 'frozen' ? 'selected' : ''}>🧊 Замороженное</option>
+                                    <option value="other" ${product?.category === 'other' ? 'selected' : ''}>📦 Другое</option>
+                                </select>
+                                <div style="font-size: 12px; color: var(--text-muted); margin-top: 4px;">💡 Автоматически заполнит остальные поля</div>
                             </div>
 
                             <div class="form-group">
@@ -1898,6 +1902,103 @@
             input.value = date.toISOString().split('T')[0];
             haptic('light');
         }
+
+        // Smart UX: Apply category defaults
+        function applyCategoryDefaults() {
+            const categorySelect = document.getElementById('productCategory');
+            const category = categorySelect?.value;
+            
+            if (!category || !categoryDefaults[category]) return;
+            
+            const defaults = categoryDefaults[category];
+            const isEditing = !!document.querySelector('[name="name"]').value;
+            
+            // Only apply defaults if creating new product (not editing)
+            if (isEditing) {
+                haptic('light');
+                return;
+            }
+            
+            // Set unit
+            const unitSelect = document.querySelector('[name="unit"]');
+            if (unitSelect && !unitSelect.value) {
+                unitSelect.value = defaults.unit;
+            }
+            
+            // Set quantity
+            const quantityInput = document.getElementById('stockQuantity');
+            if (quantityInput && (!quantityInput.value || quantityInput.value === '0')) {
+                quantityInput.value = defaults.quantity;
+            }
+            
+            // Set expiry date
+            const expiryInput = document.getElementById('expiryDate');
+            if (expiryInput && !expiryInput.value) {
+                const date = new Date();
+                date.setDate(date.getDate() + defaults.expiry_days);
+                expiryInput.value = date.toISOString().split('T')[0];
+            }
+            
+            haptic('light');
+            toast(`✨ Заполнено: ${defaults.quantity} ${defaults.unit}, срок ${defaults.expiry_days} дн.`, 'success');
+        }
+
+        // Smart UX: Show name suggestions
+        let suggestionsTimeout;
+        function showNameSuggestions(input) {
+            clearTimeout(suggestionsTimeout);
+            
+            const category = document.getElementById('productCategory')?.value;
+            const query = input.value.toLowerCase().trim();
+            const suggestionsDiv = document.getElementById('nameSuggestions');
+            
+            if (!suggestionsDiv) return;
+            
+            // Hide if no category or query too short
+            if (!category || query.length < 1) {
+                suggestionsDiv.style.display = 'none';
+                return;
+            }
+            
+            suggestionsTimeout = setTimeout(() => {
+                const suggestions = popularProducts[category] || [];
+                const filtered = suggestions.filter(s => 
+                    s.toLowerCase().includes(query) || query === ''
+                ).slice(0, 5);
+                
+                if (filtered.length === 0) {
+                    suggestionsDiv.style.display = 'none';
+                    return;
+                }
+                
+                suggestionsDiv.innerHTML = filtered.map(s => `
+                    <div class="suggestion-item" onclick="selectSuggestion('${s}')">
+                        ${s}
+                    </div>
+                `).join('');
+                suggestionsDiv.style.display = 'block';
+            }, 200);
+        }
+
+        function selectSuggestion(name) {
+            const input = document.getElementById('productName');
+            if (input) {
+                input.value = name;
+                document.getElementById('nameSuggestions').style.display = 'none';
+                haptic('light');
+            }
+        }
+
+        // Close suggestions on outside click
+        document.addEventListener('click', (e) => {
+            const suggestionsDiv = document.getElementById('nameSuggestions');
+            const nameInput = document.getElementById('productName');
+            if (suggestionsDiv && nameInput && 
+                !suggestionsDiv.contains(e.target) && 
+                e.target !== nameInput) {
+                suggestionsDiv.style.display = 'none';
+            }
+        });
 
         async function saveProduct(event, productId) {
             event.preventDefault();
@@ -2683,6 +2784,33 @@
                 }
             }
         }
+
+        // ============================================
+        // SMART UX DATA
+        // ============================================
+        const categoryDefaults = {
+            'bakery': { unit: 'шт', quantity: 10, expiry_days: 1 },
+            'dairy': { unit: 'л', quantity: 20, expiry_days: 5 },
+            'meat': { unit: 'кг', quantity: 5, expiry_days: 3 },
+            'fruits': { unit: 'кг', quantity: 10, expiry_days: 7 },
+            'vegetables': { unit: 'кг', quantity: 10, expiry_days: 7 },
+            'drinks': { unit: 'л', quantity: 24, expiry_days: 90 },
+            'snacks': { unit: 'шт', quantity: 20, expiry_days: 30 },
+            'frozen': { unit: 'кг', quantity: 5, expiry_days: 180 },
+            'other': { unit: 'шт', quantity: 10, expiry_days: 30 }
+        };
+
+        const popularProducts = {
+            'bakery': ['Хлеб белый', 'Лаваш узбекский', 'Батон', 'Булочка', 'Самса'],
+            'dairy': ['Молоко 3.2%', 'Кефир', 'Сметана 20%', 'Творог', 'Йогурт', 'Айран'],
+            'meat': ['Курица охлажденная', 'Говядина', 'Баранина', 'Колбаса', 'Сосиски'],
+            'fruits': ['Яблоки', 'Бананы', 'Апельсины', 'Мандарины', 'Виноград', 'Груши'],
+            'vegetables': ['Картофель', 'Морковь', 'Лук', 'Помидоры', 'Огурцы', 'Капуста'],
+            'drinks': ['Вода питьевая', 'Сок апельсиновый', 'Coca-Cola', 'Чай черный', 'Кофе'],
+            'snacks': ['Чипсы', 'Сухарики', 'Орехи', 'Шоколад', 'Конфеты'],
+            'frozen': ['Пельмени', 'Мороженое', 'Рыба замороженная', 'Овощи замороженные'],
+            'other': ['Хлопок', 'Бумажные полотенца', 'Мыло', 'Шампунь']
+        };
 
         // ============================================
         // HELPERS
