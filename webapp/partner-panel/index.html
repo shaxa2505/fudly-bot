@@ -9,17 +9,17 @@
     <script src="https://unpkg.com/lucide@latest"></script>
 
     <!-- Modular CSS Architecture -->
-    <link rel="stylesheet" href="/partner-panel/styles/variables.css?v=20.0">
-    <link rel="stylesheet" href="/partner-panel/styles/base.css?v=20.0">
-    <link rel="stylesheet" href="/partner-panel/styles/header.css?v=20.0">
-    <link rel="stylesheet" href="/partner-panel/styles/navigation.css?v=20.0">
-    <link rel="stylesheet" href="/partner-panel/styles/buttons.css?v=20.0">
-    <link rel="stylesheet" href="/partner-panel/styles/products.css?v=20.0">
-    <link rel="stylesheet" href="/partner-panel/styles/main.css?v=20.0">
-    <link rel="stylesheet" href="/partner-panel/styles/utilities.css?v=20.0">
-    <link rel="stylesheet" href="/partner-panel/styles/states.css?v=20.0">
-    <link rel="stylesheet" href="/partner-panel/styles/design-fixes.css?v=20.0">
-    <link rel="stylesheet" href="/partner-panel/styles/product-form-improvements.css?v=1.0">
+    <link rel="stylesheet" href="/partner-panel/styles/variables.css?v=20.1">
+    <link rel="stylesheet" href="/partner-panel/styles/base.css?v=20.1">
+    <link rel="stylesheet" href="/partner-panel/styles/header.css?v=20.1">
+    <link rel="stylesheet" href="/partner-panel/styles/navigation.css?v=20.1">
+    <link rel="stylesheet" href="/partner-panel/styles/buttons.css?v=20.1">
+    <link rel="stylesheet" href="/partner-panel/styles/products.css?v=20.1">
+    <link rel="stylesheet" href="/partner-panel/styles/main.css?v=20.1">
+    <link rel="stylesheet" href="/partner-panel/styles/utilities.css?v=20.1">
+    <link rel="stylesheet" href="/partner-panel/styles/states.css?v=20.1">
+    <link rel="stylesheet" href="/partner-panel/styles/design-fixes.css?v=20.1">
+    <link rel="stylesheet" href="/partner-panel/styles/product-form-improvements.css?v=1.1">
 
     <style>
         /* Yandex.Lavka Style + Telegram WebApp Optimizations */
@@ -1551,11 +1551,11 @@
                                         <p class="form-section-subtitle">Название, категория и описание</p>
                                     </div>
                                 </div>
-                                
+
                             <div class="form-group">
                                 <label>Название *</label>
                                 <input type="text" name="name" id="productName" value="${product?.name || ''}" required class="search-input"
-                                       oninput="validateField(this); showNameSuggestions(this)" 
+                                       oninput="validateField(this); showNameSuggestions(this)"
                                        onfocus="showNameSuggestions(this)"
                                        minlength="3" maxlength="100" placeholder="Например: Молоко 3.2%">
                                 <div id="nameSuggestions" class="autocomplete-suggestions" style="display: none;"></div>
@@ -1942,30 +1942,30 @@
         function applyCategoryDefaults() {
             const categorySelect = document.getElementById('productCategory');
             const category = categorySelect?.value;
-            
+
             if (!category || !categoryDefaults[category]) return;
-            
+
             const defaults = categoryDefaults[category];
             const isEditing = !!document.querySelector('[name="name"]').value;
-            
+
             // Only apply defaults if creating new product (not editing)
             if (isEditing) {
                 haptic('light');
                 return;
             }
-            
+
             // Set unit
             const unitSelect = document.querySelector('[name="unit"]');
             if (unitSelect && !unitSelect.value) {
                 unitSelect.value = defaults.unit;
             }
-            
+
             // Set quantity
             const quantityInput = document.getElementById('stockQuantity');
             if (quantityInput && (!quantityInput.value || quantityInput.value === '0')) {
                 quantityInput.value = defaults.quantity;
             }
-            
+
             // Set expiry date
             const expiryInput = document.getElementById('expiryDate');
             if (expiryInput && !expiryInput.value) {
@@ -1973,7 +1973,7 @@
                 date.setDate(date.getDate() + defaults.expiry_days);
                 expiryInput.value = date.toISOString().split('T')[0];
             }
-            
+
             haptic('light');
             toast(`✨ Заполнено: ${defaults.quantity} ${defaults.unit}, срок ${defaults.expiry_days} дн.`, 'success');
         }
@@ -1982,30 +1982,30 @@
         let suggestionsTimeout;
         function showNameSuggestions(input) {
             clearTimeout(suggestionsTimeout);
-            
+
             const category = document.getElementById('productCategory')?.value;
             const query = input.value.toLowerCase().trim();
             const suggestionsDiv = document.getElementById('nameSuggestions');
-            
+
             if (!suggestionsDiv) return;
-            
+
             // Hide if no category or query too short
             if (!category || query.length < 1) {
                 suggestionsDiv.style.display = 'none';
                 return;
             }
-            
+
             suggestionsTimeout = setTimeout(() => {
                 const suggestions = popularProducts[category] || [];
-                const filtered = suggestions.filter(s => 
+                const filtered = suggestions.filter(s =>
                     s.toLowerCase().includes(query) || query === ''
                 ).slice(0, 5);
-                
+
                 if (filtered.length === 0) {
                     suggestionsDiv.style.display = 'none';
                     return;
                 }
-                
+
                 suggestionsDiv.innerHTML = filtered.map(s => `
                     <div class="suggestion-item" onclick="selectSuggestion('${s}')">
                         ${s}
@@ -2028,8 +2028,8 @@
         document.addEventListener('click', (e) => {
             const suggestionsDiv = document.getElementById('nameSuggestions');
             const nameInput = document.getElementById('productName');
-            if (suggestionsDiv && nameInput && 
-                !suggestionsDiv.contains(e.target) && 
+            if (suggestionsDiv && nameInput &&
+                !suggestionsDiv.contains(e.target) &&
                 e.target !== nameInput) {
                 suggestionsDiv.style.display = 'none';
             }
