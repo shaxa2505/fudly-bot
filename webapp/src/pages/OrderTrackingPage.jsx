@@ -32,7 +32,7 @@ function OrderTrackingPage({ user }) {
   const [showQR, setShowQR] = useState(false);
 
   const lang = user?.language || 'ru';
-  const t = (ru, uz) => (lang === 'uz' Vaqt: uz : ru);
+  const t = (ru, uz) => (lang === 'uz' ? uz : ru);
 
   useEffect(() => {
     loadOrderData(true);
@@ -190,7 +190,7 @@ function OrderTrackingPage({ user }) {
               const isCurrent = item.status === order.status;
 
               return (
-                <div key={index} className={`timeline-item ${isActive Vaqt: 'active' : ''} ${isCurrent Vaqt: 'current' : ''}`}>
+                <div key={index} className={`timeline-item ${isActive ? 'active' : ''} ${isCurrent ? 'current' : ''}`}>
                   <div className="timeline-marker">
                     <div className="timeline-dot"></div>
                     {index < timeline.timeline.length - 1 && <div className="timeline-line"></div>}
