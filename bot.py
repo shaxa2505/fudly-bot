@@ -147,6 +147,56 @@ def _setup_admin() -> None:
 
 _setup_admin()
 
+
+# =============================================================================
+# DATABASE MIGRATIONS
+# =============================================================================
+
+
+def _apply_v25_migration() -> None:
+    """Apply v25 migration to add message tracking fields for live updates."""
+    if not DATABASE_URL:
+        logger.warning("⚠️ Skipping v25 migration: DATABASE_URL not set")
+        return
+
+    try:
+        import psycopg
+
+        with psycopg.connect(DATABASE_URL) as conn:
+            with conn.cursor() as cursor:
+                # Check if columns already exist
+                cursor.execute("""
+                    SELECT column_name 
+                    FROM information_schema.columns 
+                    WHERE table_name = 'orders' 
+                    AND column_name IN ('customer_message_id', 'seller_message_id')
+                """)
+                existing_columns = {row[0] for row in cursor.fetchall()}
+
+                if len(existing_columns) == 2:
+                    logger.info("✅ v25 migration already applied")
+                    return
+
+                logger.info("📦 Applying v25 migration: Add message tracking fields")
+
+                # Read and execute migration
+                migration_file = "migrations/v25_add_message_tracking.sql"
+                with open(migration_file, "r", encoding="utf-8") as f:
+                    migration_sql = f.read()
+
+                cursor.execute(migration_sql)
+                conn.commit()
+
+                logger.info("✅ v25 migration completed successfully")
+
+    except FileNotFoundError:
+        logger.warning("⚠️ Migration file not found: migrations/v25_add_message_tracking.sql")
+    except Exception as e:
+        logger.error(f"❌ v25 migration failed: {e}")
+
+
+_apply_v25_migration()
+
 # =============================================================================
 # SENTRY INITIALIZATION
 # =============================================================================
