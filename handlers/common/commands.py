@@ -621,8 +621,30 @@ async def cmd_start(message: types.Message, state: FSMContext, db: DatabaseProto
         return
 
     lang = db.get_user_language(user_id)
+    user_phone = user.phone if user else None
+    if not user_phone:
+        await callback.message.answer(
+            get_text(lang, "welcome_phone_step"),
+            parse_mode="HTML",
+            reply_markup=phone_request_keyboard(lang),
+        )
+        await state.set_state(Registration.phone)
+        await callback.answer()
+        return
+
     user_city = user.city
     user_role = user.role or "customer"
+    user_phone = user.phone if user else None
+
+    # Require phone early to avoid checkout friction
+    if not user_phone:
+        await state.set_state(Registration.phone)
+        await message.answer(
+            get_text(lang, "welcome_phone_step"),
+            parse_mode="HTML",
+            reply_markup=phone_request_keyboard(lang),
+        )
+        return
 
     # User exists but hasn't selected city yet - show city selection
     if not user_city:
@@ -634,9 +656,6 @@ async def cmd_start(message: types.Message, state: FSMContext, db: DatabaseProto
         # DON'T set state - city is selected via inline buttons only
         await state.clear()
         return
-
-    # Phone is optional - user can browse without it
-    # Phone will be requested only when placing an order
 
     # Registered user - show menu
     current_mode = get_user_view_mode(user_id, db)
@@ -660,7 +679,7 @@ async def cmd_start(message: types.Message, state: FSMContext, db: DatabaseProto
 async def registration_choose_language(
     callback: types.CallbackQuery, state: FSMContext, db: DatabaseProtocol
 ):
-    """Step 1: Language selected → show city selection (skip phone, ask at checkout)."""
+    """Step 1: Language selected -> request phone, then city selection."""
     if not callback.data or not callback.message:
         await callback.answer()
         return
@@ -676,18 +695,18 @@ async def registration_choose_language(
 
     db.update_user_language(callback.from_user.id, lang)
 
-    # Show city selection instead of phone request
+    # Switch to phone request step
     try:
-        await callback.message.edit_text(
-            get_text(lang, "choose_city"),
-            parse_mode="HTML",
-            reply_markup=city_inline_keyboard(lang),
-        )
+        await callback.message.edit_text(get_text(lang, "language_changed"), parse_mode="HTML")
     except Exception as e:
-        logger.debug("Could not edit city selection: %s", e)
+        logger.debug("Could not edit language confirmation: %s", e)
 
-    # DON'T set state - city is selected via inline buttons only
-    await state.clear()
+    await callback.message.answer(
+        get_text(lang, "welcome_phone_step"),
+        parse_mode="HTML",
+        reply_markup=phone_request_keyboard(lang),
+    )
+    await state.set_state(Registration.phone)
     await callback.answer()
 
 
@@ -702,7 +721,7 @@ async def choose_language(callback: types.CallbackQuery, state: FSMContext, db: 
     user = db.get_user_model(callback.from_user.id)
 
     if not user:
-        # Redirect to new registration flow - show city selection
+        # Redirect to new registration flow - request phone first
         db.add_user(
             callback.from_user.id, callback.from_user.username, callback.from_user.first_name
         )
@@ -710,15 +729,17 @@ async def choose_language(callback: types.CallbackQuery, state: FSMContext, db: 
 
         try:
             await callback.message.edit_text(
-                get_text(lang, "choose_city"),
-                parse_mode="HTML",
-                reply_markup=city_inline_keyboard(lang),
+                get_text(lang, "language_changed"), parse_mode="HTML"
             )
         except Exception as e:
-            logger.debug("Could not edit city selection: %s", e)
+            logger.debug("Could not edit language confirmation: %s", e)
 
-        # DON'T set state - city is selected via inline buttons only
-        await state.clear()
+        await callback.message.answer(
+            get_text(lang, "welcome_phone_step"),
+            parse_mode="HTML",
+            reply_markup=phone_request_keyboard(lang),
+        )
+        await state.set_state(Registration.phone)
         await callback.answer()
         return
 

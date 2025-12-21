@@ -281,7 +281,7 @@ def get_appropriate_menu(
 class RegistrationCheckMiddleware(BaseMiddleware):
     """Check that user exists (has account) before any action.
 
-    Phone is now optional - will be requested only at checkout.
+    Phone is collected during registration; checkout keeps a safety net.
     """
 
     def __init__(
@@ -358,7 +358,7 @@ class RegistrationCheckMiddleware(BaseMiddleware):
                 return await handler(event, data)
 
         # Only check if user exists, NOT if they have phone
-        # Phone will be requested at checkout time
+        # Phone is requested during registration (checkout still validates)
         user = self.db.get_user_model(user_id)
         if not user:
             lang = "ru"

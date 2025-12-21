@@ -7,6 +7,8 @@ from aiogram import Bot
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 from fastapi import APIRouter, Depends, HTTPException
 
+from app.core.sanitize import sanitize_phone
+from app.core.security import validator
 from app.services.unified_order_service import OrderItem, get_unified_order_service
 
 from .common import (
@@ -40,6 +42,19 @@ async def create_order(
             bot_instance = Bot(token=settings.bot_token)
         except Exception as e:  # pragma: no cover - defensive
             logger.warning(f"Could not create bot instance: {e}")
+
+        raw_phone = order.phone or ""
+        if raw_phone:
+            sanitized_phone = sanitize_phone(raw_phone)
+            if sanitized_phone and validator.validate_phone(sanitized_phone):
+                try:
+                    if hasattr(db, "update_user_phone"):
+                        user_model = db.get_user_model(user_id)
+                        current_phone = get_val(user_model, "phone") if user_model else None
+                        if not current_phone:
+                            db.update_user_phone(user_id, sanitized_phone)
+                except Exception as e:  # pragma: no cover - defensive
+                    logger.warning(f"Could not update user phone for {user_id}: {e}")
 
         is_delivery = bool(order.delivery_address and order.delivery_address.strip())
 

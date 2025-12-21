@@ -86,6 +86,7 @@ class OfferMixin:
         original_price: int = None,  # Now in kopeks (INTEGER)
         discount_price: int = None,  # Now in kopeks (INTEGER)
         quantity: int = 1,
+        stock_quantity: int | None = None,
         available_from: str = None,  # Will be converted to TIME by Pydantic
         available_until: str = None,  # Will be converted to TIME by Pydantic
         photo_id: str = None,  # Unified parameter name
@@ -103,6 +104,9 @@ class OfferMixin:
         """
         with self.get_connection() as conn:
             cursor = conn.cursor()
+            # Support legacy/new partner panel which may send `stock_quantity`.
+            final_quantity = stock_quantity if stock_quantity is not None else quantity
+
             cursor.execute(
                 """
                 INSERT INTO offers (store_id, title, description, original_price, discount_price,
@@ -116,7 +120,7 @@ class OfferMixin:
                     description,
                     original_price,
                     discount_price,
-                    quantity,
+                    final_quantity,
                     available_from,
                     available_until,
                     expiry_date,
