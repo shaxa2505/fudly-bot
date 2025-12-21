@@ -66,7 +66,7 @@
 
 /* Placeholder icon for missing photos */
 .card-image-container::before {
-  content: '📦';
+  content: 'IMG';
   position: absolute;
   top: 50%;
   left: 50%;

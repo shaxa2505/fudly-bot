@@ -97,7 +97,7 @@ const OfferCard = memo(function OfferCard({ offer, cartQuantity = 0, onAddToCart
 
   // Get photo URL (handles Telegram file_id conversion)
   const photoUrl = api.getPhotoUrl(offer.photo)
-  const fallbackUrl = 'https://placehold.co/300x300/F5F5F5/CCCCCC?text=📷'
+  const fallbackUrl = 'https://placehold.co/300x300/F5F5F5/CCCCCC?text=IMG'
 
   return (
     <div className={`offer-card ${cartQuantity > 0 ? 'in-cart' : ''} ${isAdding ? 'adding' : ''}`} onClick={handleCardClick}>
@@ -167,7 +167,7 @@ const OfferCard = memo(function OfferCard({ offer, cartQuantity = 0, onAddToCart
               />
             </div>
             <div className={`stock-label ${stockProgress.level === 'low' ? 'low' : ''}`}>
-              <span>{stockProgress.level === 'low' ? '🔥 Tez tugaydi!' : 'Qoldi'}</span>
+              <span>{stockProgress.level === 'low' ? 'Tez tugaydi!' : 'Qoldi'}</span>
               <span>{stockProgress.current} {getUnitLabel(offer.unit)}</span>
             </div>
           </div>
@@ -190,7 +190,7 @@ const OfferCard = memo(function OfferCard({ offer, cartQuantity = 0, onAddToCart
         <div className="cart-action">
           {cartQuantity > 0 ? (
             <div className="quantity-control">
-              <button className="qty-btn" onClick={handleRemoveClick}>−</button>
+              <button className="qty-btn" onClick={handleRemoveClick}>-</button>
               <span className="qty-num">{cartQuantity}{stockLimit < 99 ? `/${stockLimit}` : ''}</span>
               <button
                 className={`qty-btn qty-plus ${isMaxReached ? 'disabled' : ''}`}

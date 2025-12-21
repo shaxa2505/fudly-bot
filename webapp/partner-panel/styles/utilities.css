@@ -98,6 +98,57 @@
 .text-muted { color: var(--text-muted) !important; }
 .text-secondary { color: var(--text-secondary) !important; }
 
+/* === Icon Sizes === */
+.icon-16,
+.icon-16 svg {
+    width: 16px !important;
+    height: 16px !important;
+}
+
+.icon-18,
+.icon-18 svg {
+    width: 18px !important;
+    height: 18px !important;
+}
+
+.icon-20,
+.icon-20 svg {
+    width: 20px !important;
+    height: 20px !important;
+}
+
+.icon-24,
+.icon-24 svg {
+    width: 24px !important;
+    height: 24px !important;
+}
+
+.icon-48,
+.icon-48 svg {
+    width: 48px !important;
+    height: 48px !important;
+}
+
+.icon-64,
+.icon-64 svg {
+    width: 64px !important;
+    height: 64px !important;
+}
+
+.icon-96,
+.icon-96 svg {
+    width: 96px !important;
+    height: 96px !important;
+}
+
+.icon-muted {
+    color: #C4C4C4 !important;
+}
+
+.icon-spin {
+    animation: spin 1s linear infinite;
+}
+
 /* === Background === */
 .bg-primary { background-color: var(--primary) !important; }
 .bg-success { background-color: var(--success) !important; }

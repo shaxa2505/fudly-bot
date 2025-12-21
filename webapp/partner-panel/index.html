@@ -21,160 +21,6 @@
     <link rel="stylesheet" href="/partner-panel/styles/design-fixes.css?v=20.3">
     <link rel="stylesheet" href="/partner-panel/styles/product-form-improvements.css?v=1.3">
 
-    <style>
-        /* Yandex.Lavka Style + Telegram WebApp Optimizations */
-        :root {
-            /* Telegram safe areas */
-            --safe-area-top: env(safe-area-inset-top, 0);
-            --safe-area-bottom: env(safe-area-inset-bottom, 0);
-            --header-height: 64px;
-            --nav-height: 60px;
-        }
-
-        * {
-            -webkit-tap-highlight-color: transparent;
-            -webkit-touch-callout: none;
-        }
-
-        body {
-            background: #F7F7F7 !important;
-            color: #000000 !important;
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;
-            overscroll-behavior-y: contain;
-            overflow-x: hidden;
-        }
-
-        .app-header {
-            background: #FFFFFF !important;
-            border-bottom: 1px solid #E8E8E8 !important;
-            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06) !important;
-            position: fixed;
-            top: 0;
-            left: 0;
-            right: 0;
-            height: var(--header-height);
-            padding-top: var(--safe-area-top);
-            z-index: 100;
-        }
-
-        .bottom-nav {
-            padding-bottom: calc(var(--safe-area-bottom) + 8px) !important;
-            height: calc(var(--nav-height) + var(--safe-area-bottom)) !important;
-        }
-
-        main {
-            padding-top: calc(var(--header-height) + 16px) !important;
-            padding-bottom: calc(var(--nav-height) + var(--safe-area-bottom) + 16px) !important;
-        }
-        /* Preload animation */
-        @keyframes shimmerPreload {
-            0% { background-position: -200% 0; }
-            100% { background-position: 200% 0; }
-        }
-        .loading-overlay {
-            position: fixed;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background: linear-gradient(135deg, #FAFBFC 0%, #EEF2FF 100%);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            z-index: 9999;
-            animation: fadeOut 0.5s ease-out 1s forwards;
-        }
-        @keyframes fadeOut {
-            to { opacity: 0; visibility: hidden; }
-        }
-
-        /* Modal Styles */
-        .modal-overlay {
-            position: fixed;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background: rgba(0, 0, 0, 0.5);
-            backdrop-filter: blur(4px);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            z-index: 1000;
-            padding: 20px;
-            animation: fadeIn 0.2s ease-out;
-        }
-
-        .modal-body {
-            padding: 24px;
-            max-height: 60vh;
-            overflow-y: auto;
-        }
-
-        .form-group {
-            margin-bottom: 20px;
-        }
-
-        .form-group label {
-            display: block;
-            margin-bottom: 8px;
-            font-weight: 600;
-            color: var(--text);
-            font-size: 14px;
-        }
-
-        .order-detail-section {
-            margin-bottom: 20px;
-            padding-bottom: 16px;
-            border-bottom: 1px solid var(--border-light);
-        }
-
-        .order-detail-section:last-child {
-            border-bottom: none;
-            margin-bottom: 0;
-        }
-
-        .order-detail-section h4 {
-            font-size: 14px;
-            font-weight: 600;
-            color: var(--text-secondary);
-            margin-bottom: 8px;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-        }
-
-        .order-actions {
-            display: flex;
-            gap: 8px;
-            margin-top: 12px;
-            padding-top: 12px;
-            border-top: 1px solid var(--border-light);
-        }
-
-        .badge {
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            min-width: 20px;
-            height: 20px;
-            padding: 0 6px;
-            background: var(--primary);
-            color: white;
-            font-size: 11px;
-            font-weight: 700;
-            border-radius: 10px;
-            margin-left: 6px;
-        }
-
-        .badge-discount {
-            padding: 4px 8px;
-            background: linear-gradient(135deg, var(--danger), #DC2626);
-            color: white;
-            font-size: 11px;
-            font-weight: 700;
-            border-radius: 6px;
-        }
-    </style>
 </head>
 <body>
     <!-- Header -->
@@ -182,7 +28,7 @@
         <div class="header-content">
             <div class="store-info">
                 <div class="store-avatar">
-                    <i data-lucide="store" style="width: 24px; height: 24px;"></i>
+                    <i data-lucide="store"></i>
                 </div>
                 <div class="store-details">
                     <h1 id="storeName">Загрузка...</h1>
@@ -194,11 +40,11 @@
             </div>
             <div class="header-actions">
                 <button class="icon-btn" onclick="refreshAll()" aria-label="Обновить данные">
-                    <i data-lucide="refresh-cw" style="width: 20px; height: 20px;"></i>
+                    <i data-lucide="refresh-cw"></i>
                 </button>
                 <button class="icon-btn" aria-label="Уведомления">
-                    <i data-lucide="bell" style="width: 20px; height: 20px;"></i>
-                    <span class="notification-badge" id="notificationCount" style="display: none;">0</span>
+                    <i data-lucide="bell"></i>
+                    <span class="notification-badge" id="notificationCount">0</span>
                 </button>
             </div>
         </div>
@@ -646,7 +492,7 @@
                                         <span class="urgent-badge">${formatTime(order.created_at)}</span>
                                     </div>
                                     <div style="padding-left: 16px;">
-                                        <p style="margin: 0 0 4px; font-size: 14px; color: #000;">${order.order_type === 'pickup' ? '🏃 Самовывоз' : '🚗 Доставка'} • ${formatPrice(order.price)}</p>
+                                        <p class="order-summary">${order.order_type === 'pickup' ? '🏃 Самовывоз' : '🚗 Доставка'} • ${formatPrice(order.price)}</p>
                                     </div>
                                     <div class="urgent-actions" onclick="event.stopPropagation()">
                                         <button class="btn btn-success" onclick="updateOrderStatus(${order.order_id || order.id}, 'preparing')">✓ Принять заказ</button>
@@ -705,7 +551,7 @@
                                             <span class="order-section-badge">${newOrders.length}</span>
                                         </h3>
                                         <div class="order-section-toggle">
-                                            <i data-lucide="chevron-down" style="width: 16px; height: 16px;"></i>
+                                            <i data-lucide="chevron-down"></i>
                                         </div>
                                     </div>
                                     <div class="order-section-content">
@@ -721,10 +567,10 @@
                                     <div class="order-section-header" onclick="toggleOrderSection('preparingOrdersSection')">
                                         <h3 class="order-section-title">
                                             📦 В работе
-                                            <span class="order-section-badge" style="background: #4A5568;">${preparingOrders.length}</span>
+                                            <span class="order-section-badge muted">${preparingOrders.length}</span>
                                         </h3>
                                         <div class="order-section-toggle">
-                                            <i data-lucide="chevron-down" style="width: 16px; height: 16px;"></i>
+                                            <i data-lucide="chevron-down"></i>
                                         </div>
                                     </div>
                                     <div class="order-section-content">
@@ -737,7 +583,7 @@
                         ` : `
                             <div class="empty-state">
                                 <div class="empty-icon">
-                                    <i data-lucide="inbox" style="width: 48px; height: 48px; color: #C4C4C4;"></i>
+                                    <i data-lucide="inbox" class="icon-muted"></i>
                                 </div>
                                 <p class="empty-title">Нет активных заказов</p>
                                 <p class="empty-subtitle">Новые заказы появятся здесь</p>
@@ -847,7 +693,7 @@
                 return `
                     <div class="empty-state">
                         <div class="empty-icon">
-                            <i data-lucide="package-x" style="width: 96px; height: 96px;"></i>
+                            <i data-lucide="package-x"></i>
                         </div>
                         <p class="empty-title">Нет заказов</p>
                         <p class="empty-subtitle">Когда появятся новые заказы, они отобразятся здесь</p>
@@ -929,7 +775,7 @@
             const modal = document.createElement('div');
             modal.className = 'modal-overlay';
             modal.innerHTML = `
-                <div class="modal-content" style="max-width: 500px;">
+                <div class="modal-content modal-md">
                     <div class="modal-header">
                         <h3>Заказ #${oid}</h3>
                         <button class="btn-icon" onclick="this.closest('.modal-overlay').remove()">
@@ -937,7 +783,7 @@
                         </button>
                     </div>
                     <div class="modal-body">
-                        <div class="order-status status-${order.status}" style="display: inline-block; margin-bottom: 16px;">
+                        <div class="order-status status-${order.status} modal-status">
                             ${getStatusText(order.status)}
                         </div>
 
@@ -958,27 +804,27 @@
                             ${order.delivery_address ? `<p>${order.delivery_address}</p>` : ''}
                         </div>
 
-                        <div class="order-detail-section" style="border-top: 2px solid var(--border); padding-top: 16px; margin-top: 16px;">
-                            <div style="display: flex; justify-content: space-between; font-size: 18px; font-weight: bold;">
+                        <div class="order-detail-section modal-total">
+                            <div class="modal-total-row">
                                 <span>Итого</span>
                                 <span>${formatPrice(order.price)}</span>
                             </div>
                         </div>
 
                         ${order.status !== 'completed' && order.status !== 'cancelled' ? `
-                            <div style="margin-top: 24px; display: flex; gap: 12px;">
+                            <div class="modal-actions">
                                 ${order.status === 'pending' || order.status === 'new' ? `
-                                    <button class="btn btn-success ripple" style="flex: 1;" onclick="handleModalStatusUpdate(${oid}, 'preparing', this)">
+                                    <button class="btn btn-success ripple" onclick="handleModalStatusUpdate(${oid}, 'preparing', this)">
                                         ✓ Принять заказ
                                     </button>
                                 ` : ''}
                                 ${order.status === 'preparing' ? `
-                                    <button class="btn btn-success ripple" style="flex: 1;" onclick="handleModalStatusUpdate(${oid}, 'ready', this)">
+                                    <button class="btn btn-success ripple" onclick="handleModalStatusUpdate(${oid}, 'ready', this)">
                                         ✓ Заказ готов
                                     </button>
                                 ` : ''}
                                 ${order.status === 'ready' ? `
-                                    <button class="btn btn-success ripple" style="flex: 1;" onclick="handleModalStatusUpdate(${oid}, 'completed', this)">
+                                    <button class="btn btn-success ripple" onclick="handleModalStatusUpdate(${oid}, 'completed', this)">
                                         ✓ Выдан клиенту
                                     </button>
                                 ` : ''}
@@ -1085,7 +931,7 @@
             const modal = document.createElement('div');
             modal.className = 'modal-overlay scale-in';
             modal.innerHTML = `
-                <div class="modal-content" style="max-width: 480px;">
+                <div class="modal-content modal-sm">
                     <div class="modal-header">
                         <h3>Отмена заказа #${orderId}</h3>
                         <button class="btn-icon ripple" onclick="this.closest('.modal-overlay').remove()">
@@ -1094,31 +940,31 @@
                     </div>
                     <form onsubmit="submitCancelOrder(event, ${orderId})">
                         <div class="modal-body">
-                            <p style="color: var(--text-secondary); margin-bottom: 20px;">
+                            <p class="modal-text">
                                 Пожалуйста, укажите причину отмены заказа
                             </p>
 
                             <div class="form-group">
-                                <label style="margin-bottom: 12px; display: block; font-weight: 600;">Причина отмены *</label>
-                                <div style="display: flex; flex-direction: column; gap: 10px;">
+                                <label class="modal-section-label">Причина отмены *</label>
+                                <div class="d-flex flex-column gap-sm">
                                     <label class="cancel-reason-option">
-                                        <input type="radio" name="cancel_reason" value="out_of_stock" required style="margin-right: 10px;">
+                                        <input type="radio" name="cancel_reason" value="out_of_stock" required>
                                         <span>🔴 Товар закончился</span>
                                     </label>
                                     <label class="cancel-reason-option">
-                                        <input type="radio" name="cancel_reason" value="cant_fulfill" style="margin-right: 10px;">
+                                        <input type="radio" name="cancel_reason" value="cant_fulfill">
                                         <span>⏱️ Не успеваем выполнить</span>
                                     </label>
                                     <label class="cancel-reason-option">
-                                        <input type="radio" name="cancel_reason" value="customer_request" style="margin-right: 10px;">
+                                        <input type="radio" name="cancel_reason" value="customer_request">
                                         <span>📞 По просьбе клиента</span>
                                     </label>
                                     <label class="cancel-reason-option">
-                                        <input type="radio" name="cancel_reason" value="technical_issue" style="margin-right: 10px;">
+                                        <input type="radio" name="cancel_reason" value="technical_issue">
                                         <span>⚙️ Технические неполадки</span>
                                     </label>
                                     <label class="cancel-reason-option">
-                                        <input type="radio" name="cancel_reason" value="other" style="margin-right: 10px;">
+                                        <input type="radio" name="cancel_reason" value="other">
                                         <span>❓ Другая причина</span>
                                     </label>
                                 </div>
@@ -1127,19 +973,19 @@
                             <div class="form-group">
                                 <label>Комментарий (необязательно)</label>
                                 <textarea name="cancel_comment" rows="3" placeholder="Добавьте дополнительную информацию..."
-                                          class="search-input" maxlength="200" style="resize: vertical; min-height: 80px;"></textarea>
-                                <div class="form-hint" style="text-align: right; font-size: 12px; color: var(--text-secondary); margin-top: 4px;">
+                                          class="search-input textarea-resizable" maxlength="200"></textarea>
+                                <div class="form-hint">
                                     <span id="commentCounter">0/200</span>
                                 </div>
                             </div>
                         </div>
 
-                        <div style="display: flex; gap: 12px; padding: 16px; border-top: 1px solid var(--border);">
-                            <button type="button" class="btn btn-secondary ripple" onclick="this.closest('.modal-overlay').remove()" style="flex: 1;">
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-secondary ripple" onclick="this.closest('.modal-overlay').remove()">
                                 Назад
                             </button>
-                            <button type="submit" class="btn btn-danger ripple" style="flex: 1;">
-                                <i data-lucide="x-circle" style="width: 16px; height: 16px;"></i>
+                            <button type="submit" class="btn btn-danger ripple">
+                                <i data-lucide="x-circle" class="icon-16"></i>
                                 Отменить заказ
                             </button>
                         </div>
@@ -1319,7 +1165,7 @@
                     <div class="section-header">
                         <h2 class="section-title">Товары (${state.products.length})</h2>
                         <button class="btn btn-primary" onclick="openProductModal()">
-                            <i data-lucide="plus" style="width: 18px; height: 18px;"></i>
+                            <i data-lucide="plus" class="icon-18"></i>
                             Добавить
                         </button>
                     </div>
@@ -1352,7 +1198,7 @@
                             </select>
 
                             <button class="btn-icon-secondary" onclick="resetFilters()" title="Сбросить фильтры">
-                                <i data-lucide="x" style="width: 18px; height: 18px;"></i>
+                                <i data-lucide="x" class="icon-18"></i>
                             </button>
                         </div>
                     </div>
@@ -1504,7 +1350,7 @@
             const modal = document.createElement('div');
             modal.className = 'modal-overlay scale-in';
             modal.innerHTML = `
-                <div class="modal-content" style="max-width: 600px;">
+                <div class="modal-content modal-lg">
                     <div class="modal-header">
                         <h3>${isEdit ? 'Редактировать товар' : 'Добавить товар'}</h3>
                         <button class="btn-icon ripple" onclick="this.closest('.modal-overlay').remove()">
@@ -1522,14 +1368,14 @@
                                         <p class="form-section-subtitle">Товары с фото продаются на 40% лучше</p>
                                     </div>
                                 </div>
-                                <input type="file" id="photoFile" accept="image/*" style="display: none;" onchange="handlePhotoUpload(this, event)">
+                                <input type="file" id="photoFile" accept="image/*" class="hidden" onchange="handlePhotoUpload(this, event)">
                                 <input type="hidden" name="photo_id" value="${product?.photo_id || ''}">
                                 <div class="photo-upload-card ${product?.photo_url ? 'has-photo' : ''}" onclick="document.getElementById('photoFile').click()">
                                     ${product?.photo_url ? `
                                         <div class="photo-preview">
-                                            <img src="${product.photo_url}" alt="Preview" style="width: 100%; height: 200px; object-fit: cover; border-radius: 14px;">
-                                            <button type="button" class="photo-preview-remove" onclick="event.stopPropagation(); removePhoto()" style="position: absolute; top: 8px; right: 8px; background: rgba(0,0,0,0.6); color: white; border: none; width: 32px; height: 32px; border-radius: 50%; cursor: pointer;">
-                                                <i data-lucide="x" style="width: 16px; height: 16px;"></i>
+                                            <img src="${product.photo_url}" alt="Preview">
+                                            <button type="button" class="photo-preview-remove" onclick="event.stopPropagation(); removePhoto()">
+                                                <i data-lucide="x" class="icon-16"></i>
                                             </button>
                                         </div>
                                     ` : `
@@ -1699,16 +1545,16 @@
                             </div>
 
                             <div class="form-group">
-                                <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+                                <label class="checkbox-label">
                                     <input type="checkbox" name="is_available" ${product?.is_available !== false ? 'checked' : ''}>
                                     <span>Доступен для заказа</span>
                                 </label>
                             </div>
                         </div>
 
-                        <div style="display: flex; gap: 12px; padding: 16px; border-top: 1px solid var(--border);">
-                            <button type="submit" class="btn btn-primary ripple" style="flex: 1;">
-                                <i data-lucide="check" style="width: 16px; height: 16px;"></i>
+                        <div class="modal-footer">
+                            <button type="submit" class="btn btn-primary ripple">
+                                <i data-lucide="check" class="icon-16"></i>
                                 ${isEdit ? 'Сохранить' : 'Добавить'}
                             </button>
                             <button type="button" class="btn btn-secondary ripple" onclick="this.closest('.modal-overlay').remove()">
@@ -1763,7 +1609,7 @@
             // Show loading
             const uploadArea = document.querySelector('.photo-upload-area');
             uploadArea.classList.add('has-photo');
-            uploadArea.innerHTML = '<div class="upload-placeholder"><i data-lucide="loader" style="animation: spin 1s linear infinite;"></i><div>Загрузка...</div></div>';
+            uploadArea.innerHTML = '<div class="upload-placeholder"><i data-lucide="loader" class="icon-spin"></i><div>Загрузка...</div></div>';
             if (typeof lucide !== 'undefined') lucide.createIcons();
 
             // Convert to base64 for preview (real upload would go to server)
@@ -1780,7 +1626,7 @@
                     <div class="photo-preview">
                         <img src="${photoUrl}" alt="Preview">
                         <button type="button" class="photo-preview-remove" onclick="event.stopPropagation(); removePhoto()">
-                            <i data-lucide="x" style="width: 16px; height: 16px;"></i>
+                            <i data-lucide="x" class="icon-16"></i>
                         </button>
                     </div>
                 `;
@@ -1833,7 +1679,7 @@
                     <div class="photo-preview">
                         <img src="${url}" alt="Preview" onerror="this.src=''; this.parentElement.innerHTML='<div style=\\'padding: 24px; text-align: center; color: var(--danger);\\'>Ошибка загрузки изображения</div>'">
                         <button type="button" class="photo-preview-remove" onclick="event.stopPropagation(); removePhoto()">
-                            <i data-lucide="x" style="width: 16px; height: 16px;"></i>
+                            <i data-lucide="x" class="icon-16"></i>
                         </button>
                     </div>
                 `;
@@ -2666,7 +2512,7 @@
             const modal = document.createElement('div');
             modal.className = 'modal-overlay scale-in';
             modal.innerHTML = `
-                <div class="modal-content" style="max-width: 500px;">
+                <div class="modal-content modal-md">
                     <div class="modal-header">
                         <h3>Редактировать профиль</h3>
                         <button class="btn-icon ripple" onclick="this.closest('.modal-overlay').remove()">
@@ -2699,12 +2545,12 @@
                                 <label>Описание</label>
                                 <textarea name="description" rows="3" class="search-input" maxlength="300"
                                           oninput="validateField(this)">${state.store?.description || ''}</textarea>
-                                <div style="font-size: 12px; color: var(--text-muted); margin-top: 4px;">0/300</div>
+                                <div class="form-hint text-muted">0/300</div>
                             </div>
                         </div>
 
-                        <div style="display: flex; gap: 12px; padding: 16px; border-top: 1px solid var(--border);">
-                            <button type="submit" class="btn btn-primary ripple" style="flex: 1;">Сохранить</button>
+                        <div class="modal-footer">
+                            <button type="submit" class="btn btn-primary ripple">Сохранить</button>
                             <button type="button" class="btn btn-secondary" onclick="this.closest('.modal-overlay').remove()">Отмена</button>
                         </div>
                     </form>

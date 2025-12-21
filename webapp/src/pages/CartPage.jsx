@@ -192,7 +192,7 @@ function CartPage({ user }) {
         user_id: userId,
         delivery_address: orderType === 'delivery' ? address.trim() : null,
         phone: phone.trim(),
-        comment: `${orderType === 'pickup' ? '🏪 O\'zi olib ketadi' : '🚚 Yetkazib berish'}\n${comment.trim()}`.trim(),
+        comment: `${orderType === 'pickup' ? 'O\'zi olib ketadi' : 'Yetkazib berish'}\n${comment.trim()}`.trim(),
         order_type: orderType,
         delivery_fee: orderType === 'delivery' ? deliveryFee : 0,
       }
@@ -209,7 +209,7 @@ function CartPage({ user }) {
       // Get order ID from response
       const orderId = result.order_id || result.bookings?.[0]?.booking_id
 
-      // 🔴 NEW: Check if payment proof required (delivery + card)
+      // NEW: Check if payment proof required (delivery + card)
       if (result.awaiting_payment && orderId) {
         // Order created successfully - show success with payment instructions
         clearCart()
@@ -296,7 +296,7 @@ function CartPage({ user }) {
         user_id: userId,
         delivery_address: orderType === 'delivery' ? address.trim() : null,
         phone: phone.trim(),
-        comment: `${orderType === 'pickup' ? '🏪 O\'zi olib ketadi' : '🚚 Yetkazib berish'}\n${comment.trim()}`.trim(),
+        comment: `${orderType === 'pickup' ? 'O\'zi olib ketadi' : 'Yetkazib berish'}\n${comment.trim()}`.trim(),
         order_type: orderType,
         delivery_fee: orderType === 'delivery' ? deliveryFee : 0,
         payment_method: 'click',
@@ -372,15 +372,15 @@ function CartPage({ user }) {
   return (
     <div className="cart-page">
       <header className="cart-header">
-        <h1>🛒 Savat</h1>
+        <h1>Savat</h1>
         <button className="clear-cart-btn" onClick={clearCart}>
-          🗑️ Tozalash
+          Tozalash
         </button>
       </header>
 
       <div className="cart-items">
         {cartItems.map(item => {
-          const photoUrl = api.getPhotoUrl(item.offer.photo) || 'https://placehold.co/80x80/F5F5F5/CCCCCC?text=📷'
+          const photoUrl = api.getPhotoUrl(item.offer.photo) || 'https://placehold.co/80x80/F5F5F5/CCCCCC?text=IMG'
           return (
           <div key={item.offer.id} className="cart-item">
             <img
@@ -390,7 +390,7 @@ function CartPage({ user }) {
               onError={(e) => {
                 if (!e.target.dataset.fallback) {
                   e.target.dataset.fallback = 'true'
-                  e.target.src = 'https://placehold.co/80x80/F5F5F5/CCCCCC?text=📷'
+                  e.target.src = 'https://placehold.co/80x80/F5F5F5/CCCCCC?text=IMG'
                 }
               }}
             />
@@ -400,10 +400,10 @@ function CartPage({ user }) {
                 {Math.round(item.offer.discount_price).toLocaleString()} so'm
               </p>
               {item.offer.store_name && (
-                <p className="cart-item-store">🏪 {item.offer.store_name}</p>
+                <p className="cart-item-store">Do'kon: {item.offer.store_name}</p>
               )}
               {item.offer.stock && item.quantity >= item.offer.stock && (
-                <p className="cart-item-stock-warning">⚠️ Maksimum: {item.offer.stock} {getUnitLabel(item.offer.unit)}</p>
+                <p className="cart-item-stock-warning">Maksimum: {item.offer.stock} {getUnitLabel(item.offer.unit)}</p>
               )}
             </div>
             <div className="cart-item-controls">
@@ -412,7 +412,7 @@ function CartPage({ user }) {
                   className="qty-btn"
                   onClick={() => handleQuantityChange(item.offer.id, -1)}
                 >
-                  −
+                  -
                 </button>
                 <span className="qty-value">{item.quantity}</span>
                 <button
@@ -430,7 +430,7 @@ function CartPage({ user }) {
                 className="remove-btn"
                 onClick={() => removeItem(item.offer.id)}
               >
-                ✕
+                x
               </button>
             </div>
           </div>
@@ -444,7 +444,7 @@ function CartPage({ user }) {
         </div>
         {orderType === 'delivery' && (
           <div className="summary-row delivery-fee">
-            <span>🚚 Yetkazib berish</span>
+            <span>Yetkazib berish</span>
             <span>{Math.round(deliveryFee).toLocaleString()} so'm</span>
           </div>
         )}
@@ -455,7 +455,7 @@ function CartPage({ user }) {
       </div>
 
       <button className="btn-primary checkout-btn" onClick={handleCheckout}>
-        Buyurtma berish →
+        Buyurtma berish
       </button>
 
       <BottomNav currentPage="cart" cartCount={itemsCount} />
@@ -467,12 +467,12 @@ function CartPage({ user }) {
             <div className="modal-header">
               <h2>
                 {checkoutStep === 'details' && 'Buyurtmani tasdiqlash'}
-                {checkoutStep === 'payment' && '💳 To\'lov'}
+                {checkoutStep === 'payment' && 'To\'lov'}
               </h2>
               <button
                 className="modal-close"
                 onClick={() => !orderLoading && setShowCheckout(false)}
-              >✕</button>
+              >x</button>
             </div>
 
             <div className="modal-body">
@@ -487,7 +487,7 @@ function CartPage({ user }) {
                         className={`order-type-btn ${orderType === 'pickup' ? 'active' : ''}`}
                         onClick={() => setOrderType('pickup')}
                       >
-                        <span className="order-type-icon">🏪</span>
+                        <span className="order-type-icon">O</span>
                         <span className="order-type-text">O'zi olib ketadi</span>
                         <span className="order-type-desc">Bepul</span>
                       </button>
@@ -497,7 +497,7 @@ function CartPage({ user }) {
                         onClick={() => storeDeliveryEnabled && canDelivery && setOrderType('delivery')}
                         disabled={!storeDeliveryEnabled || !canDelivery}
                       >
-                        <span className="order-type-icon">🚚</span>
+                        <span className="order-type-icon">Y</span>
                         <span className="order-type-text">Yetkazib berish</span>
                         <span className="order-type-desc">
                           {!storeDeliveryEnabled
@@ -512,13 +512,13 @@ function CartPage({ user }) {
 
                     {!canDelivery && storeDeliveryEnabled && (
                       <p className="delivery-hint">
-                        💡 Yetkazib berish uchun minimum {Math.round(minOrderAmount).toLocaleString()} so'm buyurtma qiling
+                        Yetkazib berish uchun minimum {Math.round(minOrderAmount).toLocaleString()} so'm buyurtma qiling
                       </p>
                     )}
                   </div>
 
                   <label className="form-label">
-                    📱 Telefon raqam *
+                    Telefon raqam *
                     <input
                       type="tel"
                       className="form-input"
@@ -530,7 +530,7 @@ function CartPage({ user }) {
 
                   {orderType === 'delivery' && (
                     <label className="form-label">
-                      📍 Yetkazib berish manzili *
+                      Yetkazib berish manzili *
                       <textarea
                         className="form-textarea"
                         placeholder="Shahar, ko'cha, uy raqami, mo'ljal..."
@@ -541,7 +541,7 @@ function CartPage({ user }) {
                   )}
 
                   <label className="form-label">
-                    💬 Izoh
+                    Izoh
                     <textarea
                       className="form-textarea"
                       placeholder="Qo'shimcha ma'lumot..."
@@ -580,7 +580,7 @@ function CartPage({ user }) {
                         className={`payment-option ${selectedPaymentMethod === 'card' ? 'active' : ''}`}
                         onClick={() => setSelectedPaymentMethod('card')}
                       >
-                        💳 Kartaga o'tkazish
+                        Kartaga o'tkazish
                       </button>
                       {paymentProviders.includes('click') ? (
                         <button
@@ -608,7 +608,7 @@ function CartPage({ user }) {
                     <>
                       <div className="payment-info">
                         <p className="payment-instruction">
-                          💳 Quyidagi kartaga {Math.round(total).toLocaleString()} so'm o'tkazing:
+                          Quyidagi kartaga {Math.round(total).toLocaleString()} so'm o'tkazing:
                         </p>
 
                         <div className="payment-card">
@@ -622,7 +622,7 @@ function CartPage({ user }) {
                                 alert('Karta raqami nusxalandi!')
                               }}
                             >
-                              {paymentCard.card_number} 📋
+                              {paymentCard.card_number} (nusxa)
                             </span>
                           </div>
                           {paymentCard.card_holder && (
@@ -635,7 +635,7 @@ function CartPage({ user }) {
 
                         {paymentCard.payment_instructions && (
                           <p className="payment-instructions">
-                            📋 {paymentCard.payment_instructions}
+                            {paymentCard.payment_instructions}
                           </p>
                         )}
 
@@ -646,7 +646,7 @@ function CartPage({ user }) {
                       </div>
 
                       <div className="upload-section">
-                        <p className="upload-label">📸 O'tkazma chekini yuklang:</p>
+                        <p className="upload-label">O'tkazma chekini yuklang:</p>
 
                         {paymentProofPreview ? (
                           <div className="proof-preview">
@@ -658,7 +658,7 @@ function CartPage({ user }) {
                                 setPaymentProofPreview(null)
                               }}
                             >
-                              ✕ O'chirish
+                              O'chirish
                             </button>
                           </div>
                         ) : (
@@ -671,7 +671,7 @@ function CartPage({ user }) {
                               style={{ display: 'none' }}
                             />
                             <label htmlFor="payment-proof-input" className="upload-btn">
-                              📷 Rasm tanlash
+                              Rasm tanlash
                             </label>
                           </div>
                         )}
@@ -710,7 +710,7 @@ function CartPage({ user }) {
                     onClick={proceedToPayment}
                     disabled={orderLoading || !phone.trim() || (orderType === 'delivery' && !address.trim())}
                   >
-                    {orderLoading ? '⏳ ...' : orderType === 'delivery' ? '💳 To\'lovga o\'tish' : '✅ Tasdiqlash'}
+                    {orderLoading ? '...' : orderType === 'delivery' ? 'To\'lovga o\'tish' : 'Tasdiqlash'}
                   </button>
                 </>
               )}
@@ -722,7 +722,7 @@ function CartPage({ user }) {
                     onClick={() => setCheckoutStep('details')}
                     disabled={orderLoading}
                   >
-                    ← Orqaga
+                    <- Orqaga
                   </button>
                   {selectedPaymentMethod === 'card' ? (
                     <button
@@ -730,7 +730,7 @@ function CartPage({ user }) {
                       onClick={placeOrder}
                       disabled={orderLoading || !paymentProof}
                     >
-                      {orderLoading ? '⏳ Yuborilmoqda...' : '✅ Buyurtma berish'}
+                      {orderLoading ? 'Yuborilmoqda...' : 'Buyurtma berish'}
                     </button>
                   ) : (
                     <button
@@ -738,7 +738,7 @@ function CartPage({ user }) {
                       onClick={handleClickPayment}
                       disabled={orderLoading}
                     >
-                      {orderLoading ? '⏳ ...' : '💳 Click bilan to\'lash'}
+                      {orderLoading ? '...' : 'Click bilan to\'lash'}
                     </button>
                   )}
                 </>
@@ -754,9 +754,9 @@ function CartPage({ user }) {
                     style={{ display: 'none' }}
                   />
 
-                  <p className="upload-instruction">
-                    ✅ Buyurtma yaratildi! Endi to'lov chekini yuklang.
-                  </p>
+                <p className="upload-instruction">
+                    Buyurtma yaratildi! Endi to'lov chekini yuklang.
+                </p>
 
                   {paymentProofPreview && (
                     <div className="proof-preview" style={{ margin: '10px 0' }}>
@@ -775,7 +775,7 @@ function CartPage({ user }) {
                       }}
                       disabled={orderLoading}
                     >
-                      📸 Chekni yuklash
+                      Chekni yuklash
                     </button>
                   ) : (
                     <button
@@ -802,7 +802,7 @@ function CartPage({ user }) {
                       }}
                       disabled={orderLoading}
                     >
-                      {orderLoading ? '⏳ Yuklanmoqda...' : '✅ Yuborish'}
+                      {orderLoading ? 'Yuklanmoqda...' : 'Yuborish'}
                     </button>
                   )}
                 </>
@@ -818,20 +818,20 @@ function CartPage({ user }) {
           <div className="modal result-modal" onClick={e => e.stopPropagation()}>
             {orderResult.success ? (
               <>
-                <div className="result-icon success">✅</div>
+                <div className="result-icon success">OK</div>
                 <h2>{orderResult.message || 'Buyurtma qabul qilindi!'}</h2>
 
                 {/* Payment card info for awaiting payment orders */}
                 {orderResult.awaitingPayment && orderResult.paymentCard && (
                   <div className="payment-instructions">
-                    <h3>💳 To'lov ma'lumotlari</h3>
+                    <h3>To'lov ma'lumotlari</h3>
                     <div className="payment-card-info">
                       <p><strong>Karta raqami:</strong></p>
                       <p className="card-number">{orderResult.paymentCard.card_number}</p>
                       <p><strong>Egasi:</strong> {orderResult.paymentCard.card_holder}</p>
                     </div>
                     <div className="payment-steps">
-                      <p>📋 <strong>Qadamlar:</strong></p>
+                      <p><strong>Qadamlar:</strong></p>
                       <ol>
                         <li>Yuqoridagi kartaga pul o'tkazing</li>
                         <li>"Buyurtmalarim" bo'limiga o'ting</li>
@@ -843,17 +843,17 @@ function CartPage({ user }) {
 
                 {orderResult.bookingCode && (
                   <p className="booking-code-display">
-                    🎫 Kod: <strong>{orderResult.bookingCode}</strong>
+                    Kod: <strong>{orderResult.bookingCode}</strong>
                   </p>
                 )}
                 <p className="order-type-result">
                   {orderResult.orderType === 'pickup'
-                    ? '🏪 O\'zi olib ketish'
-                    : '🚚 Yetkazib berish'
+                    ? 'O\'zi olib ketish'
+                    : 'Yetkazib berish'
                   }
                 </p>
                 <p className="order-total-result">
-                  💰 Jami: {Math.round(orderResult.total).toLocaleString()} so'm
+                  Jami: {Math.round(orderResult.total).toLocaleString()} so'm
                 </p>
 
                 {orderResult.awaitingPayment ? (
@@ -862,13 +862,13 @@ function CartPage({ user }) {
                       setOrderResult(null)
                       navigate('/profile')
                     }}>
-                      📦 Buyurtmalarimga o'tish
+                      Buyurtmalarimga o'tish
                     </button>
                     <button className="btn-secondary" onClick={() => {
                       setOrderResult(null)
                       navigate('/')
                     }}>
-                      🏠 Bosh sahifa
+                      Bosh sahifa
                     </button>
                   </>
                 ) : (
@@ -876,13 +876,13 @@ function CartPage({ user }) {
                     setOrderResult(null)
                     navigate('/')
                   }}>
-                    🏠 Bosh sahifaga
+                    Bosh sahifaga
                   </button>
                 )}
               </>
             ) : (
               <>
-                <div className="result-icon error">❌</div>
+                <div className="result-icon error">ERR</div>
                 <h2>Xatolik yuz berdi</h2>
                 <p>{orderResult.error || 'Iltimos, qaytadan urinib ko\'ring'}</p>
                 <button className="btn-primary" onClick={() => setOrderResult(null)}>

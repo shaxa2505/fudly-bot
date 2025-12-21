@@ -4,6 +4,13 @@
    ================================================ */
 
 :root {
+    /* === Layout === */
+    --container-width: 1200px;
+    --header-height: 64px;
+    --nav-height: 60px;
+    --safe-area-top: env(safe-area-inset-top, 0px);
+    --safe-area-bottom: env(safe-area-inset-bottom, 0px);
+
     /* === Primary Palette (Extended) === */
     --primary-50: #E8F5E9;
     --primary-100: #C8E6C9;
@@ -81,15 +88,15 @@
     --space-lg: var(--space-6);
     --space-xl: var(--space-8);
 
-    /* === Typography Scale (1.2 ratio) === */
-    --text-xs: 11px;
+    /* === Typography Scale (Unified) === */
+    --text-xs: 12px;
     --text-sm: 13px;
     --text-base: 15px;
     --text-lg: 18px;
-    --text-xl: 22px;
-    --text-2xl: 26px;
-    --text-3xl: 32px;
-    --text-4xl: 40px;
+    --text-xl: 20px;
+    --text-2xl: 24px;
+    --text-3xl: 30px;
+    --text-4xl: 36px;
 
     --line-tight: 1.2;
     --line-normal: 1.5;

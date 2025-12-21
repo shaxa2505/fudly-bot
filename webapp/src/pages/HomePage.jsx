@@ -431,8 +431,12 @@ function HomePage() {
             onKeyDown={(e) => e.key === 'Enter' && handleSearchSubmit()}
           />
           {searchQuery && (
-            <button className="search-clear" onClick={() => setSearchQuery('')}>
-              ✕
+            <button
+              className="search-clear"
+              onClick={() => setSearchQuery('')}
+              aria-label="Qidiruvni tozalash"
+            >
+              x
             </button>
           )}
 
@@ -556,7 +560,7 @@ function HomePage() {
               setMinDiscount(minDiscount === 20 ? null : 20)
             }}
           >
-            <span className="filter-pill-icon">🏷️</span>
+            <span className="filter-pill-icon">%</span>
             <span className="filter-pill-text">20%+</span>
           </button>
           <button
@@ -566,7 +570,7 @@ function HomePage() {
               setMinDiscount(minDiscount === 30 ? null : 30)
             }}
           >
-            <span className="filter-pill-icon">🔥</span>
+            <span className="filter-pill-icon">%</span>
             <span className="filter-pill-text">30%+</span>
           </button>
           <button
@@ -576,7 +580,7 @@ function HomePage() {
               setMinDiscount(minDiscount === 50 ? null : 50)
             }}
           >
-            <span className="filter-pill-icon">💥</span>
+            <span className="filter-pill-icon">%</span>
             <span className="filter-pill-text">50%+</span>
           </button>
         </div>
@@ -594,7 +598,7 @@ function HomePage() {
             }}
           >
             <span className="sort-btn-icon">
-              {sortBy === 'discount' ? '🏷️' : sortBy === 'price_asc' ? '↑' : sortBy === 'price_desc' ? '↓' : '⇅'}
+              {sortBy === 'discount' ? '%' : sortBy === 'price_asc' ? 'up' : sortBy === 'price_desc' ? 'down' : 'sort'}
             </span>
             <span>
               {sortBy === 'discount' ? 'Chegirma' : sortBy === 'price_asc' ? 'Arzon' : sortBy === 'price_desc' ? 'Qimmat' : 'Tartiblash'}
@@ -619,7 +623,7 @@ function HomePage() {
       {/* Info banner if showing all cities */}
       {showingAllCities && offers.length > 0 && (
         <div className="all-cities-banner">
-          <span className="all-cities-icon">🌍</span>
+          <span className="all-cities-icon">i</span>
           <span className="all-cities-text">
             {cityRaw} da mahsulot yo'q. Barcha shaharlardan ko'rsatilmoqda
           </span>
@@ -689,7 +693,7 @@ function HomePage() {
             <div className="address-modal-header">
               <h3>Manzilni kiriting</h3>
               <button className="address-modal-close" onClick={() => setShowAddressModal(false)} aria-label="Yopish">
-                ×
+                x
               </button>
             </div>
 

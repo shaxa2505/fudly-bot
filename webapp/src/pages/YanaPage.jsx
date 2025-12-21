@@ -289,13 +289,11 @@ function YanaPage() {
                         <p className="order-store">🏪 {order.store_name || 'Do\'kon'}</p>
                         <div className="order-meta">
                           <span>
-                            {order.quantity || 1} × {order.total_price && order.quantity
-                              ? Math.round(order.total_price / order.quantity).toLocaleString()
+                            {order.quantity || 1} × {order.total_price && order.quantity ? Math.round(order.total_price / order.quantity).toLocaleString()
                               : '—'} so'm
                           </span>
                           <span className="order-total">
-                            {order.total_price
-                              ? Math.round(order.total_price).toLocaleString()
+                            {order.total_price ? Math.round(order.total_price).toLocaleString()
                               : '—'} so'm
                           </span>
                         </div>

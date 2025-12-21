@@ -282,7 +282,7 @@ function CheckoutPage({ user }) {
     <div className="checkout-page">
       <div className="checkout-header">
         <button onClick={() => navigate('/cart')} className="back-button">
-          ← {t('Назад', 'Orqaga')}
+          <- {t('Назад', 'Orqaga')}
         </button>
         <h1>{t('Оформление заказа', 'Buyurtmani rasmiylashtirish')}</h1>
       </div>
@@ -296,24 +296,24 @@ function CheckoutPage({ user }) {
               className={`delivery-option ${deliveryType === DELIVERY_TYPE.PICKUP ? 'active' : ''}`}
               onClick={() => setDeliveryType(DELIVERY_TYPE.PICKUP)}
             >
-              <span className="option-icon">🏪</span>
+              <span className="option-icon">O</span>
               <div className="option-content">
                 <h3>{t('Самовывоз', 'Olib ketish')}</h3>
                 <p>{t('Заберу сам из магазина', 'O\'zim do\'kondan olaman')}</p>
               </div>
-              {deliveryType === DELIVERY_TYPE.PICKUP && <span className="check-mark">✓</span>}
+              {deliveryType === DELIVERY_TYPE.PICKUP && <span className="check-mark">OK</span>}
             </button>
 
             <button
               className={`delivery-option ${deliveryType === DELIVERY_TYPE.DELIVERY ? 'active' : ''}`}
               onClick={() => setDeliveryType(DELIVERY_TYPE.DELIVERY)}
             >
-              <span className="option-icon">🚚</span>
+              <span className="option-icon">Y</span>
               <div className="option-content">
                 <h3>{t('Доставка', 'Yetkazib berish')}</h3>
                 <p>{t('Доставить по адресу', 'Manzilga yetkazib berish')}</p>
               </div>
-              {deliveryType === DELIVERY_TYPE.DELIVERY && <span className="check-mark">✓</span>}
+              {deliveryType === DELIVERY_TYPE.DELIVERY && <span className="check-mark">OK</span>}
             </button>
           </div>
         </div>
@@ -336,11 +336,11 @@ function CheckoutPage({ user }) {
               />
               {addressError && (
                 <div className="error-message">
-                  <span>⚠️</span>
+                  <span>!</span>
                   <span>{addressError}</span>
                 </div>
               )}
-              <p className="city-label">📍 {city}</p>
+              <p className="city-label">Shahar: {city}</p>
             </div>
 
             {calculatingDelivery && (
@@ -361,16 +361,16 @@ function CheckoutPage({ user }) {
                       </span>
                     </p>
                     {deliveryInfo.estimated_time && (
-                      <p className="delivery-time">⏱️ {deliveryInfo.estimated_time}</p>
+                      <p className="delivery-time">Vaqt: {deliveryInfo.estimated_time}</p>
                     )}
                     {deliveryInfo.min_order_amount && itemsTotal < deliveryInfo.min_order_amount && (
                       <p className="min-order-warning">
-                        ⚠️ {t('Минимальная сумма заказа', 'Minimal buyurtma summasi')}: {deliveryInfo.min_order_amount.toLocaleString()} {t('сум', 'so\'m')}
+                        {t('Минимальная сумма заказа', 'Minimal buyurtma summasi')}: {deliveryInfo.min_order_amount.toLocaleString()} {t('сум', 'so\'m')}
                       </p>
                     )}
                   </>
                 ) : (
-                  <p className="delivery-error">❌ {deliveryInfo.message}</p>
+                  <p className="delivery-error">Xatolik: {deliveryInfo.message}</p>
                 )}
               </div>
             )}
@@ -425,24 +425,24 @@ function CheckoutPage({ user }) {
               className={`payment-option ${paymentMethod === PAYMENT_METHOD.CASH ? 'active' : ''}`}
               onClick={() => setPaymentMethod(PAYMENT_METHOD.CASH)}
             >
-              <span className="option-icon">💵</span>
+              <span className="option-icon">N</span>
               <div className="option-content">
                 <h3>{t('Наличные', 'Naqd pul')}</h3>
                 <p>{t('Оплата при получении', 'Olishda to\'lash')}</p>
               </div>
-              {paymentMethod === PAYMENT_METHOD.CASH && <span className="check-mark">✓</span>}
+              {paymentMethod === PAYMENT_METHOD.CASH && <span className="check-mark">OK</span>}
             </button>
 
             <button
               className={`payment-option ${paymentMethod === PAYMENT_METHOD.CARD_TRANSFER ? 'active' : ''}`}
               onClick={() => setPaymentMethod(PAYMENT_METHOD.CARD_TRANSFER)}
             >
-              <span className="option-icon">💳</span>
+              <span className="option-icon">K</span>
               <div className="option-content">
                 <h3>{t('Перевод на карту', 'Kartaga o\'tkazish')}</h3>
                 <p>{t('Отправьте скриншот оплаты', 'To\'lov skrinshotini yuboring')}</p>
               </div>
-              {paymentMethod === PAYMENT_METHOD.CARD_TRANSFER && <span className="check-mark">✓</span>}
+              {paymentMethod === PAYMENT_METHOD.CARD_TRANSFER && <span className="check-mark">OK</span>}
             </button>
 
             {paymentProviders.includes('click') && (
@@ -457,7 +457,7 @@ function CheckoutPage({ user }) {
                   <h3>Click</h3>
                   <p>{t('Онлайн оплата через Click', 'Click orqali onlayn to\'lov')}</p>
                 </div>
-                {paymentMethod === PAYMENT_METHOD.CLICK && <span className="check-mark">✓</span>}
+                {paymentMethod === PAYMENT_METHOD.CLICK && <span className="check-mark">OK</span>}
               </button>
             )}
 
@@ -473,7 +473,7 @@ function CheckoutPage({ user }) {
                   <h3>Payme</h3>
                   <p>{t('Онлайн оплата через Payme', 'Payme orqali onlayn to\'lov')}</p>
                 </div>
-                {paymentMethod === PAYMENT_METHOD.PAYME && <span className="check-mark">✓</span>}
+                {paymentMethod === PAYMENT_METHOD.PAYME && <span className="check-mark">OK</span>}
               </button>
             )}
           </div>
@@ -482,7 +482,7 @@ function CheckoutPage({ user }) {
         {/* Error Message */}
         {error && (
           <div className="error-message">
-            <p>⚠️ {error}</p>
+            <p>Xatolik: {error}</p>
           </div>
         )}
 
@@ -499,7 +499,7 @@ function CheckoutPage({ user }) {
             </>
           ) : (
             <>
-              {t('Оформить заказ', 'Buyurtma berish')} • {total.toLocaleString()} {t('сум', 'so\'m')}
+              {t('Оформить заказ', 'Buyurtma berish')} - {total.toLocaleString()} {t('сум', 'so\'m')}
             </>
           )}
         </button>

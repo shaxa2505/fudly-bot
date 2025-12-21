@@ -7,7 +7,7 @@
     bottom: 0;
     left: 0;
     right: 0;
-    height: var(--nav-height);
+    height: calc(var(--nav-height) + var(--safe-area-bottom));
     background: var(--bg-secondary);
     border-top: 1px solid var(--border);
     z-index: 1000;
@@ -15,7 +15,7 @@
     align-items: center;
     justify-content: space-around;
     padding: 0;
-    padding-bottom: env(safe-area-inset-bottom);
+    padding-bottom: var(--safe-area-bottom);
     box-shadow: var(--shadow-sm);
 }
 

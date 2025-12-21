@@ -55,7 +55,7 @@ function ProductDetailPage() {
   }
 
   const handleShare = () => {
-    const text = `${offer.title}\n💰 ${Math.round(offer.discount_price).toLocaleString()} so'm\n🏪 ${offer.store_name || ''}`
+    const text = `${offer.title}\nNarx: ${Math.round(offer.discount_price).toLocaleString()} so'm\nDo'kon: ${offer.store_name || ''}`
     if (navigator.share) {
       navigator.share({ title: offer.title, text }).catch(() => {})
     }
@@ -79,7 +79,7 @@ function ProductDetailPage() {
     return (
       <div className="pdp">
         <div className="pdp-error">
-          <span>😕</span>
+          <span>!</span>
           <p>Mahsulot topilmadi</p>
           <button onClick={() => navigate(-1)}>Orqaga</button>
         </div>
@@ -139,7 +139,7 @@ function ProductDetailPage() {
         )}
 
         {expiryInfo?.urgent && (
-          <span className="pdp-expiry-badge">⏰ {expiryInfo.text}</span>
+          <span className="pdp-expiry-badge">Muddat: {expiryInfo.text}</span>
         )}
 
         <div className="pdp-image-wrapper">
@@ -169,9 +169,9 @@ function ProductDetailPage() {
           <h1 className="pdp-title">{offer.title}</h1>
           {offer.store_name && (
             <p className="pdp-store">
-              <span className="pdp-store-icon">🏪</span>
+              <span className="pdp-store-icon">Do'kon</span>
               <span className="pdp-store-name">{offer.store_name}</span>
-              {offer.store_address && <span className="pdp-store-addr"> • {offer.store_address}</span>}
+              {offer.store_address && <span className="pdp-store-addr"> - {offer.store_address}</span>}
             </p>
           )}
         </div>
@@ -190,13 +190,13 @@ function ProductDetailPage() {
               )}
             </div>
             {offer.quantity > 0 && (
-              <span className="pdp-stock">📦 {offer.quantity} {getUnitLabel(offer.unit)}</span>
+              <span className="pdp-stock">Qoldi: {offer.quantity} {getUnitLabel(offer.unit)}</span>
             )}
           </div>
 
           {savings > 0 && (
             <div className="pdp-savings">
-              💰 {Math.round(savings).toLocaleString()} so'm tejaysiz
+              {Math.round(savings).toLocaleString()} so'm tejaysiz
             </div>
           )}
         </div>
@@ -210,7 +210,7 @@ function ProductDetailPage() {
               onClick={() => handleQuantityChange(-1)}
               disabled={quantity <= 1}
             >
-              −
+              -
             </button>
             <span className="pdp-qty-value">{quantity}</span>
             <button
@@ -227,17 +227,17 @@ function ProductDetailPage() {
         {/* Tags */}
         <div className="pdp-tags">
           {offer.category && (
-            <span className="pdp-tag">🏷️ {offer.category}</span>
+            <span className="pdp-tag">Kategoriya: {offer.category}</span>
           )}
           {expiryInfo && !expiryInfo.urgent && (
-            <span className="pdp-tag">⏰ {expiryInfo.text}</span>
+            <span className="pdp-tag">Muddat: {expiryInfo.text}</span>
           )}
         </div>
 
         {/* Description */}
         {offer.description && offer.description.toLowerCase() !== offer.title?.toLowerCase() && (
           <div className="pdp-description">
-            <h3>📝 Tavsif</h3>
+            <h3>Tavsif</h3>
             <p>{offer.description}</p>
           </div>
         )}

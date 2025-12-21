@@ -49,7 +49,7 @@ input.success {
 }
 
 .form-error::before {
-    content: '⚠️';
+    content: '!';
 }
 
 /* === STATISTICS & CHARTS === */

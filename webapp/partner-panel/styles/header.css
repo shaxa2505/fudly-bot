@@ -7,11 +7,12 @@
     top: 0;
     left: 0;
     right: 0;
-    height: var(--header-height);
+    height: calc(var(--header-height) + var(--safe-area-top));
     background: white;
     border-bottom: 1px solid var(--border);
     z-index: var(--z-sticky);
     box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+    padding-top: var(--safe-area-top);
 }
 
 .app-header::before {
@@ -19,9 +20,9 @@
 }
 
 .header-content {
-    max-width: 1400px;
+    max-width: var(--container-width);
     margin: 0 auto;
-    height: 100%;
+    height: var(--header-height);
     padding: 0 var(--space-4);
     display: flex;
     align-items: center;
@@ -47,6 +48,12 @@
     justify-content: center;
     color: var(--primary);
     flex-shrink: 0;
+}
+
+.store-avatar i,
+.store-avatar svg {
+    width: 24px;
+    height: 24px;
 }
 
 .store-details {
@@ -143,6 +150,12 @@
     color: var(--text);
 }
 
+.icon-btn i,
+.icon-btn svg {
+    width: 20px;
+    height: 20px;
+}
+
 .icon-btn:hover {
     background: var(--gray-100);
     border-color: var(--primary);
@@ -169,6 +182,7 @@
     align-items: center;
     justify-content: center;
     border: 2px solid white;
+    display: none;
 }
 
 /* === Header Stats === */
