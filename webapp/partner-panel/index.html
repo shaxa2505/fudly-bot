@@ -19,6 +19,7 @@
     <link rel="stylesheet" href="/partner-panel/styles/utilities.css?v=20.0">
     <link rel="stylesheet" href="/partner-panel/styles/states.css?v=20.0">
     <link rel="stylesheet" href="/partner-panel/styles/design-fixes.css?v=20.0">
+    <link rel="stylesheet" href="/partner-panel/styles/product-form-improvements.css?v=1.0">
 
     <style>
         /* Yandex.Lavka Style + Telegram WebApp Optimizations */
@@ -1517,31 +1518,45 @@
                     </div>
                     <form id="productForm" onsubmit="saveProduct(event, ${productId})">
                         <div class="modal-body">
-                            <!-- Photo Upload (Moved to top) -->
-                            <div class="form-group">
-                                <label>Фото товара</label>
+                            <!-- 📸 СЕКЦИЯ: Фото товара -->
+                            <div class="form-section">
+                                <div class="form-section-header">
+                                    <div class="form-section-icon">📸</div>
+                                    <div>
+                                        <h4 class="form-section-title">Фото товара</h4>
+                                        <p class="form-section-subtitle">Товары с фото продаются на 40% лучше</p>
+                                    </div>
+                                </div>
                                 <input type="file" id="photoFile" accept="image/*" style="display: none;" onchange="handlePhotoUpload(this, event)">
                                 <input type="hidden" name="photo_id" value="${product?.photo_id || ''}">
-                                <div class="photo-upload-area ${product?.photo_url ? 'has-photo' : ''}" onclick="document.getElementById('photoFile').click()">
+                                <div class="photo-upload-card ${product?.photo_url ? 'has-photo' : ''}" onclick="document.getElementById('photoFile').click()">
                                     ${product?.photo_url ? `
                                         <div class="photo-preview">
-                                            <img src="${product.photo_url}" alt="Preview">
-                                            <button type="button" class="photo-preview-remove" onclick="event.stopPropagation(); removePhoto()">
+                                            <img src="${product.photo_url}" alt="Preview" style="width: 100%; height: 200px; object-fit: cover; border-radius: 14px;">
+                                            <button type="button" class="photo-preview-remove" onclick="event.stopPropagation(); removePhoto()" style="position: absolute; top: 8px; right: 8px; background: rgba(0,0,0,0.6); color: white; border: none; width: 32px; height: 32px; border-radius: 50%; cursor: pointer;">
                                                 <i data-lucide="x" style="width: 16px; height: 16px;"></i>
                                             </button>
                                         </div>
                                     ` : `
-                                        <div class="upload-placeholder">
-                                            <i data-lucide="image"></i>
-                                            <div class="upload-placeholder-text">Загрузить фото</div>
-                                            <div class="upload-placeholder-hint">или вставьте URL ниже (не сохраняется)</div>
-                                        </div>
+                                        <div class="photo-upload-icon">📷</div>
+                                        <div class="photo-upload-title">Нажмите для загрузки</div>
+                                        <div class="photo-upload-subtitle">или перетащите файл сюда</div>
                                     `}
                                 </div>
                                 <input type="url" name="photo_url_input" value="${product?.photo_url || ''}" placeholder="https://... (или загрузите файл)"
                                        class="search-input" style="margin-top: 12px;" oninput="handlePhotoUrlInput(this)">
                             </div>
 
+                            <!-- 📦 СЕКЦИЯ: Основная информация -->
+                            <div class="form-section">
+                                <div class="form-section-header">
+                                    <div class="form-section-icon">📦</div>
+                                    <div>
+                                        <h4 class="form-section-title">Основная информация</h4>
+                                        <p class="form-section-subtitle">Название, категория и описание</p>
+                                    </div>
+                                </div>
+                                
                             <div class="form-group">
                                 <label>Название *</label>
                                 <input type="text" name="name" id="productName" value="${product?.name || ''}" required class="search-input"
@@ -1567,17 +1582,31 @@
                                     <option value="frozen" ${product?.category === 'frozen' ? 'selected' : ''}>🧊 Замороженное</option>
                                     <option value="other" ${product?.category === 'other' ? 'selected' : ''}>📦 Другое</option>
                                 </select>
-                                <div style="font-size: 12px; color: var(--text-muted); margin-top: 4px;">💡 Автоматически заполнит остальные поля</div>
+                                <div class="smart-hint info" style="margin-top: 8px;">
+                                    <span class="smart-hint-icon">💡</span>
+                                    <span class="smart-hint-text">Автоматически заполнит остальные поля</span>
+                                </div>
                             </div>
 
                             <div class="form-group">
                                 <label>Описание</label>
                                 <textarea name="description" rows="3" class="search-input"
-                                          oninput="validateField(this)" maxlength="500" placeholder="Краткое описание товара">${product?.description || ''}</textarea>
-                                <div style="font-size: 12px; color: var(--text-muted); margin-top: 4px;">0/500</div>
+                                          oninput="validateField(this); updateCharCounter(this)" maxlength="500" placeholder="Краткое описание товара">${product?.description || ''}</textarea>
+                                <div class="char-counter" style="font-size: 12px; color: var(--text-muted); margin-top: 4px; text-align: right;">0/500</div>
+                            </div>
                             </div>
 
-                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+                            <!-- 💰 СЕКЦИЯ: Цены и скидки -->
+                            <div class="form-section">
+                                <div class="form-section-header">
+                                    <div class="form-section-icon">💰</div>
+                                    <div>
+                                        <h4 class="form-section-title">Цены и скидки</h4>
+                                        <p class="form-section-subtitle">Цена и процент скидки</p>
+                                    </div>
+                                </div>
+
+                            <div class="form-grid-2">
                                 <div class="form-group">
                                     <label>Оригинальная цена *</label>
                                     <input type="number" name="original_price" id="originalPrice" value="${product?.original_price || product?.price || ''}"
@@ -1601,23 +1630,34 @@
                                        oninput="validateField(this); calculateFinalPrice('price')" placeholder="10500">
                             </div>
 
-                            <!-- Price Preview -->
-                            <div class="price-preview-box" id="pricePreview" style="display: none; background: linear-gradient(135deg, #E8F5E9 0%, #C8E6C9 100%); padding: 16px; border-radius: 12px; margin-bottom: 16px;">
-                                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
-                                    <span style="color: #818C99; font-size: 14px;">Было:</span>
-                                    <span id="priceOriginal" style="color: #818C99; text-decoration: line-through;">15,000 сум</span>
+                            <!-- Live Price Preview -->
+                            <div class="price-preview-card" id="pricePreview" style="display: none;">
+                                <div class="price-preview-row">
+                                    <span class="price-preview-label">Было:</span>
+                                    <span id="priceOriginal" class="price-preview-value original">15,000 сум</span>
                                 </div>
-                                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
-                                    <span style="color: #000; font-size: 16px; font-weight: 600;">Стало:</span>
-                                    <span id="priceFinal" style="color: #21A038; font-size: 20px; font-weight: 700;">10,500 сум</span>
+                                <div class="price-preview-row">
+                                    <span class="price-preview-label" style="font-size: 16px; font-weight: 700;">Стало:</span>
+                                    <span id="priceFinal" class="price-preview-value final">10,500 сум</span>
                                 </div>
-                                <div style="display: flex; justify-content: space-between; align-items: center; padding-top: 8px; border-top: 1px solid rgba(33, 160, 56, 0.2);">
-                                    <span style="color: #21A038; font-size: 14px; font-weight: 600;">🎉 Экономия:</span>
-                                    <span id="priceSavings" style="color: #21A038; font-size: 16px; font-weight: 700;">4,500 сум (30%)</span>
+                                <div class="price-preview-savings">
+                                    <span class="price-preview-savings-label">🎉 Экономия</span>
+                                    <span id="priceSavings" class="price-preview-savings-value">4,500 сум (30%)</span>
                                 </div>
                             </div>
+                            </div>
 
-                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+                            <!-- 📊 СЕКЦИЯ: Количество и единицы -->
+                            <div class="form-section">
+                                <div class="form-section-header">
+                                    <div class="form-section-icon">📊</div>
+                                    <div>
+                                        <h4 class="form-section-title">Количество и единицы</h4>
+                                        <p class="form-section-subtitle">Остаток и срок годности</p>
+                                    </div>
+                                </div>
+
+                            <div class="form-grid-2">
                                 <div class="form-group">
                                     <label>Единица измерения *</label>
                                     <select name="unit" required class="search-input">
