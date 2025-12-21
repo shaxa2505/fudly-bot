@@ -8,7 +8,7 @@ const BANNERS = [
     title: '50% gacha chegirma',
     subtitle: 'Sut mahsulotlari',
     icon: Milk,
-    gradient: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+    gradient: 'linear-gradient(135deg, #0F766E 0%, #0B5E57 100%)',
     category: 'dairy'
   },
   {
@@ -16,7 +16,7 @@ const BANNERS = [
     title: "Yangi kelgan taomlar",
     subtitle: "Eng sara mahsulotlar",
     icon: Croissant,
-    gradient: 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)',
+    gradient: 'linear-gradient(135deg, #F97316 0%, #EA580C 100%)',
     category: 'bakery'
   },
   {
@@ -24,7 +24,7 @@ const BANNERS = [
     title: "Ichimliklar aksiyasi",
     subtitle: "30% gacha chegirma",
     icon: Beverage,
-    gradient: 'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)',
+    gradient: 'linear-gradient(135deg, #2563EB 0%, #1D4ED8 100%)',
     category: 'drinks'
   },
   {
@@ -32,7 +32,7 @@ const BANNERS = [
     title: "Yangi mevalar",
     subtitle: "Har kuni yangilanadi",
     icon: Apple,
-    gradient: 'linear-gradient(135deg, #43e97b 0%, #38f9d7 100%)',
+    gradient: 'linear-gradient(135deg, #22C55E 0%, #16A34A 100%)',
     category: 'fruits'
   }
 ]

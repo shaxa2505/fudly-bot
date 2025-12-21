@@ -10,7 +10,7 @@
  * 6. Empty states (improved UX)
  */
 
-@import url('https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Fraunces:wght@600;700;800&family=Sora:wght@400;500;600;700&display=swap');
 
 /* Design System Imports */
 @import './styles/design-tokens.css';
@@ -52,6 +52,15 @@ body {
   overscroll-behavior-y: contain;
   -webkit-overflow-scrolling: touch;
   touch-action: pan-y;
+}
+
+h1,
+h2,
+h3,
+h4 {
+  font-family: var(--font-display);
+  letter-spacing: -0.02em;
+  line-height: 1.15;
 }
 
 #root {

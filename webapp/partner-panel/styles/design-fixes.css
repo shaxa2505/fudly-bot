@@ -57,21 +57,15 @@ input.success {
     display: flex;
     gap: 16px;
     align-items: flex-end;
-    padding: 32px 20px;
-    background: linear-gradient(180deg, #FAFAFA 0%, #FFFFFF 100%);
+    padding: var(--space-6) var(--space-5);
+    background: var(--card);
+    border: 1px solid var(--border);
     border-radius: 16px;
     position: relative;
 }
 
 .chart-container::before {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    height: 2px;
-    background: linear-gradient(90deg, transparent 0%, #21A038 50%, transparent 100%);
-    opacity: 0.3;
+    display: none;
 }
 
 .chart-bar-wrapper {
@@ -215,8 +209,8 @@ input.success {
 }
 
 .status-stat-card:hover {
-    transform: translateY(-4px);
-    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-md);
 }
 
 .status-stat-card:hover::before {
@@ -246,46 +240,34 @@ input.success {
 
 /* === KEY METRICS IMPROVEMENTS === */
 .stat-card.primary {
-    background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%);
-    border: 2px solid #21A038;
-    position: relative;
-    overflow: hidden;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-left: 4px solid var(--primary);
 }
 
 .stat-card.primary::before {
-    content: '';
-    position: absolute;
-    top: -50%;
-    right: -50%;
-    width: 200%;
-    height: 200%;
-    background: radial-gradient(circle, rgba(33, 160, 56, 0.1) 0%, transparent 70%);
-    animation: pulse-bg 3s ease infinite;
-}
-
-@keyframes pulse-bg {
-    0%, 100% { transform: scale(1); opacity: 0.5; }
-    50% { transform: scale(1.1); opacity: 0.8; }
+    display: none;
 }
 
 .stat-card.success {
-    background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
-    border: 2px solid #F59E0B;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-left: 4px solid var(--success);
 }
 
 /* === DASHBOARD CARD IMPROVEMENTS === */
 .dashboard-card {
-    background: #FFFFFF;
-    border-radius: 20px;
-    padding: 24px;
-    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.04);
-    border: 1px solid #F0F0F0;
+    background: var(--card);
+    border-radius: 16px;
+    padding: 20px;
+    box-shadow: var(--shadow-sm);
+    border: 1px solid var(--border);
     transition: all 0.3s ease;
 }
 
 .dashboard-card:hover {
-    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.08);
-    transform: translateY(-2px);
+    box-shadow: var(--shadow-md);
+    transform: translateY(-1px);
 }
 
 .card-title {
@@ -530,12 +512,12 @@ input[type="checkbox"]:hover {
 /* === 8. BETTER CARD HOVER === */
 .order-card:hover {
     transform: translateY(-2px);
-    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08) !important;
+    box-shadow: var(--shadow-lg);
 }
 
 .product-card:hover {
     transform: translateY(-2px);
-    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08) !important;
+    box-shadow: var(--shadow-lg);
 }
 
 /* === 9. MOTIVATING EMPTY REVENUE === */

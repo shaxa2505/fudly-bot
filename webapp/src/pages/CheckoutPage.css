@@ -5,27 +5,30 @@
 
 .checkout-page {
   min-height: 100vh;
-  background: linear-gradient(135deg, var(--color-accent-bg-light, #FFF5F0) 0%, var(--color-accent-bg, #FFE8DC) 100%);
+  background: linear-gradient(135deg, #FFFCF8 0%, #F6EFE7 100%);
   padding: 0 0 80px 0;
 }
 
 .checkout-header {
-  background: var(--color-bg-primary);
+  background: rgba(255, 252, 248, 0.95);
   padding: var(--spacing-lg) var(--spacing-xl);
-  box-shadow: var(--shadow-sm);
+  box-shadow: var(--shadow-header);
   position: sticky;
   top: 0;
   z-index: var(--z-sticky);
   display: flex;
   align-items: center;
   gap: var(--spacing-md);
+  border-bottom: 1px solid rgba(15, 118, 110, 0.12);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
 }
 
 .back-button {
   background: none;
   border: none;
   font-size: var(--font-lg);
-  color: var(--color-accent);
+  color: var(--color-primary);
   cursor: pointer;
   padding: var(--spacing-sm);
   display: flex;
@@ -35,7 +38,7 @@
 }
 
 .back-button:focus-visible {
-  outline: 3px solid var(--color-accent);
+  outline: 3px solid var(--color-primary);
   outline-offset: 2px;
 }
 
@@ -54,9 +57,10 @@
 .delivery-type-section {
   background: var(--color-bg-primary);
   padding: var(--spacing-xl);
-  border-radius: var(--radius-2xl);
+  border-radius: 20px;
   margin-bottom: var(--spacing-lg);
-  box-shadow: var(--shadow-md);
+  box-shadow: var(--shadow-card);
+  border: 1px solid rgba(15, 118, 110, 0.12);
 }
 
 .delivery-type-section h2 {
@@ -77,25 +81,25 @@
   align-items: center;
   gap: var(--spacing-lg);
   padding: var(--spacing-lg);
-  background: var(--color-bg-secondary);
+  background: #FFFCF8;
   border: 2px solid transparent;
-  border-radius: var(--radius-xl);
+  border-radius: 16px;
   cursor: pointer;
   transition: all var(--transition-normal);
   text-align: left;
 }
 
 .delivery-option:hover {
-  background: var(--color-bg-tertiary);
+  background: #F3EFE8;
 }
 
 .delivery-option.active {
-  background: rgba(255, 107, 53, 0.05);
-  border-color: var(--color-accent);
+  background: #E7F5F3;
+  border-color: var(--color-primary);
 }
 
 .delivery-option:focus-visible {
-  outline: 3px solid var(--color-accent);
+  outline: 3px solid var(--color-primary);
   outline-offset: 2px;
 }
 
@@ -123,7 +127,7 @@
 
 .check-mark {
   font-size: var(--font-3xl);
-  color: var(--color-accent);
+  color: var(--color-primary);
   font-weight: var(--font-bold);
 }
 
@@ -131,9 +135,10 @@
 .address-section {
   background: var(--color-bg-primary);
   padding: var(--spacing-xl);
-  border-radius: var(--radius-2xl);
+  border-radius: 20px;
   margin-bottom: var(--spacing-lg);
-  box-shadow: var(--shadow-md);
+  box-shadow: var(--shadow-card);
+  border: 1px solid rgba(15, 118, 110, 0.12);
 }
 
 .address-section h2 {
@@ -152,16 +157,18 @@
 .address-input {
   width: 100%;
   padding: var(--spacing-lg) var(--spacing-lg);
-  border: 2px solid var(--color-border);
-  border-radius: var(--radius-xl);
+  border: 2px solid rgba(15, 118, 110, 0.14);
+  border-radius: 16px;
   font-size: var(--font-md);
   transition: border-color var(--transition-normal);
   box-sizing: border-box;
+  background: #FFFCF8;
 }
 
 .address-input:focus {
   outline: none;
-  border-color: var(--color-accent);
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px rgba(15, 118, 110, 0.12);
 }
 
 .city-label {
@@ -179,7 +186,7 @@
   margin-top: var(--spacing-md);
   padding: var(--spacing-md);
   background: rgba(255, 193, 7, 0.1);
-  border-radius: var(--radius-md);
+  border-radius: 12px;
 }
 
 .mini-spinner {
@@ -202,11 +209,11 @@
 .delivery-result {
   margin-top: var(--spacing-md);
   padding: var(--spacing-lg);
-  border-radius: var(--radius-md);
+  border-radius: 12px;
 }
 
 .delivery-result.success {
-  background: rgba(76, 175, 80, 0.1);
+  background: #E7F5F3;
 }
 
 .delivery-result.error {
@@ -225,7 +232,7 @@
 .delivery-cost-value {
   font-size: var(--font-lg);
   font-weight: var(--font-semibold);
-  color: var(--color-accent);
+  color: var(--color-primary-dark);
   margin-left: var(--spacing-sm);
 }
 
@@ -253,9 +260,10 @@
 .order-summary {
   background: var(--color-bg-primary);
   padding: var(--spacing-xl);
-  border-radius: var(--radius-2xl);
+  border-radius: 20px;
   margin-bottom: var(--spacing-lg);
-  box-shadow: var(--shadow-md);
+  box-shadow: var(--shadow-card);
+  border: 1px solid rgba(15, 118, 110, 0.12);
 }
 
 .order-summary h2 {
@@ -322,10 +330,10 @@
 .summary-row.total {
   margin-top: var(--spacing-sm);
   padding-top: var(--spacing-md);
-  border-top: 2px solid var(--color-border);
+  border-top: 2px solid rgba(15, 118, 110, 0.12);
   font-size: var(--font-xl);
   font-weight: var(--font-bold);
-  color: var(--color-accent);
+  color: var(--color-primary-dark);
 }
 
 /* Error Message */
@@ -347,9 +355,10 @@
 .payment-method-section {
   background: var(--color-bg-primary);
   padding: var(--spacing-xl);
-  border-radius: var(--radius-2xl);
+  border-radius: 20px;
   margin-bottom: var(--spacing-lg);
-  box-shadow: var(--shadow-md);
+  box-shadow: var(--shadow-card);
+  border: 1px solid rgba(15, 118, 110, 0.12);
 }
 
 .payment-method-section h2 {
@@ -370,35 +379,35 @@
   align-items: center;
   gap: var(--spacing-lg);
   padding: var(--spacing-lg);
-  background: var(--color-bg-secondary);
+  background: #FFFCF8;
   border: 2px solid transparent;
-  border-radius: var(--radius-xl);
+  border-radius: 16px;
   cursor: pointer;
   transition: all var(--transition-normal);
   text-align: left;
 }
 
 .payment-option:hover {
-  background: var(--color-bg-tertiary);
+  background: #F3EFE8;
 }
 
 .payment-option.active {
-  background: rgba(255, 107, 53, 0.05);
-  border-color: var(--color-accent);
+  background: #E7F5F3;
+  border-color: var(--color-primary);
 }
 
 .payment-option:focus-visible {
-  outline: 3px solid var(--color-accent);
+  outline: 3px solid var(--color-primary);
   outline-offset: 2px;
 }
 
 .payment-option.payment-online {
-  background: linear-gradient(135deg, #f8f9ff 0%, #eef0ff 100%);
+  background: linear-gradient(135deg, #F6F9FF 0%, #EAF1FF 100%);
 }
 
 .payment-option.payment-online.active {
-  background: linear-gradient(135deg, #e8f4fd 0%, #d4e8fc 100%);
-  border-color: var(--color-info);
+  background: linear-gradient(135deg, #E7F5F3 0%, #D9F0EC 100%);
+  border-color: var(--color-primary);
 }
 
 .payment-logo {
@@ -413,8 +422,8 @@
 }
 
 .place-order-button:hover:not(:disabled) {
-  background: var(--color-accent-dark, #E55A2A);
-  box-shadow: 0 6px 20px rgba(255, 107, 53, 0.5);
+  background: var(--color-accent-dark, #EA580C);
+  box-shadow: 0 6px 20px rgba(249, 115, 22, 0.5);
 }
 
 .place-order-button:active:not(:disabled) {

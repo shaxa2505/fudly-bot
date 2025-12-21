@@ -255,13 +255,13 @@
                         <div class="stats-grid">
                             ${[1,2,3,4].map(() => `
                                 <div class="stat-card skeleton">
-                                    <div class="skeleton-line" style="width: 60%; height: 20px; margin-bottom: 12px;"></div>
-                                    <div class="skeleton-line" style="width: 40%; height: 32px;"></div>
+                                    <div class="skeleton-line w-60p h-20 mb-12"></div>
+                                    <div class="skeleton-line w-40p h-32"></div>
                                 </div>
                             `).join('')}
                         </div>
-                        <div class="skeleton-line" style="width: 200px; height: 24px; margin: 32px 0 16px;"></div>
-                        ${[1,2,3].map(() => `<div class="skeleton" style="height: 100px; margin-bottom: 16px; border-radius: 16px;"></div>`).join('')}
+                        <div class="skeleton-line w-200 h-24 mt-xl mb-md"></div>
+                        ${[1,2,3].map(() => `<div class="skeleton skeleton-block tall-100"></div>`).join('')}
                     </div>
                 `,
                 products: `
@@ -269,11 +269,11 @@
                         <div class="products-grid">
                             ${[1,2,3,4,5,6].map(() => `
                                 <div class="product-card skeleton">
-                                    <div class="skeleton" style="height: 240px;"></div>
-                                    <div style="padding: 16px;">
-                                        <div class="skeleton-line" style="width: 70%; height: 20px; margin-bottom: 8px;"></div>
-                                        <div class="skeleton-line" style="width: 100%; height: 16px; margin-bottom: 12px;"></div>
-                                        <div class="skeleton-line" style="width: 40%; height: 24px;"></div>
+                                    <div class="skeleton skeleton-block tall-240"></div>
+                                    <div class="skeleton-pad">
+                                        <div class="skeleton-line w-70p h-20 mb-sm"></div>
+                                        <div class="skeleton-line w-100p h-16 mb-12"></div>
+                                        <div class="skeleton-line w-40p h-24"></div>
                                     </div>
                                 </div>
                             `).join('')}
@@ -282,12 +282,12 @@
                 `,
                 stats: `
                     <div class="container fade-in">
-                        <div class="skeleton" style="height: 300px; margin-bottom: 24px; border-radius: 20px;"></div>
+                        <div class="skeleton skeleton-block tall-300"></div>
                         <div class="stats-grid">
                             ${[1,2,3,4].map(() => `
                                 <div class="stat-card skeleton">
-                                    <div class="skeleton-line" style="width: 60%; height: 18px; margin-bottom: 10px;"></div>
-                                    <div class="skeleton-line" style="width: 50%; height: 28px;"></div>
+                                    <div class="skeleton-line w-60p h-18 mb-10"></div>
+                                    <div class="skeleton-line w-50p h-28"></div>
                                 </div>
                             `).join('')}
                         </div>
@@ -296,7 +296,7 @@
                 settings: `
                     <div class="container fade-in">
                         ${[1,2,3,4,5].map(() => `
-                            <div class="skeleton" style="height: 72px; margin-bottom: 12px; border-radius: 16px;"></div>
+                            <div class="skeleton skeleton-block tall-72"></div>
                         `).join('')}
                     </div>
                 `
@@ -491,7 +491,7 @@
                                         <h3 class="urgent-title">🔔 Новый заказ #${order.order_id || order.id}</h3>
                                         <span class="urgent-badge">${formatTime(order.created_at)}</span>
                                     </div>
-                                    <div style="padding-left: 16px;">
+                                    <div class="pl-md">
                                         <p class="order-summary">${order.order_type === 'pickup' ? '🏃 Самовывоз' : '🚗 Доставка'} • ${formatPrice(order.price)}</p>
                                     </div>
                                     <div class="urgent-actions" onclick="event.stopPropagation()">
@@ -907,7 +907,7 @@
 
             const originalText = button.innerHTML;
             button.disabled = true;
-            button.innerHTML = '<span style="opacity: 0.6;">⏳ Обновление...</span>';
+            button.innerHTML = '<span class="opacity-60">⏳ Обновление...</span>';
 
             try {
                 await updateOrderStatus(orderId, newStatus);
@@ -1023,7 +1023,7 @@
             const submitBtn = event.target.querySelector('button[type="submit"]');
             const originalText = submitBtn.innerHTML;
             submitBtn.disabled = true;
-            submitBtn.innerHTML = '<span style="opacity: 0.6;">⏳ Отмена...</span>';
+            submitBtn.innerHTML = '<span class="opacity-60">⏳ Отмена...</span>';
 
             try {
                 // Call API with cancel reason
@@ -1069,7 +1069,7 @@
 
             const originalText = button.innerHTML;
             button.disabled = true;
-            button.innerHTML = '<span style="opacity: 0.6;">⏳ Отмена...</span>';
+            button.innerHTML = '<span class="opacity-60">⏳ Отмена...</span>';
 
             try {
                 haptic('heavy');
@@ -1085,7 +1085,7 @@
             const originalText = button.innerHTML;
 
             button.disabled = true;
-            button.innerHTML = '<span style="opacity: 0.6;">⏳ Обновление...</span>';
+            button.innerHTML = '<span class="opacity-60">⏳ Обновление...</span>';
 
             try {
                 await updateOrderStatus(orderId, newStatus);
@@ -1103,7 +1103,7 @@
             const originalText = button.innerHTML;
 
             button.disabled = true;
-            button.innerHTML = '<span style="opacity: 0.6;">⏳ Отмена...</span>';
+            button.innerHTML = '<span class="opacity-60">⏳ Отмена...</span>';
 
             try {
                 haptic('heavy');
@@ -1221,7 +1221,7 @@
                                             <span>Нет фото</span>
                                         </div>
                                     `}
-                                    ${product.is_available ? '' : '<div class="product-overlay"><span style="color: white; font-weight: bold;">Нет в наличии</span></div>'}
+                                    ${product.is_available ? '' : '<div class="product-overlay"><span class="product-overlay-text">Нет в наличии</span></div>'}
                                 </div>
                                 <div class="product-actions">
                                     <button class="product-action-btn ripple" onclick="editProduct(${product.id})" title="Редактировать">
@@ -1385,7 +1385,7 @@
                                     `}
                                 </div>
                                 <input type="url" name="photo_url_input" value="${product?.photo_url || ''}" placeholder="https://... (или загрузите файл)"
-                                       class="search-input" style="margin-top: 12px;" oninput="handlePhotoUrlInput(this)">
+                                       class="search-input photo-url-input" oninput="handlePhotoUrlInput(this)">
                             </div>
 
                             <!-- 📦 СЕКЦИЯ: Основная информация -->
@@ -1404,8 +1404,8 @@
                                        oninput="validateField(this); showNameSuggestions(this)"
                                        onfocus="showNameSuggestions(this)"
                                        minlength="3" maxlength="100" placeholder="Например: Молоко 3.2%">
-                                <div id="nameSuggestions" class="autocomplete-suggestions" style="display: none;"></div>
-                                <div class="form-error" style="display: none;">Минимум 3 символа</div>
+                                <div id="nameSuggestions" class="autocomplete-suggestions hidden"></div>
+                                <div class="form-error hidden">Минимум 3 символа</div>
                             </div>
 
                             <!-- Category with smart defaults -->
@@ -1423,7 +1423,7 @@
                                     <option value="frozen" ${product?.category === 'frozen' ? 'selected' : ''}>🧊 Замороженное</option>
                                     <option value="other" ${product?.category === 'other' ? 'selected' : ''}>📦 Другое</option>
                                 </select>
-                                <div class="smart-hint info" style="margin-top: 8px;">
+                                <div class="smart-hint info mt-sm">
                                     <span class="smart-hint-icon">💡</span>
                                     <span class="smart-hint-text">Автоматически заполнит остальные поля</span>
                                 </div>
@@ -1433,7 +1433,7 @@
                                 <label>Описание</label>
                                 <textarea name="description" rows="3" class="search-input"
                                           oninput="validateField(this); updateCharCounter(this)" maxlength="500" placeholder="Краткое описание товара">${product?.description || ''}</textarea>
-                                <div class="char-counter" style="font-size: 12px; color: var(--text-muted); margin-top: 4px; text-align: right;">0/500</div>
+                                <div class="char-counter">0/500</div>
                             </div>
                             </div>
 
@@ -1453,7 +1453,7 @@
                                     <input type="number" name="original_price" id="originalPrice" value="${product?.original_price || product?.price || ''}"
                                            required min="1" step="1" class="search-input"
                                            oninput="validateField(this); calculateFinalPrice('percent')" placeholder="15000">
-                                    <div class="form-error" style="display: none;">Цена должна быть > 0</div>
+                                    <div class="form-error hidden">Цена должна быть > 0</div>
                                 </div>
 
                                 <div class="form-group">
@@ -1472,13 +1472,13 @@
                             </div>
 
                             <!-- Live Price Preview -->
-                            <div class="price-preview-card" id="pricePreview" style="display: none;">
+                            <div class="price-preview-card hidden" id="pricePreview">
                                 <div class="price-preview-row">
                                     <span class="price-preview-label">Было:</span>
                                     <span id="priceOriginal" class="price-preview-value original">15,000 сум</span>
                                 </div>
                                 <div class="price-preview-row">
-                                    <span class="price-preview-label" style="font-size: 16px; font-weight: 700;">Стало:</span>
+                                    <span class="price-preview-label price-preview-label-strong">Стало:</span>
                                     <span id="priceFinal" class="price-preview-value final">10,500 сум</span>
                                 </div>
                                 <div class="price-preview-savings">
@@ -1514,19 +1514,19 @@
                                 <div class="form-group">
                                     <label>
                                         Количество в наличии *
-                                        <span style="font-size: 12px; color: #818C99; font-weight: 400;">Автоматически уменьшается при продаже</span>
+                                        <span class="form-helper">Автоматически уменьшается при продаже</span>
                                     </label>
-                                    <div style="display: flex; gap: 8px; align-items: center;">
-                                        <button type="button" class="btn btn-sm btn-secondary" onclick="changeQuantity(-1)" style="width: 40px; height: 40px; padding: 0;">−</button>
+                                    <div class="d-flex align-center gap-sm">
+                                        <button type="button" class="btn btn-sm btn-secondary btn-square-sm" onclick="changeQuantity(-1)">−</button>
                                         <input type="number" name="stock_quantity" id="stockQuantity" value="${product?.stock_quantity || product?.stock || 0}"
-                                               required min="0" max="9999" class="search-input" placeholder="0" style="text-align: center; flex: 1;">
-                                        <button type="button" class="btn btn-sm btn-secondary" onclick="changeQuantity(1)" style="width: 40px; height: 40px; padding: 0;">+</button>
+                                               required min="0" max="9999" class="search-input text-center flex-1" placeholder="0">
+                                        <button type="button" class="btn btn-sm btn-secondary btn-square-sm" onclick="changeQuantity(1)">+</button>
                                     </div>
-                                    <div style="display: flex; gap: 8px; margin-top: 8px;">
-                                        <button type="button" class="btn btn-sm btn-ghost" onclick="setQuantity(5)" style="flex: 1;">5</button>
-                                        <button type="button" class="btn btn-sm btn-ghost" onclick="setQuantity(10)" style="flex: 1;">10</button>
-                                        <button type="button" class="btn btn-sm btn-ghost" onclick="setQuantity(20)" style="flex: 1;">20</button>
-                                        <button type="button" class="btn btn-sm btn-ghost" onclick="setQuantity(50)" style="flex: 1;">50</button>
+                                    <div class="d-flex gap-sm mt-sm">
+                                        <button type="button" class="btn btn-sm btn-ghost flex-1" onclick="setQuantity(5)">5</button>
+                                        <button type="button" class="btn btn-sm btn-ghost flex-1" onclick="setQuantity(10)">10</button>
+                                        <button type="button" class="btn btn-sm btn-ghost flex-1" onclick="setQuantity(20)">20</button>
+                                        <button type="button" class="btn btn-sm btn-ghost flex-1" onclick="setQuantity(50)">50</button>
                                     </div>
                                 </div>
                             </div>
@@ -1536,11 +1536,11 @@
                                 <label>Срок годности *</label>
                                 <input type="date" name="expiry_date" id="expiryDate" value="${product?.expiry_date ? product.expiry_date.split('T')[0] : ''}"
                                        required min="${new Date().toISOString().split('T')[0]}" class="search-input">
-                                <div style="display: flex; gap: 8px; margin-top: 8px;">
-                                    <button type="button" class="btn btn-sm btn-ghost" onclick="setExpiry(0)" style="flex: 1;">Сегодня</button>
-                                    <button type="button" class="btn btn-sm btn-ghost" onclick="setExpiry(1)" style="flex: 1;">Завтра</button>
-                                    <button type="button" class="btn btn-sm btn-ghost" onclick="setExpiry(2)" style="flex: 1;">2 дня</button>
-                                    <button type="button" class="btn btn-sm btn-ghost" onclick="setExpiry(3)" style="flex: 1;">3 дня</button>
+                                <div class="d-flex gap-sm mt-sm">
+                                    <button type="button" class="btn btn-sm btn-ghost flex-1" onclick="setExpiry(0)">Сегодня</button>
+                                    <button type="button" class="btn btn-sm btn-ghost flex-1" onclick="setExpiry(1)">Завтра</button>
+                                    <button type="button" class="btn btn-sm btn-ghost flex-1" onclick="setExpiry(2)">2 дня</button>
+                                    <button type="button" class="btn btn-sm btn-ghost flex-1" onclick="setExpiry(3)">3 дня</button>
                                 </div>
                             </div>
 
@@ -1677,7 +1677,7 @@
                 uploadArea.classList.add('has-photo');
                 uploadArea.innerHTML = `
                     <div class="photo-preview">
-                        <img src="${url}" alt="Preview" onerror="this.src=''; this.parentElement.innerHTML='<div style=\\'padding: 24px; text-align: center; color: var(--danger);\\'>Ошибка загрузки изображения</div>'">
+                        <img src="${url}" alt="Preview" onerror="this.src=''; this.parentElement.innerHTML='<div class=\'photo-error\'>Ошибка загрузки изображения</div>'">
                         <button type="button" class="photo-preview-remove" onclick="event.stopPropagation(); removePhoto()">
                             <i data-lucide="x" class="icon-16"></i>
                         </button>
@@ -1721,7 +1721,7 @@
 
             const original = parseFloat(originalInput.value) || 0;
             if (original <= 0) {
-                previewBox.style.display = 'none';
+                previewBox.classList.add('hidden');
                 return;
             }
 
@@ -1747,7 +1747,7 @@
             const savings = Math.max(0, original - finalPrice);
 
             // Show preview
-            previewBox.style.display = 'block';
+            previewBox.classList.remove('hidden');
             document.getElementById('priceOriginal').textContent = formatPrice(original);
             document.getElementById('priceFinal').textContent = formatPrice(finalPrice);
             document.getElementById('priceSavings').textContent = `${formatPrice(savings)} (${discountPercent}%)`;
@@ -1837,7 +1837,7 @@
 
             // Hide if no category or query too short
             if (!category || query.length < 1) {
-                suggestionsDiv.style.display = 'none';
+                suggestionsDiv.classList.add('hidden');
                 return;
             }
 
@@ -1848,7 +1848,7 @@
                 ).slice(0, 5);
 
                 if (filtered.length === 0) {
-                    suggestionsDiv.style.display = 'none';
+                    suggestionsDiv.classList.add('hidden');
                     return;
                 }
 
@@ -1857,7 +1857,7 @@
                         ${s}
                     </div>
                 `).join('');
-                suggestionsDiv.style.display = 'block';
+                suggestionsDiv.classList.remove('hidden');
             }, 200);
         }
 
@@ -1865,7 +1865,7 @@
             const input = document.getElementById('productName');
             if (input) {
                 input.value = name;
-                document.getElementById('nameSuggestions').style.display = 'none';
+                document.getElementById('nameSuggestions').classList.add('hidden');
                 haptic('light');
             }
         }
@@ -1877,7 +1877,7 @@
             if (suggestionsDiv && nameInput &&
                 !suggestionsDiv.contains(e.target) &&
                 e.target !== nameInput) {
-                suggestionsDiv.style.display = 'none';
+                suggestionsDiv.classList.add('hidden');
             }
         });
 
@@ -1891,7 +1891,7 @@
             const submitBtn = event.target.querySelector('button[type="submit"]');
             const originalText = submitBtn.innerHTML;
             submitBtn.disabled = true;
-            submitBtn.innerHTML = '<div class="spinner spinner-small" style="margin: 0 auto;"></div>';
+            submitBtn.innerHTML = '<div class="spinner spinner-small spinner-center"></div>';
 
             try {
                 const title = String(formData.get('name') || '').trim();
@@ -2012,12 +2012,12 @@
             if (isValid) {
                 input.classList.remove('error');
                 input.classList.add('success');
-                errorDiv.style.display = 'none';
+                errorDiv.classList.add('hidden');
             } else {
                 input.classList.add('error');
                 input.classList.remove('success');
                 errorDiv.textContent = errorMsg;
-                errorDiv.style.display = 'flex';
+                errorDiv.classList.remove('hidden');
             }
         }
 
@@ -2210,7 +2210,7 @@
                     <h2 class="section-title">📊 Статистика</h2>
 
                     <!-- Key Metrics -->
-                    <div class="stats-grid" style="margin-bottom: 32px;">
+                    <div class="stats-grid mb-xl">
                         <div class="stat-card primary">
                             <div class="stat-value">${formatPrice(stats.totalRevenue)}</div>
                             <div class="stat-label">Всего выручка</div>
@@ -2233,18 +2233,18 @@
                     </div>
 
                     <!-- Revenue Chart -->
-                    <div class="dashboard-card" style="margin-bottom: 24px;">
+                    <div class="dashboard-card mb-lg">
                         <h3 class="card-title">
                             <i data-lucide="trending-up" class="card-icon"></i>
                             Выручка за неделю
                         </h3>
-                        <div class="chart-container" style="padding: 24px 0;">
+                        <div class="chart-container compact">
                             ${stats.last7Days.map(day => `
-                                <div class="chart-bar-wrapper" style="flex: 1;">
-                                    <div class="chart-bar-value" style="font-size: 13px; font-weight: 600; color: #21A038; margin-bottom: 8px;">
+                                <div class="chart-bar-wrapper flex-1">
+                                    <div class="chart-bar-value compact">
                                         ${day.revenue > 0 ? formatPrice(day.revenue).replace(' сум', '') : '—'}
                                     </div>
-                                    <div class="chart-bar-container" style="height: 120px; background: #F7F7F7; border-radius: 8px; display: flex; align-items: flex-end; padding: 4px;">
+                                    <div class="chart-bar-container compact">
                                         <div class="chart-bar" style="
                                             width: 100%;
                                             height: ${day.revenue > 0 ? (day.revenue / maxRevenue * 100) : 0}%;
@@ -2254,10 +2254,10 @@
                                             transition: height 0.5s cubic-bezier(0.4, 0, 0.2, 1);
                                         "></div>
                                     </div>
-                                    <div class="chart-bar-label" style="font-size: 12px; color: #818C99; margin-top: 8px; text-align: center;">
+                                    <div class="chart-bar-label compact">
                                         ${day.day}
                                     </div>
-                                    <div style="font-size: 11px; color: #9CA3AF; text-align: center; margin-top: 2px;">
+                                    <div class="chart-subnote">
                                         ${day.orders} зак.
                                     </div>
                                 </div>
@@ -2267,7 +2267,7 @@
 
                     <!-- Top Products -->
                     ${stats.topProducts.length > 0 ? `
-                        <div class="dashboard-card" style="margin-bottom: 24px;">
+                        <div class="dashboard-card mb-lg">
                             <h3 class="card-title">
                                 <i data-lucide="trophy" class="card-icon"></i>
                                 Топ товаров
@@ -2276,21 +2276,21 @@
                                 ${stats.topProducts.map((product, index) => {
                                     const medalClass = index === 0 ? 'gold' : index === 1 ? 'silver' : index === 2 ? 'bronze' : 'default';
                                     return `
-                                    <div class="list-item ripple" style="padding: 18px; cursor: pointer;">
-                                        <div style="display: flex; align-items: center; gap: 16px; flex: 1;">
+                                    <div class="list-item ripple spacious">
+                                        <div class="stat-list-row">
                                             <div class="top-product-medal ${medalClass}">
                                                 ${index + 1}
                                             </div>
-                                            <div style="flex: 1;">
-                                                <div style="font-weight: 700; font-size: 17px; color: #000000; margin-bottom: 4px; letter-spacing: -0.3px;">
+                                            <div class="flex-1">
+                                                <div class="stat-list-title">
                                                     ${product.name}
                                                 </div>
-                                                <div style="font-size: 14px; color: #818C99; display: flex; align-items: center; gap: 8px;">
+                                                <div class="stat-list-meta">
                                                     <span>📦 ${product.orders} ${product.orders === 1 ? 'заказ' : product.orders < 5 ? 'заказа' : 'заказов'}</span>
                                                 </div>
                                             </div>
-                                            <div style="text-align: right;">
-                                                <div style="font-size: 20px; font-weight: 800; color: #21A038; letter-spacing: -0.5px;">
+                                            <div class="text-right">
+                                                <div class="stat-list-value">
                                                     ${formatPrice(product.revenue)}
                                                 </div>
                                             </div>
@@ -2307,51 +2307,51 @@
                             <i data-lucide="activity" class="card-icon"></i>
                             Заказы по статусам
                         </h3>
-                        <div class="stats-grid" style="margin-top: 20px; gap: 16px;">
+                        <div class="stats-grid compact">
                             <div class="status-stat-card new ripple">
-                                <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 12px;">
-                                    <div style="width: 36px; height: 36px; background: rgba(33, 160, 56, 0.1); border-radius: 10px; display: flex; align-items: center; justify-content: center;">
-                                        <span style="font-size: 18px;">🆕</span>
+                                <div class="status-stat-header">
+                                    <div class="status-stat-icon new">
+                                        <span>🆕</span>
                                     </div>
-                                    <div class="stat-label" style="margin: 0; font-size: 14px;">Новые</div>
+                                    <div class="status-stat-label">Новые</div>
                                 </div>
-                                <div class="stat-value" style="color: #21A038;">${stats.ordersByStatus.new}</div>
+                                <div class="stat-value status-stat-value new">${stats.ordersByStatus.new}</div>
                             </div>
                             <div class="status-stat-card preparing ripple">
-                                <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 12px;">
-                                    <div style="width: 36px; height: 36px; background: rgba(255, 152, 0, 0.1); border-radius: 10px; display: flex; align-items: center; justify-content: center;">
-                                        <span style="font-size: 18px;">👨‍🍳</span>
+                                <div class="status-stat-header">
+                                    <div class="status-stat-icon preparing">
+                                        <span>👨‍🍳</span>
                                     </div>
-                                    <div class="stat-label" style="margin: 0; font-size: 14px;">В работе</div>
+                                    <div class="status-stat-label">В работе</div>
                                 </div>
-                                <div class="stat-value" style="color: #FF9800;">${stats.ordersByStatus.preparing}</div>
+                                <div class="stat-value status-stat-value preparing">${stats.ordersByStatus.preparing}</div>
                             </div>
                             <div class="status-stat-card ready ripple">
-                                <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 12px;">
-                                    <div style="width: 36px; height: 36px; background: rgba(33, 150, 243, 0.1); border-radius: 10px; display: flex; align-items: center; justify-content: center;">
-                                        <span style="font-size: 18px;">✅</span>
+                                <div class="status-stat-header">
+                                    <div class="status-stat-icon ready">
+                                        <span>✅</span>
                                     </div>
-                                    <div class="stat-label" style="margin: 0; font-size: 14px;">Готовы</div>
+                                    <div class="status-stat-label">Готовы</div>
                                 </div>
-                                <div class="stat-value" style="color: #2196F3;">${stats.ordersByStatus.ready}</div>
+                                <div class="stat-value status-stat-value ready">${stats.ordersByStatus.ready}</div>
                             </div>
                             <div class="status-stat-card completed ripple">
-                                <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 12px;">
-                                    <div style="width: 36px; height: 36px; background: rgba(76, 175, 80, 0.1); border-radius: 10px; display: flex; align-items: center; justify-content: center;">
-                                        <span style="font-size: 18px;">🎉</span>
+                                <div class="status-stat-header">
+                                    <div class="status-stat-icon completed">
+                                        <span>🎉</span>
                                     </div>
-                                    <div class="stat-label" style="margin: 0; font-size: 14px;">Завершены</div>
+                                    <div class="status-stat-label">Завершены</div>
                                 </div>
-                                <div class="stat-value" style="color: #4CAF50;">${stats.ordersByStatus.completed}</div>
+                                <div class="stat-value status-stat-value completed">${stats.ordersByStatus.completed}</div>
                             </div>
                             <div class="status-stat-card cancelled ripple">
-                                <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 12px;">
-                                    <div style="width: 36px; height: 36px; background: rgba(244, 67, 54, 0.1); border-radius: 10px; display: flex; align-items: center; justify-content: center;">
-                                        <span style="font-size: 18px;">❌</span>
+                                <div class="status-stat-header">
+                                    <div class="status-stat-icon cancelled">
+                                        <span>❌</span>
                                     </div>
-                                    <div class="stat-label" style="margin: 0; font-size: 14px;">Отменены</div>
+                                    <div class="status-stat-label">Отменены</div>
                                 </div>
-                                <div class="stat-value" style="color: #F44336;">${stats.ordersByStatus.cancelled}</div>
+                                <div class="stat-value status-stat-value cancelled">${stats.ordersByStatus.cancelled}</div>
                             </div>
                         </div>
                     </div>
@@ -2377,7 +2377,7 @@
                     <div class="container fade-in">
                         <h2 class="section-title">Настройки</h2>
 
-                        <div class="dashboard-card" style="margin-bottom: 24px;">
+                        <div class="dashboard-card mb-lg">
                             <h3 class="card-title">
                                 <i data-lucide="store" class="card-icon"></i>
                                 Профиль магазина
@@ -2425,7 +2425,7 @@
                             </div>
                         </div>
 
-                        <div class="dashboard-card" style="margin-bottom: 24px;">
+                        <div class="dashboard-card mb-lg">
                             <h3 class="card-title">
                                 <i data-lucide="clock" class="card-icon"></i>
                                 Режим работы
@@ -2451,7 +2451,7 @@
                             </div>
                         </div>
 
-                        <div class="dashboard-card" style="margin-bottom: 24px;">
+                        <div class="dashboard-card mb-lg">
                             <h3 class="card-title">
                                 <i data-lucide="truck" class="card-icon"></i>
                                 Доставка
@@ -2464,7 +2464,7 @@
                             <span class="list-title">Стоимость доставки</span>
                             <span class="list-value">${formatPrice(state.store?.delivery_cost || 0)}</span>
                         </div>
-                        <button class="btn btn-sm btn-primary" onclick="toast('Функция в разработке', 'info')" style="margin-top: 12px;">
+                        <button class="btn btn-sm btn-primary mt-12" onclick="toast('Функция в разработке', 'info')" >
                             Изменить настройки
                         </button>
                     </div>
@@ -2525,7 +2525,7 @@
                                 <label>Название магазина *</label>
                                 <input type="text" name="name" value="${state.store?.name || ''}" required class="search-input"
                                        minlength="3" maxlength="50" oninput="validateField(this)">
-                                <div class="form-error" style="display: none;">Минимум 3 символа</div>
+                                <div class="form-error hidden">Минимум 3 символа</div>
                             </div>
 
                             <div class="form-group">
@@ -2538,7 +2538,7 @@
                                 <label>Телефон</label>
                                 <input type="tel" name="phone" value="${state.store?.phone || ''}" placeholder="+998 XX XXX XX XX"
                                        class="search-input" pattern="\+998\s?\d{2}\s?\d{3}\s?\d{2}\s?\d{2}" oninput="validateField(this)">
-                                <div class="form-error" style="display: none;">Некорректный формат</div>
+                                <div class="form-error hidden">Некорректный формат</div>
                             </div>
 
                             <div class="form-group">
@@ -2595,7 +2595,7 @@
             const submitBtn = event.target.querySelector('button[type="submit"]');
             const originalText = submitBtn.textContent;
             submitBtn.disabled = true;
-            submitBtn.innerHTML = '<div class="spinner spinner-small" style="margin: 0 auto;"></div>';
+            submitBtn.innerHTML = '<div class="spinner spinner-small spinner-center"></div>';
 
             try {
                 await apiFetch('/api/partner/store', {

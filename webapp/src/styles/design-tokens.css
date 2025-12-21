@@ -8,19 +8,19 @@
 :root {
   /* ===== COLORS ===== */
 
-  /* Primary Palette - Green (main brand color) */
-  --color-primary: #53B175;
-  --color-primary-dark: #3D9058;
-  --color-primary-light: #E8F5E9;
-  --color-primary-gradient: linear-gradient(135deg, #53B175 0%, #3D9058 100%);
+  /* Primary Palette - Deep Teal (main brand color) */
+  --color-primary: #0F766E;
+  --color-primary-dark: #0B5E57;
+  --color-primary-light: #DDF4F1;
+  --color-primary-gradient: linear-gradient(135deg, #0F766E 0%, #0A5C54 100%);
 
-  /* Accent Palette - Orange (CTAs, highlights) */
-  --color-accent: #FF6B35;
-  --color-accent-dark: #E55A2A;
-  --color-accent-light: #FFF5F0;
-  --color-accent-bg: #FFE8DC;
-  --color-accent-bg-light: #FFF5F0;
-  --color-accent-gradient: linear-gradient(135deg, #FF6B35 0%, #E84C1B 100%);
+  /* Accent Palette - Citrus (CTAs, highlights) */
+  --color-accent: #F97316;
+  --color-accent-dark: #EA580C;
+  --color-accent-light: #FFF1E6;
+  --color-accent-bg: #FFE6D2;
+  --color-accent-bg-light: #FFF5EC;
+  --color-accent-gradient: linear-gradient(135deg, #F97316 0%, #EA580C 100%);
 
   /* Semantic Colors */
   --color-success: #4CAF50;
@@ -33,36 +33,37 @@
   --color-info: #007AFF;
   --color-link: #007AFF;
 
-  /* Text Colors - WCAG AA Compliant */
-  --color-text-primary: #181725;      /* 14.55:1 ✅ WCAG AAA */
-  --color-text-secondary: #4A5568;    /* Was #7C7C7C (4.54:1) - Now 9.21:1 ✅ WCAG AAA */
-  --color-text-tertiary: #64748B;     /* Was #999999 (2.85:1) - Now 4.54:1 ✅ WCAG AA */
-  --color-text-muted: #6B7280;        /* Was #B0B0B0 (1.95:1) - Now 5.11:1 ✅ WCAG AA */
+  /* Text Colors */
+  --color-text-primary: #101828;
+  --color-text-secondary: #475467;
+  --color-text-tertiary: #667085;
+  --color-text-muted: #98A2B3;
   --color-text-inverse: #FFFFFF;
 
   /* Background Colors */
   --color-bg-primary: #FFFFFF;
-  --color-bg-secondary: #F6F4F0;
-  --color-bg-tertiary: #EFEDEA;
+  --color-bg-secondary: #F8F5F1;
+  --color-bg-tertiary: #EFE9E2;
   --color-bg-card: #FFFFFF;
-  --color-bg-input: #FAFAFA;
+  --color-bg-input: #FBF9F6;
   --color-bg-overlay: rgba(0, 0, 0, 0.5);
-  --color-bg-skeleton: #E5E5E5;
-  --color-primary-bg: #E8F5E9; /* Light primary background for accents */
+  --color-bg-skeleton: #E7E0D8;
+  --color-primary-bg: #E7F5F3; /* Light primary background for accents */
 
   /* Gradients */
-  --gradient-primary: linear-gradient(135deg, #22C55E 0%, #16A34A 100%);
-  --gradient-accent: linear-gradient(135deg, #FF6B35 0%, #E55A2B 100%);
+  --gradient-primary: linear-gradient(135deg, #0F766E 0%, #0A5C54 100%);
+  --gradient-accent: linear-gradient(135deg, #F97316 0%, #EA580C 100%);
 
   /* Border Colors */
-  --color-border: #E6E2DA;
-  --color-border-light: #F1EDE6;
+  --color-border: #E4DED6;
+  --color-border-light: #F0EBE4;
   --color-border-focus: var(--color-primary);
 
   /* ===== TYPOGRAPHY ===== */
 
   /* Font Family */
-  --font-family: 'Manrope', 'Segoe UI', system-ui, sans-serif;
+  --font-family: 'Sora', 'Manrope', 'Segoe UI', system-ui, sans-serif;
+  --font-display: 'Fraunces', 'Sora', 'Times New Roman', serif;
 
   /* Font Sizes (1.25 ratio type scale) */
   --font-2xs: 10px;
@@ -116,15 +117,15 @@
   /* ===== SHADOWS ===== */
 
   --shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.05);
-  --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.08);
-  --shadow-md: 0 2px 12px rgba(0, 0, 0, 0.04);
-  --shadow-lg: 0 4px 16px rgba(0, 0, 0, 0.08);
-  --shadow-xl: 0 6px 24px rgba(0, 0, 0, 0.12);
-  --shadow-primary: 0 4px 16px rgba(83, 177, 117, 0.3);
-  --shadow-accent: 0 4px 16px rgba(255, 107, 53, 0.4);
-  --shadow-card: 0 6px 16px rgba(15, 23, 42, 0.08);
-  --shadow-header: 0 8px 20px rgba(15, 23, 42, 0.06);
-  --shadow-button: 0 10px 24px rgba(255, 107, 53, 0.35);
+  --shadow-sm: 0 4px 12px rgba(16, 24, 40, 0.08);
+  --shadow-md: 0 6px 16px rgba(16, 24, 40, 0.08);
+  --shadow-lg: 0 10px 24px rgba(16, 24, 40, 0.12);
+  --shadow-xl: 0 16px 32px rgba(16, 24, 40, 0.14);
+  --shadow-primary: 0 10px 24px rgba(15, 118, 110, 0.28);
+  --shadow-accent: 0 12px 26px rgba(249, 115, 22, 0.32);
+  --shadow-card: 0 14px 32px rgba(16, 24, 40, 0.1);
+  --shadow-header: 0 18px 34px rgba(16, 24, 40, 0.08);
+  --shadow-button: 0 12px 26px rgba(249, 115, 22, 0.3);
 
   /* ===== TRANSITIONS ===== */
 
@@ -143,8 +144,8 @@
 
   /* ===== LAYOUT ===== */
 
-  --bottom-nav-height: 64px;
-  --header-height: 60px;
+  --bottom-nav-height: 72px;
+  --header-height: 64px;
   --safe-area-bottom: env(safe-area-inset-bottom, 20px);
   --container-padding: 20px;
 

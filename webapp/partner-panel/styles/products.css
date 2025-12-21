@@ -96,6 +96,11 @@
     z-index: 2;
 }
 
+.product-overlay-text {
+    color: #FFFFFF;
+    font-weight: 700;
+}
+
 .product-card:hover .product-overlay {
     opacity: 1;
 }

@@ -174,6 +174,44 @@
     width: 60%;
 }
 
+.skeleton-block {
+    border-radius: 16px;
+}
+
+.skeleton-block.tall-72 {
+    height: 72px;
+    margin-bottom: 12px;
+}
+
+.skeleton-block.tall-100 {
+    height: 100px;
+    margin-bottom: 16px;
+}
+
+.skeleton-block.tall-240 {
+    height: 240px;
+}
+
+.skeleton-block.tall-300 {
+    height: 300px;
+    margin-bottom: 24px;
+    border-radius: 20px;
+}
+
+.skeleton-pad {
+    padding: 16px;
+}
+
+.spinner-center {
+    margin: 0 auto;
+}
+
+.photo-error {
+    padding: 24px;
+    text-align: center;
+    color: var(--danger);
+}
+
 /* === Error State === */
 .error-state {
     display: flex;

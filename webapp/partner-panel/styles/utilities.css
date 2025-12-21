@@ -56,12 +56,15 @@
 .mt-md { margin-top: var(--space-md) !important; }
 .mt-lg { margin-top: var(--space-lg) !important; }
 .mt-xl { margin-top: var(--space-xl) !important; }
+.mt-12 { margin-top: 12px !important; }
 
 .mb-xs { margin-bottom: var(--space-xs) !important; }
 .mb-sm { margin-bottom: var(--space-sm) !important; }
 .mb-md { margin-bottom: var(--space-md) !important; }
 .mb-lg { margin-bottom: var(--space-lg) !important; }
 .mb-xl { margin-bottom: var(--space-xl) !important; }
+.mb-10 { margin-bottom: 10px !important; }
+.mb-12 { margin-bottom: 12px !important; }
 
 .ml-auto { margin-left: auto !important; }
 .mr-auto { margin-right: auto !important; }
@@ -72,6 +75,7 @@
 .p-md { padding: var(--space-md) !important; }
 .p-lg { padding: var(--space-lg) !important; }
 .p-xl { padding: var(--space-xl) !important; }
+.pl-md { padding-left: var(--space-md) !important; }
 
 /* === Typography === */
 .text-left { text-align: left !important; }
@@ -97,6 +101,7 @@
 .text-danger { color: var(--danger) !important; }
 .text-muted { color: var(--text-muted) !important; }
 .text-secondary { color: var(--text-secondary) !important; }
+.opacity-60 { opacity: 0.6 !important; }
 
 /* === Icon Sizes === */
 .icon-16,
@@ -171,6 +176,19 @@
 /* === Width === */
 .w-full { width: 100% !important; }
 .w-auto { width: auto !important; }
+.w-40p { width: 40% !important; }
+.w-50p { width: 50% !important; }
+.w-60p { width: 60% !important; }
+.w-70p { width: 70% !important; }
+.w-100p { width: 100% !important; }
+.w-200 { width: 200px !important; }
+
+.h-16 { height: 16px !important; }
+.h-18 { height: 18px !important; }
+.h-20 { height: 20px !important; }
+.h-24 { height: 24px !important; }
+.h-28 { height: 28px !important; }
+.h-32 { height: 32px !important; }
 
 /* === Position === */
 .relative { position: relative !important; }
