@@ -19,7 +19,7 @@ function FavoritesPage() {
       <div className="favorites-page">
         <header className="favorites-header">
           <button className="back-btn" onClick={() => navigate(-1)} aria-label="Orqaga">
-            <-
+            {'<-'}
           </button>
           <h1>Sevimlilar</h1>
           <div style={{ width: 44 }} />
@@ -53,7 +53,7 @@ function FavoritesPage() {
     <div className="favorites-page">
       <header className="favorites-header">
         <button className="back-btn" onClick={() => navigate(-1)} aria-label="Orqaga">
-          <-
+          {'<-'}
         </button>
         <h1>Sevimlilar ({favoritesCount})</h1>
         <div style={{ width: 44 }} />

@@ -134,7 +134,7 @@ export default function OrderDetailsPage() {
       {/* Header */}
       <div className="details-header">
         <button className="back-button" onClick={() => navigate('/yana')}>
-          <-
+          {'<-'}
         </button>
         <h1 className="details-title">Buyurtma #{orderId}</h1>
       </div>

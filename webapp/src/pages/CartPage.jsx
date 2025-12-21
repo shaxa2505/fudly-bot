@@ -722,7 +722,7 @@ function CartPage({ user }) {
                     onClick={() => setCheckoutStep('details')}
                     disabled={orderLoading}
                   >
-                    <- Orqaga
+                    {'<- Orqaga'}
                   </button>
                   {selectedPaymentMethod === 'card' ? (
                     <button

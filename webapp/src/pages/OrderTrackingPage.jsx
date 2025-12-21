@@ -148,7 +148,7 @@ function OrderTrackingPage({ user }) {
     <div className="order-tracking-page">
       <div className="tracking-header">
         <button onClick={() => navigate('/profile')} className="back-button">
-          <- {t('Назад', 'Orqaga')}
+          {'<- '} {t('Назад', 'Orqaga')}
         </button>
         <h1>{t('Заказ', 'Buyurtma')} #{order.booking_code}</h1>
       </div>
