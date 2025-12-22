@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { ShoppingCart, Home, Sparkles, ArrowLeft, Trash2, ChevronRight } from 'lucide-react'
+import { ShoppingCart, Home, Sparkles, ArrowLeft, Trash2, ChevronRight, X } from 'lucide-react'
 import api from '../api/client'
 import { useCart } from '../context/CartContext'
 import { useToast } from '../context/ToastContext'
@@ -444,6 +444,14 @@ function CartPage({ user }) {
           const isMaxReached = item.quantity >= stockLimit
           return (
           <div key={item.offer.id} className="cart-item">
+            <button
+              className="cart-item-remove"
+              onClick={() => removeItem(item.offer.id)}
+              aria-label="Mahsulotni o'chirish"
+              type="button"
+            >
+              <Trash2 size={16} strokeWidth={2} aria-hidden="true" />
+            </button>
             <img
               src={photoUrl}
               alt={item.offer.title}
@@ -471,13 +479,6 @@ function CartPage({ user }) {
               )}
             </div>
             <div className="cart-item-controls">
-              <button
-                className="cart-item-remove"
-                onClick={() => removeItem(item.offer.id)}
-                aria-label="Mahsulotni o'chirish"
-              >
-                x
-              </button>
               <QuantityControl
                 value={item.quantity}
                 size="md"
@@ -522,7 +523,11 @@ function CartPage({ user }) {
                 <button
                   className="modal-close"
                   onClick={closeCheckout}
-                >x</button>
+                  type="button"
+                  aria-label="Yopish"
+                >
+                  <X size={18} strokeWidth={2} aria-hidden="true" />
+                </button>
               </div>
             </div>
 

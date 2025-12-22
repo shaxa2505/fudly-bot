@@ -84,6 +84,7 @@ class CreateOrderRequest(BaseModel):
     delivery_address: str | None = None
     phone: str | None = None
     comment: str | None = None
+    payment_method: str | None = None
 
 
 class OrderResponse(BaseModel):

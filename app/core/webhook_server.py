@@ -669,6 +669,14 @@ async def create_webhook_app(
                     payment_method = data.get("payment_method")
                     if not payment_method:
                         payment_method = "card" if is_delivery else "cash"
+                    payment_method = str(payment_method).strip().lower()
+                    if is_delivery and payment_method == "cash":
+                        return add_cors_headers(
+                            web.json_response(
+                                {"error": "Cash is not allowed for delivery orders"},
+                                status=400,
+                            )
+                        )
 
                     result: OrderResult = await order_service.create_order(
                         user_id=int(user_id),
@@ -758,6 +766,14 @@ async def create_webhook_app(
                 payment_method = data.get("payment_method")
                 if not payment_method:
                     payment_method = "card" if is_delivery else "cash"
+                payment_method = str(payment_method).strip().lower()
+                if is_delivery and payment_method == "cash":
+                    return add_cors_headers(
+                        web.json_response(
+                            {"error": "Cash is not allowed for delivery orders"},
+                            status=400,
+                        )
+                    )
 
                 db_items = [
                     {

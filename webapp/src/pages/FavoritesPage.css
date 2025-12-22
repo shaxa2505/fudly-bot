@@ -89,14 +89,15 @@
   gap: var(--spacing-md);
   padding: var(--spacing-md);
   background: var(--color-bg-primary);
-  border-radius: var(--radius-xl);
+  border-radius: 20px;
   box-shadow: var(--shadow-sm);
+  border: 1px solid rgba(15, 118, 110, 0.08);
 }
 
 .favorite-image {
   width: 80px;
   height: 80px;
-  border-radius: var(--radius-lg);
+  border-radius: 16px;
   object-fit: cover;
   background: var(--color-bg-secondary);
   cursor: pointer;
@@ -111,7 +112,7 @@
 
 .favorite-title {
   font-size: var(--font-base);
-  font-weight: var(--font-semibold);
+  font-weight: 700;
   color: var(--color-text-primary);
   margin: 0 0 var(--spacing-xs) 0;
   display: -webkit-box;
@@ -124,6 +125,7 @@
 .favorite-store {
   font-size: var(--font-xs);
   color: var(--color-text-secondary);
+  font-weight: var(--font-normal);
   margin: 0 0 var(--spacing-sm) 0;
 }
 
@@ -145,6 +147,7 @@
   font-size: var(--font-sm);
   color: var(--color-text-muted);
   text-decoration: line-through;
+  font-weight: var(--font-normal);
   white-space: nowrap;
 }
 
@@ -178,7 +181,7 @@
   outline-offset: 2px;
 }
 
-.add-to-cart-btn {
+.favorites-page .add-to-cart-btn {
   width: 40px;
   height: 40px;
   display: flex;
@@ -191,16 +194,16 @@
   transition: all var(--transition-normal);
 }
 
-.add-to-cart-btn:active {
+.favorites-page .add-to-cart-btn:active {
   transform: scale(0.9);
 }
 
-.add-to-cart-btn:focus-visible {
+.favorites-page .add-to-cart-btn:focus-visible {
   outline: 3px solid var(--color-primary);
   outline-offset: 2px;
 }
 
-.in-cart-badge {
+.favorites-page .in-cart-badge {
   font-size: var(--font-2xs);
   font-weight: var(--font-semibold);
   color: var(--color-primary);

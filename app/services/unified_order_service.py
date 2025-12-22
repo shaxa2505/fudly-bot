@@ -683,6 +683,20 @@ class UnifiedOrderService:
                 error_message="Delivery address required",
             )
 
+        payment_method = PaymentStatus.normalize_method(payment_method)
+        if order_type == "delivery" and payment_method == "cash":
+            return OrderResult(
+                success=False,
+                order_ids=[],
+                booking_ids=[],
+                pickup_codes=[],
+                total_items=0,
+                total_price=0,
+                delivery_price=0,
+                grand_total=0,
+                error_message="Cash is not allowed for delivery orders",
+            )
+
         # Enforce business invariant: one order must belong to ONE store
         # This protects from mixed-store carts and keeps pricing logic correct.
         store_ids = {item.store_id for item in items}
@@ -705,7 +719,6 @@ class UnifiedOrderService:
             )
 
         # Normalize and enforce: sellers should only see paid/cash orders
-        payment_method = PaymentStatus.normalize_method(payment_method)
         if not PaymentStatus.is_cleared(
             PaymentStatus.initial_for_method(payment_method),
             payment_method=payment_method,
@@ -1215,6 +1228,7 @@ class UnifiedOrderService:
                     pickup_code = entity.get("pickup_code")
                     current_status_raw = entity.get("order_status")
                     order_type = entity.get("order_type")
+                    payment_method = entity.get("payment_method")
 
                     # Fallback: if order_type not set, determine from delivery_address
                     if not order_type:
@@ -1233,6 +1247,7 @@ class UnifiedOrderService:
                     pickup_code = getattr(entity, "pickup_code", None)
                     current_status_raw = getattr(entity, "order_status", None)
                     order_type = getattr(entity, "order_type", None)
+                    payment_method = getattr(entity, "payment_method", None)
                     if not order_type:
                         order_type = (
                             "delivery"
@@ -1245,6 +1260,7 @@ class UnifiedOrderService:
                 OrderStatus.normalize(str(current_status_raw)) if current_status_raw else None
             )
             target_status = OrderStatus.normalize(str(new_status))
+            normalized_payment_method = PaymentStatus.normalize_method(payment_method)
             terminal_statuses = {
                 OrderStatus.COMPLETED,
                 OrderStatus.CANCELLED,
@@ -1263,6 +1279,18 @@ class UnifiedOrderService:
                     f"status={current_status} -> {target_status}"
                 )
                 return True
+
+            if target_status == OrderStatus.DELIVERING:
+                if order_type != "delivery":
+                    logger.info(
+                        f"STATUS_UPDATE invalid delivering for pickup: #{entity_id} order_type={order_type}"
+                    )
+                    return False
+                if normalized_payment_method == "cash":
+                    logger.info(
+                        f"STATUS_UPDATE invalid delivering for cash delivery: #{entity_id}"
+                    )
+                    return False
 
             # Update status in DB
             if entity_type == "booking":

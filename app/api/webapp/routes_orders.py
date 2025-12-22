@@ -146,6 +146,21 @@ async def create_order(
         offers_by_id, store_id = _load_offers_and_store(order.items, db)
 
         is_delivery = bool(order.delivery_address and order.delivery_address.strip())
+        payment_method = (order.payment_method or "").strip().lower()
+        if not payment_method:
+            payment_method = "click" if is_delivery else "cash"
+
+        if is_delivery and payment_method == "cash":
+            raise HTTPException(
+                status_code=400,
+                detail="Cash is not allowed for delivery orders",
+            )
+
+        if is_delivery and payment_method == "card":
+            raise HTTPException(
+                status_code=400,
+                detail="Card payments for delivery require proof upload",
+            )
 
         if is_delivery:
             _validate_min_order(db, store_id, order.items, offers_by_id)
@@ -193,7 +208,6 @@ async def create_order(
             try:
                 from app.services.unified_order_service import OrderResult  # type: ignore
 
-                payment_method = "card" if is_delivery else "cash"
                 result: OrderResult = await order_service.create_order(
                     user_id=user_id,
                     items=order_items,

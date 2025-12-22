@@ -4,9 +4,10 @@
 
 /* ===== CARD CONTAINER ===== */
 .offer-card {
-  background: transparent;
-  border: none;
-  box-shadow: none;
+  background: #FFFFFF;
+  border: 1px solid rgba(15, 118, 110, 0.08);
+  border-radius: 20px;
+  box-shadow: var(--shadow-sm);
   display: flex;
   flex-direction: column;
   gap: 10px;
@@ -17,6 +18,7 @@
   /* Speeds up large lists in Chromium-based WebViews (ignored elsewhere). */
   content-visibility: auto;
   contain-intrinsic-size: 320px 340px;
+  padding: 10px;
 }
 
 .offer-card:active {
@@ -34,13 +36,12 @@
   width: 100%;
   padding-top: 100%;
   background: #F4F2EF;
-  border-radius: 24px;
+  border-radius: 16px;
   overflow: hidden;
   border: none;
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 10px 18px rgba(16, 24, 40, 0.08);
 }
 
 .card-image-container::before {
@@ -129,8 +130,8 @@
 /* ===== ACTIONS ===== */
 .card-action {
   position: absolute;
-  right: 10px;
-  bottom: 10px;
+  right: 12px;
+  bottom: 12px;
   left: auto;
   z-index: 2;
   display: flex;
@@ -138,8 +139,8 @@
 }
 
 .add-to-cart-fab {
-  width: 38px;
-  height: 38px;
+  width: 36px;
+  height: 36px;
   border-radius: 50%;
   border: none;
   background: #FFFFFF;
@@ -150,7 +151,9 @@
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  box-shadow: 0 10px 20px rgba(16, 24, 40, 0.18);
+  box-shadow:
+    0 0 0 2px rgba(15, 118, 110, 0.12),
+    0 10px 18px rgba(16, 24, 40, 0.14);
   transition: transform 0.15s ease, box-shadow 0.2s ease;
   padding: 0;
 }
@@ -171,10 +174,11 @@
 
 /* ===== CONTENT SECTION ===== */
 .card-content {
-  padding: 0 2px;
+  padding: 0 4px;
   display: flex;
   flex-direction: column;
   gap: 6px;
+  min-height: 76px;
 }
 
 .price-section {
@@ -187,7 +191,7 @@
   font-size: 18px;
   font-weight: 800;
   color: #111827;
-  line-height: 1;
+  line-height: 1.2;
   letter-spacing: -0.2px;
 }
 
@@ -206,14 +210,15 @@
   color: #98A2B3;
   text-decoration: line-through;
   line-height: 1;
+  font-weight: 400;
 }
 
 .offer-title {
   font-size: 14px;
-  font-weight: 600;
+  font-weight: 700;
   color: #111827;
   margin: 0;
-  line-height: 1.35;
+  line-height: 1.45;
   display: -webkit-box;
   -webkit-line-clamp: 2;
   line-clamp: 2;

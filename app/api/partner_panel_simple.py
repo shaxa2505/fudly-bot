@@ -1185,7 +1185,7 @@ async def update_order_status(
     elif status == "completed":
         await unified_service.complete_order(order_id, "order")
     else:
-        db.update_order_status(order_id, status)
+        raise HTTPException(status_code=400, detail="Unsupported status transition")
 
     # Return type based on order_type for frontend
     db_order_type = (

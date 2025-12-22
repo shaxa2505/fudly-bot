@@ -218,7 +218,11 @@ async def dlv_cancel_order(
     # Cancel the order if exists
     if order_id > 0:
         try:
-            db.update_order_status(order_id, "cancelled")
+            order_service = get_unified_order_service()
+            if order_service:
+                await order_service.cancel_order(order_id, "order")
+            elif hasattr(db, "update_order_status"):
+                db.update_order_status(order_id, "cancelled")
             logger.info(f"❌ User {user_id} cancelled order #{order_id}")
         except Exception as e:
             logger.error(f"Failed to cancel order #{order_id}: {e}")

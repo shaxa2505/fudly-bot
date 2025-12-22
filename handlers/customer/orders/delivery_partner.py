@@ -15,6 +15,7 @@ from typing import Any
 from aiogram import F, Router, types
 
 from app.core.utils import get_offer_field, get_store_field
+from app.services.unified_order_service import OrderStatus, get_unified_order_service
 from database_protocol import DatabaseProtocol
 from handlers.common.utils import html_escape as _esc
 from logging_config import logger
@@ -72,7 +73,11 @@ async def cancel_order_customer(
         await callback.answer(f"❌ {msg}", show_alert=True)
         return
 
-    db.update_order_status(order_id, "cancelled")
+    order_service = get_unified_order_service()
+    if order_service:
+        await order_service.cancel_order(order_id, "order")
+    else:
+        db.update_order_status(order_id, "cancelled")
 
     # Restore quantity
     offer_id = _get_order_field(order, "offer_id", 2)
@@ -138,6 +143,8 @@ async def partner_confirm_order_batch(
     confirmed_count = 0
     customer_notifications: dict = {}  # {customer_id: [order_infos]}
 
+    order_service = get_unified_order_service()
+
     for order_id in order_ids:
         try:
             order = db.get_order(order_id)
@@ -153,7 +160,15 @@ async def partner_confirm_order_batch(
                 continue
 
             # Update order status
-            db.update_order_status(order_id, "preparing")
+            if order_service:
+                await order_service.update_status(
+                    entity_id=order_id,
+                    entity_type="order",
+                    new_status=OrderStatus.PREPARING,
+                    notify_customer=False,
+                )
+            else:
+                db.update_order_status(order_id, "preparing")
             confirmed_count += 1
 
             # Collect info for customer notification
@@ -255,6 +270,8 @@ async def partner_reject_order_batch(
     rejected_count = 0
     customer_notifications: dict = {}  # {customer_id: [store_names]}
 
+    order_service = get_unified_order_service()
+
     for order_id in order_ids:
         try:
             order = db.get_order(order_id)
@@ -270,16 +287,24 @@ async def partner_reject_order_batch(
                 continue
 
             # Update order status
-            db.update_order_status(order_id, "rejected")
+            if order_service:
+                await order_service.update_status(
+                    entity_id=order_id,
+                    entity_type="order",
+                    new_status=OrderStatus.REJECTED,
+                    notify_customer=False,
+                )
+            else:
+                db.update_order_status(order_id, "rejected")
 
-            # Restore quantity
-            offer_id = _get_order_field(order, "offer_id", 3)
-            quantity = _get_order_field(order, "quantity", 4)
-            if offer_id:
-                try:
-                    db.increment_offer_quantity_atomic(offer_id, int(quantity))
-                except Exception:
-                    pass
+                # Restore quantity
+                offer_id = _get_order_field(order, "offer_id", 3)
+                quantity = _get_order_field(order, "quantity", 4)
+                if offer_id:
+                    try:
+                        db.increment_offer_quantity_atomic(offer_id, int(quantity))
+                    except Exception:
+                        pass
 
             rejected_count += 1
 

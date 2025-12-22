@@ -83,6 +83,8 @@ async def admin_confirm_payment(callback: types.CallbackQuery) -> None:
         # Update status to pending (approved, waiting for seller)
         if hasattr(db, "update_order_status"):
             db.update_order_status(order_id, "pending")
+        if hasattr(db, "update_payment_status"):
+            db.update_payment_status(order_id, "confirmed")
         
         # Get store and seller info
         store = db.get_store(store_id) if hasattr(db, "get_store") and store_id else None
@@ -256,6 +258,8 @@ async def admin_reject_payment(callback: types.CallbackQuery) -> None:
             )
         elif hasattr(db, "update_order_status"):
             db.update_order_status(order_id, "rejected")
+        if hasattr(db, "update_payment_status"):
+            db.update_payment_status(order_id, "rejected")
         
         # Notify customer
         customer_lang = db.get_user_language(user_id) if hasattr(db, "get_user_language") and user_id else "ru"
