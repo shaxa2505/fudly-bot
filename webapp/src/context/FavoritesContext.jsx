@@ -4,6 +4,11 @@ const FavoritesContext = createContext(null)
 
 const STORAGE_KEY = 'fudly_favorites'
 
+const resolveOfferId = (offer) => {
+  if (!offer) return null
+  return offer.id ?? offer.offer_id ?? offer.offerId ?? null
+}
+
 export function FavoritesProvider({ children }) {
   const [favorites, setFavorites] = useState(() => {
     try {
@@ -24,12 +29,18 @@ export function FavoritesProvider({ children }) {
   }, [favorites])
 
   const addToFavorites = useCallback((offer) => {
+    const offerId = resolveOfferId(offer)
+    if (!offerId) {
+      console.warn('Favorite skipped: missing offer id', offer)
+      return
+    }
+    const normalized = offer.id ? offer : { ...offer, id: offerId }
     setFavorites(prev => {
       // Check if already in favorites
-      if (prev.some(item => item.id === offer.id)) {
+      if (prev.some(item => item.id === offerId)) {
         return prev
       }
-      return [...prev, offer]
+      return [...prev, normalized]
     })
 
     // Haptic feedback
@@ -37,19 +48,27 @@ export function FavoritesProvider({ children }) {
   }, [])
 
   const removeFromFavorites = useCallback((offerId) => {
-    setFavorites(prev => prev.filter(item => item.id !== offerId))
+    const resolvedId = typeof offerId === 'object' ? resolveOfferId(offerId) : offerId
+    if (!resolvedId) return
+    setFavorites(prev => prev.filter(item => item.id !== resolvedId))
 
     // Haptic feedback
     window.Telegram?.WebApp?.HapticFeedback?.impactOccurred?.('light')
   }, [])
 
   const toggleFavorite = useCallback((offer) => {
+    const offerId = resolveOfferId(offer)
+    if (!offerId) {
+      console.warn('Favorite toggle skipped: missing offer id', offer)
+      return
+    }
+    const normalized = offer.id ? offer : { ...offer, id: offerId }
     setFavorites(prev => {
-      const exists = prev.some(item => item.id === offer.id)
+      const exists = prev.some(item => item.id === offerId)
       if (exists) {
-        return prev.filter(item => item.id !== offer.id)
+        return prev.filter(item => item.id !== offerId)
       }
-      return [...prev, offer]
+      return [...prev, normalized]
     })
 
     // Haptic feedback
@@ -57,6 +76,7 @@ export function FavoritesProvider({ children }) {
   }, [])
 
   const isFavorite = useCallback((offerId) => {
+    if (!offerId) return false
     return favorites.some(item => item.id === offerId)
   }, [favorites])
 

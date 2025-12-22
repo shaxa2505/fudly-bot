@@ -60,8 +60,10 @@ function FavoritesPage() {
       </header>
 
       <div className="favorites-list">
-        {favorites.map(offer => (
-          <div key={offer.id} className="favorite-card">
+        {favorites.map(offer => {
+          const offerId = offer.id ?? offer.offer_id ?? offer.offerId
+          return (
+          <div key={offerId ?? offer.title} className="favorite-card">
             <img
               src={offer.photo || 'https://placehold.co/100x100/F5F5F5/CCCCCC?text=IMG'}
               alt={offer.title}
@@ -90,7 +92,7 @@ function FavoritesPage() {
             <div className="favorite-actions">
               <button
                 className="remove-favorite-btn"
-                onClick={() => removeFromFavorites(offer.id)}
+                onClick={() => removeFromFavorites(offerId)}
                 aria-label="O'chirish"
               >
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="#E53935">
@@ -98,9 +100,9 @@ function FavoritesPage() {
                 </svg>
               </button>
 
-              {getQuantity(offer.id) > 0 ? (
+              {getQuantity(offerId) > 0 ? (
                 <span className="in-cart-badge">
-                  Savatda ({getQuantity(offer.id)})
+                  Savatda ({getQuantity(offerId)})
                 </span>
               ) : (
                 <button
@@ -115,7 +117,7 @@ function FavoritesPage() {
               )}
             </div>
           </div>
-        ))}
+        )})}
       </div>
 
       <BottomNav currentPage="favorites" cartCount={cartCount} />

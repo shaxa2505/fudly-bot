@@ -147,12 +147,6 @@ async def create_order(
                 detail="Cash is not allowed for delivery orders",
             )
 
-        if is_delivery and payment_method == "card":
-            raise HTTPException(
-                status_code=400,
-                detail="Card payments for delivery require proof upload",
-            )
-
         if is_delivery:
             _validate_min_order(db, store_id, order.items, offers_by_id)
 
