@@ -158,6 +158,10 @@ def create_api_app(db: Any = None, offer_service: Any = None, bot_token: str = N
             "connect-src 'self' https://api.telegram.org; "
             "frame-ancestors 'self' https://web.telegram.org"
         )
+        if request.url.path.startswith("/partner-panel"):
+            response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+            response.headers["Pragma"] = "no-cache"
+            response.headers["Expires"] = "0"
         # Prevent clickjacking
         response.headers["X-Frame-Options"] = "SAMEORIGIN"
         # Prevent MIME sniffing

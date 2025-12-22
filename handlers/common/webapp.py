@@ -5,6 +5,8 @@ from __future__ import annotations
 
 import logging
 import os
+import time
+import urllib.parse
 from typing import Any
 
 from aiogram import F, Router, types
@@ -29,7 +31,15 @@ def get_partner_panel_url() -> str:
     Partner Panel is hosted on Vercel for reliability.
     Can be overridden via PARTNER_PANEL_URL environment variable.
     """
-    return PARTNER_PANEL_URL
+    version = os.getenv("PARTNER_PANEL_VERSION")
+    cache_buster = version or str(int(time.time()))
+
+    split = urllib.parse.urlsplit(PARTNER_PANEL_URL)
+    query = urllib.parse.parse_qsl(split.query, keep_blank_values=True)
+    query = [(k, v) for (k, v) in query if k != "v"]
+    query.append(("v", cache_buster))
+    new_query = urllib.parse.urlencode(query)
+    return urllib.parse.urlunsplit((split.scheme, split.netloc, split.path, new_query, split.fragment))
 
 
 def webapp_keyboard(lang: str = "ru") -> InlineKeyboardMarkup:

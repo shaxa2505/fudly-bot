@@ -2653,18 +2653,24 @@ async def create_webhook_app(
             """Serve Partner Panel files."""
             filename = request.match_info.get("filename", "")
 
+            def _no_cache(resp: web.FileResponse) -> web.FileResponse:
+                resp.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+                resp.headers["Pragma"] = "no-cache"
+                resp.headers["Expires"] = "0"
+                return resp
+
             # If no filename or ends with /, serve index.html
             if not filename or filename.endswith("/"):
-                return web.FileResponse(partner_panel_path / "index.html")
+                return _no_cache(web.FileResponse(partner_panel_path / "index.html"))
 
             full_path = partner_panel_path / filename
 
             # Serve file if exists
             if full_path.exists() and full_path.is_file():
-                return web.FileResponse(full_path)
+                return _no_cache(web.FileResponse(full_path))
 
             # Otherwise serve index.html (for SPA routing)
-            return web.FileResponse(partner_panel_path / "index.html")
+            return _no_cache(web.FileResponse(partner_panel_path / "index.html"))
 
         # Register Partner Panel routes
         app.router.add_get("/partner-panel", serve_partner_panel)

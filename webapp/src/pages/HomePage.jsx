@@ -427,6 +427,7 @@ function HomePage() {
   // Initial load and search with debounce
   useEffect(() => {
     setShowingAllCities(false) // ?????????? ??? ????? ??????/????????
+    setShowingRegion(false)
     const recentlyManual = Date.now() - manualSearchRef.current < 300
     if (recentlyManual) return
 
@@ -813,6 +814,17 @@ function HomePage() {
         </h2>
         <span className="offers-count">{offers.length} ta</span>
       </div>
+
+      {showingRegion && !showingAllCities && offers.length > 0 && (
+        <div className="all-cities-banner">
+          <span className="all-cities-icon" aria-hidden="true">
+            <Info size={16} strokeWidth={2.2} />
+          </span>
+          <span className="all-cities-text">
+            {cityRaw} bo'yicha mahsulot topilmadi. Viloyat bo'yicha ko'rsatilmoqda
+          </span>
+        </div>
+      )}
 
       {/* Info banner if showing all cities */}
       {showingAllCities && offers.length > 0 && (
