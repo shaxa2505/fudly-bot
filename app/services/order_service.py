@@ -1,15 +1,13 @@
 """
-Unified Order Service - single entry point for all order operations.
+Deprecated Order Service (legacy).
 
-This service handles:
-- Single item orders (from product page)
-- Cart orders (multiple items)
-- Pickup and delivery orders
-- Seller notifications (grouped by store)
+Use app.services.unified_order_service.UnifiedOrderService instead.
+This module remains for backward compatibility during migration.
 """
 from __future__ import annotations
 
 import html
+import warnings
 from dataclasses import dataclass
 from typing import Any
 
@@ -59,6 +57,11 @@ class OrderService:
     """Unified service for creating orders."""
 
     def __init__(self, db: Any, bot: Bot):
+        warnings.warn(
+            "OrderService is deprecated; use UnifiedOrderService instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
         self.db = db
         self.bot = bot
 
@@ -542,6 +545,12 @@ _order_service: OrderService | None = None
 
 def get_order_service() -> OrderService | None:
     """Get the order service singleton."""
+    if _order_service is not None:
+        warnings.warn(
+            "OrderService is deprecated; use UnifiedOrderService instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
     return _order_service
 
 

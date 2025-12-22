@@ -94,117 +94,6 @@ function HomePage() {
     loadSearchHistory()
   }, [])
 
-  // Save search query to history when searching
-  const handleSearchSubmit = useCallback(async () => {
-    const trimmed = searchQuery.trim()
-    searchInputRef.current?.blur()
-    setShowSearchHistory(false)
-
-    if (!trimmed) {
-      manualSearchRef.current = Date.now()
-      await loadOffers(true)
-      return
-    }
-
-    if (trimmed.length >= 2) {
-      const userId = window.Telegram?.WebApp?.initDataUnsafe?.user?.id
-      if (userId) {
-        try {
-          await api.addSearchHistory(userId, trimmed)
-          // Update local history
-          setSearchHistory(prev => {
-            const filtered = prev.filter(q => q.toLowerCase() !== trimmed.toLowerCase())
-            return [trimmed, ...filtered].slice(0, 5)
-          })
-        } catch (error) {
-          console.error('Error saving search history:', error)
-        }
-      }
-      manualSearchRef.current = Date.now()
-      await loadOffers(true)
-    }
-  }, [searchQuery, loadOffers])
-
-  // Handle search history item click
-  const handleHistoryClick = (query) => {
-    setSearchQuery(query)
-    setShowSearchHistory(false)
-    searchInputRef.current?.blur()
-  }
-
-  // Clear search history
-  const handleClearHistory = async () => {
-    const userId = window.Telegram?.WebApp?.initDataUnsafe?.user?.id
-    if (userId) {
-      try {
-        await api.clearSearchHistory(userId)
-        setSearchHistory([])
-      } catch (error) {
-        console.error('Error clearing search history:', error)
-      }
-    }
-    setShowSearchHistory(false)
-  }
-
-  // Автоопределение локации при первом запуске
-  useEffect(() => {
-    if (autoLocationAttempted.current) return
-    autoLocationAttempted.current = true
-
-    // Если уже есть сохранённый адрес - не запрашиваем
-    if (location.address || location.coordinates) return
-
-    // Пытаемся определить автоматически
-    if (navigator.geolocation) {
-      setIsLocating(true)
-      navigator.geolocation.getCurrentPosition(
-        (position) => {
-          const { latitude, longitude } = position.coords
-          reverseGeocodeAuto(latitude, longitude)
-        },
-        (error) => {
-          console.log('Auto-geolocation denied or failed:', error.message)
-          setIsLocating(false)
-          // Если отклонил - показываем модалку ручного ввода
-          if (error.code === error.PERMISSION_DENIED) {
-            setShowAddressModal(true)
-          }
-        },
-        { enableHighAccuracy: true, timeout: 10000, maximumAge: 300000 }
-      )
-    }
-  }, [])
-
-  // Функция для автоматического геокодирования (при старте)
-  const reverseGeocodeAuto = async (lat, lon) => {
-    try {
-      const response = await fetch(
-        `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lon}&accept-language=uz`,
-        { headers: { 'User-Agent': 'FudlyApp/1.0' } }
-      )
-      if (!response.ok) throw new Error('Geo lookup failed')
-      const data = await response.json()
-
-      const city = data.address?.city || data.address?.town || data.address?.village || ''
-      const state = data.address?.state || ''
-      const primaryCity = city || state || 'Toshkent'
-      const normalizedCity = primaryCity.includes("O'zbekiston") ? primaryCity : `${primaryCity}, O'zbekiston`
-
-      setLocation({
-        city: normalizedCity,
-        address: data.display_name || '',
-        coordinates: { lat, lon },
-        region: state, // Сохраняем область
-      })
-      setLocationError('')
-    } catch (error) {
-      console.error('Reverse geocode error', error)
-      setLocationError('Manzilni aniqlab bo\'lmadi')
-    } finally {
-      setIsLocating(false)
-    }
-  }
-
   const [showingAllCities, setShowingAllCities] = useState(false)
 
   // Load offers - сначала по городу, если пусто - из всех городов
@@ -333,6 +222,118 @@ function HomePage() {
       setLoading(false)
     }
   }, [selectedCategory, searchQuery, offset, loading, cityForApi, showingAllCities, minDiscount, sortBy, priceRange])
+
+  // Save search query to history when searching
+  const handleSearchSubmit = useCallback(async () => {
+    const trimmed = searchQuery.trim()
+    searchInputRef.current?.blur()
+    setShowSearchHistory(false)
+
+    if (!trimmed) {
+      manualSearchRef.current = Date.now()
+      await loadOffers(true)
+      return
+    }
+
+    if (trimmed.length >= 2) {
+      const userId = window.Telegram?.WebApp?.initDataUnsafe?.user?.id
+      if (userId) {
+        try {
+          await api.addSearchHistory(userId, trimmed)
+          // Update local history
+          setSearchHistory(prev => {
+            const filtered = prev.filter(q => q.toLowerCase() !== trimmed.toLowerCase())
+            return [trimmed, ...filtered].slice(0, 5)
+          })
+        } catch (error) {
+          console.error('Error saving search history:', error)
+        }
+      }
+      manualSearchRef.current = Date.now()
+      await loadOffers(true)
+    }
+  }, [searchQuery, loadOffers])
+
+  // Handle search history item click
+  const handleHistoryClick = (query) => {
+    setSearchQuery(query)
+    setShowSearchHistory(false)
+    searchInputRef.current?.blur()
+  }
+
+  // Clear search history
+  const handleClearHistory = async () => {
+    const userId = window.Telegram?.WebApp?.initDataUnsafe?.user?.id
+    if (userId) {
+      try {
+        await api.clearSearchHistory(userId)
+        setSearchHistory([])
+      } catch (error) {
+        console.error('Error clearing search history:', error)
+      }
+    }
+    setShowSearchHistory(false)
+  }
+
+  // Автоопределение локации при первом запуске
+  useEffect(() => {
+    if (autoLocationAttempted.current) return
+    autoLocationAttempted.current = true
+
+    // Если уже есть сохранённый адрес - не запрашиваем
+    if (location.address || location.coordinates) return
+
+    // Пытаемся определить автоматически
+    if (navigator.geolocation) {
+      setIsLocating(true)
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          const { latitude, longitude } = position.coords
+          reverseGeocodeAuto(latitude, longitude)
+        },
+        (error) => {
+          console.log('Auto-geolocation denied or failed:', error.message)
+          setIsLocating(false)
+          // Если отклонил - показываем модалку ручного ввода
+          if (error.code === error.PERMISSION_DENIED) {
+            setShowAddressModal(true)
+          }
+        },
+        { enableHighAccuracy: true, timeout: 10000, maximumAge: 300000 }
+      )
+    }
+  }, [])
+
+  // Функция для автоматического геокодирования (при старте)
+  const reverseGeocodeAuto = async (lat, lon) => {
+    try {
+      const response = await fetch(
+        `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lon}&accept-language=uz`,
+        { headers: { 'User-Agent': 'FudlyApp/1.0' } }
+      )
+      if (!response.ok) throw new Error('Geo lookup failed')
+      const data = await response.json()
+
+      const city = data.address?.city || data.address?.town || data.address?.village || ''
+      const state = data.address?.state || ''
+      const primaryCity = city || state || 'Toshkent'
+      const normalizedCity = primaryCity.includes("O'zbekiston") ? primaryCity : `${primaryCity}, O'zbekiston`
+
+      setLocation({
+        city: normalizedCity,
+        address: data.display_name || '',
+        coordinates: { lat, lon },
+        region: state, // Сохраняем область
+      })
+      setLocationError('')
+    } catch (error) {
+      console.error('Reverse geocode error', error)
+      setLocationError('Manzilni aniqlab bo\'lmadi')
+    } finally {
+      setIsLocating(false)
+    }
+  }
+
 
   // Pull-to-refresh handler
   const handleRefresh = useCallback(async () => {

@@ -1,11 +1,11 @@
-"""Booking service layer: encapsulates booking business logic.
+"""Deprecated booking service layer.
 
-Minimal initial version used for progressive refactor out of the large
-`handlers/bookings.py` module. Handlers will call these functions instead of
-embedding business rules directly as refactor proceeds.
+Use app.services.unified_order_service.UnifiedOrderService instead.
+This module remains for backward compatibility during migration.
 """
 from __future__ import annotations
 
+import warnings
 from typing import Any
 
 from database_protocol import DatabaseProtocol
@@ -21,6 +21,11 @@ class BookingService:
     """Service providing booking-related operations using a DB protocol."""
 
     def __init__(self, db: DatabaseProtocol):
+        warnings.warn(
+            "BookingService is deprecated; use UnifiedOrderService instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
         self.db = db
 
     # -------------------- Retrieval helpers --------------------
