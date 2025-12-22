@@ -5,12 +5,12 @@
 
 .order-tracking-page {
   min-height: 100vh;
-  background: linear-gradient(135deg, #FFFCF8 0%, #F6EFE7 100%);
+  background: var(--color-bg-secondary);
   padding: 0 0 calc(var(--bottom-nav-height) + var(--spacing-xl)) 0;
 }
 
 .tracking-header {
-  background: rgba(255, 252, 248, 0.95);
+  background: var(--color-bg-secondary);
   padding: var(--spacing-lg) var(--spacing-xl);
   box-shadow: var(--shadow-header);
   position: sticky;

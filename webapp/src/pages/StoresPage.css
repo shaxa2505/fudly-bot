@@ -5,15 +5,13 @@
 
 .sp {
   min-height: 100vh;
-  background:
-    radial-gradient(900px 360px at 12% -10%, rgba(15, 118, 110, 0.1) 0%, transparent 60%),
-    linear-gradient(180deg, #FFFCF8 0%, var(--color-bg-secondary) 100%);
+  background: var(--color-bg-secondary);
   padding-bottom: calc(var(--bottom-nav-height) + var(--spacing-xl));
 }
 
 /* Topbar */
 .sp-topbar {
-  background: rgba(255, 252, 248, 0.95);
+  background: var(--color-bg-secondary);
   height: var(--app-topbar-height);
   padding: 0 var(--app-header-padding-x);
   position: sticky;
@@ -70,7 +68,7 @@
   position: sticky;
   top: var(--app-topbar-height);
   z-index: 19;
-  background: rgba(255, 252, 248, 0.95);
+  background: var(--color-bg-secondary);
   padding: var(--spacing-md) var(--app-header-padding-x);
   border-bottom: 1px solid rgba(15, 118, 110, 0.12);
   backdrop-filter: blur(10px);
@@ -134,7 +132,7 @@
   position: sticky;
   top: 86px;
   z-index: var(--z-sticky);
-  background: rgba(255, 252, 248, 0.98);
+  background: var(--color-bg-secondary);
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
   border-bottom: 1px solid rgba(15, 118, 110, 0.08);
@@ -187,7 +185,7 @@
   position: sticky;
   top: 132px;
   z-index: var(--z-sticky);
-  background: rgba(255, 252, 248, 0.98);
+  background: var(--color-bg-secondary);
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
   border-bottom: 1px solid rgba(15, 118, 110, 0.08);

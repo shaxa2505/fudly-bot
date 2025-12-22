@@ -130,12 +130,21 @@
 /* ===== ACTIONS ===== */
 .card-action {
   position: absolute;
-  right: 12px;
-  bottom: 12px;
+  right: 8px;
+  bottom: 8px;
   left: auto;
   z-index: 2;
   display: flex;
-  align-items: center;
+  align-items: flex-end;
+}
+
+.card-action .quantity-control {
+  --qc-height: 32px;
+  --qc-pad: 4px;
+  --qc-gap: 6px;
+  --qc-btn-size: 28px;
+  min-width: 96px;
+  box-shadow: 0 8px 16px rgba(16, 24, 40, 0.16);
 }
 
 .add-to-cart-fab {

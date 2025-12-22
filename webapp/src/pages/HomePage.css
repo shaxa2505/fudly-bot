@@ -7,10 +7,7 @@
 .home-page {
   min-height: 100vh;
   padding-bottom: calc(var(--bottom-nav-height) + var(--spacing-xl));
-  background:
-    radial-gradient(1000px 420px at 10% -10%, rgba(249, 115, 22, 0.18) 0%, transparent 60%),
-    radial-gradient(900px 500px at 95% 0%, rgba(15, 118, 110, 0.16) 0%, transparent 55%),
-    linear-gradient(180deg, #FFFCF8 0%, var(--color-bg-secondary) 70%, #F2EEE7 100%);
+  background: var(--color-bg-secondary);
 }
 
 /* Header - Fixed clean design */
@@ -18,7 +15,7 @@
   position: sticky;
   top: 0;
   z-index: var(--z-sticky);
-  background: rgba(255, 252, 248, 0.95);
+  background: var(--color-bg-secondary);
   height: var(--app-topbar-height);
   padding: 0 var(--app-header-padding-x);
   border-bottom: 1px solid rgba(15, 118, 110, 0.12);
@@ -114,7 +111,7 @@
   position: sticky;
   top: var(--app-topbar-height);
   z-index: 19;
-  background: rgba(255, 252, 248, 0.95);
+  background: var(--color-bg-secondary);
   padding: var(--spacing-md) var(--app-header-padding-x);
   border-bottom: 1px solid rgba(15, 118, 110, 0.12);
   box-shadow: 0 14px 28px rgba(16, 24, 40, 0.06);

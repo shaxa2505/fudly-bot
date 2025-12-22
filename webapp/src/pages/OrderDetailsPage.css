@@ -4,9 +4,7 @@
 
 .order-details-page {
   min-height: 100vh;
-  background:
-    radial-gradient(900px 360px at 12% -10%, rgba(15, 118, 110, 0.1) 0%, transparent 60%),
-    linear-gradient(180deg, #FFFCF8 0%, var(--color-bg-secondary) 100%);
+  background: var(--color-bg-secondary);
   padding-bottom: var(--spacing-xl);
 }
 
@@ -16,7 +14,7 @@
   align-items: center;
   gap: var(--spacing-lg);
   padding: var(--spacing-xl);
-  background: rgba(255, 252, 248, 0.95);
+  background: var(--color-bg-secondary);
   position: sticky;
   top: 0;
   z-index: var(--z-sticky);

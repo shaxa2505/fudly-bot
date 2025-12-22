@@ -5,7 +5,7 @@
 
 .category-products-page {
   min-height: 100vh;
-  background: var(--color-bg-primary);
+  background: var(--color-bg-secondary);
   padding-bottom: var(--spacing-xl);
 }
 
@@ -19,7 +19,7 @@
   border-bottom: 1px solid rgba(15, 118, 110, 0.12);
   position: sticky;
   top: 0;
-  background: rgba(255, 252, 248, 0.95);
+  background: var(--color-bg-secondary);
   z-index: var(--z-sticky);
   box-shadow: var(--shadow-header);
   backdrop-filter: blur(10px);
@@ -82,7 +82,7 @@
 /* Search Section */
 .search-section {
   padding: var(--spacing-lg) var(--page-padding-x);
-  background: var(--color-bg-tertiary);
+  background: var(--color-bg-secondary);
 }
 
 .search-box {
