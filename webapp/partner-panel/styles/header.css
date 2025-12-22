@@ -8,11 +8,13 @@
     left: 0;
     right: 0;
     height: calc(var(--header-height) + var(--safe-area-top));
-    background: white;
+    background: rgba(255, 255, 255, 0.9);
     border-bottom: 1px solid var(--border);
     z-index: var(--z-sticky);
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+    box-shadow: var(--shadow-sm);
     padding-top: var(--safe-area-top);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
 }
 
 .app-header::before {
@@ -39,15 +41,16 @@
 }
 
 .store-avatar {
-    width: 44px;
-    height: 44px;
-    background: var(--primary-light);
-    border-radius: var(--radius-md);
+    width: 42px;
+    height: 42px;
+    background: linear-gradient(135deg, #EAF8F0 0%, #F7F8F2 100%);
+    border-radius: 14px;
     display: flex;
     align-items: center;
     justify-content: center;
     color: var(--primary);
     flex-shrink: 0;
+    border: 1px solid var(--border-light);
 }
 
 .store-avatar i,
@@ -64,11 +67,11 @@
 }
 
 .store-details h1 {
-    font-size: 17px;
+    font-size: 16px;
     font-weight: 700;
     color: var(--text);
     margin: 0;
-    letter-spacing: -0.3px;
+    letter-spacing: -0.2px;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -78,13 +81,13 @@
     display: flex;
     align-items: center;
     gap: 6px;
-    font-size: 13px;
+    font-size: 12px;
     color: var(--text-secondary);
 }
 
 .status-dot {
-    width: 8px;
-    height: 8px;
+    width: 7px;
+    height: 7px;
     border-radius: 50%;
     background: var(--success);
     animation: pulse 2s ease infinite;
@@ -137,14 +140,14 @@
 
 .icon-btn {
     position: relative;
-    width: 44px;
-    height: 44px;
+    width: 40px;
+    height: 40px;
     display: flex;
     align-items: center;
     justify-content: center;
-    background: var(--gray-50);
+    background: #FFFFFF;
     border: 1px solid var(--border);
-    border-radius: var(--radius-md);
+    border-radius: 12px;
     cursor: pointer;
     transition: all var(--transition-fast);
     color: var(--text);
@@ -157,7 +160,7 @@
 }
 
 .icon-btn:hover {
-    background: var(--gray-100);
+    background: var(--primary-light);
     border-color: var(--primary);
     color: var(--primary);
 }

@@ -7,10 +7,10 @@
     align-items: center;
     justify-content: center;
     gap: var(--space-2);
-    padding: 0 var(--space-6);
+    padding: 0 var(--space-5);
     border: none;
-    border-radius: var(--radius-sm);
-    font-size: var(--text-base);
+    border-radius: 12px;
+    font-size: 14px;
     font-weight: var(--font-semibold);
     line-height: var(--line-normal);
     cursor: pointer;
@@ -20,7 +20,7 @@
     user-select: none;
     white-space: nowrap;
     text-decoration: none;
-    min-height: var(--touch-target);
+    min-height: 40px;
 }
 
 .btn:active:not(:disabled) {
@@ -34,14 +34,13 @@
 
 /* === Primary Button === */
 .btn-primary {
-    background: var(--primary-text);
+    background: var(--primary);
     color: #FFFFFF;
-    box-shadow: var(--shadow-sm);
+    box-shadow: none;
 }
 
 .btn-primary:hover:not(:disabled) {
     background: var(--primary-600);
-    box-shadow: var(--shadow-md);
 }
 
 .btn-primary:active:not(:disabled) {
@@ -51,7 +50,7 @@
 
 /* === Secondary Button === */
 .btn-secondary {
-    background: var(--gray-100);
+    background: var(--bg-tertiary);
     color: var(--text);
     border: 1px solid var(--border);
 }
@@ -65,7 +64,7 @@
 .btn-success {
     background: var(--success);
     color: white;
-    box-shadow: var(--shadow-sm);
+    box-shadow: none;
 }
 
 .btn-success:hover:not(:disabled) {
@@ -81,7 +80,7 @@
 .btn-danger {
     background: var(--danger);
     color: white;
-    box-shadow: var(--shadow-sm);
+    box-shadow: none;
 }
 
 .btn-danger:hover:not(:disabled) {
@@ -97,7 +96,7 @@
 .btn-warning {
     background: var(--warning);
     color: white;
-    box-shadow: var(--shadow-sm);
+    box-shadow: none;
 }
 
 .btn-warning:hover:not(:disabled) {
@@ -135,10 +134,10 @@
 
 /* === Icon Button === */
 .btn-icon {
-    width: 48px;
-    height: 48px;
+    width: 42px;
+    height: 42px;
     padding: 0;
-    border-radius: var(--radius-md);
+    border-radius: 12px;
     background: var(--card);
     border: 1px solid var(--border);
     color: var(--text);

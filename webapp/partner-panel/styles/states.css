@@ -9,25 +9,26 @@
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    padding: 48px 24px;
+    padding: 40px 20px;
     text-align: center;
-    background: #FFFFFF;
-    border-radius: 16px;
+    background: var(--card);
+    border-radius: var(--radius-md);
     margin: 16px 0;
+    border: 1px solid var(--border);
 }
 
 .empty-icon {
-    width: 120px;
-    height: 120px;
-    margin-bottom: 28px;
+    width: 96px;
+    height: 96px;
+    margin-bottom: 18px;
     opacity: 0.6;
     display: flex;
     align-items: center;
     justify-content: center;
     background: var(--gray-50);
-    border-radius: var(--radius-xl);
+    border-radius: var(--radius-lg);
     color: var(--primary);
-    font-size: 56px;
+    font-size: 48px;
 }
 
 .empty-icon i,
@@ -37,15 +38,15 @@
 }
 
 .empty-title {
-    font-size: 20px;
+    font-size: 18px;
     font-weight: 700;
     color: var(--text);
     margin: 0 0 12px 0;
-    letter-spacing: -0.3px;
+    letter-spacing: -0.2px;
 }
 
 .empty-subtitle {
-    font-size: 16px;
+    font-size: 14px;
     color: var(--text-secondary);
     margin: 0 0 12px 0;
     line-height: 1.5;
@@ -53,18 +54,18 @@
 }
 
 .empty-text {
-    font-size: 15px;
+    font-size: 14px;
     color: var(--text-muted);
-    margin: 0 0 36px 0;
+    margin: 0 0 24px 0;
     max-width: 360px;
     line-height: 1.65;
 }
 
 .empty-action {
-    background: #21A038;
+    background: var(--primary);
     color: #FFFFFF;
     padding: 12px 24px;
-    border-radius: 12px;
+    border-radius: 10px;
     font-weight: 600;
     border: none;
     cursor: pointer;
@@ -73,7 +74,7 @@
 
 .empty-action:active {
     transform: scale(0.96);
-    background: #1B8230;
+    background: var(--primary-700);
 }
 
 /* === Loading State === */
@@ -88,8 +89,8 @@
 .loading-spinner {
     width: 40px;
     height: 40px;
-    border: 3px solid #E8E8E8;
-    border-top-color: #21A038;
+    border: 3px solid var(--gray-200);
+    border-top-color: var(--primary);
     border-radius: 50%;
     animation: spin 0.8s linear infinite;
 }
@@ -101,7 +102,7 @@
 .loading-text {
     margin-top: 16px;
     font-size: 14px;
-    color: #818C99;
+    color: var(--text-secondary);
 }
 
 /* === Skeleton Loader === */

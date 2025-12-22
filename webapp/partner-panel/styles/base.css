@@ -16,12 +16,13 @@ html {
 }
 
 body {
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;
+    font-family: var(--font-family) !important;
     font-size: 15px !important;
     font-weight: 400 !important;
-    line-height: 1.5 !important;
-    color: #000000 !important;
-    background: #F7F7F7 !important;
+    line-height: 1.55 !important;
+    color: var(--text) !important;
+    background: radial-gradient(1200px 400px at 50% -200px, rgba(24, 162, 75, 0.12), rgba(24, 162, 75, 0.0) 60%),
+                linear-gradient(180deg, #F7F8F2 0%, #F1F3EC 100%) !important;
     min-height: 100vh !important;
     overflow-x: hidden !important;
     overscroll-behavior-y: contain;
@@ -33,7 +34,7 @@ body {
 h1, h2, h3, h4, h5, h6 {
     font-weight: var(--weight-bold);
     line-height: var(--leading-tight);
-    letter-spacing: var(--tracking-tight);
+    letter-spacing: -0.02em;
     color: var(--text);
     margin-bottom: var(--space-md);
 }

@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Flame, Milk, Cookie, Coffee as Beverage, Croissant, Beef, Apple, Salad, Package, Search, Info } from 'lucide-react'
+import { Flame, Milk, Cookie, Snowflake, Coffee as Beverage, Croissant, Beef, Apple, Salad, Package, Search, Info } from 'lucide-react'
 import api from '../api/client'
 import { useCart } from '../context/CartContext'
 import { transliterateCity, getSavedLocation, saveLocation, DEFAULT_LOCATION } from '../utils/cityUtils'
@@ -17,12 +17,13 @@ import './HomePage.css'
 const CATEGORIES = [
   { id: 'all', name: 'Barchasi', icon: Flame, color: '#FF6B35' },
   { id: 'dairy', name: 'Sut', icon: Milk, color: '#2196F3' },
-  { id: 'snacks', name: 'Sneklar', icon: Cookie, color: '#FF9800' },
-  { id: 'drinks', name: 'Ichimlik', icon: Beverage, color: '#4CAF50' },
   { id: 'bakery', name: 'Non', icon: Croissant, color: '#8D6E63' },
   { id: 'meat', name: "Go'sht", icon: Beef, color: '#E53935' },
   { id: 'fruits', name: 'Meva', icon: Apple, color: '#F44336' },
   { id: 'vegetables', name: 'Sabzavot', icon: Salad, color: '#43A047' },
+  { id: 'drinks', name: 'Ichimlik', icon: Beverage, color: '#4CAF50' },
+  { id: 'sweets', name: 'Shirinlik', icon: Cookie, color: '#F59E0B' },
+  { id: 'frozen', name: 'Muzlatilgan', icon: Snowflake, color: '#3B82F6' },
   { id: 'other', name: 'Boshqa', icon: Package, color: '#78909C' },
 ]
 
@@ -42,6 +43,7 @@ function HomePage() {
   // Quick filters state
   const [minDiscount, setMinDiscount] = useState(null) // null, 20, 30, 50
   const [sortBy, setSortBy] = useState('default') // default, discount, price_asc, price_desc
+  const [priceRange, setPriceRange] = useState('all') // all, up_20, 20_50, 50_100, 100_plus
 
   // Search history state
   const [searchHistory, setSearchHistory] = useState([])
@@ -224,36 +226,100 @@ function HomePage() {
         params.min_discount = minDiscount
       }
 
+      if (priceRange !== 'all') {
+        if (priceRange === 'up_20') {
+          params.max_price = 20000
+        } else if (priceRange === '20_50') {
+          params.min_price = 20000
+          params.max_price = 50000
+        } else if (priceRange === '50_100') {
+          params.min_price = 50000
+          params.max_price = 100000
+        } else if (priceRange === '100_plus') {
+          params.min_price = 100000
+        }
+      }
+
       // Добавляем сортировку
       if (sortBy !== 'default') {
         params.sort_by = sortBy
       }
 
       const data = await api.getOffers(params)
+      const dataList = Array.isArray(data?.offers) ? data.offers : (Array.isArray(data) ? data : [])
+      let nextOffers = dataList
+      const normalizedQuery = searchQuery.trim().toLowerCase()
+
+      if (normalizedQuery.length >= 2) {
+        nextOffers = nextOffers.filter(offer => {
+          const title = String(offer.title || '').toLowerCase()
+          const store = String(offer.store_name || '').toLowerCase()
+          return title.includes(normalizedQuery) || store.includes(normalizedQuery)
+        })
+      }
+
+      if (minDiscount || priceRange !== 'all' || sortBy !== 'default') {
+        nextOffers = nextOffers.filter(offer => {
+          const discountPrice = Number(offer.discount_price || 0)
+          const original = Number(offer.original_price || 0)
+          const hasDiscount = original > discountPrice
+
+          if (minDiscount) {
+            if (!hasDiscount) return false
+            const percent = Math.round((1 - discountPrice / original) * 100)
+            if (percent < minDiscount) return false
+          }
+
+          if (priceRange !== 'all') {
+            if (priceRange === 'up_20' && discountPrice > 20000) return false
+            if (priceRange === '20_50' && (discountPrice < 20000 || discountPrice > 50000)) return false
+            if (priceRange === '50_100' && (discountPrice < 50000 || discountPrice > 100000)) return false
+            if (priceRange === '100_plus' && discountPrice < 100000) return false
+          }
+
+          return true
+        })
+
+        if (sortBy === 'discount') {
+          nextOffers = [...nextOffers].sort((a, b) => {
+            const aOriginal = Number(a.original_price || 0)
+            const bOriginal = Number(b.original_price || 0)
+            const aDiscount = Number(a.discount_price || 0)
+            const bDiscount = Number(b.discount_price || 0)
+            const aPercent = aOriginal > aDiscount ? Math.round((1 - aDiscount / aOriginal) * 100) : 0
+            const bPercent = bOriginal > bDiscount ? Math.round((1 - bDiscount / bOriginal) * 100) : 0
+            return bPercent - aPercent
+          })
+        } else if (sortBy === 'price_asc') {
+          nextOffers = [...nextOffers].sort((a, b) => Number(a.discount_price || 0) - Number(b.discount_price || 0))
+        } else if (sortBy === 'price_desc') {
+          nextOffers = [...nextOffers].sort((a, b) => Number(b.discount_price || 0) - Number(a.discount_price || 0))
+        }
+      }
 
       // Если город пустой и это первая загрузка - загружаем из всех городов
-      if (reset && (!data || data.length === 0) && !forceAllCities && !showingAllCities) {
+      if (reset && dataList.length === 0 && !forceAllCities && !showingAllCities) {
         setShowingAllCities(true)
         setLoading(false)
         return loadOffers(true, true)
       }
 
       if (reset) {
-        setOffers(data || [])
+        setOffers(nextOffers || [])
         setOffset(20)
         if (forceAllCities) setShowingAllCities(true)
       } else {
-        setOffers(prev => [...prev, ...(data || [])])
+        setOffers(prev => [...prev, ...(nextOffers || [])])
         setOffset(prev => prev + 20)
       }
 
-      setHasMore((data?.length || 0) === 20)
+      setHasMore((dataList?.length || 0) === 20)
     } catch (error) {
       console.error('Error loading offers:', error)
     } finally {
       setLoading(false)
     }
-  }, [selectedCategory, searchQuery, offset, loading, cityForApi, showingAllCities, minDiscount, sortBy])
+  }, [selectedCategory, searchQuery, offset, loading, cityForApi, showingAllCities, minDiscount, sortBy, priceRange])
 
   // Pull-to-refresh handler
   const handleRefresh = useCallback(async () => {
@@ -272,7 +338,7 @@ function HomePage() {
     }, searchQuery ? 500 : 0)
 
     return () => clearTimeout(timer)
-  }, [selectedCategory, searchQuery, cityForApi, minDiscount, sortBy])
+  }, [selectedCategory, searchQuery, cityForApi, minDiscount, sortBy, priceRange])
 
   // Infinite scroll
   useEffect(() => {
@@ -584,28 +650,69 @@ function HomePage() {
               <span className="filter-pill-icon">%</span>
               <span className="filter-pill-text">50%+</span>
             </button>
-          </div>
-        </div>
 
-        {/* Sort Button */}
-        <div className="filter-sort">
-          <button
-            className={`sort-btn ${sortBy !== 'default' ? 'active' : ''}`}
-            onClick={() => {
-              window.Telegram?.WebApp?.HapticFeedback?.selectionChanged?.()
-              // Cycle through sort options
-              const options = ['default', 'discount', 'price_asc', 'price_desc']
-              const idx = options.indexOf(sortBy)
-              setSortBy(options[(idx + 1) % options.length])
-            }}
-          >
-            <span className="sort-btn-icon">
-              {sortBy === 'discount' ? '%' : sortBy === 'price_asc' ? 'up' : sortBy === 'price_desc' ? 'down' : 'sort'}
-            </span>
-            <span>
-              {sortBy === 'discount' ? 'Chegirma' : sortBy === 'price_asc' ? 'Arzon' : sortBy === 'price_desc' ? 'Qimmat' : 'Tartiblash'}
-            </span>
-          </button>
+            <div className="filter-divider" />
+
+            <button
+              className={`filter-pill ${priceRange === 'up_20' ? 'active' : ''}`}
+              onClick={() => {
+                window.Telegram?.WebApp?.HapticFeedback?.selectionChanged?.()
+                setPriceRange(priceRange === 'up_20' ? 'all' : 'up_20')
+              }}
+            >
+              <span className="filter-pill-icon">sum</span>
+              <span className="filter-pill-text">0-20k</span>
+            </button>
+            <button
+              className={`filter-pill ${priceRange === '20_50' ? 'active' : ''}`}
+              onClick={() => {
+                window.Telegram?.WebApp?.HapticFeedback?.selectionChanged?.()
+                setPriceRange(priceRange === '20_50' ? 'all' : '20_50')
+              }}
+            >
+              <span className="filter-pill-icon">sum</span>
+              <span className="filter-pill-text">20-50k</span>
+            </button>
+            <button
+              className={`filter-pill ${priceRange === '50_100' ? 'active' : ''}`}
+              onClick={() => {
+                window.Telegram?.WebApp?.HapticFeedback?.selectionChanged?.()
+                setPriceRange(priceRange === '50_100' ? 'all' : '50_100')
+              }}
+            >
+              <span className="filter-pill-icon">sum</span>
+              <span className="filter-pill-text">50-100k</span>
+            </button>
+            <button
+              className={`filter-pill ${priceRange === '100_plus' ? 'active' : ''}`}
+              onClick={() => {
+                window.Telegram?.WebApp?.HapticFeedback?.selectionChanged?.()
+                setPriceRange(priceRange === '100_plus' ? 'all' : '100_plus')
+              }}
+            >
+              <span className="filter-pill-icon">sum</span>
+              <span className="filter-pill-text">100k+</span>
+            </button>
+
+            <div className="filter-divider" />
+
+            <button
+              className={`filter-pill ${sortBy !== 'default' ? 'active' : ''}`}
+              onClick={() => {
+                window.Telegram?.WebApp?.HapticFeedback?.selectionChanged?.()
+                const options = ['default', 'discount', 'price_asc', 'price_desc']
+                const idx = options.indexOf(sortBy)
+                setSortBy(options[(idx + 1) % options.length])
+              }}
+            >
+              <span className="filter-pill-icon">
+                {sortBy === 'discount' ? '%' : sortBy === 'price_asc' ? 'up' : sortBy === 'price_desc' ? 'down' : 'sort'}
+              </span>
+              <span className="filter-pill-text">
+                {sortBy === 'discount' ? 'Chegirma' : sortBy === 'price_asc' ? 'Arzon' : sortBy === 'price_desc' ? 'Qimmat' : 'Tartib'}
+              </span>
+            </button>
+          </div>
         </div>
       </div>
 
@@ -655,6 +762,9 @@ function HomePage() {
               onClick={() => {
                 setSearchQuery('')
                 setSelectedCategory('all')
+                setMinDiscount(null)
+                setPriceRange('all')
+                setSortBy('default')
               }}
             >
               Filterni tozalash
