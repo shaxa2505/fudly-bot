@@ -178,8 +178,8 @@ def create_api_app(db: Any = None, offer_service: Any = None, bot_token: str = N
 
     # Include routers
     app.include_router(auth_router)
-    app.include_router(orders_router)
     app.include_router(webapp_router)
+    app.include_router(orders_router)
     app.include_router(partner_panel_router, prefix="/api/partner")
 
     @app.get("/")

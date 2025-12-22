@@ -125,7 +125,11 @@ const api = {
 
   async getOrders() {
     // Unified endpoint for both legacy bookings and orders (aiohttp Mini App API)
-    return cachedGet('/orders', {}, 10000)
+    const data = await cachedGet('/orders', {}, 10000)
+    if (Array.isArray(data)) {
+      return { orders: data, bookings: [] }
+    }
+    return data
   },
 
   async getUserBookings(userId, status = null) {
