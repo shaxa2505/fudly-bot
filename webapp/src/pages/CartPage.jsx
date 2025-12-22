@@ -119,6 +119,16 @@ function CartPage({ user }) {
     payme: 'Payme',
   }
   const isProviderAvailable = (provider) => paymentProviders.includes(provider)
+  const hasOnlineProviders = paymentProviders.includes('click') || paymentProviders.includes('payme')
+  const deliveryOnlyOnline = orderType === 'delivery'
+
+  useEffect(() => {
+    if (!deliveryOnlyOnline) return
+    if (!hasOnlineProviders) return
+    if (selectedPaymentMethod !== 'cash' && selectedPaymentMethod !== 'card') return
+    const preferred = paymentProviders.includes('click') ? 'click' : 'payme'
+    setSelectedPaymentMethod(preferred)
+  }, [deliveryOnlyOnline, hasOnlineProviders, paymentProviders, selectedPaymentMethod])
 
   const selectPaymentMethod = (method) => {
     setSelectedPaymentMethod(method)
@@ -186,6 +196,10 @@ function CartPage({ user }) {
     }
     if (orderType === 'delivery' && !address.trim()) {
       toast.warning('Yetkazib berish manzilini kiriting')
+      return
+    }
+    if (deliveryOnlyOnline && !hasOnlineProviders) {
+      toast.error('Yetkazib berish uchun onlayn to\'lov mavjud emas')
       return
     }
 
@@ -549,9 +563,9 @@ function CartPage({ user }) {
                       </button>
 
                       <button
-                        className={`order-type-btn ${orderType === 'delivery' ? 'active' : ''} ${!storeDeliveryEnabled || !canDelivery ? 'disabled' : ''}`}
-                        onClick={() => storeDeliveryEnabled && canDelivery && setOrderType('delivery')}
-                        disabled={!storeDeliveryEnabled || !canDelivery}
+                        className={`order-type-btn ${orderType === 'delivery' ? 'active' : ''} ${!storeDeliveryEnabled || !canDelivery || !hasOnlineProviders ? 'disabled' : ''}`}
+                        onClick={() => storeDeliveryEnabled && canDelivery && hasOnlineProviders && setOrderType('delivery')}
+                        disabled={!storeDeliveryEnabled || !canDelivery || !hasOnlineProviders}
                       >
                         <span className="order-type-icon">✓</span>
                         <span className="order-type-text">Yetkazib berish</span>
@@ -569,6 +583,11 @@ function CartPage({ user }) {
                     {!canDelivery && storeDeliveryEnabled && (
                       <p className="delivery-hint">
                         Yetkazib berish uchun minimum {Math.round(minOrderAmount).toLocaleString()} so'm buyurtma qiling
+                      </p>
+                    )}
+                    {storeDeliveryEnabled && canDelivery && !hasOnlineProviders && (
+                      <p className="delivery-hint">
+                        Yetkazib berish uchun onlayn to'lov usullari mavjud emas
                       </p>
                     )}
                   </div>
@@ -919,21 +938,25 @@ function CartPage({ user }) {
             </div>
             <div className="payment-sheet-list">
               <button
-                className={`payment-sheet-item ${selectedPaymentMethod === 'cash' ? 'active' : ''}`}
+                className={`payment-sheet-item ${selectedPaymentMethod === 'cash' ? 'active' : ''} ${deliveryOnlyOnline ? 'disabled' : ''}`}
                 onClick={() => {
+                  if (deliveryOnlyOnline) return
                   selectPaymentMethod('cash')
                   setShowPaymentSheet(false)
                 }}
+                disabled={deliveryOnlyOnline}
               >
                 <span className="payment-sheet-label">Naqd</span>
                 <span className="payment-sheet-radio" aria-hidden="true"></span>
               </button>
               <button
-                className={`payment-sheet-item ${selectedPaymentMethod === 'card' ? 'active' : ''}`}
+                className={`payment-sheet-item ${selectedPaymentMethod === 'card' ? 'active' : ''} ${deliveryOnlyOnline ? 'disabled' : ''}`}
                 onClick={() => {
+                  if (deliveryOnlyOnline) return
                   selectPaymentMethod('card')
                   setShowPaymentSheet(false)
                 }}
+                disabled={deliveryOnlyOnline}
               >
                 <span className="payment-sheet-label">Kartaga o'tkazish</span>
                 <span className="payment-sheet-radio" aria-hidden="true"></span>
