@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo, useCallback } from 'react'
+import { ArrowLeft } from 'lucide-react'
 import { useNavigate, useParams, useLocation } from 'react-router-dom'
 import api from '../api/client'
 import { useCart } from '../context/CartContext'
@@ -146,10 +147,8 @@ function CategoryProductsPage() {
     <div className="category-products-page">
       {/* Header */}
       <header className="category-header">
-        <button className="back-btn" onClick={() => navigate(-1)}>
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
-            <path d="M15 18l-6-6 6-6" stroke="#181725" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-          </svg>
+        <button className="app-back-btn" onClick={() => navigate(-1)} aria-label="Orqaga">
+          <ArrowLeft size={20} strokeWidth={2} />
         </button>
         <h1 className="category-title">{categoryName || 'Mahsulotlar'}</h1>
         <button className="filter-btn" onClick={() => setShowFilters(true)}>

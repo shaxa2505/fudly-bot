@@ -1,5 +1,5 @@
 import { useNavigate } from 'react-router-dom'
-import { Heart, Home, Sparkles } from 'lucide-react'
+import { ArrowLeft, Heart, Home, Sparkles } from 'lucide-react'
 import { useFavorites } from '../context/FavoritesContext'
 import { useCart } from '../context/CartContext'
 import BottomNav from '../components/BottomNav'
@@ -18,11 +18,11 @@ function FavoritesPage() {
     return (
       <div className="favorites-page">
         <header className="favorites-header">
-          <button className="back-btn" onClick={() => navigate(-1)} aria-label="Orqaga">
-            {'<-'}
+          <button className="app-back-btn" onClick={() => navigate(-1)} aria-label="Orqaga">
+            <ArrowLeft size={20} strokeWidth={2} />
           </button>
           <h1>Sevimlilar</h1>
-          <div style={{ width: 44 }} />
+          <div style={{ width: 36 }} />
         </header>
 
         <div className="favorites-empty empty-state">
@@ -52,11 +52,11 @@ function FavoritesPage() {
   return (
     <div className="favorites-page">
       <header className="favorites-header">
-        <button className="back-btn" onClick={() => navigate(-1)} aria-label="Orqaga">
-          {'<-'}
+        <button className="app-back-btn" onClick={() => navigate(-1)} aria-label="Orqaga">
+          <ArrowLeft size={20} strokeWidth={2} />
         </button>
         <h1>Sevimlilar ({favoritesCount})</h1>
-        <div style={{ width: 44 }} />
+        <div style={{ width: 36 }} />
       </header>
 
       <div className="favorites-list">

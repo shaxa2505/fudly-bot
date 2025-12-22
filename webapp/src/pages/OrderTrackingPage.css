@@ -24,24 +24,6 @@
   -webkit-backdrop-filter: blur(10px);
 }
 
-.back-button {
-  background: none;
-  border: none;
-  font-size: var(--font-lg);
-  color: var(--color-primary);
-  cursor: pointer;
-  padding: var(--spacing-sm);
-  display: flex;
-  align-items: center;
-  gap: var(--spacing-xs);
-  font-weight: var(--font-medium);
-}
-
-.back-button:focus-visible {
-  outline: 3px solid var(--color-primary);
-  outline-offset: 2px;
-}
-
 .tracking-header h1 {
   font-size: var(--font-2xl);
   font-weight: var(--font-semibold);

@@ -35,6 +35,8 @@ class WebSocketClient:
         if self.connected_at is None:
             self.connected_at = datetime.utcnow()
 
+    __hash__ = object.__hash__
+
     async def send(self, data: dict) -> bool:
         """Send data to client."""
         try:

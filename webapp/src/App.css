@@ -8,3 +8,26 @@
   background: var(--color-bg-secondary);
   position: relative;
 }
+
+.app-back-btn {
+  width: 36px;
+  height: 36px;
+  border-radius: 12px;
+  border: none;
+  background: #F2F4F7;
+  color: var(--color-text-primary);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.app-back-btn:active {
+  transform: scale(0.96);
+}
+
+.app-back-btn:focus-visible {
+  outline: 3px solid var(--color-primary);
+  outline-offset: 2px;
+}

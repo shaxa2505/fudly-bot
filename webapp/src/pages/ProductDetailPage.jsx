@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
+import { ArrowLeft } from 'lucide-react'
 import { useCart } from '../context/CartContext'
 import { useFavorites } from '../context/FavoritesContext'
 import { getUnitLabel } from '../utils/helpers'
@@ -104,10 +105,8 @@ function ProductDetailPage() {
     <div className="pdp">
       {/* Floating Header */}
       <header className="pdp-header">
-        <button className="pdp-back" onClick={() => navigate(-1)} aria-label="Orqaga">
-          <svg width="28" height="28" viewBox="0 0 24 24" fill="none">
-            <path d="M15 18l-6-6 6-6" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/>
-          </svg>
+        <button className="app-back-btn" onClick={() => navigate(-1)} aria-label="Orqaga">
+          <ArrowLeft size={20} strokeWidth={2} />
         </button>
 
         <div className="pdp-header-actions">

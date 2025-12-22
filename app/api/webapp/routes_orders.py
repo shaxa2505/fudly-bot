@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import html
+import json
 from typing import Any
 
 from aiogram import Bot
@@ -29,6 +30,17 @@ router = APIRouter()
 class CancelOrderResponse(BaseModel):
     success: bool
     status: str
+
+
+def _normalize_order_status(status: str | None) -> str:
+    normalized = (status or "pending").strip().lower()
+    return {
+        "new": "pending",
+        "awaiting_payment": "pending",
+        "awaiting_admin_confirmation": "pending",
+        "paid": "pending",
+        "confirmed": "preparing",
+    }.get(normalized, normalized)
 
 
 def _require_user_id(user: dict[str, Any]) -> int:
@@ -275,6 +287,221 @@ async def create_order(
         raise HTTPException(status_code=500, detail=str(e)) from e
     finally:
         pass
+
+
+@router.get("/orders")
+async def get_orders(db=Depends(get_db), user: dict = Depends(get_current_user)):
+    """Get user's orders and bookings for WebApp."""
+    user_id = _require_user_id(user)
+
+    orders: list[dict[str, Any]] = []
+    raw_orders: list[Any] = []
+
+    try:
+        if hasattr(db, "get_connection"):
+            with db.get_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute(
+                    """
+                    SELECT
+                        o.order_id,
+                        o.order_status,
+                        o.order_type,
+                        o.pickup_code,
+                        o.delivery_address,
+                        o.total_price,
+                        o.quantity,
+                        o.payment_method,
+                        o.payment_status,
+                        o.payment_proof_photo_id,
+                        o.is_cart_order,
+                        o.cart_items,
+                        o.created_at,
+                        o.updated_at,
+                        o.store_id,
+                        s.name AS store_name,
+                        s.address AS store_address,
+                        s.phone AS store_phone,
+                        off.offer_id AS offer_id,
+                        off.title AS offer_title,
+                        off.discount_price AS offer_price,
+                        off.photo_id AS offer_photo_id,
+                        off.photo AS offer_photo
+                    FROM orders o
+                    LEFT JOIN stores s ON o.store_id = s.store_id
+                    LEFT JOIN offers off ON o.offer_id = off.offer_id
+                    WHERE o.user_id = %s
+                    ORDER BY o.created_at DESC
+                    LIMIT 100
+                    """,
+                    (int(user_id),),
+                )
+                raw_orders = cursor.fetchall() or []
+    except Exception as e:
+        logger.warning(f"Webapp get_orders failed to fetch orders: {e}")
+        raw_orders = []
+
+    for r in raw_orders:
+        if not hasattr(r, "get"):
+            continue
+
+        order_id = r.get("order_id")
+        if not order_id:
+            continue
+
+        order_type = r.get("order_type") or (
+            "delivery" if r.get("delivery_address") else "pickup"
+        )
+        order_status = _normalize_order_status(r.get("order_status"))
+
+        payment_method = r.get("payment_method") or "cash"
+        payment_status = r.get("payment_status")
+
+        is_cart = int(r.get("is_cart_order") or 0) == 1
+        cart_items_json = r.get("cart_items")
+
+        items: list[dict[str, Any]] = []
+        items_total = 0
+        qty_total = 0
+
+        if is_cart and cart_items_json:
+            try:
+                cart_items = (
+                    json.loads(cart_items_json)
+                    if isinstance(cart_items_json, str)
+                    else cart_items_json
+                )
+            except Exception:
+                cart_items = []
+
+            for it in cart_items or []:
+                title = it.get("title") or "Товар"
+                qty = int(it.get("quantity") or 1)
+                price = int(it.get("price") or 0)
+                items_total += price * qty
+                qty_total += qty
+                items.append(
+                    {
+                        "offer_id": it.get("offer_id"),
+                        "store_id": r.get("store_id"),
+                        "offer_title": title,
+                        "title": title,
+                        "price": price,
+                        "quantity": qty,
+                        "store_name": r.get("store_name"),
+                        "photo": None,
+                    }
+                )
+        else:
+            qty = int(r.get("quantity") or 1)
+            price = int(r.get("offer_price") or 0)
+            title = r.get("offer_title") or "Товар"
+            photo = r.get("offer_photo") or r.get("offer_photo_id")
+            items_total = price * qty
+            qty_total = qty
+            items.append(
+                {
+                    "offer_id": r.get("offer_id"),
+                    "store_id": r.get("store_id"),
+                    "offer_title": title,
+                    "title": title,
+                    "price": price,
+                    "quantity": qty,
+                    "store_name": r.get("store_name"),
+                    "photo": photo,
+                }
+            )
+
+        total_price = int(r.get("total_price") or 0)
+        delivery_fee = 0
+        if order_type == "delivery":
+            delivery_fee = max(0, total_price - items_total)
+
+        primary_item = items[0] if items else {}
+        offer_title = primary_item.get("title") or primary_item.get("offer_title")
+        offer_photo = primary_item.get("photo")
+
+        orders.append(
+            {
+                "id": order_id,
+                "order_id": order_id,
+                "booking_id": order_id,
+                "offer_id": primary_item.get("offer_id"),
+                "offer_title": offer_title,
+                "offer_photo": offer_photo,
+                "status": order_status,
+                "order_status": order_status,
+                "order_type": order_type,
+                "pickup_code": r.get("pickup_code"),
+                "booking_code": r.get("pickup_code"),
+                "payment_method": payment_method,
+                "payment_status": payment_status,
+                "payment_proof_photo_id": r.get("payment_proof_photo_id"),
+                "delivery_address": r.get("delivery_address"),
+                "delivery_fee": delivery_fee,
+                "total_price": total_price,
+                "quantity": qty_total,
+                "created_at": str(r.get("created_at") or ""),
+                "updated_at": str(r.get("updated_at") or "") if r.get("updated_at") else None,
+                "store_id": r.get("store_id"),
+                "store_name": r.get("store_name"),
+                "store_address": r.get("store_address"),
+                "store_phone": r.get("store_phone"),
+                "items": items,
+            }
+        )
+
+    bookings = []
+    if hasattr(db, "get_user_bookings"):
+        try:
+            raw_bookings = db.get_user_bookings(int(user_id)) or []
+            for b in raw_bookings:
+                if isinstance(b, tuple):
+                    offer_photo = None
+                    if len(b) > 1 and b[1] and hasattr(db, "get_offer"):
+                        try:
+                            offer = db.get_offer(b[1])
+                            if offer:
+                                offer_photo = get_val(offer, "photo") or get_val(
+                                    offer, "photo_id"
+                                )
+                        except Exception:
+                            pass
+
+                    bookings.append(
+                        {
+                            "booking_id": b[0] if len(b) > 0 else None,
+                            "offer_id": b[1] if len(b) > 1 else None,
+                            "user_id": b[2] if len(b) > 2 else None,
+                            "status": _normalize_order_status(
+                                b[3] if len(b) > 3 else "pending"
+                            ),
+                            "booking_code": b[4] if len(b) > 4 else None,
+                            "pickup_time": str(b[5]) if len(b) > 5 and b[5] else None,
+                            "quantity": b[6] if len(b) > 6 else 1,
+                            "created_at": str(b[7]) if len(b) > 7 and b[7] else None,
+                            "offer_title": b[8] if len(b) > 8 else None,
+                            "total_price": (b[9] or 0) * (b[6] or 1) if len(b) > 9 else 0,
+                            "store_name": b[11] if len(b) > 11 else None,
+                            "store_address": b[12] if len(b) > 12 else None,
+                            "offer_photo": offer_photo,
+                        }
+                    )
+                elif isinstance(b, dict):
+                    booking = {}
+                    for key, value in b.items():
+                        if hasattr(value, "isoformat"):
+                            booking[key] = value.isoformat()
+                        else:
+                            booking[key] = value
+                    booking["status"] = _normalize_order_status(
+                        booking.get("status") or "pending"
+                    )
+                    bookings.append(booking)
+        except Exception as e:
+            logger.warning(f"Webapp get_orders failed to fetch bookings: {e}")
+
+    return {"bookings": bookings, "orders": orders}
 
 
 @router.post("/orders/{order_id}/cancel", response_model=CancelOrderResponse)

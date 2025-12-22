@@ -53,7 +53,6 @@
   -webkit-backdrop-filter: blur(10px);
 }
 
-.pdp-back,
 .pdp-fav,
 .pdp-share {
   width: 38px;
@@ -70,14 +69,12 @@
   border: 1px solid rgba(15, 118, 110, 0.12);
 }
 
-.pdp-back:active,
 .pdp-fav:active,
 .pdp-share:active {
   transform: translateY(1px);
   background: var(--color-bg-secondary);
 }
 
-.pdp-back:focus-visible,
 .pdp-fav:focus-visible,
 .pdp-share:focus-visible {
   outline: 3px solid var(--color-primary);

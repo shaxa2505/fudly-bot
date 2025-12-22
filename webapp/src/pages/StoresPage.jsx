@@ -317,6 +317,8 @@ function StoresPage() {
                       src={api.getPhotoUrl(store.photo_url)}
                       alt={store.name}
                       className="sp-card-img"
+                      loading="lazy"
+                      decoding="async"
                       onError={(e) => {
                         e.target.style.display = 'none'
                         e.target.parentNode.querySelector('.sp-card-placeholder').style.display = 'flex'
@@ -456,6 +458,8 @@ function StoresPage() {
                               <img
                                 src={imgUrl}
                                 alt=""
+                                loading="lazy"
+                                decoding="async"
                                 onError={(e) => {
                                   e.target.style.display = 'none'
                                   e.target.nextSibling.style.display = 'flex'

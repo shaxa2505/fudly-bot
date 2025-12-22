@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { ArrowLeft } from 'lucide-react';
 import { useNavigate, useLocation, useParams } from 'react-router-dom';
 import api from '../api/client';
 import { useCart } from '../context/CartContext';
@@ -147,8 +148,12 @@ function OrderTrackingPage({ user }) {
   return (
     <div className="order-tracking-page">
       <div className="tracking-header">
-        <button onClick={() => navigate(`/order/${bookingId}/details`)} className="back-button">
-          {'<- '} {t('Назад', 'Orqaga')}
+        <button
+          onClick={() => navigate(`/order/${bookingId}/details`)}
+          className="app-back-btn"
+          aria-label={t('?????', 'Orqaga')}
+        >
+          <ArrowLeft size={20} strokeWidth={2} />
         </button>
         <h1>{t('Заказ', 'Buyurtma')} #{order.booking_code}</h1>
       </div>

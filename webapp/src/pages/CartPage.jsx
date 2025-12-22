@@ -410,9 +410,9 @@ function CartPage({ user }) {
       <div className="cart-page">
         <header className="cart-header">
           <div className="cart-header-left">
-            <button className="cart-back-btn" onClick={() => navigate(-1)} aria-label="Orqaga">
-              <ArrowLeft size={20} strokeWidth={2} />
-            </button>
+        <button className="app-back-btn" onClick={() => navigate(-1)} aria-label="Orqaga">
+          <ArrowLeft size={20} strokeWidth={2} />
+        </button>
             <h1>Savat</h1>
           </div>
         </header>
@@ -445,9 +445,9 @@ function CartPage({ user }) {
     <div className="cart-page">
       <header className="cart-header">
         <div className="cart-header-left">
-          <button className="cart-back-btn" onClick={() => navigate(-1)} aria-label="Orqaga">
-            <ArrowLeft size={20} strokeWidth={2} />
-          </button>
+        <button className="app-back-btn" onClick={() => navigate(-1)} aria-label="Orqaga">
+          <ArrowLeft size={20} strokeWidth={2} />
+        </button>
           <div className="cart-header-title">
             <h1>Savat</h1>
             <span className="cart-header-count">{itemsCount} ta</span>
@@ -530,7 +530,7 @@ function CartPage({ user }) {
             <div className="modal-header">
               <div className="modal-header-main">
                 <button
-                  className="modal-back"
+                  className="app-back-btn"
                   onClick={closeCheckout}
                   type="button"
                   aria-label="Orqaga"

@@ -553,6 +553,7 @@ select:focus-visible {
     bottom: 96px;
     left: 16px;
     right: 16px;
+    transform: none;
     background: #000000;
     color: #FFFFFF;
     padding: 16px 20px;

@@ -1880,7 +1880,8 @@ async function toggleProductAvailability(id) {
             // Group orders by date
             orders.forEach(order => {
                 if (order.status === 'completed') {
-                    const orderDate = new Date(order.created_at);
+                    const orderDate = parseDate(order.created_at);
+                    if (!orderDate) return;
                     const dayIndex = last7Days.findIndex(d =>
                         d.date.toDateString() === orderDate.toDateString()
                     );
@@ -1924,7 +1925,8 @@ async function toggleProductAvailability(id) {
             // Peak hours
             const hourStats = Array(24).fill(0);
             orders.forEach(order => {
-                const hour = new Date(order.created_at).getHours();
+                const hour = parseDate(order.created_at)?.getHours();
+                if (hour == null) return;
                 hourStats[hour]++;
             });
             const peakHour = hourStats.indexOf(Math.max(...hourStats));
@@ -2553,19 +2555,31 @@ async function toggleProductAvailability(id) {
             return `${formatted} сум`;
         }
 
+        function parseDate(dateString) {
+            if (!dateString) return null;
+            const trimmed = String(dateString).trim();
+            const hasTimezone = /([zZ]|[+-]\d{2}:?\d{2})$/.test(trimmed);
+            const normalized = hasTimezone ? trimmed : `${trimmed}Z`;
+            const date = new Date(normalized);
+            return Number.isNaN(date.getTime()) ? null : date;
+        }
+
         function formatTime(dateString) {
-            const date = new Date(dateString);
+            const date = parseDate(dateString);
+            if (!date) return '';
             return date.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
         }
 
         function isToday(dateString) {
-            const date = new Date(dateString);
+            const date = parseDate(dateString);
+            if (!date) return false;
             const today = new Date();
             return date.toDateString() === today.toDateString();
         }
 
         function isYesterday(dateString) {
-            const date = new Date(dateString);
+            const date = parseDate(dateString);
+            if (!date) return false;
             const yesterday = new Date();
             yesterday.setDate(yesterday.getDate() - 1);
             return date.toDateString() === yesterday.toDateString();

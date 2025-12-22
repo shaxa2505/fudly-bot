@@ -26,27 +26,6 @@
   -webkit-backdrop-filter: blur(10px);
 }
 
-.back-btn {
-  width: 44px;
-  height: 44px;
-  border: none;
-  background: transparent;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  -webkit-tap-highlight-color: transparent;
-}
-
-.back-btn:active {
-  transform: scale(0.95);
-}
-
-.back-btn:focus-visible {
-  outline: 3px solid var(--color-primary);
-  outline-offset: 2px;
-}
-
 .category-title {
   font-size: var(--app-header-title-size);
   font-weight: var(--app-header-title-weight);

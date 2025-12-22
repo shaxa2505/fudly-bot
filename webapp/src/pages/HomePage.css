@@ -1228,7 +1228,10 @@
 
 /* Offer card wrapper for animation */
 .offer-card-wrapper {
-  display: contents;
+  display: block;
+  content-visibility: auto;
+  contain: layout paint;
+  contain-intrinsic-size: 320px 360px;
 }
 
 .offer-card-wrapper.animate-in > * {
@@ -1256,5 +1259,19 @@
   .section-header {
     max-width: 1200px;
     margin: 0 auto;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-in,
+  .offer-card-wrapper.animate-in > * {
+    animation: none;
+    opacity: 1;
+    transform: none;
+  }
+
+  .skeleton-box,
+  .skeleton-text {
+    animation: none;
   }
 }

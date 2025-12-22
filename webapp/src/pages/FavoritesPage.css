@@ -29,30 +29,6 @@
   margin: 0;
 }
 
-.favorites-header .back-btn {
-  width: 44px;
-  height: 44px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: var(--color-bg-tertiary);
-  border: none;
-  border-radius: var(--radius-full);
-  cursor: pointer;
-  transition: all var(--transition-normal);
-  font-size: 20px;
-  color: var(--color-text-primary);
-}
-
-.favorites-header .back-btn:active {
-  transform: scale(0.92);
-}
-
-.favorites-header .back-btn:focus-visible {
-  outline: 3px solid var(--color-primary);
-  outline-offset: 2px;
-}
-
 /* Empty State */
 .favorites-empty {
   display: flex;

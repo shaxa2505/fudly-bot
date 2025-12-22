@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
+import { ArrowLeft } from 'lucide-react'
 import apiClient from '../api/client'
 import './OrderDetailsPage.css'
 
@@ -152,12 +153,15 @@ export default function OrderDetailsPage() {
   if (error || !order) {
     return (
       <div className="order-details-page">
+        <div className="details-header">
+          <button className="app-back-btn" onClick={() => navigate('/profile')} aria-label="Orqaga">
+            <ArrowLeft size={20} strokeWidth={2} />
+          </button>
+          <h1 className="details-title">Buyurtma</h1>
+        </div>
         <div className="error-container">
           <div className="error-icon">!</div>
           <p>{error || 'Xatolik yuz berdi'}</p>
-            <button className="back-btn" onClick={() => navigate('/profile')}>
-              {'<- Orqaga'}
-            </button>
         </div>
       </div>
     )
@@ -178,8 +182,8 @@ export default function OrderDetailsPage() {
     <div className="order-details-page">
       {/* Header */}
       <div className="details-header">
-        <button className="back-button" onClick={() => navigate('/profile')}>
-          {'<-'}
+        <button className="app-back-btn" onClick={() => navigate('/profile')} aria-label="Orqaga">
+          <ArrowLeft size={20} strokeWidth={2} />
         </button>
         <h1 className="details-title">Buyurtma #{orderId}</h1>
       </div>
