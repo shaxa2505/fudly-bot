@@ -66,7 +66,7 @@ async def cancel_order_customer(
         await callback.answer("❌", show_alert=True)
         return
 
-    status = _get_order_field(order, "status", 3)
+    status = _get_order_field(order, "order_status", 3) or _get_order_field(order, "status", 3)
     if status not in ["pending", "confirmed"]:
         msg = "Buyurtma allaqachon qayta ishlangan" if lang == "uz" else "Заказ уже обработан"
         await callback.answer(f"❌ {msg}", show_alert=True)

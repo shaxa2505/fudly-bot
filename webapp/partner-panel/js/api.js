@@ -30,8 +30,8 @@ export function getAuth() {
         source = 'unsafe';
     }
 
-    if (urlUserId) {
-        finalData = finalData ? `${finalData}&uid=${urlUserId}` : `uid=${urlUserId}`;
+    if (urlUserId && !finalData) {
+        finalData = `uid=${urlUserId}`;
         source += '+url';
     }
 
@@ -41,15 +41,48 @@ export function getAuth() {
     return { data: finalData, userId, source };
 }
 
+function buildAuthHeaders(initData, extraHeaders = {}, options = {}) {
+    const headers = {
+        'X-Telegram-Init-Data': initData || '',
+        ...extraHeaders
+    };
+
+    if (!options.skipContentType) {
+        headers['Content-Type'] = 'application/json';
+    }
+
+    if (initData) {
+        headers.Authorization = `tma ${initData}`;
+    }
+
+    return headers;
+}
+
+function normalizeOrder(raw) {
+    if (!raw) return raw;
+
+    const id = raw.id ?? raw.order_id ?? raw.booking_id;
+    const status = raw.status ?? raw.order_status ?? 'pending';
+    const orderType =
+        raw.order_type ??
+        (raw.type === 'booking' ? 'pickup' : raw.type === 'order' ? 'delivery' : undefined);
+    const totalPrice = raw.total_price ?? raw.price ?? raw.total ?? 0;
+    const productName = raw.product_name ?? raw.offer_title ?? raw.title ?? 'Товар';
+
+    return {
+        ...raw,
+        id,
+        status,
+        order_type: orderType || raw.order_type,
+        total_price: totalPrice,
+        product_name: productName
+    };
+}
+
 // Fetch helper with auth headers
 export async function apiFetch(endpoint, options = {}) {
     const { data: initData } = getAuth();
-
-    const headers = {
-        'Content-Type': 'application/json',
-        'X-Telegram-Init-Data': initData || '',
-        ...options.headers
-    };
+    const headers = buildAuthHeaders(initData, options.headers || {});
 
     const response = await fetch(`${API_BASE}${endpoint}`, {
         ...options,
@@ -109,9 +142,7 @@ export const productsAPI = {
 
         const response = await fetch(`${API_BASE}/api/partner/upload-photo`, {
             method: 'POST',
-            headers: {
-                'X-Telegram-Init-Data': initData || ''
-            },
+            headers: buildAuthHeaders(initData, {}, { skipContentType: true }),
             body: formData
         });
 
@@ -129,11 +160,13 @@ export const ordersAPI = {
         const url = status
             ? `/api/partner/orders?status=${status}`
             : '/api/partner/orders';
-        return apiFetch(url);
+        const orders = await apiFetch(url);
+        return Array.isArray(orders) ? orders.map(normalizeOrder) : orders;
     },
 
     async getById(id) {
-        return apiFetch(`/api/partner/orders/${id}`);
+        const order = await apiFetch(`/api/partner/orders/${id}`);
+        return normalizeOrder(order);
     },
 
     async updateStatus(id, status) {

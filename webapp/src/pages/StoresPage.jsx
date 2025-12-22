@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Store, ShoppingCart, Coffee as CafeIcon, Utensils, Croissant, Salad, Star } from 'lucide-react'
 import api from '../api/client'
@@ -34,6 +34,7 @@ function StoresPage() {
   const [viewMode, setViewMode] = useState('list') // 'list' or 'map'
   const [userLocation, setUserLocation] = useState(null)
   const [locationLoading, setLocationLoading] = useState(false)
+  const searchInputRef = useRef(null)
 
   const location = getSavedLocation()
   const cityLatin = getLatinCity(location)
@@ -160,10 +161,16 @@ function StoresPage() {
             <path d="M21 21l-4.35-4.35" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
           </svg>
           <input
+            ref={searchInputRef}
             type="text"
             placeholder="Do'kon qidirish..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                searchInputRef.current?.blur()
+              }
+            }}
           />
           {searchQuery && (
             <button onClick={() => setSearchQuery('')} aria-label="Qidiruvni tozalash">x</button>

@@ -49,6 +49,7 @@ function HomePage() {
   const [searchHistory, setSearchHistory] = useState([])
   const [showSearchHistory, setShowSearchHistory] = useState(false)
   const searchInputRef = useRef(null)
+  const manualSearchRef = useRef(0)
 
   // Use cart from context instead of local state
   const { addToCart, removeFromCart, getQuantity, cartCount } = useCart()
@@ -95,28 +96,40 @@ function HomePage() {
 
   // Save search query to history when searching
   const handleSearchSubmit = useCallback(async () => {
-    if (searchQuery.trim().length >= 2) {
+    const trimmed = searchQuery.trim()
+    searchInputRef.current?.blur()
+    setShowSearchHistory(false)
+
+    if (!trimmed) {
+      manualSearchRef.current = Date.now()
+      await loadOffers(true)
+      return
+    }
+
+    if (trimmed.length >= 2) {
       const userId = window.Telegram?.WebApp?.initDataUnsafe?.user?.id
       if (userId) {
         try {
-          await api.addSearchHistory(userId, searchQuery.trim())
+          await api.addSearchHistory(userId, trimmed)
           // Update local history
           setSearchHistory(prev => {
-            const filtered = prev.filter(q => q.toLowerCase() !== searchQuery.trim().toLowerCase())
-            return [searchQuery.trim(), ...filtered].slice(0, 5)
+            const filtered = prev.filter(q => q.toLowerCase() !== trimmed.toLowerCase())
+            return [trimmed, ...filtered].slice(0, 5)
           })
         } catch (error) {
           console.error('Error saving search history:', error)
         }
       }
+      manualSearchRef.current = Date.now()
+      await loadOffers(true)
     }
-    setShowSearchHistory(false)
-  }, [searchQuery])
+  }, [searchQuery, loadOffers])
 
   // Handle search history item click
   const handleHistoryClick = (query) => {
     setSearchQuery(query)
     setShowSearchHistory(false)
+    searchInputRef.current?.blur()
   }
 
   // Clear search history
@@ -332,13 +345,16 @@ function HomePage() {
 
   // Initial load and search with debounce
   useEffect(() => {
-    setShowingAllCities(false) // Сбрасываем при смене города/фильтров
+    setShowingAllCities(false) // ?????????? ??? ????? ??????/????????
+    const recentlyManual = Date.now() - manualSearchRef.current < 300
+    if (recentlyManual) return
+
     const timer = setTimeout(() => {
       loadOffers(true)
     }, searchQuery ? 500 : 0)
 
     return () => clearTimeout(timer)
-  }, [selectedCategory, searchQuery, cityForApi, minDiscount, sortBy, priceRange])
+  }, [selectedCategory, searchQuery, cityForApi, minDiscount, sortBy, priceRange, loadOffers])
 
   // Infinite scroll
   useEffect(() => {

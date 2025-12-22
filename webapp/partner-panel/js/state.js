@@ -207,7 +207,7 @@ export const actions = {
     updateOrder(id, updates) {
         setState({
             orders: state.orders.map(o =>
-                o.id === id ? { ...o, ...updates } : o
+                (o.id ?? o.order_id ?? o.booking_id) === id ? { ...o, ...updates } : o
             )
         });
     },
