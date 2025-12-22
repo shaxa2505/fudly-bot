@@ -345,7 +345,9 @@ function CartPage({ user }) {
     return (
       <div className="cart-page">
         <header className="cart-header">
-          <h1><ShoppingCart size={24} strokeWidth={2} aria-hidden="true" /> Savat</h1>
+          <div className="cart-header-title">
+            <h1>Savat</h1>
+          </div>
         </header>
 
         <div className="empty-cart">

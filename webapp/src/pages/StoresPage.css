@@ -14,6 +14,7 @@
 /* Header */
 .sp-header {
   background: rgba(255, 252, 248, 0.95);
+  min-height: var(--app-header-min-height);
   padding: var(--app-header-padding-y) var(--app-header-padding-x);
   position: sticky;
   top: 0;

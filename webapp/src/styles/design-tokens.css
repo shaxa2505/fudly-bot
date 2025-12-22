@@ -108,6 +108,7 @@
   --page-padding-x: var(--spacing-lg);
 
   /* Consistent app header sizing */
+  --app-header-min-height: 56px;
   --app-header-padding-y: var(--spacing-lg);
   --app-header-padding-x: var(--page-padding-x);
   --app-header-title-size: var(--font-2xl);

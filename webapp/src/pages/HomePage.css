@@ -19,6 +19,7 @@
   top: 0;
   z-index: var(--z-sticky);
   background: rgba(255, 252, 248, 0.95);
+  min-height: var(--app-header-min-height);
   padding: var(--app-header-padding-y) var(--app-header-padding-x);
   border-bottom: 1px solid rgba(15, 118, 110, 0.12);
   box-shadow: var(--shadow-header);

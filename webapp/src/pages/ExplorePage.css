@@ -11,6 +11,7 @@
 
 /* Header */
 .explore-header {
+  min-height: var(--app-header-min-height);
   padding: var(--app-header-padding-y) var(--app-header-padding-x);
   text-align: center;
   background: rgba(255, 252, 248, 0.95);
