@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import html
-import re
 from typing import Any
 
 from aiogram import Bot
@@ -9,7 +8,6 @@ from aiogram.utils.keyboard import InlineKeyboardBuilder
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
-from app.core.notifications import Notification, NotificationType, get_notification_service
 from app.core.sanitize import sanitize_phone
 from app.core.security import validator
 from app.services.unified_order_service import OrderItem, get_unified_order_service
@@ -126,8 +124,6 @@ async def create_order(
 ):
     """Create a new order from Mini App and notify partner."""
 
-    bot_instance: Bot | None = None
-
     try:
         user_id = _require_user_id(user)
         if order.user_id and order.user_id != user_id:
@@ -135,11 +131,6 @@ async def create_order(
                 "create_order user mismatch: initData=%s payload=%s", user_id, order.user_id
             )
             raise HTTPException(status_code=403, detail="User mismatch")
-
-        try:
-            bot_instance = Bot(token=settings.bot_token)
-        except Exception as e:  # pragma: no cover - defensive
-            logger.warning(f"Could not create bot instance: {e}")
 
         resolved_phone = _resolve_required_phone(db, user_id, order.phone)
 
@@ -265,70 +256,11 @@ async def create_order(
                     detail=result.error_message or "Failed to create order"
                 )
 
-        # UnifiedOrderService already notifies sellers (Telegram + WebSocket).
+        # UnifiedOrderService already notifies sellers (WebSocket + optional Telegram).
 
         order_id = created_items[0]["id"] if created_items else 0
         total_amount = sum(b["total"] for b in created_items)
         total_items = sum(b["quantity"] for b in created_items)
-
-        if bot_instance and created_items and user_id:
-            try:
-                customer_lang = (
-                    db.get_user_language(user_id) if hasattr(db, "get_user_language") else "ru"
-                )
-                currency = "so'm" if customer_lang == "uz" else "сум"
-
-                if customer_lang == "uz":
-                    order_type_uz = "🚚 Yetkazish" if is_delivery else "🏪 O'zi olib ketadi"
-                    confirm_msg = "✅ <b>Buyurtma qabul qilindi!</b>\n\n"
-                    confirm_msg += f"📦 #{order_id}\n"
-                    confirm_msg += f"{order_type_uz}\n\n"
-                    confirm_msg += "<b>Mahsulotlar:</b>\n"
-                    for item in created_items:
-                        confirm_msg += f"• {item['offer_title']} × {item['quantity']}\n"
-                    confirm_msg += f"\n💰 <b>Jami: {int(total_amount):,} {currency}</b>\n\n"
-                    if is_delivery and order.delivery_address:
-                        confirm_msg += f"📍 {order.delivery_address}\n\n"
-                    confirm_msg += "⏳ Sotuvchi tasdiqlashini kutamiz..."
-                else:
-                    order_type_ru = "🚚 Доставка" if is_delivery else "🏪 Самовывоз"
-                    confirm_msg = "✅ <b>Заказ оформлен!</b>\n\n"
-                    confirm_msg += f"📦 #{order_id}\n"
-                    confirm_msg += f"{order_type_ru}\n\n"
-                    confirm_msg += "<b>Товары:</b>\n"
-                    for item in created_items:
-                        confirm_msg += f"• {item['offer_title']} × {item['quantity']}\n"
-                    confirm_msg += f"\n💰 <b>Итого: {int(total_amount):,} {currency}</b>\n\n"
-                    if is_delivery and order.delivery_address:
-                        confirm_msg += f"📍 {order.delivery_address}\n\n"
-                    confirm_msg += "⏳ Ожидаем подтверждения продавца..."
-
-                await bot_instance.send_message(user_id, confirm_msg, parse_mode="HTML")
-                logger.info(f"✅ Sent order confirmation to customer {user_id}")
-
-                try:
-                    notification_service = get_notification_service()
-                    title = (
-                        "Buyurtma qabul qilindi"
-                        if customer_lang == "uz"
-                        else "Заказ принят"
-                    )
-                    plain_msg = re.sub(r"<[^>]+>", "", confirm_msg)
-                    await notification_service.notify_user(
-                        Notification(
-                            type=NotificationType.NEW_BOOKING,
-                            recipient_id=int(user_id),
-                            title=title,
-                            message=plain_msg,
-                            data={"order_id": order_id, "status": "pending"},
-                            priority=0,
-                        )
-                    )
-                except Exception as notify_error:  # pragma: no cover - defensive
-                    logger.warning(f"Notification service failed: {notify_error}")
-            except Exception as e:  # pragma: no cover - defensive
-                logger.warning(f"Failed to send confirmation to customer: {e}")
-
         logger.info(
             "ORDER_CREATED: id=%s, user=%s, type=%s, total=%s, items=%s, source=webapp_api",
             order_id,
@@ -348,11 +280,7 @@ async def create_order(
         logger.error(f"Error creating order: {e}")
         raise HTTPException(status_code=500, detail=str(e)) from e
     finally:
-        if bot_instance:
-            try:
-                await bot_instance.session.close()
-            except Exception:  # pragma: no cover - defensive
-                pass
+        pass
 
 
 @router.post("/orders/{order_id}/cancel", response_model=CancelOrderResponse)

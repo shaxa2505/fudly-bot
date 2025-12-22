@@ -26,6 +26,7 @@ NOTIFICATION STRATEGY (Optimized v2):
 from __future__ import annotations
 
 import html
+import os
 import re
 from dataclasses import dataclass
 from typing import Any, Literal
@@ -618,6 +619,10 @@ class UnifiedOrderService:
     def __init__(self, db: Any, bot: Bot):
         self.db = db
         self.bot = bot
+        self.telegram_order_notifications = (
+            os.getenv("ORDER_TELEGRAM_NOTIFICATIONS", "false").strip().lower()
+            in {"1", "true", "yes", "y"}
+        )
 
     def _esc(self, val: Any) -> str:
         """HTML-escape helper."""
@@ -800,8 +805,9 @@ class UnifiedOrderService:
                 customer_phone=customer_phone,
             )
 
-        # Send notification to customer
-        if notify_customer:
+        # Send notification/event to customer (WebApp sync always; Telegram optional)
+        publish_customer_event = bool(user_id)
+        if notify_customer or publish_customer_event:
             all_ids = [str(x) for x in (order_ids + booking_ids)]
             items_for_template = [
                 {"title": item.title, "price": item.price, "quantity": item.quantity}
@@ -823,10 +829,57 @@ class UnifiedOrderService:
                 currency=currency,
             )
 
-            try:
-                await self.bot.send_message(user_id, customer_msg, parse_mode="HTML")
-            except Exception as e:
-                logger.error(f"Failed to notify customer {user_id}: {e}")
+            if notify_customer and self.telegram_order_notifications:
+                try:
+                    await self.bot.send_message(user_id, customer_msg, parse_mode="HTML")
+                except Exception as e:
+                    logger.error(f"Failed to notify customer {user_id}: {e}")
+
+            if publish_customer_event:
+                try:
+                    notification_service = get_notification_service()
+                    title = (
+                        "Buyurtma qabul qilindi" if customer_lang == "uz" else "Заказ принят"
+                    )
+                    plain_msg = re.sub(r"<[^>]+>", "", customer_msg)
+                    await notification_service.notify_user(
+                        Notification(
+                            type=NotificationType.NEW_BOOKING,
+                            recipient_id=int(user_id),
+                            title=title,
+                            message=plain_msg,
+                            data={
+                                "order_ids": order_ids,
+                                "booking_ids": booking_ids,
+                                "status": OrderStatus.PENDING,
+                                "order_type": order_type,
+                            },
+                            priority=0,
+                        )
+                    )
+                except Exception as notify_error:
+                    logger.warning(
+                        f"Notification service failed for order create: {notify_error}"
+                    )
+
+                try:
+                    from app.core.websocket import get_websocket_manager
+
+                    ws_manager = get_websocket_manager()
+                    await ws_manager.send_to_user(
+                        int(user_id),
+                        {
+                            "type": "order_created",
+                            "data": {
+                                "order_ids": order_ids,
+                                "booking_ids": booking_ids,
+                                "status": OrderStatus.PENDING,
+                                "order_type": order_type,
+                            },
+                        },
+                    )
+                except Exception as ws_error:
+                    logger.warning(f"WebSocket notify failed for order create: {ws_error}")
 
         # Log order creation
         logger.info(
@@ -1116,20 +1169,23 @@ class UnifiedOrderService:
                     kb.button(text="❌ Отклонить", callback_data=f"order_reject_{first_order_id}")
                 kb.adjust(2)
 
-                # Send Telegram notification
-                sent_msg = await self.bot.send_message(
-                    owner_id, seller_text, parse_mode="HTML", reply_markup=kb.as_markup()
-                )
-                logger.info(f"Sent order notification to seller {owner_id} for orders {order_ids}")
+                sent_msg = None
+                if self.telegram_order_notifications:
+                    sent_msg = await self.bot.send_message(
+                        owner_id, seller_text, parse_mode="HTML", reply_markup=kb.as_markup()
+                    )
+                    logger.info(
+                        f"Sent order notification to seller {owner_id} for orders {order_ids}"
+                    )
 
-                if sent_msg and hasattr(self.db, "set_order_seller_message_id"):
-                    for order_id in order_id_ints:
-                        try:
-                            self.db.set_order_seller_message_id(order_id, sent_msg.message_id)
-                        except Exception as save_err:
-                            logger.warning(
-                                f"Failed to save seller_message_id for order #{order_id}: {save_err}"
-                            )
+                    if sent_msg and hasattr(self.db, "set_order_seller_message_id"):
+                        for order_id in order_id_ints:
+                            try:
+                                self.db.set_order_seller_message_id(order_id, sent_msg.message_id)
+                            except Exception as save_err:
+                                logger.warning(
+                                    f"Failed to save seller_message_id for order #{order_id}: {save_err}"
+                                )
                 
                 # Send WebSocket notification to web panel (real-time)
                 try:
@@ -1477,6 +1533,37 @@ class UnifiedOrderService:
                     f"⚡ Skipping READY notification (internal state) for {order_type} order#{entity_id}"
                 )
 
+            if user_id:
+                try:
+                    from app.core.websocket import get_websocket_manager
+
+                    ws_manager = get_websocket_manager()
+                    await ws_manager.send_to_user(
+                        int(user_id),
+                        {
+                            "type": "order_status_changed",
+                            "data": {
+                                "entity_id": entity_id,
+                                "entity_type": entity_type,
+                                "status": target_status,
+                                "order_type": order_type,
+                            },
+                        },
+                    )
+                except Exception as ws_error:
+                    logger.warning(f"WebSocket notify failed for status change: {ws_error}")
+
+            if store_id:
+                try:
+                    from app.api.websocket_manager import get_connection_manager
+
+                    store_ws = get_connection_manager()
+                    await store_ws.notify_order_status(
+                        int(store_id), int(entity_id), target_status
+                    )
+                except Exception as ws_error:
+                    logger.warning(f"Partner WebSocket notify failed: {ws_error}")
+
             if should_notify:
                 store = self.db.get_store(store_id) if store_id else None
                 store_name = store.get("name", "") if isinstance(store, dict) else ""
@@ -1560,84 +1647,85 @@ class UnifiedOrderService:
                     kb.button(text=received_text, callback_data=f"customer_received_{entity_id}")
                     reply_markup = kb.as_markup()
 
-                # Try to EDIT existing message first (live status update)
-                # This reduces spam - customer sees ONE message that updates
-                existing_message_id = None
-                if isinstance(entity, dict):
-                    existing_message_id = entity.get("customer_message_id")
-                else:
-                    existing_message_id = getattr(entity, "customer_message_id", None)
+                if self.telegram_order_notifications:
+                    # Try to EDIT existing message first (live status update)
+                    # This reduces spam - customer sees ONE message that updates
+                    existing_message_id = None
+                    if isinstance(entity, dict):
+                        existing_message_id = entity.get("customer_message_id")
+                    else:
+                        existing_message_id = getattr(entity, "customer_message_id", None)
 
-                message_sent = None
-                edit_success = False
+                    message_sent = None
+                    edit_success = False
 
-                if existing_message_id:
-                    logger.info(
-                        f"Trying to edit message {existing_message_id} for #{entity_id}"
-                    )
-
-                    # Try BOTH methods - caption first (for photos), then text
-                    # Because we don't know if original message had photo or not
-
-                    # Method 1: Try edit_message_caption (for messages with photo)
-                    try:
-                        await self.bot.edit_message_caption(
-                            chat_id=user_id,
-                            message_id=existing_message_id,
-                            caption=msg,
-                            parse_mode="HTML",
-                            reply_markup=reply_markup,
+                    if existing_message_id:
+                        logger.info(
+                            f"Trying to edit message {existing_message_id} for #{entity_id}"
                         )
-                        edit_success = True
-                        logger.info(f"✅ Edited CAPTION for {entity_type}#{entity_id}")
-                    except Exception as caption_error:
-                        logger.debug(f"Caption edit failed: {caption_error}")
 
-                        # Method 2: Try edit_message_text (for text-only messages)
+                        # Try BOTH methods - caption first (for photos), then text
+                        # Because we don't know if original message had photo or not
+
+                        # Method 1: Try edit_message_caption (for messages with photo)
                         try:
-                            await self.bot.edit_message_text(
+                            await self.bot.edit_message_caption(
                                 chat_id=user_id,
                                 message_id=existing_message_id,
-                                text=msg,
+                                caption=msg,
                                 parse_mode="HTML",
                                 reply_markup=reply_markup,
                             )
                             edit_success = True
-                            logger.info(f"✅ Edited TEXT for {entity_type}#{entity_id}")
-                        except Exception as text_error:
-                            logger.warning(
-                                f"❌ Both edit methods failed for {entity_type}#{entity_id}: caption={caption_error}, text={text_error}"
-                            )
+                            logger.info(f"✅ Edited CAPTION for {entity_type}#{entity_id}")
+                        except Exception as caption_error:
+                            logger.debug(f"Caption edit failed: {caption_error}")
 
-                if not edit_success:
-                    # Send new message only if edit failed or no existing message
-                    try:
-                        message_sent = await self.bot.send_message(
-                            user_id, msg, parse_mode="HTML", reply_markup=reply_markup
-                        )
-                        logger.info(f"📤 Sent NEW message for {entity_type}#{entity_id}")
-                        # Save message_id for future edits - ALWAYS save to maintain live update chain
-                        if message_sent:
-                            if entity_type == "order" and hasattr(
-                                self.db, "set_order_customer_message_id"
-                            ):
-                                self.db.set_order_customer_message_id(
-                                    entity_id, message_sent.message_id
+                            # Method 2: Try edit_message_text (for text-only messages)
+                            try:
+                                await self.bot.edit_message_text(
+                                    chat_id=user_id,
+                                    message_id=existing_message_id,
+                                    text=msg,
+                                    parse_mode="HTML",
+                                    reply_markup=reply_markup,
                                 )
-                                logger.info(
-                                    f"💾 Saved message_id={message_sent.message_id} for order#{entity_id}"
+                                edit_success = True
+                                logger.info(f"✅ Edited TEXT for {entity_type}#{entity_id}")
+                            except Exception as text_error:
+                                logger.warning(
+                                    f"❌ Both edit methods failed for {entity_type}#{entity_id}: caption={caption_error}, text={text_error}"
                                 )
-                            elif entity_type == "booking" and hasattr(
-                                self.db, "set_booking_customer_message_id"
-                            ):
-                                self.db.set_booking_customer_message_id(
-                                    entity_id, message_sent.message_id
-                                )
-                                logger.info(
-                                    f"💾 Saved message_id={message_sent.message_id} for booking#{entity_id}"
-                                )
-                    except Exception as e:
-                        logger.error(f"Failed to notify customer {user_id}: {e}")
+
+                    if not edit_success:
+                        # Send new message only if edit failed or no existing message
+                        try:
+                            message_sent = await self.bot.send_message(
+                                user_id, msg, parse_mode="HTML", reply_markup=reply_markup
+                            )
+                            logger.info(f"📤 Sent NEW message for {entity_type}#{entity_id}")
+                            # Save message_id for future edits - ALWAYS save to maintain live update chain
+                            if message_sent:
+                                if entity_type == "order" and hasattr(
+                                    self.db, "set_order_customer_message_id"
+                                ):
+                                    self.db.set_order_customer_message_id(
+                                        entity_id, message_sent.message_id
+                                    )
+                                    logger.info(
+                                        f"💾 Saved message_id={message_sent.message_id} for order#{entity_id}"
+                                    )
+                                elif entity_type == "booking" and hasattr(
+                                    self.db, "set_booking_customer_message_id"
+                                ):
+                                    self.db.set_booking_customer_message_id(
+                                        entity_id, message_sent.message_id
+                                    )
+                                    logger.info(
+                                        f"💾 Saved message_id={message_sent.message_id} for booking#{entity_id}"
+                                    )
+                        except Exception as e:
+                            logger.error(f"Failed to notify customer {user_id}: {e}")
 
             logger.info(f"STATUS_UPDATE: #{entity_id} -> {target_status}")
             return True

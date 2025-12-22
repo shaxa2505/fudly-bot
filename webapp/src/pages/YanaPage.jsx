@@ -126,6 +126,11 @@ function YanaPage() {
     ws.onmessage = (event) => {
       try {
         const data = JSON.parse(event.data)
+        if (data.type === 'order_status_changed' || data.type === 'order_created') {
+          loadOrders()
+          return
+        }
+
         if (data.type !== 'notification' || !data.payload) return
 
         const newItem = {

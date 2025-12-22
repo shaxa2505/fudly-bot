@@ -39,8 +39,13 @@ def set_orders_db(db, bot_token: str | None = None):
 
 def get_bot() -> Bot:
     """Dependency to get bot instance for Telegram operations."""
+    global _bot_instance
     if _bot_instance is None:
-        raise HTTPException(status_code=500, detail="Bot not configured")
+        token = os.getenv("TELEGRAM_BOT_TOKEN")
+        if token:
+            _bot_instance = Bot(token)
+        else:
+            raise HTTPException(status_code=500, detail="Bot not configured")
     return _bot_instance
 
 

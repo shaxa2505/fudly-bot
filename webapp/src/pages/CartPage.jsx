@@ -522,18 +522,18 @@ function CartPage({ user }) {
             <div className="sheet-handle" aria-hidden="true"></div>
             <div className="modal-header">
               <div className="modal-header-main">
+                <button
+                  className="modal-back"
+                  onClick={closeCheckout}
+                  type="button"
+                  aria-label="Orqaga"
+                >
+                  <ArrowLeft size={18} strokeWidth={2} aria-hidden="true" />
+                </button>
                 <h2>
                   {checkoutStep === 'details' && (orderType === 'delivery' ? 'Yetkazib berish' : 'Olib ketish')}
                   {checkoutStep === 'payment' && 'To\'lov'}
                 </h2>
-                <button
-                  className="modal-close"
-                  onClick={closeCheckout}
-                  type="button"
-                  aria-label="Yopish"
-                >
-                  <X size={18} strokeWidth={2} aria-hidden="true" />
-                </button>
               </div>
             </div>
 

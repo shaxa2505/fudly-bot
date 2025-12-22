@@ -381,6 +381,20 @@
   justify-content: space-between;
 }
 
+.modal-back {
+  width: 32px;
+  height: 32px;
+  border-radius: 10px;
+  background: #F2F4F7;
+  border: none;
+  color: #6B7280;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+}
+
 .modal-header h2 {
   font-size: 18px;
   font-weight: 700;
