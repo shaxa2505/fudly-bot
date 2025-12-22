@@ -503,6 +503,85 @@ async def get_orders(db=Depends(get_db), user: dict = Depends(get_current_user))
                     bookings.append(booking)
         except Exception as e:
             logger.warning(f"Webapp get_orders failed to fetch bookings: {e}")
+            raw_bookings = []
+
+    if not bookings and hasattr(db, "get_connection"):
+        try:
+            with db.get_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute(
+                    """
+                    SELECT
+                        b.booking_id,
+                        b.offer_id,
+                        b.user_id,
+                        b.status,
+                        b.booking_code,
+                        b.pickup_time,
+                        COALESCE(b.quantity, 1) as quantity,
+                        b.created_at,
+                        COALESCE(o.title, 'Tovar') as title,
+                        COALESCE(o.discount_price, 0) as discount_price,
+                        o.available_until,
+                        COALESCE(s.name, 'Dokon') as name,
+                        COALESCE(s.address, '') as address,
+                        s.city
+                    FROM bookings_archive b
+                    LEFT JOIN offers o ON b.offer_id = o.offer_id
+                    LEFT JOIN stores s ON o.store_id = s.store_id
+                    WHERE b.user_id = %s
+                    ORDER BY b.created_at DESC
+                    """,
+                    (int(user_id),),
+                )
+                raw_bookings = cursor.fetchall() or []
+        except Exception as e:
+            logger.warning(f"Webapp get_orders fallback bookings_archive failed: {e}")
+            raw_bookings = []
+
+        for b in raw_bookings:
+            if isinstance(b, tuple):
+                offer_photo = None
+                if len(b) > 1 and b[1] and hasattr(db, "get_offer"):
+                    try:
+                        offer = db.get_offer(b[1])
+                        if offer:
+                            offer_photo = get_val(offer, "photo") or get_val(
+                                offer, "photo_id"
+                            )
+                    except Exception:
+                        pass
+
+                bookings.append(
+                    {
+                        "booking_id": b[0] if len(b) > 0 else None,
+                        "offer_id": b[1] if len(b) > 1 else None,
+                        "user_id": b[2] if len(b) > 2 else None,
+                        "status": _normalize_order_status(
+                            b[3] if len(b) > 3 else "pending"
+                        ),
+                        "booking_code": b[4] if len(b) > 4 else None,
+                        "pickup_time": str(b[5]) if len(b) > 5 and b[5] else None,
+                        "quantity": b[6] if len(b) > 6 else 1,
+                        "created_at": str(b[7]) if len(b) > 7 and b[7] else None,
+                        "offer_title": b[8] if len(b) > 8 else None,
+                        "total_price": (b[9] or 0) * (b[6] or 1) if len(b) > 9 else 0,
+                        "store_name": b[11] if len(b) > 11 else None,
+                        "store_address": b[12] if len(b) > 12 else None,
+                        "offer_photo": offer_photo,
+                    }
+                )
+            elif isinstance(b, dict):
+                booking = {}
+                for key, value in b.items():
+                    if hasattr(value, "isoformat"):
+                        booking[key] = value.isoformat()
+                    else:
+                        booking[key] = value
+                booking["status"] = _normalize_order_status(
+                    booking.get("status") or "pending"
+                )
+                bookings.append(booking)
 
     return {"bookings": bookings, "orders": orders}
 
