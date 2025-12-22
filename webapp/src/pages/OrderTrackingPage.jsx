@@ -130,12 +130,19 @@ function OrderTrackingPage({ user }) {
   if (error || !order) {
     return (
       <div className="order-tracking-page">
+        <div className="tracking-header">
+          <button
+            onClick={() => navigate('/profile')}
+            className="app-back-btn"
+            aria-label={t('?????', 'Orqaga')}
+          >
+            <ArrowLeft size={20} strokeWidth={2} />
+          </button>
+          <h1>{t('?????', 'Buyurtma')}</h1>
+        </div>
         <div className="error-container">
           <p className="error-icon">!</p>
           <p className="error-message">{error || t('Заказ не найден', 'Buyurtma topilmadi')}</p>
-          <button onClick={() => navigate('/profile')} className="btn-primary back-btn">
-            {t('Вернуться', 'Qaytish')}
-          </button>
         </div>
       </div>
     );

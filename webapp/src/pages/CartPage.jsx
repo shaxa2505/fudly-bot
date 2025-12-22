@@ -541,6 +541,7 @@ function CartPage({ user }) {
                   {checkoutStep === 'details' && (orderType === 'delivery' ? 'Yetkazib berish' : 'Olib ketish')}
                   {checkoutStep === 'payment' && 'To\'lov'}
                 </h2>
+                <div className="modal-spacer" aria-hidden="true"></div>
               </div>
             </div>
 

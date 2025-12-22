@@ -46,6 +46,8 @@ class SchemaMixin:
                     owner_id BIGINT,
                     name TEXT NOT NULL,
                     city TEXT NOT NULL,
+                    region TEXT,
+                    district TEXT,
                     address TEXT,
                     description TEXT,
                     category TEXT DEFAULT 'Ресторан',
@@ -100,6 +102,12 @@ class SchemaMixin:
                 cursor.execute("ALTER TABLE stores ADD COLUMN IF NOT EXISTS photo TEXT")
             except Exception as e:
                 logger.warning(f"Migration for stores photo column: {e}")
+            # Migration: Add region/district columns to stores table if they don't exist
+            try:
+                cursor.execute("ALTER TABLE stores ADD COLUMN IF NOT EXISTS region TEXT")
+                cursor.execute("ALTER TABLE stores ADD COLUMN IF NOT EXISTS district TEXT")
+            except Exception as e:
+                logger.warning(f"Migration for stores region/district columns: {e}")
 
             # Orders table
             cursor.execute(
@@ -465,6 +473,8 @@ class SchemaMixin:
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_stores_status ON stores(status)")
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_stores_city ON stores(city)")
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_stores_city_status ON stores(city, status)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_stores_region ON stores(region)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_stores_district ON stores(district)")
 
         # Offer indexes - critical for browsing/search performance
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_offers_store ON offers(store_id)")

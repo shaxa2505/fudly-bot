@@ -13,6 +13,7 @@ from typing import Optional
 from weakref import WeakSet
 
 from aiohttp import WSMsgType, web
+from aiohttp.client_exceptions import ClientConnectionResetError
 
 from app.core.notifications import (
     Notification,
@@ -226,7 +227,10 @@ async def websocket_handler(request: web.Request) -> web.WebSocketResponse:
     - Server sends: notification, pong, connected, error
     """
     ws = web.WebSocketResponse(heartbeat=30)
-    await ws.prepare(request)
+    try:
+        await ws.prepare(request)
+    except ClientConnectionResetError:
+        return ws
 
     manager = WebSocketManager.get_instance()
 
@@ -268,7 +272,10 @@ async def websocket_handler(request: web.Request) -> web.WebSocketResponse:
         logger.error(f"WebSocket handler error: {e}")
 
     finally:
-        await manager._disconnect(client)
+        try:
+            await manager._disconnect(client)
+        except ClientConnectionResetError:
+            pass
 
     return ws
 

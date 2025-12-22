@@ -374,6 +374,11 @@
   margin: 0;
 }
 
+.modal-spacer {
+  width: 36px;
+  height: 36px;
+}
+
 .modal-close {
   width: 32px;
   height: 32px;

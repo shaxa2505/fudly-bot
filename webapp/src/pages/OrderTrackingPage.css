@@ -63,10 +63,6 @@
   margin-bottom: var(--spacing-2xl);
 }
 
-.back-btn {
-  width: min(100%, 320px);
-}
-
 /* Order Status Card */
 .order-status-card {
   background: var(--color-bg-primary);
