@@ -540,6 +540,40 @@ async def create_product(
     user, store = get_partner_with_store(telegram_id)
     db = get_db()
 
+    payload = await _load_json_payload(request)
+    title = title or payload.get("title") or payload.get("name")
+    category = category or payload.get("category") or "other"
+    original_price = _maybe_int(
+        original_price if original_price is not None else payload.get("original_price")
+        or payload.get("price"),
+        "original_price",
+    )
+    discount_price = _maybe_int(
+        discount_price if discount_price is not None else payload.get("discount_price"),
+        "discount_price",
+    )
+    payload_quantity = payload.get("quantity")
+    if payload_quantity is None:
+        payload_quantity = payload.get("stock")
+    quantity = _maybe_int(quantity if quantity is not None else payload_quantity, "quantity")
+    stock_quantity = _maybe_int(
+        stock_quantity if stock_quantity is not None else payload.get("stock_quantity"),
+        "stock_quantity",
+    )
+    unit = unit or payload.get("unit") or "шт"
+    expiry_date = expiry_date or payload.get("expiry_date")
+    description = description or payload.get("description")
+    photo_id = photo_id or payload.get("photo_id")
+
+    if not title or original_price is None or quantity is None:
+        raise HTTPException(
+            status_code=400,
+            detail="Missing required fields: title, original_price, quantity",
+        )
+
+    if discount_price is None:
+        discount_price = original_price
+
     # Use stock_quantity if provided, otherwise use quantity
     actual_stock = stock_quantity if stock_quantity is not None else quantity
 
@@ -648,6 +682,33 @@ async def update_product(
     offer = db.get_offer(product_id)
     if not offer or offer.get("store_id") != store["store_id"]:
         raise HTTPException(status_code=404, detail="Product not found")
+
+    payload = await _load_json_payload(request)
+    if title is None:
+        title = payload.get("title") or payload.get("name")
+    if category is None:
+        category = payload.get("category")
+    if original_price is None:
+        original_price = _maybe_int(payload.get("original_price"), "original_price")
+    if discount_price is None:
+        discount_price = _maybe_int(payload.get("discount_price"), "discount_price")
+    if quantity is None:
+        payload_quantity = payload.get("quantity")
+        if payload_quantity is None:
+            payload_quantity = payload.get("stock")
+        quantity = _maybe_int(payload_quantity, "quantity")
+    if stock_quantity is None:
+        stock_quantity = _maybe_int(payload.get("stock_quantity"), "stock_quantity")
+    if unit is None:
+        unit = payload.get("unit")
+    if expiry_date is None:
+        expiry_date = payload.get("expiry_date")
+    if description is None:
+        description = payload.get("description")
+    if photo_id is None:
+        photo_id = payload.get("photo_id")
+    if status is None:
+        status = payload.get("status")
 
     # Build update dynamically for partial updates
     update_fields = []
