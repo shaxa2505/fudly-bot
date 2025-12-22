@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Apple, Droplet, Beef, Croissant, Milk, Coffee, Search } from 'lucide-react'
 import BottomNav from '../components/BottomNav'
+import { blurOnEnter } from '../utils/helpers'
 import './ExplorePage.css'
 
 const CATEGORIES = [
@@ -93,6 +94,7 @@ function ExplorePage({ onNavigate }) {
             placeholder="Do'kon qidirish"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
+            onKeyDown={blurOnEnter}
           />
         </div>
       </div>

@@ -10,8 +10,8 @@ import HeroBanner from '../components/HeroBanner'
 import FlashDeals from '../components/FlashDeals'
 import BottomNav from '../components/BottomNav'
 import PullToRefresh from '../components/PullToRefresh'
-import RecentlyViewed from '../components/RecentlyViewed'
 import { usePullToRefresh } from '../hooks/usePullToRefresh'
+import { blurOnEnter } from '../utils/helpers'
 import './HomePage.css'
 
 const CATEGORIES = [
@@ -511,7 +511,7 @@ function HomePage() {
             onChange={(e) => setSearchQuery(e.target.value)}
             onFocus={() => setShowSearchHistory(true)}
             onBlur={() => setTimeout(() => setShowSearchHistory(false), 200)}
-            onKeyDown={(e) => e.key === 'Enter' && handleSearchSubmit()}
+            onKeyDown={(e) => blurOnEnter(e, handleSearchSubmit)}
           />
           {searchQuery && (
             <button
@@ -549,47 +549,6 @@ function HomePage() {
           )}
         </div>
       </header>
-
-      {/* Quick Actions */}
-      <div className="quick-actions">
-        <button className="quick-action" onClick={() => navigate('/profile')}>
-          <div className="quick-action-icon">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
-              <path d="M17 1l4 4-4 4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-              <path d="M3 11V9a4 4 0 0 1 4-4h14" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-              <path d="M7 23l-4-4 4-4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-              <path d="M21 13v2a4 4 0 0 1-4 4H3" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-            </svg>
-          </div>
-          <span className="quick-action-text">Takrorlash</span>
-        </button>
-        <button className="quick-action" onClick={() => navigate('/favorites')}>
-          <div className="quick-action-icon accent">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
-              <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-            </svg>
-          </div>
-          <span className="quick-action-text">Sevimlilar</span>
-        </button>
-        <button className="quick-action" onClick={() => navigate('/profile')}>
-          <div className="quick-action-icon purple">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
-              <rect x="2" y="3" width="20" height="14" rx="2" stroke="currentColor" strokeWidth="2"/>
-              <path d="M8 21h8M12 17v4" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
-            </svg>
-          </div>
-          <span className="quick-action-text">Buyurtmalar</span>
-        </button>
-        <button className="quick-action" onClick={() => navigate('/cart')}>
-          <div className="quick-action-icon orange">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
-              <path d="M9 22a1 1 0 1 0 0-2 1 1 0 0 0 0 2zM20 22a1 1 0 1 0 0-2 1 1 0 0 0 0 2z" stroke="currentColor" strokeWidth="2"/>
-              <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-            </svg>
-          </div>
-          <span className="quick-action-text">Savat</span>
-        </button>
-      </div>
 
       {/* Hero Banner Carousel */}
       <HeroBanner onCategorySelect={(category) => {
@@ -733,11 +692,6 @@ function HomePage() {
         </div>
       </div>
 
-      {/* Recently Viewed - Show only on home without search */}
-      {selectedCategory === 'all' && !searchQuery && (
-        <RecentlyViewed />
-      )}
-
       {/* Section Title */}
       <div className="section-header">
         <h2 className="section-title">
@@ -855,6 +809,7 @@ function HomePage() {
                 type="text"
                 value={manualCity}
                 onChange={(e) => setManualCity(e.target.value)}
+                onKeyDown={blurOnEnter}
                 className="address-input"
                 placeholder="Masalan, Toshkent, O'zbekiston"
               />
@@ -864,6 +819,7 @@ function HomePage() {
               <textarea
                 value={manualAddress}
                 onChange={(e) => setManualAddress(e.target.value)}
+                onKeyDown={blurOnEnter}
                 className="address-textarea"
                 placeholder="Ko'cha, uy, blok, mo'ljal"
               />

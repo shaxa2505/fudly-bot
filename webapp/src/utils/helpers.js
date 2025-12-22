@@ -101,11 +101,14 @@ export const truncateText = (text, maxLength) => {
   return text.substr(0, maxLength) + '...'
 }
 
-export const blurOnEnter = (event) => {
-  if (event?.key === 'Enter') {
-    event.preventDefault()
-    event.currentTarget?.blur()
+export const blurOnEnter = (event, onEnter) => {
+  if (event?.key !== 'Enter' || event.shiftKey) {
+    return
   }
+
+  event.preventDefault()
+  event.currentTarget?.blur?.()
+  onEnter?.()
 }
 
 // Получение инициалов

@@ -4,7 +4,7 @@ import { ShoppingCart, Home, Sparkles } from 'lucide-react'
 import api from '../api/client'
 import { useCart } from '../context/CartContext'
 import { useToast } from '../context/ToastContext'
-import { getUnitLabel } from '../utils/helpers'
+import { getUnitLabel, blurOnEnter } from '../utils/helpers'
 import BottomNav from '../components/BottomNav'
 import './CartPage.css'
 
@@ -527,6 +527,7 @@ function CartPage({ user }) {
                       placeholder="+998 90 123 45 67"
                       value={phone}
                       onChange={e => setPhone(e.target.value)}
+                      onKeyDown={blurOnEnter}
                     />
                   </label>
 
@@ -538,6 +539,7 @@ function CartPage({ user }) {
                         placeholder="Shahar, ko'cha, uy raqami, mo'ljal..."
                         value={address}
                         onChange={e => setAddress(e.target.value)}
+                        onKeyDown={blurOnEnter}
                       />
                     </label>
                   )}
@@ -549,6 +551,7 @@ function CartPage({ user }) {
                       placeholder="Qo'shimcha ma'lumot..."
                       value={comment}
                       onChange={e => setComment(e.target.value)}
+                      onKeyDown={blurOnEnter}
                     />
                   </label>
 

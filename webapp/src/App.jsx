@@ -27,6 +27,29 @@ function AppContent() {
   const [user, setUser] = useState({ id: 1, first_name: 'Guest', username: 'guest' })
   const [loading, setLoading] = useState(true)
 
+  // In Telegram WebApp on mobile, pressing "Enter/Done" often doesn't dismiss the keyboard.
+  // Blurring the focused input/textarea fixes it without needing per-input wiring everywhere.
+  useEffect(() => {
+    const handleKeyDown = (event) => {
+      if (event.key !== 'Enter' || event.shiftKey) {
+        return
+      }
+
+      const target = event.target
+      if (!target || typeof target.blur !== 'function') {
+        return
+      }
+
+      const tagName = target.tagName
+      if (tagName === 'INPUT' || tagName === 'TEXTAREA') {
+        target.blur()
+      }
+    }
+
+    document.addEventListener('keydown', handleKeyDown)
+    return () => document.removeEventListener('keydown', handleKeyDown)
+  }, [])
+
   useEffect(() => {
     initializeApp()
   }, [])

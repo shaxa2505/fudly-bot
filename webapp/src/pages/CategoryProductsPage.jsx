@@ -4,6 +4,7 @@ import api from '../api/client'
 import { useCart } from '../context/CartContext'
 import OfferCard from '../components/OfferCard'
 import FilterPanel, { FILTER_CATEGORY_OPTIONS, FILTER_BRAND_OPTIONS } from '../components/FilterPanel'
+import { blurOnEnter } from '../utils/helpers'
 import './CategoryProductsPage.css'
 
 function CategoryProductsPage() {
@@ -65,11 +66,7 @@ function CategoryProductsPage() {
     setTimeout(() => loadOffers(), 0)
   }
 
-  const handleSearchKeyPress = (e) => {
-    if (e.key === 'Enter') {
-      handleSearch()
-    }
-  }
+  const handleSearchKeyDown = (event) => blurOnEnter(event, handleSearch)
 
   const handleApplyFilters = (filters) => {
     setSelectedFilters(filters)
@@ -181,7 +178,7 @@ function CategoryProductsPage() {
             placeholder="Qidirish"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            onKeyPress={handleSearchKeyPress}
+            onKeyDown={handleSearchKeyDown}
           />
           {searchQuery && (
             <button className="clear-search-btn" onClick={handleClearSearch}>

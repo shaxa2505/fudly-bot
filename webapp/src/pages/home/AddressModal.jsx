@@ -1,3 +1,5 @@
+import { blurOnEnter } from '../../utils/helpers'
+
 const AddressModal = ({
   isOpen,
   onClose,
@@ -46,6 +48,7 @@ const AddressModal = ({
             type="text"
             value={manualCity}
             onChange={(event) => onCityChange(event.target.value)}
+            onKeyDown={blurOnEnter}
             className="address-input"
             placeholder="Masalan, Toshkent, O'zbekiston"
           />
@@ -55,6 +58,7 @@ const AddressModal = ({
           <textarea
             value={manualAddress}
             onChange={(event) => onAddressChange(event.target.value)}
+            onKeyDown={blurOnEnter}
             className="address-textarea"
             placeholder="Ko'cha, uy, blok, mo'ljal"
           />

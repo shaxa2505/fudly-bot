@@ -1,3 +1,5 @@
+import { blurOnEnter } from '../../utils/helpers'
+
 const HomeHeader = ({
   city,
   isScrolled,
@@ -18,9 +20,7 @@ const HomeHeader = ({
   onRetryLoad,
 }) => {
   const handleSearchKeyDown = (event) => {
-    if (event.key === 'Enter') {
-      onSubmitSearch()
-    }
+    blurOnEnter(event, onSubmitSearch)
   }
 
   return (
@@ -78,7 +78,7 @@ const HomeHeader = ({
         )}
         {searchQuery && (
           <button className="search-clear" onClick={() => onSearchChange('')}>
-            ✕
+            x
           </button>
         )}
 
