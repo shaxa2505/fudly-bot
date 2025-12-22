@@ -26,6 +26,22 @@
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
   /* No transitions - prevents jank */
+  overflow: hidden;
+  transition:
+    transform 0.22s ease,
+    height 0.22s ease,
+    padding 0.22s ease,
+    box-shadow 0.22s ease,
+    border-color 0.22s ease;
+}
+
+.header.is-hidden {
+  height: 0;
+  padding: 0 var(--app-header-padding-x);
+  border-color: transparent;
+  box-shadow: none;
+  transform: translateY(-100%);
+  pointer-events: none;
 }
 
 .header-top {
@@ -104,6 +120,11 @@
   box-shadow: 0 14px 28px rgba(16, 24, 40, 0.06);
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
+  transition: top 0.22s ease;
+}
+
+.home-page.topbar-hidden .home-subheader {
+  top: 0;
 }
 
 .header-action-btn {

@@ -23,6 +23,22 @@
   border-bottom: 1px solid rgba(15, 118, 110, 0.12);
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
+  overflow: hidden;
+  transition:
+    transform 0.22s ease,
+    height 0.22s ease,
+    padding 0.22s ease,
+    box-shadow 0.22s ease,
+    border-color 0.22s ease;
+}
+
+.sp-topbar.is-hidden {
+  height: 0;
+  padding: 0 var(--app-header-padding-x);
+  border-color: transparent;
+  box-shadow: none;
+  transform: translateY(-100%);
+  pointer-events: none;
 }
 
 .sp-topbar-inner {
@@ -59,6 +75,11 @@
   border-bottom: 1px solid rgba(15, 118, 110, 0.12);
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
+  transition: top 0.22s ease;
+}
+
+.sp.topbar-hidden .sp-subheader {
+  top: 0;
 }
 
 .sp-search {

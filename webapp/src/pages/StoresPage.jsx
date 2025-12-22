@@ -22,6 +22,7 @@ const BUSINESS_TYPES = [
 function StoresPage() {
   const navigate = useNavigate()
   const { cartCount } = useCart()
+  const [topbarHidden, setTopbarHidden] = useState(false)
 
   const [stores, setStores] = useState([])
   const [loading, setLoading] = useState(true)
@@ -49,6 +50,42 @@ function StoresPage() {
       setUserLocation(savedGeo)
     }
   }, [selectedType, cityRaw])
+
+  // Hide topbar on scroll-down (Lavka-like): keep search pinned, show topbar on scroll-up.
+  useEffect(() => {
+    const lastYRef = { current: window.scrollY || 0 }
+    let rafId = 0
+
+    const apply = () => {
+      rafId = 0
+      const y = window.scrollY || 0
+      const lastY = lastYRef.current
+      const delta = y - lastY
+      lastYRef.current = y
+
+      if (y <= 8) {
+        setTopbarHidden(false)
+        return
+      }
+
+      if (delta > 10 && y > 80) {
+        setTopbarHidden(true)
+      } else if (delta < -10) {
+        setTopbarHidden(false)
+      }
+    }
+
+    const onScroll = () => {
+      if (rafId) return
+      rafId = window.requestAnimationFrame(apply)
+    }
+
+    window.addEventListener('scroll', onScroll, { passive: true })
+    return () => {
+      window.removeEventListener('scroll', onScroll)
+      if (rafId) window.cancelAnimationFrame(rafId)
+    }
+  }, [])
 
   const loadStores = async () => {
     setLoading(true)
@@ -148,9 +185,9 @@ function StoresPage() {
   }
 
   return (
-    <div className="sp">
+    <div className={`sp ${topbarHidden ? 'topbar-hidden' : ''}`}>
       {/* Topbar */}
-      <header className="sp-topbar">
+      <header className={`sp-topbar ${topbarHidden ? 'is-hidden' : ''}`}>
         <div className="sp-topbar-inner">
           <h1 className="sp-title">Do'konlar</h1>
           <span className="sp-city">Shahar: {cityLatin}</span>

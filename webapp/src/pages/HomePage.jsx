@@ -33,6 +33,7 @@ const CATEGORY_ALIASES = {
 
 function HomePage() {
   const navigate = useNavigate()
+  const [topbarHidden, setTopbarHidden] = useState(false)
   const [offers, setOffers] = useState([])
   const [loading, setLoading] = useState(false)
   const [selectedCategory, setSelectedCategory] = useState('all')
@@ -77,6 +78,43 @@ function HomePage() {
   const activeFiltersCount = [minDiscount, priceRange !== 'all', sortBy !== 'default']
     .filter(Boolean)
     .length
+
+  // Hide topbar on scroll-down (Lavka-like): keep search pinned, show topbar on scroll-up.
+  useEffect(() => {
+    const lastYRef = { current: window.scrollY || 0 }
+    let rafId = 0
+
+    const apply = () => {
+      rafId = 0
+      const y = window.scrollY || 0
+      const lastY = lastYRef.current
+      const delta = y - lastY
+      lastYRef.current = y
+
+      if (y <= 8) {
+        setTopbarHidden(false)
+        return
+      }
+
+      // Small deadzone to prevent flicker.
+      if (delta > 10 && y > 80) {
+        setTopbarHidden(true)
+      } else if (delta < -10) {
+        setTopbarHidden(false)
+      }
+    }
+
+    const onScroll = () => {
+      if (rafId) return
+      rafId = window.requestAnimationFrame(apply)
+    }
+
+    window.addEventListener('scroll', onScroll, { passive: true })
+    return () => {
+      window.removeEventListener('scroll', onScroll)
+      if (rafId) window.cancelAnimationFrame(rafId)
+    }
+  }, [])
 
   // Извлекаем название города для API (без страны) и транслитерируем в кириллицу
   const cityRaw = location.city
@@ -479,7 +517,7 @@ function HomePage() {
   // Cart functions now come from useCart() hook
 
   return (
-    <div className="home-page">
+    <div className={`home-page ${topbarHidden ? 'topbar-hidden' : ''}`}>
       {/* Pull-to-Refresh */}
       <PullToRefresh
         isRefreshing={isRefreshing}
@@ -488,7 +526,7 @@ function HomePage() {
       />
 
       {/* Header */}
-      <header className="header">
+      <header className={`header ${topbarHidden ? 'is-hidden' : ''}`}>
         <div className="header-top">
           <button className="header-location" onClick={openAddressModal}>
             <div className="header-location-icon">
