@@ -37,7 +37,7 @@ function QuantityControl({
         disabled={disableDecrement}
         aria-label={decrementLabel}
       >
-        −
+        -
       </button>
       <span className="quantity-control__value" aria-live="polite">
         {value}
