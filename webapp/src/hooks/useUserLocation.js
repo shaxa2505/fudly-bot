@@ -7,6 +7,7 @@ const DEFAULT_LOCATION = {
   address: '',
   coordinates: null,
   region: '',
+  district: '',
 };
 
 /**
@@ -52,7 +53,8 @@ export function useUserLocation() {
       const data = await response.json();
 
       const city = data.address?.city || data.address?.town || data.address?.village || '';
-      const state = data.address?.state || '';
+      const state = data.address?.state || data.address?.region || '';
+      const district = data.address?.county || data.address?.city_district || data.address?.suburb || '';
       const primaryCity = city || state || 'Toshkent';
       const normalizedCity = primaryCity.includes("O'zbekiston")
         ? primaryCity
@@ -63,6 +65,7 @@ export function useUserLocation() {
         address: data.display_name || '',
         coordinates: { lat, lon },
         region: state,
+        district,
       });
 
       setError('');
@@ -139,6 +142,7 @@ export function useUserLocation() {
       address: newAddress.trim(),
       coordinates: newAddress.trim() ? prev.coordinates : null,
       region: prev.region,
+      district: prev.district,
     }));
     setError('');
   }, []);

@@ -69,6 +69,8 @@ class StoreResponse(BaseModel):
     name: str
     address: str | None = None
     city: str | None = None
+    region: str | None = None
+    district: str | None = None
     business_type: str
     rating: float = 0.0
     offers_count: int = 0

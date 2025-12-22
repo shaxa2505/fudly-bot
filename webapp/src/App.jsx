@@ -70,6 +70,9 @@ function AppContent() {
 
       // Get user from Telegram
       const tgUser = tg.initDataUnsafe?.user
+      if (tg.initData) {
+        localStorage.setItem('fudly_init_data', tg.initData)
+      }
       if (tgUser) {
         const userData = {
           id: tgUser.id,

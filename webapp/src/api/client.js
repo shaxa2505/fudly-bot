@@ -27,8 +27,11 @@ const client = axios.create({
 
 // Add auth header
 client.interceptors.request.use((config) => {
-  if (window.Telegram?.WebApp?.initData) {
-    config.headers['X-Telegram-Init-Data'] = window.Telegram.WebApp.initData
+  const initData =
+    window.Telegram?.WebApp?.initData ||
+    localStorage.getItem('fudly_init_data')
+  if (initData) {
+    config.headers['X-Telegram-Init-Data'] = initData
   }
   config.__retryCount = config.__retryCount || 0
   return config

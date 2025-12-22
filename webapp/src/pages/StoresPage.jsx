@@ -41,6 +41,8 @@ function StoresPage() {
   const location = getSavedLocation()
   const cityLatin = getLatinCity(location)
   const cityRaw = getCyrillicCity(location.city)
+  const regionRaw = location.region || ''
+  const districtRaw = location.district || ''
 
   useEffect(() => {
     loadStores()
@@ -49,7 +51,7 @@ function StoresPage() {
     if (savedGeo) {
       setUserLocation(savedGeo)
     }
-  }, [selectedType, cityRaw])
+  }, [selectedType, cityRaw, regionRaw, districtRaw])
 
   // Hide topbar on scroll-down (Lavka-like): keep search pinned, show topbar on scroll-up.
   useEffect(() => {
@@ -91,6 +93,8 @@ function StoresPage() {
     setLoading(true)
     try {
       let params = { city: cityRaw }
+      if (regionRaw) params.region = regionRaw
+      if (districtRaw) params.district = districtRaw
       if (selectedType !== 'all') {
         params.business_type = selectedType
       }

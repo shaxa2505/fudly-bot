@@ -12,6 +12,8 @@ router = APIRouter()
 @router.get("/stores", response_model=list[StoreResponse])
 async def get_stores(
     city: str = Query("Ташкент", description="City to filter by"),
+    region: str | None = Query(None, description="Region filter"),
+    district: str | None = Query(None, description="District filter"),
     business_type: str | None = Query(None, description="Business type filter"),
     db=Depends(get_db),
 ):
@@ -24,7 +26,10 @@ async def get_stores(
                 else []
             )
         else:
-            raw_stores = db.get_stores_by_city(city) if hasattr(db, "get_stores_by_city") else []
+            if hasattr(db, "get_stores_by_location"):
+                raw_stores = db.get_stores_by_location(city=city, region=region, district=district)
+            else:
+                raw_stores = db.get_stores_by_city(city) if hasattr(db, "get_stores_by_city") else []
 
         if not raw_stores:
             raw_stores = []
@@ -37,6 +42,8 @@ async def get_stores(
                     name=get_val(store, "name", ""),
                     address=get_val(store, "address"),
                     city=get_val(store, "city"),
+                    region=get_val(store, "region"),
+                    district=get_val(store, "district"),
                     business_type=get_val(store, "business_type")
                     or get_val(store, "category")
                     or "supermarket",
@@ -87,6 +94,8 @@ async def get_store(store_id: int, db=Depends(get_db)):
             name=get_val(store, "name", ""),
             address=get_val(store, "address"),
             city=get_val(store, "city"),
+            region=get_val(store, "region"),
+            district=get_val(store, "district"),
             business_type=get_val(store, "business_type") or get_val(store, "category") or "supermarket",
             rating=rating,
             offers_count=offers_count,

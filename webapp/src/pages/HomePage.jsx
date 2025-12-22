@@ -162,6 +162,13 @@ function HomePage() {
         params.city = cityForApi
       }
 
+      if (location.region) {
+        params.region = location.region
+      }
+      if (location.district) {
+        params.district = location.district
+      }
+
       const categoryAlias = CATEGORY_ALIASES[selectedCategory]
       if (selectedCategory && selectedCategory !== 'all' && !categoryAlias) {
         params.category = selectedCategory
@@ -278,7 +285,7 @@ function HomePage() {
       loadingRef.current = false
       setLoading(false)
     }
-  }, [selectedCategory, searchQuery, cityForApi, showingAllCities, minDiscount, sortBy, priceRange])
+  }, [selectedCategory, searchQuery, cityForApi, location.region, location.district, showingAllCities, minDiscount, sortBy, priceRange])
 
   // Save search query to history when searching
   const handleSearchSubmit = useCallback(async () => {
@@ -372,7 +379,8 @@ function HomePage() {
       const data = await response.json()
 
       const city = data.address?.city || data.address?.town || data.address?.village || ''
-      const state = data.address?.state || ''
+      const state = data.address?.state || data.address?.region || ''
+      const district = data.address?.county || data.address?.city_district || data.address?.suburb || ''
       const primaryCity = city || state || 'Toshkent'
       const normalizedCity = primaryCity.includes("O'zbekiston") ? primaryCity : `${primaryCity}, O'zbekiston`
 
@@ -380,7 +388,8 @@ function HomePage() {
         city: normalizedCity,
         address: data.display_name || '',
         coordinates: { lat, lon },
-        region: state, // Сохраняем область
+        region: state,
+        district, // Сохраняем область
       })
       setLocationError('')
     } catch (error) {
@@ -417,7 +426,7 @@ function HomePage() {
     }, trimmed ? 500 : 0)
 
     return () => clearTimeout(timer)
-  }, [selectedCategory, searchQuery, cityForApi, minDiscount, sortBy, priceRange, loadOffers])
+  }, [selectedCategory, searchQuery, cityForApi, location.region, location.district, minDiscount, sortBy, priceRange, loadOffers])
 
   // Infinite scroll
   useEffect(() => {
@@ -449,7 +458,8 @@ function HomePage() {
       const data = await response.json()
 
       const city = data.address?.city || data.address?.town || data.address?.village || ''
-      const state = data.address?.state || ''
+      const state = data.address?.state || data.address?.region || ''
+      const district = data.address?.county || data.address?.city_district || data.address?.suburb || ''
       const primaryCity = city || state || 'Toshkent'
       const normalizedCity = primaryCity.includes("O'zbekiston") ? primaryCity : `${primaryCity}, O'zbekiston`
 
@@ -458,6 +468,7 @@ function HomePage() {
         address: data.display_name || '',
         coordinates: { lat, lon },
         region: state,
+        district,
       })
       setLocationError('')
       setShowAddressModal(false) // Закрываем модалку после успешного определения

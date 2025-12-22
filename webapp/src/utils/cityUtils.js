@@ -105,6 +105,8 @@ export const DEFAULT_LOCATION = {
   city: "Toshkent, O'zbekiston",
   address: '',
   coordinates: null,
+  region: '',
+  district: '',
 }
 
 /**

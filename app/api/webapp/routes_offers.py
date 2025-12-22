@@ -80,7 +80,8 @@ def _to_offer_response(offer: Any, store_fallback: dict | None = None) -> OfferR
 
 @router.get("/categories", response_model=list[CategoryResponse])
 async def get_categories(
-    city: str = Query("Toshkent", description="City to filter by"), db=Depends(get_db)
+    city: str = Query("Toshkent", description="City to filter by"),
+    db=Depends(get_db),
 ):
     """Get list of product categories with counts."""
     result: list[CategoryResponse] = []
@@ -139,14 +140,17 @@ async def get_offers(
         elif search:
             raw_offers = db.search_offers(search, city) if hasattr(db, "search_offers") else []
         elif category and category != "all":
-            raw_offers = (
-                db.get_offers_by_category(category, city)
-                if hasattr(db, "get_offers_by_category")
-                else []
-            )
+            if hasattr(db, "get_offers_by_city_and_category"):
+                raw_offers = db.get_offers_by_city_and_category(
+                    city=city, category=category, region=region, district=district
+                )
+            elif hasattr(db, "get_offers_by_category"):
+                raw_offers = db.get_offers_by_category(category, city)
+            else:
+                raw_offers = []
         else:
             raw_offers = (
-                db.get_hot_offers(city, limit=limit, offset=offset)
+                db.get_hot_offers(city, limit=limit, offset=offset, region=region, district=district)
                 if hasattr(db, "get_hot_offers")
                 else []
             )
@@ -273,7 +277,7 @@ async def get_flash_deals(
     """Get flash deals - high discount items expiring soon."""
     try:
         raw_offers = (
-            db.get_hot_offers(city, limit=100, offset=0) if hasattr(db, "get_hot_offers") else []
+            db.get_hot_offers(city, limit=100, offset=0, region=region, district=district) if hasattr(db, "get_hot_offers") else []
         )
 
         if not raw_offers:

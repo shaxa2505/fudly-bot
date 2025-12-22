@@ -86,6 +86,12 @@
         // GLOBALS & STATE
         // ============================================
         const tg = window.Telegram?.WebApp;
+        if (tg) {
+            try {
+                tg.ready();
+                tg.expand();
+            } catch (e) {}
+        }
         const API_BASE = window.location.origin;
 
         const state = {
@@ -104,6 +110,24 @@
             return window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
         }
 
+        function buildInitDataFromUnsafe(unsafeData) {
+            if (!unsafeData || !unsafeData.hash) return '';
+            try {
+                const params = new URLSearchParams();
+                Object.entries(unsafeData).forEach(([key, value]) => {
+                    if (value == null) return;
+                    if (typeof value === 'object') {
+                        params.append(key, JSON.stringify(value));
+                    } else {
+                        params.append(key, String(value));
+                    }
+                });
+                return params.toString();
+            } catch (e) {
+                return '';
+            }
+        }
+
         function getAuth() {
             const urlParams = new URLSearchParams(window.location.search);
             const urlUserId = urlParams.get('uid');
@@ -116,9 +140,26 @@
             if (tg?.initData && tg.initData.length > 0) {
                 finalData = tg.initData;
                 source = 'sdk';
+            } else if (tg?.initDataUnsafe?.hash) {
+                finalData = buildInitDataFromUnsafe(tg.initDataUnsafe);
+                source = 'unsafe';
             } else if (window.location.hash.slice(1) && window.location.hash.slice(1).includes('user=')) {
                 finalData = window.location.hash.slice(1);
                 source = 'hash';
+            }
+
+            if (finalData && source !== 'cache') {
+                try {
+                    localStorage.setItem('partner_init_data', finalData);
+                } catch (e) {}
+            } else if (!finalData) {
+                try {
+                    const cached = localStorage.getItem('partner_init_data');
+                    if (cached) {
+                        finalData = cached;
+                        source = 'cache';
+                    }
+                } catch (e) {}
             }
 
             const tgUser = tg?.initDataUnsafe?.user;
@@ -900,7 +941,7 @@
             } catch (error) {
                 console.error('Status update error:', error);
                 haptic('error');
-                toast('Ошибка обновления', 'error');
+                toast(error?.message || 'Ошибка обновления', 'error');
 
                 // Revert optimistic update
                 if (order && oldStatus) {
@@ -2151,6 +2192,24 @@ async function toggleProductAvailability(id) {
                                     <div class="list-info">
                                         <div class="list-title">Адрес</div>
                                         <div class="list-subtitle">${state.store?.address || 'Не указан'}</div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="list-item">
+                                <div class="list-content">
+                                    <div class="list-info">
+                                        <div class="list-title">Viloyat</div>
+                                        <div class="list-subtitle">${state.store?.region || '-'}</div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="list-item">
+                                <div class="list-content">
+                                    <div class="list-info">
+                                        <div class="list-title">Tuman</div>
+                                        <div class="list-subtitle">${state.store?.district || '-'}</div>
                                     </div>
                                 </div>
                             </div>
