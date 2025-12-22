@@ -110,6 +110,7 @@ def create_api_app(db: Any = None, offer_service: Any = None, bot_token: str = N
         # Telegram WebApp
         "https://web.telegram.org",
         "https://telegram.org",
+        "https://fudly-webapp.vercel.app",
     ]
 
     # Only allow localhost in development
