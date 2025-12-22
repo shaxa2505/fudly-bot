@@ -168,8 +168,12 @@ function YanaPage() {
         return
       }
 
-      // Try to get bookings/orders
-      const bookings = await api.getUserBookings(userId)
+      // Unified orders list from webapp API (orders + bookings)
+      const response = await api.getOrders()
+      const bookings = [
+        ...(response.orders || []),
+        ...(response.bookings || []),
+      ]
 
       // Filter based on selection
       let filtered = bookings
@@ -230,8 +234,16 @@ function YanaPage() {
     const status = order.status || order.order_status
     const createdAt = order.created_at || order.createdAt
     const quantity = order.quantity || items.reduce((sum, item) => sum + Number(item.quantity || 0), 0) || 1
-    const totalPrice = Number(order.total_price ?? order.total_amount ?? 0)
-    const unitPrice = quantity ? Math.round(totalPrice / quantity) : 0
+    const rawTotal = Number(order.total_price ?? order.total_amount ?? order.total ?? 0)
+    const itemsTotal = items.reduce((sum, item) => {
+      const price = Number(item.price ?? item.discount_price ?? 0)
+      const qty = Number(item.quantity ?? 0)
+      return sum + price * qty
+    }, 0)
+    const totalPrice = rawTotal || itemsTotal
+    const unitPrice = quantity
+      ? Math.round((totalPrice || 0) / quantity)
+      : (items[0]?.price ?? items[0]?.discount_price ?? 0)
     const offerTitle =
       order.offer_title ||
       order.title ||
@@ -384,16 +396,12 @@ function YanaPage() {
                         <h3 className="order-title">{summary.offerTitle}</h3>
                         <p className="order-store">Do'kon: {summary.storeName}</p>
                         <div className="order-meta">
-                          <span>
-                            {summary.quantity} x {summary.unitPrice
-                              ? summary.unitPrice.toLocaleString()
-                              : '-'} so'm
-                          </span>
-                          <span className="order-total">
-                            {summary.totalPrice
-                              ? Math.round(summary.totalPrice).toLocaleString()
-                              : '-'} so'm
-                          </span>
+          <span>
+            {summary.quantity} x {Math.round(summary.unitPrice || 0).toLocaleString()} so'm
+          </span>
+          <span className="order-total">
+            {Math.round(summary.totalPrice || 0).toLocaleString()} so'm
+          </span>
                         </div>
                       </div>
                     </div>
