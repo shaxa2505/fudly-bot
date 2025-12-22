@@ -441,15 +441,9 @@ function CartPage({ user }) {
         {cartItems.map(item => {
           const photoUrl = api.getPhotoUrl(item.offer.photo) || 'https://placehold.co/80x80/F5F5F5/CCCCCC?text=IMG'
           const stockLimit = item.offer.stock || item.offer.quantity || 99
+          const isMaxReached = item.quantity >= stockLimit
           return (
           <div key={item.offer.id} className="cart-item">
-            <button
-              className="cart-item-remove"
-              onClick={() => removeItem(item.offer.id)}
-              aria-label="Mahsulotni o'chirish"
-            >
-              x
-            </button>
             <img
               src={photoUrl}
               alt={item.offer.title}
@@ -477,6 +471,13 @@ function CartPage({ user }) {
               )}
             </div>
             <div className="cart-item-controls">
+              <button
+                className="cart-item-remove"
+                onClick={() => removeItem(item.offer.id)}
+                aria-label="Mahsulotni o'chirish"
+              >
+                x
+              </button>
               <QuantityControl
                 value={item.quantity}
                 size="md"
@@ -484,6 +485,9 @@ function CartPage({ user }) {
                 onIncrement={() => handleQuantityChange(item.offer.id, 1)}
                 disableIncrement={item.quantity >= stockLimit}
               />
+              {isMaxReached && (
+                <span className="cart-item-limit">Maksimum: {stockLimit} {getUnitLabel(item.offer.unit)}</span>
+              )}
               <p className="cart-item-total">
                 {Math.round(item.offer.discount_price * item.quantity).toLocaleString()} so'm
               </p>
