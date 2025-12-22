@@ -346,17 +346,17 @@ select.success:focus {
     text-align: center;
     cursor: pointer;
     transition: all var(--transition-fast);
-    background: var(--gray-50);
+    background: var(--gray-100);
 }
 
 .photo-upload-area:hover {
     border-color: var(--primary);
-    background: rgba(33, 160, 56, 0.05);
+    background: var(--card-hover);
 }
 
 .photo-upload-area.has-photo {
     padding: 0;
-    border: 2px solid var(--success);
+    border: 2px solid var(--primary);
 }
 
 .photo-preview {
@@ -377,7 +377,7 @@ select.success:focus {
     position: absolute;
     top: 8px;
     right: 8px;
-    background: rgba(0, 0, 0, 0.7);
+    background: rgba(17, 19, 18, 0.6);
     color: white;
     border: none;
     width: 32px;

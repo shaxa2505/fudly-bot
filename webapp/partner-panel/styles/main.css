@@ -1271,12 +1271,12 @@
 
 .search-input {
     width: 100%;
-    padding: 16px 56px 16px var(--space-5);
-    border: 2px solid var(--border);
-    border-radius: var(--radius-lg);
-    font-size: 15px;
-    background: white;
-    transition: all var(--transition-fast);
+    padding: 12px 44px 12px var(--space-4);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    font-size: 14px;
+    background: #FFFFFF;
+    transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
     color: var(--text);
 }
 
@@ -1287,7 +1287,7 @@
 .search-input:focus {
     outline: none;
     border-color: var(--primary);
-    box-shadow: 0 0 0 4px var(--primary-light);
+    box-shadow: 0 0 0 3px rgba(24, 162, 75, 0.12);
 }
 
 .search-icon {
@@ -1308,8 +1308,8 @@
     left: 0;
     right: 0;
     bottom: 0;
-    background: rgba(0, 0, 0, 0.7);
-    backdrop-filter: blur(4px);
+    background: rgba(17, 19, 18, 0.45);
+    backdrop-filter: blur(8px);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -1319,10 +1319,10 @@
 }
 
 .modal-content {
-    background: white;
-    border-radius: var(--radius-2xl);
-    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
-    max-width: 600px;
+    background: #FFFFFF;
+    border-radius: 20px;
+    box-shadow: var(--shadow-xl);
+    max-width: 640px;
     width: 100%;
     max-height: 90vh;
     overflow: hidden;
@@ -1340,29 +1340,30 @@
 }
 
 .modal-content.modal-lg {
-    max-width: 600px;
+    max-width: 680px;
 }
 
 .modal-header {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: var(--space-6) var(--space-6) var(--space-5);
+    padding: var(--space-5) var(--space-5) var(--space-4);
     border-bottom: 1px solid var(--border);
 }
 
 .modal-header h3 {
-    font-size: 22px;
+    font-size: 18px;
     font-weight: 700;
     color: var(--text);
     margin: 0;
-    letter-spacing: -0.5px;
+    letter-spacing: -0.3px;
 }
 
 .modal-body {
-    padding: var(--space-6);
+    padding: var(--space-5);
     overflow-y: auto;
     flex: 1;
+    background: #FAFBF6;
 }
 
 .photo-url-input {
@@ -1370,7 +1371,7 @@
 }
 
 .char-counter {
-    font-size: 12px;
+    font-size: 11px;
     color: var(--text-muted);
     margin-top: 4px;
     text-align: right;
@@ -1442,9 +1443,9 @@
 .modal-footer {
     display: flex;
     gap: var(--space-3);
-    padding: var(--space-5) var(--space-6) var(--space-6);
+    padding: var(--space-4) var(--space-5) var(--space-5);
     border-top: 1px solid var(--border);
-    background: var(--gray-50);
+    background: #FFFFFF;
 }
 
 .modal-footer .btn {
@@ -1453,7 +1454,7 @@
 
 /* === Form Elements === */
 .form-group {
-    margin-bottom: var(--space-5);
+    margin-bottom: var(--space-4);
     position: relative;
 }
 
@@ -1462,7 +1463,7 @@
     margin-bottom: var(--space-2);
     font-weight: 600;
     color: var(--text);
-    font-size: 14px;
+    font-size: 13px;
 }
 
 .checkbox-label {
@@ -1476,13 +1477,13 @@
 .form-group textarea,
 .form-group select {
     width: 100%;
-    padding: 14px var(--space-4);
-    border: 2px solid var(--border);
-    border-radius: var(--radius-lg);
-    font-size: 15px;
+    padding: 12px var(--space-4);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    font-size: 14px;
     font-family: inherit;
-    transition: all var(--transition-fast);
-    background: white;
+    transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
+    background: #FFFFFF;
     color: var(--text);
 }
 
@@ -1491,12 +1492,12 @@
 .form-group select:focus {
     outline: none;
     border-color: var(--primary);
-    box-shadow: 0 0 0 4px var(--primary-light);
+    box-shadow: 0 0 0 3px rgba(24, 162, 75, 0.12);
 }
 
 .form-group textarea {
     resize: vertical;
-    min-height: 100px;
+    min-height: 96px;
     line-height: 1.5;
 }
 
