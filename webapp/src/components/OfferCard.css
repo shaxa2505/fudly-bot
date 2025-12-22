@@ -142,8 +142,9 @@
   --qc-height: 32px;
   --qc-pad: 4px;
   --qc-gap: 6px;
-  --qc-btn-size: 28px;
-  min-width: 96px;
+  --qc-btn-size: 26px;
+  --qc-value-font: 13px;
+  min-width: 84px;
   box-shadow: 0 8px 16px rgba(16, 24, 40, 0.16);
 }
 

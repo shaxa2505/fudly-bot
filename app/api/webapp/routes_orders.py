@@ -21,6 +21,7 @@ from .common import (
     get_db,
     get_val,
     logger,
+    normalize_price,
     settings,
 )
 
@@ -105,14 +106,13 @@ def _validate_min_order(
         offer = offers_by_id.get(item.offer_id)
         if not offer:
             continue
-        price_kopeks = float(get_val(offer, "discount_price", 0) or 0)
-        total_check += (price_kopeks / 100) * item.quantity
+        price = normalize_price(get_val(offer, "discount_price", 0))
+        total_check += price * item.quantity
 
     store_check = db.get_store(store_id) if hasattr(db, "get_store") else None
     if not store_check:
         return
-    min_order_kopeks = get_val(store_check, "min_order_amount", 0)
-    min_order = min_order_kopeks / 100 if min_order_kopeks else 0
+    min_order = normalize_price(get_val(store_check, "min_order_amount", 0))
     if min_order > 0 and total_check < min_order:
         raise HTTPException(
             status_code=400,
@@ -177,9 +177,7 @@ async def create_order(
                 if not offer:
                     continue
 
-                # Convert kopeks to sums for display (1 sum = 100 kopeks)
-                price_kopeks = int(get_val(offer, "discount_price", 0) or 0)
-                price = price_kopeks // 100
+                price = int(normalize_price(get_val(offer, "discount_price", 0)))
                 offer_store_id = int(get_val(offer, "store_id"))
                 offer_title = get_val(offer, "title", "Товар")
                 store = db.get_store(offer_store_id) if hasattr(db, "get_store") else None
@@ -187,9 +185,7 @@ async def create_order(
                 store_address = get_val(store, "address", "") if store else ""
                 delivery_price = 0
                 if is_delivery and store:
-                    # Convert delivery price from kopeks to sums
-                    delivery_price_kopeks = int(get_val(store, "delivery_price", 1500000) or 1500000)
-                    delivery_price = delivery_price_kopeks // 100
+                    delivery_price = int(normalize_price(get_val(store, "delivery_price", 1500000)))
 
                 order_items.append(
                     OrderItem(

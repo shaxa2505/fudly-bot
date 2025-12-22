@@ -13,6 +13,7 @@ from .common import (
     get_db,
     get_val,
     logger,
+    normalize_price,
 )
 
 router = APIRouter()
@@ -34,8 +35,8 @@ def _to_offer_response(offer: Any, store_fallback: dict | None = None) -> OfferR
     title = get_val(offer, "title", "Р‘РµР· РЅР°Р·РІР°РЅРёСЏ")
     description = get_val(offer, "description")
 
-    original_price = float(get_val(offer, "original_price", 0) or 0)
-    discount_price = float(get_val(offer, "discount_price", 0) or 0)
+    original_price = normalize_price(get_val(offer, "original_price", 0))
+    discount_price = normalize_price(get_val(offer, "discount_price", 0))
 
     discount_percent_val = get_val(offer, "discount_percent")
     discount_percent = float(discount_percent_val or 0)
@@ -154,12 +155,9 @@ async def get_offers(
 
         for offer in raw_offers:
             try:
-                # Convert kopeks to sums for display (1 sum = 100 kopeks)
-                original_price_kopeks = float(get_val(offer, "original_price", 0) or 0)
-                discount_price_kopeks = float(get_val(offer, "discount_price", 0) or 0)
-                original_price_sums = original_price_kopeks / 100
-                discount_price_sums = discount_price_kopeks / 100
-                
+                original_price_sums = normalize_price(get_val(offer, "original_price", 0))
+                discount_price_sums = normalize_price(get_val(offer, "discount_price", 0))
+
                 offers.append(
                     OfferResponse(
                         id=int(get_val(offer, "id", 0) or get_val(offer, "offer_id", 0) or 0),
@@ -168,10 +166,7 @@ async def get_offers(
                         original_price=original_price_sums,
                         discount_price=discount_price_sums,
                         discount_percent=float(get_val(offer, "discount_percent", 0) or 0)
-                        or _calc_discount_percent(
-                            float(get_val(offer, "original_price", 0) or 0),
-                            float(get_val(offer, "discount_price", 0) or 0),
-                        ),
+                        or _calc_discount_percent(original_price_sums, discount_price_sums),
                         quantity=int(get_val(offer, "quantity", 0) or 0),
                         unit=get_val(offer, "unit", "шт") or "шт",
                         category=get_val(offer, "category", "other") or "other",
@@ -231,12 +226,9 @@ async def get_offer(offer_id: int, db=Depends(get_db)):
             db.get_store(get_val(offer, "store_id")) if hasattr(db, "get_store") else None
         )
 
-        # Convert kopeks to sums for display (1 sum = 100 kopeks)
-        original_price_kopeks = float(get_val(offer, "original_price", 0) or 0)
-        discount_price_kopeks = float(get_val(offer, "discount_price", 0) or 0)
-        original_price_sums = original_price_kopeks / 100
-        discount_price_sums = discount_price_kopeks / 100
-        
+        original_price_sums = normalize_price(get_val(offer, "original_price", 0))
+        discount_price_sums = normalize_price(get_val(offer, "discount_price", 0))
+
         return OfferResponse(
             id=int(get_val(offer, "id", 0) or get_val(offer, "offer_id", 0) or 0),
             title=get_val(offer, "title", "Без названия"),
@@ -244,10 +236,7 @@ async def get_offer(offer_id: int, db=Depends(get_db)):
             original_price=original_price_sums,
             discount_price=discount_price_sums,
             discount_percent=float(get_val(offer, "discount_percent", 0) or 0)
-            or _calc_discount_percent(
-                float(get_val(offer, "original_price", 0) or 0),
-                float(get_val(offer, "discount_price", 0) or 0),
-            ),
+            or _calc_discount_percent(original_price_sums, discount_price_sums),
             quantity=int(get_val(offer, "quantity", 0) or 0),
             unit=get_val(offer, "unit", "шт") or "шт",
             category=get_val(offer, "category", "other") or "other",
@@ -307,12 +296,9 @@ async def get_flash_deals(
                         pass
 
                 if is_high_discount or is_expiring_soon:
-                    # Convert kopeks to sums for display (1 sum = 100 kopeks)
-                    original_price_kopeks = float(get_val(offer, "original_price", 0) or 0)
-                    discount_price_kopeks = float(get_val(offer, "discount_price", 0) or 0)
-                    original_price_sums = original_price_kopeks / 100
-                    discount_price_sums = discount_price_kopeks / 100
-                    
+                    original_price_sums = normalize_price(get_val(offer, "original_price", 0))
+                    discount_price_sums = normalize_price(get_val(offer, "discount_price", 0))
+
                     offers.append(
                         OfferResponse(
                             id=int(get_val(offer, "id", 0) or get_val(offer, "offer_id", 0) or 0),

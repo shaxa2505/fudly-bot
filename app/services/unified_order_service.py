@@ -1066,6 +1066,7 @@ class UnifiedOrderService:
 
                 # Build notification
                 order_ids: list[str] = []
+                order_id_ints: list[int] = []
                 seen_order_ids: set[int] = set()
                 for o in store_orders:
                     oid = o.get("order_id")
@@ -1076,6 +1077,7 @@ class UnifiedOrderService:
                         continue
                     seen_order_ids.add(oid_int)
                     order_ids.append(str(oid_int))
+                    order_id_ints.append(oid_int)
 
                 pickup_codes: list[str] = []
                 seen_codes: set[str] = set()
@@ -1115,10 +1117,19 @@ class UnifiedOrderService:
                 kb.adjust(2)
 
                 # Send Telegram notification
-                await self.bot.send_message(
+                sent_msg = await self.bot.send_message(
                     owner_id, seller_text, parse_mode="HTML", reply_markup=kb.as_markup()
                 )
                 logger.info(f"Sent order notification to seller {owner_id} for orders {order_ids}")
+
+                if sent_msg and hasattr(self.db, "set_order_seller_message_id"):
+                    for order_id in order_id_ints:
+                        try:
+                            self.db.set_order_seller_message_id(order_id, sent_msg.message_id)
+                        except Exception as save_err:
+                            logger.warning(
+                                f"Failed to save seller_message_id for order #{order_id}: {save_err}"
+                            )
                 
                 # Send WebSocket notification to web panel (real-time)
                 try:

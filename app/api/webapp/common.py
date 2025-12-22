@@ -16,6 +16,18 @@ from app.core.config import load_settings
 logger = logging.getLogger(__name__)
 
 settings = load_settings()
+PRICE_STORAGE_UNIT = os.getenv("PRICE_STORAGE_UNIT", "sums").lower()
+
+
+def normalize_price(value: Any) -> float:
+    """Normalize stored price to sums for API responses."""
+    try:
+        amount = float(value or 0)
+    except (TypeError, ValueError):
+        return 0.0
+    if PRICE_STORAGE_UNIT == "kopeks":
+        return amount / 100
+    return amount
 
 
 # =============================================================================

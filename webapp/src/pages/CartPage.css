@@ -134,7 +134,7 @@
 .cart-item {
   display: flex;
   gap: 12px;
-  padding: 12px 0;
+  padding: 12px 40px 12px 0;
   background: transparent;
   border-radius: 0;
   box-shadow: none;
@@ -207,6 +207,7 @@
   flex-direction: column;
   align-items: flex-end;
   gap: 8px;
+  padding-top: 4px;
 }
 
 .cart-item-total {
@@ -226,6 +227,9 @@
 }
 
 .cart-item-remove {
+  position: absolute;
+  top: 8px;
+  right: 8px;
   width: 28px;
   height: 28px;
   border: 1px solid #E5E7EB;
@@ -237,8 +241,6 @@
   justify-content: center;
   cursor: pointer;
   box-shadow: 0 6px 12px rgba(16, 24, 40, 0.08);
-  align-self: flex-end;
-  margin-bottom: 4px;
 }
 
 .cart-item-remove:active {

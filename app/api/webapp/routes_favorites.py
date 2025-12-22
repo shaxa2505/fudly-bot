@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from fastapi import APIRouter, Depends, HTTPException
 
-from .common import FavoriteRequest, OfferResponse, get_current_user, get_db, get_val, logger
+from .common import FavoriteRequest, OfferResponse, get_current_user, get_db, get_val, logger, normalize_price
 
 router = APIRouter()
 
@@ -28,12 +28,9 @@ async def get_favorites(db=Depends(get_db), user: dict = Depends(get_current_use
                     store = (
                         db.get_store(get_val(offer, "store_id")) if hasattr(db, "get_store") else None
                     )
-                    # Convert kopeks to sums for display (1 sum = 100 kopeks)
-                    original_price_kopeks = float(get_val(offer, "original_price", 0) or 0)
-                    discount_price_kopeks = float(get_val(offer, "discount_price", 0) or 0)
-                    original_price_sums = original_price_kopeks / 100
-                    discount_price_sums = discount_price_kopeks / 100
-                    
+                    original_price_sums = normalize_price(get_val(offer, "original_price", 0))
+                    discount_price_sums = normalize_price(get_val(offer, "discount_price", 0))
+
                     offers.append(
                         OfferResponse(
                             id=int(get_val(offer, "id", 0) or get_val(offer, "offer_id", 0) or 0),
