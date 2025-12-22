@@ -458,14 +458,6 @@ function CartPage({ user }) {
           const isMaxReached = item.quantity >= stockLimit
           return (
           <div key={item.offer.id} className="cart-item">
-            <button
-              className="cart-item-remove"
-              onClick={() => removeItem(item.offer.id)}
-              aria-label="Mahsulotni o'chirish"
-              type="button"
-            >
-              <Trash2 size={16} strokeWidth={2} aria-hidden="true" />
-            </button>
             <img
               src={photoUrl}
               alt={item.offer.title}
