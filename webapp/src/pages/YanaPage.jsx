@@ -15,7 +15,7 @@ function YanaPage() {
   const lang = getUserLanguage()
 
   // Settings state - load from user profile first, then localStorage
-  const [phone, setPhone] = useState(() => {
+  const [phone] = useState(() => {
     const user = getCurrentUser()
     if (user?.phone) return user.phone
     // Try Telegram WebApp contact
@@ -23,7 +23,7 @@ function YanaPage() {
     if (tgPhone) return tgPhone
     return localStorage.getItem('fudly_phone') || ''
   })
-  const [location, setLocation] = useState(() => {
+  const [location] = useState(() => {
     try {
       const user = getCurrentUser()
       if (user?.city) return { city: user.city }
@@ -55,14 +55,21 @@ function YanaPage() {
       let filtered = bookings
       if (orderFilter === 'active') {
         // Active = pending, confirmed, ready (waiting for completion)
-        filtered = bookings.filter(o =>
-          o.status === 'pending' ||
-          o.status === 'confirmed' ||
-          o.status === 'ready' ||
-          !o.status // treat undefined as pending
-        )
+        filtered = bookings.filter(o => {
+          const status = o.status || o.order_status
+          return (
+            status === 'pending' ||
+            status === 'confirmed' ||
+            status === 'ready' ||
+            status === 'preparing' ||
+            !status // treat undefined as pending
+          )
+        })
       } else if (orderFilter === 'completed') {
-        filtered = bookings.filter(o => o.status === 'completed' || o.status === 'cancelled')
+        filtered = bookings.filter(o => {
+          const status = o.status || o.order_status
+          return status === 'completed' || status === 'cancelled'
+        })
       }
 
       setOrders(filtered)
@@ -72,11 +79,6 @@ function YanaPage() {
     } finally {
       setLoading(false)
     }
-  }
-
-  const saveSettings = () => {
-    localStorage.setItem('fudly_phone', phone)
-    window.Telegram?.WebApp?.showAlert?.('Sozlamalar saqlandi!')
   }
 
   const handleChangePhone = () => {
@@ -93,11 +95,49 @@ function YanaPage() {
     const statusMap = {
       pending: { text: 'Kutilmoqda', color: '#FF9500', bg: '#FFF4E5' },
       confirmed: { text: 'Tasdiqlandi', color: '#34C759', bg: '#E8F8ED' },
+      preparing: { text: 'Tayyorlanmoqda', color: '#FF9500', bg: '#FFF4E5' },
       ready: { text: 'Tayyor', color: '#007AFF', bg: '#E5F2FF' },
       completed: { text: 'Yakunlandi', color: '#53B175', bg: '#E8F5E9' },
       cancelled: { text: 'Bekor', color: '#FF3B30', bg: '#FFEBEE' },
     }
     return statusMap[status] || { text: status, color: '#999', bg: '#F5F5F5' }
+  }
+
+  const getOrderSummary = (order) => {
+    const items = Array.isArray(order.items) ? order.items : []
+    const orderId = order.booking_id || order.order_id || order.id
+    const status = order.status || order.order_status
+    const createdAt = order.created_at || order.createdAt
+    const quantity = order.quantity || items.reduce((sum, item) => sum + Number(item.quantity || 0), 0) || 1
+    const totalPrice = Number(order.total_price ?? order.total_amount ?? 0)
+    const unitPrice = quantity ? Math.round(totalPrice / quantity) : 0
+    const offerTitle =
+      order.offer_title ||
+      order.title ||
+      items[0]?.title ||
+      items[0]?.offer_title ||
+      'Buyurtma'
+    const offerPhoto =
+      order.offer_photo ||
+      order.offer_photo_id ||
+      items[0]?.photo ||
+      items[0]?.offer_photo
+    const storeName = order.store_name || items[0]?.store_name || "Do'kon"
+    const bookingCode = order.booking_code || order.pickup_code
+    const photoUrl = api.getPhotoUrl(offerPhoto) || offerPhoto
+
+    return {
+      orderId,
+      status,
+      createdAt,
+      quantity,
+      totalPrice,
+      unitPrice,
+      offerTitle,
+      storeName,
+      bookingCode,
+      photoUrl,
+    }
   }
 
   const formatDate = (dateStr) => {
@@ -183,25 +223,26 @@ function YanaPage() {
           ) : (
             <div className="orders-list">
               {orders.map((order, idx) => {
-                const statusInfo = getStatusInfo(order.status)
+                const summary = getOrderSummary(order)
+                const statusInfo = getStatusInfo(summary.status)
                 return (
                   <div
-                    key={order.booking_id || idx}
+                    key={summary.orderId || idx}
                     className="order-card"
-                    onClick={() => navigate(`/order/${order.booking_id}`)}
+                    onClick={() => summary.orderId && navigate(`/order/${summary.orderId}`)}
                     style={{ animationDelay: `${idx * 0.05}s` }}
                   >
                     <div className="order-header">
-                      <span className="order-id">#{order.booking_id}</span>
-                      <span className="order-date">{formatDate(order.created_at)}</span>
+                      <span className="order-id">#{summary.orderId}</span>
+                      <span className="order-date">{formatDate(summary.createdAt)}</span>
                     </div>
 
                     <div className="order-content">
                       <div className="order-image-wrapper">
-                        {order.offer_photo ? (
+                        {summary.photoUrl ? (
                           <img
-                            src={order.offer_photo}
-                            alt={order.offer_title}
+                            src={summary.photoUrl}
+                            alt={summary.offerTitle}
                             className="order-image"
                             onError={(e) => {
                               e.target.style.display = 'none'
@@ -213,17 +254,17 @@ function YanaPage() {
                         )}
                       </div>
                       <div className="order-info">
-                        <h3 className="order-title">{order.offer_title || 'Buyurtma'}</h3>
-                        <p className="order-store">Do'kon: {order.store_name || 'Do\'kon'}</p>
+                        <h3 className="order-title">{summary.offerTitle}</h3>
+                        <p className="order-store">Do'kon: {summary.storeName}</p>
                         <div className="order-meta">
                           <span>
-                            {order.quantity || 1} x {order.total_price && order.quantity
-                              ? Math.round(order.total_price / order.quantity).toLocaleString()
+                            {summary.quantity} x {summary.unitPrice
+                              ? summary.unitPrice.toLocaleString()
                               : '-'} so'm
                           </span>
                           <span className="order-total">
-                            {order.total_price
-                              ? Math.round(order.total_price).toLocaleString()
+                            {summary.totalPrice
+                              ? Math.round(summary.totalPrice).toLocaleString()
                               : '-'} so'm
                           </span>
                         </div>
@@ -240,8 +281,8 @@ function YanaPage() {
                       >
                         {statusInfo.text}
                       </span>
-                      {order.booking_code && (
-                        <span className="booking-code">Kod: {order.booking_code}</span>
+                      {summary.bookingCode && (
+                        <span className="booking-code">Kod: {summary.bookingCode}</span>
                       )}
                     </div>
                   </div>
@@ -265,8 +306,8 @@ function YanaPage() {
                 className="setting-input"
                 placeholder="+998 90 123 45 67"
                 value={phone}
-                onChange={e => setPhone(e.target.value)}
                 readOnly
+                disabled
               />
               <div className="setting-note">
                 Telefon raqam bot orqali o'zgartiriladi.
@@ -283,13 +324,10 @@ function YanaPage() {
                 className="setting-input"
                 value={location.city || ''}
                 readOnly
+                disabled
                 placeholder="Joylashuvni aniqlang"
               />
             </label>
-
-            <button className="save-btn" onClick={saveSettings}>
-               Saqlash
-            </button>
           </div>
 
           <div className="settings-group">

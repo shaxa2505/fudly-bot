@@ -568,6 +568,8 @@ async def create_webhook_app(
         try:
             from app.services.unified_order_service import (
                 OrderItem as UnifiedOrderItem,
+            )
+            from app.services.unified_order_service import (
                 OrderResult,
                 PaymentStatus,
                 get_unified_order_service,
@@ -1076,8 +1078,7 @@ async def create_webhook_app(
                 active_count = sum(
                     1
                     for item in combined
-                    if item.get("status")
-                    in ("pending", "confirmed", "ready", "preparing")
+                    if item.get("status") in ("pending", "confirmed", "ready", "preparing")
                 )
                 completed_count = sum(
                     1 for item in combined if item.get("status") in ("completed", "cancelled")
@@ -1727,7 +1728,7 @@ async def create_webhook_app(
                 order = db.get_order(order_id)
                 logger.info(f"📦 Order lookup for #{order_id}: found={order is not None}")
             else:
-                logger.warning(f"⚠️ Database doesn't have get_order method!")
+                logger.warning("⚠️ Database doesn't have get_order method!")
 
             if order:
                 # 🔴 DELIVERY ORDER - Send to ADMIN for confirmation
@@ -1746,12 +1747,16 @@ async def create_webhook_app(
                     if isinstance(order, dict)
                     else getattr(order, "delivery_address", None)
                 )
-                
-                logger.info(f"📋 Order #{order_id} details: type={order_type}, user_id={user_id}, delivery={delivery_address is not None}")
+
+                logger.info(
+                    f"📋 Order #{order_id} details: type={order_type}, user_id={user_id}, delivery={delivery_address is not None}"
+                )
 
                 if order_type == "delivery":
-                    logger.info(f"📸 Payment proof uploaded for delivery order #{order_id} by user {authenticated_user_id}")
-                    
+                    logger.info(
+                        f"📸 Payment proof uploaded for delivery order #{order_id} by user {authenticated_user_id}"
+                    )
+
                     # SECURITY: user can only upload proof for their own order
                     try:
                         order_user_id_int = int(user_id) if user_id is not None else None
@@ -1768,7 +1773,7 @@ async def create_webhook_app(
                         return add_cors_headers(
                             web.json_response({"error": "Access denied"}, status=403)
                         )
-                    
+
                     # Get user info
                     user = db.get_user(user_id) if hasattr(db, "get_user") else None
                     customer_name = ""
@@ -1783,11 +1788,12 @@ async def create_webhook_app(
 
                     # Get order details (items, store, total)
                     import json
+
                     cart_items = []
                     store_name = ""
                     total_price = 0
                     delivery_fee = 0
-                    
+
                     if isinstance(order, dict):
                         cart_items_json = order.get("cart_items")
                         store_name = order.get("store_name", "")
@@ -1798,33 +1804,37 @@ async def create_webhook_app(
                         store_name = getattr(order, "store_name", "")
                         total_price = getattr(order, "total_price", 0)
                         delivery_fee = getattr(order, "delivery_fee", 0)
-                    
+
                     if cart_items_json:
                         try:
-                            cart_items = json.loads(cart_items_json) if isinstance(cart_items_json, str) else cart_items_json
+                            cart_items = (
+                                json.loads(cart_items_json)
+                                if isinstance(cart_items_json, str)
+                                else cart_items_json
+                            )
                         except Exception:
                             pass
 
                     # Build admin message with progress bar
-                    admin_msg = f"💳 <b>НОВАЯ ДОСТАВКА - ЧЕК НА ПРОВЕРКЕ</b>\n\n"
-                    
+                    admin_msg = "💳 <b>НОВАЯ ДОСТАВКА - ЧЕК НА ПРОВЕРКЕ</b>\n\n"
+
                     # Progress bar: ● ● ● ○ ○
                     admin_msg += "🔄 <b>Статус:</b> ● ● ● ○ ○\n"
                     admin_msg += "   <i>Ожидает подтверждения оплаты</i>\n\n"
-                    
+
                     admin_msg += f"📦 <b>Заказ #{order_id}</b>\n"
                     admin_msg += f"👤 {customer_name or 'Клиент'}\n"
-                    
+
                     if customer_phone:
                         phone_display = customer_phone if customer_phone else "не указан"
                         admin_msg += f"📱 <code>{phone_display}</code>\n"
-                    
+
                     if store_name:
                         admin_msg += f"🏪 {store_name}\n"
-                    
+
                     if delivery_address:
                         admin_msg += f"📍 {delivery_address}\n"
-                    
+
                     # Items list
                     if cart_items:
                         admin_msg += f"\n📋 <b>Товары ({len(cart_items)}):</b>\n"
@@ -1834,18 +1844,18 @@ async def create_webhook_app(
                             price = item.get("price", 0)
                             item_total = price * qty
                             admin_msg += f"{idx}. {title} × {qty} = {int(item_total):,} сум\n"
-                        
+
                         if len(cart_items) > 5:
                             admin_msg += f"   ... и ещё {len(cart_items) - 5}\n"
-                    
+
                     # Total
                     subtotal = total_price - delivery_fee if delivery_fee else total_price
-                    admin_msg += f"\n💰 <b>Итого:</b>\n"
+                    admin_msg += "\n💰 <b>Итого:</b>\n"
                     admin_msg += f"   Товары: {int(subtotal):,} сум\n"
                     if delivery_fee:
                         admin_msg += f"   Доставка: {int(delivery_fee):,} сум\n"
                     admin_msg += f"   <b>Всего: {int(total_price):,} сум</b>\n"
-                    
+
                     admin_msg += "\n⚠️ <b>ПРОВЕРЬТЕ ЧЕК И ПОДТВЕРДИТЕ ОПЛАТУ</b>"
 
                     # Buttons for admin
@@ -1871,26 +1881,34 @@ async def create_webhook_app(
                     if hasattr(db, "get_all_users"):
                         all_users = db.get_all_users()
                         for u in all_users:
-                            role = u.get("role") if isinstance(u, dict) else getattr(u, "role", None)
-                            u_id = u.get("user_id") if isinstance(u, dict) else getattr(u, "user_id", None)
+                            role = (
+                                u.get("role") if isinstance(u, dict) else getattr(u, "role", None)
+                            )
+                            u_id = (
+                                u.get("user_id")
+                                if isinstance(u, dict)
+                                else getattr(u, "user_id", None)
+                            )
                             if role == "admin" and u_id:
                                 admin_ids.append(u_id)
-                    
+
                     # Fallback to ADMIN_ID from env
                     if not admin_ids:
                         admin_id_env = int(os.getenv("ADMIN_ID", "0"))
                         if admin_id_env:
                             admin_ids.append(admin_id_env)
                             logger.info(f"Using ADMIN_ID from env: {admin_id_env}")
-                    
+
                     if not admin_ids:
                         logger.error("❌ No admin users found - cannot send payment proof!")
                         return add_cors_headers(
                             web.json_response({"error": "No admin configured"}, status=500)
                         )
-                    
-                    logger.info(f"📤 Sending payment proof to {len(admin_ids)} admin(s): {admin_ids}")
-                    
+
+                    logger.info(
+                        f"📤 Sending payment proof to {len(admin_ids)} admin(s): {admin_ids}"
+                    )
+
                     # Send to all admins
                     sent_count = 0
                     file_id = None
@@ -1908,18 +1926,22 @@ async def create_webhook_app(
                             sent_count += 1
                             logger.info(f"✅ Payment proof sent to admin {admin_id}")
                         except Exception as e:
-                            logger.error(f"❌ Failed to send payment proof to admin {admin_id}: {e}")
-                    
+                            logger.error(
+                                f"❌ Failed to send payment proof to admin {admin_id}: {e}"
+                            )
+
                     if sent_count > 0:
-                        logger.info(f"✅ Payment proof for order #{order_id} sent to {sent_count}/{len(admin_ids)} admins")
-                        
+                        logger.info(
+                            f"✅ Payment proof for order #{order_id} sent to {sent_count}/{len(admin_ids)} admins"
+                        )
+
                         # Persist payment proof in DB for audit trail and later access
                         if file_id:
                             if hasattr(db, "update_payment_status"):
                                 db.update_payment_status(order_id, "proof_submitted", file_id)
                             elif hasattr(db, "update_order_payment_proof"):
                                 db.update_order_payment_proof(order_id, file_id)
-                        
+
                         return add_cors_headers(
                             web.json_response(
                                 {
@@ -1929,20 +1951,20 @@ async def create_webhook_app(
                             )
                         )
                     else:
-                        logger.error(f"❌ Failed to send payment proof to any admin!")
+                        logger.error("❌ Failed to send payment proof to any admin!")
                         return add_cors_headers(
                             web.json_response({"error": "Failed to send to admins"}, status=500)
                         )
                 else:
                     logger.warning(f"⚠️ Order #{order_id} is not delivery type: {order_type}")
                     return add_cors_headers(
-                        web.json_response({"error": f"Order type is '{order_type}', not 'delivery'"}, status=400)
+                        web.json_response(
+                            {"error": f"Order type is '{order_type}', not 'delivery'"}, status=400
+                        )
                     )
             else:
                 logger.error(f"❌ Order #{order_id} not found in database!")
-                return add_cors_headers(
-                    web.json_response({"error": "Order not found"}, status=404)
-                )
+                return add_cors_headers(web.json_response({"error": "Order not found"}, status=404))
 
         except Exception as e:
             logger.error(f"API upload payment proof error: {e}")
