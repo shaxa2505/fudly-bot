@@ -1,6 +1,7 @@
 import { memo, useState, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import api from '../api/client'
+import QuantityControl from './QuantityControl'
 import './OfferCard.css'
 
 const OfferCard = memo(function OfferCard({ offer, cartQuantity = 0, onAddToCart, onRemoveFromCart }) {
@@ -81,17 +82,16 @@ const OfferCard = memo(function OfferCard({ offer, cartQuantity = 0, onAddToCart
         {/* Add/Quantity Control */}
         <div className="card-action">
           {cartQuantity > 0 ? (
-            <div className="quantity-control" onClick={(e) => e.stopPropagation()}>
-              <button className="qty-btn" onClick={handleRemoveClick}>-</button>
-              <span className="qty-num">{cartQuantity}</span>
-              <button
-                className={`qty-btn qty-plus ${isMaxReached ? 'disabled' : ''}`}
-                onClick={handleAddClick}
-                disabled={isMaxReached}
-              >+</button>
-            </div>
+            <QuantityControl
+              value={cartQuantity}
+              size="sm"
+              onDecrement={handleRemoveClick}
+              onIncrement={handleAddClick}
+              disableIncrement={isMaxReached}
+              stopPropagation
+            />
           ) : (
-            <button className={`add-to-cart-fab ${isAdding ? 'pulse' : ''}`} onClick={handleAddClick} aria-label="Savatga qo'shish">
+            <button className={`add-to-cart-fab add-to-cart-btn ${isAdding ? 'pulse' : ''}`} onClick={handleAddClick} aria-label="Savatga qo'shish">
               <span aria-hidden="true">+</span>
             </button>
           )}

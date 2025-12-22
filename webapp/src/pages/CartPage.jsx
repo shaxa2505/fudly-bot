@@ -5,6 +5,7 @@ import api from '../api/client'
 import { useCart } from '../context/CartContext'
 import { useToast } from '../context/ToastContext'
 import { getUnitLabel, blurOnEnter } from '../utils/helpers'
+import QuantityControl from '../components/QuantityControl'
 import BottomNav from '../components/BottomNav'
 import './CartPage.css'
 
@@ -383,6 +384,7 @@ function CartPage({ user }) {
       <div className="cart-items">
         {cartItems.map(item => {
           const photoUrl = api.getPhotoUrl(item.offer.photo) || 'https://placehold.co/80x80/F5F5F5/CCCCCC?text=IMG'
+          const stockLimit = item.offer.stock || item.offer.quantity || 99
           return (
           <div key={item.offer.id} className="cart-item">
             <img
@@ -409,22 +411,13 @@ function CartPage({ user }) {
               )}
             </div>
             <div className="cart-item-controls">
-              <div className="qty-controls">
-                <button
-                  className="qty-btn"
-                  onClick={() => handleQuantityChange(item.offer.id, -1)}
-                >
-                  -
-                </button>
-                <span className="qty-value">{item.quantity}</span>
-                <button
-                  className="qty-btn plus"
-                  onClick={() => handleQuantityChange(item.offer.id, 1)}
-                  disabled={item.quantity >= (item.offer.stock || 99)}
-                >
-                  +
-                </button>
-              </div>
+              <QuantityControl
+                value={item.quantity}
+                size="md"
+                onDecrement={() => handleQuantityChange(item.offer.id, -1)}
+                onIncrement={() => handleQuantityChange(item.offer.id, 1)}
+                disableIncrement={item.quantity >= stockLimit}
+              />
               <p className="cart-item-total">
                 {Math.round(item.offer.discount_price * item.quantity).toLocaleString()} so'm
               </p>

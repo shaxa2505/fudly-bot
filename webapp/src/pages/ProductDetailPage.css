@@ -274,60 +274,6 @@
   color: var(--color-text-primary);
 }
 
-.pdp-qty-controls {
-  display: flex;
-  align-items: center;
-  gap: var(--spacing-xs);
-  background: #FFFCF8;
-  border-radius: 12px;
-  padding: 4px;
-  border: 1px solid rgba(15, 118, 110, 0.12);
-}
-
-.pdp-qty-btn {
-  width: 34px;
-  height: 34px;
-  border: 1px solid rgba(15, 118, 110, 0.12);
-  background: var(--color-bg-primary);
-  border-radius: 10px;
-  font-size: var(--font-xl);
-  font-weight: var(--font-semibold);
-  color: var(--color-text-secondary);
-  cursor: pointer;
-  transition: all 0.15s ease;
-}
-
-.pdp-qty-btn:active:not(:disabled) {
-  transform: scale(0.92);
-}
-
-.pdp-qty-btn:focus-visible {
-  outline: 3px solid var(--color-primary);
-  outline-offset: 2px;
-}
-
-.pdp-qty-btn:disabled {
-  opacity: 0.4;
-  cursor: not-allowed;
-}
-
-.pdp-qty-plus {
-  background: var(--color-primary);
-  color: var(--color-text-inverse);
-}
-
-.pdp-qty-plus:active:not(:disabled) {
-  background: var(--color-primary-dark);
-}
-
-.pdp-qty-value {
-  min-width: 40px;
-  text-align: center;
-  font-size: var(--font-lg);
-  font-weight: var(--font-bold);
-  color: var(--color-text-primary);
-}
-
 .pdp-total {
   margin-left: auto;
   font-size: var(--font-lg);

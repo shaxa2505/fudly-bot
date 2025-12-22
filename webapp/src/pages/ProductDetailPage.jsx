@@ -4,6 +4,7 @@ import { useCart } from '../context/CartContext'
 import { useFavorites } from '../context/FavoritesContext'
 import { getUnitLabel } from '../utils/helpers'
 import api from '../api/client'
+import QuantityControl from '../components/QuantityControl'
 import './ProductDetailPage.css'
 
 function ProductDetailPage() {
@@ -204,23 +205,14 @@ function ProductDetailPage() {
         {/* Quantity Selector */}
         <div className="pdp-quantity-row">
           <span className="pdp-qty-label">Miqdor:</span>
-          <div className="pdp-qty-controls">
-            <button
-              className="pdp-qty-btn"
-              onClick={() => handleQuantityChange(-1)}
-              disabled={quantity <= 1}
-            >
-              -
-            </button>
-            <span className="pdp-qty-value">{quantity}</span>
-            <button
-              className="pdp-qty-btn pdp-qty-plus"
-              onClick={() => handleQuantityChange(1)}
-              disabled={quantity >= (offer.quantity || 99)}
-            >
-              +
-            </button>
-          </div>
+          <QuantityControl
+            value={quantity}
+            size="lg"
+            onDecrement={() => handleQuantityChange(-1)}
+            onIncrement={() => handleQuantityChange(1)}
+            disableDecrement={quantity <= 1}
+            disableIncrement={quantity >= (offer.quantity || offer.stock || 99)}
+          />
           <span className="pdp-total">{Math.round(totalPrice).toLocaleString()} so'm</span>
         </div>
 

@@ -44,6 +44,7 @@ function HomePage() {
   const [minDiscount, setMinDiscount] = useState(null) // null, 20, 30, 50
   const [sortBy, setSortBy] = useState('default') // default, discount, price_asc, price_desc
   const [priceRange, setPriceRange] = useState('all') // all, up_20, 20_50, 50_100, 100_plus
+  const [showAdvancedFilters, setShowAdvancedFilters] = useState(false)
 
   // Search history state
   const [searchHistory, setSearchHistory] = useState([])
@@ -67,6 +68,9 @@ function HomePage() {
   const hasPreciseLocation = Boolean(location.coordinates || location.address)
   const observerTarget = useRef(null)
   const autoLocationAttempted = useRef(null)
+  const activeFiltersCount = [minDiscount, priceRange !== 'all', sortBy !== 'default']
+    .filter(Boolean)
+    .length
 
   // Извлекаем название города для API (без страны) и транслитерируем в кириллицу
   const cityRaw = location.city
@@ -565,10 +569,9 @@ function HomePage() {
       */}
 
       {/* Unified Filter Bar */}
-      <div className="filter-bar">
-        <div className="filter-row">
-          {/* Categories Scroll */}
-          <div className="filter-scroll">
+      <div className="filters-section">
+        <div className="filters-primary">
+          <div className="filters-scroll">
             {CATEGORIES.map(cat => {
               const IconComponent = cat.icon
               return (
@@ -591,105 +594,121 @@ function HomePage() {
                 </button>
               )
             })}
-
-            {/* Divider */}
-            <div className="filter-divider" />
-
-            {/* Discount Filters */}
-            <button
-              className={`filter-pill discount ${minDiscount === 20 ? 'active' : ''}`}
-              onClick={() => {
-                window.Telegram?.WebApp?.HapticFeedback?.selectionChanged?.()
-                setMinDiscount(minDiscount === 20 ? null : 20)
-              }}
-            >
-              <span className="filter-pill-icon">%</span>
-              <span className="filter-pill-text">20%+</span>
-            </button>
-            <button
-              className={`filter-pill discount ${minDiscount === 30 ? 'active' : ''}`}
-              onClick={() => {
-                window.Telegram?.WebApp?.HapticFeedback?.selectionChanged?.()
-                setMinDiscount(minDiscount === 30 ? null : 30)
-              }}
-            >
-              <span className="filter-pill-icon">%</span>
-              <span className="filter-pill-text">30%+</span>
-            </button>
-            <button
-              className={`filter-pill discount ${minDiscount === 50 ? 'active' : ''}`}
-              onClick={() => {
-                window.Telegram?.WebApp?.HapticFeedback?.selectionChanged?.()
-                setMinDiscount(minDiscount === 50 ? null : 50)
-              }}
-            >
-              <span className="filter-pill-icon">%</span>
-              <span className="filter-pill-text">50%+</span>
-            </button>
-
-            <div className="filter-divider" />
-
-            <button
-              className={`filter-pill ${priceRange === 'up_20' ? 'active' : ''}`}
-              onClick={() => {
-                window.Telegram?.WebApp?.HapticFeedback?.selectionChanged?.()
-                setPriceRange(priceRange === 'up_20' ? 'all' : 'up_20')
-              }}
-            >
-              <span className="filter-pill-icon">sum</span>
-              <span className="filter-pill-text">0-20k</span>
-            </button>
-            <button
-              className={`filter-pill ${priceRange === '20_50' ? 'active' : ''}`}
-              onClick={() => {
-                window.Telegram?.WebApp?.HapticFeedback?.selectionChanged?.()
-                setPriceRange(priceRange === '20_50' ? 'all' : '20_50')
-              }}
-            >
-              <span className="filter-pill-icon">sum</span>
-              <span className="filter-pill-text">20-50k</span>
-            </button>
-            <button
-              className={`filter-pill ${priceRange === '50_100' ? 'active' : ''}`}
-              onClick={() => {
-                window.Telegram?.WebApp?.HapticFeedback?.selectionChanged?.()
-                setPriceRange(priceRange === '50_100' ? 'all' : '50_100')
-              }}
-            >
-              <span className="filter-pill-icon">sum</span>
-              <span className="filter-pill-text">50-100k</span>
-            </button>
-            <button
-              className={`filter-pill ${priceRange === '100_plus' ? 'active' : ''}`}
-              onClick={() => {
-                window.Telegram?.WebApp?.HapticFeedback?.selectionChanged?.()
-                setPriceRange(priceRange === '100_plus' ? 'all' : '100_plus')
-              }}
-            >
-              <span className="filter-pill-icon">sum</span>
-              <span className="filter-pill-text">100k+</span>
-            </button>
-
-            <div className="filter-divider" />
-
-            <button
-              className={`filter-pill ${sortBy !== 'default' ? 'active' : ''}`}
-              onClick={() => {
-                window.Telegram?.WebApp?.HapticFeedback?.selectionChanged?.()
-                const options = ['default', 'discount', 'price_asc', 'price_desc']
-                const idx = options.indexOf(sortBy)
-                setSortBy(options[(idx + 1) % options.length])
-              }}
-            >
-              <span className="filter-pill-icon">
-                {sortBy === 'discount' ? '%' : sortBy === 'price_asc' ? 'up' : sortBy === 'price_desc' ? 'down' : 'sort'}
-              </span>
-              <span className="filter-pill-text">
-                {sortBy === 'discount' ? 'Chegirma' : sortBy === 'price_asc' ? 'Arzon' : sortBy === 'price_desc' ? 'Qimmat' : 'Tartib'}
-              </span>
-            </button>
           </div>
+          <button
+            className={`filters-toggle ${showAdvancedFilters ? 'active' : ''}`}
+            onClick={() => {
+              window.Telegram?.WebApp?.HapticFeedback?.selectionChanged?.()
+              setShowAdvancedFilters(prev => !prev)
+            }}
+            aria-expanded={showAdvancedFilters}
+          >
+            Filtrlar
+            {activeFiltersCount > 0 && (
+              <span className="filters-count">{activeFiltersCount}</span>
+            )}
+          </button>
         </div>
+
+        {showAdvancedFilters && (
+          <div className="filters-advanced">
+            <div className="filter-group">
+              <span className="filter-group-label">Chegirma</span>
+              <div className="filter-group-row">
+                <button
+                  className={`filter-pill discount ${minDiscount === 20 ? 'active' : ''}`}
+                  onClick={() => {
+                    window.Telegram?.WebApp?.HapticFeedback?.selectionChanged?.()
+                    setMinDiscount(minDiscount === 20 ? null : 20)
+                  }}
+                >
+                  <span className="filter-pill-icon">%</span>
+                  <span className="filter-pill-text">20%+</span>
+                </button>
+                <button
+                  className={`filter-pill discount ${minDiscount === 30 ? 'active' : ''}`}
+                  onClick={() => {
+                    window.Telegram?.WebApp?.HapticFeedback?.selectionChanged?.()
+                    setMinDiscount(minDiscount === 30 ? null : 30)
+                  }}
+                >
+                  <span className="filter-pill-icon">%</span>
+                  <span className="filter-pill-text">30%+</span>
+                </button>
+                <button
+                  className={`filter-pill discount ${minDiscount === 50 ? 'active' : ''}`}
+                  onClick={() => {
+                    window.Telegram?.WebApp?.HapticFeedback?.selectionChanged?.()
+                    setMinDiscount(minDiscount === 50 ? null : 50)
+                  }}
+                >
+                  <span className="filter-pill-icon">%</span>
+                  <span className="filter-pill-text">50%+</span>
+                </button>
+              </div>
+            </div>
+
+            <div className="filter-group">
+              <span className="filter-group-label">Narx</span>
+              <div className="filter-group-row">
+                <button
+                  className={`filter-pill ${priceRange === 'up_20' ? 'active' : ''}`}
+                  onClick={() => {
+                    window.Telegram?.WebApp?.HapticFeedback?.selectionChanged?.()
+                    setPriceRange(priceRange === 'up_20' ? 'all' : 'up_20')
+                  }}
+                >
+                  <span className="filter-pill-icon">sum</span>
+                  <span className="filter-pill-text">0-20k</span>
+                </button>
+                <button
+                  className={`filter-pill ${priceRange === '20_50' ? 'active' : ''}`}
+                  onClick={() => {
+                    window.Telegram?.WebApp?.HapticFeedback?.selectionChanged?.()
+                    setPriceRange(priceRange === '20_50' ? 'all' : '20_50')
+                  }}
+                >
+                  <span className="filter-pill-icon">sum</span>
+                  <span className="filter-pill-text">20-50k</span>
+                </button>
+                <button
+                  className={`filter-pill ${priceRange === '50_100' ? 'active' : ''}`}
+                  onClick={() => {
+                    window.Telegram?.WebApp?.HapticFeedback?.selectionChanged?.()
+                    setPriceRange(priceRange === '50_100' ? 'all' : '50_100')
+                  }}
+                >
+                  <span className="filter-pill-icon">sum</span>
+                  <span className="filter-pill-text">50-100k</span>
+                </button>
+                <button
+                  className={`filter-pill ${priceRange === '100_plus' ? 'active' : ''}`}
+                  onClick={() => {
+                    window.Telegram?.WebApp?.HapticFeedback?.selectionChanged?.()
+                    setPriceRange(priceRange === '100_plus' ? 'all' : '100_plus')
+                  }}
+                >
+                  <span className="filter-pill-icon">sum</span>
+                  <span className="filter-pill-text">100k+</span>
+                </button>
+              </div>
+            </div>
+
+            <div className="filter-group">
+              <span className="filter-group-label">Tartib</span>
+              <select
+                className="sort-select"
+                value={sortBy}
+                onChange={(e) => setSortBy(e.target.value)}
+              >
+                <option value="default">Standart</option>
+                <option value="discount">Chegirma yuqori</option>
+                <option value="price_asc">Arzonroq</option>
+                <option value="price_desc">Qimmatroq</option>
+              </select>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Section Title */}

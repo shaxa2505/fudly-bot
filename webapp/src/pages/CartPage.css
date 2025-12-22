@@ -159,59 +159,6 @@
   gap: var(--spacing-sm);
 }
 
-.qty-controls {
-  display: flex;
-  align-items: center;
-  gap: var(--spacing-xs);
-  background: #FFFCF8;
-  border-radius: 12px;
-  padding: 3px;
-  border: 1px solid rgba(15, 118, 110, 0.12);
-}
-
-.qty-btn {
-  width: 32px;
-  height: 32px;
-  border: none;
-  border-radius: 10px;
-  background: var(--color-bg-primary);
-  font-size: var(--font-lg);
-  font-weight: var(--font-semibold);
-  color: var(--color-text-muted);
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: all 0.15s ease;
-  border: 1px solid rgba(15, 118, 110, 0.12);
-}
-
-.qty-btn.plus {
-  background: var(--color-primary);
-  color: var(--color-text-inverse);
-}
-
-.qty-btn:active {
-  transform: scale(0.92);
-}
-
-.qty-btn:focus-visible {
-  outline: 3px solid var(--color-primary);
-  outline-offset: 2px;
-}
-
-.qty-btn.plus:active {
-  background: var(--color-primary-dark);
-}
-
-.qty-value {
-  min-width: 20px;
-  text-align: center;
-  font-size: var(--font-sm);
-  font-weight: var(--font-bold);
-  color: var(--color-text-primary);
-}
-
 .cart-item-total {
   font-size: var(--font-base);
   font-weight: var(--font-bold);
