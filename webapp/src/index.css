@@ -36,6 +36,7 @@ html {
   font-size: 16px;
   -webkit-text-size-adjust: 100%;
   -webkit-tap-highlight-color: transparent;
+  overscroll-behavior-y: none;
 }
 
 body {
@@ -49,7 +50,7 @@ body {
   overflow-x: hidden;
   /* Telegram Mini App fixes */
   overscroll-behavior: none;
-  overscroll-behavior-y: contain;
+  overscroll-behavior-y: none;
   -webkit-overflow-scrolling: touch;
   touch-action: pan-y;
 }

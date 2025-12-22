@@ -18,28 +18,44 @@ export function usePullToRefresh(onRefresh, options = {}) {
   const [pullDistance, setPullDistance] = useState(0)
 
   const startY = useRef(0)
+  const startX = useRef(0)
   const currentY = useRef(0)
   const containerRef = useRef(null)
+  const isTracking = useRef(false)
 
   const handleTouchStart = useCallback((e) => {
     // Только если страница прокручена вверх
     if (window.scrollY > 0) return
 
+    isTracking.current = true
+    startX.current = e.touches[0].clientX
     startY.current = e.touches[0].clientY
     currentY.current = startY.current
-    setIsPulling(true)
+    setIsPulling(false)
   }, [])
 
   const handleTouchMove = useCallback((e) => {
-    if (!isPulling || isRefreshing) return
+    if (!isTracking.current || isRefreshing) return
     if (window.scrollY > 0) {
+      isTracking.current = false
       setIsPulling(false)
       setPullDistance(0)
       return
     }
 
+    const currentX = e.touches[0].clientX
     currentY.current = e.touches[0].clientY
     const distance = currentY.current - startY.current
+    const distanceX = currentX - startX.current
+
+    if (!isPulling) {
+      if (Math.abs(distance) < 6) return
+      if (Math.abs(distanceX) > Math.abs(distance)) {
+        isTracking.current = false
+        return
+      }
+      setIsPulling(true)
+    }
 
     if (distance < 0) {
       setPullDistance(0)
@@ -57,6 +73,7 @@ export function usePullToRefresh(onRefresh, options = {}) {
   }, [isPulling, isRefreshing, resistance, maxPull])
 
   const handleTouchEnd = useCallback(async () => {
+    isTracking.current = false
     if (!isPulling) return
 
     setIsPulling(false)

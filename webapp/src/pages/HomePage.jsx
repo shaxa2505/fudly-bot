@@ -399,7 +399,7 @@ function HomePage() {
   }, [loadOffers])
 
   // Pull-to-refresh hook
-  const { isPulling, isRefreshing, pullDistance, progress } = usePullToRefresh(handleRefresh)
+  const { containerRef, isPulling, isRefreshing, pullDistance, progress } = usePullToRefresh(handleRefresh)
 
   // Initial load and search with debounce
   useEffect(() => {
@@ -517,7 +517,10 @@ function HomePage() {
   // Cart functions now come from useCart() hook
 
   return (
-    <div className={`home-page ${topbarHidden ? 'topbar-hidden' : ''}`}>
+    <div
+      ref={containerRef}
+      className={`home-page ${topbarHidden ? 'topbar-hidden' : ''}`}
+    >
       {/* Pull-to-Refresh */}
       <PullToRefresh
         isRefreshing={isRefreshing}
@@ -615,20 +618,6 @@ function HomePage() {
           )}
         </div>
       </div>
-
-      {/* Hero Banner Carousel */}
-      <HeroBanner onCategorySelect={(category) => {
-        setSelectedCategory(category)
-        setTimeout(() => {
-          document.querySelector('.section-header')?.scrollIntoView({ behavior: 'smooth' })
-        }, 100)
-      }} />
-
-      {/* Flash Deals - temporarily disabled until API deployed
-      {selectedCategory === 'all' && !searchQuery && (
-        <FlashDeals city={cityForApi} />
-      )}
-      */}
 
       {/* Unified Filter Bar */}
       <div className="filters-section">
@@ -772,6 +761,20 @@ function HomePage() {
           </div>
         )}
       </div>
+
+      {/* Hero Banner Carousel */}
+      <HeroBanner onCategorySelect={(category) => {
+        setSelectedCategory(category)
+        setTimeout(() => {
+          document.querySelector('.section-header')?.scrollIntoView({ behavior: 'smooth' })
+        }, 100)
+      }} />
+
+      {/* Flash Deals - temporarily disabled until API deployed
+      {selectedCategory === 'all' && !searchQuery && (
+        <FlashDeals city={cityForApi} />
+      )}
+      */}
 
       {/* Section Title */}
       <div className="section-header">

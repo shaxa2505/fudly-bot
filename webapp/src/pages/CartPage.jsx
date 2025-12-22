@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { ShoppingCart, Home, Sparkles } from 'lucide-react'
+import { ShoppingCart, Home, Sparkles, ArrowLeft, Trash2, ChevronRight } from 'lucide-react'
 import api from '../api/client'
 import { useCart } from '../context/CartContext'
 import { useToast } from '../context/ToastContext'
@@ -24,6 +24,8 @@ function CartPage({ user }) {
   } = useCart()
 
   const [orderLoading, setOrderLoading] = useState(false)
+  const commentInputRef = useRef(null)
+  const [focusCommentOnOpen, setFocusCommentOnOpen] = useState(false)
 
   // Checkout form
   const [showCheckout, setShowCheckout] = useState(false)
@@ -49,7 +51,8 @@ function CartPage({ user }) {
   const [paymentProofPreview, setPaymentProofPreview] = useState(null)
   const [createdOrderId, setCreatedOrderId] = useState(null)
   const [paymentProviders, setPaymentProviders] = useState([])
-  const [selectedPaymentMethod, setSelectedPaymentMethod] = useState('card') // 'card' | 'click'
+  const [selectedPaymentMethod, setSelectedPaymentMethod] = useState('cash') // 'cash' | 'card' | 'click' | 'payme'
+  const [showPaymentSheet, setShowPaymentSheet] = useState(false)
 
   // Success/Error modals
   const [orderResult, setOrderResult] = useState(null)
@@ -66,6 +69,13 @@ function CartPage({ user }) {
     }
     loadProviders()
   }, [])
+
+  useEffect(() => {
+    if (showCheckout && focusCommentOnOpen) {
+      commentInputRef.current?.focus()
+      setFocusCommentOnOpen(false)
+    }
+  }, [showCheckout, focusCommentOnOpen])
 
   // Check if stores in cart support delivery
   useEffect(() => {
@@ -102,6 +112,27 @@ function CartPage({ user }) {
 
   // Check if minimum order met for delivery
   const canDelivery = subtotal >= minOrderAmount
+  const paymentMethodLabels = {
+    cash: 'Naqd',
+    card: 'Kartaga o\'tkazish',
+    click: 'Click',
+    payme: 'Payme',
+  }
+  const isProviderAvailable = (provider) => paymentProviders.includes(provider)
+
+  const selectPaymentMethod = (method) => {
+    setSelectedPaymentMethod(method)
+    if (method !== 'card') {
+      setPaymentProof(null)
+      setPaymentProofPreview(null)
+    }
+  }
+
+  const closeCheckout = () => {
+    if (orderLoading) return
+    setShowCheckout(false)
+    setShowPaymentSheet(false)
+  }
 
   // Handle quantity change with delta (+1 or -1)
   const handleQuantityChange = (offerId, delta) => {
@@ -127,6 +158,13 @@ function CartPage({ user }) {
     setShowCheckout(true)
   }
 
+  const handleCommentShortcut = () => {
+    if (isEmpty) return
+    setCheckoutStep('details')
+    setShowCheckout(true)
+    setFocusCommentOnOpen(true)
+  }
+
   // Handle file selection for payment proof
   const handleFileSelect = (e) => {
     const file = e.target.files?.[0]
@@ -140,8 +178,6 @@ function CartPage({ user }) {
     }
   }
 
-
-
   // Proceed to payment step (for delivery)
   const proceedToPayment = async () => {
     if (!phone.trim()) {
@@ -153,13 +189,17 @@ function CartPage({ user }) {
       return
     }
 
-    // If pickup - place order directly
-    if (orderType === 'pickup') {
+    if (['click', 'payme'].includes(selectedPaymentMethod)) {
+      await handleOnlinePayment(selectedPaymentMethod)
+      return
+    }
+
+    if (selectedPaymentMethod === 'cash') {
       await placeOrder()
       return
     }
 
-    // If delivery - fetch payment card and show payment step
+    // If card transfer - fetch payment card and show payment step
     setOrderLoading(true)
     try {
       const storeId = cartItems[0]?.offer?.store_id || 0
@@ -194,6 +234,7 @@ function CartPage({ user }) {
         comment: `${orderType === 'pickup' ? 'O\'zi olib ketadi' : 'Yetkazib berish'}\n${comment.trim()}`.trim(),
         order_type: orderType,
         delivery_fee: orderType === 'delivery' ? deliveryFee : 0,
+        payment_method: selectedPaymentMethod,
       }
 
       localStorage.setItem('fudly_phone', phone.trim())
@@ -214,6 +255,7 @@ function CartPage({ user }) {
         // Order created successfully - show success with payment instructions
         clearCart()
         setShowCheckout(false)
+        setShowPaymentSheet(false)
         setCheckoutStep('details')
         setPaymentCard(result.payment_card || null)
         setCreatedOrderId(orderId)
@@ -230,7 +272,7 @@ function CartPage({ user }) {
       }
 
       // If delivery and we have payment proof - upload it
-      if (orderType === 'delivery' && paymentProof && orderId) {
+      if (selectedPaymentMethod === 'card' && paymentProof && orderId) {
         try {
           await api.uploadPaymentProof(orderId, paymentProof)
         } catch (e) {
@@ -240,6 +282,7 @@ function CartPage({ user }) {
 
       clearCart()
       setShowCheckout(false)
+      setShowPaymentSheet(false)
       setCheckoutStep('details')
       setPaymentProof(null)
       setPaymentProofPreview(null)
@@ -273,14 +316,12 @@ function CartPage({ user }) {
     }
   }
 
-  // Handle Click payment
-  const handleClickPayment = async () => {
-    // Check if Click is available
-    const isClickAvailable = paymentProviders.includes('click');
-
-    if (!isClickAvailable) {
-      toast.error('Click to\'lov vaqtincha mavjud emas. Boshqa to\'lov usulini tanlang.');
-      return;
+  // Handle online payment (Click/Payme)
+  const handleOnlinePayment = async (provider) => {
+    if (!isProviderAvailable(provider)) {
+      const providerLabel = paymentMethodLabels[provider] || provider
+      toast.error(`${providerLabel} to\'lov vaqtincha mavjud emas. Boshqa to\'lov usulini tanlang.`)
+      return
     }
 
     setOrderLoading(true)
@@ -299,7 +340,7 @@ function CartPage({ user }) {
         comment: `${orderType === 'pickup' ? 'O\'zi olib ketadi' : 'Yetkazib berish'}\n${comment.trim()}`.trim(),
         order_type: orderType,
         delivery_fee: orderType === 'delivery' ? deliveryFee : 0,
-        payment_method: 'click',
+        payment_method: provider,
       }
 
       localStorage.setItem('fudly_phone', phone.trim())
@@ -314,13 +355,14 @@ function CartPage({ user }) {
       const storeId = cartItems[0]?.offer?.store_id || null
       const returnUrl = window.location.origin + '/profile'
 
-      // Create Click payment link
-      const paymentData = await api.createPaymentLink(orderId, 'click', returnUrl, storeId, total, userId)
+      // Create payment link
+      const paymentData = await api.createPaymentLink(orderId, provider, returnUrl, storeId, total, userId)
 
       if (paymentData.payment_url) {
         clearCart()
         setShowCheckout(false)
-        // Open Click payment
+        setShowPaymentSheet(false)
+        // Open payment
         if (window.Telegram?.WebApp) {
           window.Telegram.WebApp.openLink(paymentData.payment_url)
         } else {
@@ -330,8 +372,9 @@ function CartPage({ user }) {
         throw new Error('Payment URL not received')
       }
     } catch (error) {
-      console.error('Click payment error:', error)
-      toast.error('Click to\'lovda xatolik: ' + (error.message || 'Noma\'lum xatolik'))
+      console.error('Online payment error:', error)
+      const providerLabel = paymentMethodLabels[provider] || provider
+      toast.error(`${providerLabel} to\'lovda xatolik: ` + (error.message || 'Noma\'lum xatolik'))
       if (createdOrderId) {
         navigate(`/order/${createdOrderId}`)
       }
@@ -345,7 +388,10 @@ function CartPage({ user }) {
     return (
       <div className="cart-page">
         <header className="cart-header">
-          <div className="cart-header-title">
+          <div className="cart-header-left">
+            <button className="cart-back-btn" onClick={() => navigate(-1)} aria-label="Orqaga">
+              <ArrowLeft size={20} strokeWidth={2} />
+            </button>
             <h1>Savat</h1>
           </div>
         </header>
@@ -377,12 +423,17 @@ function CartPage({ user }) {
   return (
     <div className="cart-page">
       <header className="cart-header">
-        <div className="cart-header-title">
-          <h1>Savat</h1>
-          <span className="cart-header-count">{itemsCount} ta</span>
+        <div className="cart-header-left">
+          <button className="cart-back-btn" onClick={() => navigate(-1)} aria-label="Orqaga">
+            <ArrowLeft size={20} strokeWidth={2} />
+          </button>
+          <div className="cart-header-title">
+            <h1>Savat</h1>
+            <span className="cart-header-count">{itemsCount} ta</span>
+          </div>
         </div>
-        <button className="clear-cart-btn" onClick={clearCart}>
-          Tozalash
+        <button className="clear-cart-btn" onClick={clearCart} aria-label="Savatni tozalash">
+          <Trash2 size={18} strokeWidth={2} />
         </button>
       </header>
 
@@ -415,6 +466,9 @@ function CartPage({ user }) {
               <p className="cart-item-price">
                 {Math.round(item.offer.discount_price).toLocaleString()} so'm
               </p>
+              <button className="cart-item-comment" type="button" onClick={handleCommentShortcut}>
+                Izoh qoldirish
+              </button>
               {item.offer.store_name && (
                 <p className="cart-item-store">Do'kon: {item.offer.store_name}</p>
               )}
@@ -439,26 +493,12 @@ function CartPage({ user }) {
       </div>
 
       <div className="cart-sticky-checkout">
-        <div className="cart-summary">
-          <div className="cart-summary-title">Yakun</div>
-          <div className="summary-row">
-            <span>Mahsulotlar ({itemsCount} ta)</span>
-            <span>{Math.round(subtotal).toLocaleString()} so'm</span>
-          </div>
-          {orderType === 'delivery' && (
-            <div className="summary-row delivery-fee">
-              <span>Yetkazib berish</span>
-              <span>{Math.round(deliveryFee).toLocaleString()} so'm</span>
-            </div>
-          )}
-          <div className="summary-row total">
-            <span>Jami</span>
-            <span>{Math.round(total).toLocaleString()} so'm</span>
-          </div>
+        <div className="checkout-total">
+          <span className="checkout-total-label">Jami</span>
+          <span className="checkout-total-value">{Math.round(total).toLocaleString()} so'm</span>
         </div>
-
-        <button className="btn-primary checkout-btn" onClick={handleCheckout}>
-          Buyurtma berish
+        <button className="checkout-primary-btn" onClick={handleCheckout}>
+          Keyingi
         </button>
       </div>
 
@@ -466,34 +506,21 @@ function CartPage({ user }) {
 
       {/* Checkout Modal */}
       {showCheckout && (
-        <div className="modal-overlay" onClick={() => !orderLoading && setShowCheckout(false)}>
+        <div className="modal-overlay checkout-overlay" onClick={closeCheckout}>
           <div className="modal checkout-modal" onClick={e => e.stopPropagation()}>
-        <div className="modal-header">
-          <div className="modal-header-main">
-            <h2>
-              {checkoutStep === 'details' && 'Buyurtmani tasdiqlash'}
-              {checkoutStep === 'payment' && 'To\'lov'}
-            </h2>
-            <button
-              className="modal-close"
-              onClick={() => !orderLoading && setShowCheckout(false)}
-            >x</button>
-          </div>
-          <div className="modal-steps" role="list">
-            <div className={`modal-step ${checkoutStep === 'details' ? 'active' : ''} ${checkoutStep !== 'details' ? 'done' : ''}`} role="listitem">
-              <span className="modal-step-dot"></span>
-              <span className="modal-step-label">Ma'lumotlar</span>
+            <div className="sheet-handle" aria-hidden="true"></div>
+            <div className="modal-header">
+              <div className="modal-header-main">
+                <h2>
+                  {checkoutStep === 'details' && (orderType === 'delivery' ? 'Yetkazib berish' : 'Olib ketish')}
+                  {checkoutStep === 'payment' && 'To\'lov'}
+                </h2>
+                <button
+                  className="modal-close"
+                  onClick={closeCheckout}
+                >x</button>
+              </div>
             </div>
-            <div className={`modal-step ${checkoutStep === 'payment' ? 'active' : ''} ${checkoutStep === 'payment_upload' ? 'done' : ''}`} role="listitem">
-              <span className="modal-step-dot"></span>
-              <span className="modal-step-label">To'lov</span>
-            </div>
-            <div className={`modal-step ${checkoutStep === 'payment_upload' ? 'active' : ''}`} role="listitem">
-              <span className="modal-step-dot"></span>
-              <span className="modal-step-label">Chek</span>
-            </div>
-          </div>
-        </div>
 
             <div className="modal-body">
               {/* Step 1: Order Details */}
@@ -501,14 +528,14 @@ function CartPage({ user }) {
                 <>
                   {/* Order Type Selection */}
                   <div className="order-type-section">
-                    <p className="section-label">Buyurtma turi:</p>
+                    <p className="section-label">Yetkazish turi</p>
                     <div className="order-type-options">
                       <button
                         className={`order-type-btn ${orderType === 'pickup' ? 'active' : ''}`}
                         onClick={() => setOrderType('pickup')}
                       >
-                        <span className="order-type-icon">O</span>
-                        <span className="order-type-text">O'zi olib ketadi</span>
+                        <span className="order-type-icon">✓</span>
+                        <span className="order-type-text">Olib ketish</span>
                         <span className="order-type-desc">Bepul</span>
                       </button>
 
@@ -517,7 +544,7 @@ function CartPage({ user }) {
                         onClick={() => storeDeliveryEnabled && canDelivery && setOrderType('delivery')}
                         disabled={!storeDeliveryEnabled || !canDelivery}
                       >
-                        <span className="order-type-icon">Y</span>
+                        <span className="order-type-icon">✓</span>
                         <span className="order-type-text">Yetkazib berish</span>
                         <span className="order-type-desc">
                           {!storeDeliveryEnabled
@@ -563,15 +590,28 @@ function CartPage({ user }) {
                   )}
 
                   <label className="form-label">
-                    Izoh
+                    Izoh (kuryerga)
                     <textarea
                       className="form-textarea"
                       placeholder="Qo'shimcha ma'lumot..."
                       value={comment}
                       onChange={e => setComment(e.target.value)}
                       onKeyDown={blurOnEnter}
+                      ref={commentInputRef}
                     />
                   </label>
+
+                  <button
+                    type="button"
+                    className="checkout-row checkout-row-button"
+                    onClick={() => setShowPaymentSheet(true)}
+                  >
+                    <div className="checkout-row-left">
+                      <span className="checkout-row-title">To'lov</span>
+                      <span className="checkout-row-subtitle">{paymentMethodLabels[selectedPaymentMethod]}</span>
+                    </div>
+                    <ChevronRight size={18} />
+                  </button>
 
                   <div className="order-summary">
                     <div className="summary-line">
@@ -595,37 +635,6 @@ function CartPage({ user }) {
               {/* Step 2: Payment (for delivery) */}
               {checkoutStep === 'payment' && (
                 <div className="payment-step">
-                  {/* Payment Method Selection */}
-                  <div className="payment-methods">
-                    <p className="payment-label">To'lov usulini tanlang:</p>
-                    <div className="payment-options">
-                      <button
-                        className={`payment-option ${selectedPaymentMethod === 'card' ? 'active' : ''}`}
-                        onClick={() => setSelectedPaymentMethod('card')}
-                      >
-                        Kartaga o'tkazish
-                      </button>
-                      {paymentProviders.includes('click') ? (
-                        <button
-                          className={`payment-option ${selectedPaymentMethod === 'click' ? 'active' : ''}`}
-                          onClick={() => setSelectedPaymentMethod('click')}
-                        >
-                          <img src="https://click.uz/favicon.ico" alt="Click" style={{width: 20, height: 20, marginRight: 8}} onError={(e) => e.target.style.display = 'none'} />
-                          Click
-                        </button>
-                      ) : (
-                        <button
-                          className="payment-option disabled"
-                          disabled
-                          title="Click vaqtincha mavjud emas"
-                        >
-                          <img src="https://click.uz/favicon.ico" alt="Click" style={{width: 20, height: 20, marginRight: 8, opacity: 0.5}} onError={(e) => e.target.style.display = 'none'} />
-                          Click (mavjud emas)
-                        </button>
-                      )}
-                    </div>
-                  </div>
-
                   {/* Card Transfer UI */}
                   {selectedPaymentMethod === 'card' && paymentCard && (
                     <>
@@ -701,19 +710,6 @@ function CartPage({ user }) {
                       </div>
                     </>
                   )}
-
-                  {/* Click Payment UI */}
-                  {selectedPaymentMethod === 'click' && (
-                    <div className="click-payment-info">
-                      <p className="click-instruction">
-                        Click orqali to'lov qilish uchun "Click bilan to'lash" tugmasini bosing.
-                      </p>
-                      <div className="payment-amount">
-                        <span>To'lov summasi:</span>
-                        <strong>{Math.round(total).toLocaleString()} so'm</strong>
-                      </div>
-                    </div>
-                  )}
                 </div>
               )}
             </div>
@@ -721,19 +717,16 @@ function CartPage({ user }) {
             <div className="modal-footer">
               {checkoutStep === 'details' && (
                 <>
+                  <div className="checkout-footer-total">
+                    <span>Jami</span>
+                    <strong>{Math.round(total).toLocaleString()} so'm</strong>
+                  </div>
                   <button
-                    className="cancel-btn"
-                    onClick={() => setShowCheckout(false)}
-                    disabled={orderLoading}
-                  >
-                    Bekor qilish
-                  </button>
-                  <button
-                    className="confirm-btn"
+                    className="checkout-footer-btn"
                     onClick={proceedToPayment}
                     disabled={orderLoading || !phone.trim() || (orderType === 'delivery' && !address.trim())}
                   >
-                    {orderLoading ? '...' : orderType === 'delivery' ? 'To\'lovga o\'tish' : 'Tasdiqlash'}
+                    {orderLoading ? '...' : selectedPaymentMethod === 'card' ? 'To\'lovga o\'tish' : 'Buyurtma berish'}
                   </button>
                 </>
               )}
@@ -747,23 +740,13 @@ function CartPage({ user }) {
                   >
                     {'<- Orqaga'}
                   </button>
-                  {selectedPaymentMethod === 'card' ? (
-                    <button
-                      className="confirm-btn"
-                      onClick={placeOrder}
-                      disabled={orderLoading || !paymentProof}
-                    >
-                      {orderLoading ? 'Yuborilmoqda...' : 'Buyurtma berish'}
-                    </button>
-                  ) : (
-                    <button
-                      className="confirm-btn click-btn"
-                      onClick={handleClickPayment}
-                      disabled={orderLoading}
-                    >
-                      {orderLoading ? '...' : 'Click bilan to\'lash'}
-                    </button>
-                  )}
+                  <button
+                    className="confirm-btn"
+                    onClick={placeOrder}
+                    disabled={orderLoading || !paymentProof}
+                  >
+                    {orderLoading ? 'Yuborilmoqda...' : 'Buyurtma berish'}
+                  </button>
                 </>
               )}
 
@@ -913,6 +896,64 @@ function CartPage({ user }) {
                 </button>
               </>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* Payment Methods Sheet */}
+      {showPaymentSheet && (
+        <div className="modal-overlay payment-sheet-overlay" onClick={() => setShowPaymentSheet(false)}>
+          <div className="modal payment-sheet" onClick={e => e.stopPropagation()}>
+            <div className="payment-sheet-header">
+              <h3>To'lov usullari</h3>
+              <button className="modal-close" onClick={() => setShowPaymentSheet(false)}>x</button>
+            </div>
+            <div className="payment-sheet-list">
+              <button
+                className={`payment-sheet-item ${selectedPaymentMethod === 'cash' ? 'active' : ''}`}
+                onClick={() => {
+                  selectPaymentMethod('cash')
+                  setShowPaymentSheet(false)
+                }}
+              >
+                <span className="payment-sheet-label">Naqd</span>
+                <span className="payment-sheet-radio" aria-hidden="true"></span>
+              </button>
+              <button
+                className={`payment-sheet-item ${selectedPaymentMethod === 'card' ? 'active' : ''}`}
+                onClick={() => {
+                  selectPaymentMethod('card')
+                  setShowPaymentSheet(false)
+                }}
+              >
+                <span className="payment-sheet-label">Kartaga o'tkazish</span>
+                <span className="payment-sheet-radio" aria-hidden="true"></span>
+              </button>
+              <button
+                className={`payment-sheet-item ${selectedPaymentMethod === 'click' ? 'active' : ''} ${!isProviderAvailable('click') ? 'disabled' : ''}`}
+                onClick={() => {
+                  if (!isProviderAvailable('click')) return
+                  selectPaymentMethod('click')
+                  setShowPaymentSheet(false)
+                }}
+                disabled={!isProviderAvailable('click')}
+              >
+                <span className="payment-sheet-label">Click</span>
+                <span className="payment-sheet-radio" aria-hidden="true"></span>
+              </button>
+              <button
+                className={`payment-sheet-item ${selectedPaymentMethod === 'payme' ? 'active' : ''} ${!isProviderAvailable('payme') ? 'disabled' : ''}`}
+                onClick={() => {
+                  if (!isProviderAvailable('payme')) return
+                  selectPaymentMethod('payme')
+                  setShowPaymentSheet(false)
+                }}
+                disabled={!isProviderAvailable('payme')}
+              >
+                <span className="payment-sheet-label">Payme</span>
+                <span className="payment-sheet-radio" aria-hidden="true"></span>
+              </button>
+            </div>
           </div>
         </div>
       )}
