@@ -433,6 +433,11 @@ async def get_store_info(authorization: str = Header(None)):
     telegram_id = verify_telegram_webapp(authorization)
     user, store = get_partner_with_store(telegram_id)
 
+    delivery_price_raw = int(store.get("delivery_price") or 0)
+    min_order_raw = int(store.get("min_order_amount") or 0)
+    delivery_price = delivery_price_raw // 100 if delivery_price_raw else 0
+    min_order_amount = min_order_raw // 100 if min_order_raw else 0
+
     return {
         "store_id": store.get("store_id"),
         "name": store.get("name"),
@@ -442,8 +447,11 @@ async def get_store_info(authorization: str = Header(None)):
         "status": store.get("status"),
         "is_open": store.get("status") in ("approved", "active", "open"),
         "working_hours": store.get("working_hours") or "09:00 - 21:00",
-        "min_order": store.get("min_order") or 0,
-        "delivery_cost": store.get("delivery_cost") or 0,
+        "delivery_enabled": bool(store.get("delivery_enabled")),
+        "delivery_price": delivery_price,
+        "min_order_amount": min_order_amount,
+        "min_order": min_order_amount,
+        "delivery_cost": delivery_price,
     }
 
 
@@ -1314,13 +1322,55 @@ async def update_store(settings: dict, authorization: str = Header(None)):
     user, store = get_partner_with_store(telegram_id)
     db = get_db()
 
+    def _parse_bool(value, fallback=False):
+        if isinstance(value, bool):
+            return value
+        if isinstance(value, int):
+            return value != 0
+        if isinstance(value, str):
+            return value.strip().lower() in {"1", "true", "yes", "on"}
+        return fallback
+
+    def _parse_int(value, fallback=0):
+        try:
+            return int(float(value))
+        except (TypeError, ValueError):
+            return fallback
+
+    delivery_enabled = _parse_bool(
+        settings.get("delivery_enabled", store.get("delivery_enabled", 0)),
+        bool(store.get("delivery_enabled", 0)),
+    )
+    delivery_price_input = settings.get("delivery_price", settings.get("delivery_cost"))
+    min_order_input = settings.get("min_order_amount", settings.get("min_order"))
+
+    delivery_price = (
+        _parse_int(delivery_price_input, int(store.get("delivery_price") or 0) // 100)
+        if delivery_price_input is not None
+        else int(store.get("delivery_price") or 0) // 100
+    )
+    min_order_amount = (
+        _parse_int(min_order_input, int(store.get("min_order_amount") or 0) // 100)
+        if min_order_input is not None
+        else int(store.get("min_order_amount") or 0) // 100
+    )
+
+    delivery_price_kopeks = max(0, int(delivery_price) * 100)
+    min_order_kopeks = max(0, int(min_order_amount) * 100)
+
     # Update existing store via SQL
     with db.get_connection() as conn:
         cursor = conn.cursor()
         cursor.execute(
             """
             UPDATE stores
-            SET name = %s, address = %s, phone = %s, description = %s
+            SET name = %s,
+                address = %s,
+                phone = %s,
+                description = %s,
+                delivery_enabled = %s,
+                delivery_price = %s,
+                min_order_amount = %s
             WHERE store_id = %s
         """,
             (
@@ -1328,6 +1378,9 @@ async def update_store(settings: dict, authorization: str = Header(None)):
                 settings.get("address", store.get("address")),
                 settings.get("phone", store.get("phone")),
                 settings.get("description", store.get("description")),
+                int(delivery_enabled),
+                delivery_price_kopeks,
+                min_order_kopeks,
                 store["store_id"],
             ),
         )

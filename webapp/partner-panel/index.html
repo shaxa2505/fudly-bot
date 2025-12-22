@@ -1374,7 +1374,7 @@
                                     <div class="form-section-icon">??</div>
                                     <div>
                                         <h4 class="form-section-title">???? ??????</h4>
-                                        <p class="form-section-subtitle">???? ???????? ???????</p>
+                                        <p class="form-section-subtitle">??????????? ??? ??????? ????</p>
                                     </div>
                                 </div>
                                 <input type="hidden" name="photo_id" value="${product?.photo_id || ''}">
@@ -1399,7 +1399,7 @@
                                 <div class="form-section-header">
                                     <div class="form-section-icon">??</div>
                                     <div>
-                                        <h4 class="form-section-title">???????? ??????????</h4>
+                                        <h4 class="form-section-title">?????????? ? ??????</h4>
                                         <p class="form-section-subtitle">????????, ?????????, ????????</p>
                                     </div>
                                 </div>
@@ -1418,12 +1418,12 @@
                                         <option value="">???????? ?????????</option>
                                         <option value="bakery" ${product?.category === 'bakery' ? 'selected' : ''}>?? ???????</option>
                                         <option value="dairy" ${product?.category === 'dairy' ? 'selected' : ''}>?? ???????? ????????</option>
-                                        <option value="meat" ${product?.category === 'meat' ? 'selected' : ''}>?? ???? ? ?????</option>
+                                        <option value="meat" ${product?.category === 'meat' ? 'selected' : ''}>?? ???? ? ????</option>
                                         <option value="fruits" ${product?.category === 'fruits' ? 'selected' : ''}>?? ??????</option>
                                         <option value="vegetables" ${product?.category === 'vegetables' ? 'selected' : ''}>?? ?????</option>
                                         <option value="drinks" ${product?.category === 'drinks' ? 'selected' : ''}>?? ???????</option>
                                         <option value="sweets" ${product?.category === 'sweets' ? 'selected' : ''}>?? ????????</option>
-                                        <option value="frozen" ${product?.category === 'frozen' ? 'selected' : ''}>?? ????????????</option>
+                                        <option value="frozen" ${product?.category === 'frozen' ? 'selected' : ''}>?? ?????????</option>
                                         <option value="other" ${!product?.category || product?.category === 'other' ? 'selected' : ''}>?? ??????</option>
                                     </select>
                                 </div>
@@ -1431,7 +1431,7 @@
                                 <div class="form-group">
                                     <label>????????</label>
                                     <textarea name="description" rows="3" class="search-input" maxlength="500"
-                                              oninput="updateCharCounter(this)" placeholder="?????? ? ??????">${product?.description || ''}</textarea>
+                                              oninput="updateCharCounter(this)" placeholder="??????? ? ????????">${product?.description || ''}</textarea>
                                     <div class="char-counter">${product?.description?.length || 0}/500</div>
                                 </div>
                             </div>
@@ -1441,7 +1441,7 @@
                                     <div class="form-section-icon">??</div>
                                     <div>
                                         <h4 class="form-section-title">???? ? ??????</h4>
-                                        <p class="form-section-subtitle">???? ? ????? ? ??????</p>
+                                        <p class="form-section-subtitle">???? ? ?????? ?? ???????</p>
                                     </div>
                                 </div>
 
@@ -1474,7 +1474,7 @@
                                         <span id="priceOriginal" class="price-preview-value original">?</span>
                                     </div>
                                     <div class="price-preview-row">
-                                        <span class="price-preview-label price-preview-label-strong">?????:</span>
+                                        <span class="price-preview-label price-preview-label-strong">????:</span>
                                         <span id="priceFinal" class="price-preview-value final">?</span>
                                     </div>
                                     <div class="price-preview-savings">
@@ -1486,10 +1486,10 @@
 
                             <div class="form-section">
                                 <div class="form-section-header">
-                                    <div class="form-section-icon">??</div>
+                                    <div class="form-section-icon">???</div>
                                     <div>
                                         <h4 class="form-section-title">??????? ? ????</h4>
-                                        <p class="form-section-subtitle">????? ? ???? ????????</p>
+                                        <p class="form-section-subtitle">??????? ? ???? ????????</p>
                                     </div>
                                 </div>
 
@@ -1498,11 +1498,11 @@
                                         <label>??????? *</label>
                                         <select name="unit" required class="search-input">
                                             <option value="??" ${product?.unit === '??' ? 'selected' : ''}>????? (??)</option>
-                                            <option value="??" ${product?.unit === '??' ? 'selected' : ''}>????????? (??)</option>
-                                            <option value="?" ${product?.unit === '?' ? 'selected' : ''}>????? (?)</option>
-                                            <option value="?" ${product?.unit === '?' ? 'selected' : ''}>????? (?)</option>
                                             <option value="??" ${product?.unit === '??' ? 'selected' : ''}>?????????? (??)</option>
-                                            <option value="????" ${product?.unit === '????' ? 'selected' : ''}>???????? (????)</option>
+                                            <option value="?" ${product?.unit === '?' ? 'selected' : ''}>????? (?)</option>
+                                            <option value="??" ${product?.unit === '??' ? 'selected' : ''}>???????? (??)</option>
+                                            <option value="?" ${product?.unit === '?' ? 'selected' : ''}>?????? (?)</option>
+                                            <option value="??" ${product?.unit === '??' ? 'selected' : ''}>?????????? (??)</option>
                                         </select>
                                     </div>
                                     <div class="form-group">
@@ -1539,7 +1539,7 @@
                                 <div class="form-group">
                                     <label class="checkbox-label">
                                         <input type="checkbox" name="is_available" ${product?.is_available !== false ? 'checked' : ''}>
-                                        <span>???????? ??? ??????</span>
+                                        <span>???????? ??? ???????</span>
                                     </label>
                                 </div>
                             </div>
@@ -1581,7 +1581,7 @@
             if (!file) return;
 
             if (!file.type.startsWith('image/')) {
-                toast('????????? ???? ???????????', 'error');
+                toast('?????????? ? ???????', 'error');
                 input.value = '';
                 return;
             }
@@ -1711,7 +1711,7 @@
 
                 if (!title || title.length < 3) throw new Error('??????? ???????? (???. 3 ???????)');
                                 if (!productId && stockQty <= 0) throw new Error('??????? ?????????? ?????? 0');
-if (!originalPrice || originalPrice <= 0) throw new Error('???????????? ???? ???????????');
+if (!originalPrice || originalPrice <= 0) throw new Error('??????????? ???????????');
                 if (!expiryDate) throw new Error('??????? ???? ????????');
 
                 let discountPrice = Number.isFinite(discountPriceInput) && discountPriceInput > 0
@@ -2117,6 +2117,10 @@ async function toggleProductAvailability(id) {
                     state.store = await apiFetch('/api/partner/store');
                 }
 
+                const deliveryEnabled = Boolean(state.store?.delivery_enabled);
+                const minOrderAmount = Number(state.store?.min_order_amount ?? state.store?.min_order ?? 0);
+                const deliveryPrice = Number(state.store?.delivery_price ?? state.store?.delivery_cost ?? 0);
+
                 document.querySelector('.content').innerHTML = `
                     <div class="container fade-in">
                         <h2 class="section-title">Настройки</h2>
@@ -2321,6 +2325,96 @@ async function toggleProductAvailability(id) {
                     modal.remove();
                 }
             });
+        }
+
+        function editDeliverySettings() {
+            haptic('light');
+            const modal = document.createElement('div');
+            modal.className = 'modal-overlay scale-in';
+            modal.innerHTML = `
+                <div class="modal-content modal-md">
+                    <div class="modal-header">
+                        <h3>????????? ????????</h3>
+                        <button class="btn-icon ripple" onclick="this.closest('.modal-overlay').remove()">
+                            <i data-lucide="x"></i>
+                        </button>
+                    </div>
+                    <form onsubmit="saveDeliverySettings(event)">
+                        <div class="modal-body">
+                            <div class="form-group">
+                                <label class="checkbox-label">
+                                    <input type="checkbox" name="delivery_enabled" ${state.store?.delivery_enabled ? 'checked' : ''}>
+                                    <span>???????? ????????</span>
+                                </label>
+                            </div>
+
+                            <div class="form-group">
+                                <label>??????????? ????? (???)</label>
+                                <input type="number" name="min_order_amount" value="${state.store?.min_order_amount ?? state.store?.min_order ?? 0}"
+                                       min="0" step="1" class="search-input" oninput="validateField(this)">
+                            </div>
+
+                            <div class="form-group">
+                                <label>????????? ???????? (???)</label>
+                                <input type="number" name="delivery_price" value="${state.store?.delivery_price ?? state.store?.delivery_cost ?? 0}"
+                                       min="0" step="1" class="search-input" oninput="validateField(this)">
+                            </div>
+                        </div>
+
+                        <div class="modal-footer">
+                            <button type="submit" class="btn btn-primary ripple">?????????</button>
+                            <button type="button" class="btn btn-secondary ripple" onclick="this.closest('.modal-overlay').remove()">??????</button>
+                        </div>
+                    </form>
+                </div>
+            `;
+
+            document.body.appendChild(modal);
+            if (typeof lucide !== 'undefined') lucide.createIcons();
+
+            modal.addEventListener('click', (e) => {
+                if (e.target === modal) {
+                    haptic('light');
+                    modal.remove();
+                }
+            });
+        }
+
+        async function saveDeliverySettings(event) {
+            event.preventDefault();
+            haptic('medium');
+
+            const formData = new FormData(event.target);
+            const deliveryEnabled = formData.get('delivery_enabled') === 'on';
+            const minOrderAmount = parseInt(formData.get('min_order_amount'), 10) || 0;
+            const deliveryPrice = parseInt(formData.get('delivery_price'), 10) || 0;
+
+            try {
+                await apiFetch('/api/partner/store', {
+                    method: 'PUT',
+                    body: JSON.stringify({
+                        delivery_enabled: deliveryEnabled,
+                        min_order_amount: minOrderAmount,
+                        delivery_price: deliveryPrice
+                    })
+                });
+
+                state.store = {
+                    ...state.store,
+                    delivery_enabled: deliveryEnabled,
+                    min_order_amount: minOrderAmount,
+                    delivery_price: deliveryPrice,
+                    min_order: minOrderAmount,
+                    delivery_cost: deliveryPrice
+                };
+
+                toast('????????? ???????? ?????????', 'success');
+                document.querySelector('.modal-overlay').remove();
+                loadSettings();
+            } catch (error) {
+                console.error('Delivery settings error:', error);
+                toast('?????? ?????????? ????????', 'error');
+            }
         }
 
         async function saveStoreProfile(event) {

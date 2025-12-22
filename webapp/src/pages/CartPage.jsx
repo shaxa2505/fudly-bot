@@ -75,21 +75,19 @@ function CartPage({ user }) {
       if (storeIds.length === 0) return
 
       try {
-        // Check first store for simplicity
-        const stores = await api.getStores({})
-        const cartStore = stores.find(s => storeIds.includes(s.id))
+        const storeId = storeIds[0]
+        const cartStore = await api.getStore(storeId)
 
         if (cartStore) {
-          setStoreDeliveryEnabled(cartStore.delivery_enabled || false)
-          setDeliveryFee(cartStore.delivery_price || 15000)
-          setMinOrderAmount(cartStore.min_order_amount || 30000)
+          setStoreDeliveryEnabled(!!cartStore.delivery_enabled)
+          setDeliveryFee(cartStore.delivery_price || 0)
+          setMinOrderAmount(cartStore.min_order_amount || 0)
         }
       } catch (e) {
         console.warn('Could not fetch store info:', e)
-        // Default values
-        setStoreDeliveryEnabled(true)
-        setDeliveryFee(15000)
-        setMinOrderAmount(30000)
+        setStoreDeliveryEnabled(false)
+        setDeliveryFee(0)
+        setMinOrderAmount(0)
       }
     }
 
