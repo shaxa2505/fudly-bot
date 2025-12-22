@@ -2388,24 +2388,8 @@ async def create_webhook_app(
     app.router.add_get("/", health_check)  # Railway health check
 
     # Mini App API routes
-    app.router.add_options("/api/v1/categories", cors_preflight)
-    app.router.add_get("/api/v1/categories", api_categories)
-    app.router.add_options("/api/v1/offers", cors_preflight)
-    app.router.add_get("/api/v1/offers", api_offers)
-    app.router.add_options("/api/v1/offers/{offer_id}", cors_preflight)
-    app.router.add_get("/api/v1/offers/{offer_id}", api_offer_detail)
-    app.router.add_options("/api/v1/stores", cors_preflight)
-    app.router.add_get("/api/v1/stores", api_stores)
-    # Alias for compatibility
-    app.router.add_options("/api/v1/user/orders", cors_preflight)
-    app.router.add_get("/api/v1/user/orders", api_user_orders)
-    app.router.add_options("/api/v1/user/bookings", cors_preflight)
-    app.router.add_get("/api/v1/user/bookings", api_user_orders)
-    app.router.add_options("/api/v1/photo/{file_id}", cors_preflight)
-    app.router.add_get("/api/v1/photo/{file_id}", api_get_photo)
     app.router.add_options("/api/v1/payment-card/{store_id}", cors_preflight)
     app.router.add_get("/api/v1/payment-card/{store_id}", api_get_payment_card)
-    app.router.add_get("/api/v1/health", api_health)
     app.router.add_get("/api/v1/debug", api_debug)
 
     # User history routes (recently viewed, search history)
@@ -2417,9 +2401,6 @@ async def create_webhook_app(
     app.router.add_get("/api/v1/user/search-history", api_get_search_history)
     app.router.add_delete("/api/v1/user/search-history", api_clear_search_history)
 
-    # Store reviews routes
-    app.router.add_options("/api/v1/stores/{store_id}/reviews", cors_preflight)
-    app.router.add_get("/api/v1/stores/{store_id}/reviews", api_get_store_reviews)
 
     # Payment routes
     app.router.add_options("/api/v1/payment/providers", cors_preflight)
@@ -2498,8 +2479,26 @@ async def create_webhook_app(
 
     if fastapi_handler:
         app.router.add_route("*", "/api/v1/orders{path:.*}", fastapi_handler)
+        app.router.add_route("*", "/api/v1/user/orders{path:.*}", fastapi_handler)
+        app.router.add_route("*", "/api/v1/user/bookings{path:.*}", fastapi_handler)
+        app.router.add_route("*", "/api/v1/categories{path:.*}", fastapi_handler)
+        app.router.add_route("*", "/api/v1/offers{path:.*}", fastapi_handler)
+        app.router.add_route("*", "/api/v1/stores{path:.*}", fastapi_handler)
+        app.router.add_route("*", "/api/v1/photo{path:.*}", fastapi_handler)
+        app.router.add_route("*", "/api/v1/health{path:.*}", fastapi_handler)
         logger.info("✅ /api/v1/orders routed to FastAPI")
     else:
+        app.router.add_options("/api/v1/categories", cors_preflight)
+        app.router.add_get("/api/v1/categories", api_categories)
+        app.router.add_options("/api/v1/offers", cors_preflight)
+        app.router.add_get("/api/v1/offers", api_offers)
+        app.router.add_options("/api/v1/offers/{offer_id}", cors_preflight)
+        app.router.add_get("/api/v1/offers/{offer_id}", api_offer_detail)
+        app.router.add_options("/api/v1/stores", cors_preflight)
+        app.router.add_get("/api/v1/stores", api_stores)
+        app.router.add_options("/api/v1/photo/{file_id}", cors_preflight)
+        app.router.add_get("/api/v1/photo/{file_id}", api_get_photo)
+        app.router.add_get("/api/v1/health", api_health)
         app.router.add_options("/api/v1/orders", cors_preflight)
         app.router.add_post("/api/v1/orders", api_create_order)
         app.router.add_get("/api/v1/orders", api_user_orders)
@@ -2511,6 +2510,8 @@ async def create_webhook_app(
         app.router.add_get("/api/v1/orders/{order_id}/qr", api_order_qr)
         app.router.add_options("/api/v1/orders/{order_id}/payment-proof", cors_preflight)
         app.router.add_post("/api/v1/orders/{order_id}/payment-proof", api_upload_payment_proof)
+        app.router.add_options("/api/v1/stores/{store_id}/reviews", cors_preflight)
+        app.router.add_get("/api/v1/stores/{store_id}/reviews", api_get_store_reviews)
 
     # Setup WebSocket routes for real-time notifications
     setup_websocket_routes(app)

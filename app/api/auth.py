@@ -361,12 +361,24 @@ async def get_user_orders(
                 )
             )
 
-        return OrdersHistoryResponse(
-            orders=orders_list,
-            total_count=len(bookings),
-            active_count=active_count,
-            completed_count=completed_count,
-        )
+    return OrdersHistoryResponse(
+        orders=orders_list,
+        total_count=len(bookings),
+        active_count=active_count,
+        completed_count=completed_count,
+    )
+
+
+@router.get("/user/bookings", response_model=OrdersHistoryResponse)
+async def get_user_bookings(
+    user_id: int,
+    status: str | None = None,
+    limit: int = 50,
+    x_telegram_init_data: str = Header(None, alias="X-Telegram-Init-Data"),
+    db=Depends(get_db),
+) -> OrdersHistoryResponse:
+    """Alias for bookings history (compatibility)."""
+    return await get_user_orders(user_id, status, limit, x_telegram_init_data, db)
 
     except Exception as e:
         logger.error(f"Error getting user orders: {e}")

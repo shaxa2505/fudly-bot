@@ -105,6 +105,30 @@ def get_partner_with_store(telegram_id: int) -> tuple[dict, dict]:
     return user, store
 
 
+async def _load_json_payload(request: Request) -> dict:
+    """Return JSON payload when content-type is application/json."""
+    content_type = (request.headers.get("content-type") or "").lower()
+    if "application/json" not in content_type:
+        return {}
+    try:
+        payload = await request.json()
+    except Exception as exc:
+        raise HTTPException(status_code=400, detail=f"Invalid JSON body: {exc}") from exc
+    if not isinstance(payload, dict):
+        raise HTTPException(status_code=400, detail="Invalid JSON body: expected object")
+    return payload
+
+
+def _maybe_int(value: object, field: str) -> int | None:
+    """Coerce numeric input to int with a useful error message."""
+    if value is None:
+        return None
+    try:
+        return int(value)
+    except (TypeError, ValueError) as exc:
+        raise HTTPException(status_code=400, detail=f"Invalid {field} value") from exc
+
+
 def verify_telegram_webapp(authorization: str) -> int:
     """
     Verify Telegram WebApp auth and return telegram_id.
@@ -454,7 +478,7 @@ async def list_products(authorization: str = Header(None), status: Optional[str]
         # Build photo URL if photo_id exists
         photo_url = None
         if o.get("photo_id"):
-            photo_url = f"{API_BASE_URL}/photo/{o['photo_id']}"
+            photo_url = f"{API_BASE_URL}/api/v1/photo/{o['photo_id']}"
 
         product = {
             "id": o["offer_id"],  # Frontend expects 'id'
@@ -472,8 +496,10 @@ async def list_products(authorization: str = Header(None), status: Optional[str]
             "unit": o.get("unit") or "шт",
             "expiry_date": str(o.get("expiry_date")) if o.get("expiry_date") else None,
             "photo_id": o.get("photo_id"),
+            "photo_url": photo_url,
             "image": photo_url or "https://via.placeholder.com/120?text=No+Photo",
             "status": o.get("status") or "active",
+            "is_active": (o.get("status") or "active") == "active",
         }
         products.append(product)
 
@@ -485,13 +511,13 @@ async def list_products(authorization: str = Header(None), status: Optional[str]
 async def create_product(
     request: Request,
     authorization: str = Header(None),
-    title: str = Form(...),
-    category: str = Form("other"),
-    original_price: int = Form(...),  # Now required in SUMS
-    discount_price: int = Form(...),  # In SUMS
-    quantity: int = Form(...),
-    stock_quantity: int = Form(None),  # NEW: Stock quantity (v22.0)
-    unit: str = Form("шт"),
+    title: Optional[str] = Form(None),
+    category: Optional[str] = Form(None),
+    original_price: Optional[int] = Form(None),  # In SUMS
+    discount_price: Optional[int] = Form(None),  # In SUMS
+    quantity: Optional[int] = Form(None),
+    stock_quantity: Optional[int] = Form(None),  # NEW: Stock quantity (v22.0)
+    unit: Optional[str] = Form(None),
     expiry_date: Optional[str] = Form(None),
     description: Optional[str] = Form(None),
     photo_id: Optional[str] = Form(None),
