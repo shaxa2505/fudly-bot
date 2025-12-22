@@ -1725,11 +1725,16 @@ if (!originalPrice || originalPrice <= 0) throw new Error('???????????? ???? ???
                 const photoFile = fileInput?.files?.[0] || null;
 
                 if (photoFile) {
-                    const uploadForm = new FormData();
-                    uploadForm.append('photo', photoFile, photoFile.name || 'photo.jpg');
-                    const uploaded = await apiFetch('/api/partner/upload-photo', { method: 'POST', body: uploadForm });
-                    if (!uploaded?.file_id) throw new Error('?? ??????? ????????? ????');
-                    photoId = uploaded.file_id;
+                    try {
+                        const uploadForm = new FormData();
+                        uploadForm.append('photo', photoFile, photoFile.name || 'photo.jpg');
+                        const uploaded = await apiFetch('/api/partner/upload-photo', { method: 'POST', body: uploadForm });
+                        if (!uploaded?.file_id) throw new Error('?? ??????? ????????? ????');
+                        photoId = uploaded.file_id;
+                    } catch (uploadError) {
+                        console.error('Photo upload error:', uploadError);
+                        toast('???? ?? ???????????. ???????? ??? ????', 'warning');
+                    }
                 }
 
                 const payload = new FormData();

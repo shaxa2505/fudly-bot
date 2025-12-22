@@ -1052,13 +1052,7 @@ async def list_orders(authorization: str = Header(None), status: Optional[str] =
             offer_photo_id = order.get("offer_photo_id")
             offer_photo_url = f"{API_BASE_URL}/photo/{offer_photo_id}" if offer_photo_id else None
 
-            # Only show orders that are paid (or cash)
-            if not PaymentStatus.is_cleared(
-                payment_status,
-                payment_method=payment_method,
-                payment_proof_photo_id=payment_proof_photo_id,
-            ):
-                continue
+            # Keep unpaid orders visible for partner actions/updates
         else:
             # Tuple format varies, try to extract what we can
             order_id = order[0]

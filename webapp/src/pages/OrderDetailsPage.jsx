@@ -117,7 +117,7 @@ export default function OrderDetailsPage() {
         <div className="error-container">
           <div className="error-icon">!</div>
           <p>{error || 'Xatolik yuz berdi'}</p>
-            <button className="back-btn" onClick={() => navigate('/yana')}>
+            <button className="back-btn" onClick={() => navigate('/profile')}>
               {'<- Orqaga'}
             </button>
         </div>
@@ -133,7 +133,7 @@ export default function OrderDetailsPage() {
     <div className="order-details-page">
       {/* Header */}
       <div className="details-header">
-        <button className="back-button" onClick={() => navigate('/yana')}>
+        <button className="back-button" onClick={() => navigate('/profile')}>
           {'<-'}
         </button>
         <h1 className="details-title">Buyurtma #{orderId}</h1>

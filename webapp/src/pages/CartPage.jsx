@@ -208,6 +208,7 @@ function CartPage({ user }) {
 
       // Get order ID from response
       const orderId = result.order_id || result.bookings?.[0]?.booking_id
+      setCreatedOrderId(orderId)
 
       // NEW: Check if payment proof required (delivery + card)
       if (result.awaiting_payment && orderId) {
@@ -332,6 +333,9 @@ function CartPage({ user }) {
     } catch (error) {
       console.error('Click payment error:', error)
       toast.error('Click to\'lovda xatolik: ' + (error.message || 'Noma\'lum xatolik'))
+      if (createdOrderId) {
+        navigate(`/order/${createdOrderId}`)
+      }
     } finally {
       setOrderLoading(false)
     }

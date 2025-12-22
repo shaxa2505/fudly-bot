@@ -62,6 +62,7 @@ function YanaPage() {
             status === 'confirmed' ||
             status === 'ready' ||
             status === 'preparing' ||
+            status === 'delivering' ||
             !status // treat undefined as pending
           )
         })

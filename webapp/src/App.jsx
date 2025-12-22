@@ -147,11 +147,11 @@ function AppContent() {
             element={<FavoritesPage />}
           />
           <Route
-            path="/order/:bookingId"
+            path="/order/:orderId"
             element={<OrderTrackingPage user={user} />}
           />
           <Route
-            path="/order/:orderId"
+            path="/order/:orderId/details"
             element={<OrderDetailsPage user={user} />}
           />
           <Route

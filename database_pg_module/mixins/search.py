@@ -59,7 +59,7 @@ class SearchMixin:
             FROM offers o
             JOIN stores s ON o.store_id = s.store_id
             WHERE o.status = 'active'
-            AND o.quantity > 0
+            AND COALESCE(o.stock_quantity, o.quantity) > 0
             AND (s.status = 'approved' OR s.status = 'active')
         """
 
@@ -69,7 +69,7 @@ class SearchMixin:
         if city:
             city_variants = self._get_city_variants_search(city)
             city_conditions = " OR ".join(["s.city ILIKE %s" for _ in city_variants])
-            base_sql += f" AND ({city_conditions})"
+            base_sql += f" AND (({city_conditions}) OR s.city IS NULL OR s.city = '')"
             params.extend([f"%{v}%" for v in city_variants])
 
         base_sql += """

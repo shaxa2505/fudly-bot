@@ -110,8 +110,9 @@ class OfferMixin:
             cursor.execute(
                 """
                 INSERT INTO offers (store_id, title, description, original_price, discount_price,
-                                  quantity, available_from, available_until, expiry_date, photo_id, unit, category)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                                  quantity, stock_quantity, available_from, available_until,
+                                  expiry_date, photo_id, unit, category)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                 RETURNING offer_id
             """,
                 (
@@ -120,6 +121,7 @@ class OfferMixin:
                     description,
                     original_price,
                     discount_price,
+                    final_quantity,
                     final_quantity,
                     available_from,
                     available_until,
@@ -185,11 +187,12 @@ class OfferMixin:
         with self.get_connection() as conn:
             cursor = conn.cursor(row_factory=dict_row)
             base = [
-                "SELECT o.*, s.city FROM offers o JOIN stores s ON o.store_id = s.store_id WHERE o.status = 'active'"
+                "SELECT o.*, s.city FROM offers o JOIN stores s ON o.store_id = s.store_id WHERE o.status = 'active'",
+                "AND COALESCE(o.stock_quantity, o.quantity) > 0",
             ]
             params = []
             if city:
-                base.append("AND s.city = %s")
+                base.append("AND (s.city = %s OR s.city IS NULL OR s.city = '')")
                 params.append(city)
             if store_id:
                 base.append("AND o.store_id = %s")
@@ -213,7 +216,7 @@ class OfferMixin:
                 FROM offers o
                 JOIN stores s ON o.store_id = s.store_id
                 WHERE o.status = 'active'
-                AND o.quantity > 0
+                AND COALESCE(o.stock_quantity, o.quantity) > 0
                 AND (s.status = 'approved' OR s.status = 'active')
                 AND (o.expiry_date IS NULL OR o.expiry_date >= CURRENT_DATE)
             """
@@ -223,7 +226,7 @@ class OfferMixin:
                 # Поддержка транслитерации: ищем и латиницу и кириллицу
                 city_variants = self._get_city_variants(city)
                 city_conditions = " OR ".join(["s.city ILIKE %s" for _ in city_variants])
-                query += f" AND ({city_conditions})"
+                query += f" AND (({city_conditions}) OR s.city IS NULL OR s.city = '')"
                 params.extend([f"%{v}%" for v in city_variants])
 
             if business_type:
