@@ -93,8 +93,11 @@
   inset: 0;
   width: 100%;
   height: 100%;
-  object-fit: contain;
-  padding: 12px 12px 14px;
+  object-fit: cover;
+  padding: 0;
+  max-width: none;
+  max-height: none;
+  transform: scale(1.04);
   box-sizing: border-box;
   transition: opacity 0.3s ease;
   opacity: 0;
@@ -125,6 +128,7 @@
   position: absolute;
   right: 10px;
   bottom: 10px;
+  left: auto;
   z-index: 2;
   display: flex;
   align-items: center;
@@ -162,20 +166,22 @@
   100% { transform: scale(1); box-shadow: 0 6px 14px rgba(255, 107, 53, 0.35); }
 }
 
-.quantity-control {
+.offer-card .quantity-control {
   display: inline-flex;
   align-items: center;
-  justify-content: center;
+  justify-content: space-between;
   gap: 12px;
-  height: 32px;
+  height: 34px;
   padding: 4px 14px;
+  min-width: 96px;
   border-radius: 999px;
   background: #FFFFFF;
-  border: 1px solid #E8E2DC;
-  box-shadow: 0 10px 18px rgba(16, 24, 40, 0.14);
+  border: none;
+  box-shadow: 0 10px 20px rgba(16, 24, 40, 0.18);
+  margin: 0;
 }
 
-.qty-btn {
+.offer-card .quantity-control .qty-btn {
   width: 22px;
   height: 22px;
   border: none;
@@ -197,18 +203,18 @@
   transform: scale(0.92);
 }
 
-.qty-btn.qty-plus {
+.offer-card .quantity-control .qty-btn.qty-plus {
   background: transparent;
   color: #111827;
 }
 
-.qty-btn.qty-plus.disabled {
+.offer-card .quantity-control .qty-btn.qty-plus.disabled {
   background: transparent;
   color: #98A2B3;
   cursor: not-allowed;
 }
 
-.qty-num {
+.offer-card .quantity-control .qty-num {
   min-width: 14px;
   text-align: center;
   font-size: 14px;
