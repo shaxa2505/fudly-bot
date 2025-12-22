@@ -2854,21 +2854,8 @@ async function toggleProductAvailability(id) {
             }
 
             const storeId = state.store.store_id;
-            const { data: initData, urlUserId, urlAuthDate, urlSig } = getAuth();
-            let authHeader = '';
-            if (initData) {
-                authHeader = `tma ${initData}`;
-            } else if (urlUserId && urlAuthDate && urlSig) {
-                authHeader = `tma uid=${urlUserId}&auth_date=${urlAuthDate}&sig=${urlSig}`;
-            } else if (isLocalhost() && urlUserId) {
-                authHeader = `tma uid=${urlUserId}`;
-            } else {
-                console.warn('⚠️ Missing Telegram authorization for WebSocket');
-                return;
-            }
-
             const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-            const wsUrl = `${protocol}//${window.location.host}/api/partner/ws/partner/${storeId}?authorization=${encodeURIComponent(authHeader)}`;
+            const wsUrl = `${protocol}//${window.location.host}/ws/notifications?store_id=${storeId}`;
 
             console.log(`🔌 Connecting to WebSocket for store ${storeId}`);
 
@@ -2897,7 +2884,17 @@ async function toggleProductAvailability(id) {
                         const data = JSON.parse(event.data);
                         console.log('📥 WebSocket message:', data);
 
-                        if (data.type === 'new_order') {
+                        if (data.type === 'notification' && data.payload?.data) {
+                            const payload = data.payload.data;
+                            if (payload.kind === 'new_order' || payload.order_ids) {
+                                handleNewOrderNotification(payload);
+                            } else if (payload.kind === 'order_status_changed') {
+                                handleOrderStatusChanged({
+                                    order_id: payload.order_id,
+                                    status: payload.status
+                                });
+                            }
+                        } else if (data.type === 'new_order') {
                             handleNewOrderNotification(data.data);
                         } else if (data.type === 'order_status_changed') {
                             handleOrderStatusChanged(data.data);

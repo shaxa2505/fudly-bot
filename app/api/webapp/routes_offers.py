@@ -114,6 +114,8 @@ async def get_categories(
 @router.get("/offers", response_model=list[OfferResponse])
 async def get_offers(
     city: str = Query("Toshkent", description="City to filter by"),
+    region: str | None = Query(None, description="Region filter"),
+    district: str | None = Query(None, description="District filter"),
     category: str = Query("all", description="Category filter"),
     store_id: int | None = Query(None, description="Store ID filter"),
     search: str | None = Query(None, description="Search query"),
@@ -271,6 +273,8 @@ async def get_offer(offer_id: int, db=Depends(get_db)):
 @router.get("/flash-deals", response_model=list[OfferResponse])
 async def get_flash_deals(
     city: str = Query("Toshkent", description="City to filter by"),
+    region: str | None = Query(None, description="Region filter"),
+    district: str | None = Query(None, description="District filter"),
     limit: int = Query(10, ge=1, le=50),
     db=Depends(get_db),
 ):

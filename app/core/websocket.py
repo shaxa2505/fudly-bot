@@ -140,6 +140,13 @@ class WebSocketManager:
             if self._notification_service:
                 await self._notification_service.subscribe_user(user_id, client.send_notification)
 
+        if store_id:
+            # Subscribe to store notifications (partner panel)
+            if self._notification_service:
+                await self._notification_service.subscribe_store(
+                    int(store_id), client.send_notification
+                )
+
         logger.info(f"WebSocket connected: user_id={user_id}, store_id={store_id}")
 
         # Send welcome message
@@ -169,6 +176,14 @@ class WebSocketManager:
                 await self._notification_service.unsubscribe_user(
                     client.user_id, client.send_notification
                 )
+
+        if client.store_id and self._notification_service:
+            try:
+                await self._notification_service.unsubscribe_store(
+                    int(client.store_id), client.send_notification
+                )
+            except Exception:
+                pass
 
         if not client.ws.closed:
             await client.ws.close()

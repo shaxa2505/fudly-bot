@@ -143,9 +143,10 @@ function HomePage() {
   }, [])
 
   const [showingAllCities, setShowingAllCities] = useState(false)
+  const [showingRegion, setShowingRegion] = useState(false)
 
   // Load offers - сначала по городу, если пусто - из всех городов
-  const loadOffers = useCallback(async (reset = false, forceAllCities = false) => {
+  const loadOffers = useCallback(async (reset = false, forceAllCities = false, forceRegion = false) => {
     if (loadingRef.current) return
 
     loadingRef.current = true
@@ -156,9 +157,10 @@ function HomePage() {
         limit: 20,
         offset: currentOffset,
       }
+      const useRegionOnly = forceRegion || showingRegion
 
       // Если не forceAllCities - фильтруем по городу
-      if (!forceAllCities && !showingAllCities) {
+      if (!forceAllCities && !showingAllCities && !useRegionOnly) {
         params.city = cityForApi
       }
 
@@ -261,7 +263,15 @@ function HomePage() {
 
       // Если город пустой и это первая загрузка - загружаем из всех городов
       if (reset && dataList.length === 0 && !forceAllCities && !showingAllCities) {
+        if (!useRegionOnly && (location.region || location.district)) {
+          setShowingRegion(true)
+          loadingRef.current = false
+          setLoading(false)
+          return loadOffers(true, false, true)
+        }
+
         setShowingAllCities(true)
+        setShowingRegion(false)
         loadingRef.current = false
         setLoading(false)
         return loadOffers(true, true)
@@ -271,7 +281,10 @@ function HomePage() {
         setOffers(nextOffers || [])
         offsetRef.current = 20
         setOffset(20)
-        if (forceAllCities) setShowingAllCities(true)
+        if (forceAllCities) {
+          setShowingAllCities(true)
+          setShowingRegion(false)
+        }
       } else {
         setOffers(prev => [...prev, ...(nextOffers || [])])
         offsetRef.current = offsetRef.current + 20
@@ -285,7 +298,7 @@ function HomePage() {
       loadingRef.current = false
       setLoading(false)
     }
-  }, [selectedCategory, searchQuery, cityForApi, location.region, location.district, showingAllCities, minDiscount, sortBy, priceRange])
+  }, [selectedCategory, searchQuery, cityForApi, location.region, location.district, showingAllCities, showingRegion, minDiscount, sortBy, priceRange])
 
   // Save search query to history when searching
   const handleSearchSubmit = useCallback(async () => {
@@ -404,6 +417,7 @@ function HomePage() {
   // Pull-to-refresh handler
   const handleRefresh = useCallback(async () => {
     setShowingAllCities(false)
+    setShowingRegion(false)
     await loadOffers(true)
   }, [loadOffers])
 
@@ -516,11 +530,16 @@ function HomePage() {
   const handleSaveManualAddress = () => {
     const trimmedCity = manualCity.trim()
     const trimmedAddress = manualAddress.trim()
-    setLocation(prev => ({
-      city: trimmedCity || DEFAULT_LOCATION.city,
-      address: trimmedAddress,
-      coordinates: trimmedAddress ? prev.coordinates : null,
-    }))
+    setLocation(prev => {
+      const keepRegion = prev.city?.startsWith(trimmedCity)
+      return {
+        city: trimmedCity || DEFAULT_LOCATION.city,
+        address: trimmedAddress,
+        coordinates: trimmedAddress ? prev.coordinates : null,
+        region: keepRegion ? prev.region : '',
+        district: keepRegion ? prev.district : '',
+      }
+    })
     setShowAddressModal(false)
     setLocationError('')
   }

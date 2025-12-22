@@ -1186,8 +1186,43 @@ class UnifiedOrderService:
                             except Exception as save_err:
                                 logger.warning(
                                     f"Failed to save seller_message_id for order #{order_id}: {save_err}"
-                                )
-                
+                            )
+
+                # Send NotificationService store event (partner panel WebSocket)
+                try:
+                    notification_service = get_notification_service()
+                    title = (
+                        "Yangi buyurtma" if seller_lang == "uz" else "Новый заказ"
+                    )
+                    plain_msg = re.sub(r"<[^>]+>", "", seller_text)
+                    await notification_service.notify_store(
+                        Notification(
+                            type=NotificationType.SYSTEM_ANNOUNCEMENT,
+                            recipient_id=int(store_id),
+                            title=title,
+                            message=plain_msg,
+                            data={
+                                "kind": "new_order",
+                                "order_ids": order_ids,
+                                "order_type": order_type,
+                                "customer_name": customer_name,
+                                "total": store_total,
+                                "items": [
+                                    {
+                                        "title": o.get("title", ""),
+                                        "quantity": o.get("quantity", 1),
+                                        "price": o.get("price", 0),
+                                    }
+                                    for o in store_orders
+                                ],
+                                "delivery_address": delivery_address,
+                            },
+                            priority=0,
+                        )
+                    )
+                except Exception as notify_error:
+                    logger.warning(f"Store notification failed: {notify_error}")
+
                 # Send WebSocket notification to web panel (real-time)
                 try:
                     from app.api.websocket_manager import get_connection_manager
@@ -1564,6 +1599,26 @@ class UnifiedOrderService:
                     )
                 except Exception as ws_error:
                     logger.warning(f"Partner WebSocket notify failed: {ws_error}")
+
+                try:
+                    notification_service = get_notification_service()
+                    await notification_service.notify_store(
+                        Notification(
+                            type=NotificationType.SYSTEM_ANNOUNCEMENT,
+                            recipient_id=int(store_id),
+                            title=f"Order #{entity_id}",
+                            message=f"Status: {target_status}",
+                            data={
+                                "kind": "order_status_changed",
+                                "order_id": entity_id,
+                                "status": target_status,
+                                "order_type": order_type,
+                            },
+                            priority=0,
+                        )
+                    )
+                except Exception as notify_error:
+                    logger.warning(f"Store status notification failed: {notify_error}")
 
             if should_notify:
                 store = self.db.get_store(store_id) if store_id else None

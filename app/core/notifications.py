@@ -329,6 +329,14 @@ class NotificationService:
             self._store_handlers[store_id] = set()
         self._store_handlers[store_id].add(handler)
 
+    async def unsubscribe_store(self, store_id: int, handler: NotificationHandler) -> None:
+        """Unsubscribe from store's notifications."""
+        channel = self.store_channel(store_id)
+        await self._backend.unsubscribe(channel, handler)
+
+        if store_id in self._store_handlers:
+            self._store_handlers[store_id].discard(handler)
+
     async def subscribe_global(self, handler: NotificationHandler) -> None:
         """Subscribe to global notifications."""
         await self._backend.subscribe(self.global_channel(), handler)
