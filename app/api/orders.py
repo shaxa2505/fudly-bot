@@ -4,10 +4,13 @@ Provides real-time order status, QR codes, and delivery tracking
 """
 import base64
 import io
+import os
 from typing import Any
 
 import qrcode
-from fastapi import APIRouter, Depends, HTTPException
+from aiogram import Bot
+from aiogram.types import BufferedInputFile, InlineKeyboardButton, InlineKeyboardMarkup
+from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 from pydantic import BaseModel
 
 from app.api.webapp.common import get_current_user
@@ -16,6 +19,7 @@ router = APIRouter(prefix="/api/v1/orders", tags=["orders"])
 
 # Global database instance (set by api_server.py)
 _db_instance = None
+_bot_instance: Bot | None = None
 
 
 def get_db():
@@ -25,10 +29,19 @@ def get_db():
     return _db_instance
 
 
-def set_orders_db(db):
-    """Set database instance for orders module."""
-    global _db_instance
+def set_orders_db(db, bot_token: str | None = None):
+    """Set database instance (and optional bot token) for orders module."""
+    global _db_instance, _bot_instance
     _db_instance = db
+    if bot_token and _bot_instance is None:
+        _bot_instance = Bot(bot_token)
+
+
+def get_bot() -> Bot:
+    """Dependency to get bot instance for Telegram operations."""
+    if _bot_instance is None:
+        raise HTTPException(status_code=500, detail="Bot not configured")
+    return _bot_instance
 
 
 # ==================== MODELS ====================
@@ -331,6 +344,334 @@ def format_booking_to_order_status(booking: Any, db) -> OrderStatus:
 
 
 # ==================== ENDPOINTS ====================
+
+
+@router.get("")
+async def get_user_orders(
+    db=Depends(get_db),
+    user: dict = Depends(get_current_user),
+):
+    """Get user's orders from unified orders table (pickup + delivery)."""
+    user_id = int(user.get("id") or 0)
+    if user_id <= 0:
+        raise HTTPException(status_code=401, detail="Authentication required")
+
+    orders: list[dict[str, Any]] = []
+    raw_orders: list[Any] = []
+
+    try:
+        with db.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                """
+                SELECT
+                    o.order_id,
+                    o.order_status,
+                    o.order_type,
+                    o.pickup_code,
+                    o.delivery_address,
+                    o.total_price,
+                    o.quantity,
+                    o.payment_method,
+                    o.payment_status,
+                    o.payment_proof_photo_id,
+                    o.is_cart_order,
+                    o.cart_items,
+                    o.created_at,
+                    o.updated_at,
+                    o.store_id,
+                    s.name AS store_name,
+                    s.address AS store_address,
+                    s.phone AS store_phone,
+                    off.offer_id AS offer_id,
+                    off.title AS offer_title,
+                    off.discount_price AS offer_price,
+                    off.photo_id AS offer_photo_id
+                FROM orders o
+                LEFT JOIN stores s ON o.store_id = s.store_id
+                LEFT JOIN offers off ON o.offer_id = off.offer_id
+                WHERE o.user_id = %s
+                ORDER BY o.created_at DESC
+                LIMIT 100
+                """,
+                (int(user_id),),
+            )
+            raw_orders = cursor.fetchall() or []
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e)) from e
+
+    import json
+
+    for r in raw_orders:
+        if not hasattr(r, "get"):
+            continue
+
+        order_id = r.get("order_id")
+        if not order_id:
+            continue
+
+        order_type = r.get("order_type") or (
+            "delivery" if r.get("delivery_address") else "pickup"
+        )
+        order_status = r.get("order_status") or "pending"
+
+        is_cart = int(r.get("is_cart_order") or 0) == 1
+        cart_items_json = r.get("cart_items")
+
+        items: list[dict[str, Any]] = []
+        items_total = 0
+        qty_total = 0
+
+        if is_cart and cart_items_json:
+            try:
+                cart_items = (
+                    json.loads(cart_items_json)
+                    if isinstance(cart_items_json, str)
+                    else cart_items_json
+                )
+            except Exception:
+                cart_items = []
+
+            for it in cart_items or []:
+                title = it.get("title") or "Товар"
+                qty = int(it.get("quantity") or 1)
+                price = int(it.get("price") or 0)
+                items_total += price * qty
+                qty_total += qty
+                items.append(
+                    {
+                        "offer_id": it.get("offer_id"),
+                        "store_id": r.get("store_id"),
+                        "offer_title": title,
+                        "title": title,
+                        "price": price,
+                        "quantity": qty,
+                        "store_name": r.get("store_name"),
+                        "photo": None,
+                    }
+                )
+        else:
+            qty = int(r.get("quantity") or 1)
+            price = int(r.get("offer_price") or 0)
+            title = r.get("offer_title") or "Товар"
+            photo = r.get("offer_photo") or r.get("offer_photo_id")
+            items_total = price * qty
+            qty_total = qty
+            items.append(
+                {
+                    "offer_id": r.get("offer_id"),
+                    "store_id": r.get("store_id"),
+                    "offer_title": title,
+                    "title": title,
+                    "price": price,
+                    "quantity": qty,
+                    "store_name": r.get("store_name"),
+                    "photo": photo,
+                }
+            )
+
+        total_price = float(r.get("total_price") or items_total)
+
+        orders.append(
+            {
+                "order_id": order_id,
+                "order_type": order_type,
+                "order_status": order_status,
+                "status": order_status,
+                "pickup_code": r.get("pickup_code"),
+                "delivery_address": r.get("delivery_address"),
+                "total_price": total_price,
+                "quantity": qty_total,
+                "items_count": len(items),
+                "items": items,
+                "payment_method": r.get("payment_method"),
+                "payment_status": r.get("payment_status"),
+                "payment_proof_photo_id": r.get("payment_proof_photo_id"),
+                "created_at": str(r.get("created_at") or ""),
+                "updated_at": str(r.get("updated_at") or ""),
+                "store_id": r.get("store_id"),
+                "store_name": r.get("store_name"),
+                "store_address": r.get("store_address"),
+                "store_phone": r.get("store_phone"),
+            }
+        )
+
+    return orders
+
+
+@router.post("/{order_id}/payment-proof")
+async def upload_payment_proof(
+    order_id: int,
+    photo: UploadFile = File(...),
+    db=Depends(get_db),
+    user: dict = Depends(get_current_user),
+):
+    """Upload payment proof for delivery orders (admin verification flow)."""
+    bot = get_bot()
+    user_id = int(user.get("id") or 0)
+    if user_id <= 0:
+        raise HTTPException(status_code=401, detail="Authentication required")
+
+    photo_data = await photo.read()
+    if not photo_data:
+        raise HTTPException(status_code=400, detail="No photo provided")
+
+    order = db.get_order(order_id) if hasattr(db, "get_order") else None
+    if not order:
+        raise HTTPException(status_code=404, detail="Order not found")
+
+    if isinstance(order, dict):
+        order_type = order.get("order_type")
+        order_user_id = order.get("user_id")
+        delivery_address = order.get("delivery_address")
+        cart_items_json = order.get("cart_items")
+        store_name = order.get("store_name", "")
+        total_price = order.get("total_price", 0)
+        delivery_fee = order.get("delivery_fee") or order.get("delivery_price") or 0
+    else:
+        order_type = getattr(order, "order_type", None)
+        order_user_id = getattr(order, "user_id", None)
+        delivery_address = getattr(order, "delivery_address", None)
+        cart_items_json = getattr(order, "cart_items", None)
+        store_name = getattr(order, "store_name", "")
+        total_price = getattr(order, "total_price", 0)
+        delivery_fee = getattr(order, "delivery_fee", 0)
+
+    try:
+        order_user_id_int = int(order_user_id) if order_user_id is not None else None
+    except Exception:
+        order_user_id_int = None
+
+    if order_user_id_int != user_id:
+        raise HTTPException(status_code=403, detail="Access denied")
+
+    if order_type != "delivery":
+        raise HTTPException(
+            status_code=400, detail=f"Order type is '{order_type}', not 'delivery'"
+        )
+
+    photo_file = BufferedInputFile(photo_data, filename=photo.filename or "payment_proof.jpg")
+
+    customer = db.get_user(order_user_id) if hasattr(db, "get_user") else None
+    customer_name = ""
+    customer_phone = ""
+    if customer:
+        if isinstance(customer, dict):
+            customer_name = customer.get("first_name", "")
+            customer_phone = customer.get("phone", "")
+        else:
+            customer_name = getattr(customer, "first_name", "")
+            customer_phone = getattr(customer, "phone", "")
+
+    import json
+
+    cart_items = []
+    if cart_items_json:
+        try:
+            cart_items = (
+                json.loads(cart_items_json)
+                if isinstance(cart_items_json, str)
+                else cart_items_json
+            )
+        except Exception:
+            cart_items = []
+
+    admin_msg = "💳 <b>НОВАЯ ДОСТАВКА - ЧЕК НА ПРОВЕРКЕ</b>\n\n"
+    admin_msg += "🔄 <b>Статус:</b> ◻ ◻ ◻ ◻ ◻\n"
+    admin_msg += "   <i>Ожидает подтверждения оплаты</i>\n\n"
+    admin_msg += f"📦 <b>Заказ #{order_id}</b>\n"
+    admin_msg += f"👤 {customer_name or 'Клиент'}\n"
+
+    if customer_phone:
+        admin_msg += f"📱 <code>{customer_phone}</code>\n"
+    if store_name:
+        admin_msg += f"🏪 {store_name}\n"
+    if delivery_address:
+        admin_msg += f"📍 {delivery_address}\n"
+
+    if cart_items:
+        admin_msg += f"\n📋 <b>Товары ({len(cart_items)}):</b>\n"
+        for idx, item in enumerate(cart_items[:5], 1):
+            title = item.get("title", "Товар")
+            qty = item.get("quantity", 1)
+            price = item.get("price", 0)
+            item_total = price * qty
+            admin_msg += f"{idx}. {title} × {qty} = {int(item_total):,} сум\n"
+        if len(cart_items) > 5:
+            admin_msg += f"   ... и ещё {len(cart_items) - 5}\n"
+
+    subtotal = total_price - delivery_fee if delivery_fee else total_price
+    admin_msg += "\n💰 <b>Итого:</b>\n"
+    admin_msg += f"   Товары: {int(subtotal):,} сум\n"
+    if delivery_fee:
+        admin_msg += f"   Доставка: {int(delivery_fee):,} сум\n"
+    admin_msg += f"   <b>Всего: {int(total_price):,} сум</b>\n"
+    admin_msg += "\n⚠️ <b>ПРОВЕРЬТЕ ЧЕК И ПОДТВЕРДИТЕ ОПЛАТУ</b>"
+
+    admin_keyboard = InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                InlineKeyboardButton(
+                    text="✅ Оплата подтверждена",
+                    callback_data=f"admin_confirm_payment_{order_id}",
+                ),
+            ],
+            [
+                InlineKeyboardButton(
+                    text="❌ Отклонить заказ",
+                    callback_data=f"admin_reject_payment_{order_id}",
+                ),
+            ],
+        ]
+    )
+
+    admin_ids: list[int] = []
+    if hasattr(db, "get_all_users"):
+        all_users = db.get_all_users()
+        for u in all_users:
+            role = u.get("role") if isinstance(u, dict) else getattr(u, "role", None)
+            u_id = u.get("user_id") if isinstance(u, dict) else getattr(u, "user_id", None)
+            if role == "admin" and u_id:
+                admin_ids.append(u_id)
+
+    if not admin_ids:
+        admin_id_env = int(os.getenv("ADMIN_ID", "0"))
+        if admin_id_env:
+            admin_ids.append(admin_id_env)
+
+    if not admin_ids:
+        raise HTTPException(status_code=500, detail="No admin configured")
+
+    sent_count = 0
+    file_id = None
+    for admin_id in admin_ids:
+        try:
+            sent_msg = await bot.send_photo(
+                chat_id=admin_id,
+                photo=photo_file,
+                caption=admin_msg,
+                parse_mode="HTML",
+                reply_markup=admin_keyboard,
+            )
+            if not file_id and sent_msg.photo:
+                file_id = sent_msg.photo[-1].file_id
+            sent_count += 1
+        except Exception:
+            continue
+
+    if sent_count == 0:
+        raise HTTPException(status_code=500, detail="Failed to send to admins")
+
+    if file_id:
+        if hasattr(db, "update_payment_status"):
+            db.update_payment_status(order_id, "proof_submitted", file_id)
+        elif hasattr(db, "update_order_payment_proof"):
+            db.update_order_payment_proof(order_id, file_id)
+
+    return {
+        "success": True,
+        "message": f"Payment proof sent to {sent_count} admin(s) for verification",
+    }
 
 
 @router.get("/{booking_id}/status", response_model=OrderStatus)

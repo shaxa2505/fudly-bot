@@ -1350,34 +1350,35 @@
             toast('Фильтры сброшены', 'info');
         }
 
+        
         function openProductModal(productId = null) {
             haptic('light');
             const product = productId ? state.products.find(p => p.id === productId) : null;
-            const isEdit = !!product;
+            const isEdit = Boolean(product);
+            const today = new Date().toISOString().split('T')[0];
 
             const modal = document.createElement('div');
             modal.className = 'modal-overlay scale-in';
             modal.innerHTML = `
                 <div class="modal-content modal-lg">
                     <div class="modal-header">
-                        <h3>${isEdit ? 'Редактировать товар' : 'Добавить товар'}</h3>
+                        <h3>${isEdit ? '????????????? ?????' : '???????? ?????'}</h3>
                         <button class="btn-icon ripple" onclick="this.closest('.modal-overlay').remove()">
                             <i data-lucide="x"></i>
                         </button>
                     </div>
-                    <form id="productForm" onsubmit="saveProduct(event, ${productId})">
+                    <form id="productForm" onsubmit="saveProduct(event, ${productId ?? 'null'})">
                         <div class="modal-body">
-                            <!-- 📸 СЕКЦИЯ: Фото товара -->
                             <div class="form-section">
                                 <div class="form-section-header">
-                                    <div class="form-section-icon">📸</div>
+                                    <div class="form-section-icon">??</div>
                                     <div>
-                                        <h4 class="form-section-title">Фото товара</h4>
-                                        <p class="form-section-subtitle">Товары с фото продаются на 40% лучше</p>
+                                        <h4 class="form-section-title">???? ??????</h4>
+                                        <p class="form-section-subtitle">???? ???????? ???????</p>
                                     </div>
                                 </div>
-                                <input type="file" id="photoFile" accept="image/*" class="hidden" onchange="handlePhotoUpload(this, event)">
                                 <input type="hidden" name="photo_id" value="${product?.photo_id || ''}">
+                                <input type="file" id="photoFile" accept="image/*" class="hidden" onchange="handlePhotoUpload(this, event)">
                                 <div class="photo-upload-card photo-upload-area ${product?.photo_url ? 'has-photo' : ''}" onclick="document.getElementById('photoFile').click()">
                                     ${product?.photo_url ? `
                                         <div class="photo-preview">
@@ -1387,186 +1388,170 @@
                                             </button>
                                         </div>
                                     ` : `
-                                        <div class="photo-upload-icon">📷</div>
-                                        <div class="photo-upload-title">Нажмите для загрузки</div>
-                                        <div class="photo-upload-subtitle">или перетащите файл сюда</div>
+                                        <div class="photo-upload-icon">??</div>
+                                        <div class="photo-upload-title">????????? ????</div>
+                                        <div class="photo-upload-subtitle">PNG/JPG ?? 5 ??</div>
                                     `}
                                 </div>
-                                <input type="url" name="photo_url_input" value="${product?.photo_url || ''}" placeholder="https://... (или загрузите файл)"
-                                       class="search-input photo-url-input" oninput="handlePhotoUrlInput(this)">
                             </div>
 
-                            <!-- 📦 СЕКЦИЯ: Основная информация -->
                             <div class="form-section">
                                 <div class="form-section-header">
-                                    <div class="form-section-icon">📦</div>
+                                    <div class="form-section-icon">??</div>
                                     <div>
-                                        <h4 class="form-section-title">Основная информация</h4>
-                                        <p class="form-section-subtitle">Название, категория и описание</p>
+                                        <h4 class="form-section-title">???????? ??????????</h4>
+                                        <p class="form-section-subtitle">????????, ?????????, ????????</p>
                                     </div>
                                 </div>
 
-                            <div class="form-group">
-                                <label>Название *</label>
-                                <input type="text" name="name" id="productName" value="${product?.name || ''}" required class="search-input"
-                                       oninput="validateField(this); showNameSuggestions(this)"
-                                       onfocus="showNameSuggestions(this)"
-                                       minlength="3" maxlength="100" placeholder="Например: Молоко 3.2%">
-                                <div id="nameSuggestions" class="autocomplete-suggestions hidden"></div>
-                                <div class="form-error hidden">Минимум 3 символа</div>
-                            </div>
-
-                            <!-- Category with smart defaults -->
-                            <div class="form-group">
-                                <label>Категория *</label>
-                                <select name="category" id="productCategory" required class="search-input" onchange="applyCategoryDefaults()">
-                                    <option value="">Выберите категорию</option>
-                                    <option value="bakery" ${product?.category === 'bakery' ? 'selected' : ''}>🥖 Выпечка</option>
-                                    <option value="dairy" ${product?.category === 'dairy' ? 'selected' : ''}>🥛 Молочные продукты</option>
-                                    <option value="meat" ${product?.category === 'meat' ? 'selected' : ''}>🥩 Мясо и птица</option>
-                                    <option value="fruits" ${product?.category === 'fruits' ? 'selected' : ''}>🍎 Фрукты</option>
-                                    <option value="vegetables" ${product?.category === 'vegetables' ? 'selected' : ''}>🥬 Овощи</option>
-                                    <option value="drinks" ${product?.category === 'drinks' ? 'selected' : ''}>🥤 Напитки</option>
-                                    <option value="snacks" ${product?.category === 'snacks' ? 'selected' : ''}>🍿 Закуски</option>
-                                    <option value="frozen" ${product?.category === 'frozen' ? 'selected' : ''}>🧊 Замороженное</option>
-                                    <option value="other" ${product?.category === 'other' ? 'selected' : ''}>📦 Другое</option>
-                                </select>
-                                <div class="smart-hint info mt-sm">
-                                    <span class="smart-hint-icon">💡</span>
-                                    <span class="smart-hint-text">Автоматически заполнит остальные поля</span>
-                                </div>
-                            </div>
-
-                            <div class="form-group">
-                                <label>Описание</label>
-                                <textarea name="description" rows="3" class="search-input"
-                                          oninput="validateField(this); updateCharCounter(this)" maxlength="500" placeholder="Краткое описание товара">${product?.description || ''}</textarea>
-                                <div class="char-counter">0/500</div>
-                            </div>
-                            </div>
-
-                            <!-- 💰 СЕКЦИЯ: Цены и скидки -->
-                            <div class="form-section">
-                                <div class="form-section-header">
-                                    <div class="form-section-icon">💰</div>
-                                    <div>
-                                        <h4 class="form-section-title">Цены и скидки</h4>
-                                        <p class="form-section-subtitle">Цена и процент скидки</p>
-                                    </div>
-                                </div>
-
-                            <div class="form-grid-2">
                                 <div class="form-group">
-                                    <label>Оригинальная цена *</label>
-                                    <input type="number" name="original_price" id="originalPrice" value="${product?.original_price || product?.price || ''}"
-                                           required min="1" step="1" class="search-input"
-                                           oninput="validateField(this); calculateFinalPrice('percent')" placeholder="15000">
-                                    <div class="form-error hidden">Цена должна быть > 0</div>
+                                    <label>???????? *</label>
+                                    <input type="text" name="name" id="productName" value="${product?.name || ''}" required
+                                           class="search-input" minlength="3" maxlength="100"
+                                           oninput="validateField(this)" placeholder="????????: ????, 450?">
+                                    <div class="form-error hidden">??????? 3 ???????</div>
                                 </div>
 
                                 <div class="form-group">
-                                    <label>Скидка (%)</label>
-                                    <input type="number" name="discount" id="discountPercent" value="${product?.discount || 0}"
-                                           min="0" max="90" class="search-input"
-                                           oninput="validateField(this); calculateFinalPrice('percent')" placeholder="0">
-                                </div>
-                            </div>
-
-                            <div class="form-group">
-                                <label>Цена со скидкой</label>
-                                <input type="number" name="discount_price" id="discountPrice" value="${product?.price || ''}"
-                                       min="0" step="1" class="search-input"
-                                       oninput="validateField(this); calculateFinalPrice('price')" placeholder="10500">
-                            </div>
-
-                            <!-- Live Price Preview -->
-                            <div class="price-preview-card hidden" id="pricePreview">
-                                <div class="price-preview-row">
-                                    <span class="price-preview-label">Было:</span>
-                                    <span id="priceOriginal" class="price-preview-value original">15,000 сум</span>
-                                </div>
-                                <div class="price-preview-row">
-                                    <span class="price-preview-label price-preview-label-strong">Стало:</span>
-                                    <span id="priceFinal" class="price-preview-value final">10,500 сум</span>
-                                </div>
-                                <div class="price-preview-savings">
-                                    <span class="price-preview-savings-label">🎉 Экономия</span>
-                                    <span id="priceSavings" class="price-preview-savings-value">4,500 сум (30%)</span>
-                                </div>
-                            </div>
-                            </div>
-
-                            <!-- 📊 СЕКЦИЯ: Количество и единицы -->
-                            <div class="form-section">
-                                <div class="form-section-header">
-                                    <div class="form-section-icon">📊</div>
-                                    <div>
-                                        <h4 class="form-section-title">Количество и единицы</h4>
-                                        <p class="form-section-subtitle">Остаток и срок годности</p>
-                                    </div>
-                                </div>
-
-                            <div class="form-grid-2">
-                                <div class="form-group">
-                                    <label>Единица измерения *</label>
-                                    <select name="unit" required class="search-input">
-                                        <option value="шт" ${product?.unit === 'шт' ? 'selected' : ''}>Штук (шт)</option>
-                                        <option value="кг" ${product?.unit === 'кг' ? 'selected' : ''}>Килограмм (кг)</option>
-                                        <option value="л" ${product?.unit === 'л' ? 'selected' : ''}>Литры (л)</option>
-                                        <option value="г" ${product?.unit === 'г' ? 'selected' : ''}>Грамм (г)</option>
-                                        <option value="мл" ${product?.unit === 'мл' ? 'selected' : ''}>Миллилитры (мл)</option>
-                                        <option value="упак" ${product?.unit === 'упак' ? 'selected' : ''}>Упаковка (упак)</option>
+                                    <label>????????? *</label>
+                                    <select name="category" id="productCategory" required class="search-input">
+                                        <option value="">???????? ?????????</option>
+                                        <option value="bakery" ${product?.category === 'bakery' ? 'selected' : ''}>?? ???????</option>
+                                        <option value="dairy" ${product?.category === 'dairy' ? 'selected' : ''}>?? ???????? ????????</option>
+                                        <option value="meat" ${product?.category === 'meat' ? 'selected' : ''}>?? ???? ? ?????</option>
+                                        <option value="fruits" ${product?.category === 'fruits' ? 'selected' : ''}>?? ??????</option>
+                                        <option value="vegetables" ${product?.category === 'vegetables' ? 'selected' : ''}>?? ?????</option>
+                                        <option value="drinks" ${product?.category === 'drinks' ? 'selected' : ''}>?? ???????</option>
+                                        <option value="sweets" ${product?.category === 'sweets' ? 'selected' : ''}>?? ????????</option>
+                                        <option value="frozen" ${product?.category === 'frozen' ? 'selected' : ''}>?? ????????????</option>
+                                        <option value="other" ${!product?.category || product?.category === 'other' ? 'selected' : ''}>?? ??????</option>
                                     </select>
                                 </div>
 
                                 <div class="form-group">
-                                    <label>
-                                        Количество в наличии *
-                                        <span class="form-helper">Автоматически уменьшается при продаже</span>
-                                    </label>
-                                    <div class="d-flex align-center gap-sm">
-                                        <button type="button" class="btn btn-sm btn-secondary btn-square-sm" onclick="changeQuantity(-1)">−</button>
-                                        <input type="number" name="stock_quantity" id="stockQuantity" value="${product?.stock_quantity || product?.stock || 0}"
-                                               required min="0" max="9999" class="search-input text-center flex-1" placeholder="0">
-                                        <button type="button" class="btn btn-sm btn-secondary btn-square-sm" onclick="changeQuantity(1)">+</button>
+                                    <label>????????</label>
+                                    <textarea name="description" rows="3" class="search-input" maxlength="500"
+                                              oninput="updateCharCounter(this)" placeholder="?????? ? ??????">${product?.description || ''}</textarea>
+                                    <div class="char-counter">${product?.description?.length || 0}/500</div>
+                                </div>
+                            </div>
+
+                            <div class="form-section">
+                                <div class="form-section-header">
+                                    <div class="form-section-icon">??</div>
+                                    <div>
+                                        <h4 class="form-section-title">???? ? ??????</h4>
+                                        <p class="form-section-subtitle">???? ? ????? ? ??????</p>
                                     </div>
+                                </div>
+
+                                <div class="form-grid-2">
+                                    <div class="form-group">
+                                        <label>???????????? ???? *</label>
+                                        <input type="number" name="original_price" id="originalPrice"
+                                               value="${product?.original_price || ''}" min="1" step="1" required
+                                               class="search-input" oninput="calculateFinalPrice('percent'); validateField(this)" placeholder="15000">
+                                        <div class="form-error hidden">???? ?????? ???? > 0</div>
+                                    </div>
+                                    <div class="form-group">
+                                        <label>?????? (%)</label>
+                                        <input type="number" name="discount" id="discountPercent" value="${product?.discount || 0}"
+                                               min="0" max="90" class="search-input"
+                                               oninput="calculateFinalPrice('percent'); validateField(this)" placeholder="30">
+                                    </div>
+                                </div>
+
+                                <div class="form-group">
+                                    <label>???? ?? ???????</label>
+                                    <input type="number" name="discount_price" id="discountPrice" value="${product?.price || product?.discount_price || ''}"
+                                           min="0" step="1" class="search-input"
+                                           oninput="calculateFinalPrice('price'); validateField(this)" placeholder="10500">
+                                </div>
+
+                                <div class="price-preview-card hidden" id="pricePreview">
+                                    <div class="price-preview-row">
+                                        <span class="price-preview-label">????:</span>
+                                        <span id="priceOriginal" class="price-preview-value original">?</span>
+                                    </div>
+                                    <div class="price-preview-row">
+                                        <span class="price-preview-label price-preview-label-strong">?????:</span>
+                                        <span id="priceFinal" class="price-preview-value final">?</span>
+                                    </div>
+                                    <div class="price-preview-savings">
+        <span class="price-preview-savings-label">????????</span>
+                                        <span id="priceSavings" class="price-preview-savings-value">?</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="form-section">
+                                <div class="form-section-header">
+                                    <div class="form-section-icon">??</div>
+                                    <div>
+                                        <h4 class="form-section-title">??????? ? ????</h4>
+                                        <p class="form-section-subtitle">????? ? ???? ????????</p>
+                                    </div>
+                                </div>
+
+                                <div class="form-grid-2">
+                                    <div class="form-group">
+                                        <label>??????? *</label>
+                                        <select name="unit" required class="search-input">
+                                            <option value="??" ${product?.unit === '??' ? 'selected' : ''}>????? (??)</option>
+                                            <option value="??" ${product?.unit === '??' ? 'selected' : ''}>????????? (??)</option>
+                                            <option value="?" ${product?.unit === '?' ? 'selected' : ''}>????? (?)</option>
+                                            <option value="?" ${product?.unit === '?' ? 'selected' : ''}>????? (?)</option>
+                                            <option value="??" ${product?.unit === '??' ? 'selected' : ''}>?????????? (??)</option>
+                                            <option value="????" ${product?.unit === '????' ? 'selected' : ''}>???????? (????)</option>
+                                        </select>
+                                    </div>
+                                    <div class="form-group">
+                                        <label>?????????? *</label>
+                                        <div class="d-flex align-center gap-sm">
+                                            <button type="button" class="btn btn-sm btn-secondary btn-square-sm" onclick="changeQuantity(-1)">?</button>
+                                            <input type="number" name="stock_quantity" id="stockQuantity"
+                                                   value="${product?.stock_quantity ?? product?.stock ?? product?.quantity ?? 0}"
+                                                   min="0" max="9999" required class="search-input text-center flex-1">
+                                            <button type="button" class="btn btn-sm btn-secondary btn-square-sm" onclick="changeQuantity(1)">+</button>
+                                        </div>
+                                        <div class="d-flex gap-sm mt-sm">
+                                            <button type="button" class="btn btn-sm btn-ghost flex-1" onclick="setQuantity(5)">5</button>
+                                            <button type="button" class="btn btn-sm btn-ghost flex-1" onclick="setQuantity(10)">10</button>
+                                            <button type="button" class="btn btn-sm btn-ghost flex-1" onclick="setQuantity(20)">20</button>
+                                            <button type="button" class="btn btn-sm btn-ghost flex-1" onclick="setQuantity(50)">50</button>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="form-group">
+                                    <label>???? ???????? *</label>
+                                    <input type="date" name="expiry_date" id="expiryDate"
+                                           value="${product?.expiry_date ? product.expiry_date.split('T')[0] : ''}"
+                                           min="${today}" required class="search-input">
                                     <div class="d-flex gap-sm mt-sm">
-                                        <button type="button" class="btn btn-sm btn-ghost flex-1" onclick="setQuantity(5)">5</button>
-                                        <button type="button" class="btn btn-sm btn-ghost flex-1" onclick="setQuantity(10)">10</button>
-                                        <button type="button" class="btn btn-sm btn-ghost flex-1" onclick="setQuantity(20)">20</button>
-                                        <button type="button" class="btn btn-sm btn-ghost flex-1" onclick="setQuantity(50)">50</button>
+                                        <button type="button" class="btn btn-sm btn-ghost flex-1" onclick="setExpiry(0)">???????</button>
+                                        <button type="button" class="btn btn-sm btn-ghost flex-1" onclick="setExpiry(1)">??????</button>
+                                        <button type="button" class="btn btn-sm btn-ghost flex-1" onclick="setExpiry(2)">2 ???</button>
+                                        <button type="button" class="btn btn-sm btn-ghost flex-1" onclick="setExpiry(3)">3 ???</button>
                                     </div>
                                 </div>
-                            </div>
 
-                            <!-- Expiry Date -->
-                            <div class="form-group">
-                                <label>Срок годности *</label>
-                                <input type="date" name="expiry_date" id="expiryDate" value="${product?.expiry_date ? product.expiry_date.split('T')[0] : ''}"
-                                       required min="${new Date().toISOString().split('T')[0]}" class="search-input">
-                                <div class="d-flex gap-sm mt-sm">
-                                    <button type="button" class="btn btn-sm btn-ghost flex-1" onclick="setExpiry(0)">Сегодня</button>
-                                    <button type="button" class="btn btn-sm btn-ghost flex-1" onclick="setExpiry(1)">Завтра</button>
-                                    <button type="button" class="btn btn-sm btn-ghost flex-1" onclick="setExpiry(2)">2 дня</button>
-                                    <button type="button" class="btn btn-sm btn-ghost flex-1" onclick="setExpiry(3)">3 дня</button>
+                                <div class="form-group">
+                                    <label class="checkbox-label">
+                                        <input type="checkbox" name="is_available" ${product?.is_available !== false ? 'checked' : ''}>
+                                        <span>???????? ??? ??????</span>
+                                    </label>
                                 </div>
-                            </div>
-
-                            <div class="form-group">
-                                <label class="checkbox-label">
-                                    <input type="checkbox" name="is_available" ${product?.is_available !== false ? 'checked' : ''}>
-                                    <span>Доступен для заказа</span>
-                                </label>
                             </div>
                         </div>
 
                         <div class="modal-footer">
                             <button type="submit" class="btn btn-primary ripple">
                                 <i data-lucide="check" class="icon-16"></i>
-                                ${isEdit ? 'Сохранить' : 'Добавить'}
+                                ${isEdit ? '?????????' : '????????'}
                             </button>
                             <button type="button" class="btn btn-secondary ripple" onclick="this.closest('.modal-overlay').remove()">
-                                Отмена
+                                ??????
                             </button>
                         </div>
                     </form>
@@ -1576,19 +1561,8 @@
             document.body.appendChild(modal);
             if (typeof lucide !== 'undefined') lucide.createIcons();
 
-            // Initialize price preview and keep percent/price in sync
             calculateFinalPrice('percent');
-
-            // Setup character counter for description
-            const textarea = modal.querySelector('textarea[name="description"]');
-            const counter = textarea.nextElementSibling;
-            textarea.addEventListener('input', () => {
-                counter.textContent = `${textarea.value.length}/500`;
-            });
-            counter.textContent = `${textarea.value.length}/500`;
-
-            // Auto-focus first input
-            setTimeout(() => modal.querySelector('input[name="name"]').focus(), 100);
+            setTimeout(() => modal.querySelector('input[name="name"]').focus(), 80);
 
             modal.addEventListener('click', (e) => {
                 if (e.target === modal) {
@@ -1599,37 +1573,29 @@
         }
 
         function handlePhotoUpload(input, event) {
-            const file = input.files[0];
+            const file = input.files?.[0];
             if (!file) return;
 
-            // Validate file type
             if (!file.type.startsWith('image/')) {
-                toast('Пожалуйста, выберите изображение', 'error');
+                toast('????????? ???? ???????????', 'error');
+                input.value = '';
                 return;
             }
-
-            // Validate file size (max 5MB)
             if (file.size > 5 * 1024 * 1024) {
-                toast('Размер файла не должен превышать 5MB', 'error');
+                toast('???????? 5 ??', 'error');
+                input.value = '';
                 return;
             }
 
-            // Show loading
             const uploadArea = document.querySelector('.photo-upload-area');
             uploadArea.classList.add('has-photo');
-            uploadArea.innerHTML = '<div class="upload-placeholder"><i data-lucide="loader" class="icon-spin"></i><div>Загрузка...</div></div>';
+            uploadArea.innerHTML = '<div class="upload-placeholder"><i data-lucide="loader" class="icon-spin"></i><div>????????...</div></div>';
             if (typeof lucide !== 'undefined') lucide.createIcons();
 
-            // Convert to base64 for preview (real upload would go to server)
             const reader = new FileReader();
             reader.onload = (e) => {
                 const photoUrl = e.target.result;
-
-                // Clear photo_id - new file will be uploaded on save
                 document.querySelector('input[name="photo_id"]').value = '';
-                document.querySelector('input[name="photo_url_input"]').value = '';
-
-                // Show preview
                 uploadArea.innerHTML = `
                     <div class="photo-preview">
                         <img src="${photoUrl}" alt="Preview">
@@ -1639,264 +1605,90 @@
                     </div>
                 `;
                 if (typeof lucide !== 'undefined') lucide.createIcons();
-
-                haptic('light');
-                toast('Фото выбрано (загрузится при сохранении)', 'success');
             };
-
-            reader.onerror = () => {
-                toast('Ошибка загрузки фото', 'error');
-                uploadArea.classList.remove('has-photo');
-                uploadArea.innerHTML = `
-                    <div class="upload-placeholder">
-                        <i data-lucide="image"></i>
-                        <div class="upload-placeholder-text">Загрузить фото</div>
-                        <div class="upload-placeholder-hint">или вставьте URL ниже (не сохраняется)</div>
-                    </div>
-                `;
-                if (typeof lucide !== 'undefined') lucide.createIcons();
-            };
-
             reader.readAsDataURL(file);
         }
 
-        function handlePhotoUrlInput(input) {
-            const url = input.value.trim();
-            const uploadArea = document.querySelector('.photo-upload-area');
-            const photoIdInput = document.querySelector('input[name="photo_id"]');
-
-            if (!url) {
-                uploadArea.classList.remove('has-photo');
-                uploadArea.innerHTML = `
-                    <div class="upload-placeholder">
-                        <i data-lucide="image"></i>
-                        <div class="upload-placeholder-text">Загрузить фото</div>
-                        <div class="upload-placeholder-hint">или вставьте URL ниже (не сохраняется)</div>
-                    </div>
-                `;
-                photoIdInput.value = '';
-                if (typeof lucide !== 'undefined') lucide.createIcons();
-                return;
-            }
-
-            // Validate URL
-            if (url.match(/^https?:\/\/.+/)) {
-                photoIdInput.value = '';
-                uploadArea.classList.add('has-photo');
-                uploadArea.innerHTML = `
-                    <div class="photo-preview">
-                        <img src="${url}" alt="Preview" onerror="this.src=''; this.parentElement.innerHTML='<div class=\'photo-error\'>Ошибка загрузки изображения</div>'">
-                        <button type="button" class="photo-preview-remove" onclick="event.stopPropagation(); removePhoto()">
-                            <i data-lucide="x" class="icon-16"></i>
-                        </button>
-                    </div>
-                `;
-                if (typeof lucide !== 'undefined') lucide.createIcons();
-            }
-        }
-
         function removePhoto() {
-            haptic('light');
             const uploadArea = document.querySelector('.photo-upload-area');
-            const photoIdInput = document.querySelector('input[name="photo_id"]');
-            const urlInput = document.querySelector('input[name="photo_url_input"]');
-            const fileInput = document.getElementById('photoFile');
-
             uploadArea.classList.remove('has-photo');
             uploadArea.innerHTML = `
-                <div class="upload-placeholder">
-                    <i data-lucide="image"></i>
-                    <div class="upload-placeholder-text">Загрузить фото</div>
-                    <div class="upload-placeholder-hint">или вставьте URL ниже (не сохраняется)</div>
-                </div>
+                <div class="photo-upload-icon">??</div>
+                <div class="photo-upload-title">????????? ????</div>
+                <div class="photo-upload-subtitle">PNG/JPG ?? 5 ??</div>
             `;
-
-            photoIdInput.value = '';
-            urlInput.value = '';
-            fileInput.value = '';
-
-            if (typeof lucide !== 'undefined') lucide.createIcons();
+            document.querySelector('input[name="photo_id"]').value = '';
+            const fileInput = document.getElementById('photoFile');
+            if (fileInput) fileInput.value = '';
         }
 
-        // Helper: Calculate final price with discount
         function calculateFinalPrice(source = 'percent') {
             const originalInput = document.getElementById('originalPrice');
-            const discountInput = document.getElementById('discountPercent');
+            const discountPercentInput = document.getElementById('discountPercent');
             const discountPriceInput = document.getElementById('discountPrice');
-            const previewBox = document.getElementById('pricePreview');
+            const preview = document.getElementById('pricePreview');
+            const priceOriginal = document.getElementById('priceOriginal');
+            const priceFinal = document.getElementById('priceFinal');
+            const priceSavings = document.getElementById('priceSavings');
 
-            if (!originalInput || !discountInput || !previewBox) return;
+            const original = parseInt(originalInput.value, 10) || 0;
+            let percent = parseInt(discountPercentInput.value, 10);
+            let discounted = parseInt(discountPriceInput.value, 10);
 
-            const original = parseFloat(originalInput.value) || 0;
-            if (original <= 0) {
-                previewBox.classList.add('hidden');
-                return;
+            if (source === 'percent') {
+                percent = Number.isFinite(percent) ? Math.min(90, Math.max(0, percent)) : 0;
+                discountPercentInput.value = percent;
+                discounted = Math.round(original * (1 - percent / 100));
+                discountPriceInput.value = discounted || '';
+            } else {
+                discounted = Number.isFinite(discounted) ? discounted : 0;
+                if (discounted > original && original > 0) discounted = original;
+                discountPriceInput.value = discounted || '';
+                percent = original > 0 ? Math.round((1 - discounted / original) * 100) : 0;
+                discountPercentInput.value = percent;
             }
 
-            const clampPercent = (v) => Math.max(0, Math.min(90, Number.isFinite(v) ? v : 0));
-
-            let discountPercent = clampPercent(parseInt(discountInput.value, 10) || 0);
-            let finalPrice = 0;
-
-            if (source === 'price' && discountPriceInput) {
-                const rawFinal = parseFloat(discountPriceInput.value);
-                if (Number.isFinite(rawFinal) && rawFinal > 0) {
-                    finalPrice = Math.max(0, Math.min(original, Math.round(rawFinal)));
-                    discountPercent = clampPercent(Math.round((1 - finalPrice / original) * 100));
-                    discountInput.value = String(discountPercent);
-                }
+            if (original > 0) {
+                preview.classList.remove('hidden');
+                priceOriginal.textContent = `${original.toLocaleString()} ???`;
+                priceFinal.textContent = `${(discounted || original).toLocaleString()} ???`;
+                const savings = Math.max(0, original - (discounted || original));
+                priceSavings.textContent = `${savings.toLocaleString()} ??? (${percent}%)`;
+            } else {
+                preview.classList.add('hidden');
             }
-
-            if (!finalPrice) {
-                finalPrice = Math.round(original * (1 - discountPercent / 100));
-                if (discountPriceInput) discountPriceInput.value = String(finalPrice);
-            }
-
-            const savings = Math.max(0, original - finalPrice);
-
-            // Show preview
-            previewBox.classList.remove('hidden');
-            document.getElementById('priceOriginal').textContent = formatPrice(original);
-            document.getElementById('priceFinal').textContent = formatPrice(finalPrice);
-            document.getElementById('priceSavings').textContent = `${formatPrice(savings)} (${discountPercent}%)`;
         }
 
-        // Helper: Change quantity
         function changeQuantity(delta) {
             const input = document.getElementById('stockQuantity');
-            if (!input) return;
-
-            const current = parseInt(input.value) || 0;
-            const newValue = Math.max(0, Math.min(9999, current + delta));
-            input.value = newValue;
-            haptic('light');
+            const current = parseInt(input.value, 10) || 0;
+            input.value = Math.max(0, current + delta);
         }
 
-        // Helper: Set quantity
         function setQuantity(value) {
             const input = document.getElementById('stockQuantity');
-            if (!input) return;
-
             input.value = value;
-            haptic('light');
         }
 
-        // Helper: Set expiry date
-        function setExpiry(daysFromNow) {
-            const input = document.getElementById('expiryDate');
-            if (!input) return;
-
+        function setExpiry(days) {
+            const dateInput = document.getElementById('expiryDate');
             const date = new Date();
-            date.setDate(date.getDate() + daysFromNow);
-            input.value = date.toISOString().split('T')[0];
-            haptic('light');
+            date.setDate(date.getDate() + days);
+            dateInput.value = date.toISOString().split('T')[0];
         }
 
-        // Smart UX: Apply category defaults
-        function applyCategoryDefaults() {
-            const categorySelect = document.getElementById('productCategory');
-            const category = categorySelect?.value;
-
-            if (!category || !categoryDefaults[category]) return;
-
-            const defaults = categoryDefaults[category];
-            const isEditing = !!document.querySelector('[name="name"]').value;
-
-            // Only apply defaults if creating new product (not editing)
-            if (isEditing) {
-                haptic('light');
-                return;
-            }
-
-            // Set unit
-            const unitSelect = document.querySelector('[name="unit"]');
-            if (unitSelect && !unitSelect.value) {
-                unitSelect.value = defaults.unit;
-            }
-
-            // Set quantity
-            const quantityInput = document.getElementById('stockQuantity');
-            if (quantityInput && (!quantityInput.value || quantityInput.value === '0')) {
-                quantityInput.value = defaults.quantity;
-            }
-
-            // Set expiry date
-            const expiryInput = document.getElementById('expiryDate');
-            if (expiryInput && !expiryInput.value) {
-                const date = new Date();
-                date.setDate(date.getDate() + defaults.expiry_days);
-                expiryInput.value = date.toISOString().split('T')[0];
-            }
-
-            haptic('light');
-            toast(`✨ Заполнено: ${defaults.quantity} ${defaults.unit}, срок ${defaults.expiry_days} дн.`, 'success');
+        function updateCharCounter(textarea) {
+            const counter = textarea.nextElementSibling;
+            if (counter) counter.textContent = `${textarea.value.length}/500`;
         }
-
-        // Smart UX: Show name suggestions
-        let suggestionsTimeout;
-        function showNameSuggestions(input) {
-            clearTimeout(suggestionsTimeout);
-
-            const category = document.getElementById('productCategory')?.value;
-            const query = input.value.toLowerCase().trim();
-            const suggestionsDiv = document.getElementById('nameSuggestions');
-
-            if (!suggestionsDiv) return;
-
-            // Hide if no category or query too short
-            if (!category || query.length < 1) {
-                suggestionsDiv.classList.add('hidden');
-                return;
-            }
-
-            suggestionsTimeout = setTimeout(() => {
-                const suggestions = popularProducts[category] || [];
-                const filtered = suggestions.filter(s =>
-                    s.toLowerCase().includes(query) || query === ''
-                ).slice(0, 5);
-
-                if (filtered.length === 0) {
-                    suggestionsDiv.classList.add('hidden');
-                    return;
-                }
-
-                suggestionsDiv.innerHTML = filtered.map(s => `
-                    <div class="suggestion-item" onclick="selectSuggestion('${s}')">
-                        ${s}
-                    </div>
-                `).join('');
-                suggestionsDiv.classList.remove('hidden');
-            }, 200);
-        }
-
-        function selectSuggestion(name) {
-            const input = document.getElementById('productName');
-            if (input) {
-                input.value = name;
-                document.getElementById('nameSuggestions').classList.add('hidden');
-                haptic('light');
-            }
-        }
-
-        // Close suggestions on outside click
-        document.addEventListener('click', (e) => {
-            const suggestionsDiv = document.getElementById('nameSuggestions');
-            const nameInput = document.getElementById('productName');
-            if (suggestionsDiv && nameInput &&
-                !suggestionsDiv.contains(e.target) &&
-                e.target !== nameInput) {
-                suggestionsDiv.classList.add('hidden');
-            }
-        });
 
         async function saveProduct(event, productId) {
             event.preventDefault();
             haptic('medium');
 
-            const formData = new FormData(event.target);
-
-            // Show loading state on submit button
-            const submitBtn = event.target.querySelector('button[type="submit"]');
+            const form = event.target;
+            const formData = new FormData(form);
+            const submitBtn = form.querySelector('button[type="submit"]');
             const originalText = submitBtn.innerHTML;
             submitBtn.disabled = true;
             submitBtn.innerHTML = '<div class="spinner spinner-small spinner-center"></div>';
@@ -1905,29 +1697,23 @@
                 const title = String(formData.get('name') || '').trim();
                 const category = String(formData.get('category') || 'other').trim() || 'other';
                 const description = String(formData.get('description') || '').trim();
-                const unit = String(formData.get('unit') || 'шт').trim() || 'шт';
-                const stockQty = parseInt(formData.get('stock_quantity'), 10) || 0;
-
+                const unit = String(formData.get('unit') || '??').trim();
+                const stockQty = Math.max(0, parseInt(formData.get('stock_quantity'), 10) || 0);
                 const originalPrice = parseInt(formData.get('original_price'), 10);
-                if (!Number.isFinite(originalPrice) || originalPrice <= 0) {
-                    throw new Error('Оригинальная цена обязательна');
-                }
-
                 const discountPercent = Math.max(0, Math.min(90, parseInt(formData.get('discount'), 10) || 0));
                 const discountPriceInput = parseInt(formData.get('discount_price'), 10);
-                let discountPrice = 0;
-
-                if (Number.isFinite(discountPriceInput) && discountPriceInput > 0) {
-                    if (discountPriceInput > originalPrice) {
-                        throw new Error('Цена со скидкой не может быть больше оригинальной цены');
-                    }
-                    discountPrice = discountPriceInput;
-                } else {
-                    discountPrice = Math.max(0, Math.round(originalPrice * (1 - discountPercent / 100)));
-                }
                 const expiryDate = String(formData.get('expiry_date') || '');
                 const isAvailable = formData.get('is_available') === 'on';
-                const desiredStatus = stockQty <= 0 ? 'out_of_stock' : (isAvailable ? 'active' : 'hidden');
+
+                if (!title || title.length < 3) throw new Error('??????? ???????? (???. 3 ???????)');
+                if (!originalPrice || originalPrice <= 0) throw new Error('???????????? ???? ???????????');
+                if (!expiryDate) throw new Error('??????? ???? ????????');
+
+                let discountPrice = Number.isFinite(discountPriceInput) && discountPriceInput > 0
+                    ? discountPriceInput
+                    : Math.round(originalPrice * (1 - discountPercent / 100));
+
+                if (discountPrice > originalPrice) discountPrice = originalPrice;
 
                 let photoId = String(formData.get('photo_id') || '').trim();
                 const fileInput = document.getElementById('photoFile');
@@ -1937,12 +1723,8 @@
                     const uploadForm = new FormData();
                     uploadForm.append('photo', photoFile, photoFile.name || 'photo.jpg');
                     const uploaded = await apiFetch('/api/partner/upload-photo', { method: 'POST', body: uploadForm });
-                    if (!uploaded?.file_id) {
-                        throw new Error('Не удалось загрузить фото');
-                    }
+                    if (!uploaded?.file_id) throw new Error('?? ??????? ????????? ????');
                     photoId = uploaded.file_id;
-                    const photoIdInput = document.querySelector('input[name="photo_id"]');
-                    if (photoIdInput) photoIdInput.value = photoId;
                 }
 
                 const payload = new FormData();
@@ -1954,87 +1736,31 @@
                 payload.append('stock_quantity', String(stockQty));
                 payload.append('unit', unit);
                 payload.append('expiry_date', expiryDate);
-                payload.append('description', description);
+                if (description) payload.append('description', description);
                 if (photoId) payload.append('photo_id', photoId);
-                if (productId) payload.append('status', desiredStatus);
+                if (productId) payload.append('status', stockQty <= 0 ? 'out_of_stock' : (isAvailable ? 'active' : 'hidden'));
 
                 if (productId) {
                     await apiFetch(`/api/partner/products/${productId}`, { method: 'PUT', body: payload });
-                    haptic('success');
-                    toast('Товар обновлен', 'success');
+                    toast('????? ????????', 'success');
                 } else {
                     await apiFetch('/api/partner/products', { method: 'POST', body: payload });
-                    haptic('success');
-                    toast('Товар добавлен', 'success');
+                    toast('????? ????????', 'success');
                 }
 
-                document.querySelector('.modal-overlay').remove();
-                loadProducts();
+                haptic('success');
+                document.querySelector('.modal-overlay')?.remove();
+                await loadProducts();
             } catch (error) {
                 console.error('Save product error:', error);
                 haptic('error');
-                toast('Ошибка сохранения товара', 'error');
-
-                // Restore button
+                toast(error?.message || '?????? ?????????? ??????', 'error');
                 submitBtn.disabled = false;
                 submitBtn.innerHTML = originalText;
             }
         }
 
-        // Inline validation helper
-        function validateField(input) {
-            const errorDiv = input.parentElement.querySelector('.form-error');
-            if (!errorDiv) return;
-
-            let isValid = true;
-            let errorMsg = '';
-
-            // Required field
-            if (input.required && !input.value) {
-                isValid = false;
-                errorMsg = 'Обязательное поле';
-            }
-            // Min length
-            else if (input.minLength && input.value.length > 0 && input.value.length < input.minLength) {
-                isValid = false;
-                errorMsg = `Минимум ${input.minLength} символа`;
-            }
-            // URL validation
-            else if (input.type === 'url' && input.value && !input.value.match(/^https?:\/\/.+/)) {
-                isValid = false;
-                errorMsg = 'Некорректный URL';
-            }
-            // Number validation
-            else if (input.type === 'number' && input.value) {
-                const num = parseFloat(input.value);
-                if (input.min && num < parseFloat(input.min)) {
-                    isValid = false;
-                    errorMsg = `Минимум ${input.min}`;
-                }
-                if (input.max && num > parseFloat(input.max)) {
-                    isValid = false;
-                    errorMsg = `Максимум ${input.max}`;
-                }
-            }
-
-            if (isValid) {
-                input.classList.remove('error');
-                input.classList.add('success');
-                errorDiv.classList.add('hidden');
-            } else {
-                input.classList.add('error');
-                input.classList.remove('success');
-                errorDiv.textContent = errorMsg;
-                errorDiv.classList.remove('hidden');
-            }
-        }
-
-        function editProduct(id) {
-            haptic('light');
-            openProductModal(id);
-        }
-
-        async function toggleProductAvailability(id) {
+async function toggleProductAvailability(id) {
             try {
                 haptic('light');
 

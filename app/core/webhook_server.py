@@ -2396,15 +2396,6 @@ async def create_webhook_app(
     app.router.add_get("/api/v1/offers/{offer_id}", api_offer_detail)
     app.router.add_options("/api/v1/stores", cors_preflight)
     app.router.add_get("/api/v1/stores", api_stores)
-    app.router.add_options("/api/v1/orders", cors_preflight)
-    app.router.add_post("/api/v1/orders", api_create_order)
-    app.router.add_get("/api/v1/orders", api_user_orders)
-    app.router.add_options("/api/v1/orders/{order_id}/status", cors_preflight)
-    app.router.add_get("/api/v1/orders/{order_id}/status", api_order_status)
-    app.router.add_options("/api/v1/orders/{order_id}/timeline", cors_preflight)
-    app.router.add_get("/api/v1/orders/{order_id}/timeline", api_order_timeline)
-    app.router.add_options("/api/v1/orders/{order_id}/qr", cors_preflight)
-    app.router.add_get("/api/v1/orders/{order_id}/qr", api_order_qr)
     # Alias for compatibility
     app.router.add_options("/api/v1/user/orders", cors_preflight)
     app.router.add_get("/api/v1/user/orders", api_user_orders)
@@ -2414,8 +2405,6 @@ async def create_webhook_app(
     app.router.add_get("/api/v1/photo/{file_id}", api_get_photo)
     app.router.add_options("/api/v1/payment-card/{store_id}", cors_preflight)
     app.router.add_get("/api/v1/payment-card/{store_id}", api_get_payment_card)
-    app.router.add_options("/api/v1/orders/{order_id}/payment-proof", cors_preflight)
-    app.router.add_post("/api/v1/orders/{order_id}/payment-proof", api_upload_payment_proof)
     app.router.add_get("/api/v1/health", api_health)
     app.router.add_get("/api/v1/debug", api_debug)
 
@@ -2439,6 +2428,8 @@ async def create_webhook_app(
     app.router.add_post("/api/v1/payment/create", api_create_payment)
     app.router.add_post("/api/v1/payment/click/callback", api_click_callback)
     app.router.add_post("/api/v1/payment/payme/callback", api_payme_callback)
+
+    fastapi_handler = None
 
     # Partner Panel API - FastAPI integration via direct ASGI
     if offer_service and bot_token:
@@ -2495,7 +2486,7 @@ async def create_webhook_app(
                 response_body = b"".join(body_parts)
                 return web.Response(body=response_body, status=status_code, headers=dict(headers))
 
-            # Register handler for all /api/* routes (including /api/partner/*)
+            # Register handler for Partner Panel API routes
             app.router.add_route("*", "/api/partner{path:.*}", fastapi_handler)
 
             logger.info("✅ Partner Panel API endpoints registered (FastAPI direct ASGI)")
@@ -2504,6 +2495,22 @@ async def create_webhook_app(
             logger.warning("⚠️ Partner Panel API will not be available")
     else:
         logger.warning("⚠️ Partner Panel API disabled (missing offer_service or bot_token)")
+
+    if fastapi_handler:
+        app.router.add_route("*", "/api/v1/orders{path:.*}", fastapi_handler)
+        logger.info("✅ /api/v1/orders routed to FastAPI")
+    else:
+        app.router.add_options("/api/v1/orders", cors_preflight)
+        app.router.add_post("/api/v1/orders", api_create_order)
+        app.router.add_get("/api/v1/orders", api_user_orders)
+        app.router.add_options("/api/v1/orders/{order_id}/status", cors_preflight)
+        app.router.add_get("/api/v1/orders/{order_id}/status", api_order_status)
+        app.router.add_options("/api/v1/orders/{order_id}/timeline", cors_preflight)
+        app.router.add_get("/api/v1/orders/{order_id}/timeline", api_order_timeline)
+        app.router.add_options("/api/v1/orders/{order_id}/qr", cors_preflight)
+        app.router.add_get("/api/v1/orders/{order_id}/qr", api_order_qr)
+        app.router.add_options("/api/v1/orders/{order_id}/payment-proof", cors_preflight)
+        app.router.add_post("/api/v1/orders/{order_id}/payment-proof", api_upload_payment_proof)
 
     # Setup WebSocket routes for real-time notifications
     setup_websocket_routes(app)

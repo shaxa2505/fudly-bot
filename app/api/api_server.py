@@ -69,7 +69,7 @@ def create_api_app(db: Any = None, offer_service: Any = None, bot_token: str = N
     if _app_db:
         set_db_instance(_app_db, _app_offer_service)
         set_auth_db(_app_db)
-        set_orders_db(_app_db)
+        set_orders_db(_app_db, bot_token)
         set_partner_db(_app_db, bot_token)
         logger.info("✅ Database connected to API (immediate init)")
 
@@ -80,7 +80,7 @@ def create_api_app(db: Any = None, offer_service: Any = None, bot_token: str = N
         if _app_db:
             set_db_instance(_app_db, _app_offer_service)
             set_auth_db(_app_db)
-            set_orders_db(_app_db)
+            set_orders_db(_app_db, bot_token)
             set_partner_db(_app_db, bot_token)
             logger.info("✅ Database connected to API (lifespan)")
         yield
