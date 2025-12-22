@@ -818,8 +818,8 @@
 .offers-grid {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
-  gap: 14px;
-  padding: 8px 16px 24px;
+  gap: 18px;
+  padding: 12px 18px 28px;
   background: transparent;
   align-items: start;
 }

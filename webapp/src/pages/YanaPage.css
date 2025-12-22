@@ -12,7 +12,7 @@
 /* Header */
 .yana-header {
   background: var(--color-bg-primary);
-  padding: var(--spacing-xl) var(--spacing-xl) 0;
+  padding: var(--spacing-xl) var(--page-padding-x) 0;
   position: sticky;
   top: 0;
   z-index: var(--z-sticky);
@@ -76,7 +76,7 @@
 
 /* Section Base */
 .yana-section {
-  padding: var(--spacing-xl);
+  padding: var(--spacing-xl) var(--page-padding-x);
   animation: fadeInUp 0.3s ease;
 }
 

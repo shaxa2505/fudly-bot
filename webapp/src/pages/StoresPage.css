@@ -14,7 +14,7 @@
 /* Header */
 .sp-header {
   background: rgba(255, 252, 248, 0.95);
-  padding: var(--spacing-xl);
+  padding: var(--spacing-xl) var(--page-padding-x);
   position: sticky;
   top: 0;
   z-index: var(--z-sticky);

@@ -16,7 +16,7 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: var(--spacing-lg) var(--spacing-xl);
+  padding: var(--spacing-lg) var(--page-padding-x);
   background: rgba(255, 252, 248, 0.95);
   border-bottom: 1px solid rgba(15, 118, 110, 0.12);
   position: sticky;

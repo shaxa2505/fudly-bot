@@ -11,7 +11,7 @@
 
 /* Header */
 .explore-header {
-  padding: var(--spacing-2xl) var(--spacing-xl) var(--spacing-xl);
+  padding: var(--spacing-xl) var(--page-padding-x) var(--spacing-lg);
   text-align: center;
   border-bottom: 1px solid var(--color-border-light);
 }
@@ -25,7 +25,7 @@
 
 /* Search Section */
 .search-section {
-  padding: var(--spacing-xl) var(--spacing-xl) var(--spacing-lg);
+  padding: var(--spacing-xl) var(--page-padding-x) var(--spacing-lg);
 }
 
 .search-box {
@@ -71,7 +71,7 @@
   display: grid;
   grid-template-columns: repeat(2, 1fr);
   gap: var(--spacing-lg);
-  padding: 0 var(--spacing-xl) var(--spacing-xl);
+  padding: 0 var(--page-padding-x) var(--spacing-xl);
 }
 
 .category-card {
@@ -137,7 +137,7 @@
 @media (max-width: 360px) {
   .categories-grid {
     gap: var(--spacing-md);
-    padding: 0 var(--spacing-lg) var(--spacing-xl);
+    padding: 0 var(--page-padding-x) var(--spacing-xl);
   }
 
   .category-card {

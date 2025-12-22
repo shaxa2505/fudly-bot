@@ -102,6 +102,11 @@
   --spacing-4xl: 40px;
   --spacing-5xl: 60px;
 
+  /* ===== LAYOUT ===== */
+
+  /* Consistent horizontal padding across pages */
+  --page-padding-x: var(--spacing-lg);
+
   /* ===== BORDER RADIUS ===== */
 
   --radius-xs: 4px;
