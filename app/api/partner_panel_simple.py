@@ -471,9 +471,21 @@ async def list_products(authorization: str = Header(None), status: Optional[str]
     # Map to frontend-expected format
     products = []
     for o in offers:
-        # Use prices directly from database
-        discount_price = o["discount_price"] if o["discount_price"] else 0
-        original_price = o.get("original_price") if o.get("original_price") else None
+        # Convert prices from kopeks to sums for UI
+        discount_price_kopeks = o.get("discount_price") or 0
+        original_price_kopeks = o.get("original_price")
+        discount_price = discount_price_kopeks / 100
+        original_price = (
+            original_price_kopeks / 100 if original_price_kopeks is not None else None
+        )
+
+        stock_quantity = o.get("stock_quantity")
+        if stock_quantity is None:
+            stock_quantity = o["quantity"]
+
+        status = o.get("status")
+        if not status:
+            status = "out_of_stock" if stock_quantity == 0 else "active"
 
         # Build photo URL if photo_id exists
         photo_url = None
@@ -491,15 +503,16 @@ async def list_products(authorization: str = Header(None), status: Optional[str]
             "discount_price": discount_price,  # Keep for compatibility
             "original_price": original_price,
             # Frontend expects 'stock'
-            "stock": o["quantity"],
-            "quantity": o["quantity"],  # Keep for compatibility
+            "stock": stock_quantity,
+            "quantity": stock_quantity,  # Keep for compatibility
+            "stock_quantity": stock_quantity,
             "unit": o.get("unit") or "шт",
             "expiry_date": str(o.get("expiry_date")) if o.get("expiry_date") else None,
             "photo_id": o.get("photo_id"),
             "photo_url": photo_url,
             "image": photo_url or "https://via.placeholder.com/120?text=No+Photo",
-            "status": o.get("status") or "active",
-            "is_active": (o.get("status") or "active") == "active",
+            "status": status,
+            "is_active": status == "active",
         }
         products.append(product)
 
@@ -606,8 +619,8 @@ async def create_product(
             store_id=store["store_id"],
             title=title,
             description=description or title,
-            original_price=original_price,
-            discount_price=discount_price,
+            original_price=original_price * 100,
+            discount_price=discount_price * 100,
             quantity=quantity,
             available_from=available_from,
             available_until=available_until,

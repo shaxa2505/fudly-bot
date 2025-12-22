@@ -1572,6 +1572,10 @@
             });
         }
 
+        function editProduct(productId) {
+            openProductModal(productId);
+        }
+
         function handlePhotoUpload(input, event) {
             const file = input.files?.[0];
             if (!file) return;
