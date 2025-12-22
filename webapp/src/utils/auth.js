@@ -106,7 +106,7 @@ export const getUserId = () => {
   
   // Fallback to localStorage
   const user = getCurrentUser()
-  return user?.user_id || 0
+  return user?.user_id || user?.id || 0
 }
 
 /**

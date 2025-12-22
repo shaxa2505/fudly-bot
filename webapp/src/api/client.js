@@ -127,8 +127,8 @@ const api = {
 
   async getUserBookings(userId, status = null) {
     try {
-      const data = await this.getOrders()
-      return data.bookings || []
+      const data = await this.getUserOrders(userId, status)
+      return data.orders || []
     } catch (error) {
       return []
     }
