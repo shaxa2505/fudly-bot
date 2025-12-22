@@ -944,7 +944,15 @@ async def create_webhook_app(
                 order_type = r.get("order_type") or (
                     "delivery" if r.get("delivery_address") else "pickup"
                 )
-                order_status = r.get("order_status") or "pending"
+                order_status_raw = r.get("order_status") or "pending"
+                order_status = str(order_status_raw).strip().lower() or "pending"
+                order_status = {
+                    "new": "pending",
+                    "awaiting_payment": "pending",
+                    "awaiting_admin_confirmation": "pending",
+                    "paid": "pending",
+                    "confirmed": "preparing",
+                }.get(order_status, order_status)
 
                 payment_method = r.get("payment_method") or "cash"
                 payment_status = r.get("payment_status")

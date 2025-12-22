@@ -5,13 +5,13 @@
 
 .sp {
   min-height: 100vh;
-  background: var(--color-bg-secondary);
+  background: var(--color-bg-primary);
   padding-bottom: calc(var(--bottom-nav-height) + var(--spacing-xl));
 }
 
 /* Topbar */
 .sp-topbar {
-  background: var(--color-bg-secondary);
+  background: var(--color-bg-primary);
   height: var(--app-topbar-height);
   padding: 0 var(--app-header-padding-x);
   position: sticky;
@@ -68,7 +68,7 @@
   position: sticky;
   top: var(--app-topbar-height);
   z-index: 19;
-  background: var(--color-bg-secondary);
+  background: var(--color-bg-primary);
   padding: var(--spacing-md) var(--app-header-padding-x);
   border-bottom: 1px solid rgba(15, 118, 110, 0.12);
   backdrop-filter: blur(10px);
@@ -132,7 +132,7 @@
   position: sticky;
   top: 86px;
   z-index: var(--z-sticky);
-  background: var(--color-bg-secondary);
+  background: var(--color-bg-primary);
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
   border-bottom: 1px solid rgba(15, 118, 110, 0.08);
@@ -185,7 +185,7 @@
   position: sticky;
   top: 132px;
   z-index: var(--z-sticky);
-  background: var(--color-bg-secondary);
+  background: var(--color-bg-primary);
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
   border-bottom: 1px solid rgba(15, 118, 110, 0.08);

@@ -5,7 +5,7 @@
 
 .cart-page {
   min-height: 100vh;
-  background: var(--color-bg-secondary);
+  background: var(--color-bg-primary);
   padding-bottom: calc(var(--bottom-nav-height) + 96px);
 }
 
@@ -16,7 +16,7 @@
   align-items: center;
   min-height: var(--app-header-min-height);
   padding: var(--app-header-padding-y) var(--app-header-padding-x);
-  background: var(--color-bg-secondary);
+  background: var(--color-bg-primary);
   border-bottom: 1px solid #F1F1F1;
   position: sticky;
   top: 0;

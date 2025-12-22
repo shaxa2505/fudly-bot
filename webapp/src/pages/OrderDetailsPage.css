@@ -4,7 +4,7 @@
 
 .order-details-page {
   min-height: 100vh;
-  background: var(--color-bg-secondary);
+  background: var(--color-bg-primary);
   padding-bottom: var(--spacing-xl);
 }
 
@@ -14,7 +14,7 @@
   align-items: center;
   gap: var(--spacing-lg);
   padding: var(--spacing-xl);
-  background: var(--color-bg-secondary);
+  background: var(--color-bg-primary);
   position: sticky;
   top: 0;
   z-index: var(--z-sticky);

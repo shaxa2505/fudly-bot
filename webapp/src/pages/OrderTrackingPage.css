@@ -5,12 +5,12 @@
 
 .order-tracking-page {
   min-height: 100vh;
-  background: var(--color-bg-secondary);
+  background: var(--color-bg-primary);
   padding: 0 0 calc(var(--bottom-nav-height) + var(--spacing-xl)) 0;
 }
 
 .tracking-header {
-  background: var(--color-bg-secondary);
+  background: var(--color-bg-primary);
   padding: var(--spacing-lg) var(--spacing-xl);
   box-shadow: var(--shadow-header);
   position: sticky;
@@ -188,7 +188,7 @@
   height: 16px;
   border-radius: var(--radius-full);
   background: var(--color-border);
-  border: 3px solid var(--color-bg-secondary);
+  border: 3px solid var(--color-bg-primary);
   transition: all var(--transition-slow);
   z-index: 2;
 }

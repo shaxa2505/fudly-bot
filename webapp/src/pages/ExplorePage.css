@@ -5,7 +5,7 @@
 
 .explore-page {
   min-height: 100vh;
-  background: var(--color-bg-secondary);
+  background: var(--color-bg-primary);
   padding-bottom: calc(var(--bottom-nav-height) + var(--spacing-xl));
 }
 
@@ -14,7 +14,7 @@
   min-height: var(--app-header-min-height);
   padding: var(--app-header-padding-y) var(--app-header-padding-x);
   text-align: center;
-  background: var(--color-bg-secondary);
+  background: var(--color-bg-primary);
   border-bottom: 1px solid rgba(15, 118, 110, 0.12);
   position: sticky;
   top: 0;
