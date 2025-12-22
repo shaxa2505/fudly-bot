@@ -203,7 +203,13 @@ class OfferMixin:
             return list(cursor.fetchall())
 
     def get_hot_offers(
-        self, city: str = None, limit: int = 20, offset: int = 0, business_type: str = None
+        self,
+        city: str | None = None,
+        limit: int = 20,
+        offset: int = 0,
+        business_type: str | None = None,
+        region: str | None = None,
+        district: str | None = None,
     ):
         """Get hot offers (top by discount and expiry date)."""
         with self.get_connection() as conn:
@@ -229,6 +235,14 @@ class OfferMixin:
                 query += f" AND (({city_conditions}) OR s.city IS NULL OR s.city = '')"
                 params.extend([f"%{v}%" for v in city_variants])
 
+            if region:
+                query += " AND s.region ILIKE %s"
+                params.append(f"%{region}%")
+
+            if district:
+                query += " AND s.district ILIKE %s"
+                params.append(f"%{district}%")
+
             if business_type:
                 query += " AND s.category = %s"
                 params.append(business_type)
@@ -244,7 +258,13 @@ class OfferMixin:
             cursor.execute(query, params)
             return [dict(row) for row in cursor.fetchall()]
 
-    def count_hot_offers(self, city: str = None, business_type: str = None) -> int:
+    def count_hot_offers(
+        self,
+        city: str | None = None,
+        business_type: str | None = None,
+        region: str | None = None,
+        district: str | None = None,
+    ) -> int:
         """Count hot offers without loading data."""
         with self.get_connection() as conn:
             cursor = conn.cursor()
@@ -264,6 +284,14 @@ class OfferMixin:
                 city_conditions = " OR ".join(["s.city ILIKE %s" for _ in city_variants])
                 query += f" AND ({city_conditions})"
                 params.extend([f"%{v}%" for v in city_variants])
+
+            if region:
+                query += " AND s.region ILIKE %s"
+                params.append(f"%{region}%")
+
+            if district:
+                query += " AND s.district ILIKE %s"
+                params.append(f"%{district}%")
 
             if business_type:
                 query += " AND s.business_type = %s"
@@ -332,7 +360,12 @@ class OfferMixin:
             return [dict(row) for row in cursor.fetchall()]
 
     def get_offers_by_city_and_category(
-        self, city: str, category: str, limit: int = 20
+        self,
+        city: str | None,
+        category: str,
+        limit: int = 20,
+        region: str | None = None,
+        district: str | None = None,
     ) -> list[dict]:
         """Get offers by city and category."""
         with self.get_connection() as conn:
@@ -354,6 +387,14 @@ class OfferMixin:
                 city_conditions = " OR ".join(["s.city ILIKE %s" for _ in city_variants])
                 query += f" AND ({city_conditions})"
                 params.extend([f"%{v}%" for v in city_variants])
+
+            if region:
+                query += " AND s.region ILIKE %s"
+                params.append(f"%{region}%")
+
+            if district:
+                query += " AND s.district ILIKE %s"
+                params.append(f"%{district}%")
 
             query += """
                 ORDER BY o.created_at DESC

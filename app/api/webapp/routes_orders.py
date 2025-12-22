@@ -176,7 +176,7 @@ async def create_order(
 
                 price = int(normalize_price(get_val(offer, "discount_price", 0)))
                 offer_store_id = int(get_val(offer, "store_id"))
-                offer_title = get_val(offer, "title", "Товар")
+                offer_title = get_val(offer, "title", "Tovar")
                 store = db.get_store(offer_store_id) if hasattr(db, "get_store") else None
                 store_name = get_val(store, "name", "") if store else ""
                 store_address = get_val(store, "address", "") if store else ""
@@ -337,6 +337,9 @@ async def get_orders(db=Depends(get_db), user: dict = Depends(get_current_user))
                     (int(user_id),),
                 )
                 raw_orders = cursor.fetchall() or []
+                if raw_orders and not hasattr(raw_orders[0], "get"):
+                    columns = [col[0] for col in cursor.description or []]
+                    raw_orders = [dict(zip(columns, row)) for row in raw_orders]
     except Exception as e:
         logger.warning(f"Webapp get_orders failed to fetch orders: {e}")
         raw_orders = []
@@ -375,7 +378,7 @@ async def get_orders(db=Depends(get_db), user: dict = Depends(get_current_user))
                 cart_items = []
 
             for it in cart_items or []:
-                title = it.get("title") or "Товар"
+                title = it.get("title") or "Tovar"
                 qty = int(it.get("quantity") or 1)
                 price = int(it.get("price") or 0)
                 items_total += price * qty
@@ -395,7 +398,7 @@ async def get_orders(db=Depends(get_db), user: dict = Depends(get_current_user))
         else:
             qty = int(r.get("quantity") or 1)
             price = int(r.get("offer_price") or 0)
-            title = r.get("offer_title") or "Товар"
+            title = r.get("offer_title") or "Tovar"
             photo = r.get("offer_photo") or r.get("offer_photo_id")
             items_total = price * qty
             qty_total = qty

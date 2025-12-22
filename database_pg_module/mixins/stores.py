@@ -34,6 +34,8 @@ class StoreMixin:
         owner_id: int,
         name: str,
         city: str,
+        region: str | None = None,
+        district: str | None = None,
         address: str | None = None,
         description: str | None = None,
         category: str = "Ресторан",
@@ -46,11 +48,23 @@ class StoreMixin:
             cursor = conn.cursor()
             cursor.execute(
                 """
-                INSERT INTO stores (owner_id, name, city, address, description, category, phone, business_type, photo)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+                INSERT INTO stores (owner_id, name, city, region, district, address, description, category, phone, business_type, photo)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                 RETURNING store_id
             """,
-                (owner_id, name, city, address, description, category, phone, business_type, photo),
+                (
+                    owner_id,
+                    name,
+                    city,
+                    region,
+                    district,
+                    address,
+                    description,
+                    category,
+                    phone,
+                    business_type,
+                    photo,
+                ),
             )
             store_id = cursor.fetchone()[0]
             logger.info(
@@ -155,6 +169,42 @@ class StoreMixin:
             """,
                 (city,),
             )
+            return [dict(row) for row in cursor.fetchall()]
+
+    def get_stores_by_location(
+        self, city: str | None = None, region: str | None = None, district: str | None = None
+    ):
+        """Return public stores filtered by city/region/district (any combination)."""
+        with self.get_connection() as conn:
+            cursor = conn.cursor(row_factory=dict_row)
+            query = """
+                SELECT s.*,
+                       COALESCE(AVG(r.rating), 0) as avg_rating,
+                       COUNT(DISTINCT r.rating_id) as ratings_count,
+                       (SELECT COUNT(*)
+                        FROM offers o
+                        WHERE o.store_id = s.store_id
+                          AND o.status = 'active'
+                          AND (o.expiry_date IS NULL OR o.expiry_date >= CURRENT_DATE)
+                       ) as offers_count
+                FROM stores s
+                LEFT JOIN ratings r ON s.store_id = r.store_id
+                WHERE (s.status = 'active' OR s.status = 'approved')
+            """
+            params: list[str] = []
+
+            if city:
+                query += " AND s.city ILIKE %s"
+                params.append(f"%{city}%")
+            if region:
+                query += " AND s.region ILIKE %s"
+                params.append(f"%{region}%")
+            if district:
+                query += " AND s.district ILIKE %s"
+                params.append(f"%{district}%")
+
+            query += " GROUP BY s.store_id ORDER BY avg_rating DESC, s.created_at DESC"
+            cursor.execute(query, params)
             return [dict(row) for row in cursor.fetchall()]
 
     def get_approved_stores(self, city: str = None):

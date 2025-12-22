@@ -2287,6 +2287,18 @@ async function toggleProductAvailability(id) {
                             </div>
 
                             <div class="form-group">
+                                <label>Viloyat</label>
+                                <input type="text" name="region" value="${state.store?.region || ''}" class="search-input"
+                                       maxlength="100" oninput="validateField(this)">
+                            </div>
+
+                            <div class="form-group">
+                                <label>Tuman</label>
+                                <input type="text" name="district" value="${state.store?.district || ''}" class="search-input"
+                                       maxlength="100" oninput="validateField(this)">
+                            </div>
+
+                            <div class="form-group">
                                 <label>Телефон</label>
                                 <input type="tel" name="phone" value="${state.store?.phone || ''}" placeholder="+998 XX XXX XX XX"
                                        class="search-input" pattern="\+998\s?\d{2}\s?\d{3}\s?\d{2}\s?\d{2}" oninput="validateField(this)">
@@ -2429,6 +2441,8 @@ async function toggleProductAvailability(id) {
             const data = {
                 name: formData.get('name'),
                 address: formData.get('address'),
+                region: formData.get('region'),
+                district: formData.get('district'),
                 phone: formData.get('phone'),
                 description: formData.get('description')
             };

@@ -32,7 +32,7 @@ def _to_offer_response(offer: Any, store_fallback: dict | None = None) -> OfferR
     offer_id = int(get_val(offer, "id", 0) or get_val(offer, "offer_id", 0) or 0)
     store_id = int(get_val(offer, "store_id", 0) or 0)
 
-    title = get_val(offer, "title", "Р‘РµР· РЅР°Р·РІР°РЅРёСЏ")
+    title = get_val(offer, "title", "Mahsulot")
     description = get_val(offer, "description")
 
     original_price = normalize_price(get_val(offer, "original_price", 0))
@@ -68,7 +68,7 @@ def _to_offer_response(offer: Any, store_fallback: dict | None = None) -> OfferR
         discount_price=discount_price,
         discount_percent=discount_percent,
         quantity=int(get_val(offer, "quantity", 0) or 0),
-        unit=get_val(offer, "unit", "С€С‚") or "С€С‚",
+        unit=get_val(offer, "unit", "dona") or "dona",
         category=get_val(offer, "category", "other") or "other",
         store_id=store_id,
         store_name=store_name,
@@ -80,7 +80,7 @@ def _to_offer_response(offer: Any, store_fallback: dict | None = None) -> OfferR
 
 @router.get("/categories", response_model=list[CategoryResponse])
 async def get_categories(
-    city: str = Query("Ташкент", description="City to filter by"), db=Depends(get_db)
+    city: str = Query("Toshkent", description="City to filter by"), db=Depends(get_db)
 ):
     """Get list of product categories with counts."""
     result: list[CategoryResponse] = []
@@ -112,7 +112,7 @@ async def get_categories(
 
 @router.get("/offers", response_model=list[OfferResponse])
 async def get_offers(
-    city: str = Query("Ташкент", description="City to filter by"),
+    city: str = Query("Toshkent", description="City to filter by"),
     category: str = Query("all", description="Category filter"),
     store_id: int | None = Query(None, description="Store ID filter"),
     search: str | None = Query(None, description="Search query"),
@@ -131,6 +131,7 @@ async def get_offers(
         offers: list[OfferResponse] = []
         store_fallback: dict | None = None
 
+        apply_slice = True
         if store_id:
             raw_offers = db.get_store_offers(store_id) if hasattr(db, "get_store_offers") else []
             if hasattr(db, "get_store"):
@@ -149,6 +150,7 @@ async def get_offers(
                 if hasattr(db, "get_hot_offers")
                 else []
             )
+            apply_slice = False
 
         if not raw_offers:
             raw_offers = []
@@ -161,14 +163,14 @@ async def get_offers(
                 offers.append(
                     OfferResponse(
                         id=int(get_val(offer, "id", 0) or get_val(offer, "offer_id", 0) or 0),
-                        title=get_val(offer, "title", "Без названия"),
+                        title=get_val(offer, "title", "Mahsulot"),
                         description=get_val(offer, "description"),
                         original_price=original_price_sums,
                         discount_price=discount_price_sums,
                         discount_percent=float(get_val(offer, "discount_percent", 0) or 0)
                         or _calc_discount_percent(original_price_sums, discount_price_sums),
                         quantity=int(get_val(offer, "quantity", 0) or 0),
-                        unit=get_val(offer, "unit", "шт") or "шт",
+                        unit=get_val(offer, "unit", "dona") or "dona",
                         category=get_val(offer, "category", "other") or "other",
                         store_id=int(get_val(offer, "store_id", 0) or 0),
                         store_name=get_val(offer, "store_name")
@@ -204,7 +206,8 @@ async def get_offers(
         elif sort_by == "new":
             offers.sort(key=lambda x: x.id, reverse=True)
 
-        offers = offers[offset : offset + limit]
+        if apply_slice:
+            offers = offers[offset : offset + limit]
 
         return offers
 
@@ -231,14 +234,14 @@ async def get_offer(offer_id: int, db=Depends(get_db)):
 
         return OfferResponse(
             id=int(get_val(offer, "id", 0) or get_val(offer, "offer_id", 0) or 0),
-            title=get_val(offer, "title", "Без названия"),
+            title=get_val(offer, "title", "Mahsulot"),
             description=get_val(offer, "description"),
             original_price=original_price_sums,
             discount_price=discount_price_sums,
             discount_percent=float(get_val(offer, "discount_percent", 0) or 0)
             or _calc_discount_percent(original_price_sums, discount_price_sums),
             quantity=int(get_val(offer, "quantity", 0) or 0),
-            unit=get_val(offer, "unit", "шт") or "шт",
+            unit=get_val(offer, "unit", "dona") or "dona",
             category=get_val(offer, "category", "other") or "other",
             store_id=int(get_val(offer, "store_id", 0) or 0),
             store_name=get_val(offer, "store_name")
@@ -263,7 +266,7 @@ async def get_offer(offer_id: int, db=Depends(get_db)):
 
 @router.get("/flash-deals", response_model=list[OfferResponse])
 async def get_flash_deals(
-    city: str = Query("Ташкент", description="City to filter by"),
+    city: str = Query("Toshkent", description="City to filter by"),
     limit: int = Query(10, ge=1, le=50),
     db=Depends(get_db),
 ):
@@ -302,13 +305,13 @@ async def get_flash_deals(
                     offers.append(
                         OfferResponse(
                             id=int(get_val(offer, "id", 0) or get_val(offer, "offer_id", 0) or 0),
-                            title=get_val(offer, "title", "Без названия"),
+                            title=get_val(offer, "title", "Mahsulot"),
                             description=get_val(offer, "description"),
                             original_price=original_price_sums,
                             discount_price=discount_price_sums,
                             discount_percent=discount,
                             quantity=int(get_val(offer, "quantity", 0) or 0),
-                            unit=get_val(offer, "unit", "шт") or "шт",
+                            unit=get_val(offer, "unit", "dona") or "dona",
                             category=get_val(offer, "category", "other") or "other",
                             store_id=int(get_val(offer, "store_id", 0) or 0),
                             store_name=get_val(offer, "store_name") or get_val(offer, "name") or "",

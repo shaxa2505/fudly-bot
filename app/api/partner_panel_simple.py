@@ -442,6 +442,8 @@ async def get_store_info(authorization: str = Header(None)):
         "store_id": store.get("store_id"),
         "name": store.get("name"),
         "address": store.get("address"),
+        "region": store.get("region"),
+        "district": store.get("district"),
         "phone": store.get("phone"),
         "description": store.get("description"),
         "status": store.get("status"),
@@ -1369,6 +1371,8 @@ async def update_store(settings: dict, authorization: str = Header(None)):
             UPDATE stores
             SET name = %s,
                 address = %s,
+                region = %s,
+                district = %s,
                 phone = %s,
                 description = %s,
                 delivery_enabled = %s,
@@ -1379,6 +1383,8 @@ async def update_store(settings: dict, authorization: str = Header(None)):
             (
                 settings.get("name", store.get("name")),
                 settings.get("address", store.get("address")),
+                settings.get("region", store.get("region")),
+                settings.get("district", store.get("district")),
                 settings.get("phone", store.get("phone")),
                 settings.get("description", store.get("description")),
                 int(delivery_enabled),
