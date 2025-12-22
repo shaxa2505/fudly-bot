@@ -7,13 +7,13 @@
   min-height: 100vh;
   background:
     radial-gradient(900px 360px at 12% -10%, rgba(15, 118, 110, 0.08) 0%, transparent 60%),
-    linear-gradient(180deg, #FFFCF8 0%, var(--color-bg-secondary) 100%);
+    linear-gradient(180deg, #FFFFFF 0%, var(--color-bg-secondary) 100%);
   padding-bottom: calc(var(--bottom-nav-height) + var(--spacing-xl));
 }
 
 /* Topbar */
 .yana-topbar {
-  background: rgba(255, 252, 248, 0.95);
+  background: rgba(255, 255, 255, 0.95);
   height: var(--app-topbar-height);
   padding: 0 var(--app-header-padding-x);
   position: sticky;
@@ -40,7 +40,7 @@
   position: sticky;
   top: var(--app-topbar-height);
   z-index: 19;
-  background: rgba(255, 252, 248, 0.95);
+  background: rgba(255, 255, 255, 0.95);
   padding: var(--spacing-md) var(--app-header-padding-x);
   border-bottom: 1px solid rgba(15, 118, 110, 0.12);
   backdrop-filter: blur(10px);

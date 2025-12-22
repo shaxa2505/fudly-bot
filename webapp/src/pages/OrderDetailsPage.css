@@ -29,7 +29,7 @@
   height: 40px;
   border: none;
   border-radius: 14px;
-  background: #FFFCF8;
+  background: #FFFFFF;
   font-size: var(--font-2xl);
   color: var(--color-text-primary);
   cursor: pointer;
@@ -325,7 +325,7 @@
   font-size: var(--font-md);
   font-weight: var(--font-bold);
   color: var(--color-primary-dark);
-  background: #FFFCF8;
+  background: #FFFFFF;
   padding: var(--spacing-xs) var(--spacing-md);
   border-radius: var(--radius-lg);
   border: 1px solid rgba(15, 118, 110, 0.12);

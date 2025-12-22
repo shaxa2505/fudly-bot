@@ -809,7 +809,7 @@
 .payment-instructions {
   font-size: 13px;
   color: var(--color-text-secondary);
-  background: #FFFCF8;
+  background: #FFFFFF;
   padding: 10px 12px;
   border-radius: 12px;
   margin-bottom: var(--spacing-lg);
@@ -849,7 +849,7 @@
 .upload-btn {
   width: 100%;
   padding: 16px;
-  background: #FFFCF8;
+  background: #FFFFFF;
   border: 2px dashed rgba(15, 118, 110, 0.2);
   border-radius: 16px;
   font-size: 15px;
@@ -918,7 +918,7 @@
   gap: var(--spacing-sm);
   width: 100%;
   padding: var(--spacing-xl);
-  background: #FFFCF8;
+  background: #FFFFFF;
   border: 2px dashed rgba(15, 118, 110, 0.2);
   border-radius: 16px;
   font-size: var(--font-lg);

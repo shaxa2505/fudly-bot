@@ -483,7 +483,7 @@
 }
 
 .sp-sheet {
-  background: #FFFCF8;
+  background: #FFFFFF;
   border-radius: 26px 26px 0 0;
   width: 100%;
   max-height: 85vh;
@@ -824,7 +824,7 @@
 }
 
 .sp-review {
-  background: #FFFCF8;
+  background: #FFFFFF;
   border-radius: 12px;
   padding: 14px;
   border: 1px solid rgba(15, 118, 110, 0.12);
