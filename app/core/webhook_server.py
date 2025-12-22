@@ -975,11 +975,18 @@ async def create_webhook_app(
                 if order_type == "delivery":
                     delivery_fee = max(0, total_price - items_total)
 
+                primary_item = items[0] if items else {}
+                offer_title = primary_item.get("title") or primary_item.get("offer_title")
+                offer_photo = primary_item.get("photo")
+
                 orders.append(
                     {
                         "id": order_id,
                         "order_id": order_id,
                         "booking_id": order_id,  # legacy field used by UI
+                        "offer_id": primary_item.get("offer_id"),
+                        "offer_title": offer_title,
+                        "offer_photo": offer_photo,
                         "status": order_status,
                         "order_status": order_status,
                         "order_type": order_type,
@@ -1061,7 +1068,28 @@ async def create_webhook_app(
                                 booking[key] = value
                         bookings.append(booking)
 
-            return add_cors_headers(web.json_response({"bookings": bookings, "orders": orders}))
+            response_payload = {"bookings": bookings, "orders": orders}
+            if request.path.endswith("/user/orders"):
+                combined = []
+                combined.extend(orders)
+                combined.extend(bookings)
+                active_count = sum(
+                    1
+                    for item in combined
+                    if item.get("status")
+                    in ("pending", "confirmed", "ready", "preparing")
+                )
+                completed_count = sum(
+                    1 for item in combined if item.get("status") in ("completed", "cancelled")
+                )
+                response_payload = {
+                    "orders": combined,
+                    "total_count": len(combined),
+                    "active_count": active_count,
+                    "completed_count": completed_count,
+                }
+
+            return add_cors_headers(web.json_response(response_payload))
 
         except Exception as e:
             logger.error(f"API user orders error: {e}")
@@ -2356,6 +2384,8 @@ async def create_webhook_app(
     app.router.add_options("/api/v1/orders/{order_id}/qr", cors_preflight)
     app.router.add_get("/api/v1/orders/{order_id}/qr", api_order_qr)
     # Alias for compatibility
+    app.router.add_options("/api/v1/user/orders", cors_preflight)
+    app.router.add_get("/api/v1/user/orders", api_user_orders)
     app.router.add_options("/api/v1/user/bookings", cors_preflight)
     app.router.add_get("/api/v1/user/bookings", api_user_orders)
     app.router.add_options("/api/v1/photo/{file_id}", cors_preflight)
