@@ -1,12 +1,15 @@
 from __future__ import annotations
 
 import html
+import re
 from typing import Any
 
 from aiogram import Bot
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel
 
+from app.core.notifications import Notification, NotificationType, get_notification_service
 from app.core.sanitize import sanitize_phone
 from app.core.security import validator
 from app.services.unified_order_service import OrderItem, get_unified_order_service
@@ -22,6 +25,11 @@ from .common import (
 )
 
 router = APIRouter()
+
+
+class CancelOrderResponse(BaseModel):
+    success: bool
+    status: str
 
 
 def _require_user_id(user: dict[str, Any]) -> int:
@@ -316,6 +324,27 @@ async def create_order(
 
                 await bot_instance.send_message(user_id, confirm_msg, parse_mode="HTML")
                 logger.info(f"✅ Sent order confirmation to customer {user_id}")
+
+                try:
+                    notification_service = get_notification_service()
+                    title = (
+                        "Buyurtma qabul qilindi"
+                        if customer_lang == "uz"
+                        else "Заказ принят"
+                    )
+                    plain_msg = re.sub(r"<[^>]+>", "", confirm_msg)
+                    await notification_service.notify_user(
+                        Notification(
+                            type=NotificationType.NEW_BOOKING,
+                            recipient_id=int(user_id),
+                            title=title,
+                            message=plain_msg,
+                            data={"order_id": order_id, "status": "pending"},
+                            priority=0,
+                        )
+                    )
+                except Exception as notify_error:  # pragma: no cover - defensive
+                    logger.warning(f"Notification service failed: {notify_error}")
             except Exception as e:  # pragma: no cover - defensive
                 logger.warning(f"Failed to send confirmation to customer: {e}")
 
@@ -343,6 +372,47 @@ async def create_order(
                 await bot_instance.session.close()
             except Exception:  # pragma: no cover - defensive
                 pass
+
+
+@router.post("/orders/{order_id}/cancel", response_model=CancelOrderResponse)
+async def cancel_order(
+    order_id: int,
+    db=Depends(get_db),
+    user: dict = Depends(get_current_user),
+) -> CancelOrderResponse:
+    """Cancel order/booking from Mini App (customer)."""
+    user_id = _require_user_id(user)
+
+    entity = None
+    entity_type = "order"
+
+    if hasattr(db, "get_order"):
+        entity = db.get_order(order_id)
+        if entity and int(get_val(entity, "user_id", 0)) != user_id:
+            raise HTTPException(status_code=403, detail="Access denied")
+
+    if entity is None and hasattr(db, "get_booking"):
+        entity_type = "booking"
+        entity = db.get_booking(order_id)
+        if entity and int(get_val(entity, "user_id", 0)) != user_id:
+            raise HTTPException(status_code=403, detail="Access denied")
+
+    if entity is None:
+        raise HTTPException(status_code=404, detail="Order not found")
+
+    current_status = get_val(entity, "order_status") or get_val(entity, "status") or "pending"
+    if current_status in ("completed", "cancelled", "rejected"):
+        return CancelOrderResponse(success=True, status=str(current_status))
+
+    order_service = get_unified_order_service()
+    if not order_service:
+        raise HTTPException(status_code=500, detail="Order service unavailable")
+
+    ok = await order_service.cancel_order(order_id, entity_type)
+    if not ok:
+        raise HTTPException(status_code=500, detail="Failed to cancel order")
+
+    return CancelOrderResponse(success=True, status="cancelled")
 
 
 async def notify_partner_webapp_order(

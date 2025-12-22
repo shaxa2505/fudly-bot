@@ -62,6 +62,18 @@ class UserProfile(BaseModel):
     notifications_enabled: bool
 
 
+class NotificationSettingsRequest(BaseModel):
+    """Notification settings request."""
+
+    enabled: bool
+
+
+class NotificationSettingsResponse(BaseModel):
+    """Notification settings response."""
+
+    enabled: bool
+
+
 def validate_telegram_webapp_data(init_data: str, bot_token: str) -> dict[str, Any] | None:
     """
     Validate Telegram WebApp initData signature.
@@ -131,6 +143,19 @@ def _ensure_self_access(authenticated_user_id: int, target_user_id: int, scope: 
             target_user_id,
         )
         raise HTTPException(status_code=403, detail="Access denied")
+
+
+def _get_notifications_enabled(db, user_id: int) -> bool:
+    user = None
+    if hasattr(db, "get_user_model"):
+        user = db.get_user_model(user_id)
+    elif hasattr(db, "get_user"):
+        user = db.get_user(user_id)
+    if not user:
+        return True
+    if isinstance(user, dict):
+        return bool(user.get("notifications_enabled", True))
+    return bool(getattr(user, "notifications_enabled", True))
 
 
 @router.post("/auth/validate", response_model=UserProfile)
@@ -217,6 +242,37 @@ async def get_profile(
         registered=bool(user.phone),
         notifications_enabled=getattr(user, "notifications_enabled", True),
     )
+
+
+@router.get("/user/notifications", response_model=NotificationSettingsResponse)
+async def get_notifications(
+    user_id: int,
+    x_telegram_init_data: str = Header(None, alias="X-Telegram-Init-Data"),
+    db=Depends(get_db),
+) -> NotificationSettingsResponse:
+    """Get notification settings for the authenticated user."""
+    validated_data = _require_valid_init_data(x_telegram_init_data)
+    authenticated_user_id = validated_data["user"]["id"]
+    _ensure_self_access(authenticated_user_id, user_id, "notifications")
+    return NotificationSettingsResponse(enabled=_get_notifications_enabled(db, user_id))
+
+
+@router.post("/user/notifications", response_model=NotificationSettingsResponse)
+async def set_notifications(
+    request: NotificationSettingsRequest,
+    user_id: int,
+    x_telegram_init_data: str = Header(None, alias="X-Telegram-Init-Data"),
+    db=Depends(get_db),
+) -> NotificationSettingsResponse:
+    """Update notification settings for the authenticated user."""
+    validated_data = _require_valid_init_data(x_telegram_init_data)
+    authenticated_user_id = validated_data["user"]["id"]
+    _ensure_self_access(authenticated_user_id, user_id, "notifications")
+    current = _get_notifications_enabled(db, user_id)
+    target = bool(request.enabled)
+    if current != target and hasattr(db, "toggle_notifications"):
+        db.toggle_notifications(user_id)
+    return NotificationSettingsResponse(enabled=target)
 
 
 # =============================================================================

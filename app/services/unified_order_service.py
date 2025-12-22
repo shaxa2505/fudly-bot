@@ -26,12 +26,14 @@ NOTIFICATION STRATEGY (Optimized v2):
 from __future__ import annotations
 
 import html
+import re
 from dataclasses import dataclass
 from typing import Any, Literal
 
 from aiogram import Bot
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
+from app.core.notifications import Notification, NotificationType, get_notification_service
 from app.services.notification_builder import NotificationBuilder
 
 try:
@@ -1319,6 +1321,43 @@ class UnifiedOrderService:
                     reject_reason=reject_reason,
                     courier_phone=courier_phone,
                 )
+
+                try:
+                    notif_title = (
+                        f"Buyurtma #{entity_id}"
+                        if customer_lang == "uz"
+                        else f"Заказ #{entity_id}"
+                    )
+                    plain_msg = re.sub(r"<[^>]+>", "", msg)
+                    if target_status in (OrderStatus.CANCELLED,):
+                        notif_type = NotificationType.BOOKING_CANCELLED
+                    elif target_status in (OrderStatus.COMPLETED,):
+                        notif_type = NotificationType.BOOKING_COMPLETED
+                    elif target_status in (OrderStatus.PREPARING, OrderStatus.DELIVERING):
+                        notif_type = NotificationType.BOOKING_CONFIRMED
+                    else:
+                        notif_type = NotificationType.SYSTEM_ANNOUNCEMENT
+
+                    notification_service = get_notification_service()
+                    await notification_service.notify_user(
+                        Notification(
+                            type=notif_type,
+                            recipient_id=int(user_id),
+                            title=notif_title,
+                            message=plain_msg,
+                            data={
+                                "order_id": entity_id,
+                                "status": target_status,
+                                "order_type": order_type,
+                                "entity_type": entity_type,
+                            },
+                            priority=0,
+                        )
+                    )
+                except Exception as notify_error:
+                    logger.warning(
+                        f"Notification service failed for {entity_type}#{entity_id}: {notify_error}"
+                    )
 
                 # Add buttons for customer based on status
                 reply_markup = None

@@ -100,6 +100,44 @@ export default function OrderDetailsPage() {
     }
   }
 
+  const handlePayOnline = async () => {
+    const provider = order?.payment_method
+    if (!provider || !['click', 'payme'].includes(provider)) {
+      return
+    }
+
+    try {
+      const storeId = order.store_id || null
+      const available = await apiClient.getPaymentProviders(storeId)
+      if (!available.includes(provider)) {
+        if (window.Telegram?.WebApp) {
+          window.Telegram.WebApp.showAlert('Bu to\'lov usuli hozircha mavjud emas.')
+        }
+        return
+      }
+
+      const returnUrl = window.location.origin + `/order/${orderId}/details`
+      const paymentData = await apiClient.createPaymentLink(
+        order.order_id,
+        provider,
+        returnUrl,
+        storeId,
+        order.total_price || null,
+        window.Telegram?.WebApp?.initDataUnsafe?.user?.id || null
+      )
+
+      if (paymentData?.payment_url) {
+        if (window.Telegram?.WebApp) {
+          window.Telegram.WebApp.openLink(paymentData.payment_url)
+        } else {
+          window.location.href = paymentData.payment_url
+        }
+      }
+    } catch (err) {
+      console.error('Failed to open payment link:', err)
+    }
+  }
+
   if (loading) {
     return (
       <div className="order-details-page">
@@ -127,7 +165,14 @@ export default function OrderDetailsPage() {
 
   const statusInfo = getStatusInfo(order.status)
   const isDelivery = order.order_type === 'delivery' || order.delivery_address
-  const needsPayment = ['awaiting_proof', 'payment_rejected'].includes(order.status)
+  const needsPayment = ['awaiting_payment', 'awaiting_proof', 'payment_rejected'].includes(order.status)
+  const canPayOnline = order.payment_method && ['click', 'payme'].includes(order.payment_method)
+  const paymentMethodLabels = {
+    cash: 'Naqd',
+    card: 'Karta',
+    click: 'Click',
+    payme: 'Payme',
+  }
 
   return (
     <div className="order-details-page">
@@ -147,17 +192,31 @@ export default function OrderDetailsPage() {
         <span className="order-date">{formatDate(order.created_at)}</span>
       </div>
 
-      {/* Upload Payment Proof Button */}
       {needsPayment && (
-        <div className="payment-notice">
-          <div className="notice-icon">!</div>
-          <div className="notice-content">
-            <h3>To'lov talab qilinadi</h3>
-            <p>To'lovni amalga oshiring va chekni yuklang</p>
+        <div className="payment-banner">
+          <h3>To'lov holati</h3>
+          {order.status === 'awaiting_payment' && (
+            <p>To'lovni yakunlang. Buyurtma to'liq tasdiqlanishi uchun to'lov kerak.</p>
+          )}
+          {order.status === 'awaiting_proof' && (
+            <p>Chek yuborilishi kerak. To'lovni tasdiqlash uchun chek yuboring.</p>
+          )}
+          {order.status === 'payment_rejected' && (
+            <p>To'lov rad etildi. Yangi chek yuboring yoki onlayn to'lov qiling.</p>
+          )}
+
+          <div className="payment-actions">
+            {canPayOnline && (
+              <button className="payment-btn primary" onClick={handlePayOnline}>
+                {order.payment_method === 'click' ? 'Click bilan to\'lash' : 'Payme bilan to\'lash'}
+              </button>
+            )}
+            {(order.status !== 'awaiting_payment' || !canPayOnline) && (
+              <button className="payment-btn secondary" onClick={handleUploadProof}>
+                Chekni yuborish
+              </button>
+            )}
           </div>
-          <button className="upload-btn" onClick={handleUploadProof}>
-            Yuklash
-          </button>
         </div>
       )}
 
@@ -264,7 +323,7 @@ export default function OrderDetailsPage() {
           <div className="info-row">
             <span className="info-label">Usul:</span>
             <span className="info-value">
-              {order.payment_method === 'card' ? 'Karta' : 'Naqd'}
+              {paymentMethodLabels[order.payment_method] || 'Naqd'}
             </span>
           </div>
           <div className="info-row total-row">

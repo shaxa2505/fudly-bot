@@ -56,20 +56,22 @@ const OffersSection = ({
             )}
           </div>
         ) : (
-          offers.map((offer, index) => (
-            <div
-              key={offer.id}
-              className="offer-card-wrapper animate-in"
-              style={{ animationDelay: `${Math.min(index, 5) * 60}ms` }}
-            >
-              <OfferCard
-                offer={offer}
-                cartQuantity={getQuantity(offer.id)}
-                onAddToCart={onAddToCart}
-                onRemoveFromCart={onRemoveFromCart}
-              />
-            </div>
-          ))
+          offers.map((offer, index) => {
+            const offerKey = offer.id || offer.offer_id || `${offer.store_id || 'store'}-${offer.title || 'offer'}-${index}`
+            return (
+              <div
+                key={offerKey}
+                className="offer-card-wrapper"
+              >
+                <OfferCard
+                  offer={offer}
+                  cartQuantity={getQuantity(offer.id || offer.offer_id)}
+                  onAddToCart={onAddToCart}
+                  onRemoveFromCart={onRemoveFromCart}
+                />
+              </div>
+            )
+          })
         )}
       </div>
 

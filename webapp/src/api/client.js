@@ -306,10 +306,22 @@ const api = {
     }
   },
 
+  async getNotificationSettings(userId) {
+    const { data } = await client.get('/user/notifications', { params: { user_id: userId } })
+    return data
+  },
+
+  async setNotificationEnabled(userId, enabled) {
+    const { data } = await client.post('/user/notifications', { enabled }, { params: { user_id: userId } })
+    return data
+  },
+
   // Online payment endpoints
-  async getPaymentProviders() {
+  async getPaymentProviders(storeId = null) {
     try {
-      const { data } = await client.get('/payment/providers')
+      const { data } = await client.get('/payment/providers', {
+        params: storeId ? { store_id: storeId } : {},
+      })
       // API returns [{ id: 'click', ... }] - extract IDs as strings
       const providers = data.providers || []
       return providers.map(p => typeof p === 'string' ? p : p.id)
@@ -334,6 +346,11 @@ const api = {
       console.warn('createPaymentLink error:', error)
       throw error
     }
+  },
+
+  async cancelOrder(orderId) {
+    const { data } = await client.post(`/orders/${orderId}/cancel`)
+    return data
   },
 }
 

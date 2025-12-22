@@ -337,31 +337,31 @@ class OfferMixin:
         """Get offers by city and category."""
         with self.get_connection() as conn:
             cursor = conn.cursor(row_factory=dict_row)
+            query = """
+                SELECT o.*, s.name as store_name, s.address, s.city
+                FROM offers o
+                JOIN stores s ON o.store_id = s.store_id
+                WHERE o.category = %s
+                  AND o.status = 'active'
+                  AND COALESCE(o.stock_quantity, o.quantity) > 0
+                  AND (o.expiry_date IS NULL OR o.expiry_date >= CURRENT_DATE)
+                  AND (s.status = 'approved' OR s.status = 'active')
+            """
+            params = [category]
+
             if city:
-                cursor.execute(
-                    """
-                    SELECT o.*, s.name as store_name, s.address
-                    FROM offers o
-                    JOIN stores s ON o.store_id = s.store_id
-                    WHERE s.city = %s AND o.category = %s AND o.status = 'active'
-                    ORDER BY o.created_at DESC
-                    LIMIT %s
-                """,
-                    (city, category, limit),
-                )
-            else:
-                # No city filter - return all categories
-                cursor.execute(
-                    """
-                    SELECT o.*, s.name as store_name, s.address
-                    FROM offers o
-                    JOIN stores s ON o.store_id = s.store_id
-                    WHERE o.category = %s AND o.status = 'active'
-                    ORDER BY o.created_at DESC
-                    LIMIT %s
-                """,
-                    (category, limit),
-                )
+                city_variants = self._get_city_variants(city)
+                city_conditions = " OR ".join(["s.city ILIKE %s" for _ in city_variants])
+                query += f" AND ({city_conditions})"
+                params.extend([f"%{v}%" for v in city_variants])
+
+            query += """
+                ORDER BY o.created_at DESC
+                LIMIT %s
+            """
+            params.append(limit)
+
+            cursor.execute(query, params)
             return [dict(row) for row in cursor.fetchall()]
 
     def update_offer_quantity(self, offer_id: int, quantity: int):

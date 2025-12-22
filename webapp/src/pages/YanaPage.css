@@ -11,11 +11,11 @@
   padding-bottom: calc(var(--bottom-nav-height) + var(--spacing-xl));
 }
 
-/* Header */
-.yana-header {
+/* Topbar */
+.yana-topbar {
   background: rgba(255, 252, 248, 0.95);
-  min-height: var(--app-header-min-height);
-  padding: var(--app-header-padding-y) var(--app-header-padding-x);
+  height: var(--app-topbar-height);
+  padding: 0 var(--app-header-padding-x);
   position: sticky;
   top: 0;
   z-index: var(--z-sticky);
@@ -23,6 +23,8 @@
   border-bottom: 1px solid rgba(15, 118, 110, 0.12);
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
+  display: flex;
+  align-items: center;
 }
 
 .yana-title {
@@ -30,15 +32,26 @@
   font-weight: var(--app-header-title-weight);
   line-height: var(--line-height-tight);
   color: var(--color-text-primary);
-  margin: 0 0 var(--spacing-md);
+  margin: 0;
   letter-spacing: -0.2px;
+}
+
+.yana-subheader {
+  position: sticky;
+  top: var(--app-topbar-height);
+  z-index: 19;
+  background: rgba(255, 252, 248, 0.95);
+  padding: var(--spacing-md) var(--app-header-padding-x);
+  border-bottom: 1px solid rgba(15, 118, 110, 0.12);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
 }
 
 .yana-menu {
   display: flex;
   gap: var(--spacing-sm);
   overflow-x: auto;
-  padding-bottom: 6px;
+  padding-bottom: 0;
   -webkit-overflow-scrolling: touch;
 }
 
@@ -311,6 +324,28 @@
   border-top: 1px solid var(--color-border-light);
 }
 
+.order-actions {
+  margin-top: 10px;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.order-cancel-btn {
+  padding: 6px 12px;
+  border-radius: 999px;
+  border: 1px solid rgba(217, 45, 32, 0.2);
+  background: #FEECEC;
+  color: #D92D20;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all var(--transition-normal);
+}
+
+.order-cancel-btn:active {
+  transform: scale(0.98);
+}
+
 .order-status {
   font-size: 11px;
   font-weight: 700;
@@ -322,6 +357,70 @@
   font-size: 11px;
   font-weight: 700;
   color: var(--color-primary);
+}
+
+/* Notifications */
+.notifications-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin: 16px 0 10px;
+}
+
+.clear-notifications-btn {
+  padding: 6px 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(15, 118, 110, 0.16);
+  background: #FFFFFF;
+  color: var(--color-text-secondary);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.clear-notifications-btn:active {
+  transform: scale(0.98);
+}
+
+.notifications-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.notification-card {
+  background: #FFFFFF;
+  border-radius: 16px;
+  padding: 12px 14px;
+  border: 1px solid rgba(15, 118, 110, 0.08);
+  box-shadow: 0 10px 20px rgba(16, 24, 40, 0.08);
+}
+
+.notification-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 6px;
+}
+
+.notification-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--color-text-primary);
+}
+
+.notification-date {
+  font-size: 11px;
+  color: var(--color-text-muted);
+  white-space: nowrap;
+}
+
+.notification-message {
+  font-size: 13px;
+  color: var(--color-text-secondary);
+  margin: 0;
+  line-height: 1.4;
 }
 
 /* Upload Payment Proof Button */

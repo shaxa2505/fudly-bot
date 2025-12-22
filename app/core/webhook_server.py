@@ -4,6 +4,7 @@ from __future__ import annotations
 import asyncio
 import os
 import sys
+import time
 from datetime import datetime
 from typing import Any
 
@@ -135,6 +136,21 @@ async def create_webhook_app(
 ) -> web.Application:
     """Create aiohttp web application with webhook handlers."""
     app = web.Application()
+    payment_link_cache: dict[tuple[int, str], dict[str, Any]] = {}
+    payment_link_ttl = 90.0
+
+    def get_cached_payment_link(order_id: int, provider: str) -> str | None:
+        key = (order_id, provider)
+        cached = payment_link_cache.get(key)
+        if not cached:
+            return None
+        if time.monotonic() - cached["ts"] > payment_link_ttl:
+            payment_link_cache.pop(key, None)
+            return None
+        return cached["url"]
+
+    def set_cached_payment_link(order_id: int, provider: str, url: str) -> None:
+        payment_link_cache[(order_id, provider)] = {"url": url, "ts": time.monotonic()}
 
     async def webhook_handler(request: web.Request) -> web.Response:
         """Handle incoming Telegram updates via webhook."""
@@ -2197,7 +2213,9 @@ async def create_webhook_app(
         """GET /api/v1/payment/providers - Get available payment providers."""
         try:
             payment_service = get_payment_service()
-            providers = payment_service.get_available_providers()
+            store_id = request.query.get("store_id")
+            store_id_int = int(store_id) if store_id and store_id.isdigit() else None
+            providers = payment_service.get_available_providers(store_id_int)
 
             # Return provider info
             result = []
@@ -2228,17 +2246,79 @@ async def create_webhook_app(
             data = await request.json()
             order_id = data.get("order_id")
             amount = data.get("amount")
-            provider = data.get("provider", "card")
+            provider = str(data.get("provider", "card")).lower()
             user_id = data.get("user_id")
             return_url = data.get("return_url")
             store_id = data.get("store_id")  # For per-store credentials
 
-            if not order_id or not amount:
+            if not order_id:
                 return add_cors_headers(
-                    web.json_response({"error": "order_id and amount required"}, status=400)
+                    web.json_response({"error": "order_id required"}, status=400)
                 )
 
             payment_service = get_payment_service()
+            if hasattr(payment_service, "set_database"):
+                payment_service.set_database(db)
+
+            order = None
+            if hasattr(db, "get_order"):
+                order = db.get_order(int(order_id))
+            if not order:
+                return add_cors_headers(
+                    web.json_response({"error": "Order not found"}, status=404)
+                )
+
+            if not store_id:
+                store_id = order.get("store_id")
+
+            if not amount:
+                amount = order.get("total_price")
+            else:
+                order_total = order.get("total_price")
+                if order_total is not None and int(amount) != int(order_total):
+                    amount = order_total
+
+            order_status = str(order.get("order_status") or order.get("status") or "").lower()
+            payment_status = str(order.get("payment_status") or "").lower()
+            payment_method = str(order.get("payment_method") or "").lower()
+
+            if order_status in ("completed", "cancelled", "rejected"):
+                return add_cors_headers(
+                    web.json_response({"error": "Order already finalized"}, status=400)
+                )
+
+            if provider in ("click", "payme"):
+                if payment_method and payment_method != provider:
+                    return add_cors_headers(
+                        web.json_response({"error": "Payment method mismatch"}, status=400)
+                    )
+                if payment_status not in ("awaiting_payment", ""):
+                    return add_cors_headers(
+                        web.json_response({"error": "Payment not awaiting online payment"}, status=400)
+                    )
+            elif provider == "card":
+                if payment_status in ("proof_submitted", "completed"):
+                    return add_cors_headers(
+                        web.json_response({"error": "Payment already submitted"}, status=400)
+                    )
+            else:
+                return add_cors_headers(
+                    web.json_response({"error": "Unknown payment provider"}, status=400)
+                )
+
+            available = payment_service.get_available_providers(
+                int(store_id) if store_id else None
+            )
+            if provider not in available:
+                return add_cors_headers(
+                    web.json_response({"error": "Payment provider not available"}, status=400)
+                )
+
+            cached_url = get_cached_payment_link(int(order_id), provider)
+            if cached_url:
+                return add_cors_headers(
+                    web.json_response({"payment_url": cached_url, "provider": provider})
+                )
 
             if provider == "click":
                 # Check for store-specific or platform-wide Click credentials
@@ -2262,6 +2342,7 @@ async def create_webhook_app(
                     user_id=int(user_id) if user_id else 0,
                     store_id=int(store_id) if store_id else 0,
                 )
+                set_cached_payment_link(int(order_id), "click", payment_url)
                 return add_cors_headers(
                     web.json_response({"payment_url": payment_url, "provider": "click"})
                 )
@@ -2287,6 +2368,7 @@ async def create_webhook_app(
                     return_url=return_url,
                     store_id=int(store_id) if store_id else 0,
                 )
+                set_cached_payment_link(int(order_id), "payme", payment_url)
                 return add_cors_headers(
                     web.json_response({"payment_url": payment_url, "provider": "payme"})
                 )

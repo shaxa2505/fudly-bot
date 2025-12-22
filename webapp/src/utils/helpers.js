@@ -107,8 +107,14 @@ export const blurOnEnter = (event, onEnter) => {
   }
 
   event.preventDefault()
-  event.currentTarget?.blur?.()
   onEnter?.()
+  const target = event.currentTarget
+  requestAnimationFrame(() => {
+    target?.blur?.()
+    if (document.activeElement && document.activeElement !== document.body) {
+      document.activeElement.blur?.()
+    }
+  })
 }
 
 // Получение инициалов

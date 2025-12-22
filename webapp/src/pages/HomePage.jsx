@@ -27,6 +27,10 @@ const CATEGORIES = [
   { id: 'other', name: 'Boshqa', icon: Package, color: '#78909C' },
 ]
 
+const CATEGORY_ALIASES = {
+  sweets: ['sweets', 'snacks'],
+}
+
 function HomePage() {
   const navigate = useNavigate()
   const [offers, setOffers] = useState([])
@@ -68,6 +72,8 @@ function HomePage() {
   const hasPreciseLocation = Boolean(location.coordinates || location.address)
   const observerTarget = useRef(null)
   const autoLocationAttempted = useRef(null)
+  const loadingRef = useRef(false)
+  const offsetRef = useRef(0)
   const activeFiltersCount = [minDiscount, priceRange !== 'all', sortBy !== 'default']
     .filter(Boolean)
     .length
@@ -102,11 +108,12 @@ function HomePage() {
 
   // Load offers - сначала по городу, если пусто - из всех городов
   const loadOffers = useCallback(async (reset = false, forceAllCities = false) => {
-    if (loading) return
+    if (loadingRef.current) return
 
+    loadingRef.current = true
     setLoading(true)
     try {
-      const currentOffset = reset ? 0 : offset
+      const currentOffset = reset ? 0 : offsetRef.current
       const params = {
         limit: 20,
         offset: currentOffset,
@@ -117,8 +124,8 @@ function HomePage() {
         params.city = cityForApi
       }
 
-      // Добавляем категорию только если выбрана конкретная (не "all")
-      if (selectedCategory && selectedCategory !== 'all') {
+      const categoryAlias = CATEGORY_ALIASES[selectedCategory]
+      if (selectedCategory && selectedCategory !== 'all' && !categoryAlias) {
         params.category = selectedCategory
       }
 
@@ -164,6 +171,10 @@ function HomePage() {
         })
       }
 
+      if (categoryAlias) {
+        nextOffers = nextOffers.filter(offer => categoryAlias.includes(String(offer.category || '').toLowerCase()))
+      }
+
       if (minDiscount || priceRange !== 'all' || sortBy !== 'default') {
         nextOffers = nextOffers.filter(offer => {
           const discountPrice = Number(offer.discount_price || 0)
@@ -206,26 +217,30 @@ function HomePage() {
       // Если город пустой и это первая загрузка - загружаем из всех городов
       if (reset && dataList.length === 0 && !forceAllCities && !showingAllCities) {
         setShowingAllCities(true)
+        loadingRef.current = false
         setLoading(false)
         return loadOffers(true, true)
       }
 
       if (reset) {
         setOffers(nextOffers || [])
+        offsetRef.current = 20
         setOffset(20)
         if (forceAllCities) setShowingAllCities(true)
       } else {
         setOffers(prev => [...prev, ...(nextOffers || [])])
-        setOffset(prev => prev + 20)
+        offsetRef.current = offsetRef.current + 20
+        setOffset(offsetRef.current)
       }
 
       setHasMore((dataList?.length || 0) === 20)
     } catch (error) {
       console.error('Error loading offers:', error)
     } finally {
+      loadingRef.current = false
       setLoading(false)
     }
-  }, [selectedCategory, searchQuery, offset, loading, cityForApi, showingAllCities, minDiscount, sortBy, priceRange])
+  }, [selectedCategory, searchQuery, cityForApi, showingAllCities, minDiscount, sortBy, priceRange])
 
   // Save search query to history when searching
   const handleSearchSubmit = useCallback(async () => {
@@ -354,9 +369,14 @@ function HomePage() {
     const recentlyManual = Date.now() - manualSearchRef.current < 300
     if (recentlyManual) return
 
+    const trimmed = searchQuery.trim()
+    if (trimmed && trimmed.length < 2) {
+      return
+    }
+
     const timer = setTimeout(() => {
       loadOffers(true)
-    }, searchQuery ? 500 : 0)
+    }, trimmed ? 500 : 0)
 
     return () => clearTimeout(timer)
   }, [selectedCategory, searchQuery, cityForApi, minDiscount, sortBy, priceRange, loadOffers])
@@ -365,7 +385,7 @@ function HomePage() {
   useEffect(() => {
     const observer = new IntersectionObserver(
       entries => {
-        if (entries[0].isIntersecting && hasMore && !loading) {
+        if (entries[0].isIntersecting && hasMore) {
           loadOffers(false)
         }
       },
@@ -377,7 +397,7 @@ function HomePage() {
     }
 
     return () => observer.disconnect()
-  }, [hasMore, loading, loadOffers])
+  }, [hasMore, loadOffers])
 
   // Cart is now saved automatically via CartContext
 
@@ -501,6 +521,10 @@ function HomePage() {
             </button>
           </div>
         </div>
+      </header>
+
+      {/* Subheader (Search) */}
+      <div className="home-subheader">
         <div className="header-search">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" className="search-icon">
             <circle cx="11" cy="11" r="8" stroke="currentColor" strokeWidth="2"/>
@@ -552,7 +576,7 @@ function HomePage() {
             </div>
           )}
         </div>
-      </header>
+      </div>
 
       {/* Hero Banner Carousel */}
       <HeroBanner onCategorySelect={(category) => {
@@ -761,20 +785,22 @@ function HomePage() {
             </button>
           </div>
         ) : (
-          offers.map((offer, index) => (
-            <div
-              key={offer.id}
-              className="offer-card-wrapper animate-in"
-              style={{ animationDelay: `${Math.min(index, 5) * 60}ms` }}
-            >
-              <OfferCard
-                offer={offer}
-                cartQuantity={getQuantity(offer.id)}
-                onAddToCart={addToCart}
-                onRemoveFromCart={removeFromCart}
-              />
-            </div>
-          ))
+          offers.map((offer, index) => {
+            const offerKey = offer.id || offer.offer_id || `${offer.store_id || 'store'}-${offer.title || 'offer'}-${index}`
+            return (
+              <div
+                key={offerKey}
+                className="offer-card-wrapper"
+              >
+                <OfferCard
+                  offer={offer}
+                  cartQuantity={getQuantity(offer.id || offer.offer_id)}
+                  onAddToCart={addToCart}
+                  onRemoveFromCart={removeFromCart}
+                />
+              </div>
+            )
+          })
         )}
       </div>
 

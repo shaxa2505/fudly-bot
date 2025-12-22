@@ -14,6 +14,9 @@
   -webkit-tap-highlight-color: transparent;
   transition: transform 0.12s ease;
   position: relative;
+  /* Speeds up large lists in Chromium-based WebViews (ignored elsewhere). */
+  content-visibility: auto;
+  contain-intrinsic-size: 320px 340px;
 }
 
 .offer-card:active {

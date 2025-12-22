@@ -1,17 +1,19 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
-import api from '../api/client'
+import api, { API_BASE_URL } from '../api/client'
 import { useCart } from '../context/CartContext'
+import { useToast } from '../context/ToastContext'
 import BottomNav from '../components/BottomNav'
 import { getUserId, getUserLanguage, getCurrentUser } from '../utils/auth'
 import './YanaPage.css'
 
 function YanaPage() {
   const navigate = useNavigate()
-  const [activeSection, setActiveSection] = useState('orders') // orders, settings, about
+  const [activeSection, setActiveSection] = useState('orders') // orders, notifications, settings, about
   const [orders, setOrders] = useState([])
   const [loading, setLoading] = useState(true)
   const [orderFilter, setOrderFilter] = useState('all') // all, active, completed
+  const { toast } = useToast()
   const lang = getUserLanguage()
 
   // Settings state - load from user profile first, then localStorage
@@ -31,13 +33,131 @@ function YanaPage() {
     } catch { return {} }
   })
   const [notifications, setNotifications] = useState(true)
+  const [notificationsList, setNotificationsList] = useState([])
+  const [notificationsLoading, setNotificationsLoading] = useState(true)
+  const notificationsRef = useRef([])
 
   // Get cart count from context
   const { cartCount, clearCart } = useCart()
+  const userId = getUserId()
+  const notificationsStorageKey = userId ? `fudly_notifications_${userId}` : 'fudly_notifications'
+
+  const getWsUrl = () => {
+    const base = API_BASE_URL.replace(/^http/, 'ws').replace(/\/api\/v1$/, '')
+    return `${base}/ws/notifications?user_id=${userId}`
+  }
+
+  const loadNotificationSettings = async () => {
+    if (!userId) return
+    try {
+      const data = await api.getNotificationSettings(userId)
+      setNotifications(Boolean(data.enabled))
+    } catch (error) {
+      console.warn('Failed to load notification settings:', error)
+    }
+  }
+
+  const loadNotificationsCache = () => {
+    if (!userId) {
+      setNotificationsLoading(false)
+      return
+    }
+    try {
+      const raw = localStorage.getItem(notificationsStorageKey)
+      const parsed = raw ? JSON.parse(raw) : []
+      const next = Array.isArray(parsed) ? parsed : []
+      setNotificationsList(next)
+      notificationsRef.current = next
+    } catch (error) {
+      console.warn('Failed to load notifications cache:', error)
+      setNotificationsList([])
+    } finally {
+      setNotificationsLoading(false)
+    }
+  }
+
+  const persistNotifications = (items) => {
+    if (!userId) return
+    const trimmed = items.slice(0, 50)
+    localStorage.setItem(notificationsStorageKey, JSON.stringify(trimmed))
+  }
+
+  const handleToggleNotifications = async () => {
+    if (!userId) return
+    const nextValue = !notifications
+    try {
+      const data = await api.setNotificationEnabled(userId, nextValue)
+      setNotifications(Boolean(data.enabled))
+      toast.success(data.enabled ? "Bildirishnomalar yoqildi" : "Bildirishnomalar o'chirildi")
+    } catch (error) {
+      console.error('Failed to update notifications:', error)
+      toast.error("Bildirishnomalarni yangilab bo'lmadi")
+    }
+  }
+
+  const handleClearNotifications = () => {
+    setNotificationsList([])
+    notificationsRef.current = []
+    if (userId) {
+      localStorage.removeItem(notificationsStorageKey)
+    }
+  }
 
   useEffect(() => {
     loadOrders()
   }, [orderFilter])
+
+  useEffect(() => {
+    loadNotificationSettings()
+    loadNotificationsCache()
+  }, [])
+
+  useEffect(() => {
+    if (!userId || !notifications) return
+
+    let ws
+    try {
+      ws = new WebSocket(getWsUrl())
+    } catch (error) {
+      console.warn('WebSocket init failed:', error)
+      return
+    }
+
+    ws.onmessage = (event) => {
+      try {
+        const data = JSON.parse(event.data)
+        if (data.type !== 'notification' || !data.payload) return
+
+        const newItem = {
+          id: `${Date.now()}_${Math.random().toString(16).slice(2)}`,
+          title: data.payload.title || 'Bildirishnoma',
+          message: data.payload.message || '',
+          type: data.payload.type || 'system',
+          created_at: data.payload.created_at || new Date().toISOString(),
+          data: data.payload.data || {},
+        }
+
+        setNotificationsList((prev) => {
+          const next = [newItem, ...prev]
+          notificationsRef.current = next
+          persistNotifications(next)
+          return next
+        })
+
+        if (data.payload.data?.order_id || data.payload.data?.booking_id) {
+          loadOrders()
+        }
+      } catch (error) {
+        console.warn('Failed to parse notification:', error)
+      }
+    }
+
+    return () => {
+      if (ws) {
+        ws.close()
+      }
+    }
+  }, [userId, notifications])
 
   const loadOrders = async () => {
     setLoading(true)
@@ -163,15 +283,20 @@ function YanaPage() {
 
   const menuItems = [
     { id: 'orders', icon: 'O', label: 'Buyurtmalarim' },
+    { id: 'notifications', icon: 'B', label: 'Bildirishnomalar' },
     { id: 'settings', icon: 'S', label: 'Sozlamalar' },
     { id: 'about', icon: 'I', label: "Ilova haqida" },
   ]
 
   return (
     <div className="yana-page">
-      {/* Header with menu */}
-      <header className="yana-header">
+      {/* Topbar */}
+      <header className="yana-topbar">
         <h1 className="yana-title">Yana</h1>
+      </header>
+
+      {/* Subheader */}
+      <div className="yana-subheader">
         <div className="yana-menu">
           {menuItems.map(item => (
             <button
@@ -184,7 +309,7 @@ function YanaPage() {
             </button>
           ))}
         </div>
-      </header>
+      </div>
 
       {/* Orders Section */}
       {activeSection === 'orders' && (
@@ -226,6 +351,7 @@ function YanaPage() {
               {orders.map((order, idx) => {
                 const summary = getOrderSummary(order)
                 const statusInfo = getStatusInfo(summary.status)
+                const canCancel = ['pending', 'confirmed', 'preparing'].includes(summary.status)
                 return (
                   <div
                     key={summary.orderId || idx}
@@ -286,9 +412,80 @@ function YanaPage() {
                         <span className="booking-code">Kod: {summary.bookingCode}</span>
                       )}
                     </div>
+
+                    {canCancel && (
+                      <div className="order-actions">
+                        <button
+                          className="order-cancel-btn"
+                          onClick={async (e) => {
+                            e.stopPropagation()
+                            try {
+                              await api.cancelOrder(summary.orderId)
+                              toast.success("Buyurtma bekor qilindi")
+                              loadOrders()
+                            } catch (error) {
+                              console.error('Cancel order failed:', error)
+                              toast.error('Bekor qilishda xatolik')
+                            }
+                          }}
+                        >
+                          Bekor qilish
+                        </button>
+                      </div>
+                    )}
                   </div>
                 )
               })}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Notifications Section */}
+      {activeSection === 'notifications' && (
+        <div className="yana-section notifications-section">
+          <div className="settings-group">
+            <h3 className="group-title">Bildirishnomalar</h3>
+            <div className="setting-item toggle-item">
+              <span className="setting-label">Yangiliklar va statuslar</span>
+              <button
+                className={`toggle ${notifications ? 'on' : ''}`}
+                onClick={handleToggleNotifications}
+              >
+                <span className="toggle-knob"></span>
+              </button>
+            </div>
+          </div>
+
+          <div className="notifications-header">
+            <h3 className="group-title">So'nggi bildirishnomalar</h3>
+            <button className="clear-notifications-btn" onClick={handleClearNotifications}>
+              Tozalash
+            </button>
+          </div>
+
+          {notificationsLoading ? (
+            <div className="loading-state">
+              <div className="spinner"></div>
+              <p>Yuklanmoqda...</p>
+            </div>
+          ) : notificationsList.length === 0 ? (
+            <div className="empty-state">
+              <div className="empty-icon">!</div>
+              <h3>Bildirishnomalar yo'q</h3>
+              <p>Yangi xabarlar shu yerda paydo bo'ladi.</p>
+            </div>
+          ) : (
+            <div className="notifications-list">
+              {notificationsList.map((item) => (
+                <div key={item.id} className="notification-card">
+                  <div className="notification-header">
+                    <span className="notification-title">{item.title}</span>
+                    <span className="notification-date">{formatDate(item.created_at)}</span>
+                  </div>
+                  <p className="notification-message">{item.message}</p>
+                </div>
+              ))}
             </div>
           )}
         </div>
@@ -338,7 +535,7 @@ function YanaPage() {
               <span className="setting-label">Yangi takliflar</span>
               <button
                 className={`toggle ${notifications ? 'on' : ''}`}
-                onClick={() => setNotifications(!notifications)}
+                onClick={handleToggleNotifications}
               >
                 <span className="toggle-knob"></span>
               </button>

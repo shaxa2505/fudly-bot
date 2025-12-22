@@ -5,6 +5,7 @@ import api from '../api/client'
 import { useCart } from '../context/CartContext'
 import { getSavedLocation, getLatinCity, getCyrillicCity } from '../utils/cityUtils'
 import { getCurrentLocation, addDistanceToStores, saveLocation, getSavedLocation as getGeoLocation } from '../utils/geolocation'
+import { blurOnEnter } from '../utils/helpers'
 import BottomNav from '../components/BottomNav'
 import StoreMap from '../components/StoreMap'
 import './StoresPage.css'
@@ -148,13 +149,16 @@ function StoresPage() {
 
   return (
     <div className="sp">
-      {/* Header */}
-      <header className="sp-header">
-        <div className="sp-header-top">
+      {/* Topbar */}
+      <header className="sp-topbar">
+        <div className="sp-topbar-inner">
           <h1 className="sp-title">Do'konlar</h1>
           <span className="sp-city">Shahar: {cityLatin}</span>
         </div>
+      </header>
 
+      {/* Subheader */}
+      <div className="sp-subheader">
         <div className="sp-search">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
             <circle cx="11" cy="11" r="8" stroke="currentColor" strokeWidth="2"/>
@@ -166,17 +170,13 @@ function StoresPage() {
             placeholder="Do'kon qidirish..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') {
-                searchInputRef.current?.blur()
-              }
-            }}
+            onKeyDown={blurOnEnter}
           />
           {searchQuery && (
             <button onClick={() => setSearchQuery('')} aria-label="Qidiruvni tozalash">x</button>
           )}
         </div>
-      </header>
+      </div>
 
       {/* Type Filters */}
       <div className="sp-filters">
