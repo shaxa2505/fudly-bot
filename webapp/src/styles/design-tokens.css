@@ -107,6 +107,12 @@
   /* Consistent horizontal padding across pages */
   --page-padding-x: var(--spacing-lg);
 
+  /* Consistent app header sizing */
+  --app-header-padding-y: var(--spacing-lg);
+  --app-header-padding-x: var(--page-padding-x);
+  --app-header-title-size: var(--font-2xl);
+  --app-header-title-weight: var(--font-extrabold);
+
   /* ===== BORDER RADIUS ===== */
 
   --radius-xs: 4px;

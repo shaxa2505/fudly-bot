@@ -19,8 +19,8 @@
   top: 0;
   z-index: var(--z-sticky);
   background: rgba(255, 252, 248, 0.95);
-  padding: 12px 16px 14px;
-  border-bottom: 1px solid rgba(15, 118, 110, 0.08);
+  padding: var(--app-header-padding-y) var(--app-header-padding-x);
+  border-bottom: 1px solid rgba(15, 118, 110, 0.12);
   box-shadow: var(--shadow-header);
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);

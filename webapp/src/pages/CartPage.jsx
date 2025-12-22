@@ -375,7 +375,10 @@ function CartPage({ user }) {
   return (
     <div className="cart-page">
       <header className="cart-header">
-        <h1>Savat</h1>
+        <div className="cart-header-title">
+          <h1>Savat</h1>
+          <span className="cart-header-count">{itemsCount} ta</span>
+        </div>
         <button className="clear-cart-btn" onClick={clearCart}>
           Tozalash
         </button>
@@ -387,6 +390,13 @@ function CartPage({ user }) {
           const stockLimit = item.offer.stock || item.offer.quantity || 99
           return (
           <div key={item.offer.id} className="cart-item">
+            <button
+              className="cart-item-remove"
+              onClick={() => removeItem(item.offer.id)}
+              aria-label="Mahsulotni o'chirish"
+            >
+              x
+            </button>
             <img
               src={photoUrl}
               alt={item.offer.title}
@@ -421,37 +431,34 @@ function CartPage({ user }) {
               <p className="cart-item-total">
                 {Math.round(item.offer.discount_price * item.quantity).toLocaleString()} so'm
               </p>
-              <button
-                className="remove-btn"
-                onClick={() => removeItem(item.offer.id)}
-              >
-                x
-              </button>
             </div>
           </div>
         )})}
       </div>
 
-      <div className="cart-summary">
-        <div className="summary-row">
-          <span>Mahsulotlar ({itemsCount} ta)</span>
-          <span>{Math.round(subtotal).toLocaleString()} so'm</span>
-        </div>
-        {orderType === 'delivery' && (
-          <div className="summary-row delivery-fee">
-            <span>Yetkazib berish</span>
-            <span>{Math.round(deliveryFee).toLocaleString()} so'm</span>
+      <div className="cart-sticky-checkout">
+        <div className="cart-summary">
+          <div className="cart-summary-title">Yakun</div>
+          <div className="summary-row">
+            <span>Mahsulotlar ({itemsCount} ta)</span>
+            <span>{Math.round(subtotal).toLocaleString()} so'm</span>
           </div>
-        )}
-        <div className="summary-row total">
-          <span>Jami</span>
-          <span>{Math.round(total).toLocaleString()} so'm</span>
+          {orderType === 'delivery' && (
+            <div className="summary-row delivery-fee">
+              <span>Yetkazib berish</span>
+              <span>{Math.round(deliveryFee).toLocaleString()} so'm</span>
+            </div>
+          )}
+          <div className="summary-row total">
+            <span>Jami</span>
+            <span>{Math.round(total).toLocaleString()} so'm</span>
+          </div>
         </div>
-      </div>
 
-      <button className="btn-primary checkout-btn" onClick={handleCheckout}>
-        Buyurtma berish
-      </button>
+        <button className="btn-primary checkout-btn" onClick={handleCheckout}>
+          Buyurtma berish
+        </button>
+      </div>
 
       <BottomNav currentPage="cart" cartCount={itemsCount} />
 
@@ -459,16 +466,32 @@ function CartPage({ user }) {
       {showCheckout && (
         <div className="modal-overlay" onClick={() => !orderLoading && setShowCheckout(false)}>
           <div className="modal checkout-modal" onClick={e => e.stopPropagation()}>
-            <div className="modal-header">
-              <h2>
-                {checkoutStep === 'details' && 'Buyurtmani tasdiqlash'}
-                {checkoutStep === 'payment' && 'To\'lov'}
-              </h2>
-              <button
-                className="modal-close"
-                onClick={() => !orderLoading && setShowCheckout(false)}
-              >x</button>
+        <div className="modal-header">
+          <div className="modal-header-main">
+            <h2>
+              {checkoutStep === 'details' && 'Buyurtmani tasdiqlash'}
+              {checkoutStep === 'payment' && 'To\'lov'}
+            </h2>
+            <button
+              className="modal-close"
+              onClick={() => !orderLoading && setShowCheckout(false)}
+            >x</button>
+          </div>
+          <div className="modal-steps" role="list">
+            <div className={`modal-step ${checkoutStep === 'details' ? 'active' : ''} ${checkoutStep !== 'details' ? 'done' : ''}`} role="listitem">
+              <span className="modal-step-dot"></span>
+              <span className="modal-step-label">Ma'lumotlar</span>
             </div>
+            <div className={`modal-step ${checkoutStep === 'payment' ? 'active' : ''} ${checkoutStep === 'payment_upload' ? 'done' : ''}`} role="listitem">
+              <span className="modal-step-dot"></span>
+              <span className="modal-step-label">To'lov</span>
+            </div>
+            <div className={`modal-step ${checkoutStep === 'payment_upload' ? 'active' : ''}`} role="listitem">
+              <span className="modal-step-dot"></span>
+              <span className="modal-step-label">Chek</span>
+            </div>
+          </div>
+        </div>
 
             <div className="modal-body">
               {/* Step 1: Order Details */}

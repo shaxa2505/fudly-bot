@@ -1,44 +1,47 @@
 .quantity-control {
-  --qc-height: 34px;
-  --qc-padding-x: 14px;
-  --qc-gap: 12px;
+  /* Lavka-like stepper (white pill, soft shadow) */
+  --qc-height: 44px;
+  --qc-pad: 6px;
+  --qc-gap: 10px;
+  --qc-btn-size: 36px;
+  --qc-value-font: 16px;
 
-  --qc-btn-size: 22px;
-  --qc-btn-font: 18px;
-  --qc-value-font: 14px;
+  --qc-bg: #FFFFFF;
+  --qc-text: #111827;
+  --qc-muted: #CBD5E1;
+  --qc-press: rgba(17, 24, 39, 0.06);
 
   display: inline-flex;
   align-items: center;
-  justify-content: space-between;
   gap: var(--qc-gap);
   height: var(--qc-height);
-  padding: 4px var(--qc-padding-x);
-  min-width: 96px;
+  padding: var(--qc-pad);
   border-radius: 999px;
-  background: #FFFFFF;
+  background: var(--qc-bg);
   border: none;
-  box-shadow: 0 10px 20px rgba(16, 24, 40, 0.18);
+  min-width: 128px;
+  box-shadow:
+    0 16px 28px rgba(16, 24, 40, 0.14),
+    0 2px 6px rgba(16, 24, 40, 0.06);
   margin: 0;
 }
 
 .quantity-control--sm {
-  --qc-height: 34px;
-  --qc-padding-x: 14px;
-  --qc-gap: 12px;
-
-  --qc-btn-size: 22px;
-  --qc-btn-font: 18px;
+  --qc-height: 40px;
+  --qc-pad: 5px;
+  --qc-gap: 8px;
+  --qc-btn-size: 32px;
   --qc-value-font: 14px;
+  min-width: 112px;
 }
 
 .quantity-control--lg {
-  --qc-height: 40px;
-  --qc-padding-x: 16px;
-  --qc-gap: 14px;
-
-  --qc-btn-size: 28px;
-  --qc-btn-font: 22px;
-  --qc-value-font: 16px;
+  --qc-height: 48px;
+  --qc-pad: 7px;
+  --qc-gap: 12px;
+  --qc-btn-size: 40px;
+  --qc-value-font: 18px;
+  min-width: 144px;
 }
 
 .quantity-control__btn {
@@ -47,20 +50,25 @@
   border: none;
   border-radius: 50%;
   background: transparent;
-  font-size: var(--qc-btn-font);
-  font-weight: var(--font-semibold);
-  color: #111827;
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--qc-text);
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: all 0.15s ease;
+  transition: transform 0.12s ease, background 0.12s ease, border-color 0.12s ease;
   line-height: 1;
   -webkit-tap-highlight-color: transparent;
 }
 
+.quantity-control__btn:hover:not(:disabled) {
+  background: rgba(17, 24, 39, 0.03);
+}
+
 .quantity-control__btn:active:not(:disabled) {
   transform: scale(0.92);
+  background: var(--qc-press);
 }
 
 .quantity-control__btn:focus-visible {
@@ -70,20 +78,24 @@
 
 .quantity-control__btn:disabled {
   opacity: 1;
-  color: #98A2B3;
+  color: var(--qc-muted);
   cursor: not-allowed;
+}
+
+.quantity-control__btn--minus {
+  background: transparent;
 }
 
 .quantity-control__btn--plus {
   background: transparent;
-  color: #111827;
+  color: var(--qc-text);
 }
 
 .quantity-control__value {
-  min-width: 14px;
+  min-width: 24px;
   text-align: center;
   font-size: var(--qc-value-font);
-  font-weight: var(--font-bold);
-  color: #111827;
+  font-weight: 800;
+  color: var(--qc-text);
   user-select: none;
 }

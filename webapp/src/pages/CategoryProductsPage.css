@@ -14,12 +14,15 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: var(--spacing-lg) var(--page-padding-x);
-  border-bottom: 1px solid var(--color-border);
+  padding: var(--app-header-padding-y) var(--app-header-padding-x);
+  border-bottom: 1px solid rgba(15, 118, 110, 0.12);
   position: sticky;
   top: 0;
-  background: var(--color-bg-primary);
+  background: rgba(255, 252, 248, 0.95);
   z-index: var(--z-sticky);
+  box-shadow: var(--shadow-header);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
 }
 
 .back-btn {
@@ -44,8 +47,9 @@
 }
 
 .category-title {
-  font-size: var(--font-2xl);
-  font-weight: var(--font-bold);
+  font-size: var(--app-header-title-size);
+  font-weight: var(--app-header-title-weight);
+  line-height: var(--line-height-tight);
   color: var(--color-text-primary);
   margin: 0;
   flex: 1;

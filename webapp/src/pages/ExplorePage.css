@@ -11,14 +11,22 @@
 
 /* Header */
 .explore-header {
-  padding: var(--spacing-xl) var(--page-padding-x) var(--spacing-lg);
+  padding: var(--app-header-padding-y) var(--app-header-padding-x);
   text-align: center;
-  border-bottom: 1px solid var(--color-border-light);
+  background: rgba(255, 252, 248, 0.95);
+  border-bottom: 1px solid rgba(15, 118, 110, 0.12);
+  position: sticky;
+  top: 0;
+  z-index: var(--z-sticky);
+  box-shadow: var(--shadow-header);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
 }
 
 .page-title {
-  font-size: var(--font-2xl);
-  font-weight: var(--font-bold);
+  font-size: var(--app-header-title-size);
+  font-weight: var(--app-header-title-weight);
+  line-height: var(--line-height-tight);
   color: var(--color-text-primary);
   margin: 0;
 }
