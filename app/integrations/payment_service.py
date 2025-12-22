@@ -339,6 +339,24 @@ class PaymentService:
         # Here you would update order status in database
         logger.info(f"Click payment completed: order={merchant_trans_id}, amount={amount}")
 
+        if self._db and merchant_trans_id:
+            try:
+                order_id = int(merchant_trans_id)
+            except (TypeError, ValueError):
+                order_id = None
+
+            if order_id:
+                try:
+                    from app.services.unified_order_service import get_unified_order_service
+
+                    order_service = get_unified_order_service()
+                    if order_service:
+                        await order_service.confirm_payment(order_id)
+                    elif hasattr(self._db, "update_payment_status"):
+                        self._db.update_payment_status(order_id, "confirmed")
+                except Exception as e:
+                    logger.warning(f"Failed to confirm payment for order #{order_id}: {e}")
+
         return {
             "click_trans_id": click_trans_id,
             "merchant_trans_id": merchant_trans_id,

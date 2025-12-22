@@ -282,7 +282,7 @@
   cursor: pointer;
   transition: all 0.2s;
   animation: fadeUp 0.3s ease backwards;
-  box-shadow: 0 14px 28px rgba(16, 24, 40, 0.08);
+  box-shadow: var(--shadow-sm);
   border: 1px solid rgba(15, 118, 110, 0.08);
   display: flex;
   flex-direction: column;
@@ -690,11 +690,11 @@
   gap: 14px;
   padding: 12px;
   background: #FFFFFF;
-  border-radius: 16px;
+  border-radius: 20px;
   cursor: pointer;
   transition: all 0.15s;
-  border: 1px solid rgba(15, 118, 110, 0.1);
-  box-shadow: 0 10px 20px rgba(16, 24, 40, 0.08);
+  border: 1px solid rgba(15, 118, 110, 0.08);
+  box-shadow: var(--shadow-sm);
 }
 
 .sp-offer:active {
@@ -710,7 +710,7 @@
 .sp-offer-img {
   width: 64px;
   height: 64px;
-  border-radius: 12px;
+  border-radius: 16px;
   background: #F4F1EC;
   overflow: hidden;
   flex-shrink: 0;
@@ -741,7 +741,7 @@
 
 .sp-offer-info h4 {
   font-size: 14px;
-  font-weight: 600;
+  font-weight: 700;
   color: var(--color-text-primary);
   margin: 0 0 6px;
   display: -webkit-box;
@@ -767,6 +767,7 @@
   font-size: 12px;
   color: var(--color-text-muted);
   text-decoration: line-through;
+  font-weight: 400;
 }
 
 .sp-offer-badge {

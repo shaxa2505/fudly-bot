@@ -1179,13 +1179,16 @@ async def update_order_status(
 
     # Use unified service based on status
     if status == "ready":
-        await unified_service.mark_ready(order_id, "order")
+        ok = await unified_service.mark_ready(order_id, "order")
     elif status == "delivering":
-        await unified_service.start_delivery(order_id)
+        ok = await unified_service.start_delivery(order_id)
     elif status == "completed":
-        await unified_service.complete_order(order_id, "order")
+        ok = await unified_service.complete_order(order_id, "order")
     else:
         raise HTTPException(status_code=400, detail="Unsupported status transition")
+
+    if not ok:
+        raise HTTPException(status_code=400, detail="Status transition not allowed")
 
     # Return type based on order_type for frontend
     db_order_type = (

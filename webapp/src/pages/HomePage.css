@@ -749,9 +749,10 @@
   flex-shrink: 0;
   width: 140px;
   background: var(--color-bg-primary);
-  border-radius: var(--radius-xl);
+  border-radius: 20px;
   overflow: hidden;
   box-shadow: var(--shadow-sm);
+  border: 1px solid rgba(15, 118, 110, 0.08);
   cursor: pointer;
   transition: transform var(--transition-normal), box-shadow var(--transition-normal);
 }
@@ -770,6 +771,9 @@
   width: 100%;
   height: 100px;
   background: var(--color-bg-secondary);
+  border-radius: 16px;
+  overflow: hidden;
+  margin: 8px 8px 0;
 }
 
 .popular-card-image img {
@@ -791,7 +795,7 @@
 }
 
 .popular-card-info {
-  padding: var(--spacing-sm);
+  padding: var(--spacing-sm) var(--spacing-sm) var(--spacing-md);
   display: flex;
   flex-direction: column;
   gap: 2px;

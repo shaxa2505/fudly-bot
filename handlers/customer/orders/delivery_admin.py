@@ -12,6 +12,7 @@ from aiogram import F, Router, types
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
 from app.core.utils import get_offer_field, get_store_field
+from app.services.unified_order_service import get_unified_order_service
 from database_protocol import DatabaseProtocol
 from logging_config import logger
 
@@ -58,8 +59,14 @@ async def admin_confirm_payment(
         await callback.answer("❌ Buyurtma topilmadi", show_alert=True)
         return
 
-    db.update_payment_status(order_id, "confirmed")
-    db.update_order_status(order_id, "pending")  # Keep as pending until seller confirms
+    skip_seller_notify = False
+    order_service = get_unified_order_service()
+    if order_service:
+        await order_service.confirm_payment(order_id)
+        skip_seller_notify = True
+    else:
+        db.update_payment_status(order_id, "confirmed")
+        db.update_order_status(order_id, "pending")  # Keep as pending until seller confirms
 
     # Get details
     store_id = _get_order_field(order, "store_id", 2)
@@ -131,7 +138,7 @@ async def admin_confirm_payment(
         pass
 
     # Notify seller with confirmation buttons
-    if owner_id:
+    if owner_id and not skip_seller_notify:
         seller_lang = db.get_user_language(owner_id)
         currency = "so'm" if seller_lang == "uz" else "сум"
 

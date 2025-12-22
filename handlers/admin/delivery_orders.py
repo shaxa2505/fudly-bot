@@ -81,10 +81,16 @@ async def admin_confirm_payment(callback: types.CallbackQuery) -> None:
             return
         
         # Update status to pending (approved, waiting for seller)
-        if hasattr(db, "update_order_status"):
-            db.update_order_status(order_id, "pending")
-        if hasattr(db, "update_payment_status"):
-            db.update_payment_status(order_id, "confirmed")
+        skip_seller_notify = False
+        order_service = get_unified_order_service()
+        if order_service:
+            await order_service.confirm_payment(order_id)
+            skip_seller_notify = True
+        else:
+            if hasattr(db, "update_order_status"):
+                db.update_order_status(order_id, "pending")
+            if hasattr(db, "update_payment_status"):
+                db.update_payment_status(order_id, "confirmed")
         
         # Get store and seller info
         store = db.get_store(store_id) if hasattr(db, "get_store") and store_id else None
@@ -159,7 +165,7 @@ async def admin_confirm_payment(callback: types.CallbackQuery) -> None:
         kb.adjust(2)
         
         # Send to seller
-        if callback.bot:
+        if callback.bot and not skip_seller_notify:
             await callback.bot.send_message(
                 chat_id=seller_id,
                 text=seller_msg,

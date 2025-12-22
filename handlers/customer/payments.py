@@ -14,6 +14,7 @@ from typing import TYPE_CHECKING
 
 from aiogram import F, Router, types
 from aiogram.types import LabeledPrice
+from app.services.unified_order_service import get_unified_order_service
 
 if TYPE_CHECKING:
     from database_protocol import DatabaseProtocol
@@ -248,6 +249,7 @@ async def process_successful_payment(message: types.Message) -> None:
         if hasattr(db, "get_order"):
             order = db.get_order(order_id)
 
+        skip_seller_notify = False
         if order:
             # Delivery order
             offer_id = order.get("offer_id") if isinstance(order, dict) else None
@@ -257,11 +259,16 @@ async def process_successful_payment(message: types.Message) -> None:
             delivery_price = order.get("delivery_price", 0) if isinstance(order, dict) else 0
 
             # Payment is confirmed by Telegram provider (Click)
-            if hasattr(db, "update_payment_status"):
-                db.update_payment_status(order_id, "confirmed")
-            if hasattr(db, "update_order_status"):
-                # Keep fulfillment status separate from payment
-                db.update_order_status(order_id, "pending")
+            order_service = get_unified_order_service()
+            if order_service:
+                await order_service.confirm_payment(order_id)
+                skip_seller_notify = True
+            else:
+                if hasattr(db, "update_payment_status"):
+                    db.update_payment_status(order_id, "confirmed")
+                if hasattr(db, "update_order_status"):
+                    # Keep fulfillment status separate from payment
+                    db.update_order_status(order_id, "pending")
         else:
             # Try bookings table (pickup from hot_offer flow)
             if hasattr(db, "get_booking"):
@@ -397,7 +404,7 @@ async def process_successful_payment(message: types.Message) -> None:
         await message.answer(success_text, parse_mode="HTML", reply_markup=main_menu_customer(lang))
 
         # NOTIFY STORE OWNER - detailed card like card payment
-        if owner_id and bot:
+        if owner_id and bot and not skip_seller_notify:
             seller_lang = db.get_user_language(owner_id) or "ru"
 
             customer = db.get_user_model(user_id)

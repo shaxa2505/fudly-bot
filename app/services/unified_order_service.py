@@ -1154,6 +1154,140 @@ class UnifiedOrderService:
             except Exception as e:
                 logger.error(f"Failed to notify seller for store {store_id}: {e}")
 
+    async def confirm_payment(self, order_id: int) -> bool:
+        """Mark payment as confirmed and notify seller if not yet notified."""
+        try:
+            if not hasattr(self.db, "get_order"):
+                return False
+
+            order = self.db.get_order(order_id)
+            if not order:
+                return False
+
+            if isinstance(order, dict):
+                store_id = order.get("store_id")
+                delivery_address = order.get("delivery_address")
+                order_type = order.get("order_type")
+                payment_method = order.get("payment_method")
+                pickup_code = order.get("pickup_code")
+                cart_items_json = order.get("cart_items")
+                offer_id = order.get("offer_id")
+                quantity = order.get("quantity", 1)
+                customer_id = order.get("user_id")
+                seller_message_id = order.get("seller_message_id")
+                current_status = order.get("order_status")
+            else:
+                store_id = getattr(order, "store_id", None)
+                delivery_address = getattr(order, "delivery_address", None)
+                order_type = getattr(order, "order_type", None)
+                payment_method = getattr(order, "payment_method", None)
+                pickup_code = getattr(order, "pickup_code", None)
+                cart_items_json = getattr(order, "cart_items", None)
+                offer_id = getattr(order, "offer_id", None)
+                quantity = getattr(order, "quantity", 1)
+                customer_id = getattr(order, "user_id", None)
+                seller_message_id = getattr(order, "seller_message_id", None)
+                current_status = getattr(order, "order_status", None)
+
+            if hasattr(self.db, "update_payment_status"):
+                self.db.update_payment_status(order_id, PaymentStatus.CONFIRMED)
+
+            if current_status in ("awaiting_payment", "awaiting_admin_confirmation"):
+                if hasattr(self.db, "update_order_status"):
+                    self.db.update_order_status(order_id, OrderStatus.PENDING)
+
+            if seller_message_id:
+                return True
+
+            if not order_type:
+                order_type = "delivery" if delivery_address else "pickup"
+
+            store = self.db.get_store(store_id) if store_id else None
+            store_name = store.get("name", "") if isinstance(store, dict) else ""
+            store_address = store.get("address", "") if isinstance(store, dict) else ""
+
+            items: list[dict[str, Any]] = []
+            if cart_items_json:
+                import json
+
+                cart_items = (
+                    json.loads(cart_items_json)
+                    if isinstance(cart_items_json, str)
+                    else cart_items_json
+                )
+                store_delivery_price = (
+                    store.get("delivery_price", 0) if isinstance(store, dict) else 0
+                )
+                for item in cart_items or []:
+                    item_delivery_price = int(item.get("delivery_price", 0))
+                    if order_type == "delivery" and not item_delivery_price:
+                        item_delivery_price = int(store_delivery_price or 0)
+                    items.append(
+                        {
+                            "order_id": order_id,
+                            "offer_id": int(item.get("offer_id") or 0),
+                            "store_id": int(store_id or 0),
+                            "quantity": int(item.get("quantity", 1)),
+                            "price": int(item.get("price", 0)),
+                            "total": int(item.get("price", 0)) * int(item.get("quantity", 1)),
+                            "pickup_code": pickup_code,
+                            "title": item.get("title", ""),
+                            "store_name": store_name,
+                            "store_address": store_address,
+                            "delivery_price": item_delivery_price,
+                        }
+                    )
+            elif offer_id:
+                offer = self.db.get_offer(int(offer_id)) if hasattr(self.db, "get_offer") else None
+                title = offer.get("title", "") if isinstance(offer, dict) else ""
+                price = offer.get("discount_price", 0) if isinstance(offer, dict) else 0
+                items.append(
+                    {
+                        "order_id": order_id,
+                        "offer_id": int(offer_id),
+                        "store_id": int(store_id or 0),
+                        "quantity": int(quantity or 1),
+                        "price": int(price),
+                        "total": int(price) * int(quantity or 1),
+                        "pickup_code": pickup_code,
+                        "title": title,
+                        "store_name": store_name,
+                        "store_address": store_address,
+                        "delivery_price": int(order.get("delivery_price", 0))
+                        if isinstance(order, dict)
+                        else int(getattr(order, "delivery_price", 0) or 0),
+                    }
+                )
+
+            if not items or not store_id:
+                return True
+
+            customer = (
+                self.db.get_user_model(customer_id)
+                if hasattr(self.db, "get_user_model")
+                else self.db.get_user(customer_id)
+            )
+            if isinstance(customer, dict):
+                customer_name = customer.get("first_name", "")
+                customer_phone = customer.get("phone", "")
+            else:
+                customer_name = getattr(customer, "first_name", "") if customer else ""
+                customer_phone = getattr(customer, "phone", "") if customer else ""
+
+            await self._notify_sellers_new_order(
+                stores_orders={int(store_id): items},
+                order_type=order_type,
+                delivery_address=delivery_address,
+                payment_method=PaymentStatus.normalize_method(payment_method),
+                customer_name=customer_name,
+                customer_phone=customer_phone,
+            )
+
+            return True
+        except Exception as e:
+            logger.error(f"Failed to confirm payment for order #{order_id}: {e}")
+            return False
+
     # =========================================================================
     # STATUS MANAGEMENT
     # =========================================================================

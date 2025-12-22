@@ -85,8 +85,8 @@
 
 .category-card {
   aspect-ratio: 1;
-  border: 2px solid;
-  border-radius: var(--radius-2xl);
+  border: 1px solid;
+  border-radius: 20px;
   padding: var(--spacing-xl);
   display: flex;
   flex-direction: column;
@@ -98,6 +98,7 @@
   transition: all var(--transition-normal);
   position: relative;
   overflow: hidden;
+  box-shadow: var(--shadow-sm);
 }
 
 .category-card::before {
@@ -135,11 +136,11 @@
   position: relative;
   z-index: 1;
   font-size: var(--font-lg);
-  font-weight: var(--font-semibold);
+  font-weight: 700;
   color: var(--color-text-primary);
   margin: 0;
   text-align: center;
-  line-height: var(--line-height-tight);
+  line-height: 1.35;
 }
 
 /* Responsive */
@@ -151,7 +152,7 @@
 
   .category-card {
     padding: var(--spacing-lg);
-    border-radius: var(--radius-2xl);
+    border-radius: 20px;
   }
 
   .category-emoji {

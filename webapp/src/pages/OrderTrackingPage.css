@@ -91,8 +91,8 @@
   margin: var(--spacing-lg) var(--spacing-lg) var(--spacing-md);
   padding: var(--spacing-xl);
   border-radius: 20px;
-  box-shadow: var(--shadow-card);
-  border: 1px solid rgba(15, 118, 110, 0.12);
+  box-shadow: var(--shadow-sm);
+  border: 1px solid rgba(15, 118, 110, 0.08);
 }
 
 .status-badge {
@@ -119,7 +119,7 @@
 
 .order-details h3 {
   font-size: var(--font-xl);
-  font-weight: var(--font-semibold);
+  font-weight: 700;
   color: var(--color-text-primary);
   margin: 0 0 var(--spacing-md) 0;
 }
@@ -128,6 +128,7 @@
 .order-details .price {
   font-size: var(--font-base);
   color: var(--color-text-secondary);
+  font-weight: 400;
   margin: 6px 0;
 }
 
@@ -152,13 +153,13 @@
   margin: var(--spacing-md) var(--spacing-lg);
   padding: var(--spacing-xl);
   border-radius: 20px;
-  box-shadow: var(--shadow-card);
-  border: 1px solid rgba(15, 118, 110, 0.12);
+  box-shadow: var(--shadow-sm);
+  border: 1px solid rgba(15, 118, 110, 0.08);
 }
 
 .timeline-container h2 {
   font-size: var(--font-xl);
-  font-weight: var(--font-semibold);
+  font-weight: 700;
   color: var(--color-text-primary);
   margin: 0 0 var(--spacing-xl) 0;
 }
@@ -223,7 +224,7 @@
 
 .timeline-content h4 {
   font-size: var(--font-lg);
-  font-weight: var(--font-semibold);
+  font-weight: 700;
   color: var(--color-text-primary);
   margin: 0 0 var(--spacing-xs) 0;
 }
@@ -231,6 +232,7 @@
 .timeline-message {
   font-size: var(--font-base);
   color: var(--color-text-secondary);
+  font-weight: 400;
   margin: var(--spacing-xs) 0;
 }
 
@@ -247,14 +249,14 @@
   margin: var(--spacing-md) var(--spacing-lg);
   padding: var(--spacing-xl);
   border-radius: 20px;
-  box-shadow: var(--shadow-card);
-  border: 1px solid rgba(15, 118, 110, 0.12);
+  box-shadow: var(--shadow-sm);
+  border: 1px solid rgba(15, 118, 110, 0.08);
 }
 
 .store-info-card h3,
 .delivery-info-card h3 {
   font-size: var(--font-xl);
-  font-weight: var(--font-semibold);
+  font-weight: 700;
   color: var(--color-text-primary);
   margin: 0 0 var(--spacing-md) 0;
 }
@@ -273,6 +275,7 @@
 .pickup-time {
   font-size: var(--font-base);
   color: var(--color-text-secondary);
+  font-weight: 400;
   margin: var(--spacing-sm) 0;
   line-height: var(--line-height-relaxed);
 }
