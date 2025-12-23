@@ -433,10 +433,9 @@ async def get_store_info(authorization: str = Header(None)):
     telegram_id = verify_telegram_webapp(authorization)
     user, store = get_partner_with_store(telegram_id)
 
-    delivery_price_raw = int(store.get("delivery_price") or 0)
-    min_order_raw = int(store.get("min_order_amount") or 0)
-    delivery_price = delivery_price_raw // 100 if delivery_price_raw else 0
-    min_order_amount = min_order_raw // 100 if min_order_raw else 0
+    # Prices stored in sums (PRICE_STORAGE_UNIT = 'sums' by default)
+    delivery_price = int(store.get("delivery_price") or 0)
+    min_order_amount = int(store.get("min_order_amount") or 0)
 
     return {
         "store_id": store.get("store_id"),
@@ -481,12 +480,10 @@ async def list_products(authorization: str = Header(None), status: Optional[str]
     # Map to frontend-expected format
     products = []
     for o in offers:
-        # Convert prices from kopeks to sums for UI (round to avoid decimals)
-        discount_price_kopeks = o.get("discount_price") or 0
-        original_price_kopeks = o.get("original_price")
-        discount_price = round(discount_price_kopeks / 100)
+        # Prices already in sums (PRICE_STORAGE_UNIT defaults to 'sums')
+        discount_price = round(o.get("discount_price") or 0)
         original_price = (
-            round(original_price_kopeks / 100) if original_price_kopeks is not None else None
+            round(o.get("original_price")) if o.get("original_price") is not None else None
         )
 
         stock_quantity = o.get("stock_quantity")
@@ -628,13 +625,13 @@ async def create_product(
         expiry = (now + timedelta(days=7)).date()
 
     try:
-        # Validate with Pydantic model (store prices as entered)
+        # Validate with Pydantic model (prices in sums, normalize_price handles conversion)
         offer_data = OfferCreate(
             store_id=store["store_id"],
             title=title,
             description=description or title,
-            original_price=original_price * 100,
-            discount_price=discount_price * 100,
+            original_price=original_price,
+            discount_price=discount_price,
             quantity=quantity,
             available_from=available_from,
             available_until=available_until,
@@ -751,13 +748,13 @@ async def update_product(
 
     if original_price is not None:
         update_fields.append("original_price = %s")
-        # Convert sums → kopeks
-        update_values.append(original_price * 100 if original_price > 0 else None)
+        # Prices stored in sums (PRICE_STORAGE_UNIT = 'sums' by default)
+        update_values.append(original_price if original_price > 0 else None)
 
     if discount_price is not None:
         update_fields.append("discount_price = %s")
-        # Convert sums → kopeks
-        update_values.append(discount_price * 100)
+        # Prices stored in sums (PRICE_STORAGE_UNIT = 'sums' by default)
+        update_values.append(discount_price)
 
     if quantity is not None:
         update_fields.append("quantity = %s")

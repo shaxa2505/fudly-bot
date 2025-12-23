@@ -200,6 +200,46 @@ class NotificationTemplates:
     """Unified notification templates for RU and UZ languages."""
 
     @staticmethod
+    def _is_delivery(order_type: str) -> bool:
+        return order_type in ("delivery", "taxi")
+
+    @staticmethod
+    def _order_type_label(lang: str, order_type: str) -> str:
+        if lang == "uz":
+            if order_type == "pickup":
+                return "🏪 O'zi olib ketadi"
+            if order_type == "taxi":
+                return "🚕 Taksi"
+            return "🚚 Yetkazish"
+        if order_type == "pickup":
+            return "🏪 Самовывоз"
+        if order_type == "taxi":
+            return "🚕 Такси"
+        return "🚚 Доставка"
+
+    @staticmethod
+    def _payment_label(lang: str, payment_method: str) -> str:
+        if lang == "uz":
+            if payment_method == "cash":
+                return "💵 Naqd"
+            if payment_method == "card":
+                return "🏦 Kartaga o'tkazma"
+            if payment_method == "click":
+                return "💳 Click"
+            if payment_method == "payme":
+                return "💳 Payme"
+            return "💳 Onlayn to'lov"
+        if payment_method == "cash":
+            return "💵 Наличные"
+        if payment_method == "card":
+            return "🏦 Перевод на карту"
+        if payment_method == "click":
+            return "💳 Click"
+        if payment_method == "payme":
+            return "💳 Payme"
+        return "💳 Онлайн оплата"
+
+    @staticmethod
     def seller_new_order(
         lang: str,
         order_ids: list[str],
@@ -222,11 +262,12 @@ class NotificationTemplates:
         # Ensure customer name is not empty
         display_name = _esc(customer_name) if customer_name and customer_name.strip() else "Клиент"
 
+        is_delivery = NotificationTemplates._is_delivery(order_type)
         if lang == "uz":
             display_name = (
                 _esc(customer_name) if customer_name and customer_name.strip() else "Mijoz"
             )
-            order_type_text = "🏪 O'zi olib ketadi" if order_type == "pickup" else "🚚 Yetkazish"
+            order_type_text = NotificationTemplates._order_type_label(lang, order_type)
             lines = [
                 "🔔 <b>YANGI BUYURTMA!</b>",
                 "━━━━━━━━━━━━━━━━━━",
@@ -245,7 +286,7 @@ class NotificationTemplates:
                 ]
             )
 
-            if order_type == "delivery" and delivery_address:
+            if is_delivery and delivery_address:
                 lines.append(f"📍 {_esc(delivery_address)}")
 
             lines.append("")
@@ -260,7 +301,7 @@ class NotificationTemplates:
             lines.append("")
             lines.append("━━━━━━━━━━━━━━━━━━")
 
-            if order_type == "delivery":
+            if is_delivery:
                 lines.append(f"🚚 Yetkazish: {int(delivery_price):,} {currency}")
                 grand_total = int(total + delivery_price)
             else:
@@ -268,7 +309,7 @@ class NotificationTemplates:
 
             lines.append(f"💰 <b>JAMI: {grand_total:,} {currency}</b>")
 
-            payment_text = "💵 Naqd" if payment_method == "cash" else "💳 Karta"
+            payment_text = NotificationTemplates._payment_label(lang, payment_method)
             lines.extend(["", payment_text, ""])
             lines.append("⏳ <b>Buyurtmani tasdiqlang!</b>")
 
@@ -276,7 +317,7 @@ class NotificationTemplates:
             display_name = (
                 _esc(customer_name) if customer_name and customer_name.strip() else "Клиент"
             )
-            order_type_text = "🏪 Самовывоз" if order_type == "pickup" else "🚚 Доставка"
+            order_type_text = NotificationTemplates._order_type_label(lang, order_type)
             lines = [
                 "🔔 <b>НОВЫЙ ЗАКАЗ!</b>",
                 "━━━━━━━━━━━━━━━━━━",
@@ -295,7 +336,7 @@ class NotificationTemplates:
                 ]
             )
 
-            if order_type == "delivery" and delivery_address:
+            if is_delivery and delivery_address:
                 lines.append(f"📍 {_esc(delivery_address)}")
 
             lines.append("")
@@ -310,7 +351,7 @@ class NotificationTemplates:
             lines.append("")
             lines.append("━━━━━━━━━━━━━━━━━━")
 
-            if order_type == "delivery":
+            if is_delivery:
                 lines.append(f"🚚 Доставка: {int(delivery_price):,} {currency}")
                 grand_total = int(total + delivery_price)
             else:
@@ -318,7 +359,7 @@ class NotificationTemplates:
 
             lines.append(f"💰 <b>ИТОГО: {grand_total:,} {currency}</b>")
 
-            payment_text = "💵 Наличные" if payment_method == "cash" else "💳 Карта"
+            payment_text = NotificationTemplates._payment_label(lang, payment_method)
             lines.extend(["", payment_text, ""])
             lines.append("⏳ <b>Подтвердите заказ!</b>")
 
@@ -350,6 +391,8 @@ class NotificationTemplates:
         def _esc(val: Any) -> str:
             return html.escape(str(val)) if val else ""
 
+        is_delivery = NotificationTemplates._is_delivery(order_type)
+        order_type_text = NotificationTemplates._order_type_label(lang, order_type)
         if lang == "uz":
             header = (
                 "⏳ <b>BUYURTMA TEKSHIRILMOQDA</b>"
@@ -365,12 +408,12 @@ class NotificationTemplates:
             ]
 
             if order_type == "pickup":
-                lines.append("🏪 Самовывоз")
+                lines.append(order_type_text)
                 lines.append(f"📍 {_esc(store_address)}")
                 if pickup_codes:
                     lines.append(f"🎫 Kod: <b>{', '.join(pickup_codes)}</b>")
             else:
-                lines.append("🚚 Yetkazib berish")
+                lines.append(order_type_text)
                 if delivery_address:
                     lines.append(f"📍 {_esc(delivery_address)}")
 
@@ -383,12 +426,12 @@ class NotificationTemplates:
 
             lines.append("")
 
-            if order_type == "delivery":
+            if is_delivery:
                 lines.append(f"🚚 Yetkazish: {int(delivery_price):,} {currency}")
 
             lines.append(f"💰 <b>Jami: {int(total + delivery_price):,} {currency}</b>")
 
-            payment_text = "💵 Naqd" if payment_method == "cash" else "💳 Karta"
+            payment_text = NotificationTemplates._payment_label(lang, payment_method)
             lines.append(payment_text)
 
             lines.append("")
@@ -413,7 +456,7 @@ class NotificationTemplates:
             ]
 
             if order_type == "pickup":
-                lines.append("🏪 Самовывоз")
+                lines.append(order_type_text)
                 lines.append(f"📍 {_esc(store_address)}")
                 if pickup_codes:
                     lines.append(f"🎫 Код: <b>{', '.join(pickup_codes)}</b>")
@@ -431,12 +474,12 @@ class NotificationTemplates:
 
             lines.append("")
 
-            if order_type == "delivery":
+            if is_delivery:
                 lines.append(f"🚚 Доставка: {int(delivery_price):,} {currency}")
 
             lines.append(f"💰 <b>Итого: {int(total + delivery_price):,} {currency}</b>")
 
-            payment_text = "💵 Наличные" if payment_method == "cash" else "💳 Карта"
+            payment_text = NotificationTemplates._payment_label(lang, payment_method)
             lines.append(payment_text)
 
             lines.append("")
