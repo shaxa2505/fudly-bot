@@ -13,6 +13,7 @@ from aiogram.utils.keyboard import InlineKeyboardBuilder
 
 from app.core.constants import OFFERS_PER_PAGE
 from app.keyboards import cancel_keyboard, main_menu_customer, phone_request_keyboard
+from app.services.unified_order_service import OrderStatus, get_unified_order_service
 from handlers.bookings.utils import format_price
 from handlers.common.states import BookOffer, OrderDelivery, Registration
 from handlers.common.utils import is_main_menu_button
@@ -1600,16 +1601,25 @@ async def confirm_cancel_booking(callback: types.CallbackQuery) -> None:
         await callback.answer(get_text(lang, "error"), show_alert=True)
         return
 
-    # Cancel and restore quantity
-    success = db.cancel_booking(booking_id)
-    if success:
-        # Restore offer quantity
-        offer_id = get_booking_field(booking, "offer_id")
-        qty = get_booking_field(booking, "quantity", 1)
-        try:
-            db.increment_offer_quantity_atomic(offer_id, int(qty))
-        except Exception as e:
-            logger.error(f"Failed to restore quantity: {e}")
+    # Cancel and restore quantity (prefer unified service for consistent status)
+    order_service = get_unified_order_service()
+    if order_service:
+        success = await order_service.update_status(
+            entity_id=booking_id,
+            entity_type="booking",
+            new_status=OrderStatus.CANCELLED,
+            notify_customer=False,
+        )
+    else:
+        success = db.cancel_booking(booking_id)
+        if success:
+            # Restore offer quantity
+            offer_id = get_booking_field(booking, "offer_id")
+            qty = get_booking_field(booking, "quantity", 1)
+            try:
+                db.increment_offer_quantity_atomic(offer_id, int(qty))
+            except Exception as e:
+                logger.error(f"Failed to restore quantity: {e}")
 
         await callback.answer(
             get_text(lang, "booking_cancelled") or "Бронирование отменено", show_alert=True

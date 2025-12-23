@@ -8,6 +8,7 @@ from aiogram.fsm.context import FSMContext
 from aiogram.types import BufferedInputFile
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
+from app.services.unified_order_service import OrderStatus, get_unified_order_service
 from handlers.common.states import RateBooking
 from handlers.common.utils import html_escape as _esc
 from localization import get_text
@@ -96,36 +97,48 @@ async def partner_cancel_booking(callback: types.CallbackQuery) -> None:
         await callback.answer(get_text(lang, "error"), show_alert=True)
         return
 
-    # Cancel and restore quantities
+    # Cancel and restore quantities (prefer unified service for consistency)
     try:
-        db.cancel_booking(booking_id)
+        order_service = get_unified_order_service()
+        if order_service:
+            ok = await order_service.update_status(
+                entity_id=booking_id,
+                entity_type="booking",
+                new_status=OrderStatus.REJECTED,
+                notify_customer=False,
+                reject_reason="seller_cancel",
+            )
+            if not ok:
+                order_service = None
+        if not order_service:
+            db.cancel_booking(booking_id)
 
-        # Restore quantities - check if cart booking
-        is_cart_booking = get_booking_field(booking, "is_cart_booking", 0)
-        if is_cart_booking:
-            import json
+            # Restore quantities - check if cart booking
+            is_cart_booking = get_booking_field(booking, "is_cart_booking", 0)
+            if is_cart_booking:
+                import json
 
-            cart_items_json = get_booking_field(booking, "cart_items")
-            if cart_items_json:
-                try:
-                    cart_items = (
-                        json.loads(cart_items_json)
-                        if isinstance(cart_items_json, str)
-                        else cart_items_json
-                    )
-                    for item in cart_items:
-                        item_offer_id = item.get("offer_id")
-                        item_qty = item.get("quantity", 1)
-                        if item_offer_id:
-                            db.increment_offer_quantity_atomic(item_offer_id, int(item_qty))
-                except Exception as e:
-                    logger.error(f"Failed to restore cart quantities in cancel: {e}")
-        else:
-            # Single item booking
-            offer_id = get_booking_field(booking, "offer_id")
-            qty = get_booking_field(booking, "quantity", 1)
-            if offer_id:
-                db.increment_offer_quantity_atomic(offer_id, int(qty))
+                cart_items_json = get_booking_field(booking, "cart_items")
+                if cart_items_json:
+                    try:
+                        cart_items = (
+                            json.loads(cart_items_json)
+                            if isinstance(cart_items_json, str)
+                            else cart_items_json
+                        )
+                        for item in cart_items:
+                            item_offer_id = item.get("offer_id")
+                            item_qty = item.get("quantity", 1)
+                            if item_offer_id:
+                                db.increment_offer_quantity_atomic(item_offer_id, int(item_qty))
+                    except Exception as e:
+                        logger.error(f"Failed to restore cart quantities in cancel: {e}")
+            else:
+                # Single item booking
+                offer_id = get_booking_field(booking, "offer_id")
+                qty = get_booking_field(booking, "quantity", 1)
+                if offer_id:
+                    db.increment_offer_quantity_atomic(offer_id, int(qty))
     except Exception as e:
         logger.error(f"Failed to cancel booking: {e}")
         await callback.answer(get_text(lang, "error"), show_alert=True)
@@ -362,6 +375,7 @@ async def partner_confirm_batch_bookings(callback: types.CallbackQuery) -> None:
     # Confirm all bookings
     confirmed_count = 0
     customer_notifications = {}  # {customer_id: [booking_infos]}
+    order_service = get_unified_order_service()
 
     for booking_id in booking_ids:
         try:
@@ -380,9 +394,22 @@ async def partner_confirm_batch_bookings(callback: types.CallbackQuery) -> None:
                 continue
 
             # Confirm booking
-            db.update_booking_status(booking_id, "preparing")
-            db.mark_reminder_sent(booking_id)
-            confirmed_count += 1
+            if order_service:
+                ok = await order_service.update_status(
+                    entity_id=booking_id,
+                    entity_type="booking",
+                    new_status=OrderStatus.PREPARING,
+                    notify_customer=False,
+                )
+            else:
+                ok = True
+                db.update_booking_status(booking_id, "preparing")
+
+            if ok:
+                db.mark_reminder_sent(booking_id)
+                confirmed_count += 1
+            else:
+                continue
 
             # Collect info for customer notification
             customer_id = get_booking_field(booking, "user_id")
@@ -474,6 +501,7 @@ async def partner_reject_batch_bookings(callback: types.CallbackQuery) -> None:
     # Reject all bookings and restore quantities
     rejected_count = 0
     customer_notifications = {}  # {customer_id: [store_names]}
+    order_service = get_unified_order_service()
 
     for booking_id in booking_ids:
         try:
@@ -491,13 +519,25 @@ async def partner_reject_batch_bookings(callback: types.CallbackQuery) -> None:
             if partner_id != owner_id:
                 continue
 
-            # Return quantity to offer
-            quantity = get_booking_field(booking, "quantity", 1)
-            if offer_id:
-                db.increment_offer_quantity_atomic(offer_id, quantity)
-
             # Reject booking
-            db.update_booking_status(booking_id, "rejected")
+            if order_service:
+                ok = await order_service.update_status(
+                    entity_id=booking_id,
+                    entity_type="booking",
+                    new_status=OrderStatus.REJECTED,
+                    notify_customer=False,
+                )
+            else:
+                ok = True
+                # Return quantity to offer
+                quantity = get_booking_field(booking, "quantity", 1)
+                if offer_id:
+                    db.increment_offer_quantity_atomic(offer_id, quantity)
+                db.update_booking_status(booking_id, "rejected")
+
+            if not ok:
+                continue
+
             rejected_count += 1
 
             # Collect info for customer notification

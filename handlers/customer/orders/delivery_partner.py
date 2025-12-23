@@ -73,20 +73,23 @@ async def cancel_order_customer(
         await callback.answer(f"❌ {msg}", show_alert=True)
         return
 
+    restore_quantities = True
     order_service = get_unified_order_service()
     if order_service:
-        await order_service.cancel_order(order_id, "order")
+        ok = await order_service.cancel_order(order_id, "order")
+        restore_quantities = not ok
     else:
         db.update_order_status(order_id, "cancelled")
 
-    # Restore quantity
-    offer_id = _get_order_field(order, "offer_id", 2)
-    quantity = _get_order_field(order, "quantity", 4)
-    if offer_id:
-        try:
-            db.increment_offer_quantity_atomic(offer_id, int(quantity))
-        except Exception:
-            pass
+    # Restore quantity only if unified service did not handle it
+    if restore_quantities:
+        offer_id = _get_order_field(order, "offer_id", 2)
+        quantity = _get_order_field(order, "quantity", 4)
+        if offer_id:
+            try:
+                db.increment_offer_quantity_atomic(offer_id, int(quantity))
+            except Exception:
+                pass
 
     msg = "Bekor qilindi" if lang == "uz" else "Отменено"
     try:
