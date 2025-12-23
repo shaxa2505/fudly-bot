@@ -15,7 +15,11 @@ from typing import Any
 from aiogram import F, Router, types
 
 from app.core.utils import get_offer_field, get_store_field
-from app.services.unified_order_service import OrderStatus, get_unified_order_service
+from app.services.unified_order_service import (
+    OrderStatus,
+    get_unified_order_service,
+    init_unified_order_service,
+)
 from database_protocol import DatabaseProtocol
 from handlers.common.utils import html_escape as _esc
 from logging_config import logger
@@ -73,23 +77,17 @@ async def cancel_order_customer(
         await callback.answer(f"❌ {msg}", show_alert=True)
         return
 
-    restore_quantities = True
     order_service = get_unified_order_service()
-    if order_service:
-        ok = await order_service.cancel_order(order_id, "order")
-        restore_quantities = not ok
-    else:
-        db.update_order_status(order_id, "cancelled")
+    if not order_service:
+        order_service = init_unified_order_service(db, bot)
+    if not order_service:
+        await callback.answer("System error", show_alert=True)
+        return
 
-    # Restore quantity only if unified service did not handle it
-    if restore_quantities:
-        offer_id = _get_order_field(order, "offer_id", 2)
-        quantity = _get_order_field(order, "quantity", 4)
-        if offer_id:
-            try:
-                db.increment_offer_quantity_atomic(offer_id, int(quantity))
-            except Exception:
-                pass
+    ok = await order_service.cancel_order(order_id, "order")
+    if not ok:
+        await callback.answer("System error", show_alert=True)
+        return
 
     msg = "Bekor qilindi" if lang == "uz" else "Отменено"
     try:
@@ -147,6 +145,11 @@ async def partner_confirm_order_batch(
     customer_notifications: dict = {}  # {customer_id: [order_infos]}
 
     order_service = get_unified_order_service()
+    if not order_service:
+        order_service = init_unified_order_service(db, bot)
+    if not order_service:
+        await callback.answer("System error", show_alert=True)
+        return
 
     for order_id in order_ids:
         try:
@@ -163,15 +166,12 @@ async def partner_confirm_order_batch(
                 continue
 
             # Update order status
-            if order_service:
-                await order_service.update_status(
-                    entity_id=order_id,
-                    entity_type="order",
-                    new_status=OrderStatus.PREPARING,
-                    notify_customer=False,
-                )
-            else:
-                db.update_order_status(order_id, "preparing")
+            await order_service.update_status(
+                entity_id=order_id,
+                entity_type="order",
+                new_status=OrderStatus.PREPARING,
+                notify_customer=False,
+            )
             confirmed_count += 1
 
             # Collect info for customer notification
@@ -274,6 +274,11 @@ async def partner_reject_order_batch(
     customer_notifications: dict = {}  # {customer_id: [store_names]}
 
     order_service = get_unified_order_service()
+    if not order_service:
+        order_service = init_unified_order_service(db, bot)
+    if not order_service:
+        await callback.answer("System error", show_alert=True)
+        return
 
     for order_id in order_ids:
         try:
@@ -290,24 +295,12 @@ async def partner_reject_order_batch(
                 continue
 
             # Update order status
-            if order_service:
-                await order_service.update_status(
-                    entity_id=order_id,
-                    entity_type="order",
-                    new_status=OrderStatus.REJECTED,
-                    notify_customer=False,
-                )
-            else:
-                db.update_order_status(order_id, "rejected")
-
-                # Restore quantity
-                offer_id = _get_order_field(order, "offer_id", 3)
-                quantity = _get_order_field(order, "quantity", 4)
-                if offer_id:
-                    try:
-                        db.increment_offer_quantity_atomic(offer_id, int(quantity))
-                    except Exception:
-                        pass
+            await order_service.update_status(
+                entity_id=order_id,
+                entity_type="order",
+                new_status=OrderStatus.REJECTED,
+                notify_customer=False,
+            )
 
             rejected_count += 1
 

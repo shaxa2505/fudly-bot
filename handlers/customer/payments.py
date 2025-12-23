@@ -14,7 +14,11 @@ from typing import TYPE_CHECKING
 
 from aiogram import F, Router, types
 from aiogram.types import LabeledPrice
-from app.services.unified_order_service import OrderStatus, get_unified_order_service
+from app.services.unified_order_service import (
+    OrderStatus,
+    get_unified_order_service,
+    init_unified_order_service,
+)
 
 if TYPE_CHECKING:
     from database_protocol import DatabaseProtocol
@@ -260,15 +264,14 @@ async def process_successful_payment(message: types.Message) -> None:
 
             # Payment is confirmed by Telegram provider (Click)
             order_service = get_unified_order_service()
-            if order_service:
-                await order_service.confirm_payment(order_id)
-                skip_seller_notify = True
-            else:
-                if hasattr(db, "update_payment_status"):
-                    db.update_payment_status(order_id, "confirmed")
-                if hasattr(db, "update_order_status"):
-                    # Keep fulfillment status separate from payment
-                    db.update_order_status(order_id, "pending")
+            if not order_service and bot:
+                order_service = init_unified_order_service(db, bot)
+            if not order_service:
+                logger.warning("UnifiedOrderService unavailable during payment confirmation")
+                return
+
+            await order_service.confirm_payment(order_id)
+            skip_seller_notify = True
         else:
             # Try bookings table (pickup from hot_offer flow)
             if hasattr(db, "get_booking"):
@@ -288,15 +291,17 @@ async def process_successful_payment(message: types.Message) -> None:
 
                 # Keep booking status separate from payment confirmation
                 order_service = get_unified_order_service()
-                if order_service:
+                if not order_service and bot:
+                    order_service = init_unified_order_service(db, bot)
+                if not order_service:
+                    logger.warning("UnifiedOrderService unavailable for booking payment update")
+                else:
                     await order_service.update_status(
                         entity_id=order_id,
                         entity_type="booking",
                         new_status=OrderStatus.PENDING,
                         notify_customer=False,
                     )
-                elif hasattr(db, "update_booking_status"):
-                    db.update_booking_status(order_id, "pending")
 
         # Get offer and store details
         offer = db.get_offer(offer_id) if offer_id else None

@@ -29,7 +29,7 @@
         /* Prevent body scroll when modal is open */
         body.modal-open {
             overflow: hidden !important;
-            height: 100vh !important;
+            touch-action: none !important;
         }
 
         /* Ensure modal is always visible */
@@ -41,7 +41,7 @@
             bottom: 0 !important;
             z-index: 9999 !important;
             display: flex !important;
-            align-items: center !important;
+            align-items: flex-start !important;
             justify-content: center !important;
             background: rgba(17, 19, 18, 0.45) !important;
             backdrop-filter: blur(8px) !important;
@@ -49,6 +49,7 @@
             overflow-y: auto !important;
             -webkit-overflow-scrolling: touch !important;
             overscroll-behavior: contain !important;
+            touch-action: pan-y !important;
         }
         
         .modal-content {
@@ -57,21 +58,22 @@
             border-radius: 20px !important;
             max-width: 680px !important;
             width: 100% !important;
-            max-height: 85vh !important;
-            overflow: hidden !important;
+            max-height: none !important;
+            margin: 20px auto !important;
+            overflow: visible !important;
             display: flex !important;
             flex-direction: column !important;
             box-shadow: 0 20px 40px rgba(17, 19, 18, 0.12) !important;
-            touch-action: auto !important;
-            margin: auto !important;
+            touch-action: pan-y !important;
         }
 
         .modal-body {
-            overflow-y: auto !important;
+            overflow-y: visible !important;
             overflow-x: hidden !important;
             -webkit-overflow-scrolling: touch !important;
             overscroll-behavior: contain !important;
             touch-action: pan-y !important;
+            max-height: none !important;
         }
     </style>
 
@@ -379,10 +381,10 @@
 
             console.log('🔵 Appending modal to body');
             
-            // Блокируем скролл фона (без position: fixed для корректной работы touch)
+            // Блокируем скролл фона
             const scrollY = window.scrollY;
             document.body.style.overflow = 'hidden';
-            document.body.style.height = '100vh';
+            document.body.style.touchAction = 'none';
             document.body.dataset.scrollY = scrollY;
             
             document.body.appendChild(modal);
@@ -397,7 +399,7 @@
                 haptic('light');
                 // Восстанавливаем скролл
                 document.body.style.overflow = '';
-                document.body.style.height = '';
+                document.body.style.touchAction = '';
                 const scrollY = document.body.dataset.scrollY;
                 if (scrollY) {
                     window.scrollTo(0, parseInt(scrollY));
@@ -1215,7 +1217,7 @@
             // Блокируем скролл фона
             const scrollY = window.scrollY;
             document.body.style.overflow = 'hidden';
-            document.body.style.height = '100vh';
+            document.body.style.touchAction = 'none';
             document.body.dataset.scrollY = scrollY;
 
             document.body.appendChild(modal);
@@ -1224,7 +1226,7 @@
             // Функция закрытия
             const closeOrderModal = () => {
                 document.body.style.overflow = '';
-                document.body.style.height = '';
+                document.body.style.touchAction = '';
                 const scrollY = document.body.dataset.scrollY;
                 if (scrollY) {
                     window.scrollTo(0, parseInt(scrollY));

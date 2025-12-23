@@ -27,6 +27,7 @@ from app.services.unified_order_service import (
     NotificationTemplates,
     OrderItem,
     get_unified_order_service,
+    init_unified_order_service,
 )
 from database_protocol import DatabaseProtocol
 from handlers.common.states import OrderDelivery
@@ -219,10 +220,12 @@ async def dlv_cancel_order(
     if order_id > 0:
         try:
             order_service = get_unified_order_service()
+            if not order_service:
+                order_service = init_unified_order_service(db, callback.bot)
             if order_service:
                 await order_service.cancel_order(order_id, "order")
-            elif hasattr(db, "update_order_status"):
-                db.update_order_status(order_id, "cancelled")
+            else:
+                logger.warning("UnifiedOrderService unavailable for cancel_order")
             logger.info(f"❌ User {user_id} cancelled order #{order_id}")
         except Exception as e:
             logger.error(f"Failed to cancel order #{order_id}: {e}")

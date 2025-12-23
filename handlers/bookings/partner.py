@@ -8,7 +8,11 @@ from aiogram.fsm.context import FSMContext
 from aiogram.types import BufferedInputFile
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
-from app.services.unified_order_service import OrderStatus, get_unified_order_service
+from app.services.unified_order_service import (
+    OrderStatus,
+    get_unified_order_service,
+    init_unified_order_service,
+)
 from handlers.common.states import RateBooking
 from handlers.common.utils import html_escape as _esc
 from localization import get_text
@@ -376,6 +380,11 @@ async def partner_confirm_batch_bookings(callback: types.CallbackQuery) -> None:
     confirmed_count = 0
     customer_notifications = {}  # {customer_id: [booking_infos]}
     order_service = get_unified_order_service()
+    if not order_service and bot:
+        order_service = init_unified_order_service(db, bot)
+    if not order_service:
+        await callback.answer("System error", show_alert=True)
+        return
 
     for booking_id in booking_ids:
         try:
@@ -394,16 +403,12 @@ async def partner_confirm_batch_bookings(callback: types.CallbackQuery) -> None:
                 continue
 
             # Confirm booking
-            if order_service:
-                ok = await order_service.update_status(
-                    entity_id=booking_id,
-                    entity_type="booking",
-                    new_status=OrderStatus.PREPARING,
-                    notify_customer=False,
-                )
-            else:
-                ok = True
-                db.update_booking_status(booking_id, "preparing")
+            ok = await order_service.update_status(
+                entity_id=booking_id,
+                entity_type="booking",
+                new_status=OrderStatus.PREPARING,
+                notify_customer=False,
+            )
 
             if ok:
                 db.mark_reminder_sent(booking_id)
@@ -502,6 +507,11 @@ async def partner_reject_batch_bookings(callback: types.CallbackQuery) -> None:
     rejected_count = 0
     customer_notifications = {}  # {customer_id: [store_names]}
     order_service = get_unified_order_service()
+    if not order_service and bot:
+        order_service = init_unified_order_service(db, bot)
+    if not order_service:
+        await callback.answer("System error", show_alert=True)
+        return
 
     for booking_id in booking_ids:
         try:
@@ -520,20 +530,12 @@ async def partner_reject_batch_bookings(callback: types.CallbackQuery) -> None:
                 continue
 
             # Reject booking
-            if order_service:
-                ok = await order_service.update_status(
-                    entity_id=booking_id,
-                    entity_type="booking",
-                    new_status=OrderStatus.REJECTED,
-                    notify_customer=False,
-                )
-            else:
-                ok = True
-                # Return quantity to offer
-                quantity = get_booking_field(booking, "quantity", 1)
-                if offer_id:
-                    db.increment_offer_quantity_atomic(offer_id, quantity)
-                db.update_booking_status(booking_id, "rejected")
+            ok = await order_service.update_status(
+                entity_id=booking_id,
+                entity_type="booking",
+                new_status=OrderStatus.REJECTED,
+                notify_customer=False,
+            )
 
             if not ok:
                 continue

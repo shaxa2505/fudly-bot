@@ -12,7 +12,11 @@ from aiogram import F, Router, types
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
 from app.core.utils import get_offer_field, get_store_field
-from app.services.unified_order_service import OrderStatus, get_unified_order_service
+from app.services.unified_order_service import (
+    OrderStatus,
+    get_unified_order_service,
+    init_unified_order_service,
+)
 from database_protocol import DatabaseProtocol
 from logging_config import logger
 
@@ -61,12 +65,14 @@ async def admin_confirm_payment(
 
     skip_seller_notify = False
     order_service = get_unified_order_service()
-    if order_service:
-        await order_service.confirm_payment(order_id)
-        skip_seller_notify = True
-    else:
-        db.update_payment_status(order_id, "confirmed")
-        db.update_order_status(order_id, "pending")  # Keep as pending until seller confirms
+    if not order_service and bot:
+        order_service = init_unified_order_service(db, bot)
+    if not order_service:
+        await callback.answer("System error", show_alert=True)
+        return
+
+    await order_service.confirm_payment(order_id)
+    skip_seller_notify = True
 
     # Get details
     store_id = _get_order_field(order, "store_id", 2)
@@ -267,17 +273,17 @@ async def admin_reject_payment(
     db.update_payment_status(order_id, "rejected")
     # Keep order_status as fulfillment-only and allow customer to re-upload proof
     order_service = get_unified_order_service()
+    if not order_service and bot:
+        order_service = init_unified_order_service(db, bot)
     if order_service:
-        ok = await order_service.update_status(
+        await order_service.update_status(
             entity_id=order_id,
             entity_type="order",
             new_status=OrderStatus.PENDING,
             notify_customer=False,
         )
-        if not ok:
-            db.update_order_status(order_id, "pending")
     else:
-        db.update_order_status(order_id, "pending")
+        logger.warning("UnifiedOrderService unavailable for payment rejection")
 
     customer_id = _get_order_field(order, "user_id", 1)
 

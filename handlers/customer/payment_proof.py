@@ -17,6 +17,7 @@ from app.services.unified_order_service import (
     OrderStatus,
     PaymentStatus,
     get_unified_order_service,
+    init_unified_order_service,
 )
 from localization import get_text
 
@@ -273,17 +274,19 @@ async def receive_payment_proof(message: types.Message, state: FSMContext) -> No
             current_order_status in ("awaiting_payment", "awaiting_admin_confirmation")
         ):
             order_service = get_unified_order_service()
+            if not order_service:
+                bot_ref = bot_instance or message.bot
+                if bot_ref:
+                    order_service = init_unified_order_service(db, bot_ref)
             if order_service:
-                ok = await order_service.update_status(
+                await order_service.update_status(
                     entity_id=order_id,
                     entity_type="order",
                     new_status=OrderStatus.PENDING,
                     notify_customer=False,
                 )
-                if not ok and hasattr(db, "update_order_status"):
-                    db.update_order_status(order_id, "pending")
-            elif hasattr(db, "update_order_status"):
-                db.update_order_status(order_id, "pending")
+            else:
+                logger.warning("UnifiedOrderService not available to normalize order status")
 
         # Get admin IDs
         admin_ids = []
