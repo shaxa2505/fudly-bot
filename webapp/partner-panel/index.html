@@ -26,6 +26,13 @@
 
     <!-- Critical Modal Styles -->
     <style>
+        /* Prevent body scroll when modal is open */
+        body.modal-open {
+            overflow: hidden !important;
+            position: fixed !important;
+            width: 100% !important;
+        }
+
         /* Ensure modal is always visible */
         .modal-overlay {
             position: fixed !important;
@@ -40,6 +47,8 @@
             background: rgba(17, 19, 18, 0.45) !important;
             backdrop-filter: blur(8px) !important;
             padding: 20px !important;
+            overflow-y: auto !important;
+            -webkit-overflow-scrolling: touch !important;
         }
         
         .modal-content {
@@ -53,6 +62,13 @@
             display: flex !important;
             flex-direction: column !important;
             box-shadow: 0 20px 40px rgba(17, 19, 18, 0.12) !important;
+            touch-action: auto !important;
+        }
+
+        .modal-body {
+            overflow-y: auto !important;
+            -webkit-overflow-scrolling: touch !important;
+            touch-action: pan-y !important;
         }
     </style>
 
@@ -359,6 +375,12 @@
             `;
 
             console.log('🔵 Appending modal to body');
+            
+            // Блокируем скролл фона
+            document.body.style.overflow = 'hidden';
+            document.body.style.position = 'fixed';
+            document.body.style.width = '100%';
+            
             document.body.appendChild(modal);
             console.log('🔵 Modal appended, initializing Lucide icons');
             if (typeof lucide !== 'undefined') lucide.createIcons();
@@ -366,12 +388,33 @@
             calculateFinalPrice('percent');
             setTimeout(() => modal.querySelector('input[name="name"]').focus(), 80);
 
+            // Функция закрытия модалки
+            const closeModal = () => {
+                haptic('light');
+                // Восстанавливаем скролл
+                document.body.style.overflow = '';
+                document.body.style.position = '';
+                document.body.style.width = '';
+                modal.remove();
+            };
+
             modal.addEventListener('click', (e) => {
                 if (e.target === modal) {
-                    haptic('light');
-                    modal.remove();
+                    closeModal();
                 }
             });
+
+            // Обработка кнопки закрытия
+            const closeBtn = modal.querySelector('.btn-icon');
+            if (closeBtn) {
+                closeBtn.addEventListener('click', closeModal);
+            }
+
+            // Обработка кнопки отмены
+            const cancelBtn = modal.querySelector('button[type="button"].btn-secondary');
+            if (cancelBtn) {
+                cancelBtn.addEventListener('click', closeModal);
+            }
         }
 
         function editProduct(productId) {
@@ -1161,12 +1204,31 @@
                 </div>
             `;
 
+            // Блокируем скролл фона
+            document.body.style.overflow = 'hidden';
+            document.body.style.position = 'fixed';
+            document.body.style.width = '100%';
+
             document.body.appendChild(modal);
             if (typeof lucide !== 'undefined') lucide.createIcons();
 
+            // Функция закрытия
+            const closeOrderModal = () => {
+                document.body.style.overflow = '';
+                document.body.style.position = '';
+                document.body.style.width = '';
+                modal.remove();
+            };
+
             modal.addEventListener('click', (e) => {
-                if (e.target === modal) modal.remove();
+                if (e.target === modal) closeOrderModal();
             });
+
+            // Закрытие по кнопке X
+            const closeBtn = modal.querySelector('.btn-icon');
+            if (closeBtn) {
+                closeBtn.addEventListener('click', closeOrderModal);
+            }
         }
 
         async function updateOrderStatus(orderId, newStatus) {
