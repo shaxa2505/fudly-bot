@@ -481,12 +481,12 @@ async def list_products(authorization: str = Header(None), status: Optional[str]
     # Map to frontend-expected format
     products = []
     for o in offers:
-        # Convert prices from kopeks to sums for UI
+        # Convert prices from kopeks to sums for UI (round to avoid decimals)
         discount_price_kopeks = o.get("discount_price") or 0
         original_price_kopeks = o.get("original_price")
-        discount_price = discount_price_kopeks / 100
+        discount_price = round(discount_price_kopeks / 100)
         original_price = (
-            original_price_kopeks / 100 if original_price_kopeks is not None else None
+            round(original_price_kopeks / 100) if original_price_kopeks is not None else None
         )
 
         stock_quantity = o.get("stock_quantity")
@@ -555,9 +555,13 @@ async def create_product(
 
     v22.0: Added stock_quantity support.
     """
+    import logging
     from datetime import datetime, timedelta
 
     from app.domain.models import OfferCreate
+
+    logger = logging.getLogger(__name__)
+    logger.info(f"📦 Create product - received prices: original={original_price}, discount={discount_price}")
 
     telegram_id = verify_telegram_webapp(authorization)
     user, store = get_partner_with_store(telegram_id)

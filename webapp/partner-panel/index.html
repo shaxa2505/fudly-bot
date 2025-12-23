@@ -269,7 +269,7 @@
                                     <div class="form-group">
                                         <label>Оригинальная цена *</label>
                                         <input type="number" name="original_price" id="originalPrice"
-                                               value="${product?.original_price || ''}" min="1" step="1" required
+                                               value="${product?.original_price ? Math.round(product.original_price) : ''}" min="1" step="1" required
                                                class="search-input" oninput="calculateFinalPrice('percent'); validateField(this)" placeholder="15000">
                                         <div class="form-error hidden">Цена должна быть > 0</div>
                                     </div>
@@ -283,7 +283,7 @@
 
                                 <div class="form-group">
                                     <label>Цена со скидкой</label>
-                                    <input type="number" name="discount_price" id="discountPrice" value="${product?.price || product?.discount_price || ''}"
+                                    <input type="number" name="discount_price" id="discountPrice" value="${product?.price ? Math.round(product.price) : product?.discount_price ? Math.round(product.discount_price) : ''}"
                                            min="0" step="1" class="search-input"
                                            oninput="calculateFinalPrice('price'); validateField(this)" placeholder="10500">
                                 </div>
@@ -1877,17 +1877,24 @@
                 const title = String(formData.get('name') || '').trim();
                 const category = String(formData.get('category') || 'other').trim() || 'other';
                 const description = String(formData.get('description') || '').trim();
-                const unit = String(formData.get('unit') || '??').trim();
+                const unit = String(formData.get('unit') || 'шт').trim();
                 const stockQty = Math.max(0, parseInt(formData.get('stock_quantity'), 10) || 0);
-                const originalPrice = parseInt(formData.get('original_price'), 10);
+                
+                // Parse prices - remove spaces and ensure proper integer conversion
+                const originalPriceRaw = String(formData.get('original_price') || '').replace(/\s/g, '');
+                const discountPriceInputRaw = String(formData.get('discount_price') || '').replace(/\s/g, '');
+                const originalPrice = parseInt(originalPriceRaw, 10);
                 const discountPercent = Math.max(0, Math.min(90, parseInt(formData.get('discount'), 10) || 0));
-                const discountPriceInput = parseInt(formData.get('discount_price'), 10);
+                const discountPriceInput = parseInt(discountPriceInputRaw, 10);
+                
                 const expiryDate = String(formData.get('expiry_date') || '');
                 const isAvailable = formData.get('is_available') === 'on';
 
+                console.log('💰 Saving product with prices:', { originalPrice, discountPriceInput, discountPercent });
+
                 if (!title || title.length < 3) throw new Error('Название слишком короткое (мин. 3 символа)');
-                                if (!productId && stockQty <= 0) throw new Error('Количество должно быть больше 0');
-if (!originalPrice || originalPrice <= 0) throw new Error('Оригинальная цена обязательна');
+                if (!productId && stockQty <= 0) throw new Error('Количество должно быть больше 0');
+                if (!originalPrice || originalPrice <= 0 || isNaN(originalPrice)) throw new Error('Оригинальная цена обязательна и должна быть числом');
                 if (!expiryDate) throw new Error('Укажите срок годности');
 
                 let discountPrice = Number.isFinite(discountPriceInput) && discountPriceInput > 0
@@ -1916,8 +1923,8 @@ if (!originalPrice || originalPrice <= 0) throw new Error('Оригинальн�
                 const payload = new FormData();
                 payload.append('title', title);
                 payload.append('category', category);
-                payload.append('original_price', String(originalPrice));
-                payload.append('discount_price', String(discountPrice));
+                payload.append('original_price', String(originalPrice));  // Pure integer, no formatting
+                payload.append('discount_price', String(discountPrice));  // Pure integer, no formatting
                 payload.append('quantity', String(stockQty));
                 payload.append('stock_quantity', String(stockQty));
                 payload.append('unit', unit);
@@ -1925,6 +1932,11 @@ if (!originalPrice || originalPrice <= 0) throw new Error('Оригинальн�
                 if (description) payload.append('description', description);
                 if (photoId) payload.append('photo_id', photoId);
                 if (productId) payload.append('status', stockQty <= 0 ? 'out_of_stock' : (isAvailable ? 'active' : 'hidden'));
+
+                console.log('📤 Sending payload with prices:', { 
+                    original_price: originalPrice, 
+                    discount_price: discountPrice 
+                });
 
                 if (productId) {
                     await apiFetch(`/api/partner/products/${productId}`, { method: 'PUT', body: payload });
