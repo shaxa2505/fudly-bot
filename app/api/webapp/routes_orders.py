@@ -79,9 +79,7 @@ def _resolve_required_phone(db: Any, user_id: int, raw_phone: str | None) -> str
     return stored_phone
 
 
-def _load_offers_and_store(
-    items: list[Any], db: Any
-) -> tuple[dict[int, Any], int]:
+def _load_offers_and_store(items: list[Any], db: Any) -> tuple[dict[int, Any], int]:
     if not items:
         raise HTTPException(status_code=400, detail="No items provided")
     offers_by_id: dict[int, Any] = {}
@@ -89,9 +87,7 @@ def _load_offers_and_store(
     for item in items:
         offer = db.get_offer(item.offer_id) if hasattr(db, "get_offer") else None
         if not offer:
-            raise HTTPException(
-                status_code=400, detail=f"Offer not found: {item.offer_id}"
-            )
+            raise HTTPException(status_code=400, detail=f"Offer not found: {item.offer_id}")
         offers_by_id[item.offer_id] = offer
         store_id = int(get_val(offer, "store_id") or 0)
         if store_id:
@@ -220,7 +216,9 @@ async def create_order(
                     oid = result.order_ids[0] if result.order_ids else 0
                     delivery_price = int(order_items[0].delivery_price) if order_items else 0
                     for idx, item_obj in enumerate(order_items):
-                        total = (item_obj.price * item_obj.quantity) + (delivery_price if idx == 0 else 0)
+                        total = (item_obj.price * item_obj.quantity) + (
+                            delivery_price if idx == 0 else 0
+                        )
                         created_items.append(
                             {
                                 "id": oid,
@@ -258,8 +256,7 @@ async def create_order(
                 )
                 # No fallback - UnifiedOrderService is the only way
                 raise HTTPException(
-                    status_code=500, 
-                    detail=result.error_message or "Failed to create order"
+                    status_code=500, detail=result.error_message or "Failed to create order"
                 )
 
         # UnifiedOrderService already notifies sellers (WebSocket + optional Telegram).
@@ -325,8 +322,7 @@ async def get_orders(db=Depends(get_db), user: dict = Depends(get_current_user))
                         off.offer_id AS offer_id,
                         off.title AS offer_title,
                         off.discount_price AS offer_price,
-                        off.photo_id AS offer_photo_id,
-                        off.photo AS offer_photo
+                        off.photo_id AS offer_photo_id
                     FROM orders o
                     LEFT JOIN stores s ON o.store_id = s.store_id
                     LEFT JOIN offers off ON o.offer_id = off.offer_id
@@ -352,9 +348,7 @@ async def get_orders(db=Depends(get_db), user: dict = Depends(get_current_user))
         if not order_id:
             continue
 
-        order_type = r.get("order_type") or (
-            "delivery" if r.get("delivery_address") else "pickup"
-        )
+        order_type = r.get("order_type") or ("delivery" if r.get("delivery_address") else "pickup")
         order_status = _normalize_order_status(r.get("order_status"))
 
         payment_method = r.get("payment_method") or "cash"
@@ -465,9 +459,7 @@ async def get_orders(db=Depends(get_db), user: dict = Depends(get_current_user))
                         try:
                             offer = db.get_offer(b[1])
                             if offer:
-                                offer_photo = get_val(offer, "photo") or get_val(
-                                    offer, "photo_id"
-                                )
+                                offer_photo = get_val(offer, "photo") or get_val(offer, "photo_id")
                         except Exception:
                             pass
 
@@ -476,9 +468,7 @@ async def get_orders(db=Depends(get_db), user: dict = Depends(get_current_user))
                             "booking_id": b[0] if len(b) > 0 else None,
                             "offer_id": b[1] if len(b) > 1 else None,
                             "user_id": b[2] if len(b) > 2 else None,
-                            "status": _normalize_order_status(
-                                b[3] if len(b) > 3 else "pending"
-                            ),
+                            "status": _normalize_order_status(b[3] if len(b) > 3 else "pending"),
                             "booking_code": b[4] if len(b) > 4 else None,
                             "pickup_time": str(b[5]) if len(b) > 5 and b[5] else None,
                             "quantity": b[6] if len(b) > 6 else 1,
@@ -497,9 +487,7 @@ async def get_orders(db=Depends(get_db), user: dict = Depends(get_current_user))
                             booking[key] = value.isoformat()
                         else:
                             booking[key] = value
-                    booking["status"] = _normalize_order_status(
-                        booking.get("status") or "pending"
-                    )
+                    booking["status"] = _normalize_order_status(booking.get("status") or "pending")
                     bookings.append(booking)
         except Exception as e:
             logger.warning(f"Webapp get_orders failed to fetch bookings: {e}")
@@ -546,9 +534,7 @@ async def get_orders(db=Depends(get_db), user: dict = Depends(get_current_user))
                     try:
                         offer = db.get_offer(b[1])
                         if offer:
-                            offer_photo = get_val(offer, "photo") or get_val(
-                                offer, "photo_id"
-                            )
+                            offer_photo = get_val(offer, "photo") or get_val(offer, "photo_id")
                     except Exception:
                         pass
 
@@ -557,9 +543,7 @@ async def get_orders(db=Depends(get_db), user: dict = Depends(get_current_user))
                         "booking_id": b[0] if len(b) > 0 else None,
                         "offer_id": b[1] if len(b) > 1 else None,
                         "user_id": b[2] if len(b) > 2 else None,
-                        "status": _normalize_order_status(
-                            b[3] if len(b) > 3 else "pending"
-                        ),
+                        "status": _normalize_order_status(b[3] if len(b) > 3 else "pending"),
                         "booking_code": b[4] if len(b) > 4 else None,
                         "pickup_time": str(b[5]) if len(b) > 5 and b[5] else None,
                         "quantity": b[6] if len(b) > 6 else 1,
@@ -578,9 +562,7 @@ async def get_orders(db=Depends(get_db), user: dict = Depends(get_current_user))
                         booking[key] = value.isoformat()
                     else:
                         booking[key] = value
-                booking["status"] = _normalize_order_status(
-                    booking.get("status") or "pending"
-                )
+                booking["status"] = _normalize_order_status(booking.get("status") or "pending")
                 bookings.append(booking)
 
     return {"bookings": bookings, "orders": orders}
@@ -755,4 +737,3 @@ async def notify_partner_webapp_order(
                 logger.error(f"Failed to save seller_message_id: {save_err}")
     except Exception as e:  # pragma: no cover - defensive
         logger.error(f"Failed to notify partner {owner_id}: {e}")
-
