@@ -236,7 +236,11 @@ class OrderMixin:
                 store_id = item.get("store_id")
                 quantity = item.get("quantity", 1)
                 price = item.get("price", 0)
-                delivery_price = item.get("delivery_price", 0) if order_type == "delivery" else 0
+                delivery_price = (
+                    item.get("delivery_price", 0)
+                    if order_type in ("delivery", "taxi")
+                    else 0
+                )
 
                 total_amount = int((price * quantity) + delivery_price)
 
@@ -539,6 +543,7 @@ class OrderMixin:
         delivery_address: str | None = None,
         delivery_price: int = 0,
         payment_method: str = "cash",
+        order_type: str | None = None,
     ):
         """Create one order for multiple cart items atomically.
 
@@ -616,7 +621,7 @@ class OrderMixin:
                 # Add delivery price
                 total_price += delivery_price
 
-                order_type = "delivery" if delivery_address else "pickup"
+                order_type = order_type or ("delivery" if delivery_address else "pickup")
                 pickup_code = None
                 if order_type == "pickup":
                     pickup_code = "".join(

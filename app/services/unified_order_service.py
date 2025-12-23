@@ -508,7 +508,8 @@ class NotificationTemplates:
         
         Uses NotificationBuilder to eliminate code duplication.
         """
-        builder = NotificationBuilder(order_type)  # type: ignore
+        normalized_type = "delivery" if order_type == "taxi" else order_type
+        builder = NotificationBuilder(normalized_type)  # type: ignore
         return builder.build(
             status=status,
             lang=lang,
@@ -544,7 +545,7 @@ class NotificationTemplates:
             return html.escape(str(val)) if val else ""
 
         # Status indicators - different for pickup vs delivery
-        if order_type == "delivery":
+        if order_type in ("delivery", "taxi"):
             status_indicators = {
                 "uz": {
                     OrderStatus.PENDING: "⏳ KUTILMOQDA",
@@ -592,10 +593,8 @@ class NotificationTemplates:
         status_text = indicators.get(status, status)
 
         # Order type text
-        if lang == "uz":
-            order_type_text = "🏪 O'zi olib ketadi" if order_type == "pickup" else "🚚 Yetkazish"
-        else:
-            order_type_text = "🏪 Самовывоз" if order_type == "pickup" else "🚚 Доставка"
+        is_delivery = NotificationTemplates._is_delivery(order_type)
+        order_type_text = NotificationTemplates._order_type_label(lang, order_type)
 
         # Build message
         if lang == "uz":
@@ -618,7 +617,7 @@ class NotificationTemplates:
                 lines.append(f"📱 <code>{_esc(customer_phone)}</code>")
 
         # Delivery address (only for delivery)
-        if order_type == "delivery" and delivery_address:
+        if is_delivery and delivery_address:
             lines.append(f"📍 {_esc(delivery_address)}")
 
         # Items
@@ -680,7 +679,7 @@ class UnifiedOrderService:
         self,
         user_id: int,
         items: list[OrderItem],
-        order_type: Literal["pickup", "delivery"],
+        order_type: str,
         delivery_address: str | None = None,
         payment_method: str = "cash",
         notify_customer: bool = True,
@@ -719,7 +718,8 @@ class UnifiedOrderService:
                 error_message="No items provided",
             )
 
-        if order_type == "delivery" and not delivery_address:
+        is_delivery = order_type in ("delivery", "taxi")
+        if is_delivery and not delivery_address:
             return OrderResult(
                 success=False,
                 order_ids=[],
@@ -768,7 +768,7 @@ class UnifiedOrderService:
                 "store_id": item.store_id,
                 "quantity": item.quantity,
                 "price": item.price,
-                "delivery_price": item.delivery_price if order_type == "delivery" else 0,
+                "delivery_price": item.delivery_price if is_delivery else 0,
                 "title": item.title,
                 "store_name": item.store_name,
                 "store_address": item.store_address,
@@ -783,7 +783,7 @@ class UnifiedOrderService:
         else:
             # Use order system for delivery
             result = await self._create_delivery_orders(
-                user_id, db_items, delivery_address, payment_method
+                user_id, db_items, delivery_address, payment_method, order_type
             )
 
         if not result.get("success"):
@@ -806,7 +806,7 @@ class UnifiedOrderService:
         stores_orders = result.get("stores_orders", {})
         total_items = sum(item.quantity for item in items)
         total_price = sum(item.price * item.quantity for item in items)
-        delivery_price = items[0].delivery_price if order_type == "delivery" and items else 0
+        delivery_price = items[0].delivery_price if is_delivery and items else 0
         grand_total = total_price + delivery_price
 
         # Get customer info
@@ -1027,7 +1027,12 @@ class UnifiedOrderService:
             return {"success": False, "error": str(e)}
 
     async def _create_delivery_orders(
-        self, user_id: int, items: list[dict], delivery_address: str, payment_method: str
+        self,
+        user_id: int,
+        items: list[dict],
+        delivery_address: str,
+        payment_method: str,
+        order_type: str = "delivery",
     ) -> dict:
         """Create delivery orders."""
         try:
@@ -1058,6 +1063,7 @@ class UnifiedOrderService:
                     delivery_address=delivery_address,
                     delivery_price=delivery_price,
                     payment_method=payment_method,
+                    order_type=order_type,
                 )
 
                 if not ok or not order_id:
@@ -1097,7 +1103,7 @@ class UnifiedOrderService:
             result = self.db.create_cart_order(
                 user_id=user_id,
                 items=items,
-                order_type="delivery",
+                order_type=order_type,
                 delivery_address=delivery_address,
                 payment_method=payment_method,
             )
@@ -1145,7 +1151,9 @@ class UnifiedOrderService:
                 # Calculate store totals
                 store_total = sum(o["price"] * o["quantity"] for o in store_orders)
                 store_delivery = (
-                    store_orders[0].get("delivery_price", 0) if order_type == "delivery" else 0
+                    store_orders[0].get("delivery_price", 0)
+                    if order_type in ("delivery", "taxi")
+                    else 0
                 )
 
                 # Build notification
@@ -1353,7 +1361,7 @@ class UnifiedOrderService:
                 )
                 for item in cart_items or []:
                     item_delivery_price = int(item.get("delivery_price", 0))
-                    if order_type == "delivery" and not item_delivery_price:
+                    if order_type in ("delivery", "taxi") and not item_delivery_price:
                         item_delivery_price = int(store_delivery_price or 0)
                     items.append(
                         {
@@ -1548,7 +1556,7 @@ class UnifiedOrderService:
                 return True
 
             if target_status == OrderStatus.DELIVERING:
-                if order_type != "delivery":
+                if order_type not in ("delivery", "taxi"):
                     logger.info(
                         f"STATUS_UPDATE invalid delivering for pickup: #{entity_id} order_type={order_type}"
                     )
@@ -1714,7 +1722,7 @@ class UnifiedOrderService:
                         kb.button(text="⭐" * i, callback_data=f"{callback_prefix}{i}")
                     kb.adjust(5)
                     reply_markup = kb.as_markup()
-                elif new_status == OrderStatus.DELIVERING and order_type == "delivery":
+                elif new_status == OrderStatus.DELIVERING and order_type in ("delivery", "taxi"):
                     # "Received" button for delivery orders in transit
                     kb = InlineKeyboardBuilder()
                     received_text = "✅ Oldim" if customer_lang == "uz" else "✅ Получил"
