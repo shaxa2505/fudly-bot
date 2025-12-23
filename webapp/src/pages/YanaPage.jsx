@@ -211,21 +211,21 @@ function YanaPage() {
     try {
       // Unified orders list from webapp API (orders + bookings)
       const response = await api.getOrders({ force })
-      const bookings = [
+      const allOrders = [
         ...(response.orders || []),
         ...(response.bookings || []),
       ].map(normalizeOrder)
 
       // Filter based on selection
-      let filtered = bookings
+      let filtered = allOrders
       if (orderFilter === 'active') {
         // Active = pending, confirmed, ready (waiting for completion)
-        filtered = bookings.filter(o => {
+        filtered = allOrders.filter(o => {
           const status = o.status || o.order_status
           return ACTIVE_STATUSES.has(status) || !status
         })
       } else if (orderFilter === 'completed') {
-        filtered = bookings.filter(o => {
+        filtered = allOrders.filter(o => {
           const status = o.status || o.order_status
           return COMPLETED_STATUSES.has(status)
         })
