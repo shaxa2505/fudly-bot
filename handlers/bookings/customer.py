@@ -1621,6 +1621,7 @@ async def confirm_cancel_booking(callback: types.CallbackQuery) -> None:
             except Exception as e:
                 logger.error(f"Failed to restore quantity: {e}")
 
+    if success:
         await callback.answer(
             get_text(lang, "booking_cancelled") or "Бронирование отменено", show_alert=True
         )

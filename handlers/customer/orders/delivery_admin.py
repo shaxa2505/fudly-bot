@@ -12,7 +12,7 @@ from aiogram import F, Router, types
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
 from app.core.utils import get_offer_field, get_store_field
-from app.services.unified_order_service import get_unified_order_service
+from app.services.unified_order_service import OrderStatus, get_unified_order_service
 from database_protocol import DatabaseProtocol
 from logging_config import logger
 
@@ -266,7 +266,18 @@ async def admin_reject_payment(
 
     db.update_payment_status(order_id, "rejected")
     # Keep order_status as fulfillment-only and allow customer to re-upload proof
-    db.update_order_status(order_id, "pending")
+    order_service = get_unified_order_service()
+    if order_service:
+        ok = await order_service.update_status(
+            entity_id=order_id,
+            entity_type="order",
+            new_status=OrderStatus.PENDING,
+            notify_customer=False,
+        )
+        if not ok:
+            db.update_order_status(order_id, "pending")
+    else:
+        db.update_order_status(order_id, "pending")
 
     customer_id = _get_order_field(order, "user_id", 1)
 

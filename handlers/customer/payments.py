@@ -14,7 +14,7 @@ from typing import TYPE_CHECKING
 
 from aiogram import F, Router, types
 from aiogram.types import LabeledPrice
-from app.services.unified_order_service import get_unified_order_service
+from app.services.unified_order_service import OrderStatus, get_unified_order_service
 
 if TYPE_CHECKING:
     from database_protocol import DatabaseProtocol
@@ -287,7 +287,15 @@ async def process_successful_payment(message: types.Message) -> None:
                 )
 
                 # Keep booking status separate from payment confirmation
-                if hasattr(db, "update_booking_status"):
+                order_service = get_unified_order_service()
+                if order_service:
+                    await order_service.update_status(
+                        entity_id=order_id,
+                        entity_type="booking",
+                        new_status=OrderStatus.PENDING,
+                        notify_customer=False,
+                    )
+                elif hasattr(db, "update_booking_status"):
                     db.update_booking_status(order_id, "pending")
 
         # Get offer and store details

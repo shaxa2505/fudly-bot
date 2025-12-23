@@ -13,7 +13,11 @@ from aiogram.fsm.state import State, StatesGroup
 from aiogram.types import BufferedInputFile
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
-from app.services.unified_order_service import PaymentStatus
+from app.services.unified_order_service import (
+    OrderStatus,
+    PaymentStatus,
+    get_unified_order_service,
+)
 from localization import get_text
 
 try:
@@ -267,9 +271,19 @@ async def receive_payment_proof(message: types.Message, state: FSMContext) -> No
         )
         if (
             current_order_status in ("awaiting_payment", "awaiting_admin_confirmation")
-            and hasattr(db, "update_order_status")
         ):
-            db.update_order_status(order_id, "pending")
+            order_service = get_unified_order_service()
+            if order_service:
+                ok = await order_service.update_status(
+                    entity_id=order_id,
+                    entity_type="order",
+                    new_status=OrderStatus.PENDING,
+                    notify_customer=False,
+                )
+                if not ok and hasattr(db, "update_order_status"):
+                    db.update_order_status(order_id, "pending")
+            elif hasattr(db, "update_order_status"):
+                db.update_order_status(order_id, "pending")
 
         # Get admin IDs
         admin_ids = []
