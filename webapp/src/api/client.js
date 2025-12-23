@@ -69,21 +69,26 @@ client.interceptors.response.use(
 )
 
 // Cached GET request helper
-const cachedGet = async (url, params = {}, ttl = CACHE_TTL) => {
+const cachedGet = async (url, params = {}, ttl = CACHE_TTL, options = {}) => {
+  const { force = false } = options
   const cacheKey = `${url}?${JSON.stringify(params)}`
   const cached = requestCache.get(cacheKey)
 
-  if (cached && Date.now() - cached.timestamp < ttl) {
+  if (!force && cached && Date.now() - cached.timestamp < ttl) {
     return cached.data
   }
 
   const { data } = await client.get(url, { params })
-  requestCache.set(cacheKey, { data, timestamp: Date.now() })
+  if (!force) {
+    requestCache.set(cacheKey, { data, timestamp: Date.now() })
 
-  // Clean old cache entries
-  if (requestCache.size > 100) {
-    const oldestKey = requestCache.keys().next().value
-    requestCache.delete(oldestKey)
+    // Clean old cache entries
+    if (requestCache.size > 100) {
+      const oldestKey = requestCache.keys().next().value
+      requestCache.delete(oldestKey)
+    }
+  } else {
+    requestCache.delete(cacheKey)
   }
 
   return data
@@ -123,9 +128,11 @@ const api = {
     return cachedGet('/user/orders', params, 10000) // 10s cache
   },
 
-  async getOrders() {
+  async getOrders(options = {}) {
+    const normalizedOptions =
+      typeof options === 'boolean' ? { force: options } : (options || {})
     // Unified endpoint for both legacy bookings and orders (aiohttp Mini App API)
-    const data = await cachedGet('/orders', {}, 10000)
+    const data = await cachedGet('/orders', {}, 10000, normalizedOptions)
     if (Array.isArray(data)) {
       return { orders: data, bookings: [] }
     }

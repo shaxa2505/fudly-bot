@@ -7,6 +7,30 @@ import BottomNav from '../components/BottomNav'
 import { getUserId, getUserLanguage, getCurrentUser } from '../utils/auth'
 import './YanaPage.css'
 
+const ACTIVE_STATUSES = new Set([
+  'pending',
+  'confirmed',
+  'preparing',
+  'ready',
+  'delivering',
+  'awaiting_payment',
+  'awaiting_proof',
+  'proof_submitted',
+  'payment_rejected',
+])
+
+const COMPLETED_STATUSES = new Set(['completed', 'cancelled', 'rejected'])
+
+const CANCELABLE_STATUSES = new Set([
+  'pending',
+  'confirmed',
+  'preparing',
+  'awaiting_payment',
+  'awaiting_proof',
+  'proof_submitted',
+  'payment_rejected',
+])
+
 function YanaPage() {
   const navigate = useNavigate()
   const [activeSection, setActiveSection] = useState('orders') // orders, notifications, settings, about
@@ -127,7 +151,7 @@ function YanaPage() {
       try {
         const data = JSON.parse(event.data)
         if (data.type === 'order_status_changed' || data.type === 'order_created') {
-          loadOrders()
+          loadOrders(true)
           return
         }
 
@@ -150,7 +174,7 @@ function YanaPage() {
         })
 
         if (data.payload.data?.order_id || data.payload.data?.booking_id) {
-          loadOrders()
+          loadOrders(true)
         }
       } catch (error) {
         console.warn('Failed to parse notification:', error)
@@ -164,21 +188,33 @@ function YanaPage() {
     }
   }, [userId, notifications])
 
-  const loadOrders = async () => {
+  const deriveDisplayStatus = (order) => {
+    const paymentStatus = order?.payment_status
+    if (paymentStatus === 'awaiting_payment') return 'awaiting_payment'
+    if (paymentStatus === 'awaiting_proof') return 'awaiting_proof'
+    if (paymentStatus === 'proof_submitted') return 'proof_submitted'
+    if (paymentStatus === 'rejected') return 'payment_rejected'
+    return order?.order_status || order?.status || 'pending'
+  }
+
+  const normalizeOrder = (order) => {
+    const displayStatus = deriveDisplayStatus(order)
+    return {
+      ...order,
+      status: displayStatus,
+      order_status: order.order_status || order.status || 'pending',
+    }
+  }
+
+  const loadOrders = async (force = false) => {
     setLoading(true)
     try {
-      const userId = getUserId()
-      if (!userId) {
-        setLoading(false)
-        return
-      }
-
       // Unified orders list from webapp API (orders + bookings)
-      const response = await api.getOrders()
+      const response = await api.getOrders({ force })
       const bookings = [
         ...(response.orders || []),
         ...(response.bookings || []),
-      ]
+      ].map(normalizeOrder)
 
       // Filter based on selection
       let filtered = bookings
@@ -186,19 +222,12 @@ function YanaPage() {
         // Active = pending, confirmed, ready (waiting for completion)
         filtered = bookings.filter(o => {
           const status = o.status || o.order_status
-          return (
-            status === 'pending' ||
-            status === 'confirmed' ||
-            status === 'ready' ||
-            status === 'preparing' ||
-            status === 'delivering' ||
-            !status // treat undefined as pending
-          )
+          return ACTIVE_STATUSES.has(status) || !status
         })
       } else if (orderFilter === 'completed') {
         filtered = bookings.filter(o => {
           const status = o.status || o.order_status
-          return status === 'completed' || status === 'cancelled'
+          return COMPLETED_STATUSES.has(status)
         })
       }
 
@@ -206,6 +235,7 @@ function YanaPage() {
     } catch (error) {
       console.error('Error loading orders:', error)
       setOrders([])
+      toast.error("Buyurtmalarni yuklab bo'lmadi")
     } finally {
       setLoading(false)
     }
@@ -229,6 +259,10 @@ function YanaPage() {
       ready: { text: 'Tayyor', color: '#007AFF', bg: '#E5F2FF' },
       completed: { text: 'Yakunlandi', color: '#53B175', bg: '#E8F5E9' },
       cancelled: { text: 'Bekor', color: '#FF3B30', bg: '#FFEBEE' },
+      awaiting_payment: { text: "To'lov kutilmoqda", color: '#FF9500', bg: '#FFF4E5' },
+      awaiting_proof: { text: "Chek kutilmoqda", color: '#FF9500', bg: '#FFF4E5' },
+      proof_submitted: { text: "Tekshirilmoqda", color: '#007AFF', bg: '#E5F2FF' },
+      payment_rejected: { text: "To'lov rad etildi", color: '#FF3B30', bg: '#FFEBEE' },
     }
     return statusMap[status] || { text: status, color: '#999', bg: '#F5F5F5' }
   }
@@ -368,7 +402,7 @@ function YanaPage() {
               {orders.map((order, idx) => {
                 const summary = getOrderSummary(order)
                 const statusInfo = getStatusInfo(summary.status)
-                const canCancel = ['pending', 'confirmed', 'preparing'].includes(summary.status)
+                const canCancel = CANCELABLE_STATUSES.has(summary.status)
                 return (
                   <div
                     key={summary.orderId || idx}
@@ -435,10 +469,14 @@ function YanaPage() {
                             try {
                               await api.cancelOrder(summary.orderId)
                               toast.success("Buyurtma bekor qilindi")
-                              loadOrders()
+                              loadOrders(true)
                             } catch (error) {
                               console.error('Cancel order failed:', error)
-                              toast.error('Bekor qilishda xatolik')
+                              const errorMsg =
+                                error?.response?.data?.detail ||
+                                error?.response?.data?.message ||
+                                error?.message
+                              toast.error(errorMsg || 'Bekor qilishda xatolik')
                             }
                           }}
                         >

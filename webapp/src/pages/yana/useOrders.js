@@ -1,6 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
 import api from '../../api/client'
-import { getUserId } from '../../utils/auth'
 
 const deriveDisplayStatus = (order) => {
   const paymentStatus = order?.payment_status
@@ -40,17 +39,29 @@ const normalizeBookings = (bookings) => bookings.map(booking => ({
   payment_method: booking.payment_method || 'cash',
 }))
 
+const ACTIVE_STATUSES = new Set([
+  'pending',
+  'confirmed',
+  'preparing',
+  'ready',
+  'delivering',
+  'awaiting_payment',
+  'awaiting_proof',
+  'proof_submitted',
+  'payment_rejected',
+])
+
+const COMPLETED_STATUSES = new Set(['completed', 'cancelled', 'rejected'])
+
 const applyOrderFilter = (orders, orderFilter) => {
   if (orderFilter === 'active') {
     return orders.filter(order =>
-      !['completed', 'cancelled', 'rejected'].includes(order.order_status || order.status)
+      ACTIVE_STATUSES.has(order.order_status || order.status || 'pending')
     )
   }
   if (orderFilter === 'completed') {
     return orders.filter(order =>
-      order.status === 'completed' ||
-      order.status === 'cancelled' ||
-      order.status === 'rejected'
+      COMPLETED_STATUSES.has(order.order_status || order.status || '')
     )
   }
   return orders
@@ -64,12 +75,6 @@ export function useOrders(activeSection) {
   const loadOrders = useCallback(async () => {
     setLoading(true)
     try {
-      const userId = getUserId()
-      if (!userId) {
-        setLoading(false)
-        return
-      }
-
       const { bookings = [], orders: rawOrders = [] } = await api.getOrders()
 
       const normalizedOrders = normalizeOrders(rawOrders)
@@ -78,7 +83,7 @@ export function useOrders(activeSection) {
       const mergedOrders = [...normalizedOrders, ...normalizedBookings]
         .sort((a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0))
 
-      setOrders(applyOrderFilter(mergedOrders, orderFilter))
+    setOrders(applyOrderFilter(mergedOrders, orderFilter))
     } catch (error) {
       console.error('Error loading orders:', error)
       setOrders([])
