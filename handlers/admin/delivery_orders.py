@@ -14,7 +14,11 @@ from typing import Any
 from aiogram import F, Router, types
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
-from app.services.unified_order_service import get_unified_order_service
+from app.services.unified_order_service import (
+    OrderStatus,
+    get_unified_order_service,
+    init_unified_order_service,
+)
 from localization import get_text
 
 try:
@@ -83,14 +87,14 @@ async def admin_confirm_payment(callback: types.CallbackQuery) -> None:
         # Update status to pending (approved, waiting for seller)
         skip_seller_notify = False
         order_service = get_unified_order_service()
-        if order_service:
-            await order_service.confirm_payment(order_id)
-            skip_seller_notify = True
-        else:
-            if hasattr(db, "update_order_status"):
-                db.update_order_status(order_id, "pending")
-            if hasattr(db, "update_payment_status"):
-                db.update_payment_status(order_id, "confirmed")
+        if not order_service and callback.bot:
+            order_service = init_unified_order_service(db, callback.bot)
+        if not order_service:
+            await callback.answer("в?? UnifiedOrderService unavailable", show_alert=True)
+            return
+
+        await order_service.confirm_payment(order_id)
+        skip_seller_notify = True
         
         # Get store and seller info
         store = db.get_store(store_id) if hasattr(db, "get_store") and store_id else None
@@ -254,16 +258,19 @@ async def admin_reject_payment(callback: types.CallbackQuery) -> None:
         
         # Update status to rejected
         order_service = get_unified_order_service()
-        if order_service:
-            await order_service.update_status(
-                entity_id=order_id,
-                entity_type="order",
-                new_status="rejected",
-                notify_customer=False,  # We'll send custom message
-                reject_reason="Платёж не подтверждён администратором",
-            )
-        elif hasattr(db, "update_order_status"):
-            db.update_order_status(order_id, "rejected")
+        if not order_service and callback.bot:
+            order_service = init_unified_order_service(db, callback.bot)
+        if not order_service:
+            await callback.answer("System error", show_alert=True)
+            return
+
+        await order_service.update_status(
+            entity_id=order_id,
+            entity_type="order",
+            new_status=OrderStatus.REJECTED,
+            notify_customer=False,  # We'll send custom message
+            reject_reason="payment_rejected_by_admin",
+        )
         if hasattr(db, "update_payment_status"):
             db.update_payment_status(order_id, "rejected")
         

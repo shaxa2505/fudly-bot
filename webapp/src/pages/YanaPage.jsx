@@ -37,6 +37,7 @@ function YanaPage() {
   const [orders, setOrders] = useState([])
   const [loading, setLoading] = useState(true)
   const [orderFilter, setOrderFilter] = useState('all') // all, active, completed
+  const [cancelingOrderId, setCancelingOrderId] = useState(null)
   const { toast } = useToast()
   const lang = getUserLanguage()
 
@@ -129,7 +130,16 @@ function YanaPage() {
 
   useEffect(() => {
     loadOrders()
-  }, [orderFilter])
+    
+    // Poll for updates every 10 seconds if there are active orders
+    const interval = setInterval(() => {
+      if (orders.some(o => ACTIVE_STATUSES.has(o.status))) {
+        loadOrders(true)
+      }
+    }, 10000)
+    
+    return () => clearInterval(interval)
+  }, [orderFilter, orders])
 
   useEffect(() => {
     loadNotificationSettings()
@@ -464,23 +474,39 @@ function YanaPage() {
                       <div className="order-actions">
                         <button
                           className="order-cancel-btn"
+                          disabled={cancelingOrderId === summary.orderId}
                           onClick={async (e) => {
                             e.stopPropagation()
+                            const orderId = summary.orderId
+                            setCancelingOrderId(orderId)
+                            
+                            // Optimistic update
+                            setOrders(prev => prev.map(o => 
+                              (o.id || o.booking_id) === orderId 
+                                ? { ...o, status: 'cancelled', order_status: 'cancelled' }
+                                : o
+                            ))
+                            
                             try {
-                              await api.cancelOrder(summary.orderId)
+                              await api.cancelOrder(orderId)
                               toast.success("Buyurtma bekor qilindi")
-                              loadOrders(true)
+                              // Force reload to get fresh data
+                              setTimeout(() => loadOrders(true), 500)
                             } catch (error) {
                               console.error('Cancel order failed:', error)
+                              // Revert optimistic update
+                              loadOrders(true)
                               const errorMsg =
                                 error?.response?.data?.detail ||
                                 error?.response?.data?.message ||
                                 error?.message
                               toast.error(errorMsg || 'Bekor qilishda xatolik')
+                            } finally {
+                              setCancelingOrderId(null)
                             }
                           }}
                         >
-                          Bekor qilish
+                          {cancelingOrderId === summary.orderId ? 'Bekor qilinmoqda...' : 'Bekor qilish'}
                         </button>
                       </div>
                     )}

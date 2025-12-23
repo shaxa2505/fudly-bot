@@ -94,6 +94,15 @@ const cachedGet = async (url, params = {}, ttl = CACHE_TTL, options = {}) => {
   return data
 }
 
+// Helper to invalidate cache by pattern
+const invalidateCache = (pattern) => {
+  for (const key of requestCache.keys()) {
+    if (key.includes(pattern)) {
+      requestCache.delete(key)
+    }
+  }
+}
+
 const api = {
   // Helper to convert Telegram file_id to photo URL
   getPhotoUrl(photo) {
@@ -364,6 +373,9 @@ const api = {
 
   async cancelOrder(orderId) {
     const { data } = await client.post(`/orders/${orderId}/cancel`)
+    // Invalidate orders cache to force refresh
+    invalidateCache('/orders')
+    invalidateCache('/user/orders')
     return data
   },
 }
