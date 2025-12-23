@@ -690,19 +690,6 @@ class UnifiedOrderService:
             )
 
         payment_method = PaymentStatus.normalize_method(payment_method)
-        if order_type == "delivery" and payment_method == "cash":
-            return OrderResult(
-                success=False,
-                order_ids=[],
-                booking_ids=[],
-                pickup_codes=[],
-                total_items=0,
-                total_price=0,
-                delivery_price=0,
-                grand_total=0,
-                error_message="Cash is not allowed for delivery orders",
-            )
-
         # Enforce business invariant: one order must belong to ONE store
         # This protects from mixed-store carts and keeps pricing logic correct.
         store_ids = {item.store_id for item in items}
@@ -1521,11 +1508,6 @@ class UnifiedOrderService:
                 if order_type != "delivery":
                     logger.info(
                         f"STATUS_UPDATE invalid delivering for pickup: #{entity_id} order_type={order_type}"
-                    )
-                    return False
-                if normalized_payment_method == "cash":
-                    logger.info(
-                        f"STATUS_UPDATE invalid delivering for cash delivery: #{entity_id}"
                     )
                     return False
 
