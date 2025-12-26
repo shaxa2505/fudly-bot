@@ -107,7 +107,7 @@ def fix_railway_database_url(url: str) -> str:
     if "postgres://" in url and "postgresql://" not in url:
         url = url.replace("postgres://", "postgresql://", 1)
         logger.info("🔧 Fixed postgres:// to postgresql:// in DATABASE_URL")
-    
+
     return url
 
 

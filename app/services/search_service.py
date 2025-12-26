@@ -251,7 +251,7 @@ class SearchService:
                 cursor = conn.cursor()
 
                 # Build WHERE clause
-                conditions = ["o.is_active = TRUE", "o.quantity > 0"]
+                conditions = ["o.is_active = TRUE", "COALESCE(o.stock_quantity, o.quantity) > 0"]
                 params = []
 
                 if city:
@@ -420,7 +420,7 @@ class SearchService:
                 # Build WHERE clause
                 conditions = [
                     "o.is_active = 1",
-                    "o.quantity > 0",
+                    "COALESCE(o.stock_quantity, o.quantity) > 0",
                     "(o.title LIKE ? OR o.description LIKE ? OR o.category LIKE ?)",
                 ]
                 params = [pattern, pattern, pattern]

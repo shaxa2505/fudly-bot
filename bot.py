@@ -51,6 +51,9 @@ SECRET_TOKEN: str = settings.webhook.secret_token
 LOCK_PORT: int = int(os.getenv("LOCK_PORT", "8444"))
 DISABLE_LOCK: bool = os.getenv("DISABLE_LOCK", "0").strip().lower() in {"1", "true", "yes"}
 POLLING_HEALTH_PORT: int = int(os.getenv("POLLING_HEALTH_PORT", "0") or 0)
+ENABLE_INTERNAL_BOOKING_WORKER: bool = (
+    os.getenv("ENABLE_INTERNAL_BOOKING_WORKER", "1").strip().lower() in {"1", "true", "yes"}
+)
 
 # =============================================================================
 # APPLICATION BOOTSTRAP
@@ -578,6 +581,9 @@ async def cleanup_expired_fsm_states() -> None:
 
 async def start_booking_worker() -> asyncio.Task | None:
     """Start the booking expiry worker if available."""
+    if not ENABLE_INTERNAL_BOOKING_WORKER:
+        logger.info("Internal booking expiry worker disabled by ENABLE_INTERNAL_BOOKING_WORKER=0")
+        return None
     try:
         from tasks.booking_expiry_worker import start_booking_expiry_worker
 

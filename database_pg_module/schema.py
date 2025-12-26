@@ -84,6 +84,7 @@ class SchemaMixin:
                     original_price INTEGER,
                     discount_price INTEGER,
                     quantity INTEGER DEFAULT 1,
+                    stock_quantity INTEGER DEFAULT 0,
                     available_from TIME,
                     available_until TIME,
                     expiry_date DATE,
@@ -100,6 +101,17 @@ class SchemaMixin:
             # Migration: Add unit and category columns if they don't exist
             if run_runtime_migrations:
                 try:
+                    cursor.execute(
+                        "ALTER TABLE offers ADD COLUMN IF NOT EXISTS stock_quantity INTEGER DEFAULT 0"
+                    )
+                    cursor.execute(
+                        """
+                        UPDATE offers
+                        SET stock_quantity = COALESCE(quantity, 0)
+                        WHERE stock_quantity IS NULL
+                           OR (stock_quantity = 0 AND COALESCE(quantity, 0) > 0)
+                        """
+                    )
                     cursor.execute("ALTER TABLE offers ADD COLUMN IF NOT EXISTS unit TEXT DEFAULT 'шт'")
                     cursor.execute(
                         "ALTER TABLE offers ADD COLUMN IF NOT EXISTS category TEXT DEFAULT 'other'"
@@ -506,6 +518,7 @@ class SchemaMixin:
             "CREATE INDEX IF NOT EXISTS idx_offers_status_store ON offers(status, store_id)"
         )
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_offers_expiry ON offers(expiry_date)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_offers_stock ON offers(stock_quantity)")
 
         # Order indexes
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_orders_user ON orders(user_id)")
@@ -678,6 +691,9 @@ class SchemaMixin:
             cursor.execute("ALTER TABLE bookings ADD COLUMN IF NOT EXISTS expiry_time TIMESTAMP")
             cursor.execute(
                 "ALTER TABLE bookings ADD COLUMN IF NOT EXISTS reminder_sent INTEGER DEFAULT 0"
+            )
+            cursor.execute(
+                "ALTER TABLE bookings ADD COLUMN IF NOT EXISTS partner_reminder_sent INTEGER DEFAULT 0"
             )
             cursor.execute(
                 "ALTER TABLE bookings ADD COLUMN IF NOT EXISTS payment_proof_photo_id TEXT"

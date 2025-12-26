@@ -22,5 +22,3 @@ def test_customer_received_pattern_rejects_invalid() -> None:
     assert pattern.match("customer_received_123_extra") is None
     assert pattern.match("customer_received_") is None
     assert pattern.match("customer_received_abc") is None
-
-

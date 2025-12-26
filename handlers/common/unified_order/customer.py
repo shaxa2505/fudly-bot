@@ -8,13 +8,12 @@ from aiogram import F, Router, types
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
 from app.services.unified_order_service import (
+    NotificationTemplates,
     OrderStatus,
     get_unified_order_service,
-    NotificationTemplates,
 )
 
-from .common import _get_db, _get_store_field, _get_entity_field, logger
-
+from .common import _get_db, _get_entity_field, _get_store_field, logger
 
 # Public callback patterns used for customer "received" buttons.
 # Having them as constants allows tests to verify that they
@@ -54,12 +53,8 @@ async def customer_received_handler(callback: types.CallbackQuery) -> None:
         await callback.answer("❌", show_alert=True)
         return
 
-    current_status = _get_entity_field(order, "order_status") or _get_entity_field(
-        order, "status"
-    )
-    logger.info(
-        "customer_received_handler: order #%s, current_status=%s", order_id, current_status
-    )
+    current_status = _get_entity_field(order, "order_status") or _get_entity_field(order, "status")
+    logger.info("customer_received_handler: order #%s, current_status=%s", order_id, current_status)
     valid_statuses = (
         OrderStatus.DELIVERING,
         OrderStatus.PREPARING,
@@ -76,11 +71,7 @@ async def customer_received_handler(callback: types.CallbackQuery) -> None:
             current_status,
             valid_statuses,
         )
-        msg = (
-            "Buyurtma allaqachon yakunlangan"
-            if lang == "uz"
-            else "Заказ уже завершён"
-        )
+        msg = "Buyurtma allaqachon yakunlangan" if lang == "uz" else "Заказ уже завершён"
         await callback.answer(msg, show_alert=True)
         return
 

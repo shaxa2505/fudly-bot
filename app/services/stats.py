@@ -136,7 +136,7 @@ def get_partner_stats(db, partner_id: int, period: Period, tz: str, store_id: Op
                 SELECT store_id FROM stores WHERE owner_id = %s
             )
             AND o.status = 'active'
-            AND (o.quantity IS NULL OR o.quantity > 0)
+            AND (COALESCE(o.stock_quantity, o.quantity) IS NULL OR COALESCE(o.stock_quantity, o.quantity) > 0)
             """,
             (partner_id,)
         )

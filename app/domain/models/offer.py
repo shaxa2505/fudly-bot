@@ -35,7 +35,7 @@ class OfferCreate(BaseModel):
     # Photo as Telegram file_id (consistent naming)
     photo_id: Optional[str] = Field(None, max_length=255, description="Telegram file_id фото")
     
-    status: str = Field(default="active", pattern="^(active|inactive|sold_out)$")
+    status: str = Field(default="active", pattern="^(active|inactive|out_of_stock|sold_out)$")
     
     @field_validator('discount_price')
     @classmethod
@@ -145,7 +145,7 @@ class OfferUpdate(BaseModel):
     expiry_date: Optional[date] = None
     
     photo_id: Optional[str] = Field(None, max_length=255)
-    status: Optional[str] = Field(None, pattern="^(active|inactive|sold_out)$")
+    status: Optional[str] = Field(None, pattern="^(active|inactive|out_of_stock|sold_out)$")
     
     @field_validator('discount_price')
     @classmethod

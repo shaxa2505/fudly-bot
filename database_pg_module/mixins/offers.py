@@ -96,10 +96,10 @@ class OfferMixin:
     ):
         """
         Add new offer with unified schema.
-        
+
         Note: Prices should be in kopeks (INTEGER), not rubles.
         Times and dates will be validated by Pydantic models before reaching here.
-        
+
         Legacy 'photo' parameter removed - use 'photo_id' instead.
         """
         with self.get_connection() as conn:
@@ -274,7 +274,7 @@ class OfferMixin:
                 FROM offers o
                 JOIN stores s ON o.store_id = s.store_id
                 WHERE o.status = 'active'
-                  AND o.quantity > 0
+                  AND COALESCE(o.stock_quantity, o.quantity) > 0
                   AND s.status = 'active'
             """
             params = []
@@ -303,7 +303,7 @@ class OfferMixin:
     def get_offers_by_store(self, store_id: int, include_all: bool = False):
         """
         Get offers for store with store info.
-        
+
         Args:
             store_id: The store ID
             include_all: If True, includes out-of-stock and expired products (for partner panel).
@@ -311,7 +311,7 @@ class OfferMixin:
         """
         with self.get_connection() as conn:
             cursor = conn.cursor(row_factory=dict_row)
-            
+
             if include_all:
                 # Partner panel: show ALL products except deleted (inactive)
                 cursor.execute(
@@ -331,7 +331,7 @@ class OfferMixin:
                     SELECT o.*, s.name, s.address, s.city, s.category as store_category, o.category as category
                     FROM offers o
                     JOIN stores s ON o.store_id = s.store_id
-                    WHERE o.store_id = %s AND o.quantity > 0 AND o.status = 'active'
+                    WHERE o.store_id = %s AND COALESCE(o.stock_quantity, o.quantity) > 0 AND o.status = 'active'
                     AND (o.expiry_date IS NULL OR o.expiry_date >= CURRENT_DATE)
                     ORDER BY o.created_at DESC
                 """,
@@ -350,7 +350,7 @@ class OfferMixin:
                 FROM offers o
                 JOIN stores s ON o.store_id = s.store_id
                 WHERE s.city = %s AND s.status = 'active'
-                      AND o.status = 'active' AND o.quantity > 0
+                      AND o.status = 'active' AND COALESCE(o.stock_quantity, o.quantity) > 0
                       AND (o.expiry_date IS NULL OR o.expiry_date >= CURRENT_DATE)
                 ORDER BY discount_percent DESC, o.created_at DESC
                 LIMIT %s
@@ -432,11 +432,11 @@ class OfferMixin:
                 """
                 UPDATE offers
                 SET quantity = quantity + %s,
-                    stock_quantity = COALESCE(stock_quantity, quantity) + %s,
+                    stock_quantity = COALESCE(stock_quantity, quantity, 0) + %s,
                     status = CASE
-                        WHEN COALESCE(stock_quantity, quantity) + %s <= 0
+                        WHEN COALESCE(stock_quantity, quantity, 0) + %s <= 0
                              AND status IN ('active','out_of_stock') THEN 'out_of_stock'
-                        WHEN COALESCE(stock_quantity, quantity) + %s > 0
+                        WHEN COALESCE(stock_quantity, quantity, 0) + %s > 0
                              AND status = 'out_of_stock' THEN 'active'
                         ELSE status
                     END
@@ -454,11 +454,11 @@ class OfferMixin:
                 """
                 UPDATE offers
                 SET quantity = quantity + %s,
-                    stock_quantity = COALESCE(stock_quantity, quantity) + %s,
+                    stock_quantity = COALESCE(stock_quantity, quantity, 0) + %s,
                     status = CASE
-                        WHEN COALESCE(stock_quantity, quantity) + %s <= 0
+                        WHEN COALESCE(stock_quantity, quantity, 0) + %s <= 0
                              AND status IN ('active','out_of_stock') THEN 'out_of_stock'
-                        WHEN COALESCE(stock_quantity, quantity) + %s > 0
+                        WHEN COALESCE(stock_quantity, quantity, 0) + %s > 0
                              AND status = 'out_of_stock' THEN 'active'
                         ELSE status
                     END

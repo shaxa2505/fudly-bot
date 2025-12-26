@@ -214,7 +214,7 @@ class OrderMixin:
 
         Returns:
             Dictionary with created_orders list and total info
-            
+
         Note:
             The notify_customer parameter is accepted for backward compatibility
             but ignored. Notifications are now handled by UnifiedOrderService.
@@ -237,9 +237,7 @@ class OrderMixin:
                 quantity = item.get("quantity", 1)
                 price = item.get("price", 0)
                 delivery_price = (
-                    item.get("delivery_price", 0)
-                    if order_type in ("delivery", "taxi")
-                    else 0
+                    item.get("delivery_price", 0) if order_type in ("delivery", "taxi") else 0
                 )
 
                 total_amount = int((price * quantity) + delivery_price)
@@ -592,7 +590,7 @@ class OrderMixin:
                     quantity = item["quantity"]
 
                     cursor.execute(
-                        "SELECT quantity, status, discount_price FROM offers WHERE offer_id = %s AND status = 'active' FOR UPDATE",
+                        "SELECT quantity, stock_quantity, status, discount_price FROM offers WHERE offer_id = %s AND status = 'active' FOR UPDATE",
                         (offer_id,),
                     )
                     row = cursor.fetchone()
@@ -600,7 +598,9 @@ class OrderMixin:
                         logger.warning(f"🛒 Offer {offer_id} not found or inactive")
                         raise ValueError(f"offer_unavailable:{offer_id}")
 
-                    available_qty = row[0] or 0
+                    current_qty = row[0]
+                    stock_qty = row[1]
+                    available_qty = stock_qty if stock_qty is not None else (current_qty or 0)
                     if available_qty < quantity:
                         logger.warning(
                             f"🛒 Offer {offer_id}: requested {quantity}, available {available_qty}"
@@ -613,16 +613,21 @@ class OrderMixin:
                         """
                         UPDATE offers
                         SET quantity = %s,
-                            status = CASE WHEN %s <= 0 THEN 'inactive' ELSE status END
+                            stock_quantity = %s,
+                            status = CASE
+                                WHEN %s <= 0 AND status IN ('active','out_of_stock') THEN 'out_of_stock'
+                                WHEN %s > 0 AND status = 'out_of_stock' THEN 'active'
+                                ELSE status
+                            END
                         WHERE offer_id = %s
                         """,
-                        (new_qty, new_qty, offer_id),
+                        (new_qty, new_qty, new_qty, new_qty, offer_id),
                     )
                     logger.info(
                         f"🛒 Reserved offer {offer_id}: {quantity} units (new qty: {new_qty})"
                     )
 
-                    price = item.get("price", row[2] or 0)
+                    price = item.get("price", row[3] or 0)
                     total_price += price * quantity
 
                 # Add delivery price

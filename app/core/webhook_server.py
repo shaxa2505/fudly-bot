@@ -2307,9 +2307,7 @@ async def create_webhook_app(
             if hasattr(db, "get_order"):
                 order = db.get_order(int(order_id))
             if not order:
-                return add_cors_headers(
-                    web.json_response({"error": "Order not found"}, status=404)
-                )
+                return add_cors_headers(web.json_response({"error": "Order not found"}, status=404))
 
             order_user_id = (
                 order.get("user_id") if isinstance(order, dict) else getattr(order, "user_id", None)
@@ -2319,13 +2317,9 @@ async def create_webhook_app(
             except Exception:
                 order_user_id_int = None
             if order_user_id_int is None:
-                return add_cors_headers(
-                    web.json_response({"error": "Access denied"}, status=403)
-                )
+                return add_cors_headers(web.json_response({"error": "Access denied"}, status=403))
             if order_user_id_int != authenticated_user_id:
-                return add_cors_headers(
-                    web.json_response({"error": "Access denied"}, status=403)
-                )
+                return add_cors_headers(web.json_response({"error": "Access denied"}, status=403))
 
             if not store_id:
                 store_id = order.get("store_id")
@@ -2353,7 +2347,9 @@ async def create_webhook_app(
                     )
                 if payment_status not in ("awaiting_payment", ""):
                     return add_cors_headers(
-                        web.json_response({"error": "Payment not awaiting online payment"}, status=400)
+                        web.json_response(
+                            {"error": "Payment not awaiting online payment"}, status=400
+                        )
                     )
             elif provider == "card":
                 if payment_status in ("proof_submitted", "completed"):
@@ -2365,9 +2361,7 @@ async def create_webhook_app(
                     web.json_response({"error": "Unknown payment provider"}, status=400)
                 )
 
-            available = payment_service.get_available_providers(
-                int(store_id) if store_id else None
-            )
+            available = payment_service.get_available_providers(int(store_id) if store_id else None)
             if provider not in available:
                 return add_cors_headers(
                     web.json_response({"error": "Payment provider not available"}, status=400)
@@ -2542,7 +2536,6 @@ async def create_webhook_app(
     app.router.add_get("/api/v1/user/search-history", api_get_search_history)
     app.router.add_delete("/api/v1/user/search-history", api_clear_search_history)
 
-
     # Payment routes
     app.router.add_options("/api/v1/payment/providers", cors_preflight)
     app.router.add_get("/api/v1/payment/providers", api_get_payment_providers)
@@ -2669,6 +2662,7 @@ async def create_webhook_app(
     # Store services in app for access in handlers
     app["notification_service"] = notification_service
     app["websocket_manager"] = ws_manager
+    app["db"] = db
 
     return app
 

@@ -27,9 +27,9 @@ from __future__ import annotations
 
 import html
 import os
-from datetime import datetime
 import re
 from dataclasses import dataclass
+from datetime import datetime
 from typing import Any, Literal
 
 from aiogram import Bot
@@ -505,7 +505,7 @@ class NotificationTemplates:
     ) -> str:
         """
         Build customer notification for status update with visual progress.
-        
+
         Uses NotificationBuilder to eliminate code duplication.
         """
         normalized_type = "delivery" if order_type == "taxi" else order_type
@@ -662,10 +662,9 @@ class UnifiedOrderService:
     def __init__(self, db: Any, bot: Bot):
         self.db = db
         self.bot = bot
-        self.telegram_order_notifications = (
-            os.getenv("ORDER_TELEGRAM_NOTIFICATIONS", "false").strip().lower()
-            in {"1", "true", "yes", "y"}
-        )
+        self.telegram_order_notifications = os.getenv(
+            "ORDER_TELEGRAM_NOTIFICATIONS", "false"
+        ).strip().lower() in {"1", "true", "yes", "y"}
 
     def _esc(self, val: Any) -> str:
         """HTML-escape helper."""
@@ -827,9 +826,7 @@ class UnifiedOrderService:
         currency = "so'm" if customer_lang == "uz" else "сум"
 
         telegram_enabled = (
-            self.telegram_order_notifications
-            if telegram_notify is None
-            else telegram_notify
+            self.telegram_order_notifications if telegram_notify is None else telegram_notify
         )
 
         # Send notifications to sellers
@@ -877,9 +874,7 @@ class UnifiedOrderService:
             if publish_customer_event:
                 try:
                     notification_service = get_notification_service()
-                    title = (
-                        "Buyurtma qabul qilindi" if customer_lang == "uz" else "Заказ принят"
-                    )
+                    title = "Buyurtma qabul qilindi" if customer_lang == "uz" else "Заказ принят"
                     plain_msg = re.sub(r"<[^>]+>", "", customer_msg)
                     await notification_service.notify_user(
                         Notification(
@@ -897,9 +892,7 @@ class UnifiedOrderService:
                         )
                     )
                 except Exception as notify_error:
-                    logger.warning(
-                        f"Notification service failed for order create: {notify_error}"
-                    )
+                    logger.warning(f"Notification service failed for order create: {notify_error}")
 
                 try:
                     from app.core.websocket import get_websocket_manager
@@ -1145,9 +1138,7 @@ class UnifiedOrderService:
     ) -> None:
         """Send order notifications to sellers, grouped by store."""
         telegram_enabled = (
-            self.telegram_order_notifications
-            if send_telegram is None
-            else send_telegram
+            self.telegram_order_notifications if send_telegram is None else send_telegram
         )
         for store_id, store_orders in stores_orders.items():
             try:
@@ -1238,14 +1229,12 @@ class UnifiedOrderService:
                             except Exception as save_err:
                                 logger.warning(
                                     f"Failed to save seller_message_id for order #{order_id}: {save_err}"
-                            )
+                                )
 
                 # Send NotificationService store event (partner panel WebSocket)
                 try:
                     notification_service = get_notification_service()
-                    title = (
-                        "Yangi buyurtma" if seller_lang == "uz" else "Новый заказ"
-                    )
+                    title = "Yangi buyurtma" if seller_lang == "uz" else "Новый заказ"
                     plain_msg = re.sub(r"<[^>]+>", "", seller_text)
                     await notification_service.notify_store(
                         Notification(
@@ -1278,8 +1267,9 @@ class UnifiedOrderService:
                 # Send WebSocket notification to web panel (real-time)
                 try:
                     from app.api.websocket_manager import get_connection_manager
+
                     manager = get_connection_manager()
-                    
+
                     # Prepare order data for WebSocket
                     order_data = {
                         "order_ids": order_ids,
@@ -1290,18 +1280,20 @@ class UnifiedOrderService:
                             {
                                 "title": o.get("title", ""),
                                 "quantity": o.get("quantity", 1),
-                                "price": o.get("price", 0)
+                                "price": o.get("price", 0),
                             }
                             for o in store_orders
                         ],
                         "delivery_address": delivery_address,
-                        "timestamp": str(datetime.now())
+                        "timestamp": str(datetime.now()),
                     }
-                    
+
                     sent = await manager.notify_new_order(store_id, order_data)
                     if sent > 0:
-                        logger.info(f"📤 Sent WebSocket notification to {sent} web panels for store {store_id}")
-                    
+                        logger.info(
+                            f"📤 Sent WebSocket notification to {sent} web panels for store {store_id}"
+                        )
+
                 except Exception as ws_error:
                     logger.warning(f"⚠️ Failed to send WebSocket notification: {ws_error}")
                     # Don't fail if WebSocket fails - Telegram notification still sent
@@ -1473,6 +1465,7 @@ class UnifiedOrderService:
         try:
             # IMPORTANT: orders and bookings may still live in different tables at runtime.
             # Respect entity_type to avoid updating a wrong record on id collision.
+            payment_method = None
             if entity_type == "booking":
                 if not hasattr(self.db, "get_booking"):
                     logger.warning("DB layer does not support bookings")
@@ -1539,9 +1532,7 @@ class UnifiedOrderService:
                     payment_method = getattr(entity, "payment_method", None)
                     if not order_type:
                         order_type = (
-                            "delivery"
-                            if getattr(entity, "delivery_address", None)
-                            else "pickup"
+                            "delivery" if getattr(entity, "delivery_address", None) else "pickup"
                         )
 
             # Normalize statuses and enforce safe transitions/idempotence
@@ -1577,23 +1568,83 @@ class UnifiedOrderService:
                     return False
 
             # Update status in DB
-            if entity_type == "booking":
-                if not hasattr(self.db, "update_booking_status"):
-                    logger.warning("DB layer does not support update_booking_status")
+            update_ok = True
+            if target_status in [OrderStatus.REJECTED, OrderStatus.CANCELLED]:
+                try:
+                    with self.db.get_connection() as conn:
+                        cursor = conn.cursor()
+                        if entity_type == "booking":
+                            if current_status_raw is not None:
+                                cursor.execute(
+                                    "UPDATE bookings SET status = %s, updated_at = CURRENT_TIMESTAMP WHERE booking_id = %s AND status = %s",
+                                    (target_status, entity_id, current_status_raw),
+                                )
+                            else:
+                                cursor.execute(
+                                    "UPDATE bookings SET status = %s, updated_at = CURRENT_TIMESTAMP WHERE booking_id = %s",
+                                    (target_status, entity_id),
+                                )
+                        else:
+                            if current_status_raw is not None:
+                                cursor.execute(
+                                    "UPDATE orders SET order_status = %s, updated_at = CURRENT_TIMESTAMP WHERE order_id = %s AND order_status = %s",
+                                    (target_status, entity_id, current_status_raw),
+                                )
+                            else:
+                                cursor.execute(
+                                    "UPDATE orders SET order_status = %s, updated_at = CURRENT_TIMESTAMP WHERE order_id = %s",
+                                    (target_status, entity_id),
+                                )
+                        update_ok = cursor.rowcount > 0
+                except Exception as e:
+                    logger.error(f"Failed to update status atomically: {e}")
                     return False
-                self.db.update_booking_status(entity_id, target_status)
+
+                if not update_ok:
+                    latest = (
+                        self.db.get_booking(entity_id)
+                        if entity_type == "booking"
+                        else self.db.get_order(entity_id)
+                    )
+                    latest_status_raw = None
+                    if isinstance(latest, dict):
+                        latest_status_raw = (
+                            latest.get("status")
+                            if entity_type == "booking"
+                            else latest.get("order_status")
+                        )
+                    else:
+                        latest_status_raw = getattr(latest, "status", None) if entity_type == "booking" else getattr(latest, "order_status", None)
+
+                    latest_status = (
+                        OrderStatus.normalize(str(latest_status_raw))
+                        if latest_status_raw
+                        else None
+                    )
+                    if latest_status in terminal_statuses:
+                        logger.info(
+                            f"STATUS_UPDATE skipped due to race: #{entity_id} status={latest_status}"
+                        )
+                        return True
+                    return False
             else:
-                if not hasattr(self.db, "update_order_status"):
-                    logger.warning("DB layer does not support update_order_status")
-                    return False
-                self.db.update_order_status(entity_id, target_status)
+                if entity_type == "booking":
+                    if not hasattr(self.db, "update_booking_status"):
+                        logger.warning("DB layer does not support update_booking_status")
+                        return False
+                    self.db.update_booking_status(entity_id, target_status)
+                else:
+                    if not hasattr(self.db, "update_order_status"):
+                        logger.warning("DB layer does not support update_order_status")
+                        return False
+                    self.db.update_order_status(entity_id, target_status)
 
             # Restore quantity if rejected or cancelled
             if target_status in [OrderStatus.REJECTED, OrderStatus.CANCELLED] and (
                 current_status not in [OrderStatus.REJECTED, OrderStatus.CANCELLED]
             ):
-                await self._restore_quantities(entity, entity_type)
-
+                if update_ok:
+                    await self._restore_quantities(entity, entity_type)
             # Send notification to customer - SMART FILTERING
             # Skip redundant notifications to avoid spam:
             # - READY status (internal state, customer doesn't need notification)
@@ -1641,9 +1692,7 @@ class UnifiedOrderService:
                     from app.api.websocket_manager import get_connection_manager
 
                     store_ws = get_connection_manager()
-                    await store_ws.notify_order_status(
-                        int(store_id), int(entity_id), target_status
-                    )
+                    await store_ws.notify_order_status(int(store_id), int(entity_id), target_status)
                 except Exception as ws_error:
                     logger.warning(f"Partner WebSocket notify failed: {ws_error}")
 
@@ -1687,9 +1736,7 @@ class UnifiedOrderService:
 
                 try:
                     notif_title = (
-                        f"Buyurtma #{entity_id}"
-                        if customer_lang == "uz"
-                        else f"Заказ #{entity_id}"
+                        f"Buyurtma #{entity_id}" if customer_lang == "uz" else f"Заказ #{entity_id}"
                     )
                     plain_msg = re.sub(r"<[^>]+>", "", msg)
                     if target_status in (OrderStatus.CANCELLED,):

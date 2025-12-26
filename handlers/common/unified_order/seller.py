@@ -173,12 +173,12 @@ async def unified_confirm_handler(callback: types.CallbackQuery) -> None:
     delivery_price = 0
 
     if entity_type == "order":
-        delivery_address = _get_entity_field(entity, \"delivery_address\")
-        order_type_db = _get_entity_field(entity, \"order_type\")
+        delivery_address = _get_entity_field(entity, "delivery_address")
+        order_type_db = _get_entity_field(entity, "order_type")
         if order_type_db:
             order_type = order_type_db
         else:
-            order_type = \"delivery\" if delivery_address else \"pickup\"
+            order_type = "delivery" if delivery_address else "pickup"
 
         offer_id = _get_entity_field(entity, "offer_id")
         quantity = _get_entity_field(entity, "quantity", 1)

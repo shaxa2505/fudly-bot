@@ -13,8 +13,8 @@ from app.services.unified_order_service import (
 )
 from localization import get_text
 
-from .common import esc
 from . import common
+from .common import esc
 from .storage import cart_storage
 
 
@@ -61,11 +61,9 @@ def register(router: Router) -> None:
         for item in items:
             if item.max_quantity < 5 and item.quantity > (item.max_quantity * 0.5):
                 low_stock_warnings.append(
-                    (
-                        f"⚠️ {item.title}: осталось всего {item.max_quantity} {item.unit}"
-                        if lang == "ru"
-                        else f"⚠️ {item.title}: faqat {item.max_quantity} {item.unit} qoldi"
-                    )
+                    f"⚠️ {item.title}: осталось всего {item.max_quantity} {item.unit}"
+                    if lang == "ru"
+                    else f"⚠️ {item.title}: faqat {item.max_quantity} {item.unit} qoldi"
                 )
 
         if low_stock_warnings:
@@ -98,7 +96,7 @@ def register(router: Router) -> None:
             await state.set_state(Registration.phone)
             await callback.answer()
             return
-        
+
         # Enforce single-store cart
         stores = {item.store_id for item in items}
         if len(stores) > 1:
@@ -128,9 +126,7 @@ def register(router: Router) -> None:
             lines.append(f"• {esc(item.title)} × {item.quantity} = {subtotal:,} {currency}")
 
         lines.append("\n" + "─" * 25)
-        lines.append(
-            f"💵 <b>{'Jami' if lang == 'uz' else 'Итого'}: {total:,} {currency}</b>"
-        )
+        lines.append(f"💵 <b>{'Jami' if lang == 'uz' else 'Итого'}: {total:,} {currency}</b>")
         store = common.db.get_store(store_id)
         if delivery_enabled:
             lines.append(
@@ -231,20 +227,14 @@ def register(router: Router) -> None:
 
             logger.error(f"Failed to create unified pickup order from cart: {e}")
             await callback.answer(
-                (
-                    "❌ Не удалось создать заказ"
-                    if lang == "ru"
-                    else "❌ Buyurtma yaratib bo'lmadi"
-                ),
+                ("❌ Не удалось создать заказ" if lang == "ru" else "❌ Buyurtma yaratib bo'lmadi"),
                 show_alert=True,
             )
             return
 
         if not result.success:
             msg = result.error_message or (
-                "❌ Не удалось создать заказ"
-                if lang == "ru"
-                else "❌ Buyurtma yaratib bo'lmadi"
+                "❌ Не удалось создать заказ" if lang == "ru" else "❌ Buyurtma yaratib bo'lmadi"
             )
             await callback.answer(msg, show_alert=True)
             return

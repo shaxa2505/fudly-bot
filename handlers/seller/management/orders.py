@@ -119,7 +119,9 @@ def _build_keyboard(
 
     # Pickup orders buttons (from unified orders table)
     for order in pickup_orders[:5]:
-        order_id = _get_field(order, "order_id") or (order[0] if isinstance(order, (list, tuple)) else 0)
+        order_id = _get_field(order, "order_id") or (
+            order[0] if isinstance(order, (list, tuple)) else 0
+        )
         status = _get_field(order, "order_status") or "pending"
         emoji = {"pending": "⏳", "preparing": "✅", "ready": "👨‍🍳"}.get(status, "📦")
         # Use "o_" prefix for all orders (unified table)
@@ -127,7 +129,9 @@ def _build_keyboard(
 
     # Delivery orders buttons
     for order in delivery_orders[:5]:
-        order_id = _get_field(order, "order_id") or (order[0] if isinstance(order, (list, tuple)) else 0)
+        order_id = _get_field(order, "order_id") or (
+            order[0] if isinstance(order, (list, tuple)) else 0
+        )
         status = _get_field(order, "order_status") or "pending"
         emoji = {"pending": "⏳", "preparing": "👨‍🍳", "delivering": "🚚"}.get(status, "📦")
         kb.button(text=f"{emoji} 🚚#{order_id}", callback_data=f"seller_view_o_{order_id}")
@@ -201,7 +205,7 @@ def _get_all_orders(db, user_id: int) -> tuple[list, list]:
                 payment_proof_photo_id=payment_proof_photo_id,
             ):
                 visible_orders.append(order)
-        
+
         # Split by order_type for display compatibility
         for order in visible_orders:
             order_type = order.get("order_type") if isinstance(order, dict) else None
@@ -540,7 +544,7 @@ async def contact_customer(callback: types.CallbackQuery) -> None:
 # =============================================================================
 # ORDER ACTIONS (using UnifiedOrderService)
 # =============================================================================
-# NOTE: order_confirm_, order_reject_, order_ready_, order_delivering_ handlers 
+# NOTE: order_confirm_, order_reject_, order_ready_, order_delivering_ handlers
 # are in handlers/common/unified_order/seller.py to avoid duplication.
 # We keep only order_cancel_seller_ here for seller-specific cancellation.
 
@@ -600,4 +604,3 @@ async def legacy_booking_details(callback: types.CallbackQuery) -> None:
     booking_id = callback.data.split("_")[-1]
     callback.data = f"seller_view_o_{booking_id}"
     await seller_view_order(callback)
-

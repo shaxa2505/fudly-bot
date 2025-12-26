@@ -116,33 +116,6 @@ async def partner_cancel_booking(callback: types.CallbackQuery) -> None:
                 order_service = None
         if not order_service:
             db.cancel_booking(booking_id)
-
-            # Restore quantities - check if cart booking
-            is_cart_booking = get_booking_field(booking, "is_cart_booking", 0)
-            if is_cart_booking:
-                import json
-
-                cart_items_json = get_booking_field(booking, "cart_items")
-                if cart_items_json:
-                    try:
-                        cart_items = (
-                            json.loads(cart_items_json)
-                            if isinstance(cart_items_json, str)
-                            else cart_items_json
-                        )
-                        for item in cart_items:
-                            item_offer_id = item.get("offer_id")
-                            item_qty = item.get("quantity", 1)
-                            if item_offer_id:
-                                db.increment_offer_quantity_atomic(item_offer_id, int(item_qty))
-                    except Exception as e:
-                        logger.error(f"Failed to restore cart quantities in cancel: {e}")
-            else:
-                # Single item booking
-                offer_id = get_booking_field(booking, "offer_id")
-                qty = get_booking_field(booking, "quantity", 1)
-                if offer_id:
-                    db.increment_offer_quantity_atomic(offer_id, int(qty))
     except Exception as e:
         logger.error(f"Failed to cancel booking: {e}")
         await callback.answer(get_text(lang, "error"), show_alert=True)

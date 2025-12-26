@@ -10,7 +10,7 @@ import logging
 import os
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Optional
+from typing import Any, Optional
 from weakref import WeakSet
 
 from aiohttp import WSMsgType, web
@@ -293,6 +293,13 @@ async def websocket_handler(request: web.Request) -> web.WebSocketResponse:
         except ValueError:
             store_id = None
 
+    if store_id and authenticated_user_id is not None and not is_dev:
+        db = request.app.get("db") if hasattr(request, "app") else None
+        if not _user_can_access_store(db, store_id, authenticated_user_id):
+            await ws.send_json({"type": "error", "message": "Access denied"})
+            await ws.close()
+            return ws
+
     # Register connection
     client = await manager.connect(ws, user_id, store_id)
 
@@ -345,6 +352,61 @@ def _get_authenticated_user_id(init_data: str) -> int | None:
         return int(user.get("id"))
     except Exception:
         return None
+
+
+def _user_can_access_store(db: Any, store_id: int, user_id: int) -> bool:
+    """Verify that user owns or administers the store."""
+    if not db:
+        return False
+
+    if hasattr(db, "is_store_admin"):
+        try:
+            if db.is_store_admin(store_id, user_id):
+                return True
+        except Exception:
+            pass
+
+    if hasattr(db, "get_store_owner"):
+        try:
+            owner = db.get_store_owner(store_id)
+            if isinstance(owner, dict):
+                owner_id = owner.get("owner_id")
+            else:
+                owner_id = owner
+            if owner_id is not None and int(owner_id) == user_id:
+                return True
+        except Exception:
+            pass
+
+    if hasattr(db, "get_store_by_owner"):
+        try:
+            store = db.get_store_by_owner(user_id)
+            if store:
+                store_id_val = (
+                    store.get("store_id")
+                    if isinstance(store, dict)
+                    else store[0] if isinstance(store, tuple) else None
+                )
+                if store_id_val is not None and int(store_id_val) == store_id:
+                    return True
+        except Exception:
+            pass
+
+    if hasattr(db, "get_user_stores"):
+        try:
+            stores = db.get_user_stores(user_id) or []
+            for store in stores:
+                store_id_val = (
+                    store.get("store_id")
+                    if isinstance(store, dict)
+                    else store[0] if isinstance(store, tuple) else None
+                )
+                if store_id_val is not None and int(store_id_val) == store_id:
+                    return True
+        except Exception:
+            pass
+
+    return False
 
 
 async def _handle_client_message(client: WebSocketClient, data: dict) -> None:

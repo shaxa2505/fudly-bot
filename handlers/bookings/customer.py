@@ -1236,7 +1236,7 @@ async def create_booking(
     store_name = get_store_field(store, "name", "Магазин")
     store_address = get_store_field(store, "address", "")
     owner_id = get_store_field(store, "owner_id")
-    
+
     # Get offer photo
     offer_photo_val = get_offer_field(offer, "photo")
     offer_photo = str(offer_photo_val) if offer_photo_val else None
@@ -1462,9 +1462,7 @@ async def notify_partner_new_booking(
         if sent_msg and hasattr(db, "set_order_seller_message_id"):
             try:
                 db.set_order_seller_message_id(booking_id, sent_msg.message_id)
-                logger.info(
-                    f"Saved seller_message_id={sent_msg.message_id} for order#{booking_id}"
-                )
+                logger.info(f"Saved seller_message_id={sent_msg.message_id} for order#{booking_id}")
             except Exception as save_err:
                 logger.error(f"Failed to save seller_message_id: {save_err}")
     except Exception as e:
@@ -1612,14 +1610,6 @@ async def confirm_cancel_booking(callback: types.CallbackQuery) -> None:
         )
     else:
         success = db.cancel_booking(booking_id)
-        if success:
-            # Restore offer quantity
-            offer_id = get_booking_field(booking, "offer_id")
-            qty = get_booking_field(booking, "quantity", 1)
-            try:
-                db.increment_offer_quantity_atomic(offer_id, int(qty))
-            except Exception as e:
-                logger.error(f"Failed to restore quantity: {e}")
 
     if success:
         await callback.answer(

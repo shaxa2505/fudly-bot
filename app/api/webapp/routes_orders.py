@@ -333,7 +333,9 @@ async def get_orders(db=Depends(get_db), user: dict = Depends(get_current_user))
                 if raw_orders and not hasattr(raw_orders[0], "get"):
                     columns = [col[0] for col in cursor.description or []]
                     raw_orders = [dict(zip(columns, row)) for row in raw_orders]
-                logger.info(f"📦 Fetched {len(raw_orders)} raw orders from database for user {user_id}")
+                logger.info(
+                    f"📦 Fetched {len(raw_orders)} raw orders from database for user {user_id}"
+                )
     except Exception as e:
         logger.warning(f"Webapp get_orders failed to fetch orders: {e}")
         raw_orders = []
@@ -579,7 +581,9 @@ async def get_orders(db=Depends(get_db), user: dict = Depends(get_current_user))
                 )
                 bookings.append(booking)
 
-    logger.info(f"📊 get_orders result for user {user_id}: {len(orders)} orders, {len(bookings)} bookings")
+    logger.info(
+        f"📊 get_orders result for user {user_id}: {len(orders)} orders, {len(bookings)} bookings"
+    )
     return {"bookings": bookings, "orders": orders}
 
 
