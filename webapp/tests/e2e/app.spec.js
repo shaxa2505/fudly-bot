@@ -7,6 +7,7 @@ const homeOffers = [
     discount_price: 5000,
     original_price: 10000,
     store_name: 'Lavka',
+    store_id: 99,
     quantity: 10,
   },
   {
@@ -15,6 +16,7 @@ const homeOffers = [
     discount_price: 12000,
     original_price: 15000,
     store_name: 'Lavka',
+    store_id: 99,
     quantity: 5,
   },
 ]
@@ -53,6 +55,70 @@ const locationState = {
   district: '',
 }
 
+const apiState = {
+  paymentProviders: [],
+  store: {
+    delivery_enabled: false,
+    delivery_price: 0,
+    min_order_amount: 0,
+  },
+  orderCreateResponse: {
+    success: true,
+    order_id: 555,
+  },
+  orderStatus: {
+    status: 'confirmed',
+    booking_code: 'A1',
+    offer_title: 'Non',
+    quantity: 1,
+    total_price: 5000,
+    store_name: 'Lavka',
+  },
+  orderTimeline: {
+    estimated_ready_time: '12:00',
+    timeline: [
+      {
+        status: 'pending',
+        message: 'Yaratildi',
+        timestamp: new Date().toISOString(),
+      },
+    ],
+  },
+  paymentLink: 'https://pay.test/123',
+}
+
+const resetApiState = () => {
+  apiState.paymentProviders = []
+  apiState.store = {
+    delivery_enabled: false,
+    delivery_price: 0,
+    min_order_amount: 0,
+  }
+  apiState.orderCreateResponse = {
+    success: true,
+    order_id: 555,
+  }
+  apiState.orderStatus = {
+    status: 'confirmed',
+    booking_code: 'A1',
+    offer_title: 'Non',
+    quantity: 1,
+    total_price: 5000,
+    store_name: 'Lavka',
+  }
+  apiState.orderTimeline = {
+    estimated_ready_time: '12:00',
+    timeline: [
+      {
+        status: 'pending',
+        message: 'Yaratildi',
+        timestamp: new Date().toISOString(),
+      },
+    ],
+  }
+  apiState.paymentLink = 'https://pay.test/123'
+}
+
 const fulfillJson = (route, data) =>
   route.fulfill({
     status: 200,
@@ -89,11 +155,7 @@ const setupApiRoutes = async (page) => {
     }
 
     if (path.startsWith('/stores/') && method === 'GET') {
-      return fulfillJson(route, {
-        delivery_enabled: false,
-        delivery_price: 0,
-        min_order_amount: 0,
-      })
+      return fulfillJson(route, apiState.store)
     }
 
     if (path === '/user/profile' && method === 'GET') {
@@ -121,8 +183,24 @@ const setupApiRoutes = async (page) => {
       return fulfillJson(route, { orders: [], bookings: [] })
     }
 
+    if (path === '/orders' && method === 'POST') {
+      return fulfillJson(route, apiState.orderCreateResponse)
+    }
+
+    if (path.startsWith('/orders/') && path.endsWith('/status') && method === 'GET') {
+      return fulfillJson(route, apiState.orderStatus)
+    }
+
+    if (path.startsWith('/orders/') && path.endsWith('/timeline') && method === 'GET') {
+      return fulfillJson(route, apiState.orderTimeline)
+    }
+
     if (path === '/payment/providers' && method === 'GET') {
-      return fulfillJson(route, { providers: [] })
+      return fulfillJson(route, { providers: apiState.paymentProviders })
+    }
+
+    if (path === '/payment/create' && method === 'POST') {
+      return fulfillJson(route, { payment_url: apiState.paymentLink })
     }
 
     if (path === '/user/notifications' && method === 'GET') {
@@ -150,6 +228,8 @@ const setupApiRoutes = async (page) => {
 }
 
 test.beforeEach(async ({ page }) => {
+  resetApiState()
+
   await page.addInitScript((savedLocation) => {
     localStorage.setItem('fudly_location', JSON.stringify(savedLocation))
     localStorage.setItem('fudly_init_data', 'test_init_data')
@@ -283,4 +363,98 @@ test('cart shows empty state', async ({ page }) => {
   await page.goto('/cart')
 
   await expect(page.getByText("Savatingiz bo'sh")).toBeVisible()
+})
+
+test('places pickup order with cash', async ({ page }) => {
+  await page.goto('/')
+
+  await page.getByLabel("Savatga qo'shish").first().click()
+  await page.locator('.bottom-nav').getByRole('button', { name: /Savat/ }).click()
+
+  await page.getByRole('button', { name: 'Keyingi' }).click()
+  await page.getByLabel(/Telefon raqam/).fill('+998901234567')
+
+  const orderResponse = page.waitForResponse((resp) =>
+    resp.url().includes('/api/v1/orders') && resp.request().method() === 'POST'
+  )
+
+  await page.locator('.checkout-footer-btn').click()
+
+  await orderResponse
+  await expect(page.getByText("Savatingiz bo'sh")).toBeVisible()
+})
+
+test('delivery payment creates online payment link', async ({ page }) => {
+  apiState.paymentProviders = ['click']
+  apiState.store = {
+    delivery_enabled: true,
+    delivery_price: 5000,
+    min_order_amount: 0,
+  }
+
+  await page.addInitScript(() => {
+    localStorage.setItem('fudly_cart_v2', JSON.stringify({
+      '1': {
+        offer: {
+          id: 1,
+          title: 'Non',
+          discount_price: 5000,
+          original_price: 10000,
+          store_id: 99,
+        },
+        quantity: 1,
+      },
+    }))
+  })
+
+  await page.goto('/cart')
+
+  await page.getByRole('button', { name: 'Keyingi' }).click()
+
+  const deliveryButton = page
+    .locator('.order-type-options')
+    .getByRole('button', { name: /Yetkazib berish/ })
+  await expect(deliveryButton).toBeEnabled()
+  await deliveryButton.click()
+  await page.getByLabel(/Telefon raqam/).fill('+998901234567')
+  await page.getByLabel(/Yetkazib berish manzili/).fill('Toshkent, Yunusobod')
+
+  const orderResponse = page.waitForResponse((resp) =>
+    resp.url().includes('/api/v1/orders') && resp.request().method() === 'POST'
+  )
+  const paymentResponse = page.waitForResponse((resp) =>
+    resp.url().includes('/api/v1/payment/create') && resp.status() === 200
+  )
+
+  await page.locator('.checkout-footer-btn').click()
+
+  await orderResponse
+  await paymentResponse
+
+  await expect(page.getByText("Savatingiz bo'sh")).toBeVisible()
+})
+
+test('order tracking shows status', async ({ page }) => {
+  apiState.orderStatus = {
+    status: 'confirmed',
+    booking_code: 'T-555',
+    offer_title: 'Non',
+    quantity: 2,
+    total_price: 10000,
+    store_name: 'Lavka',
+  }
+
+  await page.addInitScript(() => {
+    localStorage.setItem('fudly_user', JSON.stringify({ id: 1, language: 'uz' }))
+    window.history.replaceState(
+      { usr: { bookingId: 555 }, key: 'order-test', idx: 0 },
+      '',
+      '/order/555'
+    )
+  })
+
+  await page.goto('/order/555')
+
+  await expect(page.locator('.order-details h3', { hasText: 'Non' })).toBeVisible()
+  await expect(page.getByText(/T-555/)).toBeVisible()
 })
