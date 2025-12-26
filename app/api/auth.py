@@ -145,6 +145,15 @@ def _ensure_self_access(authenticated_user_id: int, target_user_id: int, scope: 
         raise HTTPException(status_code=403, detail="Access denied")
 
 
+def _get_authenticated_user_id(x_telegram_init_data: str | None) -> int:
+    validated_data = _require_valid_init_data(x_telegram_init_data)
+    user = validated_data.get("user") or {}
+    user_id = user.get("id")
+    if not user_id:
+        raise HTTPException(status_code=401, detail="Authentication required")
+    return int(user_id)
+
+
 def _get_notifications_enabled(db, user_id: int) -> bool:
     user = None
     if hasattr(db, "get_user_model"):
@@ -215,24 +224,23 @@ async def validate_auth(request: AuthRequest, db=Depends(get_db)) -> UserProfile
 
 @router.get("/user/profile", response_model=UserProfile)
 async def get_profile(
-    user_id: int,
+    user_id: int | None = None,
     x_telegram_init_data: str = Header(None, alias="X-Telegram-Init-Data"),
     db=Depends(get_db),
 ) -> UserProfile:
     """Get user profile by ID. Requires authentication - user can only access their own profile."""
-    validated_data = _require_valid_init_data(x_telegram_init_data)
+    authenticated_user_id = _get_authenticated_user_id(x_telegram_init_data)
+    effective_user_id = user_id or authenticated_user_id
+    if user_id is not None:
+        _ensure_self_access(authenticated_user_id, user_id, "profile")
 
-    # SECURITY: User can only access their own profile (prevent IDOR)
-    authenticated_user_id = validated_data["user"]["id"]
-    _ensure_self_access(authenticated_user_id, user_id, "profile")
-
-    user = db.get_user_model(user_id)
+    user = db.get_user_model(effective_user_id)
 
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
 
     return UserProfile(
-        user_id=_get_user_id(user) or user_id,
+        user_id=_get_user_id(user) or effective_user_id,
         username=user.username,
         first_name=user.first_name or "",
         last_name=user.last_name,
@@ -246,32 +254,34 @@ async def get_profile(
 
 @router.get("/user/notifications", response_model=NotificationSettingsResponse)
 async def get_notifications(
-    user_id: int,
+    user_id: int | None = None,
     x_telegram_init_data: str = Header(None, alias="X-Telegram-Init-Data"),
     db=Depends(get_db),
 ) -> NotificationSettingsResponse:
     """Get notification settings for the authenticated user."""
-    validated_data = _require_valid_init_data(x_telegram_init_data)
-    authenticated_user_id = validated_data["user"]["id"]
-    _ensure_self_access(authenticated_user_id, user_id, "notifications")
-    return NotificationSettingsResponse(enabled=_get_notifications_enabled(db, user_id))
+    authenticated_user_id = _get_authenticated_user_id(x_telegram_init_data)
+    effective_user_id = user_id or authenticated_user_id
+    if user_id is not None:
+        _ensure_self_access(authenticated_user_id, user_id, "notifications")
+    return NotificationSettingsResponse(enabled=_get_notifications_enabled(db, effective_user_id))
 
 
 @router.post("/user/notifications", response_model=NotificationSettingsResponse)
 async def set_notifications(
     request: NotificationSettingsRequest,
-    user_id: int,
+    user_id: int | None = None,
     x_telegram_init_data: str = Header(None, alias="X-Telegram-Init-Data"),
     db=Depends(get_db),
 ) -> NotificationSettingsResponse:
     """Update notification settings for the authenticated user."""
-    validated_data = _require_valid_init_data(x_telegram_init_data)
-    authenticated_user_id = validated_data["user"]["id"]
-    _ensure_self_access(authenticated_user_id, user_id, "notifications")
-    current = _get_notifications_enabled(db, user_id)
+    authenticated_user_id = _get_authenticated_user_id(x_telegram_init_data)
+    effective_user_id = user_id or authenticated_user_id
+    if user_id is not None:
+        _ensure_self_access(authenticated_user_id, user_id, "notifications")
+    current = _get_notifications_enabled(db, effective_user_id)
     target = bool(request.enabled)
     if current != target and hasattr(db, "toggle_notifications"):
-        db.toggle_notifications(user_id)
+        db.toggle_notifications(effective_user_id)
     return NotificationSettingsResponse(enabled=target)
 
 
@@ -308,7 +318,7 @@ class OrdersHistoryResponse(BaseModel):
 
 @router.get("/user/orders", response_model=OrdersHistoryResponse)
 async def get_user_orders(
-    user_id: int,
+    user_id: int | None = None,
     status: str | None = None,
     limit: int = 50,
     x_telegram_init_data: str = Header(None, alias="X-Telegram-Init-Data"),
@@ -322,17 +332,16 @@ async def get_user_orders(
         status: Filter by status (pending, confirmed, completed, cancelled)
         limit: Maximum number of orders to return
     """
-    validated_data = _require_valid_init_data(x_telegram_init_data)
-
-    # SECURITY: User can only access their own orders (prevent IDOR)
-    authenticated_user_id = validated_data["user"]["id"]
-    _ensure_self_access(authenticated_user_id, user_id, "orders")
+    authenticated_user_id = _get_authenticated_user_id(x_telegram_init_data)
+    effective_user_id = user_id or authenticated_user_id
+    if user_id is not None:
+        _ensure_self_access(authenticated_user_id, user_id, "orders")
     try:
         # Get all bookings
         if status:
-            bookings = db.get_user_bookings_by_status(user_id, status)
+            bookings = db.get_user_bookings_by_status(effective_user_id, status)
         else:
-            bookings = db.get_user_bookings(user_id)
+            bookings = db.get_user_bookings(effective_user_id)
 
         if not bookings:
             return OrdersHistoryResponse(
@@ -431,7 +440,7 @@ async def get_user_orders(
 
 @router.get("/user/bookings", response_model=OrdersHistoryResponse)
 async def get_user_bookings(
-    user_id: int,
+    user_id: int | None = None,
     status: str | None = None,
     limit: int = 50,
     x_telegram_init_data: str = Header(None, alias="X-Telegram-Init-Data"),

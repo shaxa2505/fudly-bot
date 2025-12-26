@@ -242,14 +242,11 @@ function CartPage({ user }) {
     setOrderLoading(true)
 
     try {
-      const userId = window.Telegram?.WebApp?.initDataUnsafe?.user?.id || user?.id || 1
-
       const orderData = {
         items: cartItems.map(item => ({
           offer_id: item.offer.id,
           quantity: item.quantity,
         })),
-        user_id: userId,
         delivery_address: orderType === 'delivery' ? address.trim() : null,
         phone: phone.trim(),
         comment: `${orderType === 'pickup' ? 'O\'zi olib ketadi' : 'Yetkazib berish'}\n${comment.trim()}`.trim(),
@@ -347,15 +344,12 @@ function CartPage({ user }) {
 
     setOrderLoading(true)
     try {
-      const userId = window.Telegram?.WebApp?.initDataUnsafe?.user?.id || user?.id || 1
-
       // First create the order
       const orderData = {
         items: cartItems.map(item => ({
           offer_id: item.offer.id,
           quantity: item.quantity,
         })),
-        user_id: userId,
         delivery_address: orderType === 'delivery' ? address.trim() : null,
         phone: phone.trim(),
         comment: `${orderType === 'pickup' ? 'O\'zi olib ketadi' : 'Yetkazib berish'}\n${comment.trim()}`.trim(),
@@ -377,7 +371,7 @@ function CartPage({ user }) {
       const returnUrl = window.location.origin + '/profile'
 
       // Create payment link
-      const paymentData = await api.createPaymentLink(orderId, provider, returnUrl, storeId, total, userId)
+      const paymentData = await api.createPaymentLink(orderId, provider, returnUrl, storeId, total)
 
       if (paymentData.payment_url) {
         clearCart()

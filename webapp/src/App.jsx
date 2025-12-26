@@ -88,7 +88,7 @@ function AppContent() {
         setLoading(false)
 
         // Sync with backend in background (non-blocking)
-        api.getProfile(tgUser.id).then(profile => {
+        api.getProfile().then(profile => {
           if (profile) {
             const fullUser = {
               ...userData,

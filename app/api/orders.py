@@ -14,6 +14,7 @@ from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 from pydantic import BaseModel
 
 from app.api.webapp.common import get_current_user
+from app.services.unified_order_service import OrderStatus as UnifiedOrderStatus
 
 router = APIRouter(prefix="/api/v1/orders", tags=["orders"])
 
@@ -103,7 +104,6 @@ class OrderTimeline(BaseModel):
 class DeliveryCalculation(BaseModel):
     """Delivery cost calculation request."""
 
-    user_id: int
     city: str
     address: str
     store_id: int
@@ -233,7 +233,8 @@ def format_booking_to_order_status(booking: Any, db) -> OrderStatus:
     if booking_id is None:
         raise ValueError("Missing order_id/booking_id")
 
-    status = booking_dict.get("order_status") or booking_dict.get("status") or "pending"
+    raw_status = booking_dict.get("order_status") or booking_dict.get("status") or "pending"
+    status = UnifiedOrderStatus.normalize(str(raw_status).strip().lower())
 
     # Best-effort order_type detection (unified table vs legacy booking)
     delivery_address = booking_dict.get("delivery_address")
@@ -418,7 +419,8 @@ async def get_user_orders(
         order_type = r.get("order_type") or (
             "delivery" if r.get("delivery_address") else "pickup"
         )
-        order_status = r.get("order_status") or "pending"
+        raw_order_status = r.get("order_status") or "pending"
+        order_status = UnifiedOrderStatus.normalize(str(raw_order_status).strip().lower())
 
         is_cart = int(r.get("is_cart_order") or 0) == 1
         cart_items_json = r.get("cart_items")
@@ -759,7 +761,8 @@ async def get_order_timeline(
     order_dict = dict(order) if not isinstance(order, dict) else order
     if order_dict.get("user_id") != user.get("id"):
         raise HTTPException(status_code=403, detail="Access denied")
-    status = order_dict.get("order_status", order_dict.get("status", "pending"))
+    raw_status = order_dict.get("order_status", order_dict.get("status", "pending"))
+    status = UnifiedOrderStatus.normalize(str(raw_status).strip().lower())
     created_at = str(order_dict.get("created_at", ""))
 
     # Build timeline based on status
@@ -845,11 +848,15 @@ async def get_order_timeline(
 
 
 @router.post("/calculate-delivery", response_model=DeliveryResult)
-async def calculate_delivery(request: DeliveryCalculation, db=Depends(get_db)):
+async def calculate_delivery(
+    request: DeliveryCalculation,
+    db=Depends(get_db),
+    user: dict = Depends(get_current_user),
+):
     """Calculate delivery cost for given address.
 
     Args:
-        request: DeliveryCalculation with user_id, city, address, store_id
+        request: DeliveryCalculation with city, address, store_id
 
     Returns:
         DeliveryResult with cost and availability
@@ -895,7 +902,8 @@ async def get_order_qr_code(
     order_dict = dict(order) if not isinstance(order, dict) else order
     if order_dict.get("user_id") != user.get("id"):
         raise HTTPException(status_code=403, detail="Access denied")
-    status = order_dict.get("order_status", order_dict.get("status", "pending"))
+    raw_status = order_dict.get("order_status", order_dict.get("status", "pending"))
+    status = UnifiedOrderStatus.normalize(str(raw_status).strip().lower())
     pickup_code = order_dict.get("pickup_code", order_dict.get("booking_code", ""))
 
     # v23+ statuses: preparing, ready

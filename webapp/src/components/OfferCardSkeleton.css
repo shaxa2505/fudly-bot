@@ -4,9 +4,10 @@
 
 .offer-card-skeleton {
   background: #FFFFFF;
-  border-radius: 20px;
+  border: 1px solid #E6E8EC;
+  border-radius: 18px;
   overflow: hidden;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+  box-shadow: none;
   height: 100%;
 }
 
@@ -17,7 +18,7 @@
 }
 
 .skeleton-content {
-  padding: 16px;
+  padding: 12px;
 }
 
 .skeleton-store {

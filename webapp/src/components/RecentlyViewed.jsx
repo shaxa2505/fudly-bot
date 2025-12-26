@@ -13,7 +13,7 @@ function RecentlyViewed() {
       try {
         const userId = window.Telegram?.WebApp?.initDataUnsafe?.user?.id
         if (userId) {
-          const data = await api.getRecentlyViewed(userId, 10)
+          const data = await api.getRecentlyViewed(10)
           setOffers(data || [])
         }
       } catch (error) {

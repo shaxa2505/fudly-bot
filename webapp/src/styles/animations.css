@@ -346,8 +346,9 @@ button:active:not(:disabled) {
   }
 
   .offer-card:hover {
-    transform: translateY(-4px);
-    box-shadow: var(--shadow-lg, 0 8px 16px rgba(0, 0, 0, 0.1));
+    transform: translateY(-2px);
+    box-shadow: none;
+    border-color: #D0D5DD;
   }
 }
 

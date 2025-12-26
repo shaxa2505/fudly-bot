@@ -132,7 +132,7 @@ function HomePage() {
       const userId = window.Telegram?.WebApp?.initDataUnsafe?.user?.id
       if (userId) {
         try {
-          const history = await api.getSearchHistory(userId, 5)
+          const history = await api.getSearchHistory(5)
           setSearchHistory(history)
         } catch (error) {
           console.error('Error loading search history:', error)
@@ -316,7 +316,7 @@ function HomePage() {
       const userId = window.Telegram?.WebApp?.initDataUnsafe?.user?.id
       if (userId) {
         try {
-          await api.addSearchHistory(userId, trimmed)
+          await api.addSearchHistory(trimmed)
           // Update local history
           setSearchHistory(prev => {
             const filtered = prev.filter(q => q.toLowerCase() !== trimmed.toLowerCase())
@@ -343,7 +343,7 @@ function HomePage() {
     const userId = window.Telegram?.WebApp?.initDataUnsafe?.user?.id
     if (userId) {
       try {
-        await api.clearSearchHistory(userId)
+        await api.clearSearchHistory()
         setSearchHistory([])
       } catch (error) {
         console.error('Error clearing search history:', error)

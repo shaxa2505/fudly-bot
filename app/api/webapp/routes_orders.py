@@ -11,7 +11,12 @@ from pydantic import BaseModel
 
 from app.core.sanitize import sanitize_phone
 from app.core.security import validator
-from app.services.unified_order_service import OrderItem, get_unified_order_service
+from app.services.unified_order_service import (
+    OrderItem,
+    OrderStatus,
+    PaymentStatus,
+    get_unified_order_service,
+)
 
 from .common import (
     CreateOrderRequest,
@@ -30,17 +35,6 @@ router = APIRouter()
 class CancelOrderResponse(BaseModel):
     success: bool
     status: str
-
-
-def _normalize_order_status(status: str | None) -> str:
-    normalized = (status or "pending").strip().lower()
-    return {
-        "new": "pending",
-        "awaiting_payment": "pending",
-        "awaiting_admin_confirmation": "pending",
-        "paid": "pending",
-        "confirmed": "preparing",
-    }.get(normalized, normalized)
 
 
 def _require_user_id(user: dict[str, Any]) -> int:
@@ -145,9 +139,11 @@ async def create_order(
         offers_by_id, store_id = _load_offers_and_store(order.items, db)
 
         is_delivery = bool(order.delivery_address and order.delivery_address.strip())
-        payment_method = (order.payment_method or "").strip().lower()
-        if not payment_method:
+        raw_payment_method = order.payment_method
+        if not raw_payment_method:
             payment_method = "click" if is_delivery else "cash"
+        else:
+            payment_method = PaymentStatus.normalize_method(raw_payment_method)
 
         if is_delivery and payment_method == "cash":
             raise HTTPException(
@@ -350,10 +346,18 @@ async def get_orders(db=Depends(get_db), user: dict = Depends(get_current_user))
             continue
 
         order_type = r.get("order_type") or ("delivery" if r.get("delivery_address") else "pickup")
-        order_status = _normalize_order_status(r.get("order_status"))
+        order_status = OrderStatus.normalize(str(r.get("order_status") or "pending").lower())
 
-        payment_method = r.get("payment_method") or "cash"
-        payment_status = r.get("payment_status")
+        raw_payment_method = r.get("payment_method")
+        if raw_payment_method:
+            payment_method = PaymentStatus.normalize_method(raw_payment_method)
+        else:
+            payment_method = "card" if order_type == "delivery" else "cash"
+        payment_status = PaymentStatus.normalize(
+            r.get("payment_status"),
+            payment_method=payment_method,
+            payment_proof_photo_id=r.get("payment_proof_photo_id"),
+        )
 
         is_cart = int(r.get("is_cart_order") or 0) == 1
         cart_items_json = r.get("cart_items")
@@ -469,7 +473,9 @@ async def get_orders(db=Depends(get_db), user: dict = Depends(get_current_user))
                             "booking_id": b[0] if len(b) > 0 else None,
                             "offer_id": b[1] if len(b) > 1 else None,
                             "user_id": b[2] if len(b) > 2 else None,
-                            "status": _normalize_order_status(b[3] if len(b) > 3 else "pending"),
+                            "status": OrderStatus.normalize(
+                                str(b[3] if len(b) > 3 else "pending").lower()
+                            ),
                             "booking_code": b[4] if len(b) > 4 else None,
                             "pickup_time": str(b[5]) if len(b) > 5 and b[5] else None,
                             "quantity": b[6] if len(b) > 6 else 1,
@@ -488,7 +494,9 @@ async def get_orders(db=Depends(get_db), user: dict = Depends(get_current_user))
                             booking[key] = value.isoformat()
                         else:
                             booking[key] = value
-                    booking["status"] = _normalize_order_status(booking.get("status") or "pending")
+                    booking["status"] = OrderStatus.normalize(
+                        str(booking.get("status") or "pending").lower()
+                    )
                     bookings.append(booking)
         except Exception as e:
             logger.warning(f"Webapp get_orders failed to fetch bookings: {e}")
@@ -544,7 +552,9 @@ async def get_orders(db=Depends(get_db), user: dict = Depends(get_current_user))
                         "booking_id": b[0] if len(b) > 0 else None,
                         "offer_id": b[1] if len(b) > 1 else None,
                         "user_id": b[2] if len(b) > 2 else None,
-                        "status": _normalize_order_status(b[3] if len(b) > 3 else "pending"),
+                        "status": OrderStatus.normalize(
+                            str(b[3] if len(b) > 3 else "pending").lower()
+                        ),
                         "booking_code": b[4] if len(b) > 4 else None,
                         "pickup_time": str(b[5]) if len(b) > 5 and b[5] else None,
                         "quantity": b[6] if len(b) > 6 else 1,
@@ -563,7 +573,9 @@ async def get_orders(db=Depends(get_db), user: dict = Depends(get_current_user))
                         booking[key] = value.isoformat()
                     else:
                         booking[key] = value
-                booking["status"] = _normalize_order_status(booking.get("status") or "pending")
+                booking["status"] = OrderStatus.normalize(
+                    str(booking.get("status") or "pending").lower()
+                )
                 bookings.append(booking)
 
     logger.info(f"📊 get_orders result for user {user_id}: {len(orders)} orders, {len(bookings)} bookings")

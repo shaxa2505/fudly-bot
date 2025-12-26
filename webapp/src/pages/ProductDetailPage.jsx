@@ -24,7 +24,7 @@ function ProductDetailPage() {
     if (offer?.id) {
       const userId = window.Telegram?.WebApp?.initDataUnsafe?.user?.id
       if (userId) {
-        api.addRecentlyViewed(userId, offer.id).catch(() => {})
+        api.addRecentlyViewed(offer.id).catch(() => {})
       }
     }
   }, [offer?.id])

@@ -877,6 +877,8 @@ async def create_webhook_app(
     async def api_user_orders(request: web.Request) -> web.Response:
         """GET /api/v1/orders - Get user's orders/bookings and delivery orders."""
         try:
+            from app.services.unified_order_service import OrderStatus, PaymentStatus
+
             authenticated_user_id = _get_authenticated_user_id(request)
             if not authenticated_user_id:
                 return add_cors_headers(
@@ -945,17 +947,18 @@ async def create_webhook_app(
                     "delivery" if r.get("delivery_address") else "pickup"
                 )
                 order_status_raw = r.get("order_status") or "pending"
-                order_status = str(order_status_raw).strip().lower() or "pending"
-                order_status = {
-                    "new": "pending",
-                    "awaiting_payment": "pending",
-                    "awaiting_admin_confirmation": "pending",
-                    "paid": "pending",
-                    "confirmed": "preparing",
-                }.get(order_status, order_status)
+                order_status = OrderStatus.normalize(str(order_status_raw).strip().lower())
 
-                payment_method = r.get("payment_method") or "cash"
-                payment_status = r.get("payment_status")
+                raw_payment_method = r.get("payment_method")
+                if raw_payment_method:
+                    payment_method = PaymentStatus.normalize_method(raw_payment_method)
+                else:
+                    payment_method = "card" if order_type == "delivery" else "cash"
+                payment_status = PaymentStatus.normalize(
+                    r.get("payment_status"),
+                    payment_method=payment_method,
+                    payment_proof_photo_id=r.get("payment_proof_photo_id"),
+                )
 
                 is_cart = int(r.get("is_cart_order") or 0) == 1
                 cart_items_json = r.get("cart_items")
@@ -2173,15 +2176,14 @@ async def create_webhook_app(
     async def api_clear_search_history(request: web.Request) -> web.Response:
         """DELETE /api/v1/user/search-history - Clear user's search history."""
         try:
-            user_id = request.query.get("user_id")
-
-            if not user_id:
+            authenticated_user_id = _get_authenticated_user_id(request)
+            if not authenticated_user_id:
                 return add_cors_headers(
-                    web.json_response({"error": "user_id required"}, status=400)
+                    web.json_response({"error": "Authentication required"}, status=401)
                 )
 
             if hasattr(db, "clear_search_history"):
-                db.clear_search_history(int(user_id))
+                db.clear_search_history(int(authenticated_user_id))
                 return add_cors_headers(web.json_response({"success": True}))
             else:
                 return add_cors_headers(
@@ -2268,10 +2270,25 @@ async def create_webhook_app(
         """POST /api/v1/payment/create - Create payment URL for order."""
         try:
             data = await request.json()
+            authenticated_user_id = _get_authenticated_user_id(request)
+            if not authenticated_user_id:
+                return add_cors_headers(
+                    web.json_response({"error": "Authentication required"}, status=401)
+                )
+            payload_user_id = data.get("user_id")
+            if payload_user_id is not None:
+                try:
+                    payload_user_id_int = int(payload_user_id)
+                except Exception:
+                    payload_user_id_int = None
+                if payload_user_id_int is None or payload_user_id_int != authenticated_user_id:
+                    return add_cors_headers(
+                        web.json_response({"error": "Access denied"}, status=403)
+                    )
             order_id = data.get("order_id")
             amount = data.get("amount")
             provider = str(data.get("provider", "card")).lower()
-            user_id = data.get("user_id")
+            user_id = authenticated_user_id
             return_url = data.get("return_url")
             store_id = data.get("store_id")  # For per-store credentials
 
@@ -2290,6 +2307,22 @@ async def create_webhook_app(
             if not order:
                 return add_cors_headers(
                     web.json_response({"error": "Order not found"}, status=404)
+                )
+
+            order_user_id = (
+                order.get("user_id") if isinstance(order, dict) else getattr(order, "user_id", None)
+            )
+            try:
+                order_user_id_int = int(order_user_id) if order_user_id is not None else None
+            except Exception:
+                order_user_id_int = None
+            if order_user_id_int is None:
+                return add_cors_headers(
+                    web.json_response({"error": "Access denied"}, status=403)
+                )
+            if order_user_id_int != authenticated_user_id:
+                return add_cors_headers(
+                    web.json_response({"error": "Access denied"}, status=403)
                 )
 
             if not store_id:

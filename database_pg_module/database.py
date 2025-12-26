@@ -64,9 +64,14 @@ class Database(
         import os
 
         super().__init__(database_url)
-        # Skip init_db if SKIP_DB_INIT is set (for existing databases)
-        if not os.getenv("SKIP_DB_INIT"):
+        run_db_migrations = (
+            os.getenv("RUN_DB_MIGRATIONS", "0").strip().lower() in {"1", "true", "yes"}
+        )
+        if os.getenv("SKIP_DB_INIT"):
+            logger.info("Database initialization skipped (SKIP_DB_INIT=1).")
+            return
+        if run_db_migrations:
             self.init_db()
-            logger.info("✅ Database initialized with all mixins")
+            logger.info("Database initialized with all mixins.")
         else:
-            logger.info("⏭️  Skipping database initialization (SKIP_DB_INIT=1)")
+            logger.info("Database initialization skipped (set RUN_DB_MIGRATIONS=1 to enable).")

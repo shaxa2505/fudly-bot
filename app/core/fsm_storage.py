@@ -9,6 +9,7 @@ Improvements over original:
 """
 from __future__ import annotations
 
+import os
 import json
 import logging
 from collections.abc import Mapping
@@ -57,6 +58,9 @@ class EnhancedPostgreSQLStorage(BaseStorage):
 
     def _ensure_table(self) -> None:
         """Ensure fsm_states table exists with new schema."""
+        run_runtime_migrations = (
+            os.getenv("RUN_DB_MIGRATIONS", "0").strip().lower() in {"1", "true", "yes"}
+        )
         try:
             with self.db.get_connection() as conn:
                 cursor = conn.cursor()
@@ -67,32 +71,40 @@ class EnhancedPostgreSQLStorage(BaseStorage):
                     WHERE table_name = 'fsm_states' AND column_name = 'expires_at'
                 """
                 )
-                if not cursor.fetchone():
-                    # Add new columns if they don't exist
-                    logger.info("Upgrading fsm_states table schema...")
-                    cursor.execute(
+                has_expires_at = cursor.fetchone() is not None
+                if not has_expires_at:
+                    if not run_runtime_migrations:
+                        logger.warning(
+                            "FSM schema upgrade required (missing expires_at/chat_id); "
+                            "run migrations with RUN_DB_MIGRATIONS=1."
+                        )
+                    else:
+                        # Add new columns if they don't exist
+                        logger.info("Upgrading fsm_states table schema...")
+                        cursor.execute(
+                            """
+                            ALTER TABLE fsm_states
+                            ADD COLUMN IF NOT EXISTS chat_id BIGINT,
+                            ADD COLUMN IF NOT EXISTS expires_at TIMESTAMP,
+                            ADD COLUMN IF NOT EXISTS created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                            ADD COLUMN IF NOT EXISTS state_name TEXT
                         """
-                        ALTER TABLE fsm_states
-                        ADD COLUMN IF NOT EXISTS chat_id BIGINT,
-                        ADD COLUMN IF NOT EXISTS expires_at TIMESTAMP,
-                        ADD COLUMN IF NOT EXISTS created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                        ADD COLUMN IF NOT EXISTS state_name TEXT
-                    """
-                    )
-                    conn.commit()
-                    logger.info("✅ FSM table schema upgraded")
+                        )
+                        conn.commit()
+                        logger.info("✅ FSM table schema upgraded")
 
                 # Ensure composite unique index on (user_id, chat_id)
-                try:
-                    cursor.execute(
-                        """
-                        CREATE UNIQUE INDEX IF NOT EXISTS fsm_states_user_chat_idx
-                        ON fsm_states (user_id, chat_id)
-                        """
-                    )
-                    conn.commit()
-                except Exception as index_err:
-                    logger.warning(f"Could not ensure FSM unique index: {index_err}")
+                if run_runtime_migrations:
+                    try:
+                        cursor.execute(
+                            """
+                            CREATE UNIQUE INDEX IF NOT EXISTS fsm_states_user_chat_idx
+                            ON fsm_states (user_id, chat_id)
+                            """
+                        )
+                        conn.commit()
+                    except Exception as index_err:
+                        logger.warning(f"Could not ensure FSM unique index: {index_err}")
         except Exception as e:
             logger.warning(f"Could not upgrade fsm_states schema: {e}")
 

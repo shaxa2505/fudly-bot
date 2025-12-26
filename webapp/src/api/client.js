@@ -127,12 +127,12 @@ const api = {
     return data
   },
 
-  async getProfile(userId) {
-    return cachedGet('/user/profile', { user_id: userId }, 60000) // 1 min cache
+  async getProfile() {
+    return cachedGet('/user/profile', {}, 60000) // 1 min cache
   },
 
-  async getUserOrders(userId, status = null) {
-    const params = { user_id: userId }
+  async getUserOrders(status = null) {
+    const params = {}
     if (status) params.status = status
     return cachedGet('/user/orders', params, 10000) // 10s cache
   },
@@ -148,9 +148,9 @@ const api = {
     return data
   },
 
-  async getUserBookings(userId, status = null) {
+  async getUserBookings(status = null) {
     try {
-      const data = await this.getUserOrders(userId, status)
+      const data = await this.getUserOrders(status)
       return data.orders || []
     } catch (error) {
       return []
@@ -278,9 +278,9 @@ const api = {
   },
 
   // Recently viewed endpoints
-  async addRecentlyViewed(userId, offerId) {
+  async addRecentlyViewed(offerId) {
     try {
-      const { data } = await client.post('/user/recently-viewed', { user_id: userId, offer_id: offerId })
+      const { data } = await client.post('/user/recently-viewed', { offer_id: offerId })
       return data
     } catch (error) {
       console.warn('addRecentlyViewed error:', error)
@@ -288,9 +288,9 @@ const api = {
     }
   },
 
-  async getRecentlyViewed(userId, limit = 20) {
+  async getRecentlyViewed(limit = 20) {
     try {
-      const { data } = await client.get('/user/recently-viewed', { params: { user_id: userId, limit } })
+      const { data } = await client.get('/user/recently-viewed', { params: { limit } })
       return data.offers || []
     } catch (error) {
       console.warn('getRecentlyViewed error:', error)
@@ -299,9 +299,9 @@ const api = {
   },
 
   // Search history endpoints
-  async addSearchHistory(userId, query) {
+  async addSearchHistory(query) {
     try {
-      const { data } = await client.post('/user/search-history', { user_id: userId, query })
+      const { data } = await client.post('/user/search-history', { query })
       return data
     } catch (error) {
       console.warn('addSearchHistory error:', error)
@@ -309,9 +309,9 @@ const api = {
     }
   },
 
-  async getSearchHistory(userId, limit = 10) {
+  async getSearchHistory(limit = 10) {
     try {
-      const { data } = await client.get('/user/search-history', { params: { user_id: userId, limit } })
+      const { data } = await client.get('/user/search-history', { params: { limit } })
       return data.history || []
     } catch (error) {
       console.warn('getSearchHistory error:', error)
@@ -319,9 +319,9 @@ const api = {
     }
   },
 
-  async clearSearchHistory(userId) {
+  async clearSearchHistory() {
     try {
-      const { data } = await client.delete('/user/search-history', { params: { user_id: userId } })
+      const { data } = await client.delete('/user/search-history')
       return data
     } catch (error) {
       console.warn('clearSearchHistory error:', error)
@@ -329,13 +329,13 @@ const api = {
     }
   },
 
-  async getNotificationSettings(userId) {
-    const { data } = await client.get('/user/notifications', { params: { user_id: userId } })
+  async getNotificationSettings() {
+    const { data } = await client.get('/user/notifications')
     return data
   },
 
-  async setNotificationEnabled(userId, enabled) {
-    const { data } = await client.post('/user/notifications', { enabled }, { params: { user_id: userId } })
+  async setNotificationEnabled(enabled) {
+    const { data } = await client.post('/user/notifications', { enabled })
     return data
   },
 
@@ -354,7 +354,7 @@ const api = {
     }
   },
 
-  async createPaymentLink(orderId, provider, returnUrl = null, storeId = null, amount = null, userId = null) {
+  async createPaymentLink(orderId, provider, returnUrl = null, storeId = null, amount = null) {
     try {
       const { data } = await client.post('/payment/create', {
         order_id: orderId,
@@ -362,7 +362,6 @@ const api = {
         return_url: returnUrl,
         store_id: storeId,
         amount: amount,
-        user_id: userId,
       })
       return data
     } catch (error) {

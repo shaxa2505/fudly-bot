@@ -123,8 +123,7 @@ export default function OrderDetailsPage() {
         provider,
         returnUrl,
         storeId,
-        order.total_price || null,
-        window.Telegram?.WebApp?.initDataUnsafe?.user?.id || null
+        order.total_price || null
       )
 
       if (paymentData?.payment_url) {

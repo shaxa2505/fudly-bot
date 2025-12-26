@@ -3,6 +3,8 @@ Database schema initialization.
 """
 from __future__ import annotations
 
+import os
+
 try:
     from logging_config import logger
 except ImportError:
@@ -18,6 +20,13 @@ class SchemaMixin:
         """Initialize PostgreSQL database schema."""
         with self.get_connection() as conn:
             cursor = conn.cursor()
+            run_runtime_migrations = (
+                os.getenv("RUN_DB_MIGRATIONS", "0").strip().lower() in {"1", "true", "yes"}
+            )
+            if not run_runtime_migrations:
+                logger.info(
+                    "Runtime migrations disabled (set RUN_DB_MIGRATIONS=1 to enable)."
+                )
 
             # Users table
             cursor.execute(
@@ -89,25 +98,28 @@ class SchemaMixin:
             )
 
             # Migration: Add unit and category columns if they don't exist
-            try:
-                cursor.execute("ALTER TABLE offers ADD COLUMN IF NOT EXISTS unit TEXT DEFAULT 'шт'")
-                cursor.execute(
-                    "ALTER TABLE offers ADD COLUMN IF NOT EXISTS category TEXT DEFAULT 'other'"
-                )
-            except Exception as e:
-                logger.warning(f"Migration for offers table: {e}")
+            if run_runtime_migrations:
+                try:
+                    cursor.execute("ALTER TABLE offers ADD COLUMN IF NOT EXISTS unit TEXT DEFAULT 'шт'")
+                    cursor.execute(
+                        "ALTER TABLE offers ADD COLUMN IF NOT EXISTS category TEXT DEFAULT 'other'"
+                    )
+                except Exception as e:
+                    logger.warning(f"Migration for offers table: {e}")
 
             # Migration: Add photo column to stores table if it doesn't exist
-            try:
-                cursor.execute("ALTER TABLE stores ADD COLUMN IF NOT EXISTS photo TEXT")
-            except Exception as e:
-                logger.warning(f"Migration for stores photo column: {e}")
+            if run_runtime_migrations:
+                try:
+                    cursor.execute("ALTER TABLE stores ADD COLUMN IF NOT EXISTS photo TEXT")
+                except Exception as e:
+                    logger.warning(f"Migration for stores photo column: {e}")
             # Migration: Add region/district columns to stores table if they don't exist
-            try:
-                cursor.execute("ALTER TABLE stores ADD COLUMN IF NOT EXISTS region TEXT")
-                cursor.execute("ALTER TABLE stores ADD COLUMN IF NOT EXISTS district TEXT")
-            except Exception as e:
-                logger.warning(f"Migration for stores region/district columns: {e}")
+            if run_runtime_migrations:
+                try:
+                    cursor.execute("ALTER TABLE stores ADD COLUMN IF NOT EXISTS region TEXT")
+                    cursor.execute("ALTER TABLE stores ADD COLUMN IF NOT EXISTS district TEXT")
+                except Exception as e:
+                    logger.warning(f"Migration for stores region/district columns: {e}")
 
             # Orders table
             cursor.execute(
@@ -134,54 +146,60 @@ class SchemaMixin:
             )
 
             # Migration: Add pickup_code column to orders table
-            try:
-                cursor.execute("ALTER TABLE orders ADD COLUMN IF NOT EXISTS pickup_code TEXT")
-            except Exception as e:
-                logger.warning(f"Migration for orders pickup_code column: {e}")
+            if run_runtime_migrations:
+                try:
+                    cursor.execute("ALTER TABLE orders ADD COLUMN IF NOT EXISTS pickup_code TEXT")
+                except Exception as e:
+                    logger.warning(f"Migration for orders pickup_code column: {e}")
 
             # Migration: Add cart_items column to orders table for multi-item orders
-            try:
-                cursor.execute("ALTER TABLE orders ADD COLUMN IF NOT EXISTS cart_items JSONB")
-                cursor.execute(
-                    "ALTER TABLE orders ADD COLUMN IF NOT EXISTS is_cart_order INTEGER DEFAULT 0"
-                )
-            except Exception as e:
-                logger.warning(f"Migration for orders cart columns: {e}")
+            if run_runtime_migrations:
+                try:
+                    cursor.execute("ALTER TABLE orders ADD COLUMN IF NOT EXISTS cart_items JSONB")
+                    cursor.execute(
+                        "ALTER TABLE orders ADD COLUMN IF NOT EXISTS is_cart_order INTEGER DEFAULT 0"
+                    )
+                except Exception as e:
+                    logger.warning(f"Migration for orders cart columns: {e}")
 
             # Migration: Add customer_message_id for editable status notifications
-            try:
-                cursor.execute(
-                    "ALTER TABLE orders ADD COLUMN IF NOT EXISTS customer_message_id BIGINT"
-                )
-            except Exception as e:
-                logger.warning(f"Migration for orders customer_message_id: {e}")
+            if run_runtime_migrations:
+                try:
+                    cursor.execute(
+                        "ALTER TABLE orders ADD COLUMN IF NOT EXISTS customer_message_id BIGINT"
+                    )
+                except Exception as e:
+                    logger.warning(f"Migration for orders customer_message_id: {e}")
 
             # Migration: Add seller_message_id for editable seller notifications
-            try:
-                cursor.execute(
-                    "ALTER TABLE orders ADD COLUMN IF NOT EXISTS seller_message_id BIGINT"
-                )
-            except Exception as e:
-                logger.warning(f"Migration for orders seller_message_id: {e}")
+            if run_runtime_migrations:
+                try:
+                    cursor.execute(
+                        "ALTER TABLE orders ADD COLUMN IF NOT EXISTS seller_message_id BIGINT"
+                    )
+                except Exception as e:
+                    logger.warning(f"Migration for orders seller_message_id: {e}")
 
             # Migration: Add order_type column to orders (pickup/delivery)
-            try:
-                cursor.execute(
-                    "ALTER TABLE orders ADD COLUMN IF NOT EXISTS order_type TEXT DEFAULT 'delivery'"
-                )
-            except Exception as e:
-                logger.warning(f"Migration for orders order_type: {e}")
+            if run_runtime_migrations:
+                try:
+                    cursor.execute(
+                        "ALTER TABLE orders ADD COLUMN IF NOT EXISTS order_type TEXT DEFAULT 'delivery'"
+                    )
+                except Exception as e:
+                    logger.warning(f"Migration for orders order_type: {e}")
 
             # Migration: Add rating_reminder_sent and updated_at for rating reminders
-            try:
-                cursor.execute(
-                    "ALTER TABLE orders ADD COLUMN IF NOT EXISTS rating_reminder_sent BOOLEAN DEFAULT false"
-                )
-                cursor.execute(
-                    "ALTER TABLE orders ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP"
-                )
-            except Exception as e:
-                logger.warning(f"Migration for orders rating_reminder: {e}")
+            if run_runtime_migrations:
+                try:
+                    cursor.execute(
+                        "ALTER TABLE orders ADD COLUMN IF NOT EXISTS rating_reminder_sent BOOLEAN DEFAULT false"
+                    )
+                    cursor.execute(
+                        "ALTER TABLE orders ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP"
+                    )
+                except Exception as e:
+                    logger.warning(f"Migration for orders rating_reminder: {e}")
 
             # Bookings table
             cursor.execute(
@@ -204,40 +222,44 @@ class SchemaMixin:
             )
 
             # Migration: Add cart_items column to bookings table for multi-item bookings
-            try:
-                cursor.execute("ALTER TABLE bookings ADD COLUMN IF NOT EXISTS cart_items JSONB")
-                cursor.execute(
-                    "ALTER TABLE bookings ADD COLUMN IF NOT EXISTS is_cart_booking INTEGER DEFAULT 0"
-                )
-            except Exception as e:
-                logger.warning(f"Migration for bookings cart columns: {e}")
+            if run_runtime_migrations:
+                try:
+                    cursor.execute("ALTER TABLE bookings ADD COLUMN IF NOT EXISTS cart_items JSONB")
+                    cursor.execute(
+                        "ALTER TABLE bookings ADD COLUMN IF NOT EXISTS is_cart_booking INTEGER DEFAULT 0"
+                    )
+                except Exception as e:
+                    logger.warning(f"Migration for bookings cart columns: {e}")
 
             # Migration: Add customer_message_id for editable status notifications
-            try:
-                cursor.execute(
-                    "ALTER TABLE bookings ADD COLUMN IF NOT EXISTS customer_message_id BIGINT"
-                )
-            except Exception as e:
-                logger.warning(f"Migration for bookings customer_message_id: {e}")
+            if run_runtime_migrations:
+                try:
+                    cursor.execute(
+                        "ALTER TABLE bookings ADD COLUMN IF NOT EXISTS customer_message_id BIGINT"
+                    )
+                except Exception as e:
+                    logger.warning(f"Migration for bookings customer_message_id: {e}")
 
             # Migration: Add seller_message_id for editable seller notifications
-            try:
-                cursor.execute(
-                    "ALTER TABLE bookings ADD COLUMN IF NOT EXISTS seller_message_id BIGINT"
-                )
-            except Exception as e:
-                logger.warning(f"Migration for bookings seller_message_id: {e}")
+            if run_runtime_migrations:
+                try:
+                    cursor.execute(
+                        "ALTER TABLE bookings ADD COLUMN IF NOT EXISTS seller_message_id BIGINT"
+                    )
+                except Exception as e:
+                    logger.warning(f"Migration for bookings seller_message_id: {e}")
 
             # Migration: Add rating_reminder_sent and updated_at for rating reminders
-            try:
-                cursor.execute(
-                    "ALTER TABLE bookings ADD COLUMN IF NOT EXISTS rating_reminder_sent BOOLEAN DEFAULT false"
-                )
-                cursor.execute(
-                    "ALTER TABLE bookings ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP"
-                )
-            except Exception as e:
-                logger.warning(f"Migration for bookings rating_reminder: {e}")
+            if run_runtime_migrations:
+                try:
+                    cursor.execute(
+                        "ALTER TABLE bookings ADD COLUMN IF NOT EXISTS rating_reminder_sent BOOLEAN DEFAULT false"
+                    )
+                    cursor.execute(
+                        "ALTER TABLE bookings ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP"
+                    )
+                except Exception as e:
+                    logger.warning(f"Migration for bookings rating_reminder: {e}")
 
             # Payment settings table
             cursor.execute(
@@ -458,10 +480,10 @@ class SchemaMixin:
             )
 
             # Create indexes
-            self._create_indexes(cursor)
-
-            # Run migrations
-            self._run_migrations(cursor)
+            if run_runtime_migrations:
+                self._create_indexes(cursor)
+                # Run migrations
+                self._run_migrations(cursor)
 
             conn.commit()
             logger.info("✅ PostgreSQL database schema initialized successfully")

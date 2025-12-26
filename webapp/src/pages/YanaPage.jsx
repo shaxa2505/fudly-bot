@@ -75,7 +75,7 @@ function YanaPage() {
   const loadNotificationSettings = async () => {
     if (!userId) return
     try {
-      const data = await api.getNotificationSettings(userId)
+      const data = await api.getNotificationSettings()
       setNotifications(Boolean(data.enabled))
     } catch (error) {
       console.warn('Failed to load notification settings:', error)
@@ -111,7 +111,7 @@ function YanaPage() {
     if (!userId) return
     const nextValue = !notifications
     try {
-      const data = await api.setNotificationEnabled(userId, nextValue)
+      const data = await api.setNotificationEnabled(nextValue)
       setNotifications(Boolean(data.enabled))
       toast.success(data.enabled ? "Bildirishnomalar yoqildi" : "Bildirishnomalar o'chirildi")
     } catch (error) {
@@ -130,16 +130,20 @@ function YanaPage() {
 
   useEffect(() => {
     loadOrders()
-    
+  }, [orderFilter])
+
+  useEffect(() => {
+    if (activeSection !== 'orders') return
+
     // Poll for updates every 10 seconds if there are active orders
     const interval = setInterval(() => {
       if (orders.some(o => ACTIVE_STATUSES.has(o.status))) {
         loadOrders(true)
       }
     }, 10000)
-    
+
     return () => clearInterval(interval)
-  }, [orderFilter, orders])
+  }, [activeSection, orders, orderFilter])
 
   useEffect(() => {
     loadNotificationSettings()
@@ -217,7 +221,7 @@ function YanaPage() {
   }
 
   const loadOrders = async (force = false) => {
-    setLoading(true)
+    if (!force) setLoading(true)
     try {
       // Unified orders list from webapp API (orders + bookings)
       const response = await api.getOrders({ force })
@@ -247,7 +251,7 @@ function YanaPage() {
       setOrders([])
       toast.error("Buyurtmalarni yuklab bo'lmadi")
     } finally {
-      setLoading(false)
+      if (!force) setLoading(false)
     }
   }
 
