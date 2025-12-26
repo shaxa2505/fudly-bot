@@ -1,8 +1,9 @@
 {
-  "buildCommand": "",
+  "buildCommand": "node -e \"require('fs').writeFileSync('config.js', `window.PARTNER_API_BASE=\\\\\\\"${process.env.PARTNER_API_BASE || ''}\\\\\\\";`)\"",
   "outputDirectory": ".",
   "cleanUrls": true,
   "trailingSlash": false,
+  "alias": ["fudly-partner-panel.vercel.app"],
   "headers": [
     {
       "source": "/(.*)",

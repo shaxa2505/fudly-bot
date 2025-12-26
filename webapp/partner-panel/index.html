@@ -3,7 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="api-base" content="">
     <title>Fudly Partner v21.1</title>
+    <script src="config.js"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Onest:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -12,17 +14,17 @@
     <script src="https://unpkg.com/lucide@latest"></script>
 
     <!-- Modular CSS Architecture -->
-    <link rel="stylesheet" href="/partner-panel/styles/variables.css?v=21.1">
-    <link rel="stylesheet" href="/partner-panel/styles/base.css?v=21.1">
-    <link rel="stylesheet" href="/partner-panel/styles/header.css?v=21.1">
-    <link rel="stylesheet" href="/partner-panel/styles/navigation.css?v=21.1">
-    <link rel="stylesheet" href="/partner-panel/styles/buttons.css?v=21.1">
-    <link rel="stylesheet" href="/partner-panel/styles/products.css?v=21.1">
-    <link rel="stylesheet" href="/partner-panel/styles/main.css?v=21.1">
-    <link rel="stylesheet" href="/partner-panel/styles/utilities.css?v=21.1">
-    <link rel="stylesheet" href="/partner-panel/styles/states.css?v=21.1">
-    <link rel="stylesheet" href="/partner-panel/styles/design-fixes.css?v=21.1">
-    <link rel="stylesheet" href="/partner-panel/styles/product-form-improvements.css?v=1.5">
+    <link rel="stylesheet" href="styles/variables.css?v=21.1">
+    <link rel="stylesheet" href="styles/base.css?v=21.1">
+    <link rel="stylesheet" href="styles/header.css?v=21.1">
+    <link rel="stylesheet" href="styles/navigation.css?v=21.1">
+    <link rel="stylesheet" href="styles/buttons.css?v=21.1">
+    <link rel="stylesheet" href="styles/products.css?v=21.1">
+    <link rel="stylesheet" href="styles/main.css?v=21.1">
+    <link rel="stylesheet" href="styles/utilities.css?v=21.1">
+    <link rel="stylesheet" href="styles/states.css?v=21.1">
+    <link rel="stylesheet" href="styles/design-fixes.css?v=21.1">
+    <link rel="stylesheet" href="styles/product-form-improvements.css?v=1.5">
 
     <!-- Critical Modal Styles -->
     <style>
@@ -154,7 +156,9 @@
                 tg.expand();
             } catch (e) {}
         }
-        const API_BASE = window.location.origin;
+        const API_BASE = window.PARTNER_API_BASE ||
+            document.querySelector('meta[name="api-base"]')?.getAttribute('content') ||
+            window.location.origin;
 
         const state = {
             currentView: 'dashboard',
@@ -1072,54 +1076,75 @@
                         <div class="empty-icon">
                             <i data-lucide="package-x"></i>
                         </div>
-                        <p class="empty-title">Нет заказов</p>
-                        <p class="empty-subtitle">Когда появятся новые заказы, они отобразятся здесь</p>
+                        <p class="empty-title">??? ???????</p>
+                        <p class="empty-subtitle">???? ??? ????? ???????, ?? ??? ????? ?????? ? ????? ??????</p>
                     </div>
                 `;
             }
 
             return `
-                <div class="orders-list">
+                <div class="orders-list compact-grid">
                     ${orders.map(order => {
                         const orderId = order.order_id || order.id;
                         const photoUrl = order.offer_photo_url || order.photo_url;
+                        const qty = order.quantity || 1;
+                        const typeLabel = order.order_type === 'pickup' ? '?????????' : '????????';
+                        const statusText = getStatusText(order.status);
                         return `
-                        <div class="order-card ripple"
+                        <div class="order-card compact ripple"
                              data-order-id="${orderId}"
                              data-status="${order.status}"
                              onclick="viewOrderDetails(${orderId})">
-                            ${photoUrl ? `
-                                <div class="order-image">
-                                    <img src="${photoUrl}" alt="${order.offer_title || 'Товар'}" loading="lazy"
-                                         onerror="this.parentElement.innerHTML=''; this.remove();">
+                            <div class="order-top">
+                                <div class="order-id">#${orderId || '?'}</div>
+                                <div class="order-meta-top">
+                                    <span class="order-time">${formatTime(order.created_at)}</span>
+                                    <span class="order-status status-${order.status}">${statusText}</span>
                                 </div>
-                            ` : ''}
-                            <div class="order-header">
-                                <div class="order-id">#${orderId || '—'}</div>
-                                <div class="order-status status-${order.status}">${getStatusText(order.status)}</div>
                             </div>
-                            <div class="order-meta">
-                                <span>${order.order_type === 'pickup' ? '🏃 Самовывоз' : '🚗 Доставка'}</span>
-                                <span>${order.customer_name || ''}</span>
+
+                            <div class="order-body">
+                                <div class="order-thumb">
+                                    ${photoUrl ? `
+                                        <img src="${photoUrl}" alt="${order.offer_title || '?????'}" loading="lazy"
+                                             onerror="this.closest('.order-thumb').classList.add('fallback'); this.remove();">
+                                    ` : `
+                                        <div class="order-thumb-fallback">
+                                            <i data-lucide="package"></i>
+                                        </div>
+                                    `}
+                                </div>
+
+                                <div class="order-info">
+                                    <div class="order-title">
+                                        ${order.offer_title || '?????'}${qty > 1 ? ` ? ${qty} ??` : ''}
+                                    </div>
+                                    <div class="order-chips">
+                                        <span class="chip chip-quiet">${typeLabel}</span>
+                                        ${order.customer_name ? `<span class="chip chip-quiet">${order.customer_name}</span>` : ''}
+                                        ${order.delivery_address ? `<span class="chip chip-muted">${order.delivery_address}</span>` : ''}
+                                    </div>
+                                </div>
+
+                                <div class="order-price">
+                                    ${formatPrice(order.price)}
+                                </div>
                             </div>
-                            <div class="order-footer">
-                                <span class="order-time">${formatTime(order.created_at)}</span>
-                                <span class="order-total">${formatPrice(order.price)}</span>
-                            </div>
+
                             ${order.status === 'pending' || order.status === 'new' ? `
                                 <div class="order-actions" onclick="event.stopPropagation()">
-                                    <button class="btn btn-sm btn-success ripple" onclick="handleStatusUpdate(${orderId}, 'preparing', this)">✓ Принять</button>
-                                    <button class="btn btn-sm btn-danger ripple" onclick="handleCancelOrder(${orderId}, this)">✕ Отменить</button>
+                                    <button class="pill-btn pill-success" onclick="handleStatusUpdate(${orderId}, 'preparing', this)">???????</button>
+                                    <button class="pill-btn pill-danger" onclick="handleCancelOrder(${orderId}, this)">????????</button>
                                 </div>
                             ` : ''}
                             ${order.status === 'preparing' ? `
                                 <div class="order-actions" onclick="event.stopPropagation()">
-                                    <button class="btn btn-sm btn-success ripple" onclick="handleStatusUpdate(${orderId}, 'ready', this)">✓ Заказ готов</button>
+                                    <button class="pill-btn pill-success" onclick="handleStatusUpdate(${orderId}, 'ready', this)">????? ? ??????</button>
                                 </div>
                             ` : ''}
                             ${order.status === 'ready' ? `
                                 <div class="order-actions" onclick="event.stopPropagation()">
-                                    <button class="btn btn-sm btn-success ripple" onclick="handleStatusUpdate(${orderId}, 'completed', this)">✓ Выдан клиенту</button>
+                                    <button class="pill-btn pill-success" onclick="handleStatusUpdate(${orderId}, 'completed', this)">?????</button>
                                 </div>
                             ` : ''}
                         </div>
@@ -2831,25 +2856,42 @@ async function toggleProductAvailability(id) {
         let touchStartY = 0;
         let pullDistance = 0;
         let isPulling = false;
+        let initialScrollY = 0;
 
         document.addEventListener('touchstart', (e) => {
-            if (window.scrollY === 0) {
+            initialScrollY = window.scrollY;
+            isPulling = initialScrollY === 0;
+
+            if (isPulling) {
                 touchStartY = e.touches[0].clientY;
-                isPulling = true;
+                pullDistance = 0;
             }
-        });
+        }, { passive: true });
 
         document.addEventListener('touchmove', (e) => {
             if (!isPulling) return;
-            pullDistance = e.touches[0].clientY - touchStartY;
-            if (pullDistance > 0 && pullDistance < 120) {
+
+            // If user already scrolled the page, don't block native scrolling
+            if (window.scrollY > 0) {
+                isPulling = false;
+                document.body.style.transform = '';
+                return;
+            }
+
+            const currentY = e.touches[0].clientY;
+            pullDistance = currentY - touchStartY;
+
+            if (pullDistance > 0 && pullDistance < 140) {
                 e.preventDefault();
                 document.body.style.transform = `translateY(${pullDistance * 0.5}px)`;
+            } else if (pullDistance <= 0) {
+                isPulling = false;
+                document.body.style.transform = '';
             }
-        });
+        }, { passive: false });
 
         document.addEventListener('touchend', () => {
-            if (pullDistance > 80) {
+            if (isPulling && pullDistance > 80) {
                 refreshAll();
                 if (typeof tg?.HapticFeedback !== 'undefined') {
                     tg.HapticFeedback.impactOccurred('medium');
@@ -2858,6 +2900,7 @@ async function toggleProductAvailability(id) {
             document.body.style.transform = '';
             isPulling = false;
             pullDistance = 0;
+            initialScrollY = 0;
         });
 
         // ============================================

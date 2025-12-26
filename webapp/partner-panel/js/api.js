@@ -3,8 +3,10 @@
    Handles all backend communication
    ================================================ */
 
-// API Base URL (will use relative paths in production)
-const API_BASE = window.location.origin;
+// API Base URL (overridable for standalone hosting)
+const API_BASE = window.PARTNER_API_BASE ||
+    document.querySelector('meta[name="api-base"]')?.getAttribute('content') ||
+    window.location.origin;
 
 // Get authentication data
 export function getAuth() {
