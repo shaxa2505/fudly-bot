@@ -7,6 +7,7 @@ real-time updates about bookings, offers, etc.
 import asyncio
 import json
 import logging
+import os
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Optional
@@ -252,8 +253,33 @@ async def websocket_handler(request: web.Request) -> web.WebSocketResponse:
     # Get user info from query params
     user_id = request.query.get("user_id")
     store_id = request.query.get("store_id")
+    init_data = request.query.get("init_data") or request.headers.get("X-Telegram-Init-Data")
 
-    if user_id:
+    authenticated_user_id = None
+    if init_data:
+        authenticated_user_id = _get_authenticated_user_id(init_data)
+
+    environment = os.getenv("ENVIRONMENT", "production").lower()
+    is_dev = environment in ("development", "dev", "local", "test")
+
+    if not authenticated_user_id and not is_dev:
+        await ws.send_json({"type": "error", "message": "Authentication required"})
+        await ws.close()
+        return ws
+
+    if authenticated_user_id is not None:
+        if user_id:
+            try:
+                if int(user_id) != authenticated_user_id:
+                    await ws.send_json({"type": "error", "message": "User mismatch"})
+                    await ws.close()
+                    return ws
+            except ValueError:
+                await ws.send_json({"type": "error", "message": "Invalid user_id"})
+                await ws.close()
+                return ws
+        user_id = authenticated_user_id
+    elif user_id:
         try:
             user_id = int(user_id)
         except ValueError:
@@ -293,6 +319,32 @@ async def websocket_handler(request: web.Request) -> web.WebSocketResponse:
             pass
 
     return ws
+
+
+def _get_authenticated_user_id(init_data: str) -> int | None:
+    """Validate Telegram initData and return user_id."""
+    try:
+        from app.api.webapp.common import settings, validate_init_data
+    except Exception as exc:  # pragma: no cover - defensive
+        logger.warning(f"WebSocket auth import failed: {exc}")
+        return None
+
+    try:
+        validated = validate_init_data(init_data, settings.bot_token)
+    except Exception:
+        return None
+
+    if not validated:
+        return None
+
+    user = validated.get("user")
+    if not isinstance(user, dict):
+        return None
+
+    try:
+        return int(user.get("id"))
+    except Exception:
+        return None
 
 
 async def _handle_client_message(client: WebSocketClient, data: dict) -> None:

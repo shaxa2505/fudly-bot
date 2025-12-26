@@ -3042,8 +3042,16 @@ async function toggleProductAvailability(id) {
             }
 
             const storeId = state.store.store_id;
-            const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-            const wsUrl = `${protocol}//${window.location.host}/ws/notifications?store_id=${storeId}`;
+            const auth = getAuth();
+            const params = new URLSearchParams();
+            params.set('store_id', storeId);
+            if (auth.userId && auth.userId !== 'none') {
+                params.set('user_id', auth.userId);
+            }
+            if (auth.data) {
+                params.set('init_data', auth.data);
+            }
+            const wsUrl = `${API_BASE.replace(/^http/, 'ws')}/ws/notifications?${params.toString()}`;
 
             console.log(`🔌 Connecting to WebSocket for store ${storeId}`);
 

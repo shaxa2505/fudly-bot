@@ -218,7 +218,7 @@ async def handle_qr_pickup(message: types.Message, db: DatabaseProtocol, booking
         kb = InlineKeyboardBuilder()
         kb.button(
             text="✅ Выдать заказ" if lang == "ru" else "✅ Buyurtmani berish",
-            callback_data=f"complete_booking_{entity_id}",
+            callback_data=f"order_complete_{entity_id}",
         )
         kb.adjust(1)
 

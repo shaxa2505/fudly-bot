@@ -8,13 +8,11 @@ FROM python:3.11-slim AS builder
 
 WORKDIR /build
 
-# Install build dependencies (add Node.js for frontend)
+# Install build dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
     gcc \
     libpq-dev \
     curl \
-    && curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
-    && apt-get install -y nodejs \
     && rm -rf /var/lib/apt/lists/*
 
 # Create virtual environment
@@ -25,16 +23,6 @@ ENV PATH="/opt/venv/bin:$PATH"
 COPY requirements.txt .
 RUN pip install --no-cache-dir --upgrade pip && \
     pip install --no-cache-dir -r requirements.txt
-
-# Build frontend
-COPY webapp/package*.json ./webapp/
-WORKDIR /build/webapp
-RUN npm ci --production=false
-COPY webapp/ .
-RUN npm run build
-
-WORKDIR /build
-
 
 # Stage 2: Runtime - Minimal production image
 FROM python:3.11-slim AS runtime
@@ -69,14 +57,6 @@ RUN groupadd -r botuser && useradd -r -g botuser -u 1000 botuser
 
 # Copy application code (includes webapp/partner-panel/)
 COPY --chown=botuser:botuser . .
-
-# Copy built frontend from builder
-COPY --from=builder --chown=botuser:botuser /build/webapp/dist ./webapp/dist
-
-# Verify critical files exist
-RUN test -d webapp/dist || (echo "ERROR: webapp/dist not found" && exit 1) && \
-    test -f webapp/partner-panel/index.html || (echo "ERROR: partner-panel not found" && exit 1) && \
-    echo "✅ Frontend files verified"
 
 # Remove unnecessary files
 RUN rm -rf tests/ htmlcov/ .git/ .pytest_cache/ __pycache__/ \

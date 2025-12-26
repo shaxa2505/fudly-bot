@@ -8,6 +8,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import os
+import urllib.parse
 from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Any
@@ -15,12 +16,9 @@ from typing import Any
 import uvicorn
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, Response
-from fastapi.staticfiles import StaticFiles
 from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 from slowapi.util import get_remote_address
-from starlette.datastructures import Headers
 
 from app.api.auth import router as auth_router
 from app.api.auth import set_auth_db
@@ -32,16 +30,6 @@ from app.api.webapp_api import router as webapp_router
 from app.api.webapp_api import set_db_instance
 
 logger = logging.getLogger(__name__)
-
-
-# 🔥 Custom StaticFiles that always returns 200, never 304
-class NoCacheStaticFiles(StaticFiles):
-    """StaticFiles that disables caching by overriding is_not_modified check"""
-
-    def is_not_modified(self, response_headers, request_headers):
-        """Always return False to prevent 304 responses"""
-        return False
-
 
 # Global reference to the bot's database
 _app_db = None
@@ -106,12 +94,36 @@ def create_api_app(db: Any = None, offer_service: Any = None, bot_token: str = N
     environment = os.getenv("ENVIRONMENT", "production").lower()
     is_dev = environment in ("development", "dev", "local", "test")
 
+    def _origin_from_url(value: str | None) -> str | None:
+        if not value:
+            return None
+        try:
+            parsed = urllib.parse.urlsplit(value.strip())
+        except Exception:
+            return None
+        if not parsed.scheme or not parsed.netloc:
+            return None
+        return f"{parsed.scheme}://{parsed.netloc}"
+
     allowed_origins = [
         # Telegram WebApp
         "https://web.telegram.org",
         "https://telegram.org",
         "https://fudly-webapp.vercel.app",
     ]
+
+    # Allow explicitly configured origins (webapp + partner panel)
+    for env_name in ("WEBAPP_URL", "PARTNER_PANEL_URL", "WEBAPP_ORIGIN", "PARTNER_PANEL_ORIGIN"):
+        origin = _origin_from_url(os.getenv(env_name))
+        if origin and origin not in allowed_origins:
+            allowed_origins.append(origin)
+
+    extra_origins = os.getenv("CORS_ALLOWED_ORIGINS", "")
+    if extra_origins:
+        for raw in extra_origins.split(","):
+            origin = _origin_from_url(raw)
+            if origin and origin not in allowed_origins:
+                allowed_origins.append(origin)
 
     # Only allow localhost in development
     if is_dev:
@@ -141,6 +153,8 @@ def create_api_app(db: Any = None, offer_service: Any = None, bot_token: str = N
             "Authorization",
             "X-Requested-With",
             "X-Telegram-Init-Data",
+            "Sentry-Trace",
+            "Baggage",
         ],
         expose_headers=["Content-Length", "Content-Type"],
     )
@@ -217,49 +231,6 @@ def create_api_app(db: Any = None, offer_service: Any = None, bot_token: str = N
                 "cwd": os.getcwd(),
                 "file_location": str(Path(__file__).absolute()),
             }
-
-    # Serve static files (MUST be after all API routes)
-    logger.info(f"📁 Looking for Partner Panel at: {partner_panel_path.absolute()}")
-    logger.info(f"📁 Partner Panel exists: {partner_panel_path.exists()}")
-    if partner_panel_path.exists():
-        logger.info(f"📁 Partner Panel contents: {list(partner_panel_path.iterdir())[:5]}")
-
-    logger.info(f"📁 Looking for Mini App at: {webapp_dist_path.absolute()}")
-    logger.info(f"📁 Mini App exists: {webapp_dist_path.exists()}")
-
-    # Mount Partner Panel FIRST (more specific path)
-    if partner_panel_path.exists() and (partner_panel_path / "index.html").exists():
-        # Mount static assets with NoCacheStaticFiles to prevent 304 responses
-        app.mount(
-            "/partner-panel/styles",
-            NoCacheStaticFiles(directory=str(partner_panel_path / "styles")),
-            name="partner-panel-styles",
-        )
-        app.mount(
-            "/partner-panel/js",
-            NoCacheStaticFiles(directory=str(partner_panel_path / "js")),
-            name="partner-panel-js",
-        )
-
-        # Mount main app with HTML fallback
-        app.mount(
-            "/partner-panel",
-            NoCacheStaticFiles(directory=str(partner_panel_path), html=True),
-            name="partner-panel",
-        )
-        logger.info(f"✅ Partner Panel mounted at /partner-panel from {partner_panel_path}")
-        logger.info("   Access at: http://localhost:8000/partner-panel/")
-        logger.info("   Static files: /partner-panel/styles/, /partner-panel/js/")
-    else:
-        logger.error(f"❌ Partner Panel not found or missing index.html at {partner_panel_path}")
-        logger.error(f"   Expected file: {partner_panel_path / 'index.html'}")
-
-    # Mount Mini App (main webapp) - must be last to avoid conflicts
-    if webapp_dist_path.exists() and (webapp_dist_path / "index.html").exists():
-        app.mount("/", StaticFiles(directory=str(webapp_dist_path), html=True), name="webapp")
-        logger.info(f"✅ Mini App mounted at / from {webapp_dist_path}")
-    else:
-        logger.error(f"❌ Mini App dist not found or missing index.html at {webapp_dist_path}")
 
     return app
 

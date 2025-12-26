@@ -69,7 +69,16 @@ function YanaPage() {
 
   const getWsUrl = () => {
     const base = API_BASE_URL.replace(/^http/, 'ws').replace(/\/api\/v1$/, '')
-    return `${base}/ws/notifications?user_id=${userId}`
+    const params = new URLSearchParams()
+    if (userId) {
+      params.set('user_id', userId)
+    }
+    const initData = window.Telegram?.WebApp?.initData || localStorage.getItem('fudly_init_data')
+    if (initData) {
+      params.set('init_data', initData)
+    }
+    const query = params.toString()
+    return `${base}/ws/notifications${query ? `?${query}` : ''}`
   }
 
   const loadNotificationSettings = async () => {
@@ -483,14 +492,14 @@ function YanaPage() {
                             e.stopPropagation()
                             const orderId = summary.orderId
                             setCancelingOrderId(orderId)
-                            
+
                             // Optimistic update
-                            setOrders(prev => prev.map(o => 
-                              (o.id || o.booking_id) === orderId 
+                            setOrders(prev => prev.map(o =>
+                              (o.id || o.booking_id) === orderId
                                 ? { ...o, status: 'cancelled', order_status: 'cancelled' }
                                 : o
                             ))
-                            
+
                             try {
                               await api.cancelOrder(orderId)
                               toast.success("Buyurtma bekor qilindi")
@@ -655,7 +664,7 @@ function YanaPage() {
               Fudly - oziq-ovqat mahsulotlarini chegirmali narxlarda sotib olish uchun ilova.
             </p>
             <p>
-              Muddati o'tayotgan yoki ortiqcha mahsulotlarni arzon narxda oling va isrofgarchilikni kamaytiring! 
+              Muddati o'tayotgan yoki ortiqcha mahsulotlarni arzon narxda oling va isrofgarchilikni kamaytiring!
             </p>
           </div>
 

@@ -885,7 +885,7 @@
 /* Offers Grid */
 .offers-grid {
   display: grid;
-  grid-template-columns: repeat(2, 1fr);
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 18px;
   padding: 12px 18px 28px;
   background: transparent;
@@ -1229,9 +1229,9 @@
 /* Offer card wrapper for animation */
 .offer-card-wrapper {
   display: block;
-  content-visibility: auto;
   contain: layout paint;
-  contain-intrinsic-size: 320px 360px;
+  min-width: 0;
+  width: 100%;
 }
 
 .offer-card-wrapper.animate-in > * {
@@ -1243,13 +1243,13 @@
 /* Responsive */
 @media (min-width: 768px) {
   .offers-grid {
-    grid-template-columns: repeat(3, 1fr);
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 }
 
 @media (min-width: 1024px) {
   .offers-grid {
-    grid-template-columns: repeat(4, 1fr);
+    grid-template-columns: repeat(4, minmax(0, 1fr));
     max-width: 1200px;
     margin: 0 auto;
   }

@@ -1,6 +1,6 @@
 """Seller order management - unified with new notification system.
 
-Shows all orders/bookings in ONE message with inline pagination.
+Shows all orders in ONE message with inline pagination.
 Uses UnifiedOrderService for status changes and notifications.
 """
 from __future__ import annotations
@@ -357,104 +357,10 @@ async def seller_filter_completed(callback: types.CallbackQuery) -> None:
 
 @router.callback_query(F.data.startswith("seller_view_b_"))
 async def seller_view_booking(callback: types.CallbackQuery) -> None:
-    """View booking details with action buttons."""
-    db = get_db()
-    lang = db.get_user_language(callback.from_user.id)
-
-    try:
-        booking_id = int(callback.data.split("_")[-1])
-    except ValueError:
-        await callback.answer("❌", show_alert=True)
-        return
-
-    booking = db.get_booking(booking_id)
-    if not booking:
-        await callback.answer("❌ Topilmadi" if lang == "uz" else "❌ Не найдено", show_alert=True)
-        return
-
-    status = _get_field(booking, "status") or "pending"
-    quantity = _get_field(booking, "quantity") or 1
-    booking_code = _get_field(booking, "booking_code") or ""
-    user_id = _get_field(booking, "user_id")
-    offer_id = _get_field(booking, "offer_id")
-
-    offer = db.get_offer(offer_id) if offer_id else None
-    title = _get_field(offer, "title") or "Товар"
-    price = _get_field(offer, "discount_price") or 0
-
-    customer = db.get_user_model(user_id) if user_id else None
-    customer_name = customer.first_name if customer and customer.first_name else "Клиент"
-    customer_phone = customer.phone if customer and customer.phone else "—"
-
-    total = price * quantity
-    currency = "so'm" if lang == "uz" else "сум"
-
-    status_emoji = {
-        "pending": "⏳",
-        "confirmed": "✅",
-        "preparing": "👨‍🍳",
-        "completed": "🎉",
-        "cancelled": "❌",
-    }.get(status, "📦")
-    status_text = {
-        "pending": "Kutilmoqda" if lang == "uz" else "Ожидает",
-        "confirmed": "Tasdiqlangan" if lang == "uz" else "Подтверждён",
-        "preparing": "Tayyorlanmoqda" if lang == "uz" else "Готовится",
-        "completed": "Bajarildi" if lang == "uz" else "Выполнен",
-        "cancelled": "Bekor qilindi" if lang == "uz" else "Отменён",
-    }.get(status, status)
-
-    lines = [
-        f"🏪 <b>{'OLIB KETISH' if lang == 'uz' else 'САМОВЫВОЗ'} #{booking_id}</b>",
-        f"{status_emoji} <b>{status_text}</b>",
-        "",
-        f"📦 {title}",
-        f"🔢 {'Miqdor' if lang == 'uz' else 'Кол-во'}: <b>{quantity}</b>",
-        f"💰 {'Jami' if lang == 'uz' else 'Итого'}: <b>{total:,} {currency}</b>",
-        "",
-        f"👤 {customer_name}",
-        f"📱 <code>{customer_phone}</code>",
-    ]
-
-    if booking_code:
-        lines.append(f"🎫 {'Kod' if lang == 'uz' else 'Код'}: <code>{booking_code}</code>")
-
-    text = "\n".join(lines)
-
-    kb = InlineKeyboardBuilder()
-
-    if status == "pending":
-        kb.button(
-            text="✅ Tasdiqlash" if lang == "uz" else "✅ Подтвердить",
-            callback_data=f"booking_confirm_{booking_id}",
-        )
-        kb.button(
-            text="❌ Rad etish" if lang == "uz" else "❌ Отклонить",
-            callback_data=f"booking_reject_{booking_id}",
-        )
-    elif status in ["confirmed", "preparing"]:
-        kb.button(
-            text="🎉 Topshirildi" if lang == "uz" else "🎉 Выдано",
-            callback_data=f"complete_booking_{booking_id}",
-        )
-        kb.button(
-            text="❌ Bekor" if lang == "uz" else "❌ Отменить",
-            callback_data=f"booking_cancel_seller_{booking_id}",
-        )
-
-    kb.button(
-        text="📞 Aloqa" if lang == "uz" else "📞 Связаться",
-        callback_data=f"contact_customer_b_{booking_id}",
-    )
-    kb.button(text="⬅️ Orqaga" if lang == "uz" else "⬅️ Назад", callback_data="seller_orders_refresh")
-    kb.adjust(2, 1, 1)
-
-    try:
-        await callback.message.edit_text(text, parse_mode="HTML", reply_markup=kb.as_markup())
-    except Exception:
-        await callback.message.answer(text, parse_mode="HTML", reply_markup=kb.as_markup())
-
-    await callback.answer()
+    """Legacy pickup view: redirect to unified order view."""
+    booking_id = callback.data.split("_")[-1]
+    callback.data = f"seller_view_o_{booking_id}"
+    await seller_view_order(callback)
 
 
 # =============================================================================
@@ -632,121 +538,6 @@ async def contact_customer(callback: types.CallbackQuery) -> None:
 
 
 # =============================================================================
-# BOOKING ACTIONS (using UnifiedOrderService)
-# =============================================================================
-
-
-@router.callback_query(F.data.startswith("booking_confirm_"))
-async def confirm_booking_handler(callback: types.CallbackQuery) -> None:
-    """Confirm a pending booking via UnifiedOrderService."""
-    db = get_db()
-    lang = db.get_user_language(callback.from_user.id)
-
-    try:
-        booking_id = int(callback.data.split("_")[-1])
-    except ValueError:
-        await callback.answer("❌", show_alert=True)
-        return
-
-    booking = db.get_booking(booking_id)
-    if not booking:
-        await callback.answer("❌ Topilmadi" if lang == "uz" else "❌ Не найдено", show_alert=True)
-        return
-
-    status = _get_field(booking, "status")
-    if status != "pending":
-        await callback.answer(
-            "❌ Allaqachon ko'rib chiqilgan" if lang == "uz" else "❌ Уже обработано",
-            show_alert=True,
-        )
-        return
-
-    # Update via UnifiedOrderService
-    service = get_unified_order_service()
-    if not service:
-        logger.error("UnifiedOrderService is not initialized for booking_confirm handler")
-        await callback.answer(get_text(lang, "error") or "System error", show_alert=True)
-        return
-
-    try:
-        await service.confirm_order(booking_id, "booking")
-        await callback.answer("✅ Tasdiqlandi" if lang == "uz" else "✅ Подтверждено")
-
-        # Refresh view
-        await seller_orders_refresh(callback)
-    except Exception as e:
-        logger.error(f"confirm_booking error: {e}")
-        await callback.answer(
-            f"❌ Xatolik: {e}" if lang == "uz" else f"❌ Ошибка: {e}", show_alert=True
-        )
-
-
-@router.callback_query(F.data.startswith("booking_reject_"))
-async def reject_booking_handler(callback: types.CallbackQuery) -> None:
-    """Reject a pending booking via UnifiedOrderService."""
-    db = get_db()
-    lang = db.get_user_language(callback.from_user.id)
-
-    try:
-        booking_id = int(callback.data.split("_")[-1])
-    except ValueError:
-        await callback.answer("❌", show_alert=True)
-        return
-
-    booking = db.get_booking(booking_id)
-    if not booking:
-        await callback.answer("❌ Topilmadi" if lang == "uz" else "❌ Не найдено", show_alert=True)
-        return
-
-    service = get_unified_order_service()
-    if not service:
-        logger.error("UnifiedOrderService is not initialized for booking_reject handler")
-        await callback.answer(get_text(lang, "error") or "System error", show_alert=True)
-        return
-
-    try:
-        await service.reject_order(booking_id, "booking", reason="Продавец отклонил")
-        await callback.answer("❌ Rad etildi" if lang == "uz" else "❌ Отклонено")
-
-        await seller_orders_refresh(callback)
-    except Exception as e:
-        logger.error(f"reject_booking error: {e}")
-        await callback.answer(
-            f"❌ Xatolik: {e}" if lang == "uz" else f"❌ Ошибка: {e}", show_alert=True
-        )
-
-
-@router.callback_query(F.data.startswith("booking_cancel_seller_"))
-async def cancel_booking_seller_handler(callback: types.CallbackQuery) -> None:
-    """Cancel active booking by seller."""
-    db = get_db()
-    lang = db.get_user_language(callback.from_user.id)
-
-    try:
-        booking_id = int(callback.data.split("_")[-1])
-    except ValueError:
-        await callback.answer("❌", show_alert=True)
-        return
-
-    service = get_unified_order_service()
-    if not service:
-        logger.error("UnifiedOrderService is not initialized for booking_cancel_seller handler")
-        await callback.answer(get_text(lang, "error") or "System error", show_alert=True)
-        return
-
-    try:
-        await service.cancel_order(booking_id, "booking")
-        await callback.answer("❌ Bekor qilindi" if lang == "uz" else "❌ Отменено")
-
-        await seller_orders_refresh(callback)
-    except Exception as e:
-        logger.error(f"cancel_booking error: {e}")
-        await callback.answer(
-            f"❌ Xatolik: {e}" if lang == "uz" else f"❌ Ошибка: {e}", show_alert=True
-        )
-
-
-# =============================================================================
 # ORDER ACTIONS (using UnifiedOrderService)
 # =============================================================================
 # NOTE: order_confirm_, order_reject_, order_ready_, order_delivering_ handlers 
@@ -807,5 +598,6 @@ async def legacy_filter_completed(callback: types.CallbackQuery) -> None:
 @router.callback_query(F.data.startswith("booking_details_seller_"))
 async def legacy_booking_details(callback: types.CallbackQuery) -> None:
     booking_id = callback.data.split("_")[-1]
-    callback.data = f"seller_view_b_{booking_id}"
-    await seller_view_booking(callback)
+    callback.data = f"seller_view_o_{booking_id}"
+    await seller_view_order(callback)
+

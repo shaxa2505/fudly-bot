@@ -410,7 +410,18 @@ class OfferMixin:
         with self.get_connection() as conn:
             cursor = conn.cursor()
             cursor.execute(
-                "UPDATE offers SET quantity = %s WHERE offer_id = %s", (quantity, offer_id)
+                """
+                UPDATE offers
+                SET quantity = %s,
+                    stock_quantity = %s,
+                    status = CASE
+                        WHEN %s <= 0 AND status IN ('active','out_of_stock') THEN 'out_of_stock'
+                        WHEN %s > 0 AND status = 'out_of_stock' THEN 'active'
+                        ELSE status
+                    END
+                WHERE offer_id = %s
+                """,
+                (quantity, quantity, quantity, quantity, offer_id),
             )
 
     def increment_offer_quantity(self, offer_id: int, amount: int = 1):
@@ -420,10 +431,18 @@ class OfferMixin:
             cursor.execute(
                 """
                 UPDATE offers
-                SET quantity = quantity + %s
+                SET quantity = quantity + %s,
+                    stock_quantity = COALESCE(stock_quantity, quantity) + %s,
+                    status = CASE
+                        WHEN COALESCE(stock_quantity, quantity) + %s <= 0
+                             AND status IN ('active','out_of_stock') THEN 'out_of_stock'
+                        WHEN COALESCE(stock_quantity, quantity) + %s > 0
+                             AND status = 'out_of_stock' THEN 'active'
+                        ELSE status
+                    END
                 WHERE offer_id = %s
             """,
-                (amount, offer_id),
+                (amount, amount, amount, amount, offer_id),
             )
             logger.info(f"Offer {offer_id} quantity increased by {amount}")
 
@@ -434,11 +453,19 @@ class OfferMixin:
             cursor.execute(
                 """
                 UPDATE offers
-                SET quantity = quantity + %s
+                SET quantity = quantity + %s,
+                    stock_quantity = COALESCE(stock_quantity, quantity) + %s,
+                    status = CASE
+                        WHEN COALESCE(stock_quantity, quantity) + %s <= 0
+                             AND status IN ('active','out_of_stock') THEN 'out_of_stock'
+                        WHEN COALESCE(stock_quantity, quantity) + %s > 0
+                             AND status = 'out_of_stock' THEN 'active'
+                        ELSE status
+                    END
                 WHERE offer_id = %s
                 RETURNING quantity
             """,
-                (amount, offer_id),
+                (amount, amount, amount, amount, offer_id),
             )
             result = cursor.fetchone()
             new_qty = result[0] if result else 0

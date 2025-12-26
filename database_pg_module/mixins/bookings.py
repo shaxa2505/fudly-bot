@@ -95,7 +95,8 @@ class BookingMixin:
             # Check and reserve product atomically
             cursor.execute(
                 """
-                SELECT quantity, status, store_id FROM offers
+                SELECT quantity, stock_quantity, status, store_id
+                FROM offers
                 WHERE offer_id = %s AND status = 'active'
                 FOR UPDATE
             """,
@@ -108,35 +109,42 @@ class BookingMixin:
                 logger.warning(f"🔵 Offer {offer_id} not found or not active")
                 return (False, None, None, "offer_not_found")
 
-            if offer[0] is None or offer[0] < quantity:
+            current_qty = offer[0]
+            stock_qty = offer[1]
+            available_qty = stock_qty if stock_qty is not None else current_qty
+
+            if available_qty is None or available_qty < quantity:
                 conn.rollback()
                 logger.warning(
-                    f"🔵 Offer {offer_id} insufficient quantity: {offer[0]} < {quantity}"
+                    f"🔵 Offer {offer_id} insufficient quantity: {available_qty} < {quantity}"
                 )
-                return (False, None, None, f"insufficient_qty:{offer[0]}")
+                return (False, None, None, f"insufficient_qty:{available_qty}")
 
-            if offer[1] != "active":
+            if offer[2] != "active":
                 conn.rollback()
-                logger.warning(f"🔵 Offer {offer_id} status is '{offer[1]}', not active")
-                return (False, None, None, f"offer_inactive:{offer[1]}")
+                logger.warning(f"🔵 Offer {offer_id} status is '{offer[2]}', not active")
+                return (False, None, None, f"offer_inactive:{offer[2]}")
 
-            current_quantity = offer[0]
-            store_id = offer[2]  # store_id from offers table
-            new_quantity = current_quantity - quantity
+            store_id = offer[3]  # store_id from offers table
+            new_quantity = available_qty - quantity
 
-            logger.info(f"🔍 Offer {offer_id}: qty={current_quantity}, store_id={store_id}")
+            logger.info(f"🔍 Offer {offer_id}: qty={available_qty}, store_id={store_id}")
 
             # Update quantity atomically
             cursor.execute(
                 """
                 UPDATE offers
                 SET quantity = %s,
-                    status = CASE WHEN %s <= 0 THEN 'inactive' ELSE 'active' END
-                WHERE offer_id = %s AND quantity = %s
+                    stock_quantity = %s,
+                    status = CASE
+                        WHEN %s <= 0 AND status IN ('active','out_of_stock') THEN 'out_of_stock'
+                        WHEN %s > 0 AND status = 'out_of_stock' THEN 'active'
+                        ELSE status
+                    END
+                WHERE offer_id = %s
             """,
-                (new_quantity, new_quantity, offer_id, current_quantity),
+                (new_quantity, new_quantity, new_quantity, new_quantity, offer_id),
             )
-
             if cursor.rowcount == 0:
                 conn.rollback()
                 logger.warning(f"🔵 Offer {offer_id} concurrent update detected")
@@ -442,7 +450,7 @@ class BookingMixin:
 
             # Lock booking row
             cursor.execute(
-                "SELECT status, offer_id, quantity FROM bookings WHERE booking_id = %s FOR UPDATE",
+                "SELECT status, offer_id, quantity, is_cart_booking, cart_items FROM bookings WHERE booking_id = %s FOR UPDATE",
                 (booking_id,),
             )
             row = cursor.fetchone()
@@ -451,26 +459,62 @@ class BookingMixin:
                 return False
 
             status, offer_id, qty = row[0], row[1], row[2]
-            if status in ("cancelled", "completed"):
+            is_cart_booking = int(row[3] or 0)
+            cart_items = row[4]
+            if status in ("cancelled", "completed", "rejected"):
                 conn.rollback()
                 return False
 
             qty_to_return = int(qty or 0)
 
-            # Return quantity to offer
-            cursor.execute(
-                """
-                UPDATE offers
-                SET quantity = COALESCE(quantity, 0) + %s,
-                    status = CASE WHEN COALESCE(quantity, 0) + %s <= 0 THEN 'inactive' ELSE 'active' END
-                WHERE offer_id = %s
-            """,
-                (qty_to_return, qty_to_return, offer_id),
-            )
+            # Return quantity to offer(s)
+            if is_cart_booking and cart_items:
+                import json
+
+                try:
+                    items = json.loads(cart_items) if isinstance(cart_items, str) else cart_items
+                except Exception:
+                    items = []
+
+                for item in items or []:
+                    item_offer_id = item.get("offer_id")
+                    item_qty = int(item.get("quantity", 1))
+                    if not item_offer_id:
+                        continue
+                    cursor.execute(
+                        """
+                        UPDATE offers
+                        SET quantity = COALESCE(quantity, 0) + %s,
+                            stock_quantity = COALESCE(stock_quantity, quantity, 0) + %s,
+                            status = CASE
+                                WHEN COALESCE(stock_quantity, quantity, 0) + %s > 0
+                                     AND status = 'out_of_stock' THEN 'active'
+                                ELSE status
+                            END
+                        WHERE offer_id = %s
+                        """,
+                        (item_qty, item_qty, item_qty, item_offer_id),
+                    )
+            elif offer_id:
+                cursor.execute(
+                    """
+                    UPDATE offers
+                    SET quantity = COALESCE(quantity, 0) + %s,
+                        stock_quantity = COALESCE(stock_quantity, quantity, 0) + %s,
+                        status = CASE
+                            WHEN COALESCE(stock_quantity, quantity, 0) + %s > 0
+                                 AND status = 'out_of_stock' THEN 'active'
+                            ELSE status
+                        END
+                    WHERE offer_id = %s
+                    """,
+                    (qty_to_return, qty_to_return, qty_to_return, offer_id),
+                )
 
             # Mark as cancelled
             cursor.execute(
-                "UPDATE bookings SET status = %s WHERE booking_id = %s", ("cancelled", booking_id)
+                "UPDATE bookings SET status = %s, updated_at = CURRENT_TIMESTAMP WHERE booking_id = %s",
+                ("cancelled", booking_id),
             )
 
             conn.commit()
@@ -598,7 +642,7 @@ class BookingMixin:
                 quantity = item["quantity"]
 
                 cursor.execute(
-                    "SELECT quantity, status, store_id FROM offers WHERE offer_id = %s AND status = 'active' FOR UPDATE",
+                    "SELECT quantity, stock_quantity, status, store_id FROM offers WHERE offer_id = %s AND status = 'active' FOR UPDATE",
                     (offer_id,),
                 )
                 row = cursor.fetchone()
@@ -607,7 +651,9 @@ class BookingMixin:
                     logger.warning(f"🛒 Offer {offer_id} not found or inactive")
                     return (False, None, None, f"offer_unavailable:{offer_id}")
 
-                available_qty = row[0] or 0
+                current_qty = row[0]
+                stock_qty = row[1]
+                available_qty = stock_qty if stock_qty is not None else (current_qty or 0)
                 if available_qty < quantity:
                     conn.rollback()
                     logger.warning(
@@ -618,8 +664,18 @@ class BookingMixin:
                 # Reserve quantity
                 new_qty = available_qty - quantity
                 cursor.execute(
-                    "UPDATE offers SET quantity = %s WHERE offer_id = %s",
-                    (new_qty, offer_id),
+                    """
+                    UPDATE offers
+                    SET quantity = %s,
+                        stock_quantity = %s,
+                        status = CASE
+                            WHEN %s <= 0 AND status IN ('active','out_of_stock') THEN 'out_of_stock'
+                            WHEN %s > 0 AND status = 'out_of_stock' THEN 'active'
+                            ELSE status
+                        END
+                    WHERE offer_id = %s
+                    """,
+                    (new_qty, new_qty, new_qty, new_qty, offer_id),
                 )
                 logger.info(f"🛒 Reserved offer {offer_id}: {quantity} units (new qty: {new_qty})")
 

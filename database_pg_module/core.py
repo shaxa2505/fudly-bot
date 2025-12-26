@@ -82,7 +82,8 @@ def hybrid_row_factory(cursor):
 
 
 # Database connection configuration
-DATABASE_URL = os.environ.get("DATABASE_URL", "")
+# Railway provides DATABASE_PRIVATE_URL for internal network connections
+DATABASE_URL = os.environ.get("DATABASE_PRIVATE_URL") or os.environ.get("DATABASE_URL", "")
 MIN_CONNECTIONS = int(os.environ.get("DB_MIN_CONN", "5"))  # Увеличено с 1 до 5
 MAX_CONNECTIONS = int(os.environ.get("DB_MAX_CONN", "20"))  # Увеличено с 5 до 20
 POOL_WAIT_TIMEOUT = int(os.environ.get("DB_POOL_WAIT_TIMEOUT", "60"))
@@ -95,26 +96,18 @@ BOOKING_EXPIRY_CHECK_MINUTES = int(os.environ.get("BOOKING_EXPIRY_CHECK_MINUTES"
 
 def fix_railway_database_url(url: str) -> str:
     """
-    Fix Railway internal hostname to use public URL.
-    Railway sometimes provides internal hostnames that don't work across services.
+    Fix Railway database URL for proper connection.
+    Railway V2 uses .railway.internal for private network connections.
     """
     if not url:
         return url
 
-    if ".railway.internal" in url:
-        pghost = os.environ.get("PGHOST", "")
-        pgport = os.environ.get("PGPORT", "5432")
-        pgdatabase = os.environ.get("PGDATABASE", "railway")
-        pguser = os.environ.get("PGUSER", "postgres")
-        pgpassword = os.environ.get("PGPASSWORD", "")
-
-        if pghost and pgpassword and ".railway.internal" not in pghost:
-            rebuilt_url = f"postgresql://{pguser}:{pgpassword}@{pghost}:{pgport}/{pgdatabase}"
-            logger.info("🔧 Rebuilt DATABASE_URL from PGHOST components")
-            return rebuilt_url
-        else:
-            logger.warning("⚠️ DATABASE_URL contains .railway.internal but no valid PGHOST found")
-
+    # Railway V2 uses .railway.internal which works fine within Railway network
+    # Just ensure we're using the correct URL format
+    if "postgres://" in url and "postgresql://" not in url:
+        url = url.replace("postgres://", "postgresql://", 1)
+        logger.info("🔧 Fixed postgres:// to postgresql:// in DATABASE_URL")
+    
     return url
 
 

@@ -412,27 +412,27 @@ async def send_order_card(
             text += f"🕐 {created_at}\n"
 
         builder = InlineKeyboardBuilder()
-        builder.button(text="👁️ Подробнее", callback_data=f"booking_details_seller_{booking_id}")
-        builder.button(text="📞 Контакт", callback_data=f"contact_customer_{booking_id}")
+        builder.button(text="👁️ Подробнее", callback_data=f"seller_view_o_{booking_id}")
+        builder.button(text="📞 Контакт", callback_data=f"contact_customer_o_{booking_id}")
         if status == "pending":
-            # Use explicit booking_ prefix since this is pickup BOOKING
+            # Use order_ prefix since pickup orders live in orders.
             builder.button(
                 text="✅ Подтвердить" if lang == "ru" else "✅ Tasdiqlash",
-                callback_data=f"booking_confirm_{booking_id}",
+                callback_data=f"order_confirm_{booking_id}",
             )
             builder.button(
                 text="❌ Отменить" if lang == "ru" else "❌ Bekor qilish",
-                callback_data=f"booking_reject_{booking_id}",
+                callback_data=f"order_reject_{booking_id}",
             )
             builder.adjust(2, 2)
         elif status == "confirmed":
             builder.button(
                 text="🎉 Выдано" if lang == "ru" else "🎉 Berildi",
-                callback_data=f"complete_booking_{booking_id}",
+                callback_data=f"order_complete_{booking_id}",
             )
             builder.button(
                 text="❌ Отменить" if lang == "ru" else "❌ Bekor qilish",
-                callback_data=f"partner_cancel_{booking_id}",
+                callback_data=f"order_cancel_seller_{booking_id}",
             )
             builder.adjust(2, 2)
     else:

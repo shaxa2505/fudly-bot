@@ -684,6 +684,7 @@ class UnifiedOrderService:
         payment_method: str = "cash",
         notify_customer: bool = True,
         notify_sellers: bool = True,
+        telegram_notify: bool | None = None,
     ) -> OrderResult:
         """
         Create order(s) from items list.
@@ -825,6 +826,12 @@ class UnifiedOrderService:
         customer_lang = self.db.get_user_language(user_id)
         currency = "so'm" if customer_lang == "uz" else "сум"
 
+        telegram_enabled = (
+            self.telegram_order_notifications
+            if telegram_notify is None
+            else telegram_notify
+        )
+
         # Send notifications to sellers
         if notify_sellers and stores_orders:
             await self._notify_sellers_new_order(
@@ -834,6 +841,7 @@ class UnifiedOrderService:
                 payment_method=payment_method,
                 customer_name=customer_name,
                 customer_phone=customer_phone,
+                send_telegram=telegram_enabled,
             )
 
         # Send notification/event to customer (WebApp sync always; Telegram optional)
@@ -860,7 +868,7 @@ class UnifiedOrderService:
                 currency=currency,
             )
 
-            if notify_customer and self.telegram_order_notifications:
+            if notify_customer and telegram_enabled:
                 try:
                     await self.bot.send_message(user_id, customer_msg, parse_mode="HTML")
                 except Exception as e:
@@ -1133,8 +1141,14 @@ class UnifiedOrderService:
         payment_method: str,
         customer_name: str,
         customer_phone: str,
+        send_telegram: bool | None = None,
     ) -> None:
         """Send order notifications to sellers, grouped by store."""
+        telegram_enabled = (
+            self.telegram_order_notifications
+            if send_telegram is None
+            else send_telegram
+        )
         for store_id, store_orders in stores_orders.items():
             try:
                 store = self.db.get_store(store_id)
@@ -1209,7 +1223,7 @@ class UnifiedOrderService:
                 kb.adjust(2)
 
                 sent_msg = None
-                if self.telegram_order_notifications:
+                if telegram_enabled:
                     sent_msg = await self.bot.send_message(
                         owner_id, seller_text, parse_mode="HTML", reply_markup=kb.as_markup()
                     )

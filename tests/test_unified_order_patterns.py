@@ -24,13 +24,3 @@ def test_customer_received_pattern_rejects_invalid() -> None:
     assert pattern.match("customer_received_abc") is None
 
 
-def test_booking_received_pattern_matches_valid_id() -> None:
-    pattern = re.compile(customer.BOOKING_RECEIVED_PATTERN)
-    assert pattern.match("booking_received_45") is not None
-
-
-def test_booking_received_pattern_rejects_invalid() -> None:
-    pattern = re.compile(customer.BOOKING_RECEIVED_PATTERN)
-    assert pattern.match("booking_received_") is None
-    assert pattern.match("booking_received_45_extra") is None
-    assert pattern.match("booking_received_foo") is None

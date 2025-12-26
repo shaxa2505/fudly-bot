@@ -1,7 +1,7 @@
 """Seller-side unified order handlers.
 
 Contains confirmation/rejection, status updates and courier handover
-flows for both orders and bookings. All callbacks are registered via
+flows for orders. All callbacks are registered via
 `register(router)`.
 """
 from __future__ import annotations
@@ -28,49 +28,20 @@ from .common import _get_db, _get_entity_field, _get_store_field, logger
 
 # Regex patterns for all supported callback formats
 CONFIRM_PATTERN = re.compile(
-    r"^(booking_confirm_|order_confirm_|partner_confirm_order_|partner_confirm_|confirm_order_)(\d+)$"
+    r"^(order_confirm_|partner_confirm_order_|confirm_order_)(\d+)$"
 )
 REJECT_PATTERN = re.compile(
-    r"^(booking_reject_|order_reject_|partner_reject_order_|partner_reject_|cancel_order_)(\d+)$"
+    r"^(order_reject_|partner_reject_order_|cancel_order_)(\d+)$"
 )
 
-# Mapping from callback prefix to entity type
-PREFIX_TO_TYPE = {
-    "booking_confirm_": "booking",
-    "booking_reject_": "booking",
-    "partner_confirm_": "booking",  # Legacy booking pattern
-    "partner_reject_": "booking",  # Legacy booking pattern
-    "order_confirm_": "order",
-    "order_reject_": "order",
-    "partner_confirm_order_": "order",  # Legacy order pattern
-    "partner_reject_order_": "order",  # Legacy order pattern
-    "confirm_order_": "order",
-    "cancel_order_": "order",
-}
 
 
 def _determine_entity_type(prefix: str, entity_id: int, db_instance: Any) -> tuple[str, Any]:
-    """Determine entity type from callback prefix, with DB fallbacks."""
+    """Determine entity type for order callbacks."""
 
-    suggested_type = PREFIX_TO_TYPE.get(prefix)
-
-    if suggested_type == "booking":
-        entity = db_instance.get_booking(entity_id)
-        if entity:
-            return ("booking", entity)
-    elif suggested_type == "order":
-        entity = db_instance.get_order(entity_id)
-        if entity:
-            return ("order", entity)
-
-    # Fallback: check both tables (for generic patterns like order_confirm_)
     entity = db_instance.get_order(entity_id)
     if entity:
         return ("order", entity)
-
-    entity = db_instance.get_booking(entity_id)
-    if entity:
-        return ("booking", entity)
 
     return ("unknown", None)
 
@@ -80,14 +51,13 @@ async def _restore_quantities_fallback(db_instance: Any, entity: Any, entity_typ
 
     try:
         if isinstance(entity, dict):
-            is_cart = entity.get("is_cart_order", 0) == 1 or entity.get("is_cart_booking", 0) == 1
+            is_cart = entity.get("is_cart_order", 0) == 1
             cart_items_json = entity.get("cart_items")
             offer_id = entity.get("offer_id")
             quantity = entity.get("quantity", 1)
         else:
             is_cart = (
                 getattr(entity, "is_cart_order", 0) == 1
-                or getattr(entity, "is_cart_booking", 0) == 1
             )
             cart_items_json = getattr(entity, "cart_items", None)
             offer_id = getattr(entity, "offer_id", None)
@@ -121,7 +91,7 @@ async def _restore_quantities_fallback(db_instance: Any, entity: Any, entity_typ
 
 
 async def unified_confirm_handler(callback: types.CallbackQuery) -> None:
-    """Unified handler for order/booking confirmation callbacks."""
+    """Unified handler for order confirmation callbacks."""
 
     if not callback.from_user or not callback.data:
         await callback.answer()
@@ -195,7 +165,7 @@ async def unified_confirm_handler(callback: types.CallbackQuery) -> None:
     from app.core.utils import get_offer_field
 
     items: list[dict] = []
-    order_type = "delivery" if entity_type == "order" else "pickup"
+    order_type = "delivery"
     delivery_address: str | None = None
     customer_name: str | None = None
     customer_phone: str | None = None
@@ -203,10 +173,12 @@ async def unified_confirm_handler(callback: types.CallbackQuery) -> None:
     delivery_price = 0
 
     if entity_type == "order":
-        order_type_db = _get_entity_field(entity, "order_type", "delivery")
+        delivery_address = _get_entity_field(entity, \"delivery_address\")
+        order_type_db = _get_entity_field(entity, \"order_type\")
         if order_type_db:
             order_type = order_type_db
-        delivery_address = _get_entity_field(entity, "delivery_address")
+        else:
+            order_type = \"delivery\" if delivery_address else \"pickup\"
 
         offer_id = _get_entity_field(entity, "offer_id")
         quantity = _get_entity_field(entity, "quantity", 1)
@@ -234,17 +206,6 @@ async def unified_confirm_handler(callback: types.CallbackQuery) -> None:
         delivery_price = (
             _get_store_field(store, "delivery_price", 0) if order_type == "delivery" else 0
         )
-    else:
-        # Booking (pickup)
-        offer_id = _get_entity_field(entity, "offer_id")
-        quantity = _get_entity_field(entity, "quantity", 1)
-        if offer_id:
-            offer = db_instance.get_offer(offer_id)
-            if offer:
-                title = get_offer_field(offer, "title", "Товар")
-                price = get_offer_field(offer, "discount_price", 0)
-                items.append({"title": title, "quantity": quantity, "price": price})
-                total = price * quantity
 
     # Customer info
     customer_id = _get_entity_field(entity, "user_id")
@@ -272,16 +233,7 @@ async def unified_confirm_handler(callback: types.CallbackQuery) -> None:
 
     # Add a short next-step hint so sellers clearly understand
     # what to do after confirmation for each flow.
-    if entity_type == "booking":
-        if lang == "uz":
-            hint = (
-                "\n\n<i>Mijoz kelganda mahsulotni topshiring va “Topshirildi” "
-                "tugmasini bosing.</i>"
-            )
-        else:
-            hint = "\n\n<i>Когда клиент придёт, выдайте товар и нажмите " "«Выдано».</i>"
-        seller_text += hint
-    elif entity_type == "order" and order_type != "delivery":
+    if order_type != "delivery":
         # Pickup order created через orders: сразу ждём фактической выдачи.
         if lang == "uz":
             hint = "\n\n<i>Mijoz buyurtmani olganda “Topshirildi” tugmasini bosing.</i>"
@@ -297,13 +249,7 @@ async def unified_confirm_handler(callback: types.CallbackQuery) -> None:
         seller_text += hint
 
     kb = InlineKeyboardBuilder()
-    if entity_type == "booking":
-        # Classic pickup booking flow: after подтверждения сразу ждём выдачи
-        if lang == "uz":
-            kb.button(text="✅ Topshirildi", callback_data=f"complete_booking_{entity_id}")
-        else:
-            kb.button(text="✅ Выдано", callback_data=f"complete_booking_{entity_id}")
-    elif entity_type == "order" and order_type != "delivery":
+    if order_type != "delivery":
         # Pickup‑заказ, оформленный через orders: не показываем этапы доставки,
         # сразу даём кнопку "выдано" как для брони.
         if lang == "uz":
@@ -343,7 +289,7 @@ async def unified_confirm_handler(callback: types.CallbackQuery) -> None:
 
 
 async def unified_reject_handler(callback: types.CallbackQuery) -> None:
-    """Unified handler for order/booking rejection callbacks."""
+    """Unified handler for order rejection callbacks."""
 
     if not callback.from_user or not callback.data:
         await callback.answer()
@@ -398,10 +344,7 @@ async def unified_reject_handler(callback: types.CallbackQuery) -> None:
         success = await order_service.reject_order(entity_id, entity_type)
     else:
         try:
-            if entity_type == "order":
-                db_instance.update_order_status(entity_id, OrderStatus.REJECTED)
-            else:
-                db_instance.cancel_booking(entity_id)
+            db_instance.update_order_status(entity_id, OrderStatus.REJECTED)
 
             await _restore_quantities_fallback(db_instance, entity, entity_type)
             success = True
@@ -954,109 +897,8 @@ async def order_complete_handler(callback: types.CallbackQuery) -> None:
     await callback.answer(f"🎉 {msg}")
 
 
-async def complete_booking_handler(callback: types.CallbackQuery) -> None:
-    """Mark pickup booking as completed (item handed to customer)."""
-
-    if not callback.from_user or not callback.data:
-        await callback.answer()
-        return
-
-    db_instance = _get_db()
-    if not db_instance:
-        await callback.answer("System error", show_alert=True)
-        return
-
-    order_service = get_unified_order_service()
-    partner_id = callback.from_user.id
-    lang = db_instance.get_user_language(partner_id)
-
-    try:
-        entity_id = int(callback.data.split("_")[-1])
-    except ValueError:
-        await callback.answer("❌", show_alert=True)
-        return
-
-    entity_type = "booking"
-    entity = db_instance.get_booking(entity_id)
-
-    # v24+: pickup orders live in `orders` table (use pickup_code for verification)
-    order = db_instance.get_order(entity_id)
-    if order and _get_entity_field(order, "order_type") == "pickup":
-        entity_type = "order"
-        entity = order
-
-    if not entity:
-        msg = "Bron/Buyurtma topilmadi" if lang == "uz" else "Бронь/заказ не найден"
-        await callback.answer(f"❌ {msg}", show_alert=True)
-        return
-
-    store_id = _get_entity_field(entity, "store_id")
-    if not store_id and entity_type == "booking":
-        offer_id = _get_entity_field(entity, "offer_id")
-        if offer_id:
-            offer = db_instance.get_offer(offer_id)
-            if offer:
-                store_id = _get_entity_field(offer, "store_id")
-
-    store = db_instance.get_store(store_id) if store_id else None
-    owner_id = _get_store_field(store, "owner_id") if store else None
-
-    if not owner_id or partner_id != owner_id:
-        await callback.answer("❌", show_alert=True)
-        return
-
-    if order_service:
-        success = await order_service.complete_order(entity_id, entity_type)  # type: ignore[arg-type]
-    else:
-        try:
-            if entity_type == "order":
-                db_instance.update_order_status(entity_id, OrderStatus.COMPLETED)
-            else:
-                db_instance.complete_booking(entity_id)
-            success = True
-        except Exception as e:  # pragma: no cover
-            logger.error(f"Failed to complete {entity_type}: {e}")
-            success = False
-
-    if not success:
-        await callback.answer("❌", show_alert=True)
-        return
-
-    try:
-        complete_text = "✅ <b>TOPSHIRILDI</b>" if lang == "uz" else "✅ <b>ВЫДАНО</b>"
-        if callback.message and getattr(callback.message, "text", None):
-            await callback.message.edit_text(
-                text=f"{callback.message.text}\n\n{complete_text}",
-                parse_mode="HTML",
-            )
-    except Exception:  # pragma: no cover
-        pass
-
-    if lang == "uz":
-        text = (
-            f"✅ Buyurtma #{entity_id} yakunlandi!"
-            if entity_type == "order"
-            else f"✅ Bron #{entity_id} yakunlandi!"
-        )
-    else:
-        text = (
-            f"✅ Заказ #{entity_id} выдан!"
-            if entity_type == "order"
-            else f"✅ Бронь #{entity_id} завершена!"
-        )
-
-    try:
-        if callback.message:
-            await callback.message.answer(text)
-    except Exception:  # pragma: no cover
-        pass
-
-    msg = "Yakunlandi!" if lang == "uz" else "Завершено!"
-    await callback.answer(f"🎉 {msg}")
-
-
 async def order_cancel_seller_handler(callback: types.CallbackQuery) -> None:
-    """Seller cancels order or booking after confirmation."""
+    """Seller cancels order after confirmation."""
 
     if not callback.from_user or not callback.data:
         await callback.answer()
@@ -1076,12 +918,8 @@ async def order_cancel_seller_handler(callback: types.CallbackQuery) -> None:
     except ValueError:
         await callback.answer("❌", show_alert=True)
         return
-
     entity = db_instance.get_order(entity_id)
     entity_type = "order"
-    if not entity:
-        entity = db_instance.get_booking(entity_id)
-        entity_type = "booking"
 
     if not entity:
         await callback.answer("❌", show_alert=True)
@@ -1099,10 +937,7 @@ async def order_cancel_seller_handler(callback: types.CallbackQuery) -> None:
         success = await order_service.reject_order(entity_id, entity_type, "Отменено продавцом")
     else:
         try:
-            if entity_type == "order":
-                db_instance.update_order_status(entity_id, OrderStatus.CANCELLED)
-            else:
-                db_instance.cancel_booking(entity_id)
+            db_instance.update_order_status(entity_id, OrderStatus.CANCELLED)
             await _restore_quantities_fallback(db_instance, entity, entity_type)
             success = True
         except Exception:  # pragma: no cover
@@ -1147,9 +982,6 @@ def register(router: Router) -> None:
     )
 
     router.callback_query.register(order_complete_handler, F.data.regexp(r"^order_complete_(\d+)$"))
-    router.callback_query.register(
-        complete_booking_handler, F.data.regexp(r"^complete_booking_(\d+)$")
-    )
     router.callback_query.register(
         order_cancel_seller_handler, F.data.regexp(r"^order_cancel_seller_(\d+)$")
     )

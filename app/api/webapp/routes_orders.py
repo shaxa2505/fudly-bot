@@ -201,6 +201,7 @@ async def create_order(
                     payment_method=payment_method,
                     notify_customer=False,
                     notify_sellers=True,
+                    telegram_notify=False,
                 )
             except Exception as e:  # pragma: no cover - defensive
                 logger.error(f"Unified order service failed for webapp order: {e}")
@@ -700,12 +701,8 @@ async def notify_partner_webapp_order(
         reject_text = "❌ Отклонить"
 
     kb = InlineKeyboardBuilder()
-    if is_delivery:
-        kb.button(text=confirm_text, callback_data=f"order_confirm_{entity_id}")
-        kb.button(text=reject_text, callback_data=f"order_reject_{entity_id}")
-    else:
-        kb.button(text=confirm_text, callback_data=f"booking_confirm_{entity_id}")
-        kb.button(text=reject_text, callback_data=f"booking_reject_{entity_id}")
+    kb.button(text=confirm_text, callback_data=f"order_confirm_{entity_id}")
+    kb.button(text=reject_text, callback_data=f"order_reject_{entity_id}")
     kb.adjust(2)
 
     try:
@@ -727,26 +724,14 @@ async def notify_partner_webapp_order(
                 owner_id, text, parse_mode="HTML", reply_markup=kb.as_markup()
             )
 
-        if (
-            sent_msg
-            and hasattr(db, "set_order_seller_message_id")
-            and hasattr(db, "set_booking_seller_message_id")
-        ):
+        if sent_msg and hasattr(db, "set_order_seller_message_id"):
             try:
-                if is_delivery:
-                    db.set_order_seller_message_id(entity_id, sent_msg.message_id)
-                    logger.info(
-                        "Saved seller_message_id=%s for order#%s",
-                        sent_msg.message_id,
-                        entity_id,
-                    )
-                else:
-                    db.set_booking_seller_message_id(entity_id, sent_msg.message_id)
-                    logger.info(
-                        "Saved seller_message_id=%s for booking#%s",
-                        sent_msg.message_id,
-                        entity_id,
-                    )
+                db.set_order_seller_message_id(entity_id, sent_msg.message_id)
+                logger.info(
+                    "Saved seller_message_id=%s for order#%s",
+                    sent_msg.message_id,
+                    entity_id,
+                )
             except Exception as save_err:  # pragma: no cover - defensive
                 logger.error(f"Failed to save seller_message_id: {save_err}")
     except Exception as e:  # pragma: no cover - defensive

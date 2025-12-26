@@ -1,5 +1,5 @@
 import { useState, useEffect, lazy, Suspense } from 'react'
-import { MemoryRouter, Routes, Route, useNavigate, useLocation } from 'react-router-dom'
+import { BrowserRouter, Routes, Route, useNavigate, useLocation } from 'react-router-dom'
 import { FavoritesProvider } from './context/FavoritesContext'
 import { ToastProvider } from './context/ToastContext'
 import api from './api/client'
@@ -198,13 +198,13 @@ function AppContent() {
 
 function App() {
   return (
-    <MemoryRouter>
+    <BrowserRouter>
       <ToastProvider>
         <FavoritesProvider>
           <AppContent />
         </FavoritesProvider>
       </ToastProvider>
-    </MemoryRouter>
+    </BrowserRouter>
   )
 }
 

@@ -5,8 +5,8 @@
 /* ===== CARD CONTAINER ===== */
 .offer-card {
   background: #FFFFFF;
-  border: 1px solid #E6E8EC;
-  border-radius: 18px;
+  border: 1px solid #E5E7EB;
+  border-radius: 20px;
   box-shadow: none;
   display: flex;
   flex-direction: column;
@@ -15,10 +15,9 @@
   -webkit-tap-highlight-color: transparent;
   transition: transform 0.12s ease, border-color 0.2s ease;
   position: relative;
-  /* Speeds up large lists in Chromium-based WebViews (ignored elsewhere). */
-  content-visibility: auto;
-  contain-intrinsic-size: 320px 340px;
-  padding: 8px;
+  min-width: 0;
+  width: 100%;
+  padding: 10px;
 }
 
 .offer-card:active {
@@ -35,8 +34,8 @@
   position: relative;
   width: 100%;
   padding-top: 100%;
-  background: #F5F6F7;
-  border-radius: 14px;
+  background: #F3F4F6;
+  border-radius: 16px;
   overflow: hidden;
   border: none;
   display: flex;
@@ -50,8 +49,11 @@
   top: 50%;
   left: 50%;
   transform: translate(-50%, -50%);
-  font-size: 44px;
-  opacity: 0.2;
+  font-size: 46px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  color: #C2C7CF;
+  opacity: 1;
   z-index: 0;
   pointer-events: none;
 }
@@ -118,9 +120,9 @@
   bottom: 10px;
   background: #F04438;
   color: #FFFFFF;
-  font-size: 11px;
-  font-weight: 700;
-  padding: 5px 8px;
+  font-size: 12px;
+  font-weight: 800;
+  padding: 4px 8px;
   border-radius: 999px;
   line-height: 1;
   z-index: 2;
@@ -130,8 +132,8 @@
 /* ===== ACTIONS ===== */
 .card-action {
   position: absolute;
-  right: 6px;
-  bottom: 6px;
+  right: 8px;
+  bottom: 8px;
   left: auto;
   z-index: 2;
   display: flex;
@@ -145,24 +147,24 @@
   --qc-btn-size: 26px;
   --qc-value-font: 13px;
   min-width: 84px;
-  box-shadow: 0 2px 8px rgba(16, 24, 40, 0.12);
-  border: 1px solid #E6E8EC;
+  box-shadow: 0 2px 6px rgba(16, 24, 40, 0.12);
+  border: 1px solid #E5E7EB;
 }
 
 .add-to-cart-fab {
-  width: 34px;
-  height: 34px;
+  width: 36px;
+  height: 36px;
   border-radius: 50%;
-  border: 1px solid #E6E8EC;
+  border: 1px solid #D0D5DD;
   background: #FFFFFF;
-  color: #111827;
+  color: #1F2937;
   font-size: 20px;
   font-weight: 700;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  box-shadow: 0 2px 8px rgba(16, 24, 40, 0.14);
+  box-shadow: 0 2px 6px rgba(16, 24, 40, 0.12);
   transition: transform 0.15s ease, box-shadow 0.2s ease;
   padding: 0;
 }
@@ -183,22 +185,22 @@
 
 /* ===== CONTENT SECTION ===== */
 .card-content {
-  padding: 2px 4px 4px;
+  padding: 4px 4px 6px;
   display: flex;
   flex-direction: column;
-  gap: 4px;
-  min-height: 72px;
+  gap: 6px;
+  min-height: 74px;
 }
 
 .price-section {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 3px;
 }
 
 .price-main {
-  font-size: 17px;
-  font-weight: 700;
+  font-size: 18px;
+  font-weight: 800;
   color: #111827;
   line-height: 1.15;
   letter-spacing: -0.1px;
@@ -209,29 +211,35 @@
 }
 
 .price-main .currency {
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 600;
-  color: #98A2B3;
+  color: #667085;
+}
+
+.price-main.discounted .currency {
+  color: inherit;
 }
 
 .price-original {
   font-size: 11px;
   color: #98A2B3;
   text-decoration: line-through;
+  text-decoration-thickness: 1px;
+  text-decoration-color: #B2B8C2;
   line-height: 1;
   font-weight: 400;
 }
 
 .offer-title {
   font-size: 13px;
-  font-weight: 600;
+  font-weight: 700;
   color: #111827;
   margin: 0;
-  line-height: 1.35;
+  line-height: 1.4;
   display: -webkit-box;
   -webkit-line-clamp: 2;
   line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
-  min-height: 34px;
+  min-height: 36px;
 }

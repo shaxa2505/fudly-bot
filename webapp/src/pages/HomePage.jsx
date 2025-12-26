@@ -144,6 +144,16 @@ function HomePage() {
 
   const [showingAllCities, setShowingAllCities] = useState(false)
   const [showingRegion, setShowingRegion] = useState(false)
+  const showingAllCitiesRef = useRef(showingAllCities)
+  const showingRegionRef = useRef(showingRegion)
+
+  useEffect(() => {
+    showingAllCitiesRef.current = showingAllCities
+  }, [showingAllCities])
+
+  useEffect(() => {
+    showingRegionRef.current = showingRegion
+  }, [showingRegion])
 
   // Load offers - сначала по городу, если пусто - из всех городов
   const loadOffers = useCallback(async (reset = false, forceAllCities = false, forceRegion = false) => {
@@ -157,10 +167,10 @@ function HomePage() {
         limit: 20,
         offset: currentOffset,
       }
-      const useRegionOnly = forceRegion || showingRegion
+      const useRegionOnly = forceRegion || showingRegionRef.current
 
       // Если не forceAllCities - фильтруем по городу
-      if (!forceAllCities && !showingAllCities && !useRegionOnly) {
+      if (!forceAllCities && !showingAllCitiesRef.current && !useRegionOnly) {
         params.city = cityForApi
       }
 
@@ -229,7 +239,7 @@ function HomePage() {
           const hasDiscount = original > discountPrice
 
           if (minDiscount) {
-            if (!hasDiscount) return false
+            if (!hasDiscount || original <= 0) return false
             const percent = Math.round((1 - discountPrice / original) * 100)
             if (percent < minDiscount) return false
           }
@@ -262,19 +272,17 @@ function HomePage() {
       }
 
       // Если город пустой и это первая загрузка - загружаем из всех городов
-      if (reset && dataList.length === 0 && !forceAllCities && !showingAllCities) {
+      if (reset && dataList.length === 0 && !forceAllCities && !showingAllCitiesRef.current) {
         if (!useRegionOnly && (location.region || location.district)) {
           setShowingRegion(true)
           loadingRef.current = false
-          setLoading(false)
-          return loadOffers(true, false, true)
+          return await loadOffers(true, false, true)
         }
 
         setShowingAllCities(true)
         setShowingRegion(false)
         loadingRef.current = false
-        setLoading(false)
-        return loadOffers(true, true)
+        return await loadOffers(true, true)
       }
 
       if (reset) {
@@ -298,7 +306,7 @@ function HomePage() {
       loadingRef.current = false
       setLoading(false)
     }
-  }, [selectedCategory, searchQuery, cityForApi, location.region, location.district, showingAllCities, showingRegion, minDiscount, sortBy, priceRange])
+  }, [selectedCategory, searchQuery, cityForApi, location.region, location.district, minDiscount, sortBy, priceRange])
 
   // Save search query to history when searching
   const handleSearchSubmit = useCallback(async () => {

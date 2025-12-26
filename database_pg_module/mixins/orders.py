@@ -254,7 +254,7 @@ class OrderMixin:
                 try:
                     # First, check and reserve stock for this offer atomically
                     cursor.execute(
-                        "SELECT quantity, status FROM offers WHERE offer_id = %s FOR UPDATE",
+                        "SELECT quantity, stock_quantity, status FROM offers WHERE offer_id = %s FOR UPDATE",
                         (offer_id,),
                     )
                     offer_row = cursor.fetchone()
@@ -263,14 +263,16 @@ class OrderMixin:
                         failed_items.append(item)
                         continue
 
-                    current_qty = offer_row[0] or 0
-                    offer_status = offer_row[1]
+                    current_qty = offer_row[0]
+                    stock_qty = offer_row[1]
+                    offer_status = offer_row[2]
+                    available_qty = stock_qty if stock_qty is not None else (current_qty or 0)
 
-                    if current_qty < quantity or offer_status != "active":
+                    if available_qty < quantity or offer_status != "active":
                         logger.warning(
                             "Insufficient stock or inactive offer %s in cart order (qty=%s, status=%s)",
                             offer_id,
-                            current_qty,
+                            available_qty,
                             offer_status,
                         )
                         failed_items.append(item)
@@ -332,15 +334,20 @@ class OrderMixin:
                         order_id = result[0]
 
                         # Update offer quantity based on previously locked value
-                        new_qty = current_qty - quantity
+                        new_qty = available_qty - quantity
                         cursor.execute(
                             """
                             UPDATE offers
                             SET quantity = %s,
-                                status = CASE WHEN %s <= 0 THEN 'inactive' ELSE status END
+                                stock_quantity = %s,
+                                status = CASE
+                                    WHEN %s <= 0 AND status IN ('active','out_of_stock') THEN 'out_of_stock'
+                                    WHEN %s > 0 AND status = 'out_of_stock' THEN 'active'
+                                    ELSE status
+                                END
                             WHERE offer_id = %s
                             """,
-                            (new_qty, new_qty, offer_id),
+                            (new_qty, new_qty, new_qty, new_qty, offer_id),
                         )
 
                         order_info = {

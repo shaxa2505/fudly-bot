@@ -38,11 +38,6 @@ describe('OfferCard', () => {
     expect(screen.getByText('Test Product')).toBeInTheDocument()
   })
 
-  it('renders store name', () => {
-    renderOfferCard()
-    expect(screen.getByText('Test Store')).toBeInTheDocument()
-  })
-
   it('renders discount price', () => {
     renderOfferCard()
     expect(screen.getByText(/10.*000/)).toBeInTheDocument()

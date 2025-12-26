@@ -224,6 +224,7 @@ def register(router: Router) -> None:
                 payment_method="cash",
                 notify_customer=True,
                 notify_sellers=True,
+                telegram_notify=True,
             )
         except Exception as e:  # pragma: no cover - defensive logging
             from logging_config import logger

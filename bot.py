@@ -272,7 +272,7 @@ async def fallback_text_handler(message: types.Message, state: FSMContext) -> No
 # MINI APP ORDER CALLBACKS (LEGACY - for backwards compatibility)
 # =============================================================================
 # These handlers use the OLD format: order_accept:{booking_code}:{customer_id}
-# New orders use: booking_confirm_{id} or order_confirm_{id} (handled by unified_order_handlers)
+# New orders use: order_confirm_{id} (handled by unified_order_handlers)
 # Keep these for processing old messages that users might still click
 
 

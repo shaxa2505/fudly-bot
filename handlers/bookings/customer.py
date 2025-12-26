@@ -1432,9 +1432,9 @@ async def notify_partner_new_booking(
         reject_text = "❌ Отклонить"
 
     kb = InlineKeyboardBuilder()
-    # Use explicit booking_ prefix since this is pickup BOOKING
-    kb.button(text=confirm_text, callback_data=f"booking_confirm_{booking_id}")
-    kb.button(text=reject_text, callback_data=f"booking_reject_{booking_id}")
+    # Use order_ prefix since pickup orders live in orders.
+    kb.button(text=confirm_text, callback_data=f"order_confirm_{booking_id}")
+    kb.button(text=reject_text, callback_data=f"order_reject_{booking_id}")
     kb.adjust(2)
 
     try:
@@ -1459,11 +1459,11 @@ async def notify_partner_new_booking(
             )
 
         # Save seller_message_id for live editing
-        if sent_msg and hasattr(db, "set_booking_seller_message_id"):
+        if sent_msg and hasattr(db, "set_order_seller_message_id"):
             try:
-                db.set_booking_seller_message_id(booking_id, sent_msg.message_id)
+                db.set_order_seller_message_id(booking_id, sent_msg.message_id)
                 logger.info(
-                    f"Saved seller_message_id={sent_msg.message_id} for booking#{booking_id}"
+                    f"Saved seller_message_id={sent_msg.message_id} for order#{booking_id}"
                 )
             except Exception as save_err:
                 logger.error(f"Failed to save seller_message_id: {save_err}")
