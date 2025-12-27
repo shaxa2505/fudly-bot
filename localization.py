@@ -7,7 +7,7 @@ TEXTS = {
         # Приветствие
         "choose_language": "🌍 Выберите язык / Tilni tanlang",
         "language_changed": "✅ Язык изменён на Русский",
-        "welcome": """🛍 <b>Fudly — спасаем еду от выброса!</b>
+        "welcome": """""🛍 <b>Fudly — спасаем еду от выброса!</b>
 
 Покупайте товары с истекающим сроком годности
 со скидкой <b>до 70%</b>
@@ -16,19 +16,19 @@ TEXTS = {
 ✅ <b>Выгодно</b> — скидки до 70%
 ✅ <b>Полезно</b> — меньше отходов
 
-🔥 Более 100 магазинов в вашем городе""",
-        "welcome_phone_step": """📱 <b>Укажите номер телефона</b>
+🔥 Более 100 магазинов в вашем городе""""",
+        "welcome_phone_step": """""📱 <b>Укажите номер телефона</b>
 
 Это нужно чтобы:
 • Магазин мог связаться с вами
 • Вы получали уведомления о заказах
 
-👇 Нажмите кнопку ниже""",
-        "welcome_city_step": """📍 <b>Выберите ваш город</b>
+👇 Нажмите кнопку ниже""""",
+        "welcome_city_step": """""📍 <b>Выберите ваш город</b>
 
 Мы покажем магазины и предложения рядом с вами
 
-👇 Выберите из списка""",
+👇 Выберите из списка""""",
         
                 "phone_saved": "? ??????? ????????!",
         "registration_resume_cart": "?????? ???????? <?????> ? ??????? <???????? ?????> ??????.",
@@ -38,15 +38,15 @@ TEXTS = {
         "registration_choose_action": "?? ????????:",
         "registration_city_title": "???????? ??? ?????",
         "registration_city_hint": "??????? ??????????? ?????",
-        "registration_complete_personal": "?? <b>??????!</b>
+        "registration_complete_personal": """""Готово!
 
-?? ????? ??????????, {name}!
-?? ?????: {city}
+Добро пожаловать, {name}!
+Город: {city}
 
-?????? ?? ??????:
-?? <b>?????</b> ? ?????? ?? 70%
-?? <b>????????</b> ? ??? ????????
-?? <b>?????</b> ? ????? ?????",
+Что можно делать:
+- Бронирование — скидки до 70%
+- Заказы — быстрое оформление
+- Профиль — история покупок""""",
         "city_selected": "? ????? ??????: {city}",
         "city_changed_confirm": "? ????? ??????? ?? <b>{city}</b>",
         "cart_order_created_menu_hint": "???????? ???????? ? ????.",
@@ -120,26 +120,26 @@ TEXTS = {
         "cart_payment_canceled": "? ?????? ????????",
         "cart_payment_photo_required": "?? ??????????, ????????? ???? ????.",
         "cart_payment_photo_already_received": "? ??? ??? ???????. ???????? ?????????????.",
-        "cart_delivery_min_order": "? ??????????? ????? ????????: {min} {currency}
+        "cart_delivery_min_order": """? ??????????? ????? ????????: {min} {currency}
 ??? ?????: {total} {currency}
 
-??????????, ???????? ??? ?????? ??? ???????? ?????????.",
-        "cart_add_hint_hot": "? ????? ???????? ? ???????.
-?? ?????? ??????? ??????? ??? ????????? ? ??????.",
-        "cart_add_hint_search": "? ????? ???????? ? ???????.
-?? ?????? ??????? ??????? ??? ????????? ? ???????????.",
-        "cart_delivery_min_order": "? ??????????? ????? ????????: {min} {currency}
+??????????, ???????? ??? ?????? ??? ???????? ?????????.""",
+        "cart_add_hint_hot": """? ????? ???????? ? ???????.
+?? ?????? ??????? ??????? ??? ????????? ? ??????.""",
+        "cart_add_hint_search": """? ????? ???????? ? ???????.
+?? ?????? ??????? ??????? ??? ????????? ? ???????????.""",
+        "cart_delivery_min_order": """? ??????????? ????? ????????: {min} {currency}
 ??? ?????: {total} {currency}
 
-??????????, ???????? ??? ?????? ??? ???????? ?????????.",
-        "cart_delivery_min_order": "? Yetkazib berish uchun minimal buyurtma: {min} {currency}
+??????????, ???????? ??? ?????? ??? ???????? ?????????.""",
+        "cart_delivery_min_order": """? Yetkazib berish uchun minimal buyurtma: {min} {currency}
 Sizning buyurtmangiz: {total} {currency}
 
-Iltimos, ko'proq mahsulot qo'shing yoki olib ketishni tanlang.",
-        "cart_delivery_min_order": "? ??????????? ????? ????????: {min} {currency}
+Iltimos, ko'proq mahsulot qo'shing yoki olib ketishni tanlang.""",
+        "cart_delivery_min_order": """? ??????????? ????? ????????: {min} {currency}
 ??? ?????: {total} {currency}
 
-??????????, ???????? ??? ?????? ??? ???????? ?????????.",
+??????????, ???????? ??? ?????? ??? ???????? ?????????.""",
         "cart_total_label": "?????",
         "cart_order_title": "?????",
         "cart_single_store_only": "????? ???????? ????? ?????? ?? ?????? ????????",
@@ -150,22 +150,22 @@ Iltimos, ko'proq mahsulot qo'shing yoki olib ketishni tanlang.",
         "cart_empty": "?? <b>??????? ??????</b>\n\n???????? ?????? ?? ????????.",
         "cart_cleared": "??????? ???????",
         "cart_title": "???????",
-"registration_complete": """🎉 <b>Готово! Добро пожаловать!</b>
+"registration_complete": """""🎉 <b>Готово! Добро пожаловать!</b>
 
 Теперь вы можете:
 🔥 <b>Акции</b> — скидки до 70% каждый день
 🏪 <b>Заведения</b> — все магазины города
 🔍 <b>Поиск</b> — найти нужный товар
 
-💡 Совет: проверяйте "Акции" каждый день — товары обновляются!""",
-        "welcome_back": """👋 <b>Привет, {name}!</b>
+💡 Совет: проверяйте "Акции" каждый день — товары обновляются!""""",
+        "welcome_back": """""👋 <b>Привет, {name}!</b>
 
 📍 Ваш город: {city}
 
-👇 Выберите раздел ниже, чтобы продолжить""",
-        "registration_required": """⚠️ <b>Нужна регистрация</b>
+👇 Выберите раздел ниже, чтобы продолжить""""",
+        "registration_required": """""⚠️ <b>Нужна регистрация</b>
 
-Нажмите /start чтобы начать""",
+Нажмите /start чтобы начать""""",
         # Кнопки
         "share_phone": "📱 Поделиться номером",
         "cancel": "❌ Отмена",
@@ -247,7 +247,7 @@ Iltimos, ko'proq mahsulot qo'shing yoki olib ketishni tanlang.",
         "unit": "шт",
         "expires_on": "Годен до",
         # Help and FAQ
-        "help_customer": """❓ <b>Как работает Fudly?</b>
+        "help_customer": """""❓ <b>Как работает Fudly?</b>
 
 <b>🔥 Акции</b>
 Товары с самыми большими скидками (30-70%)
@@ -277,8 +277,8 @@ Iltimos, ko'proq mahsulot qo'shing yoki olib ketishni tanlang.",
 <b>💡 Советы:</b>
 • Проверяйте раздел "Акции" каждый день
 • Забирайте товар в указанное время
-• Оценивайте магазины после покупки""",
-        "help_partner": """❓ <b>Как работать партнёром?</b>
+• Оценивайте магазины после покупки""""",
+        "help_partner": """""❓ <b>Как работать партнёром?</b>
 
 <b>➕ Добавление товаров:</b>
 1️⃣ Нажмите "Добавить товар"
@@ -292,11 +292,11 @@ Iltimos, ko'proq mahsulot qo'shing yoki olib ketishni tanlang.",
 
 <b>🎫 Заказы продавца:</b>
 ⏳ <b>Новые</b> - покупатель забронировал товар
-   → Подтвердите заказ (кнопка ✅)
+→ Подтвердите заказ (кнопка ✅)
 
 ✅ <b>Подтверждённые</b> - покупатель придёт забрать
-   → Попросите 8-значный код
-   → Выдайте товар и завершите заказ
+→ Попросите 8-значный код
+→ Выдайте товар и завершите заказ
 
 🎉 <b>Завершённые</b> - товар выдан, деньги получены
 
@@ -312,9 +312,9 @@ Iltimos, ko'proq mahsulot qo'shing yoki olib ketishni tanlang.",
 • Загружайте качественные фото
 • Обновляйте товары каждый день
 • Быстро подтверждайте заказы
-• Указывайте точное время забора""",
+• Указывайте точное время забора""""",
         # Бронирование
-        "booking_step_quantity": """┏━━━━━━━━━━━━━━━━━━━━━┓
+        "booking_step_quantity": """""┏━━━━━━━━━━━━━━━━━━━━━┓
 ┃   БРОНИРОВАНИЕ        ┃
 ┗━━━━━━━━━━━━━━━━━━━━━┛
 
@@ -326,8 +326,8 @@ Iltimos, ko'proq mahsulot qo'shing yoki olib ketishni tanlang.",
 
 💡 Введите число от 1 до {quantity}
 
-<i>Например: 2</i>""",
-        "booking_confirm": """┏━━━━━━━━━━━━━━━━━━━━━┓
+<i>Например: 2</i>""""",
+        "booking_confirm": """""┏━━━━━━━━━━━━━━━━━━━━━┓
 ┃   ПОДТВЕРЖДЕНИЕ       ┃
 ┗━━━━━━━━━━━━━━━━━━━━━┛
 
@@ -346,8 +346,8 @@ Iltimos, ko'proq mahsulot qo'shing yoki olib ketishni tanlang.",
 ✓ Вы получите код для получения
 ✓ Оплата при получении
 
-<i>Нажмите "Подтвердить" ниже</i> 👇""",
-        "booking_success": """🎉 <b>Бронирование успешно!</b>
+<i>Нажмите "Подтвердить" ниже</i> 👇""""",
+        "booking_success": """""🎉 <b>Бронирование успешно!</b>
 
 🏪 {store_name}
 🍽 {offer_name}
@@ -358,7 +358,7 @@ Iltimos, ko'proq mahsulot qo'shing yoki olib ketishni tanlang.",
 
 🎫 Код бронирования: <code>{code}</code>
 
-⚠️ Покажите этот код при получении заказа!""",
+⚠️ Покажите этот код при получении заказа!""""",
         "my_bookings_empty": "У вас пока нет заказов.\n\nПопробуйте раздел 🔥 Акции!",
         "no_active_bookings": "Нет активных бронирований",
         "no_completed_bookings": "Нет завершённых бронирований",
@@ -374,7 +374,7 @@ Iltimos, ko'proq mahsulot qo'shing yoki olib ketishni tanlang.",
         "warn_discount_low": "⚠️ Внимание: скидка меньше 10%. Рекомендуем делать скидку от 30% для привлечения клиентов.",
         "booking_how_many": "Сколько вы хотите забронировать? (1-{max_qty})",
         # Партнёр
-        "become_partner_text": """🏪 <b>Стать партнёром Fudly</b>
+        "become_partner_text": """""🏪 <b>Стать партнёром Fudly</b>
 
 💰 Предлагайте товары со скидкой и находите новых клиентов
 🌱 Снижайте потери и заботьтесь об экологии
@@ -383,7 +383,7 @@ Iltimos, ko'proq mahsulot qo'shing yoki olib ketishni tanlang.",
 ┃ Шаг 1/5: Город 🏙     ┃
 ┗━━━━━━━━━━━━━━━━━━━━━━━━┗
 
-Выберите город, где находится ваше заведение:""",
+Выберите город, где находится ваше заведение:""""",
         "store_name": '''┏━━━━━━━━━━━━━━━━━━━━━━━━┏
 ┃ Шаг 3/5: Название 🏪 ┃
 ┗━━━━━━━━━━━━━━━━━━━━━━━━┗
@@ -391,11 +391,11 @@ Iltimos, ko'proq mahsulot qo'shing yoki olib ketishni tanlang.",
 Введите название вашего заведения:
 
 💡 Пример: "Пекарня Хлеб и Соль"''',
-        "store_category": """┏━━━━━━━━━━━━━━━━━━━━━━━━┏
+        "store_category": """""┏━━━━━━━━━━━━━━━━━━━━━━━━┏
 ┃ Шаг 2/5: Категория 🏷 ┃
 ┗━━━━━━━━━━━━━━━━━━━━━━━━┗
 
-Выберите тип вашего заведения:""",
+Выберите тип вашего заведения:""""",
         "store_address": '''┏━━━━━━━━━━━━━━━━━━━━━━━━┏
 ┃ Шаг 4/5: Адрес 📍   ┃
 ┗━━━━━━━━━━━━━━━━━━━━━━━━┗
@@ -411,7 +411,7 @@ Iltimos, ko'proq mahsulot qo'shing yoki olib ketishni tanlang.",
 
 💡 Пример: "Свежая выпечка ежедневно. Хлеб, булочки, торты"''',
         "store_phone": "Введите контактный телефон:",
-        "store_registered": """✅ <b>Заявка отправлена!</b>
+        "store_registered": """""✅ <b>Заявка отправлена!</b>
 
 🏪 {name}
 📍 {city}, {address}
@@ -420,8 +420,8 @@ Iltimos, ko'proq mahsulot qo'shing yoki olib ketishni tanlang.",
 📞 {phone}
 
 ⏳ Ожидайте одобрения администратором.
-Вы получите уведомление о решении!""",
-        "store_pending": """✅ <b>Заявка отправлена на модерацию!</b>
+Вы получите уведомление о решении!""""",
+        "store_pending": """""✅ <b>Заявка отправлена на модерацию!</b>
 
 🏪 {name}
 📍 {city}, {address}
@@ -430,8 +430,8 @@ Iltimos, ko'proq mahsulot qo'shing yoki olib ketishni tanlang.",
 📞 {phone}
 
 ⏳ Ожидайте одобрения администратором.
-Обычно это занимает не более 24 часов.""",
-        "store_approved": """🎉 <b>Поздравляем! Ваш магазин одобрен!</b>
+Обычно это занимает не более 24 часов.""""",
+        "store_approved": """""🎉 <b>Поздравляем! Ваш магазин одобрен!</b>
 
 Теперь вы официальный партнёр Fudly!
 
@@ -442,12 +442,12 @@ Iltimos, ko'proq mahsulot qo'shing yoki olib ketishni tanlang.",
 
 <b>💡 Совет:</b> Начните с 3-5 товаров и смотрите что лучше продаётся.
 
-Желаем успешных продаж! 🎉""",
-        "store_rejected": """❌ <b>Заявка отклонена</b>
+Желаем успешных продаж! 🎉""""",
+        "store_rejected": """""❌ <b>Заявка отклонена</b>
 
 К сожалению, ваша заявка не была одобрена.
 
-Вы можете подать новую заявку с исправленными данными.""",
+Вы можете подать новую заявку с исправленными данными.""""",
         # Создание предложения
         "choose_product_category": "🏷 Выберите категорию продукта:",
         "choose_unit": "📏 Выберите единицу измерения:",
@@ -459,7 +459,7 @@ Iltimos, ko'proq mahsulot qo'shing yoki olib ketishni tanlang.",
         "time_from": "🕐 Введите время начала (например: 18:00):",
         "expiry_date": "📅 Введите срок годности (например: 31.12.2025):",
         "time_until": "🕐 Введите время окончания забора (например: 21:00):",
-        "offer_created": """✅ <b>Предложение создано!</b>
+        "offer_created": """""✅ <b>Предложение создано!</b>
 
 🍽 {title}
 📝 {description}
@@ -467,20 +467,20 @@ Iltimos, ko'proq mahsulot qo'shing yoki olib ketishni tanlang.",
 📦 Количество: {quantity}
 🕐 {time_from} - {time_until}
 
-Предложение теперь доступно для покупателей!""",
+Предложение теперь доступно для покупателей!""""",
         # Массовое создание
-        "bulk_create_start": """📦 <b>Массовое создание предложений</b>
+        "bulk_create_start": """""📦 <b>Массовое создание предложений</b>
 
 🏪 Магазин: {store_name}
 
 Эта функция позволит создать несколько одинаковых предложений за один раз.
 Например: 50 наборов "Завтрак" с одинаковой ценой и временем.
 
-Введите название предложения:""",
-        "bulk_count": """🔢 <b>Сколько таких предложений создать?</b>
+Введите название предложения:""""",
+        "bulk_count": """""🔢 <b>Сколько таких предложений создать?</b>
 
-Введите количество (от 1 до 100):""",
-        "bulk_created": """✅ <b>Массовое создание завершено!</b>
+Введите количество (от 1 до 100):""""",
+        "bulk_created": """""✅ <b>Массовое создание завершено!</b>
 
 📦 Создано предложений: {count}
 
@@ -491,23 +491,23 @@ Iltimos, ko'proq mahsulot qo'shing yoki olib ketishni tanlang.",
 📊 Всего порций: {total_quantity}
 🕐 {time_from} - {time_until}
 
-Все предложения доступны для покупателей!""",
+Все предложения доступны для покупателей!""""",
         # Подтверждение выдачи
         "confirm_delivery_prompt": "✅ <b>Подтверждение выдачи заказа</b>\n\nВведите 8-значный код бронирования:",
         "booking_not_found": "❌ Бронирование с таким кодом не найдено",
-        "order_confirmed": """✅ <b>Заказ подтверждён!</b>
+        "order_confirmed": """""✅ <b>Заказ подтверждён!</b>
 
 Бронирование #{booking_id} завершено
 Клиент: {customer_name}
 Сумма: {price} сум
 
-Клиент получит уведомление с просьбой оценить ваш магазин.""",
+Клиент получит уведомление с просьбой оценить ваш магазин.""""",
         # Рейтинг
         "rate_store": "⭐ <b>Оцените магазин</b>\n\n🏪 {store_name}\n\nКак вам понравилось?",
         "rating_saved": "✅ <b>Спасибо за оценку!</b>\n\nВаш отзыв поможет другим покупателям!",
         "already_rated": "Вы уже оценили этот заказ",
         # Статистика
-        "store_stats": """🏪 <b>{name}</b>
+        "store_stats": """""🏪 <b>{name}</b>
 🏷 {category}
 📍 {city}, {address}
 📝 {description}
@@ -515,7 +515,7 @@ Iltimos, ko'proq mahsulot qo'shing yoki olib ketishni tanlang.",
 ⭐ Рейтинг: {rating}/5 ({reviews} отзывов)
 📊 Продано: {sales} заказов
 💰 Доход: {revenue:,} сум
-📦 Активных броней: {pending}""",
+📦 Активных броней: {pending}""""",
         # Ошибки
         "error_invalid_number": "❌ Пожалуйста, введите корректное число",
         "error_invalid_time": "❌ Неверный формат времени. Используйте формат ЧЧ:ММ (например: 18:00)",
@@ -553,7 +553,7 @@ Iltimos, ko'proq mahsulot qo'shing yoki olib ketishni tanlang.",
         # Настройки
         "notifications_enabled": "Уведомления: Вкл",
         "notifications_disabled": "Уведомления: Выкл",
-        "confirm_delete_account": """⚠ <b>Удаление аккаунта</b>
+        "confirm_delete_account": """""⚠ <b>Удаление аккаунта</b>
 
 Вы уверены что хотите удалить свой аккаунт?
 
@@ -563,7 +563,7 @@ Iltimos, ko'proq mahsulot qo'shing yoki olib ketishni tanlang.",
 • Все предложения
 • История бронирований
 
-Это действие необратимо!""",
+Это действие необратимо!""""",
         "account_deleted": "✅ Ваш аккаунт успешно удалён",
         "yes_delete": "✅ Да, удалить",
         "no_cancel": "❌ Нет, отменить",
@@ -571,11 +571,11 @@ Iltimos, ko'proq mahsulot qo'shing yoki olib ketishni tanlang.",
         "error_general": "❌ Произошла ошибка. Попробуйте позже.",
         "system_error": "⚠️ Системная ошибка. Попробуйте позже или напишите в поддержку.",
         # Улучшенные пустые состояния
-        "cart_empty": """🛒 <b>Корзина пуста</b>
+        "cart_empty": """""🛒 <b>Корзина пуста</b>
 
 Найдите что-нибудь вкусное со скидкой до 70%!
 
-💡 Совет: загляните в раздел «🔥 Акции»""",
+💡 Совет: загляните в раздел «🔥 Акции»""""",
         "cart_empty_cta": "?? ?????????? ???????????",
         # Навигация
         "go_back": "◀️ Назад",
@@ -585,20 +585,20 @@ Iltimos, ko'proq mahsulot qo'shing yoki olib ketishni tanlang.",
         "qty_custom": "✏️ Другое",
         "qty_enter_custom": "Введите количество (от 1 до {max}):",
         # Улучшенные ошибки с подсказками
-        "error_qty_invalid": """❌ <b>Неверное количество</b>
+        "error_qty_invalid": """""❌ <b>Неверное количество</b>
 
 Доступно: {available} шт
-Попробуйте: 1, 2 или {max}""",
-        "error_qty_exceeded": """❌ <b>Слишком много</b>
+Попробуйте: 1, 2 или {max}""""",
+        "error_qty_exceeded": """""❌ <b>Слишком много</b>
 
 Максимум: {max} шт
-Введите число от 1 до {max}""",
+Введите число от 1 до {max}""""",
         # Quick actions
         "add_to_cart": "🛒 В корзину",
         "buy_now": "⚡ Купить сейчас",
         "added_to_cart": "✅ Добавлено в корзину!",
         # Партнёрский онбординг
-        "partner_welcome": """🎉 <b>Добро пожаловать, партнёр!</b>
+        "partner_welcome": """""🎉 <b>Добро пожаловать, партнёр!</b>
 
 Ваш магазин одобрен и готов к работе.
 
@@ -607,7 +607,7 @@ Iltimos, ko'proq mahsulot qo'shing yoki olib ketishni tanlang.",
 2️⃣ Установите скидку 30-70%
 3️⃣ Получайте заказы!
 
-💡 Совет: товары с фото продаются в 3 раза лучше""",
+💡 Совет: товары с фото продаются в 3 раза лучше""""",
         "partner_add_first": "➕ Добавить первый товар",
         # Хардкод-тексты которые нужно было перевести
         "offer_not_found": "❌ Товар не найден",
@@ -630,7 +630,7 @@ Iltimos, ko'proq mahsulot qo'shing yoki olib ketishni tanlang.",
         # Salomlashish
         "choose_language": "🌍 Выберите язык / Tilni tanlang",
         "language_changed": "✅ Til O'zbekchaga o'zgartirildi",
-        "welcome": """🛍 <b>Fudly — oziq-ovqatni isrofdan saqlaymiz!</b>
+        "welcome": """""🛍 <b>Fudly — oziq-ovqatni isrofdan saqlaymiz!</b>
 
 Muddati tugash arafasidagi mahsulotlarni
 <b>70% gacha</b> chegirma bilan sotib oling
@@ -639,19 +639,19 @@ Muddati tugash arafasidagi mahsulotlarni
 ✅ <b>Foydali</b> — 70% gacha chegirma
 ✅ <b>Ekologik</b> — kamroq isrof
 
-🔥 Shahringizda 100 dan ortiq do'konlar""",
-        "welcome_phone_step": """📱 <b>Telefon raqamingizni kiriting</b>
+🔥 Shahringizda 100 dan ortiq do'konlar""""",
+        "welcome_phone_step": """""📱 <b>Telefon raqamingizni kiriting</b>
 
 Bu nima uchun kerak:
 • Do'kon siz bilan bog'lanishi uchun
 • Buyurtma haqida xabar olish uchun
 
-👇 Quyidagi tugmani bosing""",
-        "welcome_city_step": """📍 <b>Shahringizni tanlang</b>
+👇 Quyidagi tugmani bosing""""",
+        "welcome_city_step": """""📍 <b>Shahringizni tanlang</b>
 
 Yaqin atrofdagi do'konlarni ko'rsatamiz
 
-👇 Ro'yxatdan tanlang""",
+👇 Ro'yxatdan tanlang""""",
         
                 "phone_saved": "? Telefon saqlandi!",
         "registration_resume_cart": "Endi <Savat> ni ochib, <Buyurtma berish> ni qayta bosing.",
@@ -661,15 +661,15 @@ Yaqin atrofdagi do'konlarni ko'rsatamiz
         "registration_choose_action": "?? Tanlang:",
         "registration_city_title": "Shahringizni tanlang",
         "registration_city_hint": "Yaqin takliflarni ko'rsatamiz",
-        "registration_complete_personal": "?? <b>Tayyor!</b>
+                "registration_complete_personal": """""Tayyor!
 
-?? Xush kelibsiz, {name}!
-?? Shahar: {city}
+Xush kelibsiz, {name}!
+Shahar: {city}
 
-Endi siz qila olasiz:
-?? <b>Aksiyalar</b> ? 70% gacha chegirmalar
-?? <b>Do'konlar</b> ? barcha do'konlar
-?? <b>Qidirish</b> ? mahsulot topish",
+Nimalar qilish mumkin:
+- Bron qilish ? 70% gacha chegirma
+- Buyurtmalar ? tezkor rasmiylashtirish
+- Profil ? xaridlar tarixi""""",
         "city_selected": "? Shahar tanlandi: {city}",
         "city_changed_confirm": "? Shahar <b>{city}</b>ga o'zgartirildi",
         "cart_order_created_menu_hint": "Menyudan davom eting.",
@@ -743,18 +743,18 @@ Endi siz qila olasiz:
         "cart_payment_canceled": "? To'lov bekor qilindi",
         "cart_payment_photo_required": "?? Iltimos, ??? rasmini yuboring.",
         "cart_payment_photo_already_received": "? Chek qabul qilindi. Tasdiqlanishi kutilmoqda.",
-        "cart_delivery_min_order": "? Yetkazib berish uchun minimal buyurtma: {min} {currency}
+        "cart_delivery_min_order": """? Yetkazib berish uchun minimal buyurtma: {min} {currency}
 Sizning buyurtmangiz: {total} {currency}
 
-Iltimos, ko'proq mahsulot qo'shing yoki olib ketishni tanlang.",
-        "cart_add_hint_hot": "? Mahsulot savatga qo'shildi.
-Savatni ochishingiz yoki aksiyalarga qaytishingiz mumkin.",
-        "cart_add_hint_search": "? Mahsulot savatga qo'shildi.
-Savatni ochishingiz yoki natijalarga qaytishingiz mumkin.",
-        "cart_delivery_min_order": "? Yetkazib berish uchun minimal buyurtma: {min} {currency}
+Iltimos, ko'proq mahsulot qo'shing yoki olib ketishni tanlang.""",
+        "cart_add_hint_hot": """? Mahsulot savatga qo'shildi.
+Savatni ochishingiz yoki aksiyalarga qaytishingiz mumkin.""",
+        "cart_add_hint_search": """? Mahsulot savatga qo'shildi.
+Savatni ochishingiz yoki natijalarga qaytishingiz mumkin.""",
+        "cart_delivery_min_order": """? Yetkazib berish uchun minimal buyurtma: {min} {currency}
 Sizning buyurtmangiz: {total} {currency}
 
-Iltimos, ko'proq mahsulot qo'shing yoki olib ketishni tanlang.",
+Iltimos, ko'proq mahsulot qo'shing yoki olib ketishni tanlang.""",
         "cart_total_label": "Jami",
         "cart_order_title": "Buyurtma",
         "cart_single_store_only": "Faqat bitta do'kondan buyurtma berish mumkin",
@@ -765,22 +765,22 @@ Iltimos, ko'proq mahsulot qo'shing yoki olib ketishni tanlang.",
         "cart_empty": "?? <b>Savat bo'sh</b>\n\nKatalogdan mahsulot qo'shing.",
         "cart_cleared": "Savat tozalandi",
         "cart_title": "Savat",
-"registration_complete": """🎉 <b>Tayyor! Xush kelibsiz!</b>
+"registration_complete": """""🎉 <b>Tayyor! Xush kelibsiz!</b>
 
 Endi siz:
 🔥 <b>Aksiyalar</b> — har kuni 70% gacha chegirmalar
 🏪 <b>Do'konlar</b> — shahardagi barcha do'konlar
 🔍 <b>Qidirish</b> — kerakli mahsulotni topish
 
-💡 Maslahat: har kuni "Aksiyalar" bo'limini tekshiring — mahsulotlar yangilanadi!""",
-        "welcome_back": """👋 <b>Salom, {name}!</b>
+💡 Maslahat: har kuni "Aksiyalar" bo'limini tekshiring — mahsulotlar yangilanadi!""""",
+        "welcome_back": """""👋 <b>Salom, {name}!</b>
 
 📍 Shahringiz: {city}
 
-👇 Davom ettirish uchun pastdagi bo'limlardan birini tanlang""",
-        "registration_required": """⚠️ <b>Ro'yxatdan o'tish kerak</b>
+👇 Davom ettirish uchun pastdagi bo'limlardan birini tanlang""""",
+        "registration_required": """""⚠️ <b>Ro'yxatdan o'tish kerak</b>
 
-Boshlash uchun /start bosing""",
+Boshlash uchun /start bosing""""",
         # Tugmalar
         "share_phone": "📱 Raqamni ulashish",
         "cancel": "❌ Bekor qilish",
@@ -864,7 +864,7 @@ Boshlash uchun /start bosing""",
         "unit": "dona",
         "expires_on": "Yaroqlilik muddati",
         # Help and FAQ
-        "help_customer": """❓ <b>Fudly qanday ishlaydi?</b>
+        "help_customer": """""❓ <b>Fudly qanday ishlaydi?</b>
 
 <b>🔥 Aksiyalar</b>
 Eng katta chegirmali mahsulotlar (30-70%)
@@ -894,8 +894,8 @@ Misol: yogurt, non, sut
 <b>💡 Maslahatlar:</b>
 • Har kuni "Aksiyalar" bo'limini tekshiring
 • Mahsulotni ko'rsatilgan vaqtda oling
-• Xariddan keyin do'konni baholang""",
-        "help_partner": """❓ <b>Hamkor sifatida qanday ishlash?</b>
+• Xariddan keyin do'konni baholang""""",
+        "help_partner": """""❓ <b>Hamkor sifatida qanday ishlash?</b>
 
 <b>➕ Mahsulot qo'shish:</b>
 1️⃣ "Mahsulot qo'shish" tugmasini bosing
@@ -909,11 +909,11 @@ Tahrirlash yoki o'chirish mumkin
 
 <b>🎫 Sotuvchi buyurtmalari:</b>
 ⏳ <b>Yangi</b> - xaridor mahsulotni bron qildi
-   → Buyurtmani tasdiqlang (✅ tugma)
+→ Buyurtmani tasdiqlang (✅ tugma)
 
 ✅ <b>Tasdiqlangan</b> - xaridor kelib oladi
-   → 8 raqamli kodni so'rang
-   → Mahsulotni bering va buyurtmani yakunlang
+→ 8 raqamli kodni so'rang
+→ Mahsulotni bering va buyurtmani yakunlang
 
 🎉 <b>Bajarilgan</b> - mahsulot berildi, pul olindi
 
@@ -929,9 +929,9 @@ Tahrirlash yoki o'chirish mumkin
 • Sifatli rasm yuklang
 • Har kuni mahsulotlarni yangilang
 • Buyurtmalarni tez tasdiqlang
-• Olib ketish vaqtini aniq ko'rsating""",
+• Olib ketish vaqtini aniq ko'rsating""""",
         # Buyurtma
-        "booking_success": """✅ <b>Buyurtma muvaffaqiyatli!</b>
+        "booking_success": """""✅ <b>Buyurtma muvaffaqiyatli!</b>
 
 🏪 {store_name}
 🍽 {offer_name}
@@ -942,7 +942,7 @@ Tahrirlash yoki o'chirish mumkin
 
 🎫 Buyurtma kodi: <code>{code}</code>
 
-⚠️ Buyurtmani olishda bu kodni ko'rsating!""",
+⚠️ Buyurtmani olishda bu kodni ko'rsating!""""",
         "my_bookings_empty": "📋 Sizda hali buyurtmalar yo'q.\n\nTakliflar ro'yxatidan tanlang! 🍽",
         "no_active_bookings": "Faol buyurtmalar yo'q",
         "no_completed_bookings": "Yakunlangan buyurtmalar yo'q",
@@ -957,7 +957,7 @@ Tahrirlash yoki o'chirish mumkin
         "error_discount_less_than_original": "❌ Chegirma narxi oddiy narxdan kichik bo‘lishi kerak",
         "warn_discount_low": "⚠️ Diqqat: chegirma 10% dan kichik. Mijozlarni jalb qilish uchun 30% va undan yuqori tavsiya etamiz.",
         "booking_how_many": "Nechta buyurtma qilmoqchisiz? (1-{max_qty})",
-        "booking_step_quantity": """┏━━━━━━━━━━━━━━━━━━━━━┓
+        "booking_step_quantity": """""┏━━━━━━━━━━━━━━━━━━━━━┓
 ┃   BUYURTMA BERISH     ┃
 ┗━━━━━━━━━━━━━━━━━━━━━┛
 
@@ -969,8 +969,8 @@ Tahrirlash yoki o'chirish mumkin
 
 💡 1 dan {quantity} gacha son kiriting
 
-<i>Masalan: 2</i>""",
-        "booking_confirm": """┏━━━━━━━━━━━━━━━━━━━━━┓
+<i>Masalan: 2</i>""""",
+        "booking_confirm": """""┏━━━━━━━━━━━━━━━━━━━━━┓
 ┃   TASDIQLASH          ┃
 ┗━━━━━━━━━━━━━━━━━━━━━┛
 
@@ -989,9 +989,9 @@ Tahrirlash yoki o'chirish mumkin
 ✓ Olish uchun kod olasiz
 ✓ To'lov olishda
 
-<i>Quyidagi "Tasdiqlash" tugmasini bosing</i> 👇""",
+<i>Quyidagi "Tasdiqlash" tugmasini bosing</i> 👇""""",
         # Hamkor
-        "become_partner_text": """🏪 <b>Fudly hamkori bo'ling</b>
+        "become_partner_text": """""🏪 <b>Fudly hamkori bo'ling</b>
 
 💰 Chegirmali mahsulotlar taklif qiling va yangi mijozlar toping
 🌱 Yo'qotishlarni kamaytiring va ekologiyaga g'amxo'rlik qiling
@@ -1000,7 +1000,7 @@ Tahrirlash yoki o'chirish mumkin
 ┃ Qadam 1/5: Shahar 🏙    ┃
 ┗━━━━━━━━━━━━━━━━━━━━━━━━┗
 
-Muassasangiz joylashgan shaharni tanlang:""",
+Muassasangiz joylashgan shaharni tanlang:""""",
         "store_name": '''┏━━━━━━━━━━━━━━━━━━━━━━━━┏
 ┃ Qadam 3/5: Nomi 🏪    ┃
 ┗━━━━━━━━━━━━━━━━━━━━━━━━┗
@@ -1008,11 +1008,11 @@ Muassasangiz joylashgan shaharni tanlang:""",
 Muassasangiz nomini kiriting:
 
 💡 Misol: "Non va Tuz nonvoyxonasi"''',
-        "store_category": """┏━━━━━━━━━━━━━━━━━━━━━━━━┏
+        "store_category": """""┏━━━━━━━━━━━━━━━━━━━━━━━━┏
 ┃ Qadam 2/5: Kategoriya 🏷 ┃
 ┗━━━━━━━━━━━━━━━━━━━━━━━━┗
 
-Muassasangiz turini tanlang:""",
+Muassasangiz turini tanlang:""""",
         "store_address": '''┏━━━━━━━━━━━━━━━━━━━━━━━━┏
 ┃ Qadam 4/5: Manzil 📍  ┃
 ┗━━━━━━━━━━━━━━━━━━━━━━━━┗
@@ -1028,7 +1028,7 @@ Muassasangiz va assortimentini ta'riflang:
 
 💡 Misol: "Har kuni yangi pishirilgan non. Non, bulochka, tortlar"''',
         "store_phone": "Aloqa telefonini kiriting:",
-        "store_registered": """✅ <b>Ariza yuborildi!</b>
+        "store_registered": """""✅ <b>Ariza yuborildi!</b>
 
 🏪 {name}
 📍 {city}, {address}
@@ -1037,8 +1037,8 @@ Muassasangiz va assortimentini ta'riflang:
 📞 {phone}
 
 ⏳ Administrator tomonidan tasdiqlanishini kuting.
-Qaror haqida xabar olasiz!""",
-        "store_pending": """✅ <b>Ariza moderatsiyaga yuborildi!</b>
+Qaror haqida xabar olasiz!""""",
+        "store_pending": """""✅ <b>Ariza moderatsiyaga yuborildi!</b>
 
 🏪 {name}
 📍 {city}, {address}
@@ -1047,8 +1047,8 @@ Qaror haqida xabar olasiz!""",
 📞 {phone}
 
 ⏳ Administrator tomonidan tasdiqlanishini kuting.
-Odatda bu 24 soatdan ortiq vaqt olmaydi.""",
-        "store_approved": """🎉 <b>Tabriklaymiz! Do'koningiz tasdiqlandi!</b>
+Odatda bu 24 soatdan ortiq vaqt olmaydi.""""",
+        "store_approved": """""🎉 <b>Tabriklaymiz! Do'koningiz tasdiqlandi!</b>
 
 Endi siz Fudly ning rasmiy hamkorisiz!
 
@@ -1059,12 +1059,12 @@ Endi siz Fudly ning rasmiy hamkorisiz!
 
 <b>💡 Maslahat:</b> 3-5 ta tovar bilan boshlang va qaysi biri yaxshi sotilishini kuzating.
 
-Muvaffaqiyatli savdo tilaymiz! 🎉""",
-        "store_rejected": """❌ <b>Ariza rad etildi</b>
+Muvaffaqiyatli savdo tilaymiz! 🎉""""",
+        "store_rejected": """""❌ <b>Ariza rad etildi</b>
 
 Afsuski, arizangiz tasdiqlanmadi.
 
-Tuzatilgan ma'lumotlar bilan yangi ariza topshirishingiz mumkin.""",
+Tuzatilgan ma'lumotlar bilan yangi ariza topshirishingiz mumkin.""""",
         # Taklif yaratish - choose_store defined earlier at line 562
         "offer_title": "Taklif nomini kiriting:",
         "offer_description": "📝 Taklif ta'rifini kiriting:",
@@ -1074,7 +1074,7 @@ Tuzatilgan ma'lumotlar bilan yangi ariza topshirishingiz mumkin.""",
         "time_from": "🕐 Boshlanish vaqtini kiriting (masalan: 18:00):",
         "expiry_date": "📅 Yaroqlilik muddatini kiriting (masalan: 31.12.2025):",
         "time_until": "🕐 Olib ketish tugash vaqtini kiriting (masalan: 21:00):",
-        "offer_created": """✅ <b>Taklif yaratildi!</b>
+        "offer_created": """""✅ <b>Taklif yaratildi!</b>
 
 🍽 {title}
 📝 {description}
@@ -1082,20 +1082,20 @@ Tuzatilgan ma'lumotlar bilan yangi ariza topshirishingiz mumkin.""",
 📦 Soni: {quantity}
 🕐 {time_from} - {time_until}
 
-Taklif endi xaridorlar uchun mavjud!""",
+Taklif endi xaridorlar uchun mavjud!""""",
         # Ommaviy yaratish
-        "bulk_create_start": """📦 <b>Ommaviy taklif yaratish</b>
+        "bulk_create_start": """""📦 <b>Ommaviy taklif yaratish</b>
 
 🏪 Do\'kon: {store_name}
 
 Bu funksiya bir nechta bir xil takliflarni bir vaqtning o'zida yaratishga imkon beradi.
 Masalan: 50 ta "Nonushta" to'plami bir xil narx va vaqt bilan.
 
-Taklif nomini kiriting:""",
-        "bulk_count": """🔢 <b>Nechta bunday taklif yaratilsin?</b>
+Taklif nomini kiriting:""""",
+        "bulk_count": """""🔢 <b>Nechta bunday taklif yaratilsin?</b>
 
-Sonini kiriting (1 dan 100 gacha):""",
-        "bulk_created": """✅ <b>Ommaviy yaratish tugadi!</b>
+Sonini kiriting (1 dan 100 gacha):""""",
+        "bulk_created": """""✅ <b>Ommaviy yaratish tugadi!</b>
 
 📦 Yaratilgan takliflar: {count}
 
@@ -1106,23 +1106,23 @@ Sonini kiriting (1 dan 100 gacha):""",
 📊 Jami portsialar: {total_quantity}
 🕐 {time_from} - {time_until}
 
-Barcha takliflar xaridorlar uchun mavjud!""",
+Barcha takliflar xaridorlar uchun mavjud!""""",
         # Berishni tasdiqlash
         "confirm_delivery_prompt": "✅ <b>Buyurtma berishni tasdiqlash</b>\n\n8 xonali buyurtma kodini kiriting:",
         "booking_not_found": "❌ Bunday kodli buyurtma topilmadi",
-        "order_confirmed": """✅ <b>Buyurtma tasdiqlandi!</b>
+        "order_confirmed": """""✅ <b>Buyurtma tasdiqlandi!</b>
 
 Buyurtma #{booking_id} tugallandi
 Mijoz: {customer_name}
 Summa: {price} so\'m
 
-Mijoz do'koningizni baholash uchun xabar oladi.""",
+Mijoz do'koningizni baholash uchun xabar oladi.""""",
         # Baho
         "rate_store": "⭐ <b>Do'konni baholang</b>\n\n🏪 {store_name}\n\nSizga qanday yoqdi?",
         "rating_saved": "✅ <b>Baholaganingiz uchun rahmat!</b>\n\nSizning fikringiz boshqa xaridorlarga yordam beradi!",
         "already_rated": "Siz bu buyurtmani allaqachon baholagansiz",
         # Statistika
-        "store_stats": """🏪 <b>{name}</b>
+        "store_stats": """""🏪 <b>{name}</b>
 🏷 {category}
 📍 {city}, {address}
 📝 {description}
@@ -1130,7 +1130,7 @@ Mijoz do'koningizni baholash uchun xabar oladi.""",
 ⭐ Reyting: {rating}/5 ({reviews} ta sharh)
 📊 Sotilgan: {sales} ta buyurtma
 💰 Daromad: {revenue:,} so\'m
-📦 Faol buyurtmalar: {pending}""",
+📦 Faol buyurtmalar: {pending}""""",
         # Xatolar
         "error_invalid_number": "❌ Iltimos, to'g'ri raqam kiriting",
         "error_invalid_time": "❌ Noto'g'ri vaqt formati. HH:MM formatidan foydalaning (masalan: 18:00)",
@@ -1168,7 +1168,7 @@ Mijoz do'koningizni baholash uchun xabar oladi.""",
         # Sozlamalar
         "notifications_enabled": "✅ Bildirishnomalar yoqildi",
         "notifications_disabled": "🔕 Bildirishnomalar o'chirildi",
-        "confirm_delete_account": """⚠️ <b>Akkauntni o\'chirish</b>
+        "confirm_delete_account": """""⚠️ <b>Akkauntni o\'chirish</b>
 
 Akkauntingizni o\'chirishni xohlaysizmi?
 
@@ -1178,7 +1178,7 @@ O\'chiriladi:
 • Barcha takliflar
 • Buyurtmalar tarixi
 
-Bu harakatni qaytarib bo\'lmaydi!""",
+Bu harakatni qaytarib bo\'lmaydi!""""",
         "account_deleted": "✅ Akkauntingiz muvaffaqiyatli o'chirildi",
         "yes_delete": "✅ Ha, o'chirish",
         "no_cancel": "❌ Yo'q, bekor qilish",
@@ -1186,11 +1186,11 @@ Bu harakatni qaytarib bo\'lmaydi!""",
         "error_general": "❌ Xatolik yuz berdi. Keyinroq urinib ko'ring.",
         "system_error": "⚠️ Tizim xatosi. Keyinroq urinib ko'ring yoki qo'llab-quvvatlash xizmatiga yozing.",
         # Yaxshilangan bo'sh holatlar
-        "cart_empty": """🛒 <b>Savat bo'sh</b>
+        "cart_empty": """""🛒 <b>Savat bo'sh</b>
 
 70% gacha chegirma bilan mazali narsa toping!
 
-💡 Maslahat: «🔥 Aksiyalar» bo'limiga qarang""",
+💡 Maslahat: «🔥 Aksiyalar» bo'limiga qarang""""",
         "cart_empty_cta": "?? Takliflarni ko'rish",
         # Navigatsiya
         "go_back": "◀️ Orqaga",
@@ -1200,20 +1200,20 @@ Bu harakatni qaytarib bo\'lmaydi!""",
         "qty_custom": "✏️ Boshqa",
         "qty_enter_custom": "Miqdorni kiriting (1 dan {max} gacha):",
         # Yaxshilangan xatolar
-        "error_qty_invalid": """❌ <b>Noto'g'ri miqdor</b>
+        "error_qty_invalid": """""❌ <b>Noto'g'ri miqdor</b>
 
 Mavjud: {available} dona
-Urinib ko'ring: 1, 2 yoki {max}""",
-        "error_qty_exceeded": """❌ <b>Juda ko'p</b>
+Urinib ko'ring: 1, 2 yoki {max}""""",
+        "error_qty_exceeded": """""❌ <b>Juda ko'p</b>
 
 Maksimum: {max} dona
-1 dan {max} gacha son kiriting""",
+1 dan {max} gacha son kiriting""""",
         # Tezkor harakatlar
         "add_to_cart": "🛒 Savatga",
         "buy_now": "⚡ Hozir sotib olish",
         "added_to_cart": "✅ Savatga qo'shildi!",
         # Hamkor onbordingi
-        "partner_welcome": """🎉 <b>Xush kelibsiz, hamkor!</b>
+        "partner_welcome": """""🎉 <b>Xush kelibsiz, hamkor!</b>
 
 Do'koningiz tasdiqlandi va ishlashga tayyor.
 
@@ -1222,7 +1222,7 @@ Do'koningiz tasdiqlandi va ishlashga tayyor.
 2️⃣ 30-70% chegirma qo'ying
 3️⃣ Buyurtmalar oling!
 
-💡 Maslahat: rasmli mahsulotlar 3 baravar yaxshi sotiladi""",
+💡 Maslahat: rasmli mahsulotlar 3 baravar yaxshi sotiladi""""",
         "partner_add_first": "➕ Birinchi mahsulotni qo'shish",
         # Qo'shimcha tarjimalar (xardkod-tekstlar)
         "offer_not_found": "❌ Mahsulot topilmadi",
