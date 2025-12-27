@@ -373,9 +373,9 @@ async def handle_city_selection(
         else main_menu_customer(lang)
     )
 
-    city_selected = "Shahar tanlandi" if lang == "uz" else "????? ??????"
+    city_selected = "Shahar tanlandi" if lang == "uz" else "Город выбран"
     try:
-        await callback.message.edit_text(f"? {city_selected}: {city}")
+        await callback.message.edit_text(f"✅ {city_selected}: {city}")
     except Exception as e:
         logger.debug("Could not edit city confirmation: %s", e)
 
@@ -484,9 +484,9 @@ async def change_city_text(
     )
 
     if lang == "ru":
-        text_msg = f"? ????? ??????? ?? <b>{new_city}</b>"
+        text_msg = f"✅ Город изменен на <b>{new_city}</b>"
     else:
-        text_msg = f"? Shahar <b>{new_city}</b>ga o'zgartirildi"
+        text_msg = f"✅ Shahar <b>{new_city}</b>ga o'zgartirildi"
 
     await message.answer(
         text_msg,
@@ -503,90 +503,25 @@ async def change_city_text(
 def build_welcome_card(lang: str = "ru") -> str:
     """Build welcome message for new users."""
     if lang == "uz":
-        title = "Fudly ga xush kelibsiz!"
-        what = "Biz nima qilamiz"
-        line1 = "70% gacha chegirmalar"
-        line2 = "Yaqin do'konlardan eng yaxshi takliflar"
-        line3 = "Isrof bo'layotgan oziq-ovqatni saqlaymiz"
-        how = "Qanday ishlaydi"
-        step1 = "Taklifni tanlang"
-        step2 = "Savatga qo'shing"
-        step3 = "Do'kondan oling yoki yetkazib beramiz"
-        choose_lang = "Tilni tanlang"
-    else:
-        title = "????? ?????????? ? Fudly!"
-        what = "??? ?? ??????"
-        line1 = "?????? ?? ??? ?? 70%"
-        line2 = "?????? ??????????? ?????"
-        line3 = "??????? ??? ?? ????????"
-        how = "??? ??? ????????"
-        step1 = "???????? ???????????"
-        step2 = "???????? ? ???????"
-        step3 = "???????? ? ???????? ??? ???????? ????????"
-        choose_lang = "???????? ????"
-
-    return (
-        f"?? <b>{title}</b>\n\n"
-        f"{what}:\n"
-        f"?? {line1}\n"
-        f"?? {line2}\n"
-        f"?? {line3}\n\n"
-        f"{how}:\n"
-        f"1) {step1}\n"
-        f"2) {step2}\n"
-        f"3) {step3}\n\n"
-        f"--------------------\n"
-        f"?? <b>{choose_lang}:</b>"
-    )
+        return "Fudly ga xush kelibsiz!\n\nBoshlash uchun tilni tanlang."
+    return "Добро пожаловать в Fudly!\n\nЧтобы начать, выберите язык."
 
 
 def build_phone_card(lang: str) -> str:
     """Build phone request card."""
-    if lang == "uz":
-        title = "Telefon raqamingiz"
-        need = "Kerak"
-        line1 = "Do'kon siz bilan bog'lanishi"
-        line2 = "Buyurtma haqida xabar berish"
-        action = "Tugmani bosing"
-    else:
-        title = "??????? ????? ????????"
-        need = "????? ???"
-        line1 = "????? ??????? ??? ?????????"
-        line2 = "????? ???????? ? ??????"
-        action = "??????? ?????? ????"
-
-    return (
-        f"?? <b>{title}</b>\n\n"
-        f"{need}:\n"
-        f"? {line1}\n"
-        f"? {line2}\n\n"
-        f"{action}"
-    )
+    return get_text(lang, "welcome_phone_step")
 
 
 def build_city_card(lang: str) -> str:
     """Build city selection card."""
-    if lang == "uz":
-        title = "Shahringiz"
-        hint = "Yaqin takliflarni ko'rsatamiz"
-        action = "Tugmani bosing"
-    else:
-        title = "??? ?????"
-        hint = "??????? ??????????? ?????"
-        action = "??????? ?????? ????"
-
-    return (
-        f"?? <b>{title}</b>\n\n"
-        f"{hint}\n\n"
-        f"{action}"
-    )
+    return get_text(lang, "choose_city")
 
 
 def build_welcome_keyboard() -> types.InlineKeyboardMarkup:
     """Welcome keyboard with language buttons."""
     kb = InlineKeyboardBuilder()
-    kb.button(text="???? ???????", callback_data="reg_lang_ru")
-    kb.button(text="???? O'zbekcha", callback_data="reg_lang_uz")
+    kb.button(text="🇷🇺 Русский", callback_data="reg_lang_ru")
+    kb.button(text="🇺🇿 O'zbekcha", callback_data="reg_lang_uz")
     kb.adjust(2)
     return kb.as_markup()
 

@@ -796,184 +796,184 @@
             const hoursUntilPeak = currentHour < 11 ? 11 - currentHour : currentHour < 18 ? 18 - currentHour : null;
 
             document.querySelector('.content').innerHTML = `
-                <div class=\"container dashboard-shell\">
-                    <section class=\"hero-panel rise-in\">
-                        <div class=\"hero-row\">
-                            <div class=\"hero-copy\">
-                                <div class=\"hero-date\">${currentDate}</div>
-                                <h2 class=\"hero-title\">${greeting}!</h2>
-                                <div class=\"hero-store\">
-                                    <span class=\"hero-store-name\">${state.store?.name || '??? ???????'}</span>
-                                    <span class=\"hero-store-tag\">Partner Panel</span>
+                <div class="container dashboard-shell">
+                    <section class="hero-panel rise-in">
+                        <div class="hero-row">
+                            <div class="hero-copy">
+                                <div class="hero-date">${currentDate}</div>
+                                <h2 class="hero-title">${greeting}!</h2>
+                                <div class="hero-store">
+                                    <span class="hero-store-name">${state.store?.name || '\u0412\u0430\u0448 \u043c\u0430\u0433\u0430\u0437\u0438\u043d'}</span>
+                                    <span class="hero-store-tag">Partner Panel</span>
                                 </div>
                             </div>
-                            <div class=\"hero-controls\">
-                                <button class=\"status-toggle ${state.store?.is_open ? 'open' : 'closed'}\" onclick=\"toggleStoreStatus()\">
-                                    <span class=\"status-indicator\"></span>
-                                    ${state.store?.is_open ? '???????' : '???????'}
+                            <div class="hero-controls">
+                                <button class="status-toggle ${state.store?.is_open ? 'open' : 'closed'}" onclick="toggleStoreStatus()">
+                                    <span class="status-indicator"></span>
+                                    ${state.store?.is_open ? '\u041e\u0442\u043a\u0440\u044b\u0442\u043e' : '\u0417\u0430\u043a\u0440\u044b\u0442\u043e'}
                                 </button>
                             </div>
                         </div>
 
-                        <div class=\"hero-chips\">
-                            <div class=\"hero-chip\">
-                                <span class=\"chip-label\">????????</span>
-                                <span class=\"chip-value\">${activeOrders.length}</span>
+                        <div class="hero-chips">
+                            <div class="hero-chip">
+                                <span class="chip-label">\u0410\u043a\u0442\u0438\u0432\u043d\u044b\u0435</span>
+                                <span class="chip-value">${activeOrders.length}</span>
                             </div>
-                            <div class=\"hero-chip\">
-                                <span class=\"chip-label\">?????</span>
-                                <span class=\"chip-value\">${newOrders.length}</span>
+                            <div class="hero-chip">
+                                <span class="chip-label">\u041d\u043e\u0432\u044b\u0435</span>
+                                <span class="chip-value">${newOrders.length}</span>
                             </div>
-                            <div class=\"hero-chip\">
-                                <span class=\"chip-label\">??????</span>
-                                <span class=\"chip-value\">${state.products.length}</span>
+                            <div class="hero-chip">
+                                <span class="chip-label">\u0422\u043e\u0432\u0430\u0440\u044b</span>
+                                <span class="chip-value">${state.products.length}</span>
                             </div>
                         </div>
 
-                        <div class=\"hero-insights\">
+                        <div class="hero-insights">
                             ${hoursUntilPeak && hoursUntilPeak <= 2 ? `
-                                <div class=\"insight-card\">
-                                    <div class=\"insight-icon\">?</div>
+                                <div class="insight-card">
+                                    <div class="insight-icon">!</div>
                                     <div>
-                                        <div class=\"insight-title\">??? ?????? ????? ${hoursUntilPeak}?</div>
-                                        <div class=\"insight-text\">???????? ??????? ? ????????? ?????????? ?????????? ???????</div>
+                                        <div class="insight-title">\u041f\u0438\u043a \u0441\u043f\u0440\u043e\u0441\u0430 \u0447\u0435\u0440\u0435\u0437 ${hoursUntilPeak}\u0447</div>
+                                        <div class="insight-text">\u041e\u0431\u043d\u043e\u0432\u0438\u0442\u0435 \u0432\u0438\u0442\u0440\u0438\u043d\u0443 \u0438 \u043f\u0440\u043e\u0432\u0435\u0440\u044c\u0442\u0435 \u0433\u043e\u0442\u043e\u0432\u043d\u043e\u0441\u0442\u044c \u043f\u043e\u043f\u0443\u043b\u044f\u0440\u043d\u044b\u0445 \u043f\u043e\u0437\u0438\u0446\u0438\u0439</div>
                                     </div>
                                 </div>
                             ` : ''}
 
                             ${outOfStockProducts.length > 0 ? `
-                                <div class=\"insight-card warning\">
-                                    <div class=\"insight-icon\">?</div>
+                                <div class="insight-card warning">
+                                    <div class="insight-icon">!</div>
                                     <div>
-                                        <div class=\"insight-title\">??????????? ??????? (${outOfStockProducts.length})</div>
-                                        <div class=\"insight-text\">${outOfStockProducts[0]?.name || '?????'} ? ??? ${outOfStockProducts.length - 1}</div>
+                                        <div class="insight-title">\u0417\u0430\u043a\u043e\u043d\u0447\u0438\u043b\u0438\u0441\u044c \u043f\u043e\u0437\u0438\u0446\u0438\u0438 (${outOfStockProducts.length})</div>
+                                        <div class="insight-text">${outOfStockProducts[0]?.name || '\u0422\u043e\u0432\u0430\u0440'} \u0438 \u0435\u0449\u0435 ${outOfStockProducts.length - 1}</div>
                                     </div>
                                 </div>
                             ` : lowStockProducts.length > 0 ? `
-                                <div class=\"insight-card warning\">
-                                    <div class=\"insight-icon\">??</div>
+                                <div class="insight-card warning">
+                                    <div class="insight-icon">!</div>
                                     <div>
-                                        <div class=\"insight-title\">?????? ??????? (${lowStockProducts.length})</div>
-                                        <div class=\"insight-text\">${lowStockProducts.map(p => p.name).join(', ')}</div>
+                                        <div class="insight-title">\u041d\u0438\u0437\u043a\u0438\u0439 \u043e\u0441\u0442\u0430\u0442\u043e\u043a (${lowStockProducts.length})</div>
+                                        <div class="insight-text">${lowStockProducts.map(p => p.name).join(', ')}</div>
                                     </div>
                                 </div>
                             ` : ''}
 
                             ${goalProgress < 100 && todayRevenue > 0 ? `
-                                <div class=\"insight-card\">
+                                <div class="insight-card">
                                     <div>
-                                        <div class=\"goal-header\">
-                                            <span class=\"goal-label\">???? ???</span>
-                                            <span class=\"goal-values\">${formatPrice(todayRevenue)} / ${formatPrice(dailyGoal)}</span>
+                                        <div class="goal-header">
+                                            <span class="goal-label">\u0426\u0435\u043b\u044c \u0434\u043d\u044f</span>
+                                            <span class="goal-values">${formatPrice(todayRevenue)} / ${formatPrice(dailyGoal)}</span>
                                         </div>
-                                        <div class=\"goal-bar\">
-                                            <div class=\"goal-fill\" style=\"width: ${Math.min(goalProgress, 100)}%\"></div>
+                                        <div class="goal-bar">
+                                            <div class="goal-fill" style="width: ${Math.min(goalProgress, 100)}%"></div>
                                         </div>
                                     </div>
                                 </div>
                             ` : goalProgress >= 100 ? `
-                                <div class=\"insight-card success\">
-                                    <div class=\"insight-icon\">?</div>
+                                <div class="insight-card success">
+                                    <div class="insight-icon">OK</div>
                                     <div>
-                                        <div class=\"insight-title\">???? ?????????</div>
-                                        <div class=\"insight-text\">???????? ????????? ? ${formatPrice(dailyGoal)}</div>
+                                        <div class="insight-title">\u0426\u0435\u043b\u044c \u0432\u044b\u043f\u043e\u043b\u043d\u0435\u043d\u0430</div>
+                                        <div class="insight-text">\u041e\u0442\u043b\u0438\u0447\u043d\u044b\u0439 \u0440\u0435\u0437\u0443\u043b\u044c\u0442\u0430\u0442 - ${formatPrice(dailyGoal)}</div>
                                     </div>
                                 </div>
                             ` : ''}
                         </div>
                     </section>
 
-                    <div class=\"action-tiles rise-in\" style=\"--delay: 80ms;\">
-                        <button class=\"action-tile primary\" onclick=\"openProductModal()\">
-                            <span class=\"action-icon\"><i data-lucide=\"plus\"></i></span>
+                    <div class="action-tiles rise-in" style="--delay: 80ms;">
+                        <button class="action-tile primary" onclick="openProductModal()">
+                            <span class="action-icon"><i data-lucide="plus"></i></span>
                             <span>
-                                <span class=\"action-title\">???????? ?????</span>
-                                <span class=\"action-subtitle\">?????? ??????? ????? ?????</span>
+                                <span class="action-title">\u0414\u043e\u0431\u0430\u0432\u0438\u0442\u044c \u0442\u043e\u0432\u0430\u0440</span>
+                                <span class="action-subtitle">\u0411\u044b\u0441\u0442\u0440\u043e \u0441\u043e\u0437\u0434\u0430\u0442\u044c \u043d\u043e\u0432\u044b\u0439 \u043e\u0444\u0444\u0435\u0440</span>
                             </span>
                         </button>
-                        <button class=\"action-tile\" onclick=\"switchView('orders')\">
-                            <span class=\"action-icon\"><i data-lucide=\"sparkles\"></i></span>
+                        <button class="action-tile" onclick="switchView('orders')">
+                            <span class="action-icon"><i data-lucide="sparkles"></i></span>
                             <span>
-                                <span class=\"action-title\">???????? ??????</span>
-                                <span class=\"action-subtitle\">????????? ???????? ???????</span>
+                                <span class="action-title">\u0421\u043c\u043e\u0442\u0440\u0435\u0442\u044c \u0437\u0430\u043a\u0430\u0437\u044b</span>
+                                <span class="action-subtitle">\u041f\u0440\u043e\u0432\u0435\u0440\u0438\u0442\u044c \u0432\u0445\u043e\u0434\u044f\u0449\u0438\u0435 \u0437\u0430\u043f\u0440\u043e\u0441\u044b</span>
                             </span>
                         </button>
                     </div>
 
-                    <section class=\"kpi-grid rise-in\" style=\"--delay: 130ms;\">
-                        <div class=\"kpi-card kpi-primary\">
-                            ${revenueTrend != 0 ? `<span class=\"stat-trend ${revenueTrend > 0 ? 'up' : 'down'}\">
-                                <i data-lucide=\"${revenueTrend > 0 ? 'trending-up' : 'trending-down'}\"></i>
+                    <section class="kpi-grid rise-in" style="--delay: 130ms;">
+                        <div class="kpi-card kpi-primary">
+                            ${revenueTrend != 0 ? `<span class="stat-trend ${revenueTrend > 0 ? 'up' : 'down'}">
+                                <i data-lucide="${revenueTrend > 0 ? 'trending-up' : 'trending-down'}"></i>
                                 ${Math.abs(revenueTrend)}%
                             </span>` : ''}
                             ${todayRevenue > 0 ? `
-                                <div class=\"kpi-value\">${formatPrice(todayRevenue)}</div>
-                                <div class=\"kpi-label\">??????? ???????</div>
+                                <div class="kpi-value">${formatPrice(todayRevenue)}</div>
+                                <div class="kpi-label">\u0412\u044b\u0440\u0443\u0447\u043a\u0430 \u0441\u0435\u0433\u043e\u0434\u043d\u044f</div>
                             ` : `
-                                <div class=\"kpi-value empty-revenue\">??? ?????? ?? ???????</div>
-                                <div class=\"kpi-hint\">???????? ?????, ????? ????????? ?????</div>
+                                <div class="kpi-value empty-revenue">\u041d\u0435\u0442 \u043f\u0440\u043e\u0434\u0430\u0436 \u0437\u0430 \u0441\u0435\u0433\u043e\u0434\u043d\u044f</div>
+                                <div class="kpi-hint">\u0414\u043e\u0431\u0430\u0432\u044c\u0442\u0435 \u0430\u043a\u0446\u0438\u0438, \u0447\u0442\u043e\u0431\u044b \u0443\u0432\u0435\u043b\u0438\u0447\u0438\u0442\u044c \u0441\u043f\u0440\u043e\u0441</div>
                             `}
                         </div>
 
-                        <div class=\"kpi-card tone-success\">
-                            <div class=\"kpi-value\">${activeOrders.length}</div>
-                            <div class=\"kpi-label\">???????? ??????</div>
+                        <div class="kpi-card tone-success">
+                            <div class="kpi-value">${activeOrders.length}</div>
+                            <div class="kpi-label">\u0410\u043a\u0442\u0438\u0432\u043d\u044b\u0435 \u0437\u0430\u043a\u0430\u0437\u044b</div>
                         </div>
 
-                        <div class=\"kpi-card\">
-                            <div class=\"kpi-value\">${state.products.length}</div>
-                            <div class=\"kpi-label\">?????? ? ???????</div>
+                        <div class="kpi-card">
+                            <div class="kpi-value">${state.products.length}</div>
+                            <div class="kpi-label">\u0422\u043e\u0432\u0430\u0440\u044b \u0432 \u043f\u0440\u043e\u0434\u0430\u0436\u0435</div>
                         </div>
 
-                        <div class=\"kpi-card\">
-                            <div class=\"kpi-value\">4.8</div>
-                            <div class=\"kpi-label\">??????? ???????</div>
+                        <div class="kpi-card">
+                            <div class="kpi-value">4.8</div>
+                            <div class="kpi-label">\u0421\u0440\u0435\u0434\u043d\u0438\u0439 \u0440\u0435\u0439\u0442\u0438\u043d\u0433</div>
                         </div>
                     </section>
 
                     ${newOrders.length > 0 ? `
-                        <section class=\"priority-stack rise-in\" style=\"--delay: 180ms;\">
+                        <section class="priority-stack rise-in" style="--delay: 180ms;">
                             ${newOrders.map(order => `
-                                <div class=\"priority-card\" onclick=\"viewOrderDetails(${order.order_id || order.id})\">
-                                    <div class=\"priority-header\">
-                                        <h3 class=\"priority-title\">????? ????? #${order.order_id || order.id}</h3>
-                                        <span class=\"priority-time\">${formatTime(order.created_at)}</span>
+                                <div class="priority-card" onclick="viewOrderDetails(${order.order_id || order.id})">
+                                    <div class="priority-header">
+                                        <h3 class="priority-title">\u041d\u043e\u0432\u044b\u0439 \u0437\u0430\u043a\u0430\u0437 #${order.order_id || order.id}</h3>
+                                        <span class="priority-time">${formatTime(order.created_at)}</span>
                                     </div>
-                                    <div class=\"priority-meta\">
-                                        ${order.order_type === 'pickup' ? '?????????' : '????????'} ? ${formatPrice(order.price)}
+                                    <div class="priority-meta">
+                                        ${order.order_type === 'pickup' ? '\u0421\u0430\u043c\u043e\u0432\u044b\u0432\u043e\u0437' : '\u0414\u043e\u0441\u0442\u0430\u0432\u043a\u0430'} - ${formatPrice(order.price)}
                                     </div>
-                                    <div class=\"priority-actions\" onclick=\"event.stopPropagation()\">
-                                        <button class=\"btn btn-success\" onclick=\"updateOrderStatus(${order.order_id || order.id}, 'preparing')\">???????</button>
-                                        <button class=\"btn btn-outline\" onclick=\"cancelOrder(${order.order_id || order.id})\">????????</button>
+                                    <div class="priority-actions" onclick="event.stopPropagation()">
+                                        <button class="btn btn-success" onclick="updateOrderStatus(${order.order_id || order.id}, 'preparing')">\u041f\u0440\u0438\u043d\u044f\u0442\u044c</button>
+                                        <button class="btn btn-outline" onclick="cancelOrder(${order.order_id || order.id})">\u041e\u0442\u043c\u0435\u043d\u0438\u0442\u044c</button>
                                     </div>
                                 </div>
                             `).join('')}
                         </section>
                     ` : ''}
 
-                    <section class=\"section dashboard-section rise-in\" style=\"--delay: 220ms;\">
-                        <div class=\"section-header\">
+                    <section class="section dashboard-section rise-in" style="--delay: 220ms;">
+                        <div class="section-header">
                             <div>
-                                <h2 class=\"section-title\">???????? ??????</h2>
-                                <p class=\"section-subtitle\">??????? ????? ? ??????? ????????</p>
+                                <h2 class="section-title">\u0410\u043a\u0442\u0438\u0432\u043d\u044b\u0435 \u0437\u0430\u043a\u0430\u0437\u044b</h2>
+                                <p class="section-subtitle">\u0411\u044b\u0441\u0442\u0440\u044b\u0439 \u043e\u0431\u0437\u043e\u0440 \u0438 \u0431\u044b\u0441\u0442\u0440\u044b\u0435 \u0434\u0435\u0439\u0441\u0442\u0432\u0438\u044f</p>
                             </div>
-                            <button class=\"btn btn-sm btn-outline\" onclick=\"switchView('orders')\">??? ??????</button>
+                            <button class="btn btn-sm btn-outline" onclick="switchView('orders')">\u0412\u0441\u0435 \u0437\u0430\u043a\u0430\u0437\u044b</button>
                         </div>
 
                         ${activeOrders.length > 0 ? `
                             ${newOrders.length > 0 ? `
-                                <div class=\"order-section\" id=\"newOrdersSection\">
-                                    <div class=\"order-section-header\" onclick=\"toggleOrderSection('newOrdersSection')\">
-                                        <h3 class=\"order-section-title\">
-                                            ????? ??????
-                                            <span class=\"order-section-badge\">${newOrders.length}</span>
+                                <div class="order-section" id="newOrdersSection">
+                                    <div class="order-section-header" onclick="toggleOrderSection('newOrdersSection')">
+                                        <h3 class="order-section-title">
+                                            \u041d\u043e\u0432\u044b\u0435 \u0437\u0430\u044f\u0432\u043a\u0438
+                                            <span class="order-section-badge">${newOrders.length}</span>
                                         </h3>
-                                        <div class=\"order-section-toggle\">
-                                            <i data-lucide=\"chevron-down\"></i>
+                                        <div class="order-section-toggle">
+                                            <i data-lucide="chevron-down"></i>
                                         </div>
                                     </div>
-                                    <div class=\"order-section-content\">
-                                        <div class=\"orders-list\">
+                                    <div class="order-section-content">
+                                        <div class="orders-list">
                                             ${newOrders.map(order => renderOrderCard(order)).join('')}
                                         </div>
                                     </div>
@@ -981,30 +981,30 @@
                             ` : ''}
 
                             ${preparingOrders.length > 0 ? `
-                                <div class=\"order-section collapsed\" id=\"preparingOrdersSection\">
-                                    <div class=\"order-section-header\" onclick=\"toggleOrderSection('preparingOrdersSection')\">
-                                        <h3 class=\"order-section-title\">
-                                            ? ??????
-                                            <span class=\"order-section-badge muted\">${preparingOrders.length}</span>
+                                <div class="order-section collapsed" id="preparingOrdersSection">
+                                    <div class="order-section-header" onclick="toggleOrderSection('preparingOrdersSection')">
+                                        <h3 class="order-section-title">
+                                            \u0412 \u0440\u0430\u0431\u043e\u0442\u0435
+                                            <span class="order-section-badge muted">${preparingOrders.length}</span>
                                         </h3>
-                                        <div class=\"order-section-toggle\">
-                                            <i data-lucide=\"chevron-down\"></i>
+                                        <div class="order-section-toggle">
+                                            <i data-lucide="chevron-down"></i>
                                         </div>
                                     </div>
-                                    <div class=\"order-section-content\">
-                                        <div class=\"orders-list\">
+                                    <div class="order-section-content">
+                                        <div class="orders-list">
                                             ${preparingOrders.map(order => renderOrderCard(order)).join('')}
                                         </div>
                                     </div>
                                 </div>
                             ` : ''}
                         ` : `
-                            <div class=\"empty-state\">
-                                <div class=\"empty-icon\">
-                                    <i data-lucide=\"inbox\" class=\"icon-muted\"></i>
+                            <div class="empty-state">
+                                <div class="empty-icon">
+                                    <i data-lucide="inbox" class="icon-muted"></i>
                                 </div>
-                                <p class=\"empty-title\">???? ??? ???????? ???????</p>
-                                <p class=\"empty-subtitle\">????? ?????? ???????? ?????</p>
+                                <p class="empty-title">\u041f\u043e\u043a\u0430 \u043d\u0435\u0442 \u0430\u043a\u0442\u0438\u0432\u043d\u044b\u0445 \u0437\u0430\u043a\u0430\u0437\u043e\u0432</p>
+                                <p class="empty-subtitle">\u041d\u043e\u0432\u044b\u0435 \u0437\u0430\u044f\u0432\u043a\u0438 \u043f\u043e\u044f\u0432\u044f\u0442\u0441\u044f \u0437\u0434\u0435\u0441\u044c</p>
                             </div>
                         `}
                     </section>

@@ -1,13 +1,40 @@
 # 🔍 ПОЛНЫЙ АУДИТ ПРОЕКТА FUDLY BOT
-**Дата:** 28 декабря 2024  
+## Developer's Deep Dive Guide
+
+**Дата:** 28 декабря 2025  
 **Версия:** 2.0.0  
 **Статус:** Production Ready  
+
+> 💡 **Для разработчиков:** Этот документ - ваш полный guide по проекту. Здесь объяснено ГДЕ находится каждый компонент, КАК он работает, и ЗАЧЕМ он нужен.
 
 ---
 
 ## 📋 КРАТКОЕ РЕЗЮМЕ
 
 **Fudly Bot** - это Telegram бот-аналог Too Good To Go для Узбекистана. Платформа для продажи еды со скидкой до 70% вместо выбрасывания.
+
+### 🎯 Что умеет проект:
+
+**Для покупателей:**
+- 🔍 Поиск еды со скидкой в реальном времени
+- 🛒 Бронирование через Telegram бота
+- 📦 Pickup и Delivery заказы
+- ⭐ Рейтинги магазинов
+- 🌐 Веб-приложение (Mini App) для удобного заказа
+
+**Для продавцов:**
+- 📱 Создание предложений через бота
+- 🖥️ Веб-панель для управления товарами
+- 📊 Аналитика продаж
+- 💳 Интеграция с платёжными системами
+- 📞 Уведомления о новых заказах
+
+**Технологии:**
+- Python 3.11 + aiogram 3.x (Telegram Bot)
+- PostgreSQL 15 (База данных)
+- FastAPI (REST API для Mini App)
+- React 18 (Веб-приложение)
+- Railway (Production hosting)
 
 ### Общая оценка: **8.5/10** 🎯
 
@@ -24,34 +51,1313 @@
 
 ---
 
+## �️ КАРТА ПРОЕКТА - ГДЕ ЧТО НАХОДИТСЯ
+
+### 📁 Структура корневой директории:
+
+```
+fudly-bot-main/
+│
+├── 🤖 bot.py                    # ТОЧКА ВХОДА - запуск бота
+├── 📄 requirements.txt          # Python зависимости
+├── 🐳 Dockerfile                # Docker образ
+├── 🐳 docker-compose.yml        # Локальный запуск с PostgreSQL
+├── ⚙️ .env.example              # Шаблон переменных окружения
+│
+├── 📂 app/                      # ОСНОВНОЕ ПРИЛОЖЕНИЕ
+│   ├── api/                     # REST API для Mini App
+│   ├── core/                    # Конфигурация, security, constants
+│   ├── domain/                  # Бизнес-модели (Pydantic)
+│   ├── integrations/            # Внешние сервисы (платежи, AI)
+│   ├── keyboards/               # Telegram клавиатуры
+│   ├── middlewares/             # aiogram middleware
+│   ├── repositories/            # Слой доступа к данным (с кешем)
+│   ├── services/                # Бизнес-логика
+│   └── templates/               # Шаблоны сообщений
+│
+├── 📂 handlers/                 # TELEGRAM BOT HANDLERS
+│   ├── common/                  # Общие (start, help, menu)
+│   ├── customer/                # Покупатели
+│   ├── seller/                  # Продавцы
+│   ├── bookings/                # Бронирования
+│   └── admin/                   # Администратор
+│
+├── 📂 database_pg - КАК ВСЁ РАБОТАЕТ
+
+### Оценка: **9/10** ✅
+
+### 🎯 Главный вопрос: "Откуда начинается приложение?"
+
+**Точка входа:** `bot.py` (887 строк)
+
+```python
+# bot.py - что происходит при запуске:
+
+# 1. Загрузка настроек
+from app.core.config import load_settings
+settings = load_settings()  # Читает .env файл
+
+# 2. Создание главных компонентов
+from app.core.bootstrap import build_application
+bot, dp, db, cache = build_application(settings)
+# bot = aiogram Bot instance
+# dp = Dispatcher (маршрутизатор сообщений)
+# db = Database (PostgreSQL connection)
+# cache = Redis или in-memory cache
+
+# 3. Регистрация handlers (обработчиков сообщений)
+from handlers import customer, seller, admin, common
+dp.include_router(common.router)
+dp.include_router(customer.router)
+dp.include_router(seller.router)
+# ... и так далее
+
+# 4. Запуск бота
+if USE_WEBHOOK:
+    # Production: Railway
+    await bot.set_webhook(WEBHOOK_URL)
+    run_webhook_server(app, dp, bot, ...)
+else:
+    # Development: локально
+    await dp.start_polling(bot)
+```
+
+**Что происходит когда пользователь пишет "/start":**
+
+```
+Пользователь → Telegram → bot.py → Dispatcher → handlers/common/commands.py
+                                          ↓
+                                     start_command()
+                                          ↓
+                                  db.get_user(user_id)
+                                          ↓
+                          Если нет → show language selection
+                          Если есть → show main menu
+```
+
+---
+
+### 📐 Слои архитектуры (как данные текут):
+
+```
+┌─────────────────────────────────────────────────┐
+│  PRESENTATION LAYER (UI)                        │
+│  ├── Telegram Bot (handlers/)                   │
+│  ├── REST API (app/api/)                        │
+│  └── Mini App (webapp/)                         │
+└─────────────────────────────────────────────────┘
+                    ↓ ↑
+┌─────────────────────────────────────────────────┐
+│  SERVICE LAYER (Business Logic)                 │
+│  └── app/services/                              │
+│      ├── offer_service.py                       │
+│      ├── admin_service.py                       │
+│      └── unified_order_service.py               │
+└─────────────────────────────────────────────────┘
+                    ↓ ↑
+┌─────────────────────────────────────────────────┐
+│  REPOSITORY LAYER (Data Access)                 │
+│  └── app/repositories/                          │
+│      ├── offer_repository.py                    │
+│      └── cached.py (с кешем)                    │
+└─────────────────────────────────────────────────┘
+                    ↓ ↑
+┌─────────────────────────────────────────────────┐
+│  DATABASE LAYER                                 │
+│  └── database_pg_module/                        │
+│      ├── core.py (connection pool)              │
+│      └── mixins/ (SQL queries)                  │
+└─────────────────────────────────────────────────┘
+                    ↓ ↑
+┌─────────────────────────────────────────────────┐
+│  POSTGRESQL DATABASE                            │
+└─────────────────────────────────────────────────┘
+```
+
+---
+
+### 🔍 Детальный разбор каждой папки:
+
+#### 📂 `app/` - Главное приложение
+
+**app/core/** - Конфигурация и базовые компоненты
+```python
+# app/core/config.py - Настройки приложения
+@dataclass
+class Settings:
+    bot_token: str          # Токен бота из @BotFather
+    admin_id: int           # Telegram ID админа
+    database_url: str       # PostgreSQL connection string
+    redis_url: str | None   # Redis для кеша (опционально)
+    webhook: WebhookConfig  # Настройки webhook для production
+
+# Использование:
+settings = load_settings()  # Читает .env
+bot = Bot(token=settings.bot_token)
+
+# app/core/security.py - Безопасность
+class InputValidator:
+    """Валидация пользовательского ввода"""
+    
+    @staticmethod
+    def sanitize_text(text: str, max_length: int = 1000) -> str:
+        """Защита от XSS: экранирует HTML"""
+        return html.escape(text.strip())[:max_length]
+    
+    @staticmethod
+    def validate_phone(phone: str) -> bool:
+        """Проверка формата телефона"""
+        return re.match(r"^\+?[1-9]\d{1,14}$", phone) is not None
+
+# app/core/constants.py - Константы
+TELEGRAM_MESSAGE_LIMIT = 4096
+MAX_BOOKING_QUANTITY = 10
+BOOKING_DURATION_HOURS = 2
+```
+
+**app/api/** - REST API для Mini App (веб-приложения)
+```python
+# app/api/auth.py - Аутентификация Mini App
+@router.post("/auth/validate")
+async def validate_auth(request: AuthRequest):
+    """
+    Проверяет подпись Telegram WebApp initData.
+    Это гарантирует, что запрос пришёл от настоящего Telegram.
+    """
+    validated = validate_telegram_webapp_data(
+        request.init_data, 
+        settings.bot_token
+    )
+    if not validated:
+        raise HTTPException(401, "Invalid signature")
+    
+    user_id = validated["user"]["id"]
+    user = db.get_user_model(user_id)
+    return UserProfile(**user)
+
+# app/api/partner_panel_simple.py - API для продавцов
+@router.get("/products")
+async def get_products(store_id: int):
+    """Список товаров магазина"""
+    return db.get_store_offers(store_id)
+
+@router.post("/products")
+async def create_product(product: CreateProductRequest):
+    """Создание нового товара"""
+    offer_id = db.create_offer(...)
+    return {"success": True, "offer_id": offer_id}
+```
+
+**app/services/** - Бизнес-логика
+```python
+# app/services/offer_service.py
+class OfferService:
+    """Работа с предложениями"""
+    
+    def __init__(self, db: DatabaseProtocol, cache: CacheManager):
+        self.db = db
+        self.cache = cache
+    
+    def get_hot_offers(self, city: str = None) -> list[dict]:
+        """
+        Получить горячие предложения.
+        
+        Логика:
+        1. Проверить кеш (TTL 5 минут)
+        2. Если нет - загрузить из БД
+        3. Отфильтровать по городу
+        4. Сохранить в кеш
+        """
+        cache_key = f"hot_offers:{city or 'all'}"
+        
+        # Пробуем взять из кеша
+        cached = self.cache.get(cache_key)
+        if cached:
+            return cached
+        
+        # Загружаем из БД
+        offers = self.db.get_all_offers(active_only=True)
+        
+        # Фильтруем по городу
+        if city:
+            offers = [o for o in offers if o['city'] == city]
+        
+        # Сортируем по рейтингу
+        offers.sort(key=lambda x: x.get('rating', 0), reverse=True)
+        
+        # Сохраняем в кеш
+        self.cache.set(cache_key, offers, ex=300)  # 5 минут
+        
+        return offers[:20]  # Топ 20
+
+# app/services/unified_order_service.py
+class UnifiedOrderService:
+    """
+    Единая точка для работы с заказами.
+    
+    ВАЖНО: Все изменения статусов заказов должны идти через этот сервис!
+    Это гарантирует:
+    - Корректные уведомления покупателю и продавцу
+    - Обновление inventory (остатков)
+    - Audit logs
+    """
+    
+    async def create_order(
+        self,
+        user_id: int,
+        offers: list[dict],
+        order_type: str,  # "pickup" или "delivery"
+        **kwargs
+    ) -> dict:
+        """Создать заказ и отправить уведомления"""
+        
+        # 1. Создать запись в БД
+        order_id = self.db.create_order(...)
+        
+        # 2. Уменьшить quantity товаров
+        for offer in offers:
+            self.db.decrease_offer_quantity(offer['id'], offer['qty'])
+        
+        # 3. Отправить уведомление покупателю
+        await self.bot.send_message(
+            user_id,
+            f"✅ Заказ #{order_id} создан!"
+        )
+        
+        # 4. Отправить уведомление продавцу
+        store_owner_id = self.db.get_store_owner_id(offers[0]['store_id'])
+        await self.bot.send_message(
+            store_owner_id,
+            f"🔔 Новый заказ #{order_id}!"
+        )
+        
+        return {"order_id": order_id, "success": True}
+```
+
+**app/repositories/** - Слой доступа к данным (с кешированием)
+```python
+# app/repositories/offer_repository.py
+class OfferRepository:
+    """Прямой доступ к offers в БД"""
+    
+    def __init__(self, db: DatabaseProtocol):
+        self.db = db
+    
+    def get_hot_offers(self, limit: int = 10):
+        return self.db.execute("""
+            SELECT * FROM offers 
+            WHERE quantity > 0 
+            ORDER BY created_at DESC 
+            LIMIT %s
+        """, (limit,))
+
+# app/repositories/cached.py
+class CachedOfferRepository(OfferRepository):
+    """
+    Обёртка с кешем - использовать в production!
+    
+    Паттерн: Decorator Pattern
+    Наследуем OfferRepository и добавляем кеширование.
+    """
+    
+    def __init__(self, db: DatabaseProtocol, cache: CacheManager):
+        super().__init__(db)
+        self.cache = cache
+    
+    def get_hot_offers(self, limit: int = 10):
+        cache_key = f"hot_offers:{limit}"
+        
+        # Пробуем кеш
+        cached = self.cache.get(cache_key)
+        if cached:
+            logger.debug(f"Cache HIT: {cache_key}")
+            return cached
+        
+        # Если нет - вызываем parent метод
+        offers = super().get_hot_offers(limit)
+        
+        # Сохраняем в кеш на 5 минут
+        self.cache.set(cache_key, offers, ex=300)
+        logger.debug(f"Cache MISS: {cache_key}")
+        
+        return offers
+```
+
+**app/keyboards/** - Telegram клавиатуры
+```python
+# app/keyboards/customer.py
+def main_menu_customer(lang: str = "ru") -> ReplyKeyboardMarkup:
+    """
+    Главное меню для покупателя.
+    
+    Показывает кнопки:
+    - 🔥 Горячие предложения
+    - 🏪 Магазины
+    - 📦 Мои заказы
+    - ⭐ Избранное
+    - ⚙️ Настройки
+    """
+    builder = ReplyKeyboardBuilder()
+    
+    builder.button(text=get_text(lang, "hot_offers_btn"))
+    builder.button(text=get_text(lang, "stores_btn"))
+    builder.button(text=get_text(lang, "my_orders_btn"))
+    builder.button(text=get_text(lang, "favorites_btn"))
+    builder.button(text=get_text(lang, "settings_btn"))
+    
+    builder.adjust(2, 2, 1)  # 2 в первом ряду, 2 во втором, 1 в третьем
+    
+    return builder.as_markup(resize_keyboard=True)
+
+# app/keyboards/inline.py
+def offer_details_keyboard(
+    offer_id: int,
+    is_favorited: bool = False,
+    lang: str = "ru"
+) -> InlineKeyboardMarkup:
+    """
+    Inline клавиатура под предложением.
+    
+    Inline keyboard = кнопки прямо в сообщении (не внизу экрана).
+    Callback data = что отправится боту при нажатии.
+    """
+    builder = InlineKeyboardBuilder()
+    
+    # Кнопка бронирования
+    builder.button(
+        text=get_text(lang, "book_btn"),
+        callback_data=f"book_offer_{offer_id}"
+    )
+    
+    # Кнопка избранного
+    fav_text = "❤️" if is_favorited else "🤍"
+    builder.button(
+        text=fav_text,
+        callback_data=f"toggle_fav_{offer_id}"
+    )
+    
+    builder.adjust(1, 1)  # По 1 кнопке в ряду
+    return builder.as_markup()
+```
+
+**app/templates/** - Шаблоны сообщений
+```python
+# app/templates/notifications.py
+class NotificationBuilder:
+    """
+    Строит текст уведомлений для заказов.
+    
+    Используется в UnifiedOrderService для отправки сообщений.
+    """
+    
+    @staticmethod
+    def order_created_customer(order: dict, lang: str) -> str:
+        """
+        Уведомление покупателю о создании заказа.
+        
+        Возвращает готовый HTML-текст для Telegram.
+        """
+        if order['order_type'] == 'pickup':
+            return f"""
+✅ <b>Заказ #{order['id']} создан!</b>
+
+📦 Товары:
+{_format_items(order['items'])}
+
+📍 Самовывоз: {order['pickup_address']}
+🕐 Забрать до: {order['pickup_time']}
+
+🔐 Код для получения: <code>{order['pickup_code']}</code>
+
+Покажите этот код продавцу при получении заказа.
+"""
+        else:  # delivery
+            return f"""
+✅ <b>Заказ #{order['id']} создан!</b>
+
+📦 Товары:
+{_format_items(order['items'])}
+
+🚚 Доставка по адресу: {order['delivery_address']}
+⏰ Ожидаемое время: {order['estimated_delivery_time']}
+
+Мы уведомим вас когда курьер выедет.
+"""
+```
+
+**app/middlewares/** - Middleware для обработки запросов
+```python
+# app/middlewares/registration_check.py
+class RegistrationCheckMiddleware(BaseMiddleware):
+    """
+    Проверяет зарегистрирован ли пользователь.
+    
+    Middleware = промежуточный обработчик.
+    Выполняется ДО того как message попадёт в handler.
+    
+    Если пользователь не зарегистрирован:
+    - Показать экран выбора языка
+    - Запросить телефон
+    - НЕ передавать в handler
+    """
+    
+    async def __call__(
+        self,
+        handler: Callable,
+        event: types.Message,
+        data: dict
+    ) -> Any:
+        user_id = event.from_user.id
+        
+        # Проверяем есть ли пользователь в БД
+        user = self.db.get_user(user_id)
+        
+        if not user or not user.get('phone'):
+            # Не зарегистрирован - показываем регистрацию
+            await event.answer(
+                "👋 Добро пожаловать! Выберите язык:",
+                reply_markup=language_keyboard()
+            )
+            return  # НЕ вызываем handler
+        
+        # Зарегистрирован - передаём в handler
+        data['user'] = user  # Добавляем user в data
+        return await handler(event, data)
+```
+
+#### 📂 `handlers/` - Обработчики Telegram сообщений
+
+**Как работает роутинг:**
+
+```python
+# handlers/__init__.py
+from aiogram import Router
+
+router = Router()  # Главный роутер
+
+# Подключаем sub-роутеры
+from handlers import common, customer, seller, admin
+router.include_router(common.router)
+router.include_router(customer.router)
+router.include_router(seller.router)
+router.include_router(admin.router)
+
+# В bot.py:
+dp.include_router(handlers.router)
+```
+
+**handlers/common/** - Общие команды
+```python
+# handlers/common/commands.py
+
+@router.message(Command("start"))
+async def start_command(message: types.Message, state: FSMContext):
+    """
+    Обрабатывает /start
+    
+    FSMContext = Finite State Machine Context
+    Хранит состояние диалога с пользователем.
+    Например: "ждём выбор города", "ждём количество товара"
+    """
+    user_id = message.from_user.id
+    user = db.get_user(user_id)
+    
+    if not user:
+        # Первый раз - регистрация
+        await message.answer(
+            "👋 Добро пожаловать!\n"
+            "Выберите язык / Tilni tanlang:",
+            reply_markup=language_keyboard()
+        )
+        return
+    
+    # Уже зарегистрирован - показываем меню
+    lang = user.get('language', 'ru')
+    menu = get_appropriate_menu(user_id, lang)
+    
+    await message.answer(
+        get_text(lang, "welcome_back"),
+        reply_markup=menu
+    )
+
+@router.message(F.text == "🔥 Горячие предложения")
+async def hot_offers_handler(message: types.Message):
+    """
+    Обрабатывает нажатие на кнопку "Горячие предложения"
+    
+    F.text - это Magic Filter от aiogram.
+    Проверяет что текст сообщения точно совпадает.
+    """
+    user_id = message.from_user.id
+    lang = db.get_user_language(user_id)
+    
+    # Получаем предложения через сервис
+    offers = offer_service.get_hot_offers(limit=10)
+    
+    if not offers:
+        await message.answer(get_text(lang, "no_offers"))
+        return
+    
+    # Отправляем каждое предложение отдельным сообщением
+    for offer in offers:
+        text = format_offer_card(offer, lang)
+        keyboard = offer_details_keyboard(offer['id'], lang=lang)
+        
+        if offer.get('photo_id'):
+            await message.answer_photo(
+                photo=offer['photo_id'],
+                caption=text,
+                reply_markup=keyboard
+            )
+        else:
+            await message.answer(
+                text,
+                reply_markup=keyboard
+            )
+```
+
+**handlers/customer/** - Функционал для покупателей
+```python
+# handlers/customer/offers/browse.py
+
+@router.callback_query(F.data.startswith("book_offer_"))
+async def start_booking(callback: types.CallbackQuery, state: FSMContext):
+    """
+    Обрабатывает нажатие "Забронировать"
+    
+    Callback Query = ответ на inline кнопку.
+    callback.data = то что мы указали в callback_data кнопки.
+    
+    FSM States используем для многошагового диалога:
+    1. Выбрать количество
+    2. Выбрать способ получения (pickup/delivery)
+    3. Указать адрес (если delivery)
+    4. Подтвердить
+    """
+    # Извлекаем offer_id из callback_data
+    offer_id = int(callback.data.split("_")[2])
+    
+    # Получаем информацию о предложении
+    offer = db.get_offer(offer_id)
+    if not offer or offer['quantity'] <= 0:
+        await callback.answer("❌ Товар закончился", show_alert=True)
+        return
+    
+    # Сохраняем offer_id в state (памяти диалога)
+    await state.update_data(offer_id=offer_id)
+    
+    # Переходим в состояние "ждём количество"
+    await state.set_state(BookingStates.quantity)
+    
+    # Показываем inline кнопки с количеством
+    keyboard = quantity_keyboard(max_qty=offer['quantity'])
+    
+    await callback.message.answer(
+        f"Сколько единиц хотите забронировать?\n"
+        f"Доступно: {offer['quantity']}",
+        reply_markup=keyboard
+    )
+    
+    await callback.answer()  # Убираем "часики" с кнопки
+
+@router.callback_query(BookingStates.quantity, F.data.startswith("qty_"))
+async def quantity_selected(callback: types.CallbackQuery, state: FSMContext):
+    """
+    Пользователь выбрал количество.
+    Теперь спрашиваем способ получения.
+    
+    BookingStates.quantity - это проверка что мы в правильном состоянии.
+    Если пользователь нажмёт qty_5 в другом месте - handler не сработает.
+    """
+    quantity = int(callback.data.split("_")[1])
+    
+    # Сохраняем количество
+    await state.update_data(quantity=quantity)
+    
+    # Спрашиваем способ получения
+    await state.set_state(BookingStates.delivery_method)
+    
+    keyboard = InlineKeyboardBuilder()
+    keyboard.button(text="🏃 Самовывоз", callback_data="method_pickup")
+    keyboard.button(text="🚚 Доставка", callback_data="method_delivery")
+    keyboard.adjust(1)
+    
+    await callback.message.answer(
+        "Как хотите получить заказ?",
+        reply_markup=keyboard.as_markup()
+    )
+    await callback.answer()
+```
+
+**handlers/seller/** - Функционал для продавцов
+```python
+# handlers/seller/management/offers.py
+
+@router.message(F.text.in_({"📝 Создать предложение", "📝 Taklif yaratish"}))
+async def start_create_offer(message: types.Message, state: FSMContext):
+    """
+    Начинаем процесс создания предложения.
+    
+    Многошаговый процесс:
+    1. Название товара
+    2. Категория
+    3. Цена (оригинальная)
+    4. Цена со скидкой
+    5. Количество
+    6. Фото (опционально)
+    7. Подтверждение
+    """
+    user_id = message.from_user.id
+    lang = db.get_user_language(user_id)
+    
+    # Проверяем что у пользователя есть одобренный магазин
+    stores = db.get_user_accessible_stores(user_id)
+    if not stores:
+        await message.answer(
+            get_text(lang, "no_store_error")
+        )
+        return
+    
+    # Сохраняем store_id
+    store_id = stores[0]['store_id']
+    await state.update_data(store_id=store_id)
+    
+    # Переходим в состояние "ждём название"
+    await state.set_state(CreateOfferStates.title)
+    
+    await message.answer(
+        get_text(lang, "enter_offer_title"),
+        reply_markup=cancel_keyboard(lang)
+    )
+
+@router.message(CreateOfferStates.title, F.text)
+async def offer_title_entered(message: types.Message, state: FSMContext):
+    """
+    Пользователь ввёл название товара.
+    Теперь просим выбрать категорию.
+    """
+    title = message.text.strip()
+    
+    # Валидация
+    if len(title) < 3:
+        await message.answer("❌ Название слишком короткое")
+        return
+    
+    if len(title) > 200:
+        await message.answer("❌ Название слишком длинное (макс 200)")
+        return
+    
+    # Сохраняем и переходим дальше
+    await state.update_data(title=title)
+    await state.set_state(CreateOfferStates.category)
+    
+    # Показываем категории
+    keyboard = categories_keyboard(lang)
+    await message.answer(
+        get_text(lang, "select_category"),
+        reply_markup=keyboard
+    )
+```
+
+#### 📂 `database_pg_module/` - Работа с базой данных
+
+**Ключевая идея:** Все SQL запросы инкапсулированы в mixins. Handler'ы НЕ пишут SQL напрямую.
+
+```python
+# database_pg_module/core.py - Connection Pool
+
+class DatabaseCore:
+    """
+    Базовый класс для работы с PostgreSQL.
+    
+    Использует connection pool от psycopg 3.
+    Connection pool = пул соединений, не создаём новое для каждого запроса.
+    """
+    
+    def __init__(self, database_url: str):
+        self.database_url = database_url
+        
+        # Создаём connection pool
+        self.pool = ConnectionPool(
+            conninfo=database_url,
+            min_size=5,   # Минимум 5 открытых соединений
+            max_size=20,  # Максимум 20 одновременных соединений
+            max_waiting=50,  # Макс 50 запросов в очереди
+            max_waiting_timeout=60,  # Таймаут ожидания 60 сек
+            kwargs={"row_factory": hybrid_row_factory}
+        )
+    
+    @contextmanager
+    def get_connection(self):
+        """
+        Context manager для получения соединения.
+        
+        Использование:
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT ...")
+            # Автоматический commit при успехе
+            # Автоматический rollback при ошибке
+            # Автоматический возврат в pool
+        """
+        with self.pool.connection() as conn:
+            try:
+                yield conn
+                conn.commit()  # Если всё ОК
+            except Exception as e:
+                conn.rollback()  # Если ошибка - откатываем
+                logger.error(f"Database error: {e}")
+                raise
+
+# database_pg_module/mixins/offers.py - Операции с предложениями
+
+class OfferMixin:
+    """
+    Все SQL запросы для работы с offers.
+    
+    ВАЖНО: Этот класс НЕ используется напрямую!
+    Он миксуется в Database class.
+    """
+    
+    def get_offer(self, offer_id: int) -> dict | None:
+        """
+        Получить предложение по ID.
+        
+        Returns:
+            dict с полями из offers таблицы или None
+        """
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+                SELECT 
+                    offer_id, title, description, category,
+                    original_price, discount_price, quantity,
+                    store_id, photo_id, created_at, available_from, available_until
+                FROM offers
+                WHERE offer_id = %s
+            """, (offer_id,))
+            
+            row = cursor.fetchone()
+            return dict(row) if row else None
+    
+    def create_offer(
+        self,
+        store_id: int,
+        title: str,
+        category: str,
+        original_price: int,
+        discount_price: int,
+        quantity: int,
+        description: str | None = None,
+        photo_id: str | None = None,
+        available_from: str | None = None,
+        available_until: str | None = None
+    ) -> int:
+        """
+        Создать новое предложение.
+        
+        Returns:
+            offer_id нового предложения
+        """
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+                INSERT INTO offers (
+                    store_id, title, description, category,
+                    original_price, discount_price, quantity,
+                    photo_id, available_from, available_until
+                ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                RETURNING offer_id
+            """, (
+                store_id, title, description, category,
+                original_price, discount_price, quantity,
+                photo_id, available_from, available_until
+            ))
+            
+            offer_id = cursor.fetchone()[0]
+            logger.info(f"✅ Created offer {offer_id}")
+            return offer_id
+    
+    def decrease_offer_quantity(self, offer_id: int, amount: int = 1) -> bool:
+        """
+        Уменьшить количество товара (при бронировании).
+        
+        ВАЖНО: Использует FOR UPDATE для защиты от race condition.
+        
+        Returns:
+            True если успешно, False если недостаточно товара
+        """
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            
+            # Блокируем запись для изменения
+            cursor.execute("""
+                SELECT quantity FROM offers
+                WHERE offer_id = %s
+                FOR UPDATE  -- 🔒 Блокирует запись до конца транзакции
+            """, (offer_id,))
+            
+            row = cursor.fetchone()
+            if not row:
+                return False
+            
+            current_qty = row[0]
+            
+            # Проверяем что хватает товара
+            if current_qty < amount:
+                return False
+            
+            # Уменьшаем
+            cursor.execute("""
+                UPDATE offers
+                SET quantity = quantity - %s
+                WHERE offer_id = %s
+            """, (amount, offer_id))
+            
+            return True
+
+# database_pg_module/database.py - Главный класс
+
+class Database(
+    DatabaseCore,      # Connection pool
+    SchemaMixin,       # CREATE TABLE queries
+    UserMixin,         # users таблица
+    StoreMixin,        # stores таблица
+    OfferMixin,        # offers таблица
+    BookingMixin,      # bookings таблица
+    OrderMixin,        # orders таблица (unified pickup + delivery)
+    RatingMixin,       # ratings таблица
+    FavoritesMixin,    # favorites таблица
+    SearchMixin,       # full-text search
+    StatsMixin,        # статистика
+    PaymentMixin,      # payment_integrations
+    NotificationMixin  # notification_settings
+):
+    """
+    Главный класс для работы с БД.
+    
+    Использование:
+    db = Database(DATABASE_URL)
+    user = db.get_user(12345)
+    offers = db.get_all_offers()
+    db.create_offer(...)
+    """
+    pass
+
+# Почему mixins?
+# 1. Каждый mixin = ~200-500 строк
+# 2. Database class = все mixins вместе = ~5000+ строк
+# 3. Легко найти нужный метод: users.py, offers.py, etc
+# 4. Легко тестировать: тестируем каждый mixin отдельно
+```
+
+#### 📂 `webapp/` - React веб-приложение
+
+**Структура:**
+
+```
+webapp/
+├── src/
+│   ├── main.jsx                  # Точка входа React
+│   ├── App.jsx                   # Главный компонент
+│   │
+│   ├── pages/                    # Страницы (React Router)
+│   │   ├── HomePage.jsx          # / - список предложений
+│   │   ├── CartPage.jsx          # /cart - корзина
+│   │   ├── CheckoutPage.jsx      # /checkout - оформление
+│   │   ├── ProductPage.jsx       # /product - детали товара
+│   │   ├── TrackingPage.jsx      # /track - отслеживание заказа
+│   │   └── StoresPage.jsx        # /stores - список магазинов
+│   │
+│   ├── components/               # Переиспользуемые компоненты
+│   │   ├── OfferCard.jsx         # Карточка предложения
+│   │   ├── SearchBar.jsx         # Поиск
+│   │   ├── FilterPanel.jsx       # Фильтры
+│   │   ├── CartItem.jsx          # Элемент корзины
+│   │   └── LoadingSpinner.jsx    # Индикатор загрузки
+│   │
+│   ├── context/                  # React Context (глобальное состояние)
+│   │   ├── CartContext.jsx       # Корзина (useState + localStorage)
+│   │   ├── LocationContext.jsx   # Местоположение пользователя
+│   │   └── AuthContext.jsx       # Аутентификация
+│   │
+│   ├── hooks/                    # Custom React hooks
+│   │   ├── useAsyncOperation.js  # Async запросы с loading/error
+│   │   ├── useDebounce.js        # Debounce для поиска
+│   │   └── useLocalStorage.js    # Синхронизация с localStorage
+│   │
+│   ├── api/                      # API клиент
+│   │   └── client.js             # axios instance + методы
+│   │
+│   ├── utils/                    # Утилиты
+│   │   ├── auth.js               # Telegram WebApp auth
+│   │   ├── formatters.js         # Форматирование цен, дат
+│   │   └── validators.js         # Валидация форм
+│   │
+│   └── styles/                   # CSS
+│       └── index.css
+│
+├── public/                       # Статические файлы
+│   ├── icon.png
+│   └── manifest.json
+│
+└── vite.config.js                # Vite конфигурация
+```
+
+**Как работает:**
+
+```javascript
+// main.jsx - Точка входа
+import React from 'react'
+import ReactDOM from 'react-dom/client'
+import App from './App'
+import './styles/index.css'
+
+ReactDOM.createRoot(document.getElementById('root')).render(
+  <React.StrictMode>
+    <App />
+  </React.StrictMode>
+)
+
+// App.jsx - Главный компонент
+import { BrowserRouter, Routes, Route } from 'react-router-dom'
+import { CartProvider } from './context/CartContext'
+import { LocationProvider } from './context/LocationContext'
+import HomePage from './pages/HomePage'
+import CartPage from './pages/CartPage'
+// ... другие imports
+
+function App() {
+  return (
+    // Оборачиваем в Providers для глобального состояния
+    <LocationProvider>
+      <CartProvider>
+        <BrowserRouter>
+          <Routes>
+            <Route path="/" element={<HomePage />} />
+            <Route path="/cart" element={<CartPage />} />
+            <Route path="/product" element={<ProductPage />} />
+            <Route path="/checkout" element={<CheckoutPage />} />
+            <Route path="/track" element={<TrackingPage />} />
+            <Route path="/stores" element={<StoresPage />} />
+          </Routes>
+        </BrowserRouter>
+      </CartProvider>
+    </LocationProvider>
+  )
+}
+
+// context/CartContext.jsx - Глобальное состояние корзины
+import { createContext, useContext, useState, useEffect } from 'react'
+
+const CartContext = createContext()
+
+export function CartProvider({ children }) {
+  // Загружаем корзину из localStorage
+  const [cart, setCart] = useState(() => {
+    const saved = localStorage.getItem('fudly_cart_v2')
+    return saved ? JSON.parse(saved) : {}
+  })
+  
+  // Сохраняем в localStorage при изменении
+  useEffect(() => {
+    localStorage.setItem('fudly_cart_v2', JSON.stringify(cart))
+  }, [cart])
+  
+  // Методы для работы с корзиной
+  const addToCart = (offer, quantity = 1) => {
+    setCart(prev => ({
+      ...prev,
+      [offer.id]: {
+        offer,
+        quantity: (prev[offer.id]?.quantity || 0) + quantity
+      }
+    }))
+  }
+  
+  const removeFromCart = (offerId) => {
+    setCart(prev => {
+      const newCart = { ...prev }
+      delete newCart[offerId]
+      return newCart
+    })
+  }
+  
+  const updateQuantity = (offerId, quantity) => {
+    if (quantity <= 0) {
+      removeFromCart(offerId)
+      return
+    }
+    
+    setCart(prev => ({
+      ...prev,
+      [offerId]: {
+        ...prev[offerId],
+        quantity
+      }
+    }))
+  }
+  
+  const clearCart = () => setCart({})
+  
+  // Вычисляемые значения
+  const total = Object.values(cart).reduce(
+    (sum, item) => sum + (item.offer.discount_price * item.quantity),
+    0
+  )
+  
+  const itemCount = Object.values(cart).reduce(
+    (sum, item) => sum + item.quantity,
+    0
+  )
+  
+  return (
+    <CartContext.Provider value={{
+      cart,
+      addToCart,
+      removeFromCart,
+      updateQuantity,
+      clearCart,
+      total,
+      itemCount
+    }}>
+      {children}
+    </CartContext.Provider>
+  )
+}
+
+// Hook для использования корзины
+export function useCart() {
+  const context = useContext(CartContext)
+  if (!context) {
+    throw new Error('useCart must be used within CartProvider')
+  }
+  return context
+}
+
+// api/client.js - API клиент
+import axios from 'axios'
+
+const API_BASE = import.meta.env.VITE_API_URL || '/api/v1'
+
+// Создаём axios instance с базовыми настройками
+const client = axios.create({
+  baseURL: API_BASE,
+  headers: {
+    'Content-Type': 'application/json'
+  }
+})
+
+// Добавляем Telegram initData в каждый запрос
+client.interceptors.request.use(config => {
+  const initData = window.Telegram?.WebApp?.initData
+  if (initData) {
+    config.headers['X-Telegram-Init-Data'] = initData
+  }
+  return config
+})
+
+export default {
+  // Auth
+  async validateAuth(initData) {
+    const { data } = await client.post('/auth/validate', { init_data: initData })
+    return data
+  },
+  
+  // Offers
+  async getOffers(filters = {}) {
+    const { data } = await client.get('/offers', { params: filters })
+    return data
+  },
+  
+  async getOffer(offerId) {
+    const { data } = await client.get(`/offers/${offerId}`)
+    return data
+  },
+  
+  // Orders
+  async createOrder(orderData) {
+    const { data } = await client.post('/orders', orderData)
+    return data
+  },
+  
+  async getOrder(orderId) {
+    const { data } = await client.get(`/orders/${orderId}`)
+    return data
+  },
+  
+  // Cart checkout
+  async checkout(cartData) {
+    const { data} = await client.post('/checkout', cartData)
+    return data
+  }
+}
+
+// pages/HomePage.jsx - Главная страница
+import { useState, useEffect } from 'react'
+import { useLocation as useLocationContext } from '../context/LocationContext'
+import api from '../api/client'
+import OfferCard from '../components/OfferCard'
+import SearchBar from '../components/SearchBar'
+import LoadingSpinner from '../components/LoadingSpinner'
+
+export default function HomePage() {
+  const [offers, setOffers] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
+  const [searchQuery, setSearchQuery] = useState('')
+  
+  const { city } = useLocationContext()
+  
+  // Загружаем предложения при монтировании
+  useEffect(() => {
+    loadOffers()
+  }, [city])
+  
+  async function loadOffers() {
+    try {
+      setLoading(true)
+      const data = await api.getOffers({ city, search: searchQuery })
+      setOffers(data.offers)
+    } catch (err) {
+      setError(err.message)
+    } finally {
+      setLoading(false)
+    }
+  }
+  
+  if (loading) return <LoadingSpinner />
+  if (error) return <div className="error">{error}</div>
+  
+  return (
+    <div className="home-page">
+      <SearchBar 
+        value={searchQuery}
+        onChange={setSearchQuery}
+        onSearch={loadOffers}
+      />
+      
+      <div className="offers-grid">
+        {offers.map(offer => (
+          <OfferCard key={offer.id} offer={offer} />
+        ))}
+      </div>
+      
+      {offers.length === 0 && (
+        <div className="empty-state">
+          Нет доступных предложений
+        </div>
+      )}
+    </div>
+  )
+}
+
+// components/OfferCard.jsx - Карточка предложения
+import { useCart } from '../context/CartContext'
+import { formatPrice } from '../utils/formatters'
+
+export default function OfferCard({ offer }) {
+  const { addToCart } = useCart()
+  
+  const discount = Math.round(
+    ((offer.original_price - offer.discount_price) / offer.original_price) * 100
+  )
+  
+  return (
+    <div className="offer-card">
+      {offer.image_url && (
+        <img src={offer.image_url} alt={offer.title} />
+      )}
+      
+      <div className="offer-content">
+        <h3>{offer.title}</h3>
+        <p className="store-name">{offer.store_name}</p>
+        
+        <div className="prices">
+          <span className="discount-price">{formatPrice(offer.discount_price)}</span>
+          <span className="original-price">{formatPrice(offer.original_price)}</span>
+          <span className="discount-badge">-{discount}%</span>
+        </div>
+        
+        <p className="quantity">Осталось: {offer.quantity}</p>
+        
+        <button
+          className="add-to-cart-btn"
+          onClick={() => addToCart(offer, 1)}
+        >
+          🛒 В корзину
+        </button>
+      </div>
+    </div>
+  )
+}клиент
+│   │   └── hooks/               # Custom hooks
+│   ├── public/                  # Статика
+│   └── vite.config.js           # Vite конфиг
+│
+├── 📂 tests/                    # ТЕСТЫ
+│   ├── test_database.py
+│   ├── test_services.py
+│   ├── test_e2e_*.py
+│   └── ...
+│
+├── 📂 migrations/               # DATABASE MIGRATIONS
+│   ├── v22_unified_orders.sql
+│   ├── v23_store_hours.sql
+│   └── ...
+│
+├── 📂 tasks/                    # BACKGROUND WORKERS
+│   ├── booking_expiry_worker.py
+│   └── rating_reminder_worker.py
+│
+├── 📂 scripts/                  # UTILITY SCRIPTS
+│   └── smoke_test_pickup.py
+│
+├── 📂 docs/                     # ДОКУМЕНТАЦИЯ
+│   ├── architecture/
+│   ├── api/
+│   └── guides/
+│
+└── 📂 locales/                  # ПЕРЕВОДЫ (i18n)
+    ├── ru/
+    └── uz/
+```
+
+---
+
 ## 📊 ТЕХНИЧЕСКИЙ СТЕК
 
-### Backend
-- **Python 3.11** - основной язык
-- **aiogram 3.x** - Telegram Bot Framework
-- **PostgreSQL 15** - основная БД (Railway)
-- **psycopg 3.x** - connection pool
-- **FastAPI** - Mini App API
-- **Redis** - кеширование (опционально)
+### Backend (что запускается на сервере)
+- **Python 3.11** - язык программирования
+- **aiogram 3.x** - фреймворк для Telegram ботов (асинхронный)
+- **PostgreSQL 15** - реляционная база данных (Railway)
+- **psycopg 3.x** - драйвер PostgreSQL с connection pool
+- **FastAPI** - REST API фреймворк для Mini App
+- **Redis** - кеширование (опционально, для production)
+- **Pydantic** - валидация данных и type safety
 
-### Frontend (Mini App)
+### Frontend (веб-приложение)
 - **React 18** - UI библиотека
-- **Vite** - сборщик
-- **React Router** - навигация
-- **Axios** - HTTP клиент
-- **Telegram WebApp SDK** - интеграция
+- **Vite** - быстрый сборщик (вместо Webpack)
+- **React Router v6** - клиентская навигация
+- **Axios** - HTTP клиент для API запросов
+- **Telegram WebApp SDK** - интеграция с Telegram
+- **Vitest** - unit тестирование
 
-### Infrastructure
-- **Railway** - хостинг (production)
-- **Docker** - контейнеризация
-- **GitHub Actions** - CI/CD (потенциально)
-- **Vercel** - WebApp hosting
+### Infrastructure (где и как запускается)
+- **Railway** - PaaS хостинг (production) - автодеплой из GitHub
+- **Vercel** - хостинг для React приложения
+- **Docker** - контейнеризация (для локальной разработки)
+- **PostgreSQL Railway** - managed database
+- **GitHub** - version control
 
-### Testing
-- **pytest** - unit/integration tests
-- **pytest-asyncio** - async tests
-- **Vitest** - frontend unit tests
-- **Playwright** - E2E tests
+### Development Tools
+- **pytest** - unit/integration tests для Python
+- **pytest-asyncio** - тестирование async кода
+- **Playwright** - E2E тесты для веба
+- **Ruff** - Python linter (быстрая замена Flake8)
+- **Black** - code formatter
+- **pre-commit** - git hooks для проверки кода
 
 ---
 
