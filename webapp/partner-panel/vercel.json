@@ -1,6 +1,4 @@
 {
-  "buildCommand": "bash build.sh",
-  "outputDirectory": ".",
   "cleanUrls": true,
   "trailingSlash": false,
   "headers": [
@@ -10,6 +8,12 @@
         { "key": "X-Content-Type-Options", "value": "nosniff" },
         { "key": "X-Frame-Options", "value": "ALLOWALL" }
       ]
+    }
+  ],
+  "rewrites": [
+    {
+      "source": "/config.js",
+      "destination": "/config.js"
     }
   ]
 }
