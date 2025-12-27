@@ -16,6 +16,8 @@ from typing import Any
 import uvicorn
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
 from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 from slowapi.util import get_remote_address
@@ -191,7 +193,7 @@ def create_api_app(db: Any = None, offer_service: Any = None, bot_token: str = N
     webapp_dist_path = Path(__file__).parent.parent.parent / "webapp" / "dist"
     partner_panel_path = Path(__file__).parent.parent.parent / "webapp" / "partner-panel"
 
-    # Include routers
+    # Include routers (API routes must be registered BEFORE static files)
     app.include_router(auth_router)
     app.include_router(webapp_router)
     app.include_router(orders_router)
@@ -200,6 +202,22 @@ def create_api_app(db: Any = None, offer_service: Any = None, bot_token: str = N
     @app.get("/")
     async def root():
         return {"service": "Fudly Mini App API", "version": "1.0.0", "docs": "/api/docs"}
+
+    # Serve partner panel static files if directory exists
+    # MUST be mounted AFTER API routes to avoid conflicts
+    if partner_panel_path.exists():
+        logger.info(f"✅ Mounting partner panel static files from {partner_panel_path}")
+        try:
+            # Mount static files with html=True to serve index.html for directory requests
+            app.mount(
+                "/partner-panel",
+                StaticFiles(directory=str(partner_panel_path), html=True),
+                name="partner-panel",
+            )
+        except Exception as e:
+            logger.error(f"❌ Failed to mount partner panel: {e}")
+    else:
+        logger.warning(f"⚠️ Partner panel directory not found: {partner_panel_path}")
 
     # Debug endpoint - DEV ONLY (leaks filesystem layout)
     if is_dev:

@@ -2,6 +2,7 @@
   "name": "fudly-partner-panel",
   "private": true,
   "scripts": {
+    "build": "bash build.sh",
     "start": "sh -c 'printf \"window.PARTNER_API_BASE=\\\"%s\\\";\" \"${PARTNER_API_BASE:-}\" > config.js && npx serve . -s -l $PORT'"
   }
 }

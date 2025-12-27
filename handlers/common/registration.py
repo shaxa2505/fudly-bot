@@ -7,6 +7,7 @@ from aiogram.fsm.context import FSMContext
 
 from app.core.sanitize import sanitize_phone
 from app.core.security import logger, rate_limiter, secure_user_input, validator
+from app.core.utils import normalize_city
 from app.keyboards import (
     city_inline_keyboard,
     city_keyboard,
@@ -15,7 +16,7 @@ from app.keyboards import (
 )
 from database_protocol import DatabaseProtocol
 from handlers.common.states import Registration
-from localization import get_text
+from localization import get_cities, get_text
 
 router = Router(name="registration")
 
@@ -102,9 +103,19 @@ async def _after_phone_saved(
         )
         return
 
-    # Check if user already has a city set - skip city selection
-    user = db.get_user_model(message.from_user.id)
-    if user and user.city:
+    # Check if user already has a meaningful city set - skip city selection
+    user_city_raw = None
+    if hasattr(db, "get_user"):
+        user_data = db.get_user(message.from_user.id)
+        if isinstance(user_data, dict):
+            user_city_raw = user_data.get("city")
+        elif user_data and len(user_data) > 4:
+            user_city_raw = user_data[4]
+
+    default_city = normalize_city(get_cities("ru")[0])
+    user_city = normalize_city(user_city_raw) if user_city_raw else None
+
+    if user_city and user_city != default_city:
         # User already has city, complete registration
         await state.clear()
 

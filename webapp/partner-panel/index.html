@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <meta name="api-base" content="">
+    <meta name="api-base" content="https://fudly-bot-production.up.railway.app">
     <title>Fudly Partner v21.1</title>
     <script src="config.js"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -53,7 +53,7 @@
             overscroll-behavior: contain !important;
             touch-action: pan-y !important;
         }
-        
+
         .modal-content {
             position: relative !important;
             background: #FFFFFF !important;
@@ -141,11 +141,11 @@
         window.addEventListener('error', (e) => {
             console.error('🔴 Global error:', e.error || e.message);
         });
-        
+
         window.addEventListener('unhandledrejection', (e) => {
             console.error('🔴 Unhandled promise rejection:', e.reason);
         });
-        
+
         // ============================================
         // GLOBALS & STATE
         // ============================================
@@ -384,13 +384,13 @@
             `;
 
             console.log('🔵 Appending modal to body');
-            
+
             // Блокируем скролл фона
             const scrollY = window.scrollY;
             document.body.style.overflow = 'hidden';
             document.body.style.touchAction = 'none';
             document.body.dataset.scrollY = scrollY;
-            
+
             document.body.appendChild(modal);
             console.log('🔵 Modal appended, initializing Lucide icons');
             if (typeof lucide !== 'undefined') lucide.createIcons();
@@ -1904,14 +1904,14 @@
                 const description = String(formData.get('description') || '').trim();
                 const unit = String(formData.get('unit') || 'шт').trim();
                 const stockQty = Math.max(0, parseInt(formData.get('stock_quantity'), 10) || 0);
-                
+
                 // Parse prices - remove spaces and ensure proper integer conversion
                 const originalPriceRaw = String(formData.get('original_price') || '').replace(/\s/g, '');
                 const discountPriceInputRaw = String(formData.get('discount_price') || '').replace(/\s/g, '');
                 const originalPrice = parseInt(originalPriceRaw, 10);
                 const discountPercent = Math.max(0, Math.min(90, parseInt(formData.get('discount'), 10) || 0));
                 const discountPriceInput = parseInt(discountPriceInputRaw, 10);
-                
+
                 const expiryDate = String(formData.get('expiry_date') || '');
                 const isAvailable = formData.get('is_available') === 'on';
 
@@ -1958,9 +1958,9 @@
                 if (photoId) payload.append('photo_id', photoId);
                 if (productId) payload.append('status', stockQty <= 0 ? 'out_of_stock' : (isAvailable ? 'active' : 'hidden'));
 
-                console.log('📤 Sending payload with prices:', { 
-                    original_price: originalPrice, 
-                    discount_price: discountPrice 
+                console.log('📤 Sending payload with prices:', {
+                    original_price: originalPrice,
+                    discount_price: discountPrice
                 });
 
                 if (productId) {
