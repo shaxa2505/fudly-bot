@@ -21,11 +21,11 @@ class ProgressBar:
         """
         if lang == "uz":
             if step == 1:
-                return "? Tayyorlanmoqda ? ? Berildi"
-            return "? Tayyor ? ? Berildi"
+                return "Tayyorlanmoqda -> Berildi"
+            return "Tayyor -> Berildi"
         if step == 1:
-            return "? ????????? ? ? ?????"
-        return "? ?????? ? ? ?????"
+            return "????????? -> ?????"
+        return "?????? -> ?????"
 
     @staticmethod
     def delivery(step: int, lang: str) -> str:
@@ -39,22 +39,22 @@ class ProgressBar:
         """
         if lang == "uz":
             if step == 1:
-                return "? Tayyorlanmoqda ? ? Yo'lda ? ? Yetkazildi"
+                return "Tayyorlanmoqda -> Yo'lda -> Yetkazildi"
             if step == 2:
-                return "? Tayyor ? ? Yo'lda ? ? Yetkazildi"
-            return "? Tayyor ? ? Yo'lda ? ? Yetkazildi"
+                return "Tayyor -> Yo'lda -> Yetkazildi"
+            return "Tayyor -> Yo'lda -> Yetkazildi"
         if step == 1:
-            return "? ????????? ? ? ? ???? ? ? ?????????"
+            return "????????? -> ? ???? -> ?????????"
         if step == 2:
-            return "? ?????? ? ? ? ???? ? ? ?????????"
-        return "? ?????? ? ? ? ???? ? ? ?????????"
+            return "?????? -> ? ???? -> ?????????"
+        return "?????? -> ? ???? -> ?????????"
 
     @staticmethod
     def delivery_labels(lang: str) -> str:
         """Labels for delivery progress bar."""
         if lang == "uz":
-            return "Tayyorlanmoqda ? Yo'lda ? Yetkazildi"
-        return "????????? ? ? ???? ? ?????????"
+            return "Tayyorlanmoqda -> Yo'lda -> Yetkazildi"
+        return "????????? -> ? ???? -> ?????????"
 
 
 class NotificationBuilder:
@@ -82,27 +82,17 @@ class NotificationBuilder:
         if lang == "uz":
             entity = "Bron" if self.order_type == "pickup" else "Buyurtma"
             return (
-                f"?? <b>{entity.upper()} YUBORILDI</b>
-
-"
-                f"?? #{order_id}
-"
-                f"?? {self._esc(store_name)}
-
-"
-                f"? Do'kon tasdiqlashini kuting (5?10 daqiqa)"
+                f"{entity.upper()} YUBORILDI\n\n"
+                f"#{order_id}\n"
+                f"{self._esc(store_name)}\n\n"
+                f"Do\'kon tasdiqlashini kuting (5-10 daqiqa)"
             )
         entity = "?????" if self.order_type == "pickup" else "?????"
         return (
-            f"?? <b>{entity.upper()} ?????????</b>
-
-"
-            f"?? #{order_id}
-"
-            f"?? {self._esc(store_name)}
-
-"
-            f"? ???? ????????????? ???????? (5?10 ???)"
+            f"{entity.upper()} ?????????\n\n"
+            f"#{order_id}\n"
+            f"{self._esc(store_name)}\n\n"
+            f"???? ????????????? ???????? (5-10 ???)"
         )
 
     def build_preparing(
@@ -117,100 +107,57 @@ class NotificationBuilder:
         if self.order_type == "pickup":
             if lang == "uz":
                 return (
-                    f"? <b>BRON TASDIQLANDI</b>
-
-"
-                    f"{ProgressBar.pickup(1, lang)}
-
-"
-                    f"?? #{order_id}
-"
-                    f"?? {self._esc(store_name)}
-"
-                    + (f"?? {self._esc(store_address)}
-" if store_address else "")
-                    + (f"?? <b>Kod: {pickup_code}</b>
-" if pickup_code else "")
-                    + "
-? Tayyor bo'lganda xabar beramiz."
+                    "BRON TASDIQLANDI\n\n"
+                    f"{ProgressBar.pickup(1, lang)}\n\n"
+                    f"#{order_id}\n"
+                    f"{self._esc(store_name)}\n"
+                    + (f"{self._esc(store_address)}\n" if store_address else "")
+                    + (f"Kod: {pickup_code}\n" if pickup_code else "")
+                    + "\nTayyor bo\'lganda xabar beramiz."
                 )
             return (
-                f"? <b>????? ????????????</b>
-
-"
-                f"{ProgressBar.pickup(1, lang)}
-
-"
-                f"?? #{order_id}
-"
-                f"?? {self._esc(store_name)}
-"
-                + (f"?? {self._esc(store_address)}
-" if store_address else "")
-                + (f"?? <b>???: {pickup_code}</b>
-" if pickup_code else "")
-                + "
-? ???????, ????? ????? ???????."
+                "????? ????????????\n\n"
+                f"{ProgressBar.pickup(1, lang)}\n\n"
+                f"#{order_id}\n"
+                f"{self._esc(store_name)}\n"
+                + (f"{self._esc(store_address)}\n" if store_address else "")
+                + (f"???: {pickup_code}\n" if pickup_code else "")
+                + "\n???????, ????? ????? ???????."
             )
         if lang == "uz":
             return (
-                f"? <b>Buyurtma tasdiqlandi</b>
-
-"
-                f"{ProgressBar.delivery(1, lang)}
-"
-                f"{ProgressBar.delivery_labels(lang)}
-
-"
-                f"?? #{order_id} ? {self._esc(store_name)}
-"
-                f"? Tayyorlanmoqda"
+                "Buyurtma tasdiqlandi\n\n"
+                f"{ProgressBar.delivery(1, lang)}\n"
+                f"{ProgressBar.delivery_labels(lang)}\n\n"
+                f"#{order_id} - {self._esc(store_name)}\n"
+                "Tayyorlanmoqda"
             )
         return (
-            f"? <b>????? ???????????</b>
-
-"
-            f"{ProgressBar.delivery(1, lang)}
-"
-            f"{ProgressBar.delivery_labels(lang)}
-
-"
-            f"?? #{order_id} ? {self._esc(store_name)}
-"
-            f"? ??????? ?????"
+            "????? ???????????\n\n"
+            f"{ProgressBar.delivery(1, lang)}\n"
+            f"{ProgressBar.delivery_labels(lang)}\n\n"
+            f"#{order_id} - {self._esc(store_name)}\n"
+            "??????? ?????"
         )
 
     def build_delivering(self, lang: str, order_id: int, courier_phone: str | None = None) -> str:
         """Build DELIVERING status notification (delivery only)."""
-        courier_text = f"
-?? {self._esc(courier_phone)}" if courier_phone else ""
+        courier_text = f"\n???????: {self._esc(courier_phone)}" if courier_phone else ""
         if lang == "uz":
             return (
-                f"?? <b>Buyurtma yo'lda</b>
-
-"
-                f"{ProgressBar.delivery(2, lang)}
-"
-                f"{ProgressBar.delivery_labels(lang)}
-
-"
-                f"?? #{order_id}
-"
-                f"? ~30?60 daqiqa"
+                "Buyurtma yo\'lda\n\n"
+                f"{ProgressBar.delivery(2, lang)}\n"
+                f"{ProgressBar.delivery_labels(lang)}\n\n"
+                f"#{order_id}\n"
+                "Taxminan 30-60 daqiqa"
                 + courier_text
             )
         return (
-            f"?? <b>????? ? ????</b>
-
-"
-            f"{ProgressBar.delivery(2, lang)}
-"
-            f"{ProgressBar.delivery_labels(lang)}
-
-"
-            f"?? #{order_id}
-"
-            f"? ~30?60 ???"
+            "????? ? ????\n\n"
+            f"{ProgressBar.delivery(2, lang)}\n"
+            f"{ProgressBar.delivery_labels(lang)}\n\n"
+            f"#{order_id}\n"
+            "???????? 30-60 ???"
             + courier_text
         )
 
@@ -219,89 +166,55 @@ class NotificationBuilder:
         if self.order_type == "pickup":
             if lang == "uz":
                 return (
-                    f"? <b>Buyurtma berildi</b>
-
-"
-                    f"{ProgressBar.pickup(2, lang)}
-
-"
-                    f"?? #{order_id} ? {self._esc(store_name)}
-
-"
-                    f"Rahmat!"
+                    "Buyurtma berildi\n\n"
+                    f"{ProgressBar.pickup(2, lang)}\n\n"
+                    f"#{order_id} - {self._esc(store_name)}\n\n"
+                    "Rahmat!"
                 )
             return (
-                f"? <b>????? ?????</b>
-
-"
-                f"{ProgressBar.pickup(2, lang)}
-
-"
-                f"?? #{order_id} ? {self._esc(store_name)}
-
-"
-                f"???????!"
+                "????? ?????\n\n"
+                f"{ProgressBar.pickup(2, lang)}\n\n"
+                f"#{order_id} - {self._esc(store_name)}\n\n"
+                "???????!"
             )
         if lang == "uz":
             return (
-                f"? <b>Yetkazildi</b>
-
-"
-                f"{ProgressBar.delivery(3, lang)}
-
-"
-                f"?? #{order_id} ? {self._esc(store_name)}
-
-"
-                f"Rahmat!"
+                "Yetkazildi\n\n"
+                f"{ProgressBar.delivery(3, lang)}\n\n"
+                f"#{order_id} - {self._esc(store_name)}\n\n"
+                "Rahmat!"
             )
         return (
-            f"? <b>????? ?????????</b>
-
-"
-            f"{ProgressBar.delivery(3, lang)}
-
-"
-            f"?? #{order_id} ? {self._esc(store_name)}
-
-"
-            f"???????!"
+            "????? ?????????\n\n"
+            f"{ProgressBar.delivery(3, lang)}\n\n"
+            f"#{order_id} - {self._esc(store_name)}\n\n"
+            "???????!"
         )
 
     def build_rejected(self, lang: str, order_id: int, reason: str | None = None) -> str:
         """Build REJECTED status notification."""
-        reason_text = f"{self._esc(reason)}" if reason else ""
+        reason_text = self._esc(reason) if reason else ""
         if lang == "uz":
             entity = "Bron" if self.order_type == "pickup" else "Buyurtma"
             return (
-                f"? <b>{entity} rad etildi</b>
-
-"
-                f"?? #{order_id}
-"
-                + (f"Sabab: {reason_text}
-" if reason_text else "")
+                f"{entity} rad etildi\n\n"
+                f"#{order_id}\n"
+                + (f"Sabab: {reason_text}\n" if reason_text else "")
             )
         entity = "?????" if self.order_type == "pickup" else "?????"
         return (
-            f"? <b>{entity} ????????</b>
-
-"
-            f"?? #{order_id}
-"
-            + (f"???????: {reason_text}
-" if reason_text else "")
+            f"{entity} ????????\n\n"
+            f"#{order_id}\n"
+            + (f"???????: {reason_text}\n" if reason_text else "")
         )
 
     def build_cancelled(self, lang: str, order_id: int) -> str:
         """Build CANCELLED status notification."""
         if lang == "uz":
             entity = "Bron" if self.order_type == "pickup" else "Buyurtma"
-            return f"? <b>{entity} bekor qilindi</b>
-?? #{order_id}"
+            return f"{entity} bekor qilindi\n#{order_id}"
         entity = "?????" if self.order_type == "pickup" else "?????"
-        return f"? <b>{entity} ???????</b>
-?? #{order_id}"
+        return f"{entity} ???????\n#{order_id}"
 
     def build(
         self,
@@ -327,4 +240,4 @@ class NotificationBuilder:
             return self.build_rejected(lang, order_id, reject_reason)
         if status == "cancelled":
             return self.build_cancelled(lang, order_id)
-        return f"?? Order #{order_id} status: {status}"
+        return f"Order #{order_id} status: {status}"
