@@ -30,12 +30,9 @@ async def _after_phone_saved(
 
     from aiogram.types import ReplyKeyboardRemove
 
-    ru_phone_saved = "✅ Телефон сохранен!"
-    uz_phone_saved = "✅ Telefon saqlandi!"
-
     if pending_cart_checkout:
         await message.answer(
-            ru_phone_saved if lang == "ru" else uz_phone_saved,
+            get_text(lang, "phone_saved"),
             reply_markup=ReplyKeyboardRemove(),
         )
 
@@ -47,15 +44,8 @@ async def _after_phone_saved(
             logger.warning(f"Failed to resume cart after phone: {e}")
             from app.keyboards import main_menu_customer
 
-            ru_text = (
-                "Теперь откройте "
-                "<Сават> и нажмите "
-                "<Оформить заказ> заново."
-            )
-            uz_text = "Endi <Savat> ni ochib, <Buyurtma berish> ni qayta bosing."
-
             await message.answer(
-                ru_text if lang == "ru" else uz_text,
+                get_text(lang, "registration_resume_cart"),
                 reply_markup=main_menu_customer(lang),
             )
 
@@ -64,7 +54,7 @@ async def _after_phone_saved(
 
     if pending_order:
         await message.answer(
-            ru_phone_saved if lang == "ru" else uz_phone_saved,
+            get_text(lang, "phone_saved"),
             reply_markup=ReplyKeyboardRemove(),
         )
 
@@ -77,11 +67,8 @@ async def _after_phone_saved(
             await state.clear()
             from app.keyboards import main_menu_customer
 
-            ru_text = "Продолжите через <Акции>"
-            uz_text = "Aksiyalar orqali davom eting"
-
             await message.answer(
-                ru_text if lang == "ru" else uz_text,
+                get_text(lang, "registration_continue_offers"),
                 reply_markup=main_menu_customer(lang),
             )
             return
@@ -89,21 +76,13 @@ async def _after_phone_saved(
         from aiogram.utils.keyboard import InlineKeyboardBuilder
 
         kb = InlineKeyboardBuilder()
-        ru_button = "✅ Продолжить"
-        uz_button = "✅ Davom ettirish"
         kb.button(
-            text=ru_button if lang == "ru" else uz_button,
+            text=get_text(lang, "registration_continue_button"),
             callback_data=f"pbook_confirm_{offer_id}",
         )
 
-        ru_text = (
-            "Нажмите кнопку ниже, "
-            "чтобы продолжить:"
-        )
-        uz_text = "Davom etish uchun tugmani bosing:"
-
         await message.answer(
-            ru_text if lang == "ru" else uz_text,
+            get_text(lang, "registration_continue_prompt"),
             reply_markup=kb.as_markup(),
         )
         return
@@ -124,26 +103,22 @@ async def _after_phone_saved(
         from app.keyboards import main_menu_customer
 
         await message.answer(
-            ru_phone_saved if lang == "ru" else uz_phone_saved,
+            get_text(lang, "phone_saved"),
             reply_markup=ReplyKeyboardRemove(),
         )
 
-        choose_text = "Tanlang" if lang == "uz" else "Выберите"
         await message.answer(
-            f"👉 {choose_text}:",
+            get_text(lang, "registration_choose_action"),
             reply_markup=main_menu_customer(lang),
         )
         return
 
-    ru_city_title = "Выберите ваш город"
-    uz_city_title = "Shahringizni tanlang"
-    ru_city_hint = "Покажем предложения рядом"
-    uz_city_hint = "Yaqin takliflarni ko'rsatamiz"
-
-    city_text = (
-        f"✅ {uz_phone_saved if lang == 'uz' else ru_phone_saved}\n\n"
-        f"📍 <b>{uz_city_title if lang == 'uz' else ru_city_title}</b>\n\n"
-        f"{uz_city_hint if lang == 'uz' else ru_city_hint}"
+    city_text = "\n\n".join(
+        [
+            get_text(lang, "phone_saved"),
+            f"<b>{get_text(lang, 'registration_city_title')}</b>",
+            get_text(lang, "registration_city_hint"),
+        ]
     )
 
     await state.set_state(Registration.city)
@@ -152,9 +127,8 @@ async def _after_phone_saved(
         parse_mode="HTML",
         reply_markup=ReplyKeyboardRemove(),
     )
-    choose_text = "Tanlang" if lang == "uz" else "Выберите"
     await message.answer(
-        f"👉 {choose_text}:",
+        get_text(lang, "registration_choose_action"),
         reply_markup=city_inline_keyboard(lang, allow_cancel=False),
     )
 
@@ -280,25 +254,11 @@ async def registration_city_callback(
     user = db.get_user_model(callback.from_user.id)
     name = user.first_name if user else callback.from_user.first_name
 
-    title = "Tayyor!" if lang == "uz" else "Готово!"
-    welcome = "Xush kelibsiz" if lang == "uz" else "Добро пожаловать"
-    city_label = "Shahar" if lang == "uz" else "Город"
-    can_do = "Endi siz qila olasiz" if lang == "uz" else "Теперь вы можете"
-    offers = "Aksiyalar" if lang == "uz" else "Акции"
-    offers_hint = "70% gacha chegirmalar" if lang == "uz" else "скидки до 70%"
-    stores = "Do'konlar" if lang == "uz" else "Магазины"
-    stores_hint = "barcha do'konlar" if lang == "uz" else "все магазины"
-    search = "Qidirish" if lang == "uz" else "Поиск"
-    search_hint = "mahsulot topish" if lang == "uz" else "найти товар"
-
-    complete_text = (
-        f"🎉 <b>{title}</b>\n\n"
-        f"👋 {welcome}, {name}!\n"
-        f"📍 {city_label}: {city}\n\n"
-        f"{can_do}:\n"
-        f"🔥 <b>{offers}</b> ? {offers_hint}\n"
-        f"🏪 <b>{stores}</b> ? {stores_hint}\n"
-        f"🔎 <b>{search}</b> ? {search_hint}"
+    complete_text = get_text(
+        lang,
+        "registration_complete_personal",
+        name=name,
+        city=city,
     )
 
     try:
@@ -306,9 +266,8 @@ async def registration_city_callback(
     except Exception:
         pass
 
-    choose_text = "Tanlang" if lang == "uz" else "Выберите"
     await callback.message.answer(
-        f"👉 {choose_text}:",
+        get_text(lang, "registration_choose_action"),
         reply_markup=main_menu_customer(lang),
     )
     await callback.answer()

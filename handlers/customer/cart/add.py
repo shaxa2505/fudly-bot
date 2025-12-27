@@ -1,9 +1,10 @@
-"""Add-to-cart flow: quantity selection and confirmation."""
-from __future__ import annotations
+﻿from __future__ import annotations
 
 from aiogram import F, Router, types
 from aiogram.fsm.context import FSMContext
 from aiogram.utils.keyboard import InlineKeyboardBuilder
+
+from localization import get_text
 
 from . import common
 from .common import esc
@@ -23,9 +24,10 @@ def build_cart_add_card_text(
     store_address: str = "",
     unit: str = "шт",
 ) -> str:
+    currency = "so'm" if lang == "uz" else "сум"
     text_parts: list[str] = []
 
-    text_parts.append(f"🍱 <b>{title}</b>")
+    text_parts.append(f"🛒 <b>{title}</b>")
     if description:
         text_parts.append(f"<i>{description}</i>")
 
@@ -34,23 +36,23 @@ def build_cart_add_card_text(
     if original_price and original_price > price:
         discount_pct = int(((original_price - price) / original_price) * 100)
         text_parts.append(
-            f"<s>{original_price:,.0f}</s> → <b>{price:,.0f} сум</b> <code>(-{discount_pct}%)</code>"
+            f"<s>{original_price:,.0f}</s> → <b>{price:,.0f} {currency}</b> <code>(-{discount_pct}%)</code>"
         )
     else:
-        text_parts.append(f"💰 <b>{price:,.0f} сум</b>")
+        text_parts.append(
+            f"💵 {get_text(lang, 'cart_add_price_label')}: <b>{price:,.0f} {currency}</b>"
+        )
 
     text_parts.append(
-        f"📦 Количество: <b>{quantity} {unit}</b>"
-        if lang == "ru"
-        else f"📦 Miqdor: <b>{quantity} {unit}</b>"
+        f"🔢 {get_text(lang, 'cart_add_quantity_label')}: <b>{quantity} {unit}</b>"
     )
 
-    stock_label = "В наличии" if lang == "ru" else "Omborda"
-    text_parts.append(f"📊 {stock_label}: {max_qty} {unit}")
+    stock_label = get_text(lang, "cart_add_stock_label")
+    text_parts.append(f"📦 {stock_label}: {max_qty} {unit}")
 
     if expiry_date:
-        expiry_label = "Годен до" if lang == "ru" else "Srok"
-        text_parts.append(f"📅 {expiry_label}: {expiry_date}")
+        expiry_label = get_text(lang, "cart_add_expiry_label")
+        text_parts.append(f"⏰ {expiry_label}: {expiry_date}")
 
     text_parts.append("")
 
@@ -62,9 +64,7 @@ def build_cart_add_card_text(
 
     total = price * quantity
     text_parts.append(
-        f"💳 <b>ИТОГО: {total:,.0f} сум</b>"
-        if lang == "ru"
-        else f"💳 <b>JAMI: {total:,.0f} so'm</b>"
+        f"💰 <b>{get_text(lang, 'cart_add_total_label')}: {total:,.0f} {currency}</b>"
     )
 
     return "\n".join(text_parts)
@@ -75,14 +75,14 @@ def build_cart_add_card_keyboard(
 ) -> InlineKeyboardBuilder:
     kb = InlineKeyboardBuilder()
 
-    minus_btn = "➖" if quantity > 1 else "▫️"
-    plus_btn = "➕" if quantity < max_qty else "▫️"
+    minus_btn = "➖" if quantity > 1 else "⛔"
+    plus_btn = "➕" if quantity < max_qty else "⛔"
 
     kb.button(
         text=minus_btn,
         callback_data=f"cart_qty_{offer_id}_{quantity - 1}" if quantity > 1 else "cart_noop",
     )
-    kb.button(text=f"📦 {quantity}", callback_data="cart_noop")
+    kb.button(text=f"🔢 {quantity}", callback_data="cart_noop")
     kb.button(
         text=plus_btn,
         callback_data=f"cart_qty_{offer_id}_{quantity + 1}" if quantity < max_qty else "cart_noop",
@@ -90,11 +90,11 @@ def build_cart_add_card_keyboard(
     kb.adjust(3)
 
     kb.button(
-        text="✅ Добавить в корзину" if lang == "ru" else "✅ Savatga qo'shish",
+        text=get_text(lang, "cart_add_confirm_button"),
         callback_data=f"cart_add_confirm_{offer_id}",
     )
     kb.button(
-        text="❌ Отмена" if lang == "ru" else "❌ Bekor qilish",
+        text=get_text(lang, "cart_add_cancel_button"),
         callback_data=f"cart_add_cancel_{offer_id}",
     )
 
@@ -118,13 +118,13 @@ def register(router: Router) -> None:
         try:
             offer_id = int(callback.data.split("_")[-1])
         except (ValueError, IndexError):
-            await callback.answer("❌", show_alert=True)
+            await callback.answer(get_text(lang, "error"), show_alert=True)
             return
 
         offer = common.db.get_offer(offer_id)
         if not offer:
             await callback.answer(
-                "Товар не найден" if lang == "ru" else "Mahsulot topilmadi",
+                get_text(lang, "offer_not_found"),
                 show_alert=True,
             )
             return
@@ -137,14 +137,14 @@ def register(router: Router) -> None:
         max_qty = int(get_field(offer, "quantity", 0) or 0)
         if max_qty <= 0:
             await callback.answer(
-                "Товар закончился" if lang == "ru" else "Mahsulot tugadi",
+                get_text(lang, "cart_add_out_of_stock"),
                 show_alert=True,
             )
             return
 
         price = float(get_field(offer, "discount_price", 0) or 0)
         original_price = float(get_field(offer, "original_price", 0) or 0)
-        title = str(get_field(offer, "title", "Товар"))
+        title = str(get_field(offer, "title", get_text(lang, "offer_not_found")))
         description = str(get_field(offer, "description", ""))
         unit = str(get_field(offer, "unit", "шт"))
         expiry_date = str(get_field(offer, "expiry_date", "") or "")
@@ -204,7 +204,7 @@ def register(router: Router) -> None:
                 )
             await callback.answer()
         except Exception:
-            await callback.answer("❌", show_alert=True)
+            await callback.answer(get_text(lang, "error"), show_alert=True)
 
     @router.callback_query(F.data.startswith("cart_qty_"))
     async def cart_update_quantity(callback: types.CallbackQuery, state: FSMContext) -> None:
@@ -220,7 +220,7 @@ def register(router: Router) -> None:
             offer_id = int(parts[2])
             new_qty = int(parts[3])
         except (ValueError, IndexError):
-            await callback.answer("❌", show_alert=True)
+            await callback.answer(get_text(lang, "error"), show_alert=True)
             return
 
         data = await state.get_data()
@@ -309,19 +309,12 @@ def register(router: Router) -> None:
 
         cart_count = cart_storage.get_cart_count(user_id)
 
-        added_text = "Добавлено!" if lang == "ru" else "Qo'shildi!"
-        popup_text = (
-            f"✅ {added_text} В корзине: {cart_count} шт"
-            if lang == "ru"
-            else f"✅ {added_text} Savatda: {cart_count} ta"
-        )
+        popup_text = get_text(lang, "cart_add_popup", count=cart_count)
         await callback.answer(popup_text, show_alert=False)
 
-        # Decide what to show after adding based on source context
         source = str(data.get("source", ""))
 
         if source in {"hot", "search"}:
-            # For hot offers and search, keep the card and switch it to "in cart" state
             from app.keyboards.offers import offer_in_cart_keyboard
 
             text = build_cart_add_card_text(
@@ -338,21 +331,8 @@ def register(router: Router) -> None:
                 unit=offer_unit,
             )
 
-            # Append small hint about cart
-            if lang == "ru":
-                hint = "\n\n✅ Товар добавлен в корзину.\n" + (
-                    "Можно открыть корзину или вернуться к акциям."
-                    if source == "hot"
-                    else "Можно открыть корзину или вернуться к результатам поиска."
-                )
-            else:
-                hint = "\n\n✅ Mahsulot savatga qo'shildi.\n" + (
-                    "Savatni ochishingiz yoki aksiyalarga qaytishingiz mumkin."
-                    if source == "hot"
-                    else "Savatni ochishingiz yoki natijalarga qaytishingiz mumkin."
-                )
-
-            text += hint
+            hint_key = "cart_add_hint_hot" if source == "hot" else "cart_add_hint_search"
+            text += "\n\n" + get_text(lang, hint_key)
 
             kb = offer_in_cart_keyboard(lang, source)
 
@@ -370,17 +350,13 @@ def register(router: Router) -> None:
                         reply_markup=kb,
                     )
             except Exception:
-                # If we cannot edit, just leave the popup as feedback
                 pass
-            # Important: keep FSM state so back buttons (hot/search) can use stored context
             return
 
-        # Default behaviour for store-based flows: return to store offers list
         if store_id is not None:
             try:
                 await _show_store_offers(callback, state, int(store_id), lang)
             except Exception:
-                # Fallback: just clear state if showing offers fails
                 pass
 
         await state.clear()
@@ -399,7 +375,6 @@ def register(router: Router) -> None:
 
         await state.clear()
 
-        # If we know the store, return user to its offers list
         if store_id is not None:
             try:
                 await _show_store_offers(callback, state, int(store_id), lang)
@@ -433,26 +408,29 @@ def register(router: Router) -> None:
         store = common.db.get_store(store_id)
         if not store:
             await callback.answer(
-                "Магазин не найден" if lang == "ru" else "Do'kon topilmadi",
+                get_text(lang, "store_not_found"),
                 show_alert=True,
             )
             return
 
         from handlers.bookings.utils import get_store_field
 
-        store_name = get_store_field(store, "name", "Магазин")
+        store_name = get_store_field(store, "name", get_text(lang, "store_not_found"))
 
         offers = common.db.get_active_offers(store_id)
         if not offers:
             await callback.answer(
-                "Нет доступных товаров" if lang == "ru" else "Mahsulotlar yo'q",
+                get_text(lang, "no_offers_in_store"),
                 show_alert=True,
             )
             return
 
+        currency = "so'm" if lang == "uz" else "сум"
+        stock_label = get_text(lang, "store_offers_stock_label")
+
         text_lines: list[str] = []
         text_lines.append(f"🏪 <b>{esc(store_name)}</b>\n")
-        text_lines.append(f"{'Mahsulotlar:' if lang == 'uz' else 'Товары:'}\n")
+        text_lines.append(f"{get_text(lang, 'store_offers_list_title')}\n")
 
         ITEMS_PER_PAGE = 5
         page = 0
@@ -467,11 +445,13 @@ def register(router: Router) -> None:
         from handlers.bookings.utils import get_offer_field
 
         for i, offer in enumerate(page_offers, start=start_idx + 1):
-            title = get_offer_field(offer, "title", "Товар")
+            title = get_offer_field(offer, "title", get_text(lang, "offer_not_found"))
             price = get_offer_field(offer, "discount_price", 0)
             qty = get_offer_field(offer, "quantity", 0)
 
-            text_lines.append(f"{i}. {esc(title)} - {price:,} сум (в наличии: {qty})")
+            text_lines.append(
+                f"{i}. {esc(title)} - {price:,} {currency} ({stock_label}: {qty})"
+            )
 
         text = "\n".join(text_lines)
 
@@ -479,10 +459,10 @@ def register(router: Router) -> None:
 
         for offer in page_offers:
             offer_id = get_offer_field(offer, "id", 0) or get_offer_field(offer, "offer_id", 0)
-            title = get_offer_field(offer, "title", "Товар")
+            title = get_offer_field(offer, "title", get_text(lang, "offer_not_found"))
 
             kb.button(
-                text=f"📦 {title[:30]}{'...' if len(title) > 30 else ''}",
+                text=f"🔹 {title[:30]}{'...' if len(title) > 30 else ''}",
                 callback_data=f"view_offer_{offer_id}",
             )
 
@@ -494,20 +474,10 @@ def register(router: Router) -> None:
         if total_pages > 1:
             nav_buttons = []
             if page > 0:
-                nav_buttons.append(
-                    (
-                        "⬅️ Назад" if lang == "ru" else "⬅️ Orqaga",
-                        f"store_page_{store_id}_{page - 1}",
-                    )
-                )
+                nav_buttons.append((get_text(lang, "back"), f"store_page_{store_id}_{page - 1}"))
             nav_buttons.append((f"📄 {page + 1}/{total_pages}", "noop"))
             if page < total_pages - 1:
-                nav_buttons.append(
-                    (
-                        "Вперед ▶️" if lang == "ru" else "Oldinga ▶️",
-                        f"store_page_{store_id}_{page + 1}",
-                    )
-                )
+                nav_buttons.append((get_text(lang, "next_page"), f"store_page_{store_id}_{page + 1}"))
 
             for btn_text, btn_data in nav_buttons:
                 kb.button(text=btn_text, callback_data=btn_data)
@@ -516,13 +486,13 @@ def register(router: Router) -> None:
         cart_count = cart_storage.get_cart_count(user_id)
         if cart_count > 0:
             kb.button(
-                text=(f"🛒 Корзина ({cart_count})" if lang == "ru" else f"🛒 Savat ({cart_count})"),
+                text=f"🛒 {get_text(lang, 'my_cart')} ({cart_count})",
                 callback_data="view_cart",
             )
             kb.adjust(1)
 
         kb.button(
-            text="⬅️ Назад" if lang == "ru" else "⬅️ Orqaga",
+            text=get_text(lang, "back"),
             callback_data="back_to_menu",
         )
 

@@ -281,13 +281,10 @@ async def profile_change_city_cb(callback: types.CallbackQuery, state: FSMContex
     db.update_user_city(callback.from_user.id, normalized_city)
     await state.clear()
 
-    city_msg = (
-        f"✅ Город изменен на <b>{city}</b>"
-        if lang == "ru"
-        else f"✅ Shahar <b>{city}</b>ga o'zgartirildi"
-    )
     await callback.message.answer(
-        city_msg, parse_mode="HTML", reply_markup=main_menu_customer(lang)
+        get_text(lang, "city_changed_confirm", city=city),
+        parse_mode="HTML",
+        reply_markup=main_menu_customer(lang),
     )
     await callback.answer()
 

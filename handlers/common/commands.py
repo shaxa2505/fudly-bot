@@ -383,9 +383,8 @@ async def handle_city_selection(
         else main_menu_customer(lang)
     )
 
-    city_selected = "Shahar tanlandi" if lang == "uz" else "Город выбран"
     try:
-        await callback.message.edit_text(f"✅ {city_selected}: {city}")
+        await callback.message.edit_text(get_text(lang, "city_selected", city=city))
     except Exception as e:
         logger.debug("Could not edit city confirmation: %s", e)
 
@@ -493,13 +492,8 @@ async def change_city_text(
         else main_menu_customer(lang)
     )
 
-    if lang == "ru":
-        text_msg = f"✅ Город изменен на <b>{new_city}</b>"
-    else:
-        text_msg = f"✅ Shahar <b>{new_city}</b>ga o'zgartirildi"
-
     await message.answer(
-        text_msg,
+        get_text(lang, "city_changed_confirm", city=new_city),
         parse_mode="HTML",
         reply_markup=menu,
     )

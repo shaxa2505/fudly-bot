@@ -853,6 +853,11 @@
     color: var(--info);
 }
 
+.status-stat-icon.delivering {
+    background: rgba(37, 99, 235, 0.12);
+    color: var(--info);
+}
+
 .status-stat-icon.completed {
     background: rgba(24, 162, 75, 0.12);
     color: var(--success);
@@ -877,6 +882,7 @@
 .status-stat-value.new { color: var(--success); }
 .status-stat-value.preparing { color: var(--warning); }
 .status-stat-value.ready { color: var(--info); }
+.status-stat-value.delivering { color: var(--info); }
 .status-stat-value.completed { color: var(--success); }
 .status-stat-value.cancelled { color: var(--danger); }
 
@@ -1112,6 +1118,12 @@
     background: var(--success-light);
     color: var(--success-dark);
     border: 1px solid rgba(24, 162, 75, 0.25);
+}
+
+.status-delivering {
+    background: var(--info-light);
+    color: var(--info-dark);
+    border: 1px solid rgba(37, 99, 235, 0.2);
 }
 
 .status-completed {

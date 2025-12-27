@@ -612,7 +612,7 @@ input.success {
 
 .orders-metrics {
     display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
     gap: var(--space-3);
 }
 
@@ -720,6 +720,58 @@ input.success {
 .meta-chip.muted {
     background: var(--bg-tertiary);
     color: var(--text-muted);
+}
+
+.meta-chip.code {
+    background: rgba(24, 162, 75, 0.12);
+    color: var(--primary-dark);
+    border: 1px solid rgba(24, 162, 75, 0.25);
+}
+
+.meta-chip.type-pickup {
+    background: rgba(24, 162, 75, 0.12);
+    color: var(--primary-dark);
+    border: 1px solid rgba(24, 162, 75, 0.25);
+}
+
+.meta-chip.type-delivery {
+    background: rgba(37, 99, 235, 0.12);
+    color: var(--info-dark);
+    border: 1px solid rgba(37, 99, 235, 0.25);
+}
+
+.meta-chip.payment {
+    background: rgba(245, 158, 11, 0.12);
+    color: #B45309;
+    border: 1px solid rgba(245, 158, 11, 0.3);
+}
+
+.meta-chip.payment.payment-ok {
+    background: rgba(24, 162, 75, 0.12);
+    color: var(--primary-dark);
+    border: 1px solid rgba(24, 162, 75, 0.25);
+}
+
+.meta-chip.payment.payment-bad {
+    background: rgba(239, 68, 68, 0.12);
+    color: #B91C1C;
+    border: 1px solid rgba(239, 68, 68, 0.25);
+}
+
+.copy-btn {
+    border: 1px dashed var(--border);
+    background: #FFFFFF;
+    color: var(--text-secondary);
+    font-size: 11px;
+    padding: 4px 8px;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all var(--transition-fast);
+}
+
+.copy-btn:hover {
+    border-color: var(--primary);
+    color: var(--primary);
 }
 
 .order-amount {

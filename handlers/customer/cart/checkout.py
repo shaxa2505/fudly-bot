@@ -1,5 +1,4 @@
-"""Cart checkout and back-to-menu handlers."""
-from __future__ import annotations
+﻿from __future__ import annotations
 
 from aiogram import F, Router, types
 from aiogram.fsm.context import FSMContext
@@ -32,7 +31,7 @@ def register(router: Router) -> None:
 
         cart_storage.clear_cart(user_id)
 
-        text = "🗑 Корзина очищена" if lang == "ru" else "🗑 Savat tozalandi"
+        text = get_text(lang, "cart_cleared")
 
         try:
             await callback.message.edit_text(text, parse_mode="HTML")
@@ -52,44 +51,37 @@ def register(router: Router) -> None:
 
         items = cart_storage.get_cart(user_id)
         if not items:
-            await callback.answer(
-                "Корзина пуста" if lang == "ru" else "Savat bo'sh", show_alert=True
-            )
+            await callback.answer(get_text(lang, "cart_empty_alert"), show_alert=True)
             return
 
         low_stock_warnings = []
         for item in items:
             if item.max_quantity < 5 and item.quantity > (item.max_quantity * 0.5):
                 low_stock_warnings.append(
-                    f"⚠️ {item.title}: осталось всего {item.max_quantity} {item.unit}"
-                    if lang == "ru"
-                    else f"⚠️ {item.title}: faqat {item.max_quantity} {item.unit} qoldi"
+                    get_text(
+                        lang,
+                        "cart_low_stock_item",
+                        title=item.title,
+                        max=item.max_quantity,
+                        unit=item.unit,
+                    )
                 )
 
         if low_stock_warnings:
             warning_text = "\n".join(low_stock_warnings)
-            warning_text += "\n\n" + (
-                "Товар заканчивается! Рекомендуем оформить заказ как можно скорее."
-                if lang == "ru"
-                else "Mahsulot tugayapti! Tezroq buyurtma berishni tavsiya qilamiz."
-            )
+            warning_text += "\n\n" + get_text(lang, "cart_low_stock_hint")
             try:
                 await callback.message.answer(warning_text, parse_mode="HTML")
             except Exception:
                 pass
 
-        # Require phone number before checkout
         user = common.db.get_user_model(user_id)
         if not user or not getattr(user, "phone", None):
             from app.keyboards import phone_request_keyboard
             from handlers.common.states import Registration
 
             await callback.message.answer(
-                (
-                    "📱 Для оформления заказа укажите номер телефона"
-                    if lang == "ru"
-                    else "📱 Buyurtma berish uchun telefon raqamingizni kiriting"
-                ),
+                get_text(lang, "cart_phone_required"),
                 reply_markup=phone_request_keyboard(lang),
             )
             await state.update_data(pending_cart_checkout=True)
@@ -97,40 +89,38 @@ def register(router: Router) -> None:
             await callback.answer()
             return
 
-        # Enforce single-store cart
         stores = {item.store_id for item in items}
         if len(stores) > 1:
             await callback.answer(
-                (
-                    "Можно оформить заказ только из одного магазина"
-                    if lang == "ru"
-                    else "Faqat bitta do'kondan buyurtma berish mumkin"
-                ),
+                get_text(lang, "cart_single_store_only"),
                 show_alert=True,
             )
             return
 
-        store_id = items[0].store_id
-        store = common.db.get_store(store_id)
-        delivery_enabled = items[0].delivery_enabled
-        delivery_price = items[0].delivery_price
+        delivery_enabled = any(item.delivery_enabled for item in items)
+        delivery_price = max(
+            (item.delivery_price for item in items if item.delivery_enabled), default=0
+        )
 
         currency = "so'm" if lang == "uz" else "сум"
         total = int(sum(item.price * item.quantity for item in items))
 
-        lines: list[str] = [f"📋 <b>{'Buyurtma' if lang == 'uz' else 'Заказ'}</b>\n"]
+        lines: list[str] = [f"🧾 <b>{get_text(lang, 'cart_order_title')}</b>\n"]
         lines.append(f"🏪 {esc(items[0].store_name)}\n")
 
         for item in items:
             subtotal = int(item.price * item.quantity)
-            lines.append(f"• {esc(item.title)} × {item.quantity} = {subtotal:,} {currency}")
+            lines.append(f"• {esc(item.title)} x {item.quantity} = {subtotal:,} {currency}")
 
-        lines.append("\n" + "─" * 25)
-        lines.append(f"💵 <b>{'Jami' if lang == 'uz' else 'Итого'}: {total:,} {currency}</b>")
-        store = common.db.get_store(store_id)
+        lines.append("\n" + "-" * 25)
+        lines.append(f"💰 <b>{get_text(lang, 'cart_total_label')}: {total:,} {currency}</b>")
         if delivery_enabled:
             lines.append(
-                f"🚚 {'Yetkazish' if lang == 'uz' else 'Доставка'}: {delivery_price:,} {currency}"
+                f"🚚 {get_text(lang, 'cart_delivery_label')}: {delivery_price:,} {currency}"
+            )
+            grand_total = total + delivery_price
+            lines.append(
+                f"🧾 <b>{get_text(lang, 'cart_grand_total_label')}: {grand_total:,} {currency}</b>"
             )
 
         text = "\n".join(lines)
@@ -139,22 +129,22 @@ def register(router: Router) -> None:
 
         if delivery_enabled:
             kb.button(
-                text="🏪 Самовывоз" if lang == "ru" else "🏪 O'zim olib ketaman",
+                text=get_text(lang, "cart_pickup_button"),
                 callback_data="cart_confirm_pickup",
             )
             kb.button(
-                text="🚚 Доставка" if lang == "ru" else "🚚 Yetkazish",
+                text=get_text(lang, "cart_delivery_button"),
                 callback_data="cart_confirm_delivery",
             )
             kb.adjust(2)
         else:
             kb.button(
-                text="✅ Подтвердить" if lang == "ru" else "✅ Tasdiqlash",
+                text=get_text(lang, "cart_confirm_button"),
                 callback_data="cart_confirm_pickup",
             )
 
         kb.button(
-            text="⬅️ Назад" if lang == "ru" else "⬅️ Orqaga",
+            text=get_text(lang, "cart_back_button"),
             callback_data="back_to_cart",
         )
 
@@ -178,21 +168,12 @@ def register(router: Router) -> None:
 
         items = cart_storage.get_cart(user_id)
         if not items:
-            await callback.answer(
-                "Корзина пуста" if lang == "ru" else "Savat bo'sh", show_alert=True
-            )
+            await callback.answer(get_text(lang, "cart_empty_alert"), show_alert=True)
             return
 
         order_service = get_unified_order_service()
         if not order_service:
-            await callback.answer(
-                (
-                    "❌ Система заказов недоступна"
-                    if lang == "ru"
-                    else "❌ Buyurtma xizmati mavjud emas"
-                ),
-                show_alert=True,
-            )
+            await callback.answer(get_text(lang, "system_error"), show_alert=True)
             return
 
         order_items: list[OrderItem] = []
@@ -226,27 +207,36 @@ def register(router: Router) -> None:
             from logging_config import logger
 
             logger.error(f"Failed to create unified pickup order from cart: {e}")
-            await callback.answer(
-                ("❌ Не удалось создать заказ" if lang == "ru" else "❌ Buyurtma yaratib bo'lmadi"),
-                show_alert=True,
-            )
+            await callback.answer(get_text(lang, "system_error"), show_alert=True)
             return
 
         if not result.success:
-            msg = result.error_message or (
-                "❌ Не удалось создать заказ" if lang == "ru" else "❌ Buyurtma yaratib bo'lmadi"
-            )
+            msg = result.error_message or get_text(lang, "system_error")
             await callback.answer(msg, show_alert=True)
             return
 
         cart_storage.clear_cart(user_id)
 
-        # UnifiedOrderService уже отправил клиенту подробное сообщение
-        # "ЗАКАЗ ОФОРМЛЕН" с кодом и инструкциями.
-        # Здесь оставляем только короткий попап для ощущения завершённости.
+        order_ids = [str(oid) for oid in result.order_ids if oid]
+        pickup_codes = [code for code in result.pickup_codes if code]
 
-        # Short popup for continuity
-        await callback.answer("✅", show_alert=False)
+        lines: list[str] = [get_text(lang, "cart_order_created_title")]
+        if order_ids:
+            lines.append(get_text(lang, "cart_order_created_ids", ids=", ".join(order_ids)))
+        if pickup_codes:
+            lines.append(
+                get_text(lang, "cart_order_created_codes", codes=", ".join(pickup_codes))
+            )
+        lines.append(get_text(lang, "cart_order_created_menu_hint"))
+
+        text = "\n".join(lines)
+
+        try:
+            await callback.message.answer(text, parse_mode="HTML")
+        except Exception:
+            pass
+
+        await callback.answer()
 
     @router.callback_query(F.data == "back_to_menu")
     async def back_to_menu(callback: types.CallbackQuery, state: FSMContext) -> None:
@@ -261,7 +251,7 @@ def register(router: Router) -> None:
 
         cart_count = cart_storage.get_cart_count(user_id)
 
-        text = "🏠 Главное меню" if lang == "ru" else "🏠 Asosiy menyu"
+        text = get_text(lang, "main_menu")
 
         await callback.message.answer(text, reply_markup=main_menu_customer(lang, cart_count))
         await callback.answer()

@@ -1,15 +1,10 @@
-"""Cart view and editing handlers.
-
-Contains unified `show_cart` helper used by other modules
-and all handlers that display or refresh the cart contents.
-"""
-from __future__ import annotations
-
-from typing import Any
+﻿from __future__ import annotations
 
 from aiogram import F, Router, types
 from aiogram.fsm.context import FSMContext
 from aiogram.utils.keyboard import InlineKeyboardBuilder
+
+from localization import get_text
 
 from .common import esc
 from . import common
@@ -28,37 +23,31 @@ async def _build_cart_view(user_id: int) -> tuple[str, InlineKeyboardBuilder] | 
     items = cart_storage.get_cart(user_id)
 
     if not items:
-        empty_text = (
-            "🛒 Корзина пуста\n\nДобавьте товары из каталога!"
-            if lang == "ru"
-            else "🛒 Savat bo'sh\n\nKatalogdan mahsulot qo'shing!"
-        )
+        empty_text = get_text(lang, "cart_empty")
         kb = InlineKeyboardBuilder()
         kb.button(
-            text="🔥 Горячие предложения" if lang == "ru" else "🔥 Issiq takliflar",
+            text=get_text(lang, "cart_empty_cta"),
             callback_data="hot_offers",
         )
         return empty_text, kb
 
     currency = "so'm" if lang == "uz" else "сум"
-    lines: list[str] = [f"🛒 <b>{'Savat' if lang == 'uz' else 'Корзина'}</b>\n"]
+    lines: list[str] = [f"🛒 <b>{get_text(lang, 'cart_title')}</b>\n"]
 
     total = 0
     for i, item in enumerate(items, 1):
-        # Convert kopeks to sums for display
-        price_sums = int(item.price) // 100
+        price_sums = int(item.price)
         subtotal = price_sums * item.quantity
         total += subtotal
         lines.append(f"\n<b>{i}. {esc(item.title)}</b>")
         lines.append(
-            f"   {item.quantity} × {price_sums:,} = <b>{subtotal:,}</b> {currency}"
+            f"   {item.quantity} x {price_sums:,} = <b>{subtotal:,}</b> {currency}"
         )
         lines.append(f"   🏪 {esc(item.store_name)}")
 
-    lines.append("\n" + "─" * 25)
-    lines.append(f"💵 <b>{'JAMI' if lang == 'uz' else 'ИТОГО'}: {total:,} {currency}</b>")
+    lines.append("\n" + "-" * 25)
+    lines.append(f"💰 <b>{get_text(lang, 'cart_total_label')}: {total:,} {currency}</b>")
 
-    # Delivery summary
     delivery_enabled = any(item.delivery_enabled for item in items)
     delivery_price = max(
         (item.delivery_price for item in items if item.delivery_enabled), default=0
@@ -66,47 +55,44 @@ async def _build_cart_view(user_id: int) -> tuple[str, InlineKeyboardBuilder] | 
 
     if delivery_enabled:
         lines.append(
-            f"\n🚚 {'Yetkazish' if lang == 'uz' else 'Доставка'}: +{delivery_price:,} {currency}"
+            f"\n🚚 {get_text(lang, 'cart_delivery_label')}: +{delivery_price:,} {currency}"
+        )
+        grand_total = total + delivery_price
+        lines.append(
+            f"🧾 <b>{get_text(lang, 'cart_grand_total_label')}: {grand_total:,} {currency}</b>"
         )
 
     text = "\n".join(lines)
 
     kb = InlineKeyboardBuilder()
 
-    # Item delete buttons (one row per item)
     for i, item in enumerate(items, 1):
         title_short = item.title[:25] + "..." if len(item.title) > 25 else item.title
         kb.button(text=f"{i}. {title_short} ({item.quantity})", callback_data="cart_noop")
-        kb.button(text="🗑", callback_data=f"cart_remove_{item.offer_id}")
+        kb.button(text="❌", callback_data=f"cart_remove_{item.offer_id}")
 
-    # Checkout options - directly on cart screen
     kb.button(
-        text="🏪 Самовывоз" if lang == "ru" else "🏪 O'zim olaman",
+        text=get_text(lang, "cart_pickup_button"),
         callback_data="cart_confirm_pickup",
     )
     if delivery_enabled:
+        delivery_suffix = f" (+{delivery_price:,})" if delivery_price else ""
         kb.button(
-            text=(
-                f"🚚 Доставка (+{delivery_price:,})"
-                if lang == "ru"
-                else f"🚚 Yetkazish (+{delivery_price:,})"
-            ),
+            text=f"{get_text(lang, 'cart_delivery_button')}{delivery_suffix}",
             callback_data="cart_confirm_delivery",
         )
 
-    # Clear cart button
     kb.button(
-        text="🗑 Очистить" if lang == "ru" else "🗑 Tozalash",
+        text=get_text(lang, "cart_clear_button"),
         callback_data="cart_clear",
     )
 
-    # Adjust: 2 buttons per item row + checkout buttons
     num_items = len(items)
-    adjust_pattern = [2] * num_items  # 2 buttons per item row
+    adjust_pattern = [2] * num_items
     if delivery_enabled:
-        adjust_pattern.extend([2, 1])  # pickup+delivery, then clear
+        adjust_pattern.extend([2, 1])
     else:
-        adjust_pattern.extend([1, 1])  # just pickup, then clear
+        adjust_pattern.extend([1, 1])
 
     kb.adjust(*adjust_pattern)
 
@@ -132,7 +118,6 @@ async def show_cart(
 
     result = await _build_cart_view(event.from_user.id)
     if not result:
-        # Empty cart case was handled inside _build_cart_view
         if is_callback and isinstance(event, types.CallbackQuery):
             await event.answer()
         return
@@ -152,7 +137,7 @@ async def show_cart(
 def register(router: Router) -> None:
     """Register cart view and editing handlers on the given router."""
 
-    @router.message(F.text.in_(["🛒 Корзина", "🛒 Savat"]))
+    @router.message(F.text.in_([get_text("ru", "my_cart"), get_text("uz", "my_cart")]))
     async def show_cart_message(message: types.Message, state: FSMContext) -> None:
         await show_cart(message, state, is_callback=False)
 
@@ -175,28 +160,21 @@ def register(router: Router) -> None:
         try:
             offer_id = int(callback.data.split("_")[-1])
         except (ValueError, IndexError):
-            await callback.answer(
-                "❌ Ошибка" if lang == "ru" else "❌ Xatolik", show_alert=True
-            )
+            await callback.answer(get_text(lang, "error"), show_alert=True)
             return
 
         items = cart_storage.get_cart(user_id)
         item = next((i for i in items if i.offer_id == offer_id), None)
 
         if not item:
-            await callback.answer(
-                "❌ Товар не найден" if lang == "ru" else "❌ Mahsulot topilmadi",
-                show_alert=True,
-            )
+            await callback.answer(get_text(lang, "offer_not_found"), show_alert=True)
             return
 
         if item.quantity >= item.max_quantity:
             await callback.answer(
-                (
-                    f"⚠️ Максимум: {item.max_quantity}"
-                    if lang == "ru"
-                    else f"⚠️ Maksimal: {item.max_quantity}"
-                ),
+                f"⚠ Максимум: {item.max_quantity}"
+                if lang == "ru"
+                else f"⚠ Maksimal: {item.max_quantity}",
                 show_alert=True,
             )
             return
@@ -216,19 +194,14 @@ def register(router: Router) -> None:
         try:
             offer_id = int(callback.data.split("_")[-1])
         except (ValueError, IndexError):
-            await callback.answer(
-                "❌ Ошибка" if lang == "ru" else "❌ Xatolik", show_alert=True
-            )
+            await callback.answer(get_text(lang, "error"), show_alert=True)
             return
 
         items = cart_storage.get_cart(user_id)
         item = next((i for i in items if i.offer_id == offer_id), None)
 
         if not item:
-            await callback.answer(
-                "❌ Товар не найден" if lang == "ru" else "❌ Mahsulot topilmadi",
-                show_alert=True,
-            )
+            await callback.answer(get_text(lang, "offer_not_found"), show_alert=True)
             return
 
         if item.quantity <= 1:
@@ -250,9 +223,7 @@ def register(router: Router) -> None:
         try:
             offer_id = int(callback.data.split("_")[-1])
         except (ValueError, IndexError):
-            await callback.answer(
-                "❌ Ошибка" if lang == "ru" else "❌ Xatolik", show_alert=True
-            )
+            await callback.answer(get_text(lang, "error"), show_alert=True)
             return
 
         cart_storage.remove_item(user_id, offer_id)

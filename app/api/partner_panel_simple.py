@@ -9,6 +9,7 @@ import io
 import os
 import urllib.parse
 from datetime import datetime, timedelta
+import json
 from typing import Optional
 
 import pytz
@@ -1043,7 +1044,7 @@ async def list_orders(authorization: str = Header(None), status: Optional[str] =
             order_id = order.get("order_id")
             offer_id = order.get("offer_id")
             user_id = order.get("user_id")
-            order_status = order.get("order_status")
+            order_status = order.get("order_status") or order.get("status")
             order_type = order.get("order_type", "delivery")
             quantity = order.get("quantity", 1)
             total_price = order.get("total_price", 0)
@@ -1052,6 +1053,8 @@ async def list_orders(authorization: str = Header(None), status: Optional[str] =
             payment_method = order.get("payment_method")
             payment_status = order.get("payment_status")
             payment_proof_photo_id = order.get("payment_proof_photo_id")
+            pickup_code = order.get("pickup_code") or order.get("booking_code")
+            cart_items_raw = order.get("cart_items")
 
             # Customer info from JOIN
             first_name = order.get("first_name", "")
@@ -1062,6 +1065,38 @@ async def list_orders(authorization: str = Header(None), status: Optional[str] =
             offer_title = order.get("offer_title", "Unknown")
             offer_photo_id = order.get("offer_photo_id")
             offer_photo_url = f"{API_BASE_URL}/photo/{offer_photo_id}" if offer_photo_id else None
+
+            # Build items list (cart orders or single item)
+            items = []
+            if cart_items_raw:
+                try:
+                    cart_items = (
+                        json.loads(cart_items_raw)
+                        if isinstance(cart_items_raw, str)
+                        else cart_items_raw
+                    )
+                    if isinstance(cart_items, list):
+                        for it in cart_items:
+                            items.append(
+                                {
+                                    "title": it.get("title") or it.get("offer_title") or offer_title,
+                                    "quantity": int(it.get("quantity") or 1),
+                                    "price": it.get("price") or it.get("discount_price") or 0,
+                                }
+                            )
+                except Exception:
+                    items = []
+
+            if not items:
+                items = [
+                    {
+                        "title": offer_title,
+                        "quantity": int(quantity or 1),
+                        "price": int(total_price or 0),
+                    }
+                ]
+
+            items_count = sum(int(it.get("quantity") or 1) for it in items) if items else 0
 
             # Keep unpaid orders visible for partner actions/updates
         else:
@@ -1080,6 +1115,17 @@ async def list_orders(authorization: str = Header(None), status: Optional[str] =
             customer_phone = order[-1] if len(order) > 15 else None
             offer_title = "Unknown"
             offer_photo_url = None
+            pickup_code = None
+            payment_method = None
+            payment_status = None
+            items = [
+                {
+                    "title": offer_title,
+                    "quantity": int(quantity or 1),
+                    "price": int(total_price or 0),
+                }
+            ]
+            items_count = int(quantity or 1)
 
         # Filter by status if requested
         if status and status != "all" and order_status != status:
@@ -1097,8 +1143,16 @@ async def list_orders(authorization: str = Header(None), status: Optional[str] =
                 "photo_url": offer_photo_url,
                 "quantity": quantity,
                 "price": total_price,
+                "total_price": total_price,
+                "items": items,
+                "items_count": items_count,
                 "order_type": order_type,  # 'pickup' or 'delivery'
                 "status": order_status,
+                "order_status": order_status,
+                "payment_status": payment_status,
+                "payment_method": payment_method,
+                "pickup_code": pickup_code,
+                "booking_code": pickup_code,
                 "delivery_address": delivery_address,
                 "created_at": str(created_at) if created_at else None,
                 "customer_name": customer_name,

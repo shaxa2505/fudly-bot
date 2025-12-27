@@ -946,7 +946,7 @@
                                         <span class="priority-time">${formatTime(order.created_at)}</span>
                                     </div>
                                     <div class="priority-meta">
-                                        ${order.order_type === 'pickup' ? '\u0421\u0430\u043c\u043e\u0432\u044b\u0432\u043e\u0437' : '\u0414\u043e\u0441\u0442\u0430\u0432\u043a\u0430'} - ${formatPrice(order.price)}
+                                        ${getOrderType(order) === 'pickup' ? '\u0421\u0430\u043c\u043e\u0432\u044b\u0432\u043e\u0437' : '\u0414\u043e\u0441\u0442\u0430\u0432\u043a\u0430'} - ${formatPrice(order.price)}
                                     </div>
                                     <div class="priority-actions" onclick="event.stopPropagation()">
                                         <button class="btn btn-success" onclick="updateOrderStatus(${order.order_id || order.id}, 'preparing')">\u041f\u0440\u0438\u043d\u044f\u0442\u044c</button>
@@ -1026,28 +1026,24 @@
 
         function renderOrderCard(order) {
             const orderId = order.order_id || order.id;
+            const orderType = getOrderType(order);
             return `
                 <div class="order-card ripple" data-order-id="${orderId}" data-status="${order.status}" onclick="haptic('light'); viewOrderDetails(${orderId})">
                     <div class="order-header">
-                        <div class="order-id">#${orderId || '—'}</div>
-                        <div class="order-status status-${order.status}">${getStatusText(order.status)}</div>
+                        <div class="order-id">#${orderId || '?'}</div>
+                        <div class="order-status status-${order.status}">${getStatusText(order.status, orderType)}</div>
                     </div>
                     <div class="order-meta">
-                        <span class="order-type">${order.order_type === 'pickup' ? '🏃 Самовывоз' : '🚗 Доставка'}</span>
+                        <span class="order-type">${orderType === 'pickup' ? '?? ?????????' : '?? ????????'}</span>
                     </div>
                     <div class="order-footer">
                         <div class="order-time">${formatTime(order.created_at)}</div>
                         <div class="order-total">${formatPrice(order.price)}</div>
                     </div>
-                    ${order.status === 'new' ? `
+                    ${order.status === 'new' || order.status === 'pending' ? `
                         <div class="order-actions" onclick="event.stopPropagation()">
-                            <button class="btn btn-sm btn-success ripple" onclick="updateOrderStatus(${orderId}, 'preparing')">Принять</button>
-                            <button class="btn btn-sm btn-danger ripple" onclick="openCancelModal(${orderId})">Отменить</button>
-                        </div>
-                    ` : ''}
-                    ${order.status === 'preparing' ? `
-                        <div class="order-actions" onclick="event.stopPropagation()">
-                            <button class="btn btn-sm btn-success ripple" onclick="updateOrderStatus(${orderId}, 'ready')">Готов</button>
+                            <button class="btn btn-sm btn-success ripple" onclick="updateOrderStatus(${orderId}, 'preparing')">???????</button>
+                            <button class="btn btn-sm btn-danger ripple" onclick="openCancelModal(${orderId})">????????</button>
                         </div>
                     ` : ''}
                 </div>
@@ -1082,47 +1078,56 @@
             const activeCount = grouped.active.length;
             const completedCount = grouped.completed.length;
             const cancelledCount = grouped.cancelled.length;
+            const problemOrders = getProblemOrders(state.orders);
+            const problemCount = problemOrders.length;
 
             document.querySelector('.content').innerHTML = `
-                <div class="container orders-shell">
-                    <div class="orders-header">
+                <div class=\"container orders-shell\">
+                    <div class=\"orders-header\">
                         <div>
-                            <h2 class="orders-title">\u0417\u0430\u043a\u0430\u0437\u044b</h2>
-                            <p class="orders-subtitle">\u0423\u043f\u0440\u0430\u0432\u043b\u044f\u0439\u0442\u0435 \u0441\u0442\u0430\u0442\u0443\u0441\u0430\u043c\u0438 \u0438 \u0441\u043a\u043e\u0440\u043e\u0441\u0442\u044c\u044e \u043e\u0431\u0440\u0430\u0431\u043e\u0442\u043a\u0438</p>
+                            <h2 class=\"orders-title\">\u0417\u0430\u043a\u0430\u0437\u044b</h2>
+                            <p class=\"orders-subtitle\">\u0423\u043f\u0440\u0430\u0432\u043b\u044f\u0439\u0442\u0435 \u0441\u0442\u0430\u0442\u0443\u0441\u0430\u043c\u0438 \u0438 \u0441\u043a\u043e\u0440\u043e\u0441\u0442\u044c\u044e \u043e\u0431\u0440\u0430\u0431\u043e\u0442\u043a\u0438</p>
                         </div>
-                        <button class="btn btn-sm btn-outline" onclick="loadOrders()">\u041e\u0431\u043d\u043e\u0432\u0438\u0442\u044c</button>
+                        <button class=\"btn btn-sm btn-outline\" onclick=\"loadOrders()\">\u041e\u0431\u043d\u043e\u0432\u0438\u0442\u044c</button>
                     </div>
 
-                    <div class="orders-metrics">
-                        <div class="metric-card">
-                            <div class="metric-label">\u0410\u043a\u0442\u0438\u0432\u043d\u044b\u0435</div>
-                            <div class="metric-value">${activeCount}</div>
+                    <div class=\"orders-metrics\">
+                        <div class=\"metric-card\">
+                            <div class=\"metric-label\">\u0410\u043a\u0442\u0438\u0432\u043d\u044b\u0435</div>
+                            <div class=\"metric-value\">${activeCount}</div>
                         </div>
-                        <div class="metric-card">
-                            <div class="metric-label">\u0417\u0430\u0432\u0435\u0440\u0448\u0435\u043d\u044b</div>
-                            <div class="metric-value">${completedCount}</div>
+                        <div class=\"metric-card\">
+                            <div class=\"metric-label\">\u0417\u0430\u0432\u0435\u0440\u0448\u0435\u043d\u044b</div>
+                            <div class=\"metric-value\">${completedCount}</div>
                         </div>
-                        <div class="metric-card">
-                            <div class="metric-label">\u041e\u0442\u043c\u0435\u043d\u0435\u043d\u044b</div>
-                            <div class="metric-value">${cancelledCount}</div>
+                        <div class=\"metric-card\">
+                            <div class=\"metric-label\">\u041e\u0442\u043c\u0435\u043d\u0435\u043d\u044b</div>
+                            <div class=\"metric-value\">${cancelledCount}</div>
                         </div>
-                    </div>
-
-                    <div class="orders-toolbar">
-                        <div class="tabs">
-                            <button class="tab active" data-status="active" onclick="filterOrderTab('active')">
-                                \u0410\u043a\u0442\u0438\u0432\u043d\u044b\u0435 <span class="badge">${activeCount}</span>
-                            </button>
-                            <button class="tab" data-status="completed" onclick="filterOrderTab('completed')">
-                                \u0417\u0430\u0432\u0435\u0440\u0448\u0435\u043d\u044b <span class="badge">${completedCount}</span>
-                            </button>
-                            <button class="tab" data-status="cancelled" onclick="filterOrderTab('cancelled')">
-                                \u041e\u0442\u043c\u0435\u043d\u0435\u043d\u044b <span class="badge">${cancelledCount}</span>
-                            </button>
+                        <div class=\"metric-card\">
+                            <div class=\"metric-label\">\u041f\u0440\u043e\u0431\u043b\u0435\u043c\u043d\u044b\u0435</div>
+                            <div class=\"metric-value\">${problemCount}</div>
                         </div>
                     </div>
 
-                    <div id="ordersContainer" class="orders-panel">
+                    <div class=\"orders-toolbar\">
+                        <div class=\"tabs\">
+                            <button class=\"tab active\" data-status=\"active\" onclick=\"filterOrderTab('active')\">
+                                \u0410\u043a\u0442\u0438\u0432\u043d\u044b\u0435 <span class=\"badge\">${activeCount}</span>
+                            </button>
+                            <button class=\"tab\" data-status=\"completed\" onclick=\"filterOrderTab('completed')\">
+                                \u0417\u0430\u0432\u0435\u0440\u0448\u0435\u043d\u044b <span class=\"badge\">${completedCount}</span>
+                            </button>
+                            <button class=\"tab\" data-status=\"cancelled\" onclick=\"filterOrderTab('cancelled')\">
+                                \u041e\u0442\u043c\u0435\u043d\u0435\u043d\u044b <span class=\"badge\">${cancelledCount}</span>
+                            </button>
+                            <button class=\"tab\" data-status=\"problem\" onclick=\"filterOrderTab('problem')\">
+                                \u041f\u0440\u043e\u0431\u043b\u0435\u043c\u043d\u044b\u0435 <span class=\"badge\">${problemCount}</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    <div id=\"ordersContainer\" class=\"orders-panel\">
                         ${renderOrdersList(grouped.active)}
                     </div>
                 </div>
@@ -1134,89 +1139,143 @@
 
         function groupOrdersByStatus(orders) {
             const list = Array.isArray(orders) ? orders : [];
+            const getStatus = (o) => o?.order_status || o?.status || '';
             return {
-                active: list.filter(o => ['pending', 'new', 'preparing', 'ready'].includes(o.status)),
-                completed: list.filter(o => o.status === 'completed'),
-                cancelled: list.filter(o => o.status === 'cancelled')
+                active: list.filter(o => ['pending', 'new', 'preparing', 'ready', 'delivering'].includes(getStatus(o))),
+                completed: list.filter(o => getStatus(o) === 'completed'),
+                cancelled: list.filter(o => ['cancelled', 'rejected'].includes(getStatus(o)))
             };
+        }
+
+
+        function getProblemOrders(orders) {
+            const list = Array.isArray(orders) ? orders : [];
+            return list.filter((order) => {
+                const status = order.order_status || order.status || '';
+                const paymentStatus = order.payment_status || '';
+                if (['cancelled', 'rejected'].includes(status)) return true;
+                if (['awaiting_proof', 'proof_submitted', 'rejected'].includes(paymentStatus)) return true;
+                return false;
+            });
+        }
+
+        function copyPickupCode(code) {
+            if (!code) return;
+            const notify = () => toast('\u041a\u043e\u0434 \u0441\u043a\u043e\u043f\u0438\u0440\u043e\u0432\u0430\u043d', 'success');
+            if (navigator.clipboard?.writeText) {
+                navigator.clipboard.writeText(code).then(notify).catch(() => {
+                    window.prompt('Copy', code);
+                });
+                return;
+            }
+            try {
+                window.prompt('Copy', code);
+                notify();
+            } catch {
+                // no-op
+            }
         }
 
         function renderOrdersList(orders) {
             if (!orders.length) {
                 return `
-                    <div class="empty-state">
-                        <div class="empty-icon">
-                            <i data-lucide="package-x"></i>
+                    <div class=\"empty-state\">
+                        <div class=\"empty-icon\">
+                            <i data-lucide=\"package-x\"></i>
                         </div>
-                        <p class="empty-title">\u041f\u043e\u043a\u0430 \u043d\u0435\u0442 \u0437\u0430\u043a\u0430\u0437\u043e\u0432</p>
-                        <p class="empty-subtitle">\u041d\u043e\u0432\u044b\u0435 \u0437\u0430\u044f\u0432\u043a\u0438 \u043f\u043e\u044f\u0432\u044f\u0442\u0441\u044f \u0437\u0434\u0435\u0441\u044c, \u043a\u043e\u0433\u0434\u0430 \u043a\u043b\u0438\u0435\u043d\u0442 \u043e\u0444\u043e\u0440\u043c\u0438\u0442 \u0437\u0430\u043a\u0430\u0437</p>
+                        <p class=\"empty-title\">\u041f\u043e\u043a\u0430 \u043d\u0435\u0442 \u0437\u0430\u043a\u0430\u0437\u043e\u0432</p>
+                        <p class=\"empty-subtitle\">\u041d\u043e\u0432\u044b\u0435 \u0437\u0430\u044f\u0432\u043a\u0438 \u043f\u043e\u044f\u0432\u044f\u0442\u0441\u044f \u0437\u0434\u0435\u0441\u044c, \u043a\u043e\u0433\u0434\u0430 \u043a\u043b\u0438\u0435\u043d\u0442 \u043e\u0444\u043e\u0440\u043c\u0438\u0442 \u0437\u0430\u043a\u0430\u0437</p>
                     </div>
                 `;
             }
 
             return `
-                <div class="order-list">
+                <div class=\"order-list\">
                     ${orders.map(order => {
                         const orderId = order.order_id || order.id;
                         const photoUrl = order.offer_photo_url || order.photo_url;
-                        const qty = order.quantity || 1;
-                        const typeLabel = order.order_type === 'pickup' ? '\u0421\u0430\u043c\u043e\u0432\u044b\u0432\u043e\u0437' : '\u0414\u043e\u0441\u0442\u0430\u0432\u043a\u0430';
-                        const statusText = getStatusText(order.status);
+                        const status = order.order_status || order.status || 'pending';
+                        const items = Array.isArray(order.items) ? order.items : [];
+                        const mainItem = items[0];
+                        const title = (mainItem && mainItem.title) || order.offer_title || '\u0422\u043e\u0432\u0430\u0440';
+                        const extraItems = items.length > 1 ? items.length - 1 : 0;
+                        const displayTitle = extraItems > 0 ? `${title} + \u0435\u0449\u0435 ${extraItems}` : title;
+                        const qty = (mainItem && mainItem.quantity) || order.quantity || 1;
+                        const typeLabel = getOrderType(order) === 'pickup' ? '\u0421\u0430\u043c\u043e\u0432\u044b\u0432\u043e\u0437' : '\u0414\u043e\u0441\u0442\u0430\u0432\u043a\u0430';
+                        const pickupCode = order.pickup_code || order.booking_code || '';
+                        const paymentStatus = order.payment_status || '';
+                        const paymentText = getPaymentStatusText(paymentStatus, order.payment_method);
+                        const paymentTone = getPaymentStatusTone(paymentStatus);
+                        const statusText = getStatusText(status, getOrderType(order));
+                        const elapsed = formatElapsed(order.created_at);
                         return `
-                        <article class="order-card modern ripple"
-                             data-order-id="${orderId}"
-                             data-status="${order.status}"
-                             onclick="viewOrderDetails(${orderId})">
-                            <div class="order-card-top">
-                                <div class="order-id">#${orderId || '?'}</div>
-                                <div class="order-top-meta">
-                                    <span class="order-status-pill status-${order.status}">${statusText}</span>
-                                    <span class="order-time">${formatTime(order.created_at)}</span>
+                        <article class=\"order-card modern ripple\"
+                             data-order-id=\"${orderId}\"
+                             data-status=\"${status}\"
+                             onclick=\"viewOrderDetails(${orderId})\">
+                            <div class=\"order-card-top\">
+                                <div class=\"order-id\">#${orderId || '?'} </div>
+                                <div class=\"order-top-meta\">
+                                    <span class=\"order-status-pill status-${status}\">${statusText}</span>
+                                    <span class=\"order-time\">${formatTime(order.created_at)}</span>
                                 </div>
                             </div>
 
-                            <div class="order-card-main">
-                                <div class="order-thumb">
+                            <div class=\"order-card-main\">
+                                <div class=\"order-thumb\">
                                     ${photoUrl ? `
-                                        <img src="${photoUrl}" alt="${order.offer_title || '\u0422\u043e\u0432\u0430\u0440'}" loading="lazy"
-                                             onerror="this.closest('.order-thumb').classList.add('fallback'); this.remove();">
+                                        <img src=\"${photoUrl}\" alt=\"${order.offer_title || '\u0422\u043e\u0432\u0430\u0440'}\" loading=\"lazy\"
+                                             onerror=\"this.closest('.order-thumb').classList.add('fallback'); this.remove();\">
                                     ` : `
-                                        <div class="order-thumb-fallback">
-                                            <i data-lucide="package"></i>
+                                        <div class=\"order-thumb-fallback\">
+                                            <i data-lucide=\"package\"></i>
                                         </div>
                                     `}
                                 </div>
 
-                                <div class="order-main-info">
-                                    <div class="order-title">
-                                        ${order.offer_title || '\u0422\u043e\u0432\u0430\u0440'}${qty > 1 ? ` x ${qty}` : ''}
+                                <div class=\"order-main-info\">
+                                    <div class=\"order-title\">
+                                        ${displayTitle}${qty > 1 && extraItems === 0 ? ` x ${qty}` : ''}
                                     </div>
-                                    <div class="order-meta-row">
-                                        <span class="meta-chip">${typeLabel}</span>
-                                        ${order.customer_name ? `<span class="meta-chip">${order.customer_name}</span>` : ''}
-                                        ${order.delivery_address ? `<span class="meta-chip muted">${order.delivery_address}</span>` : ''}
+                                    <div class=\"order-meta-row\">
+                                        <span class=\"meta-chip\">${typeLabel}</span>
+                                        ${pickupCode ? `<span class=\"meta-chip code\">\u041a\u043e\u0434: ${pickupCode}</span>` : ''}
+                                        ${pickupCode ? `<button class=\"copy-btn\" onclick=\"event.stopPropagation(); copyPickupCode('${pickupCode}')\">\u041a\u043e\u043f\u0438\u0440\u043e\u0432\u0430\u0442\u044c</button>` : ''}
+                                        ${paymentText && paymentStatus !== 'not_required' ? `<span class=\"meta-chip payment ${paymentTone}\">${paymentText}</span>` : ''}
+                                        ${elapsed ? `<span class=\"meta-chip muted\">\u0412\u0440\u0435\u043c\u044f: ${elapsed}</span>` : ''}
+                                        ${order.customer_name ? `<span class=\"meta-chip\">${order.customer_name}</span>` : ''}
+                                        ${order.delivery_address ? `<span class=\"meta-chip muted\">${order.delivery_address}</span>` : ''}
                                     </div>
                                 </div>
 
-                                <div class="order-amount">
+                                <div class=\"order-amount\">
                                     ${formatPrice(order.price)}
                                 </div>
                             </div>
 
-                            ${order.status === 'pending' || order.status === 'new' ? `
-                                <div class="order-actions" onclick="event.stopPropagation()">
-                                    <button class="pill-btn pill-success" onclick="handleStatusUpdate(${orderId}, 'preparing', this)">\u041f\u0440\u0438\u043d\u044f\u0442\u044c</button>
-                                    <button class="pill-btn pill-danger" onclick="handleCancelOrder(${orderId}, this)">\u041e\u0442\u043c\u0435\u043d\u0438\u0442\u044c</button>
+                            ${status === 'pending' || status === 'new' ? `
+                                <div class=\"order-actions\" onclick=\"event.stopPropagation()\">
+                                    <button class=\"pill-btn pill-success\" onclick=\"handleStatusUpdate(${orderId}, 'preparing', this)\">\u041f\u0440\u0438\u043d\u044f\u0442\u044c</button>
+                                    <button class=\"pill-btn pill-danger\" onclick=\"handleCancelOrder(${orderId}, this)\">\u041e\u0442\u043c\u0435\u043d\u0438\u0442\u044c</button>
                                 </div>
                             ` : ''}
-                            ${order.status === 'preparing' ? `
-                                <div class="order-actions" onclick="event.stopPropagation()">
-                                    <button class="pill-btn pill-success" onclick="handleStatusUpdate(${orderId}, 'ready', this)">\u0413\u043e\u0442\u043e\u0432\u043e \u043a \u0432\u044b\u0434\u0430\u0447\u0435</button>
+                            ${status === 'preparing' ? `
+                                <div class=\"order-actions\" onclick=\"event.stopPropagation()\">
+                                    <button class=\"pill-btn pill-success\" onclick=\"handleStatusUpdate(${orderId}, 'ready', this)\">\u0413\u043e\u0442\u043e\u0432\u043e \u043a \u0432\u044b\u0434\u0430\u0447\u0435</button>
                                 </div>
                             ` : ''}
-                            ${order.status === 'ready' ? `
-                                <div class="order-actions" onclick="event.stopPropagation()">
-                                    <button class="pill-btn pill-success" onclick="handleStatusUpdate(${orderId}, 'completed', this)">\u0412\u044b\u0434\u0430\u0442\u044c</button>
+                            ${status === 'ready' ? `
+                                <div class=\"order-actions\" onclick=\"event.stopPropagation()\">
+                                    ${orderType === 'delivery' ? `
+                                        <button class=\"pill-btn pill-success\" onclick=\"handleStatusUpdate(${orderId}, 'delivering', this)\">\u041f\u0435\u0440\u0435\u0434\u0430\u0442\u044c \u0432 \u0434\u043e\u0441\u0442\u0430\u0432\u043a\u0443</button>
+                                    ` : `
+                                        <button class=\"pill-btn pill-success\" onclick=\"handleStatusUpdate(${orderId}, 'completed', this)\">\u0412\u044b\u0434\u0430\u0442\u044c</button>
+                                    `}
+                                </div>
+                            ` : ''}
+                            ${status === 'delivering' ? `
+                                <div class=\"order-actions\" onclick=\"event.stopPropagation()\">
+                                    <button class=\"pill-btn pill-success\" onclick=\"handleStatusUpdate(${orderId}, 'completed', this)\">\u0414\u043e\u0441\u0442\u0430\u0432\u043b\u0435\u043d\u043e</button>
                                 </div>
                             ` : ''}
                         </article>
@@ -1232,79 +1291,130 @@
             });
 
             const grouped = groupOrdersByStatus(state.orders);
+            const problemOrders = getProblemOrders(state.orders);
             const ordersMap = {
                 'active': grouped.active,
                 'completed': grouped.completed,
-                'cancelled': grouped.cancelled
+                'cancelled': grouped.cancelled,
+                'problem': problemOrders
             };
 
-            document.getElementById('ordersContainer').innerHTML = renderOrdersList(ordersMap[status]);
+            document.getElementById('ordersContainer').innerHTML = renderOrdersList(ordersMap[status] || []);
             if (typeof lucide !== 'undefined') lucide.createIcons();
         }
 
         async function viewOrderDetails(orderId) {
+(orderId) {
             const order = state.orders.find(o => (o.order_id || o.id) === orderId);
             if (!order) return;
 
             const oid = order.order_id || order.id;
+            const status = order.order_status || order.status || 'pending';
+                          const orderType = getOrderType(order);
+            const pickupCode = order.pickup_code || order.booking_code;
+            const items = Array.isArray(order.items) ? order.items : [];
+            const orderTitle = order.offer_title || '\u0422\u043e\u0432\u0430\u0440';
+            const qty = order.quantity || 1;
+            const paymentStatus = order.payment_status || '';
+            const paymentText = getPaymentStatusText(paymentStatus, order.payment_method);
+
             const modal = document.createElement('div');
             modal.className = 'modal-overlay';
             modal.innerHTML = `
-                <div class="modal-content modal-md">
-                    <div class="modal-header">
-                        <h3>Заказ #${oid}</h3>
-                        <button class="btn-icon" onclick="this.closest('.modal-overlay').remove()">
-                            <i data-lucide="x"></i>
+                <div class=\"modal-content modal-md\">
+                    <div class=\"modal-header\">
+                        <h3>\u0417\u0430\u043a\u0430\u0437 #${oid}</h3>
+                        <button class=\"btn-icon\" onclick=\"this.closest('.modal-overlay').remove()\">
+                            <i data-lucide=\"x\"></i>
                         </button>
                     </div>
-                    <div class="modal-body">
-                        <div class="order-status status-${order.status} modal-status">
-                            ${getStatusText(order.status)}
+                    <div class=\"modal-body\">
+                        <div class=\"order-status status-${status} modal-status\">
+                            ${getStatusText(status, orderType)}
                         </div>
 
-                        <div class="order-detail-section">
-                            <h4>Товар</h4>
-                            <p>${order.offer_title || 'Товар'} × ${order.quantity || 1}</p>
+                        ${pickupCode ? `
+                        <div class=\"order-detail-section\">
+                            <h4>\u041a\u043e\u0434 \u0432\u044b\u0434\u0430\u0447\u0438</h4>
+                            <p><b>${pickupCode}</b></p>
+                        </div>
+                        ` : ''}
+
+                        ${paymentText && paymentStatus !== 'not_required' ? `
+                        <div class=\"order-detail-section\">
+                            <h4>\u041e\u043f\u043b\u0430\u0442\u0430</h4>
+                            <p>${paymentText}</p>
+                        </div>
+                        ` : ''}
+
+                        <div class=\"order-detail-section\">
+                            <h4>\u0422\u043e\u0432\u0430\u0440</h4>
+                            <p>${orderTitle} \u00d7 ${qty}</p>
                         </div>
 
-                        <div class="order-detail-section">
-                            <h4>Клиент</h4>
-                            <p>${order.customer_name || 'Не указано'}</p>
+                        ${items.length > 0 ? `
+                        <div class=\"order-detail-section\">
+                            <h4>\u0421\u043e\u0441\u0442\u0430\u0432 \u0437\u0430\u043a\u0430\u0437\u0430</h4>
+                            <ul class=\"order-items\">
+                                ${items.map((item) => `
+                                    <li class=\"order-item\">
+                                        <span>${item.title || '\u0422\u043e\u0432\u0430\u0440'}</span>
+                                        <span>x ${item.quantity || 1}</span>
+                                    </li>
+                                `).join('')}
+                            </ul>
+                        </div>
+                        ` : ''}
+
+                        <div class=\"order-detail-section\">
+                            <h4>\u041a\u043b\u0438\u0435\u043d\u0442</h4>
+                            <p>${order.customer_name || '\u041a\u043b\u0438\u0435\u043d\u0442'}</p>
                             <p>${order.customer_phone || ''}</p>
                         </div>
 
-                        <div class="order-detail-section">
-                            <h4>Тип заказа</h4>
-                            <p>${order.order_type === 'pickup' ? '🏃 Самовывоз' : '🚗 Доставка'}</p>
+                        <div class=\"order-detail-section\">
+                            <h4>\u0422\u0438\u043f \u0437\u0430\u043a\u0430\u0437\u0430</h4>
+                            <p>${getOrderType(order) === 'pickup' ? '\u0421\u0430\u043c\u043e\u0432\u044b\u0432\u043e\u0437' : '\u0414\u043e\u0441\u0442\u0430\u0432\u043a\u0430'}</p>
                             ${order.delivery_address ? `<p>${order.delivery_address}</p>` : ''}
                         </div>
 
-                        <div class="order-detail-section modal-total">
-                            <div class="modal-total-row">
-                                <span>Итого</span>
+                        <div class=\"order-detail-section modal-total\">
+                            <div class=\"modal-total-row\">
+                                <span>\u0418\u0442\u043e\u0433\u043e</span>
                                 <span>${formatPrice(order.price)}</span>
                             </div>
                         </div>
 
-                        ${order.status !== 'completed' && order.status !== 'cancelled' ? `
-                            <div class="modal-actions">
-                                ${order.status === 'pending' || order.status === 'new' ? `
-                                    <button class="btn btn-success ripple" onclick="handleModalStatusUpdate(${oid}, 'preparing', this)">
-                                        ✓ Принять заказ
+                        ${status !== 'completed' && status !== 'cancelled' ? `
+                            <div class=\"modal-actions\">
+                                ${status === 'pending' || status === 'new' ? `
+                                    <button class=\"btn btn-success ripple\" onclick=\"handleModalStatusUpdate(${oid}, 'preparing', this)\">
+                                        \u041f\u0440\u0438\u043d\u044f\u0442\u044c
                                     </button>
                                 ` : ''}
-                                ${order.status === 'preparing' ? `
-                                    <button class="btn btn-success ripple" onclick="handleModalStatusUpdate(${oid}, 'ready', this)">
-                                        ✓ Заказ готов
+                                ${status === 'preparing' ? `
+                                    <button class=\"btn btn-success ripple\" onclick=\"handleModalStatusUpdate(${oid}, 'ready', this)\">
+                                        \u0413\u043e\u0442\u043e\u0432\u043e
                                     </button>
                                 ` : ''}
-                                ${order.status === 'ready' ? `
-                                    <button class="btn btn-success ripple" onclick="handleModalStatusUpdate(${oid}, 'completed', this)">
-                                        ✓ Выдан клиенту
+                                ${status === 'ready' ? `
+                                    ${orderType === 'delivery' ? `
+                                        <button class=\"btn btn-success ripple\" onclick=\"handleModalStatusUpdate(${oid}, 'delivering', this)\">
+                                            \u041f\u0435\u0440\u0435\u0434\u0430\u0442\u044c \u0432 \u0434\u043e\u0441\u0442\u0430\u0432\u043a\u0443
+                                        </button>
+                                    ` : `
+                                        <button class=\"btn btn-success ripple\" onclick=\"handleModalStatusUpdate(${oid}, 'completed', this)\">
+                                            \u0412\u044b\u0434\u0430\u0442\u044c
+                                        </button>
+                                    `}
+                                ` : ''}
+                                ${status === 'delivering' ? `
+                                    <button class=\"btn btn-success ripple\" onclick=\"handleModalStatusUpdate(${oid}, 'completed', this)\">
+                                        \u0414\u043e\u0441\u0442\u0430\u0432\u043b\u0435\u043d\u043e
                                     </button>
                                 ` : ''}
-                                <button class="btn btn-danger ripple" onclick="handleModalCancelOrder(${oid}, this)">
-                                    ✕ Отменить заказ
+                                <button class=\"btn btn-danger ripple\" onclick=\"handleModalCancelOrder(${oid}, this)\">
+                                    \u041e\u0442\u043c\u0435\u043d\u0438\u0442\u044c
                                 </button>
                             </div>
                         ` : ''}
@@ -1312,7 +1422,6 @@
                 </div>
             `;
 
-            // Блокируем скролл фона
             const scrollY = window.scrollY;
             document.body.style.overflow = 'hidden';
             document.body.style.touchAction = 'none';
@@ -1321,28 +1430,24 @@
             document.body.appendChild(modal);
             if (typeof lucide !== 'undefined') lucide.createIcons();
 
-            // Функция закрытия
             const closeOrderModal = () => {
                 document.body.style.overflow = '';
                 document.body.style.touchAction = '';
-                const scrollY = document.body.dataset.scrollY;
-                if (scrollY) {
-                    window.scrollTo(0, parseInt(scrollY));
+                const scrollPos = document.body.dataset.scrollY;
+                if (scrollPos) {
+                    window.scrollTo(0, parseInt(scrollPos));
                 }
                 delete document.body.dataset.scrollY;
                 modal.remove();
             };
 
             modal.addEventListener('click', (e) => {
-                if (e.target === modal) closeOrderModal();
+                if (e.target === modal) {
+                    closeOrderModal();
+                }
             });
-
-            // Закрытие по кнопке X
-            const closeBtn = modal.querySelector('.btn-icon');
-            if (closeBtn) {
-                closeBtn.addEventListener('click', closeOrderModal);
-            }
         }
+
 
         async function updateOrderStatus(orderId, newStatus) {
             let order = null;
@@ -1368,7 +1473,7 @@
                         const statusBadge = orderCard.querySelector('.order-status');
                         if (statusBadge) {
                             statusBadge.className = `order-status status-${newStatus}`;
-                            statusBadge.textContent = getStatusText(newStatus);
+                            statusBadge.textContent = getStatusText(newStatus, getOrderType(order));
                         }
 
                         // Hide action buttons during update
@@ -2203,8 +2308,9 @@ async function toggleProductAvailability(id) {
                 new: orders.filter(o => o.status === 'new').length,
                 preparing: orders.filter(o => o.status === 'preparing').length,
                 ready: orders.filter(o => o.status === 'ready').length,
+                delivering: orders.filter(o => o.status === 'delivering').length,
                 completed: orders.filter(o => o.status === 'completed').length,
-                cancelled: orders.filter(o => o.status === 'cancelled').length
+                cancelled: orders.filter(o => o.status === 'cancelled' || o.status === 'rejected').length
             };
 
             // Peak hours
@@ -2366,6 +2472,16 @@ async function toggleProductAvailability(id) {
                                     </div>
                                     <div class="status-stat-label">Готовы</div>
                                 </div>
+                            <div class="status-stat-card delivering ripple">
+                                <div class="status-stat-header">
+                                    <div class="status-stat-icon delivering">
+                                        <span>??</span>
+                                    </div>
+                                    <div class="status-stat-label">? ????</div>
+                                </div>
+                                <div class="stat-value status-stat-value delivering">${stats.ordersByStatus.delivering}</div>
+                            </div>
+
                                 <div class="stat-value status-stat-value ready">${stats.ordersByStatus.ready}</div>
                             </div>
                             <div class="status-stat-card completed ripple">
@@ -2887,6 +3003,20 @@ async function toggleProductAvailability(id) {
             return date.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
         }
 
+        function formatElapsed(dateString) {
+            const date = parseDate(dateString);
+            if (!date) return '';
+            const diffMs = Date.now() - date.getTime();
+            const diffMin = Math.floor(diffMs / 60000);
+            if (diffMin < 1) return '\u0442\u043e\u043b\u044c\u043a\u043e \u0447\u0442\u043e';
+            if (diffMin < 60) return `${diffMin} \u043c\u0438\u043d \u043d\u0430\u0437\u0430\u0434`;
+            const diffHr = Math.floor(diffMin / 60);
+            if (diffHr < 24) return `${diffHr} \u0447 \u043d\u0430\u0437\u0430\u0434`;
+            const diffDay = Math.floor(diffHr / 24);
+            return `${diffDay} \u0434 \u043d\u0430\u0437\u0430\u0434`;
+        }
+
+
         function isToday(dateString) {
             const date = parseDate(dateString);
             if (!date) return false;
@@ -2902,17 +3032,55 @@ async function toggleProductAvailability(id) {
             return date.toDateString() === yesterday.toDateString();
         }
 
-        function getStatusText(status) {
+        function getOrderType(order) {
+            if (!order) return 'pickup';
+            const type = order.order_type || order.type;
+            if (type === 'delivery') return 'delivery';
+            if (type === 'pickup') return 'pickup';
+            if (order.delivery_address) return 'delivery';
+            return 'pickup';
+        }
+
+        function getStatusText(status, orderType) {
+            const isDelivery = orderType === 'delivery';
             const statusMap = {
-                'pending': 'Ожидает',
-                'new': 'Новый',
-                'preparing': 'Готовится',
-                'ready': 'Готов',
-                'completed': 'Завершен',
-                'cancelled': 'Отменен'
+                pending: '???? ?????????????',
+                new: '?????',
+                preparing: '?????????',
+                ready: isDelivery ? '??????? ???????' : '????? ? ??????',
+                delivering: '? ????',
+                completed: isDelivery ? '?????????' : '?????',
+                cancelled: '???????',
+                rejected: '????????'
             };
             return statusMap[status] || status;
         }
+
+
+        function getPaymentStatusText(paymentStatus, paymentMethod) {
+            if (!paymentStatus) return '';
+            const statusMap = {
+                'not_required': '\u0411\u0435\u0437 \u043e\u043f\u043b\u0430\u0442\u044b',
+                'awaiting_payment': '\u041e\u0436\u0438\u0434\u0430\u0435\u0442 \u043e\u043f\u043b\u0430\u0442\u0443',
+                'awaiting_proof': '\u041d\u0443\u0436\u0435\u043d \u0447\u0435\u043a',
+                'proof_submitted': '\u0427\u0435\u043a \u043d\u0430 \u043f\u0440\u043e\u0432\u0435\u0440\u043a\u0435',
+                'confirmed': '\u041e\u043f\u043b\u0430\u0447\u0435\u043d',
+                'rejected': '\u041e\u043f\u043b\u0430\u0442\u0430 \u043e\u0442\u043a\u043b\u043e\u043d\u0435\u043d\u0430'
+            };
+            const label = statusMap[paymentStatus] || paymentStatus;
+            if (paymentMethod && paymentStatus !== 'not_required') {
+                return `${label} (${paymentMethod})`;
+            }
+            return label;
+        }
+
+        function getPaymentStatusTone(paymentStatus) {
+            if (!paymentStatus) return '';
+            if (paymentStatus === 'confirmed' || paymentStatus === 'not_required') return 'payment-ok';
+            if (paymentStatus === 'rejected') return 'payment-bad';
+            return 'payment-warn';
+        }
+
 
         function refreshAll() {
             const view = state.currentView;

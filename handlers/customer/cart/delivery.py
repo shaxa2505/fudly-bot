@@ -1,5 +1,4 @@
-"""Delivery flow for cart orders (address collection and validation)."""
-from __future__ import annotations
+﻿from __future__ import annotations
 
 from aiogram import F, Router, types
 from aiogram.filters import BaseFilter
@@ -7,6 +6,7 @@ from aiogram.fsm.context import FSMContext
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
 from handlers.common.states import OrderDelivery
+from localization import get_text
 
 from .common import esc
 from . import common
@@ -36,9 +36,7 @@ def register(router: Router) -> None:
 
         items = cart_storage.get_cart(user_id)
         if not items:
-            await callback.answer(
-                "Корзина пуста" if lang == "ru" else "Savat bo'sh", show_alert=True
-            )
+            await callback.answer(get_text(lang, "cart_empty_alert"), show_alert=True)
             return
 
         store_id = items[0].store_id
@@ -54,18 +52,13 @@ def register(router: Router) -> None:
 
             if min_order_amount > 0 and total < min_order_amount:
                 currency = "so'm" if lang == "uz" else "сум"
-                if lang == "uz":
-                    msg = (
-                        f"❌ Yetkazib berish uchun minimal buyurtma: {min_order_amount:,} {currency}\n"
-                        f"Sizning buyurtmangiz: {total:,} {currency}\n\n"
-                        f"Iltimos, ko'proq mahsulot qo'shing yoki olib ketishni tanlang."
-                    )
-                else:
-                    msg = (
-                        f"❌ Минимальная сумма для доставки: {min_order_amount:,} {currency}\n"
-                        f"Ваш заказ: {total:,} {currency}\n\n"
-                        f"Пожалуйста, добавьте ещё товары или выберите самовывоз."
-                    )
+                msg = get_text(
+                    lang,
+                    "cart_delivery_min_order",
+                    min=f"{min_order_amount:,}",
+                    total=f"{total:,}",
+                    currency=currency,
+                )
                 await callback.answer(msg, show_alert=True)
                 return
 
@@ -90,11 +83,7 @@ def register(router: Router) -> None:
 
         await state.set_state(OrderDelivery.address)
 
-        text = (
-            "📍 Введите адрес доставки:"
-            if lang == "ru"
-            else "📍 Yetkazish manzilini kiriting:"
-        )
+        text = get_text(lang, "cart_delivery_address_prompt")
 
         try:
             await callback.message.edit_text(text, parse_mode="HTML")
@@ -119,17 +108,12 @@ def register(router: Router) -> None:
         delivery_price = data.get("delivery_price", 0)
 
         if not cart_items_stored or not store_id:
-            await message.answer(
-                "❌ Данные корзины потеряны"
-                if lang == "ru"
-                else "❌ Savat ma'lumotlari yo'qoldi"
-            )
+            await message.answer(get_text(lang, "cart_delivery_data_lost"))
             await state.clear()
             return
 
         if len(delivery_address) < 10:
-            msg = "❌ Manzil juda qisqa" if lang == "uz" else "❌ Адрес слишком короткий"
-            await message.answer(msg)
+            await message.answer(get_text(lang, "cart_delivery_address_too_short"))
             return
 
         await state.update_data(address=delivery_address)
@@ -148,42 +132,37 @@ def register(router: Router) -> None:
         total_with_delivery = total + delivery_price
 
         lines: list[str] = []
-        lines.append(f"<b>{'Mahsulotlar' if lang == 'uz' else 'Товары'}:</b>")
+        lines.append(f"<b>{get_text(lang, 'cart_delivery_products_title')}:</b>")
         for item in cart_items_stored:
             subtotal = item["price"] * item["quantity"]
             lines.append(
-                f"• {esc(item['title'])} × {item['quantity']} = {subtotal:,} {currency}"
+                f"• {esc(item['title'])} x {item['quantity']} = {subtotal:,} {currency}"
             )
 
         lines.append(
-            f"\n🚚 {'Yetkazish' if lang == 'uz' else 'Доставка'}: {delivery_price:,} {currency}"
+            f"\n🚚 {get_text(lang, 'cart_delivery_label')}: {delivery_price:,} {currency}"
         )
         lines.append(
-            f"💵 <b>{'JAMI' if lang == 'uz' else 'ИТОГО'}: {total_with_delivery:,} {currency}</b>\n"
+            f"💰 <b>{get_text(lang, 'cart_grand_total_label')}: {total_with_delivery:,} {currency}</b>\n"
         )
         lines.append(
-            f"📍 {'Manzil' if lang == 'uz' else 'Адрес'}: {esc(delivery_address)}\n"
+            f"📍 {get_text(lang, 'cart_delivery_address_label')}: {esc(delivery_address)}\n"
         )
-        payment_prompt = (
-            "To'lov usulini tanlang:"
-            if lang == "uz"
-            else "Выберите способ оплаты:"
-        )
-        lines.append(payment_prompt)
+        lines.append(get_text(lang, "cart_delivery_payment_prompt"))
 
         text = "\n".join(lines)
 
         kb = InlineKeyboardBuilder()
         kb.button(
-            text="💳 Click" if lang == "uz" else "💳 Click",
+            text=get_text(lang, "cart_delivery_payment_click"),
             callback_data=f"cart_pay_click_{store_id}",
         )
         kb.button(
-            text="💳 Karta" if lang == "uz" else "💳 Карта",
+            text=get_text(lang, "cart_delivery_payment_card"),
             callback_data=f"cart_pay_card_{store_id}",
         )
         kb.button(
-            text="⬅️ Назад" if lang == "ru" else "⬅️ Orqaga",
+            text=get_text(lang, "cart_delivery_back_button"),
             callback_data="cart_back_to_address",
         )
         kb.adjust(2, 1)
@@ -199,11 +178,7 @@ def register(router: Router) -> None:
         user_id = callback.from_user.id
         lang = common.db.get_user_language(user_id)
 
-        text = (
-            "📍 Введите адрес доставки:"
-            if lang == "ru"
-            else "📍 Yetkazish manzilini kiriting:"
-        )
+        text = get_text(lang, "cart_delivery_address_prompt")
 
         try:
             await callback.message.edit_text(text, parse_mode="HTML")
