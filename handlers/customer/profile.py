@@ -9,7 +9,7 @@ from aiogram.fsm.context import FSMContext
 from aiogram.types import ReplyKeyboardRemove
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
-from app.core.utils import get_field, get_store_field
+from app.core.utils import get_field, get_store_field, normalize_city
 from app.integrations.sentry_integration import capture_exception
 from app.keyboards import (
     city_inline_keyboard,
@@ -249,10 +249,10 @@ async def profile_change_city_cb(callback: types.CallbackQuery, state: FSMContex
     if not db or not callback.message:
         lang_code = (callback.from_user.language_code or "ru") if callback.from_user else "ru"
         if lang_code.startswith("uz"):
-            text = "❌ Xizmat vaqtincha mavjud emas. Keyinroq urinib ko'ring."
+            text_msg = "⚠️ Xizmat vaqtincha mavjud emas. Keyinroq urinib ko'ring."
         else:
-            text = "❌ Сервис временно недоступен. Попробуйте позже."
-        await callback.answer(text, show_alert=True)
+            text_msg = "⚠️ Сервис временно недоступен. Попробуйте позже."
+        await callback.answer(text_msg, show_alert=True)
         return
 
     assert callback.from_user is not None
@@ -267,12 +267,12 @@ async def profile_change_city_cb(callback: types.CallbackQuery, state: FSMContex
         await callback.answer(get_text(lang, "error"), show_alert=True)
         return
 
-    db.update_user_city(callback.from_user.id, city)
+    normalized_city = normalize_city(city)
+    db.update_user_city(callback.from_user.id, normalized_city)
     await state.clear()
 
-    # Use city_changed text with proper formatting
     city_msg = (
-        f"✅ Город изменён на <b>{city}</b>"
+        f"✅ Город изменен на <b>{city}</b>"
         if lang == "ru"
         else f"✅ Shahar <b>{city}</b>ga o'zgartirildi"
     )

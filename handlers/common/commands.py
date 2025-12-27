@@ -26,6 +26,7 @@ from handlers.common.utils import (
 )
 from handlers.common.webapp import get_partner_panel_url
 from localization import get_cities, get_text
+from app.core.utils import normalize_city
 
 try:
     from logging_config import logger
@@ -360,7 +361,8 @@ async def handle_city_selection(
         await callback.answer(get_text(lang, "error"), show_alert=True)
         return
 
-    db.update_user_city(callback.from_user.id, city)
+    normalized_city = normalize_city(city)
+    db.update_user_city(callback.from_user.id, normalized_city)
     await state.clear()
 
     user = db.get_user_model(callback.from_user.id)
@@ -371,10 +373,9 @@ async def handle_city_selection(
         else main_menu_customer(lang)
     )
 
+    city_selected = "Shahar tanlandi" if lang == "uz" else "????? ??????"
     try:
-        await callback.message.edit_text(
-            f"✅ {'Shahar tanlandi' if lang == 'uz' else 'Город выбран'}: {city}"
-        )
+        await callback.message.edit_text(f"? {city_selected}: {city}")
     except Exception as e:
         logger.debug("Could not edit city confirmation: %s", e)
 
@@ -472,7 +473,8 @@ async def change_city_text(
     user = db.get_user_model(user_id)
     new_city = message.text
 
-    db.update_user_city(user_id, new_city)
+    normalized_city = normalize_city(new_city)
+    db.update_user_city(user_id, normalized_city)
 
     user_role = user.role or "customer" if user else "customer"
     menu = (
@@ -481,10 +483,13 @@ async def change_city_text(
         else main_menu_customer(lang)
     )
 
+    if lang == "ru":
+        text_msg = f"? ????? ??????? ?? <b>{new_city}</b>"
+    else:
+        text_msg = f"? Shahar <b>{new_city}</b>ga o'zgartirildi"
+
     await message.answer(
-        f"✅ Город изменён на <b>{new_city}</b>"
-        if lang == "ru"
-        else f"✅ Shahar <b>{new_city}</b>ga o'zgartirildi",
+        text_msg,
         parse_mode="HTML",
         reply_markup=menu,
     )
@@ -497,46 +502,91 @@ async def change_city_text(
 
 def build_welcome_card(lang: str = "ru") -> str:
     """Build welcome message for new users."""
+    if lang == "uz":
+        title = "Fudly ga xush kelibsiz!"
+        what = "Biz nima qilamiz"
+        line1 = "70% gacha chegirmalar"
+        line2 = "Yaqin do'konlardan eng yaxshi takliflar"
+        line3 = "Isrof bo'layotgan oziq-ovqatni saqlaymiz"
+        how = "Qanday ishlaydi"
+        step1 = "Taklifni tanlang"
+        step2 = "Savatga qo'shing"
+        step3 = "Do'kondan oling yoki yetkazib beramiz"
+        choose_lang = "Tilni tanlang"
+    else:
+        title = "????? ?????????? ? Fudly!"
+        what = "??? ?? ??????"
+        line1 = "?????? ?? ??? ?? 70%"
+        line2 = "?????? ??????????? ?????"
+        line3 = "??????? ??? ?? ????????"
+        how = "??? ??? ????????"
+        step1 = "???????? ???????????"
+        step2 = "???????? ? ???????"
+        step3 = "???????? ? ???????? ??? ???????? ????????"
+        choose_lang = "???????? ????"
+
     return (
-        f"🎉 <b>{'Fudly ga xush kelibsiz!' if lang == 'uz' else 'Добро пожаловать в Fudly!'}</b>\n\n"
-        f"{'Biz nima qilamiz' if lang == 'uz' else 'Что мы делаем'}:\n"
-        f"💰 {'Oziq-ovqat chegirmalarini 70% gacha topish' if lang == 'uz' else 'Находим скидки на еду до 70%'}\n"
-        f"🏪 {'Yaqin doʻkonlardan eng yaxshi takliflar' if lang == 'uz' else 'Лучшие предложения из магазинов рядом'}\n"
-        f"♻️ {'Isrof qilinadigan oziq-ovqatni saqlaymiz' if lang == 'uz' else 'Спасаем еду от списания'}\n\n"
-        f"{'Qanday ishlaydi' if lang == 'uz' else 'Как это работает'}:\n"
-        f"1️⃣ {'Taklifni tanlang' if lang == 'uz' else 'Выберите товар'}\n"
-        f"2️⃣ {'Savatga qoʻshing' if lang == 'uz' else 'Добавьте в корзину'}\n"
-        f"3️⃣ {'Doʻkondan oling yoki yetkazib bering' if lang == 'uz' else 'Заберите или закажите доставку'}\n\n"
-        f"━━━━━━━━━━━━━━━━━━\n"
-        f"🌍 <b>{'Tilni tanlang' if lang == 'uz' else 'Выберите язык'}:</b>"
+        f"?? <b>{title}</b>\n\n"
+        f"{what}:\n"
+        f"?? {line1}\n"
+        f"?? {line2}\n"
+        f"?? {line3}\n\n"
+        f"{how}:\n"
+        f"1) {step1}\n"
+        f"2) {step2}\n"
+        f"3) {step3}\n\n"
+        f"--------------------\n"
+        f"?? <b>{choose_lang}:</b>"
     )
 
 
 def build_phone_card(lang: str) -> str:
     """Build phone request card."""
+    if lang == "uz":
+        title = "Telefon raqamingiz"
+        need = "Kerak"
+        line1 = "Do'kon siz bilan bog'lanishi"
+        line2 = "Buyurtma haqida xabar berish"
+        action = "Tugmani bosing"
+    else:
+        title = "??????? ????? ????????"
+        need = "????? ???"
+        line1 = "????? ??????? ??? ?????????"
+        line2 = "????? ???????? ? ??????"
+        action = "??????? ?????? ????"
+
     return (
-        f"📱 <b>{'Telefon raqamingiz' if lang == 'uz' else 'Ваш номер телефона'}</b>\n\n"
-        f"{'Kerak' if lang == 'uz' else 'Нужен для'}:\n"
-        f"• {'Doʻkon siz bilan bogʻlanishi' if lang == 'uz' else 'Связи с магазином'}\n"
-        f"• {'Buyurtma haqida xabar' if lang == 'uz' else 'Уведомлений о заказах'}\n\n"
-        f"👇 {'Quyidagi tugmani bosing' if lang == 'uz' else 'Нажмите кнопку ниже'}"
+        f"?? <b>{title}</b>\n\n"
+        f"{need}:\n"
+        f"? {line1}\n"
+        f"? {line2}\n\n"
+        f"{action}"
     )
 
 
 def build_city_card(lang: str) -> str:
     """Build city selection card."""
+    if lang == "uz":
+        title = "Shahringiz"
+        hint = "Yaqin takliflarni ko'rsatamiz"
+        action = "Tugmani bosing"
+    else:
+        title = "??? ?????"
+        hint = "??????? ??????????? ?????"
+        action = "??????? ?????? ????"
+
     return (
-        f"📍 <b>{'Shahringiz' if lang == 'uz' else 'Ваш город'}</b>\n\n"
-        f"{'Yaqin doʻkonlar va takliflarni koʻrsatamiz' if lang == 'uz' else 'Покажем магазины и предложения рядом'}\n\n"
-        f"👇 {'Roʻyxatdan tanlang' if lang == 'uz' else 'Выберите из списка'}"
+        f"?? <b>{title}</b>\n\n"
+        f"{hint}\n\n"
+        f"{action}"
     )
 
 
 def build_welcome_keyboard() -> types.InlineKeyboardMarkup:
     """Welcome keyboard with language buttons."""
     kb = InlineKeyboardBuilder()
-    kb.button(text="🇷🇺 Русский", callback_data="reg_lang_ru")
-    kb.button(text="🇺🇿 O'zbekcha", callback_data="reg_lang_uz")
+    kb.button(text="???? ???????", callback_data="reg_lang_ru")
+    kb.button(text="???? O'zbekcha", callback_data="reg_lang_uz")
     kb.adjust(2)
     return kb.as_markup()
 
@@ -656,7 +706,7 @@ async def cmd_start(message: types.Message, state: FSMContext, db: DatabaseProto
         await message.answer(
             get_text(lang, "choose_city"),
             parse_mode="HTML",
-            reply_markup=city_inline_keyboard(lang),
+            reply_markup=city_inline_keyboard(lang, allow_cancel=False),
         )
         # DON'T set state - city is selected via inline buttons only
         await state.clear()

@@ -168,6 +168,7 @@
             stats: null,
             loading: false
         };
+        window.allProducts = window.allProducts || [];
 
         // ============================================
         // PRODUCT MODAL (defined early for use in rendered HTML)
@@ -741,6 +742,7 @@
                 state.store = store;
                 state.orders = orders;
                 state.products = normalizeProducts(products);
+                window.allProducts = state.products;
 
                 // Connect WebSocket after store info is loaded
                 if (!websocket && store.store_id) {
@@ -794,149 +796,184 @@
             const hoursUntilPeak = currentHour < 11 ? 11 - currentHour : currentHour < 18 ? 18 - currentHour : null;
 
             document.querySelector('.content').innerHTML = `
-                <div class="container">
-                    <!-- Hero Section -->
-                    <div class="hero-section">
-                        <div class="hero-greeting">
-                            <div class="hero-text">
-                                <h2>${greeting}!</h2>
-                                <p>${currentDate} • ${state.store?.name || 'Мой магазин'}</p>
+                <div class=\"container dashboard-shell\">
+                    <section class=\"hero-panel rise-in\">
+                        <div class=\"hero-row\">
+                            <div class=\"hero-copy\">
+                                <div class=\"hero-date\">${currentDate}</div>
+                                <h2 class=\"hero-title\">${greeting}!</h2>
+                                <div class=\"hero-store\">
+                                    <span class=\"hero-store-name\">${state.store?.name || '??? ???????'}</span>
+                                    <span class=\"hero-store-tag\">Partner Panel</span>
+                                </div>
                             </div>
-                            <button class="status-toggle ${state.store?.is_open ? 'open' : 'closed'}" onclick="toggleStoreStatus()">
-                                <span class="status-indicator"></span>
-                                ${state.store?.is_open ? 'Открыто' : 'Закрыто'}
-                            </button>
+                            <div class=\"hero-controls\">
+                                <button class=\"status-toggle ${state.store?.is_open ? 'open' : 'closed'}\" onclick=\"toggleStoreStatus()\">
+                                    <span class=\"status-indicator\"></span>
+                                    ${state.store?.is_open ? '???????' : '???????'}
+                                </button>
+                            </div>
                         </div>
 
-                        <!-- Smart Insights -->
-                        ${hoursUntilPeak && hoursUntilPeak <= 2 ? `
-                            <div class="smart-insight">
-                                <div class="smart-insight-icon">🔥</div>
-                                <div class="smart-insight-content">
-                                    <div class="smart-insight-title">Пик заказов через ${hoursUntilPeak}ч</div>
-                                    <div class="smart-insight-text">Проверьте остатки популярных товаров</div>
-                                </div>
+                        <div class=\"hero-chips\">
+                            <div class=\"hero-chip\">
+                                <span class=\"chip-label\">????????</span>
+                                <span class=\"chip-value\">${activeOrders.length}</span>
                             </div>
-                        ` : ''}
+                            <div class=\"hero-chip\">
+                                <span class=\"chip-label\">?????</span>
+                                <span class=\"chip-value\">${newOrders.length}</span>
+                            </div>
+                            <div class=\"hero-chip\">
+                                <span class=\"chip-label\">??????</span>
+                                <span class=\"chip-value\">${state.products.length}</span>
+                            </div>
+                        </div>
 
-                        ${outOfStockProducts.length > 0 ? `
-                            <div class="smart-insight warning">
-                                <div class="smart-insight-icon">⚠️</div>
-                                <div class="smart-insight-content">
-                                    <div class="smart-insight-title">Товары закончились (${outOfStockProducts.length})</div>
-                                    <div class="smart-insight-text">${outOfStockProducts[0]?.name || 'Товар'} и еще ${outOfStockProducts.length - 1}</div>
+                        <div class=\"hero-insights\">
+                            ${hoursUntilPeak && hoursUntilPeak <= 2 ? `
+                                <div class=\"insight-card\">
+                                    <div class=\"insight-icon\">?</div>
+                                    <div>
+                                        <div class=\"insight-title\">??? ?????? ????? ${hoursUntilPeak}?</div>
+                                        <div class=\"insight-text\">???????? ??????? ? ????????? ?????????? ?????????? ???????</div>
+                                    </div>
                                 </div>
-                            </div>
-                        ` : lowStockProducts.length > 0 ? `
-                            <div class="smart-insight warning">
-                                <div class="smart-insight-icon">📦</div>
-                                <div class="smart-insight-content">
-                                    <div class="smart-insight-title">Низкий остаток (${lowStockProducts.length})</div>
-                                    <div class="smart-insight-text">${lowStockProducts.map(p => p.name).join(', ')}</div>
-                                </div>
-                            </div>
-                        ` : ''}
+                            ` : ''}
 
-                        ${goalProgress < 100 && todayRevenue > 0 ? `
-                            <div class="goal-progress">
-                                <div class="goal-header">
-                                    <span class="goal-label">Цель на день</span>
-                                    <span class="goal-values">${formatPrice(todayRevenue)} / ${formatPrice(dailyGoal)}</span>
+                            ${outOfStockProducts.length > 0 ? `
+                                <div class=\"insight-card warning\">
+                                    <div class=\"insight-icon\">?</div>
+                                    <div>
+                                        <div class=\"insight-title\">??????????? ??????? (${outOfStockProducts.length})</div>
+                                        <div class=\"insight-text\">${outOfStockProducts[0]?.name || '?????'} ? ??? ${outOfStockProducts.length - 1}</div>
+                                    </div>
                                 </div>
-                                <div class="goal-bar">
-                                    <div class="goal-fill" style="width: ${Math.min(goalProgress, 100)}%"></div>
+                            ` : lowStockProducts.length > 0 ? `
+                                <div class=\"insight-card warning\">
+                                    <div class=\"insight-icon\">??</div>
+                                    <div>
+                                        <div class=\"insight-title\">?????? ??????? (${lowStockProducts.length})</div>
+                                        <div class=\"insight-text\">${lowStockProducts.map(p => p.name).join(', ')}</div>
+                                    </div>
                                 </div>
-                            </div>
-                        ` : goalProgress >= 100 ? `
-                            <div class="smart-insight success">
-                                <div class="smart-insight-icon">🎉</div>
-                                <div class="smart-insight-content">
-                                    <div class="smart-insight-title">Цель достигнута!</div>
-                                    <div class="smart-insight-text">Выручка превысила ${formatPrice(dailyGoal)}</div>
+                            ` : ''}
+
+                            ${goalProgress < 100 && todayRevenue > 0 ? `
+                                <div class=\"insight-card\">
+                                    <div>
+                                        <div class=\"goal-header\">
+                                            <span class=\"goal-label\">???? ???</span>
+                                            <span class=\"goal-values\">${formatPrice(todayRevenue)} / ${formatPrice(dailyGoal)}</span>
+                                        </div>
+                                        <div class=\"goal-bar\">
+                                            <div class=\"goal-fill\" style=\"width: ${Math.min(goalProgress, 100)}%\"></div>
+                                        </div>
+                                    </div>
                                 </div>
-                            </div>
-                        ` : ''}
+                            ` : goalProgress >= 100 ? `
+                                <div class=\"insight-card success\">
+                                    <div class=\"insight-icon\">?</div>
+                                    <div>
+                                        <div class=\"insight-title\">???? ?????????</div>
+                                        <div class=\"insight-text\">???????? ????????? ? ${formatPrice(dailyGoal)}</div>
+                                    </div>
+                                </div>
+                            ` : ''}
+                        </div>
+                    </section>
+
+                    <div class=\"action-tiles rise-in\" style=\"--delay: 80ms;\">
+                        <button class=\"action-tile primary\" onclick=\"openProductModal()\">
+                            <span class=\"action-icon\"><i data-lucide=\"plus\"></i></span>
+                            <span>
+                                <span class=\"action-title\">???????? ?????</span>
+                                <span class=\"action-subtitle\">?????? ??????? ????? ?????</span>
+                            </span>
+                        </button>
+                        <button class=\"action-tile\" onclick=\"switchView('orders')\">
+                            <span class=\"action-icon\"><i data-lucide=\"sparkles\"></i></span>
+                            <span>
+                                <span class=\"action-title\">???????? ??????</span>
+                                <span class=\"action-subtitle\">????????? ???????? ???????</span>
+                            </span>
+                        </button>
                     </div>
 
-                    <div class="action-bar">
-                        <button class="btn btn-primary" onclick="openProductModal()">Добавить товар</button>
-                        <button class="btn btn-outline" onclick="switchView('orders')">Все заказы</button>
-                    </div>
-
-                    <!-- Stats Grid -->
-                    <div class="stats-grid">
-                        <div class="stat-card primary">
-                            ${revenueTrend != 0 ? `<span class="stat-trend ${revenueTrend > 0 ? 'up' : 'down'}">
-                                <i data-lucide="${revenueTrend > 0 ? 'trending-up' : 'trending-down'}"></i>
+                    <section class=\"kpi-grid rise-in\" style=\"--delay: 130ms;\">
+                        <div class=\"kpi-card kpi-primary\">
+                            ${revenueTrend != 0 ? `<span class=\"stat-trend ${revenueTrend > 0 ? 'up' : 'down'}\">
+                                <i data-lucide=\"${revenueTrend > 0 ? 'trending-up' : 'trending-down'}\"></i>
                                 ${Math.abs(revenueTrend)}%
                             </span>` : ''}
                             ${todayRevenue > 0 ? `
-                                <div class="stat-value">${formatPrice(todayRevenue)}</div>
-                                <div class="stat-label">Выручка сегодня</div>
+                                <div class=\"kpi-value\">${formatPrice(todayRevenue)}</div>
+                                <div class=\"kpi-label\">??????? ???????</div>
                             ` : `
-                                <div class="stat-value empty-revenue">Первый заказ скоро! 🚀</div>
-                                <div class="stat-hint">Начните с добавления товаров</div>
+                                <div class=\"kpi-value empty-revenue\">??? ?????? ?? ???????</div>
+                                <div class=\"kpi-hint\">???????? ?????, ????? ????????? ?????</div>
                             `}
                         </div>
 
-                        <div class="stat-card success">
-                            <div class="stat-value">${activeOrders.length}</div>
-                            <div class="stat-label">Активные заказы</div>
+                        <div class=\"kpi-card tone-success\">
+                            <div class=\"kpi-value\">${activeOrders.length}</div>
+                            <div class=\"kpi-label\">???????? ??????</div>
                         </div>
 
-                        <div class="stat-card">
-                            <div class="stat-value">${state.products.length}</div>
-                            <div class="stat-label">Товаров в каталоге</div>
+                        <div class=\"kpi-card\">
+                            <div class=\"kpi-value\">${state.products.length}</div>
+                            <div class=\"kpi-label\">?????? ? ???????</div>
                         </div>
 
-                        <div class="stat-card">
-                            <div class="stat-value">4.8</div>
-                            <div class="stat-label">Средний рейтинг</div>
+                        <div class=\"kpi-card\">
+                            <div class=\"kpi-value\">4.8</div>
+                            <div class=\"kpi-label\">??????? ???????</div>
                         </div>
-                    </div>
+                    </section>
 
-                    <!-- Urgent Orders -->
                     ${newOrders.length > 0 ? `
-                        <div class="urgent-section">
+                        <section class=\"priority-stack rise-in\" style=\"--delay: 180ms;\">
                             ${newOrders.map(order => `
-                                <div class="urgent-order" onclick="viewOrderDetails(${order.order_id || order.id})">
-                                    <div class="urgent-header">
-                                        <h3 class="urgent-title">🔔 Новый заказ #${order.order_id || order.id}</h3>
-                                        <span class="urgent-badge">${formatTime(order.created_at)}</span>
+                                <div class=\"priority-card\" onclick=\"viewOrderDetails(${order.order_id || order.id})\">
+                                    <div class=\"priority-header\">
+                                        <h3 class=\"priority-title\">????? ????? #${order.order_id || order.id}</h3>
+                                        <span class=\"priority-time\">${formatTime(order.created_at)}</span>
                                     </div>
-                                    <div class="pl-md">
-                                        <p class="order-summary">${order.order_type === 'pickup' ? '🏃 Самовывоз' : '🚗 Доставка'} • ${formatPrice(order.price)}</p>
+                                    <div class=\"priority-meta\">
+                                        ${order.order_type === 'pickup' ? '?????????' : '????????'} ? ${formatPrice(order.price)}
                                     </div>
-                                    <div class="urgent-actions" onclick="event.stopPropagation()">
-                                        <button class="btn btn-success" onclick="updateOrderStatus(${order.order_id || order.id}, 'preparing')">✓ Принять заказ</button>
-                                        <button class="btn btn-outline" onclick="cancelOrder(${order.order_id || order.id})">Отклонить</button>
+                                    <div class=\"priority-actions\" onclick=\"event.stopPropagation()\">
+                                        <button class=\"btn btn-success\" onclick=\"updateOrderStatus(${order.order_id || order.id}, 'preparing')\">???????</button>
+                                        <button class=\"btn btn-outline\" onclick=\"cancelOrder(${order.order_id || order.id})\">????????</button>
                                     </div>
                                 </div>
                             `).join('')}
-                        </div>
+                        </section>
                     ` : ''}
 
-                    <!-- Active Orders with Grouping -->
-                    <div class="section">
-                        <div class="section-header">
-                            <h2 class="section-title">Активные заказы</h2>
-                            <button class="btn btn-sm btn-outline" onclick="switchView('orders')">Все заказы</button>
+                    <section class=\"section dashboard-section rise-in\" style=\"--delay: 220ms;\">
+                        <div class=\"section-header\">
+                            <div>
+                                <h2 class=\"section-title\">???????? ??????</h2>
+                                <p class=\"section-subtitle\">??????? ????? ? ??????? ????????</p>
+                            </div>
+                            <button class=\"btn btn-sm btn-outline\" onclick=\"switchView('orders')\">??? ??????</button>
                         </div>
 
                         ${activeOrders.length > 0 ? `
                             ${newOrders.length > 0 ? `
-                                <div class="order-section" id="newOrdersSection">
-                                    <div class="order-section-header" onclick="toggleOrderSection('newOrdersSection')">
-                                        <h3 class="order-section-title">
-                                            ⚡ Требуют действия
-                                            <span class="order-section-badge">${newOrders.length}</span>
+                                <div class=\"order-section\" id=\"newOrdersSection\">
+                                    <div class=\"order-section-header\" onclick=\"toggleOrderSection('newOrdersSection')\">
+                                        <h3 class=\"order-section-title\">
+                                            ????? ??????
+                                            <span class=\"order-section-badge\">${newOrders.length}</span>
                                         </h3>
-                                        <div class="order-section-toggle">
-                                            <i data-lucide="chevron-down"></i>
+                                        <div class=\"order-section-toggle\">
+                                            <i data-lucide=\"chevron-down\"></i>
                                         </div>
                                     </div>
-                                    <div class="order-section-content">
-                                        <div class="orders-list">
+                                    <div class=\"order-section-content\">
+                                        <div class=\"orders-list\">
                                             ${newOrders.map(order => renderOrderCard(order)).join('')}
                                         </div>
                                     </div>
@@ -944,33 +981,33 @@
                             ` : ''}
 
                             ${preparingOrders.length > 0 ? `
-                                <div class="order-section collapsed" id="preparingOrdersSection">
-                                    <div class="order-section-header" onclick="toggleOrderSection('preparingOrdersSection')">
-                                        <h3 class="order-section-title">
-                                            📦 В работе
-                                            <span class="order-section-badge muted">${preparingOrders.length}</span>
+                                <div class=\"order-section collapsed\" id=\"preparingOrdersSection\">
+                                    <div class=\"order-section-header\" onclick=\"toggleOrderSection('preparingOrdersSection')\">
+                                        <h3 class=\"order-section-title\">
+                                            ? ??????
+                                            <span class=\"order-section-badge muted\">${preparingOrders.length}</span>
                                         </h3>
-                                        <div class="order-section-toggle">
-                                            <i data-lucide="chevron-down"></i>
+                                        <div class=\"order-section-toggle\">
+                                            <i data-lucide=\"chevron-down\"></i>
                                         </div>
                                     </div>
-                                    <div class="order-section-content">
-                                        <div class="orders-list">
+                                    <div class=\"order-section-content\">
+                                        <div class=\"orders-list\">
                                             ${preparingOrders.map(order => renderOrderCard(order)).join('')}
                                         </div>
                                     </div>
                                 </div>
                             ` : ''}
                         ` : `
-                            <div class="empty-state">
-                                <div class="empty-icon">
-                                    <i data-lucide="inbox" class="icon-muted"></i>
+                            <div class=\"empty-state\">
+                                <div class=\"empty-icon\">
+                                    <i data-lucide=\"inbox\" class=\"icon-muted\"></i>
                                 </div>
-                                <p class="empty-title">Нет активных заказов</p>
-                                <p class="empty-subtitle">Новые заказы появятся здесь</p>
+                                <p class=\"empty-title\">???? ??? ???????? ???????</p>
+                                <p class=\"empty-subtitle\">????? ?????? ???????? ?????</p>
                             </div>
                         `}
-                    </div>
+                    </section>
                 </div>
             `;
 
@@ -1588,6 +1625,7 @@
             try {
                 const products = await apiFetch('/api/partner/products');
                 state.products = normalizeProducts(products);
+                window.allProducts = state.products;
                 renderProducts();
             } catch (error) {
                 toast('Ошибка загрузки товаров', 'error');

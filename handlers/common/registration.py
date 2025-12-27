@@ -24,22 +24,21 @@ router = Router(name="registration")
 async def _after_phone_saved(
     message: types.Message, state: FSMContext, db: DatabaseProtocol, lang: str
 ) -> None:
-    # Check if there was a pending order (Tez buyurtma) or cart checkout
     data = await state.get_data()
     pending_order = data.get("pending_order")
     pending_cart_checkout = data.get("pending_cart_checkout")
 
     from aiogram.types import ReplyKeyboardRemove
 
-    # 1) Pending cart checkout: user started cart checkout without phone
+    ru_phone_saved = "✅ Телефон сохранен!"
+    uz_phone_saved = "✅ Telefon saqlandi!"
+
     if pending_cart_checkout:
-        # Confirm phone saved and hide contact keyboard
         await message.answer(
-            "✅ Телефон сохранён!" if lang == "ru" else "✅ Telefon saqlandi!",
+            ru_phone_saved if lang == "ru" else uz_phone_saved,
             reply_markup=ReplyKeyboardRemove(),
         )
 
-        # Try to show cart again so user can continue checkout
         try:
             from handlers.customer.cart.router import show_cart
 
@@ -48,62 +47,67 @@ async def _after_phone_saved(
             logger.warning(f"Failed to resume cart after phone: {e}")
             from app.keyboards import main_menu_customer
 
+            ru_text = (
+                "Теперь откройте "
+                "<Сават> и нажмите "
+                "<Оформить заказ> заново."
+            )
+            uz_text = "Endi <Savat> ni ochib, <Buyurtma berish> ni qayta bosing."
+
             await message.answer(
-                (
-                    "Теперь откройте «Сават» и нажмите «Оформить заказ» заново."
-                    if lang == "ru"
-                    else "Endi «Savat» ni ochib, qayta «Buyurtma berish» ni bosing."
-                ),
+                ru_text if lang == "ru" else uz_text,
                 reply_markup=main_menu_customer(lang),
             )
 
-        # Clear state - cart flow will set its own FSM state again
         await state.clear()
         return
 
-    # 2) Pending single-order / Tez buyurtma flow
     if pending_order:
         await message.answer(
-            "✅ Телефон сохранён!" if lang == "ru" else "✅ Telefon saqlandi!",
+            ru_phone_saved if lang == "ru" else uz_phone_saved,
             reply_markup=ReplyKeyboardRemove(),
         )
 
-        # Get order data to show confirmation button
         data = await state.get_data()
         offer_id = data.get("offer_id")
         store_id = data.get("store_id")
         delivery_method = data.get("selected_delivery")
 
-        # Check if we have minimum required data
         if not offer_id or not store_id or not delivery_method:
-            # Data incomplete - show menu
             await state.clear()
             from app.keyboards import main_menu_customer
 
+            ru_text = "Продолжите через <Акции>"
+            uz_text = "Aksiyalar orqali davom eting"
+
             await message.answer(
-                "Продолжите через «Акции»" if lang == "ru" else "Aksiyalar orqali davom eting",
+                ru_text if lang == "ru" else uz_text,
                 reply_markup=main_menu_customer(lang),
             )
             return
 
-        # Show confirmation button to continue Tez buyurtma
         from aiogram.utils.keyboard import InlineKeyboardBuilder
 
         kb = InlineKeyboardBuilder()
+        ru_button = "✅ Продолжить"
+        uz_button = "✅ Davom ettirish"
         kb.button(
-            text="✅ Продолжить" if lang == "ru" else "✅ Davom ettirish",
+            text=ru_button if lang == "ru" else uz_button,
             callback_data=f"pbook_confirm_{offer_id}",
         )
 
+        ru_text = (
+            "Нажмите кнопку ниже, "
+            "чтобы продолжить:"
+        )
+        uz_text = "Davom etish uchun tugmani bosing:"
+
         await message.answer(
-            "Нажмите кнопку ниже, чтобы продолжить:"
-            if lang == "ru"
-            else "Davom etish uchun tugmani bosing:",
+            ru_text if lang == "ru" else uz_text,
             reply_markup=kb.as_markup(),
         )
         return
 
-    # Check if user already has a meaningful city set - skip city selection
     user_city_raw = None
     if hasattr(db, "get_user"):
         user_data = db.get_user(message.from_user.id)
@@ -116,45 +120,42 @@ async def _after_phone_saved(
     user_city = normalize_city(user_city_raw) if user_city_raw else None
 
     if user_city and user_city != default_city:
-        # User already has city, complete registration
         await state.clear()
-
-        from aiogram.types import ReplyKeyboardRemove
-
         from app.keyboards import main_menu_customer
 
         await message.answer(
-            "✅ Телефон сохранён!" if lang == "ru" else "✅ Telefon saqlandi!",
+            ru_phone_saved if lang == "ru" else uz_phone_saved,
             reply_markup=ReplyKeyboardRemove(),
         )
 
-        # Send main menu
+        choose_text = "Tanlang" if lang == "uz" else "Выберите"
         await message.answer(
-            f"👉 {'Tanlang' if lang == 'uz' else 'Выберите'}:",
+            f"👉 {choose_text}:",
             reply_markup=main_menu_customer(lang),
         )
         return
 
-    # Normal registration flow - show city selection
+    ru_city_title = "Выберите ваш город"
+    uz_city_title = "Shahringizni tanlang"
+    ru_city_hint = "Покажем предложения рядом"
+    uz_city_hint = "Yaqin takliflarni ko'rsatamiz"
+
     city_text = (
-        f"✅ {'Telefon saqlandi!' if lang == 'uz' else 'Телефон сохранён!'}\n\n"
-        f"🏙 <b>{'Shahringizni tanlang' if lang == 'uz' else 'Выберите ваш город'}</b>\n\n"
-        f"{'Yaqin takliflarni ko‘rsatamiz' if lang == 'uz' else 'Покажем предложения рядом'}"
+        f"✅ {uz_phone_saved if lang == 'uz' else ru_phone_saved}\n\n"
+        f"📍 <b>{uz_city_title if lang == 'uz' else ru_city_title}</b>\n\n"
+        f"{uz_city_hint if lang == 'uz' else ru_city_hint}"
     )
 
     await state.set_state(Registration.city)
-
-    # Remove reply keyboard and show inline cities
-    from aiogram.types import ReplyKeyboardRemove
-
     await message.answer(
         city_text,
         parse_mode="HTML",
         reply_markup=ReplyKeyboardRemove(),
     )
+    choose_text = "Tanlang" if lang == "uz" else "Выберите"
     await message.answer(
-        f"👉 {'Tanlang' if lang == 'uz' else 'Выберите'}:",
-        reply_markup=city_inline_keyboard(lang),
+        f"👉 {choose_text}:",
+        reply_markup=city_inline_keyboard(lang, allow_cancel=False),
     )
 
 
@@ -189,6 +190,16 @@ async def process_phone(message: types.Message, state: FSMContext, db: DatabaseP
         return
 
     lang = db.get_user_language(message.from_user.id)
+    if (
+        message.contact
+        and message.contact.user_id
+        and message.contact.user_id != message.from_user.id
+    ):
+        await message.answer(
+            get_text(lang, "error_invalid_number"),
+            reply_markup=phone_request_keyboard(lang),
+        )
+        return
     phone = await _save_phone(
         message,
         db,
@@ -247,26 +258,37 @@ async def registration_city_callback(
         await callback.answer(get_text(lang, "error"), show_alert=True)
         return
 
+    normalized_city = normalize_city(city)
     try:
-        db.update_user_city(callback.from_user.id, city)
-        logger.info(f"City updated for user {callback.from_user.id}: {city}")
+        db.update_user_city(callback.from_user.id, normalized_city)
+        logger.info(f"City updated for user {callback.from_user.id}: {normalized_city}")
     except Exception as e:
         logger.error(f"Failed to update city: {e}")
 
     await state.clear()
 
-    # Edit message to show completion
     user = db.get_user_model(callback.from_user.id)
     name = user.first_name if user else callback.from_user.first_name
 
+    title = "Tayyor!" if lang == "uz" else "Готово!"
+    welcome = "Xush kelibsiz" if lang == "uz" else "Добро пожаловать"
+    city_label = "Shahar" if lang == "uz" else "Город"
+    can_do = "Endi siz qila olasiz" if lang == "uz" else "Теперь вы можете"
+    offers = "Aksiyalar" if lang == "uz" else "Акции"
+    offers_hint = "70% gacha chegirmalar" if lang == "uz" else "скидки до 70%"
+    stores = "Do'konlar" if lang == "uz" else "Магазины"
+    stores_hint = "barcha do'konlar" if lang == "uz" else "все магазины"
+    search = "Qidirish" if lang == "uz" else "Поиск"
+    search_hint = "mahsulot topish" if lang == "uz" else "найти товар"
+
     complete_text = (
-        f"🎉 <b>{'Tayyor!' if lang == 'uz' else 'Готово!'}</b>\n\n"
-        f"👋 {'Xush kelibsiz' if lang == 'uz' else 'Добро пожаловать'}, {name}!\n"
-        f"📍 {'Shahar' if lang == 'uz' else 'Город'}: {city}\n\n"
-        f"{'Endi siz qila olasiz' if lang == 'uz' else 'Теперь вы можете'}:\n"
-        f"🔥 <b>{'Aksiyalar' if lang == 'uz' else 'Акции'}</b> — {'70% gacha chegirmalar' if lang == 'uz' else 'скидки до 70%'}\n"
-        f"🏪 <b>{'Doʻkonlar' if lang == 'uz' else 'Заведения'}</b> — {'barcha doʻkonlar' if lang == 'uz' else 'все магазины'}\n"
-        f"🔍 <b>{'Qidirish' if lang == 'uz' else 'Поиск'}</b> — {'mahsulot topish' if lang == 'uz' else 'найти товар'}"
+        f"🎉 <b>{title}</b>\n\n"
+        f"👋 {welcome}, {name}!\n"
+        f"📍 {city_label}: {city}\n\n"
+        f"{can_do}:\n"
+        f"🔥 <b>{offers}</b> ? {offers_hint}\n"
+        f"🏪 <b>{stores}</b> ? {stores_hint}\n"
+        f"🔎 <b>{search}</b> ? {search_hint}"
     )
 
     try:
@@ -274,9 +296,9 @@ async def registration_city_callback(
     except Exception:
         pass
 
-    # Send main menu (single message)
+    choose_text = "Tanlang" if lang == "uz" else "Выберите"
     await callback.message.answer(
-        f"👇 {'Tanlang' if lang == 'uz' else 'Выберите'}:",
+        f"👉 {choose_text}:",
         reply_markup=main_menu_customer(lang),
     )
     await callback.answer()
@@ -285,6 +307,3 @@ async def registration_city_callback(
 # OLD TEXT-BASED CITY HANDLER REMOVED
 # City is now selected ONLY via inline buttons (select_city:) in commands.py
 # This prevents accidental triggering when user types numbers during registration
-
-
-

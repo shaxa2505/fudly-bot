@@ -42,7 +42,7 @@ def city_keyboard(lang: str = "ru", allow_cancel: bool = True) -> ReplyKeyboardM
     cities = get_cities(lang)
     builder = ReplyKeyboardBuilder()
     for city in cities:
-        builder.button(text=f"📍 {city}")
+        builder.button(text=f"\U0001F4CD {city}")
 
     if allow_cancel:
         builder.button(text=get_text(lang, "cancel"))
@@ -53,15 +53,21 @@ def city_keyboard(lang: str = "ru", allow_cancel: bool = True) -> ReplyKeyboardM
     return builder.as_markup(resize_keyboard=True)
 
 
-def city_inline_keyboard(lang: str = "ru") -> InlineKeyboardMarkup:
-    """City selection inline keyboard for partner registration."""
+def city_inline_keyboard(lang: str = "ru", allow_cancel: bool = True) -> InlineKeyboardMarkup:
+    """City selection inline keyboard.
+
+    Args:
+        lang: Interface language
+        allow_cancel: Show cancel button
+    """
     from localization import get_cities
 
     cities = get_cities(lang)
     builder = InlineKeyboardBuilder()
     for city in cities:
-        builder.button(text=f"📍 {city}", callback_data=f"reg_city_{city}")
-    builder.button(text=get_text(lang, "cancel"), callback_data="reg_cancel")
+        builder.button(text=f"\U0001F4CD {city}", callback_data=f"reg_city_{city}")
+    if allow_cancel:
+        builder.button(text=get_text(lang, "cancel"), callback_data="reg_cancel")
     builder.adjust(1)
     return builder.as_markup()
 
