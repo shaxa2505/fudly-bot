@@ -64,12 +64,13 @@ async def _cart_show_card_payment_details(
 
     currency = "so'm" if lang == "uz" else "сум"
 
+    safe_holder = esc(card_holder)
     lines = [
         f"<b>{get_text(lang, 'cart_payment_card_title')}</b>",
         "",
         f"{get_text(lang, 'cart_payment_amount_label')}: <b>{total_with_delivery:,} {currency}</b>",
         f"{get_text(lang, 'cart_payment_card_label')}: <code>{card_number}</code>",
-        f"{get_text(lang, 'cart_payment_holder_label')}: {card_holder}",
+        f"{get_text(lang, 'cart_payment_holder_label')}: {safe_holder}",
         "",
         f"<i>{get_text(lang, 'cart_payment_receipt_hint')}</i>",
     ]
@@ -101,6 +102,7 @@ def register(router: Router) -> None:
         address = data.get("address", "")
 
         if not cart_items_stored or not store_id or not address:
+            await state.clear()
             await callback.answer(get_text(lang, "cart_payment_data_missing"), show_alert=True)
             return
 
@@ -128,6 +130,7 @@ def register(router: Router) -> None:
         address = data.get("address", "")
 
         if not cart_items_stored or not store_id or not address:
+            await state.clear()
             await callback.answer(get_text(lang, "cart_payment_data_missing"), show_alert=True)
             return
 
@@ -135,10 +138,11 @@ def register(router: Router) -> None:
         total = sum(int(item["price"]) * int(item["quantity"]) for item in cart_items_stored)
         total_with_delivery = total + int(delivery_price)
 
+        safe_address = esc(address)
         text = (
             f"💳 <b>{get_text(lang, 'cart_payment_select_title')}</b>\n\n"
             f"{get_text(lang, 'cart_payment_amount_label')}: <b>{total_with_delivery:,} {currency}</b>\n"
-            f"{get_text(lang, 'cart_delivery_address_label')}: {address}"
+            f"{get_text(lang, 'cart_delivery_address_label')}: {safe_address}"
         )
 
         kb = InlineKeyboardBuilder()
@@ -182,13 +186,17 @@ def register(router: Router) -> None:
         address = data.get("address", "")
 
         if not cart_items_stored or not store_id or not address:
+            await state.clear()
             await callback.answer(get_text(lang, "cart_payment_data_missing"), show_alert=True)
             return
 
         await state.update_data(payment_method="card")
         await state.set_state(OrderDelivery.payment_proof)
 
-        await callback.message.delete()
+        try:
+            await callback.message.delete()
+        except Exception:
+            pass
         await _cart_show_card_payment_details(callback.message, state, lang)
         await callback.answer()
 
@@ -210,6 +218,12 @@ def register(router: Router) -> None:
             await message.answer(get_text(lang, "cart_delivery_data_lost"))
             await state.clear()
             return
+
+        if data.get("payment_proof_in_progress"):
+            await message.answer(get_text(lang, "cart_payment_photo_already_received"))
+            return
+
+        await state.update_data(payment_proof_in_progress=True)
 
         order_service = get_unified_order_service()
         if not order_service:
@@ -297,8 +311,9 @@ def register(router: Router) -> None:
             kb.adjust(2)
 
             items_text = "\n".join(
-                [f"• {item['title']} x {item['quantity']}" for item in cart_items_stored]
+                [f"• {esc(item['title'])} x {item['quantity']}" for item in cart_items_stored]
             )
+            safe_address = esc(address)
 
             try:
                 await common.bot.send_photo(
@@ -309,7 +324,7 @@ def register(router: Router) -> None:
                         f"{get_text(lang, 'cart_payment_admin_order')}: #{order_id} | {store_name}\n"
                         f"{get_text(lang, 'cart_payment_admin_items')}:\n{items_text}\n"
                         f"{get_text(lang, 'cart_payment_admin_total')}: {total_with_delivery:,} {currency}\n"
-                        f"{get_text(lang, 'cart_payment_admin_address')}: {address}\n"
+                        f"{get_text(lang, 'cart_payment_admin_address')}: {safe_address}\n"
                         f"{get_text(lang, 'cart_payment_admin_customer')}: {message.from_user.first_name}\n"
                         f"{get_text(lang, 'cart_payment_admin_phone')}: <code>{customer_phone}</code>"
                     ),
@@ -378,3 +393,11 @@ def register(router: Router) -> None:
         await callback.message.answer(get_text(lang, "cart_payment_canceled"))
         await state.clear()
         await callback.answer()
+
+    @router.message(OrderDelivery.payment_proof, IsCartOrderFilter())
+    async def cart_payment_proof_invalid(message: types.Message, state: FSMContext) -> None:
+        if not common.db or not message.from_user:
+            return
+
+        lang = common.db.get_user_language(message.from_user.id)
+        await message.answer(get_text(lang, "cart_payment_photo_required"))

@@ -1,18 +1,8 @@
-"""Admin handlers for delivery order payment confirmation.
+﻿from __future__ import annotations
 
-When Mini App user creates DELIVERY order with CARD payment:
-1. User uploads payment proof photo
-2. Photo sent to ADMIN with confirmation buttons
-3. Admin confirms/rejects payment
-4. If confirmed → notify seller via unified_order_service
-5. If rejected → notify customer, restore quantities
-"""
-from __future__ import annotations
-
-from typing import Any
+from html import escape as esc
 
 from aiogram import F, Router, types
-from aiogram.utils.keyboard import InlineKeyboardBuilder
 
 from app.services.unified_order_service import (
     OrderStatus,
@@ -25,289 +15,204 @@ try:
     from logging_config import logger
 except ImportError:
     import logging
+
     logger = logging.getLogger(__name__)
 
 
 router = Router(name="admin_delivery_orders")
 
 # Module dependencies
-db: Any | None = None
+db = None
 
 
-def setup(database: Any) -> None:
+def setup(database) -> None:
     """Setup module dependencies."""
     global db
     db = database
-    logger.info("✅ Admin delivery orders handler initialized")
+    logger.info("Admin delivery orders handler initialized")
+
+
+def _get_lang(user_id: int | None) -> str:
+    if db and hasattr(db, "get_user_language") and user_id:
+        return db.get_user_language(user_id)
+    return "ru"
+
+
+def _get_order_field(order, key: str, default=None):
+    if isinstance(order, dict):
+        return order.get(key, default)
+    return getattr(order, key, default)
 
 
 @router.callback_query(F.data.startswith("admin_confirm_payment_"))
 async def admin_confirm_payment(callback: types.CallbackQuery) -> None:
-    """Admin confirms payment proof for delivery order.
-    
-    Flow:
-    1. Update order status from awaiting_admin_confirmation → pending
-    2. Notify seller via unified_order_service
-    3. Seller receives order with confirmation buttons
-    """
+    """Admin confirms payment proof for delivery order."""
     if not callback.message or not callback.from_user:
         return
-    
+
+    lang = _get_lang(callback.from_user.id)
+
     try:
         order_id = int(callback.data.split("_")[-1])
-        logger.info(f"Admin {callback.from_user.id} confirming payment for order #{order_id}")
-        
-        # Get order details
+    except (ValueError, IndexError):
+        await callback.answer(get_text(lang, "error"), show_alert=True)
+        return
+
+    try:
         if not db or not hasattr(db, "get_order"):
-            await callback.answer("❌ Database error", show_alert=True)
+            await callback.answer(get_text(lang, "admin_db_error"), show_alert=True)
             return
-        
+
         order = db.get_order(order_id)
         if not order:
-            await callback.answer("❌ Order not found", show_alert=True)
+            await callback.answer(get_text(lang, "admin_order_not_found"), show_alert=True)
             return
-        
-        # Get order data
-        if isinstance(order, dict):
-            user_id = order.get("user_id")
-            store_id = order.get("store_id")
-            delivery_address = order.get("delivery_address")
-            order_status = order.get("order_status")
-        else:
-            user_id = getattr(order, "user_id", None)
-            store_id = getattr(order, "store_id", None)
-            delivery_address = getattr(order, "delivery_address", None)
-            order_status = getattr(order, "order_status", None)
-        
-        # Check if already processed
+
+        user_id = _get_order_field(order, "user_id")
+        store_id = _get_order_field(order, "store_id")
+        order_status = _get_order_field(order, "order_status")
+
         if order_status not in ["awaiting_payment", "awaiting_admin_confirmation"]:
-            await callback.answer(f"⚠️ Order already processed (status: {order_status})", show_alert=True)
+            await callback.answer(
+                get_text(lang, "admin_order_already_processed", status=order_status),
+                show_alert=True,
+            )
             return
-        
-        # Update status to pending (approved, waiting for seller)
-        skip_seller_notify = False
+
         order_service = get_unified_order_service()
         if not order_service and callback.bot:
             order_service = init_unified_order_service(db, callback.bot)
         if not order_service:
-            await callback.answer("в?? UnifiedOrderService unavailable", show_alert=True)
+            await callback.answer(get_text(lang, "admin_service_unavailable"), show_alert=True)
             return
 
-        await order_service.confirm_payment(order_id)
-        skip_seller_notify = True
-        
-        # Get store and seller info
+        ok = await order_service.confirm_payment(order_id)
+        if not ok:
+            await callback.answer(get_text(lang, "admin_payment_processing_error"), show_alert=True)
+            return
+
         store = db.get_store(store_id) if hasattr(db, "get_store") and store_id else None
-        if not store:
-            await callback.answer("❌ Store not found", show_alert=True)
-            return
-        
-        if isinstance(store, dict):
-            seller_id = store.get("owner_id") or store.get("user_id")
-            store_name = store.get("name", "")
-        else:
-            seller_id = getattr(store, "owner_id", None) or getattr(store, "user_id", None)
-            store_name = getattr(store, "name", "")
-        
-        if not seller_id:
-            await callback.answer("❌ Seller not found", show_alert=True)
-            return
-        
-        # Get seller language
-        seller_lang = db.get_user_language(seller_id) if hasattr(db, "get_user_language") else "ru"
-        
-        # Get user info
-        user = db.get_user(user_id) if hasattr(db, "get_user") and user_id else None
-        customer_name = ""
-        customer_phone = ""
-        if user:
-            if isinstance(user, dict):
-                customer_name = user.get("first_name", "")
-                customer_phone = user.get("phone", "")
-            else:
-                customer_name = getattr(user, "first_name", "")
-                customer_phone = getattr(user, "phone", "")
-        
-        # Build seller notification
-        if seller_lang == "uz":
-            seller_msg = (
-                f"🔔 <b>YANGI BUYURTMA!</b>\n"
-                f"━━━━━━━━━━━━━━━━━━\n\n"
-                f"📦 #{order_id} | 🚚 Yetkazish\n\n"
-                f"👤 {customer_name or 'Mijoz'}\n"
-            )
-            if customer_phone:
-                seller_msg += f"📱 <code>{customer_phone}</code>\n"
-            if delivery_address:
-                seller_msg += f"📍 {delivery_address}\n"
-            seller_msg += "\n💳 <b>To'lov admin tomonidan tasdiqlangan</b>\n\n"
-            seller_msg += "⏳ <b>Buyurtmani tasdiqlang!</b>"
-            
-            confirm_text = "✅ Qabul qilish"
-            reject_text = "❌ Rad etish"
-        else:
-            seller_msg = (
-                f"🔔 <b>НОВЫЙ ЗАКАЗ!</b>\n"
-                f"━━━━━━━━━━━━━━━━━━\n\n"
-                f"📦 #{order_id} | 🚚 Доставка\n\n"
-                f"👤 {customer_name or 'Клиент'}\n"
-            )
-            if customer_phone:
-                seller_msg += f"📱 <code>{customer_phone}</code>\n"
-            if delivery_address:
-                seller_msg += f"📍 {delivery_address}\n"
-            seller_msg += "\n💳 <b>Оплата подтверждена администратором</b>\n\n"
-            seller_msg += "⏳ <b>Подтвердите заказ!</b>"
-            
-            confirm_text = "✅ Принять"
-            reject_text = "❌ Отклонить"
-        
-        # Build keyboard
-        kb = InlineKeyboardBuilder()
-        kb.button(text=confirm_text, callback_data=f"order_confirm_{order_id}")
-        kb.button(text=reject_text, callback_data=f"order_reject_{order_id}")
-        kb.adjust(2)
-        
-        # Send to seller
-        if callback.bot and not skip_seller_notify:
-            await callback.bot.send_message(
-                chat_id=seller_id,
-                text=seller_msg,
-                parse_mode="HTML",
-                reply_markup=kb.as_markup(),
-            )
-        
-        # Notify customer
-        customer_lang = db.get_user_language(user_id) if hasattr(db, "get_user_language") and user_id else "ru"
-        if customer_lang == "uz":
-            customer_msg = (
-                f"✅ <b>To'lov tasdiqlandi!</b>\n\n"
-                f"📦 Buyurtma #{order_id}\n"
-                f"🏪 {store_name}\n\n"
-                f"Do'kon tasdiqini kuting (5-10 daqiqa)\n"
-                f"✨ Tayyorlanganda xabar beramiz!"
-            )
-        else:
-            customer_msg = (
-                f"✅ <b>Оплата подтверждена!</b>\n\n"
-                f"📦 Заказ #{order_id}\n"
-                f"🏪 {store_name}\n\n"
-                f"Ожидайте подтверждения от заведения (5-10 минут)\n"
-                f"✨ Мы напишем, когда заказ будет готов!"
-            )
-        
+        store_name = esc(str(_get_order_field(store, "name", "")))
+
+        customer_lang = _get_lang(user_id)
+        customer_msg = get_text(
+            customer_lang,
+            "admin_payment_confirmed_customer",
+            order_id=str(order_id),
+            store_name=store_name,
+        )
+
         if callback.bot and user_id:
             await callback.bot.send_message(
                 chat_id=user_id,
                 text=customer_msg,
                 parse_mode="HTML",
             )
-        
-        # Update admin message
-        await callback.message.edit_caption(
-            caption=callback.message.caption + "\n\n✅ <b>ОПЛАТА ПОДТВЕРЖДЕНА</b>\n"
-                    f"👨‍💼 Администратор: {callback.from_user.first_name}",
-            parse_mode="HTML",
+
+        caption = callback.message.caption or ""
+        admin_note = get_text(
+            lang,
+            "admin_payment_confirmed_caption",
+            admin_name=esc(callback.from_user.first_name or ""),
         )
-        await callback.answer("✅ Оплата подтверждена, заказ отправлен продавцу")
-        
-        logger.info(f"Order #{order_id} payment confirmed by admin, sent to seller {seller_id}")
-        
+        try:
+            await callback.message.edit_caption(
+                caption=(caption + "\n\n" + admin_note).strip(),
+                parse_mode="HTML",
+            )
+        except Exception:
+            pass
+
+        await callback.answer(get_text(lang, "admin_payment_confirmed"))
+        logger.info("Order #%s payment confirmed by admin", order_id)
+
     except Exception as e:
-        logger.error(f"Error confirming payment: {e}")
-        await callback.answer("❌ Ошибка подтверждения", show_alert=True)
+        logger.error("Error confirming payment: %s", e)
+        await callback.answer(get_text(lang, "error"), show_alert=True)
 
 
 @router.callback_query(F.data.startswith("admin_reject_payment_"))
 async def admin_reject_payment(callback: types.CallbackQuery) -> None:
-    """Admin rejects payment proof for delivery order.
-    
-    Flow:
-    1. Update order status → rejected
-    2. Notify customer
-    3. Restore offer quantities
-    """
+    """Admin rejects payment proof for delivery order."""
     if not callback.message or not callback.from_user:
         return
-    
+
+    lang = _get_lang(callback.from_user.id)
+
     try:
         order_id = int(callback.data.split("_")[-1])
-        logger.info(f"Admin {callback.from_user.id} rejecting payment for order #{order_id}")
-        
-        # Get order
+    except (ValueError, IndexError):
+        await callback.answer(get_text(lang, "error"), show_alert=True)
+        return
+
+    try:
         if not db or not hasattr(db, "get_order"):
-            await callback.answer("❌ Database error", show_alert=True)
+            await callback.answer(get_text(lang, "admin_db_error"), show_alert=True)
             return
-        
+
         order = db.get_order(order_id)
         if not order:
-            await callback.answer("❌ Order not found", show_alert=True)
+            await callback.answer(get_text(lang, "admin_order_not_found"), show_alert=True)
             return
-        
-        if isinstance(order, dict):
-            user_id = order.get("user_id")
-            order_status = order.get("order_status")
-        else:
-            user_id = getattr(order, "user_id", None)
-            order_status = getattr(order, "order_status", None)
-        
-        # Check if already processed
+
+        user_id = _get_order_field(order, "user_id")
+        order_status = _get_order_field(order, "order_status")
+
         if order_status not in ["awaiting_payment", "awaiting_admin_confirmation"]:
-            await callback.answer(f"⚠️ Order already processed (status: {order_status})", show_alert=True)
+            await callback.answer(
+                get_text(lang, "admin_order_already_processed", status=order_status),
+                show_alert=True,
+            )
             return
-        
-        # Update status to rejected
+
         order_service = get_unified_order_service()
         if not order_service and callback.bot:
             order_service = init_unified_order_service(db, callback.bot)
         if not order_service:
-            await callback.answer("System error", show_alert=True)
+            await callback.answer(get_text(lang, "admin_service_unavailable"), show_alert=True)
             return
 
         await order_service.update_status(
             entity_id=order_id,
             entity_type="order",
             new_status=OrderStatus.REJECTED,
-            notify_customer=False,  # We'll send custom message
+            notify_customer=False,
             reject_reason="payment_rejected_by_admin",
         )
         if hasattr(db, "update_payment_status"):
             db.update_payment_status(order_id, "rejected")
-        
-        # Notify customer
-        customer_lang = db.get_user_language(user_id) if hasattr(db, "get_user_language") and user_id else "ru"
-        if customer_lang == "uz":
-            customer_msg = (
-                f"😔 <b>To'lov tasdiqlanmadi</b>\n\n"
-                f"📦 Buyurtma #{order_id}\n\n"
-                f"To'lov cheki tasdiqlanmadi.\n"
-                f"Iltimos, qo'llab-quvvatlash bilan bog'laning."
-            )
-        else:
-            customer_msg = (
-                f"😔 <b>Оплата не подтверждена</b>\n\n"
-                f"📦 Заказ #{order_id}\n\n"
-                f"К сожалению, платёж не подтверждён.\n"
-                f"Пожалуйста, свяжитесь с поддержкой."
-            )
-        
+
+        customer_lang = _get_lang(user_id)
+        customer_msg = get_text(
+            customer_lang,
+            "admin_payment_rejected_customer",
+            order_id=str(order_id),
+        )
+
         if callback.bot and user_id:
             await callback.bot.send_message(
                 chat_id=user_id,
                 text=customer_msg,
                 parse_mode="HTML",
             )
-        
-        # Update admin message
-        await callback.message.edit_caption(
-            caption=callback.message.caption + "\n\n❌ <b>ОПЛАТА ОТКЛОНЕНА</b>\n"
-                    f"👨‍💼 Администратор: {callback.from_user.first_name}",
-            parse_mode="HTML",
+
+        caption = callback.message.caption or ""
+        admin_note = get_text(
+            lang,
+            "admin_payment_rejected_caption",
+            admin_name=esc(callback.from_user.first_name or ""),
         )
-        await callback.answer("❌ Оплата отклонена, клиент уведомлён")
-        
-        logger.info(f"Order #{order_id} payment rejected by admin")
-        
+        try:
+            await callback.message.edit_caption(
+                caption=(caption + "\n\n" + admin_note).strip(),
+                parse_mode="HTML",
+            )
+        except Exception:
+            pass
+
+        await callback.answer(get_text(lang, "admin_payment_rejected"))
+        logger.info("Order #%s payment rejected by admin", order_id)
+
     except Exception as e:
-        logger.error(f"Error rejecting payment: {e}")
-        await callback.answer("❌ Ошибка отклонения", show_alert=True)
+        logger.error("Error rejecting payment: %s", e)
+        await callback.answer(get_text(lang, "error"), show_alert=True)

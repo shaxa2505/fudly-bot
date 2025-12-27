@@ -23,7 +23,6 @@ class ProgressBar:
             if step == 1:
                 return "? Tayyorlanmoqda ? ? Berildi"
             return "? Tayyor ? ? Berildi"
-        # ru
         if step == 1:
             return "? ????????? ? ? ?????"
         return "? ?????? ? ? ?????"
@@ -44,7 +43,6 @@ class ProgressBar:
             if step == 2:
                 return "? Tayyor ? ? Yo'lda ? ? Yetkazildi"
             return "? Tayyor ? ? Yo'lda ? ? Yetkazildi"
-        # ru
         if step == 1:
             return "? ????????? ? ? ? ???? ? ? ?????????"
         if step == 2:
@@ -63,8 +61,7 @@ class NotificationBuilder:
     """
     Unified notification builder for customer status updates.
 
-    Eliminates template duplication by providing a single interface
-    for both pickup and delivery orders.
+    Provides a single interface for both pickup and delivery orders.
     """
 
     def __init__(self, order_type: Literal["pickup", "delivery"]):
@@ -95,7 +92,6 @@ class NotificationBuilder:
 "
                 f"? Do'kon tasdiqlashini kuting (5?10 daqiqa)"
             )
-        # ru
         entity = "?????" if self.order_type == "pickup" else "?????"
         return (
             f"?? <b>{entity.upper()} ?????????</b>
@@ -156,7 +152,6 @@ class NotificationBuilder:
                 + "
 ? ???????, ????? ????? ???????."
             )
-        # delivery
         if lang == "uz":
             return (
                 f"? <b>Buyurtma tasdiqlandi</b>
@@ -247,7 +242,6 @@ class NotificationBuilder:
 "
                 f"???????!"
             )
-        # delivery
         if lang == "uz":
             return (
                 f"? <b>Yetkazildi</b>
