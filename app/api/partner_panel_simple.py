@@ -1133,7 +1133,6 @@ async def list_orders(authorization: str = Header(None), status: Optional[str] =
 
         # Determine entity type for API - 'booking' for pickup, 'order' for delivery
         entity_type = "booking" if order_type == "pickup" else "order"
-
         result.append(
             {
                 "order_id": order_id,
@@ -1151,6 +1150,12 @@ async def list_orders(authorization: str = Header(None), status: Optional[str] =
                 "order_status": order_status,
                 "payment_status": payment_status,
                 "payment_method": payment_method,
+                "payment_proof_photo_id": payment_proof_photo_id,
+                "payment_proof_url": (
+                    f"{API_BASE_URL}/photo/{payment_proof_photo_id}"
+                    if payment_proof_photo_id
+                    else None
+                ),
                 "pickup_code": pickup_code,
                 "booking_code": pickup_code,
                 "delivery_address": delivery_address,
@@ -1159,6 +1164,7 @@ async def list_orders(authorization: str = Header(None), status: Optional[str] =
                 "customer_phone": customer_phone,
             }
         )
+
 
     # Sort by created_at descending
     result.sort(key=lambda x: x.get("created_at") or "", reverse=True)

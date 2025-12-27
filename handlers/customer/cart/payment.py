@@ -1,7 +1,4 @@
-"""Payment handlers for cart orders (Click and card flows)."""
-from __future__ import annotations
-
-from typing import Any
+﻿from __future__ import annotations
 
 from aiogram import F, Router, types
 from aiogram.filters import BaseFilter
@@ -15,6 +12,7 @@ from app.services.unified_order_service import (
     get_unified_order_service,
 )
 from handlers.common.states import OrderDelivery
+from localization import get_text
 
 from .common import esc
 from . import common
@@ -53,42 +51,34 @@ async def _cart_show_card_payment_details(
 
     if isinstance(payment_card, dict):
         card_number = payment_card.get("card_number", "")
-        card_holder = payment_card.get("card_holder", "—")
+        card_holder = payment_card.get("card_holder", "FUDLY")
     elif isinstance(payment_card, (tuple, list)) and len(payment_card) > 1:
         card_number = payment_card[1]
-        card_holder = payment_card[2] if len(payment_card) > 2 else "—"
+        card_holder = payment_card[2] if len(payment_card) > 2 else "FUDLY"
     else:
         card_number = str(payment_card)
-        card_holder = "—"
+        card_holder = "FUDLY"
 
     total = sum(item["price"] * item["quantity"] for item in cart_items_stored)
     total_with_delivery = total + delivery_price
 
     currency = "so'm" if lang == "uz" else "сум"
 
-    if lang == "uz":
-        text = (
-            f"💳 <b>Kartaga o'tkazing:</b>\n\n"
-            f"💰 Summa: <b>{total_with_delivery:,} {currency}</b>\n"
-            f"💳 Karta: <code>{card_number}</code>\n"
-            f"👤 {card_holder}\n\n"
-            f"📸 <i>Chek skrinshotini yuboring</i>"
-        )
-    else:
-        text = (
-            f"💳 <b>Переведите на карту:</b>\n\n"
-            f"💰 Сумма: <b>{total_with_delivery:,} {currency}</b>\n"
-            f"💳 Карта: <code>{card_number}</code>\n"
-            f"👤 {card_holder}\n\n"
-            f"📸 <i>Отправьте скриншот чека</i>"
-        )
+    lines = [
+        f"<b>{get_text(lang, 'cart_payment_card_title')}</b>",
+        "",
+        f"{get_text(lang, 'cart_payment_amount_label')}: <b>{total_with_delivery:,} {currency}</b>",
+        f"{get_text(lang, 'cart_payment_card_label')}: <code>{card_number}</code>",
+        f"{get_text(lang, 'cart_payment_holder_label')}: {card_holder}",
+        "",
+        f"<i>{get_text(lang, 'cart_payment_receipt_hint')}</i>",
+    ]
+
+    text = "\n".join(lines)
 
     kb = InlineKeyboardBuilder()
-    # Back to payment method selection + full cancel
-    back_text = "⬅️ Orqaga" if lang == "uz" else "⬅️ Назад"
-    cancel_text = "❌ Bekor" if lang == "uz" else "❌ Отмена"
-    kb.button(text=back_text, callback_data="cart_back_to_payment")
-    kb.button(text=cancel_text, callback_data="cart_cancel_payment")
+    kb.button(text=get_text(lang, "cart_delivery_back_button"), callback_data="cart_back_to_payment")
+    kb.button(text=get_text(lang, "cart_payment_cancel_button"), callback_data="cart_cancel_payment")
 
     await message.answer(text, parse_mode="HTML", reply_markup=kb.as_markup())
 
@@ -108,23 +98,13 @@ def register(router: Router) -> None:
         data = await state.get_data()
         cart_items_stored = data.get("cart_items", [])
         store_id = data.get("store_id")
-        delivery_price = data.get("delivery_price", 0)
         address = data.get("address", "")
 
         if not cart_items_stored or not store_id or not address:
-            await callback.answer(
-                "❌ Ошибка" if lang == "ru" else "❌ Xatolik", show_alert=True
-            )
+            await callback.answer(get_text(lang, "cart_payment_data_missing"), show_alert=True)
             return
 
-        # TODO: Click payment not implemented - redirect to card payment
-        # Order will be created after screenshot
-        msg = (
-            "⚠️ Click недоступен. Оплатите картой."
-            if lang == "ru"
-            else "⚠️ Click ishlamayapti. Karta orqali to'lang."
-        )
-        await callback.message.answer(msg)
+        await callback.message.answer(get_text(lang, "cart_payment_click_unavailable"))
 
         await state.update_data(payment_method="card")
         await state.set_state(OrderDelivery.payment_proof)
@@ -147,42 +127,35 @@ def register(router: Router) -> None:
         delivery_price = data.get("delivery_price", 0)
         address = data.get("address", "")
 
-        # Rebuild payment summary card with Click / Card buttons
         if not cart_items_stored or not store_id or not address:
-            await callback.answer(
-                "❌ Ошибка" if lang == "ru" else "❌ Xatolik", show_alert=True
-            )
+            await callback.answer(get_text(lang, "cart_payment_data_missing"), show_alert=True)
             return
 
         currency = "so'm" if lang == "uz" else "сум"
         total = sum(int(item["price"]) * int(item["quantity"]) for item in cart_items_stored)
         total_with_delivery = total + int(delivery_price)
 
-        if lang == "uz":
-            text = (
-                f"💳 <b>To'lov usulini tanlang</b>\n\n"
-                f"💰 Summa: <b>{total_with_delivery:,} {currency}</b>\n"
-                f"📍 Manzil: {address}"
-            )
-        else:
-            text = (
-                f"💳 <b>Выберите способ оплаты</b>\n\n"
-                f"💰 Сумма: <b>{total_with_delivery:,} {currency}</b>\n"
-                f"📍 Адрес: {address}"
-            )
+        text = (
+            f"💳 <b>{get_text(lang, 'cart_payment_select_title')}</b>\n\n"
+            f"{get_text(lang, 'cart_payment_amount_label')}: <b>{total_with_delivery:,} {currency}</b>\n"
+            f"{get_text(lang, 'cart_delivery_address_label')}: {address}"
+        )
 
         kb = InlineKeyboardBuilder()
-        kb.button(text="💳 Click", callback_data=f"cart_pay_click_{store_id}")
         kb.button(
-            text=("💳 Карта" if lang == "ru" else "💳 Karta"),
+            text=get_text(lang, "cart_delivery_payment_click"),
+            callback_data=f"cart_pay_click_{store_id}",
+        )
+        kb.button(
+            text=get_text(lang, "cart_delivery_payment_card"),
             callback_data=f"cart_pay_card_{store_id}",
         )
         kb.button(
-            text="⬅️ Назад" if lang == "ru" else "⬅️ Orqaga",
+            text=get_text(lang, "cart_delivery_back_button"),
             callback_data="cart_back_to_address",
         )
         kb.button(
-            text="❌ Отмена" if lang == "ru" else "❌ Bekor qilish",
+            text=get_text(lang, "cart_payment_cancel_button"),
             callback_data="cart_cancel_payment",
         )
         kb.adjust(2, 2)
@@ -206,17 +179,12 @@ def register(router: Router) -> None:
         data = await state.get_data()
         cart_items_stored = data.get("cart_items", [])
         store_id = data.get("store_id")
-        delivery_price = data.get("delivery_price", 0)
         address = data.get("address", "")
 
         if not cart_items_stored or not store_id or not address:
-            await callback.answer(
-                "❌ Ошибка" if lang == "ru" else "❌ Xatolik", show_alert=True
-            )
+            await callback.answer(get_text(lang, "cart_payment_data_missing"), show_alert=True)
             return
 
-        # DON'T CREATE ORDER YET - wait for payment screenshot
-        # Order will be created in cart_payment_proof after screenshot is received
         await state.update_data(payment_method="card")
         await state.set_state(OrderDelivery.payment_proof)
 
@@ -239,22 +207,13 @@ def register(router: Router) -> None:
         address = data.get("address", "")
 
         if not cart_items_stored or not store_id or not address:
-            msg = (
-                "❌ Ma'lumotlar yo'qoldi" if lang == "uz" else "❌ Данные потеряны"
-            )
-            await message.answer(msg)
+            await message.answer(get_text(lang, "cart_delivery_data_lost"))
             await state.clear()
             return
 
-        # CREATE ORDER NOW (after screenshot received)
         order_service = get_unified_order_service()
         if not order_service:
-            msg = (
-                "❌ Система заказов недоступна"
-                if lang == "ru"
-                else "❌ Buyurtma xizmati mavjud emas"
-            )
-            await message.answer(msg)
+            await message.answer(get_text(lang, "cart_payment_service_unavailable"))
             await state.clear()
             return
 
@@ -281,27 +240,19 @@ def register(router: Router) -> None:
                 order_type="delivery",
                 delivery_address=address,
                 payment_method="card",
-                notify_customer=False,  # We'll notify below
-                notify_sellers=False,   # We'll notify admin below
+                notify_customer=False,
+                notify_sellers=False,
             )
         except Exception as e:
             from logging_config import logger
+
             logger.error(f"Failed to create unified delivery order from cart (after screenshot): {e}")
-            msg = (
-                "❌ Не удалось создать заказ"
-                if lang == "ru"
-                else "❌ Buyurtma yaratib bo'lmadi"
-            )
-            await message.answer(msg)
+            await message.answer(get_text(lang, "cart_payment_order_failed"))
             await state.clear()
             return
 
         if not result.success or not result.order_ids:
-            msg = result.error_message or (
-                "❌ Не удалось создать заказ"
-                if lang == "ru"
-                else "❌ Buyurtma yaratib bo'lmadi"
-            )
+            msg = result.error_message or get_text(lang, "cart_payment_order_failed")
             await message.answer(msg)
             await state.clear()
             return
@@ -309,11 +260,11 @@ def register(router: Router) -> None:
         order_id = result.order_ids[0]
 
         from .storage import cart_storage
+
         cart_storage.clear_cart(user_id)
 
         photo_id = message.photo[-1].file_id
 
-        # Update payment status with photo
         common.db.update_payment_status(order_id, "proof_submitted", photo_id)
 
         await state.clear()
@@ -321,11 +272,11 @@ def register(router: Router) -> None:
         store = common.db.get_store(store_id)
         from handlers.bookings.utils import get_store_field
 
-        store_name = get_store_field(store, "name", "Магазин")
+        store_name = get_store_field(store, "name", get_text(lang, "store_not_found"))
         owner_id = get_store_field(store, "owner_id")
 
         customer = common.db.get_user_model(user_id) if common.db else None
-        customer_phone = customer.phone if customer else "—"
+        customer_phone = customer.phone if customer else ""
 
         total = sum(item["price"] * item["quantity"] for item in cart_items_stored)
         total_with_delivery = total + delivery_price
@@ -336,15 +287,17 @@ def register(router: Router) -> None:
         if ADMIN_ID > 0 and common.bot:
             kb = InlineKeyboardBuilder()
             kb.button(
-                text="✅ Tasdiqlash", callback_data=f"admin_confirm_payment_{order_id}"
+                text=get_text(lang, "admin_confirm_payment_button"),
+                callback_data=f"admin_confirm_payment_{order_id}",
             )
             kb.button(
-                text="❌ Rad etish", callback_data=f"admin_reject_payment_{order_id}"
+                text=get_text(lang, "admin_reject_payment_button"),
+                callback_data=f"admin_reject_payment_{order_id}",
             )
             kb.adjust(2)
 
             items_text = "\n".join(
-                [f"• {item['title']} × {item['quantity']}" for item in cart_items_stored]
+                [f"• {item['title']} x {item['quantity']}" for item in cart_items_stored]
             )
 
             try:
@@ -352,13 +305,13 @@ def register(router: Router) -> None:
                     chat_id=ADMIN_ID,
                     photo=photo_id,
                     caption=(
-                        f"💳 <b>Yangi chek (Savat)!</b>\n\n"
-                        f"📦 #{order_id} | {store_name}\n"
-                        f"🛒 {items_text}\n"
-                        f"💵 {total_with_delivery:,} {currency}\n"
-                        f"📍 {address}\n"
-                        f"👤 {message.from_user.first_name}\n"
-                        f"📱 <code>{customer_phone}</code>"
+                        f"<b>{get_text(lang, 'cart_payment_admin_title')}</b>\n\n"
+                        f"{get_text(lang, 'cart_payment_admin_order')}: #{order_id} | {store_name}\n"
+                        f"{get_text(lang, 'cart_payment_admin_items')}:\n{items_text}\n"
+                        f"{get_text(lang, 'cart_payment_admin_total')}: {total_with_delivery:,} {currency}\n"
+                        f"{get_text(lang, 'cart_payment_admin_address')}: {address}\n"
+                        f"{get_text(lang, 'cart_payment_admin_customer')}: {message.from_user.first_name}\n"
+                        f"{get_text(lang, 'cart_payment_admin_phone')}: <code>{customer_phone}</code>"
                     ),
                     parse_mode="HTML",
                     reply_markup=kb.as_markup(),
@@ -368,7 +321,6 @@ def register(router: Router) -> None:
 
                 logger.error(f"Failed to notify admin: {e}")
 
-        # Build unified customer-facing message using NotificationTemplates
         items_for_template = [
             {
                 "title": item["title"],
@@ -397,13 +349,7 @@ def register(router: Router) -> None:
             awaiting_payment=True,
         )
 
-        # For card payments, explicitly highlight that payment confirmation is pending.
-        if lang == "uz":
-            tail = "\n\n⏳ To'lov tasdiqlanishi kutilmoqda..."
-        else:
-            tail = "\n\n⏳ Ожидаем подтверждения оплаты..."
-
-        confirm_text = customer_msg + tail
+        confirm_text = customer_msg + "\n\n" + get_text(lang, "cart_payment_pending_confirmation")
 
         sent_msg = await message.answer(confirm_text, parse_mode="HTML")
 
@@ -429,9 +375,6 @@ def register(router: Router) -> None:
         user_id = callback.from_user.id
         lang = common.db.get_user_language(user_id) if common.db else "ru"
 
-        msg = (
-            "❌ To'lov bekor qilindi" if lang == "uz" else "❌ Оплата отменена"
-        )
-        await callback.message.answer(msg)
+        await callback.message.answer(get_text(lang, "cart_payment_canceled"))
         await state.clear()
         await callback.answer()

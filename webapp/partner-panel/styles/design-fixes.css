@@ -774,6 +774,52 @@ input.success {
     color: var(--primary);
 }
 
+.meta-chip.sla {
+    background: rgba(37, 99, 235, 0.12);
+    color: #1D4ED8;
+    border: 1px solid rgba(37, 99, 235, 0.25);
+}
+
+.meta-chip.sla.sla-warn {
+    background: rgba(245, 158, 11, 0.14);
+    color: #B45309;
+    border: 1px solid rgba(245, 158, 11, 0.3);
+}
+
+.meta-chip.sla.sla-bad {
+    background: rgba(239, 68, 68, 0.12);
+    color: #B91C1C;
+    border: 1px solid rgba(239, 68, 68, 0.25);
+}
+
+.payment-proof {
+    width: 100%;
+    margin-top: var(--space-2);
+    border-radius: var(--radius-md);
+    border: 1px solid var(--border);
+    max-height: 220px;
+    object-fit: cover;
+}
+
+.call-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    margin-top: var(--space-2);
+    padding: 8px 12px;
+    border-radius: 10px;
+    border: 1px solid var(--border);
+    color: var(--text);
+    font-weight: 600;
+    text-decoration: none;
+    transition: all var(--transition-fast);
+}
+
+.call-btn:hover {
+    border-color: var(--primary);
+    color: var(--primary);
+}
+
 .order-amount {
     font-size: 18px;
     font-weight: 800;
@@ -825,6 +871,10 @@ input.success {
 }
 
 .status-stat-card.ready::before {
+    background: var(--info);
+}
+
+.status-stat-card.delivering::before {
     background: var(--info);
 }
 
