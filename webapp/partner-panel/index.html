@@ -170,6 +170,12 @@
         };
         window.allProducts = window.allProducts || [];
 
+        function syncAllProducts(nextProducts) {
+            const safeProducts = Array.isArray(nextProducts) ? nextProducts : [];
+            window.allProducts = safeProducts;
+            return safeProducts;
+        }
+
         // ============================================
         // PRODUCT MODAL (defined early for use in rendered HTML)
         // ============================================
@@ -740,9 +746,9 @@
                 ]);
 
                 state.store = store;
-                state.orders = orders;
+                state.orders = Array.isArray(orders) ? orders : [];
                 state.products = normalizeProducts(products);
-                window.allProducts = state.products;
+                syncAllProducts(state.products);
 
                 // Connect WebSocket after store info is loaded
                 if (!websocket && store.store_id) {
@@ -1062,7 +1068,8 @@
         async function loadOrders() {
             showLoading();
             try {
-                state.orders = await apiFetch('/api/partner/orders');
+                const orders = await apiFetch('/api/partner/orders');
+                state.orders = Array.isArray(orders) ? orders : [];
                 renderOrders();
                 updateNotificationBadge(); // Update badge with new orders count
             } catch (error) {
@@ -1072,24 +1079,50 @@
 
         function renderOrders() {
             const grouped = groupOrdersByStatus(state.orders);
+            const activeCount = grouped.active.length;
+            const completedCount = grouped.completed.length;
+            const cancelledCount = grouped.cancelled.length;
 
             document.querySelector('.content').innerHTML = `
-                <div class="container">
-                    <h2 class="section-title">Заказы</h2>
-
-                    <div class="tabs">
-                        <button class="tab active" data-status="active" onclick="filterOrderTab('active')">
-                            Активные <span class="badge">${grouped.active.length}</span>
-                        </button>
-                        <button class="tab" data-status="completed" onclick="filterOrderTab('completed')">
-                            Завершенные
-                        </button>
-                        <button class="tab" data-status="cancelled" onclick="filterOrderTab('cancelled')">
-                            Отменённые
-                        </button>
+                <div class="container orders-shell">
+                    <div class="orders-header">
+                        <div>
+                            <h2 class="orders-title">\u0417\u0430\u043a\u0430\u0437\u044b</h2>
+                            <p class="orders-subtitle">\u0423\u043f\u0440\u0430\u0432\u043b\u044f\u0439\u0442\u0435 \u0441\u0442\u0430\u0442\u0443\u0441\u0430\u043c\u0438 \u0438 \u0441\u043a\u043e\u0440\u043e\u0441\u0442\u044c\u044e \u043e\u0431\u0440\u0430\u0431\u043e\u0442\u043a\u0438</p>
+                        </div>
+                        <button class="btn btn-sm btn-outline" onclick="loadOrders()">\u041e\u0431\u043d\u043e\u0432\u0438\u0442\u044c</button>
                     </div>
 
-                    <div id="ordersContainer">
+                    <div class="orders-metrics">
+                        <div class="metric-card">
+                            <div class="metric-label">\u0410\u043a\u0442\u0438\u0432\u043d\u044b\u0435</div>
+                            <div class="metric-value">${activeCount}</div>
+                        </div>
+                        <div class="metric-card">
+                            <div class="metric-label">\u0417\u0430\u0432\u0435\u0440\u0448\u0435\u043d\u044b</div>
+                            <div class="metric-value">${completedCount}</div>
+                        </div>
+                        <div class="metric-card">
+                            <div class="metric-label">\u041e\u0442\u043c\u0435\u043d\u0435\u043d\u044b</div>
+                            <div class="metric-value">${cancelledCount}</div>
+                        </div>
+                    </div>
+
+                    <div class="orders-toolbar">
+                        <div class="tabs">
+                            <button class="tab active" data-status="active" onclick="filterOrderTab('active')">
+                                \u0410\u043a\u0442\u0438\u0432\u043d\u044b\u0435 <span class="badge">${activeCount}</span>
+                            </button>
+                            <button class="tab" data-status="completed" onclick="filterOrderTab('completed')">
+                                \u0417\u0430\u0432\u0435\u0440\u0448\u0435\u043d\u044b <span class="badge">${completedCount}</span>
+                            </button>
+                            <button class="tab" data-status="cancelled" onclick="filterOrderTab('cancelled')">
+                                \u041e\u0442\u043c\u0435\u043d\u0435\u043d\u044b <span class="badge">${cancelledCount}</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    <div id="ordersContainer" class="orders-panel">
                         ${renderOrdersList(grouped.active)}
                     </div>
                 </div>
@@ -1098,11 +1131,13 @@
             if (typeof lucide !== 'undefined') lucide.createIcons();
         }
 
+
         function groupOrdersByStatus(orders) {
+            const list = Array.isArray(orders) ? orders : [];
             return {
-                active: orders.filter(o => ['pending', 'new', 'preparing', 'ready'].includes(o.status)),
-                completed: orders.filter(o => o.status === 'completed'),
-                cancelled: orders.filter(o => o.status === 'cancelled')
+                active: list.filter(o => ['pending', 'new', 'preparing', 'ready'].includes(o.status)),
+                completed: list.filter(o => o.status === 'completed'),
+                cancelled: list.filter(o => o.status === 'cancelled')
             };
         }
 
@@ -1113,37 +1148,37 @@
                         <div class="empty-icon">
                             <i data-lucide="package-x"></i>
                         </div>
-                        <p class="empty-title">??? ???????</p>
-                        <p class="empty-subtitle">???? ??? ????? ???????, ?? ??? ????? ?????? ? ????? ??????</p>
+                        <p class="empty-title">\u041f\u043e\u043a\u0430 \u043d\u0435\u0442 \u0437\u0430\u043a\u0430\u0437\u043e\u0432</p>
+                        <p class="empty-subtitle">\u041d\u043e\u0432\u044b\u0435 \u0437\u0430\u044f\u0432\u043a\u0438 \u043f\u043e\u044f\u0432\u044f\u0442\u0441\u044f \u0437\u0434\u0435\u0441\u044c, \u043a\u043e\u0433\u0434\u0430 \u043a\u043b\u0438\u0435\u043d\u0442 \u043e\u0444\u043e\u0440\u043c\u0438\u0442 \u0437\u0430\u043a\u0430\u0437</p>
                     </div>
                 `;
             }
 
             return `
-                <div class="orders-list compact-grid">
+                <div class="order-list">
                     ${orders.map(order => {
                         const orderId = order.order_id || order.id;
                         const photoUrl = order.offer_photo_url || order.photo_url;
                         const qty = order.quantity || 1;
-                        const typeLabel = order.order_type === 'pickup' ? '?????????' : '????????';
+                        const typeLabel = order.order_type === 'pickup' ? '\u0421\u0430\u043c\u043e\u0432\u044b\u0432\u043e\u0437' : '\u0414\u043e\u0441\u0442\u0430\u0432\u043a\u0430';
                         const statusText = getStatusText(order.status);
                         return `
-                        <div class="order-card compact ripple"
+                        <article class="order-card modern ripple"
                              data-order-id="${orderId}"
                              data-status="${order.status}"
                              onclick="viewOrderDetails(${orderId})">
-                            <div class="order-top">
+                            <div class="order-card-top">
                                 <div class="order-id">#${orderId || '?'}</div>
-                                <div class="order-meta-top">
+                                <div class="order-top-meta">
+                                    <span class="order-status-pill status-${order.status}">${statusText}</span>
                                     <span class="order-time">${formatTime(order.created_at)}</span>
-                                    <span class="order-status status-${order.status}">${statusText}</span>
                                 </div>
                             </div>
 
-                            <div class="order-body">
+                            <div class="order-card-main">
                                 <div class="order-thumb">
                                     ${photoUrl ? `
-                                        <img src="${photoUrl}" alt="${order.offer_title || '?????'}" loading="lazy"
+                                        <img src="${photoUrl}" alt="${order.offer_title || '\u0422\u043e\u0432\u0430\u0440'}" loading="lazy"
                                              onerror="this.closest('.order-thumb').classList.add('fallback'); this.remove();">
                                     ` : `
                                         <div class="order-thumb-fallback">
@@ -1152,43 +1187,44 @@
                                     `}
                                 </div>
 
-                                <div class="order-info">
+                                <div class="order-main-info">
                                     <div class="order-title">
-                                        ${order.offer_title || '?????'}${qty > 1 ? ` ? ${qty} ??` : ''}
+                                        ${order.offer_title || '\u0422\u043e\u0432\u0430\u0440'}${qty > 1 ? ` x ${qty}` : ''}
                                     </div>
-                                    <div class="order-chips">
-                                        <span class="chip chip-quiet">${typeLabel}</span>
-                                        ${order.customer_name ? `<span class="chip chip-quiet">${order.customer_name}</span>` : ''}
-                                        ${order.delivery_address ? `<span class="chip chip-muted">${order.delivery_address}</span>` : ''}
+                                    <div class="order-meta-row">
+                                        <span class="meta-chip">${typeLabel}</span>
+                                        ${order.customer_name ? `<span class="meta-chip">${order.customer_name}</span>` : ''}
+                                        ${order.delivery_address ? `<span class="meta-chip muted">${order.delivery_address}</span>` : ''}
                                     </div>
                                 </div>
 
-                                <div class="order-price">
+                                <div class="order-amount">
                                     ${formatPrice(order.price)}
                                 </div>
                             </div>
 
                             ${order.status === 'pending' || order.status === 'new' ? `
                                 <div class="order-actions" onclick="event.stopPropagation()">
-                                    <button class="pill-btn pill-success" onclick="handleStatusUpdate(${orderId}, 'preparing', this)">???????</button>
-                                    <button class="pill-btn pill-danger" onclick="handleCancelOrder(${orderId}, this)">????????</button>
+                                    <button class="pill-btn pill-success" onclick="handleStatusUpdate(${orderId}, 'preparing', this)">\u041f\u0440\u0438\u043d\u044f\u0442\u044c</button>
+                                    <button class="pill-btn pill-danger" onclick="handleCancelOrder(${orderId}, this)">\u041e\u0442\u043c\u0435\u043d\u0438\u0442\u044c</button>
                                 </div>
                             ` : ''}
                             ${order.status === 'preparing' ? `
                                 <div class="order-actions" onclick="event.stopPropagation()">
-                                    <button class="pill-btn pill-success" onclick="handleStatusUpdate(${orderId}, 'ready', this)">????? ? ??????</button>
+                                    <button class="pill-btn pill-success" onclick="handleStatusUpdate(${orderId}, 'ready', this)">\u0413\u043e\u0442\u043e\u0432\u043e \u043a \u0432\u044b\u0434\u0430\u0447\u0435</button>
                                 </div>
                             ` : ''}
                             ${order.status === 'ready' ? `
                                 <div class="order-actions" onclick="event.stopPropagation()">
-                                    <button class="pill-btn pill-success" onclick="handleStatusUpdate(${orderId}, 'completed', this)">?????</button>
+                                    <button class="pill-btn pill-success" onclick="handleStatusUpdate(${orderId}, 'completed', this)">\u0412\u044b\u0434\u0430\u0442\u044c</button>
                                 </div>
                             ` : ''}
-                        </div>
+                        </article>
                     `}).join('')}
                 </div>
             `;
         }
+
 
         function filterOrderTab(status) {
             document.querySelectorAll('.tab').forEach(tab => {
@@ -1625,7 +1661,7 @@
             try {
                 const products = await apiFetch('/api/partner/products');
                 state.products = normalizeProducts(products);
-                window.allProducts = state.products;
+                syncAllProducts(state.products);
                 renderProducts();
             } catch (error) {
                 toast('Ошибка загрузки товаров', 'error');
@@ -3251,10 +3287,10 @@ async function toggleProductAvailability(id) {
         }
 
         function updateNotificationBadge() {
-            if (!state.orders) return;
+            const orders = Array.isArray(state.orders) ? state.orders : [];
 
             // Count new/pending orders
-            const newOrdersCount = state.orders.filter(o =>
+            const newOrdersCount = orders.filter(o =>
                 o.status === 'pending' || o.status === 'new'
             ).length;
 

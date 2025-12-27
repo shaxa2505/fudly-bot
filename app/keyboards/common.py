@@ -64,8 +64,8 @@ def city_inline_keyboard(lang: str = "ru", allow_cancel: bool = True) -> InlineK
 
     cities = get_cities(lang)
     builder = InlineKeyboardBuilder()
-    for city in cities:
-        builder.button(text=f"\U0001F4CD {city}", callback_data=f"reg_city_{city}")
+    for idx, city in enumerate(cities):
+        builder.button(text=f"\U0001F4CD {city}", callback_data=f"reg_city_{idx}")
     if allow_cancel:
         builder.button(text=get_text(lang, "cancel"), callback_data="reg_cancel")
     builder.adjust(1)

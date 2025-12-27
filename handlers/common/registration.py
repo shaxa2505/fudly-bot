@@ -250,9 +250,19 @@ async def registration_city_callback(
     try:
         raw = callback.data or ""
         parts = raw.split("_", 2)
-        city = parts[2] if len(parts) > 2 else ""
-        if not city:
-            raise ValueError("empty city")
+        idx_raw = parts[2] if len(parts) > 2 else ""
+        if idx_raw == "":
+            raise ValueError("empty city index")
+        cities = get_cities(lang)
+        try:
+            idx = int(idx_raw)
+            if idx < 0 or idx >= len(cities):
+                raise IndexError("city index out of range")
+            city = cities[idx]
+        except ValueError:
+            if idx_raw not in cities:
+                raise ValueError("city not found")
+            city = idx_raw
     except Exception as e:
         logger.error(f"City parse error: {e}")
         await callback.answer(get_text(lang, "error"), show_alert=True)

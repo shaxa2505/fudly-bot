@@ -8,6 +8,32 @@ let viewMode = localStorage.getItem('viewMode') || 'grid'; // 'grid' | 'compact'
 let selectedProducts = new Set();
 let productAnalytics = {}; // Кэш аналитики
 let uxBootstrapped = false;
+window.allProducts = window.allProducts || [];
+
+function getAllProducts() {
+    return Array.isArray(window.allProducts) ? window.allProducts : [];
+}
+
+function getApiBaseSafe() {
+    if (typeof API_BASE !== 'undefined' && API_BASE) return API_BASE;
+    return (
+        window.PARTNER_API_BASE ||
+        document.querySelector('meta[name="api-base"]')?.getAttribute('content') ||
+        window.location.origin
+    );
+}
+
+function buildAuthHeaderSafe() {
+    if (typeof getAuth !== 'function') return '';
+    const auth = getAuth();
+    if (auth?.data) {
+        return `tma ${auth.data}`;
+    }
+    if (auth?.urlUserId && auth?.urlAuthDate && auth?.urlSig) {
+        return `tma uid=${auth.urlUserId}&auth_date=${auth.urlAuthDate}&sig=${auth.urlSig}`;
+    }
+    return '';
+}
 
 // === 1. ИНИЦИАЛИЗАЦИЯ ===
 function initUXImprovements() {
@@ -170,7 +196,7 @@ function makePriceEditable(productId) {
 function startPriceEdit(priceEl) {
     const card = priceEl.closest('.product-card');
     const productId = card.dataset.productId;
-    const product = allProducts.find(p => p.id == productId);
+    const product = getAllProducts().find(p => p.id == productId);
     if (!product) return;
 
     priceEl.classList.add('editing');
@@ -226,21 +252,24 @@ async function updateProductPrice(productId, newPrice) {
     try {
         const formData = new FormData();
         formData.append('price', newPrice.toString());
+        const endpoint = `/api/partner/products/${productId}`;
+        if (typeof apiFetch === 'function') {
+            await apiFetch(endpoint, { method: 'PATCH', body: formData });
+        } else {
+            const authHeader = buildAuthHeaderSafe();
+            const headers = authHeader ? { Authorization: authHeader } : {};
+            const response = await fetch(`${getApiBaseSafe()}${endpoint}`, {
+                method: 'PATCH',
+                headers,
+                body: formData
+            });
 
-        const response = await fetch(`${API}/products/${productId}`, {
-            method: 'PATCH',
-            headers: {
-                'Authorization': getAuth()
-            },
-            body: formData
-        });
-
-        if (!response.ok) {
-            throw new Error('Ошибка обновления цены');
+            if (!response.ok) {
+                throw new Error('?????? ?????????? ????');
+            }
         }
-
-        // Обновляем локальные данные
-        const product = allProducts.find(p => p.id == productId);
+// Обновляем локальные данные
+        const product = getAllProducts().find(p => p.id == productId);
         if (product) {
             product.price = newPrice;
         }
@@ -312,14 +341,15 @@ function initQuickFilters() {
 }
 
 function updateFilterCounts() {
-    if (!allProducts || !allProducts.length) return;
+    const products = getAllProducts();
+    if (!products.length) return;
 
     const counts = {
-        all: allProducts.length,
-        active: allProducts.filter(p => p.is_active).length,
-        inactive: allProducts.filter(p => !p.is_active).length,
-        low_stock: allProducts.filter(p => p.stock_quantity > 0 && p.stock_quantity < 10).length,
-        out_of_stock: allProducts.filter(p => p.stock_quantity === 0).length
+        all: products.length,
+        active: products.filter(p => p.is_active).length,
+        inactive: products.filter(p => !p.is_active).length,
+        low_stock: products.filter(p => p.stock_quantity > 0 && p.stock_quantity < 10).length,
+        out_of_stock: products.filter(p => p.stock_quantity === 0).length
     };
 
     // Обновляем счетчики по ID (для существующих элементов)
@@ -441,7 +471,7 @@ async function bulkDeleteProducts() {
 function calculateProductMetrics() {
     // Рассчитываем метрики для каждого товара
     // В реальном проекте данные приходят с бэкенда
-    allProducts?.forEach(product => {
+    getAllProducts().forEach(product => {
         productAnalytics[product.id] = {
             salesRank: Math.floor(Math.random() * 100), // 1-100
             trend: Math.floor(Math.random() * 50) - 10, // -10 до +40
@@ -454,7 +484,7 @@ function calculateProductMetrics() {
 }
 
 function showProductAnalytics(productId) {
-    const product = allProducts.find(p => p.id == productId);
+    const product = getAllProducts().find(p => p.id == productId);
     const analytics = productAnalytics[productId];
     if (!product || !analytics) return;
 

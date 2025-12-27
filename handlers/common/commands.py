@@ -337,8 +337,8 @@ async def show_city_selection(
         # For inline keyboard, send new message instead of editing with reply keyboard
         cities = get_cities(lang)
         builder = InlineKeyboardBuilder()
-        for city in cities:
-            builder.button(text=city, callback_data=f"select_city:{city}")
+        for idx, city in enumerate(cities):
+            builder.button(text=city, callback_data=f"select_city:{idx}")
         builder.adjust(2)
         await callback.message.edit_text(
             get_text(lang, "choose_city"), reply_markup=builder.as_markup()
@@ -355,9 +355,19 @@ async def handle_city_selection(
         return
 
     lang = db.get_user_language(callback.from_user.id)
-    city = callback.data.split(":", 1)[1] if ":" in callback.data else ""
-
-    if not city:
+    idx_raw = callback.data.split(":", 1)[1] if ":" in callback.data else ""
+    try:
+        cities = get_cities(lang)
+        try:
+            idx = int(idx_raw)
+            if idx < 0 or idx >= len(cities):
+                raise IndexError("city index out of range")
+            city = cities[idx]
+        except ValueError:
+            if idx_raw not in cities:
+                raise ValueError("city not found")
+            city = idx_raw
+    except Exception:
         await callback.answer(get_text(lang, "error"), show_alert=True)
         return
 
