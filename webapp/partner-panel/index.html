@@ -1271,7 +1271,6 @@
         }
 
         async function viewOrderDetails(orderId) {
-(orderId) {
             const order = state.orders.find(o => (o.order_id || o.id) === orderId);
             if (!order) return;
 
