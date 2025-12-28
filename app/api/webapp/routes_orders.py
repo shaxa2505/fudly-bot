@@ -536,7 +536,8 @@ async def get_orders(db=Depends(get_db), user: dict = Depends(get_current_user))
                 )
                 raw_bookings = cursor.fetchall() or []
         except Exception as e:
-            logger.warning(f"Webapp get_orders fallback bookings_archive failed: {e}")
+            # bookings_archive is optional (only exists after v24 migration)
+            logger.debug(f"Webapp get_orders fallback bookings_archive skipped: {e}")
             raw_bookings = []
 
         for b in raw_bookings:
