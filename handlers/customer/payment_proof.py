@@ -361,7 +361,50 @@ async def receive_payment_proof(message: types.Message, state: FSMContext) -> No
                 f"Скоро мы сообщим о подтверждении."
             )
 
-        await message.answer(success_msg, parse_mode="HTML")
+        existing_msg_id = None
+        if isinstance(order, dict):
+            existing_msg_id = order.get("customer_message_id")
+        else:
+            existing_msg_id = getattr(order, "customer_message_id", None)
+
+        edit_success = False
+        if existing_msg_id:
+            try:
+                await message.bot.edit_message_caption(
+                    chat_id=user_id,
+                    message_id=existing_msg_id,
+                    caption=success_msg,
+                    parse_mode="HTML",
+                )
+                edit_success = True
+            except Exception:
+                try:
+                    await message.bot.edit_message_text(
+                        chat_id=user_id,
+                        message_id=existing_msg_id,
+                        text=success_msg,
+                        parse_mode="HTML",
+                    )
+                    edit_success = True
+                except Exception:
+                    pass
+
+        if not edit_success:
+            sent_msg = await message.answer(success_msg, parse_mode="HTML")
+            if sent_msg and db and hasattr(db, "set_order_customer_message_id"):
+                try:
+                    db.set_order_customer_message_id(order_id, sent_msg.message_id)
+                    logger.info(
+                        "Saved customer_message_id=%s for order#%s",
+                        sent_msg.message_id,
+                        order_id,
+                    )
+                except Exception as save_err:  # pragma: no cover - defensive
+                    logger.warning(
+                        "Failed to save customer_message_id for order %s: %s",
+                        order_id,
+                        save_err,
+                    )
         await state.clear()
 
         logger.info(f"Payment proof for order #{order_id} sent to {sent_count} admins")

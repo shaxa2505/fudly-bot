@@ -686,7 +686,7 @@ async def create_webhook_app(
                         payment_method=payment_method,
                         notify_customer=True,
                         notify_sellers=True,
-                        telegram_notify=False,
+                        telegram_notify=True,
                     )
 
                     logger.info(
@@ -827,7 +827,7 @@ async def create_webhook_app(
                         payment_method=payment_method,
                         notify_customer=True,
                         notify_sellers=True,
-                        telegram_notify=False,
+                        telegram_notify=True,
                     )
 
                     if result.success and result.order_ids:

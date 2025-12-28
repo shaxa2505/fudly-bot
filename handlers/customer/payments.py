@@ -414,7 +414,74 @@ async def process_successful_payment(message: types.Message) -> None:
 
         from app.keyboards.user import main_menu_customer
 
-        await message.answer(success_text, parse_mode="HTML", reply_markup=main_menu_customer(lang))
+        existing_msg_id = None
+        entity_type = None
+        if order:
+            entity_type = "order"
+            existing_msg_id = order.get("customer_message_id") if isinstance(order, dict) else None
+        elif booking:
+            entity_type = "booking"
+            existing_msg_id = (
+                booking.get("customer_message_id") if isinstance(booking, dict) else None
+            )
+
+        edit_success = False
+        if existing_msg_id:
+            try:
+                await message.bot.edit_message_caption(
+                    chat_id=user_id,
+                    message_id=existing_msg_id,
+                    caption=success_text,
+                    parse_mode="HTML",
+                )
+                edit_success = True
+            except Exception:
+                try:
+                    await message.bot.edit_message_text(
+                        chat_id=user_id,
+                        message_id=existing_msg_id,
+                        text=success_text,
+                        parse_mode="HTML",
+                    )
+                    edit_success = True
+                except Exception:
+                    pass
+
+        if not edit_success:
+            sent_msg = await message.answer(
+                success_text, parse_mode="HTML", reply_markup=main_menu_customer(lang)
+            )
+            if sent_msg and db:
+                if entity_type == "order" and hasattr(db, "set_order_customer_message_id"):
+                    try:
+                        db.set_order_customer_message_id(order_id, sent_msg.message_id)
+                        logger.info(
+                            "Saved customer_message_id=%s for order#%s",
+                            sent_msg.message_id,
+                            order_id,
+                        )
+                    except Exception as save_err:  # pragma: no cover - defensive
+                        logger.warning(
+                            "Failed to save customer_message_id for order %s: %s",
+                            order_id,
+                            save_err,
+                        )
+                elif entity_type == "booking" and hasattr(
+                    db, "set_booking_customer_message_id"
+                ):
+                    try:
+                        db.set_booking_customer_message_id(order_id, sent_msg.message_id)
+                        logger.info(
+                            "Saved customer_message_id=%s for booking#%s",
+                            sent_msg.message_id,
+                            order_id,
+                        )
+                    except Exception as save_err:  # pragma: no cover - defensive
+                        logger.warning(
+                            "Failed to save customer_message_id for booking %s: %s",
+                            order_id,
+                            save_err,
+                        )
 
         # NOTIFY STORE OWNER - detailed card like card payment
         if owner_id and bot and not skip_seller_notify:

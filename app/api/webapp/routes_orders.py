@@ -199,9 +199,9 @@ async def create_order(
                     order_type="delivery" if is_delivery else "pickup",
                     delivery_address=order.delivery_address if is_delivery else None,
                     payment_method=payment_method,
-                    notify_customer=False,
+                    notify_customer=True,
                     notify_sellers=True,
-                    telegram_notify=False,
+                    telegram_notify=True,
                 )
             except Exception as e:  # pragma: no cover - defensive
                 logger.error(f"Unified order service failed for webapp order: {e}")

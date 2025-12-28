@@ -522,6 +522,99 @@ class NotificationTemplates:
         )
 
     @staticmethod
+    def customer_cart_status_update(
+        lang: str,
+        order_id: int | str,
+        status: str,
+        order_type: str,
+        items: list[dict],
+        currency: str,
+        store_name: str | None = None,
+        store_address: str | None = None,
+        delivery_address: str | None = None,
+        delivery_price: int = 0,
+        pickup_code: str | None = None,
+        courier_phone: str | None = None,
+    ) -> str:
+        """Build cart summary status message for customers."""
+
+        def _esc(val: Any) -> str:
+            return html.escape(str(val)) if val else ""
+
+        normalized_type = "delivery" if order_type == "taxi" else order_type
+        is_delivery = NotificationTemplates._is_delivery(normalized_type)
+        order_type_text = NotificationTemplates._order_type_label(lang, normalized_type)
+
+        status_labels = {
+            "uz": {
+                OrderStatus.PENDING: "⏳ Tasdiq kutilmoqda",
+                OrderStatus.PREPARING: "👩‍🍳 Tayyorlanmoqda",
+                OrderStatus.READY: "✅ Tayyor",
+                OrderStatus.DELIVERING: "🚚 Yo'lda",
+                OrderStatus.COMPLETED: "✅ Yetkazildi",
+                OrderStatus.REJECTED: "❌ Rad etildi",
+                OrderStatus.CANCELLED: "❌ Bekor qilindi",
+            },
+            "ru": {
+                OrderStatus.PENDING: "⏳ Ожидаем подтверждение",
+                OrderStatus.PREPARING: "👩‍🍳 Готовится",
+                OrderStatus.READY: "✅ Готово",
+                OrderStatus.DELIVERING: "🚚 В пути",
+                OrderStatus.COMPLETED: "✅ Доставлено",
+                OrderStatus.REJECTED: "❌ Отклонено",
+                OrderStatus.CANCELLED: "❌ Отменено",
+            },
+        }
+        status_text = status_labels.get(lang, status_labels["ru"]).get(status, status)
+
+        header = (
+            f"🧺 <b>Buyurtma #{order_id}</b>" if lang == "uz" else f"🧺 <b>Корзина #{order_id}</b>"
+        )
+
+        lines: list[str] = [
+            header,
+            f"{order_type_text}",
+            f"Статус: {status_text}" if lang != "uz" else f"Holat: {status_text}",
+        ]
+
+        if store_name:
+            lines.append(f"🏪 {_esc(store_name)}")
+
+        if is_delivery:
+            if delivery_address:
+                lines.append(f"📍 {_esc(delivery_address)}")
+        else:
+            if store_address:
+                lines.append(f"📍 {_esc(store_address)}")
+            if pickup_code:
+                lines.append(
+                    f"🔑 {'Kod' if lang == 'uz' else 'Код'}: <b>{_esc(pickup_code)}</b>"
+                )
+
+        lines.append("")
+        lines.append("🧾 Mahsulotlar:" if lang == "uz" else "🧾 Товары:")
+
+        total = 0
+        for item in items:
+            title = _esc(item.get("title", ""))
+            qty = int(item.get("quantity", 1))
+            price = int(item.get("price", 0))
+            subtotal = price * qty
+            total += subtotal
+            lines.append(f"• {title} × {qty} = {subtotal:,} {currency}")
+
+        if is_delivery and delivery_price:
+            total += int(delivery_price)
+            lines.append(f"🚚 {'Yetkazish' if lang == 'uz' else 'Доставка'}: {int(delivery_price):,} {currency}")
+
+        lines.append(f"💰 {'Jami' if lang == 'uz' else 'Итого'}: <b>{int(total):,} {currency}</b>")
+
+        if courier_phone and status == OrderStatus.DELIVERING:
+            lines.append(f"📞 {'Kuryer' if lang == 'uz' else 'Курьер'}: {_esc(courier_phone)}")
+
+        return "\n".join(lines)
+
+    @staticmethod
     def seller_status_update(
         lang: str,
         order_id: int | str,
@@ -912,8 +1005,34 @@ class UnifiedOrderService:
                                 save_err,
                             )
                 else:
-                    logger.debug(
-                        "Skipped saving customer_message_id for user %s: order_ids=%s booking_ids=%s",
+                    # Cart/legacy multi-order: attach the same message_id to all entities
+                    if order_ids and hasattr(self.db, "set_order_customer_message_id"):
+                        for order_id in order_ids:
+                            try:
+                                self.db.set_order_customer_message_id(
+                                    int(order_id), sent_msg.message_id
+                                )
+                            except Exception as save_err:
+                                logger.warning(
+                                    "Failed to save customer_message_id for order %s: %s",
+                                    order_id,
+                                    save_err,
+                                )
+                    if booking_ids and hasattr(self.db, "set_booking_customer_message_id"):
+                        for booking_id in booking_ids:
+                            try:
+                                self.db.set_booking_customer_message_id(
+                                    int(booking_id), sent_msg.message_id
+                                )
+                            except Exception as save_err:
+                                logger.warning(
+                                    "Failed to save customer_message_id for booking %s: %s",
+                                    booking_id,
+                                    save_err,
+                                )
+                    logger.info(
+                        "Saved shared customer_message_id=%s for user %s: order_ids=%s booking_ids=%s",
+                        sent_msg.message_id,
                         user_id,
                         order_ids,
                         booking_ids,
@@ -1514,6 +1633,10 @@ class UnifiedOrderService:
             # IMPORTANT: orders and bookings may still live in different tables at runtime.
             # Respect entity_type to avoid updating a wrong record on id collision.
             payment_method = None
+            delivery_address = None
+            delivery_price = 0
+            cart_items_json = None
+            is_cart = False
             if entity_type == "booking":
                 if not hasattr(self.db, "get_booking"):
                     logger.warning("DB layer does not support bookings")
@@ -1540,6 +1663,8 @@ class UnifiedOrderService:
                     store_id = entity.get("store_id")
                     pickup_code = entity.get("booking_code") or entity.get("pickup_code")
                     current_status_raw = entity.get("status") or entity.get("order_status")
+                    is_cart = int(entity.get("is_cart_booking") or 0) == 1
+                    cart_items_json = entity.get("cart_items")
                 else:
                     user_id = getattr(entity, "user_id", None)
                     store_id = getattr(entity, "store_id", None)
@@ -1549,6 +1674,8 @@ class UnifiedOrderService:
                     current_status_raw = getattr(entity, "status", None) or getattr(
                         entity, "order_status", None
                     )
+                    is_cart = int(getattr(entity, "is_cart_booking", 0) or 0) == 1
+                    cart_items_json = getattr(entity, "cart_items", None)
 
                 order_type = "pickup"
             else:
@@ -1559,14 +1686,17 @@ class UnifiedOrderService:
                     current_status_raw = entity.get("order_status")
                     order_type = entity.get("order_type")
                     payment_method = entity.get("payment_method")
+                    delivery_address = entity.get("delivery_address")
+                    delivery_price = int(entity.get("delivery_price") or 0)
+                    is_cart = int(entity.get("is_cart_order") or 0) == 1
+                    cart_items_json = entity.get("cart_items")
 
                     # Fallback: if order_type not set, determine from delivery_address
                     if not order_type:
-                        delivery_addr = entity.get("delivery_address")
-                        order_type = "delivery" if delivery_addr else "pickup"
+                        order_type = "delivery" if delivery_address else "pickup"
                         logger.info(
                             f"Order type fallback for #{entity_id}: "
-                            f"delivery_address={delivery_addr}, order_type={order_type}"
+                            f"delivery_address={delivery_address}, order_type={order_type}"
                         )
                     else:
                         logger.info(f"Order type from DB for #{entity_id}: {order_type}")
@@ -1578,10 +1708,12 @@ class UnifiedOrderService:
                     current_status_raw = getattr(entity, "order_status", None)
                     order_type = getattr(entity, "order_type", None)
                     payment_method = getattr(entity, "payment_method", None)
+                    delivery_address = getattr(entity, "delivery_address", None)
+                    delivery_price = int(getattr(entity, "delivery_price", 0) or 0)
+                    is_cart = int(getattr(entity, "is_cart_order", 0) or 0) == 1
+                    cart_items_json = getattr(entity, "cart_items", None)
                     if not order_type:
-                        order_type = (
-                            "delivery" if getattr(entity, "delivery_address", None) else "pickup"
-                        )
+                        order_type = "delivery" if delivery_address else "pickup"
 
             # Normalize statuses and enforce safe transitions/idempotence
             current_status = (
@@ -1776,17 +1908,47 @@ class UnifiedOrderService:
                 store_address = store.get("address", "") if isinstance(store, dict) else ""
 
                 customer_lang = self.db.get_user_language(user_id)
-                msg = NotificationTemplates.customer_status_update(
-                    lang=customer_lang,
-                    order_id=entity_id,
-                    status=target_status,
-                    order_type=order_type,
-                    store_name=store_name,
-                    store_address=store_address,
-                    pickup_code=pickup_code,
-                    reject_reason=reject_reason,
-                    courier_phone=courier_phone,
-                )
+                cart_items = None
+                if is_cart and cart_items_json:
+                    try:
+                        import json
+
+                        cart_items = (
+                            json.loads(cart_items_json)
+                            if isinstance(cart_items_json, str)
+                            else cart_items_json
+                        )
+                    except Exception:
+                        cart_items = None
+
+                if cart_items:
+                    currency = "so'm" if customer_lang == "uz" else "сум"
+                    msg = NotificationTemplates.customer_cart_status_update(
+                        lang=customer_lang,
+                        order_id=entity_id,
+                        status=target_status,
+                        order_type=order_type,
+                        items=cart_items,
+                        currency=currency,
+                        store_name=store_name,
+                        store_address=store_address,
+                        delivery_address=delivery_address,
+                        delivery_price=delivery_price,
+                        pickup_code=pickup_code,
+                        courier_phone=courier_phone,
+                    )
+                else:
+                    msg = NotificationTemplates.customer_status_update(
+                        lang=customer_lang,
+                        order_id=entity_id,
+                        status=target_status,
+                        order_type=order_type,
+                        store_name=store_name,
+                        store_address=store_address,
+                        pickup_code=pickup_code,
+                        reject_reason=reject_reason,
+                        courier_phone=courier_phone,
+                    )
 
                 if should_notify:
 
