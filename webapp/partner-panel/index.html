@@ -1751,6 +1751,18 @@
 
 
 
+
+function normalizeText(value) {
+    if (value == null) return '';
+    const text = String(value).trim();
+    if (!text) return '';
+    const lower = text.toLowerCase();
+    if (lower === 'none' || lower === 'null' || lower === 'nan' || lower === 'non') {
+        return '';
+    }
+    return text;
+}
+
 function getProductStatusInfo(product) {
     const stock = Number(product?.stock ?? 0);
     const status = product?.status;
@@ -1801,6 +1813,7 @@ function formatShortDate(dateString) {
 
 
 
+
 function renderProducts() {
     const totalCount = state.products.length;
     const activeCount = state.products.filter(p => p.is_available && Number(p.stock ?? 0) > 0).length;
@@ -1813,12 +1826,15 @@ function renderProducts() {
     document.querySelector('.content').innerHTML = `
         <div class="container">
             <div class="products-shell">
-                <div class="products-header">
-                    <div>
-                        <h2 class="section-title">\u0422\u043e\u0432\u0430\u0440\u044b (${totalCount})</h2>
-                        <p class="section-subtitle">\u0423\u043f\u0440\u0430\u0432\u043b\u044f\u0439\u0442\u0435 \u0442\u043e\u0432\u0430\u0440\u0430\u043c\u0438 \u0438 \u043e\u0441\u0442\u0430\u0442\u043a\u0430\u043c\u0438.</p>
+                <div class="products-hero">
+                    <div class="products-hero-main">
+                        <div class="products-title-row">
+                            <h2 class="section-title">\u0422\u043e\u0432\u0430\u0440\u044b</h2>
+                            <span class="products-count">${totalCount}</span>
+                        </div>
+                        <p class="section-subtitle">\u041f\u0440\u043e\u0432\u0435\u0440\u044f\u0439\u0442\u0435 \u0430\u0441\u0441\u043e\u0440\u0442\u0438\u043c\u0435\u043d\u0442, \u043e\u0441\u0442\u0430\u0442\u043a\u0438 \u0438 \u0441\u043a\u0438\u0434\u043a\u0438.</p>
                     </div>
-                    <div class="products-actions">
+                    <div class="products-hero-actions">
                         <button class="btn btn-primary" onclick="openProductModal()">
                             <i data-lucide="plus" class="icon-18"></i>
                             \u0414\u043e\u0431\u0430\u0432\u0438\u0442\u044c \u0442\u043e\u0432\u0430\u0440
@@ -1890,47 +1906,44 @@ function renderProducts() {
                         const unitLabel = product.unit || '\u0448\u0442';
                         const categoryLabel = getCategoryLabel(product.category);
                         const expiryLabel = formatShortDate(product.expiry_date);
-                        const descriptionText = product.description || '\u0411\u0435\u0437 \u043e\u043f\u0438\u0441\u0430\u043d\u0438\u044f';
+                        const nameText = normalizeText(product.name) || '\u0422\u043e\u0432\u0430\u0440';
+                        const descriptionText = normalizeText(product.description) || '\u0411\u0435\u0437 \u043e\u043f\u0438\u0441\u0430\u043d\u0438\u044f';
                         const viewsValue = Number.isFinite(product.views) ? product.views : null;
+                        const originalPrice = Number(product.original_price ?? 0);
+                        const currentPrice = Number(product.price ?? 0);
+                        const showOldPrice = originalPrice > 0 && currentPrice > 0 && originalPrice > currentPrice;
 
                         return `
                             <div class="product-card" data-product-id="${product.id}" data-status="${product.status || ''}">
-                                <div class="product-image">
-                                    ${product.photo_url ? `
-                                        <img src="${product.photo_url}" alt="${product.name}" loading="lazy"
-                                             onerror="this.parentElement.innerHTML='<div class=\'product-placeholder\'><i data-lucide=\'image\'></i><span>\u041d\u0435\u0442 \u0444\u043e\u0442\u043e</span></div>'; lucide.createIcons();">
-                                    ` : `
-                                        <div class="product-placeholder">
-                                            <i data-lucide="image"></i>
-                                            <span>\u041d\u0435\u0442 \u0444\u043e\u0442\u043e</span>
+                                <div class="product-media">
+                                    <div class="product-image">
+                                        ${product.photo_url ? `
+                                            <img src="${product.photo_url}" alt="${nameText}" loading="lazy"
+                                                 onerror="this.parentElement.innerHTML='<div class=\'product-placeholder\'><i data-lucide=\'image\'></i><span>\u041d\u0435\u0442 \u0444\u043e\u0442\u043e</span></div>'; lucide.createIcons();">
+                                        ` : `
+                                            <div class="product-placeholder">
+                                                <i data-lucide="image"></i>
+                                                <span>\u041d\u0435\u0442 \u0444\u043e\u0442\u043e</span>
+                                            </div>
+                                        `}
+                                        <div class="product-status-chip tone-${statusInfo.tone}">${statusInfo.label}</div>
+                                        <div class="product-badges">
+                                            ${product.discount > 0 ? `<span class="product-badge badge-discount">-${product.discount}%</span>` : ''}
+                                            ${stockValue > 0 && stockValue < 5 ? `<span class="product-badge badge-warning">\u041c\u0430\u043b\u043e</span>` : ''}
                                         </div>
-                                    `}
-                                    <div class="product-badges">
-                                        ${product.discount > 0 ? `<span class="product-badge badge-discount">-${product.discount}%</span>` : ''}
-                                        ${stockValue > 0 && stockValue < 5 ? `<span class="product-badge badge-warning">\u041c\u0430\u043b\u043e</span>` : ''}
                                     </div>
-                                    <div class="product-status-chip tone-${statusInfo.tone}">${statusInfo.label}</div>
                                 </div>
-                                <div class="product-actions">
-                                    <button class="product-action-btn ripple" onclick="editProduct(${product.id})" title="\u0420\u0435\u0434\u0430\u043a\u0442\u0438\u0440\u043e\u0432\u0430\u0442\u044c">
-                                        <i data-lucide="edit"></i>
-                                    </button>
-                                    <button class="product-action-btn ripple" onclick="toggleProductAvailability(${product.id})" title="${product.is_available ? '\u0421\u043a\u0440\u044b\u0442\u044c' : '\u041f\u043e\u043a\u0430\u0437\u0430\u0442\u044c'}">
-                                        <i data-lucide="${product.is_available ? 'eye-off' : 'eye'}"></i>
-                                    </button>
-                                    <button class="product-action-btn ripple" onclick="deleteProduct(${product.id})" title="\u0423\u0434\u0430\u043b\u0438\u0442\u044c">
-                                        <i data-lucide="trash-2"></i>
-                                    </button>
-                                </div>
-                                <div class="product-body">
+                                <div class="product-content">
                                     <div class="product-title-row">
-                                        <h3 class="product-title">${product.name}</h3>
-                                        <div class="product-price">
-                                            ${product.discount > 0 ? `<div class="product-price-old">${formatPrice(product.original_price)}</div>` : ''}
-                                            <div class="product-price-current">${formatPrice(product.price)}</div>
+                                        <div class="product-title-block">
+                                            <h3 class="product-title">${nameText}</h3>
+                                            <p class="product-description">${descriptionText}</p>
+                                        </div>
+                                        <div class="product-price-block">
+                                            ${showOldPrice ? `<div class="product-price-old">${formatPrice(originalPrice)}</div>` : ''}
+                                            <div class="product-price-current">${formatPrice(currentPrice)}</div>
                                         </div>
                                     </div>
-                                    <p class="product-description">${descriptionText}</p>
                                     <div class="product-meta">
                                         <span class="meta-chip"><i data-lucide="package"></i>${stockValue} ${unitLabel}</span>
                                         <span class="meta-chip"><i data-lucide="tag"></i>${categoryLabel}</span>
@@ -1938,6 +1951,17 @@ function renderProducts() {
                                         ${viewsValue !== null ? `<span class="meta-chip"><i data-lucide="eye"></i>${viewsValue}</span>` : ''}
                                     </div>
                                     <div class="product-footer">
+                                        <div class="product-actions">
+                                            <button class="product-action-btn ripple" onclick="editProduct(${product.id})" title="\u0420\u0435\u0434\u0430\u043a\u0442\u0438\u0440\u043e\u0432\u0430\u0442\u044c">
+                                                <i data-lucide="edit"></i>
+                                            </button>
+                                            <button class="product-action-btn ripple" onclick="toggleProductAvailability(${product.id})" title="${product.is_available ? '\u0421\u043a\u0440\u044b\u0442\u044c' : '\u041f\u043e\u043a\u0430\u0437\u0430\u0442\u044c'}">
+                                                <i data-lucide="${product.is_available ? 'eye-off' : 'eye'}"></i>
+                                            </button>
+                                            <button class="product-action-btn ripple" onclick="deleteProduct(${product.id})" title="\u0423\u0434\u0430\u043b\u0438\u0442\u044c">
+                                                <i data-lucide="trash-2"></i>
+                                            </button>
+                                        </div>
                                         <button class="product-cta" onclick="editProduct(${product.id})">
                                             <i data-lucide="edit"></i>
                                             <span>\u0420\u0435\u0434\u0430\u043a\u0442\u0438\u0440\u043e\u0432\u0430\u0442\u044c</span>
@@ -1961,14 +1985,24 @@ function renderProducts() {
 
     if (typeof lucide !== 'undefined') lucide.createIcons();
 }
-        function searchProducts(query) {
-            const cards = document.querySelectorAll('.product-card');
-            cards.forEach(card => {
-                const title = card.querySelector('.product-title').textContent.toLowerCase();
-                const match = title.includes(query.toLowerCase());
-                card.style.display = match ? '' : 'none';
-            });
+
+function searchProducts(query) {
+    const needle = String(query || '').trim().toLowerCase();
+    const cards = document.querySelectorAll('.product-card');
+    cards.forEach(card => {
+        if (!needle) {
+            card.style.display = '';
+            return;
         }
+        const title = card.querySelector('.product-title')?.textContent || '';
+        const description = card.querySelector('.product-description')?.textContent || '';
+        const meta = Array.from(card.querySelectorAll('.meta-chip'))
+            .map((chip) => chip.textContent || '')
+            .join(' ');
+        const haystack = `${title} ${description} ${meta}`.toLowerCase();
+        card.style.display = haystack.includes(needle) ? '' : 'none';
+    });
+}
 
         // Filter products by category, status, discount
 

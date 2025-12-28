@@ -530,6 +530,7 @@ class NotificationTemplates:
         items: list[dict],
         currency: str,
         is_cart: bool = True,
+        order_ids: list[int] | None = None,
         store_name: str | None = None,
         store_address: str | None = None,
         delivery_address: str | None = None,
@@ -579,6 +580,18 @@ class NotificationTemplates:
             f"{order_type_text}",
             f"Статус: {status_text}" if lang != "uz" else f"Holat: {status_text}",
         ]
+
+        if order_ids:
+            unique_ids = sorted({int(x) for x in order_ids if x})
+            if len(unique_ids) > 1:
+                max_show = 5
+                shown = unique_ids[:max_show]
+                suffix = ""
+                if len(unique_ids) > max_show:
+                    suffix = f" +{len(unique_ids) - max_show}"
+                ids_text = ", ".join([f"#{oid}" for oid in shown]) + suffix
+                label = "Buyurtmalar" if lang == "uz" else "Заказы"
+                lines.append(f"🧾 {label}: {ids_text}")
 
         if store_name:
             lines.append(f"🏪 {_esc(store_name)}")
@@ -1971,8 +1984,29 @@ class UnifiedOrderService:
                         }
                     ]
 
+                group_order_ids = None
+                if entity_type == "order" and existing_message_id and user_id and hasattr(
+                    self.db, "get_user_orders"
+                ):
+                    try:
+                        user_orders = self.db.get_user_orders(int(user_id)) or []
+                        grouped_ids: list[int] = []
+                        for order in user_orders:
+                            if not isinstance(order, dict):
+                                continue
+                            if order.get("customer_message_id") != existing_message_id:
+                                continue
+                            oid = order.get("order_id") or order.get("id")
+                            if oid is not None:
+                                grouped_ids.append(int(oid))
+                        if grouped_ids:
+                            group_order_ids = grouped_ids
+                    except Exception as group_err:
+                        logger.debug(f"Failed to load grouped order ids: {group_err}")
+
                 if cart_items:
                     currency = "so'm" if customer_lang == "uz" else "сум"
+                    is_grouped = bool(group_order_ids and len(group_order_ids) > 1)
                     msg = NotificationTemplates.customer_cart_status_update(
                         lang=customer_lang,
                         order_id=entity_id,
@@ -1980,7 +2014,8 @@ class UnifiedOrderService:
                         order_type=order_type,
                         items=cart_items,
                         currency=currency,
-                        is_cart=is_cart,
+                        is_cart=is_cart or is_grouped,
+                        order_ids=group_order_ids,
                         store_name=store_name,
                         store_address=store_address,
                         delivery_address=delivery_address,
@@ -2073,7 +2108,6 @@ class UnifiedOrderService:
                 allow_telegram_updates = self.telegram_order_notifications or should_edit
 
                 if allow_telegram_updates:
-                    message_sent = None
                     edit_success = False
 
                     if should_edit and existing_message_id:
@@ -2115,34 +2149,10 @@ class UnifiedOrderService:
                                 )
 
                     if not edit_success and self.telegram_order_notifications and should_notify:
-                        # Send new message only if edit failed or no existing message
-                        try:
-                            message_sent = await self.bot.send_message(
-                                user_id, msg, parse_mode="HTML", reply_markup=reply_markup
-                            )
-                            logger.info(f"📤 Sent NEW message for {entity_type}#{entity_id}")
-                            # Save message_id for future edits - ALWAYS save to maintain live update chain
-                            if message_sent:
-                                if entity_type == "order" and hasattr(
-                                    self.db, "set_order_customer_message_id"
-                                ):
-                                    self.db.set_order_customer_message_id(
-                                        entity_id, message_sent.message_id
-                                    )
-                                    logger.info(
-                                        f"💾 Saved message_id={message_sent.message_id} for order#{entity_id}"
-                                    )
-                                elif entity_type == "booking" and hasattr(
-                                    self.db, "set_booking_customer_message_id"
-                                ):
-                                    self.db.set_booking_customer_message_id(
-                                        entity_id, message_sent.message_id
-                                    )
-                                    logger.info(
-                                        f"💾 Saved message_id={message_sent.message_id} for booking#{entity_id}"
-                                    )
-                        except Exception as e:
-                            logger.error(f"Failed to notify customer {user_id}: {e}")
+                        if should_edit and existing_message_id:
+                            logger.warning("Telegram edit failed for {entity_type}#{entity_id}; not sending new message".format(entity_type=entity_type, entity_id=entity_id))
+                        else:
+                            logger.info("Skipping Telegram update for {entity_type}#{entity_id}: no customer_message_id".format(entity_type=entity_type, entity_id=entity_id))
 
 
             # Update seller message in Telegram if it exists (partner bot sync)
