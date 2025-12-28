@@ -510,6 +510,13 @@
         async function apiFetch(endpoint, options = {}) {
             const { data: initData, urlUserId, urlAuthDate, urlSig } = getAuth();
 
+            console.log('🔐 apiFetch auth info:', {
+                hasInitData: !!initData,
+                urlUserId,
+                endpoint,
+                API_BASE
+            });
+
             // Determine authorization header
             let authHeader = '';
             if (initData) {
@@ -520,6 +527,7 @@
                 // Local development fallback ONLY (backend must also be in dev mode)
                 authHeader = `tma uid=${urlUserId}`;
             } else {
+                console.error('❌ Missing authorization data:', { initData, urlUserId });
                 throw new Error('Missing Telegram authorization. Please open this panel from the Telegram bot.');
             }
 
@@ -530,18 +538,25 @@
             }
 
             try {
+                console.log(`📡 Fetching ${endpoint}...`);
                 const response = await fetch(`${API_BASE}${endpoint}`, {
                     ...options,
                     headers
                 });
 
+                console.log(`📡 Response ${endpoint}: ${response.status}`);
+
                 if (!response.ok) {
                     const err = await response.json().catch(() => ({ detail: `HTTP ${response.status}` }));
+                    console.error(`❌ API Error ${endpoint}:`, err);
                     throw new Error(err.detail || `HTTP ${response.status}`);
                 }
 
-                return response.json();
+                const data = await response.json();
+                console.log(`✅ Success ${endpoint}`, data);
+                return data;
             } catch (error) {
+                console.error(`❌ Fetch error ${endpoint}:`, error);
                 throw error;
             }
         }
@@ -2475,7 +2490,9 @@ async function toggleProductAvailability(id) {
             try {
                 // Load fresh store data if needed
                 if (!state.store) {
+                    console.log('🔄 Loading store data...');
                     state.store = await apiFetch('/api/partner/store');
+                    console.log('✅ Store data loaded:', state.store);
                 }
 
                 const deliveryEnabled = Boolean(state.store?.delivery_enabled);
@@ -2619,12 +2636,18 @@ async function toggleProductAvailability(id) {
 
             if (typeof lucide !== 'undefined') lucide.createIcons();
             } catch (error) {
+                console.error('❌ Error loading settings:', error);
                 document.querySelector('.content').innerHTML = `
                     <div class="container">
                         <div class="error-state">
                             <div class="error-icon">🚨</div>
-                            <p class="error-title">Ошибка загрузки</p>
-                            <p class="error-text">Не удалось загрузить настройки</p>
+                            <p class="error-title">Ошибка загрузки настроек</p>
+                            <p class="error-text">${error.message || 'Не удалось загрузить настройки'}</p>
+                            <div class="error-details">
+                                <p style="font-size: 12px; color: #666; margin-top: 8px;">
+                                    ${error.stack ? error.stack.split('\n')[0] : ''}
+                                </p>
+                            </div>
                             <button class="btn btn-primary error-action ripple" onclick="loadSettings()">
                                 Повторить
                             </button>
