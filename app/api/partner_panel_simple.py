@@ -30,7 +30,11 @@ from slowapi.util import get_remote_address
 
 from app.api.websocket_manager import get_connection_manager
 from app.services.stats import PartnerTotals, Period, get_partner_stats
-from app.services.unified_order_service import PaymentStatus, get_unified_order_service
+from app.services.unified_order_service import (
+    OrderStatus,
+    PaymentStatus,
+    get_unified_order_service,
+)
 from database_protocol import DatabaseProtocol
 
 router = APIRouter(tags=["partner-panel"])
@@ -1045,7 +1049,7 @@ async def list_orders(authorization: str = Header(None), status: Optional[str] =
             offer_id = order.get("offer_id")
             user_id = order.get("user_id")
             order_status = order.get("order_status") or order.get("status")
-            order_type = order.get("order_type", "delivery")
+            order_type = order.get("order_type") or ("delivery" if order.get("delivery_address") else "pickup")
             quantity = order.get("quantity", 1)
             total_price = order.get("total_price", 0)
             delivery_address = order.get("delivery_address")
@@ -1198,8 +1202,12 @@ async def confirm_order(
     if order_store_id != store["store_id"]:
         raise HTTPException(status_code=403, detail="Not your order")
 
-    # Use unified service to update status with notifications
-    await unified_service.confirm_order(order_id, "order")
+    # Use unified service if available; fall back to direct status update.
+    if unified_service:
+        await unified_service.confirm_order(order_id, "order")
+    else:
+        if hasattr(db, "update_order_status"):
+            db.update_order_status(order_id, OrderStatus.PREPARING)
 
     # Return type based on order_type for frontend
     db_order_type = (
@@ -1241,14 +1249,27 @@ async def update_order_status(
         raise HTTPException(status_code=403, detail="Not your order")
 
     # Use unified service based on status
-    if status == "ready":
-        ok = await unified_service.mark_ready(order_id, "order")
-    elif status == "delivering":
-        ok = await unified_service.start_delivery(order_id)
-    elif status == "completed":
-        ok = await unified_service.complete_order(order_id, "order")
+    if unified_service:
+        if status == "ready":
+            ok = await unified_service.mark_ready(order_id, "order")
+        elif status == "delivering":
+            ok = await unified_service.start_delivery(order_id)
+        elif status == "completed":
+            ok = await unified_service.complete_order(order_id, "order")
+        else:
+            raise HTTPException(status_code=400, detail="Unsupported status transition")
     else:
-        raise HTTPException(status_code=400, detail="Unsupported status transition")
+        if not hasattr(db, "update_order_status"):
+            raise HTTPException(status_code=500, detail="Order service unavailable")
+        if status == "ready":
+            db.update_order_status(order_id, OrderStatus.READY)
+        elif status == "delivering":
+            db.update_order_status(order_id, OrderStatus.DELIVERING)
+        elif status == "completed":
+            db.update_order_status(order_id, OrderStatus.COMPLETED)
+        else:
+            raise HTTPException(status_code=400, detail="Unsupported status transition")
+        ok = True
 
     if not ok:
         raise HTTPException(status_code=400, detail="Status transition not allowed")
