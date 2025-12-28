@@ -1084,7 +1084,20 @@
                 renderOrders();
                 updateNotificationBadge(); // Update badge with new orders count
             } catch (error) {
-                toast('\u041e\u0448\u0438\u0431\u043a\u0430 \u0441\u043e\u0445\u0440\u0430\u043d\u0435\u043d\u0438\u044f \u043d\u0430\u0441\u0442\u0440\u043e\u0435\u043a', 'error');
+                console.error('Orders load error:', error);
+                const message = error?.message || '\u041d\u0435 \u0443\u0434\u0430\u043b\u043e\u0441\u044c \u0437\u0430\u0433\u0440\u0443\u0437\u0438\u0442\u044c \u0437\u0430\u043a\u0430\u0437\u044b';
+                document.querySelector('.content').innerHTML = `
+                    <div class="container empty-state">
+                        <div class="empty-icon">
+                            <i data-lucide="alert-triangle" class="icon-muted"></i>
+                        </div>
+                        <p class="empty-title">\u0417\u0430\u043a\u0430\u0437\u044b \u0432\u0440\u0435\u043c\u0435\u043d\u043d\u043e \u043d\u0435\u0434\u043e\u0441\u0442\u0443\u043f\u043d\u044b</p>
+                        <p class="empty-subtitle">${message}</p>
+                        <button class="btn btn-primary" onclick="loadOrders()">\u041f\u043e\u0432\u0442\u043e\u0440\u0438\u0442\u044c</button>
+                    </div>
+                `;
+                if (typeof lucide !== 'undefined') lucide.createIcons();
+                toast('\u041e\u0448\u0438\u0431\u043a\u0430 \u0437\u0430\u0433\u0440\u0443\u0437\u043a\u0438 \u0437\u0430\u043a\u0430\u0437\u043e\u0432', 'error', { description: message });
             }
         }
 
@@ -3295,12 +3308,18 @@ async function toggleProductAvailability(id) {
             if (auth.userId && auth.userId !== 'none') {
                 params.set('user_id', auth.userId);
             }
+            // Send full init_data for authentication
             if (auth.data) {
                 params.set('init_data', auth.data);
             }
             const wsUrl = `${API_BASE.replace(/^http/, 'ws')}/ws/notifications?${params.toString()}`;
 
             console.log(`🔌 Connecting to WebSocket for store ${storeId}`);
+            console.log(`🔐 WebSocket auth:`, { 
+                hasInitData: !!auth.data, 
+                userId: auth.userId,
+                storeId 
+            });
 
             try {
                 websocket = new WebSocket(wsUrl);
@@ -3326,6 +3345,15 @@ async function toggleProductAvailability(id) {
                     try {
                         const data = JSON.parse(event.data);
                         console.log('📥 WebSocket message:', data);
+
+                        // Handle authentication errors gracefully
+                        if (data.type === 'error') {
+                            if (data.message === 'Authentication required' || data.message === 'Access denied') {
+                                console.warn('⚠️ WebSocket authentication failed (will use polling instead)');
+                                disconnectWebSocket(); // Stop reconnecting
+                                return;
+                            }
+                        }
 
                         if (data.type === 'notification' && data.payload?.data) {
                             const payload = data.payload.data;
@@ -3355,15 +3383,21 @@ async function toggleProductAvailability(id) {
                     console.error('❌ WebSocket error:', error);
                 };
 
-                websocket.onclose = () => {
-                    console.log('🔌 WebSocket disconnected');
+                websocket.onclose = (event) => {
+                    console.log('🔌 WebSocket disconnected', { code: event.code, reason: event.reason });
                     websocket = null;
                     if (wsPingInterval) {
                         clearInterval(wsPingInterval);
                         wsPingInterval = null;
                     }
 
-                    // Reconnect after 5 seconds
+                    // Don't reconnect if authentication failed (code 1008 = policy violation)
+                    if (event.code === 1008 || event.reason?.includes('Authentication')) {
+                        console.warn('⚠️ WebSocket closed due to auth error - not reconnecting');
+                        return;
+                    }
+
+                    // Reconnect after 5 seconds for other errors
                     wsReconnectTimeout = setTimeout(() => {
                         console.log('🔄 Reconnecting WebSocket...');
                         connectWebSocket();

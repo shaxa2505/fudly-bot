@@ -24,8 +24,8 @@ class ProgressBar:
                 return "Tayyorlanmoqda -> Berildi"
             return "Tayyor -> Berildi"
         if step == 1:
-            return "????????? -> ??????"
-        return "?????? -> ??????"
+            return "Готовится -> Выдано"
+        return "Готово -> Выдано"
 
     @staticmethod
     def delivery(step: int, lang: str) -> str:
@@ -44,17 +44,17 @@ class ProgressBar:
                 return "Tayyor -> Yo'lda -> Yetkazildi"
             return "Tayyor -> Yo'lda -> Yetkazildi"
         if step == 1:
-            return "????????? -> ? ???? -> ??????????"
+            return "Готовится -> В пути -> Доставлено"
         if step == 2:
-            return "?????? -> ? ???? -> ??????????"
-        return "?????? -> ? ???? -> ??????????"
+            return "Готово -> В пути -> Доставлено"
+        return "Готово -> В пути -> Доставлено"
 
     @staticmethod
     def delivery_labels(lang: str) -> str:
         """Labels for delivery progress bar."""
         if lang == "uz":
             return "Tayyorlanmoqda -> Yo'lda -> Yetkazildi"
-        return "????????? -> ? ???? -> ??????????"
+        return "Готовится -> В пути -> Доставлено"
 
 
 class NotificationBuilder:
@@ -87,12 +87,12 @@ class NotificationBuilder:
                 f"{self._esc(store_name)}\n\n"
                 f"Do'kon tasdiqlashini kuting (5-10 daqiqa)"
             )
-        header = "????? ??????????" if self.order_type == "pickup" else "????? ?????????"
+        header = "БРОНЬ ОТПРАВЛЕНА" if self.order_type == "pickup" else "ЗАКАЗ ДОСТАВЛЕН"
         return (
             f"{header}\n\n"
             f"#{order_id}\n"
             f"{self._esc(store_name)}\n\n"
-            f"???????? ????????????? ???????? (5-10 ???)"
+            f"???БРОНЬ ОТПРАВЛЕНА??? Бронь??? (5-10 ???)"
         )
 
     def build_preparing(
@@ -116,13 +116,13 @@ class NotificationBuilder:
                     + "\nTayyor bo'lganda xabar beramiz."
                 )
             return (
-                "????? ????????????\n\n"
+                "БРОНЬ ОТПРАВЛЕНА??\n\n"
                 f"{ProgressBar.pickup(1, lang)}\n\n"
                 f"#{order_id}\n"
                 f"{self._esc(store_name)}\n"
                 + (f"{self._esc(store_address)}\n" if store_address else "")
                 + (f"???: {pickup_code}\n" if pickup_code else "")
-                + "\n???????, ????? ????? ??????."
+                + "\nСообщим, когда будет готово."
             )
         if lang == "uz":
             return (
@@ -133,11 +133,11 @@ class NotificationBuilder:
                 "Tayyorlanmoqda"
             )
         return (
-            "????? ???????????\n\n"
+            "БРОНЬ ОТПРАВЛЕНА?\n\n"
             f"{ProgressBar.delivery(1, lang)}\n"
             f"{ProgressBar.delivery_labels(lang)}\n\n"
             f"#{order_id} - {self._esc(store_name)}\n"
-            "?????????"
+            "отклонена"
         )
 
     def build_delivering(self, lang: str, order_id: int, courier_phone: str | None = None) -> str:
@@ -152,13 +152,13 @@ class NotificationBuilder:
                 "Taxminan 30-60 daqiqa"
                 + courier_text
             )
-        courier_text = f"\n??????: {self._esc(courier_phone)}" if courier_phone else ""
+        courier_text = f"\nКурьер: {self._esc(courier_phone)}" if courier_phone else ""
         return (
-            "????? ? ????\n\n"
+            "ЗАКАЗ В ПУТИ\n\n"
             f"{ProgressBar.delivery(2, lang)}\n"
             f"{ProgressBar.delivery_labels(lang)}\n\n"
             f"#{order_id}\n"
-            "???????? 30-60 ???"
+            "Примерно 30-60 мин"
             + courier_text
         )
 
@@ -173,10 +173,10 @@ class NotificationBuilder:
                     "Rahmat!"
                 )
             return (
-                "????? ??????\n\n"
+                "БРОНЬ ВЫДАНА\n\n"
                 f"{ProgressBar.pickup(2, lang)}\n\n"
                 f"#{order_id} - {self._esc(store_name)}\n\n"
-                "???????!"
+                "Спасибо!"
             )
         if lang == "uz":
             return (
@@ -186,10 +186,10 @@ class NotificationBuilder:
                 "Rahmat!"
             )
         return (
-            "????? ?????????\n\n"
+            "ЗАКАЗ ДОСТАВЛЕН\n\n"
             f"{ProgressBar.delivery(3, lang)}\n\n"
             f"#{order_id} - {self._esc(store_name)}\n\n"
-            "???????!"
+            "Спасибо!"
         )
 
     def build_rejected(self, lang: str, order_id: int, reason: str | None = None) -> str:
@@ -202,12 +202,12 @@ class NotificationBuilder:
                 f"#{order_id}\n"
                 + (f"Sabab: {reason_text}\n" if reason_text else "")
             )
-        entity = "?????" if self.order_type == "pickup" else "?????"
-        verb = "?????????" if self.order_type == "pickup" else "????????"
+        entity = "Бронь" if self.order_type == "pickup" else "Бронь"
+        verb = "отклонена" if self.order_type == "pickup" else "Бронь???"
         return (
             f"{entity} {verb}\n\n"
             f"#{order_id}\n"
-            + (f"???????: {reason_text}\n" if reason_text else "")
+            + (f"?Курьер: {reason_text}\n" if reason_text else "")
         )
 
     def build_cancelled(self, lang: str, order_id: int) -> str:
@@ -215,8 +215,8 @@ class NotificationBuilder:
         if lang == "uz":
             entity = "Bron" if self.order_type == "pickup" else "Buyurtma"
             return f"{entity} bekor qilindi\n#{order_id}"
-        entity = "?????" if self.order_type == "pickup" else "?????"
-        verb = "????????" if self.order_type == "pickup" else "???????"
+        entity = "Бронь" if self.order_type == "pickup" else "Бронь"
+        verb = "Бронь???" if self.order_type == "pickup" else "Бронь??"
         return f"{entity} {verb}\n#{order_id}"
 
     def build(
