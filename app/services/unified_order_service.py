@@ -529,11 +529,13 @@ class NotificationTemplates:
         order_type: str,
         items: list[dict],
         currency: str,
+        is_cart: bool = True,
         store_name: str | None = None,
         store_address: str | None = None,
         delivery_address: str | None = None,
         delivery_price: int = 0,
         pickup_code: str | None = None,
+        reject_reason: str | None = None,
         courier_phone: str | None = None,
     ) -> str:
         """Build cart summary status message for customers."""
@@ -567,9 +569,10 @@ class NotificationTemplates:
         }
         status_text = status_labels.get(lang, status_labels["ru"]).get(status, status)
 
-        header = (
-            f"🧺 <b>Buyurtma #{order_id}</b>" if lang == "uz" else f"🧺 <b>Корзина #{order_id}</b>"
-        )
+        header_label = "Buyurtma" if lang == "uz" else "Заказ"
+        if is_cart:
+            header_label = "Buyurtma" if lang == "uz" else "Корзина"
+        header = f"🧺 <b>{header_label} #{order_id}</b>"
 
         lines: list[str] = [
             header,
@@ -611,6 +614,11 @@ class NotificationTemplates:
 
         if courier_phone and status == OrderStatus.DELIVERING:
             lines.append(f"📞 {'Kuryer' if lang == 'uz' else 'Курьер'}: {_esc(courier_phone)}")
+
+        if reject_reason and status in (OrderStatus.REJECTED, OrderStatus.CANCELLED):
+            lines.append(
+                f"📝 {'Sabab' if lang == 'uz' else 'Причина'}: {_esc(reject_reason)}"
+            )
 
         return "\n".join(lines)
 
@@ -1637,6 +1645,9 @@ class UnifiedOrderService:
             delivery_price = 0
             cart_items_json = None
             is_cart = False
+            offer_id = None
+            quantity = 1
+            total_price = None
             if entity_type == "booking":
                 if not hasattr(self.db, "get_booking"):
                     logger.warning("DB layer does not support bookings")
@@ -1665,6 +1676,8 @@ class UnifiedOrderService:
                     current_status_raw = entity.get("status") or entity.get("order_status")
                     is_cart = int(entity.get("is_cart_booking") or 0) == 1
                     cart_items_json = entity.get("cart_items")
+                    offer_id = entity.get("offer_id")
+                    quantity = int(entity.get("quantity") or 1)
                 else:
                     user_id = getattr(entity, "user_id", None)
                     store_id = getattr(entity, "store_id", None)
@@ -1676,6 +1689,8 @@ class UnifiedOrderService:
                     )
                     is_cart = int(getattr(entity, "is_cart_booking", 0) or 0) == 1
                     cart_items_json = getattr(entity, "cart_items", None)
+                    offer_id = getattr(entity, "offer_id", None)
+                    quantity = int(getattr(entity, "quantity", 1) or 1)
 
                 order_type = "pickup"
             else:
@@ -1690,6 +1705,9 @@ class UnifiedOrderService:
                     delivery_price = int(entity.get("delivery_price") or 0)
                     is_cart = int(entity.get("is_cart_order") or 0) == 1
                     cart_items_json = entity.get("cart_items")
+                    offer_id = entity.get("offer_id")
+                    quantity = int(entity.get("quantity") or 1)
+                    total_price = entity.get("total_price")
 
                     # Fallback: if order_type not set, determine from delivery_address
                     if not order_type:
@@ -1712,6 +1730,9 @@ class UnifiedOrderService:
                     delivery_price = int(getattr(entity, "delivery_price", 0) or 0)
                     is_cart = int(getattr(entity, "is_cart_order", 0) or 0) == 1
                     cart_items_json = getattr(entity, "cart_items", None)
+                    offer_id = getattr(entity, "offer_id", None)
+                    quantity = int(getattr(entity, "quantity", 1) or 1)
+                    total_price = getattr(entity, "total_price", None)
                     if not order_type:
                         order_type = "delivery" if delivery_address else "pickup"
 
@@ -1921,6 +1942,35 @@ class UnifiedOrderService:
                     except Exception:
                         cart_items = None
 
+                if not cart_items and offer_id:
+                    item_title = ""
+                    item_price = None
+                    if hasattr(self.db, "get_offer"):
+                        offer = self.db.get_offer(int(offer_id))
+                        if isinstance(offer, dict):
+                            item_title = offer.get("title", "")
+                            item_price = offer.get("discount_price", None)
+                        else:
+                            item_title = getattr(offer, "title", "") if offer else ""
+                            item_price = getattr(offer, "discount_price", None) if offer else None
+
+                    if not item_title:
+                        item_title = "Mahsulot" if customer_lang == "uz" else "Товар"
+
+                    if item_price is None and total_price is not None and quantity:
+                        try:
+                            item_price = int((float(total_price) - float(delivery_price)) / quantity)
+                        except Exception:
+                            item_price = 0
+
+                    cart_items = [
+                        {
+                            "title": item_title,
+                            "quantity": int(quantity or 1),
+                            "price": int(item_price or 0),
+                        }
+                    ]
+
                 if cart_items:
                     currency = "so'm" if customer_lang == "uz" else "сум"
                     msg = NotificationTemplates.customer_cart_status_update(
@@ -1930,11 +1980,13 @@ class UnifiedOrderService:
                         order_type=order_type,
                         items=cart_items,
                         currency=currency,
+                        is_cart=is_cart,
                         store_name=store_name,
                         store_address=store_address,
                         delivery_address=delivery_address,
                         delivery_price=delivery_price,
                         pickup_code=pickup_code,
+                        reject_reason=reject_reason,
                         courier_phone=courier_phone,
                     )
                 else:
@@ -2091,6 +2143,209 @@ class UnifiedOrderService:
                                     )
                         except Exception as e:
                             logger.error(f"Failed to notify customer {user_id}: {e}")
+
+
+            # Update seller message in Telegram if it exists (partner bot sync)
+            if entity_type == "order":
+                try:
+                    seller_message_id = (
+                        entity.get("seller_message_id")
+                        if isinstance(entity, dict)
+                        else getattr(entity, "seller_message_id", None)
+                    )
+                    if seller_message_id and store_id:
+                        store = self.db.get_store(store_id) if store_id else None
+                        owner_id = store.get("owner_id") if isinstance(store, dict) else None
+                        if owner_id:
+                            seller_lang = self.db.get_user_language(owner_id)
+                            currency = "so'm" if seller_lang == "uz" else "sum"
+
+                            customer_name = None
+                            customer_phone = None
+                            if user_id:
+                                customer = (
+                                    self.db.get_user_model(user_id)
+                                    if hasattr(self.db, "get_user_model")
+                                    else self.db.get_user(user_id)
+                                    if hasattr(self.db, "get_user")
+                                    else None
+                                )
+                                if isinstance(customer, dict):
+                                    customer_name = customer.get("first_name") or customer.get("name")
+                                    customer_phone = customer.get("phone")
+                                else:
+                                    customer_name = getattr(customer, "first_name", None) if customer else None
+                                    customer_phone = getattr(customer, "phone", None) if customer else None
+
+                            resolved_order_type = order_type or (
+                                "delivery" if delivery_address else "pickup"
+                            )
+
+                            items: list[dict] = []
+                            total = 0
+
+                            cart_items_json = (
+                                entity.get("cart_items")
+                                if isinstance(entity, dict)
+                                else getattr(entity, "cart_items", None)
+                            )
+                            if cart_items_json:
+                                try:
+                                    import json
+
+                                    cart_items = (
+                                        json.loads(cart_items_json)
+                                        if isinstance(cart_items_json, str)
+                                        else cart_items_json
+                                    )
+                                    for item in cart_items or []:
+                                        qty = int(item.get("quantity", 1))
+                                        price = int(item.get("price", 0))
+                                        title = item.get("title", "")
+                                        items.append(
+                                            {"title": title, "quantity": qty, "price": price}
+                                        )
+                                        total += price * qty
+                                except Exception:
+                                    pass
+                            else:
+                                offer_id = (
+                                    entity.get("offer_id")
+                                    if isinstance(entity, dict)
+                                    else getattr(entity, "offer_id", None)
+                                )
+                                quantity = (
+                                    entity.get("quantity", 1)
+                                    if isinstance(entity, dict)
+                                    else getattr(entity, "quantity", 1)
+                                )
+                                if offer_id:
+                                    offer = (
+                                        self.db.get_offer(offer_id)
+                                        if hasattr(self.db, "get_offer")
+                                        else None
+                                    )
+                                    title = offer.get("title", "") if isinstance(offer, dict) else ""
+                                    price = (
+                                        offer.get("discount_price", 0) if isinstance(offer, dict) else 0
+                                    )
+                                    items.append(
+                                        {
+                                            "title": title,
+                                            "quantity": int(quantity or 1),
+                                            "price": int(price or 0),
+                                        }
+                                    )
+                                    total = int(price or 0) * int(quantity or 1)
+
+                            delivery_price = 0
+                            if resolved_order_type in ("delivery", "taxi"):
+                                raw_delivery = (
+                                    entity.get("delivery_price")
+                                    if isinstance(entity, dict)
+                                    else getattr(entity, "delivery_price", None)
+                                )
+                                if raw_delivery is None and isinstance(store, dict):
+                                    raw_delivery = store.get("delivery_price", 0)
+                                try:
+                                    delivery_price = int(raw_delivery or 0)
+                                except Exception:
+                                    delivery_price = 0
+
+                            seller_text = NotificationTemplates.seller_status_update(
+                                lang=seller_lang,
+                                order_id=entity_id,
+                                status=target_status,
+                                order_type=resolved_order_type,
+                                items=items or None,
+                                customer_name=customer_name,
+                                customer_phone=customer_phone,
+                                delivery_address=delivery_address,
+                                total=total,
+                                delivery_price=delivery_price,
+                                currency=currency,
+                            )
+
+                            kb = InlineKeyboardBuilder()
+                            if resolved_order_type in ("delivery", "taxi"):
+                                if target_status in (OrderStatus.PENDING, OrderStatus.PREPARING):
+                                    if seller_lang == "uz":
+                                        kb.button(
+                                            text="Topshirishga tayyor",
+                                            callback_data=f"order_ready_{entity_id}",
+                                        )
+                                    else:
+                                        kb.button(
+                                            text="Gotov k peredache",
+                                            callback_data=f"order_ready_{entity_id}",
+                                        )
+                                elif target_status == OrderStatus.READY:
+                                    if seller_lang == "uz":
+                                        kb.button(
+                                            text="Kuryerga topshirdim",
+                                            callback_data=f"order_delivering_{entity_id}",
+                                        )
+                                    else:
+                                        kb.button(
+                                            text="Peredal kureru",
+                                            callback_data=f"order_delivering_{entity_id}",
+                                        )
+                                elif target_status == OrderStatus.DELIVERING:
+                                    if seller_lang == "uz":
+                                        kb.button(
+                                            text="Topshirildi",
+                                            callback_data=f"order_complete_{entity_id}",
+                                        )
+                                    else:
+                                        kb.button(
+                                            text="Vydano",
+                                            callback_data=f"order_complete_{entity_id}",
+                                        )
+                            else:
+                                if target_status in (
+                                    OrderStatus.PENDING,
+                                    OrderStatus.PREPARING,
+                                    OrderStatus.READY,
+                                    OrderStatus.DELIVERING,
+                                ):
+                                    if seller_lang == "uz":
+                                        kb.button(
+                                            text="Topshirildi",
+                                            callback_data=f"order_complete_{entity_id}",
+                                        )
+                                    else:
+                                        kb.button(
+                                            text="Vydano",
+                                            callback_data=f"order_complete_{entity_id}",
+                                        )
+
+                            reply_markup = kb.as_markup() if kb.buttons else None
+
+                            try:
+                                await self.bot.edit_message_caption(
+                                    chat_id=owner_id,
+                                    message_id=seller_message_id,
+                                    caption=seller_text,
+                                    parse_mode="HTML",
+                                    reply_markup=reply_markup,
+                                )
+                            except Exception:
+                                try:
+                                    await self.bot.edit_message_text(
+                                        chat_id=owner_id,
+                                        message_id=seller_message_id,
+                                        text=seller_text,
+                                        parse_mode="HTML",
+                                        reply_markup=reply_markup,
+                                    )
+                                except Exception as edit_error:
+                                    logger.warning(
+                                        f"Failed to update seller message for order#{entity_id}: {edit_error}"
+                                    )
+                except Exception as seller_error:
+                    logger.warning(
+                        f"Seller message update skipped for order#{entity_id}: {seller_error}"
+                    )
 
             logger.info(f"STATUS_UPDATE: #{entity_id} -> {target_status}")
             return True
