@@ -276,8 +276,9 @@ async def websocket_handler(request: web.Request) -> web.WebSocketResponse:
                 pass
 
         if not authenticated_user_id:
-            logger.warning(
-                f"WebSocket auth failed: is_dev={is_dev}, user_id={user_id}, has_init_data={bool(init_data)}"
+            # Debug level - this is expected when users open Partner Panel outside Telegram
+            logger.debug(
+                f"WebSocket auth skipped: is_dev={is_dev}, user_id={user_id}, has_init_data={bool(init_data)}"
             )
             await ws.send_json({"type": "error", "message": "Authentication required"})
             await ws.close()
