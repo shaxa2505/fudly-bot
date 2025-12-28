@@ -1225,6 +1225,8 @@
                         const paymentStatus = order.payment_status || '';
                         const paymentText = getPaymentStatusText(paymentStatus, order.payment_method);
                         const paymentTone = getPaymentStatusTone(paymentStatus);
+                        const orderTypeLabel = orderType === 'delivery' ? '\u0414\u043e\u0441\u0442\u0430\u0432\u043a\u0430' : '\u0421\u0430\u043c\u043e\u0432\u044b\u0432\u043e\u0437';
+                        const orderTypeClass = orderType === 'delivery' ? 'type-delivery' : 'type-pickup';
 
                         let action = null;
                         if (status === 'pending' || status === 'new') {
@@ -1255,6 +1257,7 @@
                                 </div>
                                 <div class=\"order-row-title\">${displayTitle}${qty > 1 && extraItems === 0 ? ` x ${qty}` : ''}</div>
                                 <div class=\"order-row-meta\">
+                                    <span class=\"meta-chip ${orderTypeClass}\">${orderTypeLabel}</span>
                                     ${pickupCode ? `<button class=\"code-pill\" onclick=\"event.stopPropagation(); copyPickupCode('${pickupCode}')\">${pickupCode}</button>` : ''}
                                     ${paymentText && paymentStatus !== 'not_required' ? `<span class=\"meta-chip payment ${paymentTone}\">${paymentText}</span>` : ''}
                                     ${order.customer_name ? `<span class=\"meta-chip\">${order.customer_name}</span>` : ''}
