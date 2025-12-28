@@ -210,7 +210,7 @@ async def process_phone_text(message: types.Message, state: FSMContext, db: Data
     await _after_phone_saved(message, state, db, lang)
 
 
-@router.callback_query(F.data.startswith("reg_city_"), StateFilter(Registration.city, None))
+@router.callback_query(F.data.startswith("reg_city_"), StateFilter(Registration.city))
 async def registration_city_callback(
     callback: types.CallbackQuery, state: FSMContext, db: DatabaseProtocol
 ):
