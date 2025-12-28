@@ -19,6 +19,25 @@ const RETRY_CONFIG = {
 // Helper function to delay
 const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms))
 
+const getTelegramInitData = () => {
+  const tgWebApp = window.Telegram?.WebApp
+  const tgInitData = tgWebApp?.initData
+  if (tgInitData) {
+    return tgInitData
+  }
+
+  const tgUserId = tgWebApp?.initDataUnsafe?.user?.id
+  if (tgUserId) {
+    return localStorage.getItem(`fudly_init_data_${tgUserId}`)
+  }
+
+  if (tgWebApp) {
+    return null
+  }
+
+  return localStorage.getItem('fudly_init_data')
+}
+
 // Create axios instance
 const client = axios.create({
   baseURL: API_BASE,
@@ -27,9 +46,7 @@ const client = axios.create({
 
 // Add auth header
 client.interceptors.request.use((config) => {
-  const initData =
-    window.Telegram?.WebApp?.initData ||
-    localStorage.getItem('fudly_init_data')
+  const initData = getTelegramInitData()
   if (initData) {
     config.headers['X-Telegram-Init-Data'] = initData
   }

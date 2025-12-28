@@ -72,6 +72,11 @@ function AppContent() {
       const tgUser = tg.initDataUnsafe?.user
       if (tg.initData) {
         localStorage.setItem('fudly_init_data', tg.initData)
+        if (tgUser?.id) {
+          const userKey = `fudly_init_data_${tgUser.id}`
+          localStorage.setItem(userKey, tg.initData)
+          localStorage.setItem('fudly_last_user_id', String(tgUser.id))
+        }
       }
       if (tgUser) {
         const userData = {

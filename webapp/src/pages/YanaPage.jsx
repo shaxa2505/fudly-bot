@@ -73,7 +73,14 @@ function YanaPage() {
     if (userId) {
       params.set('user_id', userId)
     }
-    const initData = window.Telegram?.WebApp?.initData || localStorage.getItem('fudly_init_data')
+    const tgWebApp = window.Telegram?.WebApp
+    let initData = tgWebApp?.initData
+    if (!initData && userId) {
+      initData = localStorage.getItem(`fudly_init_data_${userId}`)
+    }
+    if (!initData && !tgWebApp) {
+      initData = localStorage.getItem('fudly_init_data')
+    }
     if (initData) {
       params.set('init_data', initData)
     }

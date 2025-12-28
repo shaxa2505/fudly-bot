@@ -467,6 +467,22 @@
             }
         }
 
+        function extractUserIdFromInitData(initData) {
+            if (!initData) return null;
+            try {
+                const params = new URLSearchParams(initData);
+                const userRaw = params.get('user');
+                if (userRaw) {
+                    const user = JSON.parse(userRaw);
+                    if (user?.id) return String(user.id);
+                }
+                const directUserId = params.get('user_id') || params.get('id');
+                return directUserId ? String(directUserId) : null;
+            } catch (e) {
+                return null;
+            }
+        }
+
         function getAuth() {
             const urlParams = new URLSearchParams(window.location.search);
             const urlUserId = urlParams.get('uid');
@@ -487,22 +503,49 @@
                 source = 'hash';
             }
 
+            const tgUser = tg?.initDataUnsafe?.user;
+            const tgUserId = tgUser?.id ? String(tgUser.id) : '';
+            const resolvedUserId = tgUserId || (urlUserId ? String(urlUserId) : '');
+
             if (finalData && source !== 'cache') {
                 try {
-                    localStorage.setItem('partner_init_data', finalData);
+                    if (resolvedUserId) {
+                        localStorage.setItem(`partner_init_data_${resolvedUserId}`, finalData);
+                        localStorage.setItem('partner_last_user_id', resolvedUserId);
+                    } else {
+                        localStorage.setItem('partner_init_data', finalData);
+                    }
                 } catch (e) {}
             } else if (!finalData) {
                 try {
-                    const cached = localStorage.getItem('partner_init_data');
-                    if (cached) {
-                        finalData = cached;
-                        source = 'cache';
+                    if (resolvedUserId) {
+                        const cached = localStorage.getItem(`partner_init_data_${resolvedUserId}`);
+                        if (cached) {
+                            finalData = cached;
+                            source = 'cache';
+                        }
+                    } else {
+                        const cached = localStorage.getItem('partner_init_data');
+                        if (cached) {
+                            finalData = cached;
+                            source = 'cache';
+                        }
                     }
                 } catch (e) {}
             }
 
-            const tgUser = tg?.initDataUnsafe?.user;
-            const userId = tgUser?.id || urlUserId || 'none';
+            if (finalData && tgUserId) {
+                const initDataUserId = extractUserIdFromInitData(finalData);
+                if (initDataUserId && initDataUserId !== tgUserId) {
+                    try {
+                        localStorage.removeItem(`partner_init_data_${tgUserId}`);
+                    } catch (e) {}
+                    finalData = '';
+                    source = 'mismatch';
+                }
+            }
+
+            const userId = resolvedUserId || 'none';
 
             return { data: finalData, userId, urlUserId, urlAuthDate, urlSig, source };
         }
