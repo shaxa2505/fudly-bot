@@ -392,6 +392,16 @@ class OrderMixin:
             result = cursor.fetchone()
             return dict(result) if result else None
 
+    def get_orders_by_customer_message_id(self, message_id: int) -> list[dict]:
+        """Get orders sharing the same customer_message_id."""
+        with self.get_connection() as conn:
+            cursor = conn.cursor(row_factory=dict_row)
+            cursor.execute(
+                "SELECT * FROM orders WHERE customer_message_id = %s ORDER BY created_at DESC",
+                (message_id,),
+            )
+            return [dict(row) for row in cursor.fetchall()]
+
     def update_order_payment_proof(self, order_id: int, photo_id: str):
         """Update order with payment proof photo."""
         with self.get_connection() as conn:

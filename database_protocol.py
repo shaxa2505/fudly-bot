@@ -388,6 +388,10 @@ class DatabaseProtocol(Protocol):
     def get_order(self, order_id: int) -> tuple[Any, ...] | None:
         ...
 
+    def get_orders_by_customer_message_id(self, message_id: int) -> list[dict]:
+        """Get orders sharing the same customer_message_id."""
+        ...
+
     def update_order_status(self, order_id: int, status: str) -> bool:
         """Update order status."""
         ...
