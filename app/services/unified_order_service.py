@@ -1698,20 +1698,27 @@ class UnifiedOrderService:
             # - READY status (internal state, customer doesn't need notification)
             # - Only important statuses: PREPARING (accepted), DELIVERING, COMPLETED, REJECTED, CANCELLED
             should_notify = notify_customer and user_id
+            existing_message_id = None
+            if isinstance(entity, dict):
+                existing_message_id = entity.get("customer_message_id")
+            else:
+                existing_message_id = getattr(entity, "customer_message_id", None)
+            should_edit = bool(existing_message_id) and user_id
 
             logger.info(
                 f"Notification check for #{entity_id}: "
                 f"status={target_status}, order_type={order_type}, "
                 f"notify_customer={notify_customer}, user_id={user_id}, "
-                f"should_notify={should_notify}"
+                f"should_notify={should_notify}, should_edit={should_edit}"
             )
 
             # OPTIMIZATION: Skip READY notification for delivery orders only
             # READY is mostly internal for delivery (courier pickup), but it's important for pickup
             if target_status == OrderStatus.READY and order_type in ("delivery", "taxi"):
                 should_notify = False
+                should_edit = False
                 logger.info(
-                    f"⚡ Skipping READY notification for delivery order#{entity_id}"
+                    f"Skipping READY notification for delivery order#{entity_id}"
                 )
 
             if user_id:
@@ -1763,7 +1770,7 @@ class UnifiedOrderService:
                 except Exception as notify_error:
                     logger.warning(f"Store status notification failed: {notify_error}")
 
-            if should_notify:
+            if should_notify or should_edit:
                 store = self.db.get_store(store_id) if store_id else None
                 store_name = store.get("name", "") if isinstance(store, dict) else ""
                 store_address = store.get("address", "") if isinstance(store, dict) else ""
@@ -1781,40 +1788,43 @@ class UnifiedOrderService:
                     courier_phone=courier_phone,
                 )
 
-                try:
-                    notif_title = (
-                        f"Buyurtma #{entity_id}" if customer_lang == "uz" else f"Заказ #{entity_id}"
-                    )
-                    plain_msg = re.sub(r"<[^>]+>", "", msg)
-                    if target_status in (OrderStatus.CANCELLED,):
-                        notif_type = NotificationType.BOOKING_CANCELLED
-                    elif target_status in (OrderStatus.COMPLETED,):
-                        notif_type = NotificationType.BOOKING_COMPLETED
-                    elif target_status in (OrderStatus.PREPARING, OrderStatus.DELIVERING):
-                        notif_type = NotificationType.BOOKING_CONFIRMED
-                    else:
-                        notif_type = NotificationType.SYSTEM_ANNOUNCEMENT
+                if should_notify:
 
-                    notification_service = get_notification_service()
-                    await notification_service.notify_user(
-                        Notification(
-                            type=notif_type,
-                            recipient_id=int(user_id),
-                            title=notif_title,
-                            message=plain_msg,
-                            data={
-                                "order_id": entity_id,
-                                "status": target_status,
-                                "order_type": order_type,
-                                "entity_type": entity_type,
-                            },
-                            priority=0,
+
+                    try:
+                        notif_title = (
+                            f"Buyurtma #{entity_id}" if customer_lang == "uz" else f"Заказ #{entity_id}"
                         )
-                    )
-                except Exception as notify_error:
-                    logger.warning(
-                        f"Notification service failed for {entity_type}#{entity_id}: {notify_error}"
-                    )
+                        plain_msg = re.sub(r"<[^>]+>", "", msg)
+                        if target_status in (OrderStatus.CANCELLED,):
+                            notif_type = NotificationType.BOOKING_CANCELLED
+                        elif target_status in (OrderStatus.COMPLETED,):
+                            notif_type = NotificationType.BOOKING_COMPLETED
+                        elif target_status in (OrderStatus.PREPARING, OrderStatus.DELIVERING):
+                            notif_type = NotificationType.BOOKING_CONFIRMED
+                        else:
+                            notif_type = NotificationType.SYSTEM_ANNOUNCEMENT
+
+                        notification_service = get_notification_service()
+                        await notification_service.notify_user(
+                            Notification(
+                                type=notif_type,
+                                recipient_id=int(user_id),
+                                title=notif_title,
+                                message=plain_msg,
+                                data={
+                                    "order_id": entity_id,
+                                    "status": target_status,
+                                    "order_type": order_type,
+                                    "entity_type": entity_type,
+                                },
+                                priority=0,
+                            )
+                        )
+                    except Exception as notify_error:
+                        logger.warning(
+                            f"Notification service failed for {entity_type}#{entity_id}: {notify_error}"
+                        )
 
                 # Add buttons for customer based on status
                 reply_markup = None
@@ -1844,23 +1854,15 @@ class UnifiedOrderService:
                     kb.button(text=received_text, callback_data=f"customer_received_{entity_id}")
                     reply_markup = kb.as_markup()
 
-                # Try to EDIT existing message first (live status update)
+                                # Try to EDIT existing message first (live status update)
                 # This reduces spam - customer sees ONE message that updates
-                existing_message_id = None
-                if isinstance(entity, dict):
-                    existing_message_id = entity.get("customer_message_id")
-                else:
-                    existing_message_id = getattr(entity, "customer_message_id", None)
-
-                allow_telegram_updates = self.telegram_order_notifications or bool(
-                    existing_message_id
-                )
+                allow_telegram_updates = self.telegram_order_notifications or should_edit
 
                 if allow_telegram_updates:
                     message_sent = None
                     edit_success = False
 
-                    if existing_message_id:
+                    if should_edit and existing_message_id:
                         logger.info(
                             f"Trying to edit message {existing_message_id} for #{entity_id}"
                         )
@@ -1898,7 +1900,7 @@ class UnifiedOrderService:
                                     f"❌ Both edit methods failed for {entity_type}#{entity_id}: caption={caption_error}, text={text_error}"
                                 )
 
-                    if not edit_success and self.telegram_order_notifications:
+                    if not edit_success and self.telegram_order_notifications and should_notify:
                         # Send new message only if edit failed or no existing message
                         try:
                             message_sent = await self.bot.send_message(

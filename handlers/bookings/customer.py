@@ -1191,7 +1191,7 @@ async def create_booking(
     used_unified_service = False
     store_id_int = int(store_id or get_offer_field(offer, "store_id") or 0)
     store = db.get_store(store_id_int) if store_id_int else None
-    store_name = get_store_field(store, "name", "??????????????")
+    store_name = get_store_field(store, "name", "Store")
     store_address = get_store_field(store, "address", "")
 
     order_service = get_unified_order_service()
