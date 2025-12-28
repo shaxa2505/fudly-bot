@@ -1656,7 +1656,7 @@ a:focus:not(:focus-visible) {
     font-size: 12px;
 }
 
-.action-btn {
+.order-action-btn {
     background: var(--primary);
     color: #FFFFFF;
     border: none;
@@ -1667,9 +1667,11 @@ a:focus:not(:focus-visible) {
     cursor: pointer;
     transition: transform var(--transition-fast), box-shadow var(--transition-fast);
     align-self: flex-end;
+    min-width: 120px;
+    text-align: center;
 }
 
-.action-btn:hover {
+.order-action-btn:hover {
     transform: translateY(-1px);
     box-shadow: 0 6px 12px rgba(24, 162, 75, 0.2);
 }

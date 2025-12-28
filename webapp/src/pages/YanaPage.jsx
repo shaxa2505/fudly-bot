@@ -302,9 +302,11 @@ function YanaPage() {
       const qty = Number(item.quantity ?? 0)
       return sum + price * qty
     }, 0)
+    const deliveryFee = Number(order.delivery_fee ?? 0)
+    const baseTotal = itemsTotal || (rawTotal && deliveryFee ? Math.max(0, rawTotal - deliveryFee) : rawTotal)
     const totalPrice = rawTotal || itemsTotal
     const unitPrice = quantity
-      ? Math.round((totalPrice || 0) / quantity)
+      ? Math.round((baseTotal || 0) / quantity)
       : (items[0]?.price ?? items[0]?.discount_price ?? 0)
     const offerTitle =
       order.offer_title ||

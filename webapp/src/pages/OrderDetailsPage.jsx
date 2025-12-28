@@ -170,6 +170,12 @@ export default function OrderDetailsPage() {
   const isDelivery = order.order_type === 'delivery' || order.delivery_address
   const needsPayment = ['awaiting_payment', 'awaiting_proof', 'payment_rejected'].includes(order.status)
   const canPayOnline = order.payment_method && ['click', 'payme'].includes(order.payment_method)
+  const itemsSubtotal = Array.isArray(order.items) && order.items.length > 0
+    ? order.items.reduce((sum, item) => sum + Number(item.price || 0) * Number(item.quantity || 0), 0)
+    : 0
+  const totalPrice = Number(order.total_price || 0)
+  const fallbackDeliveryFee = totalPrice > itemsSubtotal ? totalPrice - itemsSubtotal : 0
+  const deliveryFee = Number(order.delivery_fee || 0) || fallbackDeliveryFee
   const paymentMethodLabels = {
     cash: 'Naqd',
     card: 'Karta',
@@ -228,11 +234,13 @@ export default function OrderDetailsPage() {
         <h2 className="section-title">Mahsulotlar</h2>
         <div className="items-list">
           {order.items && order.items.length > 0 ? (
-            order.items.map((item, idx) => (
+            order.items.map((item, idx) => {
+              const itemPhoto = apiClient.getPhotoUrl(item.photo) || item.photo
+              return (
               <div key={idx} className="item-card">
-                {item.photo && (
+                {itemPhoto && (
                   <img
-                    src={item.photo}
+                    src={itemPhoto}
                     alt={item.offer_title}
                     className="item-image"
                     onError={(e) => {
@@ -249,12 +257,12 @@ export default function OrderDetailsPage() {
                   </div>
                 </div>
               </div>
-            ))
+            )})
           ) : (
             <div className="single-item-card">
-              {order.offer_photo && (
+              {(apiClient.getPhotoUrl(order.offer_photo) || order.offer_photo) && (
                 <img
-                  src={order.offer_photo}
+                  src={apiClient.getPhotoUrl(order.offer_photo) || order.offer_photo}
                   alt={order.offer_title}
                   className="item-image"
                   onError={(e) => {
@@ -296,6 +304,12 @@ export default function OrderDetailsPage() {
                 <span className="info-value">{order.delivery_notes}</span>
               </div>
             )}
+            {deliveryFee > 0 && (
+              <div className="info-row">
+                <span className="info-label">Yetkazib berish:</span>
+                <span className="info-value">{Math.round(deliveryFee).toLocaleString()} so'm</span>
+              </div>
+            )}
           </div>
         </div>
       )}
@@ -323,6 +337,14 @@ export default function OrderDetailsPage() {
       <div className="details-section">
         <h2 className="section-title">To'lov</h2>
         <div className="info-card">
+          {deliveryFee > 0 && itemsSubtotal > 0 && (
+            <div className="info-row">
+              <span className="info-label">Mahsulotlar:</span>
+              <span className="info-value">
+                {Math.round(itemsSubtotal).toLocaleString()} so'm
+              </span>
+            </div>
+          )}
           <div className="info-row">
             <span className="info-label">Usul:</span>
             <span className="info-value">
@@ -332,7 +354,7 @@ export default function OrderDetailsPage() {
           <div className="info-row total-row">
             <span className="info-label">Jami:</span>
             <span className="info-value total-price">
-              {Math.round(order.total_price || 0).toLocaleString()} so'm
+              {Math.round(totalPrice || 0).toLocaleString()} so'm
             </span>
           </div>
         </div>

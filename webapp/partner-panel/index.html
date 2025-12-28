@@ -1267,7 +1267,7 @@
                             <div class=\"order-row-side\">
                                 <div class=\"order-amount\">${formatPrice(order.price)}</div>
                                 ${action ? `
-                                    <button class=\"action-btn\" onclick=\"event.stopPropagation(); handleStatusUpdate(${orderId}, '${action.next}', this)\">${action.label}</button>
+                                    <button class=\"order-action-btn\" onclick=\"event.stopPropagation(); handleStatusUpdate(${orderId}, '${action.next}', this)\">${action.label}</button>
                                 ` : ''}
                             </div>
                         </article>
@@ -3547,7 +3547,7 @@ async function toggleProductAvailability(id) {
 
             // Add haptic feedback to buttons
             document.addEventListener('click', (e) => {
-                const btn = e.target.closest('.btn, .nav-item, .icon-btn, .action-btn, .product-card, .order-card');
+                const btn = e.target.closest('.btn, .nav-item, .icon-btn, .order-action-btn, .product-card, .order-card');
                 if (btn && typeof tg?.HapticFeedback !== 'undefined') {
                     tg.HapticFeedback.impactOccurred('light');
                 }

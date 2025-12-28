@@ -23,8 +23,8 @@ function OrderTrackingPage({ user }) {
   const params = useParams();
   const { cartCount } = useCart();
 
-  // Get bookingId from URL params or route state
-  const bookingId = params.bookingId || location.state?.bookingId;
+  // Get orderId from URL params or route state
+  const bookingId = params.orderId || location.state?.bookingId;
 
   const [order, setOrder] = useState(null);
   const [timeline, setTimeline] = useState(null);
@@ -151,6 +151,7 @@ function OrderTrackingPage({ user }) {
   const currentStatusOrder = STATUS_STEPS[order.status]?.order || 0;
   const isCancelled = order.status === 'cancelled';
   const canShowQR = ['confirmed', 'preparing', 'ready'].includes(order.status) && order.qr_code;
+  const orderPhotoUrl = api.getPhotoUrl(order.offer_photo) || order.offer_photo;
 
   return (
     <div className="order-tracking-page">
@@ -187,8 +188,8 @@ function OrderTrackingPage({ user }) {
           </p>
         </div>
 
-        {order.offer_photo && (
-          <img src={order.offer_photo} alt={order.offer_title} className="order-photo" />
+        {orderPhotoUrl && (
+          <img src={orderPhotoUrl} alt={order.offer_title} className="order-photo" />
         )}
       </div>
 
