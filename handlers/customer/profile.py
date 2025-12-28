@@ -29,7 +29,7 @@ from handlers.common.utils import (
     has_approved_store,
     set_user_view_mode,
 )
-from localization import get_text
+from localization import get_cities, get_text
 from logging_config import logger
 
 # Module-level dependencies
