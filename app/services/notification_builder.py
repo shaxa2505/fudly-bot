@@ -140,6 +140,51 @@ class NotificationBuilder:
             "отклонена"
         )
 
+    def build_ready(
+        self,
+        lang: str,
+        order_id: int,
+        store_name: str,
+        store_address: str | None = None,
+        pickup_code: str | None = None,
+    ) -> str:
+        """Build READY status notification."""
+        if self.order_type == "pickup":
+            if lang == "uz":
+                return (
+                    "Buyurtma tayyor\n\n"
+                    f"{ProgressBar.pickup(2, lang)}\n\n"
+                    f"#{order_id}\n"
+                    f"{self._esc(store_name)}\n"
+                    + (f"{self._esc(store_address)}\n" if store_address else "")
+                    + (f"Kod: {pickup_code}\n" if pickup_code else "")
+                    + "\nOlib ketishingiz mumkin."
+                )
+            return (
+                "Заказ готов\n\n"
+                f"{ProgressBar.pickup(2, lang)}\n\n"
+                f"#{order_id}\n"
+                f"{self._esc(store_name)}\n"
+                + (f"{self._esc(store_address)}\n" if store_address else "")
+                + (f"Код: {pickup_code}\n" if pickup_code else "")
+                + "\nМожно забирать."
+            )
+        if lang == "uz":
+            return (
+                "Buyurtma tayyor\n\n"
+                f"{ProgressBar.delivery(1, lang)}\n"
+                f"{ProgressBar.delivery_labels(lang)}\n\n"
+                f"#{order_id} - {self._esc(store_name)}\n"
+                "Kuryerga topshirilmoqda"
+            )
+        return (
+            "Заказ собран\n\n"
+            f"{ProgressBar.delivery(1, lang)}\n"
+            f"{ProgressBar.delivery_labels(lang)}\n\n"
+            f"#{order_id} - {self._esc(store_name)}\n"
+            "Передаём курьеру"
+        )
+
     def build_delivering(self, lang: str, order_id: int, courier_phone: str | None = None) -> str:
         """Build DELIVERING status notification (delivery only)."""
         if lang == "uz":
@@ -236,6 +281,8 @@ class NotificationBuilder:
             return self.build_pending(lang, order_id, store_name)
         if status == "preparing":
             return self.build_preparing(lang, order_id, store_name, store_address, pickup_code)
+        if status == "ready":
+            return self.build_ready(lang, order_id, store_name, store_address, pickup_code)
         if status == "delivering":
             return self.build_delivering(lang, order_id, courier_phone)
         if status == "completed":

@@ -1658,13 +1658,12 @@ class UnifiedOrderService:
                 f"should_notify={should_notify}"
             )
 
-            # OPTIMIZATION: Skip READY notification for ALL orders
-            # READY is an internal state (order packed, waiting for pickup/courier)
-            # Customer only needs: PREPARING (accepted) → DELIVERING (in transit) → COMPLETED
-            if target_status == OrderStatus.READY:
+            # OPTIMIZATION: Skip READY notification for delivery orders only
+            # READY is mostly internal for delivery (courier pickup), but it's important for pickup
+            if target_status == OrderStatus.READY and order_type in ("delivery", "taxi"):
                 should_notify = False
                 logger.info(
-                    f"⚡ Skipping READY notification (internal state) for {order_type} order#{entity_id}"
+                    f"⚡ Skipping READY notification for delivery order#{entity_id}"
                 )
 
             if user_id:
@@ -1789,8 +1788,8 @@ class UnifiedOrderService:
                     received_text = "✅ Oldim" if customer_lang == "uz" else "✅ Получил"
                     kb.button(text=received_text, callback_data=f"customer_received_{entity_id}")
                     reply_markup = kb.as_markup()
-                elif target_status == OrderStatus.PREPARING and order_type == "pickup":
-                    # "Received" button for pickup orders when preparing
+                elif target_status == OrderStatus.READY and order_type == "pickup":
+                    # "Received" button for pickup orders when ready
                     # v24+: all orders in unified table, use customer_received_
                     kb = InlineKeyboardBuilder()
                     received_text = "✅ Oldim" if customer_lang == "uz" else "✅ Получил"

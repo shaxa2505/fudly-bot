@@ -757,6 +757,21 @@ async def order_received_handler(callback: types.CallbackQuery) -> None:
         return
 
     try:
+        entity = None
+        if order_type == "b":
+            entity = db.get_booking(order_id) if hasattr(db, "get_booking") else None
+        else:
+            entity = db.get_order(order_id) if hasattr(db, "get_order") else None
+
+        if not entity:
+            await callback.answer(_t(lang, "❌ Заказ не найден", "❌ Buyurtma topilmadi"), show_alert=True)
+            return
+
+        entity_user_id = entity.get("user_id") if hasattr(entity, "get") else _get_field(entity, 2)
+        if entity_user_id != user_id:
+            await callback.answer(_t(lang, "❌ Доступ запрещен", "❌ Ruxsat yo'q"), show_alert=True)
+            return
+
         service = get_unified_order_service()
         if not service:
             await callback.answer(_t(lang, "❌ Ошибка", "❌ Xatolik"), show_alert=True)
@@ -967,11 +982,11 @@ async def order_cancel_handler(callback: types.CallbackQuery) -> None:
             await callback.answer(_t(lang, "❌ Заказ не найден", "❌ Buyurtma topilmadi"))
             return
 
-        status = (
-            order.get("status")
-            if hasattr(order, "get")
-            else order[10]
-        )
+        if hasattr(order, "get"):
+            raw_status = order.get("order_status") or order.get("status")
+        else:
+            raw_status = _get_field(order, 10)
+        status = _normalize_status(raw_status)
         if status != "pending":
             await callback.answer(
                 _t(
