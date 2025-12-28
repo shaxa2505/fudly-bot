@@ -1219,7 +1219,8 @@
                         const displayTitle = extraItems > 0 ? `${title} + \u0435\u0449\u0435 ${extraItems}` : title;
                         const qty = (mainItem && mainItem.quantity) || order.quantity || 1;
                         const pickupCode = order.pickup_code || order.booking_code || '';
-                        const statusText = getStatusText(status, getOrderType(order));
+                        const orderType = getOrderType(order);
+                        const statusText = getStatusText(status, orderType);
                         const sla = getSlaInfo(status, order.created_at);
                         const paymentStatus = order.payment_status || '';
                         const paymentText = getPaymentStatusText(paymentStatus, order.payment_method);
