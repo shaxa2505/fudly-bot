@@ -225,25 +225,49 @@ async def admin_confirm_payment(
             text = f"✅ <b>Оплата подтверждена!</b>\n\n📦 #{order_id}\n⏳ Ожидаем подтверждение продавца..."
 
         try:
-            # Try to edit existing customer message first
+            # Try to edit existing customer message first (caption -> text)
             existing_msg_id = order.get("customer_message_id") if isinstance(order, dict) else None
             edit_success = False
 
             if existing_msg_id:
                 try:
-                    await bot.edit_message_text(
+                    await bot.edit_message_caption(
                         chat_id=customer_id,
                         message_id=existing_msg_id,
-                        text=text,
+                        caption=text,
                         parse_mode="HTML",
                     )
                     edit_success = True
                     logger.info(f"Edited payment confirmation for order #{order_id}")
                 except Exception:
-                    pass
+                    try:
+                        await bot.edit_message_text(
+                            chat_id=customer_id,
+                            message_id=existing_msg_id,
+                            text=text,
+                            parse_mode="HTML",
+                        )
+                        edit_success = True
+                        logger.info(f"Edited payment confirmation for order #{order_id}")
+                    except Exception:
+                        pass
 
             if not edit_success:
-                await bot.send_message(customer_id, text, parse_mode="HTML")
+                sent_msg = await bot.send_message(customer_id, text, parse_mode="HTML")
+                if sent_msg and hasattr(db, "set_order_customer_message_id"):
+                    try:
+                        db.set_order_customer_message_id(order_id, sent_msg.message_id)
+                        logger.info(
+                            "Saved customer_message_id=%s for order#%s",
+                            sent_msg.message_id,
+                            order_id,
+                        )
+                    except Exception as save_err:
+                        logger.warning(
+                            "Failed to save customer_message_id for order %s: %s",
+                            order_id,
+                            save_err,
+                        )
         except Exception as e:
             logger.error(f"Failed to notify customer: {e}")
 
@@ -309,7 +333,46 @@ async def admin_reject_payment(
             )
 
         try:
-            await bot.send_message(customer_id, text, parse_mode="HTML")
+            existing_msg_id = order.get("customer_message_id") if isinstance(order, dict) else None
+            edit_success = False
+
+            if existing_msg_id:
+                try:
+                    await bot.edit_message_caption(
+                        chat_id=customer_id,
+                        message_id=existing_msg_id,
+                        caption=text,
+                        parse_mode="HTML",
+                    )
+                    edit_success = True
+                except Exception:
+                    try:
+                        await bot.edit_message_text(
+                            chat_id=customer_id,
+                            message_id=existing_msg_id,
+                            text=text,
+                            parse_mode="HTML",
+                        )
+                        edit_success = True
+                    except Exception:
+                        pass
+
+            if not edit_success:
+                sent_msg = await bot.send_message(customer_id, text, parse_mode="HTML")
+                if sent_msg and hasattr(db, "set_order_customer_message_id"):
+                    try:
+                        db.set_order_customer_message_id(order_id, sent_msg.message_id)
+                        logger.info(
+                            "Saved customer_message_id=%s for order#%s",
+                            sent_msg.message_id,
+                            order_id,
+                        )
+                    except Exception as save_err:
+                        logger.warning(
+                            "Failed to save customer_message_id for order %s: %s",
+                            order_id,
+                            save_err,
+                        )
         except Exception:
             pass
 

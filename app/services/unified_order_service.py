@@ -865,11 +865,59 @@ class UnifiedOrderService:
                 currency=currency,
             )
 
+            sent_msg = None
             if notify_customer and telegram_enabled:
                 try:
-                    await self.bot.send_message(user_id, customer_msg, parse_mode="HTML")
+                    sent_msg = await self.bot.send_message(
+                        user_id, customer_msg, parse_mode="HTML"
+                    )
                 except Exception as e:
                     logger.error(f"Failed to notify customer {user_id}: {e}")
+
+            if sent_msg:
+                total_entities = len(order_ids) + len(booking_ids)
+                if total_entities == 1:
+                    if order_ids and hasattr(self.db, "set_order_customer_message_id"):
+                        try:
+                            self.db.set_order_customer_message_id(
+                                int(order_ids[0]), sent_msg.message_id
+                            )
+                            logger.info(
+                                "Saved customer_message_id=%s for order#%s",
+                                sent_msg.message_id,
+                                order_ids[0],
+                            )
+                        except Exception as save_err:
+                            logger.warning(
+                                "Failed to save customer_message_id for order %s: %s",
+                                order_ids[0],
+                                save_err,
+                            )
+                    elif booking_ids and hasattr(
+                        self.db, "set_booking_customer_message_id"
+                    ):
+                        try:
+                            self.db.set_booking_customer_message_id(
+                                int(booking_ids[0]), sent_msg.message_id
+                            )
+                            logger.info(
+                                "Saved customer_message_id=%s for booking#%s",
+                                sent_msg.message_id,
+                                booking_ids[0],
+                            )
+                        except Exception as save_err:
+                            logger.warning(
+                                "Failed to save customer_message_id for booking %s: %s",
+                                booking_ids[0],
+                                save_err,
+                            )
+                else:
+                    logger.debug(
+                        "Skipped saving customer_message_id for user %s: order_ids=%s booking_ids=%s",
+                        user_id,
+                        order_ids,
+                        booking_ids,
+                    )
 
             if publish_customer_event:
                 try:
@@ -1796,15 +1844,19 @@ class UnifiedOrderService:
                     kb.button(text=received_text, callback_data=f"customer_received_{entity_id}")
                     reply_markup = kb.as_markup()
 
-                if self.telegram_order_notifications:
-                    # Try to EDIT existing message first (live status update)
-                    # This reduces spam - customer sees ONE message that updates
-                    existing_message_id = None
-                    if isinstance(entity, dict):
-                        existing_message_id = entity.get("customer_message_id")
-                    else:
-                        existing_message_id = getattr(entity, "customer_message_id", None)
+                # Try to EDIT existing message first (live status update)
+                # This reduces spam - customer sees ONE message that updates
+                existing_message_id = None
+                if isinstance(entity, dict):
+                    existing_message_id = entity.get("customer_message_id")
+                else:
+                    existing_message_id = getattr(entity, "customer_message_id", None)
 
+                allow_telegram_updates = self.telegram_order_notifications or bool(
+                    existing_message_id
+                )
+
+                if allow_telegram_updates:
                     message_sent = None
                     edit_success = False
 
@@ -1846,7 +1898,7 @@ class UnifiedOrderService:
                                     f"❌ Both edit methods failed for {entity_type}#{entity_id}: caption={caption_error}, text={text_error}"
                                 )
 
-                    if not edit_success:
+                    if not edit_success and self.telegram_order_notifications:
                         # Send new message only if edit failed or no existing message
                         try:
                             message_sent = await self.bot.send_message(

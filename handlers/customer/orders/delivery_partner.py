@@ -142,7 +142,6 @@ async def partner_confirm_order_batch(
 
     # Confirm all orders
     confirmed_count = 0
-    customer_notifications: dict = {}  # {customer_id: [order_infos]}
 
     order_service = get_unified_order_service()
     if not order_service:
@@ -150,6 +149,9 @@ async def partner_confirm_order_batch(
     if not order_service:
         await callback.answer("System error", show_alert=True)
         return
+
+    send_live_updates = order_service.telegram_order_notifications
+    customer_notifications: dict = {}  # {customer_id: [order_infos]}
 
     for order_id in order_ids:
         try:
@@ -170,66 +172,68 @@ async def partner_confirm_order_batch(
                 entity_id=order_id,
                 entity_type="order",
                 new_status=OrderStatus.PREPARING,
-                notify_customer=False,
+                notify_customer=send_live_updates,
             )
             confirmed_count += 1
 
-            # Collect info for customer notification
-            customer_id = _get_order_field(order, "user_id", 1)
-            if customer_id:
-                if customer_id not in customer_notifications:
-                    customer_notifications[customer_id] = []
-
-                offer_id = _get_order_field(order, "offer_id", 3)
-                quantity = _get_order_field(order, "quantity", 4)
-                address = _get_order_field(order, "delivery_address", 7)
-
-                offer = db.get_offer(offer_id) if offer_id else None
-                offer_title = get_offer_field(offer, "title", "Товар") if offer else "Товар"
-                store_name = get_store_field(store, "name", "Магазин") if store else "Магазин"
-
-                customer_notifications[customer_id].append(
-                    {
-                        "order_id": order_id,
-                        "title": offer_title,
-                        "quantity": quantity,
-                        "store_name": store_name,
-                        "address": address,
-                    }
-                )
-
+            if not send_live_updates:
+                # Collect info for customer notification
+                customer_id = _get_order_field(order, "user_id", 1)
+                if customer_id:
+                    if customer_id not in customer_notifications:
+                        customer_notifications[customer_id] = []
+    
+                    offer_id = _get_order_field(order, "offer_id", 3)
+                    quantity = _get_order_field(order, "quantity", 4)
+                    address = _get_order_field(order, "delivery_address", 7)
+    
+                    offer = db.get_offer(offer_id) if offer_id else None
+                    offer_title = get_offer_field(offer, "title", "Товар") if offer else "Товар"
+                    store_name = get_store_field(store, "name", "Магазин") if store else "Магазин"
+    
+                    customer_notifications[customer_id].append(
+                        {
+                            "order_id": order_id,
+                            "title": offer_title,
+                            "quantity": quantity,
+                            "store_name": store_name,
+                            "address": address,
+                        }
+                    )
+    
         except Exception as e:
             logger.error(f"Failed to confirm order {order_id}: {e}")
             continue
 
-    # Notify customers (grouped)
-    for customer_id, orders_info in customer_notifications.items():
-        try:
-            cust_lang = db.get_user_language(customer_id)
-
-            lines: list[str] = []
-            if cust_lang == "uz":
-                lines.append("🎉 <b>Barcha buyurtmalar qabul qilindi!</b>\n")
-            else:
-                lines.append("🎉 <b>Все заказы приняты!</b>\n")
-
-            for info in orders_info:
-                lines.append(f"📦 #{info['order_id']}")
-                lines.append(f"🏪 {_esc(info['store_name'])}")
-                lines.append(f"🛒 {_esc(info['title'])} × {info['quantity']}")
-                lines.append(f"📍 {_esc(info['address'])}\n")
-
-            if cust_lang == "uz":
-                lines.append("🚚 <b>Yetkazib berish tashkil qilinmoqda!</b>")
-            else:
-                lines.append("🚚 <b>Доставка организуется!</b>")
-
-            customer_msg = "\n".join(lines)
-            await bot.send_message(customer_id, customer_msg, parse_mode="HTML")
-
-        except Exception as e:
-            logger.error(f"Failed to notify customer {customer_id}: {e}")
-
+    if not send_live_updates:
+        # Notify customers (grouped)
+        for customer_id, orders_info in customer_notifications.items():
+            try:
+                cust_lang = db.get_user_language(customer_id)
+    
+                lines: list[str] = []
+                if cust_lang == "uz":
+                    lines.append("🎉 <b>Barcha buyurtmalar qabul qilindi!</b>\n")
+                else:
+                    lines.append("🎉 <b>Все заказы приняты!</b>\n")
+    
+                for info in orders_info:
+                    lines.append(f"📦 #{info['order_id']}")
+                    lines.append(f"🏪 {_esc(info['store_name'])}")
+                    lines.append(f"🛒 {_esc(info['title'])} × {info['quantity']}")
+                    lines.append(f"📍 {_esc(info['address'])}\n")
+    
+                if cust_lang == "uz":
+                    lines.append("🚚 <b>Yetkazib berish tashkil qilinmoqda!</b>")
+                else:
+                    lines.append("🚚 <b>Доставка организуется!</b>")
+    
+                customer_msg = "\n".join(lines)
+                await bot.send_message(customer_id, customer_msg, parse_mode="HTML")
+    
+            except Exception as e:
+                logger.error(f"Failed to notify customer {customer_id}: {e}")
+    
     # Update partner message
     try:
         if callback.message:
@@ -280,6 +284,8 @@ async def partner_reject_order_batch(
         await callback.answer("System error", show_alert=True)
         return
 
+    send_live_updates = order_service.telegram_order_notifications
+
     for order_id in order_ids:
         try:
             order = db.get_order(order_id)
@@ -299,20 +305,21 @@ async def partner_reject_order_batch(
                 entity_id=order_id,
                 entity_type="order",
                 new_status=OrderStatus.REJECTED,
-                notify_customer=False,
+                notify_customer=send_live_updates,
             )
 
             rejected_count += 1
 
-            # Collect info for customer notification
-            customer_id = _get_order_field(order, "user_id", 1)
-            if customer_id:
-                if customer_id not in customer_notifications:
-                    customer_notifications[customer_id] = []
-
-                store_name = get_store_field(store, "name", "Магазин") if store else "Магазин"
-                customer_notifications[customer_id].append(store_name)
-
+            if not send_live_updates:
+                # Collect info for customer notification
+                customer_id = _get_order_field(order, "user_id", 1)
+                if customer_id:
+                    if customer_id not in customer_notifications:
+                        customer_notifications[customer_id] = []
+    
+                    store_name = get_store_field(store, "name", "Магазин") if store else "Магазин"
+                    customer_notifications[customer_id].append(store_name)
+    
             # Notify admin about rejection
             if ADMIN_ID > 0:
                 try:
@@ -323,26 +330,27 @@ async def partner_reject_order_batch(
                     )
                 except Exception:
                     pass
-
+    
         except Exception as e:
             logger.error(f"Failed to reject order {order_id}: {e}")
             continue
 
-    # Notify customers (grouped)
-    for customer_id, store_names in customer_notifications.items():
-        try:
-            cust_lang = db.get_user_language(customer_id)
-
-            if cust_lang == "uz":
-                customer_msg = f"😔 <b>Buyurtmalar rad etildi</b>\n\n🏪 {', '.join(store_names)}\n\n💰 Pul qaytariladi."
-            else:
-                customer_msg = f"😔 <b>Заказы отклонены</b>\n\n🏪 {', '.join(store_names)}\n\n💰 Деньги будут возвращены."
-
-            await bot.send_message(customer_id, customer_msg, parse_mode="HTML")
-
-        except Exception as e:
-            logger.error(f"Failed to notify customer {customer_id}: {e}")
-
+    if not send_live_updates:
+        # Notify customers (grouped)
+        for customer_id, store_names in customer_notifications.items():
+            try:
+                cust_lang = db.get_user_language(customer_id)
+    
+                if cust_lang == "uz":
+                    customer_msg = f"😔 <b>Buyurtmalar rad etildi</b>\n\n🏪 {', '.join(store_names)}\n\n💰 Pul qaytariladi."
+                else:
+                    customer_msg = f"😔 <b>Заказы отклонены</b>\n\n🏪 {', '.join(store_names)}\n\n💰 Деньги будут возвращены."
+    
+                await bot.send_message(customer_id, customer_msg, parse_mode="HTML")
+    
+            except Exception as e:
+                logger.error(f"Failed to notify customer {customer_id}: {e}")
+    
     # Update partner message
     try:
         if callback.message:

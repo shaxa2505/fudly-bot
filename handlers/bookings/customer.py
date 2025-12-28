@@ -13,7 +13,11 @@ from aiogram.utils.keyboard import InlineKeyboardBuilder
 
 from app.core.constants import OFFERS_PER_PAGE
 from app.keyboards import cancel_keyboard, main_menu_customer, phone_request_keyboard
-from app.services.unified_order_service import OrderStatus, get_unified_order_service
+from app.services.unified_order_service import (
+    OrderItem,
+    OrderStatus,
+    get_unified_order_service,
+)
 from handlers.bookings.utils import format_price
 from handlers.common.states import BookOffer, OrderDelivery, Registration
 from handlers.common.utils import is_main_menu_button
@@ -1182,28 +1186,75 @@ async def create_booking(
     except Exception:
         unit_price = int(offer_price or 0)
 
-    try:
-        store_id_int = int(store_id or get_offer_field(offer, "store_id") or 0)
-        result = db.create_cart_order(
-            user_id=user_id,
-            items=[
-                {
-                    "offer_id": int(offer_id),
-                    "store_id": store_id_int,
-                    "quantity": int(quantity),
-                    "price": unit_price,
-                    "title": offer_title,
-                }
-            ],
-            order_type="pickup",
-            delivery_address=None,
-            payment_method="cash",
-            notify_customer=False,  # ✅ FIX: UnifiedOrderService already sends notification
-        )
-        created_orders = result.get("created_orders", [])
-    except Exception as e:
-        logger.error(f"Order creation failed: {e}")
-        created_orders = []
+
+    created_orders = []
+    used_unified_service = False
+    store_id_int = int(store_id or get_offer_field(offer, "store_id") or 0)
+    store = db.get_store(store_id_int) if store_id_int else None
+    store_name = get_store_field(store, "name", "??????????????")
+    store_address = get_store_field(store, "address", "")
+
+    order_service = get_unified_order_service()
+    if order_service:
+        try:
+            order_item = OrderItem(
+                offer_id=int(offer_id),
+                store_id=store_id_int,
+                title=offer_title,
+                price=unit_price,
+                original_price=unit_price,
+                quantity=int(quantity),
+                store_name=store_name,
+                store_address=store_address,
+                delivery_price=0,
+            )
+            result = await order_service.create_order(
+                user_id=user_id,
+                items=[order_item],
+                order_type="pickup",
+                delivery_address=None,
+                payment_method="cash",
+                notify_customer=True,
+                notify_sellers=True,
+                telegram_notify=True,
+            )
+            if result.success and result.order_ids:
+                created_orders = [
+                    {
+                        "order_id": result.order_ids[0],
+                        "pickup_code": result.pickup_codes[0] if result.pickup_codes else None,
+                    }
+                ]
+                used_unified_service = True
+            else:
+                logger.error(
+                    f"Unified order service failed for pickup order: {result.error_message}"
+                )
+        except Exception as e:
+            logger.error(f"Unified pickup order creation failed: {e}")
+
+    if not created_orders:
+        try:
+            result = db.create_cart_order(
+                user_id=user_id,
+                items=[
+                    {
+                        "offer_id": int(offer_id),
+                        "store_id": store_id_int,
+                        "quantity": int(quantity),
+                        "price": unit_price,
+                        "title": offer_title,
+                    }
+                ],
+                order_type="pickup",
+                delivery_address=None,
+                payment_method="cash",
+                notify_customer=False,
+            )
+            created_orders = result.get("created_orders", [])
+        except Exception as e:
+            logger.error(f"Order creation failed: {e}")
+            created_orders = []
 
     order_id = created_orders[0].get("order_id") if created_orders else None
     code = created_orders[0].get("pickup_code") if created_orders else None
@@ -1232,24 +1283,14 @@ async def create_booking(
     await state.clear()
 
     # Get store info
-    store = db.get_store(store_id) if store_id else None
-    store_name = get_store_field(store, "name", "Магазин")
-    store_address = get_store_field(store, "address", "")
     owner_id = get_store_field(store, "owner_id")
 
     # Get offer photo
     offer_photo_val = get_offer_field(offer, "photo")
     offer_photo = str(offer_photo_val) if offer_photo_val else None
 
-    # NOTE: Customer notification is sent by UnifiedOrderService in create_cart_order()
-    # No need to send duplicate notification here
-
-    # TODO: Get message_id from UnifiedOrderService response for status tracking
-    # Currently UnifiedOrderService sends the notification but doesn't return message_id
-    # For live status updates, we need to track the message_id
-
     # Notify partner
-    if owner_id:
+    if owner_id and not used_unified_service:
         await notify_partner_new_pickup_order(
             owner_id=owner_id,
             order_id=int(order_id),
