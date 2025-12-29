@@ -14,6 +14,7 @@ from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 from pydantic import BaseModel
 
 from app.api.webapp.common import get_current_user
+from app.core.utils import normalize_city
 from app.services.unified_order_service import OrderStatus as UnifiedOrderStatus
 
 router = APIRouter(prefix="/api/v1/orders", tags=["orders"])
@@ -152,18 +153,7 @@ def generate_qr_code(booking_code: str) -> str:
 
 
 def calculate_delivery_cost(city: str, address: str, store_id: int, db) -> DeliveryResult:
-    """Calculate delivery cost based on distance and city.
-
-    Args:
-        city: User city
-        address: Delivery address
-        store_id: Store ID
-        db: Database instance
-
-    Returns:
-        DeliveryResult with cost and availability
-    """
-    # Get store info
+    """Calculate delivery cost based on distance and city."""
     store = db.get_store(store_id)
     if not store:
         return DeliveryResult(
@@ -171,39 +161,44 @@ def calculate_delivery_cost(city: str, address: str, store_id: int, db) -> Deliv
             delivery_cost=None,
             estimated_time=None,
             min_order_amount=None,
-            message="Магазин не найден",
+            message="Store not found",
         )
 
     store_dict = dict(store) if not isinstance(store, dict) else store
-    store_city = store_dict.get("city", "")
+    store_city_raw = store_dict.get("city", "") or ""
+    normalized_city = normalize_city(city or "")
+    normalized_store_city = normalize_city(store_city_raw)
 
-    # Check if same city
-    if city.lower() != store_city.lower():
+    # Check if same city using normalized values to align Uzbek/Russian inputs
+    if normalized_city.lower() != normalized_store_city.lower():
         return DeliveryResult(
             can_deliver=False,
             delivery_cost=None,
             estimated_time=None,
             min_order_amount=None,
-            message=f"Доставка доступна только в городе {store_city}",
+            message=f"Delivery available only in {store_city_raw or 'store city'}",
         )
 
-    # Simple distance-based pricing (in production, use real geolocation)
-    # For MVP: flat rate per city
     delivery_costs = {
-        "Ташкент": 15000,  # 15k sum
-        "Самарканд": 12000,
-        "Бухара": 10000,
-        "Андижан": 10000,
-        "Фергана": 10000,
+        "???????": 15000,  # 15k sum
+        "?????????": 12000,
+        "??????": 10000,
+        "????????": 10000,
+        "???????": 10000,
+        "Tashkent": 15000,
+        "Samarqand": 12000,
+        "Bukhara": 10000,
+        "Namangan": 10000,
+        "Fergana": 10000,
     }
 
-    base_cost = delivery_costs.get(city, 15000)
+    base_cost = delivery_costs.get(normalized_store_city or normalized_city, 15000)
     min_order = 50000  # 50k sum minimum
 
     return DeliveryResult(
         can_deliver=True,
         delivery_cost=float(base_cost),
-        estimated_time="30-45 мин",
+        estimated_time="30-45 min",
         min_order_amount=float(min_order),
         message=None,
     )

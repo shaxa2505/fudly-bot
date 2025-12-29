@@ -5,13 +5,14 @@ from typing import Any
 from fastapi import APIRouter, Depends, HTTPException, Query
 
 from .common import LocationRequest, StoreResponse, get_db, get_val, logger, normalize_price
+from app.core.utils import normalize_city
 
 router = APIRouter()
 
 
 @router.get("/stores", response_model=list[StoreResponse])
 async def get_stores(
-    city: str = Query("Ташкент", description="City to filter by"),
+    city: str = Query("Toshkent", description="City to filter by"),
     region: str | None = Query(None, description="Region filter"),
     district: str | None = Query(None, description="District filter"),
     business_type: str | None = Query(None, description="Business type filter"),
@@ -19,17 +20,22 @@ async def get_stores(
 ):
     """Get list of stores."""
     try:
+        normalized_city = normalize_city(city)
         if business_type:
             raw_stores = (
-                db.get_stores_by_business_type(business_type, city)
+                db.get_stores_by_business_type(business_type, normalized_city)
                 if hasattr(db, "get_stores_by_business_type")
                 else []
             )
         else:
             if hasattr(db, "get_stores_by_location"):
-                raw_stores = db.get_stores_by_location(city=city, region=region, district=district)
+                raw_stores = db.get_stores_by_location(
+                    city=normalized_city, region=region, district=district
+                )
             else:
-                raw_stores = db.get_stores_by_city(city) if hasattr(db, "get_stores_by_city") else []
+                raw_stores = (
+                    db.get_stores_by_city(normalized_city) if hasattr(db, "get_stores_by_city") else []
+                )
 
         if not raw_stores:
             raw_stores = []
@@ -164,7 +170,7 @@ async def get_nearby_stores(
         if hasattr(db, "get_stores_by_city"):
             for city in ["Ташкент", "Tashkent", "Самарканд", "Бухара"]:
                 try:
-                    stores = db.get_stores_by_city(city)
+                    stores = db.get_stores_by_city(normalize_city(city))
                     if stores:
                         raw_stores.extend(stores)
                 except Exception:  # pragma: no cover - defensive

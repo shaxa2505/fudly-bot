@@ -1,53 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import api from '../api/client';
-
-// Transliteration map for cities: Latin -> Cyrillic (for API)
-const CITY_TO_CYRILLIC = {
-  'toshkent': 'Ташкент',
-  'tashkent': 'Ташкент',
-  'samarqand': 'Самарканд',
-  'samarkand': 'Самарканд',
-  'buxoro': 'Бухара',
-  'bukhara': 'Бухара',
-  "farg'ona": 'Фергана',
-  'fergana': 'Фергана',
-  'andijon': 'Андижан',
-  'andijan': 'Андижан',
-  'namangan': 'Наманган',
-  'navoiy': 'Навои',
-  'navoi': 'Навои',
-  'qarshi': 'Карши',
-  'karshi': 'Карши',
-  'nukus': 'Нукус',
-  'urganch': 'Ургенч',
-  'urgench': 'Ургенч',
-  'jizzax': 'Джизак',
-  'jizzakh': 'Джизак',
-  'termiz': 'Термез',
-  'termez': 'Термез',
-  'guliston': 'Гулистан',
-  'gulistan': 'Гулистан',
-  'chirchiq': 'Чирчик',
-  'chirchik': 'Чирчик',
-  "kattaqo'rg'on": 'Каттакурган',
-  'kattakurgan': 'Каттакурган',
-  'kattaqurgan': 'Каттакурган',
-  'olmaliq': 'Алмалык',
-  'angren': 'Ангрен',
-  'bekobod': 'Бекабад',
-  'shahrisabz': 'Шахрисабз',
-  "marg'ilon": 'Маргилан',
-  "qo'qon": 'Коканд',
-  'xiva': 'Хива',
-  'khiva': 'Хива',
-};
-
-// Transliterate city to Cyrillic for API
-const transliterateCity = (city) => {
-  if (!city) return city;
-  const cityLower = city.toLowerCase().trim();
-  return CITY_TO_CYRILLIC[cityLower] || city;
-};
+import { transliterateCity } from '../utils/cityUtils';
 
 /**
  * Hook for loading offers with infinite scroll

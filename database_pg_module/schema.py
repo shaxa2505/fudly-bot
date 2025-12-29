@@ -142,6 +142,12 @@ class SchemaMixin:
                     offer_id INTEGER,
                     store_id INTEGER,
                     delivery_address TEXT,
+                    delivery_city TEXT,
+                    delivery_region TEXT,
+                    delivery_district TEXT,
+                    delivery_lat REAL,
+                    delivery_lon REAL,
+                    delivery_structured JSONB,
                     payment_method TEXT DEFAULT 'cash',
                     payment_status TEXT DEFAULT 'not_required',
                     payment_proof_photo_id TEXT,
@@ -163,6 +169,19 @@ class SchemaMixin:
                     cursor.execute("ALTER TABLE orders ADD COLUMN IF NOT EXISTS pickup_code TEXT")
                 except Exception as e:
                     logger.warning(f"Migration for orders pickup_code column: {e}")
+                try:
+                    cursor.execute("ALTER TABLE orders ADD COLUMN IF NOT EXISTS delivery_city TEXT")
+                    cursor.execute("ALTER TABLE orders ADD COLUMN IF NOT EXISTS delivery_region TEXT")
+                    cursor.execute(
+                        "ALTER TABLE orders ADD COLUMN IF NOT EXISTS delivery_district TEXT"
+                    )
+                    cursor.execute("ALTER TABLE orders ADD COLUMN IF NOT EXISTS delivery_lat REAL")
+                    cursor.execute("ALTER TABLE orders ADD COLUMN IF NOT EXISTS delivery_lon REAL")
+                    cursor.execute(
+                        "ALTER TABLE orders ADD COLUMN IF NOT EXISTS delivery_structured JSONB"
+                    )
+                except Exception as e:
+                    logger.warning(f"Migration for orders delivery structured columns: {e}")
 
             # Migration: Add cart_items column to orders table for multi-item orders
             if run_runtime_migrations:
@@ -699,5 +718,12 @@ class SchemaMixin:
                 "ALTER TABLE bookings ADD COLUMN IF NOT EXISTS payment_proof_photo_id TEXT"
             )
             cursor.execute("ALTER TABLE bookings ADD COLUMN IF NOT EXISTS pickup_address TEXT")
+            cursor.execute("ALTER TABLE bookings ADD COLUMN IF NOT EXISTS delivery_city TEXT")
+            cursor.execute("ALTER TABLE bookings ADD COLUMN IF NOT EXISTS delivery_region TEXT")
+            cursor.execute("ALTER TABLE bookings ADD COLUMN IF NOT EXISTS delivery_district TEXT")
+            cursor.execute("ALTER TABLE bookings ADD COLUMN IF NOT EXISTS delivery_lat REAL")
+            cursor.execute("ALTER TABLE bookings ADD COLUMN IF NOT EXISTS delivery_lon REAL")
+            cursor.execute("ALTER TABLE bookings ADD COLUMN IF NOT EXISTS delivery_structured JSONB")
+
         except Exception as e:
             logger.warning(f"Could not add columns to bookings: {e}")

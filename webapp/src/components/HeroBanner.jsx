@@ -7,6 +7,7 @@ const BANNERS = [
     id: 1,
     title: '50% gacha chegirma',
     subtitle: 'Sut mahsulotlari',
+    tag: 'Chegirma',
     icon: Milk,
     gradient: 'linear-gradient(135deg, #0F766E 0%, #0B5E57 100%)',
     category: 'dairy'
@@ -15,6 +16,7 @@ const BANNERS = [
     id: 2,
     title: "Yangi kelgan taomlar",
     subtitle: "Eng sara mahsulotlar",
+    tag: 'Yangi',
     icon: Croissant,
     gradient: 'linear-gradient(135deg, #F97316 0%, #EA580C 100%)',
     category: 'bakery'
@@ -23,6 +25,7 @@ const BANNERS = [
     id: 3,
     title: "Ichimliklar aksiyasi",
     subtitle: "30% gacha chegirma",
+    tag: 'Aksiya',
     icon: Beverage,
     gradient: 'linear-gradient(135deg, #2563EB 0%, #1D4ED8 100%)',
     category: 'drinks'
@@ -31,6 +34,7 @@ const BANNERS = [
     id: 4,
     title: "Yangi mevalar",
     subtitle: "Har kuni yangilanadi",
+    tag: 'Fresh',
     icon: Apple,
     gradient: 'linear-gradient(135deg, #22C55E 0%, #16A34A 100%)',
     category: 'fruits'
@@ -129,14 +133,25 @@ const HeroBanner = memo(function HeroBanner({ onCategorySelect }) {
       >
         <div className="banner-content">
           <div className="banner-text">
+            <div className="banner-meta">
+              <span className="banner-pill">{currentBanner.tag || 'Tanlov'}</span>
+              <span className="banner-subtitle">{currentBanner.subtitle}</span>
+            </div>
             <h2 className="banner-title">{currentBanner.title}</h2>
-            <p className="banner-subtitle">{currentBanner.subtitle}</p>
-              <span className="banner-cta">Ko'rish {'->'}</span>
+            <button className="banner-cta" type="button">
+              Ko'rish
+              <span className="cta-arrow">→</span>
+            </button>
           </div>
           <div className="banner-icon">
             {(() => {
               const IconComponent = currentBanner.icon
-              return <IconComponent size={80} strokeWidth={2} color="white" aria-hidden="true" />
+              return (
+                <div className="icon-wrap" aria-hidden="true">
+                  <div className="icon-glow" />
+                  <IconComponent size={74} strokeWidth={2} color="white" />
+                </div>
+              )
             })()}
           </div>
         </div>

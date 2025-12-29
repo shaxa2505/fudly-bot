@@ -15,6 +15,7 @@ from .common import (
     logger,
     normalize_price,
 )
+from app.core.utils import normalize_city
 
 router = APIRouter()
 
@@ -85,13 +86,14 @@ async def get_categories(
 ):
     """Get list of product categories with counts."""
     result: list[CategoryResponse] = []
+    normalized_city = normalize_city(city)
 
     for cat in CATEGORIES:
         count = 0
         if cat["id"] != "all":
             try:
                 offers = (
-                    db.get_offers_by_category(cat["id"], city)
+                    db.get_offers_by_category(cat["id"], normalized_city)
                     if hasattr(db, "get_offers_by_category")
                     else []
                 )
@@ -100,7 +102,9 @@ async def get_categories(
                 count = 0
         else:
             try:
-                count = db.count_hot_offers(city) if hasattr(db, "count_hot_offers") else 0
+                count = (
+                    db.count_hot_offers(normalized_city) if hasattr(db, "count_hot_offers") else 0
+                )
             except Exception:  # pragma: no cover - defensive
                 count = 0
 
@@ -131,6 +135,7 @@ async def get_offers(
     """Get list of offers with advanced filters and sorting."""
     try:
         _ = user  # explicitly mark dependency as used
+        normalized_city = normalize_city(city)
         offers: list[OfferResponse] = []
         store_fallback: dict | None = None
 
@@ -140,19 +145,23 @@ async def get_offers(
             if hasattr(db, "get_store"):
                 store_fallback = db.get_store(store_id)
         elif search:
-            raw_offers = db.search_offers(search, city) if hasattr(db, "search_offers") else []
+            raw_offers = (
+                db.search_offers(search, normalized_city) if hasattr(db, "search_offers") else []
+            )
         elif category and category != "all":
             if hasattr(db, "get_offers_by_city_and_category"):
                 raw_offers = db.get_offers_by_city_and_category(
-                    city=city, category=category, region=region, district=district
+                    city=normalized_city, category=category, region=region, district=district
                 )
             elif hasattr(db, "get_offers_by_category"):
-                raw_offers = db.get_offers_by_category(category, city)
+                raw_offers = db.get_offers_by_category(category, normalized_city)
             else:
                 raw_offers = []
         else:
             raw_offers = (
-                db.get_hot_offers(city, limit=limit, offset=offset, region=region, district=district)
+                db.get_hot_offers(
+                    normalized_city, limit=limit, offset=offset, region=region, district=district
+                )
                 if hasattr(db, "get_hot_offers")
                 else []
             )
@@ -280,8 +289,13 @@ async def get_flash_deals(
 ):
     """Get flash deals - high discount items expiring soon."""
     try:
+        normalized_city = normalize_city(city)
         raw_offers = (
-            db.get_hot_offers(city, limit=100, offset=0, region=region, district=district) if hasattr(db, "get_hot_offers") else []
+            db.get_hot_offers(
+                normalized_city, limit=100, offset=0, region=region, district=district
+            )
+            if hasattr(db, "get_hot_offers")
+            else []
         )
 
         if not raw_offers:

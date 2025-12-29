@@ -36,7 +36,7 @@ class City(str, Enum):
     @classmethod
     def normalize(cls, city: str) -> str:
         """Normalize city name to standard form."""
-        city_clean = city.replace("📍 ", "").strip()
+        city_clean = city.replace("\U0001F4CD ", "").strip()
         # Try to find matching enum value
         for item in cls:
             if item.value == city_clean:

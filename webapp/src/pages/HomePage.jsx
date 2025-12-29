@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Flame, Milk, Cookie, Snowflake, Coffee as Beverage, Croissant, Beef, Apple, Salad, Package, Search, Info } from 'lucide-react'
+import { Flame, Milk, Cookie, Snowflake, Coffee as Beverage, Croissant, Beef, Apple, Salad, Package, Search, Info, SlidersHorizontal } from 'lucide-react'
 import api from '../api/client'
 import { useCart } from '../context/CartContext'
 import { transliterateCity, getSavedLocation, saveLocation, DEFAULT_LOCATION } from '../utils/cityUtils'
@@ -630,6 +630,21 @@ function HomePage() {
               x
             </button>
           )}
+          <button
+            type="button"
+            className={`search-filter-toggle ${showAdvancedFilters ? 'active' : ''}`}
+            onClick={() => {
+              window.Telegram?.WebApp?.HapticFeedback?.selectionChanged?.()
+              setShowAdvancedFilters(prev => !prev)
+            }}
+            aria-label="Filtrlar"
+            aria-expanded={showAdvancedFilters}
+          >
+            <SlidersHorizontal size={18} strokeWidth={2} aria-hidden="true" />
+            {activeFiltersCount > 0 && (
+              <span className="search-filter-count">{activeFiltersCount}</span>
+            )}
+          </button>
 
           {/* Search History Dropdown */}
           {showSearchHistory && searchHistory.length > 0 && !searchQuery && (
@@ -685,19 +700,6 @@ function HomePage() {
               )
             })}
           </div>
-          <button
-            className={`filters-toggle ${showAdvancedFilters ? 'active' : ''}`}
-            onClick={() => {
-              window.Telegram?.WebApp?.HapticFeedback?.selectionChanged?.()
-              setShowAdvancedFilters(prev => !prev)
-            }}
-            aria-expanded={showAdvancedFilters}
-          >
-            Filtrlar
-            {activeFiltersCount > 0 && (
-              <span className="filters-count">{activeFiltersCount}</span>
-            )}
-          </button>
         </div>
 
         {showAdvancedFilters && (

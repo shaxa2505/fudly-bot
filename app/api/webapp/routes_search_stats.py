@@ -3,6 +3,7 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends, HTTPException, Query
 
 from .common import CATEGORIES, get_db, get_val, logger
+from app.core.utils import normalize_city
 
 router = APIRouter()
 
@@ -39,9 +40,10 @@ async def get_search_suggestions(
 
 
 @router.get("/stats/hot-deals")
-async def get_hot_deals_stats(city: str = Query("Ташкент"), db=Depends(get_db)):
+async def get_hot_deals_stats(city: str = Query("Toshkent"), db=Depends(get_db)):
     """Get statistics about hot deals."""
     try:
+        normalized_city = normalize_city(city)
         stats = {
             "total_offers": 0,
             "total_stores": 0,
@@ -51,7 +53,7 @@ async def get_hot_deals_stats(city: str = Query("Ташкент"), db=Depends(ge
         }
 
         if hasattr(db, "get_hot_offers"):
-            offers = db.get_hot_offers(city, limit=1000)
+            offers = db.get_hot_offers(normalized_city, limit=1000)
             if offers:
                 stats["total_offers"] = len(offers)
 
@@ -65,7 +67,7 @@ async def get_hot_deals_stats(city: str = Query("Ташкент"), db=Depends(ge
                     stats["max_discount"] = round(max(discounts), 1)
 
         if hasattr(db, "get_stores_by_city"):
-            stores = db.get_stores_by_city(city)
+            stores = db.get_stores_by_city(normalized_city)
             if stores:
                 stats["total_stores"] = len(stores)
 

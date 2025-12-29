@@ -28,6 +28,7 @@ from fastapi import (
 from slowapi import Limiter
 from slowapi.util import get_remote_address
 
+from app.core.utils import normalize_city
 from app.api.websocket_manager import get_connection_manager
 from app.services.stats import PartnerTotals, Period, get_partner_stats
 from app.services.unified_order_service import (
@@ -330,9 +331,11 @@ async def get_profile(authorization: str = Header(None)):
     user, store_info = get_partner_with_store(telegram_id)
     logging.info(f"✅ Got partner with store: {store_info.get('name') if store_info else 'None'}")
 
+    user_city = normalize_city(user.get("city") or "Toshkent")
+
     return {
         "name": user.get("first_name") or user.get("username") or "Partner",
-        "city": user.get("city") or "Ташкент",
+        "city": user_city,
         "store": {
             "name": store_info.get("name"),
             "address": store_info.get("address"),
