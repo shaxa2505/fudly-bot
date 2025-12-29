@@ -31,10 +31,13 @@ from slowapi.util import get_remote_address
 from app.core.utils import normalize_city
 from app.api.websocket_manager import get_connection_manager
 from app.services.stats import PartnerTotals, Period, get_partner_stats
+from aiogram import Bot
+
 from app.services.unified_order_service import (
     OrderStatus,
     PaymentStatus,
     get_unified_order_service,
+    init_unified_order_service,
 )
 from database_protocol import DatabaseProtocol
 
@@ -73,6 +76,19 @@ def get_db() -> DatabaseProtocol:
     if _db is None:
         raise HTTPException(status_code=500, detail="Database not configured")
     return _db
+
+
+def _ensure_unified_service(db: DatabaseProtocol):
+    """Return initialized UnifiedOrderService if possible."""
+    service = get_unified_order_service()
+    if service is not None:
+        return service
+    if not _bot_token:
+        return None
+    try:
+        return init_unified_order_service(db, Bot(_bot_token))
+    except Exception:
+        return None
 
 
 def get_partner_with_store(telegram_id: int) -> tuple[dict, dict]:
@@ -948,22 +964,26 @@ async def cancel_order(
         if order[2] == "cancelled":
             raise HTTPException(status_code=400, detail="Order already cancelled")
 
-        # Update order status with cancellation details
+    unified_service = _ensure_unified_service(db)
+    if not unified_service:
+        raise HTTPException(status_code=500, detail="Order service unavailable")
+
+    ok = await unified_service.cancel_order(order_id, "order")
+    if not ok:
+        raise HTTPException(status_code=400, detail="Status transition not allowed")
+
+    with db.get_connection() as conn:
+        cursor = conn.cursor()
         cursor.execute(
             """
             UPDATE orders
-            SET order_status = 'cancelled',
-                cancel_reason = %s,
+            SET cancel_reason = %s,
                 cancel_comment = %s
             WHERE order_id = %s
             """,
             (cancel_reason, cancel_comment, order_id),
         )
         conn.commit()
-
-    # TODO: Send notification to customer via bot
-    # This would require bot instance which we don't have in API context
-    # For now, customer will see updated status in their orders list
 
     return {
         "order_id": order_id,
@@ -1193,7 +1213,7 @@ async def confirm_order(
     telegram_id = verify_telegram_webapp(authorization)
     user, store = get_partner_with_store(telegram_id)
     db = get_db()
-    unified_service = get_unified_order_service()
+    unified_service = _ensure_unified_service(db)
 
     # Get order from unified orders table
     order = db.get_order(order_id)
@@ -1239,7 +1259,7 @@ async def update_order_status(
     telegram_id = verify_telegram_webapp(authorization)
     user, store = get_partner_with_store(telegram_id)
     db = get_db()
-    unified_service = get_unified_order_service()
+    unified_service = _ensure_unified_service(db)
 
     # Get order from unified orders table
     order = db.get_order(order_id)

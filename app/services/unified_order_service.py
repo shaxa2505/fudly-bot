@@ -794,6 +794,22 @@ class UnifiedOrderService:
         """HTML-escape helper."""
         return html.escape(str(val)) if val else ""
 
+    def _notifications_enabled(self, user_id: int | None) -> bool:
+        """Check if user notifications are enabled."""
+        if not user_id:
+            return False
+        try:
+            user = (
+                self.db.get_user_model(user_id)
+                if hasattr(self.db, "get_user_model")
+                else self.db.get_user(user_id)
+            )
+            if isinstance(user, dict):
+                return bool(user.get("notifications_enabled", True))
+            return bool(getattr(user, "notifications_enabled", True))
+        except Exception:
+            return True
+
     # =========================================================================
     # ORDER CREATION
     # =========================================================================
@@ -952,6 +968,8 @@ class UnifiedOrderService:
         telegram_enabled = (
             self.telegram_order_notifications if telegram_notify is None else telegram_notify
         )
+        notifications_enabled = self._notifications_enabled(user_id)
+        customer_notifications = bool(notify_customer and notifications_enabled)
 
         # Send notifications to sellers
         if notify_sellers and stores_orders:
@@ -966,8 +984,8 @@ class UnifiedOrderService:
             )
 
         # Send notification/event to customer (WebApp sync always; Telegram optional)
-        publish_customer_event = bool(user_id)
-        if notify_customer or publish_customer_event:
+        publish_customer_event = bool(user_id) and notifications_enabled
+        if customer_notifications or publish_customer_event:
             all_ids = [str(x) for x in (order_ids + booking_ids)]
             items_for_template = [
                 {"title": item.title, "price": item.price, "quantity": item.quantity}
@@ -990,7 +1008,7 @@ class UnifiedOrderService:
             )
 
             sent_msg = None
-            if notify_customer and telegram_enabled:
+            if customer_notifications and telegram_enabled:
                 try:
                     sent_msg = await self.bot.send_message(
                         user_id, customer_msg, parse_mode="HTML"
@@ -1873,14 +1891,17 @@ class UnifiedOrderService:
             # Skip redundant notifications to avoid spam:
             # - READY status (internal state, customer doesn't need notification)
             # - Only important statuses: PREPARING (accepted), DELIVERING, COMPLETED, REJECTED, CANCELLED
-            should_notify = notify_customer and user_id
+            notifications_enabled = self._notifications_enabled(user_id)
+            should_notify = notify_customer and user_id and notifications_enabled
             existing_message_id = None
             if isinstance(entity, dict):
                 existing_message_id = entity.get("customer_message_id")
             else:
                 existing_message_id = getattr(entity, "customer_message_id", None)
-            should_edit = bool(existing_message_id) and user_id
-            should_force_send = self.force_telegram_sync and user_id and not existing_message_id
+            should_edit = bool(existing_message_id) and user_id and notifications_enabled
+            should_force_send = (
+                self.force_telegram_sync and user_id and not existing_message_id and notifications_enabled
+            )
 
             logger.info(
                 f"Notification check for #{entity_id}: "

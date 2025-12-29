@@ -1974,6 +1974,12 @@ a:focus:not(:focus-visible) {
     gap: var(--space-2);
 }
 
+.products-shell .product-meta {
+    margin-bottom: 0;
+    padding-bottom: 0;
+    border-bottom: none;
+}
+
 .meta-chip {
     background: var(--gray-100);
     border-radius: var(--radius-full);
@@ -2003,6 +2009,9 @@ a:focus:not(:focus-visible) {
     position: static;
     display: flex;
     gap: 8px;
+    flex-direction: row;
+    align-items: center;
+    flex-wrap: wrap;
 }
 
 .products-shell .product-action-btn {
@@ -2026,6 +2035,13 @@ a:focus:not(:focus-visible) {
     display: inline-flex;
     align-items: center;
     gap: 6px;
+}
+
+.products-shell .product-cta {
+    width: auto;
+    height: auto;
+    min-height: 36px;
+    min-width: 0;
 }
 
 .product-cta i,

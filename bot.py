@@ -54,6 +54,9 @@ POLLING_HEALTH_PORT: int = int(os.getenv("POLLING_HEALTH_PORT", "0") or 0)
 ENABLE_INTERNAL_BOOKING_WORKER: bool = (
     os.getenv("ENABLE_INTERNAL_BOOKING_WORKER", "1").strip().lower() in {"1", "true", "yes"}
 )
+ENABLE_RATING_REMINDERS: bool = (
+    os.getenv("ENABLE_RATING_REMINDERS", "0").strip().lower() in {"1", "true", "yes"}
+)
 
 # =============================================================================
 # APPLICATION BOOTSTRAP
@@ -128,6 +131,17 @@ def get_appropriate_menu(user_id: int, lang: str) -> Any:
     return handlers_common.get_appropriate_menu(
         user_id, lang, db, main_menu_seller, main_menu_customer
     )
+
+
+def _notifications_enabled(user_id: int) -> bool:
+    """Check if user notifications are enabled."""
+    try:
+        user = db.get_user_model(user_id) if hasattr(db, "get_user_model") else db.get_user(user_id)
+        if isinstance(user, dict):
+            return bool(user.get("notifications_enabled", True))
+        return bool(getattr(user, "notifications_enabled", True))
+    except Exception:
+        return True
 
 
 # =============================================================================
@@ -294,12 +308,26 @@ async def handle_order_accept(callback: types.CallbackQuery, db: DatabaseProtoco
         # Update booking status in database
         booking = None
         booking_id = None
+        used_unified = False
         if db and hasattr(db, "get_booking_by_code"):
             booking = db.get_booking_by_code(booking_code)
             logger.info(f"Found booking: {booking}")
             if booking:
                 booking_id = booking.get("booking_id") if isinstance(booking, dict) else booking[0]
-                if booking_id and hasattr(db, "update_booking_status"):
+                if booking_id and unified_order_service:
+                    try:
+                        used_unified = await unified_order_service.confirm_order(
+                            booking_id, "booking"
+                        )
+                        logger.info(
+                            "Booking %s (%s) confirmed by unified service",
+                            booking_id,
+                            booking_code,
+                        )
+                    except Exception as e:
+                        logger.warning(f"Unified confirm failed for booking {booking_id}: {e}")
+                        used_unified = False
+                if booking_id and not used_unified and hasattr(db, "update_booking_status"):
                     db.update_booking_status(booking_id, "confirmed")
                     logger.info(f"Booking {booking_id} ({booking_code}) confirmed by seller")
 
@@ -308,17 +336,20 @@ async def handle_order_accept(callback: types.CallbackQuery, db: DatabaseProtoco
             callback.message.text + "\n\n✅ <b>Заказ принят!</b>", parse_mode="HTML"
         )
 
+        customer_notifications = _notifications_enabled(int(customer_id))
+
         # Notify customer
-        try:
-            await callback.bot.send_message(
-                chat_id=int(customer_id),
-                text=f"🎉 <b>Ваш заказ принят!</b>\n\n"
-                f"🎫 Код бронирования: <code>{booking_code}</code>\n\n"
-                f"Продавец подтвердил ваш заказ. Ожидайте дальнейших инструкций!",
-                parse_mode="HTML",
-            )
-        except Exception as e:
-            logger.warning(f"Failed to notify customer {customer_id}: {e}")
+        if not used_unified and customer_notifications:
+            try:
+                await callback.bot.send_message(
+                    chat_id=int(customer_id),
+                    text=f"🎉 <b>Ваш заказ принят!</b>\n\n"
+                    f"🎫 Код бронирования: <code>{booking_code}</code>\n\n"
+                    f"Продавец подтвердил ваш заказ. Ожидайте дальнейших инструкций!",
+                    parse_mode="HTML",
+                )
+            except Exception as e:
+                logger.warning(f"Failed to notify customer {customer_id}: {e}")
 
         await callback.answer("Заказ принят! Покупатель уведомлен.", show_alert=True)
 
@@ -340,31 +371,53 @@ async def handle_order_reject(callback: types.CallbackQuery, db: DatabaseProtoco
         logger.info(f"Order reject: code={booking_code}, customer={customer_id}")
 
         # Update booking status in database
+        booking_id = None
+        used_unified = False
         if db and hasattr(db, "get_booking_by_code"):
             booking = db.get_booking_by_code(booking_code)
             logger.info(f"Found booking for rejection: {booking}")
             if booking:
                 booking_id = booking.get("booking_id") if isinstance(booking, dict) else booking[0]
-                if booking_id and hasattr(db, "update_booking_status"):
-                    db.update_booking_status(booking_id, "cancelled")
-                    logger.info(f"Booking {booking_id} ({booking_code}) rejected by seller")
+                if booking_id and unified_order_service:
+                    try:
+                        used_unified = await unified_order_service.reject_order(
+                            booking_id, "booking", reason="seller_cancel"
+                        )
+                        logger.info(
+                            "Booking %s (%s) rejected by unified service",
+                            booking_id,
+                            booking_code,
+                        )
+                    except Exception as e:
+                        logger.warning(f"Unified reject failed for booking {booking_id}: {e}")
+                        used_unified = False
+                if booking_id and not used_unified:
+                    if hasattr(db, "cancel_booking"):
+                        db.cancel_booking(booking_id)
+                        logger.info(f"Booking {booking_id} ({booking_code}) rejected by seller")
+                    elif hasattr(db, "update_booking_status"):
+                        db.update_booking_status(booking_id, "cancelled")
+                        logger.info(f"Booking {booking_id} ({booking_code}) rejected by seller")
 
         # Update message to show rejected
         await callback.message.edit_text(
             callback.message.text + "\n\n❌ <b>Заказ отклонён</b>", parse_mode="HTML"
         )
 
+        customer_notifications = _notifications_enabled(int(customer_id))
+
         # Notify customer
-        try:
-            await callback.bot.send_message(
-                chat_id=int(customer_id),
-                text=f"😔 <b>К сожалению, ваш заказ отклонён</b>\n\n"
-                f"🎫 Код: <code>{booking_code}</code>\n\n"
-                f"Продавец не может выполнить ваш заказ. Попробуйте выбрать другой товар.",
-                parse_mode="HTML",
-            )
-        except Exception as e:
-            logger.warning(f"Failed to notify customer {customer_id}: {e}")
+        if not used_unified and customer_notifications:
+            try:
+                await callback.bot.send_message(
+                    chat_id=int(customer_id),
+                    text=f"😔 <b>К сожалению, ваш заказ отклонён</b>\n\n"
+                    f"🎫 Код: <code>{booking_code}</code>\n\n"
+                    f"Продавец не может выполнить ваш заказ. Попробуйте выбрать другой товар.",
+                    parse_mode="HTML",
+                )
+            except Exception as e:
+                logger.warning(f"Failed to notify customer {customer_id}: {e}")
 
         await callback.answer("Заказ отклонён. Покупатель уведомлен.", show_alert=True)
 
@@ -597,6 +650,9 @@ async def start_booking_worker() -> asyncio.Task | None:
 
 async def start_rating_reminder_worker_task() -> asyncio.Task | None:
     """Start the rating reminder worker."""
+    if not ENABLE_RATING_REMINDERS:
+        logger.info("Rating reminder worker disabled by ENABLE_RATING_REMINDERS=0")
+        return None
     try:
         from tasks.rating_reminder_worker import start_rating_reminder_worker
 

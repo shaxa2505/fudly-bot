@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { ArrowLeft } from 'lucide-react';
 import { useNavigate, useLocation, useParams } from 'react-router-dom';
 import api from '../api/client';
@@ -6,6 +6,8 @@ import { useCart } from '../context/CartContext';
 import { getCurrentUser } from '../utils/auth';
 import { resolveOrderItemImageUrl } from '../utils/imageUtils';
 import BottomNav from '../components/BottomNav';
+import PullToRefresh from '../components/PullToRefresh';
+import { usePullToRefresh } from '../hooks/usePullToRefresh';
 import './OrderTrackingPage.css';
 
 const STATUS_STEPS = {
@@ -92,6 +94,12 @@ function OrderTrackingPage({ user }) {
     setShowQR(false);
   };
 
+  const handleRefresh = useCallback(async () => {
+    await loadOrderData(false);
+  }, [loadOrderData]);
+
+  const { containerRef, isRefreshing, pullDistance, progress } = usePullToRefresh(handleRefresh);
+
   const getStatusColor = (status) => {
     switch (status) {
       case 'pending': return '#FFA500';
@@ -122,7 +130,12 @@ function OrderTrackingPage({ user }) {
 
   if (loading) {
     return (
-      <div className="order-tracking-page">
+      <div ref={containerRef} className="order-tracking-page">
+        <PullToRefresh
+          isRefreshing={isRefreshing}
+          pullDistance={pullDistance}
+          progress={progress}
+        />
         <div className="loading-container">
           <div className="spinner"></div>
           <p>{t('Загрузка заказа...', 'Buyurtma yuklanmoqda...')}</p>
@@ -133,7 +146,12 @@ function OrderTrackingPage({ user }) {
 
   if (error || !order) {
     return (
-      <div className="order-tracking-page">
+      <div ref={containerRef} className="order-tracking-page">
+        <PullToRefresh
+          isRefreshing={isRefreshing}
+          pullDistance={pullDistance}
+          progress={progress}
+        />
         <div className="tracking-header">
           <button
             onClick={() => navigate('/profile')}
@@ -158,7 +176,12 @@ function OrderTrackingPage({ user }) {
   const orderPhotoUrl = resolveOrderItemImageUrl(order);
 
   return (
-    <div className="order-tracking-page">
+    <div ref={containerRef} className="order-tracking-page">
+      <PullToRefresh
+        isRefreshing={isRefreshing}
+        pullDistance={pullDistance}
+        progress={progress}
+      />
       <div className="tracking-header">
         <button
           onClick={() => navigate(`/order/${bookingId}/details`)}

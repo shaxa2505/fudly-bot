@@ -1,9 +1,11 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import api, { API_BASE_URL } from '../api/client'
 import { useCart } from '../context/CartContext'
 import { useToast } from '../context/ToastContext'
 import BottomNav from '../components/BottomNav'
+import PullToRefresh from '../components/PullToRefresh'
+import { usePullToRefresh } from '../hooks/usePullToRefresh'
 import { getUserId, getUserLanguage, getCurrentUser } from '../utils/auth'
 import { resolveImageUrl } from '../utils/imageUtils'
 import './YanaPage.css'
@@ -276,6 +278,20 @@ function YanaPage() {
     }
   }
 
+  const handleRefresh = useCallback(async () => {
+    if (activeSection === 'notifications') {
+      await loadNotificationSettings()
+      loadNotificationsCache()
+      return
+    }
+    if (activeSection !== 'orders') {
+      return
+    }
+    await loadOrders(true)
+  }, [activeSection, loadNotificationSettings, loadNotificationsCache, loadOrders])
+
+  const { containerRef, isRefreshing, pullDistance, progress } = usePullToRefresh(handleRefresh)
+
   const handleChangePhone = () => {
     const botUsername = window.Telegram?.WebApp?.initDataUnsafe?.bot?.username || 'fudlybot'
     const link = `https://t.me/${botUsername}`
@@ -388,7 +404,12 @@ function YanaPage() {
   ]
 
   return (
-    <div className="yana-page">
+    <div ref={containerRef} className="yana-page">
+      <PullToRefresh
+        isRefreshing={isRefreshing}
+        pullDistance={pullDistance}
+        progress={progress}
+      />
       {/* Topbar */}
       <header className="yana-topbar">
         <h1 className="yana-title">Yana</h1>
