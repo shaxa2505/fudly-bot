@@ -10,6 +10,7 @@ const STATIC_ASSETS = [
   '/',
   '/index.html',
   '/manifest.json',
+  '/images/placeholder.svg',
 ]
 
 // Паттерны для кэширования

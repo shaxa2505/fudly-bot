@@ -8,7 +8,8 @@
 ## Next (high impact)
 - [x] Deduplicate in-flight GET requests and use LRU cache in `webapp/src/api/client.js`.
 - [ ] Add pagination + `updated_since` (or ETag) for `/orders` in `app/api/webapp/routes_orders.py`.
-- [ ] Push `/offers` filtering/sorting into DB + add indexes for city/category/price/discount.
+- [x] Push `/offers` filtering/sorting into DB and add pagination for store/category/hot offers.
+- [ ] Add indexes for city/category/price/discount to support `/offers` queries.
 - [ ] Add `/stores` pagination and trim response payloads.
 - [ ] Use `OptimizedImage` in orders list to reduce layout shifts.
 

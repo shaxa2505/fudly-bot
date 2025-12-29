@@ -65,13 +65,25 @@ export function CartProvider({ children }) {
         return prev;
       }
 
+      const rawPhoto =
+        offer.photo ||
+        offer.photo_url ||
+        offer.image_url ||
+        offer.photoUrl ||
+        offer.imageUrl ||
+        offer.photo_id ||
+        offer.offer_photo ||
+        offer.offer_photo_url ||
+        offer.image ||
+        existing?.offer?.photo
+
       return {
         ...prev,
         [key]: {
           offer: {
             id: offer.id,
             title: offer.title || existing?.offer?.title,
-            photo: offer.photo || existing?.offer?.photo,
+            photo: rawPhoto,
             discount_price: offer.discount_price || existing?.offer?.discount_price,
             original_price: offer.original_price || existing?.offer?.original_price,
             store_id: offer.store_id || existing?.offer?.store_id,
@@ -157,7 +169,12 @@ export function CartProvider({ children }) {
 
   const cartTotal = useMemo(() => {
     return cartItems.reduce(
-      (sum, item) => sum + item.offer.discount_price * item.quantity,
+      (sum, item) => {
+        const price = Number(
+          item.offer.discount_price ?? item.offer.original_price ?? 0
+        )
+        return sum + price * item.quantity
+      },
       0
     );
   }, [cartItems]);

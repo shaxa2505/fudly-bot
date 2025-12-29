@@ -3,6 +3,7 @@ import { ArrowLeft, Heart, Home, Sparkles } from 'lucide-react'
 import { useFavorites } from '../context/FavoritesContext'
 import { useCart } from '../context/CartContext'
 import BottomNav from '../components/BottomNav'
+import { PLACEHOLDER_IMAGE, resolveOfferImageUrl } from '../utils/imageUtils'
 import './FavoritesPage.css'
 
 function FavoritesPage() {
@@ -65,11 +66,11 @@ function FavoritesPage() {
           return (
           <div key={offerId ?? offer.title} className="favorite-card">
             <img
-              src={offer.photo || 'https://placehold.co/100x100/F5F5F5/CCCCCC?text=IMG'}
+              src={resolveOfferImageUrl(offer) || PLACEHOLDER_IMAGE}
               alt={offer.title}
               className="favorite-image"
               onClick={() => navigate('/product', { state: { offer } })}
-              onError={(e) => { e.target.src = 'https://placehold.co/100x100/F5F5F5/CCCCCC?text=IMG' }}
+              onError={(e) => { e.target.src = PLACEHOLDER_IMAGE }}
             />
 
             <div className="favorite-info" onClick={() => navigate('/product', { state: { offer } })}>

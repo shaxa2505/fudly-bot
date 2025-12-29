@@ -6,6 +6,7 @@ import { useCart } from '../context/CartContext'
 import { getSavedLocation, getLatinCity, getCyrillicCity } from '../utils/cityUtils'
 import { getCurrentLocation, addDistanceToStores, saveLocation, getSavedLocation as getGeoLocation } from '../utils/geolocation'
 import { blurOnEnter } from '../utils/helpers'
+import { resolveOfferImageUrl, resolveStoreImageUrl } from '../utils/imageUtils'
 import BottomNav from '../components/BottomNav'
 import StoreMap from '../components/StoreMap'
 import './StoresPage.css'
@@ -307,37 +308,39 @@ function StoresPage() {
           </div>
         ) : (
           <div className="sp-grid">
-            {filteredStores.map((store, idx) => (
-              <div
-                key={store.id}
-                className="sp-card"
-                onClick={() => loadStoreOffers(store)}
-                style={{ animationDelay: `${idx * 0.05}s` }}
-              >
-                {/* Store Image */}
-                <div className="sp-card-image">
-                  {api.getPhotoUrl(store.photo_url) && (
-                    <img
-                      src={api.getPhotoUrl(store.photo_url)}
-                      alt={store.name}
-                      className="sp-card-img"
-                      loading="lazy"
-                      decoding="async"
-                      onError={(e) => {
-                        e.target.style.display = 'none'
-                        e.target.parentNode.querySelector('.sp-card-placeholder').style.display = 'flex'
-                      }}
-                    />
-                  )}
-                  <div className="sp-card-placeholder" style={{ display: api.getPhotoUrl(store.photo_url) ? 'none' : 'flex' }}>
-                    <svg width="40" height="40" viewBox="0 0 24 24" fill="none">
-                      <path d="M3 21h18M3 7v14M21 7v14M6 7V4a1 1 0 011-1h10a1 1 0 011 1v3M12 11v6M9 14h6" stroke="#bbb" strokeWidth="1.5" strokeLinecap="round"/>
-                    </svg>
+            {filteredStores.map((store, idx) => {
+              const storePhotoUrl = resolveStoreImageUrl(store)
+              return (
+                <div
+                  key={store.id}
+                  className="sp-card"
+                  onClick={() => loadStoreOffers(store)}
+                  style={{ animationDelay: `${idx * 0.05}s` }}
+                >
+                  {/* Store Image */}
+                  <div className="sp-card-image">
+                    {storePhotoUrl && (
+                      <img
+                        src={storePhotoUrl}
+                        alt={store.name}
+                        className="sp-card-img"
+                        loading="lazy"
+                        decoding="async"
+                        onError={(e) => {
+                          e.target.style.display = 'none'
+                          e.target.parentNode.querySelector('.sp-card-placeholder').style.display = 'flex'
+                        }}
+                      />
+                    )}
+                    <div className="sp-card-placeholder" style={{ display: storePhotoUrl ? 'none' : 'flex' }}>
+                      <svg width="40" height="40" viewBox="0 0 24 24" fill="none">
+                        <path d="M3 21h18M3 7v14M21 7v14M6 7V4a1 1 0 011-1h10a1 1 0 011 1v3M12 11v6M9 14h6" stroke="#bbb" strokeWidth="1.5" strokeLinecap="round"/>
+                      </svg>
+                    </div>
+                    {store.offers_count > 0 && (
+                      <span className="sp-card-badge">{store.offers_count} ta</span>
+                    )}
                   </div>
-                  {store.offers_count > 0 && (
-                    <span className="sp-card-badge">{store.offers_count} ta</span>
-                  )}
-                </div>
 
                 <div className="sp-card-body">
                   <h3 className="sp-card-name">{store.name}</h3>
@@ -362,8 +365,9 @@ function StoresPage() {
                     )}
                   </div>
                 </div>
-              </div>
-            ))}
+                </div>
+              )
+            })}
           </div>
         )}
       </div>
@@ -442,7 +446,7 @@ function StoresPage() {
                     </h3>
                     <div className="sp-offers">
                       {storeOffers.map(offer => {
-                        const imgUrl = offer.image_url || offer.photo || ''
+                        const imgUrl = resolveOfferImageUrl(offer)
                         // Calculate discount percent if not provided
                         let discountPercent = 0
                         if (offer.discount_percent) {

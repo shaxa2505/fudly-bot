@@ -60,11 +60,18 @@ function buildAuthHeaders(initData, extraHeaders = {}, options = {}) {
     return headers;
 }
 
+function normalizeOrderStatus(rawStatus) {
+    if (!rawStatus) return '';
+    const status = String(rawStatus).trim().toLowerCase();
+    if (status === 'confirmed') return 'preparing';
+    return status;
+}
+
 function normalizeOrder(raw) {
     if (!raw) return raw;
 
     const id = raw.id ?? raw.order_id ?? raw.booking_id;
-    const status = raw.status ?? raw.order_status ?? 'pending';
+    const status = normalizeOrderStatus(raw.status ?? raw.order_status ?? 'pending');
     const orderType =
         raw.order_type ??
         (raw.type === 'booking' ? 'pickup' : raw.type === 'order' ? 'delivery' : undefined);
@@ -75,6 +82,7 @@ function normalizeOrder(raw) {
         ...raw,
         id,
         status,
+        order_status: status,
         order_type: orderType || raw.order_type,
         total_price: totalPrice,
         product_name: productName

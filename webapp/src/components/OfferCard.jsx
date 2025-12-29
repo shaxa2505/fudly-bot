@@ -1,6 +1,6 @@
 import { memo, useState, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
-import api from '../api/client'
+import { PLACEHOLDER_IMAGE, resolveOfferImageUrl } from '../utils/imageUtils'
 import QuantityControl from './QuantityControl'
 import './OfferCard.css'
 
@@ -46,8 +46,8 @@ const OfferCard = memo(function OfferCard({ offer, cartQuantity = 0, onAddToCart
   const hasDiscount = offer.original_price > offer.discount_price
 
   // Get photo URL (handles Telegram file_id conversion)
-  const photoUrl = api.getPhotoUrl(offer.photo)
-  const fallbackUrl = 'https://placehold.co/300x300/F5F5F5/CCCCCC?text=IMG'
+  const photoUrl = resolveOfferImageUrl(offer)
+  const fallbackUrl = PLACEHOLDER_IMAGE
 
   return (
     <div className={`offer-card ${cartQuantity > 0 ? 'in-cart' : ''} ${isAdding ? 'adding' : ''}`} onClick={handleCardClick}>

@@ -205,7 +205,17 @@ class DatabaseProtocol(Protocol):
     def get_offer(self, offer_id: int) -> tuple[Any, ...] | None:
         ...
 
-    def get_store_offers(self, store_id: int) -> list[tuple[Any, ...]]:
+    def get_store_offers(
+        self,
+        store_id: int,
+        status: str = "active",
+        limit: int | None = None,
+        offset: int = 0,
+        sort_by: str | None = None,
+        min_price: float | None = None,
+        max_price: float | None = None,
+        min_discount: float | None = None,
+    ) -> list[tuple[Any, ...]]:
         ...
 
     def get_offers_by_store(self, store_id: int) -> list[dict]:

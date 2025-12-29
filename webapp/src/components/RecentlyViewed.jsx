@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import api from '../api/client'
+import { PLACEHOLDER_IMAGE, resolveOfferImageUrl } from '../utils/imageUtils'
 import './RecentlyViewed.css'
 
 function RecentlyViewed() {
@@ -53,11 +54,11 @@ function RecentlyViewed() {
           >
             <div className="recently-viewed-card-image">
               <img
-                src={offer.photo || offer.photo_id || 'https://placehold.co/120x120/F5F5F5/CCCCCC?text=IMG'}
+                src={resolveOfferImageUrl(offer) || PLACEHOLDER_IMAGE}
                 alt={offer.name || offer.title}
                 loading="lazy"
                 onError={(e) => {
-                  e.target.src = 'https://placehold.co/120x120/F5F5F5/CCCCCC?text=IMG'
+                  e.target.src = PLACEHOLDER_IMAGE
                 }}
               />
             </div>

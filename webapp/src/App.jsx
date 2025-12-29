@@ -11,7 +11,6 @@ import './styles/animations.css'
 // Lazy load pages for better initial load
 const CartPage = lazy(() => import('./pages/CartPage'))
 const YanaPage = lazy(() => import('./pages/YanaPage'))
-const OrderTrackingPage = lazy(() => import('./pages/OrderTrackingPage'))
 const OrderDetailsPage = lazy(() => import('./pages/OrderDetailsPage'))
 const ProductDetailPage = lazy(() => import('./pages/ProductDetailPage'))
 const StoresPage = lazy(() => import('./pages/StoresPage'))
@@ -179,7 +178,7 @@ function AppContent() {
           />
           <Route
             path="/order/:orderId"
-            element={<OrderTrackingPage user={user} />}
+            element={<OrderDetailsPage user={user} />}
           />
           <Route
             path="/order/:orderId/details"

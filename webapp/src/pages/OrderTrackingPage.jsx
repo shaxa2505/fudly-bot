@@ -4,6 +4,7 @@ import { useNavigate, useLocation, useParams } from 'react-router-dom';
 import api from '../api/client';
 import { useCart } from '../context/CartContext';
 import { getCurrentUser } from '../utils/auth';
+import { resolveOrderItemImageUrl } from '../utils/imageUtils';
 import BottomNav from '../components/BottomNav';
 import './OrderTrackingPage.css';
 
@@ -14,7 +15,8 @@ const STATUS_STEPS = {
   'ready': { order: 3, label: { ru: 'Готов', uz: 'Tayyor' } },
   'delivering': { order: 4, label: { ru: 'В пути', uz: 'Yo\'lda' } },
   'completed': { order: 5, label: { ru: 'Завершен', uz: 'Yakunlandi' } },
-  'cancelled': { order: -1, label: { ru: 'Отменен', uz: 'Bekor qilindi' } }
+  'cancelled': { order: -1, label: { ru: 'Отменен', uz: 'Bekor qilindi' } },
+  'rejected': { order: -1, label: { ru: 'Отклонен', uz: 'Rad etildi' } }
 };
 
 function OrderTrackingPage({ user }) {
@@ -99,6 +101,7 @@ function OrderTrackingPage({ user }) {
       case 'delivering': return '#2196F3';
       case 'completed': return '#9E9E9E';
       case 'cancelled': return '#F44336';
+      case 'rejected': return '#F44336';
       default: return '#9E9E9E';
     }
   };
@@ -112,6 +115,7 @@ function OrderTrackingPage({ user }) {
       case 'delivering': return 'WAY';
       case 'completed': return 'OK';
       case 'cancelled': return 'X';
+      case 'rejected': return 'X';
       default: return '.';
     }
   };
@@ -149,9 +153,9 @@ function OrderTrackingPage({ user }) {
   }
 
   const currentStatusOrder = STATUS_STEPS[order.status]?.order || 0;
-  const isCancelled = order.status === 'cancelled';
+  const isCancelled = ['cancelled', 'rejected'].includes(order.status);
   const canShowQR = ['confirmed', 'preparing', 'ready'].includes(order.status) && order.qr_code;
-  const orderPhotoUrl = api.getPhotoUrl(order.offer_photo) || order.offer_photo;
+  const orderPhotoUrl = resolveOrderItemImageUrl(order);
 
   return (
     <div className="order-tracking-page">

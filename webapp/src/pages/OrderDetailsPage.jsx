@@ -2,9 +2,17 @@ import { useEffect, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { ArrowLeft } from 'lucide-react'
 import apiClient from '../api/client'
+import { resolveOrderItemImageUrl } from '../utils/imageUtils'
 import './OrderDetailsPage.css'
 
 export default function OrderDetailsPage() {
+  const normalizeOrderStatus = (status) => {
+    if (!status) return ''
+    const normalized = String(status).trim().toLowerCase()
+    if (normalized === 'confirmed') return 'preparing'
+    return normalized
+  }
+
   const { orderId } = useParams()
   const navigate = useNavigate()
   const [order, setOrder] = useState(null)
@@ -29,19 +37,21 @@ export default function OrderDetailsPage() {
 
       if (raw) {
         const ps = raw.payment_status
+        const baseStatus = normalizeOrderStatus(raw.order_status || raw.status || 'pending')
         const displayStatus =
+          ['completed', 'cancelled', 'rejected'].includes(baseStatus) ? baseStatus :
           ps === 'awaiting_payment' ? 'awaiting_payment' :
           ps === 'awaiting_proof' ? 'awaiting_proof' :
           ps === 'proof_submitted' ? 'proof_submitted' :
           ps === 'rejected' ? 'payment_rejected' :
-          (raw.order_status || raw.status || 'pending')
+          (baseStatus || 'pending')
 
         foundOrder = {
           ...raw,
           order_id: raw.order_id || raw.booking_id,
           status: displayStatus,
           offer_title: raw.items?.[0]?.offer_title || raw.offer_title || 'Buyurtma',
-          offer_photo: apiClient.getPhotoUrl(raw.items?.[0]?.photo) || raw.offer_photo,
+          offer_photo: resolveOrderItemImageUrl(raw.items?.[0]) || resolveOrderItemImageUrl(raw),
           store_name: raw.store_name || raw.items?.[0]?.store_name,
           quantity: raw.quantity || raw.items?.reduce((sum, item) => sum + (item.quantity || 0), 0) || 1,
           items: raw.items || [],
@@ -182,6 +192,7 @@ export default function OrderDetailsPage() {
     click: 'Click',
     payme: 'Payme',
   }
+  const orderPhotoUrl = resolveOrderItemImageUrl(order)
 
   return (
     <div className="order-details-page">
@@ -235,7 +246,7 @@ export default function OrderDetailsPage() {
         <div className="items-list">
           {order.items && order.items.length > 0 ? (
             order.items.map((item, idx) => {
-              const itemPhoto = apiClient.getPhotoUrl(item.photo) || item.photo
+              const itemPhoto = resolveOrderItemImageUrl(item)
               return (
               <div key={idx} className="item-card">
                 {itemPhoto && (
@@ -260,9 +271,9 @@ export default function OrderDetailsPage() {
             )})
           ) : (
             <div className="single-item-card">
-              {(apiClient.getPhotoUrl(order.offer_photo) || order.offer_photo) && (
+              {orderPhotoUrl && (
                 <img
-                  src={apiClient.getPhotoUrl(order.offer_photo) || order.offer_photo}
+                  src={orderPhotoUrl}
                   alt={order.offer_title}
                   className="item-image"
                   onError={(e) => {

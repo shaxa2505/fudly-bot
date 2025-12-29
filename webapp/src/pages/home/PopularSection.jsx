@@ -1,3 +1,5 @@
+import { PLACEHOLDER_IMAGE, resolveOfferImageUrl } from '../../utils/imageUtils'
+
 const PopularSection = ({ isVisible, offers, loading, onOfferClick, onScrollToList }) => {
   if (!isVisible) {
     return null
@@ -35,14 +37,14 @@ const PopularSection = ({ isVisible, offers, loading, onOfferClick, onScrollToLi
             >
               <div className="popular-card-image">
                 <img
-                  src={offer.photo || 'https://placehold.co/300x300/F5F5F5/CCCCCC?text=📷'}
+                  src={resolveOfferImageUrl(offer) || PLACEHOLDER_IMAGE}
                   alt={offer.title}
                   loading="lazy"
                   decoding="async"
                   width="300"
                   height="300"
                   onError={(event) => {
-                    event.target.src = 'https://placehold.co/300x300/F5F5F5/CCCCCC?text=📷'
+                    event.target.src = PLACEHOLDER_IMAGE
                   }}
                 />
                 {offer.discount_percent > 0 && (

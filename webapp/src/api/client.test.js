@@ -17,12 +17,35 @@ describe('API Client', () => {
       expect(api.getPhotoUrl(httpsUrl)).toBe(httpsUrl)
     })
 
+    it('returns data and blob URLs as-is', () => {
+      const dataUrl = 'data:image/png;base64,abc123'
+      const blobUrl = 'blob:https://example.com/abc'
+
+      expect(api.getPhotoUrl(dataUrl)).toBe(dataUrl)
+      expect(api.getPhotoUrl(blobUrl)).toBe(blobUrl)
+    })
+
     it('converts Telegram file_id to API URL', () => {
       const fileId = 'AgACAgIAAxkBAAITest123456789'
       const result = api.getPhotoUrl(fileId)
 
       expect(result).toContain('/photo/')
       expect(result).toContain(encodeURIComponent(fileId))
+    })
+
+    it('converts relative photo paths to API URL', () => {
+      const result = api.getPhotoUrl('/photo/test-id')
+      expect(result).toContain('/photo/test-id')
+    })
+
+    it('converts photo/ relative paths to API URL', () => {
+      const result = api.getPhotoUrl('photo/test-id')
+      expect(result).toContain('/photo/test-id')
+    })
+
+    it('converts numeric ids to API URL', () => {
+      const result = api.getPhotoUrl(12345)
+      expect(result).toContain('/photo/12345')
     })
   })
 

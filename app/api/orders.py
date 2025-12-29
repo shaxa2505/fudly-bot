@@ -767,7 +767,7 @@ async def get_order_timeline(
     timeline.append(StatusUpdate(status="pending", timestamp=created_at, message="Заказ создан"))
 
     # v23+ statuses: pending, preparing, ready, delivering, completed, rejected, cancelled
-    if status in ["preparing", "confirmed", "ready", "completed"]:
+    if status in ["preparing", "confirmed", "ready", "delivering", "completed"]:
         timeline.append(
             StatusUpdate(
                 status="preparing",
@@ -776,12 +776,21 @@ async def get_order_timeline(
             )
         )
 
-    if status in ["ready", "completed"]:
+    if status in ["ready", "delivering", "completed"]:
         timeline.append(
             StatusUpdate(
                 status="ready",
                 timestamp=str(order_dict.get("updated_at", created_at)),
                 message="Заказ готов к выдаче",
+            )
+        )
+
+    if status == "delivering":
+        timeline.append(
+            StatusUpdate(
+                status="delivering",
+                timestamp=str(order_dict.get("updated_at", created_at)),
+                message="Buyurtma yetkazib berilmoqda",
             )
         )
 
@@ -791,6 +800,15 @@ async def get_order_timeline(
                 status="completed",
                 timestamp=str(order_dict.get("updated_at", created_at)),
                 message="Заказ завершен",
+            )
+        )
+
+    if status == "rejected":
+        timeline.append(
+            StatusUpdate(
+                status="rejected",
+                timestamp=str(order_dict.get("updated_at", created_at)),
+                message="Buyurtma rad etildi",
             )
         )
 

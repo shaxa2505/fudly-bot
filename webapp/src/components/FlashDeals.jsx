@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import api from '../api/client'
 import { useCart } from '../context/CartContext'
+import { PLACEHOLDER_IMAGE, resolveOfferImageUrl } from '../utils/imageUtils'
 import './FlashDeals.css'
 
 // Calculate time remaining until expiry
@@ -95,7 +96,7 @@ function FlashDeals({ city = 'Ташкент' }) {
           deals.map(deal => {
             const timeLeft = getTimeRemaining(deal.expiry_date)
             const inCart = getQuantity(deal.id) > 0
-            const photoUrl = api.getPhotoUrl(deal.photo) || 'https://placehold.co/120x120/F5F5F5/CCCCCC?text=📷'
+            const photoUrl = resolveOfferImageUrl(deal) || PLACEHOLDER_IMAGE
 
             return (
               <div
@@ -109,7 +110,7 @@ function FlashDeals({ city = 'Ташкент' }) {
                     alt={deal.title}
                     loading="lazy"
                     onError={(e) => {
-                      e.target.src = 'https://placehold.co/120x120/F5F5F5/CCCCCC?text=📷'
+                      e.target.src = PLACEHOLDER_IMAGE
                     }}
                   />
                   {deal.discount_percent > 0 && (

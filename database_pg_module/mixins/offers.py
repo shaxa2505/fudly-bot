@@ -186,20 +186,66 @@ class OfferMixin:
             logger.error(f"Failed to convert offer {offer_id} to model: {e}")
             return None
 
-    def get_store_offers(self, store_id: int, status: str = "active"):
-        """Get all offers for a store (excluding expired)."""
+    def get_store_offers(
+        self,
+        store_id: int,
+        status: str = "active",
+        limit: int | None = None,
+        offset: int = 0,
+        sort_by: str | None = None,
+        min_price: float | None = None,
+        max_price: float | None = None,
+        min_discount: float | None = None,
+    ):
+        """Get offers for a store (excluding expired)."""
         with self.get_connection() as conn:
             cursor = conn.cursor(row_factory=dict_row)
-            cursor.execute(
-                """
-                SELECT * FROM offers
-                WHERE store_id = %s
-                AND status = %s
-                AND (expiry_date IS NULL OR expiry_date >= CURRENT_DATE)
-                ORDER BY created_at DESC
-            """,
-                (store_id, status),
-            )
+
+            query = """
+                SELECT o.*,
+                       CASE WHEN o.original_price > 0 THEN CAST((1.0 - o.discount_price::numeric / o.original_price::numeric) * 100 AS INTEGER) ELSE 0 END as discount_percent
+                FROM offers o
+                WHERE o.store_id = %s
+                  AND o.status = %s
+                  AND (o.expiry_date IS NULL OR o.expiry_date >= CURRENT_DATE)
+            """
+            params: list[Any] = [store_id, status]
+
+            if min_price is not None:
+                query += " AND o.discount_price >= %s"
+                params.append(min_price)
+            if max_price is not None:
+                query += " AND o.discount_price <= %s"
+                params.append(max_price)
+            if min_discount is not None:
+                query += (
+                    " AND o.original_price > 0"
+                    " AND (1.0 - o.discount_price::numeric / o.original_price::numeric) * 100 >= %s"
+                )
+                params.append(min_discount)
+
+            order_by = "o.created_at DESC"
+            if sort_by:
+                sort_key = sort_by.lower()
+                if sort_key == "discount":
+                    order_by = "discount_percent DESC, o.created_at DESC"
+                elif sort_key == "price_asc":
+                    order_by = "o.discount_price ASC, o.created_at DESC"
+                elif sort_key == "price_desc":
+                    order_by = "o.discount_price DESC, o.created_at DESC"
+                elif sort_key == "new":
+                    order_by = "o.offer_id DESC"
+
+            query += f" ORDER BY {order_by}"
+
+            if limit is not None:
+                query += " LIMIT %s OFFSET %s"
+                params.extend([limit, offset])
+            elif offset:
+                query += " OFFSET %s"
+                params.append(offset)
+
+            cursor.execute(query, params)
             return [dict(row) for row in cursor.fetchall()]
 
     def get_active_offers(
@@ -232,6 +278,10 @@ class OfferMixin:
         business_type: str | None = None,
         region: str | None = None,
         district: str | None = None,
+        sort_by: str | None = None,
+        min_price: float | None = None,
+        max_price: float | None = None,
+        min_discount: float | None = None,
     ):
         """Get hot offers (top by discount and expiry date)."""
         with self.get_connection() as conn:
@@ -269,10 +319,37 @@ class OfferMixin:
                 query += " AND s.category = %s"
                 params.append(business_type)
 
-            query += """
-                ORDER BY discount_percent DESC,
-                         COALESCE(o.expiry_date, '9999-12-31') ASC,
-                         o.created_at DESC
+            if min_price is not None:
+                query += " AND o.discount_price >= %s"
+                params.append(min_price)
+            if max_price is not None:
+                query += " AND o.discount_price <= %s"
+                params.append(max_price)
+            if min_discount is not None:
+                query += (
+                    " AND o.original_price > 0"
+                    " AND (1.0 - o.discount_price::numeric / o.original_price::numeric) * 100 >= %s"
+                )
+                params.append(min_discount)
+
+            order_by = (
+                "discount_percent DESC, COALESCE(o.expiry_date, '9999-12-31') ASC, o.created_at DESC"
+            )
+            if sort_by:
+                sort_key = sort_by.lower()
+                if sort_key == "price_asc":
+                    order_by = "o.discount_price ASC, o.created_at DESC"
+                elif sort_key == "price_desc":
+                    order_by = "o.discount_price DESC, o.created_at DESC"
+                elif sort_key == "new":
+                    order_by = "o.offer_id DESC"
+                elif sort_key == "discount":
+                    order_by = (
+                        "discount_percent DESC, COALESCE(o.expiry_date, '9999-12-31') ASC, o.created_at DESC"
+                    )
+
+            query += f"""
+                ORDER BY {order_by}
                 LIMIT %s OFFSET %s
             """
             params.extend([limit, offset])
@@ -386,14 +463,20 @@ class OfferMixin:
         city: str | None,
         category: str,
         limit: int = 20,
+        offset: int = 0,
         region: str | None = None,
         district: str | None = None,
+        sort_by: str | None = None,
+        min_price: float | None = None,
+        max_price: float | None = None,
+        min_discount: float | None = None,
     ) -> list[dict]:
         """Get offers by city and category."""
         with self.get_connection() as conn:
             cursor = conn.cursor(row_factory=dict_row)
             query = """
-                SELECT o.*, s.name as store_name, s.address, s.city
+                SELECT o.*, s.name as store_name, s.address, s.city,
+                       CASE WHEN o.original_price > 0 THEN CAST((1.0 - o.discount_price::numeric / o.original_price::numeric) * 100 AS INTEGER) ELSE 0 END as discount_percent
                 FROM offers o
                 JOIN stores s ON o.store_id = s.store_id
                 WHERE o.category = %s
@@ -418,11 +501,36 @@ class OfferMixin:
                 query += " AND s.district ILIKE %s"
                 params.append(f"%{district}%")
 
-            query += """
-                ORDER BY o.created_at DESC
-                LIMIT %s
+            if min_price is not None:
+                query += " AND o.discount_price >= %s"
+                params.append(min_price)
+            if max_price is not None:
+                query += " AND o.discount_price <= %s"
+                params.append(max_price)
+            if min_discount is not None:
+                query += (
+                    " AND o.original_price > 0"
+                    " AND (1.0 - o.discount_price::numeric / o.original_price::numeric) * 100 >= %s"
+                )
+                params.append(min_discount)
+
+            order_by = "o.created_at DESC"
+            if sort_by:
+                sort_key = sort_by.lower()
+                if sort_key == "discount":
+                    order_by = "discount_percent DESC, o.created_at DESC"
+                elif sort_key == "price_asc":
+                    order_by = "o.discount_price ASC, o.created_at DESC"
+                elif sort_key == "price_desc":
+                    order_by = "o.discount_price DESC, o.created_at DESC"
+                elif sort_key == "new":
+                    order_by = "o.offer_id DESC"
+
+            query += f"""
+                ORDER BY {order_by}
+                LIMIT %s OFFSET %s
             """
-            params.append(limit)
+            params.extend([limit, offset])
 
             cursor.execute(query, params)
             return [dict(row) for row in cursor.fetchall()]

@@ -9,6 +9,7 @@ from .common import (
     CATEGORIES,
     CategoryResponse,
     OfferResponse,
+    PRICE_STORAGE_UNIT,
     get_current_user,
     get_db,
     get_val,
@@ -27,6 +28,18 @@ def _calc_discount_percent(original_price: float, discount_price: float) -> floa
     except Exception:  # pragma: no cover - defensive
         pass
     return 0.0
+
+
+def _to_storage_price(price: float | None) -> float | None:
+    if price is None:
+        return None
+    try:
+        amount = float(price)
+    except (TypeError, ValueError):
+        return None
+    if PRICE_STORAGE_UNIT == "kopeks":
+        return amount * 100
+    return amount
 
 
 def _to_offer_response(offer: Any, store_fallback: dict | None = None) -> OfferResponse:
@@ -139,11 +152,31 @@ async def get_offers(
         offers: list[OfferResponse] = []
         store_fallback: dict | None = None
 
+        storage_min_price = _to_storage_price(min_price)
+        storage_max_price = _to_storage_price(max_price)
+
+        apply_filters = True
+        apply_sort = True
         apply_slice = True
         if store_id:
-            raw_offers = db.get_store_offers(store_id) if hasattr(db, "get_store_offers") else []
+            raw_offers = (
+                db.get_store_offers(
+                    store_id,
+                    limit=limit,
+                    offset=offset,
+                    sort_by=sort_by,
+                    min_price=storage_min_price,
+                    max_price=storage_max_price,
+                    min_discount=min_discount,
+                )
+                if hasattr(db, "get_store_offers")
+                else []
+            )
             if hasattr(db, "get_store"):
                 store_fallback = db.get_store(store_id)
+            apply_filters = False
+            apply_sort = False
+            apply_slice = False
         elif search:
             raw_offers = (
                 db.search_offers(search, normalized_city) if hasattr(db, "search_offers") else []
@@ -151,20 +184,42 @@ async def get_offers(
         elif category and category != "all":
             if hasattr(db, "get_offers_by_city_and_category"):
                 raw_offers = db.get_offers_by_city_and_category(
-                    city=normalized_city, category=category, region=region, district=district
+                    city=normalized_city,
+                    category=category,
+                    limit=limit,
+                    offset=offset,
+                    region=region,
+                    district=district,
+                    sort_by=sort_by,
+                    min_price=storage_min_price,
+                    max_price=storage_max_price,
+                    min_discount=min_discount,
                 )
             elif hasattr(db, "get_offers_by_category"):
                 raw_offers = db.get_offers_by_category(category, normalized_city)
             else:
                 raw_offers = []
+            apply_filters = False
+            apply_sort = False
+            apply_slice = False
         else:
             raw_offers = (
                 db.get_hot_offers(
-                    normalized_city, limit=limit, offset=offset, region=region, district=district
+                    normalized_city,
+                    limit=limit,
+                    offset=offset,
+                    region=region,
+                    district=district,
+                    sort_by=sort_by,
+                    min_price=storage_min_price,
+                    max_price=storage_max_price,
+                    min_discount=min_discount,
                 )
                 if hasattr(db, "get_hot_offers")
                 else []
             )
+            apply_filters = False
+            apply_sort = False
             apply_slice = False
 
         if not raw_offers:
@@ -205,21 +260,23 @@ async def get_offers(
                 logger.warning(f"Error parsing offer: {e}")
                 continue
 
-        if min_price is not None:
-            offers = [o for o in offers if o.discount_price >= min_price]
-        if max_price is not None:
-            offers = [o for o in offers if o.discount_price <= max_price]
-        if min_discount is not None:
-            offers = [o for o in offers if o.discount_percent >= min_discount]
+        if apply_filters:
+            if min_price is not None:
+                offers = [o for o in offers if o.discount_price >= min_price]
+            if max_price is not None:
+                offers = [o for o in offers if o.discount_price <= max_price]
+            if min_discount is not None:
+                offers = [o for o in offers if o.discount_percent >= min_discount]
 
-        if sort_by == "discount":
-            offers.sort(key=lambda x: x.discount_percent, reverse=True)
-        elif sort_by == "price_asc":
-            offers.sort(key=lambda x: x.discount_price)
-        elif sort_by == "price_desc":
-            offers.sort(key=lambda x: x.discount_price, reverse=True)
-        elif sort_by == "new":
-            offers.sort(key=lambda x: x.id, reverse=True)
+        if apply_sort:
+            if sort_by == "discount":
+                offers.sort(key=lambda x: x.discount_percent, reverse=True)
+            elif sort_by == "price_asc":
+                offers.sort(key=lambda x: x.discount_price)
+            elif sort_by == "price_desc":
+                offers.sort(key=lambda x: x.discount_price, reverse=True)
+            elif sort_by == "new":
+                offers.sort(key=lambda x: x.id, reverse=True)
 
         if apply_slice:
             offers = offers[offset : offset + limit]

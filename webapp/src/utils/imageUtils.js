@@ -23,9 +23,11 @@ export const resolveImageUrl = (...candidates) => {
 export const resolveOfferImageUrl = (offer) => resolveImageUrl(
   offer?.photo_url,
   offer?.image_url,
+  offer?.imageUrl,
   offer?.photo,
   offer?.photo_id,
   offer?.offer_photo,
+  offer?.offer_photo_url,
   offer?.offer_photo_id,
   offer?.image,
   offer?.photoUrl
@@ -34,18 +36,24 @@ export const resolveOfferImageUrl = (offer) => resolveImageUrl(
 export const resolveStoreImageUrl = (store) => resolveImageUrl(
   store?.photo_url,
   store?.photo,
+  store?.photo_id,
   store?.image_url,
+  store?.imageUrl,
   store?.image,
+  store?.photoUrl,
   store?.logo,
   store?.avatar
 )
 
 export const resolveOrderItemImageUrl = (item) => resolveImageUrl(
   item?.photo_url,
+  item?.photoUrl,
   item?.photo,
   item?.offer_photo,
+  item?.offer_photo_url,
   item?.offer_photo_id,
   item?.image_url,
+  item?.imageUrl,
   item?.image,
   item?.photo_id
 )

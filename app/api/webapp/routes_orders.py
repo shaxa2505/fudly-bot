@@ -614,9 +614,15 @@ async def cancel_order(
     if entity is None:
         raise HTTPException(status_code=404, detail="Order not found")
 
-    current_status = get_val(entity, "order_status") or get_val(entity, "status") or "pending"
+    current_status_raw = get_val(entity, "order_status") or get_val(entity, "status") or "pending"
+    current_status = OrderStatus.normalize(str(current_status_raw).lower())
     if current_status in ("completed", "cancelled", "rejected"):
         return CancelOrderResponse(success=True, status=str(current_status))
+    if current_status != "pending":
+        raise HTTPException(
+            status_code=400,
+            detail="Order can only be cancelled while pending",
+        )
 
     order_service = get_unified_order_service()
     if not order_service:

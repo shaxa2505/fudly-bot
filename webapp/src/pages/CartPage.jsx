@@ -5,6 +5,7 @@ import api from '../api/client'
 import { useCart } from '../context/CartContext'
 import { useToast } from '../context/ToastContext'
 import { getUnitLabel, blurOnEnter } from '../utils/helpers'
+import { PLACEHOLDER_IMAGE, resolveOfferImageUrl } from '../utils/imageUtils'
 import QuantityControl from '../components/QuantityControl'
 import BottomNav from '../components/BottomNav'
 import './CartPage.css'
@@ -268,9 +269,18 @@ function CartPage({ user }) {
       const orderId = result.order_id || result.bookings?.[0]?.booking_id
       setCreatedOrderId(orderId)
 
-      // NEW: Check if payment proof required (delivery + card)
+      let paymentProofUploaded = false
+      if (selectedPaymentMethod === 'card' && paymentProof && orderId) {
+        try {
+          await api.uploadPaymentProof(orderId, paymentProof)
+          paymentProofUploaded = true
+        } catch (e) {
+          console.warn('Could not upload payment proof:', e)
+        }
+      }
+
+      // Check if payment proof required (delivery + card)
       if (result.awaiting_payment && orderId) {
-        // Order created successfully - show success with payment instructions
         clearCart()
         setShowCheckout(false)
         setShowPaymentSheet(false)
@@ -280,22 +290,15 @@ function CartPage({ user }) {
         setOrderResult({
           success: true,
           orderId: orderId,
-          awaitingPayment: true,
+          awaitingPayment: !paymentProofUploaded,
           orderType: orderType,
           total: total,
           paymentCard: result.payment_card,
-          message: result.message || 'Buyurtma yaratildi! To\'lovni amalga oshiring.'
+          message: paymentProofUploaded
+            ? 'Chek yuborildi! Admin tekshiradi.'
+            : result.message || 'Buyurtma yaratildi! To\'lovni amalga oshiring.'
         })
         return
-      }
-
-      // If delivery and we have payment proof - upload it
-      if (selectedPaymentMethod === 'card' && paymentProof && orderId) {
-        try {
-          await api.uploadPaymentProof(orderId, paymentProof)
-        } catch (e) {
-          console.warn('Could not upload payment proof:', e)
-        }
       }
 
       clearCart()
@@ -367,6 +370,7 @@ function CartPage({ user }) {
       }
 
       const orderId = result.order_id || result.bookings?.[0]?.booking_id
+      setCreatedOrderId(orderId)
       const storeId = cartItems[0]?.offer?.store_id || null
       const returnUrl = window.location.origin + '/profile'
 
@@ -454,7 +458,7 @@ function CartPage({ user }) {
 
       <div className="cart-items">
         {cartItems.map(item => {
-          const photoUrl = api.getPhotoUrl(item.offer.photo) || 'https://placehold.co/80x80/F5F5F5/CCCCCC?text=IMG'
+          const photoUrl = resolveOfferImageUrl(item.offer) || PLACEHOLDER_IMAGE
           const stockLimit = item.offer.stock || item.offer.quantity || 99
           const isMaxReached = item.quantity >= stockLimit
           return (
@@ -466,7 +470,7 @@ function CartPage({ user }) {
               onError={(e) => {
                 if (!e.target.dataset.fallback) {
                   e.target.dataset.fallback = 'true'
-                  e.target.src = 'https://placehold.co/80x80/F5F5F5/CCCCCC?text=IMG'
+                  e.target.src = PLACEHOLDER_IMAGE
                 }
               }}
             />

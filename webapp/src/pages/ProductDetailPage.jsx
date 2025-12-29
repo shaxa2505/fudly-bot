@@ -5,6 +5,7 @@ import { useCart } from '../context/CartContext'
 import { useFavorites } from '../context/FavoritesContext'
 import { getUnitLabel } from '../utils/helpers'
 import api from '../api/client'
+import { resolveOfferImageUrl } from '../utils/imageUtils'
 import QuantityControl from '../components/QuantityControl'
 import './ProductDetailPage.css'
 
@@ -30,8 +31,7 @@ function ProductDetailPage() {
   }, [offer?.id])
 
   // Get image URL - support multiple field names and convert file_id
-  const rawPhoto = offer?.image_url || offer?.photo || ''
-  const imageUrl = api.getPhotoUrl(rawPhoto) || ''
+  const imageUrl = resolveOfferImageUrl(offer) || ''
 
   const handleQuantityChange = (delta) => {
     const maxQty = offer?.quantity || 99

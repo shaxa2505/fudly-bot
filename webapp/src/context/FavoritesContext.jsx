@@ -9,6 +9,22 @@ const resolveOfferId = (offer) => {
   return offer.id ?? offer.offer_id ?? offer.offerId ?? null
 }
 
+const normalizeOfferPhoto = (offer) => {
+  if (!offer) return null
+  return (
+    offer.photo ||
+    offer.photo_url ||
+    offer.image_url ||
+    offer.photoUrl ||
+    offer.imageUrl ||
+    offer.photo_id ||
+    offer.offer_photo ||
+    offer.offer_photo_url ||
+    offer.image ||
+    null
+  )
+}
+
 export function FavoritesProvider({ children }) {
   const [favorites, setFavorites] = useState(() => {
     try {
@@ -34,7 +50,10 @@ export function FavoritesProvider({ children }) {
       console.warn('Favorite skipped: missing offer id', offer)
       return
     }
-    const normalized = offer.id ? offer : { ...offer, id: offerId }
+    const normalized = {
+      ...(offer.id ? offer : { ...offer, id: offerId }),
+      photo: normalizeOfferPhoto(offer) || offer.photo
+    }
     setFavorites(prev => {
       // Check if already in favorites
       if (prev.some(item => item.id === offerId)) {
@@ -62,7 +81,10 @@ export function FavoritesProvider({ children }) {
       console.warn('Favorite toggle skipped: missing offer id', offer)
       return
     }
-    const normalized = offer.id ? offer : { ...offer, id: offerId }
+    const normalized = {
+      ...(offer.id ? offer : { ...offer, id: offerId }),
+      photo: normalizeOfferPhoto(offer) || offer.photo
+    }
     setFavorites(prev => {
       const exists = prev.some(item => item.id === offerId)
       if (exists) {

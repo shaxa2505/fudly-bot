@@ -1,7 +1,8 @@
 import { useState, useRef, useEffect, memo } from 'react';
+import { PLACEHOLDER_IMAGE } from '../utils/imageUtils';
 
-// Default placeholder - simple gray box with camera emoji
-const DEFAULT_PLACEHOLDER = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 300"%3E%3Crect fill="%23F5F5F5" width="300" height="300"/%3E%3Ctext x="150" y="160" text-anchor="middle" font-size="48"%3EIMG%3C/text%3E%3C/svg%3E';
+// Default placeholder - local asset for offline-safe fallback
+const DEFAULT_PLACEHOLDER = PLACEHOLDER_IMAGE;
 
 /**
  * OptimizedImage component with lazy loading and placeholder

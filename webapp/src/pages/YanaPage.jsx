@@ -5,6 +5,7 @@ import { useCart } from '../context/CartContext'
 import { useToast } from '../context/ToastContext'
 import BottomNav from '../components/BottomNav'
 import { getUserId, getUserLanguage, getCurrentUser } from '../utils/auth'
+import { resolveImageUrl } from '../utils/imageUtils'
 import './YanaPage.css'
 
 const ACTIVE_STATUSES = new Set([
@@ -21,15 +22,7 @@ const ACTIVE_STATUSES = new Set([
 
 const COMPLETED_STATUSES = new Set(['completed', 'cancelled', 'rejected'])
 
-const CANCELABLE_STATUSES = new Set([
-  'pending',
-  'confirmed',
-  'preparing',
-  'awaiting_payment',
-  'awaiting_proof',
-  'proof_submitted',
-  'payment_rejected',
-])
+const CANCELABLE_STATUSES = new Set(['pending'])
 
 function YanaPage() {
   const navigate = useNavigate()
@@ -218,21 +211,33 @@ function YanaPage() {
     }
   }, [userId, notifications])
 
+  const normalizeOrderStatus = (status) => {
+    if (!status) return ''
+    const normalized = String(status).trim().toLowerCase()
+    if (normalized === 'confirmed') return 'preparing'
+    return normalized
+  }
+
   const deriveDisplayStatus = (order) => {
+    const baseStatus = normalizeOrderStatus(order?.order_status || order?.status || 'pending')
+    if (COMPLETED_STATUSES.has(baseStatus)) {
+      return baseStatus
+    }
     const paymentStatus = order?.payment_status
     if (paymentStatus === 'awaiting_payment') return 'awaiting_payment'
     if (paymentStatus === 'awaiting_proof') return 'awaiting_proof'
     if (paymentStatus === 'proof_submitted') return 'proof_submitted'
     if (paymentStatus === 'rejected') return 'payment_rejected'
-    return order?.order_status || order?.status || 'pending'
+    return baseStatus || 'pending'
   }
 
   const normalizeOrder = (order) => {
     const displayStatus = deriveDisplayStatus(order)
+    const normalizedStatus = normalizeOrderStatus(order?.order_status || order?.status || 'pending')
     return {
       ...order,
       status: displayStatus,
-      order_status: order.order_status || order.status || 'pending',
+      order_status: normalizedStatus || 'pending',
     }
   }
 
@@ -284,11 +289,12 @@ function YanaPage() {
   const getStatusInfo = (status) => {
     const statusMap = {
       pending: { text: 'Kutilmoqda', color: '#FF9500', bg: '#FFF4E5' },
-      confirmed: { text: 'Tasdiqlandi', color: '#34C759', bg: '#E8F8ED' },
       preparing: { text: 'Tayyorlanmoqda', color: '#FF9500', bg: '#FFF4E5' },
       ready: { text: 'Tayyor', color: '#007AFF', bg: '#E5F2FF' },
+      delivering: { text: "Yo'lda", color: '#007AFF', bg: '#E5F2FF' },
       completed: { text: 'Yakunlandi', color: '#53B175', bg: '#E8F5E9' },
       cancelled: { text: 'Bekor', color: '#FF3B30', bg: '#FFEBEE' },
+      rejected: { text: 'Rad etildi', color: '#FF3B30', bg: '#FFEBEE' },
       awaiting_payment: { text: "To'lov kutilmoqda", color: '#FF9500', bg: '#FFF4E5' },
       awaiting_proof: { text: "Chek kutilmoqda", color: '#FF9500', bg: '#FFF4E5' },
       proof_submitted: { text: "Tekshirilmoqda", color: '#007AFF', bg: '#E5F2FF' },
@@ -302,6 +308,7 @@ function YanaPage() {
     const orderId = order.booking_id || order.order_id || order.id
     const status = order.status || order.order_status
     const createdAt = order.created_at || order.createdAt
+    const orderStatus = normalizeOrderStatus(order.order_status || order.status)
     const quantity = order.quantity || items.reduce((sum, item) => sum + Number(item.quantity || 0), 0) || 1
     const rawTotal = Number(order.total_price ?? order.total_amount ?? order.total ?? 0)
     const itemsTotal = items.reduce((sum, item) => {
@@ -321,18 +328,27 @@ function YanaPage() {
       items[0]?.title ||
       items[0]?.offer_title ||
       'Buyurtma'
-    const offerPhoto =
-      order.offer_photo ||
-      order.offer_photo_id ||
-      items[0]?.photo ||
-      items[0]?.offer_photo
     const storeName = order.store_name || items[0]?.store_name || "Do'kon"
     const bookingCode = order.booking_code || order.pickup_code
-    const photoUrl = api.getPhotoUrl(offerPhoto) || offerPhoto
+    const photoUrl = resolveImageUrl(
+      order.offer_photo,
+      order.offer_photo_url,
+      order.offer_photo_id,
+      order.photo,
+      order.photo_id,
+      items[0]?.offer_photo_url,
+      items[0]?.photo_url,
+      items[0]?.image_url,
+      items[0]?.photo,
+      items[0]?.photo_id,
+      items[0]?.offer_photo,
+      items[0]?.offer_photo_id
+    )
 
     return {
       orderId,
       status,
+      orderStatus,
       createdAt,
       quantity,
       totalPrice,
@@ -434,7 +450,7 @@ function YanaPage() {
               {orders.map((order, idx) => {
                 const summary = getOrderSummary(order)
                 const statusInfo = getStatusInfo(summary.status)
-                const canCancel = CANCELABLE_STATUSES.has(summary.status)
+                const canCancel = CANCELABLE_STATUSES.has(summary.orderStatus)
                 return (
                   <div
                     key={summary.orderId || idx}

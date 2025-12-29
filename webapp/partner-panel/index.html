@@ -160,6 +160,38 @@
             document.querySelector('meta[name="api-base"]')?.getAttribute('content') ||
             window.location.origin;
 
+        function resolvePhotoUrl(value) {
+            if (value == null) return '';
+            const raw = String(value).trim();
+            if (!raw) return '';
+            const lowered = raw.toLowerCase();
+            if (lowered === 'null' || lowered === 'undefined' || lowered === 'none' || lowered === 'nan') {
+                return '';
+            }
+            if (raw.startsWith('data:') || raw.startsWith('blob:')) return raw;
+            if (raw.startsWith('http://') || raw.startsWith('https://')) return raw;
+            if (raw.startsWith('/')) return new URL(raw, API_BASE).toString();
+            if (raw.startsWith('api/') || raw.startsWith('photo/')) {
+                return new URL(`/${raw}`, API_BASE).toString();
+            }
+            return `${API_BASE}/photo/${encodeURIComponent(raw)}`;
+        }
+
+        function extractPhotoId(value) {
+            if (value == null) return '';
+            const raw = String(value).trim();
+            if (!raw) return '';
+            const match = raw.match(/\/photo\/([^/?#]+)/);
+            if (match) {
+                try {
+                    return decodeURIComponent(match[1]);
+                } catch (e) {
+                    return match[1];
+                }
+            }
+            return '';
+        }
+
         const state = {
             currentView: 'dashboard',
             store: null,
@@ -176,6 +208,14 @@
             return safeProducts;
         }
 
+        function getPhotoUploadPlaceholder() {
+            return `
+                <div class="photo-upload-icon">📷</div>
+                <div class="photo-upload-title">Загрузить фото</div>
+                <div class="photo-upload-subtitle">PNG/JPG до 5 МБ</div>
+            `;
+        }
+
         // ============================================
         // PRODUCT MODAL (defined early for use in rendered HTML)
         // ============================================
@@ -185,6 +225,25 @@
             const product = productId ? state.products.find(p => p.id === productId) : null;
             const isEdit = Boolean(product);
             const today = new Date().toISOString().split('T')[0];
+            const defaultExpiry = product?.expiry_date
+                ? product.expiry_date.split('T')[0]
+                : new Date(Date.now() + 7 * 86400000).toISOString().split('T')[0];
+            const defaultStock = product?.stock_quantity ?? product?.stock ?? product?.quantity ?? 10;
+            const originalPriceValue = product?.original_price ? Math.round(product.original_price) : '';
+            const discountPriceValue = product?.price
+                ? Math.round(product.price)
+                : product?.discount_price
+                    ? Math.round(product.discount_price)
+                    : '';
+            const explicitDiscount = product?.discount != null ? parseInt(product.discount, 10) : NaN;
+            const computedDiscount = originalPriceValue && discountPriceValue
+                ? Math.round((1 - discountPriceValue / originalPriceValue) * 100)
+                : 0;
+            const discountPercentValue = Number.isFinite(explicitDiscount) ? explicitDiscount : computedDiscount;
+            const productPhotoUrl = product
+                ? resolvePhotoUrl(product.photo_url || product.photo_id || product.image || '')
+                : '';
+            const hasProductPhoto = Boolean(productPhotoUrl);
             console.log('🔵 Creating modal, isEdit:', isEdit);
 
             const modal = document.createElement('div');
@@ -201,62 +260,64 @@
                         <div class="modal-body">
                             <div class="form-section">
                                 <div class="form-section-header">
-                                    <div class="form-section-icon">📦</div>
+                                    <div class="form-section-icon">📷</div>
                                     <div>
-                                        <h4 class="form-section-title">Наличие и срок</h4>
-                                        <p class="form-section-subtitle">Опционально для лучшего вида</p>
+                                        <h4 class="form-section-title">Фото товара</h4>
+                                        <p class="form-section-subtitle">Опционально, но повышает продажи</p>
                                     </div>
                                 </div>
                                 <input type="hidden" name="photo_id" value="${product?.photo_id || ''}">
                                 <input type="file" id="photoFile" accept="image/*" class="hidden" onchange="handlePhotoUpload(this, event)">
-                                <div class="photo-upload-card photo-upload-area ${product?.photo_url ? 'has-photo' : ''}" onclick="document.getElementById('photoFile').click()">
-                                    ${product?.photo_url ? `
+                                <div class="photo-upload-card photo-upload-area ${hasProductPhoto ? 'has-photo' : ''}" onclick="document.getElementById('photoFile').click()">
+                                    ${hasProductPhoto ? `
                                         <div class="photo-preview">
-                                            <img src="${product.photo_url}" alt="Preview">
-                                            <button type="button" class="photo-preview-remove" onclick="event.stopPropagation(); removePhoto()">
+                                            <img src="${productPhotoUrl}" alt="Preview">
+                                            <button type="button" class="photo-preview-remove" onclick="event.stopPropagation(); removePhoto(event)">
                                                 <i data-lucide="x" class="icon-16"></i>
                                             </button>
                                         </div>
-                                    ` : `
-                                        <div class="photo-upload-icon">📷</div>
-                                        <div class="photo-upload-title">Загрузить фото</div>
-                                        <div class="photo-upload-subtitle">PNG/JPG до 5 МБ</div>
-                                    `}
+                                    ` : getPhotoUploadPlaceholder()}
+                                </div>
+                                <div class="smart-hint info">
+                                    <div class="smart-hint-icon">💡</div>
+                                    <div class="smart-hint-text">Фото повышает доверие и продажи, но можно добавить позже.</div>
                                 </div>
                             </div>
 
                             <div class="form-section">
                                 <div class="form-section-header">
-                                   <div class="form-section-icon">📌</div>>
+                                   <div class="form-section-icon">📌</div>
                                     <div>
                                         <h4 class="form-section-title">Информация о товаре</h4>
                                         <p class="form-section-subtitle">Название, категория, описание</p>
                                     </div>
                                 </div>
 
-                                <div class="form-group">
-                                    <label>Название *</label>
-                                    <input type="text" name="name" id="productName" value="${product?.name || ''}" required
-                                           class="search-input" minlength="3" maxlength="100"
-                                           oninput="validateField(this)" placeholder="Например: Хлеб, 450г">
-                                    <div class="form-error hidden">Цена должна быть > 0</div>
-                                </div>
+                                <div class="form-grid-2">
+                                    <div class="form-group">
+                                        <label>Название *</label>
+                                        <input type="text" name="name" id="productName" value="${product?.name || ''}" required
+                                               class="search-input" minlength="3" maxlength="100"
+                                               oninput="validateField(this)" placeholder="Например: Хлеб, 450г">
+                                        <div class="form-error hidden">Введите название (мин. 3 символа)</div>
+                                    </div>
 
-                                <div class="form-group">
-                                    <label>Категория *</label>
-                                    <select name="category" id="productCategory" required class="search-input">
+                                    <div class="form-group">
+                                        <label>Категория *</label>
+                                        <select name="category" id="productCategory" required class="search-input" onchange="validateField(this)">
 
-                                        <option value="">Выберите категорию</option>
-                                        <option value="bakery" ${product?.category === 'bakery' ? 'selected' : ''}>🥐 Выпечка</option>
-                                        <option value="dairy" ${product?.category === 'dairy' ? 'selected' : ''}>🥛 Молочные продукты</option>
-                                        <option value="meat" ${product?.category === 'meat' ? 'selected' : ''}>🥩 Мясо и рыба</option>
-                                        <option value="fruits" ${product?.category === 'fruits' ? 'selected' : ''}>🍎 Фрукты</option>
-                                        <option value="vegetables" ${product?.category === 'vegetables' ? 'selected' : ''}>🥕 Овощи</option>
-                                        <option value="drinks" ${product?.category === 'drinks' ? 'selected' : ''}>🥤 Напитки</option>
-                                        <option value="sweets" ${product?.category === 'sweets' ? 'selected' : ''}>🍰 Сладости</option>
-                                        <option value="frozen" ${product?.category === 'frozen' ? 'selected' : ''}>❄️ Заморозка</option>
-                                        <option value="other" ${!product?.category || product?.category === 'other' ? 'selected' : ''}>📦 Другое</option>
-                                    </select>
+                                            <option value="">Выберите категорию</option>
+                                            <option value="bakery" ${product?.category === 'bakery' ? 'selected' : ''}>🥐 Выпечка</option>
+                                            <option value="dairy" ${product?.category === 'dairy' ? 'selected' : ''}>🥛 Молочные продукты</option>
+                                            <option value="meat" ${product?.category === 'meat' ? 'selected' : ''}>🥩 Мясо и рыба</option>
+                                            <option value="fruits" ${product?.category === 'fruits' ? 'selected' : ''}>🍎 Фрукты</option>
+                                            <option value="vegetables" ${product?.category === 'vegetables' ? 'selected' : ''}>🥕 Овощи</option>
+                                            <option value="drinks" ${product?.category === 'drinks' ? 'selected' : ''}>🥤 Напитки</option>
+                                            <option value="sweets" ${product?.category === 'sweets' ? 'selected' : ''}>🍰 Сладости</option>
+                                            <option value="frozen" ${product?.category === 'frozen' ? 'selected' : ''}>❄️ Заморозка</option>
+                                            <option value="other" ${!product?.category || product?.category === 'other' ? 'selected' : ''}>📦 Другое</option>
+                                        </select>
+                                    </div>
                                 </div>
 
                                 <div class="form-group">
@@ -269,7 +330,7 @@
 
                             <div class="form-section">
                                 <div class="form-section-header">
-                                   <div class="form-section-icon">📌</div>>
+                                   <div class="form-section-icon">📌</div>
                                     <div>
                                         <h4 class="form-section-title">Цена и скидка</h4>
                                         <p class="form-section-subtitle">Цена и скидка по желанию</p>
@@ -278,25 +339,32 @@
 
                                 <div class="form-grid-2">
                                     <div class="form-group">
-                                        <label>Оригинальная цена *</label>
-                                        <input type="number" name="original_price" id="originalPrice"
-                                               value="${product?.original_price ? Math.round(product.original_price) : ''}" min="1" step="1" required
-                                               class="search-input" oninput="calculateFinalPrice('percent'); validateField(this)" placeholder="15000">
-                                        <div class="form-error hidden">Цена должна быть > 0</div>
+                                        <label>Цена для клиента *</label>
+                                        <input type="number" name="discount_price" id="discountPrice"
+                                               value="${discountPriceValue}" min="1" step="1" required inputmode="numeric"
+                                               class="search-input price-main-input"
+                                               oninput="calculateFinalPrice('price'); validateField(this)" placeholder="10500">
+                                        <div class="form-error hidden">Введите цену больше 0</div>
                                     </div>
                                     <div class="form-group">
-                                        <label>Скидка (%)</label>
-                                        <input type="number" name="discount" id="discountPercent" value="${product?.discount || 0}"
-                                               min="0" max="90" class="search-input"
-                                               oninput="calculateFinalPrice('percent'); validateField(this)" placeholder="30">
+                                        <label>Цена без скидки</label>
+                                        <input type="number" name="original_price" id="originalPrice"
+                                               value="${originalPriceValue}" min="1" step="1" inputmode="numeric"
+                                               class="search-input" oninput="handleOriginalPriceInput(); validateField(this)" placeholder="15000">
+                                        <div class="form-error hidden">Цена должна быть > 0</div>
                                     </div>
                                 </div>
 
                                 <div class="form-group">
-                                    <label>Цена со скидкой</label>
-                                    <input type="number" name="discount_price" id="discountPrice" value="${product?.price ? Math.round(product.price) : product?.discount_price ? Math.round(product.discount_price) : ''}"
-                                           min="0" step="1" class="search-input"
-                                           oninput="calculateFinalPrice('price'); validateField(this)" placeholder="10500">
+                                    <label>Скидка (%)</label>
+                                    <input type="number" name="discount" id="discountPercent" value="${discountPercentValue || 0}"
+                                           min="0" max="90" class="search-input" inputmode="numeric"
+                                           oninput="calculateFinalPrice('percent'); validateField(this)" placeholder="30">
+                                </div>
+
+                                <div class="smart-hint info">
+                                    <div class="smart-hint-icon">💡</div>
+                                    <div class="smart-hint-text">Можно указать только цену для клиента — скидка будет 0%.</div>
                                 </div>
 
                                 <div class="price-preview-card hidden" id="pricePreview">
@@ -317,7 +385,7 @@
 
                             <div class="form-section">
                                 <div class="form-section-header">
-                                   <div class="form-section-icon">📌</div>>
+                                   <div class="form-section-icon">📌</div>
                                     <div>
                                         <h4 class="form-section-title">Наличие и срок</h4>
                                         <p class="form-section-subtitle">Остаток и срок годности</p>
@@ -339,14 +407,15 @@
                                     </div>
                                     <div class="form-group">
                                         <label>Количество *</label>
-                                        <div class="d-flex align-center gap-sm">
-                                            <button type="button" class="btn btn-sm btn-secondary btn-square-sm" onclick="changeQuantity(-1)">−</button>
+                                        <div class="quantity-controls">
+                                            <button type="button" class="quantity-btn" onclick="changeQuantity(-1)">−</button>
                                             <input type="number" name="stock_quantity" id="stockQuantity"
-                                                   value="${product?.stock_quantity ?? product?.stock ?? product?.quantity ?? 0}"
-                                                   min="0" max="9999" required class="search-input text-center flex-1">
-                                            <button type="button" class="btn btn-sm btn-secondary btn-square-sm" onclick="changeQuantity(1)">+</button>
+                                                   value="${defaultStock}"
+                                                   min="0" max="9999" required inputmode="numeric"
+                                                   class="search-input quantity-input" oninput="validateField(this)">
+                                            <button type="button" class="quantity-btn" onclick="changeQuantity(1)">+</button>
                                         </div>
-                                        <div class="d-flex gap-sm mt-sm">
+                                        <div class="d-flex flex-wrap gap-sm mt-sm">
                                             <button type="button" class="btn btn-sm btn-ghost flex-1" onclick="setQuantity(5)">5</button>
                                             <button type="button" class="btn btn-sm btn-ghost flex-1" onclick="setQuantity(10)">10</button>
                                             <button type="button" class="btn btn-sm btn-ghost flex-1" onclick="setQuantity(20)">20</button>
@@ -358,13 +427,14 @@
                                 <div class="form-group">
                                     <label>Срок годности *</label>
                                     <input type="date" name="expiry_date" id="expiryDate"
-                                           value="${product?.expiry_date ? product.expiry_date.split('T')[0] : ''}"
-                                           min="${today}" required class="search-input">
-                                    <div class="d-flex gap-sm mt-sm">
+                                           value="${defaultExpiry}"
+                                           min="${today}" required class="search-input" oninput="validateField(this)">
+                                    <div class="d-flex flex-wrap gap-sm mt-sm">
                                         <button type="button" class="btn btn-sm btn-ghost flex-1" onclick="setExpiry(0)">Сегодня</button>
                                         <button type="button" class="btn btn-sm btn-ghost flex-1" onclick="setExpiry(1)">Завтра</button>
                                         <button type="button" class="btn btn-sm btn-ghost flex-1" onclick="setExpiry(2)">2 дня</button>
                                         <button type="button" class="btn btn-sm btn-ghost flex-1" onclick="setExpiry(3)">3 дня</button>
+                                        <button type="button" class="btn btn-sm btn-ghost flex-1" onclick="setExpiry(7)">7 дней</button>
                                     </div>
                                 </div>
 
@@ -373,6 +443,10 @@
                                         <input type="checkbox" name="is_available" ${product?.is_available !== false ? 'checked' : ''}>
                                         <span>Доступен для продажи</span>
                                     </label>
+                                </div>
+                                <div class="smart-hint warning">
+                                    <div class="smart-hint-icon">⚠️</div>
+                                    <div class="smart-hint-text">Если количество = 0, товар не будет показан клиентам.</div>
                                 </div>
                             </div>
                         </div>
@@ -605,6 +679,36 @@
         }
 
         // ============================================
+        // ORDER HELPERS
+        // ============================================
+        function normalizeOrderStatus(rawStatus) {
+            if (!rawStatus) return '';
+            const status = String(rawStatus).trim().toLowerCase();
+            if (status === 'confirmed') return 'preparing';
+            return status;
+        }
+
+        function normalizeOrderRecord(order) {
+            if (!order || typeof order !== 'object') return order;
+            const rawStatus = order.order_status ?? order.status ?? '';
+            const normalizedStatus = normalizeOrderStatus(rawStatus);
+            if (!normalizedStatus) return order;
+            return {
+                ...order,
+                status: normalizedStatus,
+                order_status: normalizedStatus
+            };
+        }
+
+        function normalizeOrders(list) {
+            return Array.isArray(list) ? list.map(normalizeOrderRecord) : [];
+        }
+
+        function getOrderStatus(order) {
+            return normalizeOrderStatus(order?.order_status || order?.status || '');
+        }
+
+        // ============================================
         // UI HELPERS
         // ============================================
         // HAPTIC FEEDBACK
@@ -804,7 +908,7 @@
                 ]);
 
                 state.store = store;
-                state.orders = Array.isArray(orders) ? orders : [];
+                state.orders = normalizeOrders(orders);
                 state.products = normalizeProducts(products);
                 syncAllProducts(state.products);
 
@@ -831,16 +935,20 @@
                 document.getElementById('storeName').textContent = state.store.name;
             }
 
-            const activeOrders = state.orders.filter(o => o.status !== 'completed' && o.status !== 'cancelled');
-            const newOrders = activeOrders.filter(o => o.status === 'new');
-            const preparingOrders = activeOrders.filter(o => ['preparing', 'ready'].includes(o.status));
+            const activeOrders = state.orders.filter(o =>
+                !['completed', 'cancelled', 'rejected'].includes(getOrderStatus(o))
+            );
+            const newOrders = activeOrders.filter(o => getOrderStatus(o) === 'new');
+            const preparingOrders = activeOrders.filter(o =>
+                ['preparing', 'ready'].includes(getOrderStatus(o))
+            );
 
             const todayRevenue = state.orders
-                .filter(o => o.status === 'completed' && isToday(o.created_at))
+                .filter(o => getOrderStatus(o) === 'completed' && isToday(o.created_at))
                 .reduce((sum, o) => sum + (o.price || 0), 0);
 
             const yesterdayRevenue = state.orders
-                .filter(o => o.status === 'completed' && isYesterday(o.created_at))
+                .filter(o => getOrderStatus(o) === 'completed' && isYesterday(o.created_at))
                 .reduce((sum, o) => sum + (o.price || 0), 0);
 
             const revenueTrend = yesterdayRevenue ? ((todayRevenue - yesterdayRevenue) / yesterdayRevenue * 100).toFixed(0) : 0;
@@ -1085,11 +1193,12 @@
         function renderOrderCard(order) {
             const orderId = order.order_id || order.id;
             const orderType = getOrderType(order);
+            const status = getOrderStatus(order) || 'pending';
             return `
-                <div class="order-card ripple" data-order-id="${orderId}" data-status="${order.status}" onclick="haptic('light'); viewOrderDetails(${orderId})">
+                <div class="order-card ripple" data-order-id="${orderId}" data-status="${status}" onclick="haptic('light'); viewOrderDetails(${orderId})">
                     <div class="order-header">
                         <div class="order-id">#${orderId || '?'}</div>
-                        <div class="order-status status-${order.status}">${getStatusText(order.status, orderType)}</div>
+                        <div class="order-status status-${status}">${getStatusText(status, orderType)}</div>
                     </div>
                     <div class="order-meta">
                         <span class="order-type">${orderType === 'pickup' ? '?? ?????????' : '?? ????????'}</span>
@@ -1098,7 +1207,7 @@
                         <div class="order-time">${formatTime(order.created_at)}</div>
                         <div class="order-total">${formatPrice(order.price)}</div>
                     </div>
-                    ${order.status === 'new' || order.status === 'pending' ? `
+                    ${status === 'new' || status === 'pending' ? `
                         <div class="order-actions" onclick="event.stopPropagation()">
                             <button class="btn btn-sm btn-success ripple" onclick="updateOrderStatus(${orderId}, 'preparing')">???????</button>
                             <button class="btn btn-sm btn-danger ripple" onclick="openCancelModal(${orderId})">????????</button>
@@ -1123,7 +1232,7 @@
             showLoading();
             try {
                 const orders = await apiFetch('/api/partner/orders');
-                state.orders = Array.isArray(orders) ? orders : [];
+                state.orders = normalizeOrders(orders);
                 renderOrders();
                 updateNotificationBadge(); // Update badge with new orders count
             } catch (error) {
@@ -1146,7 +1255,7 @@
 
         function renderOrders() {
             const list = Array.isArray(state.orders) ? state.orders : [];
-            const getStatus = (o) => o?.order_status || o?.status || '';
+            const getStatus = (o) => getOrderStatus(o);
             const activeOrders = list.filter(o => ['pending', 'new', 'preparing'].includes(getStatus(o)));
             const readyOrders = list.filter(o => getStatus(o) === 'ready');
             const deliveringOrders = list.filter(o => getStatus(o) === 'delivering');
@@ -1200,7 +1309,7 @@
 
         function groupOrdersByStatus(orders) {
             const list = Array.isArray(orders) ? orders : [];
-            const getStatus = (o) => o?.order_status || o?.status || '';
+            const getStatus = (o) => getOrderStatus(o);
             return {
                 active: list.filter(o => ['pending', 'new', 'preparing', 'ready', 'delivering'].includes(getStatus(o))),
                 completed: list.filter(o => getStatus(o) === 'completed'),
@@ -1212,7 +1321,7 @@
         function getProblemOrders(orders) {
             const list = Array.isArray(orders) ? orders : [];
             return list.filter((order) => {
-                const status = order.order_status || order.status || '';
+                const status = getOrderStatus(order);
                 const paymentStatus = order.payment_status || '';
                 if (['cancelled', 'rejected'].includes(status)) return true;
                 if (['awaiting_proof', 'proof_submitted', 'rejected'].includes(paymentStatus)) return true;
@@ -1254,7 +1363,7 @@
                 <div class=\"order-list ops-list\">
                     ${orders.map(order => {
                         const orderId = order.order_id || order.id;
-                        const status = order.order_status || order.status || 'pending';
+                        const status = getOrderStatus(order) || 'pending';
                         const items = Array.isArray(order.items) ? order.items : [];
                         const mainItem = items[0];
                         const title = (mainItem && mainItem.title) || order.offer_title || '\u0422\u043e\u0432\u0430\u0440';
@@ -1326,7 +1435,7 @@
             });
 
             const list = Array.isArray(state.orders) ? state.orders : [];
-            const getStatus = (o) => o?.order_status || o?.status || '';
+            const getStatus = (o) => getOrderStatus(o);
             const activeOrders = list.filter(o => ['pending', 'new', 'preparing'].includes(getStatus(o)));
             const readyOrders = list.filter(o => getStatus(o) === 'ready');
             const deliveringOrders = list.filter(o => getStatus(o) === 'delivering');
@@ -1350,14 +1459,14 @@
             if (!order) return;
 
             const oid = order.order_id || order.id;
-            const status = order.order_status || order.status || 'pending';
+            const status = getOrderStatus(order) || 'pending';
             const pickupCode = order.pickup_code || order.booking_code;
             const items = Array.isArray(order.items) ? order.items : [];
             const orderTitle = order.offer_title || '\u0422\u043e\u0432\u0430\u0440';
             const qty = order.quantity || 1;
             const paymentStatus = order.payment_status || '';
             const paymentText = getPaymentStatusText(paymentStatus, order.payment_method);
-            const proofUrl = order.payment_proof_url || '';
+            const proofUrl = resolvePhotoUrl(order.payment_proof_url || order.payment_proof || '');
 
             const modal = document.createElement('div');
             modal.className = 'modal-overlay';
@@ -1385,7 +1494,7 @@
                         <div class=\"order-detail-section\">
                             <h4>\u041e\u043f\u043b\u0430\u0442\u0430</h4>
                             <p>${paymentText}</p>
-                            ${proofUrl ? `<img class=\"payment-proof\" src=\"${proofUrl}\" alt=\"proof\" />` : ''}
+                            ${proofUrl ? `<img class=\"payment-proof\" src=\"${proofUrl}\" alt=\"proof\" loading=\"lazy\" decoding=\"async\" />` : ''}
                         </div>
                         ` : ''}
 
@@ -1776,7 +1885,9 @@
                         : 0;
 
                 const status = p.status || (stock > 0 ? 'active' : 'out_of_stock');
-                const photoUrl = p.photo_url || p.image || '';
+                const rawPhoto = p.photo_url || p.photo_id || p.image || '';
+                const photoUrl = resolvePhotoUrl(rawPhoto);
+                const photoId = p.photo_id || extractPhotoId(p.photo_url) || extractPhotoId(photoUrl);
 
                 return {
                     ...p,
@@ -1788,6 +1899,7 @@
                     status,
                     is_available: status === 'active',
                     photo_url: photoUrl,
+                    photo_id: photoId || '',
                 };
             });
         }
@@ -2134,7 +2246,10 @@ function handlePhotoUpload(input, event) {
                 return;
             }
 
-            const uploadArea = document.querySelector('.photo-upload-area');
+            const modal = input.closest('.modal-overlay');
+            const uploadArea =
+                modal?.querySelector('.photo-upload-area') || document.querySelector('.photo-upload-area');
+            if (!uploadArea) return;
             uploadArea.classList.add('has-photo');
             uploadArea.innerHTML = '<div class="upload-placeholder"><i data-lucide="loader" class="icon-spin"></i><div>\u0417\u0430\u0433\u0440\u0443\u0437\u043a\u0430...</div></div>';
             if (typeof lucide !== 'undefined') lucide.createIcons();
@@ -2142,11 +2257,14 @@ function handlePhotoUpload(input, event) {
             const reader = new FileReader();
             reader.onload = (e) => {
                 const photoUrl = e.target.result;
-                document.querySelector('input[name="photo_id"]').value = '';
+                const photoIdInput =
+                    modal?.querySelector('input[name="photo_id"]') ||
+                    document.querySelector('input[name="photo_id"]');
+                if (photoIdInput) photoIdInput.value = '';
                 uploadArea.innerHTML = `
                     <div class="photo-preview">
                         <img src="${photoUrl}" alt="Preview">
-                        <button type="button" class="photo-preview-remove" onclick="event.stopPropagation(); removePhoto()">
+                        <button type="button" class="photo-preview-remove" onclick="event.stopPropagation(); removePhoto(event)">
                             <i data-lucide="x" class="icon-16"></i>
                         </button>
                     </div>
@@ -2156,17 +2274,31 @@ function handlePhotoUpload(input, event) {
             reader.readAsDataURL(file);
         }
 
-        function removePhoto() {
-            const uploadArea = document.querySelector('.photo-upload-area');
+        function removePhoto(event) {
+            const modal = event?.target?.closest('.modal-overlay');
+            const uploadArea =
+                modal?.querySelector('.photo-upload-area') || document.querySelector('.photo-upload-area');
+            if (!uploadArea) return;
             uploadArea.classList.remove('has-photo');
-            uploadArea.innerHTML = `
-                <div class="photo-upload-icon">📷</div>
-                <div class="photo-upload-title">Загрузить фото</div>
-                <div class="photo-upload-subtitle">PNG/JPG до 5 МБ</div>
-            `;
-            document.querySelector('input[name="photo_id"]').value = '';
-            const fileInput = document.getElementById('photoFile');
+            uploadArea.innerHTML = getPhotoUploadPlaceholder();
+            const photoIdInput =
+                modal?.querySelector('input[name="photo_id"]') ||
+                document.querySelector('input[name="photo_id"]');
+            if (photoIdInput) photoIdInput.value = '';
+            const fileInput = modal?.querySelector('#photoFile') || document.getElementById('photoFile');
             if (fileInput) fileInput.value = '';
+        }
+
+        function handleOriginalPriceInput() {
+            const discountPriceInput = document.getElementById('discountPrice');
+            const hasPrice = discountPriceInput && discountPriceInput.value !== '';
+            if (hasPrice) {
+                calculateFinalPrice('price');
+                return;
+            }
+            const discountPercentInput = document.getElementById('discountPercent');
+            const hasPercent = discountPercentInput && discountPercentInput.value !== '';
+            calculateFinalPrice(hasPercent ? 'percent' : 'price');
         }
 
         function calculateFinalPrice(source = 'percent') {
@@ -2178,29 +2310,37 @@ function handlePhotoUpload(input, event) {
             const priceFinal = document.getElementById('priceFinal');
             const priceSavings = document.getElementById('priceSavings');
 
-            const original = parseInt(originalInput.value, 10) || 0;
+            const original = parseInt(originalInput.value, 10);
             let percent = parseInt(discountPercentInput.value, 10);
             let discounted = parseInt(discountPriceInput.value, 10);
+            const originalValue = Number.isFinite(original) ? original : 0;
 
             if (source === 'percent') {
                 percent = Number.isFinite(percent) ? Math.min(90, Math.max(0, percent)) : 0;
                 discountPercentInput.value = percent;
-                discounted = Math.round(original * (1 - percent / 100));
-                discountPriceInput.value = discounted || '';
+                if (originalValue > 0) {
+                    discounted = Math.round(originalValue * (1 - percent / 100));
+                    discountPriceInput.value = discounted || '';
+                }
             } else {
                 discounted = Number.isFinite(discounted) ? discounted : 0;
-                if (discounted > original && original > 0) discounted = original;
-                discountPriceInput.value = discounted || '';
-                percent = original > 0 ? Math.round((1 - discounted / original) * 100) : 0;
-                discountPercentInput.value = percent;
+                if (originalValue > 0) {
+                    if (discounted > originalValue) discounted = originalValue;
+                    discountPriceInput.value = discounted || '';
+                    percent = Math.round((1 - discounted / originalValue) * 100);
+                    discountPercentInput.value = Number.isFinite(percent) ? percent : 0;
+                } else {
+                    discountPercentInput.value = 0;
+                }
             }
 
-            if (original > 0) {
+            if (originalValue > 0) {
                 preview.classList.remove('hidden');
-                priceOriginal.textContent = `${original.toLocaleString()} \u0441\u0443\u043c`;
-                priceFinal.textContent = `${(discounted || original).toLocaleString()} \u0441\u0443\u043c`;
-                const savings = Math.max(0, original - (discounted || original));
-                priceSavings.textContent = `${savings.toLocaleString()} \u0441\u0443\u043c (${percent}%)`;
+                priceOriginal.textContent = `${originalValue.toLocaleString()} ???`;
+                const finalValue = discounted || originalValue;
+                priceFinal.textContent = `${finalValue.toLocaleString()} ???`;
+                const savings = Math.max(0, originalValue - finalValue);
+                priceSavings.textContent = `${savings.toLocaleString()} ??? (${percent}%)`;
             } else {
                 preview.classList.add('hidden');
             }
@@ -2210,11 +2350,13 @@ function handlePhotoUpload(input, event) {
             const input = document.getElementById('stockQuantity');
             const current = parseInt(input.value, 10) || 0;
             input.value = Math.max(0, current + delta);
+            validateField(input);
         }
 
         function setQuantity(value) {
             const input = document.getElementById('stockQuantity');
             input.value = value;
+            validateField(input);
         }
 
         function setExpiry(days) {
@@ -2222,11 +2364,32 @@ function handlePhotoUpload(input, event) {
             const date = new Date();
             date.setDate(date.getDate() + days);
             dateInput.value = date.toISOString().split('T')[0];
+            validateField(dateInput);
         }
 
         function updateCharCounter(textarea) {
             const counter = textarea.nextElementSibling;
             if (counter) counter.textContent = `${textarea.value.length}/500`;
+        }
+
+        function sanitizePriceInput(value) {
+            return String(value || '').replace(/[^\d]/g, '');
+        }
+
+        function validateField(input) {
+            if (!input) return true;
+            const isValid = input.checkValidity();
+            const hasValue = Boolean(input.value && String(input.value).trim());
+            input.classList.toggle('error', !isValid);
+            input.classList.toggle('success', isValid && hasValue);
+            input.setAttribute('aria-invalid', isValid ? 'false' : 'true');
+
+            const wrapper = input.closest('.form-group');
+            const errorEl = wrapper?.querySelector('.form-error');
+            if (errorEl) {
+                errorEl.classList.toggle('hidden', isValid);
+            }
+            return isValid;
         }
 
         async function saveProduct(event, productId) {
@@ -2247,31 +2410,37 @@ function handlePhotoUpload(input, event) {
                 const unit = String(formData.get('unit') || 'шт').trim();
                 const stockQty = Math.max(0, parseInt(formData.get('stock_quantity'), 10) || 0);
 
-                // Parse prices - remove spaces and ensure proper integer conversion
-                const originalPriceRaw = String(formData.get('original_price') || '').replace(/\s/g, '');
-                const discountPriceInputRaw = String(formData.get('discount_price') || '').replace(/\s/g, '');
-                const originalPrice = parseInt(originalPriceRaw, 10);
+                // Parse prices - remove formatting and ensure proper integer conversion
+                const originalPriceRaw = sanitizePriceInput(formData.get('original_price'));
+                const discountPriceInputRaw = sanitizePriceInput(formData.get('discount_price'));
+                const originalPriceInput = parseInt(originalPriceRaw, 10);
                 const discountPercent = Math.max(0, Math.min(90, parseInt(formData.get('discount'), 10) || 0));
                 const discountPriceInput = parseInt(discountPriceInputRaw, 10);
+                const hasOriginal = Number.isFinite(originalPriceInput) && originalPriceInput > 0;
+                const hasDiscount = Number.isFinite(discountPriceInput) && discountPriceInput > 0;
 
                 const expiryDate = String(formData.get('expiry_date') || '');
                 const isAvailable = formData.get('is_available') === 'on';
 
-                console.log('💰 Saving product with prices:', { originalPrice, discountPriceInput, discountPercent });
+                console.log('💰 Saving product with prices:', {
+                    originalPrice: originalPriceInput,
+                    discountPriceInput,
+                    discountPercent
+                });
 
                 if (!title || title.length < 3) throw new Error('Название слишком короткое (мин. 3 символа)');
-                if (!productId && stockQty <= 0) throw new Error('Количество должно быть больше 0');
-                if (!originalPrice || originalPrice <= 0 || isNaN(originalPrice)) throw new Error('Оригинальная цена обязательна и должна быть числом');
+                if (!hasOriginal && !hasDiscount) throw new Error('Укажите цену для клиента');
                 if (!expiryDate) throw new Error('Укажите срок годности');
 
-                let discountPrice = Number.isFinite(discountPriceInput) && discountPriceInput > 0
-                    ? discountPriceInput
-                    : Math.round(originalPrice * (1 - discountPercent / 100));
-
+                const originalPrice = hasOriginal ? originalPriceInput : discountPriceInput;
+                let discountPrice = hasDiscount ? discountPriceInput : originalPrice;
+                if (hasOriginal && !hasDiscount) {
+                    discountPrice = Math.round(originalPrice * (1 - discountPercent / 100));
+                }
                 if (discountPrice > originalPrice) discountPrice = originalPrice;
 
                 let photoId = String(formData.get('photo_id') || '').trim();
-                const fileInput = document.getElementById('photoFile');
+                const fileInput = form.querySelector('#photoFile') || document.getElementById('photoFile');
                 const photoFile = fileInput?.files?.[0] || null;
 
                 if (photoFile) {
@@ -2432,7 +2601,7 @@ async function toggleProductAvailability(id) {
 
             // Group orders by date
             orders.forEach(order => {
-                if (order.status === 'completed') {
+                if (getOrderStatus(order) === 'completed') {
                     const orderDate = parseDate(order.created_at);
                     if (!orderDate) return;
                     const dayIndex = last7Days.findIndex(d =>
@@ -2468,12 +2637,12 @@ async function toggleProductAvailability(id) {
 
             // Orders by status
             const ordersByStatus = {
-                new: orders.filter(o => o.status === 'new').length,
-                preparing: orders.filter(o => o.status === 'preparing').length,
-                ready: orders.filter(o => o.status === 'ready').length,
-                delivering: orders.filter(o => o.status === 'delivering').length,
-                completed: orders.filter(o => o.status === 'completed').length,
-                cancelled: orders.filter(o => o.status === 'cancelled' || o.status === 'rejected').length
+                new: orders.filter(o => getOrderStatus(o) === 'new').length,
+                preparing: orders.filter(o => getOrderStatus(o) === 'preparing').length,
+                ready: orders.filter(o => getOrderStatus(o) === 'ready').length,
+                delivering: orders.filter(o => getOrderStatus(o) === 'delivering').length,
+                completed: orders.filter(o => getOrderStatus(o) === 'completed').length,
+                cancelled: orders.filter(o => ['cancelled', 'rejected'].includes(getOrderStatus(o))).length
             };
 
             // Peak hours
@@ -2487,7 +2656,7 @@ async function toggleProductAvailability(id) {
 
             // Total stats
             const totalRevenue = orders
-                .filter(o => o.status === 'completed')
+                .filter(o => getOrderStatus(o) === 'completed')
                 .reduce((sum, o) => sum + (Number(o.price) || 0), 0);
 
             const totalOrders = orders.length;
@@ -3239,6 +3408,7 @@ async function toggleProductAvailability(id) {
         }
 
         function getStatusText(status, orderType) {
+            const normalizedStatus = normalizeOrderStatus(status);
             const isDelivery = orderType === 'delivery';
             const statusMap = {
                 pending: 'Ждёт подтверждения',
@@ -3250,7 +3420,7 @@ async function toggleProductAvailability(id) {
                 cancelled: 'Отменён',
                 rejected: 'Отклонён'
             };
-            return statusMap[status] || status;
+            return statusMap[normalizedStatus] || normalizedStatus || status;
         }
 
 
@@ -3676,9 +3846,10 @@ async function toggleProductAvailability(id) {
             const orders = Array.isArray(state.orders) ? state.orders : [];
 
             // Count new/pending orders
-            const newOrdersCount = orders.filter(o =>
-                o.status === 'pending' || o.status === 'new'
-            ).length;
+            const newOrdersCount = orders.filter(o => {
+                const status = getOrderStatus(o);
+                return status === 'pending' || status === 'new';
+            }).length;
 
             const badge = document.getElementById('notificationCount');
             if (newOrdersCount > 0) {

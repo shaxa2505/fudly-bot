@@ -140,6 +140,13 @@
     margin-left: 8px;
 }
 
+/* === Primary Price Input === */
+.price-main-input {
+    font-size: 20px;
+    font-weight: 800;
+    letter-spacing: -0.2px;
+}
+
 /* === Quick Action Buttons === */
 .quick-actions {
     display: flex;

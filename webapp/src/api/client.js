@@ -161,6 +161,10 @@ const api = {
 
     const normalized = photo.trim()
     if (!normalized) return null
+    const lowered = normalized.toLowerCase()
+    if (lowered === 'null' || lowered === 'undefined' || lowered === 'none' || lowered === 'nan') {
+      return null
+    }
 
     if (normalized.startsWith('data:') || normalized.startsWith('blob:')) {
       return normalized
@@ -172,11 +176,19 @@ const api = {
     }
 
     // Relative paths from API responses
+    if (normalized.startsWith('/photo/')) {
+      return `${API_BASE}${normalized}`
+    }
+
+    if (normalized.startsWith('photo/')) {
+      return `${API_BASE}/${normalized}`
+    }
+
     if (normalized.startsWith('/')) {
       return new URL(normalized, API_BASE).toString()
     }
 
-    if (normalized.startsWith('api/') || normalized.startsWith('photo/')) {
+    if (normalized.startsWith('api/')) {
       return new URL(`/${normalized}`, API_BASE).toString()
     }
 

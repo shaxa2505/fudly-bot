@@ -7,6 +7,8 @@ import { ordersAPI, statsAPI, storeAPI } from './api.js';
 import { formatPrice, timeAgo, toast } from './utils.js';
 import { state, actions } from './state.js';
 
+const normalizeOrderStatus = (status) => (status === 'confirmed' ? 'preparing' : status);
+
 // Load dashboard (orders + stats)
 export async function loadDashboard() {
     console.log('⚡ Loading dashboard...');
@@ -102,9 +104,9 @@ function renderOrders() {
 
 // Render single order card
 function renderOrderCard(order) {
+    const normalizedStatus = normalizeOrderStatus(order.status);
     const statusNames = {
         pending: 'Новый',
-        confirmed: 'Подтвержден',
         preparing: 'Готовится',
         ready: 'Готов',
         delivering: 'В пути',
@@ -112,16 +114,16 @@ function renderOrderCard(order) {
         cancelled: 'Отменен'
     };
 
-    const statusName = statusNames[order.status] || order.status;
+    const statusName = statusNames[normalizedStatus] || normalizedStatus;
     const typeText = order.order_type === 'delivery' ? 'Доставка' : 'Самовывоз';
     const typeIcon = order.order_type === 'delivery' ? '🚚' : '🏃';
 
     return `
-        <div class="order-card ${order.status}" data-order-id="${order.id}">
+        <div class="order-card ${normalizedStatus}" data-order-id="${order.id}">
             <div class="order-header">
                 <div class="order-id">#${order.id}</div>
-                <div class="order-status-badge ${order.status}">
-                    ${getStatusEmoji(order.status)} ${statusName}
+                <div class="order-status-badge ${normalizedStatus}">
+                    ${getStatusEmoji(normalizedStatus)} ${statusName}
                 </div>
             </div>
 
@@ -175,6 +177,7 @@ function renderOrderCard(order) {
 }
 
 function getStatusEmoji(status) {
+    const normalizedStatus = normalizeOrderStatus(status);
     const emojis = {
         pending: '⏳',
         confirmed: '✅',
@@ -184,13 +187,14 @@ function getStatusEmoji(status) {
         completed: '🎉',
         cancelled: '❌'
     };
-    return emojis[status] || '📦';
+    return emojis[normalizedStatus] || '📦';
 }
 
 function getOrderActions(order) {
     const id = order.id;
+    const status = normalizeOrderStatus(order.status);
 
-    if (order.status === 'pending') {
+    if (status === 'pending') {
         return `
             <button class="btn btn-success" onclick="window.confirmOrder(${id})">
                 ✅ Подтвердить
@@ -199,7 +203,7 @@ function getOrderActions(order) {
                 ❌ Отказать
             </button>
         `;
-    } else if (order.status === 'confirmed') {
+    } else if (status === 'confirmed') {
         return `
             <button class="btn btn-primary" onclick="window.updateOrderStatus(${id}, 'preparing')">
                 👨‍🍳 Готовится
@@ -208,13 +212,13 @@ function getOrderActions(order) {
                 ❌ Отменить
             </button>
         `;
-    } else if (order.status === 'preparing') {
+    } else if (status === 'preparing') {
         return `
             <button class="btn btn-success" onclick="window.updateOrderStatus(${id}, 'ready')">
                 ✅ Готово
             </button>
         `;
-    } else if (order.status === 'ready') {
+    } else if (status === 'ready') {
         return order.order_type === 'delivery' ? `
             <button class="btn btn-primary" onclick="window.updateOrderStatus(${id}, 'delivering')">
                 🚚 В пути
@@ -227,7 +231,7 @@ function getOrderActions(order) {
                 🎉 Выдано
             </button>
         `;
-    } else if (order.status === 'delivering') {
+    } else if (status === 'delivering') {
         return `
             <button class="btn btn-success" onclick="window.completeOrder(${id})">
                 🎉 Доставлено
@@ -242,7 +246,7 @@ function getOrderActions(order) {
 export async function confirmOrder(orderId) {
     try {
         await ordersAPI.confirm(orderId);
-        actions.updateOrder(orderId, { status: 'confirmed' });
+        actions.updateOrder(orderId, { status: 'preparing' });
         renderOrders();
         toast('Заказ подтвержден', 'success');
     } catch (error) {

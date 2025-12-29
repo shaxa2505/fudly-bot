@@ -1,4 +1,5 @@
 import { useNavigate } from 'react-router-dom'
+import { resolveImageUrl } from '../../utils/imageUtils'
 import { Package, ShoppingCart, Home } from 'lucide-react'
 
 const ORDER_FILTERS = [
@@ -105,6 +106,13 @@ function OrdersSection({ orders, loading, orderFilter, onFilterChange }) {
           {orders.map((order, idx) => {
             const statusInfo = getStatusInfo(order.status)
             const orderId = order.order_id || order.booking_id
+            const photoUrl = resolveImageUrl(
+              order.offer_photo,
+              order.offer_photo_url,
+              order.offer_photo_id,
+              order.photo,
+              order.photo_id
+            )
             return (
               <div
                 key={orderId || idx}
@@ -119,9 +127,9 @@ function OrdersSection({ orders, loading, orderFilter, onFilterChange }) {
 
                 <div className="order-content">
                   <div className="order-image-wrapper">
-                    {order.offer_photo ? (
+                    {photoUrl ? (
                       <img
-                        src={order.offer_photo}
+                        src={photoUrl}
                         alt={order.offer_title}
                         className="order-image"
                         onError={(e) => {
