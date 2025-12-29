@@ -219,7 +219,10 @@ UZB_TZ = timezone(timedelta(hours=5))
 
 def normalize_city(city: str) -> str:
     """Convert city name to Russian format for database search."""
-    return CITY_UZ_TO_RU.get(city, city)
+    if not city:
+        return city
+    city_clean = city.strip()
+    return CITY_UZ_TO_RU.get(city_clean.lower(), city_clean)
 
 
 def get_uzb_time() -> datetime:

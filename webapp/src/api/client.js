@@ -1,11 +1,14 @@
 import axios from 'axios'
 import { captureException } from '../utils/sentry'
+import LRUCache from '../utils/lruCache'
 
 const API_BASE = import.meta.env.VITE_API_URL || 'https://fudly-bot-production.up.railway.app/api/v1'
 
 // In-memory cache for GET requests
-const requestCache = new Map()
 const CACHE_TTL = 30000 // 30 seconds cache
+const CACHE_MAX_TTL = 600000 // 10 minutes max TTL for LRU eviction
+const requestCache = new LRUCache(100, CACHE_MAX_TTL)
+const inFlightRequests = new Map()
 
 // Retry configuration
 const RETRY_CONFIG = {
@@ -85,30 +88,57 @@ client.interceptors.response.use(
   }
 )
 
+const serializeParams = (params) => {
+  const entries = Object.entries(params || {})
+  if (entries.length === 0) return ''
+  entries.sort(([a], [b]) => a.localeCompare(b))
+  return entries.map(([key, value]) => `${key}:${JSON.stringify(value)}`).join('&')
+}
+
+const buildCacheKey = (url, params) => `${url}?${serializeParams(params)}`
+
+const getCachedEntry = (cacheKey) => {
+  const cached = requestCache.get(cacheKey)
+  if (!cached) return null
+  const age = Date.now() - cached.timestamp
+  if (age > cached.ttl) {
+    requestCache.delete(cacheKey)
+    return null
+  }
+  return cached.data
+}
+
 // Cached GET request helper
 const cachedGet = async (url, params = {}, ttl = CACHE_TTL, options = {}) => {
   const { force = false } = options
-  const cacheKey = `${url}?${JSON.stringify(params)}`
-  const cached = requestCache.get(cacheKey)
+  const cacheKey = buildCacheKey(url, params)
 
-  if (!force && cached && Date.now() - cached.timestamp < ttl) {
-    return cached.data
-  }
-
-  const { data } = await client.get(url, { params })
   if (!force) {
-    requestCache.set(cacheKey, { data, timestamp: Date.now() })
-
-    // Clean old cache entries
-    if (requestCache.size > 100) {
-      const oldestKey = requestCache.keys().next().value
-      requestCache.delete(oldestKey)
-    }
+    const cached = getCachedEntry(cacheKey)
+    if (cached !== null) return cached
   } else {
     requestCache.delete(cacheKey)
   }
 
-  return data
+  if (inFlightRequests.has(cacheKey)) {
+    return inFlightRequests.get(cacheKey)
+  }
+
+  const requestPromise = client.get(url, { params })
+    .then(({ data }) => {
+      if (!force) {
+        requestCache.set(cacheKey, { data, timestamp: Date.now(), ttl })
+      } else {
+        requestCache.delete(cacheKey)
+      }
+      return data
+    })
+    .finally(() => {
+      inFlightRequests.delete(cacheKey)
+    })
+
+  inFlightRequests.set(cacheKey, requestPromise)
+  return requestPromise
 }
 
 // Helper to invalidate cache by pattern
@@ -123,19 +153,35 @@ const invalidateCache = (pattern) => {
 const api = {
   // Helper to convert Telegram file_id to photo URL
   getPhotoUrl(photo) {
-    if (!photo) return null
+    if (photo == null) return null
+    if (typeof photo === 'number') {
+      photo = String(photo)
+    }
+    if (typeof photo !== 'string') return null
+
+    const normalized = photo.trim()
+    if (!normalized) return null
+
+    if (normalized.startsWith('data:') || normalized.startsWith('blob:')) {
+      return normalized
+    }
 
     // Already a URL
-    if (photo.startsWith('http://') || photo.startsWith('https://')) {
-      return photo
+    if (normalized.startsWith('http://') || normalized.startsWith('https://')) {
+      return normalized
     }
 
-    // Telegram file_id - use our API endpoint
-    if (photo.startsWith('AgAC') || photo.length > 50) {
-      return `${API_BASE}/photo/${encodeURIComponent(photo)}`
+    // Relative paths from API responses
+    if (normalized.startsWith('/')) {
+      return new URL(normalized, API_BASE).toString()
     }
 
-    return null
+    if (normalized.startsWith('api/') || normalized.startsWith('photo/')) {
+      return new URL(`/${normalized}`, API_BASE).toString()
+    }
+
+    // Telegram file_id or storage id - use our API endpoint
+    return `${API_BASE}/photo/${encodeURIComponent(normalized)}`
   },
 
   // Auth endpoints

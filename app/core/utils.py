@@ -10,14 +10,23 @@ UZB_TZ = timezone(timedelta(hours=5))
 
 # Словарь для преобразования узбекских названий городов в русские
 CITY_UZ_TO_RU = {
-    "Toshkent": "Ташкент",
-    "Samarqand": "Самарканд",
-    "Buxoro": "Бухара",
-    "Andijon": "Андижан",
-    "Namangan": "Наманган",
-    "Farg'ona": "Фергана",
-    "Xiva": "Хива",
-    "Nukus": "Нукус",
+    "toshkent": "Ташкент",
+    "tashkent": "Ташкент",
+    "samarqand": "Самарканд",
+    "samarkand": "Самарканд",
+    "buxoro": "Бухара",
+    "bukhara": "Бухара",
+    "andijon": "Андижан",
+    "namangan": "Наманган",
+    "farg'ona": "Фергана",
+    "fargona": "Фергана",
+    "fergana": "Фергана",
+    "xiva": "Хива",
+    "khiva": "Хива",
+    "nukus": "Нукус",
+    "qarshi": "Карши",
+    "qoqon": "Коканд",
+    "kokand": "Коканд",
 }
 
 
@@ -215,5 +224,8 @@ def get_order_field(order: Any, field_name: str, default: Any = None) -> Any:
 
 
 def normalize_city(city: str) -> str:
-    """Convert Uzbek city name to Russian representation used in DB."""
-    return CITY_UZ_TO_RU.get(city, city)
+    """Convert Uzbek/English city names to the Russian form used in DB."""
+    if not city:
+        return city
+    city_clean = city.strip()
+    return CITY_UZ_TO_RU.get(city_clean.lower(), city_clean)

@@ -6,7 +6,7 @@
 - [x] Align city enums and normalize-city helpers to real Cyrillic values.
 
 ## Next (high impact)
-- [ ] Deduplicate in-flight GET requests and use LRU cache in `webapp/src/api/client.js`.
+- [x] Deduplicate in-flight GET requests and use LRU cache in `webapp/src/api/client.js`.
 - [ ] Add pagination + `updated_since` (or ETag) for `/orders` in `app/api/webapp/routes_orders.py`.
 - [ ] Push `/offers` filtering/sorting into DB + add indexes for city/category/price/discount.
 - [ ] Add `/stores` pagination and trim response payloads.
