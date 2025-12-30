@@ -291,12 +291,31 @@ def verify_telegram_webapp(authorization: str) -> int:
                 current_timestamp = int(datetime.now().timestamp())
                 age_seconds = current_timestamp - auth_timestamp
 
-                # Allow auth data up to 24 hours old (86400 seconds)
-                MAX_AUTH_AGE = 86400
-                if age_seconds > MAX_AUTH_AGE:
-                    logging.warning(f"⚠️ Auth data too old: {age_seconds}s (max {MAX_AUTH_AGE}s)")
+                # Allow auth data up to a configurable age (default 7 days).
+                max_auth_age_raw = os.getenv("PARTNER_PANEL_AUTH_MAX_AGE_SECONDS", "604800")
+                try:
+                    max_auth_age = int(max_auth_age_raw)
+                except (TypeError, ValueError):
+                    max_auth_age = 604800
+                    logging.warning(
+                        "⚠️ Invalid PARTNER_PANEL_AUTH_MAX_AGE_SECONDS value. "
+                        "Falling back to 604800 seconds."
+                    )
+                if max_auth_age < 0:
+                    max_auth_age = 0
+                if 0 < max_auth_age < 604800:
+                    logging.warning(
+                        "⚠️ PARTNER_PANEL_AUTH_MAX_AGE_SECONDS below 7 days. "
+                        "Clamping to 604800 seconds."
+                    )
+                    max_auth_age = 604800
+                if age_seconds > max_auth_age:
+                    logging.warning(
+                        f"⚠️ Auth data too old: {age_seconds}s (max {max_auth_age}s)"
+                    )
                     raise HTTPException(
-                        status_code=401, detail=f"Auth data expired (age: {age_seconds // 3600}h)"
+                        status_code=401,
+                        detail=f"Auth data expired (age: {age_seconds // 3600}h)",
                     )
                 elif age_seconds < 0:
                     logging.warning(f"⚠️ Auth data from future: {age_seconds}s")
