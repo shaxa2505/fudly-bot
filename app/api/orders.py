@@ -514,7 +514,22 @@ async def upload_payment_proof(
     if user_id <= 0:
         raise HTTPException(status_code=401, detail="Authentication required")
 
-    photo_data = await photo.read()
+    if not (photo.content_type or "").startswith("image/"):
+        raise HTTPException(status_code=400, detail="Unsupported file type")
+
+    max_bytes = int(os.getenv("MAX_PAYMENT_PROOF_BYTES", str(5 * 1024 * 1024)))
+    chunks: list[bytes] = []
+    total_size = 0
+    while True:
+        chunk = await photo.read(1024 * 1024)
+        if not chunk:
+            break
+        total_size += len(chunk)
+        if total_size > max_bytes:
+            raise HTTPException(status_code=413, detail="Payment proof is too large")
+        chunks.append(chunk)
+
+    photo_data = b"".join(chunks)
     if not photo_data:
         raise HTTPException(status_code=400, detail="No photo provided")
 

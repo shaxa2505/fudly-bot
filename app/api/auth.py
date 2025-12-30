@@ -6,6 +6,8 @@ import hashlib
 import hmac
 import json
 import logging
+import os
+import time
 from typing import Any
 from urllib.parse import parse_qsl
 
@@ -95,6 +97,20 @@ def validate_telegram_webapp_data(init_data: str, bot_token: str) -> dict[str, A
             return None
 
         received_hash = parsed_data.pop("hash")
+
+        auth_date_raw = parsed_data.get("auth_date")
+        if not auth_date_raw:
+            return None
+        try:
+            auth_ts = int(auth_date_raw)
+        except (TypeError, ValueError):
+            return None
+        now_ts = int(time.time())
+        if auth_ts > now_ts:
+            return None
+        max_age = int(os.getenv("TELEGRAM_AUTH_MAX_AGE_SECONDS", "300"))
+        if now_ts - auth_ts > max_age:
+            return None
 
         # Create data-check-string
         data_check_arr = [f"{k}={v}" for k, v in sorted(parsed_data.items())]

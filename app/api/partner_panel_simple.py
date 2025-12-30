@@ -208,7 +208,20 @@ def verify_telegram_webapp(authorization: str) -> int:
         #
         # IMPORTANT: Do not append extra params (like uid) to signed initData in production,
         # it invalidates the Telegram signature.
+        allow_url_auth = os.getenv("ALLOW_URL_AUTH", "").lower() in ("1", "true", "yes")
+        allow_url_auth_prod = os.getenv("ALLOW_URL_AUTH_PROD", "").lower() in ("1", "true", "yes")
+
         if "uid" in parsed and "hash" not in parsed:
+            if not allow_url_auth:
+                raise HTTPException(
+                    status_code=401,
+                    detail="URL auth disabled. Please open from Telegram bot.",
+                )
+            if not (_is_dev_env() or allow_url_auth_prod):
+                raise HTTPException(
+                    status_code=401,
+                    detail="URL auth not allowed in production.",
+                )
             # Signed URL auth fallback: uid + auth_date + sig.
             # Used when Telegram initData isn't available (e.g. BotFather domain misconfigured).
             try:
