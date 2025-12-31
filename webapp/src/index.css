@@ -39,6 +39,10 @@ html {
   overscroll-behavior-y: none;
 }
 
+html.tg-webapp {
+  scroll-behavior: auto;
+}
+
 body {
   font-family: var(--font-family);
   font-size: var(--font-base);
