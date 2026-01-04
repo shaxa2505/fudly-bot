@@ -514,6 +514,7 @@ async def upload_payment_proof(
     if user_id <= 0:
         raise HTTPException(status_code=401, detail="Authentication required")
 
+<<<<<<< HEAD
     if not (photo.content_type or "").startswith("image/"):
         raise HTTPException(status_code=400, detail="Unsupported file type")
 
@@ -530,6 +531,9 @@ async def upload_payment_proof(
         chunks.append(chunk)
 
     photo_data = b"".join(chunks)
+=======
+    photo_data = await photo.read()
+>>>>>>> a84f901 (initial)
     if not photo_data:
         raise HTTPException(status_code=400, detail="No photo provided")
 

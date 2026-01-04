@@ -23,6 +23,7 @@ export function usePullToRefresh(onRefresh, options = {}) {
   const containerRef = useRef(null)
   const isTracking = useRef(false)
 
+<<<<<<< HEAD
   const getScrollTop = useCallback(() => {
     const container = containerRef.current
     if (container && container !== document && container !== document.body && container !== document.documentElement) {
@@ -36,17 +37,30 @@ export function usePullToRefresh(onRefresh, options = {}) {
     // Только если страница прокручена вверх
     if (e.touches.length !== 1) return
     if (getScrollTop() > 0) return
+=======
+  const handleTouchStart = useCallback((e) => {
+    // Только если страница прокручена вверх
+    if (window.scrollY > 0) return
+>>>>>>> a84f901 (initial)
 
     isTracking.current = true
     startX.current = e.touches[0].clientX
     startY.current = e.touches[0].clientY
     currentY.current = startY.current
     setIsPulling(false)
+<<<<<<< HEAD
   }, [getScrollTop])
 
   const handleTouchMove = useCallback((e) => {
     if (!isTracking.current || isRefreshing) return
     if (getScrollTop() > 0) {
+=======
+  }, [])
+
+  const handleTouchMove = useCallback((e) => {
+    if (!isTracking.current || isRefreshing) return
+    if (window.scrollY > 0) {
+>>>>>>> a84f901 (initial)
       isTracking.current = false
       setIsPulling(false)
       setPullDistance(0)
@@ -77,10 +91,17 @@ export function usePullToRefresh(onRefresh, options = {}) {
     setPullDistance(resistedDistance)
 
     // Предотвращаем прокрутку если тянем вниз
+<<<<<<< HEAD
     if (resistedDistance > 10 && e.cancelable) {
       e.preventDefault()
     }
   }, [getScrollTop, isPulling, isRefreshing, resistance, maxPull])
+=======
+    if (resistedDistance > 10) {
+      e.preventDefault()
+    }
+  }, [isPulling, isRefreshing, resistance, maxPull])
+>>>>>>> a84f901 (initial)
 
   const handleTouchEnd = useCallback(async () => {
     isTracking.current = false

@@ -7,7 +7,11 @@
 .home-page {
   min-height: 100vh;
   padding-bottom: calc(var(--bottom-nav-height) + var(--spacing-xl));
+<<<<<<< HEAD
   background: linear-gradient(180deg, #F7FBFA 0%, #FFFFFF 32%);
+=======
+  background: var(--color-bg-primary);
+>>>>>>> a84f901 (initial)
 }
 
 /* Header - Fixed clean design */
@@ -18,8 +22,13 @@
   background: var(--color-bg-primary);
   height: var(--app-topbar-height);
   padding: 0 var(--app-header-padding-x);
+<<<<<<< HEAD
   border-bottom: 1px solid rgba(15, 118, 110, 0.08);
   box-shadow: 0 10px 24px rgba(16, 24, 40, 0.06);
+=======
+  border-bottom: 1px solid rgba(15, 118, 110, 0.12);
+  box-shadow: var(--shadow-header);
+>>>>>>> a84f901 (initial)
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
   /* No transitions - prevents jank */
@@ -66,11 +75,18 @@
   display: flex;
   align-items: center;
   justify-content: center;
+<<<<<<< HEAD
   background: linear-gradient(135deg, #ECF9F7 0%, #DFF2EF 100%);
   border-radius: 12px;
   transition: transform 0.2s ease, background 0.2s ease;
   border: 1px solid rgba(15, 118, 110, 0.18);
   box-shadow: 0 8px 14px rgba(15, 118, 110, 0.12);
+=======
+  background: linear-gradient(135deg, #E7F5F3 0%, #D7F0EC 100%);
+  border-radius: 12px;
+  transition: transform 0.2s ease, background 0.2s ease;
+  border: 1px solid rgba(15, 118, 110, 0.18);
+>>>>>>> a84f901 (initial)
 }
 
 .header-location:active .header-location-icon {
@@ -114,8 +130,13 @@
   z-index: 19;
   background: var(--color-bg-primary);
   padding: var(--spacing-md) var(--app-header-padding-x);
+<<<<<<< HEAD
   border-bottom: 1px solid rgba(15, 118, 110, 0.08);
   box-shadow: 0 18px 32px rgba(16, 24, 40, 0.06);
+=======
+  border-bottom: 1px solid rgba(15, 118, 110, 0.12);
+  box-shadow: 0 14px 28px rgba(16, 24, 40, 0.06);
+>>>>>>> a84f901 (initial)
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
   transition: top 0.22s ease;
@@ -132,13 +153,20 @@
   width: 34px;
   height: 34px;
   background: #FFFFFF;
+<<<<<<< HEAD
   border: 1px solid rgba(15, 118, 110, 0.1);
+=======
+  border: 1px solid rgba(15, 118, 110, 0.12);
+>>>>>>> a84f901 (initial)
   border-radius: 14px;
   color: var(--color-text-primary);
   cursor: pointer;
   transition: all 0.2s ease;
   -webkit-tap-highlight-color: transparent;
+<<<<<<< HEAD
   box-shadow: 0 6px 14px rgba(16, 24, 40, 0.06);
+=======
+>>>>>>> a84f901 (initial)
 }
 
 .header-action-btn svg {
@@ -185,7 +213,11 @@
   font-size: var(--font-base);
   color: var(--color-text-primary);
   transition: all var(--transition-normal);
+<<<<<<< HEAD
   box-shadow: 0 12px 26px rgba(16, 24, 40, 0.08);
+=======
+  box-shadow: 0 10px 24px rgba(16, 24, 40, 0.06);
+>>>>>>> a84f901 (initial)
 }
 
 .header-search .search-input::placeholder {
@@ -348,12 +380,17 @@
   display: grid;
   grid-template-columns: repeat(4, 1fr);
   gap: var(--spacing-md);
+<<<<<<< HEAD
   margin: var(--spacing-md) var(--spacing-lg) 0;
   padding: var(--spacing-md) var(--spacing-md);
   background: #FFFFFF;
   border-radius: 20px;
   border: 1px solid rgba(15, 118, 110, 0.08);
   box-shadow: 0 12px 24px rgba(16, 24, 40, 0.05);
+=======
+  padding: var(--spacing-md) var(--spacing-lg) var(--spacing-md);
+  background: transparent;
+>>>>>>> a84f901 (initial)
 }
 
 .quick-action {
@@ -388,8 +425,13 @@
   border-radius: 16px;
   color: var(--color-primary);
   transition: all var(--transition-normal);
+<<<<<<< HEAD
   border: 1px solid rgba(15, 118, 110, 0.12);
   box-shadow: 0 8px 16px rgba(16, 24, 40, 0.08);
+=======
+  border: 1px solid rgba(15, 118, 110, 0.14);
+  box-shadow: 0 10px 18px rgba(16, 24, 40, 0.08);
+>>>>>>> a84f901 (initial)
 }
 
 .quick-action-icon.accent {
@@ -451,8 +493,13 @@
   align-items: center;
   gap: 8px;
   padding: 10px 16px;
+<<<<<<< HEAD
   background: #FFFFFF;
   border: 1px solid rgba(15, 118, 110, 0.1);
+=======
+  background: var(--color-bg-primary);
+  border: 1px solid var(--color-border);
+>>>>>>> a84f901 (initial)
   border-radius: 20px;
   cursor: pointer;
   transition: all var(--transition-normal);
@@ -473,7 +520,11 @@
 .category-pill.active {
   background: var(--color-primary);
   border-color: transparent;
+<<<<<<< HEAD
   box-shadow: 0 10px 22px rgba(15, 118, 110, 0.25);
+=======
+  box-shadow: var(--shadow-primary);
+>>>>>>> a84f901 (initial)
 }
 
 .category-pill-icon {
@@ -562,11 +613,19 @@
 
 .filters-section {
   margin: var(--spacing-sm) var(--page-padding-x) var(--spacing-sm);
+<<<<<<< HEAD
   padding: 10px;
   background: #FFFFFF;
   border: 1px solid rgba(15, 118, 110, 0.08);
   border-radius: 18px;
   box-shadow: 0 10px 20px rgba(16, 24, 40, 0.05);
+=======
+  padding: 8px;
+  background: #FFFFFF;
+  border: 1px solid rgba(15, 118, 110, 0.08);
+  border-radius: 18px;
+  box-shadow: 0 4px 12px rgba(16, 24, 40, 0.04);
+>>>>>>> a84f901 (initial)
 }
 
 .filters-primary {
@@ -593,10 +652,17 @@
 .filters-advanced {
   margin-top: 8px;
   padding: 12px;
+<<<<<<< HEAD
   background: #F9FCFB;
   border: 1px solid rgba(15, 118, 110, 0.1);
   border-radius: 14px;
   box-shadow: 0 8px 16px rgba(16, 24, 40, 0.05);
+=======
+  background: #FFFFFF;
+  border: 1px solid rgba(15, 118, 110, 0.08);
+  border-radius: 14px;
+  box-shadow: 0 4px 10px rgba(16, 24, 40, 0.04);
+>>>>>>> a84f901 (initial)
   display: grid;
   gap: 12px;
 }
@@ -638,8 +704,13 @@
   justify-content: center;
   gap: 6px;
   padding: 6px 14px;
+<<<<<<< HEAD
   background: #FFFFFF;
   border: 1px solid rgba(15, 118, 110, 0.12);
+=======
+  background: var(--color-bg-primary);
+  border: 1px solid rgba(15, 118, 110, 0.14);
+>>>>>>> a84f901 (initial)
   border-radius: 999px;
   font-size: 13px;
   font-weight: 600;
@@ -673,7 +744,11 @@
   background: var(--color-primary);
   color: #FFFFFF;
   border-color: transparent;
+<<<<<<< HEAD
   box-shadow: 0 10px 20px rgba(15, 118, 110, 0.25);
+=======
+  box-shadow: 0 10px 18px rgba(15, 118, 110, 0.25);
+>>>>>>> a84f901 (initial)
 }
 
 .filter-pill.discount.active {
@@ -709,7 +784,11 @@
 
 /* Popular Section */
 .popular-section {
+<<<<<<< HEAD
   background: transparent;
+=======
+  background: var(--color-bg-primary);
+>>>>>>> a84f901 (initial)
   padding: var(--spacing-lg) 0;
   border-bottom: 1px solid var(--color-border-light);
 }
@@ -759,8 +838,13 @@
 .popular-card {
   flex-shrink: 0;
   width: 140px;
+<<<<<<< HEAD
   background: #FFFFFF;
   border-radius: 22px;
+=======
+  background: var(--color-bg-primary);
+  border-radius: 20px;
+>>>>>>> a84f901 (initial)
   overflow: hidden;
   box-shadow: var(--shadow-sm);
   border: 1px solid rgba(15, 118, 110, 0.08);
@@ -781,7 +865,11 @@
   position: relative;
   width: 100%;
   height: 100px;
+<<<<<<< HEAD
   background: #F5F8F7;
+=======
+  background: var(--color-bg-primary);
+>>>>>>> a84f901 (initial)
   border-radius: 16px;
   overflow: hidden;
   margin: 8px 8px 0;
@@ -857,7 +945,11 @@
   color: var(--color-text-secondary);
   font-weight: var(--font-semibold);
   background: #FFFFFF;
+<<<<<<< HEAD
   border: 1px solid rgba(15, 118, 110, 0.1);
+=======
+  border: 1px solid rgba(15, 118, 110, 0.12);
+>>>>>>> a84f901 (initial)
   border-radius: 999px;
   line-height: 1;
 }
@@ -869,8 +961,13 @@
   gap: 10px;
   margin: 0 var(--page-padding-x) var(--spacing-md);
   padding: var(--spacing-md) var(--spacing-lg);
+<<<<<<< HEAD
   background: #FFF6ED;
   border: 1px solid rgba(249, 115, 22, 0.22);
+=======
+  background: #FFF4EB;
+  border: 1px solid rgba(249, 115, 22, 0.25);
+>>>>>>> a84f901 (initial)
   border-radius: 16px;
   font-size: var(--font-sm);
   color: var(--color-text-secondary);
@@ -908,8 +1005,13 @@
 .offers-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
+<<<<<<< HEAD
   gap: 18px;
   padding: 14px var(--page-padding-x) 28px;
+=======
+  gap: 16px;
+  padding: 12px var(--page-padding-x) 28px;
+>>>>>>> a84f901 (initial)
   background: transparent;
   align-items: start;
 }

@@ -61,8 +61,11 @@ function AppContent() {
       // Expand to full height - do this FIRST for perceived speed
       tg.expand()
       tg.ready()
+<<<<<<< HEAD
       tg.disableVerticalSwipes?.()
       document.documentElement.classList.add('tg-webapp')
+=======
+>>>>>>> a84f901 (initial)
 
       // Set theme colors immediately
       document.documentElement.style.setProperty('--tg-theme-bg-color', tg.themeParams.bg_color || '#ffffff')

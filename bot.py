@@ -669,7 +669,11 @@ async def start_rating_reminder_worker_task() -> asyncio.Task | None:
 # =============================================================================
 
 
+<<<<<<< HEAD
 async def on_startup() -> bool:
+=======
+async def on_startup() -> None:
+>>>>>>> a84f901 (initial)
     """Actions on bot startup."""
     if USE_WEBHOOK:
         webhook_url = f"{WEBHOOK_URL}{WEBHOOK_PATH}"
@@ -692,22 +696,33 @@ async def on_startup() -> bool:
                 allowed_updates=allowed_updates,
             )
             logger.info(f"✅ Webhook set: {webhook_url} (allowed_updates: {allowed_updates})")
+<<<<<<< HEAD
             return True
+=======
+>>>>>>> a84f901 (initial)
         except Exception as e:
             logger.error(f"⚠️ Failed to set webhook: {e}")
             logger.warning(
                 "Bot will continue running, but may not receive updates until webhook is fixed"
             )
             # Don't raise - let the bot continue running so health checks pass
+<<<<<<< HEAD
             return False
+=======
+>>>>>>> a84f901 (initial)
     else:
         try:
             await bot.delete_webhook(drop_pending_updates=True)
             logger.info("✅ Polling mode activated")
+<<<<<<< HEAD
             return True
         except Exception as e:
             logger.warning(f"Failed to delete webhook: {e}")
             return False
+=======
+        except Exception as e:
+            logger.warning(f"Failed to delete webhook: {e}")
+>>>>>>> a84f901 (initial)
 
 
 async def on_shutdown() -> None:
@@ -819,6 +834,7 @@ async def main() -> None:
         logger.info(f"🌐 Webhook server running on port {PORT}")
 
         # Now register webhook with Telegram (can fail without breaking health checks)
+<<<<<<< HEAD
         webhook_ready = await on_startup()
 
         polling_task = None
@@ -838,6 +854,9 @@ async def main() -> None:
                 logger.info("✅ Polling fallback activated")
             except Exception as e:
                 logger.error(f"❌ Failed to start polling fallback: {e}")
+=======
+        await on_startup()
+>>>>>>> a84f901 (initial)
 
         try:
             await shutdown_event.wait()
@@ -850,12 +869,15 @@ async def main() -> None:
                 rating_task.cancel()
             if api_task:
                 api_task.cancel()
+<<<<<<< HEAD
             if polling_task:
                 polling_task.cancel()
                 try:
                     await polling_task
                 except asyncio.CancelledError:
                     pass
+=======
+>>>>>>> a84f901 (initial)
             await runner.cleanup()
             await on_shutdown()
     else:
