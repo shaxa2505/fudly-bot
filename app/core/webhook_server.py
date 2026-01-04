@@ -2447,6 +2447,8 @@ async def create_webhook_app(
             data = await request.post()
 
             payment_service = get_payment_service()
+            if hasattr(payment_service, "set_database"):
+                payment_service.set_database(db)
 
             click_trans_id = data.get("click_trans_id", "")
             service_id = data.get("service_id", "")
@@ -2460,6 +2462,7 @@ async def create_webhook_app(
             if action == "0":  # Prepare
                 result = await payment_service.process_click_prepare(
                     click_trans_id=click_trans_id,
+                    service_id=service_id,
                     merchant_trans_id=merchant_trans_id,
                     amount=amount,
                     action=action,
@@ -2469,6 +2472,7 @@ async def create_webhook_app(
             else:  # Complete
                 result = await payment_service.process_click_complete(
                     click_trans_id=click_trans_id,
+                    service_id=service_id,
                     merchant_trans_id=merchant_trans_id,
                     merchant_prepare_id=data.get("merchant_prepare_id", ""),
                     amount=amount,
@@ -2486,19 +2490,30 @@ async def create_webhook_app(
     async def api_payme_callback(request: web.Request) -> web.Response:
         """POST /api/v1/payment/payme/callback - Payme JSON-RPC callback."""
         try:
-            # Verify authorization
             payment_service = get_payment_service()
+            if hasattr(payment_service, "set_database"):
+                payment_service.set_database(db)
             auth_header = request.headers.get("Authorization", "")
-
-            if not payment_service.verify_payme_signature(auth_header):
-                return web.json_response(
-                    {"error": {"code": -32504, "message": "Unauthorized"}, "id": None}, status=401
-                )
 
             data = await request.json()
             method = data.get("method", "")
             params = data.get("params", {})
             request_id = data.get("id")
+
+            store_id = None
+            order_id = params.get("account", {}).get("order_id")
+            if order_id and hasattr(db, "get_order"):
+                try:
+                    order = db.get_order(int(order_id))
+                except Exception:
+                    order = None
+                if isinstance(order, dict):
+                    store_id = order.get("store_id")
+
+            if not payment_service.verify_payme_signature(auth_header, store_id=store_id):
+                return web.json_response(
+                    {"error": {"code": -32504, "message": "Unauthorized"}, "id": None}, status=401
+                )
 
             result = await payment_service.process_payme_request(method, params, request_id)
             return web.json_response(result)
