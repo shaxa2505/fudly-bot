@@ -5,10 +5,7 @@ import hmac
 import json
 import logging
 import os
-<<<<<<< HEAD
 import time
-=======
->>>>>>> a84f901 (initial)
 from typing import Any
 from urllib.parse import parse_qsl, unquote
 
@@ -174,7 +171,6 @@ def validate_init_data(init_data: str, bot_token: str) -> dict[str, Any] | None:
             return None
 
         received_hash = parsed.pop("hash")
-<<<<<<< HEAD
         auth_date_raw = parsed.get("auth_date")
         if not auth_date_raw:
             return None
@@ -188,8 +184,6 @@ def validate_init_data(init_data: str, bot_token: str) -> dict[str, Any] | None:
         max_age = int(os.getenv("TELEGRAM_AUTH_MAX_AGE_SECONDS", "300"))
         if now_ts - auth_ts > max_age:
             return None
-=======
->>>>>>> a84f901 (initial)
 
         data_check_arr = sorted([f"{k}={v}" for k, v in parsed.items()])
         data_check_string = "\n".join(data_check_arr)

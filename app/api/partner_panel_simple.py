@@ -208,7 +208,6 @@ def verify_telegram_webapp(authorization: str) -> int:
         #
         # IMPORTANT: Do not append extra params (like uid) to signed initData in production,
         # it invalidates the Telegram signature.
-<<<<<<< HEAD
         allow_url_auth = os.getenv("ALLOW_URL_AUTH", "").lower() in ("1", "true", "yes")
         allow_url_auth_prod = os.getenv("ALLOW_URL_AUTH_PROD", "").lower() in ("1", "true", "yes")
 
@@ -223,9 +222,6 @@ def verify_telegram_webapp(authorization: str) -> int:
                     status_code=401,
                     detail="URL auth not allowed in production.",
                 )
-=======
-        if "uid" in parsed and "hash" not in parsed:
->>>>>>> a84f901 (initial)
             # Signed URL auth fallback: uid + auth_date + sig.
             # Used when Telegram initData isn't available (e.g. BotFather domain misconfigured).
             try:
@@ -295,7 +291,6 @@ def verify_telegram_webapp(authorization: str) -> int:
                 current_timestamp = int(datetime.now().timestamp())
                 age_seconds = current_timestamp - auth_timestamp
 
-<<<<<<< HEAD
                 # Allow auth data up to a configurable age (default 7 days).
                 max_auth_age_raw = os.getenv("PARTNER_PANEL_AUTH_MAX_AGE_SECONDS", "604800")
                 try:
@@ -321,14 +316,6 @@ def verify_telegram_webapp(authorization: str) -> int:
                     raise HTTPException(
                         status_code=401,
                         detail=f"Auth data expired (age: {age_seconds // 3600}h)",
-=======
-                # Allow auth data up to 24 hours old (86400 seconds)
-                MAX_AUTH_AGE = 86400
-                if age_seconds > MAX_AUTH_AGE:
-                    logging.warning(f"⚠️ Auth data too old: {age_seconds}s (max {MAX_AUTH_AGE}s)")
-                    raise HTTPException(
-                        status_code=401, detail=f"Auth data expired (age: {age_seconds // 3600}h)"
->>>>>>> a84f901 (initial)
                     )
                 elif age_seconds < 0:
                     logging.warning(f"⚠️ Auth data from future: {age_seconds}s")
