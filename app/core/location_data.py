@@ -23,6 +23,11 @@ _REGION_DISTRICTS: dict[str, list[dict[str, str]]] = {
     ],
 }
 
+# Indexes from localization.get_cities(): 0=Tashkent, 1=Samarkand, ...
+_CITY_INDEX_TO_REGION: dict[int, str] = {
+    1: "Самарканд",
+}
+
 
 def get_districts_for_region(region: str | None, lang: str = "ru") -> list[tuple[str, str]]:
     """Return [(label, canonical_ru)] for district selection."""
@@ -40,6 +45,23 @@ def get_districts_for_region(region: str | None, lang: str = "ru") -> list[tuple
         if label and canonical:
             result.append((label, canonical))
     return result
+
+
+def get_region_key_for_city_index(city_index: int | None) -> str | None:
+    """Return canonical region key for a city index."""
+    if city_index is None:
+        return None
+    return _CITY_INDEX_TO_REGION.get(city_index)
+
+
+def get_districts_for_city_index(
+    city_index: int | None, lang: str = "ru"
+) -> list[tuple[str, str]]:
+    """Return district options by city index (stable even if labels are mojibake)."""
+    region_key = get_region_key_for_city_index(city_index)
+    if not region_key:
+        return []
+    return get_districts_for_region(region_key, lang)
 
 
 def get_district_label(

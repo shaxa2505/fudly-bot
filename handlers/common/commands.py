@@ -9,7 +9,12 @@ from aiogram.filters import Command, StateFilter
 from aiogram.fsm.context import FSMContext
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
-from app.core.location_data import get_district_label, get_districts_for_region
+from app.core.location_data import (
+    get_district_label,
+    get_districts_for_city_index,
+    get_districts_for_region,
+    get_region_key_for_city_index,
+)
 from app.keyboards import (
     city_inline_keyboard,
     language_keyboard,
@@ -363,6 +368,7 @@ async def handle_city_selection(
 
     lang = db.get_user_language(callback.from_user.id)
     idx_raw = callback.data.split(":", 1)[1] if ":" in callback.data else ""
+    idx: int | None = None
     try:
         cities = get_cities(lang)
         try:
@@ -379,9 +385,17 @@ async def handle_city_selection(
         return
 
     normalized_city = normalize_city(city)
-    district_options = get_districts_for_region(city, lang)
+    region_key = get_region_key_for_city_index(idx)
+    district_options = get_districts_for_city_index(idx, lang)
+    if not district_options:
+        district_options = get_districts_for_region(city, lang)
     if district_options:
-        await state.update_data(region_label=city, region_value=normalized_city)
+        region_value = normalize_city(region_key or city)
+        await state.update_data(
+            region_label=city,
+            region_value=region_value,
+            region_key=region_key,
+        )
         await state.set_state(ChangeCity.district)
         builder = InlineKeyboardBuilder()
         for idx, (label, _value) in enumerate(district_options):
@@ -391,7 +405,11 @@ async def handle_city_selection(
             "🏘 Выберите район/город в области:" if lang == "ru" else "🏘 Viloyatdagi tuman/shaharni tanlang:"
         )
         if callback.message:
-            await callback.message.edit_text(prompt, reply_markup=builder.as_markup())
+            try:
+                await callback.message.edit_text(prompt, reply_markup=builder.as_markup())
+            except Exception as e:
+                logger.debug("Could not edit district prompt: %s", e)
+                await callback.message.answer(prompt, reply_markup=builder.as_markup())
         await callback.answer()
         return
 
@@ -439,7 +457,8 @@ async def handle_district_selection(
     lang = db.get_user_language(callback.from_user.id)
     data = await state.get_data()
     region_label = data.get("region_label")
-    region_value = data.get("region_value") or normalize_city(region_label or "")
+    region_key = data.get("region_key")
+    region_value = data.get("region_value") or normalize_city(region_key or region_label or "")
 
     try:
         idx_raw = callback.data.split(":", 1)[1]
@@ -472,7 +491,7 @@ async def handle_district_selection(
         else main_menu_customer(lang)
     )
 
-    city_display = region_label or region_value
+    city_display = region_label or region_key or region_value
     if district_label:
         city_display = f"{city_display} / {district_label}"
 

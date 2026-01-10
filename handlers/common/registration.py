@@ -6,7 +6,7 @@ from aiogram.filters import StateFilter
 from aiogram.fsm.context import FSMContext
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
-from app.core.location_data import get_districts_for_region
+from app.core.location_data import get_districts_for_city_index, get_districts_for_region, get_region_key_for_city_index
 from app.core.sanitize import sanitize_phone
 from app.core.security import logger, rate_limiter, secure_user_input, validator
 from app.core.utils import normalize_city
@@ -22,8 +22,9 @@ from localization import get_cities, get_text
 router = Router(name="registration")
 
 
-def _build_district_keyboard(region: str, lang: str) -> types.InlineKeyboardMarkup | None:
-    options = get_districts_for_region(region, lang)
+def _build_district_keyboard(
+    options: list[tuple[str, str]],
+) -> types.InlineKeyboardMarkup | None:
     if not options:
         return None
     builder = InlineKeyboardBuilder()
@@ -233,6 +234,7 @@ async def registration_city_callback(
 
     lang = db.get_user_language(callback.from_user.id)
 
+    idx: int | None = None
     try:
         raw = callback.data or ""
         parts = raw.split("_", 2)
@@ -255,11 +257,19 @@ async def registration_city_callback(
         return
 
     normalized_city = normalize_city(city)
-    district_options = get_districts_for_region(city, lang)
+    region_key = get_region_key_for_city_index(idx)
+    district_options = get_districts_for_city_index(idx, lang)
+    if not district_options:
+        district_options = get_districts_for_region(city, lang)
     if district_options:
-        await state.update_data(region_label=city, region_value=normalized_city)
+        region_value = normalize_city(region_key or city)
+        await state.update_data(
+            region_label=city,
+            region_value=region_value,
+            region_key=region_key,
+        )
         await state.set_state(Registration.district)
-        keyboard = _build_district_keyboard(city, lang)
+        keyboard = _build_district_keyboard(district_options)
         prompt = (
             "🏘 Выберите район/город в области:" if lang == "ru" else "🏘 Viloyatdagi tuman/shaharni tanlang:"
         )
@@ -321,7 +331,8 @@ async def registration_district_callback(
     lang = db.get_user_language(callback.from_user.id)
     data = await state.get_data()
     region_label = data.get("region_label")
-    region_value = data.get("region_value") or normalize_city(region_label or "")
+    region_key = data.get("region_key")
+    region_value = data.get("region_value") or normalize_city(region_key or region_label or "")
 
     try:
         raw = callback.data or ""
@@ -362,7 +373,7 @@ async def registration_district_callback(
 
     user = db.get_user_model(callback.from_user.id)
     name = user.first_name if user else callback.from_user.first_name
-    city_display = region_label or region_value
+    city_display = region_label or region_key or region_value
     if district_label:
         city_display = f"{city_display} / {district_label}"
 
