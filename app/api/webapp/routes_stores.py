@@ -12,30 +12,75 @@ router = APIRouter()
 
 @router.get("/stores", response_model=list[StoreResponse])
 async def get_stores(
-    city: str = Query("Toshkent", description="City to filter by"),
+    city: str | None = Query(None, description="City to filter by"),
     region: str | None = Query(None, description="Region filter"),
     district: str | None = Query(None, description="District filter"),
+    lat: float | None = Query(None, description="Latitude for nearby fallback"),
+    lon: float | None = Query(None, description="Longitude for nearby fallback"),
+    latitude: float | None = Query(None, description="Latitude (alias)"),
+    longitude: float | None = Query(None, description="Longitude (alias)"),
     business_type: str | None = Query(None, description="Business type filter"),
     db=Depends(get_db),
 ):
     """Get list of stores."""
     try:
-        normalized_city = normalize_city(city)
-        if business_type:
-            raw_stores = (
-                db.get_stores_by_business_type(business_type, normalized_city)
-                if hasattr(db, "get_stores_by_business_type")
-                else []
-            )
-        else:
+        normalized_city = normalize_city(city) if city else None
+        normalized_city = normalized_city or None
+        region = region or None
+        district = district or None
+        lat_val = lat if lat is not None else latitude
+        lon_val = lon if lon is not None else longitude
+
+        raw_stores: list[Any] = []
+
+        def _fetch_scoped_stores(
+            city_scope: str | None, region_scope: str | None, district_scope: str | None
+        ) -> list[Any]:
             if hasattr(db, "get_stores_by_location"):
-                raw_stores = db.get_stores_by_location(
-                    city=normalized_city, region=region, district=district
+                return db.get_stores_by_location(
+                    city=city_scope,
+                    region=region_scope,
+                    district=district_scope,
+                    business_type=business_type,
                 )
-            else:
-                raw_stores = (
-                    db.get_stores_by_city(normalized_city) if hasattr(db, "get_stores_by_city") else []
-                )
+            if city_scope and hasattr(db, "get_stores_by_city"):
+                return db.get_stores_by_city(city_scope)
+            return []
+
+        scopes: list[tuple[str | None, str | None, str | None]] = []
+        if district:
+            scopes.append((normalized_city, region, district))
+        if region:
+            scopes.append((normalized_city, region, None))
+        if normalized_city:
+            scopes.append((normalized_city, None, None))
+        if region and not normalized_city:
+            scopes.append((None, region, None))
+        if not scopes:
+            scopes.append((None, None, None))
+
+        seen: set[tuple[str | None, str | None, str | None]] = set()
+        for scope in scopes:
+            if scope in seen:
+                continue
+            seen.add(scope)
+            raw_stores = _fetch_scoped_stores(*scope)
+            if raw_stores:
+                break
+
+        if (
+            not raw_stores
+            and lat_val is not None
+            and lon_val is not None
+            and hasattr(db, "get_nearby_stores")
+        ):
+            raw_stores = db.get_nearby_stores(
+                latitude=lat_val,
+                longitude=lon_val,
+                business_type=business_type,
+                limit=200,
+                offset=0,
+            )
 
         if not raw_stores:
             raw_stores = []
@@ -167,14 +212,14 @@ async def get_nearby_stores(
     """
     try:
         raw_stores: list[Any] = []
-        if hasattr(db, "get_stores_by_city"):
-            for city in ["Ташкент", "Tashkent", "Самарканд", "Бухара"]:
-                try:
-                    stores = db.get_stores_by_city(normalize_city(city))
-                    if stores:
-                        raw_stores.extend(stores)
-                except Exception:  # pragma: no cover - defensive
-                    continue
+        if hasattr(db, "get_nearby_stores"):
+            raw_stores = db.get_nearby_stores(
+                latitude=location.latitude,
+                longitude=location.longitude,
+                max_distance_km=radius_km,
+                limit=200,
+                offset=0,
+            )
 
         if not raw_stores:
             return []
@@ -182,29 +227,34 @@ async def get_nearby_stores(
         stores_with_distance: list[dict[str, Any]] = []
 
         for store in raw_stores:
-            import random
+            distance = get_val(store, "distance_km")
+            store_data = StoreResponse(
+                id=int(get_val(store, "id", 0) or get_val(store, "store_id", 0) or 0),
+                name=get_val(store, "name", ""),
+                address=get_val(store, "address"),
+                city=get_val(store, "city"),
+                region=get_val(store, "region"),
+                district=get_val(store, "district"),
+                business_type=get_val(store, "business_type")
+                or get_val(store, "category")
+                or "supermarket",
+                rating=float(get_val(store, "avg_rating", 0) or get_val(store, "rating", 0) or 0),
+                offers_count=int(get_val(store, "offers_count", 0) or 0),
+                delivery_enabled=bool(get_val(store, "delivery_enabled", False)),
+                delivery_price=normalize_price(get_val(store, "delivery_price", 0))
+                if get_val(store, "delivery_price")
+                else None,
+                min_order_amount=normalize_price(get_val(store, "min_order_amount", 0))
+                if get_val(store, "min_order_amount")
+                else None,
+                photo_url=get_val(store, "photo"),
+            )
+            stores_with_distance.append(
+                {"store": store_data, "distance_km": round(float(distance), 2) if distance is not None else None}
+            )
 
-            distance = random.uniform(0.5, 10.0)
+        stores_with_distance.sort(key=lambda x: x["distance_km"] or 0.0)
 
-            if distance <= radius_km:
-                store_data = StoreResponse(
-                    id=int(get_val(store, "id", 0) or get_val(store, "store_id", 0) or 0),
-                    name=get_val(store, "name", ""),
-                    address=get_val(store, "address"),
-                    city=get_val(store, "city"),
-                    business_type=get_val(store, "business_type")
-                    or get_val(store, "category")
-                    or "supermarket",
-                    rating=float(get_val(store, "avg_rating", 0) or get_val(store, "rating", 0) or 0),
-                    offers_count=int(get_val(store, "offers_count", 0) or 0),
-                )
-                stores_with_distance.append(
-                    {"store": store_data, "distance_km": round(distance, 2)}
-                )
-
-        stores_with_distance.sort(key=lambda x: x["distance_km"])
-
-        _ = location  # keep parameter for future real implementation
         return stores_with_distance
 
     except Exception as e:  # pragma: no cover - defensive

@@ -407,7 +407,18 @@ class DatabaseProtocol(Protocol):
         ...
 
     # ======= SEARCH =======
-    def search_offers(self, query: str, city: str | None = None) -> RowList:
+    def search_offers(
+        self,
+        query: str,
+        city: str | None = None,
+        limit: int = 50,
+        offset: int = 0,
+        region: str | None = None,
+        district: str | None = None,
+        min_price: float | None = None,
+        max_price: float | None = None,
+        min_discount: float | None = None,
+    ) -> RowList:
         ...
 
     def search_stores(self, query: str, city: str | None = None) -> RowList:

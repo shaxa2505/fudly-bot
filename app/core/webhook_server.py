@@ -375,7 +375,9 @@ async def create_webhook_app(
 
     async def api_categories(request: web.Request) -> web.Response:
         """GET /api/v1/categories - List categories."""
-        city = request.query.get("city", "Ташкент")
+        city = request.query.get("city", "")
+        city = city.strip() if isinstance(city, str) else city
+        city = city or None
         result = []
 
         for cat in API_CATEGORIES:
@@ -407,12 +409,37 @@ async def create_webhook_app(
 
     async def api_offers(request: web.Request) -> web.Response:
         """GET /api/v1/offers - List offers."""
+        def _parse_float(value: str | None) -> float | None:
+            if value is None or value == "":
+                return None
+            try:
+                return float(value)
+            except ValueError:
+                return None
+
         city = request.query.get("city", "")  # Empty = all cities
+        region = request.query.get("region") or None
+        district = request.query.get("district") or None
         category = request.query.get("category", "all")
         store_id = request.query.get("store_id")
         search = request.query.get("search")
         limit = int(request.query.get("limit", "50"))
         offset = int(request.query.get("offset", "0"))
+        sort_by = request.query.get("sort_by")
+        min_price = _parse_float(request.query.get("min_price"))
+        max_price = _parse_float(request.query.get("max_price"))
+        min_discount = _parse_float(request.query.get("min_discount"))
+        lat = _parse_float(request.query.get("lat") or request.query.get("latitude"))
+        lon = _parse_float(request.query.get("lon") or request.query.get("longitude"))
+        price_unit = os.getenv("PRICE_STORAGE_UNIT", "sums").lower()
+        if price_unit == "kopeks":
+            if min_price is not None:
+                min_price *= 100
+            if max_price is not None:
+                max_price *= 100
+
+        city = city.strip() if isinstance(city, str) else city
+        city = city or None
 
         logger.info(f"API /offers request: city={city}, category={category}, limit={limit}")
 
@@ -425,27 +452,121 @@ async def create_webhook_app(
                     logger.info(f"get_store_offers({store_id}) returned {len(raw_offers)} items")
             elif search:
                 if hasattr(db, "search_offers"):
-                    raw_offers = db.search_offers(search, city) or []
-                    logger.info(f"search_offers returned {len(raw_offers)} items")
-            elif category and category != "all":
-                if hasattr(db, "get_offers_by_city_and_category"):
-                    raw_offers = db.get_offers_by_city_and_category(city, category, limit) or []
-                    logger.info(
-                        f"get_offers_by_city_and_category({city}, {category}) returned {len(raw_offers)} items"
+                    raw_offers = (
+                        db.search_offers(
+                            search,
+                            city,
+                            limit=limit,
+                            offset=offset,
+                            region=region,
+                            district=district,
+                            min_price=min_price,
+                            max_price=max_price,
+                            min_discount=min_discount,
+                        )
+                        or []
                     )
-                elif hasattr(db, "get_hot_offers"):
-                    # Fallback: filter hot offers by category
-                    all_offers = db.get_hot_offers(city, limit=100) or []
-                    raw_offers = [
-                        o for o in all_offers if get_offer_value(o, "category") == category
-                    ][:limit]
-                    logger.info(f"Filtered hot_offers by {category}: {len(raw_offers)} items")
+                    logger.info(f"search_offers returned {len(raw_offers)} items")
             else:
-                if hasattr(db, "get_hot_offers"):
-                    raw_offers = db.get_hot_offers(city, limit=limit, offset=offset) or []
-                    logger.info(f"get_hot_offers({city}) returned {len(raw_offers)} items")
-                else:
-                    logger.warning("db has no get_hot_offers method!")
+                def _fetch_scoped_offers(
+                    city_scope: str | None, region_scope: str | None, district_scope: str | None
+                ) -> list[Any]:
+                    if category and category != "all":
+                        if hasattr(db, "get_offers_by_city_and_category"):
+                            return (
+                                db.get_offers_by_city_and_category(
+                                    city_scope,
+                                    category,
+                                    limit=limit,
+                                    offset=offset,
+                                    region=region_scope,
+                                    district=district_scope,
+                                    sort_by=sort_by,
+                                    min_price=min_price,
+                                    max_price=max_price,
+                                    min_discount=min_discount,
+                                )
+                                or []
+                            )
+                        if hasattr(db, "get_hot_offers"):
+                            all_offers = (
+                                db.get_hot_offers(
+                                    city_scope,
+                                    limit=100,
+                                    offset=0,
+                                    region=region_scope,
+                                    district=district_scope,
+                                    sort_by=sort_by,
+                                    min_price=min_price,
+                                    max_price=max_price,
+                                    min_discount=min_discount,
+                                )
+                                or []
+                            )
+                            return [
+                                o for o in all_offers if get_offer_value(o, "category") == category
+                            ][:limit]
+                        return []
+                    if hasattr(db, "get_hot_offers"):
+                        return (
+                            db.get_hot_offers(
+                                city_scope,
+                                limit=limit,
+                                offset=offset,
+                                region=region_scope,
+                                district=district_scope,
+                                sort_by=sort_by,
+                                min_price=min_price,
+                                max_price=max_price,
+                                min_discount=min_discount,
+                            )
+                            or []
+                        )
+                    return []
+
+                scopes: list[tuple[str | None, str | None, str | None]] = []
+                if district:
+                    scopes.append((city, region, district))
+                if region:
+                    scopes.append((city, region, None))
+                if city:
+                    scopes.append((city, None, None))
+                if region and not city:
+                    scopes.append((None, region, None))
+                if not scopes:
+                    scopes.append((None, None, None))
+                if not scopes:
+                    scopes.append((None, None, None))
+
+                seen: set[tuple[str | None, str | None, str | None]] = set()
+                for scope in scopes:
+                    if scope in seen:
+                        continue
+                    seen.add(scope)
+                    raw_offers = _fetch_scoped_offers(*scope)
+                    if raw_offers:
+                        break
+
+                if (
+                    not raw_offers
+                    and lat is not None
+                    and lon is not None
+                    and hasattr(db, "get_nearby_offers")
+                ):
+                    raw_offers = (
+                        db.get_nearby_offers(
+                            latitude=lat,
+                            longitude=lon,
+                            limit=limit,
+                            offset=offset,
+                            category=category if category != "all" else None,
+                            sort_by=sort_by,
+                            min_price=min_price,
+                            max_price=max_price,
+                            min_discount=min_discount,
+                        )
+                        or []
+                    )
 
             # Convert offers with photo URLs (parallel loading)
             async def load_offer_with_photo(o: Any) -> dict:
@@ -535,17 +656,76 @@ async def create_webhook_app(
 
     async def api_stores(request: web.Request) -> web.Response:
         """GET /api/v1/stores - List stores."""
+        def _parse_float(value: str | None) -> float | None:
+            if value is None or value == "":
+                return None
+            try:
+                return float(value)
+            except ValueError:
+                return None
+
         city = request.query.get("city", "")  # Empty = all cities
+        region = request.query.get("region") or None
+        district = request.query.get("district") or None
         business_type = request.query.get("business_type")
+        lat = _parse_float(request.query.get("lat") or request.query.get("latitude"))
+        lon = _parse_float(request.query.get("lon") or request.query.get("longitude"))
+        city = city.strip() if isinstance(city, str) else city
+        city = city or None
 
         try:
             raw_stores: list[Any] = []
 
             # Get stores from database with offers count
-            if hasattr(db, "get_connection"):
+            if hasattr(db, "get_stores_by_location"):
+                def _fetch_scoped_stores(
+                    city_scope: str | None, region_scope: str | None, district_scope: str | None
+                ) -> list[Any]:
+                    return db.get_stores_by_location(
+                        city=city_scope,
+                        region=region_scope,
+                        district=district_scope,
+                        business_type=business_type,
+                    )
+
+                scopes: list[tuple[str | None, str | None, str | None]] = []
+                if district:
+                    scopes.append((city, region, district))
+                if region:
+                    scopes.append((city, region, None))
+                if city:
+                    scopes.append((city, None, None))
+                if region and not city:
+                    scopes.append((None, region, None))
+
+                seen: set[tuple[str | None, str | None, str | None]] = set()
+                for scope in scopes:
+                    if scope in seen:
+                        continue
+                    seen.add(scope)
+                    raw_stores = _fetch_scoped_stores(*scope) or []
+                    if raw_stores:
+                        break
+
+                if (
+                    not raw_stores
+                    and lat is not None
+                    and lon is not None
+                    and hasattr(db, "get_nearby_stores")
+                ):
+                    raw_stores = (
+                        db.get_nearby_stores(
+                            latitude=lat,
+                            longitude=lon,
+                            business_type=business_type,
+                            limit=200,
+                            offset=0,
+                        )
+                        or []
+                    )
+            elif hasattr(db, "get_connection"):
                 with db.get_connection() as conn:
                     cursor = conn.cursor()
-                    # Join with offers to get count
                     base_query = """
                         SELECT s.*, COALESCE(oc.offer_count, 0) as offers_count
                         FROM stores s
@@ -2447,8 +2627,6 @@ async def create_webhook_app(
             data = await request.post()
 
             payment_service = get_payment_service()
-            if hasattr(payment_service, "set_database"):
-                payment_service.set_database(db)
 
             click_trans_id = data.get("click_trans_id", "")
             service_id = data.get("service_id", "")
@@ -2462,7 +2640,6 @@ async def create_webhook_app(
             if action == "0":  # Prepare
                 result = await payment_service.process_click_prepare(
                     click_trans_id=click_trans_id,
-                    service_id=service_id,
                     merchant_trans_id=merchant_trans_id,
                     amount=amount,
                     action=action,
@@ -2472,7 +2649,6 @@ async def create_webhook_app(
             else:  # Complete
                 result = await payment_service.process_click_complete(
                     click_trans_id=click_trans_id,
-                    service_id=service_id,
                     merchant_trans_id=merchant_trans_id,
                     merchant_prepare_id=data.get("merchant_prepare_id", ""),
                     amount=amount,
@@ -2490,30 +2666,19 @@ async def create_webhook_app(
     async def api_payme_callback(request: web.Request) -> web.Response:
         """POST /api/v1/payment/payme/callback - Payme JSON-RPC callback."""
         try:
+            # Verify authorization
             payment_service = get_payment_service()
-            if hasattr(payment_service, "set_database"):
-                payment_service.set_database(db)
             auth_header = request.headers.get("Authorization", "")
+
+            if not payment_service.verify_payme_signature(auth_header):
+                return web.json_response(
+                    {"error": {"code": -32504, "message": "Unauthorized"}, "id": None}, status=401
+                )
 
             data = await request.json()
             method = data.get("method", "")
             params = data.get("params", {})
             request_id = data.get("id")
-
-            store_id = None
-            order_id = params.get("account", {}).get("order_id")
-            if order_id and hasattr(db, "get_order"):
-                try:
-                    order = db.get_order(int(order_id))
-                except Exception:
-                    order = None
-                if isinstance(order, dict):
-                    store_id = order.get("store_id")
-
-            if not payment_service.verify_payme_signature(auth_header, store_id=store_id):
-                return web.json_response(
-                    {"error": {"code": -32504, "message": "Unauthorized"}, "id": None}, status=401
-                )
 
             result = await payment_service.process_payme_request(method, params, request_id)
             return web.json_response(result)

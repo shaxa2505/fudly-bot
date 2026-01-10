@@ -6,6 +6,7 @@ import { useCart } from '../context/CartContext'
 import OfferCard from '../components/OfferCard'
 import FilterPanel, { FILTER_CATEGORY_OPTIONS, FILTER_BRAND_OPTIONS } from '../components/FilterPanel'
 import { blurOnEnter } from '../utils/helpers'
+import { getSavedLocation, transliterateCity } from '../utils/cityUtils'
 import './CategoryProductsPage.css'
 
 function CategoryProductsPage() {
@@ -44,11 +45,29 @@ function CategoryProductsPage() {
   const loadOffers = async () => {
     setLoading(true)
     try {
-      const data = await api.getOffers({
+      const savedLocation = getSavedLocation()
+      const cityRaw = savedLocation?.city ? savedLocation.city.split(',')[0].trim() : ''
+      const cityForApi = transliterateCity(cityRaw)
+      const params = {
         category: categoryId,
         search: searchQuery || undefined,
-        limit: 50
-      })
+        limit: 50,
+      }
+      if (cityForApi) {
+        params.city = cityForApi
+      }
+      if (savedLocation?.region) {
+        params.region = savedLocation.region
+      }
+      if (savedLocation?.district) {
+        params.district = savedLocation.district
+      }
+      if (savedLocation?.coordinates?.lat != null && savedLocation?.coordinates?.lon != null) {
+        params.lat = savedLocation.coordinates.lat
+        params.lon = savedLocation.coordinates.lon
+      }
+
+      const data = await api.getOffers(params)
       setOffers(data)
     } catch (error) {
       console.error('Error loading offers:', error)
@@ -261,4 +280,3 @@ function CategoryProductsPage() {
 }
 
 export default CategoryProductsPage
-

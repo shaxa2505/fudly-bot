@@ -1,9 +1,9 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Flame, Milk, Cookie, Snowflake, Coffee as Beverage, Croissant, Beef, Apple, Salad, Package, Search, Info, SlidersHorizontal } from 'lucide-react'
+import { Flame, Milk, Cookie, Snowflake, Coffee as Beverage, Croissant, Beef, Apple, Salad, Package, Search, SlidersHorizontal } from 'lucide-react'
 import api from '../api/client'
 import { useCart } from '../context/CartContext'
-import { transliterateCity, getSavedLocation, saveLocation, DEFAULT_LOCATION } from '../utils/cityUtils'
+import { transliterateCity, getSavedLocation, saveLocation, DEFAULT_LOCATION, normalizeLocationName } from '../utils/cityUtils'
 import OfferCard from '../components/OfferCard'
 import OfferCardSkeleton from '../components/OfferCardSkeleton'
 import HeroBanner from '../components/HeroBanner'
@@ -119,8 +119,9 @@ function HomePage() {
   // Извлекаем название города для API (без страны) и транслитерируем в кириллицу
   const cityRaw = location.city
     ? location.city.split(',')[0].trim()
-    : 'Toshkent'
-  const cityForApi = transliterateCity(cityRaw)
+    : ''
+  const cityForApi = cityRaw ? transliterateCity(cityRaw) : ''
+  const cityLabel = cityRaw || 'Shahar tanlang'
 
   useEffect(() => {
     saveLocation(location)
@@ -141,22 +142,8 @@ function HomePage() {
     }
     loadSearchHistory()
   }, [])
-
-  const [showingAllCities, setShowingAllCities] = useState(false)
-  const [showingRegion, setShowingRegion] = useState(false)
-  const showingAllCitiesRef = useRef(showingAllCities)
-  const showingRegionRef = useRef(showingRegion)
-
-  useEffect(() => {
-    showingAllCitiesRef.current = showingAllCities
-  }, [showingAllCities])
-
-  useEffect(() => {
-    showingRegionRef.current = showingRegion
-  }, [showingRegion])
-
   // Load offers - сначала по городу, если пусто - из всех городов
-  const loadOffers = useCallback(async (reset = false, forceAllCities = false, forceRegion = false) => {
+  const loadOffers = useCallback(async (reset = false) => {
     if (loadingRef.current) return
 
     loadingRef.current = true
@@ -167,11 +154,12 @@ function HomePage() {
         limit: 20,
         offset: currentOffset,
       }
-      const useRegionOnly = forceRegion || showingRegionRef.current
-
-      // Если не forceAllCities - фильтруем по городу
-      if (!forceAllCities && !showingAllCitiesRef.current && !useRegionOnly) {
+      if (cityForApi) {
         params.city = cityForApi
+      }
+      if (location.coordinates?.lat != null && location.coordinates?.lon != null) {
+        params.lat = location.coordinates.lat
+        params.lon = location.coordinates.lon
       }
 
       if (location.region) {
@@ -218,15 +206,6 @@ function HomePage() {
       const data = await api.getOffers(params)
       const dataList = Array.isArray(data?.offers) ? data.offers : (Array.isArray(data) ? data : [])
       let nextOffers = dataList
-      const normalizedQuery = searchQuery.trim().toLowerCase()
-
-      if (normalizedQuery.length >= 2) {
-        nextOffers = nextOffers.filter(offer => {
-          const title = String(offer.title || '').toLowerCase()
-          const store = String(offer.store_name || '').toLowerCase()
-          return title.includes(normalizedQuery) || store.includes(normalizedQuery)
-        })
-      }
 
       if (categoryAlias) {
         nextOffers = nextOffers.filter(offer => categoryAlias.includes(String(offer.category || '').toLowerCase()))
@@ -272,27 +251,11 @@ function HomePage() {
       }
 
       // Если город пустой и это первая загрузка - загружаем из всех городов
-      if (reset && dataList.length === 0 && !forceAllCities && !showingAllCitiesRef.current) {
-        if (!useRegionOnly && (location.region || location.district)) {
-          setShowingRegion(true)
-          loadingRef.current = false
-          return await loadOffers(true, false, true)
-        }
-
-        setShowingAllCities(true)
-        setShowingRegion(false)
-        loadingRef.current = false
-        return await loadOffers(true, true)
-      }
 
       if (reset) {
         setOffers(nextOffers || [])
         offsetRef.current = 20
         setOffset(20)
-        if (forceAllCities) {
-          setShowingAllCities(true)
-          setShowingRegion(false)
-        }
       } else {
         setOffers(prev => [...prev, ...(nextOffers || [])])
         offsetRef.current = offsetRef.current + 20
@@ -306,7 +269,18 @@ function HomePage() {
       loadingRef.current = false
       setLoading(false)
     }
-  }, [selectedCategory, searchQuery, cityForApi, location.region, location.district, minDiscount, sortBy, priceRange])
+  }, [
+    selectedCategory,
+    searchQuery,
+    cityForApi,
+    location.region,
+    location.district,
+    location.coordinates?.lat,
+    location.coordinates?.lon,
+    minDiscount,
+    sortBy,
+    priceRange,
+  ])
 
   // Save search query to history when searching
   const handleSearchSubmit = useCallback(async () => {
@@ -399,11 +373,19 @@ function HomePage() {
       if (!response.ok) throw new Error('Geo lookup failed')
       const data = await response.json()
 
-      const city = data.address?.city || data.address?.town || data.address?.village || ''
-      const state = data.address?.state || data.address?.region || ''
-      const district = data.address?.county || data.address?.city_district || data.address?.suburb || ''
-      const primaryCity = city || state || 'Toshkent'
-      const normalizedCity = primaryCity.includes("O'zbekiston") ? primaryCity : `${primaryCity}, O'zbekiston`
+      const city = normalizeLocationName(
+        data.address?.city || data.address?.town || data.address?.village || ''
+      )
+      const state = normalizeLocationName(data.address?.state || data.address?.region || '')
+      const district = normalizeLocationName(
+        data.address?.county || data.address?.city_district || data.address?.suburb || ''
+      )
+      const primaryCity = city || state || ''
+      const normalizedCity = primaryCity
+        ? (primaryCity.includes("O'zbekiston")
+          ? primaryCity
+          : `${primaryCity}, O'zbekiston`)
+        : ''
 
       setLocation({
         city: normalizedCity,
@@ -424,8 +406,6 @@ function HomePage() {
 
   // Pull-to-refresh handler
   const handleRefresh = useCallback(async () => {
-    setShowingAllCities(false)
-    setShowingRegion(false)
     await loadOffers(true)
   }, [loadOffers])
 
@@ -434,8 +414,6 @@ function HomePage() {
 
   // Initial load and search with debounce
   useEffect(() => {
-    setShowingAllCities(false) // ?????????? ??? ????? ??????/????????
-    setShowingRegion(false)
     const recentlyManual = Date.now() - manualSearchRef.current < 300
     if (recentlyManual) return
 
@@ -480,11 +458,19 @@ function HomePage() {
       if (!response.ok) throw new Error('Geo lookup failed')
       const data = await response.json()
 
-      const city = data.address?.city || data.address?.town || data.address?.village || ''
-      const state = data.address?.state || data.address?.region || ''
-      const district = data.address?.county || data.address?.city_district || data.address?.suburb || ''
-      const primaryCity = city || state || 'Toshkent'
-      const normalizedCity = primaryCity.includes("O'zbekiston") ? primaryCity : `${primaryCity}, O'zbekiston`
+      const city = normalizeLocationName(
+        data.address?.city || data.address?.town || data.address?.village || ''
+      )
+      const state = normalizeLocationName(data.address?.state || data.address?.region || '')
+      const district = normalizeLocationName(
+        data.address?.county || data.address?.city_district || data.address?.suburb || ''
+      )
+      const primaryCity = city || state || ''
+      const normalizedCity = primaryCity
+        ? (primaryCity.includes("O'zbekiston")
+          ? primaryCity
+          : `${primaryCity}, O'zbekiston`)
+        : ''
 
       setLocation({
         city: normalizedCity,
@@ -537,7 +523,7 @@ function HomePage() {
   }
 
   const handleSaveManualAddress = () => {
-    const trimmedCity = manualCity.trim()
+    const trimmedCity = normalizeLocationName(manualCity.trim())
     const trimmedAddress = manualAddress.trim()
     setLocation(prev => {
       const keepRegion = prev.city?.startsWith(trimmedCity)
@@ -580,7 +566,7 @@ function HomePage() {
             <div className="header-location-text">
               <span className="header-location-label">Yetkazish</span>
               <span className="header-location-city">
-                {cityRaw}
+                {cityLabel}
                 <svg width="12" height="12" viewBox="0 0 24 24" fill="none">
                   <path d="M6 9l6 6 6-6" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
                 </svg>
@@ -813,7 +799,7 @@ function HomePage() {
 
       {/* Flash Deals - temporarily disabled until API deployed
       {selectedCategory === 'all' && !searchQuery && (
-        <FlashDeals city={cityForApi} />
+        <FlashDeals city={cityForApi} region={location.region} district={location.district} />
       )}
       */}
 
@@ -824,29 +810,6 @@ function HomePage() {
         </h2>
         <span className="offers-count">{offers.length} ta</span>
       </div>
-
-      {showingRegion && !showingAllCities && offers.length > 0 && (
-        <div className="all-cities-banner">
-          <span className="all-cities-icon" aria-hidden="true">
-            <Info size={16} strokeWidth={2.2} />
-          </span>
-          <span className="all-cities-text">
-            {cityRaw} bo'yicha mahsulot topilmadi. Viloyat bo'yicha ko'rsatilmoqda
-          </span>
-        </div>
-      )}
-
-      {/* Info banner if showing all cities */}
-      {showingAllCities && offers.length > 0 && (
-        <div className="all-cities-banner">
-          <span className="all-cities-icon" aria-hidden="true">
-            <Info size={16} strokeWidth={2.2} />
-          </span>
-          <span className="all-cities-text">
-            {cityRaw} da mahsulot yo'q. Barcha shaharlardan ko'rsatilmoqda
-          </span>
-        </div>
-      )}
 
       {/* Offers Grid */}
       <div className="offers-grid">
@@ -978,3 +941,7 @@ function HomePage() {
 }
 
 export default HomePage
+
+
+
+

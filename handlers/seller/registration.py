@@ -18,6 +18,7 @@ from app.keyboards import (
     main_menu_customer,
     main_menu_seller,
 )
+from app.core.geocoding import geocode_store_address, reverse_geocode_store
 from database_protocol import DatabaseProtocol
 from handlers.common.states import RegisterStore
 from handlers.common.utils import (
@@ -83,6 +84,22 @@ def normalize_business_type(cat_text: str) -> str:
         "Boshqa": "Другое",
     }
     return cat_map.get(cat_text, cat_text)
+
+
+def location_request_keyboard(lang: str) -> types.ReplyKeyboardMarkup:
+    """Keyboard for requesting store geolocation."""
+    location_text = (
+        "📍 Отправить геолокацию" if lang == "ru" else "📍 Joylashuvni yuborish"
+    )
+    cancel_text = get_text(lang, "cancel")
+    return types.ReplyKeyboardMarkup(
+        keyboard=[
+            [types.KeyboardButton(text=location_text, request_location=True)],
+            [types.KeyboardButton(text=cancel_text)],
+        ],
+        resize_keyboard=True,
+        one_time_keyboard=True,
+    )
 
 
 @router.message(F.text.contains("Стать партнером") | F.text.contains("Hamkor bolish"))
@@ -358,10 +375,66 @@ async def register_store_address(message: types.Message, state: FSMContext) -> N
         f"Handler register_store_address called, user {message.from_user.id}, address: {message.text}"
     )
     await state.update_data(address=message.text)
+    location_text = (
+        "📍 Отправьте геолокацию магазина (кнопка ниже). Это обязательно для корректной выдачи."
+        if lang == "ru"
+        else "📍 Do'kon joylashuvini yuboring (pastdagi tugma). Bu majburiy."
+    )
+    await message.answer(location_text, reply_markup=location_request_keyboard(lang))
+    await state.set_state(RegisterStore.location)
+
+
+@router.message(RegisterStore.location, F.location)
+async def register_store_location(message: types.Message, state: FSMContext) -> None:
+    """Store location shared - proceed to description."""
+    if not db:
+        await message.answer("System error")
+        return
+
+    assert message.from_user is not None
+    assert message.location is not None
+    lang = db.get_user_language(message.from_user.id)
+
+    latitude = message.location.latitude
+    longitude = message.location.longitude
+
+    region = None
+    district = None
+    try:
+        geo = await reverse_geocode_store(latitude, longitude)
+        if geo:
+            region = geo.get("region")
+            district = geo.get("district")
+    except Exception as e:
+        logger.warning(f"Reverse geocode failed during registration: {e}")
+
+    await state.update_data(
+        latitude=latitude,
+        longitude=longitude,
+        region=region,
+        district=district,
+    )
+
     description_text = get_text(lang, "store_description")
-    logger.info(f"Sending description prompt: {description_text}")
     await message.answer(description_text, reply_markup=cancel_keyboard(lang))
     await state.set_state(RegisterStore.description)
+
+
+@router.message(RegisterStore.location)
+async def register_store_location_invalid(message: types.Message, state: FSMContext) -> None:
+    """Require location message during registration."""
+    if not db:
+        await message.answer("System error")
+        return
+
+    assert message.from_user is not None
+    lang = db.get_user_language(message.from_user.id)
+    text = (
+        "📍 Пожалуйста, отправьте геолокацию магазина кнопкой ниже."
+        if lang == "ru"
+        else "📍 Iltimos, do'kon geolokatsiyasini pastdagi tugma orqali yuboring."
+    )
+    await message.answer(text, reply_markup=location_request_keyboard(lang))
 
 
 @router.message(RegisterStore.description)
@@ -377,12 +450,12 @@ async def register_store_description(message: types.Message, state: FSMContext) 
 
     # Ask for store photo (required)
     photo_prompt = (
-        "📸 <b>Шаг 6/6: Фото магазина</b>\n\n"
+        "📸 <b>Шаг 7/7: Фото магазина</b>\n\n"
         "Отправьте фото вашего магазина или витрины.\n"
         "Это поможет покупателям узнать ваш магазин!\n\n"
         "⚠️ Фото обязательно для подачи заявки"
         if lang == "ru"
-        else "📸 <b>6/6-qadam: Do'kon fotosurati</b>\n\n"
+        else "📸 <b>7/7-qadam: Do'kon fotosurati</b>\n\n"
         "Do'koningiz yoki vitrina fotosuratini yuboring.\n"
         "Bu xaridorlarga do'koningizni tanishga yordam beradi!\n\n"
         "⚠️ Fotosurat ariza uchun majburiy"
@@ -486,11 +559,29 @@ async def create_store_from_data(message: types.Message, state: FSMContext) -> N
     user = db.get_user_model(message.from_user.id)
     owner_phone = user.phone if user else None
 
+    manual_lat = data.get("latitude")
+    manual_lon = data.get("longitude")
+    has_manual_coords = manual_lat is not None and manual_lon is not None
+
+    geo = None
+    if not has_manual_coords or not data.get("region") or not data.get("district"):
+        try:
+            geo = await geocode_store_address(data.get("address"), data.get("city"))
+        except Exception as e:
+            logger.warning(f"Geocode failed for store owner {message.from_user.id}: {e}")
+
+    region = data.get("region") or (geo.get("region") if geo else None)
+    district = data.get("district") or (geo.get("district") if geo else None)
+    latitude = manual_lat if has_manual_coords else (geo.get("latitude") if geo else None)
+    longitude = manual_lon if has_manual_coords else (geo.get("longitude") if geo else None)
+
     # Create store application (status: pending)
-    db.add_store(
+    store_id = db.add_store(
         owner_id=message.from_user.id,
         name=data["name"],
         city=data["city"],
+        region=region,
+        district=district,
         address=data["address"],
         description=data["description"],
         category=data["category"],
@@ -498,6 +589,18 @@ async def create_store_from_data(message: types.Message, state: FSMContext) -> N
         business_type=data.get("business_type", "supermarket"),
         photo=data.get("photo"),  # Add photo parameter
     )
+
+    if latitude is not None and longitude is not None:
+        try:
+            db.update_store_location(
+                store_id,
+                float(latitude),
+                float(longitude),
+                region=region,
+                district=district,
+            )
+        except Exception as e:
+            logger.warning(f"Failed to save store coordinates for {store_id}: {e}")
 
     await state.clear()
 
@@ -516,6 +619,18 @@ async def create_store_from_data(message: types.Message, state: FSMContext) -> N
         parse_mode="HTML",
         reply_markup=main_menu_customer(lang),
     )
+
+    if latitude is None or longitude is None:
+        if lang == "ru":
+            await message.answer(
+                "📍 Не удалось определить координаты магазина автоматически. "
+                "Пожалуйста, установите геолокацию в настройках магазина."
+            )
+        else:
+            await message.answer(
+                "📍 Do'kon koordinatalarini avtomatik aniqlab bo'lmadi. "
+                "Iltimos, do'kon sozlamalarida geolokatsiyani o'rnating."
+            )
 
     # Notify ALL admins about new application
     admins = db.get_all_admins()

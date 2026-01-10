@@ -128,20 +128,16 @@ describe('HomePage', () => {
     expect(screen.queryByTestId('offer-card-skeleton')).not.toBeInTheDocument()
   })
 
-  it('falls back to all cities when the first request is empty', async () => {
-    apiMocks.getOffers
-      .mockResolvedValueOnce({ offers: [] })
-      .mockResolvedValueOnce({ offers: [{ id: 10, title: 'Fallback Offer' }] })
+  it('does not send city when location is empty', async () => {
+    apiMocks.getOffers.mockResolvedValueOnce({ offers: [] })
 
     renderHomePage()
 
     await waitFor(() => {
-      expect(apiMocks.getOffers).toHaveBeenCalledTimes(2)
+      expect(apiMocks.getOffers).toHaveBeenCalledTimes(1)
     })
 
-    expect(apiMocks.getOffers.mock.calls[0][0]).toHaveProperty('city')
-    expect(apiMocks.getOffers.mock.calls[1][0].city).toBeUndefined()
-    expect(screen.getByText(/Barcha shaharlardan ko'rsatilmoqda/)).toBeInTheDocument()
+    expect(apiMocks.getOffers.mock.calls[0][0].city).toBeUndefined()
   })
 
   it('filters out invalid discount data when min discount is applied', async () => {
@@ -179,11 +175,18 @@ describe('HomePage', () => {
   })
 
   it('filters offers by search query and passes search param', async () => {
-    apiMocks.getOffers.mockResolvedValue({
-      offers: [
-        { id: 1, title: 'Milk', store_name: 'Daily' },
-        { id: 2, title: 'Bread', store_name: 'Bakery' },
-      ],
+    apiMocks.getOffers.mockImplementation((params = {}) => {
+      if (params.search) {
+        return Promise.resolve({
+          offers: [{ id: 1, title: 'Milk', store_name: 'Daily' }],
+        })
+      }
+      return Promise.resolve({
+        offers: [
+          { id: 1, title: 'Milk', store_name: 'Daily' },
+          { id: 2, title: 'Bread', store_name: 'Bakery' },
+        ],
+      })
     })
 
     renderHomePage()
@@ -259,28 +262,25 @@ describe('HomePage', () => {
     expect(titles).toEqual(['First', 'Second'])
   })
 
-  it('falls back to region when city has no offers', async () => {
+  it('sends region filter when region is set', async () => {
     localStorage.setItem('fudly_location', JSON.stringify({
-      city: "Toshkent, O'zbekiston",
+      city: '',
       address: '',
       coordinates: null,
       region: 'Toshkent',
       district: '',
     }))
 
-    apiMocks.getOffers
-      .mockResolvedValueOnce({ offers: [] })
-      .mockResolvedValueOnce({ offers: [{ id: 3, title: 'Region Offer' }] })
+    apiMocks.getOffers.mockResolvedValueOnce({ offers: [] })
 
     renderHomePage()
 
     await waitFor(() => {
-      expect(apiMocks.getOffers).toHaveBeenCalledTimes(2)
+      expect(apiMocks.getOffers).toHaveBeenCalledTimes(1)
     })
 
-    expect(apiMocks.getOffers.mock.calls[1][0].city).toBeUndefined()
-    expect(apiMocks.getOffers.mock.calls[1][0].region).toBe('Toshkent')
-    expect(screen.getByText(/Viloyat bo'yicha ko'rsatilmoqda/)).toBeInTheDocument()
+    expect(apiMocks.getOffers.mock.calls[0][0].city).toBeUndefined()
+    expect(apiMocks.getOffers.mock.calls[0][0].region).toBe('Toshkent')
   })
 
   it('passes category param for non-alias categories', async () => {

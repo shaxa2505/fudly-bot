@@ -4,6 +4,7 @@ Offer-related database operations.
 from __future__ import annotations
 
 from typing import Any
+import re
 
 from psycopg.rows import dict_row
 
@@ -79,13 +80,26 @@ CITY_TRANSLITERATION = {
     "хива": ["Xiva", "Khiva"],
 }
 
+_CITY_SUFFIX_RE = re.compile(
+    r"\s+(?:shahri|shahar|shahr|tumani|tuman|viloyati|viloyat|region|district|province|oblast|oblasti"
+    r"|город|район|область|шахри|шахар|тумани|туман|вилояти)\b",
+    re.IGNORECASE,
+)
+
 
 class OfferMixin:
     """Mixin for offer-related database operations."""
 
+    def _normalize_city_label(self, city: str) -> str:
+        city_clean = " ".join(city.strip().split())
+        city_clean = city_clean.split(",")[0]
+        city_clean = re.sub(r"\s*\([^)]*\)", "", city_clean)
+        city_clean = _CITY_SUFFIX_RE.sub("", city_clean).strip(" ,")
+        return city_clean.lower()
+
     def _get_city_variants(self, city: str) -> list[str]:
         """Get all variants of city name (transliteration)."""
-        city_lower = city.lower().strip()
+        city_lower = self._normalize_city_label(city)
         variants = {city_lower}
 
         # Добавляем варианты из маппинга
@@ -260,8 +274,10 @@ class OfferMixin:
             ]
             params = []
             if city:
-                base.append("AND (s.city = %s OR s.city IS NULL OR s.city = '')")
-                params.append(city)
+                city_variants = self._get_city_variants(city)
+                city_conditions = " OR ".join(["s.city ILIKE %s" for _ in city_variants])
+                base.append(f"AND ({city_conditions})")
+                params.extend([f"%{v}%" for v in city_variants])
             if store_id:
                 base.append("AND o.store_id = %s")
                 params.append(store_id)
@@ -304,7 +320,7 @@ class OfferMixin:
                 # Поддержка транслитерации: ищем и латиницу и кириллицу
                 city_variants = self._get_city_variants(city)
                 city_conditions = " OR ".join(["s.city ILIKE %s" for _ in city_variants])
-                query += f" AND (({city_conditions}) OR s.city IS NULL OR s.city = '')"
+                query += f" AND ({city_conditions})"
                 params.extend([f"%{v}%" for v in city_variants])
 
             if region:
@@ -399,6 +415,92 @@ class OfferMixin:
             cursor.execute(query, params)
             return cursor.fetchone()[0]
 
+    def get_nearby_offers(
+        self,
+        latitude: float,
+        longitude: float,
+        limit: int = 20,
+        offset: int = 0,
+        category: str | None = None,
+        business_type: str | None = None,
+        max_distance_km: float | None = None,
+        sort_by: str | None = None,
+        min_price: float | None = None,
+        max_price: float | None = None,
+        min_discount: float | None = None,
+    ) -> list[dict]:
+        """Get offers nearest to the provided coordinates."""
+        with self.get_connection() as conn:
+            cursor = conn.cursor(row_factory=dict_row)
+            distance_expr = (
+                "6371 * 2 * ASIN(SQRT("
+                "POWER(SIN(RADIANS(%s - s.latitude) / 2), 2) + "
+                "COS(RADIANS(s.latitude)) * COS(RADIANS(%s)) * "
+                "POWER(SIN(RADIANS(%s - s.longitude) / 2), 2)"
+                "))"
+            )
+            query = f"""
+                SELECT * FROM (
+                    SELECT o.*, s.name as store_name, s.address, s.city, s.category as store_category,
+                           s.delivery_enabled, s.delivery_price, s.min_order_amount,
+                           CASE WHEN o.original_price > 0 THEN CAST((1.0 - o.discount_price::numeric / o.original_price::numeric) * 100 AS INTEGER) ELSE 0 END as discount_percent,
+                           {distance_expr} as distance_km
+                    FROM offers o
+                    JOIN stores s ON o.store_id = s.store_id
+                    WHERE o.status = 'active'
+                      AND COALESCE(o.stock_quantity, o.quantity) > 0
+                      AND (s.status = 'approved' OR s.status = 'active')
+                      AND (o.expiry_date IS NULL OR o.expiry_date >= CURRENT_DATE)
+                      AND s.latitude IS NOT NULL
+                      AND s.longitude IS NOT NULL
+                ) as t
+            """
+            params: list[Any] = [latitude, latitude, longitude]
+            where_parts: list[str] = []
+
+            if max_distance_km is not None:
+                where_parts.append("t.distance_km <= %s")
+                params.append(max_distance_km)
+            if category:
+                where_parts.append("t.category = %s")
+                params.append(category)
+            if business_type:
+                where_parts.append("t.store_category = %s")
+                params.append(business_type)
+            if min_price is not None:
+                where_parts.append("t.discount_price >= %s")
+                params.append(min_price)
+            if max_price is not None:
+                where_parts.append("t.discount_price <= %s")
+                params.append(max_price)
+            if min_discount is not None:
+                where_parts.append(
+                    "t.original_price > 0"
+                    " AND (1.0 - t.discount_price::numeric / t.original_price::numeric) * 100 >= %s"
+                )
+                params.append(min_discount)
+
+            if where_parts:
+                query += " WHERE " + " AND ".join(where_parts)
+
+            order_by = "t.distance_km ASC, t.discount_percent DESC, t.created_at DESC"
+            if sort_by:
+                sort_key = sort_by.lower()
+                if sort_key == "price_asc":
+                    order_by = "t.distance_km ASC, t.discount_price ASC, t.created_at DESC"
+                elif sort_key == "price_desc":
+                    order_by = "t.distance_km ASC, t.discount_price DESC, t.created_at DESC"
+                elif sort_key == "new":
+                    order_by = "t.distance_km ASC, t.offer_id DESC"
+                elif sort_key == "discount":
+                    order_by = "t.distance_km ASC, t.discount_percent DESC, t.created_at DESC"
+
+            query += f" ORDER BY {order_by} LIMIT %s OFFSET %s"
+            params.extend([limit, offset])
+
+            cursor.execute(query, params)
+            return [dict(row) for row in cursor.fetchall()]
+
     def get_offers_by_store(self, store_id: int, include_all: bool = False):
         """
         Get offers for store with store info.
@@ -442,19 +544,23 @@ class OfferMixin:
         """Get top offers in city (by discount)."""
         with self.get_connection() as conn:
             cursor = conn.cursor(row_factory=dict_row)
+            city_variants = self._get_city_variants(city)
+            city_conditions = " OR ".join(["s.city ILIKE %s" for _ in city_variants])
+            params = [f"%{v}%" for v in city_variants]
+            params.append(limit)
             cursor.execute(
-                """
+                f"""
                 SELECT o.*, s.name, s.address, s.city, s.category,
                        CAST((o.original_price - o.discount_price) * 100.0 / o.original_price AS INTEGER) as discount_percent
                 FROM offers o
                 JOIN stores s ON o.store_id = s.store_id
-                WHERE s.city = %s AND s.status = 'active'
+                WHERE ({city_conditions}) AND s.status = 'active'
                       AND o.status = 'active' AND COALESCE(o.stock_quantity, o.quantity) > 0
                       AND (o.expiry_date IS NULL OR o.expiry_date >= CURRENT_DATE)
                 ORDER BY discount_percent DESC, o.created_at DESC
                 LIMIT %s
             """,
-                (city, limit),
+                tuple(params),
             )
             return [dict(row) for row in cursor.fetchall()]
 

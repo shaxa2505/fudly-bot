@@ -264,7 +264,6 @@ class PaymentService:
     async def process_click_prepare(
         self,
         click_trans_id: str,
-        service_id: str,
         merchant_trans_id: str,
         amount: float,
         action: str,
@@ -277,30 +276,14 @@ class PaymentService:
         Returns response dict for Click.
         """
         # Verify signature
-        order_id = None
-        store_id = None
-        try:
-            order_id = int(merchant_trans_id)
-        except (TypeError, ValueError):
-            order_id = None
-        if order_id and self._db and hasattr(self._db, "get_order"):
-            try:
-                order = self._db.get_order(order_id)
-                if isinstance(order, dict):
-                    store_id = order.get("store_id")
-            except Exception:
-                store_id = None
-
-        effective_service_id = service_id or self.click_service_id or ""
         if not self.verify_click_signature(
             click_trans_id,
-            effective_service_id,
+            self.click_service_id,
             merchant_trans_id,
             str(int(amount)),
             action,
             sign_time,
             sign_string,
-            store_id=store_id,
         ):
             return {"error": -1, "error_note": "Invalid signature"}
 
@@ -317,7 +300,6 @@ class PaymentService:
     async def process_click_complete(
         self,
         click_trans_id: str,
-        service_id: str,
         merchant_trans_id: str,
         merchant_prepare_id: str,
         amount: float,
@@ -332,30 +314,14 @@ class PaymentService:
         Returns response dict for Click.
         """
         # Verify signature
-        order_id = None
-        store_id = None
-        try:
-            order_id = int(merchant_trans_id)
-        except (TypeError, ValueError):
-            order_id = None
-        if order_id and self._db and hasattr(self._db, "get_order"):
-            try:
-                order = self._db.get_order(order_id)
-                if isinstance(order, dict):
-                    store_id = order.get("store_id")
-            except Exception:
-                store_id = None
-
-        effective_service_id = service_id or self.click_service_id or ""
         if not self.verify_click_signature(
             click_trans_id,
-            effective_service_id,
+            self.click_service_id,
             merchant_trans_id,
             str(int(amount)),
             action,
             sign_time,
             sign_string,
-            store_id=store_id,
         ):
             return {"error": -1, "error_note": "Invalid signature"}
 
@@ -505,14 +471,6 @@ class PaymentService:
         if not order_id:
             return {"error": {"code": -31050, "message": "Order not found"}, "id": request_id}
 
-        if self._db and hasattr(self._db, "get_order"):
-            try:
-                order = self._db.get_order(int(order_id))
-            except Exception:
-                order = None
-            if not order:
-                return {"error": {"code": -31050, "message": "Order not found"}, "id": request_id}
-
         # Here you would validate order exists and amount matches
         # For now, return allow
         return {"result": {"allow": True}, "id": request_id}
@@ -523,14 +481,6 @@ class PaymentService:
         account = params.get("account", {})
         order_id = account.get("order_id")
         amount = params.get("amount", 0)
-
-        if self._db and hasattr(self._db, "get_order"):
-            try:
-                order = self._db.get_order(int(order_id))
-            except Exception:
-                order = None
-            if not order:
-                return {"error": {"code": -31050, "message": "Order not found"}, "id": request_id}
 
         # Here you would create transaction in database
         logger.info(
@@ -549,29 +499,6 @@ class PaymentService:
     async def _payme_perform_transaction(self, params: dict, request_id: Any) -> dict:
         """Perform (complete) transaction."""
         transaction_id = params.get("id")
-
-        order_id = None
-        try:
-            order_id = int(transaction_id)
-        except (TypeError, ValueError):
-            order_id = None
-
-        if order_id and self._db and hasattr(self._db, "get_order"):
-            try:
-                order = self._db.get_order(order_id)
-            except Exception:
-                order = None
-            if order:
-                try:
-                    from app.services.unified_order_service import get_unified_order_service
-
-                    order_service = get_unified_order_service()
-                    if order_service:
-                        await order_service.confirm_payment(order_id)
-                    elif hasattr(self._db, "update_payment_status"):
-                        self._db.update_payment_status(order_id, "confirmed")
-                except Exception as e:
-                    logger.warning(f"Failed to confirm Payme payment for order #{order_id}: {e}")
 
         # Here you would complete transaction in database
         logger.info(f"Payme transaction performed: {transaction_id}")

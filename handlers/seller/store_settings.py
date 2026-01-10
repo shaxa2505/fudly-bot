@@ -8,6 +8,7 @@ from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
+from app.core.geocoding import reverse_geocode_store
 from database_protocol import DatabaseProtocol
 from logging_config import logger
 
@@ -506,7 +507,17 @@ async def handle_store_location(message: types.Message, state: FSMContext) -> No
 
     # Update store location
     try:
-        db.update_store_location(store_id, latitude, longitude)
+        region = None
+        district = None
+        try:
+            geo = await reverse_geocode_store(latitude, longitude)
+            if geo:
+                region = geo.get("region")
+                district = geo.get("district")
+        except Exception as e:
+            logger.warning(f"Reverse geocode failed for store {store_id}: {e}")
+
+        db.update_store_location(store_id, latitude, longitude, region=region, district=district)
 
         await state.clear()
 

@@ -65,6 +65,41 @@ export const CITY_TRANSLATIONS = {
   'Angren': 'Ангрен',
 }
 
+const LOCATION_SUFFIXES = [
+  'shahri',
+  'shahar',
+  'shahr',
+  'tumani',
+  'tuman',
+  'viloyati',
+  'viloyat',
+  'region',
+  'district',
+  'province',
+  'oblast',
+  'oblasti',
+  'город',
+  'район',
+  'область',
+  'шахри',
+  'шахар',
+  'тумани',
+  'туман',
+  'вилояти',
+]
+
+export const normalizeLocationName = (value) => {
+  if (!value) return ''
+  let cleaned = String(value).trim()
+  cleaned = cleaned.replace(/\s*\([^)]*\)/g, '')
+  const suffixPattern = new RegExp(`\\s+(?:${LOCATION_SUFFIXES.join('|')})\\b`, 'gi')
+  cleaned = cleaned.replace(suffixPattern, '')
+  cleaned = cleaned.replace(/\s*,\s*/g, ', ')
+  cleaned = cleaned.replace(/\s{2,}/g, ' ')
+  cleaned = cleaned.replace(/[,\\s]+$/g, '')
+  return cleaned.trim()
+}
+
 
 /**
  * Transliterate city name from Latin to Cyrillic for API calls
@@ -73,8 +108,9 @@ export const CITY_TRANSLATIONS = {
  */
 export const transliterateCity = (city) => {
   if (!city) return city
-  const cityLower = city.toLowerCase().trim()
-  return CITY_TO_CYRILLIC[cityLower] || city
+  const normalized = normalizeLocationName(city)
+  const cityLower = normalized.toLowerCase().trim()
+  return CITY_TO_CYRILLIC[cityLower] || normalized
 }
 
 /**
@@ -84,7 +120,7 @@ export const transliterateCity = (city) => {
  */
 export const getCyrillicCity = (cityString) => {
   if (!cityString) return ''  // Empty = all cities
-  const cityLatin = cityString.split(',')[0]?.trim()
+  const cityLatin = normalizeLocationName(cityString.split(',')[0]?.trim())
   return CITY_TRANSLATIONS[cityLatin] || transliterateCity(cityLatin) || cityLatin
 }
 
@@ -94,15 +130,15 @@ export const getCyrillicCity = (cityString) => {
  * @returns {string} Latin city name for display
  */
 export const getLatinCity = (location) => {
-  if (!location?.city) return 'Toshkent'
-  return location.city.split(',')[0]?.trim() || 'Toshkent'
+  if (!location?.city) return ''
+  return normalizeLocationName(location.city.split(',')[0]?.trim() || '')
 }
 
 /**
  * Default location for the app
  */
 export const DEFAULT_LOCATION = {
-  city: "Toshkent, O'zbekiston",
+  city: '',
   address: '',
   coordinates: null,
   region: '',
@@ -116,7 +152,35 @@ export const DEFAULT_LOCATION = {
 export const getSavedLocation = () => {
   try {
     const saved = localStorage.getItem('fudly_location')
-    return saved ? JSON.parse(saved) : DEFAULT_LOCATION
+    const baseLocation = saved ? JSON.parse(saved) : {}
+    let location = {
+      ...DEFAULT_LOCATION,
+      ...baseLocation,
+      city: normalizeLocationName(baseLocation.city || DEFAULT_LOCATION.city),
+      region: normalizeLocationName(baseLocation.region || DEFAULT_LOCATION.region),
+      district: normalizeLocationName(baseLocation.district || DEFAULT_LOCATION.district),
+    }
+
+    const geoSaved = localStorage.getItem('fudly_user_location')
+    if (geoSaved) {
+      const geo = JSON.parse(geoSaved)
+      const isFresh = geo.timestamp && Date.now() - geo.timestamp < 3600000
+      if (
+        isFresh &&
+        (!location.coordinates ||
+          location.coordinates.lat == null ||
+          location.coordinates.lon == null) &&
+        geo.latitude != null &&
+        geo.longitude != null
+      ) {
+        location = {
+          ...location,
+          coordinates: { lat: geo.latitude, lon: geo.longitude },
+        }
+      }
+    }
+
+    return location
   } catch {
     return DEFAULT_LOCATION
   }

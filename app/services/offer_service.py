@@ -362,18 +362,19 @@ class OfferService:
 
         return count
 
-    def search_offers(self, query: str, city: str | None = None) -> list[OfferListItem]:
+    def search_offers(
+        self, query: str, city: str | None = None, limit: int = 50, offset: int = 0
+    ) -> list[OfferListItem]:
         """Search active offers by title or store name."""
         # This is a simplified search. Ideally, this should be done in the repository/DB layer.
         # For now, we'll fetch all active offers and filter in Python.
         # Optimization: Add search method to repository later.
 
-        # Use a default city if None, or handle it in list_hot_offers
-        search_city = city or "Ташкент"
+        search_city = city or None
 
         # Fetch active offers directly from DB if possible, otherwise fallback to hot offers
         if hasattr(self._db, "search_offers"):
-            raw_offers = self._db.search_offers(query, search_city)
+            raw_offers = self._db.search_offers(query, search_city, limit=limit, offset=offset)
             return [self._to_offer_list_item(row) for row in raw_offers]
 
         result = self.list_hot_offers(city=search_city, limit=1000)  # Fetch a reasonable amount

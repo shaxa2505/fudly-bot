@@ -4,6 +4,7 @@ Search-related database operations.
 from __future__ import annotations
 
 from typing import Any
+import re
 
 from psycopg.rows import dict_row
 
@@ -17,13 +18,23 @@ except ImportError:
 # Импортируем маппинг транслитерации из offers
 from database_pg_module.mixins.offers import CITY_TRANSLITERATION
 
+_CITY_SUFFIX_RE = re.compile(
+    r"\s+(?:shahri|shahar|shahr|tumani|tuman|viloyati|viloyat|region|district|province|oblast|oblasti"
+    r"|город|район|область|шахри|шахар|тумани|туман|вилояти)\b",
+    re.IGNORECASE,
+)
+
 
 class SearchMixin:
     """Mixin for search-related database operations."""
 
     def _get_city_variants_search(self, city: str) -> list[str]:
         """Get all variants of city name (transliteration)."""
-        city_lower = city.lower().strip()
+        city_clean = " ".join(city.strip().split())
+        city_clean = city_clean.split(",")[0]
+        city_clean = re.sub(r"\s*\([^)]*\)", "", city_clean)
+        city_clean = _CITY_SUFFIX_RE.sub("", city_clean).strip(" ,")
+        city_lower = city_clean.lower()
         variants = {city_lower}
 
         if city_lower in CITY_TRANSLITERATION:
@@ -36,7 +47,18 @@ class SearchMixin:
 
         return list(variants)
 
-    def search_offers(self, query: str, city: str = None) -> list[Any]:
+    def search_offers(
+        self,
+        query: str,
+        city: str | None = None,
+        limit: int = 50,
+        offset: int = 0,
+        region: str | None = None,
+        district: str | None = None,
+        min_price: float | None = None,
+        max_price: float | None = None,
+        min_discount: float | None = None,
+    ) -> list[Any]:
         """Search offers by title or store name using advanced PostgreSQL full-text search."""
         base_sql = """
             SELECT
@@ -69,8 +91,31 @@ class SearchMixin:
         if city:
             city_variants = self._get_city_variants_search(city)
             city_conditions = " OR ".join(["s.city ILIKE %s" for _ in city_variants])
-            base_sql += f" AND (({city_conditions}) OR s.city IS NULL OR s.city = '')"
+            base_sql += f" AND ({city_conditions})"
             params.extend([f"%{v}%" for v in city_variants])
+
+        if region:
+            base_sql += " AND s.region ILIKE %s"
+            params.append(f"%{region}%")
+
+        if district:
+            base_sql += " AND s.district ILIKE %s"
+            params.append(f"%{district}%")
+
+        if min_price is not None:
+            base_sql += " AND o.discount_price >= %s"
+            params.append(min_price)
+
+        if max_price is not None:
+            base_sql += " AND o.discount_price <= %s"
+            params.append(max_price)
+
+        if min_discount is not None:
+            base_sql += (
+                " AND o.original_price > 0"
+                " AND (1.0 - o.discount_price::numeric / o.original_price::numeric) * 100 >= %s"
+            )
+            params.append(min_discount)
 
         base_sql += """
             AND (o.expiry_date IS NULL OR o.expiry_date >= CURRENT_DATE)
@@ -81,9 +126,10 @@ class SearchMixin:
                 TRANSLATE(LOWER(o.title), 'абвгдеёжзийклмнопрстуфхцчшщъыьэюя', 'abvgdeejziiklmnoprstufxcchshshhyyyeua') LIKE '%%' || LOWER(%s) || '%%'
             )
             ORDER BY relevance DESC, o.created_at DESC
-            LIMIT 50
+            LIMIT %s OFFSET %s
         """
         params.extend([query, query, query, query])
+        params.extend([limit, offset])
 
         with self.get_connection() as conn:
             cursor = conn.cursor(row_factory=dict_row)

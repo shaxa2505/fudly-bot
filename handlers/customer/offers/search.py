@@ -362,7 +362,7 @@ def setup(
         # 1. Search stores first
         if hasattr(db, "search_stores"):
             try:
-                stores = db.search_stores(query, city or "Ташкент")
+                stores = db.search_stores(query, city)
                 logger.info(f"🔍 Store search found {len(stores)} stores")
                 store_results = stores
             except Exception as e:

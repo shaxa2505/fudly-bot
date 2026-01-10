@@ -28,7 +28,7 @@ const getTimeRemaining = (expiryDate) => {
   }
 }
 
-function FlashDeals({ city = 'Ташкент' }) {
+function FlashDeals({ city = '', region = '', district = '' }) {
   const navigate = useNavigate()
   const { addToCart, getQuantity } = useCart()
   const [deals, setDeals] = useState([])
@@ -38,7 +38,7 @@ function FlashDeals({ city = 'Ташкент' }) {
   const loadDeals = useCallback(async () => {
     try {
       setLoading(true)
-      const data = await api.getFlashDeals(city, 10)
+      const data = await api.getFlashDeals({ city, region, district, limit: 10 })
       setDeals(data || [])
       setError(null)
     } catch (err) {
@@ -47,7 +47,7 @@ function FlashDeals({ city = 'Ташкент' }) {
     } finally {
       setLoading(false)
     }
-  }, [city])
+  }, [city, region, district])
 
   useEffect(() => {
     loadDeals()

@@ -49,10 +49,10 @@ function StoresPage() {
     loadStores()
     // Try to get saved location
     const savedGeo = getGeoLocation()
-    if (savedGeo) {
+    if (savedGeo && !userLocation) {
       setUserLocation(savedGeo)
     }
-  }, [selectedType, cityRaw, regionRaw, districtRaw])
+  }, [selectedType, cityRaw, regionRaw, districtRaw, userLocation])
 
   // Hide topbar on scroll-down (Lavka-like): keep search pinned, show topbar on scroll-up.
   useEffect(() => {
@@ -99,12 +99,11 @@ function StoresPage() {
       if (selectedType !== 'all') {
         params.business_type = selectedType
       }
-      let data = await api.getStores(params)
-
-      if ((!data || data.length === 0) && cityRaw) {
-        const paramsNoCity = selectedType !== 'all' ? { business_type: selectedType } : {}
-        data = await api.getStores(paramsNoCity)
+      if (userLocation?.latitude != null && userLocation?.longitude != null) {
+        params.lat = userLocation.latitude
+        params.lon = userLocation.longitude
       }
+      let data = await api.getStores(params)
 
       setStores(Array.isArray(data) ? data : [])
     } catch (error) {
@@ -195,7 +194,7 @@ function StoresPage() {
       <header className={`sp-topbar ${topbarHidden ? 'is-hidden' : ''}`}>
         <div className="sp-topbar-inner">
           <h1 className="sp-title">Do'konlar</h1>
-          <span className="sp-city">Shahar: {cityLatin}</span>
+          <span className="sp-city">Shahar: {cityLatin || 'Tanlanmagan'}</span>
         </div>
       </header>
 

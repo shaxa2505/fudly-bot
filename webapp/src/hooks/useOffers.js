@@ -20,7 +20,6 @@ export function useOffers({
   const [loading, setLoading] = useState(false);
   const [hasMore, setHasMore] = useState(true);
   const [offset, setOffset] = useState(0);
-  const [showingAllCities, setShowingAllCities] = useState(false);
   const [error, setError] = useState(null);
 
   // Ref to track if currently loading
@@ -30,7 +29,7 @@ export function useOffers({
   const cityForApi = transliterateCity(city);
 
   // Load offers function
-  const loadOffers = useCallback(async (reset = false, forceAllCities = false) => {
+  const loadOffers = useCallback(async (reset = false) => {
     // Prevent duplicate requests
     if (loadingRef.current) return;
 
@@ -45,8 +44,7 @@ export function useOffers({
         offset: currentOffset,
       };
 
-      // Filter by city unless showing all
-      if (!forceAllCities && !showingAllCities) {
+      if (cityForApi) {
         params.city = cityForApi;
       }
 
@@ -62,18 +60,9 @@ export function useOffers({
 
       const data = await api.getOffers(params);
 
-      // If city is empty on first load, show all cities
-      if (reset && (!data || data.length === 0) && !forceAllCities && !showingAllCities) {
-        setShowingAllCities(true);
-        loadingRef.current = false;
-        setLoading(false);
-        return loadOffers(true, true);
-      }
-
       if (reset) {
         setOffers(data || []);
         setOffset(limit);
-        if (forceAllCities) setShowingAllCities(true);
       } else {
         setOffers(prev => [...prev, ...(data || [])]);
         setOffset(prev => prev + limit);
@@ -87,11 +76,10 @@ export function useOffers({
       setLoading(false);
       loadingRef.current = false;
     }
-  }, [cityForApi, category, searchQuery, offset, limit, showingAllCities]);
+  }, [cityForApi, category, searchQuery, offset, limit]);
 
   // Reset and reload when filters change
   useEffect(() => {
-    setShowingAllCities(false);
     setOffset(0);
 
     const timer = setTimeout(() => {
@@ -110,7 +98,6 @@ export function useOffers({
 
   // Refresh function
   const refresh = useCallback(() => {
-    setShowingAllCities(false);
     setOffset(0);
     loadOffers(true);
   }, [loadOffers]);
@@ -120,7 +107,6 @@ export function useOffers({
     loading,
     hasMore,
     error,
-    showingAllCities,
     loadMore,
     refresh,
   };

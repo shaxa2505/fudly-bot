@@ -40,7 +40,7 @@ async def get_search_suggestions(
 
 
 @router.get("/stats/hot-deals")
-async def get_hot_deals_stats(city: str = Query("Toshkent"), db=Depends(get_db)):
+async def get_hot_deals_stats(city: str | None = Query(None), db=Depends(get_db)):
     """Get statistics about hot deals."""
     try:
         normalized_city = normalize_city(city)

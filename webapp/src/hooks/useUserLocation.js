@@ -1,9 +1,10 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
+import { normalizeLocationName } from '../utils/cityUtils';
 
 const STORAGE_KEY = 'fudly_location';
 
 const DEFAULT_LOCATION = {
-  city: "Toshkent, O'zbekiston",
+  city: '',
   address: '',
   coordinates: null,
   region: '',
@@ -29,8 +30,8 @@ export function useUserLocation() {
 
   // Extract city name without country
   const cityName = location.city
-    ? location.city.split(',')[0].trim()
-    : 'Toshkent';
+    ? normalizeLocationName(location.city.split(',')[0].trim())
+    : '';
 
   // Check if we have precise location (coordinates or address)
   const hasPreciseLocation = Boolean(location.coordinates || location.address);
@@ -52,13 +53,19 @@ export function useUserLocation() {
 
       const data = await response.json();
 
-      const city = data.address?.city || data.address?.town || data.address?.village || '';
-      const state = data.address?.state || data.address?.region || '';
-      const district = data.address?.county || data.address?.city_district || data.address?.suburb || '';
-      const primaryCity = city || state || 'Toshkent';
-      const normalizedCity = primaryCity.includes("O'zbekiston")
-        ? primaryCity
-        : `${primaryCity}, O'zbekiston`;
+      const city = normalizeLocationName(
+        data.address?.city || data.address?.town || data.address?.village || ''
+      );
+      const state = normalizeLocationName(data.address?.state || data.address?.region || '');
+      const district = normalizeLocationName(
+        data.address?.county || data.address?.city_district || data.address?.suburb || ''
+      );
+      const primaryCity = city || state || '';
+      const normalizedCity = primaryCity
+        ? (primaryCity.includes("O'zbekiston")
+          ? primaryCity
+          : `${primaryCity}, O'zbekiston`)
+        : '';
 
       setLocation({
         city: normalizedCity,
@@ -138,7 +145,7 @@ export function useUserLocation() {
   // Update location manually
   const updateLocation = useCallback((newCity, newAddress = '') => {
     setLocation(prev => ({
-      city: newCity.trim() || DEFAULT_LOCATION.city,
+      city: normalizeLocationName(newCity.trim()) || DEFAULT_LOCATION.city,
       address: newAddress.trim(),
       coordinates: newAddress.trim() ? prev.coordinates : null,
       region: prev.region,

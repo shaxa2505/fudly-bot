@@ -94,7 +94,7 @@ def _to_offer_response(offer: Any, store_fallback: dict | None = None) -> OfferR
 
 @router.get("/categories", response_model=list[CategoryResponse])
 async def get_categories(
-    city: str = Query("Toshkent", description="City to filter by"),
+    city: str | None = Query(None, description="City to filter by"),
     db=Depends(get_db),
 ):
     """Get list of product categories with counts."""
@@ -130,16 +130,20 @@ async def get_categories(
 
 @router.get("/offers", response_model=list[OfferResponse])
 async def get_offers(
-    city: str = Query("Toshkent", description="City to filter by"),
+    city: str | None = Query(None, description="City to filter by"),
     region: str | None = Query(None, description="Region filter"),
     district: str | None = Query(None, description="District filter"),
+    lat: float | None = Query(None, description="Latitude for nearby fallback"),
+    lon: float | None = Query(None, description="Longitude for nearby fallback"),
+    latitude: float | None = Query(None, description="Latitude (alias)"),
+    longitude: float | None = Query(None, description="Longitude (alias)"),
     category: str = Query("all", description="Category filter"),
     store_id: int | None = Query(None, description="Store ID filter"),
     search: str | None = Query(None, description="Search query"),
     min_price: float | None = Query(None, description="Minimum price filter"),
     max_price: float | None = Query(None, description="Maximum price filter"),
     min_discount: float | None = Query(None, description="Minimum discount percent"),
-    sort_by: str = Query("discount", description="Sort by: discount, price_asc, price_desc, new"),
+    sort_by: str | None = Query(None, description="Sort by: discount, price_asc, price_desc, new"),
     limit: int = Query(50, ge=1, le=100),
     offset: int = Query(0, ge=0),
     db=Depends(get_db),
@@ -148,13 +152,20 @@ async def get_offers(
     """Get list of offers with advanced filters and sorting."""
     try:
         _ = user  # explicitly mark dependency as used
-        normalized_city = normalize_city(city)
+        normalized_city = normalize_city(city) if city else None
+        normalized_city = normalized_city or None
+        region = region or None
+        district = district or None
+        lat_val = lat if lat is not None else latitude
+        lon_val = lon if lon is not None else longitude
         offers: list[OfferResponse] = []
         store_fallback: dict | None = None
 
         storage_min_price = _to_storage_price(min_price)
         storage_max_price = _to_storage_price(max_price)
 
+        raw_offers: list[Any] = []
+        sort_key = sort_by or "discount"
         apply_filters = True
         apply_sort = True
         apply_slice = True
@@ -164,7 +175,7 @@ async def get_offers(
                     store_id,
                     limit=limit,
                     offset=offset,
-                    sort_by=sort_by,
+                    sort_by=sort_key,
                     min_price=storage_min_price,
                     max_price=storage_max_price,
                     min_discount=min_discount,
@@ -179,45 +190,97 @@ async def get_offers(
             apply_slice = False
         elif search:
             raw_offers = (
-                db.search_offers(search, normalized_city) if hasattr(db, "search_offers") else []
-            )
-        elif category and category != "all":
-            if hasattr(db, "get_offers_by_city_and_category"):
-                raw_offers = db.get_offers_by_city_and_category(
-                    city=normalized_city,
-                    category=category,
-                    limit=limit,
-                    offset=offset,
-                    region=region,
-                    district=district,
-                    sort_by=sort_by,
-                    min_price=storage_min_price,
-                    max_price=storage_max_price,
-                    min_discount=min_discount,
-                )
-            elif hasattr(db, "get_offers_by_category"):
-                raw_offers = db.get_offers_by_category(category, normalized_city)
-            else:
-                raw_offers = []
-            apply_filters = False
-            apply_sort = False
-            apply_slice = False
-        else:
-            raw_offers = (
-                db.get_hot_offers(
+                db.search_offers(
+                    search,
                     normalized_city,
                     limit=limit,
                     offset=offset,
                     region=region,
                     district=district,
-                    sort_by=sort_by,
                     min_price=storage_min_price,
                     max_price=storage_max_price,
                     min_discount=min_discount,
                 )
-                if hasattr(db, "get_hot_offers")
+                if hasattr(db, "search_offers")
                 else []
             )
+            apply_filters = False
+            apply_sort = bool(sort_by)
+            apply_slice = False
+        else:
+            def _fetch_scoped_offers(
+                city_scope: str | None, region_scope: str | None, district_scope: str | None
+            ) -> list[Any]:
+                if category and category != "all":
+                    if hasattr(db, "get_offers_by_city_and_category"):
+                        return db.get_offers_by_city_and_category(
+                            city=city_scope,
+                            category=category,
+                            limit=limit,
+                            offset=offset,
+                            region=region_scope,
+                            district=district_scope,
+                            sort_by=sort_key,
+                            min_price=storage_min_price,
+                            max_price=storage_max_price,
+                            min_discount=min_discount,
+                        )
+                    if hasattr(db, "get_offers_by_category") and city_scope:
+                        return db.get_offers_by_category(category, city_scope)
+                    return []
+                if hasattr(db, "get_hot_offers"):
+                    return db.get_hot_offers(
+                        city_scope,
+                        limit=limit,
+                        offset=offset,
+                        region=region_scope,
+                        district=district_scope,
+                        sort_by=sort_key,
+                        min_price=storage_min_price,
+                        max_price=storage_max_price,
+                        min_discount=min_discount,
+                    )
+                return []
+
+            scopes: list[tuple[str | None, str | None, str | None]] = []
+            if district:
+                scopes.append((normalized_city, region, district))
+            if region:
+                scopes.append((normalized_city, region, None))
+            if normalized_city:
+                scopes.append((normalized_city, None, None))
+            if region and not normalized_city:
+                scopes.append((None, region, None))
+            if not scopes:
+                scopes.append((None, None, None))
+
+            seen: set[tuple[str | None, str | None, str | None]] = set()
+            for scope in scopes:
+                if scope in seen:
+                    continue
+                seen.add(scope)
+                raw_offers = _fetch_scoped_offers(*scope)
+                if raw_offers:
+                    break
+
+            if (
+                not raw_offers
+                and lat_val is not None
+                and lon_val is not None
+                and hasattr(db, "get_nearby_offers")
+            ):
+                raw_offers = db.get_nearby_offers(
+                    latitude=lat_val,
+                    longitude=lon_val,
+                    limit=limit,
+                    offset=offset,
+                    category=category if category and category != "all" else None,
+                    sort_by=sort_key,
+                    min_price=storage_min_price,
+                    max_price=storage_max_price,
+                    min_discount=min_discount,
+                )
+
             apply_filters = False
             apply_sort = False
             apply_slice = False
@@ -338,7 +401,7 @@ async def get_offer(offer_id: int, db=Depends(get_db)):
 
 @router.get("/flash-deals", response_model=list[OfferResponse])
 async def get_flash_deals(
-    city: str = Query("Toshkent", description="City to filter by"),
+    city: str | None = Query(None, description="City to filter by"),
     region: str | None = Query(None, description="Region filter"),
     district: str | None = Query(None, description="District filter"),
     limit: int = Query(10, ge=1, le=50),
@@ -346,7 +409,7 @@ async def get_flash_deals(
 ):
     """Get flash deals - high discount items expiring soon."""
     try:
-        normalized_city = normalize_city(city)
+        normalized_city = normalize_city(city) if city else None
         raw_offers = (
             db.get_hot_offers(
                 normalized_city, limit=100, offset=0, region=region, district=district

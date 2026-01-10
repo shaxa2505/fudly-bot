@@ -194,6 +194,20 @@ export function saveLocation(location) {
   } catch {
     // Ignore storage errors
   }
+
+  try {
+    if (location?.latitude != null && location?.longitude != null) {
+      const saved = localStorage.getItem('fudly_location');
+      const base = saved ? JSON.parse(saved) : {};
+      const next = {
+        ...base,
+        coordinates: { lat: location.latitude, lon: location.longitude },
+      };
+      localStorage.setItem('fudly_location', JSON.stringify(next));
+    }
+  } catch {
+    // Ignore storage errors
+  }
 }
 
 export default {

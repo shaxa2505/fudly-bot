@@ -15,6 +15,7 @@ from database_pg_module.crypto import (
     is_dev_environment,
     is_fernet_token,
 )
+from database_pg_module.mixins.offers import CITY_TRANSLITERATION
 
 try:
     from logging_config import logger
@@ -28,6 +29,21 @@ _plaintext_payment_secret_warned = False
 
 class StoreMixin:
     """Mixin for store-related database operations."""
+
+    def _get_city_variants(self, city: str) -> list[str]:
+        """Get all variants of city name (transliteration)."""
+        city_lower = city.lower().strip()
+        variants = {city_lower}
+
+        if city_lower in CITY_TRANSLITERATION:
+            variants.update(CITY_TRANSLITERATION[city_lower])
+
+        for key, values in CITY_TRANSLITERATION.items():
+            if city_lower in [v.lower() for v in values]:
+                variants.add(key)
+                variants.update(values)
+
+        return list(variants)
 
     def add_store(
         self,
@@ -149,8 +165,7 @@ class StoreMixin:
         """
         with self.get_connection() as conn:
             cursor = conn.cursor(row_factory=dict_row)
-            cursor.execute(
-                """
+            query = """
                 SELECT s.*,
                        COALESCE(AVG(r.rating), 0) as avg_rating,
                        COUNT(DISTINCT r.rating_id) as ratings_count,
@@ -162,17 +177,25 @@ class StoreMixin:
                        ) as offers_count
                 FROM stores s
                 LEFT JOIN ratings r ON s.store_id = r.store_id
-                WHERE s.city ILIKE %s
-                  AND (s.status = 'active' OR s.status = 'approved')
-                GROUP BY s.store_id
-                ORDER BY avg_rating DESC, s.created_at DESC
-            """,
-                (city,),
-            )
+                WHERE (s.status = 'active' OR s.status = 'approved')
+            """
+            params: list[str] = []
+            if city:
+                city_variants = self._get_city_variants(city)
+                city_conditions = " OR ".join(["s.city ILIKE %s" for _ in city_variants])
+                query += f" AND ({city_conditions})"
+                params.extend([f"%{v}%" for v in city_variants])
+
+            query += " GROUP BY s.store_id ORDER BY avg_rating DESC, s.created_at DESC"
+            cursor.execute(query, params)
             return [dict(row) for row in cursor.fetchall()]
 
     def get_stores_by_location(
-        self, city: str | None = None, region: str | None = None, district: str | None = None
+        self,
+        city: str | None = None,
+        region: str | None = None,
+        district: str | None = None,
+        business_type: str | None = None,
     ):
         """Return public stores filtered by city/region/district (any combination)."""
         with self.get_connection() as conn:
@@ -194,16 +217,80 @@ class StoreMixin:
             params: list[str] = []
 
             if city:
-                query += " AND s.city ILIKE %s"
-                params.append(f"%{city}%")
+                city_variants = self._get_city_variants(city)
+                city_conditions = " OR ".join(["s.city ILIKE %s" for _ in city_variants])
+                query += f" AND ({city_conditions})"
+                params.extend([f"%{v}%" for v in city_variants])
             if region:
                 query += " AND s.region ILIKE %s"
                 params.append(f"%{region}%")
             if district:
                 query += " AND s.district ILIKE %s"
                 params.append(f"%{district}%")
+            if business_type:
+                query += " AND s.business_type = %s"
+                params.append(business_type)
 
             query += " GROUP BY s.store_id ORDER BY avg_rating DESC, s.created_at DESC"
+            cursor.execute(query, params)
+            return [dict(row) for row in cursor.fetchall()]
+
+    def get_nearby_stores(
+        self,
+        latitude: float,
+        longitude: float,
+        limit: int = 20,
+        offset: int = 0,
+        business_type: str | None = None,
+        max_distance_km: float | None = None,
+    ) -> list[dict]:
+        """Get stores nearest to the provided coordinates."""
+        with self.get_connection() as conn:
+            cursor = conn.cursor(row_factory=dict_row)
+            distance_expr = (
+                "6371 * 2 * ASIN(SQRT("
+                "POWER(SIN(RADIANS(%s - s.latitude) / 2), 2) + "
+                "COS(RADIANS(s.latitude)) * COS(RADIANS(%s)) * "
+                "POWER(SIN(RADIANS(%s - s.longitude) / 2), 2)"
+                "))"
+            )
+            query = f"""
+                SELECT * FROM (
+                    SELECT s.*,
+                           COALESCE(AVG(r.rating), 0) as avg_rating,
+                           COUNT(DISTINCT r.rating_id) as ratings_count,
+                           (SELECT COUNT(*)
+                            FROM offers o
+                            WHERE o.store_id = s.store_id
+                              AND o.status = 'active'
+                              AND (o.expiry_date IS NULL OR o.expiry_date >= CURRENT_DATE)
+                           ) as offers_count,
+                           {distance_expr} as distance_km
+                    FROM stores s
+                    LEFT JOIN ratings r ON s.store_id = r.store_id
+                    WHERE (s.status = 'active' OR s.status = 'approved')
+                      AND s.latitude IS NOT NULL
+                      AND s.longitude IS NOT NULL
+                    GROUP BY s.store_id
+                ) as t
+            """
+            params: list[Any] = [latitude, latitude, longitude]
+            where_parts: list[str] = []
+
+            if max_distance_km is not None:
+                where_parts.append("t.distance_km <= %s")
+                params.append(max_distance_km)
+            if business_type:
+                where_parts.append("t.business_type = %s")
+                params.append(business_type)
+
+            if where_parts:
+                query += " WHERE " + " AND ".join(where_parts)
+
+            query += " ORDER BY t.distance_km ASC, t.avg_rating DESC, t.created_at DESC"
+            query += " LIMIT %s OFFSET %s"
+            params.extend([limit, offset])
+
             cursor.execute(query, params)
             return [dict(row) for row in cursor.fetchall()]
 
@@ -238,103 +325,86 @@ class StoreMixin:
         """Get stores by business type with offers count."""
         with self.get_connection() as conn:
             cursor = conn.cursor(row_factory=dict_row)
+            query = """
+                SELECT s.*,
+                       COALESCE(AVG(r.rating), 0) as avg_rating,
+                       COUNT(DISTINCT r.rating_id) as ratings_count,
+                       (SELECT COUNT(*) FROM offers o
+                        WHERE o.store_id = s.store_id
+                        AND o.status = 'active') as offers_count
+                FROM stores s
+                LEFT JOIN ratings r ON s.store_id = r.store_id
+                WHERE s.business_type = %s
+                AND (s.status = 'active' OR s.status = 'approved')
+            """
+            params: list[str] = [business_type]
             if city:
-                cursor.execute(
-                    """
-                    SELECT s.*,
-                           COALESCE(AVG(r.rating), 0) as avg_rating,
-                           COUNT(DISTINCT r.rating_id) as ratings_count,
-                           (SELECT COUNT(*) FROM offers o
-                            WHERE o.store_id = s.store_id
-                            AND o.status = 'active') as offers_count
-                    FROM stores s
-                    LEFT JOIN ratings r ON s.store_id = r.store_id
-                    WHERE s.business_type = %s
-                    AND s.city = %s
-                    AND (s.status = 'active' OR s.status = 'approved')
-                    GROUP BY s.store_id
-                    ORDER BY avg_rating DESC, s.created_at DESC
-                """,
-                    (business_type, city),
-                )
-            else:
-                cursor.execute(
-                    """
-                    SELECT s.*,
-                           COALESCE(AVG(r.rating), 0) as avg_rating,
-                           COUNT(DISTINCT r.rating_id) as ratings_count,
-                           (SELECT COUNT(*) FROM offers o
-                            WHERE o.store_id = s.store_id
-                            AND o.status = 'active') as offers_count
-                    FROM stores s
-                    LEFT JOIN ratings r ON s.store_id = r.store_id
-                    WHERE s.business_type = %s
-                    AND (s.status = 'active' OR s.status = 'approved')
-                    GROUP BY s.store_id
-                    ORDER BY avg_rating DESC, s.created_at DESC
-                """,
-                    (business_type,),
-                )
+                city_variants = self._get_city_variants(city)
+                city_conditions = " OR ".join(["s.city ILIKE %s" for _ in city_variants])
+                query += f" AND ({city_conditions})"
+                params.extend([f"%{v}%" for v in city_variants])
+
+            query += " GROUP BY s.store_id ORDER BY avg_rating DESC, s.created_at DESC"
+            cursor.execute(query, params)
             return [dict(row) for row in cursor.fetchall()]
 
     def get_stores_by_category(self, category: str, city: str = None) -> list[dict]:
         """Get stores by category."""
         with self.get_connection() as conn:
             cursor = conn.cursor(row_factory=dict_row)
+            query = """
+                SELECT * FROM stores
+                WHERE category = %s
+                AND (status = 'active' OR status = 'approved')
+            """
+            params: list[str] = [category]
             if city:
-                cursor.execute(
-                    """
-                    SELECT * FROM stores
-                    WHERE category = %s AND city = %s
-                    AND (status = 'active' OR status = 'approved')
-                    ORDER BY created_at DESC
-                """,
-                    (category, city),
-                )
-            else:
-                cursor.execute(
-                    """
-                    SELECT * FROM stores
-                    WHERE category = %s
-                    AND (status = 'active' OR status = 'approved')
-                    ORDER BY created_at DESC
-                """,
-                    (category,),
-                )
+                city_variants = self._get_city_variants(city)
+                city_conditions = " OR ".join(["city ILIKE %s" for _ in city_variants])
+                query += f" AND ({city_conditions})"
+                params.extend([f"%{v}%" for v in city_variants])
+
+            query += " ORDER BY created_at DESC"
+            cursor.execute(query, params)
             return [dict(row) for row in cursor.fetchall()]
 
     def get_stores_count_by_category(self, city: str) -> dict:
         """Get store counts grouped by category."""
         with self.get_connection() as conn:
             cursor = conn.cursor()
-            cursor.execute(
-                """
+            city_variants = self._get_city_variants(city)
+            city_conditions = " OR ".join(["city ILIKE %s" for _ in city_variants])
+            query = f"""
                 SELECT category, COUNT(*) as count
                 FROM stores
-                WHERE city = %s AND (status = 'active' OR status = 'approved')
+                WHERE ({city_conditions}) AND (status = 'active' OR status = 'approved')
                 GROUP BY category
-            """,
-                (city,),
-            )
+            """
+            params = [f"%{v}%" for v in city_variants]
+            cursor.execute(query, params)
             return dict(cursor.fetchall())
 
     def get_top_stores_by_city(self, city: str, limit: int = 10) -> list[dict]:
         """Get top rated stores in city."""
         with self.get_connection() as conn:
             cursor = conn.cursor(row_factory=dict_row)
+            city_variants = self._get_city_variants(city)
+            city_conditions = " OR ".join(["s.city ILIKE %s" for _ in city_variants])
+            params = [f"%{v}%" for v in city_variants]
+            params.append(limit)
             cursor.execute(
-                """
+                f"""
                 SELECT s.*,
                        COALESCE(AVG(r.rating), 0) as avg_rating,
                        COUNT(r.rating_id) as ratings_count
                 FROM stores s
                 LEFT JOIN ratings r ON s.store_id = r.store_id
-                WHERE s.city = %s AND s.status = 'active'
+                WHERE ({city_conditions}) AND s.status = 'active'
                 GROUP BY s.store_id
                 ORDER BY avg_rating DESC, ratings_count DESC
                 LIMIT %s
             """,
-                (city, limit),
+                tuple(params),
             )
             return cursor.fetchall()
 
@@ -445,13 +515,30 @@ class StoreMixin:
             logger.info(f"Store {store_id} photo updated")
             return True
 
-    def update_store_location(self, store_id: int, latitude: float, longitude: float) -> bool:
-        """Update store geolocation coordinates."""
+    def update_store_location(
+        self,
+        store_id: int,
+        latitude: float,
+        longitude: float,
+        region: str | None = None,
+        district: str | None = None,
+    ) -> bool:
+        """Update store geolocation coordinates (optionally region/district)."""
+        fields = ["latitude = %s", "longitude = %s"]
+        params: list[Any] = [latitude, longitude]
+        if region is not None:
+            fields.append("region = %s")
+            params.append(region)
+        if district is not None:
+            fields.append("district = %s")
+            params.append(district)
+        params.append(store_id)
+
         with self.get_connection() as conn:
             cursor = conn.cursor()
             cursor.execute(
-                "UPDATE stores SET latitude = %s, longitude = %s WHERE store_id = %s",
-                (latitude, longitude, store_id),
+                f"UPDATE stores SET {', '.join(fields)} WHERE store_id = %s",
+                tuple(params),
             )
             logger.info(f"Store {store_id} location updated to ({latitude}, {longitude})")
             return True

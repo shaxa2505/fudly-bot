@@ -48,7 +48,7 @@ class ChangeCity(StatesGroup):
 
 class RegisterStore(StatesGroup):
     """
-    Store registration flow (7 steps).
+    Store registration flow (8 steps).
 
     Flow: Become Partner → city → category → name → address → description → photo → submit
     """
@@ -57,9 +57,10 @@ class RegisterStore(StatesGroup):
     category = State()  # Step 2: Select business category
     name = State()  # Step 3: Enter store name
     address = State()  # Step 4: Enter address
-    description = State()  # Step 5: Enter description
-    phone = State()  # Step 6: Enter phone (optional)
-    photo = State()  # Step 7: Upload photo
+    location = State()  # Step 5: Share store location (required)
+    description = State()  # Step 6: Enter description
+    phone = State()  # Step 7: Enter phone (optional)
+    photo = State()  # Step 8: Upload photo
 
 
 # =============================================================================

@@ -3,6 +3,7 @@ from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
 from datetime import datetime, timedelta, timezone
+import re
 from typing import Any
 
 # Узбекская временная зона (UTC+5)
@@ -28,6 +29,12 @@ CITY_UZ_TO_RU = {
     "qoqon": "Коканд",
     "kokand": "Коканд",
 }
+
+_CITY_SUFFIX_RE = re.compile(
+    r"\s+(?:shahri|shahar|shahr|tumani|tuman|viloyati|viloyat|region|district|province|oblast|oblasti"
+    r"|город|район|область|шахри|шахар|тумани|туман|вилояти)\b",
+    re.IGNORECASE,
+)
 
 
 def get_uzb_time() -> datetime:
@@ -227,5 +234,8 @@ def normalize_city(city: str) -> str:
     """Convert Uzbek/English city names to the Russian form used in DB."""
     if not city:
         return city
-    city_clean = city.strip()
+    city_clean = " ".join(city.strip().split())
+    city_clean = city_clean.split(",")[0]
+    city_clean = re.sub(r"\s*\([^)]*\)", "", city_clean)
+    city_clean = _CITY_SUFFIX_RE.sub("", city_clean).strip(" ,")
     return CITY_UZ_TO_RU.get(city_clean.lower(), city_clean)
