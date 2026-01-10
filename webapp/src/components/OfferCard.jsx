@@ -44,6 +44,7 @@ const OfferCard = memo(function OfferCard({ offer, cartQuantity = 0, onAddToCart
   const discountPercent = Math.round(offer.discount_percent ||
     ((offer.original_price - offer.discount_price) / offer.original_price * 100))
   const hasDiscount = offer.original_price > offer.discount_price
+  const isFrozen = Boolean(offer.is_frozen) || String(offer.category || '').toLowerCase() === 'frozen'
 
   // Get photo URL (handles Telegram file_id conversion)
   const photoUrl = resolveOfferImageUrl(offer)
@@ -81,7 +82,7 @@ const OfferCard = memo(function OfferCard({ offer, cartQuantity = 0, onAddToCart
         />
 
         {/* Add/Quantity Control */}
-        <div className="card-action">
+        <div className={`card-action ${cartQuantity > 0 ? 'is-qty' : 'is-add'}`}>
           {cartQuantity > 0 ? (
             <QuantityControl
               value={cartQuantity}
@@ -117,6 +118,12 @@ const OfferCard = memo(function OfferCard({ offer, cartQuantity = 0, onAddToCart
           )}
         </div>
         <h3 className="offer-title">{offer.title}</h3>
+        {isFrozen && (
+          <div className="offer-tag">
+            <span className="offer-tag-icon" aria-hidden="true">*</span>
+            <span>Muzlatkichdan</span>
+          </div>
+        )}
       </div>
     </div>
   )
