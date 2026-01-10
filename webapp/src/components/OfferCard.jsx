@@ -58,28 +58,29 @@ const OfferCard = memo(function OfferCard({ offer, cartQuantity = 0, onAddToCart
         {discountPercent > 0 && (
           <div className="discount-badge">-{discountPercent}%</div>
         )}
+        <div className="card-image-frame">
+          {/* Image skeleton while loading */}
+          {!imageLoaded && !imageError && (
+            <div className="image-skeleton shimmer" />
+          )}
 
-        {/* Image skeleton while loading */}
-        {!imageLoaded && !imageError && (
-          <div className="image-skeleton shimmer" />
-        )}
-
-        <img
-          src={photoUrl || fallbackUrl}
-          alt={offer.title}
-          className={`card-image ${imageLoaded ? 'loaded' : ''}`}
-          loading="lazy"
-          decoding="async"
-          onLoad={() => setImageLoaded(true)}
-          onError={(e) => {
-            if (!e.target.dataset.fallback) {
-              e.target.dataset.fallback = 'true'
-              e.target.src = fallbackUrl
-              setImageError(true)
-              setImageLoaded(true)
-            }
-          }}
-        />
+          <img
+            src={photoUrl || fallbackUrl}
+            alt={offer.title}
+            className={`card-image ${imageLoaded ? 'loaded' : ''}`}
+            loading="lazy"
+            decoding="async"
+            onLoad={() => setImageLoaded(true)}
+            onError={(e) => {
+              if (!e.target.dataset.fallback) {
+                e.target.dataset.fallback = 'true'
+                e.target.src = fallbackUrl
+                setImageError(true)
+                setImageLoaded(true)
+              }
+            }}
+          />
+        </div>
 
         {/* Add/Quantity Control */}
         <div className={`card-action ${cartQuantity > 0 ? 'is-qty' : 'is-add'}`}>

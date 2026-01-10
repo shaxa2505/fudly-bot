@@ -15,10 +15,18 @@
   position: relative;
   width: 100%;
   padding-top: 100%;
-  border-radius: 24px;
-  background: linear-gradient(135deg, #F5F5F5 0%, #EEEEEE 100%);
+  border-radius: 26px;
+  background: #F6F6F6;
   overflow: hidden;
-  box-shadow: 0 10px 20px rgba(16, 24, 40, 0.08);
+  box-shadow: 0 12px 22px rgba(16, 24, 40, 0.1);
+}
+
+.skeleton-image-frame {
+  position: absolute;
+  inset: 14px;
+  border-radius: 18px;
+  background: #FFFFFF;
+  border: 1px solid #EDEDED;
 }
 
 .skeleton-action {
