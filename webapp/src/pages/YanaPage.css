@@ -14,7 +14,7 @@
 /* Topbar */
 .yana-topbar {
   background: rgba(255, 255, 255, 0.95);
-  height: var(--app-topbar-height);
+  height: calc(var(--app-topbar-height) + var(--safe-area-top));
   padding: 0 var(--app-header-padding-x);
   padding-top: var(--safe-area-top);
   position: sticky;

@@ -1068,7 +1068,6 @@
   gap: 12px;
 }
 
-.cart-hero .app-back-btn,
 .cart-clear-btn {
   width: 40px;
   height: 40px;
@@ -1084,7 +1083,6 @@
   transition: transform var(--transition-fast), box-shadow var(--transition-fast);
 }
 
-.cart-hero .app-back-btn:active,
 .cart-clear-btn:active {
   transform: scale(0.96);
 }

@@ -64,8 +64,18 @@ function AppContent() {
       root.style.setProperty('--safe-area-left', toPx(insets.left))
     }
 
+    const readInset = (insets, key) => Number(insets?.[key]) || 0
+
     const updateSafeArea = () => {
-      applyInsets(tg.contentSafeAreaInset || tg.safeAreaInset)
+      const contentInsets = tg.contentSafeAreaInset
+      const safeInsets = tg.safeAreaInset
+
+      applyInsets({
+        top: Math.max(readInset(contentInsets, 'top'), readInset(safeInsets, 'top')),
+        right: Math.max(readInset(contentInsets, 'right'), readInset(safeInsets, 'right')),
+        bottom: Math.max(readInset(contentInsets, 'bottom'), readInset(safeInsets, 'bottom')),
+        left: Math.max(readInset(contentInsets, 'left'), readInset(safeInsets, 'left')),
+      })
     }
 
     updateSafeArea()
