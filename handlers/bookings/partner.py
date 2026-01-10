@@ -41,7 +41,7 @@ router = Router()
 # Module dependencies
 db: Any = None
 bot: Any = None
-bot_username: str = "fudly_bot"  # Default, will be updated from bot.get_me()
+bot_username: str = "fudlyuzbot"  # Default, will be updated from bot.get_me()
 
 
 def setup_dependencies(database: Any, bot_instance: Any):

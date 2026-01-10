@@ -57,7 +57,9 @@ function OrdersSection({ orders, loading, orderFilter, onFilterChange }) {
 
   const handleUploadProof = (orderId) => {
     if (!orderId || !window.Telegram?.WebApp) return
-    const botUsername = window.Telegram.WebApp.initDataUnsafe?.bot?.username || 'fudlybot'
+  const botUsername = window.Telegram.WebApp.initDataUnsafe?.bot?.username
+    || import.meta.env.VITE_BOT_USERNAME
+    || 'fudlyuzbot'
     window.Telegram.WebApp.openTelegramLink(
       `https://t.me/${botUsername}?start=upload_proof_${orderId}`
     )

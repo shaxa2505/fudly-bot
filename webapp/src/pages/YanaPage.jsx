@@ -293,7 +293,9 @@ function YanaPage() {
   const { containerRef, isRefreshing, pullDistance, progress } = usePullToRefresh(handleRefresh)
 
   const handleChangePhone = () => {
-    const botUsername = window.Telegram?.WebApp?.initDataUnsafe?.bot?.username || 'fudlybot'
+  const botUsername = window.Telegram?.WebApp?.initDataUnsafe?.bot?.username
+    || import.meta.env.VITE_BOT_USERNAME
+    || 'fudlyuzbot'
     const link = `https://t.me/${botUsername}`
     if (window.Telegram?.WebApp?.openTelegramLink) {
       window.Telegram.WebApp.openTelegramLink(link)

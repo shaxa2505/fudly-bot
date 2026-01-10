@@ -106,7 +106,7 @@ export default function OrderDetailsPage() {
   const handleUploadProof = () => {
     if (window.Telegram?.WebApp) {
       window.Telegram.WebApp.openTelegramLink(
-        `https://t.me/${window.Telegram.WebApp.initDataUnsafe?.bot?.username || 'fudlybot'}?start=upload_proof_${orderId}`
+        `https://t.me/${window.Telegram.WebApp.initDataUnsafe?.bot?.username || import.meta.env.VITE_BOT_USERNAME || 'fudlyuzbot'}?start=upload_proof_${orderId}`
       )
     }
   }

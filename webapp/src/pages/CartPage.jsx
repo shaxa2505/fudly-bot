@@ -24,7 +24,7 @@ function CartPage({ user }) {
     clearCart
   } = useCart()
 
-  const botUsername = import.meta.env.VITE_BOT_USERNAME || ''
+  const botUsername = import.meta.env.VITE_BOT_USERNAME || 'fudlyuzbot'
   const canonicalPhone = (user?.phone || '').toString().trim()
 
   const [orderLoading, setOrderLoading] = useState(false)

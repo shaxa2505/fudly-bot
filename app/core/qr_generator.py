@@ -25,7 +25,7 @@ except ImportError:
 
 
 # Bot username for deep links - can be overridden via parameter
-DEFAULT_BOT_USERNAME = os.environ.get("BOT_USERNAME", "fudly_bot")
+DEFAULT_BOT_USERNAME = os.environ.get("BOT_USERNAME", "fudlyuzbot")
 
 
 def generate_booking_qr(
