@@ -50,6 +50,39 @@ function AppContent() {
   }, [])
 
   useEffect(() => {
+    const tg = window.Telegram?.WebApp
+    if (!tg) return
+
+    const root = document.documentElement
+    const toPx = (value) => `${Math.max(0, Number(value) || 0)}px`
+
+    const applyInsets = (insets) => {
+      if (!insets) return
+      root.style.setProperty('--safe-area-top', toPx(insets.top))
+      root.style.setProperty('--safe-area-right', toPx(insets.right))
+      root.style.setProperty('--safe-area-bottom', toPx(insets.bottom))
+      root.style.setProperty('--safe-area-left', toPx(insets.left))
+    }
+
+    const updateSafeArea = () => {
+      applyInsets(tg.contentSafeAreaInset || tg.safeAreaInset)
+    }
+
+    updateSafeArea()
+
+    const handleViewportChange = () => updateSafeArea()
+    tg.onEvent?.('viewportChanged', handleViewportChange)
+    tg.onEvent?.('safeAreaChanged', handleViewportChange)
+    tg.onEvent?.('contentSafeAreaChanged', handleViewportChange)
+
+    return () => {
+      tg.offEvent?.('viewportChanged', handleViewportChange)
+      tg.offEvent?.('safeAreaChanged', handleViewportChange)
+      tg.offEvent?.('contentSafeAreaChanged', handleViewportChange)
+    }
+  }, [])
+
+  useEffect(() => {
     initializeApp()
   }, [])
 

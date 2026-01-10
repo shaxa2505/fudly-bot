@@ -44,7 +44,7 @@
   justify-content: space-between;
   align-items: center;
   padding: 10px 16px;
-  padding-top: max(12px, env(safe-area-inset-top));
+  padding-top: max(12px, var(--safe-area-top));
   background: rgba(255, 255, 255, 0.96);
   border-bottom: 1px solid rgba(15, 118, 110, 0.12);
   backdrop-filter: blur(10px);
@@ -100,7 +100,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: calc(56px + env(safe-area-inset-top)) var(--page-padding-x) var(--spacing-lg);
+  padding: calc(56px + var(--safe-area-top)) var(--page-padding-x) var(--spacing-lg);
 }
 
 .pdp-image-wrapper {
@@ -135,7 +135,7 @@
 /* Badges */
 .pdp-discount-badge {
   position: absolute;
-  top: calc(58px + env(safe-area-inset-top));
+  top: calc(58px + var(--safe-area-top));
   left: var(--page-padding-x);
   background: #111827;
   color: white;
@@ -148,7 +148,7 @@
 
 .pdp-expiry-badge {
   position: absolute;
-  top: calc(58px + env(safe-area-inset-top));
+  top: calc(58px + var(--safe-area-top));
   right: var(--page-padding-x);
   background: #FFF7ED;
   font-size: 11px;
@@ -345,7 +345,7 @@
   left: 0;
   right: 0;
   padding: var(--spacing-md) var(--page-padding-x);
-  padding-bottom: max(var(--spacing-lg), env(safe-area-inset-bottom));
+  padding-bottom: max(var(--spacing-lg), var(--safe-area-bottom));
   background: rgba(255, 255, 255, 0.98);
   border-top: 1px solid rgba(17, 24, 39, 0.08);
   z-index: var(--z-fixed);
@@ -393,7 +393,7 @@
 /* Responsive */
 @media (max-width: 360px) {
   .pdp-image-section {
-    padding: calc(52px + env(safe-area-inset-top)) var(--page-padding-x) 12px;
+    padding: calc(52px + var(--safe-area-top)) var(--page-padding-x) 12px;
   }
 
   .pdp-title {

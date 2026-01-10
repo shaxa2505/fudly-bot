@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { ShoppingCart, Home, Sparkles, ArrowLeft, Trash2, ChevronRight, X } from 'lucide-react'
+import { ShoppingCart, Home, Sparkles, Trash2, ChevronRight, X } from 'lucide-react'
 import api from '../api/client'
 import { useCart } from '../context/CartContext'
 import { useToast } from '../context/ToastContext'
@@ -509,9 +509,7 @@ function CartPage({ user }) {
     return (
       <div className="cart-page cart-page--empty">
         <header className="cart-topbar">
-          <button className="cart-icon-btn" onClick={() => navigate(-1)} aria-label="Orqaga">
-            <ArrowLeft size={18} strokeWidth={2} />
-          </button>
+          <span className="cart-icon-spacer" aria-hidden="true"></span>
           <div className="cart-topbar-title">
             <h1>Savat</h1>
             <span className="cart-topbar-count">0 ta</span>
@@ -549,9 +547,7 @@ function CartPage({ user }) {
   return (
     <div className="cart-page">
       <header className="cart-topbar">
-        <button className="cart-icon-btn" onClick={() => navigate(-1)} aria-label="Orqaga">
-          <ArrowLeft size={18} strokeWidth={2} />
-        </button>
+        <span className="cart-icon-spacer" aria-hidden="true"></span>
         <div className="cart-topbar-title">
           <h1>Savat</h1>
           <span className="cart-topbar-count">{itemsCount} ta</span>
@@ -652,19 +648,19 @@ function CartPage({ user }) {
             <div className="sheet-handle" aria-hidden="true"></div>
             <div className="modal-header">
               <div className="modal-header-main">
-                <button
-                  className="app-back-btn"
-                  onClick={closeCheckout}
-                  type="button"
-                  aria-label="Orqaga"
-                >
-                  <ArrowLeft size={18} strokeWidth={2} aria-hidden="true" />
-                </button>
+                <div className="modal-spacer" aria-hidden="true"></div>
                 <h2>
                   {checkoutStep === 'details' && (orderType === 'delivery' ? 'Yetkazib berish' : 'Olib ketish')}
                   {checkoutStep === 'payment' && 'To\'lov'}
                 </h2>
-                <div className="modal-spacer" aria-hidden="true"></div>
+                <button
+                  className="modal-close"
+                  onClick={closeCheckout}
+                  type="button"
+                  aria-label="Yopish"
+                >
+                  <X size={18} strokeWidth={2} aria-hidden="true" />
+                </button>
               </div>
             </div>
 
@@ -895,7 +891,7 @@ function CartPage({ user }) {
                     onClick={() => setCheckoutStep('details')}
                     disabled={orderLoading}
                   >
-                    {'<- Orqaga'}
+                    Bekor qilish
                   </button>
                   <button
                     className="confirm-btn"

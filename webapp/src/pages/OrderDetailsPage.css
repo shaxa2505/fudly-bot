@@ -13,7 +13,7 @@
   display: flex;
   align-items: center;
   gap: var(--spacing-lg);
-  padding: var(--spacing-xl);
+  padding: calc(var(--spacing-xl) + var(--safe-area-top)) var(--spacing-xl) var(--spacing-xl);
   background: var(--color-bg-primary);
   position: sticky;
   top: 0;

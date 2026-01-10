@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
-import { ArrowLeft } from 'lucide-react'
 import { useCart } from '../context/CartContext'
 import { useFavorites } from '../context/FavoritesContext'
 import { getUnitLabel } from '../utils/helpers'
@@ -83,7 +82,6 @@ function ProductDetailPage() {
         <div className="pdp-error">
           <span>!</span>
           <p>Mahsulot topilmadi</p>
-          <button onClick={() => navigate(-1)}>Orqaga</button>
         </div>
       </div>
     )
@@ -105,10 +103,6 @@ function ProductDetailPage() {
     <div className="pdp">
       {/* Floating Header */}
       <header className="pdp-header">
-        <button className="app-back-btn" onClick={() => navigate(-1)} aria-label="Orqaga">
-          <ArrowLeft size={20} strokeWidth={2} />
-        </button>
-
         <div className="pdp-header-actions">
           <button
             className={`pdp-fav ${isFav ? 'active' : ''}`}

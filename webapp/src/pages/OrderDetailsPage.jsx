@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { ArrowLeft } from 'lucide-react'
 import apiClient from '../api/client'
 import { resolveOrderItemImageUrl } from '../utils/imageUtils'
 import './OrderDetailsPage.css'
@@ -163,9 +162,6 @@ export default function OrderDetailsPage() {
     return (
       <div className="order-details-page">
         <div className="details-header">
-          <button className="app-back-btn" onClick={() => navigate('/profile')} aria-label="Orqaga">
-            <ArrowLeft size={20} strokeWidth={2} />
-          </button>
           <h1 className="details-title">Buyurtma</h1>
         </div>
         <div className="error-container">
@@ -198,9 +194,6 @@ export default function OrderDetailsPage() {
     <div className="order-details-page">
       {/* Header */}
       <div className="details-header">
-        <button className="app-back-btn" onClick={() => navigate('/profile')} aria-label="Orqaga">
-          <ArrowLeft size={20} strokeWidth={2} />
-        </button>
         <h1 className="details-title">Buyurtma #{orderId}</h1>
       </div>
 

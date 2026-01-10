@@ -5,7 +5,7 @@
   border-bottom: 1px solid rgba(15, 118, 110, 0.08);
   box-shadow: var(--shadow-header);
   position: sticky;
-  top: 120px;
+  top: calc(120px + var(--safe-area-top));
   z-index: 15;
 }
 

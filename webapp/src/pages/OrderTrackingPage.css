@@ -11,7 +11,7 @@
 
 .tracking-header {
   background: var(--color-bg-primary);
-  padding: var(--spacing-lg) var(--spacing-xl);
+  padding: calc(var(--spacing-lg) + var(--safe-area-top)) var(--spacing-xl) var(--spacing-lg);
   box-shadow: var(--shadow-header);
   position: sticky;
   top: 0;

@@ -16,6 +16,7 @@
   background: rgba(255, 255, 255, 0.95);
   height: var(--app-topbar-height);
   padding: 0 var(--app-header-padding-x);
+  padding-top: var(--safe-area-top);
   position: sticky;
   top: 0;
   z-index: var(--z-sticky);
@@ -38,7 +39,7 @@
 
 .yana-subheader {
   position: sticky;
-  top: var(--app-topbar-height);
+  top: calc(var(--app-topbar-height) + var(--safe-area-top));
   z-index: 19;
   background: rgba(255, 255, 255, 0.95);
   padding: var(--spacing-md) var(--app-header-padding-x);

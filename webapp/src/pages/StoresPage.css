@@ -14,6 +14,7 @@
   background: var(--color-bg-primary);
   height: var(--app-topbar-height);
   padding: 0 var(--app-header-padding-x);
+  padding-top: var(--safe-area-top);
   position: sticky;
   top: 0;
   z-index: var(--z-sticky);
@@ -66,7 +67,7 @@
 /* Subheader */
 .sp-subheader {
   position: sticky;
-  top: var(--app-topbar-height);
+  top: calc(var(--app-topbar-height) + var(--safe-area-top));
   z-index: 19;
   background: var(--color-bg-primary);
   padding: var(--spacing-md) var(--app-header-padding-x);
@@ -77,7 +78,7 @@
 }
 
 .sp.topbar-hidden .sp-subheader {
-  top: 0;
+  top: var(--safe-area-top);
 }
 
 .sp-search {
@@ -130,7 +131,7 @@
   overflow-x: auto;
   -webkit-overflow-scrolling: touch;
   position: sticky;
-  top: 86px;
+  top: calc(86px + var(--safe-area-top));
   z-index: var(--z-sticky);
   background: var(--color-bg-primary);
   backdrop-filter: blur(10px);
@@ -784,7 +785,7 @@
 /* Sheet Footer */
 .sp-sheet-footer {
   padding: 16px 20px;
-  padding-bottom: max(16px, env(safe-area-inset-bottom));
+  padding-bottom: max(16px, var(--safe-area-bottom));
   border-top: 1px solid rgba(15, 118, 110, 0.12);
 }
 
