@@ -19,7 +19,9 @@ function FavoritesPage() {
     return (
       <div className="favorites-page">
         <header className="favorites-header">
-          <h1>Sevimlilar</h1>
+          <div className="topbar-card favorites-header-inner">
+            <h1>Sevimlilar</h1>
+          </div>
         </header>
 
         <div className="favorites-empty empty-state">
@@ -49,7 +51,9 @@ function FavoritesPage() {
   return (
     <div className="favorites-page">
       <header className="favorites-header">
-        <h1>Sevimlilar ({favoritesCount})</h1>
+        <div className="topbar-card favorites-header-inner">
+          <h1>Sevimlilar ({favoritesCount})</h1>
+        </div>
       </header>
 
       <div className="favorites-list">

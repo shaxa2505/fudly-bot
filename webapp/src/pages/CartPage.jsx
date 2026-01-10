@@ -509,12 +509,14 @@ function CartPage({ user }) {
     return (
       <div className="cart-page cart-page--empty">
         <header className="cart-topbar">
-          <span className="cart-icon-spacer" aria-hidden="true"></span>
-          <div className="cart-topbar-title">
-            <h1>Savat</h1>
-            <span className="cart-topbar-count">0 ta</span>
+          <div className="cart-topbar-inner topbar-card">
+            <span className="cart-icon-spacer" aria-hidden="true"></span>
+            <div className="cart-topbar-title">
+              <h1>Savat</h1>
+              <span className="cart-topbar-count">0 ta</span>
+            </div>
+            <span className="cart-icon-spacer" aria-hidden="true"></span>
           </div>
-          <span className="cart-icon-spacer" aria-hidden="true"></span>
         </header>
 
         <main className="cart-empty">
@@ -547,14 +549,16 @@ function CartPage({ user }) {
   return (
     <div className="cart-page">
       <header className="cart-topbar">
-        <span className="cart-icon-spacer" aria-hidden="true"></span>
-        <div className="cart-topbar-title">
-          <h1>Savat</h1>
-          <span className="cart-topbar-count">{itemsCount} ta</span>
+        <div className="cart-topbar-inner topbar-card">
+          <span className="cart-icon-spacer" aria-hidden="true"></span>
+          <div className="cart-topbar-title">
+            <h1>Savat</h1>
+            <span className="cart-topbar-count">{itemsCount} ta</span>
+          </div>
+          <button className="cart-icon-btn" onClick={clearCart} aria-label="Savatni tozalash">
+            <Trash2 size={18} strokeWidth={2} />
+          </button>
         </div>
-        <button className="cart-icon-btn" onClick={clearCart} aria-label="Savatni tozalash">
-          <Trash2 size={18} strokeWidth={2} />
-        </button>
       </header>
 
       <main className="cart-content">
@@ -848,14 +852,13 @@ function CartPage({ user }) {
                           </div>
                         ) : (
                           <div className="upload-area">
-                            <input
-                              type="file"
-                              id="payment-proof-input"
-                              accept="image/*"
-                              onChange={handleFileSelect}
-                              className="file-input-hidden"
-                            />
-                            <label htmlFor="payment-proof-input" className="upload-btn">
+                            <label className="upload-btn file-picker-btn">
+                              <input
+                                type="file"
+                                accept="image/*"
+                                onChange={handleFileSelect}
+                                className="file-input-overlay"
+                              />
                               Rasm tanlash
                             </label>
                           </div>
@@ -905,14 +908,6 @@ function CartPage({ user }) {
 
               {checkoutStep === 'payment_upload' && (
                 <>
-                  <input
-                    type="file"
-                    id="payment-proof-upload-input"
-                    accept="image/*,image/jpeg,image/jpg,image/png"
-                    onChange={handleFileSelect}
-                    className="file-input-hidden"
-                  />
-
                 <p className="upload-instruction">
                     Buyurtma yaratildi! Endi to'lov chekini yuklang.
                 </p>
@@ -924,18 +919,16 @@ function CartPage({ user }) {
                   )}
 
                   {!paymentProof ? (
-                    <button
-                      className="confirm-btn"
-                      onClick={() => {
-                        const input = document.getElementById('payment-proof-upload-input')
-                        if (input) {
-                          input.click()
-                        }
-                      }}
-                      disabled={orderLoading}
-                    >
+                    <label className="confirm-btn file-picker-btn">
+                      <input
+                        type="file"
+                        accept="image/*,image/jpeg,image/jpg,image/png"
+                        onChange={handleFileSelect}
+                        className="file-input-overlay"
+                        disabled={orderLoading}
+                      />
                       Chekni yuklash
-                    </button>
+                    </label>
                   ) : (
                     <button
                       className="confirm-btn"

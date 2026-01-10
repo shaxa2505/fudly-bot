@@ -166,18 +166,20 @@ function CategoryProductsPage() {
     <div className="category-products-page">
       {/* Header */}
       <header className="category-header">
-        <h1 className="category-title">{categoryName || 'Mahsulotlar'}</h1>
-        <button className="filter-btn" onClick={() => setShowFilters(true)}>
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
-            <line x1="4" y1="6" x2="20" y2="6" stroke="#181725" strokeWidth="2" strokeLinecap="round"/>
-            <line x1="4" y1="12" x2="20" y2="12" stroke="#181725" strokeWidth="2" strokeLinecap="round"/>
-            <line x1="4" y1="18" x2="20" y2="18" stroke="#181725" strokeWidth="2" strokeLinecap="round"/>
-            <circle cx="8" cy="6" r="2" fill="#181725"/>
-            <circle cx="16" cy="12" r="2" fill="#181725"/>
-            <circle cx="12" cy="18" r="2" fill="#181725"/>
-          </svg>
-          {hasActiveFilters && <span className="filter-indicator" aria-hidden />}
-        </button>
+        <div className="topbar-card category-header-inner">
+          <h1 className="category-title">{categoryName || 'Mahsulotlar'}</h1>
+          <button className="filter-btn" onClick={() => setShowFilters(true)}>
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+              <line x1="4" y1="6" x2="20" y2="6" stroke="#181725" strokeWidth="2" strokeLinecap="round"/>
+              <line x1="4" y1="12" x2="20" y2="12" stroke="#181725" strokeWidth="2" strokeLinecap="round"/>
+              <line x1="4" y1="18" x2="20" y2="18" stroke="#181725" strokeWidth="2" strokeLinecap="round"/>
+              <circle cx="8" cy="6" r="2" fill="#181725"/>
+              <circle cx="16" cy="12" r="2" fill="#181725"/>
+              <circle cx="12" cy="18" r="2" fill="#181725"/>
+            </svg>
+            {hasActiveFilters && <span className="filter-indicator" aria-hidden />}
+          </button>
+        </div>
       </header>
 
       {/* Search */}

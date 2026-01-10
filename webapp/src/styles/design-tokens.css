@@ -163,6 +163,10 @@
   --safe-area-right: env(safe-area-inset-right, 0px);
   --safe-area-bottom: env(safe-area-inset-bottom, 0px);
   --safe-area-left: env(safe-area-inset-left, 0px);
+  --tg-cap-gap: 0px;
+  --app-top-inset: calc(var(--safe-area-top) + var(--tg-cap-gap));
+  --app-topbar-gap: 8px;
+  --app-topbar-total-height: calc(var(--app-topbar-height) + var(--app-top-inset) + var(--app-topbar-gap));
   --container-padding: 20px;
 
   /* ===== COMPONENT SIZES ===== */

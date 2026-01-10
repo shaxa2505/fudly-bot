@@ -55,6 +55,7 @@ function AppContent() {
 
     const root = document.documentElement
     const toPx = (value) => `${Math.max(0, Number(value) || 0)}px`
+    const isMobile = tg.platform === 'android' || tg.platform === 'ios'
 
     const applyInsets = (insets) => {
       if (!insets) return
@@ -69,9 +70,10 @@ function AppContent() {
     const updateSafeArea = () => {
       const contentInsets = tg.contentSafeAreaInset
       const safeInsets = tg.safeAreaInset
+      const minTop = isMobile ? 24 : 0
 
       applyInsets({
-        top: Math.max(readInset(contentInsets, 'top'), readInset(safeInsets, 'top')),
+        top: Math.max(readInset(contentInsets, 'top'), readInset(safeInsets, 'top'), minTop),
         right: Math.max(readInset(contentInsets, 'right'), readInset(safeInsets, 'right')),
         bottom: Math.max(readInset(contentInsets, 'bottom'), readInset(safeInsets, 'bottom')),
         left: Math.max(readInset(contentInsets, 'left'), readInset(safeInsets, 'left')),
@@ -79,6 +81,7 @@ function AppContent() {
     }
 
     updateSafeArea()
+    root.style.setProperty('--tg-cap-gap', isMobile ? '8px' : '0px')
 
     const handleViewportChange = () => updateSafeArea()
     tg.onEvent?.('viewportChanged', handleViewportChange)

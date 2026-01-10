@@ -162,7 +162,9 @@ export default function OrderDetailsPage() {
     return (
       <div className="order-details-page">
         <div className="details-header">
-          <h1 className="details-title">Buyurtma</h1>
+          <div className="topbar-card details-header-inner">
+            <h1 className="details-title">Buyurtma</h1>
+          </div>
         </div>
         <div className="error-container">
           <div className="error-icon">!</div>
@@ -194,7 +196,9 @@ export default function OrderDetailsPage() {
     <div className="order-details-page">
       {/* Header */}
       <div className="details-header">
-        <h1 className="details-title">Buyurtma #{orderId}</h1>
+        <div className="topbar-card details-header-inner">
+          <h1 className="details-title">Buyurtma #{orderId}</h1>
+        </div>
       </div>
 
       {/* Status Banner */}

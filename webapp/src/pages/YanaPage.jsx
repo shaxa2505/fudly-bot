@@ -416,7 +416,9 @@ function YanaPage({ user }) {
       />
       {/* Topbar */}
       <header className="yana-topbar">
-        <h1 className="yana-title">Yana</h1>
+        <div className="topbar-card yana-topbar-inner">
+          <h1 className="yana-title">Yana</h1>
+        </div>
       </header>
 
       {/* Subheader */}

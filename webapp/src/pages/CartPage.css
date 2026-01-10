@@ -15,7 +15,7 @@
   justify-content: space-between;
   align-items: center;
   min-height: var(--app-header-min-height);
-  padding: calc(var(--app-header-padding-y) + var(--safe-area-top)) var(--app-header-padding-x) var(--app-header-padding-y);
+  padding: calc(var(--app-header-padding-y) + var(--app-top-inset)) var(--app-header-padding-x) var(--app-header-padding-y);
   background: var(--color-bg-primary);
   border-bottom: 1px solid #F1F1F1;
   position: sticky;
@@ -870,17 +870,19 @@
   cursor: pointer;
 }
 
-/* Hidden file input - accessible but invisible */
-.file-input-hidden {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  padding: 0;
-  margin: -1px;
+/* File input overlay for iOS-friendly pickers */
+.file-picker-btn {
+  position: relative;
   overflow: hidden;
-  clip: rect(0, 0, 0, 0);
-  white-space: nowrap;
-  border: 0;
+}
+
+.file-input-overlay {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  cursor: pointer;
 }
 
 /* Upload area container */
@@ -1551,13 +1553,15 @@
   position: sticky;
   top: 0;
   z-index: var(--z-sticky);
+  padding: var(--app-top-inset) 16px var(--app-topbar-gap);
+  background: transparent;
+}
+
+.cart-topbar-inner {
   display: grid;
   grid-template-columns: auto 1fr auto;
   align-items: center;
   gap: 12px;
-  padding: 12px 16px;
-  background: #f6f7f9;
-  border-bottom: 1px solid var(--cart-border);
 }
 
 .cart-icon-btn {

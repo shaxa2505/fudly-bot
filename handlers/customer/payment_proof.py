@@ -5,6 +5,7 @@ payment proof directly through bot by clicking button in order history.
 """
 from __future__ import annotations
 
+import os
 from typing import Any
 
 from aiogram import F, Router, types
@@ -299,6 +300,12 @@ async def receive_payment_proof(message: types.Message, state: FSMContext) -> No
                     admin_ids.append(u_id)
 
         # Send to all admins
+        if not admin_ids:
+            admin_id_env = int(os.getenv("ADMIN_ID", "0"))
+            if admin_id_env:
+                admin_ids.append(admin_id_env)
+                logger.info("Using ADMIN_ID fallback: %s", admin_id_env)
+
         if not admin_ids:
             logger.warning("No admin users found in database")
             await message.answer("⚠️ Adminlar topilmadi / Администраторы не найдены")

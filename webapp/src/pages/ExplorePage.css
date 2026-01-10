@@ -11,17 +11,17 @@
 
 /* Header */
 .explore-header {
-  min-height: var(--app-header-min-height);
-  padding: calc(var(--app-header-padding-y) + var(--safe-area-top)) var(--app-header-padding-x) var(--app-header-padding-y);
+  padding: var(--app-top-inset) var(--app-header-padding-x) var(--app-topbar-gap);
   text-align: center;
-  background: var(--color-bg-primary);
-  border-bottom: 1px solid rgba(15, 118, 110, 0.12);
+  background: transparent;
   position: sticky;
   top: 0;
   z-index: var(--z-sticky);
-  box-shadow: var(--shadow-header);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
+  box-shadow: none;
+}
+
+.explore-header-inner {
+  justify-content: center;
 }
 
 .page-title {

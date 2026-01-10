@@ -81,7 +81,9 @@ function ExplorePage({ onNavigate }) {
     <div className="explore-page">
       {/* Header */}
       <header className="explore-header">
-        <h1 className="page-title">Mahsulotlarni Topish</h1>
+        <div className="topbar-card explore-header-inner">
+          <h1 className="page-title">Mahsulotlarni Topish</h1>
+        </div>
       </header>
 
       {/* Search */}

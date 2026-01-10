@@ -152,7 +152,9 @@ function OrderTrackingPage({ user }) {
           progress={progress}
         />
         <div className="tracking-header">
-          <h1>{t('?????', 'Buyurtma')}</h1>
+          <div className="topbar-card tracking-header-inner">
+            <h1>{t('?????', 'Buyurtma')}</h1>
+          </div>
         </div>
         <div className="error-container">
           <p className="error-icon">!</p>
@@ -175,7 +177,9 @@ function OrderTrackingPage({ user }) {
         progress={progress}
       />
       <div className="tracking-header">
-        <h1>{t('Заказ', 'Buyurtma')} #{order.booking_code}</h1>
+        <div className="topbar-card tracking-header-inner">
+          <h1>{t('Заказ', 'Buyurtma')} #{order.booking_code}</h1>
+        </div>
       </div>
 
       {/* Order Status Card */}
@@ -297,4 +301,5 @@ function OrderTrackingPage({ user }) {
 }
 
 export default OrderTrackingPage;
+
 

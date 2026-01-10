@@ -14,16 +14,16 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  min-height: var(--app-header-min-height);
-  padding: calc(var(--app-header-padding-y) + var(--safe-area-top)) var(--app-header-padding-x) var(--app-header-padding-y);
-  border-bottom: 1px solid rgba(15, 118, 110, 0.12);
+  padding: var(--app-top-inset) var(--app-header-padding-x) var(--app-topbar-gap);
   position: sticky;
   top: 0;
-  background: var(--color-bg-primary);
+  background: transparent;
   z-index: var(--z-sticky);
-  box-shadow: var(--shadow-header);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
+  box-shadow: none;
+}
+
+.category-header-inner {
+  width: 100%;
 }
 
 .category-title {

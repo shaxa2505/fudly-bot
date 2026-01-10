@@ -44,7 +44,7 @@
   justify-content: space-between;
   align-items: center;
   padding: 10px 16px;
-  padding-top: max(12px, var(--safe-area-top));
+  padding-top: max(12px, var(--app-top-inset));
   background: rgba(255, 255, 255, 0.96);
   border-bottom: 1px solid rgba(15, 118, 110, 0.12);
   backdrop-filter: blur(10px);
@@ -100,7 +100,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: calc(56px + var(--safe-area-top)) var(--page-padding-x) var(--spacing-lg);
+  padding: calc(56px + var(--app-top-inset)) var(--page-padding-x) var(--spacing-lg);
 }
 
 .pdp-image-wrapper {
@@ -135,7 +135,7 @@
 /* Badges */
 .pdp-discount-badge {
   position: absolute;
-  top: calc(58px + var(--safe-area-top));
+  top: calc(58px + var(--app-top-inset));
   left: var(--page-padding-x);
   background: #111827;
   color: white;
@@ -148,7 +148,7 @@
 
 .pdp-expiry-badge {
   position: absolute;
-  top: calc(58px + var(--safe-area-top));
+  top: calc(58px + var(--app-top-inset));
   right: var(--page-padding-x);
   background: #FFF7ED;
   font-size: 11px;
@@ -393,7 +393,7 @@
 /* Responsive */
 @media (max-width: 360px) {
   .pdp-image-section {
-    padding: calc(52px + var(--safe-area-top)) var(--page-padding-x) 12px;
+    padding: calc(52px + var(--app-top-inset)) var(--page-padding-x) 12px;
   }
 
   .pdp-title {

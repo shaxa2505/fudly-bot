@@ -13,15 +13,17 @@
   display: flex;
   align-items: center;
   gap: var(--spacing-lg);
-  padding: calc(var(--spacing-xl) + var(--safe-area-top)) var(--spacing-xl) var(--spacing-xl);
-  background: var(--color-bg-primary);
+  padding: var(--app-top-inset) var(--spacing-xl) var(--app-topbar-gap);
+  background: transparent;
   position: sticky;
   top: 0;
   z-index: var(--z-sticky);
-  box-shadow: var(--shadow-header);
-  border-bottom: 1px solid rgba(15, 118, 110, 0.12);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
+  box-shadow: none;
+  border-bottom: none;
+}
+
+.details-header-inner {
+  justify-content: flex-start;
 }
 
 
