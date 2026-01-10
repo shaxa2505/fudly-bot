@@ -16,7 +16,8 @@ from app.core.config import load_settings
 logger = logging.getLogger(__name__)
 
 settings = load_settings()
-PRICE_STORAGE_UNIT = os.getenv("PRICE_STORAGE_UNIT", "sums").lower()
+# Default to kopeks since DB stores prices in minor units (1 sum = 100 tiyin)
+PRICE_STORAGE_UNIT = os.getenv("PRICE_STORAGE_UNIT", "kopeks").lower()
 
 
 def normalize_price(value: Any) -> float:

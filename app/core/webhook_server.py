@@ -62,12 +62,15 @@ def offer_to_dict(offer: Any, photo_url: str | None = None) -> dict:
     # Use provided photo_url, or fallback to photo field
     photo = photo_url or get_offer_value(offer, "photo")
 
+    price_unit = os.getenv("PRICE_STORAGE_UNIT", "kopeks").lower()
+    convert = (lambda v: float(v or 0) / 100) if price_unit == "kopeks" else (lambda v: float(v or 0))
+
     return {
         "id": offer_id,
         "title": get_offer_value(offer, "title", ""),
         "description": get_offer_value(offer, "description"),
-        "original_price": float(get_offer_value(offer, "original_price", 0) or 0),
-        "discount_price": float(get_offer_value(offer, "discount_price", 0) or 0),
+        "original_price": convert(get_offer_value(offer, "original_price", 0)),
+        "discount_price": convert(get_offer_value(offer, "discount_price", 0)),
         "discount_percent": float(get_offer_value(offer, "discount_percent", 0) or 0),
         "quantity": int(get_offer_value(offer, "quantity", 0) or 0),
         "category": get_offer_value(offer, "category", "other") or "other",
