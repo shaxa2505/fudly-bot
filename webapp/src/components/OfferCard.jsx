@@ -79,51 +79,44 @@ const OfferCard = memo(function OfferCard({ offer, cartQuantity = 0, onAddToCart
             }
           }}
         />
+
+        {/* Add/Quantity Control */}
+        <div className="card-action">
+          {cartQuantity > 0 ? (
+            <QuantityControl
+              value={cartQuantity}
+              size="sm"
+              onDecrement={handleRemoveClick}
+              onIncrement={handleAddClick}
+              disableIncrement={isMaxReached}
+              stopPropagation
+            />
+          ) : (
+            <button
+              className={`add-to-cart-fab add-to-cart-btn ${isAdding ? 'pulse' : ''}`}
+              onClick={handleAddClick}
+              aria-label="Savatga qo'shish"
+            >
+              <span aria-hidden="true">+</span>
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Content Section */}
       <div className="card-content">
-        {offer.store_name && (
-          <div className="offer-store">{offer.store_name}</div>
-        )}
-        <h3 className="offer-title">{offer.title}</h3>
-
-        <div className="card-footer">
-          {/* Prices */}
-          <div className="price-section">
-            <div className={`price-main ${hasDiscount ? 'discounted' : ''}`}>
-              {Math.round(offer.discount_price).toLocaleString('ru-RU')}
-              <span className="currency"> so'm</span>
+        <div className="price-section">
+          <div className={`price-main ${hasDiscount ? 'discounted' : ''}`}>
+            {Math.round(offer.discount_price).toLocaleString('ru-RU')}
+            <span className="currency"> so'm</span>
+          </div>
+          {hasDiscount && (
+            <div className="price-original">
+              {Math.round(offer.original_price).toLocaleString('ru-RU')} so'm
             </div>
-            {hasDiscount && (
-              <div className="price-original">
-                {Math.round(offer.original_price).toLocaleString('ru-RU')} so'm
-              </div>
-            )}
-          </div>
-
-          {/* Add/Quantity Control */}
-          <div className="card-action">
-            {cartQuantity > 0 ? (
-              <QuantityControl
-                value={cartQuantity}
-                size="sm"
-                onDecrement={handleRemoveClick}
-                onIncrement={handleAddClick}
-                disableIncrement={isMaxReached}
-                stopPropagation
-              />
-            ) : (
-              <button
-                className={`add-to-cart-fab add-to-cart-btn ${isAdding ? 'pulse' : ''}`}
-                onClick={handleAddClick}
-                aria-label="Savatga qo'shish"
-              >
-                <span aria-hidden="true">+</span>
-              </button>
-            )}
-          </div>
+          )}
         </div>
+        <h3 className="offer-title">{offer.title}</h3>
       </div>
     </div>
   )
