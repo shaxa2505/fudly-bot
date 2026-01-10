@@ -2795,9 +2795,12 @@ async def create_webhook_app(
         logger.warning("⚠️ Partner Panel API disabled (missing offer_service or bot_token)")
 
     if fastapi_handler:
+        app.router.add_route("*", "/api/v1/auth{path:.*}", fastapi_handler)
         app.router.add_route("*", "/api/v1/orders{path:.*}", fastapi_handler)
         app.router.add_route("*", "/api/v1/user/orders{path:.*}", fastapi_handler)
         app.router.add_route("*", "/api/v1/user/bookings{path:.*}", fastapi_handler)
+        app.router.add_route("*", "/api/v1/user/profile{path:.*}", fastapi_handler)
+        app.router.add_route("*", "/api/v1/user/notifications{path:.*}", fastapi_handler)
         app.router.add_route("*", "/api/v1/categories{path:.*}", fastapi_handler)
         app.router.add_route("*", "/api/v1/offers{path:.*}", fastapi_handler)
         app.router.add_route("*", "/api/v1/stores{path:.*}", fastapi_handler)
