@@ -525,6 +525,20 @@
             return window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
         }
 
+        const AUTH_MAX_AGE_SECONDS = Number(window.PARTNER_AUTH_MAX_AGE_SECONDS || 86400);
+
+        function parseAuthDate(raw) {
+            if (!raw) return null;
+            const ts = Number(raw);
+            return Number.isFinite(ts) ? ts : null;
+        }
+
+        function isAuthExpired(authTs) {
+            if (!authTs) return false;
+            const age = Math.floor(Date.now() / 1000) - authTs;
+            return age > AUTH_MAX_AGE_SECONDS || age < -300;
+        }
+
         function buildInitDataFromUnsafe(unsafeData) {
             if (!unsafeData || !unsafeData.hash) return '';
             try {
@@ -559,6 +573,16 @@
             }
         }
 
+        function extractAuthDate(initData) {
+            if (!initData) return null;
+            try {
+                const params = new URLSearchParams(initData);
+                return parseAuthDate(params.get('auth_date'));
+            } catch (e) {
+                return null;
+            }
+        }
+
         function getAuth() {
             const urlParams = new URLSearchParams(window.location.search);
             const urlUserId = urlParams.get('uid');
@@ -582,6 +606,7 @@
             const tgUser = tg?.initDataUnsafe?.user;
             const tgUserId = tgUser?.id ? String(tgUser.id) : '';
             const resolvedUserId = tgUserId || (urlUserId ? String(urlUserId) : '');
+            let authExpired = false;
 
             if (finalData && source !== 'cache') {
                 try {
@@ -621,13 +646,42 @@
                 }
             }
 
+            const initAuthTs = extractAuthDate(finalData);
+            const urlAuthTs = parseAuthDate(urlAuthDate);
+
+            if (isAuthExpired(initAuthTs)) {
+                authExpired = true;
+                finalData = '';
+                try {
+                    if (resolvedUserId) {
+                        localStorage.removeItem(`partner_init_data_${resolvedUserId}`);
+                    } else {
+                        localStorage.removeItem('partner_init_data');
+                    }
+                } catch (e) {}
+            }
+
+            const urlAuthExpired = isAuthExpired(urlAuthTs);
+
             const userId = resolvedUserId || 'none';
 
-            return { data: finalData, userId, urlUserId, urlAuthDate, urlSig, source };
+            return {
+                data: finalData,
+                userId,
+                urlUserId,
+                urlAuthDate: urlAuthExpired ? null : urlAuthDate,
+                urlSig: urlAuthExpired ? null : urlSig,
+                source,
+                authExpired: authExpired || urlAuthExpired
+            };
         }
 
         async function apiFetch(endpoint, options = {}) {
-            const { data: initData, urlUserId, urlAuthDate, urlSig } = getAuth();
+            const { data: initData, urlUserId, urlAuthDate, urlSig, authExpired } = getAuth();
+
+            if (authExpired) {
+                throw new Error('Session expired. Please reopen this panel from the Telegram bot.');
+            }
 
             console.log('🔐 apiFetch auth info:', {
                 hasInitData: !!initData,

@@ -29,7 +29,6 @@ from slowapi import Limiter
 from slowapi.util import get_remote_address
 
 from app.core.utils import normalize_city
-from app.core.geocoding import geocode_store_address, reverse_geocode_store, geocoding_enabled
 from app.api.websocket_manager import get_connection_manager
 from app.services.stats import PartnerTotals, Period, get_partner_stats
 from aiogram import Bot
@@ -205,13 +204,15 @@ def verify_telegram_webapp(authorization: str) -> int:
             logging.debug(f"PARSED KEYS: {list(parsed.keys())}")
 
         # URL-based auth (uid passed in the WebApp URL) is NOT secure on its own.
-        # Allow it only in non-production environments for local testing.
+        # Allow unsigned uid only in local/dev; signed URLs (uid+auth_date+sig) are allowed as a
+        # fallback when Telegram doesn't pass initData (e.g. BotFather domain glitches).
         #
         # IMPORTANT: Do not append extra params (like uid) to signed initData in production,
         # it invalidates the Telegram signature.
+        allow_url_auth = os.getenv("ALLOW_URL_AUTH", "").lower() in ("1", "true", "yes")
+        allow_url_auth_prod = os.getenv("ALLOW_URL_AUTH_PROD", "").lower() in ("1", "true", "yes")
+
         if "uid" in parsed and "hash" not in parsed:
-            # Signed URL auth fallback: uid + auth_date + sig.
-            # Used when Telegram initData isn't available (e.g. BotFather domain misconfigured).
             try:
                 user_id = int(parsed.get("uid", 0))
             except (ValueError, TypeError):
@@ -221,6 +222,9 @@ def verify_telegram_webapp(authorization: str) -> int:
 
             sig = parsed.get("sig")
             auth_date = parsed.get("auth_date")
+
+            # Signed URL auth fallback: uid + auth_date + sig.
+            # Accept even in production (signature is HMAC with bot token + 24h TTL).
             if sig and auth_date:
                 try:
                     auth_ts = int(auth_date)
@@ -247,7 +251,17 @@ def verify_telegram_webapp(authorization: str) -> int:
 
                 return user_id
 
-            # Unsigned uid is allowed only for local development.
+            # Unsigned uid is allowed only for local development (or when explicitly enabled).
+            if not allow_url_auth:
+                raise HTTPException(
+                    status_code=401,
+                    detail="URL auth disabled. Please open from Telegram bot.",
+                )
+            if not (_is_dev_env() or allow_url_auth_prod):
+                raise HTTPException(
+                    status_code=401,
+                    detail="URL auth not allowed in production.",
+                )
             if not _is_dev_env():
                 raise HTTPException(
                     status_code=401,
@@ -279,12 +293,31 @@ def verify_telegram_webapp(authorization: str) -> int:
                 current_timestamp = int(datetime.now().timestamp())
                 age_seconds = current_timestamp - auth_timestamp
 
-                # Allow auth data up to 24 hours old (86400 seconds)
-                MAX_AUTH_AGE = 86400
-                if age_seconds > MAX_AUTH_AGE:
-                    logging.warning(f"⚠️ Auth data too old: {age_seconds}s (max {MAX_AUTH_AGE}s)")
+                # Allow auth data up to a configurable age (default 7 days).
+                max_auth_age_raw = os.getenv("PARTNER_PANEL_AUTH_MAX_AGE_SECONDS", "604800")
+                try:
+                    max_auth_age = int(max_auth_age_raw)
+                except (TypeError, ValueError):
+                    max_auth_age = 604800
+                    logging.warning(
+                        "⚠️ Invalid PARTNER_PANEL_AUTH_MAX_AGE_SECONDS value. "
+                        "Falling back to 604800 seconds."
+                    )
+                if max_auth_age < 0:
+                    max_auth_age = 0
+                if 0 < max_auth_age < 604800:
+                    logging.warning(
+                        "⚠️ PARTNER_PANEL_AUTH_MAX_AGE_SECONDS below 7 days. "
+                        "Clamping to 604800 seconds."
+                    )
+                    max_auth_age = 604800
+                if age_seconds > max_auth_age:
+                    logging.warning(
+                        f"⚠️ Auth data too old: {age_seconds}s (max {max_auth_age}s)"
+                    )
                     raise HTTPException(
-                        status_code=401, detail=f"Auth data expired (age: {age_seconds // 3600}h)"
+                        status_code=401,
+                        detail=f"Auth data expired (age: {age_seconds // 3600}h)",
                     )
                 elif age_seconds < 0:
                     logging.warning(f"⚠️ Auth data from future: {age_seconds}s")
@@ -468,8 +501,6 @@ async def get_store_info(authorization: str = Header(None)):
         "address": store.get("address"),
         "region": store.get("region"),
         "district": store.get("district"),
-        "latitude": store.get("latitude"),
-        "longitude": store.get("longitude"),
         "phone": store.get("phone"),
         "description": store.get("description"),
         "status": store.get("status"),
@@ -1450,26 +1481,6 @@ async def update_store(settings: dict, authorization: str = Header(None)):
         except (TypeError, ValueError):
             return fallback
 
-    def _parse_float(value):
-        try:
-            return float(value)
-        except (TypeError, ValueError):
-            return None
-
-    def _normalize_text(value):
-        if value is None:
-            return None
-        value = str(value).strip()
-        return value if value else None
-
-    def _is_missing_coord(value):
-        if value is None:
-            return True
-        try:
-            return float(value) == 0.0
-        except (TypeError, ValueError):
-            return True
-
     delivery_enabled = _parse_bool(
         settings.get("delivery_enabled", store.get("delivery_enabled", 0)),
         bool(store.get("delivery_enabled", 0)),
@@ -1491,54 +1502,6 @@ async def update_store(settings: dict, authorization: str = Header(None)):
     delivery_price_kopeks = max(0, int(delivery_price) * 100)
     min_order_kopeks = max(0, int(min_order_amount) * 100)
 
-    address_input = _normalize_text(settings.get("address"))
-    address_value = address_input if address_input is not None else store.get("address")
-    address_changed = (
-        address_input is not None
-        and _normalize_text(address_input) != _normalize_text(store.get("address"))
-    )
-
-    region_input = _normalize_text(settings.get("region"))
-    district_input = _normalize_text(settings.get("district"))
-
-    lat_input = _parse_float(settings.get("latitude", settings.get("lat")))
-    lon_input = _parse_float(settings.get("longitude", settings.get("lon")))
-    if _is_missing_coord(lat_input):
-        lat_input = None
-    if _is_missing_coord(lon_input):
-        lon_input = None
-
-    final_region = region_input if region_input is not None else store.get("region")
-    final_district = district_input if district_input is not None else store.get("district")
-    final_lat = lat_input if lat_input is not None else store.get("latitude")
-    final_lon = lon_input if lon_input is not None else store.get("longitude")
-
-    geo = None
-    if geocoding_enabled():
-        if lat_input is not None and lon_input is not None and (
-            region_input is None or district_input is None
-        ):
-            geo = await reverse_geocode_store(lat_input, lon_input)
-        elif (
-            address_changed
-            or _is_missing_coord(final_lat)
-            or _is_missing_coord(final_lon)
-            or not final_region
-            or not final_district
-        ):
-            geo = await geocode_store_address(address_value, store.get("city"))
-
-    if geo:
-        if lat_input is None and lon_input is None and (
-            _is_missing_coord(final_lat) or _is_missing_coord(final_lon)
-        ):
-            final_lat = geo.get("latitude")
-            final_lon = geo.get("longitude")
-        if region_input is None and geo.get("region"):
-            final_region = geo.get("region")
-        if district_input is None and geo.get("district"):
-            final_district = geo.get("district")
-
     # Update existing store via SQL
     with db.get_connection() as conn:
         cursor = conn.cursor()
@@ -1549,8 +1512,6 @@ async def update_store(settings: dict, authorization: str = Header(None)):
                 address = %s,
                 region = %s,
                 district = %s,
-                latitude = %s,
-                longitude = %s,
                 phone = %s,
                 description = %s,
                 delivery_enabled = %s,
@@ -1560,11 +1521,9 @@ async def update_store(settings: dict, authorization: str = Header(None)):
         """,
             (
                 settings.get("name", store.get("name")),
-                address_value,
-                final_region,
-                final_district,
-                final_lat,
-                final_lon,
+                settings.get("address", store.get("address")),
+                settings.get("region", store.get("region")),
+                settings.get("district", store.get("district")),
                 settings.get("phone", store.get("phone")),
                 settings.get("description", store.get("description")),
                 int(delivery_enabled),

@@ -8,6 +8,30 @@ const API_BASE = window.PARTNER_API_BASE ||
     document.querySelector('meta[name="api-base"]')?.getAttribute('content') ||
     window.location.origin;
 
+const AUTH_MAX_AGE_SECONDS = Number(window.PARTNER_AUTH_MAX_AGE_SECONDS || 86400);
+
+const parseAuthDate = (raw) => {
+    if (!raw) return null;
+    const ts = Number(raw);
+    return Number.isFinite(ts) ? ts : null;
+};
+
+const extractAuthDate = (initData) => {
+    if (!initData) return null;
+    try {
+        const params = new URLSearchParams(initData);
+        return parseAuthDate(params.get('auth_date'));
+    } catch (e) {
+        return null;
+    }
+};
+
+const isAuthExpired = (authTs) => {
+    if (!authTs) return false;
+    const age = Math.floor(Date.now() / 1000) - authTs;
+    return age > AUTH_MAX_AGE_SECONDS || age < -300;
+};
+
 // Get authentication data
 export function getAuth() {
     const urlParams = new URLSearchParams(window.location.search);
@@ -16,6 +40,7 @@ export function getAuth() {
     const tg = window.Telegram?.WebApp;
     let finalData = '';
     let source = 'none';
+    let authExpired = false;
 
     if (tg?.initData && tg.initData.length > 0) {
         finalData = tg.initData;
@@ -39,8 +64,14 @@ export function getAuth() {
 
     const tgUser = tg?.initDataUnsafe?.user;
     const userId = urlUserId || tgUser?.id || 'none';
+    const initAuthTs = extractAuthDate(finalData);
 
-    return { data: finalData, userId, source };
+    if (isAuthExpired(initAuthTs)) {
+        authExpired = true;
+        finalData = '';
+    }
+
+    return { data: finalData, userId, source, authExpired };
 }
 
 function buildAuthHeaders(initData, extraHeaders = {}, options = {}) {
@@ -91,7 +122,12 @@ function normalizeOrder(raw) {
 
 // Fetch helper with auth headers
 export async function apiFetch(endpoint, options = {}) {
-    const { data: initData } = getAuth();
+    const { data: initData, authExpired } = getAuth();
+
+    if (authExpired) {
+        throw new Error('Session expired. Please reopen this panel from the Telegram bot.');
+    }
+
     const headers = buildAuthHeaders(initData, options.headers || {});
 
     const response = await fetch(`${API_BASE}${endpoint}`, {
