@@ -31,13 +31,13 @@
   position: relative;
   width: 100%;
   padding-top: 100%;
-  border-radius: 22px;
-  background: #F5F5F5;
+  border-radius: 24px;
+  background: #F4F4F4;
   overflow: hidden;
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 10px 20px rgba(16, 24, 40, 0.08);
+  box-shadow: 0 10px 18px rgba(16, 24, 40, 0.08);
 }
 
 .image-skeleton {
@@ -79,7 +79,7 @@
   width: 100%;
   height: 100%;
   object-fit: contain;
-  padding: 16px;
+  padding: 18px;
   max-width: none;
   max-height: none;
   box-sizing: border-box;
@@ -132,13 +132,13 @@
   border: none;
   background: #FFFFFF;
   color: #111827;
-  font-size: 18px;
+  font-size: 20px;
   font-weight: 700;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  box-shadow: 0 8px 16px rgba(16, 24, 40, 0.16);
+  box-shadow: 0 8px 16px rgba(16, 24, 40, 0.18);
   transition: transform 0.15s ease, box-shadow 0.2s ease;
   padding: 0;
 }
@@ -159,14 +159,14 @@
 
 .card-action .quantity-control {
   --qc-height: 34px;
-  --qc-pad: 6px;
-  --qc-gap: 18px;
-  --qc-btn-size: 26px;
+  --qc-pad: 4px;
+  --qc-gap: 16px;
+  --qc-btn-size: 24px;
   --qc-value-font: 14px;
-  min-width: 128px;
+  min-width: 120px;
   background: #FFFFFF;
   border: none;
-  box-shadow: 0 10px 18px rgba(16, 24, 40, 0.16);
+  box-shadow: 0 10px 18px rgba(16, 24, 40, 0.14);
 }
 
 .card-action .quantity-control__btn {
@@ -174,6 +174,7 @@
   border-radius: 50%;
   font-size: 18px;
   color: #9CA3AF;
+  font-weight: 600;
 }
 
 .card-action .quantity-control__btn:active:not(:disabled) {
@@ -203,7 +204,7 @@
 
 .price-main {
   font-size: 16px;
-  font-weight: 800;
+  font-weight: 700;
   color: #111827;
   line-height: 1.15;
   letter-spacing: -0.1px;
@@ -224,13 +225,13 @@
   color: #98A2B3;
   text-decoration: line-through;
   text-decoration-thickness: 1px;
-  text-decoration-color: #B2B8C2;
+  text-decoration-color: #B8BDC6;
   line-height: 1.2;
   font-weight: 500;
 }
 
 .offer-title {
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 600;
   color: #111827;
   margin: 0;
