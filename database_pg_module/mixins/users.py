@@ -84,6 +84,11 @@ class UserMixin:
         district: str | None = None,
         latitude: float | None = None,
         longitude: float | None = None,
+        clear_city: bool = False,
+        clear_region: bool = False,
+        clear_district: bool = False,
+        clear_latitude: bool = False,
+        clear_longitude: bool = False,
     ) -> None:
         """Update user location fields (any subset)."""
         fields: list[str] = []
@@ -91,18 +96,28 @@ class UserMixin:
         if city is not None:
             fields.append("city = %s")
             params.append(city)
+        elif clear_city:
+            fields.append("city = NULL")
         if region is not None:
             fields.append("region = %s")
             params.append(region)
+        elif clear_region:
+            fields.append("region = NULL")
         if district is not None:
             fields.append("district = %s")
             params.append(district)
+        elif clear_district:
+            fields.append("district = NULL")
         if latitude is not None:
             fields.append("latitude = %s")
             params.append(latitude)
+        elif clear_latitude:
+            fields.append("latitude = NULL")
         if longitude is not None:
             fields.append("longitude = %s")
             params.append(longitude)
+        elif clear_longitude:
+            fields.append("longitude = NULL")
         if not fields:
             return
         params.append(user_id)

@@ -74,6 +74,11 @@ class DatabaseProtocol(Protocol):
         district: str | None = None,
         latitude: float | None = None,
         longitude: float | None = None,
+        clear_city: bool = False,
+        clear_region: bool = False,
+        clear_district: bool = False,
+        clear_latitude: bool = False,
+        clear_longitude: bool = False,
     ) -> None:
         ...
 

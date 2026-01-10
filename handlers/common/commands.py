@@ -5,10 +5,11 @@ Optimized registration flow - minimal messages, all in one card.
 from typing import Any
 
 from aiogram import F, Router, types
-from aiogram.filters import Command
+from aiogram.filters import Command, StateFilter
 from aiogram.fsm.context import FSMContext
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
+from app.core.location_data import get_district_label, get_districts_for_region
 from app.keyboards import (
     city_inline_keyboard,
     language_keyboard,
@@ -17,7 +18,7 @@ from app.keyboards import (
     phone_request_keyboard,
 )
 from database_protocol import DatabaseProtocol
-from handlers.common.states import ConfirmOrder, Registration
+from handlers.common.states import ChangeCity, ConfirmOrder, Registration
 from handlers.common.utils import (
     get_user_view_mode,
     has_approved_store,
@@ -301,11 +302,16 @@ async def change_city(
     current_city = user.city if user else get_cities(lang)[0]
     if not current_city:
         current_city = get_cities(lang)[0]
+    stats_city = current_city
+    if user and getattr(user, "district", None):
+        district_label = get_district_label(user.region or user.city, user.district, lang)
+        if district_label:
+            current_city = f"{current_city} / {district_label}"
 
     stats_text = ""
     try:
-        stores_count = len(db.get_stores_by_city(current_city))
-        offers_count = len(db.get_active_offers(city=current_city))
+        stores_count = len(db.get_stores_by_city(stats_city))
+        offers_count = len(db.get_active_offers(city=stats_city))
         stats_text = (
             f"\n\n📊 В вашем городе:\n🏪 Магазинов: {stores_count}\n🍽 Предложений: {offers_count}"
         )
@@ -333,6 +339,7 @@ async def show_city_selection(
 ):
     """Show list of cities for selection."""
     lang = db.get_user_language(callback.from_user.id)
+    await state.set_state(ChangeCity.city)
     if callback.message and hasattr(callback.message, "edit_text"):
         # For inline keyboard, send new message instead of editing with reply keyboard
         cities = get_cities(lang)
@@ -372,7 +379,31 @@ async def handle_city_selection(
         return
 
     normalized_city = normalize_city(city)
-    db.update_user_city(callback.from_user.id, normalized_city)
+    district_options = get_districts_for_region(city, lang)
+    if district_options:
+        await state.update_data(region_label=city, region_value=normalized_city)
+        await state.set_state(ChangeCity.district)
+        builder = InlineKeyboardBuilder()
+        for idx, (label, _value) in enumerate(district_options):
+            builder.button(text=f"\U0001F4CD {label}", callback_data=f"select_district:{idx}")
+        builder.adjust(2)
+        prompt = (
+            "🏘 Выберите район/город в области:" if lang == "ru" else "🏘 Viloyatdagi tuman/shaharni tanlang:"
+        )
+        if callback.message:
+            await callback.message.edit_text(prompt, reply_markup=builder.as_markup())
+        await callback.answer()
+        return
+
+    if hasattr(db, "update_user_location"):
+        db.update_user_location(
+            callback.from_user.id,
+            city=normalized_city,
+            clear_region=True,
+            clear_district=True,
+        )
+    else:
+        db.update_user_city(callback.from_user.id, normalized_city)
     await state.clear()
 
     user = db.get_user_model(callback.from_user.id)
@@ -390,6 +421,68 @@ async def handle_city_selection(
 
     await callback.message.answer(
         get_text(lang, "welcome_back", name=callback.from_user.first_name, city=city),
+        parse_mode="HTML",
+        reply_markup=menu,
+    )
+    await callback.answer()
+
+
+@router.callback_query(F.data.startswith("select_district:"), StateFilter(ChangeCity.district))
+async def handle_district_selection(
+    callback: types.CallbackQuery, state: FSMContext, db: DatabaseProtocol
+):
+    """Handle district selection from inline keyboard."""
+    if not callback.data or not callback.message:
+        await callback.answer()
+        return
+
+    lang = db.get_user_language(callback.from_user.id)
+    data = await state.get_data()
+    region_label = data.get("region_label")
+    region_value = data.get("region_value") or normalize_city(region_label or "")
+
+    try:
+        idx_raw = callback.data.split(":", 1)[1]
+        options = get_districts_for_region(region_label or region_value, lang)
+        idx = int(idx_raw)
+        if idx < 0 or idx >= len(options):
+            raise IndexError("district index out of range")
+        district_label, district_value = options[idx]
+    except Exception:
+        await callback.answer(get_text(lang, "error"), show_alert=True)
+        return
+
+    if hasattr(db, "update_user_location"):
+        db.update_user_location(
+            callback.from_user.id,
+            city=region_value,
+            region=region_value,
+            district=district_value,
+        )
+    else:
+        db.update_user_city(callback.from_user.id, region_value)
+
+    await state.clear()
+
+    user = db.get_user_model(callback.from_user.id)
+    user_role = user.role if user else "customer"
+    menu = (
+        main_menu_seller(lang, webapp_url=get_partner_panel_url(), user_id=callback.from_user.id)
+        if user_role == "seller"
+        else main_menu_customer(lang)
+    )
+
+    city_display = region_label or region_value
+    if district_label:
+        city_display = f"{city_display} / {district_label}"
+
+    try:
+        await callback.message.edit_text(get_text(lang, "city_selected", city=city_display))
+    except Exception as e:
+        logger.debug("Could not edit city confirmation: %s", e)
+
+    await callback.message.answer(
+        get_text(lang, "welcome_back", name=callback.from_user.first_name, city=city_display),
         parse_mode="HTML",
         reply_markup=menu,
     )

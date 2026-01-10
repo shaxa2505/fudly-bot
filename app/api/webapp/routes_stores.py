@@ -49,15 +49,13 @@ async def get_stores(
 
         scopes: list[tuple[str | None, str | None, str | None]] = []
         if district:
-            scopes.append((normalized_city, region, district))
+            scopes.append((None, region, district))
         if region:
-            scopes.append((normalized_city, region, None))
+            scopes.append((None, region, None))
         if normalized_city:
             scopes.append((normalized_city, None, None))
-        if normalized_city and not region:
-            scopes.append((None, normalized_city, None))
-        if region and not normalized_city:
-            scopes.append((None, region, None))
+            if not region:
+                scopes.append((None, normalized_city, None))
         if not scopes:
             scopes.append((None, None, None))
 

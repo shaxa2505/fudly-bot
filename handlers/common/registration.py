@@ -4,13 +4,14 @@ User registration handlers (phone and city collection).
 from aiogram import F, Router, types
 from aiogram.filters import StateFilter
 from aiogram.fsm.context import FSMContext
+from aiogram.utils.keyboard import InlineKeyboardBuilder
 
+from app.core.location_data import get_districts_for_region
 from app.core.sanitize import sanitize_phone
 from app.core.security import logger, rate_limiter, secure_user_input, validator
 from app.core.utils import normalize_city
 from app.keyboards import (
     city_inline_keyboard,
-    city_keyboard,
     main_menu_customer,
     phone_request_keyboard,
 )
@@ -19,6 +20,17 @@ from handlers.common.states import Registration
 from localization import get_cities, get_text
 
 router = Router(name="registration")
+
+
+def _build_district_keyboard(region: str, lang: str) -> types.InlineKeyboardMarkup | None:
+    options = get_districts_for_region(region, lang)
+    if not options:
+        return None
+    builder = InlineKeyboardBuilder()
+    for idx, (label, _value) in enumerate(options):
+        builder.button(text=f"\U0001F4CD {label}", callback_data=f"reg_district_{idx}")
+    builder.adjust(1)
+    return builder.as_markup()
 
 
 async def _after_phone_saved(
@@ -243,8 +255,32 @@ async def registration_city_callback(
         return
 
     normalized_city = normalize_city(city)
+    district_options = get_districts_for_region(city, lang)
+    if district_options:
+        await state.update_data(region_label=city, region_value=normalized_city)
+        await state.set_state(Registration.district)
+        keyboard = _build_district_keyboard(city, lang)
+        prompt = (
+            "🏘 Выберите район/город в области:" if lang == "ru" else "🏘 Viloyatdagi tuman/shaharni tanlang:"
+        )
+        if callback.message:
+            try:
+                await callback.message.edit_text(prompt, reply_markup=keyboard)
+            except Exception:
+                await callback.message.answer(prompt, reply_markup=keyboard)
+        await callback.answer()
+        return
+
     try:
-        db.update_user_city(callback.from_user.id, normalized_city)
+        if hasattr(db, "update_user_location"):
+            db.update_user_location(
+                callback.from_user.id,
+                city=normalized_city,
+                clear_region=True,
+                clear_district=True,
+            )
+        else:
+            db.update_user_city(callback.from_user.id, normalized_city)
         logger.info(f"City updated for user {callback.from_user.id}: {normalized_city}")
     except Exception as e:
         logger.error(f"Failed to update city: {e}")
@@ -259,6 +295,82 @@ async def registration_city_callback(
         "registration_complete_personal",
         name=name,
         city=city,
+    )
+
+    try:
+        await callback.message.edit_text(complete_text, parse_mode="HTML")
+    except Exception:
+        pass
+
+    await callback.message.answer(
+        get_text(lang, "registration_choose_action"),
+        reply_markup=main_menu_customer(lang),
+    )
+    await callback.answer()
+
+
+@router.callback_query(F.data.startswith("reg_district_"), StateFilter(Registration.district))
+async def registration_district_callback(
+    callback: types.CallbackQuery, state: FSMContext, db: DatabaseProtocol
+):
+    """Handle district selection - complete registration."""
+    if not db or not callback.message:
+        await callback.answer("System error", show_alert=True)
+        return
+
+    lang = db.get_user_language(callback.from_user.id)
+    data = await state.get_data()
+    region_label = data.get("region_label")
+    region_value = data.get("region_value") or normalize_city(region_label or "")
+
+    try:
+        raw = callback.data or ""
+        idx_raw = raw.split("_", 2)[2] if "_" in raw else ""
+        if idx_raw == "":
+            raise ValueError("empty district index")
+        options = get_districts_for_region(region_label or region_value, lang)
+        idx = int(idx_raw)
+        if idx < 0 or idx >= len(options):
+            raise IndexError("district index out of range")
+        district_label, district_value = options[idx]
+    except Exception as e:
+        logger.error(f"District parse error: {e}")
+        await callback.answer(get_text(lang, "error"), show_alert=True)
+        return
+
+    try:
+        if hasattr(db, "update_user_location"):
+            db.update_user_location(
+                callback.from_user.id,
+                city=region_value,
+                region=region_value,
+                district=district_value,
+            )
+        else:
+            db.update_user_city(callback.from_user.id, region_value)
+        logger.info(
+            "Location updated for user %s: city=%s region=%s district=%s",
+            callback.from_user.id,
+            region_value,
+            region_value,
+            district_value,
+        )
+    except Exception as e:
+        logger.error(f"Failed to update district: {e}")
+
+    await state.clear()
+
+    user = db.get_user_model(callback.from_user.id)
+    name = user.first_name if user else callback.from_user.first_name
+    city_display = region_label or region_value
+    if district_label:
+        city_display = f"{city_display} / {district_label}"
+
+    complete_text = get_text(
+        lang,
+        "registration_complete_personal",
+        name=name,
+        city=city_display,
     )
 
     try:

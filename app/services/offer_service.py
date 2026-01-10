@@ -248,15 +248,13 @@ class OfferService:
     ) -> list[tuple[str | None, str | None, str | None]]:
         scopes: list[tuple[str | None, str | None, str | None]] = []
         if district:
-            scopes.append((city, region, district))
+            scopes.append((None, region, district))
         if region:
-            scopes.append((city, region, None))
+            scopes.append((None, region, None))
         if city:
             scopes.append((city, None, None))
             if not region:
                 scopes.append((None, city, None))
-        if region and not city:
-            scopes.append((None, region, None))
         if not scopes:
             scopes.append((None, None, None))
         seen: set[tuple[str | None, str | None, str | None]] = set()

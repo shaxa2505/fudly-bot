@@ -134,6 +134,11 @@ class UserRepository(BaseRepository):
         district: str | None = None,
         latitude: float | None = None,
         longitude: float | None = None,
+        clear_city: bool = False,
+        clear_region: bool = False,
+        clear_district: bool = False,
+        clear_latitude: bool = False,
+        clear_longitude: bool = False,
     ) -> None:
         """Set user location fields.
 
@@ -154,6 +159,11 @@ class UserRepository(BaseRepository):
                     district=district,
                     latitude=latitude,
                     longitude=longitude,
+                    clear_city=clear_city,
+                    clear_region=clear_region,
+                    clear_district=clear_district,
+                    clear_latitude=clear_latitude,
+                    clear_longitude=clear_longitude,
                 )
             elif city is not None:
                 self.db.set_user_city(user_id, city)

@@ -24,21 +24,23 @@ class Registration(StatesGroup):
     """
     User registration flow.
 
-    Flow: /start → choose language → enter phone → select city → done
+    Flow: /start → choose language → enter phone → select city → select district → done
     """
 
     phone = State()  # Waiting for phone number
     city = State()  # Waiting for city selection
+    district = State()  # Waiting for district selection
 
 
 class ChangeCity(StatesGroup):
     """
     City change flow.
 
-    Flow: Profile → Change City → select new city → done
+    Flow: Profile → Change City → select new city → select district → done
     """
 
     city = State()  # Waiting for new city selection
+    district = State()  # Waiting for district selection
 
 
 # =============================================================================
