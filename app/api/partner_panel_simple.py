@@ -151,6 +151,29 @@ def _maybe_int(value: object, field: str) -> int | None:
         raise HTTPException(status_code=400, detail=f"Invalid {field} value") from exc
 
 
+def _to_kopeks(price_in_sums: int | float | None) -> int | None:
+    """
+    Convert price from sums (user-facing) to kopeks (DB storage).
+    Returns None if input is None.
+    """
+    if price_in_sums is None:
+        return None
+    try:
+        return int(round(float(price_in_sums) * 100))
+    except (TypeError, ValueError) as exc:
+        raise HTTPException(status_code=400, detail="Invalid price value") from exc
+
+
+def _to_sums(price_in_kopeks: int | float | None) -> int:
+    """Convert price from kopeks (DB) to sums for API responses."""
+    if price_in_kopeks is None:
+        return 0
+    try:
+        return int(round(float(price_in_kopeks) / 100))
+    except (TypeError, ValueError):
+        return 0
+
+
 def verify_telegram_webapp(authorization: str) -> int:
     """
     Verify Telegram WebApp auth and return telegram_id.
@@ -293,24 +316,24 @@ def verify_telegram_webapp(authorization: str) -> int:
                 current_timestamp = int(datetime.now().timestamp())
                 age_seconds = current_timestamp - auth_timestamp
 
-                # Allow auth data up to a configurable age (default 7 days).
-                max_auth_age_raw = os.getenv("PARTNER_PANEL_AUTH_MAX_AGE_SECONDS", "604800")
+                # Allow auth data up to a configurable age (default 24 hours; override via env).
+                max_auth_age_raw = os.getenv("PARTNER_PANEL_AUTH_MAX_AGE_SECONDS", "86400")
                 try:
                     max_auth_age = int(max_auth_age_raw)
                 except (TypeError, ValueError):
-                    max_auth_age = 604800
+                    max_auth_age = 86400
                     logging.warning(
                         "⚠️ Invalid PARTNER_PANEL_AUTH_MAX_AGE_SECONDS value. "
-                        "Falling back to 604800 seconds."
+                        "Falling back to 86400 seconds."
                     )
                 if max_auth_age < 0:
                     max_auth_age = 0
-                if 0 < max_auth_age < 604800:
+                if 0 < max_auth_age < 86400:
                     logging.warning(
-                        "⚠️ PARTNER_PANEL_AUTH_MAX_AGE_SECONDS below 7 days. "
-                        "Clamping to 604800 seconds."
+                        "⚠️ PARTNER_PANEL_AUTH_MAX_AGE_SECONDS below minimum (24h). "
+                        "Clamping to 86400 seconds."
                     )
-                    max_auth_age = 604800
+                    max_auth_age = 86400
                 if age_seconds > max_auth_age:
                     logging.warning(
                         f"⚠️ Auth data too old: {age_seconds}s (max {max_auth_age}s)"
@@ -538,11 +561,9 @@ async def list_products(authorization: str = Header(None), status: Optional[str]
     # Map to frontend-expected format
     products = []
     for o in offers:
-        # Prices already in sums (PRICE_STORAGE_UNIT defaults to 'sums')
-        discount_price = round(o.get("discount_price") or 0)
-        original_price = (
-            round(o.get("original_price")) if o.get("original_price") is not None else None
-        )
+        # Prices stored in kopeks; convert to sums for UI
+        discount_price = _to_sums(o.get("discount_price"))
+        original_price = _to_sums(o.get("original_price")) if o.get("original_price") is not None else None
 
         stock_quantity = o.get("stock_quantity")
         if stock_quantity is None:
@@ -655,6 +676,10 @@ async def create_product(
 
     if discount_price is None:
         discount_price = original_price
+
+    # Convert prices from sums (UI) to kopeks (DB storage)
+    original_price = _to_kopeks(original_price)
+    discount_price = _to_kopeks(discount_price)
 
     # Use stock_quantity if provided, otherwise use quantity
     actual_stock = stock_quantity if stock_quantity is not None else quantity
@@ -792,6 +817,12 @@ async def update_product(
     if status is None:
         status = payload.get("status")
 
+    # Convert prices from sums (UI) to kopeks (DB storage)
+    if original_price is not None:
+        original_price = _to_kopeks(original_price)
+    if discount_price is not None:
+        discount_price = _to_kopeks(discount_price)
+
     # Build update dynamically for partial updates
     update_fields = []
     update_values = []
@@ -806,12 +837,10 @@ async def update_product(
 
     if original_price is not None:
         update_fields.append("original_price = %s")
-        # Prices stored in sums (PRICE_STORAGE_UNIT = 'sums' by default)
         update_values.append(original_price if original_price > 0 else None)
 
     if discount_price is not None:
         update_fields.append("discount_price = %s")
-        # Prices stored in sums (PRICE_STORAGE_UNIT = 'sums' by default)
         update_values.append(discount_price)
 
     if quantity is not None:
@@ -1066,8 +1095,8 @@ async def import_csv(
                 store_id=store_id,
                 title=row["title"],
                 description=row.get("description", row["title"]),
-                original_price=int(row.get("original_price", 0)) or None,
-                discount_price=int(row["discount_price"]),
+                original_price=_to_kopeks(row.get("original_price", 0)) or None,
+                discount_price=_to_kopeks(row.get("discount_price", 0)),
                 quantity=int(row.get("quantity", 1)),
                 available_from=now,
                 available_until=until,

@@ -22,21 +22,25 @@ export function usePullToRefresh(onRefresh, options = {}) {
   const currentY = useRef(0)
   const containerRef = useRef(null)
   const isTracking = useRef(false)
+  const getScrollTop = useCallback(
+    () => window.scrollY || window.pageYOffset || document.documentElement.scrollTop || 0,
+    []
+  )
 
   const handleTouchStart = useCallback((e) => {
     // Только если страница прокручена вверх
-    if (window.scrollY > 0) return
+    if (getScrollTop() > 2) return
 
     isTracking.current = true
     startX.current = e.touches[0].clientX
     startY.current = e.touches[0].clientY
     currentY.current = startY.current
     setIsPulling(false)
-  }, [])
+  }, [getScrollTop])
 
   const handleTouchMove = useCallback((e) => {
     if (!isTracking.current || isRefreshing) return
-    if (window.scrollY > 0) {
+    if (getScrollTop() > 2) {
       isTracking.current = false
       setIsPulling(false)
       setPullDistance(0)
@@ -67,10 +71,10 @@ export function usePullToRefresh(onRefresh, options = {}) {
     setPullDistance(resistedDistance)
 
     // Предотвращаем прокрутку если тянем вниз
-    if (resistedDistance > 10) {
+    if (resistedDistance > 6) {
       e.preventDefault()
     }
-  }, [isPulling, isRefreshing, resistance, maxPull])
+  }, [isPulling, isRefreshing, resistance, maxPull, getScrollTop])
 
   const handleTouchEnd = useCallback(async () => {
     isTracking.current = false
@@ -134,3 +138,4 @@ export function usePullToRefresh(onRefresh, options = {}) {
 }
 
 export default usePullToRefresh
+

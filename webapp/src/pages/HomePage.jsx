@@ -78,29 +78,38 @@ function HomePage() {
   const activeFiltersCount = [minDiscount, priceRange !== 'all', sortBy !== 'default']
     .filter(Boolean)
     .length
+  const topbarStateRef = useRef(false)
 
   // Hide topbar on scroll-down (Lavka-like): keep search pinned, show topbar on scroll-up.
   useEffect(() => {
-    const lastYRef = { current: window.scrollY || 0 }
+    const getScrollY = () =>
+      window.scrollY || window.pageYOffset || document.documentElement.scrollTop || 0
+    const lastYRef = { current: getScrollY() }
     let rafId = 0
+
+    const setHidden = (nextHidden) => {
+      if (topbarStateRef.current === nextHidden) return
+      topbarStateRef.current = nextHidden
+      setTopbarHidden(nextHidden)
+    }
 
     const apply = () => {
       rafId = 0
-      const y = window.scrollY || 0
+      const y = getScrollY()
       const lastY = lastYRef.current
       const delta = y - lastY
       lastYRef.current = y
 
-      if (y <= 8) {
-        setTopbarHidden(false)
+      if (y <= 12) {
+        setHidden(false)
         return
       }
 
       // Small deadzone to prevent flicker.
-      if (delta > 10 && y > 80) {
-        setTopbarHidden(true)
-      } else if (delta < -10) {
-        setTopbarHidden(false)
+      if (delta > 12 && y > 96) {
+        setHidden(true)
+      } else if (delta < -12 || (y < 64 && topbarStateRef.current)) {
+        setHidden(false)
       }
     }
 

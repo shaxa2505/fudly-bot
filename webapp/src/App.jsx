@@ -58,6 +58,8 @@ function AppContent() {
     const tg = window.Telegram?.WebApp
 
     if (tg) {
+      // Prevent swipe-to-close in Telegram webview (iOS) and expand immediately for stability
+      tg.disableVerticalSwipes?.()
       // Expand to full height - do this FIRST for perceived speed
       tg.expand()
       tg.ready()
