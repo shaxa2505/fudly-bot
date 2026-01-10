@@ -91,11 +91,18 @@ function AppContent() {
     const tg = window.Telegram?.WebApp
 
     if (tg) {
-      // Prevent swipe-to-close in Telegram webview (iOS) and expand immediately for stability
+      // Prevent swipe-to-close in Telegram webview (iOS) and signal readiness early.
       tg.disableVerticalSwipes?.()
-      // Expand to full height - do this FIRST for perceived speed
-      tg.expand()
       tg.ready()
+
+      const isMobile = tg.platform === 'android' || tg.platform === 'ios'
+      if (isMobile && typeof tg.requestFullscreen === 'function' && !tg.isFullscreen) {
+        tg.requestFullscreen()
+      }
+
+      if (!tg.isExpanded) {
+        tg.expand()
+      }
 
       // Set theme colors immediately
       document.documentElement.style.setProperty('--tg-theme-bg-color', tg.themeParams.bg_color || '#ffffff')

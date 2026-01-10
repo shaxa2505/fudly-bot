@@ -1,5 +1,4 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { ArrowLeft } from 'lucide-react';
 import { useNavigate, useLocation, useParams } from 'react-router-dom';
 import api from '../api/client';
 import { useCart } from '../context/CartContext';
@@ -153,13 +152,6 @@ function OrderTrackingPage({ user }) {
           progress={progress}
         />
         <div className="tracking-header">
-          <button
-            onClick={() => navigate('/profile')}
-            className="app-back-btn"
-            aria-label={t('?????', 'Orqaga')}
-          >
-            <ArrowLeft size={20} strokeWidth={2} />
-          </button>
           <h1>{t('?????', 'Buyurtma')}</h1>
         </div>
         <div className="error-container">
@@ -183,13 +175,6 @@ function OrderTrackingPage({ user }) {
         progress={progress}
       />
       <div className="tracking-header">
-        <button
-          onClick={() => navigate(`/order/${bookingId}/details`)}
-          className="app-back-btn"
-          aria-label={t('?????', 'Orqaga')}
-        >
-          <ArrowLeft size={20} strokeWidth={2} />
-        </button>
         <h1>{t('Заказ', 'Buyurtma')} #{order.booking_code}</h1>
       </div>
 
@@ -312,3 +297,4 @@ function OrderTrackingPage({ user }) {
 }
 
 export default OrderTrackingPage;
+
