@@ -5,6 +5,7 @@ import api from '../api/client'
 import { useCart } from '../context/CartContext'
 import { useToast } from '../context/ToastContext'
 import { getUnitLabel, blurOnEnter, isValidPhone } from '../utils/helpers'
+import { getCurrentUser } from '../utils/auth'
 import { PLACEHOLDER_IMAGE, resolveOfferImageUrl } from '../utils/imageUtils'
 import QuantityControl from '../components/QuantityControl'
 import BottomNav from '../components/BottomNav'
@@ -25,7 +26,8 @@ function CartPage({ user }) {
   } = useCart()
 
   const botUsername = import.meta.env.VITE_BOT_USERNAME || 'fudlyuzbot'
-  const canonicalPhone = (user?.phone || '').toString().trim()
+  const cachedUser = getCurrentUser()
+  const canonicalPhone = (user?.phone || cachedUser?.phone || '').toString().trim()
 
   const [orderLoading, setOrderLoading] = useState(false)
   const commentInputRef = useRef(null)
@@ -176,9 +178,30 @@ function CartPage({ user }) {
     }
   }
 
-  const handleCheckout = () => {
-    if (isEmpty) return
-    if (!canonicalPhone) {
+  const refreshProfilePhone = useCallback(async () => {
+    try {
+      const profile = await api.getProfile({ force: true })
+      const profilePhone = (profile?.phone || '').toString().trim()
+      if (!profilePhone) {
+        return ''
+      }
+      const mergedUser = { ...(getCurrentUser() || {}), ...profile }
+      localStorage.setItem('fudly_user', JSON.stringify(mergedUser))
+      localStorage.setItem('fudly_phone', profilePhone)
+      setPhone(profilePhone)
+      return profilePhone
+    } catch (error) {
+      console.warn('Could not refresh profile phone:', error)
+      return ''
+    }
+  }, [setPhone])
+
+  const requireVerifiedPhone = async () => {
+    let verifiedPhone = canonicalPhone
+    if (!verifiedPhone) {
+      verifiedPhone = await refreshProfilePhone()
+    }
+    if (!verifiedPhone) {
       toast.error('Telefon raqamingiz botda tasdiqlanmagan. Botga o\'ting va raqamni yuboring.')
       if (botUsername) {
         const tg = window.Telegram?.WebApp
@@ -189,6 +212,15 @@ function CartPage({ user }) {
           window.open(url, '_blank')
         }
       }
+      return ''
+    }
+    return verifiedPhone
+  }
+
+  const handleCheckout = async () => {
+    if (isEmpty) return
+    const verifiedPhone = await requireVerifiedPhone()
+    if (!verifiedPhone) {
       return
     }
     const storeIds = new Set(cartItems.map(item => item.offer?.store_id).filter(Boolean))
@@ -200,8 +232,12 @@ function CartPage({ user }) {
     setShowCheckout(true)
   }
 
-  const handleCommentShortcut = () => {
+  const handleCommentShortcut = async () => {
     if (isEmpty) return
+    const verifiedPhone = await requireVerifiedPhone()
+    if (!verifiedPhone) {
+      return
+    }
     setCheckoutStep('details')
     setShowCheckout(true)
     setFocusCommentOnOpen(true)

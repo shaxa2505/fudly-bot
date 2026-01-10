@@ -202,8 +202,8 @@ const api = {
     return data
   },
 
-  async getProfile() {
-    return cachedGet('/user/profile', {}, 60000) // 1 min cache
+  async getProfile(options = {}) {
+    return cachedGet('/user/profile', {}, 60000, options) // 1 min cache
   },
 
   async getUserOrders(status = null) {
