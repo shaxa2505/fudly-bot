@@ -95,12 +95,18 @@ class SearchMixin:
             params.extend([f"%{v}%" for v in city_variants])
 
         if region:
-            base_sql += " AND s.region ILIKE %s"
-            params.append(f"%{region}%")
+            region_variants = self._get_city_variants_search(region)
+            region_conditions = " OR ".join(["s.region ILIKE %s" for _ in region_variants])
+            base_sql += f" AND ({region_conditions})"
+            params.extend([f"%{v}%" for v in region_variants])
 
         if district:
-            base_sql += " AND s.district ILIKE %s"
-            params.append(f"%{district}%")
+            district_variants = self._get_city_variants_search(district)
+            district_conditions = " OR ".join(
+                ["s.district ILIKE %s" for _ in district_variants]
+            )
+            base_sql += f" AND ({district_conditions})"
+            params.extend([f"%{v}%" for v in district_variants])
 
         if min_price is not None:
             base_sql += " AND o.discount_price >= %s"

@@ -1,4 +1,4 @@
-"""
+﻿"""
 Database Protocol - Interface contract for database implementations.
 
 This protocol defines the interface that all database implementations must follow.
@@ -41,8 +41,12 @@ class DatabaseProtocol(Protocol):
         username: str | None = None,
         first_name: str | None = None,
         phone: str | None = None,
-        city: str = "Ташкент",
+        city: str = "РўР°С€РєРµРЅС‚",
         language: str = "ru",
+        region: str | None = None,
+        district: str | None = None,
+        latitude: float | None = None,
+        longitude: float | None = None,
     ) -> None:
         ...
 
@@ -60,6 +64,17 @@ class DatabaseProtocol(Protocol):
         ...
 
     def update_user_language(self, user_id: int, language: str) -> None:
+        ...
+
+    def update_user_location(
+        self,
+        user_id: int,
+        city: str | None = None,
+        region: str | None = None,
+        district: str | None = None,
+        latitude: float | None = None,
+        longitude: float | None = None,
+    ) -> None:
         ...
 
     def update_user_role(self, user_id: int, role: str) -> None:
@@ -95,7 +110,7 @@ class DatabaseProtocol(Protocol):
         city: str,
         address: str | None = None,
         description: str | None = None,
-        category: str = "Ресторан",
+        category: str = "Р РµСЃС‚РѕСЂР°РЅ",
         phone: str | None = None,
         business_type: str = "supermarket",
     ) -> int:
@@ -124,6 +139,26 @@ class DatabaseProtocol(Protocol):
     def get_stores_by_business_type(
         self, business_type: str, city: str | None = None
     ) -> list[tuple[Any, ...]]:
+        ...
+
+    def get_stores_by_location(
+        self,
+        city: str | None = None,
+        region: str | None = None,
+        district: str | None = None,
+        business_type: str | None = None,
+    ) -> list[dict]:
+        ...
+
+    def get_nearby_stores(
+        self,
+        latitude: float,
+        longitude: float,
+        limit: int = 20,
+        offset: int = 0,
+        business_type: str | None = None,
+        max_distance_km: float | None = None,
+    ) -> list[dict]:
         ...
 
     def get_pending_stores(self) -> list[tuple[Any, ...]]:
@@ -182,7 +217,7 @@ class DatabaseProtocol(Protocol):
         available_until: str,
         photo: str | None = None,
         expiry_date: str | None = None,
-        unit: str = "шт",
+        unit: str = "С€С‚",
         category: str = "other",
     ) -> int:
         ...
@@ -196,10 +231,38 @@ class DatabaseProtocol(Protocol):
         limit: int = 20,
         offset: int = 0,
         business_type: str | None = None,
+        region: str | None = None,
+        district: str | None = None,
+        sort_by: str | None = None,
+        min_price: float | None = None,
+        max_price: float | None = None,
+        min_discount: float | None = None,
     ) -> list[tuple[Any, ...]]:
         ...
 
-    def count_hot_offers(self, city: str | None = None, business_type: str | None = None) -> int:
+    def count_hot_offers(
+        self,
+        city: str | None = None,
+        business_type: str | None = None,
+        region: str | None = None,
+        district: str | None = None,
+    ) -> int:
+        ...
+
+    def get_nearby_offers(
+        self,
+        latitude: float,
+        longitude: float,
+        limit: int = 20,
+        offset: int = 0,
+        category: str | None = None,
+        business_type: str | None = None,
+        max_distance_km: float | None = None,
+        sort_by: str | None = None,
+        min_price: float | None = None,
+        max_price: float | None = None,
+        min_discount: float | None = None,
+    ) -> list[dict]:
         ...
 
     def get_offer(self, offer_id: int) -> tuple[Any, ...] | None:
@@ -444,3 +507,7 @@ class DatabaseProtocol(Protocol):
 
     def disable_store_payment_integration(self, store_id: int, provider: str) -> bool:
         ...
+
+
+
+

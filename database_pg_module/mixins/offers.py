@@ -114,6 +114,10 @@ class OfferMixin:
 
         return list(variants)
 
+    def _get_location_variants(self, value: str) -> list[str]:
+        """Return normalized variants for region/district matching."""
+        return self._get_city_variants(value)
+
     def add_offer(
         self,
         store_id: int,
@@ -324,12 +328,18 @@ class OfferMixin:
                 params.extend([f"%{v}%" for v in city_variants])
 
             if region:
-                query += " AND s.region ILIKE %s"
-                params.append(f"%{region}%")
+                region_variants = self._get_location_variants(region)
+                region_conditions = " OR ".join(["s.region ILIKE %s" for _ in region_variants])
+                query += f" AND ({region_conditions})"
+                params.extend([f"%{v}%" for v in region_variants])
 
             if district:
-                query += " AND s.district ILIKE %s"
-                params.append(f"%{district}%")
+                district_variants = self._get_location_variants(district)
+                district_conditions = " OR ".join(
+                    ["s.district ILIKE %s" for _ in district_variants]
+                )
+                query += f" AND ({district_conditions})"
+                params.extend([f"%{v}%" for v in district_variants])
 
             if business_type:
                 query += " AND s.category = %s"
@@ -401,12 +411,18 @@ class OfferMixin:
                 params.extend([f"%{v}%" for v in city_variants])
 
             if region:
-                query += " AND s.region ILIKE %s"
-                params.append(f"%{region}%")
+                region_variants = self._get_location_variants(region)
+                region_conditions = " OR ".join(["s.region ILIKE %s" for _ in region_variants])
+                query += f" AND ({region_conditions})"
+                params.extend([f"%{v}%" for v in region_variants])
 
             if district:
-                query += " AND s.district ILIKE %s"
-                params.append(f"%{district}%")
+                district_variants = self._get_location_variants(district)
+                district_conditions = " OR ".join(
+                    ["s.district ILIKE %s" for _ in district_variants]
+                )
+                query += f" AND ({district_conditions})"
+                params.extend([f"%{v}%" for v in district_variants])
 
             if business_type:
                 query += " AND s.business_type = %s"
@@ -600,12 +616,18 @@ class OfferMixin:
                 params.extend([f"%{v}%" for v in city_variants])
 
             if region:
-                query += " AND s.region ILIKE %s"
-                params.append(f"%{region}%")
+                region_variants = self._get_location_variants(region)
+                region_conditions = " OR ".join(["s.region ILIKE %s" for _ in region_variants])
+                query += f" AND ({region_conditions})"
+                params.extend([f"%{v}%" for v in region_variants])
 
             if district:
-                query += " AND s.district ILIKE %s"
-                params.append(f"%{district}%")
+                district_variants = self._get_location_variants(district)
+                district_conditions = " OR ".join(
+                    ["s.district ILIKE %s" for _ in district_variants]
+                )
+                query += f" AND ({district_conditions})"
+                params.extend([f"%{v}%" for v in district_variants])
 
             if min_price is not None:
                 query += " AND o.discount_price >= %s"

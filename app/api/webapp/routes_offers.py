@@ -249,6 +249,8 @@ async def get_offers(
                 scopes.append((normalized_city, region, None))
             if normalized_city:
                 scopes.append((normalized_city, None, None))
+            if normalized_city and not region:
+                scopes.append((None, normalized_city, None))
             if region and not normalized_city:
                 scopes.append((None, region, None))
             if not scopes:

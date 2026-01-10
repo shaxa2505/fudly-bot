@@ -1,0 +1,5 @@
+-- Add location fields to users
+ALTER TABLE users ADD COLUMN IF NOT EXISTS region TEXT;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS district TEXT;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS latitude REAL;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS longitude REAL;

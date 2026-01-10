@@ -71,6 +71,10 @@ def get_user_field(user: Any, field_name: str, default: Any = None) -> Any:
     idx = field_map.get(field_name)
     if idx is not None and isinstance(user, (tuple, list)) and len(user) > idx:
         return user[idx]
+    if field_name in {"region", "district", "latitude", "longitude"}:
+        if isinstance(user, (tuple, list)) and len(user) >= 15:
+            tail_map = {"region": -4, "district": -3, "latitude": -2, "longitude": -1}
+            return user[tail_map[field_name]]
     return default
 
 

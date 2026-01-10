@@ -1,4 +1,4 @@
-"""Tests for app/services/ - business logic layer."""
+﻿"""Tests for app/services/ - business logic layer."""
 from __future__ import annotations
 
 from unittest.mock import MagicMock
@@ -34,16 +34,16 @@ class TestOfferService:
                 10000.0,
                 5000.0,
                 10,
-                "шт",
+                "С€С‚",
                 None,
                 "2025-12-31",
                 None,
                 None,
                 "bakery",
-                "шт",
+                "С€С‚",
                 "Test Store",
                 "Address 1",
-                "Ташкент",
+                "РўР°С€РєРµРЅС‚",
                 "bakery",
                 50.0,
                 1,
@@ -63,7 +63,7 @@ class TestOfferService:
         self, service: OfferService, mock_db: MagicMock
     ) -> None:
         """Test list_hot_offers returns OfferListResult."""
-        result = service.list_hot_offers(city="Ташкент", limit=20, offset=0)
+        result = service.list_hot_offers(city="РўР°С€РєРµРЅС‚", limit=20, offset=0)
 
         assert result.total == 1
         assert len(result.items) == 1
@@ -74,10 +74,25 @@ class TestOfferService:
 
     def test_list_hot_offers_calls_db(self, service: OfferService, mock_db: MagicMock) -> None:
         """Test list_hot_offers calls database methods."""
-        service.list_hot_offers(city="Ташкент", limit=10, offset=0)
+        city = "Ташкент"
+        service.list_hot_offers(city=city, limit=10, offset=0)
 
-        mock_db.get_hot_offers.assert_called_once_with("Ташкент", limit=10, offset=0)
-        mock_db.count_hot_offers.assert_called_once_with("Ташкент")
+        mock_db.get_hot_offers.assert_called_once_with(
+            city,
+            limit=10,
+            offset=0,
+            region=None,
+            district=None,
+            sort_by=None,
+            min_price=None,
+            max_price=None,
+            min_discount=None,
+        )
+        mock_db.count_hot_offers.assert_called_once_with(
+            city,
+            region=None,
+            district=None,
+        )
 
     def test_get_store_returns_details(self, mock_db: MagicMock) -> None:
         """Test get_store returns StoreDetails."""
@@ -89,7 +104,7 @@ class TestOfferService:
             10,
             100,
             "Test Store",
-            "Ташкент",
+            "РўР°С€РєРµРЅС‚",
             "Address 1",
             "Description",
             "food",
@@ -116,7 +131,7 @@ class TestOfferService:
         assert result is not None
         assert isinstance(result, StoreDetails)
         assert result.name == "Test Store"
-        assert result.city == "Ташкент"
+        assert result.city == "РўР°С€РєРµРЅС‚"
         assert result.delivery_enabled is True
 
     def test_get_store_not_found(self, mock_db: MagicMock) -> None:
@@ -220,13 +235,13 @@ class TestServiceIntegration:
                 10000.0,
                 5000.0,
                 5,
-                "шт",
+                "С€С‚",
                 None,
                 "2025-12-31",
                 None,
                 None,
                 "bakery",
-                "шт",
+                "С€С‚",
                 "Store",
                 "Addr",
                 "City",
@@ -240,7 +255,7 @@ class TestServiceIntegration:
         mock_db.count_hot_offers.return_value = 1
 
         service = OfferService(db=mock_db, cache=mock_cache)
-        result = service.list_hot_offers(city="Ташкент", limit=10, offset=0)
+        result = service.list_hot_offers(city="РўР°С€РєРµРЅС‚", limit=10, offset=0)
 
         # Should use cache for offset=0
         mock_cache.get_hot_offers.assert_called_once()
@@ -260,13 +275,13 @@ class TestServiceIntegration:
                 10000.0,
                 5000.0,
                 5,
-                "шт",
+                "С€С‚",
                 None,
                 "2025-12-31",
                 None,
                 None,
                 "bakery",
-                "шт",
+                "С€С‚",
                 "Store",
                 "Addr",
                 "City",
@@ -280,7 +295,7 @@ class TestServiceIntegration:
         mock_db.count_hot_offers.return_value = 1
 
         service = OfferService(db=mock_db, cache=None)
-        result = service.list_hot_offers(city="Ташкент", limit=10, offset=0)
+        result = service.list_hot_offers(city="РўР°С€РєРµРЅС‚", limit=10, offset=0)
 
         # Should use DB
         mock_db.get_hot_offers.assert_called_once()
@@ -295,3 +310,4 @@ class TestServiceIntegration:
         service = AdminService(db=mock_db, use_postgres=True)
 
         assert service.is_admin(123) is True
+

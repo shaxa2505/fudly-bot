@@ -4,6 +4,7 @@ Store-related database operations.
 from __future__ import annotations
 
 from typing import Any
+import re
 
 from psycopg.rows import dict_row
 
@@ -15,7 +16,7 @@ from database_pg_module.crypto import (
     is_dev_environment,
     is_fernet_token,
 )
-from database_pg_module.mixins.offers import CITY_TRANSLITERATION
+from database_pg_module.mixins.offers import CITY_TRANSLITERATION, _CITY_SUFFIX_RE
 
 try:
     from logging_config import logger
@@ -32,7 +33,11 @@ class StoreMixin:
 
     def _get_city_variants(self, city: str) -> list[str]:
         """Get all variants of city name (transliteration)."""
-        city_lower = city.lower().strip()
+        city_clean = " ".join(city.strip().split())
+        city_clean = city_clean.split(",")[0]
+        city_clean = re.sub(r"\s*\([^)]*\)", "", city_clean)
+        city_clean = _CITY_SUFFIX_RE.sub("", city_clean).strip(" ,")
+        city_lower = city_clean.lower()
         variants = {city_lower}
 
         if city_lower in CITY_TRANSLITERATION:
@@ -222,11 +227,17 @@ class StoreMixin:
                 query += f" AND ({city_conditions})"
                 params.extend([f"%{v}%" for v in city_variants])
             if region:
-                query += " AND s.region ILIKE %s"
-                params.append(f"%{region}%")
+                region_variants = self._get_city_variants(region)
+                region_conditions = " OR ".join(["s.region ILIKE %s" for _ in region_variants])
+                query += f" AND ({region_conditions})"
+                params.extend([f"%{v}%" for v in region_variants])
             if district:
-                query += " AND s.district ILIKE %s"
-                params.append(f"%{district}%")
+                district_variants = self._get_city_variants(district)
+                district_conditions = " OR ".join(
+                    ["s.district ILIKE %s" for _ in district_variants]
+                )
+                query += f" AND ({district_conditions})"
+                params.extend([f"%{v}%" for v in district_variants])
             if business_type:
                 query += " AND s.business_type = %s"
                 params.append(business_type)

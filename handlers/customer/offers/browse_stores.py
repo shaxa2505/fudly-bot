@@ -76,13 +76,26 @@ def register_stores(
         data = callback.data or ""
         business_type = data.replace("biztype_", "")
         city = user.city or "Ташкент"
+        region = getattr(user, "region", None)
+        district = getattr(user, "district", None)
+        latitude = getattr(user, "latitude", None)
+        longitude = getattr(user, "longitude", None)
         search_city = normalize_city(city)
+        search_region = normalize_city(region) if region else None
+        search_district = normalize_city(district) if district else None
 
         logger.info(
             f"🏪 Browse stores: business_type={business_type}, user_city={city}, search_city={search_city}"
         )
 
-        stores = offer_service.list_stores_by_type(search_city, business_type)
+        stores = offer_service.list_stores_by_type(
+            search_city,
+            business_type,
+            region=search_region,
+            district=search_district,
+            latitude=latitude,
+            longitude=longitude,
+        )
 
         logger.info(f"🏪 Found {len(stores)} stores for {business_type} in {search_city}")
 

@@ -42,7 +42,11 @@ class SchemaMixin:
                     is_admin INTEGER DEFAULT 0,
                     notifications_enabled INTEGER DEFAULT 1,
                     view_mode TEXT DEFAULT 'customer',
-                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    region TEXT,
+                    district TEXT,
+                    latitude REAL,
+                    longitude REAL
                 )
             """
             )
@@ -600,6 +604,16 @@ class SchemaMixin:
             logger.info("✅ last_delivery_address column ensured in users table")
         except Exception as e:
             logger.warning(f"Could not add last_delivery_address column: {e}")
+
+        # Add location fields for user-level search scoping
+        try:
+            cursor.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS region TEXT")
+            cursor.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS district TEXT")
+            cursor.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS latitude REAL")
+            cursor.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS longitude REAL")
+            logger.info("INFO: user location columns ensured in users table")
+        except Exception as e:
+            logger.warning(f"Could not add user location columns: {e}")
 
     def _migrate_favorites_table(self, cursor):
         """Migrate favorites from offer_id to store_id if needed."""

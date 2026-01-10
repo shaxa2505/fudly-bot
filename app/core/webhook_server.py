@@ -531,6 +531,8 @@ async def create_webhook_app(
                     scopes.append((city, region, None))
                 if city:
                     scopes.append((city, None, None))
+                if city and not region:
+                    scopes.append((None, city, None))
                 if region and not city:
                     scopes.append((None, region, None))
                 if not scopes:
@@ -695,6 +697,8 @@ async def create_webhook_app(
                     scopes.append((city, region, None))
                 if city:
                     scopes.append((city, None, None))
+                if city and not region:
+                    scopes.append((None, city, None))
                 if region and not city:
                     scopes.append((None, region, None))
 

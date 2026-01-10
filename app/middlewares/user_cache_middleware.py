@@ -53,11 +53,19 @@ class UserCacheMiddleware(BaseMiddleware):
             # Also inject commonly used values for convenience
             data["user_lang"] = user_data.get("lang", "ru")
             data["user_city"] = user_data.get("city", "Ташкент")
+            data["user_region"] = user_data.get("region")
+            data["user_district"] = user_data.get("district")
+            data["user_latitude"] = user_data.get("latitude")
+            data["user_longitude"] = user_data.get("longitude")
             data["cached_user"] = user_data.get("user")
         else:
             data["user_data"] = {"lang": "ru", "city": "Ташкент", "user": None}
             data["user_lang"] = "ru"
             data["user_city"] = "Ташкент"
+            data["user_region"] = None
+            data["user_district"] = None
+            data["user_latitude"] = None
+            data["user_longitude"] = None
             data["cached_user"] = None
 
         return await handler(event, data)

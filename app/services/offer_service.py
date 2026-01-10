@@ -1,4 +1,4 @@
-"""Offer-related domain services and data transfer objects."""
+﻿"""Offer-related domain services and data transfer objects."""
 from __future__ import annotations
 
 from collections.abc import Sequence
@@ -90,21 +90,80 @@ class OfferService:
     # ------------------------------------------------------------------
     # Hot offers
     # ------------------------------------------------------------------
-    def list_hot_offers(self, city: str, limit: int = 20, offset: int = 0) -> OfferListResult:
-        """Return cached hot offers plus total count for pagination."""
-        raw_offers = (
-            self._cache.get_hot_offers(city, limit, offset)
-            if self._cache and offset == 0
-            else self._db.get_hot_offers(city, limit=limit, offset=offset)
-        )
+    def list_hot_offers(
+        self,
+        city: str | None = None,
+        limit: int = 20,
+        offset: int = 0,
+        region: str | None = None,
+        district: str | None = None,
+        latitude: float | None = None,
+        longitude: float | None = None,
+        sort_by: str | None = None,
+        min_price: float | None = None,
+        max_price: float | None = None,
+        min_discount: float | None = None,
+    ) -> OfferListResult:
+        """Return hot offers with optional location scoping and fallback."""
+        raw_offers: list[Any] = []
+        used_scope = (None, None, None)
+        scopes = self._build_location_scopes(city, region, district)
+
+        for scope_city, scope_region, scope_district in scopes:
+            raw_offers = self._fetch_hot_offers(
+                scope_city,
+                scope_region,
+                scope_district,
+                limit,
+                offset,
+                sort_by,
+                min_price,
+                max_price,
+                min_discount,
+            )
+            used_scope = (scope_city, scope_region, scope_district)
+            if raw_offers:
+                break
+
+        total = 0
+        if raw_offers:
+            if hasattr(self._db, "count_hot_offers"):
+                total = int(
+                    self._db.count_hot_offers(
+                        used_scope[0],
+                        region=used_scope[1],
+                        district=used_scope[2],
+                    )
+                )
+        elif latitude is not None and longitude is not None and hasattr(self._db, "get_nearby_offers"):
+            raw_offers = self._db.get_nearby_offers(
+                latitude=latitude,
+                longitude=longitude,
+                limit=limit,
+                offset=offset,
+                category=None,
+                sort_by=sort_by,
+                min_price=min_price,
+                max_price=max_price,
+                min_discount=min_discount,
+            )
+            total = len(raw_offers)
+
         items = [self._to_offer_list_item(row) for row in raw_offers]
-        total = int(self._db.count_hot_offers(city))
         return OfferListResult(items=items, total=total)
 
     # ------------------------------------------------------------------
     # Stores filtering
     # ------------------------------------------------------------------
-    def list_stores_by_type(self, city: str, business_type: str) -> list[StoreSummary]:
+    def list_stores_by_type(
+        self,
+        city: str | None,
+        business_type: str,
+        region: str | None = None,
+        district: str | None = None,
+        latitude: float | None = None,
+        longitude: float | None = None,
+    ) -> list[StoreSummary]:
         """Return stores for a business type with cached fallback."""
         normalized = self._map_business_type(business_type)
 
@@ -112,26 +171,60 @@ class OfferService:
 
         logger = getLogger(__name__)
         logger.info(
-            f"🏪 list_stores_by_type: city={city}, business_type={business_type}, normalized={normalized}"
+            f"à??ٍ list_stores_by_type: city={city}, business_type={business_type}, normalized={normalized}"
         )
 
-        if business_type == "delivery":
-            raw_stores = self._fetch_delivery_enabled_stores(city, normalized)
-        elif self._cache:
-            raw_stores = self._cache.get_stores_by_type(city, normalized)
-        else:
-            raw_stores = self._db.get_stores_by_business_type(normalized, city)
+        raw_stores: list[Any] = []
+        scopes = self._build_location_scopes(city, region, district)
+        for scope_city, scope_region, scope_district in scopes:
+            if business_type == "delivery":
+                raw_stores = self._fetch_delivery_enabled_stores(
+                    scope_city, scope_region, scope_district, normalized
+                )
+            else:
+                raw_stores = self._fetch_stores_by_scope(
+                    scope_city, scope_region, scope_district, normalized
+                )
+            if raw_stores:
+                break
 
-        logger.info(f"🏪 Found {len(raw_stores)} raw stores")
+        if (
+            not raw_stores
+            and latitude is not None
+            and longitude is not None
+            and hasattr(self._db, "get_nearby_stores")
+        ):
+            raw_stores = self._db.get_nearby_stores(
+                latitude=latitude,
+                longitude=longitude,
+                business_type=normalized,
+            )
+            if business_type == "delivery":
+                raw_stores = [
+                    row for row in raw_stores if get_store_field(row, "delivery_enabled", 0)
+                ]
+
+        logger.info(f"à??ٍ Found {len(raw_stores)} raw stores")
 
         return [self._to_store_summary(store) for store in raw_stores]
 
-    def _fetch_delivery_enabled_stores(self, city: str, normalized: str) -> list[Any]:
+    def _fetch_delivery_enabled_stores(
+        self,
+        city: str | None,
+        region: str | None,
+        district: str | None,
+        normalized: str,
+    ) -> list[Any]:
         stores: list[Any] = []
+        if region or district:
+            raw = self._fetch_stores_by_scope(city, region, district, normalized)
+            stores = [row for row in raw if get_store_field(row, "delivery_enabled", 0)]
+            return stores
+
         if hasattr(self._db, "get_stores_with_delivery"):
             stores = self._db.get_stores_with_delivery(city) or []
         if not stores:
-            raw = self._db.get_stores_by_business_type(normalized, city)
+            raw = self._fetch_stores_by_scope(city, None, None, normalized)
             stores = [row for row in raw if get_store_field(row, "delivery_enabled", 0)]
         return stores
 
@@ -146,6 +239,91 @@ class OfferService:
             "delivery": "supermarket",
         }
         return mapping.get(business_type, "supermarket")
+
+    @staticmethod
+    def _build_location_scopes(
+        city: str | None,
+        region: str | None,
+        district: str | None,
+    ) -> list[tuple[str | None, str | None, str | None]]:
+        scopes: list[tuple[str | None, str | None, str | None]] = []
+        if district:
+            scopes.append((city, region, district))
+        if region:
+            scopes.append((city, region, None))
+        if city:
+            scopes.append((city, None, None))
+            if not region:
+                scopes.append((None, city, None))
+        if region and not city:
+            scopes.append((None, region, None))
+        if not scopes:
+            scopes.append((None, None, None))
+        seen: set[tuple[str | None, str | None, str | None]] = set()
+        deduped: list[tuple[str | None, str | None, str | None]] = []
+        for scope in scopes:
+            if scope in seen:
+                continue
+            seen.add(scope)
+            deduped.append(scope)
+        return deduped
+
+    def _fetch_hot_offers(
+        self,
+        city: str | None,
+        region: str | None,
+        district: str | None,
+        limit: int,
+        offset: int,
+        sort_by: str | None,
+        min_price: float | None,
+        max_price: float | None,
+        min_discount: float | None,
+    ) -> list[Any]:
+        use_cache = (
+            self._cache is not None
+            and city is not None
+            and not region
+            and not district
+            and offset == 0
+            and sort_by is None
+            and min_price is None
+            and max_price is None
+            and min_discount is None
+        )
+        if use_cache:
+            return self._cache.get_hot_offers(city, limit, offset)
+        return self._db.get_hot_offers(
+            city,
+            limit=limit,
+            offset=offset,
+            region=region,
+            district=district,
+            sort_by=sort_by,
+            min_price=min_price,
+            max_price=max_price,
+            min_discount=min_discount,
+        )
+
+    def _fetch_stores_by_scope(
+        self,
+        city: str | None,
+        region: str | None,
+        district: str | None,
+        business_type: str,
+    ) -> list[Any]:
+        if region or district or city is None:
+            if hasattr(self._db, "get_stores_by_location"):
+                return self._db.get_stores_by_location(
+                    city=city,
+                    region=region,
+                    district=district,
+                    business_type=business_type,
+                )
+            return self._db.get_stores_by_business_type(business_type, city)
+        if self._cache:
+            return self._cache.get_stores_by_type(city, business_type)
+        return self._db.get_stores_by_business_type(business_type, city)
 
     # ------------------------------------------------------------------
     # Store details
@@ -185,14 +363,46 @@ class OfferService:
         return [self._to_offer_list_item(row) for row in raw]
 
     def list_offers_by_category(
-        self, city: str, category: str, limit: int = 20
+        self,
+        city: str | None,
+        category: str,
+        limit: int = 20,
+        region: str | None = None,
+        district: str | None = None,
     ) -> list[OfferListItem]:
-        raw = self._db.get_offers_by_city_and_category(city, category, limit=limit) or []
+        raw: list[Any] = []
+        scopes = self._build_location_scopes(city, region, district)
+        for scope_city, scope_region, scope_district in scopes:
+            raw = (
+                self._db.get_offers_by_city_and_category(
+                    city=scope_city,
+                    category=category,
+                    limit=limit,
+                    region=scope_region,
+                    district=scope_district,
+                )
+                or []
+            )
+            if raw:
+                break
         return [self._to_offer_list_item(row) for row in raw]
 
-    def list_top_offers(self, city: str, limit: int = 20) -> list[OfferListItem]:
-        raw = self._db.get_top_offers_by_city(city, limit=limit) or []
-        return [self._to_offer_list_item(row) for row in raw]
+    def list_top_offers(
+        self,
+        city: str | None,
+        limit: int = 20,
+        region: str | None = None,
+        district: str | None = None,
+    ) -> list[OfferListItem]:
+        result = self.list_hot_offers(
+            city=city,
+            limit=limit,
+            offset=0,
+            region=region,
+            district=district,
+            sort_by="discount",
+        )
+        return result.items
 
     def get_offer_details(self, offer_id: int) -> OfferDetails | None:
         offer = self._offer_repo.get_offer(offer_id)
@@ -249,7 +459,7 @@ class OfferService:
     def _to_offer_list_item(self, data: Any) -> OfferListItem:
         offer_id = int(get_offer_field(data, "offer_id", get_field(data, 0, 0)) or 0)
         store_id = int(get_offer_field(data, "store_id", get_field(data, 1, 0)) or 0)
-        title = str(get_offer_field(data, "title", get_field(data, 2, "Товар")))
+        title = str(get_offer_field(data, "title", get_field(data, 2, "РўРѕРІР°СЂ")))
         original_price = self._safe_float(
             get_offer_field(data, "original_price", get_field(data, 4, 0))
         )
@@ -258,10 +468,10 @@ class OfferService:
         )
         quantity = get_offer_field(data, "quantity", get_field(data, 6, 0))
         expiry_date = get_offer_field(data, "expiry_date", get_field(data, 9, ""))
-        store_name = str(get_field(data, "store_name", get_field(data, 14, "Магазин")))
+        store_name = str(get_field(data, "store_name", get_field(data, 14, "РњР°РіР°Р·РёРЅ")))
         store_address = get_field(data, "address", get_field(data, 15, ""))
         store_category = get_field(data, "store_category", get_field(data, 17, ""))
-        unit = get_offer_field(data, "unit", get_field(data, 13, "шт"))
+        unit = get_offer_field(data, "unit", get_field(data, 13, "С€С‚"))
         discount_percent_src = get_field(data, "discount_percent", get_field(data, 18, 0))
         discount_percent = self._safe_float(discount_percent_src, 0.0)
         # Safe discount calculation - handle edge cases
@@ -312,7 +522,7 @@ class OfferService:
 
     def _to_store_summary(self, store: Any) -> StoreSummary:
         store_id = int(get_store_field(store, "store_id", get_field(store, 0, 0)) or 0)
-        name = get_store_field(store, "name", get_field(store, 2, "Магазин"))
+        name = get_store_field(store, "name", get_field(store, 2, "РњР°РіР°Р·РёРЅ"))
         city = get_store_field(store, "city", get_field(store, 3, ""))
         address = get_store_field(store, "address", get_field(store, 4, ""))
         business_type = get_store_field(store, "business_type", get_field(store, 11, "supermarket"))
@@ -363,7 +573,13 @@ class OfferService:
         return count
 
     def search_offers(
-        self, query: str, city: str | None = None, limit: int = 50, offset: int = 0
+        self,
+        query: str,
+        city: str | None = None,
+        region: str | None = None,
+        district: str | None = None,
+        limit: int = 50,
+        offset: int = 0,
     ) -> list[OfferListItem]:
         """Search active offers by title or store name."""
         # This is a simplified search. Ideally, this should be done in the repository/DB layer.
@@ -374,10 +590,22 @@ class OfferService:
 
         # Fetch active offers directly from DB if possible, otherwise fallback to hot offers
         if hasattr(self._db, "search_offers"):
-            raw_offers = self._db.search_offers(query, search_city, limit=limit, offset=offset)
+            raw_offers = self._db.search_offers(
+                query,
+                search_city,
+                limit=limit,
+                offset=offset,
+                region=region,
+                district=district,
+            )
             return [self._to_offer_list_item(row) for row in raw_offers]
 
-        result = self.list_hot_offers(city=search_city, limit=1000)  # Fetch a reasonable amount
+        result = self.list_hot_offers(
+            city=search_city,
+            limit=1000,
+            region=region,
+            district=district,
+        )  # Fetch a reasonable amount
         all_offers = result.items
         query = query.lower()
 
@@ -391,3 +619,4 @@ class OfferService:
                 results.append(offer)
 
         return results
+

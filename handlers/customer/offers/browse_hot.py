@@ -26,7 +26,20 @@ from .browse_helpers import (
     range_text as _range_text,
 )
 
-FetchOffersFn = Callable[[str, int], list[OfferListItem]]
+FetchOffersFn = Callable[[str | None, int, str | None, str | None], list[OfferListItem]]
+
+DEFAULT_CITY = "ђчђш‘?ђуђзђ?‘'"
+
+
+def _extract_location(
+    user: Any,
+) -> tuple[str, str | None, str | None, float | None, float | None]:
+    city = getattr(user, "city", None) or DEFAULT_CITY
+    region = getattr(user, "region", None)
+    district = getattr(user, "district", None)
+    latitude = getattr(user, "latitude", None)
+    longitude = getattr(user, "longitude", None)
+    return city, region, district, latitude, longitude
 
 
 def register_hot(
@@ -67,14 +80,20 @@ def register_hot(
                 else "⚠️ Sessiya eskirgan. /start ni bosing va ‘🏪 Do'konlar va aksiyalar’ ni qayta oching.",
             )
             return
-        city = user.city or "Ташкент"
+        city, region, district, latitude, longitude = _extract_location(user)
         search_city = normalize_city(city)
+        search_region = normalize_city(region) if region else None
+        search_district = normalize_city(district) if district else None
         await _send_hot_offers_list(
             message,
             state,
             lang,
             city,
             search_city,
+            search_region,
+            search_district,
+            latitude,
+            longitude,
             offer_service,
             logger,
         )
@@ -98,8 +117,10 @@ def register_hot(
             )
             return
 
-        city = user.city or "Ташкент"
+        city, region, district, latitude, longitude = _extract_location(user)
         search_city = normalize_city(city)
+        search_region = normalize_city(region) if region else None
+        search_district = normalize_city(district) if district else None
 
         await callback.answer()
         await _send_hot_offers_list(
@@ -108,6 +129,10 @@ def register_hot(
             lang,
             city,
             search_city,
+            search_region,
+            search_district,
+            latitude,
+            longitude,
             offer_service,
             logger,
         )
@@ -126,7 +151,7 @@ def register_hot(
                 else "⚠️ Sessiya eskirgan. /start ni bosing va ‘🏪 Do'konlar va aksiyalar’ ni qayta oching.",
             )
             return
-        city = user.city or "Ташкент"
+        city, _, _, _, _ = _extract_location(user)
 
         select_text = (
             "Выберите категорию для просмотра актуальных предложений"
@@ -162,14 +187,20 @@ def register_hot(
                 show_alert=True,
             )
             return
-        city = user.city or "Ташкент"
+        city, region, district, latitude, longitude = _extract_location(user)
         search_city = normalize_city(city)
+        search_region = normalize_city(region) if region else None
+        search_district = normalize_city(district) if district else None
         await _send_hot_offers_list(
             msg,
             state,
             lang,
             city,
             search_city,
+            search_region,
+            search_district,
+            latitude,
+            longitude,
             offer_service,
             logger,
             page=0,
@@ -206,8 +237,10 @@ def register_hot(
             await callback.answer(get_text(lang, "error"), show_alert=True)
             return
 
-        city = user.city or "Ташкент"
+        city, region, district, latitude, longitude = _extract_location(user)
         search_city = normalize_city(city)
+        search_region = normalize_city(region) if region else None
+        search_district = normalize_city(district) if district else None
 
         await _send_hot_offers_list(
             msg,
@@ -215,6 +248,10 @@ def register_hot(
             lang,
             city,
             search_city,
+            search_region,
+            search_district,
+            latitude,
+            longitude,
             offer_service,
             logger,
             page=page,
@@ -445,7 +482,7 @@ def register_hot(
         if not user:
             await callback.answer(get_text(lang, "error"), show_alert=True)
             return
-        city = user.city or "Ташкент"
+        city, region, district, _, _ = _extract_location(user)
         categories = get_product_categories(lang)  # Используем категории товаров
 
         try:
@@ -475,7 +512,13 @@ def register_hot(
             ]
         else:
             # Global category filter
-            offers = offer_service.list_offers_by_category(city, normalized, limit=20)
+            offers = offer_service.list_offers_by_category(
+                normalize_city(city),
+                normalized,
+                limit=20,
+                region=normalize_city(region) if region else None,
+                district=normalize_city(district) if district else None,
+            )
 
         if not offers:
             no_offers_msg = f"😔 {'В категории' if lang == 'ru' else 'Toifada'} {category} {'нет предложений' if lang == 'ru' else 'takliflar yoq'}"
@@ -522,8 +565,10 @@ def register_hot(
         if not user:
             await callback.answer(get_text(lang, "error"), show_alert=True)
             return
-        city = user.city or "Ташкент"
+        city, region, district, latitude, longitude = _extract_location(user)
         search_city = normalize_city(city)
+        search_region = normalize_city(region) if region else None
+        search_district = normalize_city(district) if district else None
 
         # Get last page from state or default to 0
         data = await state.get_data()
@@ -541,6 +586,10 @@ def register_hot(
             lang,
             city,
             search_city,
+            search_region,
+            search_district,
+            latitude,
+            longitude,
             offer_service,
             logger,
             page=last_page,
@@ -558,6 +607,10 @@ def register_hot(
         lang: str,
         city: str,
         search_city: str,
+        search_region: str | None,
+        search_district: str | None,
+        latitude: float | None,
+        longitude: float | None,
         service: OfferService,
         log: Any,
         page: int = 0,
@@ -568,7 +621,15 @@ def register_hot(
         try:
             offset = page * ITEMS_PER_PAGE
             log.info(f"[HOT_OFFERS] Fetching offers for city='{search_city}', offset={offset}")
-            result = service.list_hot_offers(search_city, limit=ITEMS_PER_PAGE, offset=offset)
+            result = service.list_hot_offers(
+                search_city,
+                limit=ITEMS_PER_PAGE,
+                offset=offset,
+                region=search_region,
+                district=search_district,
+                latitude=latitude,
+                longitude=longitude,
+            )
             log.info(f"[HOT_OFFERS] Got {len(result.items)} items, total={result.total}")
             if not result.items and page == 0:
                 log.info("[HOT_OFFERS] No items - showing empty message")
@@ -831,8 +892,11 @@ def register_hot(
         if not user:
             await callback.answer(get_text(lang, "error"), show_alert=True)
             return
-        city = user.city or "Ташкент"
-        offers: list[OfferListItem] = fetcher(city, 20)
+        city, region, district, _, _ = _extract_location(user)
+        search_city = normalize_city(city)
+        search_region = normalize_city(region) if region else None
+        search_district = normalize_city(district) if district else None
+        offers: list[OfferListItem] = fetcher(search_city, 20, search_region, search_district)
         if not offers:
             await callback.answer("😔 Нет доступных предложений", show_alert=True)
             return

@@ -546,7 +546,13 @@ async def pbook_cancel(callback: types.CallbackQuery, state: FSMContext) -> None
 
     user = db.get_user_model(user_id)
     city = user.city if user else "Ташкент"
+    region = getattr(user, "region", None) if user else None
+    district = getattr(user, "district", None) if user else None
+    latitude = getattr(user, "latitude", None) if user else None
+    longitude = getattr(user, "longitude", None) if user else None
     search_city = normalize_city(city)
+    search_region = normalize_city(region) if region else None
+    search_district = normalize_city(district) if district else None
 
     # Return to store list
     if source == "store":
@@ -714,7 +720,13 @@ async def pbook_cancel(callback: types.CallbackQuery, state: FSMContext) -> None
     await state.clear()
 
     result = offer_service.list_hot_offers(
-        search_city, limit=OFFERS_PER_PAGE, offset=last_page * OFFERS_PER_PAGE
+        search_city,
+        limit=OFFERS_PER_PAGE,
+        offset=last_page * OFFERS_PER_PAGE,
+        region=search_region,
+        district=search_district,
+        latitude=latitude,
+        longitude=longitude,
     )
     if not result.items:
         # No offers - show main menu

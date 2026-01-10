@@ -88,6 +88,10 @@ class CacheManager:
                 "lang": get_user_field(user, "language", "ru"),
                 "role": get_user_field(user, "role", "customer"),
                 "city": get_user_field(user, "city", "Ташкент"),
+                "region": get_user_field(user, "region"),
+                "district": get_user_field(user, "district"),
+                "latitude": get_user_field(user, "latitude"),
+                "longitude": get_user_field(user, "longitude"),
                 "user": user,
                 "ts": now,
             }
@@ -100,7 +104,17 @@ class CacheManager:
 
             return data
 
-        return {"lang": "ru", "role": "customer", "city": "Ташкент", "user": None, "ts": now}
+        return {
+            "lang": "ru",
+            "role": "customer",
+            "city": "Ташкент",
+            "region": None,
+            "district": None,
+            "latitude": None,
+            "longitude": None,
+            "user": None,
+            "ts": now,
+        }
 
     def invalidate_user(self, user_id: int) -> None:
         self._user_cache.pop(user_id, None)

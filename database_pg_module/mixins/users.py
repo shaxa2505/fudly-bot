@@ -1,4 +1,4 @@
-"""
+﻿"""
 User-related database operations.
 """
 from __future__ import annotations
@@ -24,24 +24,35 @@ class UserMixin:
         username: str | None = None,
         first_name: str | None = None,
         phone: str | None = None,
-        city: str = "Ташкент",
+        city: str = "РўР°С€РєРµРЅС‚",
         language: str = "ru",
+        region: str | None = None,
+        district: str | None = None,
+        latitude: float | None = None,
+        longitude: float | None = None,
     ) -> None:
         """Add or update user."""
         with self.get_connection() as conn:
             cursor = conn.cursor()
             cursor.execute(
                 """
-                INSERT INTO users (user_id, username, first_name, phone, city, language)
-                VALUES (%s, %s, %s, %s, %s, %s)
+                INSERT INTO users (
+                    user_id, username, first_name, phone, city, language,
+                    region, district, latitude, longitude
+                )
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                 ON CONFLICT (user_id) DO UPDATE SET
                     username = EXCLUDED.username,
                     first_name = EXCLUDED.first_name,
                     phone = COALESCE(EXCLUDED.phone, users.phone),
                     city = COALESCE(EXCLUDED.city, users.city),
-                    language = EXCLUDED.language
+                    language = EXCLUDED.language,
+                    region = COALESCE(EXCLUDED.region, users.region),
+                    district = COALESCE(EXCLUDED.district, users.district),
+                    latitude = COALESCE(EXCLUDED.latitude, users.latitude),
+                    longitude = COALESCE(EXCLUDED.longitude, users.longitude)
             """,
-                (user_id, username, first_name, phone, city, language),
+                (user_id, username, first_name, phone, city, language, region, district, latitude, longitude),
             )
             logger.info(f"User {user_id} added/updated")
 
@@ -64,6 +75,40 @@ class UserMixin:
         with self.get_connection() as conn:
             cursor = conn.cursor()
             cursor.execute("UPDATE users SET city = %s WHERE user_id = %s", (city, user_id))
+
+    def update_user_location(
+        self,
+        user_id: int,
+        city: str | None = None,
+        region: str | None = None,
+        district: str | None = None,
+        latitude: float | None = None,
+        longitude: float | None = None,
+    ) -> None:
+        """Update user location fields (any subset)."""
+        fields: list[str] = []
+        params: list[Any] = []
+        if city is not None:
+            fields.append("city = %s")
+            params.append(city)
+        if region is not None:
+            fields.append("region = %s")
+            params.append(region)
+        if district is not None:
+            fields.append("district = %s")
+            params.append(district)
+        if latitude is not None:
+            fields.append("latitude = %s")
+            params.append(latitude)
+        if longitude is not None:
+            fields.append("longitude = %s")
+            params.append(longitude)
+        if not fields:
+            return
+        params.append(user_id)
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(f"UPDATE users SET {', '.join(fields)} WHERE user_id = %s", params)
 
     def update_user_language(self, user_id: int, language: str):
         """Update user language."""
@@ -105,7 +150,7 @@ class UserMixin:
             if not user_dict.get("first_name"):
                 user_dict["first_name"] = user_dict.get("username") or ""
             if not user_dict.get("city"):
-                user_dict["city"] = "Ташкент"
+                user_dict["city"] = "РўР°С€РєРµРЅС‚"
             if user_dict.get("language") is None:
                 user_dict["language"] = "ru"
         except Exception:
@@ -388,3 +433,4 @@ class UserMixin:
                 "UPDATE users SET last_delivery_address = %s WHERE user_id = %s",
                 (address, user_id),
             )
+

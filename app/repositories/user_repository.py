@@ -126,6 +126,40 @@ class UserRepository(BaseRepository):
         except Exception as e:
             self._handle_db_error("set_user_city", e)
 
+    def set_user_location(
+        self,
+        user_id: int,
+        city: str | None = None,
+        region: str | None = None,
+        district: str | None = None,
+        latitude: float | None = None,
+        longitude: float | None = None,
+    ) -> None:
+        """Set user location fields.
+
+        Args:
+            user_id: Telegram user ID
+            city: City name
+            region: Region name
+            district: District name
+            latitude: Latitude
+            longitude: Longitude
+        """
+        try:
+            if hasattr(self.db, "update_user_location"):
+                self.db.update_user_location(
+                    user_id,
+                    city=city,
+                    region=region,
+                    district=district,
+                    latitude=latitude,
+                    longitude=longitude,
+                )
+            elif city is not None:
+                self.db.set_user_city(user_id, city)
+        except Exception as e:
+            self._handle_db_error("set_user_location", e)
+
     def get_all_users(self) -> list[dict[str, Any]]:
         """Get all users.
 

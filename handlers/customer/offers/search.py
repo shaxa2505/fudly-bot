@@ -346,11 +346,15 @@ def setup(
         # Use get_user instead of get_user_model if protocol doesn't support it
         user_data = db.get_user(message.from_user.id)
         raw_city = user_data.get("city") if user_data else None
+        raw_region = user_data.get("region") if user_data else None
+        raw_district = user_data.get("district") if user_data else None
 
         # Normalize city (e.g. "Samarqand" -> "Самарканд") to match DB records
         from app.core.utils import normalize_city
 
         city = normalize_city(raw_city) if raw_city else None
+        region = normalize_city(raw_region) if raw_region else None
+        district = normalize_city(raw_district) if raw_district else None
 
         logger.info(f"🔍 Search: user_city='{raw_city}', normalized_city='{city}'")
 
@@ -362,7 +366,8 @@ def setup(
         # 1. Search stores first
         if hasattr(db, "search_stores"):
             try:
-                stores = db.search_stores(query, city)
+                store_city_scope = city or region
+                stores = db.search_stores(query, store_city_scope)
                 logger.info(f"🔍 Store search found {len(stores)} stores")
                 store_results = stores
             except Exception as e:
@@ -374,7 +379,7 @@ def setup(
             if len(term) < 2:  # Пропускаем короткие термины
                 continue
 
-            results = offer_service.search_offers(term, city)
+            results = offer_service.search_offers(term, city, region=region, district=district)
             logger.info(f"🔍 Search term '{term}' found {len(results)} offers")
 
             for offer in results:

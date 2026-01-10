@@ -16,6 +16,10 @@ class User(BaseModel):
     first_name: str = Field(..., description="User's first name")
     phone: str | None = Field(None, description="Phone number")
     city: str = Field(..., description="User's city")
+    region: str | None = Field(None, description="User's region")
+    district: str | None = Field(None, description="User's district")
+    latitude: float | None = Field(None, description="User latitude")
+    longitude: float | None = Field(None, description="User longitude")
     language: Language = Field(Language.RUSSIAN, description="Interface language")
     role: UserRole = Field(UserRole.CUSTOMER, description="User role")
     notifications_enabled: bool = Field(True, description="Push notifications enabled")
@@ -68,6 +72,10 @@ class User(BaseModel):
             "first_name": self.first_name,
             "phone": self.phone,
             "city": self.city,
+            "region": self.region,
+            "district": self.district,
+            "latitude": self.latitude,
+            "longitude": self.longitude,
             "language": self.language.value
             if isinstance(self.language, Language)
             else self.language,
@@ -89,13 +97,21 @@ class User(BaseModel):
         if isinstance(row, dict):
             return cls(**row)
 
-        # Tuple format: (user_id, username, first_name, phone, city, language, role, notifications_enabled, created_at)
+        # Tuple format: (user_id, username, first_name, phone, city, language, role, notifications_enabled, created_at, ...)
+        region = row[-4] if len(row) >= 15 else None
+        district = row[-3] if len(row) >= 15 else None
+        latitude = row[-2] if len(row) >= 15 else None
+        longitude = row[-1] if len(row) >= 15 else None
         return cls(
             user_id=row[0],
             username=row[1] if len(row) > 1 else None,
             first_name=row[2] if len(row) > 2 else "User",
             phone=row[3] if len(row) > 3 else None,
             city=row[4] if len(row) > 4 else "Ташкент",
+            region=region,
+            district=district,
+            latitude=latitude,
+            longitude=longitude,
             language=row[5] if len(row) > 5 else Language.RUSSIAN,
             role=row[6] if len(row) > 6 else UserRole.CUSTOMER,
             notifications_enabled=bool(row[7]) if len(row) > 7 else True,
