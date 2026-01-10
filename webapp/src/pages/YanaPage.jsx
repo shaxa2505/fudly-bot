@@ -26,7 +26,7 @@ const COMPLETED_STATUSES = new Set(['completed', 'cancelled', 'rejected'])
 
 const CANCELABLE_STATUSES = new Set(['pending'])
 
-function YanaPage() {
+function YanaPage({ user }) {
   const navigate = useNavigate()
   const [activeSection, setActiveSection] = useState('orders') // orders, notifications, settings, about
   const [orders, setOrders] = useState([])
@@ -36,22 +36,24 @@ function YanaPage() {
   const { toast } = useToast()
   const lang = getUserLanguage()
 
-  // Settings state - load from user profile first, then localStorage
-  const [phone] = useState(() => {
-    const user = getCurrentUser()
-    if (user?.phone) return user.phone
-    // Try Telegram WebApp contact
-    const tgPhone = window.Telegram?.WebApp?.initDataUnsafe?.user?.phone_number
-    if (tgPhone) return tgPhone
-    return localStorage.getItem('fudly_phone') || ''
-  })
-  const [location] = useState(() => {
+  const cachedUser = getCurrentUser()
+  const resolvedPhone = (
+    user?.phone ||
+    cachedUser?.phone ||
+    window.Telegram?.WebApp?.initDataUnsafe?.user?.phone_number ||
+    localStorage.getItem('fudly_phone') ||
+    ''
+  )
+  const resolvedCity = (() => {
+    if (user?.city) return user.city
+    if (cachedUser?.city) return cachedUser.city
     try {
-      const user = getCurrentUser()
-      if (user?.city) return { city: user.city }
-      return JSON.parse(localStorage.getItem('fudly_location') || '{}')
-    } catch { return {} }
-  })
+      const stored = JSON.parse(localStorage.getItem('fudly_location') || '{}')
+      return stored?.city || ''
+    } catch {
+      return ''
+    }
+  })()
   const [notifications, setNotifications] = useState(true)
   const [notificationsList, setNotificationsList] = useState([])
   const [notificationsLoading, setNotificationsLoading] = useState(true)
@@ -641,7 +643,7 @@ function YanaPage() {
                 type="tel"
                 className="setting-input"
                 placeholder="+998 90 123 45 67"
-                value={phone}
+                value={resolvedPhone}
                 readOnly
                 disabled
               />
@@ -658,7 +660,7 @@ function YanaPage() {
               <input
                 type="text"
                 className="setting-input"
-                value={location.city || ''}
+                value={resolvedCity}
                 readOnly
                 disabled
                 placeholder="Joylashuvni aniqlang"
