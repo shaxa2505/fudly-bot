@@ -594,8 +594,40 @@ async def change_city_text(
     user = db.get_user_model(user_id)
     new_city = message.text
 
+    cities = get_cities(lang)
+    idx = cities.index(new_city) if new_city in cities else None
+    district_options = get_districts_for_city_index(idx, lang)
+    if not district_options:
+        district_options = get_districts_for_region(new_city, lang)
+    if district_options and state is not None:
+        region_key = get_region_key_for_city_index(idx)
+        region_value = normalize_city(region_key or new_city)
+        await state.update_data(
+            region_label=new_city,
+            region_value=region_value,
+            region_key=region_key,
+        )
+        await state.set_state(ChangeCity.district)
+        builder = InlineKeyboardBuilder()
+        for idx, (label, _value) in enumerate(district_options):
+            builder.button(text=f"\U0001F4CD {label}", callback_data=f"select_district:{idx}")
+        builder.adjust(2)
+        prompt = (
+            "🏘 Выберите район/город в области:" if lang == "ru" else "🏘 Viloyatdagi tuman/shaharni tanlang:"
+        )
+        await message.answer(prompt, reply_markup=builder.as_markup())
+        return
+
     normalized_city = normalize_city(new_city)
-    db.update_user_city(user_id, normalized_city)
+    if hasattr(db, "update_user_location"):
+        db.update_user_location(
+            user_id,
+            city=normalized_city,
+            clear_region=True,
+            clear_district=True,
+        )
+    else:
+        db.update_user_city(user_id, normalized_city)
 
     user_role = user.role or "customer" if user else "customer"
     menu = (

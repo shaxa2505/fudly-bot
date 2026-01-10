@@ -9,11 +9,15 @@ from aiogram.fsm.context import FSMContext
 from aiogram.types import ReplyKeyboardRemove
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
+from app.core.location_data import (
+    get_districts_for_city_index,
+    get_districts_for_region,
+    get_region_key_for_city_index,
+)
 from app.core.utils import get_field, get_store_field, normalize_city
 from app.integrations.sentry_integration import capture_exception
 from app.keyboards import (
     city_inline_keyboard,
-    city_keyboard,
     language_keyboard,
     main_menu_customer,
     main_menu_seller,
@@ -237,7 +241,7 @@ async def profile_change_city(callback: types.CallbackQuery, state: FSMContext) 
         await callback.message.answer(
             get_text(lang, "choose_city"),
             parse_mode="HTML",
-            reply_markup=city_keyboard(lang),
+            reply_markup=city_inline_keyboard(lang),
         )
     await state.set_state(ChangeCity.city)
     await callback.answer()
@@ -257,6 +261,7 @@ async def profile_change_city_cb(callback: types.CallbackQuery, state: FSMContex
 
     assert callback.from_user is not None
     lang = db.get_user_language(callback.from_user.id)
+    idx: int | None = None
     try:
         raw = callback.data or ""
         parts = raw.split("_", 2)
@@ -278,7 +283,38 @@ async def profile_change_city_cb(callback: types.CallbackQuery, state: FSMContex
         return
 
     normalized_city = normalize_city(city)
-    db.update_user_city(callback.from_user.id, normalized_city)
+    region_key = get_region_key_for_city_index(idx)
+    district_options = get_districts_for_city_index(idx, lang)
+    if not district_options:
+        district_options = get_districts_for_region(city, lang)
+    if district_options:
+        region_value = normalize_city(region_key or city)
+        await state.update_data(
+            region_label=city,
+            region_value=region_value,
+            region_key=region_key,
+        )
+        await state.set_state(ChangeCity.district)
+        builder = InlineKeyboardBuilder()
+        for idx, (label, _value) in enumerate(district_options):
+            builder.button(text=f"\U0001F4CD {label}", callback_data=f"select_district:{idx}")
+        builder.adjust(2)
+        prompt = (
+            "🏘 Выберите район/город в области:" if lang == "ru" else "🏘 Viloyatdagi tuman/shaharni tanlang:"
+        )
+        await callback.message.edit_text(prompt, reply_markup=builder.as_markup())
+        await callback.answer()
+        return
+
+    if hasattr(db, "update_user_location"):
+        db.update_user_location(
+            callback.from_user.id,
+            city=normalized_city,
+            clear_region=True,
+            clear_district=True,
+        )
+    else:
+        db.update_user_city(callback.from_user.id, normalized_city)
     await state.clear()
 
     await callback.message.answer(
