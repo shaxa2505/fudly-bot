@@ -163,7 +163,7 @@
 
 .card-footer {
   display: flex;
-  align-items: center;
+  align-items: flex-end;
   justify-content: space-between;
   gap: 8px;
 }
@@ -172,6 +172,7 @@
   display: flex;
   flex-direction: column;
   gap: 2px;
+  min-width: 0;
 }
 
 .price-main {
@@ -215,12 +216,12 @@
 }
 
 .card-action .quantity-control {
-  --qc-height: 30px;
-  --qc-pad: 3px;
-  --qc-gap: 6px;
-  --qc-btn-size: 24px;
-  --qc-value-font: 12px;
-  min-width: 86px;
+  --qc-height: 28px;
+  --qc-pad: 2px;
+  --qc-gap: 4px;
+  --qc-btn-size: 22px;
+  --qc-value-font: 11px;
+  min-width: 74px;
   border: 1px solid rgba(15, 118, 110, 0.18);
   box-shadow: 0 6px 14px rgba(16, 24, 40, 0.12);
 }
