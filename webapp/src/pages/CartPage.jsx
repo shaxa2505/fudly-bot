@@ -4,7 +4,7 @@ import { ShoppingCart, Home, Sparkles, ArrowLeft, Trash2, ChevronRight, X } from
 import api from '../api/client'
 import { useCart } from '../context/CartContext'
 import { useToast } from '../context/ToastContext'
-import { getUnitLabel, blurOnEnter } from '../utils/helpers'
+import { getUnitLabel, blurOnEnter, isValidPhone } from '../utils/helpers'
 import { PLACEHOLDER_IMAGE, resolveOfferImageUrl } from '../utils/imageUtils'
 import QuantityControl from '../components/QuantityControl'
 import BottomNav from '../components/BottomNav'
@@ -225,20 +225,31 @@ function CartPage({ user }) {
     [canonicalPhone, phone]
   )
 
+  const normalizePhoneInput = (value) => value.replace(/[^\d+]/g, '')
+
   const ensurePhoneOrPrompt = () => {
     const resolved = getResolvedPhone()
-    if (resolved) return resolved
-    toast.error('Telefon raqamingiz botda tasdiqlanmagan. Botga o\'ting va raqamni yuboring.')
-    if (botUsername) {
-      const tg = window.Telegram?.WebApp
-      const url = `https://t.me/${botUsername}?start=register`
-      if (tg?.openTelegramLink) {
-        tg.openTelegramLink(url)
-      } else {
-        window.open(url, '_blank')
+    if (!resolved) {
+      toast.error('Telefon raqamini kiriting yoki botda tasdiqlang.')
+      if (botUsername) {
+        const tg = window.Telegram?.WebApp
+        const url = `https://t.me/${botUsername}?start=register`
+        if (tg?.openTelegramLink) {
+          tg.openTelegramLink(url)
+        } else {
+          window.open(url, '_blank')
+        }
       }
+      return ''
     }
-    return ''
+
+    const normalized = normalizePhoneInput(resolved)
+    if (!canonicalPhone && !isValidPhone(normalized)) {
+      toast.error('Telefon formati: +998XXXXXXXXX')
+      return ''
+    }
+
+    return normalized
   }
 
   // Proceed to payment step (for delivery)
@@ -652,12 +663,13 @@ function CartPage({ user }) {
                       className="form-input"
                       placeholder="+998 90 123 45 67"
                       value={canonicalPhone || phone}
-                      readOnly
-                      disabled
+                      onChange={e => setPhone(e.target.value)}
+                      readOnly={!!canonicalPhone}
+                      disabled={!!canonicalPhone}
                     />
-                    {!canonicalPhone && (
+                    {!canonicalPhone && !phone.trim() && (
                       <div className="form-hint">
-                        Telefon raqamingiz botda tasdiqlanmagan. Botga o\'ting va raqamni yuboring.
+                        Telefon raqamini kiriting yoki botda tasdiqlang.
                       </div>
                     )}
                   </label>
