@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { ShoppingCart, Home, Sparkles, ArrowLeft, Trash2, ChevronRight, X } from 'lucide-react'
 import api from '../api/client'
@@ -24,13 +24,16 @@ function CartPage({ user }) {
     clearCart
   } = useCart()
 
+  const botUsername = import.meta.env.VITE_BOT_USERNAME || ''
+  const canonicalPhone = (user?.phone || '').toString().trim()
+
   const [orderLoading, setOrderLoading] = useState(false)
   const commentInputRef = useRef(null)
   const [focusCommentOnOpen, setFocusCommentOnOpen] = useState(false)
 
   // Checkout form
   const [showCheckout, setShowCheckout] = useState(false)
-  const [phone, setPhone] = useState(() => localStorage.getItem('fudly_phone') || '')
+  const [phone, setPhone] = useState(() => canonicalPhone || localStorage.getItem('fudly_phone') || '')
   const [address, setAddress] = useState(() => {
     try {
       const loc = JSON.parse(localStorage.getItem('fudly_location') || '{}')
@@ -77,6 +80,14 @@ function CartPage({ user }) {
       setFocusCommentOnOpen(false)
     }
   }, [showCheckout, focusCommentOnOpen])
+
+  // Keep phone in sync with server profile (bot registration is the single source)
+  useEffect(() => {
+    if (canonicalPhone && canonicalPhone !== phone) {
+      setPhone(canonicalPhone)
+      localStorage.setItem('fudly_phone', canonicalPhone)
+    }
+  }, [canonicalPhone, phone])
 
   // Check if stores in cart support delivery
   useEffect(() => {
@@ -167,6 +178,19 @@ function CartPage({ user }) {
 
   const handleCheckout = () => {
     if (isEmpty) return
+    if (!canonicalPhone) {
+      toast.error('Telefon raqamingiz botda tasdiqlanmagan. Botga o\'ting va raqamni yuboring.')
+      if (botUsername) {
+        const tg = window.Telegram?.WebApp
+        const url = `https://t.me/${botUsername}?start=register`
+        if (tg?.openTelegramLink) {
+          tg.openTelegramLink(url)
+        } else {
+          window.open(url, '_blank')
+        }
+      }
+      return
+    }
     const storeIds = new Set(cartItems.map(item => item.offer?.store_id).filter(Boolean))
     if (storeIds.size > 1) {
       toast.error('Checkout supports only one store. Clear the cart and try again.')
@@ -196,10 +220,31 @@ function CartPage({ user }) {
     }
   }
 
+  const getResolvedPhone = useCallback(
+    () => (canonicalPhone || phone || '').trim(),
+    [canonicalPhone, phone]
+  )
+
+  const ensurePhoneOrPrompt = () => {
+    const resolved = getResolvedPhone()
+    if (resolved) return resolved
+    toast.error('Telefon raqamingiz botda tasdiqlanmagan. Botga o\'ting va raqamni yuboring.')
+    if (botUsername) {
+      const tg = window.Telegram?.WebApp
+      const url = `https://t.me/${botUsername}?start=register`
+      if (tg?.openTelegramLink) {
+        tg.openTelegramLink(url)
+      } else {
+        window.open(url, '_blank')
+      }
+    }
+    return ''
+  }
+
   // Proceed to payment step (for delivery)
   const proceedToPayment = async () => {
-    if (!phone.trim()) {
-      toast.warning('Telefon raqamingizni kiriting')
+    const resolvedPhone = ensurePhoneOrPrompt()
+    if (!resolvedPhone) {
       return
     }
     if (orderType === 'delivery' && !address.trim()) {
@@ -243,20 +288,25 @@ function CartPage({ user }) {
     setOrderLoading(true)
 
     try {
+      const resolvedPhone = ensurePhoneOrPrompt()
+      if (!resolvedPhone) {
+        setOrderLoading(false)
+        return
+      }
       const orderData = {
         items: cartItems.map(item => ({
           offer_id: item.offer.id,
           quantity: item.quantity,
         })),
         delivery_address: orderType === 'delivery' ? address.trim() : null,
-        phone: phone.trim(),
+        phone: resolvedPhone,
         comment: `${orderType === 'pickup' ? 'O\'zi olib ketadi' : 'Yetkazib berish'}\n${comment.trim()}`.trim(),
         order_type: orderType,
         delivery_fee: orderType === 'delivery' ? deliveryFee : 0,
         payment_method: selectedPaymentMethod,
       }
 
-      localStorage.setItem('fudly_phone', phone.trim())
+      localStorage.setItem('fudly_phone', resolvedPhone)
 
       const result = await api.createOrder(orderData)
 
@@ -347,6 +397,11 @@ function CartPage({ user }) {
 
     setOrderLoading(true)
     try {
+      const resolvedPhone = ensurePhoneOrPrompt()
+      if (!resolvedPhone) {
+        setOrderLoading(false)
+        return
+      }
       // First create the order
       const orderData = {
         items: cartItems.map(item => ({
@@ -354,14 +409,14 @@ function CartPage({ user }) {
           quantity: item.quantity,
         })),
         delivery_address: orderType === 'delivery' ? address.trim() : null,
-        phone: phone.trim(),
+        phone: resolvedPhone,
         comment: `${orderType === 'pickup' ? 'O\'zi olib ketadi' : 'Yetkazib berish'}\n${comment.trim()}`.trim(),
         order_type: orderType,
         delivery_fee: orderType === 'delivery' ? deliveryFee : 0,
         payment_method: provider,
       }
 
-      localStorage.setItem('fudly_phone', phone.trim())
+      localStorage.setItem('fudly_phone', resolvedPhone)
       const result = await api.createOrder(orderData)
 
       const isSuccess = !!(result?.success || result?.order_id)
@@ -596,10 +651,15 @@ function CartPage({ user }) {
                       type="tel"
                       className="form-input"
                       placeholder="+998 90 123 45 67"
-                      value={phone}
-                      onChange={e => setPhone(e.target.value)}
-                      onKeyDown={blurOnEnter}
+                      value={canonicalPhone || phone}
+                      readOnly
+                      disabled
                     />
+                    {!canonicalPhone && (
+                      <div className="form-hint">
+                        Telefon raqamingiz botda tasdiqlanmagan. Botga o\'ting va raqamni yuboring.
+                      </div>
+                    )}
                   </label>
 
                   {orderType === 'delivery' && (
@@ -750,7 +810,7 @@ function CartPage({ user }) {
                   <button
                     className="checkout-footer-btn"
                     onClick={proceedToPayment}
-                    disabled={orderLoading || !phone.trim() || (orderType === 'delivery' && !address.trim())}
+                    disabled={orderLoading || !getResolvedPhone() || (orderType === 'delivery' && !address.trim())}
                   >
                     {orderLoading ? '...' : selectedPaymentMethod === 'card' ? 'To\'lovga o\'tish' : 'Buyurtma berish'}
                   </button>

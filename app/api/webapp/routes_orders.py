@@ -44,11 +44,19 @@ def _require_user_id(user: dict[str, Any]) -> int:
     return user_id
 
 
-def _update_phone_if_valid(db: Any, user_id: int, raw_phone: str | None) -> None:
+def _normalize_phone(raw_phone: str | None) -> str:
+    """Sanitize + validate phone; return empty string if invalid."""
     if not raw_phone:
-        return
-    sanitized_phone = sanitize_phone(raw_phone)
-    if not sanitized_phone or not validator.validate_phone(sanitized_phone):
+        return ""
+    sanitized = sanitize_phone(raw_phone)
+    if not sanitized or not validator.validate_phone(sanitized):
+        return ""
+    return sanitized
+
+
+def _update_phone_if_valid(db: Any, user_id: int, raw_phone: str | None) -> None:
+    sanitized_phone = _normalize_phone(raw_phone)
+    if not sanitized_phone:
         return
     try:
         if hasattr(db, "update_user_phone"):
@@ -61,16 +69,24 @@ def _update_phone_if_valid(db: Any, user_id: int, raw_phone: str | None) -> None
 
 
 def _resolve_required_phone(db: Any, user_id: int, raw_phone: str | None) -> str:
-    candidate = (raw_phone or "").strip()
+    """Return canonical phone: use DB if present, otherwise allow first-time set."""
+    user_model = db.get_user_model(user_id) if hasattr(db, "get_user_model") else None
+    stored_phone = _normalize_phone((get_val(user_model, "phone") if user_model else None))
+    candidate = _normalize_phone(raw_phone)
+
+    if stored_phone:
+        if candidate and candidate != stored_phone:
+            raise HTTPException(
+                status_code=400,
+                detail="Phone does not match registered number. Update it in the bot.",
+            )
+        return stored_phone
+
     if candidate:
         _update_phone_if_valid(db, user_id, candidate)
         return candidate
-    user_model = db.get_user_model(user_id) if hasattr(db, "get_user_model") else None
-    stored_phone = (get_val(user_model, "phone") if user_model else None) or ""
-    stored_phone = str(stored_phone).strip()
-    if not stored_phone:
-        raise HTTPException(status_code=400, detail="Phone is required")
-    return stored_phone
+
+    raise HTTPException(status_code=400, detail="Phone is required")
 
 
 def _load_offers_and_store(items: list[Any], db: Any) -> tuple[dict[int, Any], int]:
