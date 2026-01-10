@@ -149,7 +149,7 @@ def build_order_card_text(
         lines.append("")
         # Show delivery price
         delivery_label = "Yetkazish" if lang == "uz" else "Доставка"
-        delivery_price_sums = int(delivery_price) // 100
+        delivery_price_sums = int(delivery_price)
         lines.append(f"🚚 {delivery_label}: {delivery_price_sums:,} {currency}")
 
         # Pickup option

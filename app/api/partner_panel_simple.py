@@ -153,23 +153,23 @@ def _maybe_int(value: object, field: str) -> int | None:
 
 def _to_kopeks(price_in_sums: int | float | None) -> int | None:
     """
-    Convert price from sums (user-facing) to kopeks (DB storage).
+    Normalize price from UI (sums) to DB storage (also sums).
     Returns None if input is None.
     """
     if price_in_sums is None:
         return None
     try:
-        return int(round(float(price_in_sums) * 100))
+        return int(round(float(price_in_sums)))
     except (TypeError, ValueError) as exc:
         raise HTTPException(status_code=400, detail="Invalid price value") from exc
 
 
 def _to_sums(price_in_kopeks: int | float | None) -> int:
-    """Convert price from kopeks (DB) to sums for API responses."""
+    """Normalize price from DB to sums for API responses."""
     if price_in_kopeks is None:
         return 0
     try:
-        return int(round(float(price_in_kopeks) / 100))
+        return int(round(float(price_in_kopeks)))
     except (TypeError, ValueError):
         return 0
 
@@ -543,8 +543,7 @@ async def list_products(authorization: str = Header(None), status: Optional[str]
     """
     List partner's products with frontend-compatible field names.
 
-    Returns prices in SUMS (converted from kopeks for display).
-    1 sum = 100 kopeks stored in DB.
+    Returns prices in sums for display.
     Maps DB fields to frontend expectations: offer_id→id, title→name, quantity→stock, etc.
     """
     telegram_id = verify_telegram_webapp(authorization)
@@ -561,7 +560,7 @@ async def list_products(authorization: str = Header(None), status: Optional[str]
     # Map to frontend-expected format
     products = []
     for o in offers:
-        # Prices stored in kopeks; convert to sums for UI
+        # Prices stored in sums; use as-is for UI
         discount_price = _to_sums(o.get("discount_price"))
         original_price = _to_sums(o.get("original_price")) if o.get("original_price") is not None else None
 
@@ -624,8 +623,7 @@ async def create_product(
     """
     Create new product with unified schema.
 
-    Prices are accepted in SUMS (user-friendly) and converted to kopeks internally.
-    1 sum = 100 kopeks for precise calculation.
+    Prices are accepted in sums (user-friendly) and stored as-is.
     Times are generated automatically (08:00 - 23:00).
     Validation happens via Pydantic models.
 
@@ -677,7 +675,7 @@ async def create_product(
     if discount_price is None:
         discount_price = original_price
 
-    # Convert prices from sums (UI) to kopeks (DB storage)
+    # Normalize prices from UI input
     original_price = _to_kopeks(original_price)
     discount_price = _to_kopeks(discount_price)
 
@@ -729,8 +727,8 @@ async def create_product(
             store_id=offer_data.store_id,
             title=offer_data.title,
             description=offer_data.description,
-            original_price=offer_data.original_price,  # Already in kopeks
-            discount_price=offer_data.discount_price,  # Already in kopeks
+            original_price=offer_data.original_price,
+            discount_price=offer_data.discount_price,
             quantity=offer_data.quantity,
             stock_quantity=actual_stock,  # NEW: v22.0 field
             available_from=offer_data.available_from.isoformat(),
@@ -770,8 +768,7 @@ async def update_product(
     Update product (supports partial updates for quick actions).
     Accepts both PUT and PATCH methods.
 
-    Prices accepted in SUMS and converted to kopeks internally.
-    1 sum = 100 kopeks.
+    Prices accepted in sums and stored as-is.
 
     v22.0: Added stock_quantity support.
     """
@@ -817,7 +814,7 @@ async def update_product(
     if status is None:
         status = payload.get("status")
 
-    # Convert prices from sums (UI) to kopeks (DB storage)
+    # Normalize prices from UI input
     if original_price is not None:
         original_price = _to_kopeks(original_price)
     if discount_price is not None:
@@ -1518,18 +1515,18 @@ async def update_store(settings: dict, authorization: str = Header(None)):
     min_order_input = settings.get("min_order_amount", settings.get("min_order"))
 
     delivery_price = (
-        _parse_int(delivery_price_input, int(store.get("delivery_price") or 0) // 100)
+        _parse_int(delivery_price_input, int(store.get("delivery_price") or 0))
         if delivery_price_input is not None
-        else int(store.get("delivery_price") or 0) // 100
+        else int(store.get("delivery_price") or 0)
     )
     min_order_amount = (
-        _parse_int(min_order_input, int(store.get("min_order_amount") or 0) // 100)
+        _parse_int(min_order_input, int(store.get("min_order_amount") or 0))
         if min_order_input is not None
-        else int(store.get("min_order_amount") or 0) // 100
+        else int(store.get("min_order_amount") or 0)
     )
 
-    delivery_price_kopeks = max(0, int(delivery_price) * 100)
-    min_order_kopeks = max(0, int(min_order_amount) * 100)
+    delivery_price_value = max(0, int(delivery_price))
+    min_order_value = max(0, int(min_order_amount))
 
     # Update existing store via SQL
     with db.get_connection() as conn:
@@ -1556,8 +1553,8 @@ async def update_store(settings: dict, authorization: str = Header(None)):
                 settings.get("phone", store.get("phone")),
                 settings.get("description", store.get("description")),
                 int(delivery_enabled),
-                delivery_price_kopeks,
-                min_order_kopeks,
+                delivery_price_value,
+                min_order_value,
                 store["store_id"],
             ),
         )

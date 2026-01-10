@@ -72,7 +72,7 @@ function renderRevenueChart(data) {
             labels: data.map(d => d.label),
             datasets: [{
                 label: 'Выручка',
-                data: data.map(d => d.value / 100), // Convert kopeks to sums
+                data: data.map(d => d.value),
                 borderColor: '#6366f1',
                 backgroundColor: 'rgba(99, 102, 241, 0.1)',
                 borderWidth: 2,
@@ -89,7 +89,7 @@ function renderRevenueChart(data) {
                 },
                 tooltip: {
                     callbacks: {
-                        label: (context) => formatPrice(context.raw * 100)
+                        label: (context) => formatPrice(context.raw)
                     }
                 }
             },

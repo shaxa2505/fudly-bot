@@ -601,30 +601,57 @@ function HomePage() {
       {/* Subheader (Search) */}
       <div className="home-subheader">
         <div className="header-search">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" className="search-icon">
-            <circle cx="11" cy="11" r="8" stroke="currentColor" strokeWidth="2"/>
-            <path d="M21 21l-4.35-4.35" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
-          </svg>
-          <input
-            ref={searchInputRef}
-            type="text"
-            className="search-input"
-            placeholder="Mahsulot qidirish..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            onFocus={() => setShowSearchHistory(true)}
-            onBlur={() => setTimeout(() => setShowSearchHistory(false), 200)}
-            onKeyDown={(e) => blurOnEnter(e, handleSearchSubmit)}
-          />
-          {searchQuery && (
-            <button
-              className="search-clear"
-              onClick={() => setSearchQuery('')}
-              aria-label="Qidiruvni tozalash"
-            >
-              x
-            </button>
-          )}
+          <div className="search-field">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" className="search-icon">
+              <circle cx="11" cy="11" r="8" stroke="currentColor" strokeWidth="2"/>
+              <path d="M21 21l-4.35-4.35" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+            </svg>
+            <input
+              ref={searchInputRef}
+              type="text"
+              className="search-input"
+              placeholder="Mahsulot qidirish..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              onFocus={() => setShowSearchHistory(true)}
+              onBlur={() => setTimeout(() => setShowSearchHistory(false), 200)}
+              onKeyDown={(e) => blurOnEnter(e, handleSearchSubmit)}
+            />
+            {searchQuery && (
+              <button
+                className="search-clear"
+                onClick={() => setSearchQuery('')}
+                aria-label="Qidiruvni tozalash"
+              >
+                x
+              </button>
+            )}
+
+            {/* Search History Dropdown */}
+            {showSearchHistory && searchHistory.length > 0 && !searchQuery && (
+              <div className="search-history-dropdown">
+                <div className="search-history-header">
+                  <span>So'nggi qidiruvlar</span>
+                  <button className="search-history-clear" onClick={handleClearHistory}>
+                    Tozalash
+                  </button>
+                </div>
+                {searchHistory.map((query, index) => (
+                  <button
+                    key={index}
+                    className="search-history-item"
+                    onMouseDown={() => handleHistoryClick(query)}
+                  >
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                      <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="2"/>
+                      <path d="M12 6v6l4 2" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+                    </svg>
+                    <span>{query}</span>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
           <button
             type="button"
             className={`search-filter-toggle ${showAdvancedFilters ? 'active' : ''}`}
@@ -635,36 +662,14 @@ function HomePage() {
             aria-label="Filtrlar"
             aria-expanded={showAdvancedFilters}
           >
-            <SlidersHorizontal size={18} strokeWidth={2} aria-hidden="true" />
+            <span className="filter-icon" aria-hidden="true">
+              <SlidersHorizontal size={16} strokeWidth={2} />
+            </span>
+            <span className="filter-label">Filtr</span>
             {activeFiltersCount > 0 && (
               <span className="search-filter-count">{activeFiltersCount}</span>
             )}
           </button>
-
-          {/* Search History Dropdown */}
-          {showSearchHistory && searchHistory.length > 0 && !searchQuery && (
-            <div className="search-history-dropdown">
-              <div className="search-history-header">
-                <span>So'nggi qidiruvlar</span>
-                <button className="search-history-clear" onClick={handleClearHistory}>
-                  Tozalash
-                </button>
-              </div>
-              {searchHistory.map((query, index) => (
-                <button
-                  key={index}
-                  className="search-history-item"
-                  onMouseDown={() => handleHistoryClick(query)}
-                >
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
-                    <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="2"/>
-                    <path d="M12 6v6l4 2" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
-                  </svg>
-                  <span>{query}</span>
-                </button>
-              ))}
-            </div>
-          )}
         </div>
       </div>
 

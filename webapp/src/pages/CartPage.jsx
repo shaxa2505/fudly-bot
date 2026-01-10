@@ -834,7 +834,7 @@ function CartPage({ user }) {
                               id="payment-proof-input"
                               accept="image/*"
                               onChange={handleFileSelect}
-                              style={{ display: 'none' }}
+                              className="file-input-hidden"
                             />
                             <label htmlFor="payment-proof-input" className="upload-btn">
                               Rasm tanlash
@@ -891,7 +891,7 @@ function CartPage({ user }) {
                     id="payment-proof-upload-input"
                     accept="image/*,image/jpeg,image/jpg,image/png"
                     onChange={handleFileSelect}
-                    style={{ display: 'none' }}
+                    className="file-input-hidden"
                   />
 
                 <p className="upload-instruction">

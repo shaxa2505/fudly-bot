@@ -8,8 +8,10 @@ function OfferCardSkeleton() {
         <div className="skeleton-store shimmer" />
         <div className="skeleton-title shimmer" />
         <div className="skeleton-title-short shimmer" />
-        <div className="skeleton-price shimmer" />
-        <div className="skeleton-button shimmer" />
+        <div className="skeleton-footer">
+          <div className="skeleton-price shimmer" />
+          <div className="skeleton-button shimmer" />
+        </div>
       </div>
     </div>
   )

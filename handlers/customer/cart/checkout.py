@@ -217,24 +217,31 @@ def register(router: Router) -> None:
 
         cart_storage.clear_cart(user_id)
 
-        order_ids = [str(oid) for oid in result.order_ids if oid]
-        pickup_codes = [code for code in result.pickup_codes if code]
+        user = common.db.get_user_model(user_id)
+        if isinstance(user, dict):
+            notifications_enabled = bool(user.get("notifications_enabled", True))
+        else:
+            notifications_enabled = bool(getattr(user, "notifications_enabled", True))
 
-        lines: list[str] = [get_text(lang, "cart_order_created_title")]
-        if order_ids:
-            lines.append(get_text(lang, "cart_order_created_ids", ids=", ".join(order_ids)))
-        if pickup_codes:
-            lines.append(
-                get_text(lang, "cart_order_created_codes", codes=", ".join(pickup_codes))
-            )
-        lines.append(get_text(lang, "cart_order_created_menu_hint"))
+        if not notifications_enabled:
+            order_ids = [str(oid) for oid in result.order_ids if oid]
+            pickup_codes = [code for code in result.pickup_codes if code]
 
-        text = "\n".join(lines)
+            lines: list[str] = [get_text(lang, "cart_order_created_title")]
+            if order_ids:
+                lines.append(get_text(lang, "cart_order_created_ids", ids=", ".join(order_ids)))
+            if pickup_codes:
+                lines.append(
+                    get_text(lang, "cart_order_created_codes", codes=", ".join(pickup_codes))
+                )
+            lines.append(get_text(lang, "cart_order_created_menu_hint"))
 
-        try:
-            await callback.message.answer(text, parse_mode="HTML")
-        except Exception:
-            pass
+            text = "\n".join(lines)
+
+            try:
+                await callback.message.answer(text, parse_mode="HTML")
+            except Exception:
+                pass
 
         await callback.answer()
 

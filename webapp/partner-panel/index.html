@@ -269,7 +269,7 @@
                                     </div>
                                 </div>
                                 <input type="hidden" name="photo_id" value="${product?.photo_id || ''}">
-                                <input type="file" id="photoFile" accept="image/*" class="hidden" onchange="handlePhotoUpload(this, event)">
+                                <input type="file" id="photoFile" accept="image/*" class="file-input-hidden" onchange="handlePhotoUpload(this, event)">
                                 <div class="photo-upload-card photo-upload-area ${hasProductPhoto ? 'has-photo' : ''}" onclick="document.getElementById('photoFile').click()">
                                     ${hasProductPhoto ? `
                                         <div class="photo-preview">

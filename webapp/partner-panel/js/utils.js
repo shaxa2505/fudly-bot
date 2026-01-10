@@ -4,9 +4,9 @@
    ================================================ */
 
 // Format price in sums
-export function formatPrice(kopeks) {
-    if (kopeks == null || kopeks === '') return '0 сум';
-    const sums = Math.floor(Number(kopeks) / 100);
+export function formatPrice(amount) {
+    if (amount == null || amount === '') return '0 сум';
+    const sums = Math.round(Number(amount)) || 0;
     return sums.toLocaleString('ru-RU') + ' сум';
 }
 
@@ -81,14 +81,13 @@ export function toast(message, type = 'info', duration = 3000) {
 export const money = {
     format: formatPrice,
 
-    // Convert sums to kopeks for API
+    // Storage uses sums; conversion helpers are no-ops.
     toKopeks(sums) {
-        return Math.floor(Number(sums) * 100);
+        return Math.round(Number(sums)) || 0;
     },
 
-    // Convert kopeks to sums
     toSums(kopeks) {
-        return Number(kopeks) / 100;
+        return Number(kopeks) || 0;
     },
 
     // Validate amount

@@ -365,7 +365,7 @@ def register_hot(
         # Delivery/pickup options
         lines.append("")
         if delivery_enabled:
-            lines.append(f"🚚 {delivery_label}: {int(delivery_price) // 100:,} {currency}")
+            lines.append(f"🚚 {delivery_label}: {int(delivery_price):,} {currency}")
             lines.append(f"🏪 {pickup_label}: {free_label}")
         else:
             lines.append(f"🏪 {pickup_only}")

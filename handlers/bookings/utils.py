@@ -27,12 +27,12 @@ __all__ = [
 ]
 
 
-def format_price(amount_in_kopeks: int | float, lang: str = "ru") -> str:
+def format_price(amount_in_sums: int | float, lang: str = "ru") -> str:
     """
-    Format price from kopeks (stored in DB) to human-readable format.
+    Format price from sums (stored in DB) to human-readable format.
     
     Args:
-        amount_in_kopeks: Price in kopeks (1 sum = 100 kopeks)
+        amount_in_sums: Price in sums
         lang: Language code ('uz' or 'ru')
     
     Returns:
@@ -44,14 +44,11 @@ def format_price(amount_in_kopeks: int | float, lang: str = "ru") -> str:
         >>> format_price(3500000, "uz")
         '35 000 so'm'
     """
-    if not amount_in_kopeks and amount_in_kopeks != 0:
-        amount_in_kopeks = 0
-    
-    # Convert kopeks to sums
-    amount_in_sums = int(amount_in_kopeks) // 100
-    
+    if not amount_in_sums and amount_in_sums != 0:
+        amount_in_sums = 0
+
     # Format with spaces as thousand separators
-    formatted = f"{amount_in_sums:,}".replace(",", " ")
+    formatted = f"{int(amount_in_sums):,}".replace(",", " ")
     
     # Add currency suffix
     currency = "so'm" if lang == "uz" else "сум"

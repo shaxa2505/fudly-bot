@@ -4,6 +4,7 @@ import { useNavigate, useParams, useLocation } from 'react-router-dom'
 import api from '../api/client'
 import { useCart } from '../context/CartContext'
 import OfferCard from '../components/OfferCard'
+import OfferCardSkeleton from '../components/OfferCardSkeleton'
 import FilterPanel, { FILTER_CATEGORY_OPTIONS, FILTER_BRAND_OPTIONS } from '../components/FilterPanel'
 import { blurOnEnter } from '../utils/helpers'
 import { getSavedLocation, transliterateCity } from '../utils/cityUtils'
@@ -186,35 +187,40 @@ function CategoryProductsPage() {
       {/* Search */}
       <div className="search-section">
         <div className="search-box">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" className="search-icon-left">
-            <circle cx="11" cy="11" r="8" stroke="#181725" strokeWidth="2"/>
-            <path d="M21 21l-4.35-4.35" stroke="#181725" strokeWidth="2" strokeLinecap="round"/>
-          </svg>
-          <input
-            type="text"
-            className="search-input-active"
-            placeholder="Qidirish"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            onKeyDown={handleSearchKeyDown}
-          />
-          {searchQuery && (
-            <button className="clear-search-btn" onClick={handleClearSearch}>
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
-                <circle cx="12" cy="12" r="10" fill="#B3B3B3"/>
-                <path d="M8 8l8 8M16 8l-8 8" stroke="white" strokeWidth="2" strokeLinecap="round"/>
-              </svg>
-            </button>
-          )}
-          <button className="filter-icon-btn" onClick={() => setShowFilters(true)}>
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
-              <line x1="4" y1="6" x2="20" y2="6" stroke="#181725" strokeWidth="2" strokeLinecap="round"/>
-              <line x1="4" y1="12" x2="20" y2="12" stroke="#181725" strokeWidth="2" strokeLinecap="round"/>
-              <line x1="4" y1="18" x2="20" y2="18" stroke="#181725" strokeWidth="2" strokeLinecap="round"/>
-              <circle cx="8" cy="6" r="2" fill="#181725"/>
-              <circle cx="16" cy="12" r="2" fill="#181725"/>
-              <circle cx="12" cy="18" r="2" fill="#181725"/>
+          <div className="search-field">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" className="search-icon-left">
+              <circle cx="11" cy="11" r="8" stroke="#181725" strokeWidth="2"/>
+              <path d="M21 21l-4.35-4.35" stroke="#181725" strokeWidth="2" strokeLinecap="round"/>
             </svg>
+            <input
+              type="text"
+              className="search-input-active"
+              placeholder="Qidirish"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              onKeyDown={handleSearchKeyDown}
+            />
+            {searchQuery && (
+              <button className="clear-search-btn" onClick={handleClearSearch}>
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+                  <circle cx="12" cy="12" r="10" fill="#B3B3B3"/>
+                  <path d="M8 8l8 8M16 8l-8 8" stroke="white" strokeWidth="2" strokeLinecap="round"/>
+                </svg>
+              </button>
+            )}
+          </div>
+          <button className="filter-icon-btn" onClick={() => setShowFilters(true)}>
+            <span className="filter-icon" aria-hidden="true">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+                <line x1="4" y1="6" x2="20" y2="6" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+                <line x1="4" y1="12" x2="20" y2="12" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+                <line x1="4" y1="18" x2="20" y2="18" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+                <circle cx="8" cy="6" r="2" fill="currentColor"/>
+                <circle cx="16" cy="12" r="2" fill="currentColor"/>
+                <circle cx="12" cy="18" r="2" fill="currentColor"/>
+              </svg>
+            </span>
+            <span className="filter-label">Filtr</span>
             {hasActiveFilters && <span className="filter-indicator" aria-hidden />}
           </button>
         </div>
@@ -226,11 +232,7 @@ function CategoryProductsPage() {
       <div className="products-grid">
         {loading ? (
           Array.from({ length: 6 }).map((_, i) => (
-            <div key={i} className="offer-card skeleton">
-              <div className="skeleton-image" />
-              <div className="skeleton-text" />
-              <div className="skeleton-text short" />
-            </div>
+            <OfferCardSkeleton key={i} />
           ))
         ) : filteredOffers.length === 0 ? (
           <div className="category-empty">

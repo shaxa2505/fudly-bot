@@ -158,7 +158,7 @@ def format_offer_card_text(
     if store_address:
         lines.append(f"📍 {store_address}")
     if delivery_enabled:
-        lines.append(f"🚚 Доставка: {int(delivery_price) // 100:,} {currency}")
+        lines.append(f"🚚 Доставка: {int(delivery_price):,} {currency}")
 
     return "\n".join(lines)
 

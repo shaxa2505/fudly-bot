@@ -2,7 +2,7 @@
 Pydantic models for offer (product) data validation.
 
 These models enforce consistent data format across bot and Partner Panel:
-- Prices are stored in kopeks (INTEGER) for precision
+- Prices are stored in sums (INTEGER) for precision
 - Times use datetime.time objects
 - Dates use datetime.date objects
 - All validation happens at the API boundary
@@ -19,7 +19,7 @@ class OfferCreate(BaseModel):
     title: str = Field(..., min_length=1, max_length=255, description="Название товара")
     description: Optional[str] = Field(None, max_length=2000, description="Описание товара")
     
-    # Prices in KOPEKS (not rubles) - stored as INTEGER
+    # Prices in SUMS - stored as INTEGER
     original_price: int = Field(..., ge=0, description="Оригинальная цена в копейках")
     discount_price: int = Field(..., ge=0, description="Цена со скидкой в копейках")
     
@@ -189,7 +189,7 @@ class OfferResponse(BaseModel):
     title: str
     description: Optional[str]
     
-    # Return prices in RUBLES for display (convert from kopeks)
+    # Return prices in sums for display
     original_price: float = Field(..., description="Оригинальная цена в рублях")
     discount_price: float = Field(..., description="Цена со скидкой в рублях")
     
@@ -209,17 +209,10 @@ class OfferResponse(BaseModel):
     def from_db_row(cls, row: dict) -> "OfferResponse":
         """
         Create OfferResponse from database row.
-        Converts prices from kopeks (INTEGER) to rubles (FLOAT).
+        Prices are stored in sums (INTEGER), so no conversion is needed.
         """
         # Make a copy to avoid modifying original
         data = dict(row)
-        
-        # Convert prices from kopeks to rubles
-        if 'original_price' in data and data['original_price'] is not None:
-            data['original_price'] = data['original_price'] / 100.0
-        
-        if 'discount_price' in data and data['discount_price'] is not None:
-            data['discount_price'] = data['discount_price'] / 100.0
         
         return cls(**data)
     

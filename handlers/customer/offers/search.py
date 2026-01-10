@@ -640,7 +640,7 @@ def setup(
             if store_address:
                 lines.append(f"📍 {store_address}")
             if delivery_enabled:
-                lines.append(f"🚚 Доставка: {delivery_price // 100:,.0f} сум")
+                lines.append(f"🚚 Доставка: {delivery_price:,.0f} сум")
 
             text = "\n".join(lines)
 
@@ -1084,7 +1084,7 @@ def setup(
                 if store_address:
                     lines.append(f"📍 {store_address}")
                 if delivery_enabled:
-                    lines.append(f"🚚 Доставка: {delivery_price // 100:,.0f} сум")
+                    lines.append(f"🚚 Доставка: {delivery_price:,.0f} сум")
 
                 text = "\n".join(lines)
 
