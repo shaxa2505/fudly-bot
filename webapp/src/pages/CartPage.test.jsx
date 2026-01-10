@@ -68,7 +68,7 @@ describe('CartPage', () => {
 
     expect(await screen.findByText('Milk')).toBeInTheDocument()
 
-    fireEvent.click(screen.getByRole('button', { name: 'Keyingi' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Davom ettirish' }))
 
     expect(await screen.findByLabelText(/Telefon raqam/)).toBeInTheDocument()
 

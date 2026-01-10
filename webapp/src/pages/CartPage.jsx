@@ -573,13 +573,20 @@ function CartPage({ user }) {
         <p className="cart-hero-subtitle">
           Tanlangan mahsulotlarni tekshiring va buyurtmani yakunlang.
         </p>
-        <div className="cart-hero-chips">
-          <span className="cart-chip">{itemsCount} ta mahsulot</span>
-          <span className="cart-chip cart-chip--accent">{Math.round(subtotal).toLocaleString()} so'm</span>
+        <div className="cart-hero-stats">
+          <div className="cart-hero-stat">
+            <span>Mahsulotlar</span>
+            <strong>{itemsCount} ta</strong>
+          </div>
+          <div className="cart-hero-stat">
+            <span>Jami</span>
+            <strong>{Math.round(subtotal).toLocaleString()} so'm</strong>
+          </div>
           {storeDeliveryEnabled && (
-            <span className="cart-chip">
-              Yetkazish {Math.round(deliveryFee).toLocaleString()} so'm
-            </span>
+            <div className="cart-hero-stat">
+              <span>Yetkazish</span>
+              <strong>{Math.round(deliveryFee).toLocaleString()} so'm</strong>
+            </div>
           )}
         </div>
       </header>
@@ -589,11 +596,7 @@ function CartPage({ user }) {
           <div className="cart-list-header">
             <div>
               <h2>Mahsulotlar</h2>
-              <p className="cart-list-subtitle">{itemsCount} ta mahsulot</p>
             </div>
-            <button className="cart-list-note" type="button" onClick={handleCommentShortcut}>
-              Izoh qoldirish
-            </button>
           </div>
           <div className="cart-items">
             {cartItems.map(item => {
@@ -636,9 +639,6 @@ function CartPage({ user }) {
                       <p className="cart-item-price">
                         {Math.round(item.offer.discount_price).toLocaleString()} so'm
                       </p>
-                      <button className="cart-item-comment" type="button" onClick={handleCommentShortcut}>
-                        Izoh qoldirish
-                      </button>
                     </div>
                     {item.offer.stock && item.quantity >= item.offer.stock && (
                       <p className="cart-item-stock-warning">
@@ -713,7 +713,7 @@ function CartPage({ user }) {
           <span className="checkout-total-value">{Math.round(total).toLocaleString()} so'm</span>
         </div>
         <button className="checkout-primary-btn" onClick={handleCheckout}>
-          <span>Keyingi</span>
+          <span>Davom ettirish</span>
           <ChevronRight size={18} strokeWidth={2} aria-hidden="true" />
         </button>
       </div>
