@@ -698,7 +698,7 @@ function CartPage({ user }) {
             )}
           </div>
           <button className="cart-summary-cta" onClick={handleCheckout}>
-            <span>Keyingi</span>
+            <span>Davom ettirish</span>
             <ChevronRight size={18} strokeWidth={2} aria-hidden="true" />
           </button>
           <button className="cart-summary-link" type="button" onClick={handleCommentShortcut}>

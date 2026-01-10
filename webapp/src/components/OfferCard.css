@@ -31,23 +31,13 @@
   position: relative;
   width: 100%;
   padding-top: 100%;
-  border-radius: 26px;
-  background: #F6F6F6;
+  border-radius: 22px;
+  background: #F5F5F5;
   overflow: hidden;
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 12px 22px rgba(16, 24, 40, 0.1);
-}
-
-.card-image-frame {
-  position: absolute;
-  inset: 14px;
-  border-radius: 18px;
-  background: #FFFFFF;
-  border: 1px solid #EDEDED;
-  overflow: hidden;
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.9);
+  box-shadow: 0 10px 20px rgba(16, 24, 40, 0.08);
 }
 
 .image-skeleton {
@@ -89,7 +79,7 @@
   width: 100%;
   height: 100%;
   object-fit: contain;
-  padding: 10px;
+  padding: 16px;
   max-width: none;
   max-height: none;
   box-sizing: border-box;
@@ -136,19 +126,19 @@
 }
 
 .add-to-cart-fab {
-  width: 38px;
-  height: 38px;
+  width: 36px;
+  height: 36px;
   border-radius: 50%;
   border: none;
   background: #FFFFFF;
   color: #111827;
-  font-size: 20px;
+  font-size: 18px;
   font-weight: 700;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  box-shadow: 0 10px 18px rgba(16, 24, 40, 0.16);
+  box-shadow: 0 8px 16px rgba(16, 24, 40, 0.16);
   transition: transform 0.15s ease, box-shadow 0.2s ease;
   padding: 0;
 }
@@ -168,24 +158,22 @@
 }
 
 .card-action .quantity-control {
-  --qc-height: 36px;
+  --qc-height: 34px;
   --qc-pad: 6px;
-  --qc-gap: 14px;
-  --qc-btn-size: 30px;
+  --qc-gap: 18px;
+  --qc-btn-size: 26px;
   --qc-value-font: 14px;
-  width: 100%;
-  max-width: 180px;
-  min-width: 132px;
+  min-width: 128px;
   background: #FFFFFF;
   border: none;
-  box-shadow: 0 12px 22px rgba(16, 24, 40, 0.16);
+  box-shadow: 0 10px 18px rgba(16, 24, 40, 0.16);
 }
 
 .card-action .quantity-control__btn {
   background: transparent;
   border-radius: 50%;
-  font-size: 20px;
-  color: #111827;
+  font-size: 18px;
+  color: #9CA3AF;
 }
 
 .card-action .quantity-control__btn:active:not(:disabled) {
@@ -194,7 +182,7 @@
 }
 
 .card-action .quantity-control__value {
-  font-size: 14px;
+  font-size: 15px;
   font-weight: 700;
   color: #111827;
 }
@@ -214,7 +202,7 @@
 }
 
 .price-main {
-  font-size: 17px;
+  font-size: 16px;
   font-weight: 800;
   color: #111827;
   line-height: 1.15;
@@ -232,7 +220,7 @@
 }
 
 .price-original {
-  font-size: 13px;
+  font-size: 12px;
   color: #98A2B3;
   text-decoration: line-through;
   text-decoration-thickness: 1px;
@@ -242,7 +230,7 @@
 }
 
 .offer-title {
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 600;
   color: #111827;
   margin: 0;

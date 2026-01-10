@@ -1100,6 +1100,13 @@
   align-items: center;
   justify-content: center;
   color: var(--cart-ink);
+  cursor: pointer;
+  transition: transform var(--transition-fast), box-shadow var(--transition-fast);
+}
+
+.cart-hero .app-back-btn:active,
+.cart-clear-btn:active {
+  transform: scale(0.96);
 }
 
 .cart-hero-title {

@@ -3,8 +3,7 @@ import './OfferCardSkeleton.css'
 function OfferCardSkeleton() {
   return (
     <div className="offer-card-skeleton">
-      <div className="skeleton-image">
-        <div className="skeleton-image-frame shimmer" />
+      <div className="skeleton-image shimmer">
         <div className="skeleton-action shimmer" />
       </div>
       <div className="skeleton-content">
