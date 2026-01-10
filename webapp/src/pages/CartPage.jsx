@@ -508,42 +508,33 @@ function CartPage({ user }) {
   if (isEmpty) {
     return (
       <div className="cart-page cart-page--empty">
-        <header className="cart-hero cart-hero--empty">
-          <div className="cart-hero-top">
-            <button
-              className="app-back-btn cart-back-btn"
-              onClick={() => navigate(-1)}
-              aria-label="Orqaga"
-            >
-              <ArrowLeft size={20} strokeWidth={2} />
-            </button>
-          </div>
-          <div className="cart-hero-title">
+        <header className="cart-topbar">
+          <button className="cart-icon-btn" onClick={() => navigate(-1)} aria-label="Orqaga">
+            <ArrowLeft size={18} strokeWidth={2} />
+          </button>
+          <div className="cart-topbar-title">
             <h1>Savat</h1>
-            <span className="cart-hero-count">0 ta</span>
+            <span className="cart-topbar-count">0 ta</span>
           </div>
-          <p className="cart-hero-subtitle">
-            Savatingiz bo'sh. Yangi takliflarni ko'rib chiqing.
-          </p>
+          <span className="cart-icon-spacer" aria-hidden="true"></span>
         </header>
 
         <main className="cart-empty">
-          <div className="empty-cart">
+          <div className="empty-card">
             <div className="empty-icon">
-              <ShoppingCart size={80} strokeWidth={1.5} color="#F97316" aria-hidden="true" />
+              <ShoppingCart size={72} strokeWidth={1.5} color="#0F766E" aria-hidden="true" />
             </div>
             <h2>Savatingiz bo'sh</h2>
             <p className="empty-description">
               Mahsulotlarni ko'rish va savatga qo'shish uchun bosh sahifaga o'ting.
-              Eng yaxshi takliflarni o'tkazib yubormang!
             </p>
             <div className="empty-actions">
               <button className="btn-primary" onClick={() => navigate('/')}>
-                <Home size={20} strokeWidth={2} aria-hidden="true" />
+                <Home size={18} strokeWidth={2} aria-hidden="true" />
                 <span>Bosh sahifaga o'tish</span>
               </button>
               <button className="btn-secondary" onClick={() => navigate('/stores')}>
-                <Sparkles size={20} strokeWidth={2} aria-hidden="true" />
+                <Sparkles size={18} strokeWidth={2} aria-hidden="true" />
                 <span>Do'konlarni ko'rish</span>
               </button>
             </div>
@@ -557,75 +548,44 @@ function CartPage({ user }) {
 
   return (
     <div className="cart-page">
-      <header className="cart-hero">
-        <div className="cart-hero-top">
-          <button className="app-back-btn cart-back-btn" onClick={() => navigate(-1)} aria-label="Orqaga">
-            <ArrowLeft size={20} strokeWidth={2} />
-          </button>
-          <button className="cart-clear-btn" onClick={clearCart} aria-label="Savatni tozalash">
-            <Trash2 size={18} strokeWidth={2} />
-          </button>
-        </div>
-        <div className="cart-hero-title">
+      <header className="cart-topbar">
+        <button className="cart-icon-btn" onClick={() => navigate(-1)} aria-label="Orqaga">
+          <ArrowLeft size={18} strokeWidth={2} />
+        </button>
+        <div className="cart-topbar-title">
           <h1>Savat</h1>
-          <span className="cart-hero-count">{itemsCount} ta</span>
+          <span className="cart-topbar-count">{itemsCount} ta</span>
         </div>
-        <p className="cart-hero-subtitle">
-          Tanlangan mahsulotlarni tekshiring va buyurtmani yakunlang.
-        </p>
-        <div className="cart-hero-stats">
-          <div className="cart-hero-stat">
-            <span>Mahsulotlar</span>
-            <strong>{itemsCount} ta</strong>
-          </div>
-          <div className="cart-hero-stat">
-            <span>Jami</span>
-            <strong>{Math.round(subtotal).toLocaleString()} so'm</strong>
-          </div>
-          {storeDeliveryEnabled && (
-            <div className="cart-hero-stat">
-              <span>Yetkazish</span>
-              <strong>{Math.round(deliveryFee).toLocaleString()} so'm</strong>
-            </div>
-          )}
-        </div>
+        <button className="cart-icon-btn" onClick={clearCart} aria-label="Savatni tozalash">
+          <Trash2 size={18} strokeWidth={2} />
+        </button>
       </header>
 
-      <main className="cart-body">
-        <section className="cart-list">
+      <main className="cart-content">
+        <div className="cart-list-card">
           <div className="cart-list-header">
-            <div>
-              <h2>Mahsulotlar</h2>
-            </div>
+            <h2>Mahsulotlar</h2>
           </div>
           <div className="cart-items">
             {cartItems.map(item => {
               const photoUrl = resolveOfferImageUrl(item.offer) || PLACEHOLDER_IMAGE
               const stockLimit = item.offer.stock || item.offer.quantity || 99
-              const isMaxReached = item.quantity >= stockLimit
               return (
                 <div key={item.offer.id} className="cart-item">
-                  <div className="cart-item-media">
-                    <img
-                      src={photoUrl}
-                      alt={item.offer.title}
-                      className="cart-item-img"
-                      onError={(e) => {
-                        if (!e.target.dataset.fallback) {
-                          e.target.dataset.fallback = 'true'
-                          e.target.src = PLACEHOLDER_IMAGE
-                        }
-                      }}
-                    />
-                  </div>
-                  <div className="cart-item-info">
-                    <div className="cart-item-top">
-                      <div className="cart-item-heading">
-                        <h3 className="cart-item-title">{item.offer.title}</h3>
-                        {item.offer.store_name && (
-                          <p className="cart-item-store">Do'kon: {item.offer.store_name}</p>
-                        )}
-                      </div>
+                  <img
+                    src={photoUrl}
+                    alt={item.offer.title}
+                    className="cart-item-img"
+                    onError={(e) => {
+                      if (!e.target.dataset.fallback) {
+                        e.target.dataset.fallback = 'true'
+                        e.target.src = PLACEHOLDER_IMAGE
+                      }
+                    }}
+                  />
+                  <div className="cart-item-main">
+                    <div className="cart-item-row">
+                      <h3 className="cart-item-title">{item.offer.title}</h3>
                       <button
                         className="cart-item-remove"
                         type="button"
@@ -635,76 +595,41 @@ function CartPage({ user }) {
                         <X size={16} strokeWidth={2} aria-hidden="true" />
                       </button>
                     </div>
-                    <div className="cart-item-meta">
-                      <p className="cart-item-price">
+                    <div className="cart-item-subrow">
+                      <span className="cart-item-price">
                         {Math.round(item.offer.discount_price).toLocaleString()} so'm
-                      </p>
+                      </span>
+                      {item.offer.store_name && (
+                        <span className="cart-item-store">Do'kon: {item.offer.store_name}</span>
+                      )}
+                    </div>
+                    <div className="cart-item-actions">
+                      <QuantityControl
+                        value={item.quantity}
+                        size="sm"
+                        className="cart-qty"
+                        onDecrement={() => handleQuantityChange(item.offer.id, -1)}
+                        onIncrement={() => handleQuantityChange(item.offer.id, 1)}
+                        disableIncrement={item.quantity >= stockLimit}
+                      />
+                      <span className="cart-item-total">
+                        {Math.round(item.offer.discount_price * item.quantity).toLocaleString()} so'm
+                      </span>
                     </div>
                     {item.offer.stock && item.quantity >= item.offer.stock && (
                       <p className="cart-item-stock-warning">
                         Maksimum: {item.offer.stock} {getUnitLabel(item.offer.unit)}
                       </p>
                     )}
-                    <div className="cart-item-controls">
-                      <QuantityControl
-                        value={item.quantity}
-                        size="md"
-                        onDecrement={() => handleQuantityChange(item.offer.id, -1)}
-                        onIncrement={() => handleQuantityChange(item.offer.id, 1)}
-                        disableIncrement={item.quantity >= stockLimit}
-                      />
-                      {isMaxReached && (
-                        <span className="cart-item-limit">
-                          Maksimum: {stockLimit} {getUnitLabel(item.offer.unit)}
-                        </span>
-                      )}
-                      <p className="cart-item-total">
-                        {Math.round(item.offer.discount_price * item.quantity).toLocaleString()} so'm
-                      </p>
-                    </div>
                   </div>
                 </div>
               )
             })}
           </div>
-        </section>
-
-        <aside className="cart-sidebar">
-          <div className="cart-summary-card">
-            <p className="cart-summary-title">Buyurtma</p>
-            <div className="cart-summary-row">
-              <span>Mahsulotlar</span>
-              <strong>{Math.round(subtotal).toLocaleString()} so'm</strong>
-            </div>
-            {storeDeliveryEnabled && (
-              <div className="cart-summary-row">
-                <span>Yetkazish</span>
-                <span>
-                  {orderType === 'delivery'
-                    ? `${Math.round(deliveryFee).toLocaleString()} so'm`
-                    : `dan ${Math.round(deliveryFee).toLocaleString()} so'm`
-                  }
-                </span>
-              </div>
-            )}
-            <div className="cart-summary-row cart-summary-total">
-              <span>Jami</span>
-              <strong>{Math.round(total).toLocaleString()} so'm</strong>
-            </div>
-            {storeDeliveryEnabled && !canDelivery && (
-              <p className="cart-summary-hint">
-                Yetkazish uchun min {Math.round(minOrderAmount).toLocaleString()} so'm
-              </p>
-            )}
-          </div>
-          <button className="cart-summary-cta" onClick={handleCheckout}>
-            <span>Davom ettirish</span>
-            <ChevronRight size={18} strokeWidth={2} aria-hidden="true" />
-          </button>
-          <button className="cart-summary-link" type="button" onClick={handleCommentShortcut}>
-            Izoh qoldirish
-          </button>
-        </aside>
+        </div>
+        <button className="cart-note-link" type="button" onClick={handleCommentShortcut}>
+          Izoh qoldirish
+        </button>
       </main>
 
       <div className="cart-sticky-checkout">
