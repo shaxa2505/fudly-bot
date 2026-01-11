@@ -78,7 +78,7 @@
   position: absolute;
   left: 50%;
   transform: translateX(-50%);
-  max-width: calc(100% - (var(--touch-target-min) * 2) - 24px);
+  max-width: calc(100% - (var(--touch-target-min) + var(--touch-target-min)) - 24px);
   background: transparent;
   border: 1px solid transparent;
   height: var(--home-topbar-height);
