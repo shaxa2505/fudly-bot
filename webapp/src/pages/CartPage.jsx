@@ -177,6 +177,22 @@ function CartPage({ user }) {
     setShowPaymentSheet(false)
   }
 
+  const handleClearCart = useCallback(() => {
+    const message = "Savatni tozalashni xohlaysizmi?"
+    const tg = window.Telegram?.WebApp
+    if (tg?.showConfirm) {
+      tg.showConfirm(message, (confirmed) => {
+        if (confirmed) {
+          clearCart()
+        }
+      })
+      return
+    }
+    if (window.confirm(message)) {
+      clearCart()
+    }
+  }, [clearCart])
+
   // Handle quantity change with delta (+1 or -1)
   const handleQuantityChange = (offerId, delta) => {
     const item = cartItems.find(i => i.offer.id === offerId)
@@ -454,6 +470,7 @@ function CartPage({ user }) {
     }
 
     setOrderLoading(true)
+    let orderId = null
     try {
       const resolvedPhone = ensurePhoneOrPrompt()
       if (!resolvedPhone) {
@@ -482,7 +499,7 @@ function CartPage({ user }) {
         throw new Error(result?.message || result?.error || 'Order failed')
       }
 
-      const orderId = result.order_id || result.bookings?.[0]?.booking_id
+      orderId = result.order_id || result.bookings?.[0]?.booking_id
       setCreatedOrderId(orderId)
       const storeId = cartItems[0]?.offer?.store_id || null
       const returnUrl = window.location.origin + '/profile'
@@ -507,8 +524,8 @@ function CartPage({ user }) {
       console.error('Online payment error:', error)
       const providerLabel = paymentMethodLabels[provider] || provider
       toast.error(`${providerLabel} to\'lovda xatolik: ` + (error.message || 'Noma\'lum xatolik'))
-      if (createdOrderId) {
-        navigate(`/order/${createdOrderId}`)
+      if (orderId) {
+        navigate(`/order/${orderId}`)
       }
     } finally {
       setOrderLoading(false)
@@ -558,7 +575,7 @@ function CartPage({ user }) {
       <header className="cart-topbar">
         <div className="cart-topbar-inner topbar-card">
           <span className="cart-icon-spacer" aria-hidden="true"></span>
-          <button className="cart-icon-btn" onClick={clearCart} aria-label="Savatni tozalash">
+          <button className="cart-icon-btn" onClick={handleClearCart} aria-label="Savatni tozalash">
             <Trash2 size={18} strokeWidth={2} />
           </button>
         </div>
@@ -572,7 +589,13 @@ function CartPage({ user }) {
           <div className="cart-items">
             {cartItems.map(item => {
               const photoUrl = resolveOfferImageUrl(item.offer) || PLACEHOLDER_IMAGE
-              const stockLimit = item.offer.stock || item.offer.quantity || 99
+              const rawStockLimit = item.offer.stock ?? item.offer.quantity ?? 99
+              const parsedStockLimit = Number(rawStockLimit)
+              const stockLimit = Number.isFinite(parsedStockLimit) ? parsedStockLimit : 99
+              const maxStock = item.offer.stock ?? item.offer.quantity
+              const rawUnitPrice = item.offer.discount_price ?? item.offer.original_price ?? 0
+              const parsedUnitPrice = Number(rawUnitPrice)
+              const unitPrice = Number.isFinite(parsedUnitPrice) ? parsedUnitPrice : 0
               return (
                 <div key={item.offer.id} className="cart-item">
                   <img
@@ -600,7 +623,7 @@ function CartPage({ user }) {
                     </div>
                     <div className="cart-item-subrow">
                       <span className="cart-item-price">
-                        {Math.round(item.offer.discount_price).toLocaleString()} so'm
+                        {Math.round(unitPrice).toLocaleString()} so'm
                       </span>
                       {item.offer.store_name && (
                         <span className="cart-item-store">Do'kon: {item.offer.store_name}</span>
@@ -616,12 +639,12 @@ function CartPage({ user }) {
                         disableIncrement={item.quantity >= stockLimit}
                       />
                       <span className="cart-item-total">
-                        {Math.round(item.offer.discount_price * item.quantity).toLocaleString()} so'm
+                        {Math.round(unitPrice * item.quantity).toLocaleString()} so'm
                       </span>
                     </div>
-                    {item.offer.stock && item.quantity >= item.offer.stock && (
+                    {maxStock != null && item.quantity >= maxStock && (
                       <p className="cart-item-stock-warning">
-                        Maksimum: {item.offer.stock} {getUnitLabel(item.offer.unit)}
+                        Maksimum: {maxStock} {getUnitLabel(item.offer.unit)}
                       </p>
                     )}
                   </div>

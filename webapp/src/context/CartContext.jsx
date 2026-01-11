@@ -55,7 +55,9 @@ export function CartProvider({ children }) {
 
       // Use offer's available stock as limit
       // Priority: existing.offer.stock (saved) > offer.quantity > offer.stock > 99 (fallback)
-      const stockLimit = existing?.offer?.stock || offer.quantity || offer.stock || 99;
+      const rawStockLimit = existing?.offer?.stock ?? offer.quantity ?? offer.stock ?? 99;
+      const parsedStockLimit = Number(rawStockLimit);
+      const stockLimit = Number.isFinite(parsedStockLimit) ? parsedStockLimit : 99;
 
       // Check if we've reached the stock limit
       if (currentQty >= stockLimit) {
@@ -129,8 +131,15 @@ export function CartProvider({ children }) {
       }
 
       // Enforce stock limit
-      const stockLimit = existing.offer?.stock || 99;
+      const rawStockLimit = existing.offer?.stock ?? 99;
+      const parsedStockLimit = Number(rawStockLimit);
+      const stockLimit = Number.isFinite(parsedStockLimit) ? parsedStockLimit : 99;
       const clampedQty = Math.min(quantity, stockLimit);
+
+      if (clampedQty <= 0) {
+        const { [key]: _, ...rest } = prev;
+        return rest;
+      }
 
       return {
         ...prev,

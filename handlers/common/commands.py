@@ -1,4 +1,4 @@
-"""
+﻿"""
 User command handlers (start, language selection, city selection, cancel actions).
 Optimized registration flow - minimal messages, all in one card.
 """
@@ -806,7 +806,7 @@ async def cmd_start(message: types.Message, state: FSMContext, db: DatabaseProto
 
     await message.answer(
         get_text(
-            lang, "welcome_back", name=message.from_user.first_name, city=user_city or "Ташкент"
+            lang, "welcome_back", name=message.from_user.first_name, city=normalize_city(user_city) if user_city else "Ташкент"
         ),
         parse_mode="HTML",
         reply_markup=menu,
@@ -905,7 +905,7 @@ async def choose_language(callback: types.CallbackQuery, state: FSMContext, db: 
     menu = main_menu_seller(lang) if user_role == "seller" else main_menu_customer(lang)
     await callback.message.answer(
         get_text(
-            lang, "welcome_back", name=callback.from_user.first_name, city=user_city or "Ташкент"
+            lang, "welcome_back", name=callback.from_user.first_name, city=normalize_city(user_city) if user_city else "Ташкент"
         ),
         parse_mode="HTML",
         reply_markup=menu,
@@ -987,3 +987,4 @@ async def cancel_offer_callback(
         )
 
     await callback.answer()
+

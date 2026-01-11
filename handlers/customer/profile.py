@@ -82,12 +82,13 @@ async def profile(message: types.Message, state: FSMContext) -> None:
     if not user:
         await message.answer(get_text(lang, "choose_language"), reply_markup=language_keyboard())
         return
-    lang_text = "Русский" if lang == "ru" else "Ozbekcha"`n    city_display = normalize_city(user.city) if user.city else "N/A"
+    lang_text = "Русский" if lang == "ru" else "Ozbekcha"
+    city_display = normalize_city(user.city) if user.city else "N/A"
 
     text = f"👤 <b>{get_text(lang, 'your_profile')}</b>\n\n"
     text += f"📝 {get_text(lang, 'name')}: <b>{user.first_name or 'N/A'}</b>\n"
     text += f"📱 {get_text(lang, 'phone')}: <code>{user.phone or 'N/A'}</code>\n"
-    text += f"?? {get_text(lang, 'city')}: <b>{city_display}</b>\\n"
+    text += f"?? {get_text(lang, 'city')}: <b>{city_display}</b>\n"
     text += f"🌍 {get_text(lang, 'language')}: {lang_text}\n"
 
     # Determine user role - check both DB role and if has approved store

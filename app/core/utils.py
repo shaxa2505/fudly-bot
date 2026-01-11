@@ -55,7 +55,7 @@ _CITY_MOJIBAKE_FIXES = {
 
 _CITY_SUFFIX_RE = re.compile(
     r"\s+(?:shahri|shahar|shahr|tumani|tuman|viloyati|viloyat|region|district|province|oblast|oblasti"
-    r"|город|г\.|район|районы|область|области|обл\.)\b",
+    r"|город|г\.|район|районы|область|области|обл\.|шахри|шахар|тумани|туман|вилояти|вилоят)\b",
     re.IGNORECASE,
 )
 

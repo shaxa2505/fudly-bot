@@ -211,6 +211,7 @@ def normalize_city(city: str) -> str:
     """Convert city name to Russian format for database search."""
     return core_normalize_city(city)
 
+
 def get_uzb_time() -> datetime:
     """Get current time in Uzbekistan timezone (UTC+5)."""
     return datetime.now(UZB_TZ)
