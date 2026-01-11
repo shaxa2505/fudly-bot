@@ -15,7 +15,7 @@
   scroll-behavior: smooth;
   touch-action: pan-y;
   --home-topbar-height: 44px;
-  --home-topbar-gap: 2px;
+  --home-topbar-gap: 0px;
   --home-top-inset: max(
     var(--safe-area-top-raw, 0px),
     calc((var(--safe-area-top, 0px) + var(--safe-area-top-raw, 0px) - var(--home-topbar-height)) / 2)
@@ -50,9 +50,10 @@
 }
 
 .header-top {
-  display: grid;
-  grid-template-columns: minmax(var(--touch-target-min), 1fr) auto minmax(var(--touch-target-min), 1fr);
+  position: relative;
+  display: flex;
   align-items: center;
+  justify-content: space-between;
   height: var(--home-topbar-height);
   min-height: var(--home-topbar-height);
   padding: 0;
@@ -67,13 +68,17 @@
 .header-system-slot {
   height: var(--home-topbar-height);
   min-height: var(--home-topbar-height);
-  min-width: var(--touch-target-min);
+  flex: 0 0 var(--touch-target-min);
 }
 
 .header-location {
   display: inline-flex;
   align-items: center;
   justify-self: center;
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  max-width: calc(100% - (var(--touch-target-min) * 2) - 24px);
   background: transparent;
   border: 1px solid transparent;
   height: var(--home-topbar-height);
@@ -81,11 +86,12 @@
   margin: 0;
   cursor: pointer;
   text-align: center;
+  z-index: 1;
   -webkit-tap-highlight-color: transparent;
 }
 
 .header-location:active {
-  transform: scale(0.98);
+  transform: translateX(-50%) scale(0.98);
 }
 
 .header-location:focus-visible {
@@ -98,12 +104,15 @@
   display: inline-flex;
   align-items: center;
   text-align: center;
+  min-width: 0;
 }
 
 .header-location-city {
+  position: relative;
   display: inline-flex;
   align-items: center;
-  gap: var(--spacing-xs);
+  justify-content: center;
+  padding-right: 14px;
   font-size: var(--font-base);
   font-weight: var(--font-semibold);
   line-height: 1;
@@ -116,11 +125,16 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  text-align: center;
 }
 
 .header-location-city svg {
   opacity: 0.5;
   flex-shrink: 0;
+  position: absolute;
+  right: 0;
+  top: 50%;
+  transform: translateY(-50%);
 }
 
 .home-subheader {
@@ -128,7 +142,7 @@
   top: var(--home-topbar-total-height);
   z-index: 19;
   background: var(--color-bg-primary);
-  padding: var(--spacing-2xs) var(--app-header-padding-x) var(--spacing-xs);
+  padding: 0 var(--app-header-padding-x) var(--spacing-xs);
   border-bottom: none;
   box-shadow: none;
   backdrop-filter: none;
@@ -146,6 +160,7 @@
   grid-template-columns: minmax(0, 1fr) auto;
   gap: 6px;
   align-items: center;
+  margin-top: 2px;
 }
 
 .header-search .search-field {
@@ -253,14 +268,14 @@
 }
 
 .header-search .search-filter-toggle.active {
-  background: var(--color-primary);
-  color: #FFFFFF;
-  border-color: transparent;
-  box-shadow: var(--shadow-primary);
+  background: rgba(15, 118, 110, 0.08);
+  color: var(--color-primary-dark);
+  border-color: rgba(15, 118, 110, 0.18);
+  box-shadow: none;
 }
 
 .header-search .search-filter-toggle.active .filter-icon {
-  background: rgba(255, 255, 255, 0.18);
+  background: rgba(15, 118, 110, 0.08);
 }
 
 .header-search .search-filter-count {
@@ -588,7 +603,7 @@
    ============================================================================= */
 
 .filters-section {
-  margin: var(--spacing-xs) var(--page-padding-x) var(--spacing-sm);
+  margin: var(--spacing-sm) var(--page-padding-x) var(--spacing-sm);
   padding: 0;
   background: transparent;
   border: none;
@@ -621,9 +636,9 @@
   height: 34px;
   padding: 0 14px;
   border: none;
-  border-radius: 6px;
+  border-radius: var(--radius-xs);
   background: transparent;
-  color: var(--color-text-tertiary);
+  color: var(--color-text-secondary);
   font-size: 13px;
   font-weight: var(--font-medium);
   line-height: 1;
@@ -639,11 +654,11 @@
 }
 
 .category-tab:active {
-  background: rgba(15, 118, 110, 0.08);
+  background: rgba(15, 118, 110, 0.06);
 }
 
 .category-tab.is-active {
-  background: rgba(15, 118, 110, 0.06);
+  background: rgba(15, 118, 110, 0.04);
   color: var(--color-primary);
 }
 
@@ -762,7 +777,7 @@
 
 @media (max-width: 480px) {
   .filters-section {
-    margin: var(--spacing-xs) var(--spacing-md) 6px;
+    margin: var(--spacing-sm) var(--spacing-md) 6px;
     padding: 0;
   }
 
