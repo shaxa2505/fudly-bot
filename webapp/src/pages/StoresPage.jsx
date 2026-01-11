@@ -193,7 +193,6 @@ function StoresPage() {
       {/* Topbar */}
       <header className={`sp-topbar ${topbarHidden ? 'is-hidden' : ''}`}>
         <div className="sp-topbar-inner">
-          <h1 className="sp-title">Do'konlar</h1>
           <span className="sp-city">Shahar: {cityLatin || 'Tanlanmagan'}</span>
         </div>
       </header>

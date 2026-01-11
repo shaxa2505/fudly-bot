@@ -511,10 +511,6 @@ function CartPage({ user }) {
         <header className="cart-topbar">
           <div className="cart-topbar-inner topbar-card">
             <span className="cart-icon-spacer" aria-hidden="true"></span>
-            <div className="cart-topbar-title">
-              <h1>Savat</h1>
-              <span className="cart-topbar-count">0 ta</span>
-            </div>
             <span className="cart-icon-spacer" aria-hidden="true"></span>
           </div>
         </header>
@@ -551,10 +547,6 @@ function CartPage({ user }) {
       <header className="cart-topbar">
         <div className="cart-topbar-inner topbar-card">
           <span className="cart-icon-spacer" aria-hidden="true"></span>
-          <div className="cart-topbar-title">
-            <h1>Savat</h1>
-            <span className="cart-topbar-count">{itemsCount} ta</span>
-          </div>
           <button className="cart-icon-btn" onClick={clearCart} aria-label="Savatni tozalash">
             <Trash2 size={18} strokeWidth={2} />
           </button>
@@ -650,23 +642,6 @@ function CartPage({ user }) {
         <div className="modal-overlay checkout-overlay" onClick={closeCheckout}>
           <div className="modal checkout-modal" onClick={e => e.stopPropagation()}>
             <div className="sheet-handle" aria-hidden="true"></div>
-            <div className="modal-header">
-              <div className="modal-header-main">
-                <div className="modal-spacer" aria-hidden="true"></div>
-                <h2>
-                  {checkoutStep === 'details' && (orderType === 'delivery' ? 'Yetkazib berish' : 'Olib ketish')}
-                  {checkoutStep === 'payment' && 'To\'lov'}
-                </h2>
-                <button
-                  className="modal-close"
-                  onClick={closeCheckout}
-                  type="button"
-                  aria-label="Yopish"
-                >
-                  <X size={18} strokeWidth={2} aria-hidden="true" />
-                </button>
-              </div>
-            </div>
 
             <div className="modal-body">
               {/* Step 1: Order Details */}
