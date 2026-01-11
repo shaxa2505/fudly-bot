@@ -30,11 +30,24 @@ const CATEGORY_ALIASES = {
   sweets: ['sweets', 'snacks'],
 }
 
+const CATEGORY_IDS = new Set(CATEGORIES.map(category => category.id))
+
+const normalizeCategoryId = (value) => {
+  const raw = String(value || '').toLowerCase().trim()
+  if (!raw) return 'other'
+  if (CATEGORY_IDS.has(raw)) return raw
+  const aliasEntry = Object.entries(CATEGORY_ALIASES)
+    .find(([, aliases]) => aliases.includes(raw))
+  if (aliasEntry) return aliasEntry[0]
+  return 'other'
+}
+
 function HomePage() {
   const [topbarHidden, setTopbarHidden] = useState(false)
   const [offers, setOffers] = useState([])
   const [loading, setLoading] = useState(false)
   const [selectedCategory, setSelectedCategory] = useState('all')
+  const [activeCategory, setActiveCategory] = useState('all')
   const [searchQuery, setSearchQuery] = useState('')
   const [location, setLocation] = useState(getSavedLocation)
   const [isLocating, setIsLocating] = useState(false)
@@ -54,6 +67,10 @@ function HomePage() {
   const [showSearchHistory, setShowSearchHistory] = useState(false)
   const [searchFocused, setSearchFocused] = useState(false)
   const searchInputRef = useRef(null)
+  const categoriesScrollRef = useRef(null)
+  const categoryTabRefs = useRef(new Map())
+  const categoryMarkersRef = useRef([])
+  const activeCategoryRef = useRef(activeCategory)
   const manualSearchRef = useRef(0)
 
   // Use cart from context instead of local state
@@ -78,6 +95,98 @@ function HomePage() {
     .filter(Boolean)
     .length
   const topbarStateRef = useRef(false)
+
+  const registerCategoryTab = useCallback((id, node) => {
+    if (node) {
+      categoryTabRefs.current.set(id, node)
+    } else {
+      categoryTabRefs.current.delete(id)
+    }
+  }, [])
+
+  const handleCategorySelect = useCallback((categoryId, options = {}) => {
+    const { withHaptic = true } = options
+    if (withHaptic) {
+      window.Telegram?.WebApp?.HapticFeedback?.impactOccurred?.('light')
+    }
+    setSelectedCategory(categoryId)
+    setActiveCategory(categoryId)
+  }, [])
+
+  useEffect(() => {
+    activeCategoryRef.current = activeCategory
+  }, [activeCategory])
+
+  useEffect(() => {
+    setActiveCategory(selectedCategory)
+  }, [selectedCategory])
+
+  useEffect(() => {
+    categoryMarkersRef.current = Array.from(
+      document.querySelectorAll('.home-page [data-category-id]')
+    )
+  }, [offers, selectedCategory])
+
+  // Sync active tab with scroll position when showing all categories.
+  useEffect(() => {
+    if (selectedCategory !== 'all' || searchQuery.trim()) return
+    let rafId = 0
+
+    const updateActiveFromScroll = () => {
+      rafId = 0
+      const markers = categoryMarkersRef.current
+      if (!markers.length) return
+
+      const subheader = document.querySelector('.home-subheader')
+      const stickyOffset = subheader
+        ? Math.max(subheader.getBoundingClientRect().bottom, 0) + 4
+        : 0
+
+      let candidate = null
+      for (const marker of markers) {
+        const rect = marker.getBoundingClientRect()
+        if (rect.bottom <= stickyOffset) continue
+        candidate = marker
+        break
+      }
+
+      if (!candidate) return
+      const nextCategory = normalizeCategoryId(candidate.dataset.categoryId || 'all')
+      if (nextCategory !== activeCategoryRef.current) {
+        setActiveCategory(nextCategory)
+      }
+    }
+
+    const onScroll = () => {
+      if (rafId) return
+      rafId = window.requestAnimationFrame(updateActiveFromScroll)
+    }
+
+    window.addEventListener('scroll', onScroll, { passive: true })
+    updateActiveFromScroll()
+
+    return () => {
+      window.removeEventListener('scroll', onScroll)
+      if (rafId) window.cancelAnimationFrame(rafId)
+    }
+  }, [selectedCategory, searchQuery, offers])
+
+  useEffect(() => {
+    const container = categoriesScrollRef.current
+    const tab = categoryTabRefs.current.get(activeCategory)
+    if (!container || !tab) return
+
+    const containerRect = container.getBoundingClientRect()
+    const tabRect = tab.getBoundingClientRect()
+    const leftDelta = tabRect.left - containerRect.left
+    const rightDelta = tabRect.right - containerRect.right
+
+    if (leftDelta < 0) {
+      container.scrollBy({ left: leftDelta - 12, behavior: 'smooth' })
+    } else if (rightDelta > 0) {
+      container.scrollBy({ left: rightDelta + 12, behavior: 'smooth' })
+    }
+  }, [activeCategory])
 
   // Hide topbar on scroll-down (Lavka-like): keep search pinned, show topbar on scroll-up.
   useEffect(() => {
@@ -580,7 +689,7 @@ function HomePage() {
           <button className="header-location" onClick={openAddressModal}>
             <div className="header-location-text">
               <span className="header-location-city">
-                {cityLabel}
+                <span className="header-location-city-name">{cityLabel}</span>
                 <svg width="12" height="12" viewBox="0 0 24 24" fill="none">
                   <path d="M6 9l6 6 6-6" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
                 </svg>
@@ -668,29 +777,26 @@ function HomePage() {
       {/* Unified Filter Bar */}
       <div className="filters-section">
         <div className="filters-primary">
-          <div className="filters-scroll">
-            {CATEGORIES.map(cat => {
-              const IconComponent = cat.icon
-              return (
-                <button
-                  key={cat.id}
-                  className={`filter-pill ${selectedCategory === cat.id ? 'active' : ''}`}
-                  onClick={() => {
-                    window.Telegram?.WebApp?.HapticFeedback?.impactOccurred?.('light')
-                    setSelectedCategory(cat.id)
-                  }}
-                  style={{ '--pill-color': cat.color }}
-                >
-                  <IconComponent
-                    size={18}
-                    strokeWidth={2}
-                    className="filter-pill-icon"
-                    aria-hidden="true"
-                  />
-                  <span className="filter-pill-text">{cat.name}</span>
-                </button>
-              )
-            })}
+          <div
+            className="category-tabs"
+            ref={categoriesScrollRef}
+            role="tablist"
+            aria-label="Kategoriyalar"
+          >
+            {CATEGORIES.map(cat => (
+              <button
+                key={cat.id}
+                type="button"
+                ref={(node) => registerCategoryTab(cat.id, node)}
+                className={`category-tab ${activeCategory === cat.id ? 'is-active' : ''}`}
+                role="tab"
+                aria-selected={activeCategory === cat.id}
+                tabIndex={activeCategory === cat.id ? 0 : -1}
+                onClick={() => handleCategorySelect(cat.id)}
+              >
+                {cat.name}
+              </button>
+            ))}
           </div>
         </div>
 
@@ -797,7 +903,7 @@ function HomePage() {
 
       {/* Hero Banner Carousel */}
       <HeroBanner onCategorySelect={(category) => {
-        setSelectedCategory(category)
+        handleCategorySelect(category, { withHaptic: false })
         setTimeout(() => {
           document.querySelector('.section-header')?.scrollIntoView({ behavior: 'smooth' })
         }, 100)
@@ -810,7 +916,10 @@ function HomePage() {
       */}
 
       {/* Section Title */}
-      <div className="section-header">
+      <div
+        className="section-header"
+        data-category-id={selectedCategory === 'all' ? 'all' : selectedCategory}
+      >
         <h2 className="section-title">
           {selectedCategory === 'all' ? 'Barcha takliflar' : CATEGORIES.find(c => c.id === selectedCategory)?.name}
         </h2>
@@ -853,6 +962,7 @@ function HomePage() {
               <div
                 key={offerKey}
                 className="offer-card-wrapper"
+                data-category-id={normalizeCategoryId(offer.category)}
               >
                 <OfferCard
                   offer={offer}

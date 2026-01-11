@@ -72,12 +72,18 @@ function AppContent() {
       const safeInsets = tg.safeAreaInset
       const minTop = isMobile ? 24 : 0
 
+      const safeTop = Math.max(readInset(safeInsets, 'top'), minTop)
+      const safeRight = Math.max(readInset(safeInsets, 'right'), 0)
+      const safeBottom = Math.max(readInset(safeInsets, 'bottom'), 0)
+      const safeLeft = Math.max(readInset(safeInsets, 'left'), 0)
+
       applyInsets({
-        top: Math.max(readInset(contentInsets, 'top'), readInset(safeInsets, 'top'), minTop),
-        right: Math.max(readInset(contentInsets, 'right'), readInset(safeInsets, 'right')),
-        bottom: Math.max(readInset(contentInsets, 'bottom'), readInset(safeInsets, 'bottom')),
-        left: Math.max(readInset(contentInsets, 'left'), readInset(safeInsets, 'left')),
+        top: Math.max(readInset(contentInsets, 'top'), safeTop),
+        right: Math.max(readInset(contentInsets, 'right'), safeRight),
+        bottom: Math.max(readInset(contentInsets, 'bottom'), safeBottom),
+        left: Math.max(readInset(contentInsets, 'left'), safeLeft),
       })
+      root.style.setProperty('--safe-area-top-raw', toPx(safeTop))
     }
 
     updateSafeArea()
