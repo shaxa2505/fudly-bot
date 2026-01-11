@@ -48,8 +48,9 @@ const OfferCard = memo(function OfferCard({ offer, cartQuantity = 0, onAddToCart
   const computedPercent = hasDiscount && originalPrice > 0
     ? Math.round((1 - discountPrice / originalPrice) * 100)
     : 0
-  const discountPercent = Number(offer.discount_percent) || computedPercent
-  const showPercentOnly = !hasDiscount && discountPercent > 0
+  const rawDiscountPercent = Number(offer.discount_percent) || 0
+  const discountPercent = rawDiscountPercent || computedPercent
+  const showDiscountPercent = discountPercent > 0 && (hasDiscount || rawDiscountPercent > 0)
   const isFrozen = Boolean(offer.is_frozen) || String(offer.category || '').toLowerCase() === 'frozen'
 
   // Get photo URL (handles Telegram file_id conversion)
@@ -92,7 +93,7 @@ const OfferCard = memo(function OfferCard({ offer, cartQuantity = 0, onAddToCart
                 {Math.round(priceValue).toLocaleString('ru-RU')}
                 <span className="currency"> so'm</span>
               </div>
-              {showPercentOnly && (
+              {showDiscountPercent && (
                 <span className="price-discount">-{discountPercent}%</span>
               )}
             </div>
@@ -106,7 +107,7 @@ const OfferCard = memo(function OfferCard({ offer, cartQuantity = 0, onAddToCart
         <h3 className="offer-title">
           {offer.title}
           {isFrozen && (
-            <span className="offer-title-tag"> · Muzlatilgan</span>
+            <span className="offer-title-tag"> - Muzlatilgan</span>
           )}
         </h3>
         <div className="card-control">

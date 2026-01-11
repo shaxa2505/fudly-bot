@@ -4,11 +4,12 @@
  */
 
 .app {
-  min-height: var(--tg-viewport-stable-height, 100vh);
+  min-height: calc(var(--tg-viewport-stable-height, 100vh) - var(--app-surface-gap));
   background: #121416;
   position: relative;
   isolation: isolate;
-  --app-surface-gap: 12px;
+  --app-surface-gap: 20px;
+  padding-top: var(--app-surface-gap);
 }
 
 .app-surface {
@@ -18,7 +19,6 @@
   box-shadow: none;
   overflow: hidden;
   position: relative;
-  transform: translateY(var(--app-surface-gap));
 }
 
 .topbar-card {

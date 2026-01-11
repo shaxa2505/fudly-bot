@@ -5,16 +5,17 @@
 .offer-card {
   display: flex;
   flex-direction: column;
-  gap: 3px;
-  background: transparent;
+  gap: 4px;
+  background: linear-gradient(180deg, #FFFFFF 0%, #FBF8F3 100%);
   border: none;
-  box-shadow: none;
-  padding: 0;
+  box-shadow: 0 1px 6px rgba(16, 24, 40, 0.06);
+  border-radius: 12px;
+  padding: 6px;
   min-width: 0;
   width: 100%;
   cursor: pointer;
   -webkit-tap-highlight-color: transparent;
-  transition: transform 0.12s ease;
+  transition: transform 0.12s ease, box-shadow 0.12s ease;
 }
 
 .offer-card:active {
@@ -32,7 +33,7 @@
   width: 100%;
   padding-top: 100%;
   border-radius: 10px;
-  background: var(--color-bg-primary);
+  background: transparent;
   border: none;
   overflow: hidden;
   display: flex;
@@ -44,7 +45,7 @@
 .image-skeleton {
   position: absolute;
   inset: 0;
-  background: linear-gradient(135deg, #FFFEFC 0%, #F6F1EA 100%);
+  background: linear-gradient(135deg, #FFFFFF 0%, #F3EFE8 100%);
   z-index: 1;
   border-radius: inherit;
 }
@@ -97,15 +98,15 @@
 .card-content {
   display: flex;
   flex-direction: column;
-  gap: 2px;
-  padding: 2px 1px 0;
+  gap: 3px;
+  padding: 0 2px 2px;
 }
 
 .price-row {
   display: flex;
-  align-items: baseline;
+  align-items: center;
   justify-content: flex-start;
-  gap: 0;
+  gap: 6px;
 }
 
 .price-stack {
@@ -118,7 +119,7 @@
 .price-line {
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: 6px;
   flex-wrap: wrap;
 }
 
@@ -136,7 +137,7 @@
 }
 
 .price-main.discounted {
-  color: var(--color-text-primary);
+  color: var(--color-primary-dark);
 }
 
 .price-main .currency {
@@ -147,11 +148,12 @@
 
 .price-discount {
   font-size: 9px;
-  font-weight: 600;
-  color: var(--color-text-muted);
-  background: transparent;
-  padding: 0;
-  line-height: 1.2;
+  font-weight: 700;
+  color: var(--color-primary-dark);
+  background: rgba(15, 118, 110, 0.12);
+  padding: 2px 6px;
+  line-height: 1;
+  border-radius: 999px;
   font-variant-numeric: tabular-nums;
 }
 
@@ -169,7 +171,7 @@
 .offer-title {
   font-size: 12.5px;
   font-weight: 500;
-  color: var(--color-text-secondary);
+  color: var(--color-text-primary);
   margin: 0;
   line-height: 1.25;
   display: -webkit-box;
@@ -190,17 +192,18 @@
   display: flex;
   align-items: center;
   flex-shrink: 0;
-  margin-top: 2px;
-  align-self: flex-end;
+  margin-top: 4px;
+  align-self: stretch;
+  width: 100%;
 }
 
 .add-to-cart-inline {
-  width: 28px;
-  height: 28px;
-  border-radius: 8px;
-  border: 1px solid rgba(15, 118, 110, 0.18);
-  background: rgba(15, 118, 110, 0.05);
-  color: var(--color-primary-dark);
+  width: 100%;
+  height: 32px;
+  border-radius: 999px;
+  border: 1px solid rgba(16, 24, 40, 0.08);
+  background: rgba(16, 24, 40, 0.05);
+  color: var(--color-text-primary);
   font-size: 18px;
   font-weight: 600;
   letter-spacing: 0;
@@ -210,12 +213,13 @@
   cursor: pointer;
   transition: transform 0.12s ease, border-color 0.12s ease, background 0.12s ease, color 0.12s ease;
   -webkit-tap-highlight-color: transparent;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.7);
 }
 
 .add-to-cart-inline:active {
-  transform: scale(0.96);
-  background: rgba(15, 118, 110, 0.12);
-  color: var(--color-primary-dark);
+  transform: scale(0.98);
+  background: rgba(16, 24, 40, 0.08);
+  color: var(--color-text-primary);
 }
 
 .add-to-cart-inline:focus-visible {
@@ -234,26 +238,28 @@
 }
 
 .card-stepper.quantity-control {
-  --qc-height: 28px;
-  --qc-pad: 2px;
-  --qc-gap: 4px;
-  --qc-btn-size: 20px;
-  --qc-value-font: 11px;
-  --qc-bg: rgba(15, 118, 110, 0.06);
-  --qc-text: var(--color-text-secondary);
+  --qc-height: 32px;
+  --qc-pad: 2px 8px;
+  --qc-gap: 0;
+  --qc-btn-size: 26px;
+  --qc-value-font: 12px;
+  --qc-bg: rgba(16, 24, 40, 0.05);
+  --qc-text: var(--color-text-primary);
   --qc-muted: var(--color-text-muted);
-  --qc-press: rgba(15, 118, 110, 0.12);
-  min-width: 84px;
+  --qc-press: rgba(16, 24, 40, 0.1);
+  min-width: 0;
+  width: 100%;
+  justify-content: space-between;
   background: var(--qc-bg);
-  border: 1px solid rgba(15, 118, 110, 0.14);
-  border-radius: 8px;
-  box-shadow: none;
+  border: 1px solid rgba(16, 24, 40, 0.08);
+  border-radius: 999px;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.7);
 }
 
 .card-stepper .quantity-control__btn {
-  font-size: 16px;
+  font-size: 18px;
   font-weight: 600;
-  color: var(--color-text-tertiary);
+  color: var(--color-text-primary);
 }
 
 .card-stepper .quantity-control__btn:active:not(:disabled) {
@@ -261,7 +267,7 @@
 }
 
 .card-stepper .quantity-control__value {
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 600;
-  color: var(--color-text-secondary);
+  color: var(--color-text-primary);
 }
