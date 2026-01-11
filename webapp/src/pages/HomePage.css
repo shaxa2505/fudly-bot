@@ -41,13 +41,6 @@
   will-change: transform, opacity;
 }
 
-.header.is-hidden {
-  opacity: 0;
-  border-color: transparent;
-  box-shadow: none;
-  transform: translateY(calc(-1 * var(--home-topbar-total-height)));
-  pointer-events: none;
-}
 
 .header-top {
   position: relative;
@@ -151,9 +144,6 @@
   will-change: transform;
 }
 
-.home-page.topbar-hidden .home-subheader {
-  transform: translateY(calc(-1 * var(--home-topbar-total-height)));
-}
 
 .header-search {
   display: grid;

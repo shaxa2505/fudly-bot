@@ -70,7 +70,7 @@ function AppContent() {
     const updateSafeArea = () => {
       const contentInsets = tg.contentSafeAreaInset
       const safeInsets = tg.safeAreaInset
-      const minTop = isMobile ? 24 : 0
+    const minTop = isMobile ? 28 : 0
 
       const safeTop = Math.max(readInset(safeInsets, 'top'), minTop)
       const safeRight = Math.max(readInset(safeInsets, 'right'), 0)
