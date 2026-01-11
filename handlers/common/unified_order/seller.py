@@ -556,6 +556,16 @@ async def order_delivering_handler(callback: types.CallbackQuery, state: FSMCont
         await callback.answer("❌", show_alert=True)
         return
 
+    order_type = _get_entity_field(order, "order_type", "delivery")
+    if order_type not in ("delivery", "taxi"):
+        msg = (
+            "O'zi olib ketishda kuryer telefoni kerak emas. Buyurtma berilgach \"Topshirildi\" tugmasini bosing."
+            if lang == "uz"
+            else "Для самовывоза номер курьера не нужен. Нажмите \"Выдано\" после выдачи."
+        )
+        await callback.answer(msg, show_alert=True)
+        return
+
     await state.set_state(CourierHandover.courier_phone)
     await state.update_data(
         order_id=order_id,

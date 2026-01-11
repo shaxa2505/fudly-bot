@@ -243,3 +243,4 @@ def normalize_city(city: str) -> str:
     city_clean = re.sub(r"\s*\([^)]*\)", "", city_clean)
     city_clean = _CITY_SUFFIX_RE.sub("", city_clean).strip(" ,")
     return CITY_UZ_TO_RU.get(city_clean.lower(), city_clean)
+
