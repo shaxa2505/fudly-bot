@@ -4,21 +4,23 @@
  */
 
 .app {
-  min-height: calc(var(--tg-viewport-stable-height, 100vh) - var(--app-surface-gap));
+  min-height: var(--tg-viewport-stable-height, 100vh);
   background: #121416;
   position: relative;
   isolation: isolate;
-  --app-surface-gap: 20px;
-  padding-top: var(--app-surface-gap);
+  --app-surface-top: var(--safe-area-top-raw, 0px);
 }
 
 .app-surface {
-  min-height: calc(var(--tg-viewport-stable-height, 100vh) - var(--app-surface-gap));
+  min-height: calc(var(--tg-viewport-stable-height, 100vh) - var(--app-surface-top));
+  margin-top: var(--app-surface-top);
   background: var(--color-bg-primary);
   border-radius: 26px 26px 0 0;
   box-shadow: none;
-  overflow: hidden;
+  overflow: visible;
   position: relative;
+  --safe-area-top: 0px;
+  --safe-area-top-raw: 0px;
 }
 
 .topbar-card {
