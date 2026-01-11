@@ -8,15 +8,17 @@
   background: #121416;
   position: relative;
   isolation: isolate;
+  --app-surface-gap: 12px;
 }
 
 .app-surface {
-  min-height: var(--tg-viewport-stable-height, 100vh);
+  min-height: calc(var(--tg-viewport-stable-height, 100vh) - var(--app-surface-gap));
   background: var(--color-bg-primary);
   border-radius: 26px 26px 0 0;
   box-shadow: none;
   overflow: hidden;
   position: relative;
+  transform: translateY(var(--app-surface-gap));
 }
 
 .topbar-card {

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { useNavigate, useLocation } from 'react-router-dom'
+import { useLocation } from 'react-router-dom'
 import { useCart } from '../context/CartContext'
 import { useFavorites } from '../context/FavoritesContext'
 import { getUnitLabel } from '../utils/helpers'
@@ -9,7 +9,6 @@ import QuantityControl from '../components/QuantityControl'
 import './ProductDetailPage.css'
 
 function ProductDetailPage() {
-  const navigate = useNavigate()
   const location = useLocation()
   const { addToCart } = useCart()
   const { isFavorite, toggleFavorite } = useFavorites()
@@ -31,6 +30,7 @@ function ProductDetailPage() {
 
   // Get image URL - support multiple field names and convert file_id
   const imageUrl = resolveOfferImageUrl(offer) || ''
+  const hasImage = Boolean(imageUrl) && !imgError
 
   const handleQuantityChange = (delta) => {
     const maxQty = offer?.quantity || 99
@@ -88,24 +88,16 @@ function ProductDetailPage() {
   }
 
   const expiryInfo = getExpiryInfo()
-  const totalPrice = offer.discount_price * quantity
-  const savings = (offer.original_price - offer.discount_price) * quantity
   const hasDiscount = offer.original_price > offer.discount_price
-  // Calculate discount percent if not provided
-  const discountPercent = offer.discount_percent
-    ? Math.round(offer.discount_percent)
-    : hasDiscount
-      ? Math.round((1 - offer.discount_price / offer.original_price) * 100)
-      : 0
   const isFav = isFavorite(offer.id)
 
   return (
     <div className="pdp">
-      {/* Floating Header */}
+      {/* Header Actions */}
       <header className="pdp-header">
         <div className="pdp-header-actions">
           <button
-            className={`pdp-fav ${isFav ? 'active' : ''}`}
+            className={`pdp-action pdp-fav ${isFav ? 'active' : ''}`}
             onClick={handleFavorite}
             aria-label="Sevimli"
           >
@@ -117,7 +109,7 @@ function ProductDetailPage() {
                 strokeLinejoin="round"/>
             </svg>
           </button>
-          <button className="pdp-share" onClick={handleShare} aria-label="Ulashish">
+          <button className="pdp-action pdp-share" onClick={handleShare} aria-label="Ulashish">
             <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
               <path d="M4 12v8a2 2 0 002 2h12a2 2 0 002-2v-8M16 6l-4-4-4 4M12 2v13"
                 stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
@@ -126,18 +118,10 @@ function ProductDetailPage() {
         </div>
       </header>
 
-      {/* Image Section */}
-      <section className="pdp-image-section">
-        {discountPercent > 0 && (
-          <span className="pdp-discount-badge">-{discountPercent}%</span>
-        )}
-
-        {expiryInfo?.urgent && (
-          <span className="pdp-expiry-badge">Muddat: {expiryInfo.text}</span>
-        )}
-
-        <div className="pdp-image-wrapper">
-          {!imgError && imageUrl ? (
+      {/* Hero Section */}
+      <section className="pdp-hero">
+        <div className={`pdp-hero-media ${hasImage ? 'has-image' : 'is-placeholder'}`}>
+          {hasImage ? (
             <img
               src={imageUrl}
               alt={offer.title}
@@ -154,72 +138,50 @@ function ProductDetailPage() {
             </div>
           )}
         </div>
-      </section>
-
-      {/* Content */}
-      <section className="pdp-content">
-        {/* Title & Store */}
-        <div className="pdp-title-section">
+        <div className="pdp-hero-info">
           <h1 className="pdp-title">{offer.title}</h1>
           {offer.store_name && (
             <p className="pdp-store">
-              <span className="pdp-store-icon">Do'kon</span>
+              <span className="pdp-store-label">Do'kon:</span>
               <span className="pdp-store-name">{offer.store_name}</span>
               {offer.store_address && <span className="pdp-store-addr"> - {offer.store_address}</span>}
             </p>
           )}
+          {expiryInfo && (
+            <p className={`pdp-expiry ${expiryInfo.urgent ? 'is-urgent' : ''}`}>
+              Muddat: {expiryInfo.text}
+            </p>
+          )}
         </div>
+      </section>
 
-        {/* Price Card */}
-        <div className="pdp-price-card">
-          <div className="pdp-price-row">
-            <div className="pdp-prices">
-              <span className="pdp-current-price">
-                {Math.round(offer.discount_price).toLocaleString()} so'm
+      {/* Content */}
+      <section className="pdp-body">
+        <div className="pdp-price-row">
+          <div className="pdp-price-block">
+            <span className="pdp-current-price">
+              {Math.round(offer.discount_price).toLocaleString()} so'm
+            </span>
+            {hasDiscount && (
+              <span className="pdp-old-price">
+                {Math.round(offer.original_price).toLocaleString()} so'm
               </span>
-              {hasDiscount && (
-                <span className="pdp-old-price">
-                  {Math.round(offer.original_price).toLocaleString()}
-                </span>
-              )}
-            </div>
+            )}
             {offer.quantity > 0 && (
               <span className="pdp-stock">Qoldi: {offer.quantity} {getUnitLabel(offer.unit)}</span>
             )}
           </div>
-
-          {savings > 0 && (
-            <div className="pdp-savings">
-              {Math.round(savings).toLocaleString()} so'm tejaysiz
-            </div>
-          )}
-        </div>
-
-        {/* Quantity Selector */}
-        <div className="pdp-quantity-row">
-          <span className="pdp-qty-label">Miqdor:</span>
           <QuantityControl
             value={quantity}
-            size="lg"
+            size="sm"
+            className="pdp-quantity-control"
             onDecrement={() => handleQuantityChange(-1)}
             onIncrement={() => handleQuantityChange(1)}
             disableDecrement={quantity <= 1}
             disableIncrement={quantity >= (offer.quantity || offer.stock || 99)}
           />
-          <span className="pdp-total">{Math.round(totalPrice).toLocaleString()} so'm</span>
         </div>
 
-        {/* Tags */}
-        <div className="pdp-tags">
-          {offer.category && (
-            <span className="pdp-tag">Kategoriya: {offer.category}</span>
-          )}
-          {expiryInfo && !expiryInfo.urgent && (
-            <span className="pdp-tag">Muddat: {expiryInfo.text}</span>
-          )}
-        </div>
-
-        {/* Description */}
         {offer.description && offer.description.toLowerCase() !== offer.title?.toLowerCase() && (
           <div className="pdp-description">
             <h3>Tavsif</h3>
@@ -235,24 +197,7 @@ function ProductDetailPage() {
           onClick={handleAddToCart}
           disabled={addedToCart}
         >
-          {addedToCart ? (
-            <>
-              <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
-                <path d="M20 6L9 17l-5-5" stroke="white" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"/>
-              </svg>
-              Qo'shildi!
-            </>
-          ) : (
-            <>
-              <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
-                <circle cx="9" cy="21" r="1" fill="white"/>
-                <circle cx="20" cy="21" r="1" fill="white"/>
-                <path d="M1 1h4l2.68 13.39a2 2 0 002 1.61h9.72a2 2 0 002-1.61L23 6H6"
-                  stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-              </svg>
-              Savatga qo'shish
-            </>
-          )}
+          {addedToCart ? "Qo'shildi!" : "Savatga qo'shish"}
         </button>
       </div>
     </div>
