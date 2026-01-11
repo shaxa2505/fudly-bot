@@ -102,8 +102,15 @@ const OfferCard = memo(function OfferCard({ offer, cartQuantity = 0, onAddToCart
               </div>
             )}
           </div>
-          <div className="card-control">
-            {cartQuantity > 0 ? (
+        </div>
+        <h3 className="offer-title">
+          {offer.title}
+          {isFrozen && (
+            <span className="offer-title-tag"> · Muzlatilgan</span>
+          )}
+        </h3>
+        <div className="card-control">
+          {cartQuantity > 0 ? (
             <QuantityControl
               value={cartQuantity}
               size="sm"
@@ -115,21 +122,15 @@ const OfferCard = memo(function OfferCard({ offer, cartQuantity = 0, onAddToCart
             />
           ) : (
             <button
+              type="button"
               className={`add-to-cart-inline ${isAdding ? 'pulse' : ''}`}
               onClick={handleAddClick}
-              aria-label="Savatga qo‘shish"
+              aria-label="Savatga qo'shish"
             >
-              Qo‘shish
+              +
             </button>
           )}
-          </div>
         </div>
-        <h3 className="offer-title">
-          {offer.title}
-          {isFrozen && (
-            <span className="offer-title-tag"> · Muzlatilgan</span>
-          )}
-        </h3>
       </div>
     </div>
   )

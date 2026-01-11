@@ -5,7 +5,7 @@
 .offer-card {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 3px;
   background: transparent;
   border: none;
   box-shadow: none;
@@ -32,7 +32,7 @@
   width: 100%;
   padding-top: 100%;
   border-radius: 10px;
-  background: var(--color-bg-input);
+  background: var(--color-bg-primary);
   border: none;
   overflow: hidden;
   display: flex;
@@ -44,7 +44,7 @@
 .image-skeleton {
   position: absolute;
   inset: 0;
-  background: linear-gradient(135deg, #F7F4EF 0%, #EFE9E2 100%);
+  background: linear-gradient(135deg, #FFFEFC 0%, #F6F1EA 100%);
   z-index: 1;
   border-radius: inherit;
 }
@@ -103,9 +103,9 @@
 
 .price-row {
   display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 6px;
+  align-items: baseline;
+  justify-content: flex-start;
+  gap: 0;
 }
 
 .price-stack {
@@ -118,7 +118,7 @@
 .price-line {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 4px;
   flex-wrap: wrap;
 }
 
@@ -132,10 +132,11 @@
   align-items: baseline;
   gap: 4px;
   white-space: nowrap;
+  font-variant-numeric: tabular-nums;
 }
 
 .price-main.discounted {
-  color: #111827;
+  color: var(--color-text-primary);
 }
 
 .price-main .currency {
@@ -145,12 +146,13 @@
 }
 
 .price-discount {
-  font-size: 10px;
+  font-size: 9px;
   font-weight: 600;
-  color: var(--color-text-tertiary);
+  color: var(--color-text-muted);
   background: transparent;
   padding: 0;
   line-height: 1.2;
+  font-variant-numeric: tabular-nums;
 }
 
 .price-original {
@@ -161,12 +163,13 @@
   text-decoration-color: var(--color-border);
   line-height: 1.1;
   font-weight: 500;
+  font-variant-numeric: tabular-nums;
 }
 
 .offer-title {
   font-size: 12.5px;
   font-weight: 500;
-  color: var(--color-text-primary);
+  color: var(--color-text-secondary);
   margin: 0;
   line-height: 1.25;
   display: -webkit-box;
@@ -187,28 +190,32 @@
   display: flex;
   align-items: center;
   flex-shrink: 0;
-  margin-top: 1px;
+  margin-top: 2px;
+  align-self: flex-end;
 }
 
 .add-to-cart-inline {
+  width: 28px;
   height: 28px;
-  padding: 0 8px;
-  border-radius: 7px;
-  border: 1px solid rgba(16, 24, 40, 0.1);
-  background: transparent;
-  color: var(--color-text-tertiary);
-  font-size: 11px;
+  border-radius: 8px;
+  border: 1px solid rgba(15, 118, 110, 0.18);
+  background: rgba(15, 118, 110, 0.05);
+  color: var(--color-primary-dark);
+  font-size: 18px;
   font-weight: 600;
   letter-spacing: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   cursor: pointer;
   transition: transform 0.12s ease, border-color 0.12s ease, background 0.12s ease, color 0.12s ease;
   -webkit-tap-highlight-color: transparent;
 }
 
 .add-to-cart-inline:active {
-  transform: scale(0.97);
-  background: rgba(16, 24, 40, 0.06);
-  color: var(--color-text-secondary);
+  transform: scale(0.96);
+  background: rgba(15, 118, 110, 0.12);
+  color: var(--color-primary-dark);
 }
 
 .add-to-cart-inline:focus-visible {
@@ -232,13 +239,13 @@
   --qc-gap: 4px;
   --qc-btn-size: 20px;
   --qc-value-font: 11px;
-  --qc-bg: rgba(16, 24, 40, 0.04);
+  --qc-bg: rgba(15, 118, 110, 0.06);
   --qc-text: var(--color-text-secondary);
   --qc-muted: var(--color-text-muted);
-  --qc-press: rgba(16, 24, 40, 0.08);
+  --qc-press: rgba(15, 118, 110, 0.12);
   min-width: 84px;
   background: var(--qc-bg);
-  border: 1px solid rgba(16, 24, 40, 0.08);
+  border: 1px solid rgba(15, 118, 110, 0.14);
   border-radius: 8px;
   box-shadow: none;
 }
