@@ -44,7 +44,7 @@ body {
   font-size: var(--font-base);
   line-height: var(--line-height-normal);
   color: var(--color-text-primary);
-  background: var(--color-bg-secondary);
+  background: #121416;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   overflow-x: hidden;
