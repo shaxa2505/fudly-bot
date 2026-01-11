@@ -31,6 +31,7 @@ function CartPage({ user }) {
 
   const [orderLoading, setOrderLoading] = useState(false)
   const commentInputRef = useRef(null)
+  const paymentProofInputRef = useRef(null)
   const [focusCommentOnOpen, setFocusCommentOnOpen] = useState(false)
 
   // Checkout form
@@ -151,11 +152,30 @@ function CartPage({ user }) {
     }
   }, [deliveryRequiresPrepay, hasOnlineProviders, hasCardProvider, paymentProviders, selectedPaymentMethod])
 
+  const clearPaymentProof = () => {
+    setPaymentProof(null)
+    setPaymentProofPreview(null)
+    if (paymentProofInputRef.current) {
+      paymentProofInputRef.current.value = ''
+    }
+  }
+
+  // Keep the file input mounted and open it synchronously for iOS Safari.
+  const openPaymentProofPicker = (event) => {
+    if (event) {
+      event.preventDefault()
+      event.stopPropagation()
+    }
+    const input = paymentProofInputRef.current
+    if (!input || input.disabled) return
+    input.value = ''
+    input.click()
+  }
+
   const selectPaymentMethod = (method) => {
     setSelectedPaymentMethod(method)
     if (method !== 'card') {
-      setPaymentProof(null)
-      setPaymentProofPreview(null)
+      clearPaymentProof()
     }
   }
 
@@ -402,8 +422,7 @@ function CartPage({ user }) {
       setShowCheckout(false)
       setShowPaymentSheet(false)
       setCheckoutStep('details')
-      setPaymentProof(null)
-      setPaymentProofPreview(null)
+      clearPaymentProof()
       setPaymentCard(null)
       setOrderResult({
         success: true,
@@ -642,6 +661,14 @@ function CartPage({ user }) {
         <div className="modal-overlay checkout-overlay" onClick={closeCheckout}>
           <div className="modal checkout-modal" onClick={e => e.stopPropagation()}>
             <div className="sheet-handle" aria-hidden="true"></div>
+            <input
+              ref={paymentProofInputRef}
+              type="file"
+              accept="image/*,image/jpeg,image/jpg,image/png"
+              onChange={handleFileSelect}
+              className="visually-hidden"
+              disabled={orderLoading}
+            />
 
             <div className="modal-body">
               {/* Step 1: Order Details */}
@@ -818,8 +845,7 @@ function CartPage({ user }) {
                             <button
                               className="remove-proof"
                               onClick={() => {
-                                setPaymentProof(null)
-                                setPaymentProofPreview(null)
+                                clearPaymentProof()
                               }}
                             >
                               O'chirish
@@ -827,15 +853,14 @@ function CartPage({ user }) {
                           </div>
                         ) : (
                           <div className="upload-area">
-                            <label className="upload-btn file-picker-btn">
-                              <input
-                                type="file"
-                                accept="image/*"
-                                onChange={handleFileSelect}
-                                className="file-input-overlay"
-                              />
+                            <button
+                              type="button"
+                              className="upload-btn file-picker-btn"
+                              onClick={openPaymentProofPicker}
+                              disabled={orderLoading}
+                            >
                               Rasm tanlash
-                            </label>
+                            </button>
                           </div>
                         )}
                       </div>
@@ -894,16 +919,14 @@ function CartPage({ user }) {
                   )}
 
                   {!paymentProof ? (
-                    <label className="confirm-btn file-picker-btn">
-                      <input
-                        type="file"
-                        accept="image/*,image/jpeg,image/jpg,image/png"
-                        onChange={handleFileSelect}
-                        className="file-input-overlay"
-                        disabled={orderLoading}
-                      />
+                    <button
+                      type="button"
+                      className="confirm-btn file-picker-btn"
+                      onClick={openPaymentProofPicker}
+                      disabled={orderLoading}
+                    >
                       Chekni yuklash
-                    </label>
+                    </button>
                   ) : (
                     <button
                       className="confirm-btn"
@@ -914,8 +937,7 @@ function CartPage({ user }) {
                           clearCart()
                           setShowCheckout(false)
                           setCheckoutStep('details')
-                          setPaymentProof(null)
-                          setPaymentProofPreview(null)
+                          clearPaymentProof()
                           setOrderResult({
                             ...orderResult,
                             awaitingPayment: false,

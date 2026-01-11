@@ -4,12 +4,13 @@
  */
 
 .app {
-  min-height: var(--tg-viewport-stable-height, 100vh);
+  height: var(--tg-viewport-stable-height, 100vh);
   background: #121416;
   position: relative;
   isolation: isolate;
   --app-surface-top: var(--safe-area-top-raw, 0px);
   --app-surface-radius: 28px;
+  overflow: hidden;
 }
 
 .app::before {
@@ -25,17 +26,27 @@
 }
 
 .app-surface {
-  min-height: calc(var(--tg-viewport-stable-height, 100vh) - var(--app-surface-top));
-  margin-top: var(--app-surface-top);
+  position: absolute;
+  top: var(--app-surface-top);
+  left: 0;
+  right: 0;
+  bottom: 0;
   background: var(--color-bg-primary);
   border-radius: var(--app-surface-radius) var(--app-surface-radius) 0 0;
   box-shadow: none;
-  overflow: visible;
-  position: relative;
+  overflow-y: auto;
+  overflow-x: hidden;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
   -webkit-clip-path: inset(0 0 0 0 round var(--app-surface-radius) var(--app-surface-radius) 0 0);
   clip-path: inset(0 0 0 0 round var(--app-surface-radius) var(--app-surface-radius) 0 0);
   --safe-area-top: 0px;
   --safe-area-top-raw: 0px;
+}
+
+.app-surface-content {
+  min-height: 100%;
+  --app-surface-top: 0px;
 }
 
 .topbar-card {

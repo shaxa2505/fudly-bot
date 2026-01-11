@@ -212,52 +212,54 @@ function AppContent() {
   return (
     <div className="app">
       <div className="app-surface">
-        <Suspense fallback={<PageLoader />}>
-          <Routes>
-            <Route
-              path="/"
-              element={<HomePage user={user} />}
-            />
-            <Route
-              path="/cart"
-              element={<CartPage user={user} />}
-            />
-            <Route
-              path="/profile"
-              element={<YanaPage user={user} />}
-            />
-            <Route
-              path="/checkout"
-              element={<CartPage user={user} />}
-            />
-            <Route
-              path="/stores"
-              element={<StoresPage user={user} />}
-            />
-            <Route
-              path="/favorites"
-              element={<FavoritesPage />}
-            />
-            <Route
-              path="/order/:orderId"
-              element={<OrderDetailsPage user={user} />}
-            />
-            <Route
-              path="/order/:orderId/details"
-              element={<OrderDetailsPage user={user} />}
-            />
-            <Route
-              path="/product"
-              element={<ProductDetailPage />}
-            />
-            <Route
-              path="/category/:categoryId"
-              element={<CategoryProductsPage />}
-            />
-            {/* Fallback to home */}
-            <Route path="*" element={<HomePage user={user} />} />
-          </Routes>
-        </Suspense>
+        <div className="app-surface-content">
+          <Suspense fallback={<PageLoader />}>
+            <Routes>
+              <Route
+                path="/"
+                element={<HomePage user={user} />}
+              />
+              <Route
+                path="/cart"
+                element={<CartPage user={user} />}
+              />
+              <Route
+                path="/profile"
+                element={<YanaPage user={user} />}
+              />
+              <Route
+                path="/checkout"
+                element={<CartPage user={user} />}
+              />
+              <Route
+                path="/stores"
+                element={<StoresPage user={user} />}
+              />
+              <Route
+                path="/favorites"
+                element={<FavoritesPage />}
+              />
+              <Route
+                path="/order/:orderId"
+                element={<OrderDetailsPage user={user} />}
+              />
+              <Route
+                path="/order/:orderId/details"
+                element={<OrderDetailsPage user={user} />}
+              />
+              <Route
+                path="/product"
+                element={<ProductDetailPage />}
+              />
+              <Route
+                path="/category/:categoryId"
+                element={<CategoryProductsPage />}
+              />
+              {/* Fallback to home */}
+              <Route path="*" element={<HomePage user={user} />} />
+            </Routes>
+          </Suspense>
+        </div>
       </div>
     </div>
   )

@@ -10,6 +10,7 @@ import FlashDeals from '../components/FlashDeals'
 import BottomNav from '../components/BottomNav'
 import PullToRefresh from '../components/PullToRefresh'
 import { usePullToRefresh } from '../hooks/usePullToRefresh'
+import { getScrollContainer } from '../utils/scrollContainer'
 import { blurOnEnter } from '../utils/helpers'
 import './HomePage.css'
 
@@ -160,11 +161,19 @@ function HomePage() {
       rafId = window.requestAnimationFrame(updateActiveFromScroll)
     }
 
-    window.addEventListener('scroll', onScroll, { passive: true })
+    const scrollContainer = getScrollContainer()
+    if (!scrollContainer) {
+      updateActiveFromScroll()
+      return () => {
+        if (rafId) window.cancelAnimationFrame(rafId)
+      }
+    }
+
+    scrollContainer.addEventListener('scroll', onScroll, { passive: true })
     updateActiveFromScroll()
 
     return () => {
-      window.removeEventListener('scroll', onScroll)
+      scrollContainer.removeEventListener('scroll', onScroll)
       if (rafId) window.cancelAnimationFrame(rafId)
     }
   }, [selectedCategory, searchQuery, offers])

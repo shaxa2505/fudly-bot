@@ -7,6 +7,7 @@ import { getSavedLocation, getLatinCity, getCyrillicCity } from '../utils/cityUt
 import { getCurrentLocation, addDistanceToStores, saveLocation, getSavedLocation as getGeoLocation } from '../utils/geolocation'
 import { blurOnEnter } from '../utils/helpers'
 import { resolveOfferImageUrl, resolveStoreImageUrl } from '../utils/imageUtils'
+import { getScrollContainer, getScrollTop } from '../utils/scrollContainer'
 import BottomNav from '../components/BottomNav'
 import StoreMap from '../components/StoreMap'
 import './StoresPage.css'
@@ -56,12 +57,13 @@ function StoresPage() {
 
   // Hide topbar on scroll-down (Lavka-like): keep search pinned, show topbar on scroll-up.
   useEffect(() => {
-    const lastYRef = { current: window.scrollY || 0 }
+    const scrollContainer = getScrollContainer()
+    const lastYRef = { current: getScrollTop(scrollContainer) }
     let rafId = 0
 
     const apply = () => {
       rafId = 0
-      const y = window.scrollY || 0
+      const y = getScrollTop(scrollContainer)
       const lastY = lastYRef.current
       const delta = y - lastY
       lastYRef.current = y
@@ -83,9 +85,16 @@ function StoresPage() {
       rafId = window.requestAnimationFrame(apply)
     }
 
-    window.addEventListener('scroll', onScroll, { passive: true })
+    if (!scrollContainer) {
+      apply()
+      return () => {
+        if (rafId) window.cancelAnimationFrame(rafId)
+      }
+    }
+
+    scrollContainer.addEventListener('scroll', onScroll, { passive: true })
     return () => {
-      window.removeEventListener('scroll', onScroll)
+      scrollContainer.removeEventListener('scroll', onScroll)
       if (rafId) window.cancelAnimationFrame(rafId)
     }
   }, [])

@@ -4,6 +4,7 @@
  */
 
 import { useState, useEffect, useCallback, useRef } from 'react'
+import { getScrollContainer, getScrollTop as readScrollTop } from '../utils/scrollContainer'
 
 export function usePullToRefresh(onRefresh, options = {}) {
   const {
@@ -22,9 +23,17 @@ export function usePullToRefresh(onRefresh, options = {}) {
   const currentY = useRef(0)
   const containerRef = useRef(null)
   const isTracking = useRef(false)
+  const resolveScrollContainer = useCallback(() => {
+    const node = containerRef.current
+    if (node) {
+      return node.closest('.app-surface') || node
+    }
+    return getScrollContainer()
+  }, [])
+
   const getScrollTop = useCallback(
-    () => window.scrollY || window.pageYOffset || document.documentElement.scrollTop || 0,
-    []
+    () => readScrollTop(resolveScrollContainer()),
+    [resolveScrollContainer]
   )
 
   const handleTouchStart = useCallback((e) => {
@@ -112,7 +121,7 @@ export function usePullToRefresh(onRefresh, options = {}) {
 
   // Подключаем обработчики к контейнеру
   useEffect(() => {
-    const container = containerRef.current || document
+    const container = resolveScrollContainer() || document
 
     container.addEventListener('touchstart', handleTouchStart, { passive: true })
     container.addEventListener('touchmove', handleTouchMove, { passive: false })
