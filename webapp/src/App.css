@@ -36,15 +36,15 @@
   background:
     radial-gradient(
       circle at top left,
-      transparent 0,
-      transparent calc(var(--app-surface-radius) - 1px),
-      #121416 var(--app-surface-radius)
+      #121416 0,
+      #121416 calc(var(--app-surface-radius) - 1px),
+      transparent var(--app-surface-radius)
     ) top left / var(--app-surface-radius) var(--app-surface-radius) no-repeat,
     radial-gradient(
       circle at top right,
-      transparent 0,
-      transparent calc(var(--app-surface-radius) - 1px),
-      #121416 var(--app-surface-radius)
+      #121416 0,
+      #121416 calc(var(--app-surface-radius) - 1px),
+      transparent var(--app-surface-radius)
     ) top right / var(--app-surface-radius) var(--app-surface-radius) no-repeat;
 }
 

@@ -34,7 +34,7 @@ function ProductDetailPage() {
   const hasImage = Boolean(imageUrl) && !imgError
 
   const handleQuantityChange = (delta) => {
-    const maxQty = offer?.quantity || 99
+    const maxQty = offer?.quantity ?? offer?.stock ?? 99
     setQuantity(prev => Math.max(1, Math.min(prev + delta, maxQty)))
     window.Telegram?.WebApp?.HapticFeedback?.impactOccurred?.('light')
   }
@@ -99,7 +99,8 @@ function ProductDetailPage() {
   const expiryInfo = getExpiryInfo()
   const hasDiscount = offer.original_price > offer.discount_price
   const isFav = isFavorite(offer.id)
-  const hasStock = Number(offer.quantity || offer.stock || 0) > 0
+  const stockValue = Number(offer.quantity ?? offer.stock ?? 0)
+  const hasStock = stockValue > 0
   const showPriceMeta = hasDiscount || hasStock
 
   return (
@@ -175,7 +176,7 @@ function ProductDetailPage() {
             <p className="pdp-store">
               <span className="pdp-store-label">Do'kon:</span>
               <span className="pdp-store-name">{offer.store_name}</span>
-              {offer.store_address && <span className="pdp-store-addr"> - {offer.store_address}</span>}
+              {offer.store_address && <span className="pdp-store-addr">{offer.store_address}</span>}
             </p>
           )}
           {expiryInfo && (
@@ -203,9 +204,9 @@ function ProductDetailPage() {
                   </span>
                 )}
                 {hasStock && (
-                  <span className="pdp-stock">Qoldi: {offer.quantity} {getUnitLabel(offer.unit)}</span>
+                  <span className="pdp-stock">Qoldi: {stockValue} {getUnitLabel(offer.unit)}</span>
                 )}
-              </div>
+          </div>
             )}
           </div>
           <QuantityControl
@@ -215,7 +216,7 @@ function ProductDetailPage() {
             onDecrement={() => handleQuantityChange(-1)}
             onIncrement={() => handleQuantityChange(1)}
             disableDecrement={quantity <= 1}
-            disableIncrement={quantity >= (offer.quantity || offer.stock || 99)}
+            disableIncrement={quantity >= (offer.quantity ?? offer.stock ?? 99)}
           />
         </div>
 
