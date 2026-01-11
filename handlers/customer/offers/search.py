@@ -18,7 +18,7 @@ from app.services.offer_service import OfferService
 from app.templates.offers import render_offer_card
 from database_protocol import DatabaseProtocol
 from handlers.common.states import BrowseOffers, Search
-from handlers.common.utils import is_main_menu_button
+from handlers.common.utils import is_main_menu_button, is_search_button
 from localization import get_text
 
 logger = logging.getLogger(__name__)
@@ -279,7 +279,7 @@ def setup(
             get_text(lang, "operation_cancelled"), reply_markup=main_menu_customer(lang)
         )
 
-    @dp.message(F.text.in_(["🔍 Поиск", "🔍 Qidirish"]))
+    @dp.message(F.text.func(is_search_button))
     async def start_search(message: types.Message, state: FSMContext):
         """Start search flow."""
         assert message.from_user is not None

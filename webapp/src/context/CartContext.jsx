@@ -40,11 +40,12 @@ export function CartProvider({ children }) {
       const existingStoreId = Object.values(prev).find(item => item.offer?.store_id)?.offer?.store_id
       if (existingStoreId && newStoreId && existingStoreId !== newStoreId) {
         window.Telegram?.WebApp?.HapticFeedback?.notificationOccurred?.('warning')
+        const message = "Savatda faqat bitta do'kondan mahsulot bo'lishi mumkin. Savatni tozalab qayta urinib ko'ring."
         if (window.Telegram?.WebApp?.showAlert) {
-          window.Telegram.WebApp.showAlert('Cart supports only one store. Clear cart to add items from another store.')
+          window.Telegram.WebApp.showAlert(message)
         } else {
           // eslint-disable-next-line no-alert
-          alert('Cart supports only one store. Clear cart to add items from another store.')
+          alert(message)
         }
         return prev
       }

@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { ShoppingCart, Home, Sparkles, Trash2, ChevronRight, X } from 'lucide-react'
 import api from '../api/client'
@@ -32,7 +32,7 @@ function CartPage({ user }) {
   const [orderLoading, setOrderLoading] = useState(false)
   const commentInputRef = useRef(null)
   const paymentProofInputRef = useRef(null)
-  const paymentProofUploadInputRef = useRef(null)
+  const fileSelectHandlerRef = useRef(null)
   const [focusCommentOnOpen, setFocusCommentOnOpen] = useState(false)
 
   // Checkout form
@@ -53,7 +53,7 @@ function CartPage({ user }) {
   const [storeDeliveryEnabled, setStoreDeliveryEnabled] = useState(false)
 
   // Payment step for delivery
-  const [checkoutStep, setCheckoutStep] = useState('details') // 'details' | 'payment' | 'upload'
+  const [checkoutStep, setCheckoutStep] = useState('details') // 'details' | 'payment'
   const [paymentCard, setPaymentCard] = useState(null)
   const [paymentProof, setPaymentProof] = useState(null)
   const [paymentProofPreview, setPaymentProofPreview] = useState(null)
@@ -93,33 +93,48 @@ function CartPage({ user }) {
     }
   }, [canonicalPhone, phone])
 
+  const cartStoreIds = useMemo(
+    () => [...new Set(cartItems.map(item => item.offer?.store_id).filter(Boolean))],
+    [cartItems]
+  )
+  const cartStoreId = cartStoreIds[0] || null
+  const hasMultipleStores = cartStoreIds.length > 1
+  const multiStoreMessage = "Savatda faqat bitta do'kondan mahsulot bo'lishi mumkin. Savatni tozalab qayta urinib ko'ring."
+
   // Check if stores in cart support delivery
   useEffect(() => {
+    let isActive = true
     const checkDeliveryAvailability = async () => {
-      // Get unique store IDs from cart
-      const storeIds = [...new Set(cartItems.map(item => item.offer?.store_id).filter(Boolean))]
-
-      if (storeIds.length === 0) return
+      if (!cartStoreId) {
+        setStoreDeliveryEnabled(false)
+        setDeliveryFee(0)
+        setMinOrderAmount(0)
+        return
+      }
 
       try {
-        const storeId = storeIds[0]
-        const cartStore = await api.getStore(storeId)
+        const cartStore = await api.getStore(cartStoreId)
 
-        if (cartStore) {
+        if (cartStore && isActive) {
           setStoreDeliveryEnabled(!!cartStore.delivery_enabled)
           setDeliveryFee(cartStore.delivery_price || 0)
           setMinOrderAmount(cartStore.min_order_amount || 0)
         }
       } catch (e) {
         console.warn('Could not fetch store info:', e)
-        setStoreDeliveryEnabled(false)
-        setDeliveryFee(0)
-        setMinOrderAmount(0)
+        if (isActive) {
+          setStoreDeliveryEnabled(false)
+          setDeliveryFee(0)
+          setMinOrderAmount(0)
+        }
       }
     }
 
     checkDeliveryAvailability()
-  }, [cartItems])
+    return () => {
+      isActive = false
+    }
+  }, [cartStoreId])
 
   // Calculate totals using context values
   const subtotal = cartTotal
@@ -156,12 +171,10 @@ function CartPage({ user }) {
   const clearPaymentProof = () => {
     setPaymentProof(null)
     setPaymentProofPreview(null)
-    const inputs = [paymentProofInputRef, paymentProofUploadInputRef]
-    inputs.forEach((ref) => {
-      if (ref.current) {
-        ref.current.value = ''
-      }
-    })
+    if (paymentProofInputRef.current) {
+      paymentProofInputRef.current.value = ''
+    }
+    document.documentElement.classList.remove('file-picker-open')
   }
 
   const selectPaymentMethod = (method) => {
@@ -175,6 +188,16 @@ function CartPage({ user }) {
     if (orderLoading) return
     setShowCheckout(false)
     setShowPaymentSheet(false)
+  }
+
+  // Open the file picker synchronously on user click (iOS Safari safe).
+  const openPaymentProofPicker = () => {
+    if (orderLoading) return
+    const input = paymentProofInputRef.current
+    if (!input) return
+    input.value = ''
+    document.documentElement.classList.add('file-picker-open')
+    input.click()
   }
 
   const handleClearCart = useCallback(() => {
@@ -247,13 +270,12 @@ function CartPage({ user }) {
 
   const handleCheckout = async () => {
     if (isEmpty) return
-    const verifiedPhone = await requireVerifiedPhone()
-    if (!verifiedPhone) {
+    if (hasMultipleStores) {
+      toast.error(multiStoreMessage)
       return
     }
-    const storeIds = new Set(cartItems.map(item => item.offer?.store_id).filter(Boolean))
-    if (storeIds.size > 1) {
-      toast.error('Checkout supports only one store. Clear the cart and try again.')
+    const verifiedPhone = await requireVerifiedPhone()
+    if (!verifiedPhone) {
       return
     }
     setCheckoutStep('details')
@@ -262,6 +284,10 @@ function CartPage({ user }) {
 
   const handleCommentShortcut = async () => {
     if (isEmpty) return
+    if (hasMultipleStores) {
+      toast.error(multiStoreMessage)
+      return
+    }
     const verifiedPhone = await requireVerifiedPhone()
     if (!verifiedPhone) {
       return
@@ -272,17 +298,58 @@ function CartPage({ user }) {
   }
 
   // Handle file selection for payment proof
-  const handleFileSelect = (e) => {
-    const file = e.target.files?.[0]
-    if (file) {
-      setPaymentProof(file)
-      const reader = new FileReader()
-      reader.onloadend = () => {
-        setPaymentProofPreview(reader.result)
-      }
-      reader.readAsDataURL(file)
+  const handleFileSelect = useCallback((event) => {
+    const file = event.target?.files?.[0]
+    if (!file) return
+    setPaymentProof(file)
+    const reader = new FileReader()
+    reader.onloadend = () => {
+      setPaymentProofPreview(reader.result)
     }
-  }
+    reader.readAsDataURL(file)
+  }, [])
+
+  useEffect(() => {
+    fileSelectHandlerRef.current = handleFileSelect
+  }, [handleFileSelect])
+
+  useEffect(() => {
+    if (paymentProofInputRef.current) return
+    const input = document.createElement('input')
+    input.type = 'file'
+    input.accept = 'image/*,image/jpeg,image/jpg,image/png'
+    input.style.position = 'fixed'
+    input.style.top = '-1000px'
+    input.style.left = '0'
+    input.style.width = '1px'
+    input.style.height = '1px'
+    input.style.opacity = '0'
+    input.style.pointerEvents = 'none'
+    input.setAttribute('aria-hidden', 'true')
+
+    const handleChange = (event) => {
+      document.documentElement.classList.remove('file-picker-open')
+      fileSelectHandlerRef.current?.(event)
+    }
+    const handleWindowFocus = () => {
+      document.documentElement.classList.remove('file-picker-open')
+    }
+
+    input.addEventListener('change', handleChange)
+    window.addEventListener('focus', handleWindowFocus)
+    document.body.appendChild(input)
+    paymentProofInputRef.current = input
+
+    return () => {
+      input.removeEventListener('change', handleChange)
+      window.removeEventListener('focus', handleWindowFocus)
+      input.remove()
+      if (paymentProofInputRef.current === input) {
+        paymentProofInputRef.current = null
+      }
+      document.documentElement.classList.remove('file-picker-open')
+    }
+  }, [])
 
   const getResolvedPhone = useCallback(
     () => (canonicalPhone || phone || '').trim(),
@@ -586,6 +653,14 @@ function CartPage({ user }) {
           <div className="cart-list-header">
             <h2>Mahsulotlar</h2>
           </div>
+          {hasMultipleStores && (
+            <div className="cart-alert" role="status">
+              <p>{multiStoreMessage}</p>
+              <button type="button" className="cart-alert-action" onClick={handleClearCart}>
+                Savatni tozalash
+              </button>
+            </div>
+          )}
           <div className="cart-items">
             {cartItems.map(item => {
               const photoUrl = resolveOfferImageUrl(item.offer) || PLACEHOLDER_IMAGE
@@ -653,7 +728,13 @@ function CartPage({ user }) {
             })}
           </div>
         </div>
-        <button className="cart-note-link" type="button" onClick={handleCommentShortcut}>
+        <button
+          className="cart-note-link"
+          type="button"
+          onClick={handleCommentShortcut}
+          disabled={hasMultipleStores}
+          aria-disabled={hasMultipleStores}
+        >
           Izoh qoldirish
         </button>
       </main>
@@ -663,7 +744,11 @@ function CartPage({ user }) {
           <span className="checkout-total-label">Jami</span>
           <span className="checkout-total-value">{Math.round(total).toLocaleString()} so'm</span>
         </div>
-        <button className="checkout-primary-btn" onClick={handleCheckout}>
+        <button
+          className="checkout-primary-btn"
+          onClick={handleCheckout}
+          disabled={hasMultipleStores}
+        >
           <span>Davom ettirish</span>
           <ChevronRight size={18} strokeWidth={2} aria-hidden="true" />
         </button>
@@ -847,20 +932,14 @@ function CartPage({ user }) {
                         <p className="upload-label">O'tkazma chekini yuklang:</p>
 
                         <div className="upload-area">
-                          <label
+                          <button
+                            type="button"
                             className={`upload-btn file-picker-btn${paymentProof ? ' is-hidden' : ''}${orderLoading ? ' is-disabled' : ''}`}
-                            aria-disabled={orderLoading}
+                            onClick={openPaymentProofPicker}
+                            disabled={orderLoading}
                           >
-                            <input
-                              ref={paymentProofInputRef}
-                              type="file"
-                              accept="image/*,image/jpeg,image/jpg,image/png"
-                              onChange={handleFileSelect}
-                              className="file-input-overlay"
-                              disabled={orderLoading}
-                            />
                             Rasm tanlash
-                          </label>
+                          </button>
                         </div>
 
                         {paymentProofPreview ? (
@@ -919,59 +998,6 @@ function CartPage({ user }) {
                 </>
               )}
 
-              {checkoutStep === 'payment_upload' && (
-                <>
-                <p className="upload-instruction">
-                    Buyurtma yaratildi! Endi to'lov chekini yuklang.
-                </p>
-
-                  {paymentProofPreview && (
-                    <div className="proof-preview" style={{ margin: '10px 0' }}>
-                      <img src={paymentProofPreview} alt="Chek" style={{ maxWidth: '200px', borderRadius: '8px' }} />
-                    </div>
-                  )}
-
-                  <label
-                    className={`confirm-btn file-picker-btn${paymentProof ? ' is-hidden' : ''}${orderLoading ? ' is-disabled' : ''}`}
-                    aria-disabled={orderLoading}
-                  >
-                    <input
-                      ref={paymentProofUploadInputRef}
-                      type="file"
-                      accept="image/*,image/jpeg,image/jpg,image/png"
-                      onChange={handleFileSelect}
-                      className="file-input-overlay"
-                      disabled={orderLoading}
-                    />
-                    Chekni yuklash
-                  </label>
-                  <button
-                    className={`confirm-btn${!paymentProof ? ' is-hidden' : ''}`}
-                    onClick={async () => {
-                      setOrderLoading(true)
-                      try {
-                        await api.uploadPaymentProof(orderResult.orderId, paymentProof)
-                        clearCart()
-                        setShowCheckout(false)
-                        setCheckoutStep('details')
-                        clearPaymentProof()
-                        setOrderResult({
-                          ...orderResult,
-                          awaitingPayment: false,
-                          message: 'Chek yuklandi! Admin tekshiradi.'
-                        })
-                      } catch (error) {
-                        alert('Xatolik: ' + error.message)
-                      } finally {
-                        setOrderLoading(false)
-                      }
-                    }}
-                    disabled={orderLoading}
-                  >
-                    {orderLoading ? 'Yuklanmoqda...' : 'Yuborish'}
-                  </button>
-                </>
-              )}
             </div>
           </div>
         </div>

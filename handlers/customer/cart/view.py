@@ -5,6 +5,7 @@ from aiogram.fsm.context import FSMContext
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
 from localization import get_text
+from handlers.common.utils import is_cart_button
 
 from .common import esc
 from . import common
@@ -137,7 +138,7 @@ async def show_cart(
 def register(router: Router) -> None:
     """Register cart view and editing handlers on the given router."""
 
-    @router.message(F.text.in_([get_text("ru", "my_cart"), get_text("uz", "my_cart")]))
+    @router.message(F.text.func(is_cart_button))
     async def show_cart_message(message: types.Message, state: FSMContext) -> None:
         await show_cart(message, state, is_callback=False)
 

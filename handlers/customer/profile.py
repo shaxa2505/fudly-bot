@@ -31,6 +31,7 @@ from handlers.common.utils import (
 from handlers.common.utils import (
     get_user_view_mode,
     has_approved_store,
+    is_profile_button,
     set_user_view_mode,
 )
 from localization import get_cities, get_text
@@ -61,7 +62,7 @@ def get_appropriate_menu(user_id: int, lang: str) -> Any:
     return _get_appropriate_menu(user_id, lang, db)
 
 
-@router.message(F.text.contains("Профиль") | F.text.contains("Profil"))
+@router.message(F.text.func(is_profile_button))
 async def profile(message: types.Message, state: FSMContext) -> None:
     """Display user profile with statistics."""
     # Clear any active FSM state when returning to main menu

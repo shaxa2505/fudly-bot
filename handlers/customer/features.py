@@ -14,6 +14,7 @@ from aiogram.utils.keyboard import InlineKeyboardBuilder
 
 from app.core.utils import get_field
 from database_protocol import DatabaseProtocol
+from handlers.common.utils import is_cart_button
 
 logger = logging.getLogger(__name__)
 router = Router()
@@ -98,7 +99,7 @@ def setup(
 
     # ============== МОЯ КОРЗИНА ==============
 
-    @dp_or_router.message(F.text.in_(["🛒 Корзина", "🛒 Savat"]))
+    @dp_or_router.message(F.text.func(is_cart_button))
     async def my_cart(message: types.Message, state: FSMContext):
         """Redirect to new cart view."""
         from handlers.customer.cart.router import show_cart

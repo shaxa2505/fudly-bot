@@ -1,11 +1,11 @@
-"""
-Идеальная реализация Buyurtmalarim (Мои заказы).
+﻿"""
+РРґРµР°Р»СЊРЅР°СЏ СЂРµР°Р»РёР·Р°С†РёСЏ Buyurtmalarim (РњРѕРё Р·Р°РєР°Р·С‹).
 
-Функционал:
-1. Показ активных заказов с прогрессом
-2. Детальный просмотр заказа (товары, цены, адрес)
-3. Действия: Получил, Позвонить курьеру, Проблема
-4. История заказов с фильтрами
+Р¤СѓРЅРєС†РёРѕРЅР°Р»:
+1. РџРѕРєР°Р· Р°РєС‚РёРІРЅС‹С… Р·Р°РєР°Р·РѕРІ СЃ РїСЂРѕРіСЂРµСЃСЃРѕРј
+2. Р”РµС‚Р°Р»СЊРЅС‹Р№ РїСЂРѕСЃРјРѕС‚СЂ Р·Р°РєР°Р·Р° (С‚РѕРІР°СЂС‹, С†РµРЅС‹, Р°РґСЂРµСЃ)
+3. Р”РµР№СЃС‚РІРёСЏ: РџРѕР»СѓС‡РёР», РџРѕР·РІРѕРЅРёС‚СЊ РєСѓСЂСЊРµСЂСѓ, РџСЂРѕР±Р»РµРјР°
+4. РСЃС‚РѕСЂРёСЏ Р·Р°РєР°Р·РѕРІ СЃ С„РёР»СЊС‚СЂР°РјРё
 """
 from __future__ import annotations
 
@@ -17,6 +17,7 @@ from aiogram.fsm.context import FSMContext
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
 from app.services.unified_order_service import OrderStatus, get_unified_order_service
+from handlers.common.utils import is_my_orders_button
 
 try:
     from logging_config import logger
@@ -51,22 +52,22 @@ def _t(lang: str, ru: str, uz: str) -> str:
 # =============================================================================
 
 ORDER_STATUSES = {
-    "pending": {"emoji": "🟡", "ru": "Ожидает подтверждения", "uz": "Tasdiqlanishi kutilmoqda"},
-    "preparing": {"emoji": "👨‍🍳", "ru": "Готовится", "uz": "Tayyorlanmoqda"},
-    "ready": {"emoji": "📦", "ru": "Готов", "uz": "Tayyor"},
-    "delivering": {"emoji": "🚚", "ru": "Курьер в пути", "uz": "Kuryer yo'lda"},
-    "completed": {"emoji": "✅", "ru": "Завершён", "uz": "Yakunlangan"},
-    "rejected": {"emoji": "❌", "ru": "Отклонён", "uz": "Rad etilgan"},
-    "cancelled": {"emoji": "❌", "ru": "Отменён", "uz": "Bekor qilingan"},
+    "pending": {"emoji": "рџџЎ", "ru": "РћР¶РёРґР°РµС‚ РїРѕРґС‚РІРµСЂР¶РґРµРЅРёСЏ", "uz": "Tasdiqlanishi kutilmoqda"},
+    "preparing": {"emoji": "рџ‘ЁвЂЌрџЌі", "ru": "Р“РѕС‚РѕРІРёС‚СЃСЏ", "uz": "Tayyorlanmoqda"},
+    "ready": {"emoji": "рџ“¦", "ru": "Р“РѕС‚РѕРІ", "uz": "Tayyor"},
+    "delivering": {"emoji": "рџљљ", "ru": "РљСѓСЂСЊРµСЂ РІ РїСѓС‚Рё", "uz": "Kuryer yo'lda"},
+    "completed": {"emoji": "вњ…", "ru": "Р—Р°РІРµСЂС€С‘РЅ", "uz": "Yakunlangan"},
+    "rejected": {"emoji": "вќЊ", "ru": "РћС‚РєР»РѕРЅС‘РЅ", "uz": "Rad etilgan"},
+    "cancelled": {"emoji": "вќЊ", "ru": "РћС‚РјРµРЅС‘РЅ", "uz": "Bekor qilingan"},
 }
 
 BOOKING_STATUSES = {
-    "pending": {"emoji": "🟡", "ru": "Ожидает", "uz": "Kutilmoqda"},
-    "preparing": {"emoji": "👨‍🍳", "ru": "Готовится", "uz": "Tayyorlanmoqda"},
-    "ready": {"emoji": "📦", "ru": "Готов", "uz": "Tayyor"},
-    "completed": {"emoji": "✅", "ru": "Завершён", "uz": "Yakunlangan"},
-    "rejected": {"emoji": "❌", "ru": "Отклонён", "uz": "Rad etilgan"},
-    "cancelled": {"emoji": "❌", "ru": "Отменён", "uz": "Bekor qilingan"},
+    "pending": {"emoji": "рџџЎ", "ru": "РћР¶РёРґР°РµС‚", "uz": "Kutilmoqda"},
+    "preparing": {"emoji": "рџ‘ЁвЂЌрџЌі", "ru": "Р“РѕС‚РѕРІРёС‚СЃСЏ", "uz": "Tayyorlanmoqda"},
+    "ready": {"emoji": "рџ“¦", "ru": "Р“РѕС‚РѕРІ", "uz": "Tayyor"},
+    "completed": {"emoji": "вњ…", "ru": "Р—Р°РІРµСЂС€С‘РЅ", "uz": "Yakunlangan"},
+    "rejected": {"emoji": "вќЊ", "ru": "РћС‚РєР»РѕРЅС‘РЅ", "uz": "Rad etilgan"},
+    "cancelled": {"emoji": "вќЊ", "ru": "РћС‚РјРµРЅС‘РЅ", "uz": "Bekor qilingan"},
 }
 
 
@@ -84,13 +85,13 @@ def _get_status_info(status: str, is_delivery: bool, lang: str) -> tuple[str, st
     """Get status emoji and text."""
     statuses = ORDER_STATUSES if is_delivery else BOOKING_STATUSES
     status_norm = _normalize_status(status)
-    info = statuses.get(status_norm, {"emoji": "❓", "ru": status_norm, "uz": status_norm})
+    info = statuses.get(status_norm, {"emoji": "вќ“", "ru": status_norm, "uz": status_norm})
     return info["emoji"], info.get(lang, info["ru"])
 
 
 def _format_price(amount: int | float, lang: str) -> str:
     """Format price with currency."""
-    currency = "сум" if lang == "ru" else "so'm"
+    currency = "СЃСѓРј" if lang == "ru" else "so'm"
     return f"{int(amount):,} {currency}".replace(",", " ")
 
 
@@ -99,37 +100,25 @@ def _format_price(amount: int | float, lang: str) -> str:
 # =============================================================================
 
 
-@router.message(
-    F.text.in_
-    (
-        [
-            "📋 Мои заказы",
-            "📋 Buyurtmalarim",
-            "📦 Мои заказы",
-            "📦 Mening buyurtmalarim",
-            "📋 Заказы и бронирования",
-            "📋 Buyurtmalar va bronlar",
-        ]
-    )
-)
+@router.message(F.text.func(is_my_orders_button))
 async def my_orders_handler(message: types.Message) -> None:
     """
-    Главный экран "Мои заказы".
-    Показывает активные заказы с кнопками детализации.
+    Р“Р»Р°РІРЅС‹Р№ СЌРєСЂР°РЅ "РњРѕРё Р·Р°РєР°Р·С‹".
+    РџРѕРєР°Р·С‹РІР°РµС‚ Р°РєС‚РёРІРЅС‹Рµ Р·Р°РєР°Р·С‹ СЃ РєРЅРѕРїРєР°РјРё РґРµС‚Р°Р»РёР·Р°С†РёРё.
     """
     if not db:
         lang_code = (message.from_user.language_code or "ru") if message.from_user else "ru"
         if lang_code.startswith("uz"):
-            text = "❌ Xizmat vaqtincha mavjud emas. Keyinroq urinib ko'ring."
+            text = "вќЊ Xizmat vaqtincha mavjud emas. Keyinroq urinib ko'ring."
         else:
-            text = "❌ Сервис временно недоступен. Попробуйте позже."
+            text = "вќЊ РЎРµСЂРІРёСЃ РІСЂРµРјРµРЅРЅРѕ РЅРµРґРѕСЃС‚СѓРїРµРЅ. РџРѕРїСЂРѕР±СѓР№С‚Рµ РїРѕР·Р¶Рµ."
         await message.answer(text)
         return
 
     user_id = message.from_user.id
     lang = db.get_user_language(user_id)
 
-    # Получаем bookings (самовывоз) и orders (доставка)
+    # РџРѕР»СѓС‡Р°РµРј bookings (СЃР°РјРѕРІС‹РІРѕР·) Рё orders (РґРѕСЃС‚Р°РІРєР°)
     bookings = db.get_user_bookings(user_id) or []
     try:
         orders = db.get_user_orders(user_id) or []
@@ -142,7 +131,7 @@ async def my_orders_handler(message: types.Message) -> None:
 
     active_statuses = {"pending", "preparing", "ready", "delivering"}
 
-    # Разделяем по статусам (legacy bookings + unified orders)
+    # Р Р°Р·РґРµР»СЏРµРј РїРѕ СЃС‚Р°С‚СѓСЃР°Рј (legacy bookings + unified orders)
     active_bookings = [
         b for b in bookings if _normalize_status(_get_field(b, "status")) in active_statuses
     ]
@@ -161,7 +150,7 @@ async def my_orders_handler(message: types.Message) -> None:
         else:
             active_pickup_orders.append(o)
 
-    # Счётчики для summary
+    # РЎС‡С‘С‚С‡РёРєРё РґР»СЏ summary
     total_completed = len([b for b in bookings if _normalize_status(_get_field(b, "status")) == "completed"]) + len(
         [o for o in orders if _normalize_status(_get_field(o, "order_status", 10)) == "completed"]
     )
@@ -182,43 +171,43 @@ async def my_orders_handler(message: types.Message) -> None:
     kb = InlineKeyboardBuilder()
     text_lines = []
 
-    # ═══════════════════════════════════════════════════════════════════
-    # АКТИВНЫЕ ЗАКАЗЫ
-    # ═══════════════════════════════════════════════════════════════════
+    # в•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђ
+    # РђРљРўРР’РќР«Р• Р—РђРљРђР—Р«
+    # в•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђ
     if active_bookings or active_pickup_orders or active_delivery_orders:
-        title = _t(lang, "🔥 Активные заказы", "🔥 Faol buyurtmalar")
+        title = _t(lang, "рџ”Ґ РђРєС‚РёРІРЅС‹Рµ Р·Р°РєР°Р·С‹", "рџ”Ґ Faol buyurtmalar")
         text_lines.append(f"<b>{title}</b>\n")
 
-        # Показываем legacy bookings (самовывоз из таблицы bookings)
+        # РџРѕРєР°Р·С‹РІР°РµРј legacy bookings (СЃР°РјРѕРІС‹РІРѕР· РёР· С‚Р°Р±Р»РёС†С‹ bookings)
         for booking in active_bookings[:5]:
             booking_id = _get_field(booking, "booking_id")
-            store_name = _get_field(booking, "name") or "Магазин"  # name в dict, не store_name
+            store_name = _get_field(booking, "name") or "РњР°РіР°Р·РёРЅ"  # name РІ dict, РЅРµ store_name
             status = _normalize_status(_get_field(booking, "status"))
             pickup_code = _get_field(booking, "booking_code")
-            # Вычисляем total из quantity × discount_price
+            # Р’С‹С‡РёСЃР»СЏРµРј total РёР· quantity Г— discount_price
             quantity = _get_field(booking, "quantity") or 1
             discount_price = _get_field(booking, "discount_price") or 0
             total = quantity * discount_price
 
             emoji, status_text = _get_status_info(status, False, lang)
 
-            text_lines.append(f"{emoji} <b>#{booking_id}</b> • {store_name}")
+            text_lines.append(f"{emoji} <b>#{booking_id}</b> вЂў {store_name}")
             text_lines.append(
-                f"   🏪 {_t(lang, 'Самовывоз', 'Olib ketish')} • {_format_price(total, lang)}"
+                f"   рџЏЄ {_t(lang, 'РЎР°РјРѕРІС‹РІРѕР·', 'Olib ketish')} вЂў {_format_price(total, lang)}"
             )
             if pickup_code:
-                text_lines.append(f"   🎫 {_t(lang, 'Код', 'Kod')}: <code>{pickup_code}</code>")
-            text_lines.append(f"   📊 {status_text}")
+                text_lines.append(f"   рџЋ« {_t(lang, 'РљРѕРґ', 'Kod')}: <code>{pickup_code}</code>")
+            text_lines.append(f"   рџ“Љ {status_text}")
             text_lines.append("")
 
-            # Кнопка детализации
-            store_name_str = str(store_name) if store_name else "Магазин"
+            # РљРЅРѕРїРєР° РґРµС‚Р°Р»РёР·Р°С†РёРё
+            store_name_str = str(store_name) if store_name else "РњР°РіР°Р·РёРЅ"
             kb.button(
-                text=f"👁 #{booking_id} {store_name_str[:15]}",
+                text=f"рџ‘Ѓ #{booking_id} {store_name_str[:15]}",
                 callback_data=f"myorder_detail_b_{booking_id}",
             )
 
-        # Показываем pickup orders из таблицы orders (новый самовывоз)
+        # РџРѕРєР°Р·С‹РІР°РµРј pickup orders РёР· С‚Р°Р±Р»РёС†С‹ orders (РЅРѕРІС‹Р№ СЃР°РјРѕРІС‹РІРѕР·)
         for order in active_pickup_orders[:5]:
             order_id = _get_field(order, "order_id", 0)
             store_id = _get_field(order, "store_id")
@@ -229,7 +218,7 @@ async def my_orders_handler(message: types.Message) -> None:
                 else getattr(store, "name", None)
                 if store
                 else None
-            ) or "Магазин"
+            ) or "РњР°РіР°Р·РёРЅ"
 
             status = _normalize_status(_get_field(order, "order_status", 10))
             total = _get_field(order, "total_price", 5) or 0
@@ -237,22 +226,22 @@ async def my_orders_handler(message: types.Message) -> None:
 
             emoji, status_text = _get_status_info(status, False, lang)
 
-            text_lines.append(f"{emoji} <b>#{order_id}</b> • {store_name}")
+            text_lines.append(f"{emoji} <b>#{order_id}</b> вЂў {store_name}")
             text_lines.append(
-                f"   🏪 {_t(lang, 'Самовывоз', 'Olib ketish')} • {_format_price(total, lang)}"
+                f"   рџЏЄ {_t(lang, 'РЎР°РјРѕРІС‹РІРѕР·', 'Olib ketish')} вЂў {_format_price(total, lang)}"
             )
             if pickup_code:
-                text_lines.append(f"   🎫 {_t(lang, 'Код', 'Kod')}: <code>{pickup_code}</code>")
-            text_lines.append(f"   📊 {status_text}")
+                text_lines.append(f"   рџЋ« {_t(lang, 'РљРѕРґ', 'Kod')}: <code>{pickup_code}</code>")
+            text_lines.append(f"   рџ“Љ {status_text}")
             text_lines.append("")
 
-            store_name_str = str(store_name) if store_name else "Магазин"
+            store_name_str = str(store_name) if store_name else "РњР°РіР°Р·РёРЅ"
             kb.button(
-                text=f"👁 #{order_id} {store_name_str[:15]}",
+                text=f"рџ‘Ѓ #{order_id} {store_name_str[:15]}",
                 callback_data=f"myorder_detail_o_{order_id}",
             )
 
-        # Показываем delivery orders (доставка)
+        # РџРѕРєР°Р·С‹РІР°РµРј delivery orders (РґРѕСЃС‚Р°РІРєР°)
         for order in active_delivery_orders[:5]:
             order_id = _get_field(order, "order_id", 0)
             store_id = _get_field(order, "store_id")
@@ -263,7 +252,7 @@ async def my_orders_handler(message: types.Message) -> None:
                 else getattr(store, "name", None)
                 if store
                 else None
-            ) or "Магазин"
+            ) or "РњР°РіР°Р·РёРЅ"
 
             status = _normalize_status(_get_field(order, "order_status", 10))
             total = _get_field(order, "total_price", 5) or 0
@@ -271,48 +260,48 @@ async def my_orders_handler(message: types.Message) -> None:
 
             emoji, status_text = _get_status_info(status, True, lang)
 
-            text_lines.append(f"{emoji} <b>#{order_id}</b> • {store_name}")
+            text_lines.append(f"{emoji} <b>#{order_id}</b> вЂў {store_name}")
             text_lines.append(
-                f"   🚚 {_t(lang, 'Доставка', 'Yetkazish')} • {_format_price(total, lang)}"
+                f"   рџљљ {_t(lang, 'Р”РѕСЃС‚Р°РІРєР°', 'Yetkazish')} вЂў {_format_price(total, lang)}"
             )
             if address:
                 short_addr = address[:30] + "..." if len(address) > 30 else address
-                text_lines.append(f"   📍 {short_addr}")
-            text_lines.append(f"   📊 {status_text}")
+                text_lines.append(f"   рџ“Ќ {short_addr}")
+            text_lines.append(f"   рџ“Љ {status_text}")
             text_lines.append("")
 
-            # Кнопка детализации
-            store_name_str = str(store_name) if store_name else "Магазин"
+            # РљРЅРѕРїРєР° РґРµС‚Р°Р»РёР·Р°С†РёРё
+            store_name_str = str(store_name) if store_name else "РњР°РіР°Р·РёРЅ"
             kb.button(
-                text=f"👁 #{order_id} {store_name_str[:15]}",
+                text=f"рџ‘Ѓ #{order_id} {store_name_str[:15]}",
                 callback_data=f"myorder_detail_o_{order_id}",
             )
 
-        kb.adjust(1)  # По одной кнопке в ряд
+        kb.adjust(1)  # РџРѕ РѕРґРЅРѕР№ РєРЅРѕРїРєРµ РІ СЂСЏРґ
     else:
-        # Нет активных
-        no_active = _t(lang, "✅ Все заказы выполнены!", "✅ Barcha buyurtmalar bajarildi!")
+        # РќРµС‚ Р°РєС‚РёРІРЅС‹С…
+        no_active = _t(lang, "вњ… Р’СЃРµ Р·Р°РєР°Р·С‹ РІС‹РїРѕР»РЅРµРЅС‹!", "вњ… Barcha buyurtmalar bajarildi!")
         text_lines.append(f"<b>{no_active}</b>\n")
 
-    # ═══════════════════════════════════════════════════════════════════
-    # SUMMARY + ИСТОРИЯ
-    # ═══════════════════════════════════════════════════════════════════
-    text_lines.append("━━━━━━━━━━━━━━━━━━━━")
+    # в•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђ
+    # SUMMARY + РРЎРўРћР РРЇ
+    # в•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђ
+    text_lines.append("в”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓ")
 
-    completed_label = _t(lang, "Завершённых", "Yakunlangan")
-    cancelled_label = _t(lang, "Отменённых", "Bekor qilingan")
-    text_lines.append(f"✅ {completed_label}: <b>{total_completed}</b>")
-    text_lines.append(f"❌ {cancelled_label}: <b>{total_cancelled}</b>")
+    completed_label = _t(lang, "Р—Р°РІРµСЂС€С‘РЅРЅС‹С…", "Yakunlangan")
+    cancelled_label = _t(lang, "РћС‚РјРµРЅС‘РЅРЅС‹С…", "Bekor qilingan")
+    text_lines.append(f"вњ… {completed_label}: <b>{total_completed}</b>")
+    text_lines.append(f"вќЊ {cancelled_label}: <b>{total_cancelled}</b>")
 
-    # Кнопки фильтров истории
+    # РљРЅРѕРїРєРё С„РёР»СЊС‚СЂРѕРІ РёСЃС‚РѕСЂРёРё
     kb.button(
-        text=f"✅ {_t(lang, 'История заказов', 'Buyurtmalar tarixi')} ({total_completed})",
+        text=f"вњ… {_t(lang, 'РСЃС‚РѕСЂРёСЏ Р·Р°РєР°Р·РѕРІ', 'Buyurtmalar tarixi')} ({total_completed})",
         callback_data="myorders_history_completed",
     )
 
     if total_cancelled > 0:
         kb.button(
-            text=f"❌ {_t(lang, 'Отменённые', 'Bekor qilingan')} ({total_cancelled})",
+            text=f"вќЊ {_t(lang, 'РћС‚РјРµРЅС‘РЅРЅС‹Рµ', 'Bekor qilingan')} ({total_cancelled})",
             callback_data="myorders_history_cancelled",
         )
 
@@ -322,22 +311,22 @@ async def my_orders_handler(message: types.Message) -> None:
 
 
 async def _show_empty_orders(message: types.Message, lang: str) -> None:
-    """Показать пустой экран заказов."""
-    title = _t(lang, "📋 Мои заказы", "📋 Mening buyurtmalarim")
-    empty_text = _t(lang, "У вас пока нет заказов", "Sizda hali buyurtmalar yo'q")
+    """РџРѕРєР°Р·Р°С‚СЊ РїСѓСЃС‚РѕР№ СЌРєСЂР°РЅ Р·Р°РєР°Р·РѕРІ."""
+    title = _t(lang, "рџ“‹ РњРѕРё Р·Р°РєР°Р·С‹", "рџ“‹ Mening buyurtmalarim")
+    empty_text = _t(lang, "РЈ РІР°СЃ РїРѕРєР° РЅРµС‚ Р·Р°РєР°Р·РѕРІ", "Sizda hali buyurtmalar yo'q")
     hint = _t(
         lang,
-        "Попробуйте раздел Акции — там товары со скидками до 70%",
-        "Aksiyalar bo'limini sinab ko'ring — u yerda 70% gacha chegirmalar",
+        "РџРѕРїСЂРѕР±СѓР№С‚Рµ СЂР°Р·РґРµР» РђРєС†РёРё вЂ” С‚Р°Рј С‚РѕРІР°СЂС‹ СЃРѕ СЃРєРёРґРєР°РјРё РґРѕ 70%",
+        "Aksiyalar bo'limini sinab ko'ring вЂ” u yerda 70% gacha chegirmalar",
     )
 
     kb = InlineKeyboardBuilder()
     kb.button(
-        text=f"🔥 {_t(lang, 'Смотреть акции', 'Aksiyalarni ko''rish')}", callback_data="hot_offers"
+        text=f"рџ”Ґ {_t(lang, 'РЎРјРѕС‚СЂРµС‚СЊ Р°РєС†РёРё', 'Aksiyalarni ko''rish')}", callback_data="hot_offers"
     )
 
     await message.answer(
-        f"<b>{title}</b>\n\n{empty_text}\n\n💡 {hint}",
+        f"<b>{title}</b>\n\n{empty_text}\n\nрџ’Ў {hint}",
         parse_mode="HTML",
         reply_markup=kb.as_markup(),
     )
@@ -351,8 +340,8 @@ async def _show_empty_orders(message: types.Message, lang: str) -> None:
 @router.callback_query(F.data.startswith("myorder_detail_"))
 async def order_detail_handler(callback: types.CallbackQuery) -> None:
     """
-    Детальный просмотр заказа.
-    Показывает: товары, цены, статус, адрес/код, кнопки действий.
+    Р”РµС‚Р°Р»СЊРЅС‹Р№ РїСЂРѕСЃРјРѕС‚СЂ Р·Р°РєР°Р·Р°.
+    РџРѕРєР°Р·С‹РІР°РµС‚: С‚РѕРІР°СЂС‹, С†РµРЅС‹, СЃС‚Р°С‚СѓСЃ, Р°РґСЂРµСЃ/РєРѕРґ, РєРЅРѕРїРєРё РґРµР№СЃС‚РІРёР№.
     """
     if not db or not callback.data:
         await callback.answer()
@@ -361,17 +350,17 @@ async def order_detail_handler(callback: types.CallbackQuery) -> None:
     user_id = callback.from_user.id
     lang = db.get_user_language(user_id)
 
-    # Parse: myorder_detail_b_123 или myorder_detail_o_123
+    # Parse: myorder_detail_b_123 РёР»Рё myorder_detail_o_123
     parts = callback.data.split("_")
     if len(parts) < 4:
-        await callback.answer("❌ Error")
+        await callback.answer("вќЊ Error")
         return
 
     order_type = parts[2]  # 'b' = booking, 'o' = order
     try:
         order_id = int(parts[3])
     except ValueError:
-        await callback.answer("❌ Error")
+        await callback.answer("вќЊ Error")
         return
 
     if order_type == "b":
@@ -383,10 +372,10 @@ async def order_detail_handler(callback: types.CallbackQuery) -> None:
 
 
 async def _show_booking_detail(callback: types.CallbackQuery, booking_id: int, lang: str) -> None:
-    """Показать детали бронирования (самовывоз)."""
+    """РџРѕРєР°Р·Р°С‚СЊ РґРµС‚Р°Р»Рё Р±СЂРѕРЅРёСЂРѕРІР°РЅРёСЏ (СЃР°РјРѕРІС‹РІРѕР·)."""
     user_id = callback.from_user.id
 
-    # Получаем детали бронирования
+    # РџРѕР»СѓС‡Р°РµРј РґРµС‚Р°Р»Рё Р±СЂРѕРЅРёСЂРѕРІР°РЅРёСЏ
     try:
         with db.get_connection() as conn:
             cursor = conn.cursor()
@@ -415,14 +404,14 @@ async def _show_booking_detail(callback: types.CallbackQuery, booking_id: int, l
             booking = cursor.fetchone()
     except Exception as e:
         logger.error(f"Failed to get booking {booking_id}: {e}")
-        await callback.message.answer(_t(lang, "❌ Ошибка загрузки", "❌ Yuklab bo'lmadi"))
+        await callback.message.answer(_t(lang, "вќЊ РћС€РёР±РєР° Р·Р°РіСЂСѓР·РєРё", "вќЊ Yuklab bo'lmadi"))
         return
 
     if not booking:
-        await callback.message.answer(_t(lang, "❌ Заказ не найден", "❌ Buyurtma topilmadi"))
+        await callback.message.answer(_t(lang, "вќЊ Р—Р°РєР°Р· РЅРµ РЅР°Р№РґРµРЅ", "вќЊ Buyurtma topilmadi"))
         return
 
-    # Парсим данные
+    # РџР°СЂСЃРёРј РґР°РЅРЅС‹Рµ
     if hasattr(booking, "get"):
         data = booking
     else:
@@ -441,74 +430,74 @@ async def _show_booking_detail(callback: types.CallbackQuery, booking_id: int, l
             "discount_price": discount_price,
             "original_price": booking[10],
             "unit": booking[11],
-            "total_price": quantity * discount_price,  # Вычисляем
+            "total_price": quantity * discount_price,  # Р’С‹С‡РёСЃР»СЏРµРј
         }
 
     status = data.get("status", "pending")
     emoji, status_text = _get_status_info(status, False, lang)
 
-    # Формируем текст
+    # Р¤РѕСЂРјРёСЂСѓРµРј С‚РµРєСЃС‚
     lines = []
-    lines.append(f"<b>🏪 {_t(lang, 'Самовывоз', 'Olib ketish')} #{data['booking_id']}</b>")
+    lines.append(f"<b>рџЏЄ {_t(lang, 'РЎР°РјРѕРІС‹РІРѕР·', 'Olib ketish')} #{data['booking_id']}</b>")
     lines.append(f"{emoji} <b>{status_text}</b>")
     lines.append("")
 
-    # Магазин
-    lines.append(f"📍 <b>{data.get('store_name', 'Магазин')}</b>")
+    # РњР°РіР°Р·РёРЅ
+    lines.append(f"рџ“Ќ <b>{data.get('store_name', 'РњР°РіР°Р·РёРЅ')}</b>")
     if data.get("store_address"):
         lines.append(f"   {data['store_address']}")
     lines.append("")
 
-    # Товары
-    lines.append(f"<b>📦 {_t(lang, 'Товары', 'Mahsulotlar')}:</b>")
+    # РўРѕРІР°СЂС‹
+    lines.append(f"<b>рџ“¦ {_t(lang, 'РўРѕРІР°СЂС‹', 'Mahsulotlar')}:</b>")
 
-    # Bookings всегда одиночный товар (не корзина)
-    title = data.get("offer_title", "Товар") or "Товар"
+    # Bookings РІСЃРµРіРґР° РѕРґРёРЅРѕС‡РЅС‹Р№ С‚РѕРІР°СЂ (РЅРµ РєРѕСЂР·РёРЅР°)
+    title = data.get("offer_title", "РўРѕРІР°СЂ") or "РўРѕРІР°СЂ"
     qty = data.get("quantity") or 1
     price = data.get("discount_price") or 0
     total = data.get("total_price") or (price * qty)
-    lines.append(f"   • {title} × {qty} = {_format_price(price * qty, lang)}")
+    lines.append(f"   вЂў {title} Г— {qty} = {_format_price(price * qty, lang)}")
 
     lines.append("")
-    lines.append(f"💰 <b>{_t(lang, 'Итого', 'Jami')}:</b> {_format_price(total, lang)}")
+    lines.append(f"рџ’° <b>{_t(lang, 'РС‚РѕРіРѕ', 'Jami')}:</b> {_format_price(total, lang)}")
 
-    # Код получения
+    # РљРѕРґ РїРѕР»СѓС‡РµРЅРёСЏ
     if data.get("booking_code") and status in ("confirmed", "preparing"):
         lines.append("")
-        lines.append(f"🎫 <b>{_t(lang, 'Код получения', 'Olish kodi')}:</b>")
+        lines.append(f"рџЋ« <b>{_t(lang, 'РљРѕРґ РїРѕР»СѓС‡РµРЅРёСЏ', 'Olish kodi')}:</b>")
         lines.append(f"<code>{data['booking_code']}</code>")
         lines.append(
-            f"<i>{_t(lang, 'Покажите код при получении', 'Olishda kodni ko''rsating')}</i>"
+            f"<i>{_t(lang, 'РџРѕРєР°Р¶РёС‚Рµ РєРѕРґ РїСЂРё РїРѕР»СѓС‡РµРЅРёРё', 'Olishda kodni ko''rsating')}</i>"
         )
 
-    # Кнопки действий
+    # РљРЅРѕРїРєРё РґРµР№СЃС‚РІРёР№
     kb = InlineKeyboardBuilder()
 
     if status in ("confirmed", "preparing"):
-        # Активный заказ
+        # РђРєС‚РёРІРЅС‹Р№ Р·Р°РєР°Р·
         kb.button(
-            text=f"✅ {_t(lang, 'Получил заказ', 'Buyurtmani oldim')}",
+            text=f"вњ… {_t(lang, 'РџРѕР»СѓС‡РёР» Р·Р°РєР°Р·', 'Buyurtmani oldim')}",
             callback_data=f"myorder_received_b_{booking_id}",
         )
 
-        # Показываем телефон магазина в тексте вместо кнопки (Telegram не поддерживает tel: URL)
+        # РџРѕРєР°Р·С‹РІР°РµРј С‚РµР»РµС„РѕРЅ РјР°РіР°Р·РёРЅР° РІ С‚РµРєСЃС‚Рµ РІРјРµСЃС‚Рѕ РєРЅРѕРїРєРё (Telegram РЅРµ РїРѕРґРґРµСЂР¶РёРІР°РµС‚ tel: URL)
         if data.get("store_phone"):
             lines.append("")
-            lines.append(f"📞 <b>{_t(lang, 'Телефон магазина', 'Do''kon telefoni')}:</b>")
+            lines.append(f"рџ“ћ <b>{_t(lang, 'РўРµР»РµС„РѕРЅ РјР°РіР°Р·РёРЅР°', 'Do''kon telefoni')}:</b>")
             lines.append(f"<code>{data['store_phone']}</code>")
 
         kb.button(
-            text=f"❗ {_t(lang, 'Проблема', 'Muammo')}",
+            text=f"вќ— {_t(lang, 'РџСЂРѕР±Р»РµРјР°', 'Muammo')}",
             callback_data=f"myorder_problem_b_{booking_id}",
         )
 
     elif status == "pending":
         kb.button(
-            text=f"❌ {_t(lang, 'Отменить', 'Bekor qilish')}",
+            text=f"вќЊ {_t(lang, 'РћС‚РјРµРЅРёС‚СЊ', 'Bekor qilish')}",
             callback_data=f"cancel_booking_{booking_id}",
         )
 
-    kb.button(text=f"⬅️ {_t(lang, 'Назад', 'Orqaga')}", callback_data="myorders_back")
+    kb.button(text=f"в¬…пёЏ {_t(lang, 'РќР°Р·Р°Рґ', 'Orqaga')}", callback_data="myorders_back")
 
     kb.adjust(1)
 
@@ -523,10 +512,10 @@ async def _show_booking_detail(callback: types.CallbackQuery, booking_id: int, l
 
 
 async def _show_order_detail(callback: types.CallbackQuery, order_id: int, lang: str) -> None:
-    """Показать детали заказа (orders table: pickup или delivery)."""
+    """РџРѕРєР°Р·Р°С‚СЊ РґРµС‚Р°Р»Рё Р·Р°РєР°Р·Р° (orders table: pickup РёР»Рё delivery)."""
     user_id = callback.from_user.id
 
-    # Получаем детали заказа
+    # РџРѕР»СѓС‡Р°РµРј РґРµС‚Р°Р»Рё Р·Р°РєР°Р·Р°
     try:
         with db.get_connection() as conn:
             cursor = conn.cursor()
@@ -560,14 +549,14 @@ async def _show_order_detail(callback: types.CallbackQuery, order_id: int, lang:
             order = cursor.fetchone()
     except Exception as e:
         logger.error(f"Failed to get order {order_id}: {e}")
-        await callback.message.answer(_t(lang, "❌ Ошибка загрузки", "❌ Yuklab bo'lmadi"))
+        await callback.message.answer(_t(lang, "вќЊ РћС€РёР±РєР° Р·Р°РіСЂСѓР·РєРё", "вќЊ Yuklab bo'lmadi"))
         return
 
     if not order:
-        await callback.message.answer(_t(lang, "❌ Заказ не найден", "❌ Buyurtma topilmadi"))
+        await callback.message.answer(_t(lang, "вќЊ Р—Р°РєР°Р· РЅРµ РЅР°Р№РґРµРЅ", "вќЊ Buyurtma topilmadi"))
         return
 
-    # Парсим данные (SQL возвращает tuple, нужен dict)
+    # РџР°СЂСЃРёРј РґР°РЅРЅС‹Рµ (SQL РІРѕР·РІСЂР°С‰Р°РµС‚ tuple, РЅСѓР¶РµРЅ dict)
     # SELECT: order_id[0], order_type[1], order_status[2], pickup_code[3], delivery_address[4], total_price[5],
     #         created_at[6], quantity[7], store_name[8], store_address[9], store_phone[10], offer_title[11],
     #         discount_price[12], original_price[13], unit[14], is_cart_order[15], cart_items[16]
@@ -600,33 +589,33 @@ async def _show_order_detail(callback: types.CallbackQuery, order_id: int, lang:
     is_delivery = order_type == "delivery"
     emoji, status_text = _get_status_info(status, is_delivery, lang)
 
-    # Формируем текст
+    # Р¤РѕСЂРјРёСЂСѓРµРј С‚РµРєСЃС‚
     lines = []
     if is_delivery:
-        lines.append(f"<b>🚚 {_t(lang, 'Доставка', 'Yetkazish')} #{data['order_id']}</b>")
+        lines.append(f"<b>рџљљ {_t(lang, 'Р”РѕСЃС‚Р°РІРєР°', 'Yetkazish')} #{data['order_id']}</b>")
     else:
-        lines.append(f"<b>🏪 {_t(lang, 'Самовывоз', 'Olib ketish')} #{data['order_id']}</b>")
+        lines.append(f"<b>рџЏЄ {_t(lang, 'РЎР°РјРѕРІС‹РІРѕР·', 'Olib ketish')} #{data['order_id']}</b>")
     lines.append(f"{emoji} <b>{status_text}</b>")
     lines.append("")
 
     if is_delivery:
-        # Адрес доставки
+        # РђРґСЂРµСЃ РґРѕСЃС‚Р°РІРєРё
         if data.get("delivery_address"):
-            lines.append(f"📍 <b>{_t(lang, 'Адрес доставки', 'Yetkazish manzili')}:</b>")
+            lines.append(f"рџ“Ќ <b>{_t(lang, 'РђРґСЂРµСЃ РґРѕСЃС‚Р°РІРєРё', 'Yetkazish manzili')}:</b>")
             lines.append(f"   {data['delivery_address']}")
             lines.append("")
     else:
         pickup_code = data.get("pickup_code")
         if pickup_code:
-            lines.append(f"🎫 <b>{_t(lang, 'Код', 'Kod')}:</b> <code>{pickup_code}</code>")
+            lines.append(f"рџЋ« <b>{_t(lang, 'РљРѕРґ', 'Kod')}:</b> <code>{pickup_code}</code>")
             lines.append("")
 
-    # Магазин
-    lines.append(f"🏪 <b>{data.get('store_name', 'Магазин')}</b>")
+    # РњР°РіР°Р·РёРЅ
+    lines.append(f"рџЏЄ <b>{data.get('store_name', 'РњР°РіР°Р·РёРЅ')}</b>")
     lines.append("")
 
-    # Товары
-    lines.append(f"<b>📦 {_t(lang, 'Товары', 'Mahsulotlar')}:</b>")
+    # РўРѕРІР°СЂС‹
+    lines.append(f"<b>рџ“¦ {_t(lang, 'РўРѕРІР°СЂС‹', 'Mahsulotlar')}:</b>")
 
     is_cart = data.get("is_cart_order")
     cart_items_json = data.get("cart_items")
@@ -638,25 +627,25 @@ async def _show_order_detail(callback: types.CallbackQuery, order_id: int, lang:
                 json.loads(cart_items_json) if isinstance(cart_items_json, str) else cart_items_json
             )
             for item in items:
-                title = item.get("title", "Товар")
+                title = item.get("title", "РўРѕРІР°СЂ")
                 qty = item.get("quantity", 1)
                 price = item.get("price", 0)
                 item_total = price * qty
                 subtotal += item_total
-                lines.append(f"   • {title} × {qty} = {_format_price(item_total, lang)}")
+                lines.append(f"   вЂў {title} Г— {qty} = {_format_price(item_total, lang)}")
         except Exception:
-            lines.append(f"   • {_t(lang, 'Корзина товаров', 'Savat')}")
+            lines.append(f"   вЂў {_t(lang, 'РљРѕСЂР·РёРЅР° С‚РѕРІР°СЂРѕРІ', 'Savat')}")
             subtotal = data.get("total_price", 0) - (data.get("delivery_fee", 0) or 0)
     else:
-        title = data.get("offer_title", "Товар")
+        title = data.get("offer_title", "РўРѕРІР°СЂ")
         qty = data.get("quantity", 1)
         price = data.get("discount_price", 0)
         subtotal = price * qty
-        lines.append(f"   • {title} × {qty} = {_format_price(subtotal, lang)}")
+        lines.append(f"   вЂў {title} Г— {qty} = {_format_price(subtotal, lang)}")
 
-    # Итоги
+    # РС‚РѕРіРё
     lines.append("")
-    lines.append(f"💰 {_t(lang, 'Товары', 'Mahsulotlar')}: {_format_price(subtotal, lang)}")
+    lines.append(f"рџ’° {_t(lang, 'РўРѕРІР°СЂС‹', 'Mahsulotlar')}: {_format_price(subtotal, lang)}")
 
     total_price = data.get("total_price") or 0
     delivery_fee = 0
@@ -666,56 +655,56 @@ async def _show_order_detail(callback: types.CallbackQuery, order_id: int, lang:
         except Exception:
             delivery_fee = 0
         if delivery_fee > 0:
-            lines.append(f"🚚 {_t(lang, 'Доставка', 'Yetkazish')}: {_format_price(delivery_fee, lang)}")
+            lines.append(f"рџљљ {_t(lang, 'Р”РѕСЃС‚Р°РІРєР°', 'Yetkazish')}: {_format_price(delivery_fee, lang)}")
 
     total = total_price or (subtotal + delivery_fee)
-    lines.append(f"<b>💵 {_t(lang, 'Итого', 'Jami')}: {_format_price(total, lang)}</b>")
+    lines.append(f"<b>рџ’µ {_t(lang, 'РС‚РѕРіРѕ', 'Jami')}: {_format_price(total, lang)}</b>")
 
-    # Курьер
+    # РљСѓСЂСЊРµСЂ
     if status == "delivering" and data.get("courier_phone"):
         lines.append("")
-        lines.append(f"🏍 <b>{_t(lang, 'Курьер', 'Kuryer')}:</b>")
-        lines.append(f"   📱 {data['courier_phone']}")
+        lines.append(f"рџЏЌ <b>{_t(lang, 'РљСѓСЂСЊРµСЂ', 'Kuryer')}:</b>")
+        lines.append(f"   рџ“± {data['courier_phone']}")
 
-    # Кнопки действий
+    # РљРЅРѕРїРєРё РґРµР№СЃС‚РІРёР№
     kb = InlineKeyboardBuilder()
 
     if is_delivery and status == "delivering":
         kb.button(
-            text=f"✅ {_t(lang, 'Получил заказ', 'Buyurtmani oldim')}",
+            text=f"вњ… {_t(lang, 'РџРѕР»СѓС‡РёР» Р·Р°РєР°Р·', 'Buyurtmani oldim')}",
             callback_data=f"myorder_received_o_{order_id}",
         )
 
-        # Показываем телефон магазина для связи при доставке
+        # РџРѕРєР°Р·С‹РІР°РµРј С‚РµР»РµС„РѕРЅ РјР°РіР°Р·РёРЅР° РґР»СЏ СЃРІСЏР·Рё РїСЂРё РґРѕСЃС‚Р°РІРєРµ
         if data.get("store_phone"):
             lines.append("")
-            lines.append(f"📞 <b>{_t(lang, 'Телефон магазина', 'Do''kon telefoni')}:</b>")
+            lines.append(f"рџ“ћ <b>{_t(lang, 'РўРµР»РµС„РѕРЅ РјР°РіР°Р·РёРЅР°', 'Do''kon telefoni')}:</b>")
             lines.append(f"<code>{data['store_phone']}</code>")
 
         kb.button(
-            text=f"❗ {_t(lang, 'Проблема с заказом', 'Buyurtma muammosi')}",
+            text=f"вќ— {_t(lang, 'РџСЂРѕР±Р»РµРјР° СЃ Р·Р°РєР°Р·РѕРј', 'Buyurtma muammosi')}",
             callback_data=f"myorder_problem_o_{order_id}",
         )
 
     elif status in ("pending", "preparing", "ready"):
-        # Показываем телефон магазина в тексте
+        # РџРѕРєР°Р·С‹РІР°РµРј С‚РµР»РµС„РѕРЅ РјР°РіР°Р·РёРЅР° РІ С‚РµРєСЃС‚Рµ
         if data.get("store_phone"):
             lines.append("")
-            lines.append(f"📞 <b>{_t(lang, 'Телефон магазина', 'Do''kon telefoni')}:</b>")
+            lines.append(f"рџ“ћ <b>{_t(lang, 'РўРµР»РµС„РѕРЅ РјР°РіР°Р·РёРЅР°', 'Do''kon telefoni')}:</b>")
             lines.append(f"<code>{data['store_phone']}</code>")
 
         if status == "pending":
             kb.button(
-                text=f"❌ {_t(lang, 'Отменить', 'Bekor qilish')}",
+                text=f"вќЊ {_t(lang, 'РћС‚РјРµРЅРёС‚СЊ', 'Bekor qilish')}",
                 callback_data=f"myorder_cancel_o_{order_id}",
             )
         elif not is_delivery and status == "ready":
             kb.button(
-                text=f"✅ {_t(lang, 'Получил заказ', 'Buyurtmani oldim')}",
+                text=f"вњ… {_t(lang, 'РџРѕР»СѓС‡РёР» Р·Р°РєР°Р·', 'Buyurtmani oldim')}",
                 callback_data=f"myorder_received_o_{order_id}",
             )
 
-    kb.button(text=f"⬅️ {_t(lang, 'Назад', 'Orqaga')}", callback_data="myorders_back")
+    kb.button(text=f"в¬…пёЏ {_t(lang, 'РќР°Р·Р°Рґ', 'Orqaga')}", callback_data="myorders_back")
 
     kb.adjust(1)
 
@@ -736,7 +725,7 @@ async def _show_order_detail(callback: types.CallbackQuery, order_id: int, lang:
 
 @router.callback_query(F.data.startswith("myorder_received_"))
 async def order_received_handler(callback: types.CallbackQuery) -> None:
-    """Клиент подтвердил получение заказа."""
+    """РљР»РёРµРЅС‚ РїРѕРґС‚РІРµСЂРґРёР» РїРѕР»СѓС‡РµРЅРёРµ Р·Р°РєР°Р·Р°."""
     if not db or not callback.data:
         await callback.answer()
         return
@@ -746,14 +735,14 @@ async def order_received_handler(callback: types.CallbackQuery) -> None:
 
     parts = callback.data.split("_")
     if len(parts) < 4:
-        await callback.answer("❌ Error")
+        await callback.answer("вќЊ Error")
         return
 
     order_type = parts[2]  # 'b' or 'o'
     try:
         order_id = int(parts[3])
     except ValueError:
-        await callback.answer("❌ Error")
+        await callback.answer("вќЊ Error")
         return
 
     try:
@@ -764,55 +753,55 @@ async def order_received_handler(callback: types.CallbackQuery) -> None:
             entity = db.get_order(order_id) if hasattr(db, "get_order") else None
 
         if not entity:
-            await callback.answer(_t(lang, "❌ Заказ не найден", "❌ Buyurtma topilmadi"), show_alert=True)
+            await callback.answer(_t(lang, "вќЊ Р—Р°РєР°Р· РЅРµ РЅР°Р№РґРµРЅ", "вќЊ Buyurtma topilmadi"), show_alert=True)
             return
 
         entity_user_id = entity.get("user_id") if hasattr(entity, "get") else _get_field(entity, 2)
         if entity_user_id != user_id:
-            await callback.answer(_t(lang, "❌ Доступ запрещен", "❌ Ruxsat yo'q"), show_alert=True)
+            await callback.answer(_t(lang, "вќЊ Р”РѕСЃС‚СѓРї Р·Р°РїСЂРµС‰РµРЅ", "вќЊ Ruxsat yo'q"), show_alert=True)
             return
 
         service = get_unified_order_service()
         if not service:
-            await callback.answer(_t(lang, "❌ Ошибка", "❌ Xatolik"), show_alert=True)
+            await callback.answer(_t(lang, "вќЊ РћС€РёР±РєР°", "вќЊ Xatolik"), show_alert=True)
             return
 
         entity_type = "booking" if order_type == "b" else "order"
         success = await service.complete_order(order_id, entity_type)
         if not success:
-            await callback.answer(_t(lang, "❌ Ошибка", "❌ Xatolik"), show_alert=True)
+            await callback.answer(_t(lang, "вќЊ РћС€РёР±РєР°", "вќЊ Xatolik"), show_alert=True)
             return
 
         await callback.answer(
-            _t(lang, "✅ Спасибо! Заказ завершён", "✅ Rahmat! Buyurtma yakunlandi"),
+            _t(lang, "вњ… РЎРїР°СЃРёР±Рѕ! Р—Р°РєР°Р· Р·Р°РІРµСЂС€С‘РЅ", "вњ… Rahmat! Buyurtma yakunlandi"),
             show_alert=True,
         )
 
-        # Показываем экран рейтинга
+        # РџРѕРєР°Р·С‹РІР°РµРј СЌРєСЂР°РЅ СЂРµР№С‚РёРЅРіР°
         kb = InlineKeyboardBuilder()
-        kb.button(text="⭐⭐⭐⭐⭐", callback_data=f"myorder_rate_{order_type}_{order_id}_5")
-        kb.button(text="⭐⭐⭐⭐", callback_data=f"myorder_rate_{order_type}_{order_id}_4")
-        kb.button(text="⭐⭐⭐", callback_data=f"myorder_rate_{order_type}_{order_id}_3")
+        kb.button(text="в­ђв­ђв­ђв­ђв­ђ", callback_data=f"myorder_rate_{order_type}_{order_id}_5")
+        kb.button(text="в­ђв­ђв­ђв­ђ", callback_data=f"myorder_rate_{order_type}_{order_id}_4")
+        kb.button(text="в­ђв­ђв­ђ", callback_data=f"myorder_rate_{order_type}_{order_id}_3")
         kb.button(
-            text=f"⬅️ {_t(lang, 'Пропустить', 'O''tkazib yuborish')}", callback_data="myorders_back"
+            text=f"в¬…пёЏ {_t(lang, 'РџСЂРѕРїСѓСЃС‚РёС‚СЊ', 'O''tkazib yuborish')}", callback_data="myorders_back"
         )
         kb.adjust(1)
 
         await callback.message.edit_text(
-            f"<b>{_t(lang, 'Оцените заказ', 'Buyurtmani baholang')}</b>\n\n"
-            f"{_t(lang, 'Как вам качество товаров и обслуживание?', 'Mahsulotlar sifati va xizmat qanday bo''ldi?')}",
+            f"<b>{_t(lang, 'РћС†РµРЅРёС‚Рµ Р·Р°РєР°Р·', 'Buyurtmani baholang')}</b>\n\n"
+            f"{_t(lang, 'РљР°Рє РІР°Рј РєР°С‡РµСЃС‚РІРѕ С‚РѕРІР°СЂРѕРІ Рё РѕР±СЃР»СѓР¶РёРІР°РЅРёРµ?', 'Mahsulotlar sifati va xizmat qanday bo''ldi?')}",
             parse_mode="HTML",
             reply_markup=kb.as_markup(),
         )
 
     except Exception as e:
         logger.error(f"Failed to complete order {order_id}: {e}")
-        await callback.answer(_t(lang, "❌ Ошибка", "❌ Xatolik"), show_alert=True)
+        await callback.answer(_t(lang, "вќЊ РћС€РёР±РєР°", "вќЊ Xatolik"), show_alert=True)
 
 
 @router.callback_query(F.data.startswith("myorder_rate_"))
 async def order_rate_handler(callback: types.CallbackQuery) -> None:
-    """Клиент оценил заказ."""
+    """РљР»РёРµРЅС‚ РѕС†РµРЅРёР» Р·Р°РєР°Р·."""
     if not db or not callback.data:
         await callback.answer()
         return
@@ -834,22 +823,22 @@ async def order_rate_handler(callback: types.CallbackQuery) -> None:
         await callback.answer()
         return
 
-    # Сохраняем рейтинг (если есть такая функция)
+    # РЎРѕС…СЂР°РЅСЏРµРј СЂРµР№С‚РёРЅРі (РµСЃР»Рё РµСЃС‚СЊ С‚Р°РєР°СЏ С„СѓРЅРєС†РёСЏ)
     try:
         if hasattr(db, "add_order_rating"):
             db.add_order_rating(order_id, user_id, rating)
     except Exception as e:
         logger.warning(f"Failed to save rating: {e}")
 
-    await callback.answer(_t(lang, "✅ Спасибо за оценку!", "✅ Baholaganingiz uchun rahmat!"))
+    await callback.answer(_t(lang, "вњ… РЎРїР°СЃРёР±Рѕ Р·Р° РѕС†РµРЅРєСѓ!", "вњ… Baholaganingiz uchun rahmat!"))
 
-    # Возвращаемся к списку заказов
+    # Р’РѕР·РІСЂР°С‰Р°РµРјСЃСЏ Рє СЃРїРёСЃРєСѓ Р·Р°РєР°Р·РѕРІ
     await callback.message.delete()
 
 
 @router.callback_query(F.data.startswith("myorder_problem_"))
 async def order_problem_handler(callback: types.CallbackQuery) -> None:
-    """Клиент сообщает о проблеме с заказом."""
+    """РљР»РёРµРЅС‚ СЃРѕРѕР±С‰Р°РµС‚ Рѕ РїСЂРѕР±Р»РµРјРµ СЃ Р·Р°РєР°Р·РѕРј."""
     if not db or not callback.data:
         await callback.answer()
         return
@@ -869,27 +858,27 @@ async def order_problem_handler(callback: types.CallbackQuery) -> None:
         await callback.answer()
         return
 
-    # Показываем опции проблем
+    # РџРѕРєР°Р·С‹РІР°РµРј РѕРїС†РёРё РїСЂРѕР±Р»РµРј
     kb = InlineKeyboardBuilder()
 
     problems = [
-        ("late", _t(lang, "⏰ Долгая доставка", "⏰ Uzoq yetkazish")),
-        ("wrong", _t(lang, "❌ Неправильный заказ", "❌ Noto'g'ri buyurtma")),
-        ("quality", _t(lang, "👎 Качество товара", "👎 Mahsulot sifati")),
-        ("other", _t(lang, "💬 Другое", "💬 Boshqa")),
+        ("late", _t(lang, "вЏ° Р”РѕР»РіР°СЏ РґРѕСЃС‚Р°РІРєР°", "вЏ° Uzoq yetkazish")),
+        ("wrong", _t(lang, "вќЊ РќРµРїСЂР°РІРёР»СЊРЅС‹Р№ Р·Р°РєР°Р·", "вќЊ Noto'g'ri buyurtma")),
+        ("quality", _t(lang, "рџ‘Ћ РљР°С‡РµСЃС‚РІРѕ С‚РѕРІР°СЂР°", "рџ‘Ћ Mahsulot sifati")),
+        ("other", _t(lang, "рџ’¬ Р”СЂСѓРіРѕРµ", "рџ’¬ Boshqa")),
     ]
 
     for code, text in problems:
         kb.button(text=text, callback_data=f"myorder_report_{order_type}_{order_id}_{code}")
 
     kb.button(
-        text=f"⬅️ {_t(lang, 'Назад', 'Orqaga')}",
+        text=f"в¬…пёЏ {_t(lang, 'РќР°Р·Р°Рґ', 'Orqaga')}",
         callback_data=f"myorder_detail_{order_type}_{order_id}",
     )
     kb.adjust(1)
 
     await callback.message.edit_text(
-        f"<b>{_t(lang, 'Выберите тип проблемы', 'Muammo turini tanlang')}</b>",
+        f"<b>{_t(lang, 'Р’С‹Р±РµСЂРёС‚Рµ С‚РёРї РїСЂРѕР±Р»РµРјС‹', 'Muammo turini tanlang')}</b>",
         parse_mode="HTML",
         reply_markup=kb.as_markup(),
     )
@@ -898,7 +887,7 @@ async def order_problem_handler(callback: types.CallbackQuery) -> None:
 
 @router.callback_query(F.data.startswith("myorder_report_"))
 async def order_report_handler(callback: types.CallbackQuery) -> None:
-    """Сохранение жалобы на заказ."""
+    """РЎРѕС…СЂР°РЅРµРЅРёРµ Р¶Р°Р»РѕР±С‹ РЅР° Р·Р°РєР°Р·."""
     if not db or not callback.data:
         await callback.answer()
         return
@@ -920,22 +909,22 @@ async def order_report_handler(callback: types.CallbackQuery) -> None:
         await callback.answer()
         return
 
-    # Логируем жалобу (можно добавить таблицу complaints)
+    # Р›РѕРіРёСЂСѓРµРј Р¶Р°Р»РѕР±Сѓ (РјРѕР¶РЅРѕ РґРѕР±Р°РІРёС‚СЊ С‚Р°Р±Р»РёС†Сѓ complaints)
     logger.info(
         f"User {user_id} reported problem '{problem_code}' for order {order_type}_{order_id}"
     )
 
-    # Уведомление админу
+    # РЈРІРµРґРѕРјР»РµРЅРёРµ Р°РґРјРёРЅСѓ
     try:
         admin_ids = db.get_admin_ids() if hasattr(db, "get_admin_ids") else []
         for admin_id in admin_ids[:3]:  # Max 3 admins
             try:
                 await bot.send_message(
                     admin_id,
-                    f"⚠️ <b>Жалоба на заказ #{order_id}</b>\n\n"
-                    f"Пользователь: {user_id}\n"
-                    f"Тип: {'Доставка' if order_type == 'o' else 'Самовывоз'}\n"
-                    f"Проблема: {problem_code}",
+                    f"вљ пёЏ <b>Р–Р°Р»РѕР±Р° РЅР° Р·Р°РєР°Р· #{order_id}</b>\n\n"
+                    f"РџРѕР»СЊР·РѕРІР°С‚РµР»СЊ: {user_id}\n"
+                    f"РўРёРї: {'Р”РѕСЃС‚Р°РІРєР°' if order_type == 'o' else 'РЎР°РјРѕРІС‹РІРѕР·'}\n"
+                    f"РџСЂРѕР±Р»РµРјР°: {problem_code}",
                     parse_mode="HTML",
                 )
             except Exception:
@@ -946,13 +935,13 @@ async def order_report_handler(callback: types.CallbackQuery) -> None:
     await callback.answer(
         _t(
             lang,
-            "✅ Жалоба отправлена. Мы свяжемся с вами!",
-            "✅ Shikoyat yuborildi. Siz bilan bog'lanamiz!",
+            "вњ… Р–Р°Р»РѕР±Р° РѕС‚РїСЂР°РІР»РµРЅР°. РњС‹ СЃРІСЏР¶РµРјСЃСЏ СЃ РІР°РјРё!",
+            "вњ… Shikoyat yuborildi. Siz bilan bog'lanamiz!",
         ),
         show_alert=True,
     )
 
-    # Возвращаемся к списку
+    # Р’РѕР·РІСЂР°С‰Р°РµРјСЃСЏ Рє СЃРїРёСЃРєСѓ
     try:
         await callback.message.delete()
     except Exception:
@@ -961,7 +950,7 @@ async def order_report_handler(callback: types.CallbackQuery) -> None:
 
 @router.callback_query(F.data.startswith("myorder_cancel_o_"))
 async def order_cancel_handler(callback: types.CallbackQuery) -> None:
-    """Отмена заказа пользователем."""
+    """РћС‚РјРµРЅР° Р·Р°РєР°Р·Р° РїРѕР»СЊР·РѕРІР°С‚РµР»РµРј."""
     if not db or not callback.data:
         await callback.answer()
         return
@@ -972,14 +961,14 @@ async def order_cancel_handler(callback: types.CallbackQuery) -> None:
     try:
         order_id = int(callback.data.split("_")[-1])
     except ValueError:
-        await callback.answer("❌ Error")
+        await callback.answer("вќЊ Error")
         return
 
-    # Проверяем статус - можно отменить только pending
+    # РџСЂРѕРІРµСЂСЏРµРј СЃС‚Р°С‚СѓСЃ - РјРѕР¶РЅРѕ РѕС‚РјРµРЅРёС‚СЊ С‚РѕР»СЊРєРѕ pending
     try:
         order = db.get_order(order_id)
         if not order:
-            await callback.answer(_t(lang, "❌ Заказ не найден", "❌ Buyurtma topilmadi"))
+            await callback.answer(_t(lang, "вќЊ Р—Р°РєР°Р· РЅРµ РЅР°Р№РґРµРЅ", "вќЊ Buyurtma topilmadi"))
             return
 
         if hasattr(order, "get"):
@@ -991,8 +980,8 @@ async def order_cancel_handler(callback: types.CallbackQuery) -> None:
             await callback.answer(
                 _t(
                     lang,
-                    "⚠️ Заказ уже обрабатывается, отменить нельзя",
-                    "⚠️ Buyurtma qayta ishlanmoqda, bekor qilib bo'lmaydi",
+                    "вљ пёЏ Р—Р°РєР°Р· СѓР¶Рµ РѕР±СЂР°Р±Р°С‚С‹РІР°РµС‚СЃСЏ, РѕС‚РјРµРЅРёС‚СЊ РЅРµР»СЊР·СЏ",
+                    "вљ пёЏ Buyurtma qayta ishlanmoqda, bekor qilib bo'lmaydi",
                 ),
                 show_alert=True,
             )
@@ -1000,19 +989,19 @@ async def order_cancel_handler(callback: types.CallbackQuery) -> None:
 
         service = get_unified_order_service()
         if not service:
-            await callback.answer(_t(lang, "❌ Ошибка", "❌ Xatolik"), show_alert=True)
+            await callback.answer(_t(lang, "вќЊ РћС€РёР±РєР°", "вќЊ Xatolik"), show_alert=True)
             return
 
         success = await service.cancel_order(order_id, "order")
         if not success:
-            await callback.answer(_t(lang, "❌ Ошибка", "❌ Xatolik"), show_alert=True)
+            await callback.answer(_t(lang, "вќЊ РћС€РёР±РєР°", "вќЊ Xatolik"), show_alert=True)
             return
 
         await callback.answer(
-            _t(lang, "✅ Заказ отменён", "✅ Buyurtma bekor qilindi"), show_alert=True
+            _t(lang, "вњ… Р—Р°РєР°Р· РѕС‚РјРµРЅС‘РЅ", "вњ… Buyurtma bekor qilindi"), show_alert=True
         )
 
-        # Удаляем сообщение и возвращаемся
+        # РЈРґР°Р»СЏРµРј СЃРѕРѕР±С‰РµРЅРёРµ Рё РІРѕР·РІСЂР°С‰Р°РµРјСЃСЏ
         try:
             await callback.message.delete()
         except Exception:
@@ -1020,7 +1009,7 @@ async def order_cancel_handler(callback: types.CallbackQuery) -> None:
 
     except Exception as e:
         logger.error(f"Failed to cancel order {order_id}: {e}")
-        await callback.answer(_t(lang, "❌ Ошибка", "❌ Xatolik"), show_alert=True)
+        await callback.answer(_t(lang, "вќЊ РћС€РёР±РєР°", "вќЊ Xatolik"), show_alert=True)
 
 
 # =============================================================================
@@ -1030,7 +1019,7 @@ async def order_cancel_handler(callback: types.CallbackQuery) -> None:
 
 @router.callback_query(F.data.startswith("myorders_history_"))
 async def orders_history_handler(callback: types.CallbackQuery) -> None:
-    """Показать историю заказов по фильтру."""
+    """РџРѕРєР°Р·Р°С‚СЊ РёСЃС‚РѕСЂРёСЋ Р·Р°РєР°Р·РѕРІ РїРѕ С„РёР»СЊС‚СЂСѓ."""
     if not db or not callback.data:
         await callback.answer()
         return
@@ -1040,14 +1029,14 @@ async def orders_history_handler(callback: types.CallbackQuery) -> None:
 
     status_filter = callback.data.replace("myorders_history_", "")
 
-    # Получаем заказы с нужным статусом
+    # РџРѕР»СѓС‡Р°РµРј Р·Р°РєР°Р·С‹ СЃ РЅСѓР¶РЅС‹Рј СЃС‚Р°С‚СѓСЃРѕРј
     bookings = db.get_user_bookings(user_id) or []
     try:
         orders = db.get_user_orders(user_id) or []
     except Exception:
         orders = []
 
-    # Фильтруем
+    # Р¤РёР»СЊС‚СЂСѓРµРј
     if status_filter == "cancelled":
         filtered_bookings = [
             b
@@ -1068,34 +1057,34 @@ async def orders_history_handler(callback: types.CallbackQuery) -> None:
         ]
 
     if not filtered_bookings and not filtered_orders:
-        await callback.answer(_t(lang, "📭 Нет заказов", "📭 Buyurtmalar yo'q"))
+        await callback.answer(_t(lang, "рџ“­ РќРµС‚ Р·Р°РєР°Р·РѕРІ", "рџ“­ Buyurtmalar yo'q"))
         return
 
     lines = []
     title = (
-        _t(lang, "Завершённые заказы", "Yakunlangan buyurtmalar")
+        _t(lang, "Р—Р°РІРµСЂС€С‘РЅРЅС‹Рµ Р·Р°РєР°Р·С‹", "Yakunlangan buyurtmalar")
         if status_filter == "completed"
-        else _t(lang, "Отменённые заказы", "Bekor qilingan buyurtmalar")
+        else _t(lang, "РћС‚РјРµРЅС‘РЅРЅС‹Рµ Р·Р°РєР°Р·С‹", "Bekor qilingan buyurtmalar")
     )
-    lines.append(f"<b>📋 {title}</b>\n")
+    lines.append(f"<b>рџ“‹ {title}</b>\n")
 
     kb = InlineKeyboardBuilder()
 
     # Bookings
     for b in filtered_bookings[:10]:
         booking_id = _get_field(b, "booking_id")
-        store_name = _get_field(b, "name") or "Магазин"  # name в dict, не store_name
-        # Вычисляем total
+        store_name = _get_field(b, "name") or "РњР°РіР°Р·РёРЅ"  # name РІ dict, РЅРµ store_name
+        # Р’С‹С‡РёСЃР»СЏРµРј total
         quantity = _get_field(b, "quantity") or 1
         discount_price = _get_field(b, "discount_price") or 0
         total = quantity * discount_price
 
-        emoji = "✅" if status_filter == "completed" else "❌"
-        lines.append(f"{emoji} <b>#{booking_id}</b> • {store_name}")
-        lines.append(f"   🏪 {_t(lang, 'Самовывоз', 'Olib ketish')} • {_format_price(total, lang)}")
+        emoji = "вњ…" if status_filter == "completed" else "вќЊ"
+        lines.append(f"{emoji} <b>#{booking_id}</b> вЂў {store_name}")
+        lines.append(f"   рџЏЄ {_t(lang, 'РЎР°РјРѕРІС‹РІРѕР·', 'Olib ketish')} вЂў {_format_price(total, lang)}")
         lines.append("")
 
-        kb.button(text=f"🔄 #{booking_id}", callback_data=f"repeat_order_b_{booking_id}")
+        kb.button(text=f"рџ”„ #{booking_id}", callback_data=f"repeat_order_b_{booking_id}")
 
     # Orders (pickup + delivery in orders table)
     for o in filtered_orders[:10]:
@@ -1108,25 +1097,25 @@ async def orders_history_handler(callback: types.CallbackQuery) -> None:
             else getattr(store, "name", None)
             if store
             else None
-        ) or "Магазин"
+        ) or "РњР°РіР°Р·РёРЅ"
         total = _get_field(o, "total_price", 5) or 0
         order_type = _get_field(o, "order_type") or ("delivery" if _get_field(o, "delivery_address") else "pickup")
 
-        emoji = "✅" if status_filter == "completed" else "❌"
-        lines.append(f"{emoji} <b>#{order_id}</b> • {store_name}")
+        emoji = "вњ…" if status_filter == "completed" else "вќЊ"
+        lines.append(f"{emoji} <b>#{order_id}</b> вЂў {store_name}")
         if order_type == "delivery":
             lines.append(
-                f"   🚚 {_t(lang, 'Доставка', 'Yetkazish')} • {_format_price(total, lang)}"
+                f"   рџљљ {_t(lang, 'Р”РѕСЃС‚Р°РІРєР°', 'Yetkazish')} вЂў {_format_price(total, lang)}"
             )
         else:
             lines.append(
-                f"   🏪 {_t(lang, 'Самовывоз', 'Olib ketish')} • {_format_price(total, lang)}"
+                f"   рџЏЄ {_t(lang, 'РЎР°РјРѕРІС‹РІРѕР·', 'Olib ketish')} вЂў {_format_price(total, lang)}"
             )
         lines.append("")
 
-        kb.button(text=f"🔄 #{order_id}", callback_data=f"repeat_order_o_{order_id}")
+        kb.button(text=f"рџ”„ #{order_id}", callback_data=f"repeat_order_o_{order_id}")
 
-    kb.button(text=f"⬅️ {_t(lang, 'Назад', 'Orqaga')}", callback_data="myorders_back")
+    kb.button(text=f"в¬…пёЏ {_t(lang, 'РќР°Р·Р°Рґ', 'Orqaga')}", callback_data="myorders_back")
     kb.adjust(5, 1)  # 5 repeat buttons per row, then back
 
     try:
@@ -1143,13 +1132,13 @@ async def orders_history_handler(callback: types.CallbackQuery) -> None:
 
 @router.callback_query(F.data == "myorders_back")
 async def myorders_back_handler(callback: types.CallbackQuery) -> None:
-    """Вернуться к списку заказов."""
+    """Р’РµСЂРЅСѓС‚СЊСЃСЏ Рє СЃРїРёСЃРєСѓ Р·Р°РєР°Р·РѕРІ."""
     if not db:
         await callback.answer()
         return
 
-    # Создаём фейковый message для вызова главного хендлера
-    # Удаляем текущее сообщение и отправляем новое
+    # РЎРѕР·РґР°С‘Рј С„РµР№РєРѕРІС‹Р№ message РґР»СЏ РІС‹Р·РѕРІР° РіР»Р°РІРЅРѕРіРѕ С…РµРЅРґР»РµСЂР°
+    # РЈРґР°Р»СЏРµРј С‚РµРєСѓС‰РµРµ СЃРѕРѕР±С‰РµРЅРёРµ Рё РѕС‚РїСЂР°РІР»СЏРµРј РЅРѕРІРѕРµ
     try:
         await callback.message.delete()
     except Exception:
@@ -1158,10 +1147,10 @@ async def myorders_back_handler(callback: types.CallbackQuery) -> None:
     user_id = callback.from_user.id
     lang = db.get_user_language(user_id)
 
-    # Создаём новое сообщение через главный хендлер
-    # Используем callback.message как base
+    # РЎРѕР·РґР°С‘Рј РЅРѕРІРѕРµ СЃРѕРѕР±С‰РµРЅРёРµ С‡РµСЂРµР· РіР»Р°РІРЅС‹Р№ С…РµРЅРґР»РµСЂ
+    # РСЃРїРѕР»СЊР·СѓРµРј callback.message РєР°Рє base
     fake_message = callback.message
-    fake_message.text = "📋 Мои заказы" if lang == "ru" else "📋 Buyurtmalarim"
+    fake_message.text = "рџ“‹ РњРѕРё Р·Р°РєР°Р·С‹" if lang == "ru" else "рџ“‹ Buyurtmalarim"
 
     await my_orders_handler(fake_message)
     await callback.answer()
@@ -1179,3 +1168,4 @@ def _get_field(obj: Any, key: str | int, default: Any = None) -> Any:
     elif isinstance(key, int) and isinstance(obj, (list, tuple)):
         return obj[key] if len(obj) > key else default
     return default
+

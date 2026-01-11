@@ -49,6 +49,22 @@
   --app-surface-top: 0px;
 }
 
+/* iOS Safari: keep the system picker open by avoiding clipped/overflowed parents. */
+.file-picker-open body {
+  overflow: visible;
+}
+
+.file-picker-open .app {
+  overflow: visible;
+}
+
+.file-picker-open .app-surface {
+  overflow: visible;
+  -webkit-overflow-scrolling: auto;
+  -webkit-clip-path: none;
+  clip-path: none;
+}
+
 .topbar-card {
   width: calc(100% + (var(--topbar-inline-padding, var(--app-header-padding-x)) * 2));
   min-height: var(--app-topbar-height);

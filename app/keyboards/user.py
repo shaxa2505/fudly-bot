@@ -14,15 +14,7 @@ def main_menu_customer(lang: str = "ru", cart_count: int = 0) -> ReplyKeyboardMa
         lang: Interface language
         cart_count: Number of items in cart (shown on button)
     """
-    import logging
-    
-    # DEBUG: Check what lang parameter is passed
-    logging.info(f"main_menu_customer called with lang={lang!r} (type: {type(lang).__name__})")
-    
-    # DEBUG: Test get_text() output
     hot_offers_text = get_text(lang, "hot_offers")
-    logging.info(f"get_text(lang={lang!r}, 'hot_offers') returned: {hot_offers_text!r}")
-    
     builder = ReplyKeyboardBuilder()
 
     # Row 1: Main action - Hot offers (merged with Establishments concept)

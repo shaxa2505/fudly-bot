@@ -3,14 +3,17 @@ Common utilities, constants and middleware.
 """
 import html
 import logging
+import re
 from collections.abc import Awaitable, Callable
 from datetime import datetime, timedelta, timezone
+from functools import lru_cache
 from typing import Any
 
 from aiogram import BaseMiddleware
 
 from database_protocol import DatabaseProtocol
 from app.core.utils import CITY_UZ_TO_RU as CORE_CITY_UZ_TO_RU, normalize_city as core_normalize_city
+from localization import get_text
 
 logger = logging.getLogger("fudly")
 
@@ -70,6 +73,11 @@ __all__ = [
     "UZB_TZ",
     "CITY_UZ_TO_RU",
     "is_main_menu_button",
+    "is_cart_button",
+    "is_hot_offers_button",
+    "is_search_button",
+    "is_my_orders_button",
+    "is_profile_button",
     # Safe message operations
     "safe_delete_message",
     "safe_edit_message",
@@ -80,16 +88,16 @@ __all__ = [
 # Main menu button texts (Russian and Uzbek)
 MAIN_MENU_BUTTONS = {
     # Customer menu
-    "🔥 Горячее",
-    "🔥 Issiq takliflar",
+    "🏪 Горячее",
+    "🏪 Issiq takliflar",
     "🏪 Заведения",
     "🏪 Do'konlar",
     "🔍 Поиск",
     "🔍 Qidirish",
     "🛒 Корзина",
     "🛒 Savat",
-    "❤️ Избранное",
-    "❤️ Sevimlilar",
+    "💙 Избранное",
+    "💙 Sevimlilar",
     "👤 Профиль",
     "👤 Profil",
     # Seller menu
@@ -97,21 +105,113 @@ MAIN_MENU_BUTTONS = {
     "📦 Mening tovarlarim",
     "➕ Добавить товар",
     "➕ Tovar qo'shish",
-    "📊 Статистика",
-    "📊 Statistika",
-    "🏪 Мой магазин",
-    "🏪 Mening do'konim",
+    "📈 Статистика",
+    "📈 Statistika",
+    "🏠 Мой магазин",
+    "🏠 Mening do'konim",
     # Common
     "❌ Отмена",
     "❌ Bekor qilish",
 }
 
+LEGACY_MAIN_MENU_BUTTONS = {
+    # Hot offers legacy labels
+    "🏪 Горячее",
+    "🏪 Issiq takliflar",
+    "🏪 Заведения",
+    "🏪 Do'konlar",
+    # Search legacy
+    "🔍 Поиск",
+    "🔍 Qidirish",
+    # Cart
+    "🛒 Корзина",
+    "🛒 Savat",
+    # Orders
+    "📋 Мои заказы",
+    "📋 Mening buyurtmalarim",
+    # Profile
+    "👤 Профиль",
+    "👤 Profil",
+}
+
+@lru_cache(maxsize=1)
+def _menu_labels() -> dict[str, set[str]]:
+    """Return localized menu labels for RU and UZ."""
+    keys = ["hot_offers", "search", "my_cart", "my_orders", "profile"]
+    labels: dict[str, set[str]] = {}
+    for key in keys:
+        labels[key] = {get_text("ru", key), get_text("uz", key)}
+    return labels
+
+
+def _strip(text: str | None) -> str:
+    return (text or "").strip()
+
+
+def is_cart_button(text: str | None) -> bool:
+    """Cart button matcher (supports counter suffix)."""
+    stripped = _strip(text)
+    if not stripped:
+        return False
+    for base in _menu_labels()["my_cart"] | {"🛒 Корзина", "🛒 Savat"}:
+        if re.fullmatch(rf"{re.escape(base)}(?: \(\d+\))?", stripped):
+            return True
+    return False
+
+
+def is_hot_offers_button(text: str | None) -> bool:
+    stripped = _strip(text)
+    if not stripped:
+        return False
+    return stripped in _menu_labels()["hot_offers"] or stripped in {
+        "🏪 Горячее",
+        "🏪 Issiq takliflar",
+        "🏪 Акции до -70%",
+        "🏪 -70% gacha aksiyalar",
+        "🏪 Заведения",
+        "🏪 Do'konlar",
+    }
+
+
+def is_search_button(text: str | None) -> bool:
+    stripped = _strip(text)
+    if not stripped:
+        return False
+    return stripped in _menu_labels()["search"] or stripped in {"🔍 Поиск", "🔍 Qidirish"}
+
+
+def is_my_orders_button(text: str | None) -> bool:
+    stripped = _strip(text)
+    if not stripped:
+        return False
+    return stripped in _menu_labels()["my_orders"] or stripped in {
+        "📋 Мои заказы",
+        "📋 Mening buyurtmalarim",
+        "📋 Заказы и бронирования",
+        "📋 Buyurtmalar va bronlar",
+    }
+
+
+def is_profile_button(text: str | None) -> bool:
+    stripped = _strip(text)
+    if not stripped:
+        return False
+    return stripped in _menu_labels()["profile"] or stripped in {"👤 Профиль", "👤 Profil"}
+
 
 def is_main_menu_button(text: str | None) -> bool:
     """Check if text is a main menu button (should exit FSM and handle separately)."""
-    if not text:
-        return False
-    return text.strip() in MAIN_MENU_BUTTONS
+    return any(
+        (
+            is_hot_offers_button(text),
+            is_search_button(text),
+            is_cart_button(text),
+            is_my_orders_button(text),
+            is_profile_button(text),
+            _strip(text) in MAIN_MENU_BUTTONS,
+            _strip(text) in LEGACY_MAIN_MENU_BUTTONS,
+        )
+    )
 
 
 # =============================================================================
@@ -406,4 +506,5 @@ async def safe_answer_or_send(msg_like, user_id: int, text: str, bot: Any = None
             await bot.send_message(user_id, text, **kwargs)
         except Exception:
             pass
+
 

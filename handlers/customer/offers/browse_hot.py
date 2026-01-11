@@ -14,6 +14,7 @@ from app.keyboards import offers_category_filter
 from app.services.offer_service import OfferDetails, OfferListItem, OfferService
 from app.templates import offers as offer_templates
 from handlers.common import BrowseOffers
+from handlers.common.utils import is_hot_offers_button
 from localization import get_product_categories, get_text, normalize_category
 
 from .browse_helpers import (
@@ -50,18 +51,7 @@ def register_hot(
 ) -> None:
     """Register hot-offers and catalog-related handlers on dispatcher."""
 
-    @dp.message(
-        F.text.in_(
-            [
-                "🔥 Горячее",
-                "🔥 Issiq takliflar",  # Old names
-                "🔥 Акции до -70%",  # Legacy label
-                "🔥 -70% gacha aksiyalar",  # Legacy label
-                "🏪 Магазины и акции",  # Current RU label
-                "🏪 Do'konlar va aksiyalar",  # Current UZ label
-            ]
-        )
-    )
+    @dp.message(F.text.func(is_hot_offers_button))
     async def hot_offers_handler(message: types.Message, state: FSMContext) -> None:
         logger.info(f"[HOT_OFFERS] Handler triggered, text='{message.text}'")
         if not message.from_user:
@@ -914,4 +904,5 @@ def register_hot(
         for offer in offers[:10]:
             await _send_offer_card(msg, offer, lang)
             await asyncio.sleep(0.1)
+
 
