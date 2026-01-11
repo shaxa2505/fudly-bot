@@ -43,6 +43,7 @@ const OfferCard = memo(function OfferCard({ offer, cartQuantity = 0, onAddToCart
 
   const originalPrice = Number(offer.original_price) || 0
   const discountPrice = Number(offer.discount_price) || 0
+  const priceValue = discountPrice || originalPrice
   const hasDiscount = originalPrice > discountPrice && discountPrice > 0
   const computedPercent = hasDiscount && originalPrice > 0
     ? Math.round((1 - discountPrice / originalPrice) * 100)
@@ -87,7 +88,7 @@ const OfferCard = memo(function OfferCard({ offer, cartQuantity = 0, onAddToCart
         <div className="price-section">
           <div className="price-row">
             <div className={`price-main ${hasDiscount ? 'discounted' : ''}`}>
-              {Math.round(discountPrice).toLocaleString('ru-RU')}
+              {Math.round(priceValue).toLocaleString('ru-RU')}
               <span className="currency"> so'm</span>
             </div>
             {showPercentOnly && (
