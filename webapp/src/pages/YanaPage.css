@@ -16,7 +16,7 @@
   background: transparent;
   padding: var(--app-top-inset) var(--app-header-padding-x) var(--app-topbar-gap);
   position: sticky;
-  top: 0;
+  top: var(--app-surface-top);
   z-index: var(--z-sticky);
   box-shadow: none;
   border-bottom: none;
@@ -39,7 +39,7 @@
 
 .yana-subheader {
   position: sticky;
-  top: var(--app-topbar-total-height);
+  top: calc(var(--app-surface-top) + var(--app-topbar-total-height));
   z-index: 19;
   background: rgba(255, 255, 255, 0.95);
   padding: var(--spacing-md) var(--app-header-padding-x);

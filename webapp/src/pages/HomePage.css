@@ -26,7 +26,7 @@
 /* Header - Fixed clean design */
 .header {
   position: sticky;
-  top: 0;
+  top: var(--app-surface-top);
   z-index: var(--z-sticky);
   background: linear-gradient(180deg, rgba(244, 248, 247, 0.98) 0%, rgba(255, 255, 255, 1) 70%);
   padding: var(--home-top-inset) var(--app-header-padding-x) var(--home-topbar-gap);
@@ -132,7 +132,7 @@
 
 .home-subheader {
   position: sticky;
-  top: var(--home-topbar-total-height);
+  top: calc(var(--app-surface-top) + var(--home-topbar-total-height));
   z-index: 19;
   background: var(--color-bg-primary);
   padding: 0 var(--app-header-padding-x) var(--spacing-xs);

@@ -29,7 +29,7 @@
 /* Header */
 .pdp-header {
   position: sticky;
-  top: 0;
+  top: var(--app-surface-top);
   z-index: var(--z-sticky);
   display: flex;
   justify-content: flex-end;

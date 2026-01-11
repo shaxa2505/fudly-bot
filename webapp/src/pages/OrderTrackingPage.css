@@ -14,7 +14,7 @@
   padding: var(--app-top-inset) var(--spacing-xl) var(--app-topbar-gap);
   box-shadow: none;
   position: sticky;
-  top: 0;
+  top: var(--app-surface-top);
   z-index: var(--z-sticky);
   display: flex;
   align-items: center;

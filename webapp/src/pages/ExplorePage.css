@@ -15,7 +15,7 @@
   text-align: center;
   background: transparent;
   position: sticky;
-  top: 0;
+  top: var(--app-surface-top);
   z-index: var(--z-sticky);
   box-shadow: none;
 }

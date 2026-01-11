@@ -11,6 +11,18 @@
   --app-surface-top: var(--safe-area-top-raw, 0px);
 }
 
+.app::before {
+  content: '';
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: var(--app-surface-top);
+  background: #121416;
+  pointer-events: none;
+  z-index: 10;
+}
+
 .app-surface {
   min-height: calc(var(--tg-viewport-stable-height, 100vh) - var(--app-surface-top));
   margin-top: var(--app-surface-top);

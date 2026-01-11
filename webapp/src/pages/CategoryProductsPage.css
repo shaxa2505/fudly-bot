@@ -16,7 +16,7 @@
   justify-content: space-between;
   padding: var(--app-top-inset) var(--app-header-padding-x) var(--app-topbar-gap);
   position: sticky;
-  top: 0;
+  top: var(--app-surface-top);
   background: transparent;
   z-index: var(--z-sticky);
   box-shadow: none;

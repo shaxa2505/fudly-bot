@@ -26,7 +26,7 @@
   background: linear-gradient(180deg, rgba(244, 248, 247, 0.98) 0%, rgba(255, 255, 255, 1) 70%);
   padding: var(--sp-top-inset) var(--app-header-padding-x) var(--sp-topbar-gap);
   position: sticky;
-  top: 0;
+  top: var(--app-surface-top);
   z-index: var(--z-sticky);
   box-shadow: none;
   border-bottom: none;
@@ -84,7 +84,7 @@
 /* Subheader */
 .sp-subheader {
   position: sticky;
-  top: var(--sp-topbar-total-height);
+  top: calc(var(--app-surface-top) + var(--sp-topbar-total-height));
   z-index: 19;
   background: var(--color-bg-primary);
   padding: 0 var(--app-header-padding-x) var(--spacing-sm);
@@ -96,7 +96,7 @@
 }
 
 .sp.topbar-hidden .sp-subheader {
-  top: var(--sp-top-inset);
+  top: var(--app-surface-top);
 }
 
 .sp-search {
