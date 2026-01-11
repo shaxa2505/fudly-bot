@@ -1,4 +1,4 @@
-"""
+﻿"""
 User registration handlers (phone and city collection).
 """
 from aiogram import F, Router, types
@@ -270,9 +270,7 @@ async def registration_city_callback(
         )
         await state.set_state(Registration.district)
         keyboard = _build_district_keyboard(district_options)
-        prompt = (
-            "🏘 Выберите район/город в области:" if lang == "ru" else "🏘 Viloyatdagi tuman/shaharni tanlang:"
-        )
+        prompt = ("Выберите район/город в области:" if lang == "ru" else "Viloyatdagi tuman/shaharni tanlang:")
         if callback.message:
             try:
                 await callback.message.edit_text(prompt, reply_markup=keyboard)
@@ -399,3 +397,5 @@ async def registration_district_callback(
 # OLD TEXT-BASED CITY HANDLER REMOVED
 # City is now selected ONLY via inline buttons (select_city:) in commands.py
 # This prevents accidental triggering when user types numbers during registration
+
+

@@ -1,4 +1,4 @@
-"""Value Objects for domain model."""
+﻿"""Value Objects for domain model."""
 from __future__ import annotations
 
 from enum import Enum
@@ -93,3 +93,4 @@ class BusinessCategory(str, Enum):
 
 
 ProductUnit = Literal["шт", "кг", "г", "л", "мл", "упак", "м", "см"]
+

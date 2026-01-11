@@ -41,7 +41,7 @@ class DatabaseProtocol(Protocol):
         username: str | None = None,
         first_name: str | None = None,
         phone: str | None = None,
-        city: str = "РўР°С€РєРµРЅС‚",
+        city: str = "Ташкент",
         language: str = "ru",
         region: str | None = None,
         district: str | None = None,
@@ -512,6 +512,7 @@ class DatabaseProtocol(Protocol):
 
     def disable_store_payment_integration(self, store_id: int, provider: str) -> bool:
         ...
+
 
 
 

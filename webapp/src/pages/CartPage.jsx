@@ -825,7 +825,7 @@ function CartPage({ user }) {
 
                         <div className="upload-area">
                           <label
-                            className={`upload-btn file-picker-btn${paymentProofPreview ? ' is-hidden' : ''}${orderLoading ? ' is-disabled' : ''}`}
+                            className={`upload-btn file-picker-btn${paymentProof ? ' is-hidden' : ''}${orderLoading ? ' is-disabled' : ''}`}
                             aria-disabled={orderLoading}
                           >
                             <input

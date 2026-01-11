@@ -24,7 +24,7 @@ class UserMixin:
         username: str | None = None,
         first_name: str | None = None,
         phone: str | None = None,
-        city: str = "РўР°С€РєРµРЅС‚",
+        city: str = "Ташкент",
         language: str = "ru",
         region: str | None = None,
         district: str | None = None,
@@ -165,7 +165,7 @@ class UserMixin:
             if not user_dict.get("first_name"):
                 user_dict["first_name"] = user_dict.get("username") or ""
             if not user_dict.get("city"):
-                user_dict["city"] = "РўР°С€РєРµРЅС‚"
+                user_dict["city"] = "Ташкент"
             if user_dict.get("language") is None:
                 user_dict["language"] = "ru"
         except Exception:
@@ -448,4 +448,5 @@ class UserMixin:
                 "UPDATE users SET last_delivery_address = %s WHERE user_id = %s",
                 (address, user_id),
             )
+
 

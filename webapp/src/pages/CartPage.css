@@ -648,6 +648,10 @@
   cursor: not-allowed;
 }
 
+.confirm-btn.is-hidden {
+  display: none;
+}
+
 .checkout-footer-total {
   display: flex;
   flex-direction: column;
@@ -880,6 +884,10 @@
   opacity: 0.6;
   pointer-events: none;
   cursor: not-allowed;
+}
+
+.file-picker-btn.is-hidden {
+  display: none;
 }
 
 .file-input-overlay {

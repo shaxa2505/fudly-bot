@@ -1,4 +1,4 @@
-"""User profile and settings handlers."""
+﻿"""User profile and settings handlers."""
 from __future__ import annotations
 
 from typing import Any
@@ -82,13 +82,12 @@ async def profile(message: types.Message, state: FSMContext) -> None:
     if not user:
         await message.answer(get_text(lang, "choose_language"), reply_markup=language_keyboard())
         return
-
-    lang_text = "Русский" if lang == "ru" else "Ozbekcha"
+    lang_text = "Русский" if lang == "ru" else "Ozbekcha"`n    city_display = normalize_city(user.city) if user.city else "N/A"
 
     text = f"👤 <b>{get_text(lang, 'your_profile')}</b>\n\n"
     text += f"📝 {get_text(lang, 'name')}: <b>{user.first_name or 'N/A'}</b>\n"
     text += f"📱 {get_text(lang, 'phone')}: <code>{user.phone or 'N/A'}</code>\n"
-    text += f"📍 {get_text(lang, 'city')}: <b>{user.city or 'N/A'}</b>\n"
+    text += f"?? {get_text(lang, 'city')}: <b>{city_display}</b>\\n"
     text += f"🌍 {get_text(lang, 'language')}: {lang_text}\n"
 
     # Determine user role - check both DB role and if has approved store
@@ -299,9 +298,7 @@ async def profile_change_city_cb(callback: types.CallbackQuery, state: FSMContex
         for idx, (label, _value) in enumerate(district_options):
             builder.button(text=f"\U0001F4CD {label}", callback_data=f"select_district:{idx}")
         builder.adjust(2)
-        prompt = (
-            "🏘 Выберите район/город в области:" if lang == "ru" else "🏘 Viloyatdagi tuman/shaharni tanlang:"
-        )
+        prompt = ("Выберите район/город в области:" if lang == "ru" else "Viloyatdagi tuman/shaharni tanlang:")
         await callback.message.edit_text(prompt, reply_markup=builder.as_markup())
         await callback.answer()
         return
@@ -682,3 +679,5 @@ async def switch_to_customer(message: types.Message) -> None:
     await message.answer(
         get_text(lang, "switched_to_customer"), reply_markup=main_menu_customer(lang)
     )
+
+

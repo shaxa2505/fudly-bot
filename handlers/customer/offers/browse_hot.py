@@ -1,4 +1,4 @@
-"""Hot offers and catalog browsing handlers split from browse.py."""
+﻿"""Hot offers and catalog browsing handlers split from browse.py."""
 from __future__ import annotations
 
 import asyncio
@@ -28,7 +28,7 @@ from .browse_helpers import (
 
 FetchOffersFn = Callable[[str | None, int, str | None, str | None], list[OfferListItem]]
 
-DEFAULT_CITY = "ђчђш‘?ђуђзђ?‘'"
+DEFAULT_CITY = "Ташкент"
 
 
 def _extract_location(
@@ -914,3 +914,4 @@ def register_hot(
         for offer in offers[:10]:
             await _send_offer_card(msg, offer, lang)
             await asyncio.sleep(0.1)
+

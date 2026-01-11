@@ -1,4 +1,4 @@
-"""User entity model."""
+﻿"""User entity model."""
 from __future__ import annotations
 
 from datetime import datetime
@@ -117,3 +117,4 @@ class User(BaseModel):
             notifications_enabled=bool(row[7]) if len(row) > 7 else True,
             created_at=row[8] if len(row) > 8 else None,
         )
+
