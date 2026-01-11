@@ -160,18 +160,6 @@ function CartPage({ user }) {
     }
   }
 
-  // Keep the file input mounted and open it synchronously for iOS Safari.
-  const openPaymentProofPicker = (event) => {
-    if (event) {
-      event.preventDefault()
-      event.stopPropagation()
-    }
-    const input = paymentProofInputRef.current
-    if (!input || input.disabled) return
-    input.value = ''
-    input.click()
-  }
-
   const selectPaymentMethod = (method) => {
     setSelectedPaymentMethod(method)
     if (method !== 'card') {
@@ -663,9 +651,13 @@ function CartPage({ user }) {
             <div className="sheet-handle" aria-hidden="true"></div>
             <input
               ref={paymentProofInputRef}
+              id="paymentProofInput"
               type="file"
               accept="image/*,image/jpeg,image/jpg,image/png"
               onChange={handleFileSelect}
+              onClick={(event) => {
+                event.currentTarget.value = ''
+              }}
               className="visually-hidden"
               disabled={orderLoading}
             />
@@ -853,14 +845,13 @@ function CartPage({ user }) {
                           </div>
                         ) : (
                           <div className="upload-area">
-                            <button
-                              type="button"
-                              className="upload-btn file-picker-btn"
-                              onClick={openPaymentProofPicker}
-                              disabled={orderLoading}
+                            <label
+                              htmlFor={orderLoading ? undefined : 'paymentProofInput'}
+                              className={`upload-btn file-picker-btn${orderLoading ? ' is-disabled' : ''}`}
+                              aria-disabled={orderLoading}
                             >
                               Rasm tanlash
-                            </button>
+                            </label>
                           </div>
                         )}
                       </div>
@@ -919,14 +910,13 @@ function CartPage({ user }) {
                   )}
 
                   {!paymentProof ? (
-                    <button
-                      type="button"
-                      className="confirm-btn file-picker-btn"
-                      onClick={openPaymentProofPicker}
-                      disabled={orderLoading}
+                    <label
+                      htmlFor={orderLoading ? undefined : 'paymentProofInput'}
+                      className={`confirm-btn file-picker-btn${orderLoading ? ' is-disabled' : ''}`}
+                      aria-disabled={orderLoading}
                     >
                       Chekni yuklash
-                    </button>
+                    </label>
                   ) : (
                     <button
                       className="confirm-btn"

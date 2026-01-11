@@ -876,6 +876,12 @@
   overflow: hidden;
 }
 
+.file-picker-btn.is-disabled {
+  opacity: 0.6;
+  pointer-events: none;
+  cursor: not-allowed;
+}
+
 .file-input-overlay {
   position: absolute;
   inset: 0;
