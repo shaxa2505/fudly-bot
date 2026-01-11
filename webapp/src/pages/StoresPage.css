@@ -7,11 +7,16 @@
   min-height: 100vh;
   background: var(--color-bg-primary);
   padding-bottom: calc(var(--bottom-nav-height) + var(--spacing-xl));
+  overscroll-behavior-y: contain;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-gutter: stable;
+  scroll-behavior: smooth;
+  touch-action: pan-y;
 }
 
 /* Topbar */
 .sp-topbar {
-  background: transparent;
+  background: linear-gradient(180deg, rgba(244, 248, 247, 0.98) 0%, rgba(255, 255, 255, 1) 70%);
   padding: var(--app-top-inset) var(--app-header-padding-x) var(--app-topbar-gap);
   position: sticky;
   top: 0;
@@ -37,34 +42,36 @@
 
 .sp-topbar-inner {
   display: flex;
-  justify-content: space-between;
+  flex-direction: column;
+  justify-content: center;
   align-items: center;
-  gap: var(--spacing-md);
+  gap: 2px;
   min-height: var(--app-topbar-height);
-  padding: 8px 12px;
-  background: rgba(255, 255, 255, 0.94);
-  border: 1px solid rgba(15, 118, 110, 0.12);
-  border-radius: 18px;
-  box-shadow: 0 18px 32px rgba(16, 24, 40, 0.08);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
+  padding: 0;
+  background: transparent;
+  border: none;
+  border-radius: 0;
+  box-shadow: none;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
 }
 
 .sp-title {
-  font-size: var(--app-header-title-size);
-  font-weight: var(--app-header-title-weight);
+  font-size: var(--font-xl);
+  font-weight: var(--font-semibold);
   line-height: var(--line-height-tight);
   color: var(--color-text-primary);
   margin: 0;
+  text-align: center;
 }
 
 .sp-city {
   font-size: 12px;
   font-weight: 600;
-  color: var(--color-primary);
-  background: #E7F5F3;
-  padding: 6px 10px;
-  border-radius: 999px;
+  color: var(--color-text-secondary);
+  background: transparent;
+  padding: 0;
+  border-radius: 0;
 }
 
 /* Subheader */
@@ -73,11 +80,12 @@
   top: var(--app-topbar-total-height);
   z-index: 19;
   background: var(--color-bg-primary);
-  padding: var(--spacing-md) var(--app-header-padding-x);
-  border-bottom: 1px solid rgba(15, 118, 110, 0.12);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
-  transition: top 0.22s ease;
+  padding: 0 var(--app-header-padding-x) var(--spacing-sm);
+  border-bottom: none;
+  box-shadow: none;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  transition: top 0.22s ease, transform 0.22s ease;
 }
 
 .sp.topbar-hidden .sp-subheader {
@@ -92,25 +100,38 @@
 
 .sp-search svg {
   position: absolute;
-  left: 14px;
+  left: var(--spacing-md);
+  top: 50%;
+  transform: translateY(-50%);
   color: var(--color-text-muted);
+  pointer-events: none;
 }
 
 .sp-search input {
   width: 100%;
-  padding: 12px 44px;
-  border: 1px solid rgba(15, 118, 110, 0.12);
-  border-radius: 16px;
-  font-size: 14px;
+  height: 44px;
+  padding: 0 40px;
+  border: 1px solid rgba(15, 118, 110, 0.16);
+  border-radius: 12px;
+  font-size: var(--font-base);
+  font-weight: var(--font-semibold);
+  line-height: 1.2;
+  color: var(--color-text-primary);
   background: #FFFFFF;
-  box-shadow: 0 10px 18px rgba(16, 24, 40, 0.08);
-  transition: all 0.2s;
+  box-shadow: 0 10px 20px rgba(16, 24, 40, 0.12);
+  transition: all var(--transition-normal);
+}
+
+.sp-search input::placeholder {
+  color: var(--color-text-muted);
+  font-weight: var(--font-normal);
 }
 
 .sp-search input:focus {
   outline: none;
-  border-color: var(--color-primary);
-  background: white;
+  border-color: rgba(15, 118, 110, 0.4);
+  box-shadow: 0 0 0 3px rgba(15, 118, 110, 0.12), 0 12px 24px rgba(16, 24, 40, 0.12);
+  background: #FFFFFF;
 }
 
 .sp-search button {
@@ -119,27 +140,34 @@
   width: 24px;
   height: 24px;
   border: none;
-  background: #F1ECE6;
-  border-radius: 50%;
-  font-size: 11px;
-  color: var(--color-text-secondary);
+  background: rgba(15, 118, 110, 0.08);
+  border-radius: var(--radius-full);
+  font-size: var(--font-xs);
+  color: var(--color-primary-dark);
   cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform var(--transition-fast);
+}
+
+.sp-search button:active {
+  transform: scale(0.9);
 }
 
 /* Filters */
 .sp-filters {
   display: flex;
-  gap: 8px;
-  padding: 14px 16px 10px;
+  align-items: center;
+  gap: 10px;
+  padding: 0 var(--page-padding-x);
+  margin: var(--spacing-sm) 0 var(--spacing-sm);
   overflow-x: auto;
   -webkit-overflow-scrolling: touch;
-  position: sticky;
-  top: calc(86px + var(--app-top-inset) + var(--app-topbar-gap));
-  z-index: var(--z-sticky);
-  background: var(--color-bg-primary);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
-  border-bottom: 1px solid rgba(15, 118, 110, 0.08);
+  position: relative;
+  z-index: 1;
+  background: transparent;
+  border-bottom: none;
 }
 
 .sp-filters::-webkit-scrollbar {
@@ -147,31 +175,57 @@
 }
 
 .sp-filter {
-  display: flex;
+  position: relative;
+  display: inline-flex;
   align-items: center;
   gap: 6px;
-  padding: 8px 14px;
-  border: 1px solid rgba(15, 118, 110, 0.12);
-  border-radius: 999px;
-  background: #FFFFFF;
-  font-size: 12px;
-  font-weight: 600;
+  padding: 0 10px;
+  height: 34px;
+  border: none;
+  border-radius: var(--radius-xs);
+  background: transparent;
+  font-size: 13px;
+  font-weight: var(--font-medium);
   color: var(--color-text-secondary);
   cursor: pointer;
   white-space: nowrap;
   flex-shrink: 0;
-  transition: all 0.2s;
+  transition: color var(--transition-fast), opacity var(--transition-fast);
+  -webkit-tap-highlight-color: transparent;
+}
+
+.sp-filter::after {
+  content: '';
+  position: absolute;
+  left: 8px;
+  right: 8px;
+  bottom: 4px;
+  height: 2px;
+  border-radius: 999px;
+  background: transparent;
+  transition: background var(--transition-fast);
+}
+
+.sp-filter svg {
+  width: 16px;
+  height: 16px;
+  opacity: 0.6;
 }
 
 .sp-filter.active {
+  color: var(--color-primary);
+}
+
+.sp-filter.active::after {
   background: var(--color-primary);
-  color: white;
-  border-color: var(--color-primary);
-  box-shadow: var(--shadow-primary);
+}
+
+.sp-filter.active svg {
+  opacity: 1;
 }
 
 .sp-filter:active {
-  transform: scale(0.95);
+  opacity: 0.7;
 }
 
 .sp-filter:focus-visible {
@@ -184,44 +238,43 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 6px 16px 16px;
-  gap: 12px;
-  position: sticky;
-  top: calc(132px + var(--app-top-inset) + var(--app-topbar-gap));
-  z-index: var(--z-sticky);
-  background: var(--color-bg-primary);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
-  border-bottom: 1px solid rgba(15, 118, 110, 0.08);
+  padding: 0 var(--page-padding-x) var(--spacing-sm);
+  gap: 10px;
+  background: transparent;
+  border-bottom: none;
+  flex-wrap: wrap;
 }
 
 .sp-view-toggle {
-  display: flex;
-  background: #FFFFFF;
-  border-radius: 12px;
-  padding: 4px;
-  box-shadow: var(--shadow-sm);
-  border: 1px solid rgba(15, 118, 110, 0.12);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: transparent;
+  border-radius: 999px;
+  padding: 0;
+  box-shadow: none;
+  border: none;
 }
 
 .sp-view-btn {
-  display: flex;
+  display: inline-flex;
   align-items: center;
   gap: 6px;
-  padding: 7px 12px;
+  height: 32px;
+  padding: 0 10px;
   border: none;
   background: transparent;
-  border-radius: 8px;
+  border-radius: 999px;
   font-size: 12px;
   font-weight: 600;
   color: var(--color-text-secondary);
   cursor: pointer;
-  transition: all 0.2s;
+  transition: color var(--transition-fast), background var(--transition-fast);
 }
 
 .sp-view-btn.active {
-  background: var(--color-primary);
-  color: white;
+  background: rgba(15, 118, 110, 0.1);
+  color: var(--color-primary-dark);
 }
 
 .sp-view-btn svg {
@@ -230,24 +283,24 @@
 }
 
 .sp-location-btn {
-  display: flex;
+  display: inline-flex;
   align-items: center;
   gap: 6px;
-  padding: 7px 12px;
-  border: 1px solid rgba(15, 118, 110, 0.12);
-  background: #FFFFFF;
-  border-radius: 12px;
+  height: 32px;
+  padding: 0 10px;
+  border: none;
+  background: rgba(15, 118, 110, 0.06);
+  border-radius: 999px;
   font-size: 12px;
   font-weight: 600;
   color: var(--color-text-secondary);
   cursor: pointer;
-  transition: all 0.2s;
-  box-shadow: var(--shadow-sm);
+  transition: background var(--transition-fast), color var(--transition-fast);
 }
 
 .sp-location-btn.active {
-  border-color: var(--color-primary);
   color: var(--color-primary);
+  background: rgba(15, 118, 110, 0.12);
 }
 
 .sp-location-btn:disabled {
