@@ -52,6 +52,7 @@ function HomePage() {
   // Search history state
   const [searchHistory, setSearchHistory] = useState([])
   const [showSearchHistory, setShowSearchHistory] = useState(false)
+  const [searchFocused, setSearchFocused] = useState(false)
   const searchInputRef = useRef(null)
   const manualSearchRef = useRef(0)
 
@@ -341,6 +342,18 @@ function HomePage() {
     setShowSearchHistory(false)
   }
 
+  const handleSearchFocus = () => {
+    setShowSearchHistory(true)
+    setSearchFocused(true)
+  }
+
+  const handleSearchBlur = () => {
+    setTimeout(() => {
+      setShowSearchHistory(false)
+      setSearchFocused(false)
+    }, 200)
+  }
+
   // Автоопределение локации при первом запуске
   useEffect(() => {
     if (autoLocationAttempted.current) return
@@ -566,7 +579,6 @@ function HomePage() {
           <div className="header-system-slot" aria-hidden="true" />
           <button className="header-location" onClick={openAddressModal}>
             <div className="header-location-text">
-              <span className="header-location-label">Yetkazish</span>
               <span className="header-location-city">
                 {cityLabel}
                 <svg width="12" height="12" viewBox="0 0 24 24" fill="none">
@@ -580,7 +592,7 @@ function HomePage() {
       </header>
 
       {/* Subheader (Search) */}
-      <div className="home-subheader">
+      <div className={`home-subheader ${searchFocused ? 'search-active' : ''}`}>
         <div className="header-search">
           <div className="search-field">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" className="search-icon">
@@ -594,8 +606,8 @@ function HomePage() {
               placeholder="Mahsulot qidirish..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              onFocus={() => setShowSearchHistory(true)}
-              onBlur={() => setTimeout(() => setShowSearchHistory(false), 200)}
+              onFocus={handleSearchFocus}
+              onBlur={handleSearchBlur}
               onKeyDown={(e) => blurOnEnter(e, handleSearchSubmit)}
             />
             {searchQuery && (
@@ -646,7 +658,6 @@ function HomePage() {
             <span className="filter-icon" aria-hidden="true">
               <SlidersHorizontal size={16} strokeWidth={2} />
             </span>
-            <span className="filter-label">Filtr</span>
             {activeFiltersCount > 0 && (
               <span className="search-filter-count">{activeFiltersCount}</span>
             )}
