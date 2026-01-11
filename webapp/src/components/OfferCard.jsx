@@ -65,6 +65,9 @@ const OfferCard = memo(function OfferCard({ offer, cartQuantity = 0, onAddToCart
         {!imageLoaded && !imageError && (
           <div className="image-skeleton shimmer" />
         )}
+        {showDiscountPercent && (
+          <div className="image-discount-badge">-{discountPercent}%</div>
+        )}
 
         <img
           src={photoUrl || fallbackUrl}
@@ -93,9 +96,6 @@ const OfferCard = memo(function OfferCard({ offer, cartQuantity = 0, onAddToCart
                 {Math.round(priceValue).toLocaleString('ru-RU')}
                 <span className="currency"> so'm</span>
               </div>
-              {showDiscountPercent && (
-                <span className="price-discount">-{discountPercent}%</span>
-              )}
             </div>
             {hasDiscount && (
               <div className="price-original">
