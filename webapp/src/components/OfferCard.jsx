@@ -41,9 +41,14 @@ const OfferCard = memo(function OfferCard({ offer, cartQuantity = 0, onAddToCart
     onRemoveFromCart?.(offer)
   }, [offer, onRemoveFromCart])
 
-  const discountPercent = Math.round(offer.discount_percent ||
-    ((offer.original_price - offer.discount_price) / offer.original_price * 100))
-  const hasDiscount = offer.original_price > offer.discount_price
+  const originalPrice = Number(offer.original_price) || 0
+  const discountPrice = Number(offer.discount_price) || 0
+  const hasDiscount = originalPrice > discountPrice && discountPrice > 0
+  const computedPercent = hasDiscount && originalPrice > 0
+    ? Math.round((1 - discountPrice / originalPrice) * 100)
+    : 0
+  const discountPercent = Number(offer.discount_percent) || computedPercent
+  const showPercentOnly = !hasDiscount && discountPercent > 0
   const isFrozen = Boolean(offer.is_frozen) || String(offer.category || '').toLowerCase() === 'frozen'
 
   // Get photo URL (handles Telegram file_id conversion)
@@ -54,10 +59,6 @@ const OfferCard = memo(function OfferCard({ offer, cartQuantity = 0, onAddToCart
     <div className={`offer-card ${cartQuantity > 0 ? 'in-cart' : ''} ${isAdding ? 'adding' : ''}`} onClick={handleCardClick}>
       {/* Image Section */}
       <div className={`card-image-container ${imageLoaded && !imageError ? 'has-image' : ''}`}>
-        {/* Discount Badge */}
-        {discountPercent > 0 && (
-          <div className="discount-badge">-{discountPercent}%</div>
-        )}
         {/* Image skeleton while loading */}
         {!imageLoaded && !imageError && (
           <div className="image-skeleton shimmer" />
@@ -79,13 +80,36 @@ const OfferCard = memo(function OfferCard({ offer, cartQuantity = 0, onAddToCart
             }
           }}
         />
+      </div>
 
-        {/* Add/Quantity Control */}
-        <div className={`card-action ${cartQuantity > 0 ? 'is-qty' : 'is-add'}`}>
+      {/* Content Section */}
+      <div className="card-content">
+        <div className="price-section">
+          <div className="price-row">
+            <div className={`price-main ${hasDiscount ? 'discounted' : ''}`}>
+              {Math.round(discountPrice).toLocaleString('ru-RU')}
+              <span className="currency"> so'm</span>
+            </div>
+            {showPercentOnly && (
+              <span className="price-discount">-{discountPercent}%</span>
+            )}
+          </div>
+          {hasDiscount && (
+            <div className="price-original">
+              {Math.round(originalPrice).toLocaleString('ru-RU')} so'm
+            </div>
+          )}
+        </div>
+        <h3 className="offer-title">{offer.title}</h3>
+        <div className="card-footer">
+          {isFrozen && (
+            <span className="offer-tag">Muzlatilgan</span>
+          )}
           {cartQuantity > 0 ? (
             <QuantityControl
               value={cartQuantity}
               size="sm"
+              className="card-stepper"
               onDecrement={handleRemoveClick}
               onIncrement={handleAddClick}
               disableIncrement={isMaxReached}
@@ -93,36 +117,14 @@ const OfferCard = memo(function OfferCard({ offer, cartQuantity = 0, onAddToCart
             />
           ) : (
             <button
-              className={`add-to-cart-fab add-to-cart-btn ${isAdding ? 'pulse' : ''}`}
+              className={`add-to-cart-inline ${isAdding ? 'pulse' : ''}`}
               onClick={handleAddClick}
               aria-label="Savatga qo'shish"
             >
-              <span aria-hidden="true">+</span>
+              Qo'shish
             </button>
           )}
         </div>
-      </div>
-
-      {/* Content Section */}
-      <div className="card-content">
-        <div className="price-section">
-          <div className={`price-main ${hasDiscount ? 'discounted' : ''}`}>
-            {Math.round(offer.discount_price).toLocaleString('ru-RU')}
-            <span className="currency"> so'm</span>
-          </div>
-          {hasDiscount && (
-            <div className="price-original">
-              {Math.round(offer.original_price).toLocaleString('ru-RU')} so'm
-            </div>
-          )}
-        </div>
-        <h3 className="offer-title">{offer.title}</h3>
-        {isFrozen && (
-          <div className="offer-tag">
-            <span className="offer-tag-icon" aria-hidden="true">*</span>
-            <span>Muzlatkichdan</span>
-          </div>
-        )}
       </div>
     </div>
   )

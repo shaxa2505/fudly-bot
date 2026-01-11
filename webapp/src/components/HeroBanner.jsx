@@ -4,25 +4,31 @@ import './HeroBanner.css'
 const BANNERS = [
   {
     id: 1,
-    title: 'Yangi ichimliklar',
-    subtitle: 'Har kuni yangilanadi',
-    badge: 'Ichimliklar',
-    cta: "Tanlash",
-    image: '/images/hero/juice.jpg',
-    position: 'center bottom',
-    accent: '#F97316',
-    category: 'drinks'
+    title: 'Sut mahsulotlari',
+    image: '/images/hero/dairy.jpeg',
+    position: 'center',
+    category: 'dairy'
   },
   {
     id: 2,
-    title: "Go'sht tanlovi",
-    subtitle: 'Grill uchun',
-    badge: "Go'sht",
-    cta: "Ko'rish",
-    image: '/images/hero/steak.jpg',
+    title: 'Ichimliklar',
+    image: '/images/hero/drinks.jpeg',
+    position: 'center bottom',
+    category: 'drinks'
+  },
+  {
+    id: 3,
+    title: "Go'sht mahsulotlari",
+    image: '/images/hero/meat.jpeg',
     position: 'center',
-    accent: '#EF4444',
     category: 'meat'
+  },
+  {
+    id: 4,
+    title: 'Mevalar',
+    image: '/images/hero/produce.jpeg',
+    position: 'center',
+    category: 'fruits'
   },
 ]
 
@@ -111,7 +117,6 @@ const HeroBanner = memo(function HeroBanner({ onCategorySelect }) {
       <div
         className="hero-banner"
         style={{
-          '--banner-accent': currentBanner.accent,
           '--banner-image': `url(${currentBanner.image})`,
           '--banner-position': currentBanner.position || 'center',
         }}
@@ -123,15 +128,7 @@ const HeroBanner = memo(function HeroBanner({ onCategorySelect }) {
         <div className="hero-banner__image" aria-hidden="true" />
         <div className="hero-banner__overlay" aria-hidden="true" />
         <div className="banner-content">
-          <div className="banner-kicker">
-            <span className="banner-badge">{currentBanner.badge || 'Tanlov'}</span>
-            <span className="banner-subtitle">{currentBanner.subtitle}</span>
-          </div>
           <h2 className="banner-title">{currentBanner.title}</h2>
-          <button className="banner-cta" type="button">
-            {currentBanner.cta || "Ko'rish"}
-            <span className="cta-arrow" aria-hidden="true">&gt;</span>
-          </button>
         </div>
       </div>
 
