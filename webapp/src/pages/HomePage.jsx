@@ -43,7 +43,6 @@ const normalizeCategoryId = (value) => {
 }
 
 function HomePage() {
-  const [topbarHidden, setTopbarHidden] = useState(false)
   const [offers, setOffers] = useState([])
   const [loading, setLoading] = useState(false)
   const [selectedCategory, setSelectedCategory] = useState('all')
@@ -94,7 +93,6 @@ function HomePage() {
   const activeFiltersCount = [minDiscount, priceRange !== 'all', sortBy !== 'default']
     .filter(Boolean)
     .length
-  const topbarStateRef = useRef(false)
 
   const registerCategoryTab = useCallback((id, node) => {
     if (node) {
@@ -188,50 +186,6 @@ function HomePage() {
     }
   }, [activeCategory])
 
-  // Hide topbar on scroll-down (Lavka-like): keep search pinned, show topbar on scroll-up.
-  useEffect(() => {
-    const getScrollY = () =>
-      window.scrollY || window.pageYOffset || document.documentElement.scrollTop || 0
-    const lastYRef = { current: getScrollY() }
-    let rafId = 0
-
-    const setHidden = (nextHidden) => {
-      if (topbarStateRef.current === nextHidden) return
-      topbarStateRef.current = nextHidden
-      setTopbarHidden(nextHidden)
-    }
-
-    const apply = () => {
-      rafId = 0
-      const y = getScrollY()
-      const lastY = lastYRef.current
-      const delta = y - lastY
-      lastYRef.current = y
-
-      if (y <= 12) {
-        setHidden(false)
-        return
-      }
-
-      // Small deadzone to prevent flicker.
-      if (delta > 12 && y > 96) {
-        setHidden(true)
-      } else if (delta < -12 || (y < 64 && topbarStateRef.current)) {
-        setHidden(false)
-      }
-    }
-
-    const onScroll = () => {
-      if (rafId) return
-      rafId = window.requestAnimationFrame(apply)
-    }
-
-    window.addEventListener('scroll', onScroll, { passive: true })
-    return () => {
-      window.removeEventListener('scroll', onScroll)
-      if (rafId) window.cancelAnimationFrame(rafId)
-    }
-  }, [])
 
   // Извлекаем название города для API (без страны) и транслитерируем в кириллицу
   const cityRaw = location.city
@@ -673,7 +627,7 @@ function HomePage() {
   return (
     <div
       ref={containerRef}
-      className={`home-page ${topbarHidden ? 'topbar-hidden' : ''}`}
+      className="home-page"
     >
       {/* Pull-to-Refresh */}
       <PullToRefresh
@@ -683,7 +637,7 @@ function HomePage() {
       />
 
       {/* Header */}
-      <header className={`header ${topbarHidden ? 'is-hidden' : ''}`}>
+      <header className="header">
         <div className="header-top">
           <div className="header-system-slot" aria-hidden="true" />
           <button className="header-location" onClick={openAddressModal}>
@@ -774,33 +728,8 @@ function HomePage() {
         </div>
       </div>
 
-      {/* Unified Filter Bar */}
-      <div className="filters-section">
-        <div className="filters-primary">
-          <div
-            className="category-tabs"
-            ref={categoriesScrollRef}
-            role="tablist"
-            aria-label="Kategoriyalar"
-          >
-            {CATEGORIES.map(cat => (
-              <button
-                key={cat.id}
-                type="button"
-                ref={(node) => registerCategoryTab(cat.id, node)}
-                className={`category-tab ${activeCategory === cat.id ? 'is-active' : ''}`}
-                role="tab"
-                aria-selected={activeCategory === cat.id}
-                tabIndex={activeCategory === cat.id ? 0 : -1}
-                onClick={() => handleCategorySelect(cat.id)}
-              >
-                {cat.name}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        {showAdvancedFilters && (
+      {showAdvancedFilters && (
+        <div className="filters-section">
           <div className="filters-advanced">
             <div className="filter-group">
               <span className="filter-group-label">Chegirma</span>
@@ -898,8 +827,8 @@ function HomePage() {
               </select>
             </div>
           </div>
-        )}
-      </div>
+        </div>
+      )}
 
       {/* Hero Banner Carousel */}
       <HeroBanner onCategorySelect={(category) => {
@@ -908,6 +837,30 @@ function HomePage() {
           document.querySelector('.section-header')?.scrollIntoView({ behavior: 'smooth' })
         }, 100)
       }} />
+
+      <div className="categories-nav-section">
+        <div
+          className="category-tabs"
+          ref={categoriesScrollRef}
+          role="tablist"
+          aria-label="Kategoriyalar"
+        >
+          {CATEGORIES.map(cat => (
+            <button
+              key={cat.id}
+              type="button"
+              ref={(node) => registerCategoryTab(cat.id, node)}
+              className={`category-tab ${activeCategory === cat.id ? 'is-active' : ''}`}
+              role="tab"
+              aria-selected={activeCategory === cat.id}
+              tabIndex={activeCategory === cat.id ? 0 : -1}
+              onClick={() => handleCategorySelect(cat.id)}
+            >
+              {cat.name}
+            </button>
+          ))}
+        </div>
+      </div>
 
       {/* Flash Deals - temporarily disabled until API deployed
       {selectedCategory === 'all' && !searchQuery && (
