@@ -85,28 +85,25 @@ const OfferCard = memo(function OfferCard({ offer, cartQuantity = 0, onAddToCart
 
       {/* Content Section */}
       <div className="card-content">
-        <div className="price-section">
-          <div className="price-row">
-            <div className={`price-main ${hasDiscount ? 'discounted' : ''}`}>
-              {Math.round(priceValue).toLocaleString('ru-RU')}
-              <span className="currency"> so'm</span>
+        <div className="price-row">
+          <div className="price-stack">
+            <div className="price-line">
+              <div className={`price-main ${hasDiscount ? 'discounted' : ''}`}>
+                {Math.round(priceValue).toLocaleString('ru-RU')}
+                <span className="currency"> so'm</span>
+              </div>
+              {showPercentOnly && (
+                <span className="price-discount">-{discountPercent}%</span>
+              )}
             </div>
-            {showPercentOnly && (
-              <span className="price-discount">-{discountPercent}%</span>
+            {hasDiscount && (
+              <div className="price-original">
+                {Math.round(originalPrice).toLocaleString('ru-RU')} so'm
+              </div>
             )}
           </div>
-          {hasDiscount && (
-            <div className="price-original">
-              {Math.round(originalPrice).toLocaleString('ru-RU')} so'm
-            </div>
-          )}
-        </div>
-        <h3 className="offer-title">{offer.title}</h3>
-        <div className="card-footer">
-          {isFrozen && (
-            <span className="offer-tag">Muzlatilgan</span>
-          )}
-          {cartQuantity > 0 ? (
+          <div className="card-control">
+            {cartQuantity > 0 ? (
             <QuantityControl
               value={cartQuantity}
               size="sm"
@@ -125,7 +122,14 @@ const OfferCard = memo(function OfferCard({ offer, cartQuantity = 0, onAddToCart
               Qo'shish
             </button>
           )}
+          </div>
         </div>
+        <h3 className="offer-title">
+          {offer.title}
+          {isFrozen && (
+            <span className="offer-title-tag"> · Muzlatilgan</span>
+          )}
+        </h3>
       </div>
     </div>
   )
