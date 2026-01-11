@@ -20,6 +20,7 @@
   z-index: var(--z-sticky);
   box-shadow: none;
   border-bottom: none;
+  --topbar-inline-padding: var(--spacing-xl);
 }
 
 .details-header-inner {

@@ -1898,6 +1898,7 @@
   z-index: var(--z-sticky);
   padding: var(--cart-top-inset) var(--page-padding-x) var(--cart-topbar-gap);
   background: linear-gradient(180deg, rgba(244, 248, 247, 0.98) 0%, rgba(255, 255, 255, 1) 70%);
+  border-radius: var(--app-surface-radius) var(--app-surface-radius) 0 0;
 }
 
 .cart-topbar-inner {

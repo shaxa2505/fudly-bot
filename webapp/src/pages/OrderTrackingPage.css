@@ -20,6 +20,7 @@
   align-items: center;
   gap: var(--spacing-md);
   border-bottom: none;
+  --topbar-inline-padding: var(--spacing-xl);
 }
 
 .tracking-header-inner {

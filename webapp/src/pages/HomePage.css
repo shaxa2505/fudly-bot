@@ -30,6 +30,7 @@
   z-index: var(--z-sticky);
   background: linear-gradient(180deg, rgba(244, 248, 247, 0.98) 0%, rgba(255, 255, 255, 1) 70%);
   padding: var(--home-top-inset) var(--app-header-padding-x) var(--home-topbar-gap);
+  border-radius: var(--app-surface-radius) var(--app-surface-radius) 0 0;
   border-bottom: none;
   box-shadow: none;
   /* No transitions - prevents jank */

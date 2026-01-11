@@ -30,6 +30,7 @@
   z-index: var(--z-sticky);
   box-shadow: none;
   border-bottom: none;
+  border-radius: var(--app-surface-radius) var(--app-surface-radius) 0 0;
   overflow: visible;
   transition:
     transform 0.22s ease,
