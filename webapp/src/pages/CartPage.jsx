@@ -32,6 +32,7 @@ function CartPage({ user }) {
   const [orderLoading, setOrderLoading] = useState(false)
   const commentInputRef = useRef(null)
   const paymentProofInputRef = useRef(null)
+  const paymentProofUploadInputRef = useRef(null)
   const [focusCommentOnOpen, setFocusCommentOnOpen] = useState(false)
 
   // Checkout form
@@ -155,9 +156,12 @@ function CartPage({ user }) {
   const clearPaymentProof = () => {
     setPaymentProof(null)
     setPaymentProofPreview(null)
-    if (paymentProofInputRef.current) {
-      paymentProofInputRef.current.value = ''
-    }
+    const inputs = [paymentProofInputRef, paymentProofUploadInputRef]
+    inputs.forEach((ref) => {
+      if (ref.current) {
+        ref.current.value = ''
+      }
+    })
   }
 
   const selectPaymentMethod = (method) => {
@@ -649,18 +653,6 @@ function CartPage({ user }) {
         <div className="modal-overlay checkout-overlay" onClick={closeCheckout}>
           <div className="modal checkout-modal" onClick={e => e.stopPropagation()}>
             <div className="sheet-handle" aria-hidden="true"></div>
-            <input
-              ref={paymentProofInputRef}
-              id="paymentProofInput"
-              type="file"
-              accept="image/*,image/jpeg,image/jpg,image/png"
-              onChange={handleFileSelect}
-              onClick={(event) => {
-                event.currentTarget.value = ''
-              }}
-              className="visually-hidden"
-              disabled={orderLoading}
-            />
 
             <div className="modal-body">
               {/* Step 1: Order Details */}
@@ -831,6 +823,23 @@ function CartPage({ user }) {
                       <div className="upload-section">
                         <p className="upload-label">O'tkazma chekini yuklang:</p>
 
+                        <div className="upload-area">
+                          <label
+                            className={`upload-btn file-picker-btn${paymentProofPreview ? ' is-hidden' : ''}${orderLoading ? ' is-disabled' : ''}`}
+                            aria-disabled={orderLoading}
+                          >
+                            <input
+                              ref={paymentProofInputRef}
+                              type="file"
+                              accept="image/*,image/jpeg,image/jpg,image/png"
+                              onChange={handleFileSelect}
+                              className="file-input-overlay"
+                              disabled={orderLoading}
+                            />
+                            Rasm tanlash
+                          </label>
+                        </div>
+
                         {paymentProofPreview ? (
                           <div className="proof-preview">
                             <img src={paymentProofPreview} alt="Chek" />
@@ -842,16 +851,6 @@ function CartPage({ user }) {
                             >
                               O'chirish
                             </button>
-                          </div>
-                        ) : (
-                          <div className="upload-area">
-                            <label
-                              htmlFor={orderLoading ? undefined : 'paymentProofInput'}
-                              className={`upload-btn file-picker-btn${orderLoading ? ' is-disabled' : ''}`}
-                              aria-disabled={orderLoading}
-                            >
-                              Rasm tanlash
-                            </label>
                           </div>
                         )}
                       </div>
@@ -909,41 +908,45 @@ function CartPage({ user }) {
                     </div>
                   )}
 
-                  {!paymentProof ? (
-                    <label
-                      htmlFor={orderLoading ? undefined : 'paymentProofInput'}
-                      className={`confirm-btn file-picker-btn${orderLoading ? ' is-disabled' : ''}`}
-                      aria-disabled={orderLoading}
-                    >
-                      Chekni yuklash
-                    </label>
-                  ) : (
-                    <button
-                      className="confirm-btn"
-                      onClick={async () => {
-                        setOrderLoading(true)
-                        try {
-                          await api.uploadPaymentProof(orderResult.orderId, paymentProof)
-                          clearCart()
-                          setShowCheckout(false)
-                          setCheckoutStep('details')
-                          clearPaymentProof()
-                          setOrderResult({
-                            ...orderResult,
-                            awaitingPayment: false,
-                            message: 'Chek yuklandi! Admin tekshiradi.'
-                          })
-                        } catch (error) {
-                          alert('Xatolik: ' + error.message)
-                        } finally {
-                          setOrderLoading(false)
-                        }
-                      }}
+                  <label
+                    className={`confirm-btn file-picker-btn${paymentProof ? ' is-hidden' : ''}${orderLoading ? ' is-disabled' : ''}`}
+                    aria-disabled={orderLoading}
+                  >
+                    <input
+                      ref={paymentProofUploadInputRef}
+                      type="file"
+                      accept="image/*,image/jpeg,image/jpg,image/png"
+                      onChange={handleFileSelect}
+                      className="file-input-overlay"
                       disabled={orderLoading}
-                    >
-                      {orderLoading ? 'Yuklanmoqda...' : 'Yuborish'}
-                    </button>
-                  )}
+                    />
+                    Chekni yuklash
+                  </label>
+                  <button
+                    className={`confirm-btn${!paymentProof ? ' is-hidden' : ''}`}
+                    onClick={async () => {
+                      setOrderLoading(true)
+                      try {
+                        await api.uploadPaymentProof(orderResult.orderId, paymentProof)
+                        clearCart()
+                        setShowCheckout(false)
+                        setCheckoutStep('details')
+                        clearPaymentProof()
+                        setOrderResult({
+                          ...orderResult,
+                          awaitingPayment: false,
+                          message: 'Chek yuklandi! Admin tekshiradi.'
+                        })
+                      } catch (error) {
+                        alert('Xatolik: ' + error.message)
+                      } finally {
+                        setOrderLoading(false)
+                      }
+                    }}
+                    disabled={orderLoading}
+                  >
+                    {orderLoading ? 'Yuklanmoqda...' : 'Yuborish'}
+                  </button>
                 </>
               )}
             </div>

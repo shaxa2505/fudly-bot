@@ -1,4 +1,4 @@
-"""
+﻿"""
 Common utilities, constants and middleware.
 """
 import html
@@ -10,6 +10,7 @@ from typing import Any
 from aiogram import BaseMiddleware
 
 from database_protocol import DatabaseProtocol
+from app.core.utils import CITY_UZ_TO_RU as CORE_CITY_UZ_TO_RU, normalize_city as core_normalize_city
 
 logger = logging.getLogger("fudly")
 
@@ -200,18 +201,7 @@ def set_user_view_mode(user_id: int, mode: str, db: DatabaseProtocol) -> None:
     user_view_mode[user_id] = mode
 
 
-# Uzbek city names mapping to Russian
-CITY_UZ_TO_RU = {
-    "Toshkent": "Ташкент",
-    "Samarqand": "Самарканд",
-    "Buxoro": "Бухара",
-    "Andijon": "Андижан",
-    "Namangan": "Наманган",
-    "Farg'ona": "Фергана",
-    "Qo'qon": "Коканд",
-    "Xiva": "Хива",
-    "Nukus": "Нукус",
-}
+CITY_UZ_TO_RU = CORE_CITY_UZ_TO_RU
 
 # Uzbekistan timezone (UTC+5)
 UZB_TZ = timezone(timedelta(hours=5))
@@ -219,11 +209,7 @@ UZB_TZ = timezone(timedelta(hours=5))
 
 def normalize_city(city: str) -> str:
     """Convert city name to Russian format for database search."""
-    if not city:
-        return city
-    city_clean = city.strip()
-    return CITY_UZ_TO_RU.get(city_clean.lower(), city_clean)
-
+    return core_normalize_city(city)
 
 def get_uzb_time() -> datetime:
     """Get current time in Uzbekistan timezone (UTC+5)."""
@@ -419,3 +405,4 @@ async def safe_answer_or_send(msg_like, user_id: int, text: str, bot: Any = None
             await bot.send_message(user_id, text, **kwargs)
         except Exception:
             pass
+

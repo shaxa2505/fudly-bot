@@ -1,4 +1,4 @@
-"""Shared helper utilities reused across handlers and services."""
+﻿"""Shared helper utilities reused across handlers and services."""
 from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
@@ -28,13 +28,54 @@ CITY_UZ_TO_RU = {
     "qarshi": "Карши",
     "qoqon": "Коканд",
     "kokand": "Коканд",
+    "ташкент": "Ташкент",
+    "самарканд": "Самарканд",
+    "бухара": "Бухара",
+    "андижан": "Андижан",
+    "наманган": "Наманган",
+    "фергана": "Фергана",
+    "хива": "Хива",
+    "нукус": "Нукус",
+    "карши": "Карши",
+    "коканд": "Коканд",
+}
+
+_CITY_MOJIBAKE_FIXES = {
+    "\u0420\u045e\u0420\u00b0\u0421\u20ac\u0420\u0454\u0420\u00b5\u0420\u0405\u0421\u201a": "Ташкент",
+    "\u0420\u040e\u0420\u00b0\u0420\u0458\u0420\u00b0\u0421\u0402\u0420\u0454\u0420\u00b0\u0420\u0405\u0420\u0491": "Самарканд",
+    "\u0420\u2018\u0421\u0453\u0421\u2026\u0420\u00b0\u0421\u0402\u0420\u00b0": "Бухара",
+    "\u0420\u0452\u0420\u0405\u0420\u0491\u0420\u0451\u0420\u00b6\u0420\u00b0\u0420\u0405": "Андижан",
+    "\u0420\u045c\u0420\u00b0\u0420\u0458\u0420\u00b0\u0420\u0405\u0420\u0456\u0420\u00b0\u0420\u0405": "Наманган",
+    "\u0420\u00a4\u0420\u00b5\u0421\u0402\u0420\u0456\u0420\u00b0\u0420\u0405\u0420\u00b0": "Фергана",
+    "\u0420\u0490\u0420\u0451\u0420\u0406\u0420\u00b0": "Хива",
+    "\u0420\u045c\u0421\u0453\u0420\u0454\u0421\u0453\u0421\u0403": "Нукус",
+    "\u0420\u0459\u0420\u00b0\u0421\u0402\u0421\u20ac\u0420\u0451": "Карши",
+    "\u0420\u0459\u0420\u0455\u0420\u0454\u0420\u00b0\u0420\u0405\u0420\u0491": "Коканд",
 }
 
 _CITY_SUFFIX_RE = re.compile(
     r"\s+(?:shahri|shahar|shahr|tumani|tuman|viloyati|viloyat|region|district|province|oblast|oblasti"
-    r"|город|район|область|шахри|шахар|тумани|туман|вилояти)\b",
+    r"|город|г\.|район|районы|область|области|обл\.)\b",
     re.IGNORECASE,
 )
+
+
+def _contains_cyrillic(text: str) -> bool:
+    return any("\u0400" <= ch <= "\u04FF" for ch in text)
+
+
+def _fix_mojibake_city(city: str) -> str:
+    fixed = _CITY_MOJIBAKE_FIXES.get(city)
+    if fixed:
+        return fixed
+    for encoding in ("cp1251", "latin1", "cp866"):
+        try:
+            candidate = city.encode(encoding).decode("utf-8")
+        except UnicodeError:
+            continue
+        if _contains_cyrillic(candidate):
+            return candidate
+    return city
 
 
 def get_uzb_time() -> datetime:
@@ -242,5 +283,7 @@ def normalize_city(city: str) -> str:
     city_clean = city_clean.split(",")[0]
     city_clean = re.sub(r"\s*\([^)]*\)", "", city_clean)
     city_clean = _CITY_SUFFIX_RE.sub("", city_clean).strip(" ,")
+    city_clean = _fix_mojibake_city(city_clean)
     return CITY_UZ_TO_RU.get(city_clean.lower(), city_clean)
+
 
