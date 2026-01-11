@@ -16,9 +16,6 @@
   touch-action: pan-y;
   --home-topbar-height: 44px;
   --home-topbar-gap: 0px;
-  --home-left-slot: calc(var(--touch-target-min) + 32px);
-  --home-right-slot: calc(var(--touch-target-min) + 8px);
-  --home-location-offset: calc((var(--home-left-slot) - var(--home-right-slot)) / 2);
   --home-top-inset: max(
     var(--safe-area-top-raw, 0px),
     calc((var(--safe-area-top, 0px) + var(--safe-area-top-raw, 0px) - var(--home-topbar-height)) / 2)
@@ -71,15 +68,7 @@
 .header-system-slot {
   height: var(--home-topbar-height);
   min-height: var(--home-topbar-height);
-  flex: 0 0 var(--home-right-slot);
-}
-
-.header-system-slot:first-of-type {
-  flex-basis: var(--home-left-slot);
-}
-
-.header-system-slot:last-of-type {
-  flex-basis: var(--home-right-slot);
+  flex: 0 0 var(--touch-target-min);
 }
 
 .header-location {
@@ -87,9 +76,9 @@
   align-items: center;
   justify-self: center;
   position: absolute;
-  left: calc(50% + var(--home-location-offset));
+  left: 50%;
   transform: translateX(-50%);
-  max-width: calc(100% - var(--home-left-slot) - var(--home-right-slot) - 16px);
+  max-width: calc(100% - (var(--touch-target-min) * 2) - 16px);
   background: transparent;
   border: 1px solid transparent;
   height: var(--home-topbar-height);

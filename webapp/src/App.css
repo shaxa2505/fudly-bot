@@ -22,7 +22,7 @@
     radial-gradient(220px 100px at 82% -30%, rgba(249, 115, 22, 0.18), transparent 72%),
     linear-gradient(180deg, rgba(244, 248, 247, 0.98) 0%, rgba(255, 255, 255, 0.72) 60%, rgba(255, 255, 255, 0) 100%);
   border-bottom: 1px solid rgba(15, 118, 110, 0.1);
-  box-shadow: 0 8px 20px rgba(16, 24, 40, 0.08);
+  box-shadow: 0 8px 20px rgba(16, 24, 40, 0.08), inset 0 -1px 0 rgba(15, 118, 110, 0.08);
   backdrop-filter: blur(14px);
   -webkit-backdrop-filter: blur(14px);
   pointer-events: none;
