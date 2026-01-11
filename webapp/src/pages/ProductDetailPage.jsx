@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { useLocation } from 'react-router-dom'
+import { useLocation, useNavigate } from 'react-router-dom'
 import { useCart } from '../context/CartContext'
 import { useFavorites } from '../context/FavoritesContext'
 import { getUnitLabel } from '../utils/helpers'
@@ -10,6 +10,7 @@ import './ProductDetailPage.css'
 
 function ProductDetailPage() {
   const location = useLocation()
+  const navigate = useNavigate()
   const { addToCart } = useCart()
   const { isFavorite, toggleFavorite } = useFavorites()
 
@@ -55,6 +56,14 @@ function ProductDetailPage() {
     window.Telegram?.WebApp?.HapticFeedback?.impactOccurred?.('light')
   }
 
+  const handleBack = () => {
+    if (window.history.length > 1) {
+      navigate(-1)
+      return
+    }
+    navigate('/')
+  }
+
   const handleShare = () => {
     const text = `${offer.title}\nNarx: ${Math.round(offer.discount_price).toLocaleString()} so'm\nDo'kon: ${offer.store_name || ''}`
     if (navigator.share) {
@@ -90,31 +99,53 @@ function ProductDetailPage() {
   const expiryInfo = getExpiryInfo()
   const hasDiscount = offer.original_price > offer.discount_price
   const isFav = isFavorite(offer.id)
+  const hasStock = Number(offer.quantity || offer.stock || 0) > 0
+  const showPriceMeta = hasDiscount || hasStock
 
   return (
     <div className="pdp">
       {/* Header Actions */}
       <header className="pdp-header">
-        <div className="pdp-header-actions">
-          <button
-            className={`pdp-action pdp-fav ${isFav ? 'active' : ''}`}
-            onClick={handleFavorite}
-            aria-label="Sevimli"
-          >
-            <svg width="26" height="26" viewBox="0 0 24 24" fill={isFav ? "#FF4757" : "none"}>
-              <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"
-                stroke={isFav ? "#FF4757" : "currentColor"}
+        <div className="pdp-header-inner">
+          <button className="pdp-action pdp-back" onClick={handleBack} aria-label="Ortga">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
+              <path
+                d="M15 18l-6-6 6-6"
+                stroke="currentColor"
                 strokeWidth="2"
                 strokeLinecap="round"
-                strokeLinejoin="round"/>
+                strokeLinejoin="round"
+              />
             </svg>
           </button>
-          <button className="pdp-action pdp-share" onClick={handleShare} aria-label="Ulashish">
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
-              <path d="M4 12v8a2 2 0 002 2h12a2 2 0 002-2v-8M16 6l-4-4-4 4M12 2v13"
-                stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-            </svg>
-          </button>
+          <div className="pdp-header-actions">
+            <button
+              className={`pdp-action pdp-fav ${isFav ? 'active' : ''}`}
+              onClick={handleFavorite}
+              aria-label="Sevimli"
+            >
+              <svg width="24" height="24" viewBox="0 0 24 24" fill={isFav ? "#FF4757" : "none"}>
+                <path
+                  d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"
+                  stroke={isFav ? "#FF4757" : "currentColor"}
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </svg>
+            </button>
+            <button className="pdp-action pdp-share" onClick={handleShare} aria-label="Ulashish">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
+                <path
+                  d="M4 12v8a2 2 0 002 2h12a2 2 0 002-2v-8M16 6l-4-4-4 4M12 2v13"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </svg>
+            </button>
+          </div>
         </div>
       </header>
 
@@ -159,16 +190,22 @@ function ProductDetailPage() {
       <section className="pdp-body">
         <div className="pdp-price-row">
           <div className="pdp-price-block">
-            <span className="pdp-current-price">
-              {Math.round(offer.discount_price).toLocaleString()} so'm
-            </span>
-            {hasDiscount && (
-              <span className="pdp-old-price">
-                {Math.round(offer.original_price).toLocaleString()} so'm
+            <div className="pdp-price-main">
+              <span className="pdp-current-price">
+                {Math.round(offer.discount_price).toLocaleString()} so'm
               </span>
-            )}
-            {offer.quantity > 0 && (
-              <span className="pdp-stock">Qoldi: {offer.quantity} {getUnitLabel(offer.unit)}</span>
+            </div>
+            {showPriceMeta && (
+              <div className="pdp-price-sub">
+                {hasDiscount && (
+                  <span className="pdp-old-price">
+                    {Math.round(offer.original_price).toLocaleString()} so'm
+                  </span>
+                )}
+                {hasStock && (
+                  <span className="pdp-stock">Qoldi: {offer.quantity} {getUnitLabel(offer.unit)}</span>
+                )}
+              </div>
             )}
           </div>
           <QuantityControl

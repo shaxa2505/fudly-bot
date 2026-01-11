@@ -24,6 +24,30 @@
   z-index: 10;
 }
 
+.app::after {
+  content: '';
+  position: fixed;
+  top: var(--app-surface-top);
+  left: 0;
+  right: 0;
+  height: var(--app-surface-radius);
+  pointer-events: none;
+  z-index: 30;
+  background:
+    radial-gradient(
+      circle at top left,
+      transparent 0,
+      transparent calc(var(--app-surface-radius) - 1px),
+      #121416 var(--app-surface-radius)
+    ) top left / var(--app-surface-radius) var(--app-surface-radius) no-repeat,
+    radial-gradient(
+      circle at top right,
+      transparent 0,
+      transparent calc(var(--app-surface-radius) - 1px),
+      #121416 var(--app-surface-radius)
+    ) top right / var(--app-surface-radius) var(--app-surface-radius) no-repeat;
+}
+
 .app-surface {
   min-height: calc(var(--tg-viewport-stable-height, 100vh) - var(--app-surface-top));
   margin-top: var(--app-surface-top);
