@@ -219,6 +219,7 @@
   align-items: center;
   justify-content: center;
   box-sizing: border-box;
+  padding: 0;
   cursor: pointer;
   transition: transform 0.12s ease, border-color 0.12s ease, background 0.12s ease, color 0.12s ease;
   -webkit-tap-highlight-color: transparent;
@@ -249,7 +250,7 @@ button.add-to-cart-inline:active:not(:disabled) {
 
 .card-stepper.quantity-control {
   --qc-height: 32px;
-  --qc-pad: 2px 8px;
+  --qc-pad: 0 8px;
   --qc-gap: 0;
   --qc-btn-size: 24px;
   --qc-value-font: 12px;
