@@ -117,9 +117,9 @@ const OfferCard = memo(function OfferCard({ offer, cartQuantity = 0, onAddToCart
             <button
               className={`add-to-cart-inline ${isAdding ? 'pulse' : ''}`}
               onClick={handleAddClick}
-              aria-label="Savatga qo'shish"
+              aria-label="Savatga qo‘shish"
             >
-              Qo'shish
+              Qo‘shish
             </button>
           )}
           </div>
