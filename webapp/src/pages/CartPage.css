@@ -1048,6 +1048,104 @@
   background: rgba(15, 118, 110, 0.16);
 }
 
+.cart-toggle {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.cart-toggle-btn {
+  border: 1px solid rgba(15, 118, 110, 0.14);
+  background: var(--cart-card);
+  border-radius: 18px;
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  cursor: pointer;
+  text-align: left;
+  transition: transform var(--transition-fast), border-color var(--transition-fast), box-shadow var(--transition-fast);
+  box-shadow: 0 10px 20px rgba(16, 24, 40, 0.05);
+}
+
+.cart-toggle-btn:active {
+  transform: scale(0.99);
+}
+
+.cart-toggle-btn.active {
+  border-color: rgba(15, 118, 110, 0.4);
+  background: rgba(15, 118, 110, 0.12);
+  box-shadow: 0 12px 22px rgba(15, 118, 110, 0.12);
+}
+
+.cart-toggle-btn.disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  box-shadow: none;
+}
+
+.cart-toggle-btn.disabled:active {
+  transform: none;
+}
+
+.cart-toggle-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-text-primary);
+}
+
+.cart-toggle-subtitle {
+  font-size: 11px;
+  color: var(--color-text-tertiary);
+}
+
+.cart-toggle-hint {
+  margin-top: -4px;
+}
+
+.cart-address-card {
+  width: 100%;
+  border: 1px solid rgba(15, 118, 110, 0.12);
+  background: rgba(255, 255, 255, 0.92);
+  border-radius: 18px;
+  padding: 14px 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  cursor: pointer;
+  text-align: left;
+  box-shadow: 0 12px 22px rgba(16, 24, 40, 0.06);
+  transition: transform var(--transition-fast), box-shadow var(--transition-fast);
+}
+
+.cart-address-card:active {
+  transform: scale(0.99);
+}
+
+.cart-address-main {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.cart-address-label {
+  font-size: 11px;
+  color: var(--color-text-tertiary);
+}
+
+.cart-address-value {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-text-primary);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
 .cart-list-card {
   background: transparent;
   border: none;
@@ -1405,6 +1503,12 @@
   .cart-item-img {
     width: 64px;
     height: 64px;
+  }
+}
+
+@media (max-width: 420px) {
+  .cart-toggle {
+    grid-template-columns: 1fr;
   }
 }
 

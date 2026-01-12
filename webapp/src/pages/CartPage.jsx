@@ -697,6 +697,60 @@ function CartPage({ user }) {
           </div>
         </section>
 
+        <section className="cart-toggle">
+          <button
+            type="button"
+            className={`cart-toggle-btn ${orderType === 'pickup' ? 'active' : ''}`}
+            onClick={() => setOrderType('pickup')}
+          >
+            <span className="cart-toggle-title">Olib ketish</span>
+            <span className="cart-toggle-subtitle">Bepul</span>
+          </button>
+          <button
+            type="button"
+            className={`cart-toggle-btn ${orderType === 'delivery' ? 'active' : ''} ${!storeDeliveryEnabled || !canDelivery || !hasPrepayProviders ? 'disabled' : ''}`}
+            onClick={() => storeDeliveryEnabled && canDelivery && hasPrepayProviders && setOrderType('delivery')}
+            disabled={!storeDeliveryEnabled || !canDelivery || !hasPrepayProviders}
+          >
+            <span className="cart-toggle-title">Yetkazib berish</span>
+            <span className="cart-toggle-subtitle">
+              {!storeDeliveryEnabled
+                ? 'Mavjud emas'
+                : !canDelivery
+                  ? `Min: ${Math.round(minOrderAmount).toLocaleString()} so'm`
+                  : `${Math.round(deliveryFee).toLocaleString()} so'm`
+              }
+            </span>
+          </button>
+        </section>
+
+        {!canDelivery && storeDeliveryEnabled && (
+          <p className="delivery-hint cart-toggle-hint">
+            Yetkazib berish uchun minimum {Math.round(minOrderAmount).toLocaleString()} so'm buyurtma qiling
+          </p>
+        )}
+        {storeDeliveryEnabled && canDelivery && !hasPrepayProviders && (
+          <p className="delivery-hint cart-toggle-hint">
+            Yetkazib berish uchun to'lov usullari mavjud emas
+          </p>
+        )}
+
+        {orderType === 'delivery' && (
+          <button
+            type="button"
+            className="cart-address-card"
+            onClick={handleCheckout}
+          >
+            <div className="cart-address-main">
+              <span className="cart-address-label">Manzil</span>
+              <span className="cart-address-value">
+                {address.trim() ? address : 'Manzil kiritilmagan'}
+              </span>
+            </div>
+            <ChevronRight size={18} strokeWidth={2} aria-hidden="true" />
+          </button>
+        )}
+
         <div className="cart-list-card">
           <div className="cart-list-header">
             <div className="cart-list-title">
