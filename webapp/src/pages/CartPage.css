@@ -18,6 +18,7 @@
 .modal-overlay.checkout-overlay {
   align-items: stretch;
   padding: 0;
+  padding-top: var(--tg-top-inset, 0px);
   background: #FFFFFF;
 }
 
