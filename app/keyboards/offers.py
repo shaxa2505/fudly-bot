@@ -10,6 +10,22 @@ from aiogram.utils.keyboard import InlineKeyboardBuilder
 from app.core.constants import OFFERS_PER_PAGE, STORES_PER_PAGE
 
 
+def hot_entry_keyboard(lang: str) -> InlineKeyboardMarkup:
+    """Entry keyboard for the main 'Магазины и акции' button."""
+    builder = InlineKeyboardBuilder()
+    deals = "🔥 Акции" if lang == "ru" else "🔥 Aksiyalar"
+    stores = "🏪 Магазины" if lang == "ru" else "🏪 Do'konlar"
+    change_city = (
+        "📍 Сменить город" if lang == "ru" else "📍 Shaharni almashtirish"
+    )
+
+    builder.button(text=deals, callback_data="hot_entry_offers")
+    builder.button(text=stores, callback_data="hot_entry_stores")
+    builder.button(text=change_city, callback_data="profile_change_city")
+    builder.adjust(2, 1)
+    return builder.as_markup()
+
+
 def hot_offers_compact_keyboard(
     lang: str, offers: Sequence[Any], page: int, total_pages: int
 ) -> InlineKeyboardMarkup:
@@ -103,7 +119,12 @@ def offer_details_keyboard(
 
 
 def offer_details_with_back_keyboard(
-    lang: str, offer_id: int, store_id: int, delivery_enabled: bool
+    lang: str,
+    offer_id: int,
+    store_id: int,
+    delivery_enabled: bool,
+    back_callback: str = "back_to_hot",
+    back_text: str | None = None,
 ) -> InlineKeyboardMarkup:
     """Offer card keyboard - simplified to 2 main actions + back."""
     builder = InlineKeyboardBuilder()
@@ -117,8 +138,8 @@ def offer_details_with_back_keyboard(
     builder.button(text=order, callback_data=f"book_{offer_id}")
 
     # Back button - full width
-    back = "◀️ Назад к списку" if lang == "ru" else "◀️ Ro'yxatga qaytish"
-    builder.button(text=back, callback_data="back_to_hot")
+    back = back_text or ("◀️ Назад к списку" if lang == "ru" else "◀️ Ro'yxatga qaytish")
+    builder.button(text=back, callback_data=back_callback)
 
     builder.adjust(2, 1)  # 2 buttons top row, 1 bottom
     return builder.as_markup()

@@ -627,9 +627,16 @@ def register_stores(
 
         text = "\n".join(lines)
 
+        back_text = "◀️ К магазину" if lang == "ru" else "◀️ Do'konga"
+
         # Use cart keyboard
         kb = offer_keyboards.offer_details_with_back_keyboard(
-            lang, offer_id, offer.store_id, delivery_enabled
+            lang,
+            offer_id,
+            offer.store_id,
+            delivery_enabled,
+            back_callback=f"back_to_store_{store_id}",
+            back_text=back_text,
         )
 
         # Get message to respond to
@@ -917,8 +924,9 @@ def register_stores(
 
             await state.set_state(BrowseOffers.offer_list)
             await state.update_data(
-                offer_list=[offer.id for offer in offers],
+                offer_list=[offer.id for offer in page_offers],
                 store_offers_page=page,
+                store_offers_offset=offset,
                 current_store_id=store_id,
                 store_category=category,
             )

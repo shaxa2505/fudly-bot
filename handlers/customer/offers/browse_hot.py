@@ -9,6 +9,7 @@ from aiogram import Dispatcher, F, types
 from aiogram.fsm.context import FSMContext
 
 from app.core.utils import normalize_city
+from app.keyboards import business_type_keyboard
 from app.keyboards import offers as offer_keyboards
 from app.keyboards import offers_category_filter
 from app.services.offer_service import OfferDetails, OfferListItem, OfferService
@@ -74,6 +75,18 @@ def register_hot(
         search_city = normalize_city(city)
         search_region = normalize_city(region) if region else None
         search_district = normalize_city(district) if district else None
+
+        entry_text = (
+            f"🏪 <b>{get_text(lang, 'hot_offers')}</b>\n\n"
+            f"📍 {city}\n"
+            f"{get_text(lang, 'hot_offers_subtitle')}"
+        )
+        await message.answer(
+            entry_text,
+            parse_mode="HTML",
+            reply_markup=offer_keyboards.hot_entry_keyboard(lang),
+        )
+
         await _send_hot_offers_list(
             message,
             state,
@@ -126,6 +139,63 @@ def register_hot(
             offer_service,
             logger,
         )
+
+    @dp.callback_query(F.data == "hot_entry_offers")
+    async def hot_entry_offers(callback: types.CallbackQuery, state: FSMContext) -> None:
+        """Entry point from the mini-menu: show hot offers list."""
+        if not callback.from_user or not callback.message:
+            await callback.answer()
+            return
+
+        user_id = callback.from_user.id
+        lang = db.get_user_language(user_id)
+        user = db.get_user_model(user_id)
+        if not user:
+            await callback.answer(get_text(lang, "error"), show_alert=True)
+            return
+
+        city, region, district, latitude, longitude = _extract_location(user)
+        search_city = normalize_city(city)
+        search_region = normalize_city(region) if region else None
+        search_district = normalize_city(district) if district else None
+
+        await callback.answer()
+        await _send_hot_offers_list(
+            callback.message,
+            state,
+            lang,
+            city,
+            search_city,
+            search_region,
+            search_district,
+            latitude,
+            longitude,
+            offer_service,
+            logger,
+        )
+
+    @dp.callback_query(F.data == "hot_entry_stores")
+    async def hot_entry_stores(callback: types.CallbackQuery, state: FSMContext) -> None:
+        """Entry point from the mini-menu: go to store categories."""
+        if not callback.from_user or not callback.message:
+            await callback.answer()
+            return
+
+        user_id = callback.from_user.id
+        lang = db.get_user_language(user_id)
+        user = db.get_user_model(user_id)
+        if not user:
+            await callback.answer(get_text(lang, "error"), show_alert=True)
+            return
+
+        city, _, _, _, _ = _extract_location(user)
+        await state.set_state(BrowseOffers.store_list)
+        await callback.message.answer(
+            get_text(lang, "browse_by_business_type") + f"\n\n📍 {city}",
+            parse_mode="HTML",
+            reply_markup=business_type_keyboard(lang),
+        )
+        await callback.answer()
 
     @dp.message(F.text.contains("Категории") | F.text.contains("Kategoriyalar"))
     async def show_categories_handler(message: types.Message) -> None:
@@ -447,11 +517,33 @@ def register_hot(
             await message.answer(get_text(lang, "error"))
             await state.clear()
             return
-        # Save current page for back navigation (same as hot_offer_selected_handler)
+
+        # Determine context: hot offers or store offers
+        store_id = data.get("current_store_id")
+        if store_id:
+            current_page = data.get("store_offers_page", 0)
+            category = data.get("store_category", "all")
+            await state.update_data(
+                last_store_id=store_id,
+                last_store_page=current_page,
+                last_store_category=category,
+                source="store",
+            )
+            back_cb = f"back_to_store_{store_id}"
+            back_text = "◀️ К магазину" if lang == "ru" else "◀️ Do'konga"
+            await _send_offer_details(
+                message,
+                details,
+                lang,
+                with_back=True,
+                back_callback=back_cb,
+                back_text=back_text,
+            )
+            return
+
+        # Hot offers context (default)
         current_page = data.get("hot_offers_page", 0)
         await state.update_data(last_hot_page=current_page, source="hot")
-
-        # Show offer details with back-to-list button for consistent UX
         await _send_offer_details(message, details, lang, with_back=True)
 
     @dp.callback_query(F.data == "offers_all")
@@ -713,12 +805,20 @@ def register_hot(
         offer: OfferDetails,
         lang: str,
         with_back: bool = False,
+        back_callback: str | None = None,
+        back_text: str | None = None,
     ) -> None:
         store = offer_service.get_store(offer.store_id)
         text = offer_templates.render_offer_details(lang, offer, store)
+        back_cb = back_callback or "back_to_hot"
         if with_back:
             keyboard = offer_keyboards.offer_details_with_back_keyboard(
-                lang, offer.id, offer.store_id, store.delivery_enabled if store else False
+                lang,
+                offer.id,
+                offer.store_id,
+                store.delivery_enabled if store else False,
+                back_callback=back_cb,
+                back_text=back_text,
             )
         else:
             keyboard = offer_keyboards.offer_details_keyboard(
