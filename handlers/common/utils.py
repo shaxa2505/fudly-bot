@@ -65,6 +65,7 @@ __all__ = [
     "user_view_mode",
     "get_user_view_mode",
     "set_user_view_mode",
+    "fix_mojibake_text",
     "normalize_city",
     "get_uzb_time",
     "has_approved_store",
@@ -146,6 +147,26 @@ def _menu_labels() -> dict[str, set[str]]:
 
 def _strip(text: str | None) -> str:
     return (text or "").strip()
+
+
+def fix_mojibake_text(text: str | bytes | None) -> str:
+    """Fix cp1251/latin1-decoded UTF-8 text (mojibake) if detected."""
+    if text is None:
+        return ""
+    if isinstance(text, bytes):
+        try:
+            text = text.decode("utf-8")
+        except UnicodeDecodeError:
+            text = text.decode("cp1251", errors="replace")
+    original = str(text)
+    for encoding in ("cp1251", "latin1", "cp866"):
+        try:
+            candidate = original.encode(encoding).decode("utf-8")
+        except UnicodeDecodeError:
+            continue
+        if candidate != original and _strip(candidate):
+            return candidate
+    return original
 
 
 def is_cart_button(text: str | None) -> bool:

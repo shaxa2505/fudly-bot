@@ -7,7 +7,7 @@ from __future__ import annotations
 
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
-from handlers.common.utils import html_escape as _esc
+from handlers.common.utils import fix_mojibake_text, html_escape as _esc
 from logging_config import logger
 
 
@@ -101,7 +101,7 @@ def build_order_card_text(
         incl_delivery = "yetkazish bilan" if lang == "uz" else "с доставкой"
         lines.append(f"   <i>({incl_delivery})</i>")
 
-    return "\n".join(lines)
+    return fix_mojibake_text("\n".join(lines))
 
 
 def build_order_card_keyboard(
@@ -216,7 +216,7 @@ def build_booking_list_text(lang: str, bookings: list, status_filter: str = "all
 
         lines.append(f"{status_emoji} #{booking_id} | {code}")
 
-    return "\n".join(lines)
+    return fix_mojibake_text("\n".join(lines))
 
 
 def build_booking_list_keyboard(lang: str, bookings: list) -> InlineKeyboardBuilder:

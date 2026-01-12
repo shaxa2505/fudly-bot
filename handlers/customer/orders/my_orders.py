@@ -17,7 +17,7 @@ from aiogram.fsm.context import FSMContext
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
 from app.services.unified_order_service import OrderStatus, get_unified_order_service
-from handlers.common.utils import is_my_orders_button
+from handlers.common.utils import fix_mojibake_text, is_my_orders_button
 
 try:
     from logging_config import logger
@@ -93,6 +93,11 @@ def _format_price(amount: int | float, lang: str) -> str:
     """Format price with currency."""
     currency = "сум" if lang == "ru" else "so'm"
     return f"{int(amount):,} {currency}".replace(",", " ")
+
+
+def _fmt(lines: list[str]) -> str:
+    """Join lines and fix mojibake (cp1251-decoded UTF-8) if present."""
+    return fix_mojibake_text("\n".join(lines))
 
 
 # =============================================================================
@@ -307,7 +312,7 @@ async def my_orders_handler(message: types.Message) -> None:
 
     kb.adjust(1)
 
-    await message.answer("\n".join(text_lines), parse_mode="HTML", reply_markup=kb.as_markup())
+    await message.answer(_fmt(text_lines), parse_mode="HTML", reply_markup=kb.as_markup())
 
 
 async def _show_empty_orders(message: types.Message, lang: str) -> None:
@@ -502,13 +507,9 @@ async def _show_booking_detail(callback: types.CallbackQuery, booking_id: int, l
     kb.adjust(1)
 
     try:
-        await callback.message.edit_text(
-            "\n".join(lines), parse_mode="HTML", reply_markup=kb.as_markup()
-        )
+        await callback.message.edit_text(_fmt(lines), parse_mode="HTML", reply_markup=kb.as_markup())
     except Exception:
-        await callback.message.answer(
-            "\n".join(lines), parse_mode="HTML", reply_markup=kb.as_markup()
-        )
+        await callback.message.answer(_fmt(lines), parse_mode="HTML", reply_markup=kb.as_markup())
 
 
 async def _show_order_detail(callback: types.CallbackQuery, order_id: int, lang: str) -> None:
@@ -709,13 +710,9 @@ async def _show_order_detail(callback: types.CallbackQuery, order_id: int, lang:
     kb.adjust(1)
 
     try:
-        await callback.message.edit_text(
-            "\n".join(lines), parse_mode="HTML", reply_markup=kb.as_markup()
-        )
+        await callback.message.edit_text(_fmt(lines), parse_mode="HTML", reply_markup=kb.as_markup())
     except Exception:
-        await callback.message.answer(
-            "\n".join(lines), parse_mode="HTML", reply_markup=kb.as_markup()
-        )
+        await callback.message.answer(_fmt(lines), parse_mode="HTML", reply_markup=kb.as_markup())
 
 
 # =============================================================================
@@ -1119,13 +1116,9 @@ async def orders_history_handler(callback: types.CallbackQuery) -> None:
     kb.adjust(5, 1)  # 5 repeat buttons per row, then back
 
     try:
-        await callback.message.edit_text(
-            "\n".join(lines), parse_mode="HTML", reply_markup=kb.as_markup()
-        )
+        await callback.message.edit_text(_fmt(lines), parse_mode="HTML", reply_markup=kb.as_markup())
     except Exception:
-        await callback.message.answer(
-            "\n".join(lines), parse_mode="HTML", reply_markup=kb.as_markup()
-        )
+        await callback.message.answer(_fmt(lines), parse_mode="HTML", reply_markup=kb.as_markup())
 
     await callback.answer()
 
