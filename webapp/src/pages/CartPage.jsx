@@ -101,6 +101,11 @@ function CartPage({ user }) {
   const cartStoreId = cartStoreIds[0] || null
   const hasMultipleStores = cartStoreIds.length > 1
   const multiStoreMessage = "Savatda faqat bitta do'kondan mahsulot bo'lishi mumkin. Savatni tozalab qayta urinib ko'ring."
+  const cartStoreName = useMemo(() => {
+    if (cartItems.length === 0) return ''
+    if (hasMultipleStores) return "Bir nechta do'kon"
+    return cartItems.find(item => item.offer?.store_name)?.offer?.store_name || "Do'kon"
+  }, [cartItems, hasMultipleStores])
 
   // Check if stores in cart support delivery
   useEffect(() => {
@@ -144,6 +149,12 @@ function CartPage({ user }) {
 
   // Check if minimum order met for delivery
   const canDelivery = subtotal >= minOrderAmount
+  const deliveryFeeLabel = storeDeliveryEnabled
+    ? `${Math.round(deliveryFee).toLocaleString()} so'm`
+    : 'Mavjud emas'
+  const minOrderLabel = storeDeliveryEnabled && minOrderAmount > 0
+    ? `${Math.round(minOrderAmount).toLocaleString()} so'm`
+    : '—'
   const paymentMethodLabels = {
     cash: 'Naqd',
     card: 'Kartaga o\'tkazish',
@@ -155,6 +166,7 @@ function CartPage({ user }) {
   const hasCardProvider = paymentProviders.includes('card')
   const hasPrepayProviders = hasOnlineProviders || hasCardProvider
   const deliveryRequiresPrepay = orderType === 'delivery'
+  const checkoutTitle = checkoutStep === 'payment' ? "To'lov" : "Ma'lumotlar"
 
   useEffect(() => {
     if (!deliveryRequiresPrepay) return
@@ -613,6 +625,10 @@ function CartPage({ user }) {
         <header className="cart-topbar">
           <div className="cart-topbar-inner topbar-card">
             <span className="cart-icon-spacer" aria-hidden="true"></span>
+            <div className="cart-topbar-title">
+              <h1>Savat</h1>
+              <span className="cart-topbar-count">0</span>
+            </div>
             <span className="cart-icon-spacer" aria-hidden="true"></span>
           </div>
         </header>
@@ -649,6 +665,10 @@ function CartPage({ user }) {
       <header className="cart-topbar">
         <div className="cart-topbar-inner topbar-card">
           <span className="cart-icon-spacer" aria-hidden="true"></span>
+          <div className="cart-topbar-title">
+            <h1>Savat</h1>
+            <span className="cart-topbar-count">{itemsCount}</span>
+          </div>
           <button className="cart-icon-btn" onClick={handleClearCart} aria-label="Savatni tozalash">
             <Trash2 size={18} strokeWidth={2} />
           </button>
@@ -656,9 +676,33 @@ function CartPage({ user }) {
       </header>
 
       <main className="cart-content">
+        <section className="cart-hero-card">
+          <div className="cart-hero-header">
+            <div className="cart-hero-title">
+              <span className="cart-hero-eyebrow">Do'kon</span>
+              <h2>{cartStoreName || "Do'kon"}</h2>
+            </div>
+            <span className="cart-hero-pill">{itemsCount} ta</span>
+          </div>
+          <div className="cart-hero-meta">
+            <div className="cart-hero-meta-item">
+              <span className="cart-hero-meta-label">Yetkazish</span>
+              <span className="cart-hero-meta-value">{deliveryFeeLabel}</span>
+            </div>
+            <div className="cart-hero-divider" aria-hidden="true"></div>
+            <div className="cart-hero-meta-item">
+              <span className="cart-hero-meta-label">Min buyurtma</span>
+              <span className="cart-hero-meta-value">{minOrderLabel}</span>
+            </div>
+          </div>
+        </section>
+
         <div className="cart-list-card">
           <div className="cart-list-header">
-            <h2>Mahsulotlar</h2>
+            <div className="cart-list-title">
+              <h2>Mahsulotlar</h2>
+              <span className="cart-list-count">{itemsCount} ta</span>
+            </div>
           </div>
           {hasMultipleStores && (
             <div className="cart-alert" role="status">
@@ -669,17 +713,22 @@ function CartPage({ user }) {
             </div>
           )}
           <div className="cart-items">
-            {cartItems.map(item => {
+            {cartItems.map((item, index) => {
               const photoUrl = resolveOfferImageUrl(item.offer) || PLACEHOLDER_IMAGE
               const rawStockLimit = item.offer.stock ?? item.offer.quantity ?? 99
               const parsedStockLimit = Number(rawStockLimit)
               const stockLimit = Number.isFinite(parsedStockLimit) ? parsedStockLimit : 99
               const maxStock = item.offer.stock ?? item.offer.quantity
-              const rawUnitPrice = item.offer.discount_price ?? item.offer.original_price ?? 0
-              const parsedUnitPrice = Number(rawUnitPrice)
-              const unitPrice = Number.isFinite(parsedUnitPrice) ? parsedUnitPrice : 0
+              const rawOriginalPrice = item.offer.original_price
+              const rawDiscountPrice = item.offer.discount_price
+              const parsedOriginalPrice = rawOriginalPrice == null ? NaN : Number(rawOriginalPrice)
+              const parsedDiscountPrice = rawDiscountPrice == null ? NaN : Number(rawDiscountPrice)
+              const originalPrice = Number.isFinite(parsedOriginalPrice) ? parsedOriginalPrice : null
+              const discountPrice = Number.isFinite(parsedDiscountPrice) ? parsedDiscountPrice : null
+              const unitPrice = discountPrice ?? originalPrice ?? 0
+              const showOriginalPrice = discountPrice != null && originalPrice != null && originalPrice > discountPrice
               return (
-                <div key={item.offer.id} className="cart-item">
+                <div key={item.offer.id} className="cart-item" style={{ '--item-index': index }}>
                   <img
                     src={photoUrl}
                     alt={item.offer.title}
@@ -707,6 +756,11 @@ function CartPage({ user }) {
                       <span className="cart-item-price">
                         {Math.round(unitPrice).toLocaleString()} so'm
                       </span>
+                      {showOriginalPrice && (
+                        <span className="cart-item-price cart-item-price--old">
+                          {Math.round(originalPrice).toLocaleString()} so'm
+                        </span>
+                      )}
                       {item.offer.store_name && (
                         <span className="cart-item-store">Do'kon: {item.offer.store_name}</span>
                       )}
@@ -742,7 +796,11 @@ function CartPage({ user }) {
           disabled={hasMultipleStores}
           aria-disabled={hasMultipleStores}
         >
-          Izoh qoldirish
+          <div className="cart-note-main">
+            <span className="cart-note-title">Izoh qoldirish</span>
+            <span className="cart-note-subtitle">Kuryer yoki do'kon uchun qo'shimcha ma'lumot</span>
+          </div>
+          <ChevronRight size={18} strokeWidth={2} aria-hidden="true" />
         </button>
       </main>
 
@@ -750,6 +808,7 @@ function CartPage({ user }) {
         <div className="checkout-total">
           <span className="checkout-total-label">Jami</span>
           <span className="checkout-total-value">{Math.round(total).toLocaleString()} so'm</span>
+          <span className="checkout-total-sub">{itemsCount} ta mahsulot</span>
         </div>
         <button
           className="checkout-primary-btn"
@@ -768,20 +827,46 @@ function CartPage({ user }) {
         <div className="modal-overlay checkout-overlay" onClick={closeCheckout}>
           <div className="modal checkout-modal" onClick={e => e.stopPropagation()}>
             <div className="sheet-handle" aria-hidden="true"></div>
+            <div className="modal-header checkout-header">
+              <div className="modal-header-main">
+                <div className="checkout-title-group">
+                  <span className="checkout-title-eyebrow">Buyurtma</span>
+                  <h2>{checkoutTitle}</h2>
+                </div>
+                <button className="modal-close" onClick={closeCheckout} aria-label="Yopish">
+                  <X size={16} strokeWidth={2} />
+                </button>
+              </div>
+              <div className="modal-steps">
+                <div className={`modal-step ${checkoutStep === 'details' ? 'active' : 'done'}`}>
+                  <span className="modal-step-dot" aria-hidden="true"></span>
+                  <span>Ma'lumotlar</span>
+                </div>
+                <div className={`modal-step ${checkoutStep === 'payment' ? 'active' : ''}`}>
+                  <span className="modal-step-dot" aria-hidden="true"></span>
+                  <span>To'lov</span>
+                </div>
+              </div>
+            </div>
 
             <div className="modal-body">
               {/* Step 1: Order Details */}
               {checkoutStep === 'details' && (
                 <>
                   {/* Order Type Selection */}
-                  <div className="order-type-section">
-                    <p className="section-label">Yetkazish turi</p>
+                  <section className="checkout-section order-type-section">
+                    <div className="section-head">
+                      <p className="section-label">Yetkazish turi</p>
+                      <span className={`section-pill ${orderType === 'delivery' ? 'section-pill--accent' : ''}`}>
+                        {orderType === 'delivery' ? 'Yetkazish' : 'Olib ketish'}
+                      </span>
+                    </div>
                     <div className="order-type-options">
                       <button
                         className={`order-type-btn ${orderType === 'pickup' ? 'active' : ''}`}
                         onClick={() => setOrderType('pickup')}
                       >
-                        <span className="order-type-icon">✓</span>
+                        <span className="order-type-icon" aria-hidden="true"></span>
                         <span className="order-type-text">Olib ketish</span>
                         <span className="order-type-desc">Bepul</span>
                       </button>
@@ -791,7 +876,7 @@ function CartPage({ user }) {
                         onClick={() => storeDeliveryEnabled && canDelivery && hasPrepayProviders && setOrderType('delivery')}
                         disabled={!storeDeliveryEnabled || !canDelivery || !hasPrepayProviders}
                       >
-                        <span className="order-type-icon">✓</span>
+                        <span className="order-type-icon" aria-hidden="true"></span>
                         <span className="order-type-text">Yetkazib berish</span>
                         <span className="order-type-desc">
                           {!storeDeliveryEnabled
@@ -814,84 +899,101 @@ function CartPage({ user }) {
                         Yetkazib berish uchun to'lov usullari mavjud emas
                       </p>
                     )}
-                  </div>
+                  </section>
 
-                  <label className="form-label">
-                    Telefon raqam *
-                    <input
-                      type="tel"
-                      className="form-input"
-                      placeholder="+998 90 123 45 67"
-                      value={canonicalPhone || phone}
-                      onChange={e => setPhone(e.target.value)}
-                      readOnly={!!canonicalPhone}
-                      disabled={!!canonicalPhone}
-                    />
-                    {!canonicalPhone && !phone.trim() && (
-                      <div className="form-hint">
-                        Telefon raqamini kiriting yoki botda tasdiqlang.
-                      </div>
-                    )}
-                  </label>
+                  <section className="checkout-section">
+                    <div className="section-head">
+                      <p className="section-label">Kontakt</p>
+                      {canonicalPhone && (
+                        <span className="section-pill section-pill--success">Tasdiqlangan</span>
+                      )}
+                    </div>
+                    <label className="form-label">
+                      Telefon raqam *
+                      <input
+                        type="tel"
+                        className="form-input"
+                        placeholder="+998 90 123 45 67"
+                        value={canonicalPhone || phone}
+                        onChange={e => setPhone(e.target.value)}
+                        readOnly={!!canonicalPhone}
+                        disabled={!!canonicalPhone}
+                      />
+                      {!canonicalPhone && !phone.trim() && (
+                        <div className="form-hint">
+                          Telefon raqamini kiriting yoki botda tasdiqlang.
+                        </div>
+                      )}
+                    </label>
+                  </section>
 
                   {orderType === 'delivery' && (
-                    <label className="form-label">
-                      Yetkazib berish manzili *
-                      <textarea
-                        className="form-textarea"
-                        placeholder="Shahar, ko'cha, uy raqami, mo'ljal..."
-                        value={address}
-                        onChange={e => setAddress(e.target.value)}
-                        onKeyDown={blurOnEnter}
-                      />
-                    </label>
+                    <section className="checkout-section">
+                      <p className="section-label">Manzil</p>
+                      <label className="form-label">
+                        Yetkazib berish manzili *
+                        <textarea
+                          className="form-textarea"
+                          placeholder="Shahar, ko'cha, uy raqami, mo'ljal..."
+                          value={address}
+                          onChange={e => setAddress(e.target.value)}
+                          onKeyDown={blurOnEnter}
+                        />
+                      </label>
+                    </section>
                   )}
 
-                  <label className="form-label">
-                    Izoh (kuryerga)
-                    <textarea
-                      className="form-textarea"
-                      placeholder="Qo'shimcha ma'lumot..."
-                      value={comment}
-                      onChange={e => setComment(e.target.value)}
-                      onKeyDown={blurOnEnter}
-                      ref={commentInputRef}
-                    />
-                  </label>
+                  <section className="checkout-section">
+                    <p className="section-label">Izoh</p>
+                    <label className="form-label">
+                      Izoh (kuryerga)
+                      <textarea
+                        className="form-textarea"
+                        placeholder="Qo'shimcha ma'lumot..."
+                        value={comment}
+                        onChange={e => setComment(e.target.value)}
+                        onKeyDown={blurOnEnter}
+                        ref={commentInputRef}
+                      />
+                    </label>
+                  </section>
 
-                  <button
-                    type="button"
-                    className="checkout-row checkout-row-button"
-                    onClick={() => setShowPaymentSheet(true)}
-                  >
-                    <div className="checkout-row-left">
-                      <span className="checkout-row-title">To'lov</span>
-                      <span className="checkout-row-subtitle">{paymentMethodLabels[selectedPaymentMethod]}</span>
-                    </div>
-                    <ChevronRight size={18} />
-                  </button>
-
-                  <div className="order-summary">
-                    <div className="summary-line">
-                      <span>Mahsulotlar:</span>
-                      <span>{Math.round(subtotal).toLocaleString()} so'm</span>
-                    </div>
-                    {orderType === 'delivery' && (
-                      <div className="summary-line">
-                        <span>Yetkazib berish:</span>
-                        <span>{Math.round(deliveryFee).toLocaleString()} so'm</span>
+                  <section className="checkout-section">
+                    <p className="section-label">To'lov</p>
+                    <button
+                      type="button"
+                      className="checkout-row checkout-row-button"
+                      onClick={() => setShowPaymentSheet(true)}
+                    >
+                      <div className="checkout-row-left">
+                        <span className="checkout-row-title">To'lov</span>
+                        <span className="checkout-row-subtitle">{paymentMethodLabels[selectedPaymentMethod]}</span>
                       </div>
-                    )}
-                <div className="summary-line total">
-                  <span><strong>Jami:</strong></span>
-                  <span><strong>{Math.round(total).toLocaleString()} so'm</strong></span>
-                </div>
-                {orderType === 'delivery' && (
-                  <div className="prepay-hint">
-                    <strong>Yetkazib berish faqat oldindan to'lov bilan.</strong> Kartaga o'tkazishda chekni yuklash majburiy.
-                  </div>
-                )}
-              </div>
+                      <ChevronRight size={18} />
+                    </button>
+
+                    <div className="order-summary">
+                      <div className="summary-line">
+                        <span>Mahsulotlar:</span>
+                        <span>{Math.round(subtotal).toLocaleString()} so'm</span>
+                      </div>
+                      {orderType === 'delivery' && (
+                        <div className="summary-line">
+                          <span>Yetkazib berish:</span>
+                          <span>{Math.round(deliveryFee).toLocaleString()} so'm</span>
+                        </div>
+                      )}
+                      <div className="summary-line total">
+                        <span><strong>Jami:</strong></span>
+                        <span><strong>{Math.round(total).toLocaleString()} so'm</strong></span>
+                      </div>
+                      {orderType === 'delivery' && (
+                        <div className="prepay-hint">
+                          <strong>Yetkazib berish faqat oldindan to'lov bilan.</strong> Kartaga o'tkazishda chekni yuklash majburiy.
+                        </div>
+                      )}
+                    </div>
+                  </section>
                 </>
               )}
 
@@ -901,7 +1003,7 @@ function CartPage({ user }) {
                   {/* Card Transfer UI */}
                   {selectedPaymentMethod === 'card' && paymentCard && (
                     <>
-                      <div className="payment-info">
+                      <div className="payment-info checkout-section">
                         <p className="payment-instruction">
                           Quyidagi kartaga {Math.round(total).toLocaleString()} so'm o'tkazing:
                         </p>
@@ -940,7 +1042,7 @@ function CartPage({ user }) {
                         </div>
                       </div>
 
-                      <div className="upload-section">
+                      <div className="upload-section checkout-section">
                         <p className="upload-label">
                           O'tkazma chekini yuklang (majburiy):
                         </p>
@@ -1025,6 +1127,12 @@ function CartPage({ user }) {
               <>
                 <div className="result-icon success">OK</div>
                 <h2>{orderResult.message || 'Buyurtma qabul qilindi!'}</h2>
+
+                {orderResult.awaitingPayment && (
+                  <div className="payment-status-chip">
+                    To'lov tasdiqlanishini kutyapti (chek yuborildi)
+                  </div>
+                )}
 
                 {/* Payment card info for awaiting payment orders */}
                 {orderResult.awaitingPayment && orderResult.paymentCard && (
@@ -1165,3 +1273,4 @@ function CartPage({ user }) {
 }
 
 export default CartPage
+
