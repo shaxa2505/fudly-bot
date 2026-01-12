@@ -11,6 +11,7 @@ from typing import Any
 from aiogram import F, Router, types
 from aiogram.fsm.context import FSMContext
 from aiogram.utils.keyboard import InlineKeyboardBuilder
+from localization import get_text
 
 try:
     from logging_config import logger
@@ -116,6 +117,11 @@ async def repeat_order(callback: types.CallbackQuery, state: FSMContext) -> None
         store_address = order[10] if len(order) > 10 else ""
 
     added_count = 0
+
+    existing_stores = cart_storage.get_cart_stores(user_id)
+    if existing_stores and store_id not in existing_stores:
+        await callback.answer(get_text(lang, "cart_single_store_only"), show_alert=True)
+        return
 
     if is_cart and cart_items_json:
         # Repeat cart order - add all items

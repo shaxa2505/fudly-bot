@@ -15,7 +15,7 @@ from app.keyboards import offers_category_filter
 from app.services.offer_service import OfferDetails, OfferListItem, OfferService
 from app.templates import offers as offer_templates
 from handlers.common import BrowseOffers
-from handlers.common.utils import is_hot_offers_button
+from handlers.common.utils import is_hot_offers_button, safe_edit_message
 from localization import get_product_categories, get_text, normalize_category
 
 from .browse_helpers import (
@@ -125,6 +125,7 @@ def register_hot(
             offer_service,
             logger,
             edit_message=True,
+            show_entry_back=False,
         )
 
     @dp.callback_query(F.data == "hot_entry_offers")
@@ -160,6 +161,7 @@ def register_hot(
             offer_service,
             logger,
             edit_message=True,
+            show_entry_back=True,
         )
 
     @dp.callback_query(F.data == "hot_entry_stores")
@@ -178,11 +180,49 @@ def register_hot(
 
         city, _, _, _, _ = _extract_location(user)
         await state.set_state(BrowseOffers.store_list)
-        await callback.message.answer(
-            get_text(lang, "browse_by_business_type") + f"\n\n📍 {city}",
-            parse_mode="HTML",
-            reply_markup=business_type_keyboard(lang),
+        text = get_text(lang, "browse_by_business_type") + f"\n\n📍 {city}"
+        keyboard = business_type_keyboard(
+            lang, include_back=True, back_callback="hot_entry_back"
         )
+        if not await safe_edit_message(callback.message, text, reply_markup=keyboard):
+            await callback.message.answer(text, parse_mode="HTML", reply_markup=keyboard)
+        await callback.answer()
+
+    @dp.callback_query(F.data == "hot_entry_back")
+    async def hot_entry_back(callback: types.CallbackQuery, state: FSMContext) -> None:
+        """Return to the mini-menu from offers/stores flows."""
+        if not callback.from_user:
+            await callback.answer()
+            return
+        msg = _callback_message(callback)
+        if not msg:
+            await callback.answer()
+            return
+        user_id = callback.from_user.id
+        lang = db.get_user_language(user_id)
+        user = db.get_user_model(user_id)
+        if not user:
+            await callback.answer(get_text(lang, "error"), show_alert=True)
+            return
+
+        city, _, _, _, _ = _extract_location(user)
+        entry_text = (
+            f"🏪 <b>{get_text(lang, 'hot_offers')}</b>\n\n"
+            f"📍 {city}\n"
+            f"{get_text(lang, 'hot_offers_subtitle')}"
+        )
+
+        await state.clear()
+        if not await safe_edit_message(
+            msg,
+            entry_text,
+            reply_markup=offer_keyboards.hot_entry_keyboard(lang),
+        ):
+            await msg.answer(
+                entry_text,
+                parse_mode="HTML",
+                reply_markup=offer_keyboards.hot_entry_keyboard(lang),
+            )
         await callback.answer()
 
     @dp.message(F.text.contains("Категории") | F.text.contains("Kategoriyalar"))
@@ -673,6 +713,7 @@ def register_hot(
         log: Any,
         page: int = 0,
         edit_message: bool = False,
+        show_entry_back: bool | None = None,
     ) -> None:
         """Send hot offers with compact list and inline buttons."""
         ITEMS_PER_PAGE = 5
@@ -696,10 +737,16 @@ def register_hot(
                 )
                 return
 
+            if show_entry_back is None:
+                state_data = await state.get_data()
+                show_entry_back = bool(state_data.get("hot_entry_back"))
+            show_entry_back = bool(show_entry_back)
+
             await state.set_state(BrowseOffers.offer_list)
             await state.update_data(
                 offer_list=[offer.id for offer in result.items],
                 hot_offers_page=page,
+                hot_entry_back=show_entry_back,
             )
 
             total_pages = (result.total + ITEMS_PER_PAGE - 1) // ITEMS_PER_PAGE
@@ -761,7 +808,11 @@ def register_hot(
 
             # Build keyboard with offer buttons
             keyboard = offer_keyboards.hot_offers_compact_keyboard(
-                lang, result.items, page, total_pages
+                lang,
+                result.items,
+                page,
+                total_pages,
+                show_entry_back=show_entry_back,
             )
 
             if edit_message:

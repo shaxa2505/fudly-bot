@@ -821,6 +821,7 @@ class UnifiedOrderService:
         order_type: str,
         delivery_address: str | None = None,
         payment_method: str = "cash",
+        payment_proof: str | None = None,
         notify_customer: bool = True,
         notify_sellers: bool = True,
         telegram_notify: bool | None = None,
@@ -873,6 +874,30 @@ class UnifiedOrderService:
             )
 
         payment_method = PaymentStatus.normalize_method(payment_method)
+        if is_delivery and payment_method == "cash":
+            return OrderResult(
+                success=False,
+                order_ids=[],
+                booking_ids=[],
+                pickup_codes=[],
+                total_items=0,
+                total_price=0,
+                delivery_price=0,
+                grand_total=0,
+                error_message="Cash is not allowed for delivery orders",
+            )
+        if is_delivery and payment_method == "card" and not payment_proof:
+            return OrderResult(
+                success=False,
+                order_ids=[],
+                booking_ids=[],
+                pickup_codes=[],
+                total_items=0,
+                total_price=0,
+                delivery_price=0,
+                grand_total=0,
+                error_message="Payment proof is required for card delivery orders",
+            )
         # Enforce business invariant: one order must belong to ONE store
         # This protects from mixed-store carts and keeps pricing logic correct.
         store_ids = {item.store_id for item in items}
@@ -898,6 +923,7 @@ class UnifiedOrderService:
         if not PaymentStatus.is_cleared(
             PaymentStatus.initial_for_method(payment_method),
             payment_method=payment_method,
+            payment_proof_photo_id=payment_proof,
         ):
             notify_sellers = False
 
@@ -948,6 +974,20 @@ class UnifiedOrderService:
         total_price = sum(item.price * item.quantity for item in items)
         delivery_price = items[0].delivery_price if is_delivery and items else 0
         grand_total = total_price + delivery_price
+
+        if (
+            is_delivery
+            and payment_proof
+            and order_ids
+            and hasattr(self.db, "update_payment_status")
+        ):
+            for oid in order_ids:
+                try:
+                    self.db.update_payment_status(
+                        int(oid), PaymentStatus.PROOF_SUBMITTED, str(payment_proof)
+                    )
+                except Exception as proof_err:
+                    logger.warning(f"Failed to save payment proof for order {oid}: {proof_err}")
 
         # Get customer info
         customer = (

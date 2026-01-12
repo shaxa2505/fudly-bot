@@ -8,6 +8,7 @@ from aiogram.types import InlineKeyboardMarkup
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
 from app.core.constants import OFFERS_PER_PAGE, STORES_PER_PAGE
+from localization import get_text
 
 
 def hot_entry_keyboard(lang: str) -> InlineKeyboardMarkup:
@@ -27,7 +28,11 @@ def hot_entry_keyboard(lang: str) -> InlineKeyboardMarkup:
 
 
 def hot_offers_compact_keyboard(
-    lang: str, offers: Sequence[Any], page: int, total_pages: int
+    lang: str,
+    offers: Sequence[Any],
+    page: int,
+    total_pages: int,
+    show_entry_back: bool = False,
 ) -> InlineKeyboardMarkup:
     """Compact keyboard for hot offers with item buttons and pagination."""
     builder = InlineKeyboardBuilder()
@@ -75,6 +80,12 @@ def hot_offers_compact_keyboard(
 
     # Combine keyboards
     builder.attach(nav_builder)
+
+    if show_entry_back:
+        back_builder = InlineKeyboardBuilder()
+        back_builder.button(text=get_text(lang, "back"), callback_data="hot_entry_back")
+        back_builder.adjust(1)
+        builder.attach(back_builder)
 
     return builder.as_markup()
 

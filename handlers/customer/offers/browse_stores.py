@@ -12,6 +12,7 @@ from app.keyboards import offers as offer_keyboards
 from app.services.offer_service import OfferDetails, OfferListItem, OfferService
 from app.templates import offers as offer_templates
 from handlers.common import BrowseOffers
+from handlers.common.utils import safe_edit_message
 from localization import get_text
 
 from .browse_helpers import (
@@ -45,7 +46,9 @@ def register_stores(
 
         await message.answer(
             get_text(lang, "choose_category"),  # Reuse existing text key for now
-            reply_markup=business_type_keyboard(lang),
+            reply_markup=business_type_keyboard(
+                lang, include_back=True, back_callback="hot_entry_back"
+            ),
         )
 
     @dp.message(F.text.in_(["🏪 Заведения", "🏪 Muassasalar", "🏪 Места", "🏪 Joylar"]))
@@ -56,7 +59,9 @@ def register_stores(
         await message.answer(
             get_text(lang, "browse_by_business_type"),
             parse_mode="HTML",
-            reply_markup=business_type_keyboard(lang),
+            reply_markup=business_type_keyboard(
+                lang, include_back=True, back_callback="hot_entry_back"
+            ),
         )
 
     @dp.callback_query(F.data.startswith("biztype_"))
@@ -210,7 +215,12 @@ def register_stores(
             else f"🏪 <b>{store.name}</b>\n\n" f"📂 Mahsulot toifasini tanlang:"
         )
 
-        keyboard = offers_category_filter(lang, store_id=store_id)
+        keyboard = offers_category_filter(
+            lang,
+            store_id=store_id,
+            include_back=True,
+            back_callback=f"store_card_back_{store_id}",
+        )
 
         await message.answer(text, parse_mode="HTML", reply_markup=keyboard)
 
@@ -250,7 +260,11 @@ def register_stores(
         await msg.edit_text(
             header,
             parse_mode="HTML",
-            reply_markup=offers_category_filter(lang),
+            reply_markup=offers_category_filter(
+                lang,
+                include_back=True,
+                back_callback=f"store_card_back_{store_id}",
+            ),
         )
         # Do NOT show offers list immediately
 
@@ -316,6 +330,39 @@ def register_stores(
             await msg.answer(text, parse_mode="HTML", reply_markup=keyboard)
         await callback.answer()
 
+    @dp.callback_query(F.data.startswith("store_card_back_"))
+    async def store_card_back(callback: types.CallbackQuery) -> None:
+        """Return to store card from category selection."""
+        if not callback.from_user or not callback.data:
+            await callback.answer()
+            return
+        msg = _callback_message(callback)
+        if not msg:
+            await callback.answer()
+            return
+        lang = db.get_user_language(callback.from_user.id)
+
+        try:
+            store_id = int(callback.data.split("_")[-1])
+        except (ValueError, IndexError) as e:
+            logger.error(f"Invalid store_id in callback data: {callback.data}, error: {e}")
+            await callback.answer(get_text(lang, "error"), show_alert=True)
+            return
+
+        store = offer_service.get_store(store_id)
+        if not store:
+            await callback.answer(get_text(lang, "error"), show_alert=True)
+            return
+
+        text = offer_templates.render_store_card(lang, store)
+        keyboard = offer_keyboards.store_card_keyboard(
+            lang, store_id, store.offers_count, store.ratings_count
+        )
+
+        if not await safe_edit_message(msg, text, reply_markup=keyboard):
+            await msg.answer(text, parse_mode="HTML", reply_markup=keyboard)
+        await callback.answer()
+
     @dp.callback_query(F.data.startswith("store_offers_"))
     async def show_store_offers(callback: types.CallbackQuery, state: FSMContext) -> None:
         if not callback.from_user or not callback.data:
@@ -349,7 +396,12 @@ def register_stores(
             else f"🏪 <b>{store.name}</b>\n\n" f"📂 Mahsulot toifasini tanlang:"
         )
 
-        keyboard = offers_category_filter(lang, store_id=store_id)
+        keyboard = offers_category_filter(
+            lang,
+            store_id=store_id,
+            include_back=True,
+            back_callback=f"store_card_back_{store_id}",
+        )
 
         # Try edit_text first, fallback to edit_caption for photo messages
         try:
@@ -785,7 +837,12 @@ def register_stores(
             else f"🏪 <b>{store.name}</b>\n\n" f"📂 Mahsulot toifasini tanlang:"
         )
 
-        keyboard = offers_category_filter(lang, store_id=store_id)
+        keyboard = offers_category_filter(
+            lang,
+            store_id=store_id,
+            include_back=True,
+            back_callback=f"store_card_back_{store_id}",
+        )
 
         # Try edit_text first, then edit_caption, then send new message
         try:
@@ -812,11 +869,12 @@ def register_stores(
         if not msg:
             await callback.answer()
             return
-        await msg.answer(
-            get_text(lang, "browse_by_business_type"),
-            parse_mode="HTML",
-            reply_markup=business_type_keyboard(lang),
+        text = get_text(lang, "browse_by_business_type")
+        keyboard = business_type_keyboard(
+            lang, include_back=True, back_callback="hot_entry_back"
         )
+        if not await safe_edit_message(msg, text, reply_markup=keyboard):
+            await msg.answer(text, parse_mode="HTML", reply_markup=keyboard)
         await callback.answer()
 
     @dp.callback_query(F.data.startswith("stores_page_"))

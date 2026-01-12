@@ -60,138 +60,61 @@ class OrderMixin:
         delivery_price: int = 0,
         payment_method: str = None,
     ) -> int | None:
-        """Create new order.
+        """Create new order (single-item) using transactional cart flow.
 
-        Args:
-            user_id: Customer user ID
-            store_id: Store ID
-            offer_id: Offer ID
-            quantity: Order quantity
-            order_type: 'pickup' or 'delivery'
-            delivery_address: Delivery address (for delivery orders)
-            delivery_price: Delivery cost
-            payment_method: 'cash' or 'card'
+        Deprecated: prefer UnifiedOrderService.create_order() or create_cart_order().
+        This wrapper now reuses create_cart_order_atomic to ensure stock is checked
+        and reserved in a single transaction.
 
         Returns:
-            order_id if successful, None otherwise
-
-        TODO: This method has no transaction protection and no stock checking!
-        Should use create_cart_order() instead which has atomic stock reservation.
+            order_id if successful, None otherwise.
         """
-        with self.get_connection() as conn:
-            cursor = conn.cursor()
+        order_type_norm = order_type or ("delivery" if delivery_address else "pickup")
+        payment_method_norm = self._normalize_payment_method(payment_method)
 
-            offer = self.get_offer(offer_id)
-            if not offer:
-                logger.error(f"Offer {offer_id} not found for order creation")
-                return None
+        offer = self.get_offer(offer_id)
+        if not offer:
+            logger.error(f"Offer {offer_id} not found for order creation")
+            return None
 
-            discount_price = offer.get("discount_price", 0) if isinstance(offer, dict) else offer[5]
-            total_amount = int((discount_price * quantity) + delivery_price)
+        discount_price = offer.get("discount_price", 0) if isinstance(offer, dict) else offer[5]
+        title = offer.get("title", "") if isinstance(offer, dict) else ""
 
-            # Generate pickup code for pickup orders
-            pickup_code = None
-            if order_type == "pickup":
-                pickup_code = "".join(random.choices(string.ascii_uppercase + string.digits, k=6))
+        cart_items = [
+            {
+                "offer_id": int(offer_id),
+                "quantity": int(quantity),
+                "price": int(discount_price or 0),
+                "title": title,
+            }
+        ]
 
-            payment_method_norm = self._normalize_payment_method(payment_method)
-            payment_status = self._initial_payment_status(payment_method_norm)
+        ok, order_id, _, error_reason = self.create_cart_order_atomic(
+            user_id=user_id,
+            store_id=store_id,
+            cart_items=cart_items,
+            delivery_address=delivery_address if order_type_norm == "delivery" else None,
+            delivery_price=int(delivery_price or 0),
+            payment_method=payment_method_norm,
+            order_type=order_type_norm,
+        )
 
-            try:
-                # Try with pickup_code and order_type columns
-                cursor.execute(
-                    """
-                    INSERT INTO orders (user_id, store_id, offer_id, quantity, delivery_address,
-                                      total_price, payment_method, payment_status, order_status, pickup_code, order_type)
-                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-                    RETURNING order_id
-                    """,
-                    (
-                        user_id,
-                        store_id,
-                        offer_id,
-                        quantity,
-                        delivery_address,
-                        total_amount,
-                        payment_method_norm,
-                        payment_status,
-                        "pending",
-                        pickup_code,
-                        order_type,
-                    ),
-                )
-                result = cursor.fetchone()
-                if result:
-                    order_id = result[0]
-                    logger.info(f"Order {order_id} created by user {user_id} (type={order_type})")
-                    return order_id
-                return None
-            except Exception as e:
-                # Fallback: try without order_type column (for older DB schemas)
-                logger.warning(f"Trying order creation without order_type: {e}")
-                try:
-                    cursor.execute(
-                        """
-                        INSERT INTO orders (user_id, store_id, offer_id, quantity, delivery_address,
-                                          total_price, payment_method, payment_status, order_status, pickup_code)
-                        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-                        RETURNING order_id
-                        """,
-                        (
-                            user_id,
-                            store_id,
-                            offer_id,
-                            quantity,
-                            delivery_address,
-                            total_amount,
-                            payment_method_norm,
-                            payment_status,
-                            "pending",
-                            pickup_code,
-                        ),
-                    )
-                    result = cursor.fetchone()
-                    if result:
-                        order_id = result[0]
-                        logger.info(
-                            f"Order {order_id} created (fallback) by user {user_id} (type={order_type})"
-                        )
-                        return order_id
-                    return None
-                except Exception as e2:
-                    # Fallback: try without pickup_code column (for oldest DB schemas)
-                    logger.warning(f"Trying order creation without pickup_code: {e2}")
-                    try:
-                        cursor.execute(
-                            """
-                            INSERT INTO orders (user_id, store_id, offer_id, quantity, delivery_address,
-                                              total_price, payment_method, payment_status, order_status)
-                            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
-                            RETURNING order_id
-                            """,
-                            (
-                                user_id,
-                                store_id,
-                                offer_id,
-                                quantity,
-                                delivery_address,
-                                total_amount,
-                                payment_method_norm,
-                                payment_status,
-                                "pending",
-                            ),
-                        )
-                        result = cursor.fetchone()
-                        if result:
-                            order_id = result[0]
-                            logger.info(
-                                f"Order {order_id} created (oldest fallback) by user {user_id}"
-                            )
-                            return order_id
-                        return None
-                    except Exception as e3:
-                        logger.error(f"Failed to create order (all methods): {e3}")
-                        return None
+        if ok and order_id:
+            logger.info(
+                "Order %s created via transactional wrapper (type=%s, user=%s)",
+                order_id,
+                order_type_norm,
+                user_id,
+            )
+            return int(order_id)
+
+        logger.error(
+            "Failed to create order via transactional wrapper (offer=%s, user=%s, reason=%s)",
+            offer_id,
+            user_id,
+            error_reason,
+        )
+        return None
 
     def create_cart_order(
         self,

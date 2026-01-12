@@ -56,6 +56,7 @@ function CartPage({ user }) {
   const [checkoutStep, setCheckoutStep] = useState('details') // 'details' | 'payment'
   const [paymentCard, setPaymentCard] = useState(null)
   const [paymentProof, setPaymentProof] = useState(null)
+  const [paymentProofData, setPaymentProofData] = useState(null)
   const [paymentProofPreview, setPaymentProofPreview] = useState(null)
   const [createdOrderId, setCreatedOrderId] = useState(null)
   const [paymentProviders, setPaymentProviders] = useState([])
@@ -170,6 +171,7 @@ function CartPage({ user }) {
 
   const clearPaymentProof = () => {
     setPaymentProof(null)
+    setPaymentProofData(null)
     setPaymentProofPreview(null)
     if (paymentProofInputRef.current) {
       paymentProofInputRef.current.value = ''
@@ -305,6 +307,7 @@ function CartPage({ user }) {
     const reader = new FileReader()
     reader.onloadend = () => {
       setPaymentProofPreview(reader.result)
+      setPaymentProofData(reader.result)
     }
     reader.readAsDataURL(file)
   }, [])
@@ -446,6 +449,10 @@ function CartPage({ user }) {
         order_type: orderType,
         delivery_fee: orderType === 'delivery' ? deliveryFee : 0,
         payment_method: selectedPaymentMethod,
+        payment_proof:
+          orderType === 'delivery' && selectedPaymentMethod === 'card' && paymentProofData
+            ? paymentProofData
+            : undefined,
       }
 
       localStorage.setItem('fudly_phone', resolvedPhone)
@@ -462,7 +469,7 @@ function CartPage({ user }) {
       setCreatedOrderId(orderId)
 
       let paymentProofUploaded = false
-      if (selectedPaymentMethod === 'card' && paymentProof && orderId) {
+      if (selectedPaymentMethod === 'card' && paymentProof && orderId && !paymentProofData) {
         try {
           await api.uploadPaymentProof(orderId, paymentProof)
           paymentProofUploaded = true
@@ -875,11 +882,16 @@ function CartPage({ user }) {
                         <span>{Math.round(deliveryFee).toLocaleString()} so'm</span>
                       </div>
                     )}
-                    <div className="summary-line total">
-                      <span><strong>Jami:</strong></span>
-                      <span><strong>{Math.round(total).toLocaleString()} so'm</strong></span>
-                    </div>
+                <div className="summary-line total">
+                  <span><strong>Jami:</strong></span>
+                  <span><strong>{Math.round(total).toLocaleString()} so'm</strong></span>
+                </div>
+                {orderType === 'delivery' && (
+                  <div className="prepay-hint">
+                    <strong>Yetkazib berish faqat oldindan to'lov bilan.</strong> Kartaga o'tkazishda chekni yuklash majburiy.
                   </div>
+                )}
+              </div>
                 </>
               )}
 
@@ -929,7 +941,9 @@ function CartPage({ user }) {
                       </div>
 
                       <div className="upload-section">
-                        <p className="upload-label">O'tkazma chekini yuklang:</p>
+                        <p className="upload-label">
+                          O'tkazma chekini yuklang (majburiy):
+                        </p>
 
                         <div className="upload-area">
                           <button

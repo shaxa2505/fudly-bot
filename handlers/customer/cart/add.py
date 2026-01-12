@@ -289,7 +289,13 @@ def register(router: Router) -> None:
         offer_unit = str(data.get("offer_unit", "шт"))
         expiry_date = str(data.get("expiry_date", ""))
 
-        cart_storage.add_item(
+        # Enforce single-store cart at add time
+        existing_stores = cart_storage.get_cart_stores(user_id)
+        if existing_stores and store_id is not None and store_id not in existing_stores:
+            await callback.answer(get_text(lang, "cart_single_store_only"), show_alert=True)
+            return
+
+        added = cart_storage.add_item(
             user_id=user_id,
             offer_id=offer_id,
             store_id=store_id,
@@ -306,6 +312,9 @@ def register(router: Router) -> None:
             delivery_enabled=delivery_enabled,
             delivery_price=delivery_price,
         )
+        if not added:
+            await callback.answer(get_text(lang, "cart_single_store_only"), show_alert=True)
+            return
 
         cart_count = cart_storage.get_cart_count(user_id)
 

@@ -150,7 +150,11 @@ def booking_rating_keyboard(booking_id: int, lang: str = "ru") -> InlineKeyboard
     return builder.as_markup()
 
 
-def business_type_keyboard(lang: str = "ru") -> InlineKeyboardMarkup:
+def business_type_keyboard(
+    lang: str = "ru",
+    include_back: bool = False,
+    back_callback: str = "hot_entry_back",
+) -> InlineKeyboardMarkup:
     """Business type selection keyboard."""
     builder = InlineKeyboardBuilder()
     builder.button(text=get_text(lang, "supermarkets"), callback_data="biztype_supermarket")
@@ -158,7 +162,11 @@ def business_type_keyboard(lang: str = "ru") -> InlineKeyboardMarkup:
     builder.button(text=get_text(lang, "bakeries"), callback_data="biztype_bakery")
     builder.button(text=get_text(lang, "cafes"), callback_data="biztype_cafe")
     builder.button(text=get_text(lang, "pharmacies"), callback_data="biztype_pharmacy")
-    builder.adjust(2)
+    if include_back:
+        builder.button(text=get_text(lang, "back"), callback_data=back_callback)
+        builder.adjust(2, 2, 1, 1)
+    else:
+        builder.adjust(2)
     return builder.as_markup()
 
 
@@ -199,7 +207,12 @@ def stores_list_keyboard(stores, lang: str = "ru") -> InlineKeyboardMarkup:
     return builder.as_markup()
 
 
-def offers_category_filter(lang: str = "ru", store_id: int | None = None) -> InlineKeyboardMarkup:
+def offers_category_filter(
+    lang: str = "ru",
+    store_id: int | None = None,
+    include_back: bool = False,
+    back_callback: str | None = None,
+) -> InlineKeyboardMarkup:
     """Inline keyboard with offer category filters.
 
     Args:
@@ -242,5 +255,11 @@ def offers_category_filter(lang: str = "ru", store_id: int | None = None) -> Inl
         builder.button(text=f"{emoji} {category}", callback_data=callback_data)
 
     # Раскладка: 1 кнопка "Все", затем по 2 категории в ряд
-    builder.adjust(1, 2, 2, 2, 2)
+    if include_back:
+        builder.button(text=get_text(lang, "back"), callback_data=back_callback or "hot_entry_back")
+
+    rows = [1, 2, 2, 2, 2]
+    if include_back:
+        rows.append(1)
+    builder.adjust(*rows)
     return builder.as_markup()

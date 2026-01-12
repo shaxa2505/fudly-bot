@@ -792,6 +792,11 @@ async def create_webhook_app(
             # Support both address and delivery_address field names
             address = data.get("delivery_address") or data.get("address", "")
             notes = data.get("notes") or data.get("comment", "")
+            payment_proof = (
+                data.get("payment_proof")
+                or data.get("payment_proof_photo_id")
+                or data.get("payment_screenshot")
+            )
 
             if not items:
                 return add_cors_headers(
@@ -799,6 +804,29 @@ async def create_webhook_app(
                 )
 
             is_delivery = delivery_type == "delivery"
+            payment_method = data.get("payment_method")
+            if not payment_method:
+                payment_method = "card" if is_delivery else "cash"
+            payment_method = PaymentStatus.normalize_method(payment_method)
+
+            if is_delivery and (not address or not str(address).strip()):
+                return add_cors_headers(
+                    web.json_response({"error": "Delivery address required"}, status=400)
+                )
+            if is_delivery and payment_method == "cash":
+                return add_cors_headers(
+                    web.json_response(
+                        {"error": "Cash is not allowed for delivery orders"},
+                        status=400,
+                    )
+                )
+            if is_delivery and payment_method == "card" and not payment_proof:
+                return add_cors_headers(
+                    web.json_response(
+                        {"error": "payment_proof is required for card delivery orders"},
+                        status=400,
+                    )
+                )
 
             # Try unified order service first
             created_bookings: list[dict[str, Any]] = []
@@ -849,24 +877,13 @@ async def create_webhook_app(
                     )
 
                 try:
-                    payment_method = data.get("payment_method")
-                    if not payment_method:
-                        payment_method = "card" if is_delivery else "cash"
-                    payment_method = str(payment_method).strip().lower()
-                    if is_delivery and payment_method == "cash":
-                        return add_cors_headers(
-                            web.json_response(
-                                {"error": "Cash is not allowed for delivery orders"},
-                                status=400,
-                            )
-                        )
-
                     result: OrderResult = await order_service.create_order(
                         user_id=int(user_id),
                         items=order_items,
                         order_type="delivery" if is_delivery else "pickup",
                         delivery_address=address if is_delivery else None,
                         payment_method=payment_method,
+                        payment_proof=str(payment_proof) if payment_proof else None,
                         notify_customer=True,
                         notify_sellers=True,
                         telegram_notify=True,
@@ -899,9 +916,23 @@ async def create_webhook_app(
                         )
 
                     initial_payment_status = PaymentStatus.initial_for_method(payment_method)
-                    awaiting_payment = initial_payment_status in (
+                    resolved_payment_status = initial_payment_status
+                    if payment_proof and result.order_ids and hasattr(db, "update_payment_status"):
+                        try:
+                            for order_id in result.order_ids:
+                                db.update_payment_status(
+                                    int(order_id),
+                                    PaymentStatus.PROOF_SUBMITTED,
+                                    str(payment_proof),
+                                )
+                            resolved_payment_status = PaymentStatus.PROOF_SUBMITTED
+                        except Exception as proof_err:
+                            logger.warning(f"Failed to attach payment_proof to orders: {proof_err}")
+
+                    awaiting_payment = resolved_payment_status in (
                         PaymentStatus.AWAITING_PAYMENT,
                         PaymentStatus.AWAITING_PROOF,
+                        PaymentStatus.PROOF_SUBMITTED,
                     )
 
                     payment_card_info = None
@@ -931,7 +962,7 @@ async def create_webhook_app(
                         "pickup_code": pickup_code,
                         "pickup_codes": result.pickup_codes,
                         "payment_method": payment_method,
-                        "payment_status": initial_payment_status,
+                        "payment_status": resolved_payment_status,
                         "awaiting_payment": awaiting_payment,
                         "payment_card": payment_card_info,
                         "bookings": created_bookings,
@@ -947,18 +978,6 @@ async def create_webhook_app(
                 and order_items
                 and hasattr(db, "create_cart_order")
             ):
-                payment_method = data.get("payment_method")
-                if not payment_method:
-                    payment_method = "card" if is_delivery else "cash"
-                payment_method = str(payment_method).strip().lower()
-                if is_delivery and payment_method == "cash":
-                    return add_cors_headers(
-                        web.json_response(
-                            {"error": "Cash is not allowed for delivery orders"},
-                            status=400,
-                        )
-                    )
-
                 db_items = [
                     {
                         "offer_id": int(i.offer_id),
@@ -1008,6 +1027,7 @@ async def create_webhook_app(
                         order_type="delivery" if is_delivery else "pickup",
                         delivery_address=address if is_delivery else None,
                         payment_method=payment_method,
+                        payment_proof=str(payment_proof) if payment_proof else None,
                         notify_customer=True,
                         notify_sellers=True,
                         telegram_notify=True,

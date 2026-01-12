@@ -140,12 +140,28 @@ class CartStorage:
         expiry_date: str = "",
         delivery_enabled: bool = False,
         delivery_price: int = 0,
-    ) -> CartItem:
-        """Add item to cart or update quantity if exists."""
+    ) -> CartItem | None:
+        """
+        Add item to cart or update quantity if exists.
+
+        Returns None if cart already contains items from a different store
+        to enforce single-store carts.
+        """
         self._touch(user_id)
 
         if user_id not in self._carts:
             self._carts[user_id] = []
+
+        # Enforce single-store cart: reject items from another store
+        existing_stores = {item.store_id for item in self._carts[user_id]}
+        if existing_stores and store_id not in existing_stores:
+            logger.info(
+                "Rejected add_item: mixed stores not allowed (existing=%s, new=%s, user=%s)",
+                existing_stores,
+                store_id,
+                user_id,
+            )
+            return None
 
         # Check if item already in cart
         for item in self._carts[user_id]:
