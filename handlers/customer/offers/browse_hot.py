@@ -87,20 +87,6 @@ def register_hot(
             reply_markup=offer_keyboards.hot_entry_keyboard(lang),
         )
 
-        await _send_hot_offers_list(
-            message,
-            state,
-            lang,
-            city,
-            search_city,
-            search_region,
-            search_district,
-            latitude,
-            longitude,
-            offer_service,
-            logger,
-        )
-
     @dp.callback_query(F.data == "hot_offers")
     async def hot_offers_callback(callback: types.CallbackQuery, state: FSMContext) -> None:
         """Handle hot offers inline button (e.g., from cart empty state)."""
@@ -138,6 +124,7 @@ def register_hot(
             longitude,
             offer_service,
             logger,
+            edit_message=True,
         )
 
     @dp.callback_query(F.data == "hot_entry_offers")
@@ -172,6 +159,7 @@ def register_hot(
             longitude,
             offer_service,
             logger,
+            edit_message=True,
         )
 
     @dp.callback_query(F.data == "hot_entry_stores")
@@ -437,40 +425,34 @@ def register_hot(
             lang, offer_id, offer.store_id, delivery_enabled
         )
 
-        # Send offer card - handle photo vs text properly to avoid duplicates
-        msg_deleted = False
+        # Send offer card - prefer editing, but avoid удаление исходного сообщения
         if offer.photo:
-            # Photo messages require delete + send (can't edit to photo)
-            try:
-                await msg.delete()
-                msg_deleted = True
-            except Exception:
-                pass
+            # If original is a photo, try to edit caption; otherwise send a new photo message
+            if getattr(msg, "photo", None):
+                try:
+                    await msg.edit_caption(
+                        caption=text, parse_mode="HTML", reply_markup=kb
+                    )
+                    await callback.answer()
+                    return
+                except Exception:
+                    pass
             try:
                 await msg.answer_photo(
                     photo=offer.photo, caption=text, parse_mode="HTML", reply_markup=kb
                 )
                 await callback.answer()
-                return  # Success - exit early
+                return
             except Exception:
-                # Photo failed - will fallback to text below
                 pass
         else:
-            # Text only - try to edit in place
             try:
                 await msg.edit_text(text, parse_mode="HTML", reply_markup=kb)
                 await callback.answer()
-                return  # Success - exit early
+                return
             except Exception:
-                # Edit failed - will fallback to delete + send
                 pass
 
-        # Fallback: send as text message (only if we haven't succeeded above)
-        if not msg_deleted:
-            try:
-                await msg.delete()
-            except Exception:
-                pass
         await msg.answer(text, parse_mode="HTML", reply_markup=kb)
         await callback.answer()
 
@@ -656,12 +638,6 @@ def register_hot(
         data = await state.get_data()
         last_page = data.get("last_hot_page", 0)
 
-        # Delete current message (may have photo) and send list
-        try:
-            await msg.delete()
-        except Exception:
-            pass
-
         await _send_hot_offers_list(
             msg,
             state,
@@ -675,7 +651,7 @@ def register_hot(
             offer_service,
             logger,
             page=last_page,
-            edit_message=False,  # Already deleted, send new
+            edit_message=True,
         )
         await callback.answer()
 
@@ -825,6 +801,15 @@ def register_hot(
                 lang, offer.id, offer.store_id, store.delivery_enabled if store else False
             )
         if offer.photo:
+            # Try editing caption if original is photo, otherwise send new photo
+            if getattr(message, "photo", None):
+                try:
+                    await message.edit_caption(
+                        caption=text, parse_mode="HTML", reply_markup=keyboard
+                    )
+                    return
+                except Exception:
+                    pass
             try:
                 await message.answer_photo(
                     photo=offer.photo,
@@ -835,7 +820,10 @@ def register_hot(
                 return
             except Exception:  # pragma: no cover - fallback to text only
                 pass
-        await message.answer(text, parse_mode="HTML", reply_markup=keyboard)
+        try:
+            await message.edit_text(text, parse_mode="HTML", reply_markup=keyboard)
+        except Exception:
+            await message.answer(text, parse_mode="HTML", reply_markup=keyboard)
 
     async def _send_offer_details_edit(
         message: types.Message,
@@ -915,12 +903,18 @@ def register_hot(
             lang, offer.id, offer.store_id, store.delivery_enabled if store else False
         )
 
-        # If offer has photo, need to delete old message and send photo
+        # If offer has photo, prefer editing caption or sending new photo without deleting
         if offer.photo:
-            try:
-                await message.delete()
-            except Exception:
-                pass
+            if getattr(message, "photo", None):
+                try:
+                    await message.edit_caption(
+                        caption=text,
+                        parse_mode="HTML",
+                        reply_markup=keyboard,
+                    )
+                    return
+                except Exception:
+                    pass
             try:
                 await message.answer_photo(
                     photo=offer.photo,

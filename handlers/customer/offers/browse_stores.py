@@ -434,12 +434,6 @@ def register_stores(
             )
             return
 
-        # Delete current message and send new compact list
-        try:
-            await msg.delete()
-        except Exception:
-            pass
-
         await _send_store_offers_list(
             msg,
             state,
@@ -447,7 +441,7 @@ def register_stores(
             store,
             offers,
             page=0,
-            edit_message=False,
+            edit_message=True,
             category=category,
         )
         await callback.answer()
@@ -645,15 +639,17 @@ def register_stores(
             await callback.answer()
             return
 
-        # Send offer card - handle photo vs text properly to avoid duplicates
-        msg_deleted = False
+        # Send offer card - avoid deleting the original list message
         if getattr(offer, "photo", None):
-            # Photo messages require delete + send (can't edit to photo)
-            try:
-                await msg.delete()
-                msg_deleted = True
-            except Exception:
-                pass
+            if getattr(msg, "photo", None):
+                try:
+                    await msg.edit_caption(
+                        caption=text, parse_mode="HTML", reply_markup=kb
+                    )
+                    await callback.answer()
+                    return
+                except Exception:
+                    pass
             try:
                 await msg.answer_photo(
                     photo=offer.photo,
@@ -662,26 +658,17 @@ def register_stores(
                     reply_markup=kb,
                 )
                 await callback.answer()
-                return  # Success - exit early
+                return
             except Exception:
-                # Photo failed - will fallback to text below
                 pass
         else:
-            # Text only - try to edit in place
             try:
                 await msg.edit_text(text, parse_mode="HTML", reply_markup=kb)
                 await callback.answer()
-                return  # Success - exit early
+                return
             except Exception:
-                # Edit failed - will fallback to delete + send
                 pass
 
-        # Fallback: send as text message (only if we haven't succeeded above)
-        if not msg_deleted:
-            try:
-                await msg.delete()
-            except Exception:
-                pass
         await msg.answer(text, parse_mode="HTML", reply_markup=kb)
         await callback.answer()
 
