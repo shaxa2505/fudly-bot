@@ -395,7 +395,7 @@ def register_stores(
             await msg.answer(text, parse_mode="HTML", reply_markup=keyboard)
         await callback.answer()
 
-    @dp.callback_query(F.data.startswith("store_offers_"))
+    @dp.callback_query(F.data.regexp(r"^store_offers_\d+$"))
     async def show_store_offers(callback: types.CallbackQuery, state: FSMContext) -> None:
         if not callback.from_user or not callback.data:
             await callback.answer()
@@ -881,7 +881,7 @@ def register_stores(
         await msg.answer(text, parse_mode="HTML", reply_markup=keyboard)
         await callback.answer()
 
-    @dp.callback_query(F.data.startswith("back_to_store_"))
+    @dp.callback_query(F.data.regexp(r"^back_to_store_\d+$"))
     async def back_to_store_card(callback: types.CallbackQuery) -> None:
         """Return to store - show categories instead of card."""
         if not callback.from_user or not callback.data:
