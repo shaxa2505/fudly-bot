@@ -154,7 +154,7 @@ function CartPage({ user }) {
     : 'Mavjud emas'
   const minOrderLabel = storeDeliveryEnabled && minOrderAmount > 0
     ? `${Math.round(minOrderAmount).toLocaleString()} so'm`
-    : '—'
+    : '-'
   const paymentMethodLabels = {
     cash: 'Naqd',
     card: 'Kartaga o\'tkazish',

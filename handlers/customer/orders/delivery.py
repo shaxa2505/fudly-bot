@@ -1133,19 +1133,24 @@ async def dlv_payment_proof(
         kb.button(text="❌ Rad etish", callback_data=f"admin_reject_payment_{order_id}")
         kb.adjust(2)
 
+        items_text = f"• {esc(title)} × {quantity}"
+        admin_caption = NotificationTemplates.admin_payment_review(
+            lang=lang,
+            order_id=order_id,
+            store_name=store_name,
+            items_text=items_text,
+            total_with_delivery=total,
+            currency=currency,
+            address=address,
+            customer_name=message.from_user.first_name,
+            customer_phone=customer_phone,
+        )
+
         try:
             await bot.send_photo(
                 chat_id=ADMIN_ID,
                 photo=photo_id,
-                caption=(
-                    f"💳 <b>Yangi chek!</b>\n\n"
-                    f"📦 #{order_id} | {store_name}\n"
-                    f"🛒 {title} × {quantity}\n"
-                    f"💵 {total:,} {currency}\n"
-                    f"📍 {address}\n"
-                    f"👤 {message.from_user.first_name}\n"
-                    f"📱 <code>{customer_phone}</code>"
-                ),
+                caption=admin_caption,
                 parse_mode="HTML",
                 reply_markup=kb.as_markup(),
             )

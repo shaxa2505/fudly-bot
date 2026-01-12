@@ -240,6 +240,43 @@ class NotificationTemplates:
         return "💳 Онлайн оплата"
 
     @staticmethod
+    def admin_payment_review(
+        lang: str,
+        order_id: int,
+        store_name: str,
+        items_text: str,
+        total_with_delivery: int,
+        currency: str,
+        address: str,
+        customer_name: str,
+        customer_phone: str,
+    ) -> str:
+        """Build admin caption for payment proof review."""
+        if lang == "uz":
+            lines = [
+                "💳 <b>To'lovni tasdiqlash</b>",
+                "",
+                f"🧾 Buyurtma: #{order_id} | {store_name}",
+                f"📦 Mahsulotlar:\n{items_text}",
+                f"💰 Jami: {total_with_delivery:,} {currency}",
+                f"📍 Manzil: {address}",
+                f"🙋‍♂️ Mijoz: {customer_name}",
+                f"📞 <code>{customer_phone}</code>",
+            ]
+        else:
+            lines = [
+                "💳 <b>Проверка оплаты</b>",
+                "",
+                f"🧾 Заказ: #{order_id} | {store_name}",
+                f"📦 Товары:\n{items_text}",
+                f"💰 Итог: {total_with_delivery:,} {currency}",
+                f"📍 Адрес: {address}",
+                f"🙋‍♂️ Клиент: {customer_name}",
+                f"📞 <code>{customer_phone}</code>",
+            ]
+        return "\n".join(lines)
+
+    @staticmethod
     def seller_new_order(
         lang: str,
         order_ids: list[str],

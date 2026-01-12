@@ -15,7 +15,7 @@ from app.keyboards import offers_category_filter
 from app.services.offer_service import OfferDetails, OfferListItem, OfferService
 from app.templates import offers as offer_templates
 from handlers.common import BrowseOffers
-from handlers.common.utils import is_hot_offers_button, safe_edit_message
+from handlers.common.utils import is_hot_offers_button, safe_delete_message, safe_edit_message
 from localization import get_product_categories, get_text, normalize_category
 
 from .browse_helpers import (
@@ -465,33 +465,21 @@ def register_hot(
             lang, offer_id, offer.store_id, delivery_enabled
         )
 
-        # Send offer card - prefer editing, but avoid удаление исходного сообщения
+        # Send offer card - keep one active message
         if offer.photo:
-            # If original is a photo, try to edit caption; otherwise send a new photo message
-            if getattr(msg, "photo", None):
-                try:
-                    await msg.edit_caption(
-                        caption=text, parse_mode="HTML", reply_markup=kb
-                    )
-                    await callback.answer()
-                    return
-                except Exception:
-                    pass
             try:
                 await msg.answer_photo(
                     photo=offer.photo, caption=text, parse_mode="HTML", reply_markup=kb
                 )
+                await safe_delete_message(msg)
                 await callback.answer()
                 return
             except Exception:
                 pass
-        else:
-            try:
-                await msg.edit_text(text, parse_mode="HTML", reply_markup=kb)
-                await callback.answer()
-                return
-            except Exception:
-                pass
+
+        if await safe_edit_message(msg, text, reply_markup=kb):
+            await callback.answer()
+            return
 
         await msg.answer(text, parse_mode="HTML", reply_markup=kb)
         await callback.answer()
@@ -551,15 +539,12 @@ def register_hot(
                 last_store_category=category,
                 source="store",
             )
-            back_cb = f"back_to_store_{store_id}"
-            back_text = "◀️ К магазину" if lang == "ru" else "◀️ Do'konga"
             await _send_offer_details(
                 message,
                 details,
                 lang,
                 with_back=True,
-                back_callback=back_cb,
-                back_text=back_text,
+                back_callback=f"back_to_store_offers_{store_id}",
             )
             return
 
@@ -678,21 +663,39 @@ def register_hot(
         data = await state.get_data()
         last_page = data.get("last_hot_page", 0)
 
-        await _send_hot_offers_list(
-            msg,
-            state,
-            lang,
-            city,
-            search_city,
-            search_region,
-            search_district,
-            latitude,
-            longitude,
-            offer_service,
-            logger,
-            page=last_page,
-            edit_message=True,
-        )
+        if getattr(msg, "photo", None):
+            await safe_delete_message(msg)
+            await _send_hot_offers_list(
+                msg,
+                state,
+                lang,
+                city,
+                search_city,
+                search_region,
+                search_district,
+                latitude,
+                longitude,
+                offer_service,
+                logger,
+                page=last_page,
+                edit_message=False,
+            )
+        else:
+            await _send_hot_offers_list(
+                msg,
+                state,
+                lang,
+                city,
+                search_city,
+                search_region,
+                search_district,
+                latitude,
+                longitude,
+                offer_service,
+                logger,
+                page=last_page,
+                edit_message=True,
+            )
         await callback.answer()
 
     # ------------------------------------------------------------------

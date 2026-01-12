@@ -6,6 +6,7 @@ from aiogram.utils.keyboard import InlineKeyboardBuilder
 
 from app.keyboards import main_menu_customer
 from app.services.unified_order_service import (
+    NotificationTemplates,
     OrderItem,
     OrderResult,
     get_unified_order_service,
@@ -226,17 +227,28 @@ def register(router: Router) -> None:
         if not notifications_enabled:
             order_ids = [str(oid) for oid in result.order_ids if oid]
             pickup_codes = [code for code in result.pickup_codes if code]
+            items_for_template = [
+                {"title": i.title, "price": i.price, "quantity": i.quantity} for i in order_items
+            ]
+            store_name = order_items[0].store_name if order_items else ""
+            store_address = order_items[0].store_address if order_items else ""
+            currency = "so'm" if lang == "uz" else "сум"
 
-            lines: list[str] = [get_text(lang, "cart_order_created_title")]
-            if order_ids:
-                lines.append(get_text(lang, "cart_order_created_ids", ids=", ".join(order_ids)))
-            if pickup_codes:
-                lines.append(
-                    get_text(lang, "cart_order_created_codes", codes=", ".join(pickup_codes))
-                )
-            lines.append(get_text(lang, "cart_order_created_menu_hint"))
-
-            text = "\n".join(lines)
+            text = NotificationTemplates.customer_order_created(
+                lang=lang,
+                order_ids=order_ids,
+                pickup_codes=pickup_codes,
+                items=items_for_template,
+                order_type="pickup",
+                delivery_address=None,
+                payment_method="cash",
+                store_name=store_name,
+                store_address=store_address,
+                total=int(result.total_price) if hasattr(result, "total_price") else total,
+                delivery_price=0,
+                currency=currency,
+            )
+            text += "\n\n" + get_text(lang, "cart_order_created_menu_hint")
 
             try:
                 await callback.message.answer(text, parse_mode="HTML")

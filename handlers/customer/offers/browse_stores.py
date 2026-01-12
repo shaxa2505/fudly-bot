@@ -12,7 +12,7 @@ from app.keyboards import offers as offer_keyboards
 from app.services.offer_service import OfferDetails, OfferListItem, OfferService
 from app.templates import offers as offer_templates
 from handlers.common import BrowseOffers
-from handlers.common.utils import safe_edit_message
+from handlers.common.utils import safe_delete_message, safe_edit_message
 from localization import get_text
 
 from .browse_helpers import (
@@ -111,7 +111,9 @@ def register_stores(
         await state.set_state(BrowseOffers.store_list)
         # Save store list and business type for pagination
         await state.update_data(
-            store_list=[store.id for store in stores], current_business_type=business_type
+            store_list=[store.id for store in stores],
+            current_business_type=business_type,
+            store_list_page=0,
         )
         text = offer_templates.render_business_type_store_list(lang, business_type, city, stores)
         # Compact keyboard with pagination
@@ -137,7 +139,7 @@ def register_stores(
             await callback.answer(get_text(lang, "error"), show_alert=True)
             return
 
-        await state.clear()
+        await state.set_state(None)
 
         # Get store info and show full card
         store = offer_service.get_store(store_id)
@@ -151,7 +153,11 @@ def register_stores(
         # Render full store card
         text = offer_templates.render_store_card(lang, store)
         keyboard = offer_keyboards.store_card_keyboard(
-            lang, store_id, store.offers_count, store.ratings_count
+            lang,
+            store_id,
+            store.offers_count,
+            store.ratings_count,
+            back_callback="back_to_store_list",
         )
 
         # Try to get photo from raw store data
@@ -168,12 +174,14 @@ def register_stores(
                 await msg.answer_photo(
                     photo=photo, caption=text, parse_mode="HTML", reply_markup=keyboard
                 )
+                await safe_delete_message(msg)
                 await callback.answer()
                 return
             except Exception:
                 pass
 
-        await msg.edit_text(text, parse_mode="HTML", reply_markup=keyboard)
+        if not await safe_edit_message(msg, text, reply_markup=keyboard):
+            await msg.answer(text, parse_mode="HTML", reply_markup=keyboard)
         await callback.answer()
 
     @dp.message(BrowseOffers.store_list, F.text.regexp(r"^\d+$"))
@@ -200,7 +208,7 @@ def register_stores(
             await message.answer(_range_text(lang, len(store_list), "магазина"))
             return
         store_id = store_list[number - 1]
-        await state.clear()
+        await state.set_state(None)
 
         # Get store info
         store = offer_service.get_store(store_id)
@@ -299,7 +307,11 @@ def register_stores(
         # Render full store card with all details
         text = offer_templates.render_store_card(lang, store)
         keyboard = offer_keyboards.store_card_keyboard(
-            lang, store_id, store.offers_count, store.ratings_count
+            lang,
+            store_id,
+            store.offers_count,
+            store.ratings_count,
+            back_callback="back_to_store_list",
         )
 
         # Try to get photo from raw store data
@@ -317,16 +329,14 @@ def register_stores(
                 await msg.answer_photo(
                     photo=photo, caption=text, parse_mode="HTML", reply_markup=keyboard
                 )
+                await safe_delete_message(msg)
                 await callback.answer()
                 return
             except Exception:
                 # Fall back to text if photo fails
                 pass
 
-        # Try to edit existing message or send new one
-        try:
-            await msg.edit_text(text, parse_mode="HTML", reply_markup=keyboard)
-        except Exception:
+        if not await safe_edit_message(msg, text, reply_markup=keyboard):
             await msg.answer(text, parse_mode="HTML", reply_markup=keyboard)
         await callback.answer()
 
@@ -356,8 +366,30 @@ def register_stores(
 
         text = offer_templates.render_store_card(lang, store)
         keyboard = offer_keyboards.store_card_keyboard(
-            lang, store_id, store.offers_count, store.ratings_count
+            lang,
+            store_id,
+            store.offers_count,
+            store.ratings_count,
+            back_callback="back_to_store_list",
         )
+        photo = None
+        try:
+            raw_store = db.get_store(store_id) if db else None
+            if isinstance(raw_store, dict):
+                photo = raw_store.get("photo") or raw_store.get("photo_id")
+        except Exception:
+            photo = None
+
+        if photo:
+            try:
+                await msg.answer_photo(
+                    photo=photo, caption=text, parse_mode="HTML", reply_markup=keyboard
+                )
+                await safe_delete_message(msg)
+                await callback.answer()
+                return
+            except Exception:
+                pass
 
         if not await safe_edit_message(msg, text, reply_markup=keyboard):
             await msg.answer(text, parse_mode="HTML", reply_markup=keyboard)
@@ -403,19 +435,14 @@ def register_stores(
             back_callback=f"store_card_back_{store_id}",
         )
 
-        # Try edit_text first, fallback to edit_caption for photo messages
-        try:
-            await msg.edit_text(text, parse_mode="HTML", reply_markup=keyboard)
-        except Exception:
-            try:
-                await msg.edit_caption(caption=text, parse_mode="HTML", reply_markup=keyboard)
-            except Exception:
-                # If both fail, delete old message and send new one
-                try:
-                    await msg.delete()
-                except Exception:
-                    pass
-                await callback.message.answer(text, parse_mode="HTML", reply_markup=keyboard)
+        if getattr(msg, "photo", None):
+            await safe_delete_message(msg)
+            await msg.answer(text, parse_mode="HTML", reply_markup=keyboard)
+            await callback.answer()
+            return
+
+        if not await safe_edit_message(msg, text, reply_markup=keyboard):
+            await msg.answer(text, parse_mode="HTML", reply_markup=keyboard)
         await callback.answer()
 
     @dp.callback_query(F.data.startswith("store_cat_"))
@@ -673,16 +700,13 @@ def register_stores(
 
         text = "\n".join(lines)
 
-        back_text = "◀️ К магазину" if lang == "ru" else "◀️ Do'konga"
-
         # Use cart keyboard
         kb = offer_keyboards.offer_details_with_back_keyboard(
             lang,
             offer_id,
             offer.store_id,
             delivery_enabled,
-            back_callback=f"back_to_store_{store_id}",
-            back_text=back_text,
+            back_callback=f"back_to_store_offers_{store_id}",
         )
 
         # Get message to respond to
@@ -691,17 +715,8 @@ def register_stores(
             await callback.answer()
             return
 
-        # Send offer card - avoid deleting the original list message
+        # Send offer card - keep one active message
         if getattr(offer, "photo", None):
-            if getattr(msg, "photo", None):
-                try:
-                    await msg.edit_caption(
-                        caption=text, parse_mode="HTML", reply_markup=kb
-                    )
-                    await callback.answer()
-                    return
-                except Exception:
-                    pass
             try:
                 await msg.answer_photo(
                     photo=offer.photo,
@@ -709,19 +724,83 @@ def register_stores(
                     parse_mode="HTML",
                     reply_markup=kb,
                 )
-                await callback.answer()
-                return
-            except Exception:
-                pass
-        else:
-            try:
-                await msg.edit_text(text, parse_mode="HTML", reply_markup=kb)
+                await safe_delete_message(msg)
                 await callback.answer()
                 return
             except Exception:
                 pass
 
-        await msg.answer(text, parse_mode="HTML", reply_markup=kb)
+        if not await safe_edit_message(msg, text, reply_markup=kb):
+            await msg.answer(text, parse_mode="HTML", reply_markup=kb)
+        await callback.answer()
+
+    @dp.callback_query(F.data.startswith("back_to_store_offers_"))
+    async def back_to_store_offers(callback: types.CallbackQuery, state: FSMContext) -> None:
+        if not callback.from_user or not callback.data:
+            await callback.answer()
+            return
+        msg = _callback_message(callback)
+        if not msg:
+            await callback.answer()
+            return
+        lang = db.get_user_language(callback.from_user.id)
+
+        try:
+            store_id = int(callback.data.split("_")[-1])
+        except (ValueError, IndexError) as e:
+            logger.error(f"Invalid store_id in callback data: {callback.data}, error: {e}")
+            await callback.answer(get_text(lang, "error"), show_alert=True)
+            return
+
+        store = offer_service.get_store(store_id)
+        if not store:
+            await callback.answer("РњР°РіР°Р·РёРЅ РЅРµ РЅР°Р№РґРµРЅ", show_alert=True)
+            return
+
+        data = await state.get_data()
+        category = data.get("store_category", "all")
+        page = data.get("store_offers_page", 0)
+
+        all_offers = offer_service.list_store_offers(store_id)
+        if category != "all":
+            category_map = {
+                "bakery": "bakery",
+                "dairy": "dairy",
+                "meat": "meat",
+                "fruits": "fruits",
+                "vegetables": "vegetables",
+                "drinks": "drinks",
+                "snacks": "snacks",
+                "frozen": "frozen",
+            }
+            db_category = category_map.get(category, category)
+            offers = [offer for offer in all_offers if offer.category == db_category]
+        else:
+            offers = all_offers
+
+        if getattr(msg, "photo", None):
+            await safe_delete_message(msg)
+            await _send_store_offers_list(
+                msg,
+                state,
+                lang,
+                store,
+                offers,
+                page=page,
+                edit_message=False,
+                category=category,
+            )
+        else:
+            await _send_store_offers_list(
+                msg,
+                state,
+                lang,
+                store,
+                offers,
+                page=page,
+                edit_message=True,
+                category=category,
+            )
         await callback.answer()
 
     @dp.callback_query(F.data.startswith("store_offers_next_"))
@@ -844,19 +923,64 @@ def register_stores(
             back_callback=f"store_card_back_{store_id}",
         )
 
-        # Try edit_text first, then edit_caption, then send new message
-        try:
-            await msg.edit_text(text, parse_mode="HTML", reply_markup=keyboard)
-        except Exception:
-            try:
-                await msg.edit_caption(caption=text, parse_mode="HTML", reply_markup=keyboard)
-            except Exception:
-                # Delete old message and send new one
-                try:
-                    await msg.delete()
-                except Exception:
-                    pass
-                await callback.message.answer(text, parse_mode="HTML", reply_markup=keyboard)
+        if getattr(msg, "photo", None):
+            await safe_delete_message(msg)
+            await msg.answer(text, parse_mode="HTML", reply_markup=keyboard)
+            await callback.answer()
+            return
+
+        if not await safe_edit_message(msg, text, reply_markup=keyboard):
+            await msg.answer(text, parse_mode="HTML", reply_markup=keyboard)
+        await callback.answer()
+
+    @dp.callback_query(F.data == "back_to_store_list")
+    async def back_to_store_list(callback: types.CallbackQuery, state: FSMContext) -> None:
+        if not callback.from_user:
+            await callback.answer()
+            return
+        msg = _callback_message(callback)
+        if not msg:
+            await callback.answer()
+            return
+        lang = db.get_user_language(callback.from_user.id)
+        data = await state.get_data()
+
+        store_ids = data.get("store_list", [])
+        business_type = data.get("current_business_type", "")
+        page = int(data.get("store_list_page", 0) or 0)
+
+        user = db.get_user_model(callback.from_user.id)
+        city = user.city if user else "Ташкент"
+
+        stores = []
+        for sid in store_ids:
+            store = offer_service.get_store(sid)
+            if store:
+                stores.append(store)
+
+        if not stores:
+            text = get_text(lang, "browse_by_business_type")
+            keyboard = business_type_keyboard(
+                lang, include_back=True, back_callback="hot_entry_back"
+            )
+            if getattr(msg, "photo", None):
+                await safe_delete_message(msg)
+                await msg.answer(text, parse_mode="HTML", reply_markup=keyboard)
+            else:
+                if not await safe_edit_message(msg, text, reply_markup=keyboard):
+                    await msg.answer(text, parse_mode="HTML", reply_markup=keyboard)
+            await callback.answer()
+            return
+
+        text = offer_templates.render_business_type_store_list(lang, business_type, city, stores)
+        keyboard = offer_keyboards.store_list_keyboard(lang, stores, page=page)
+
+        if getattr(msg, "photo", None):
+            await safe_delete_message(msg)
+            await msg.answer(text, parse_mode="HTML", reply_markup=keyboard)
+        else:
+            if not await safe_edit_message(msg, text, reply_markup=keyboard):
+                await msg.answer(text, parse_mode="HTML", reply_markup=keyboard)
         await callback.answer()
 
     @dp.callback_query(F.data == "back_to_places")
@@ -922,6 +1046,7 @@ def register_stores(
         # Render with new page
         text = offer_templates.render_business_type_store_list(lang, business_type, city, stores)
         keyboard = offer_keyboards.store_list_keyboard(lang, stores, page=page)
+        await state.update_data(store_list_page=page)
 
         try:
             await msg.edit_text(text, parse_mode="HTML", reply_markup=keyboard)

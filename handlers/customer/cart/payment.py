@@ -298,11 +298,11 @@ def register(router: Router) -> None:
 
         from bot import ADMIN_ID
 
-        if ADMIN_ID > 0 and common.bot:
-            kb = InlineKeyboardBuilder()
-            kb.button(
-                text=get_text(lang, "admin_confirm_payment_button"),
-                callback_data=f"admin_confirm_payment_{order_id}",
+            if ADMIN_ID > 0 and common.bot:
+                kb = InlineKeyboardBuilder()
+                kb.button(
+                    text=get_text(lang, "admin_confirm_payment_button"),
+                    callback_data=f"admin_confirm_payment_{order_id}",
             )
             kb.button(
                 text=get_text(lang, "admin_reject_payment_button"),
@@ -314,20 +314,23 @@ def register(router: Router) -> None:
                 [f"• {esc(item['title'])} x {item['quantity']}" for item in cart_items_stored]
             )
             safe_address = esc(address)
+            admin_caption = NotificationTemplates.admin_payment_review(
+                lang=lang,
+                order_id=order_id,
+                store_name=store_name,
+                items_text=items_text,
+                total_with_delivery=total_with_delivery,
+                currency=currency,
+                address=safe_address,
+                customer_name=message.from_user.first_name,
+                customer_phone=customer_phone,
+            )
 
             try:
                 await common.bot.send_photo(
                     chat_id=ADMIN_ID,
                     photo=photo_id,
-                    caption=(
-                        f"<b>{get_text(lang, 'cart_payment_admin_title')}</b>\n\n"
-                        f"{get_text(lang, 'cart_payment_admin_order')}: #{order_id} | {store_name}\n"
-                        f"{get_text(lang, 'cart_payment_admin_items')}:\n{items_text}\n"
-                        f"{get_text(lang, 'cart_payment_admin_total')}: {total_with_delivery:,} {currency}\n"
-                        f"{get_text(lang, 'cart_payment_admin_address')}: {safe_address}\n"
-                        f"{get_text(lang, 'cart_payment_admin_customer')}: {message.from_user.first_name}\n"
-                        f"{get_text(lang, 'cart_payment_admin_phone')}: <code>{customer_phone}</code>"
-                    ),
+                    caption=admin_caption,
                     parse_mode="HTML",
                     reply_markup=kb.as_markup(),
                 )

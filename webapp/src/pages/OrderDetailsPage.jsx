@@ -178,6 +178,14 @@ export default function OrderDetailsPage() {
   const isDelivery = order.order_type === 'delivery' || order.delivery_address
   const needsPayment = ['awaiting_payment', 'awaiting_proof', 'payment_rejected'].includes(order.status)
   const canPayOnline = order.payment_method && ['click', 'payme'].includes(order.payment_method)
+  const paymentChipText =
+    order.status === 'proof_submitted'
+      ? "Chek yuborildi, tasdiqlash kutilmoqda"
+      : order.status === 'awaiting_proof'
+      ? "Chek yuborilmadi"
+      : needsPayment
+      ? "To'lov kutilmoqda"
+      : null
   const itemsSubtotal = Array.isArray(order.items) && order.items.length > 0
     ? order.items.reduce((sum, item) => sum + Number(item.price || 0) * Number(item.quantity || 0), 0)
     : 0
@@ -197,16 +205,22 @@ export default function OrderDetailsPage() {
       {/* Header */}
       <div className="details-header">
         <div className="topbar-card details-header-inner">
-          <h1 className="details-title">Buyurtma #{orderId}</h1>
+          <div className="details-title-row">
+            <h1 className="details-title">Buyurtma #{orderId}</h1>
+            <div
+              className="status-badge"
+              style={{ backgroundColor: statusInfo.bg, color: statusInfo.color }}
+            >
+              {statusInfo.text}
+            </div>
+            {paymentChipText && (
+              <div className="payment-status-chip" title={order.payment_status || ''}>
+                {paymentChipText}
+              </div>
+            )}
+          </div>
+          <span className="order-date">{formatDate(order.created_at)}</span>
         </div>
-      </div>
-
-      {/* Status Banner */}
-      <div className="status-banner" style={{ background: statusInfo.bg }}>
-        <span className="status-text" style={{ color: statusInfo.color }}>
-          {statusInfo.text}
-        </span>
-        <span className="order-date">{formatDate(order.created_at)}</span>
       </div>
 
       {needsPayment && (

@@ -94,11 +94,16 @@ def hot_offers_compact_keyboard(
 
 
 def store_card_keyboard(
-    lang: str, store_id: int, offers_count: int, ratings_count: int
+    lang: str,
+    store_id: int,
+    offers_count: int,
+    ratings_count: int,
+    back_callback: str = "back_to_places",
+    back_text: str | None = None,
 ) -> InlineKeyboardMarkup:
     builder = InlineKeyboardBuilder()
     products = "🛍 Посмотреть товары" if lang == "ru" else "🛍 Mahsulotlarni ko'rish"
-    back = "◀️ Назад" if lang == "ru" else "◀️ Orqaga"
+    back = back_text or ("◀️ Назад" if lang == "ru" else "◀️ Orqaga")
 
     # Показывать количество только если товары есть
     if offers_count > 0:
@@ -107,7 +112,7 @@ def store_card_keyboard(
         button_text = products
 
     builder.button(text=button_text, callback_data=f"store_offers_{store_id}")
-    builder.button(text=back, callback_data="back_to_places")
+    builder.button(text=back, callback_data=back_callback)
     builder.adjust(1)
     return builder.as_markup()
 

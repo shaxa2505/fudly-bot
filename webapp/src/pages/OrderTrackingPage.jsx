@@ -127,6 +127,22 @@ function OrderTrackingPage({ user }) {
     }
   };
 
+  const paymentStatusLabel = () => {
+    if (order?.payment_status === 'proof_submitted') {
+      return t('Чек yuborildi, tekshirilmoqda', "Chek yuborildi, tekshirilmoqda");
+    }
+    if (order?.payment_status === 'awaiting_proof') {
+      return t('Chek yuborilmadi', 'Chek yuborilmadi');
+    }
+    if (order?.payment_status === 'awaiting_payment') {
+      return t('To\'lov kutilmoqda', "To'lov kutilmoqda");
+    }
+    if (order?.payment_status === 'rejected') {
+      return t('To\'lov rad etildi', 'To\'lov rad etildi');
+    }
+    return null;
+  };
+
   if (loading) {
     return (
       <div ref={containerRef} className="order-tracking-page">
@@ -187,6 +203,11 @@ function OrderTrackingPage({ user }) {
         <div className="status-badge" style={{ backgroundColor: getStatusColor(order.status) }}>
           {getStatusIcon(order.status)} {STATUS_STEPS[order.status]?.label[lang] || order.status}
         </div>
+        {paymentStatusLabel() && (
+          <div className="payment-status-chip">
+            {paymentStatusLabel()}
+          </div>
+        )}
 
         {timeline?.estimated_ready_time && ['confirmed', 'preparing'].includes(order.status) && (
           <div className="estimated-time">
