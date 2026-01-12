@@ -1112,7 +1112,7 @@ function CartPage({ user }) {
                           </button>
                         </div>
 
-                        {paymentProofPreview ? (
+                        {paymentProofPreview && (
                           <div className="proof-preview">
                             <img src={paymentProofPreview} alt="Chek" />
                             <button
