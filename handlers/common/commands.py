@@ -25,10 +25,10 @@ from app.keyboards import (
 from database_protocol import DatabaseProtocol
 from handlers.common.states import ChangeCity, ConfirmOrder, Registration
 from handlers.common.utils import (
+    get_appropriate_menu,
     get_user_view_mode,
     has_approved_store,
     set_user_view_mode,
-    user_view_mode,
 )
 from handlers.common.webapp import get_partner_panel_url
 from localization import get_cities, get_text
@@ -424,12 +424,13 @@ async def handle_city_selection(
         db.update_user_city(callback.from_user.id, normalized_city)
     await state.clear()
 
-    user = db.get_user_model(callback.from_user.id)
-    user_role = user.role if user else "customer"
-    menu = (
-        main_menu_seller(lang, webapp_url=get_partner_panel_url(), user_id=callback.from_user.id)
-        if user_role == "seller"
-        else main_menu_customer(lang)
+    user_id = callback.from_user.id
+    menu = get_appropriate_menu(
+        user_id,
+        lang,
+        db,
+        main_menu_seller=main_menu_seller,
+        main_menu_customer=main_menu_customer,
     )
 
     try:
@@ -483,12 +484,13 @@ async def handle_district_selection(
 
     await state.clear()
 
-    user = db.get_user_model(callback.from_user.id)
-    user_role = user.role if user else "customer"
-    menu = (
-        main_menu_seller(lang, webapp_url=get_partner_panel_url(), user_id=callback.from_user.id)
-        if user_role == "seller"
-        else main_menu_customer(lang)
+    user_id = callback.from_user.id
+    menu = get_appropriate_menu(
+        user_id,
+        lang,
+        db,
+        main_menu_seller=main_menu_seller,
+        main_menu_customer=main_menu_customer,
     )
 
     city_display = region_label or region_key or region_value
@@ -558,18 +560,15 @@ async def process_booking_code_input(
 async def back_to_main_menu(callback: types.CallbackQuery, db: DatabaseProtocol):
     """Return to main menu."""
     lang = db.get_user_language(callback.from_user.id)
-    user = db.get_user_model(callback.from_user.id)
-    user_role = user.role if user else "customer"
+    user_id = callback.from_user.id
 
-    if user_role == "seller":
-        current_mode = get_user_view_mode(callback.from_user.id, db)
-        if current_mode != "seller":
-            set_user_view_mode(callback.from_user.id, "seller", db)
-
-    menu = (
-        main_menu_seller(lang, webapp_url=get_partner_panel_url(), user_id=callback.from_user.id)
-        if user_role == "seller"
-        else main_menu_customer(lang)
+    # Respect saved view mode instead of forcing seller menu
+    menu = get_appropriate_menu(
+        user_id,
+        lang,
+        db,
+        main_menu_seller=main_menu_seller,
+        main_menu_customer=main_menu_customer,
     )
 
     if callback.message:
@@ -629,11 +628,12 @@ async def change_city_text(
     else:
         db.update_user_city(user_id, normalized_city)
 
-    user_role = user.role or "customer" if user else "customer"
-    menu = (
-        main_menu_seller(lang, webapp_url=get_partner_panel_url(), user_id=user_id)
-        if user_role == "seller"
-        else main_menu_customer(lang)
+    menu = get_appropriate_menu(
+        user_id,
+        lang,
+        db,
+        main_menu_seller=main_menu_seller,
+        main_menu_customer=main_menu_customer,
     )
 
     await message.answer(
@@ -901,8 +901,13 @@ async def choose_language(callback: types.CallbackQuery, state: FSMContext, db: 
         return
 
     user_city = user.city
-    user_role = user.role or "customer"
-    menu = main_menu_seller(lang) if user_role == "seller" else main_menu_customer(lang)
+    menu = get_appropriate_menu(
+        callback.from_user.id,
+        lang,
+        db,
+        main_menu_seller=main_menu_seller,
+        main_menu_customer=main_menu_customer,
+    )
     await callback.message.answer(
         get_text(
             lang, "welcome_back", name=callback.from_user.first_name, city=normalize_city(user_city) if user_city else "Ташкент"
@@ -948,7 +953,8 @@ async def cancel_action(message: types.Message, state: FSMContext, db: DatabaseP
         except Exception:
             preferred_menu = None
 
-    user = db.get_user_model(message.from_user.id)
+    user_id = message.from_user.id
+    user = db.get_user_model(user_id)
     role = user.role if user else "customer"
 
     if current_state and str(current_state).startswith("RegisterStore"):
@@ -958,13 +964,20 @@ async def cancel_action(message: types.Message, state: FSMContext, db: DatabaseP
         return
 
     if role == "seller":
-        if not has_approved_store(message.from_user.id, db):
+        if not has_approved_store(user_id, db):
             role = "customer"
             preferred_menu = "customer"
 
-    view_override = user_view_mode.get(message.from_user.id)
-    target = preferred_menu or view_override or ("seller" if role == "seller" else "customer")
-    menu = main_menu_seller(lang) if target == "seller" else main_menu_customer(lang)
+    current_mode = get_user_view_mode(user_id, db)
+    target = preferred_menu or (current_mode if role == "seller" else "customer")
+    if role != "seller":
+        target = "customer"
+
+    menu = (
+        main_menu_seller(lang, webapp_url=get_partner_panel_url(), user_id=user_id)
+        if target == "seller"
+        else main_menu_customer(lang)
+    )
 
     await message.answer(get_text(lang, "operation_cancelled"), reply_markup=menu)
 
