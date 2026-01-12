@@ -298,11 +298,11 @@ def register(router: Router) -> None:
 
         from bot import ADMIN_ID
 
-            if ADMIN_ID > 0 and common.bot:
-                kb = InlineKeyboardBuilder()
-                kb.button(
-                    text=get_text(lang, "admin_confirm_payment_button"),
-                    callback_data=f"admin_confirm_payment_{order_id}",
+        if ADMIN_ID > 0 and common.bot:
+            kb = InlineKeyboardBuilder()
+            kb.button(
+                text=get_text(lang, "admin_confirm_payment_button"),
+                callback_data=f"admin_confirm_payment_{order_id}",
             )
             kb.button(
                 text=get_text(lang, "admin_reject_payment_button"),

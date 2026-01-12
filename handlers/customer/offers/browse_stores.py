@@ -105,7 +105,9 @@ def register_stores(
         logger.info(f"🏪 Found {len(stores)} stores for {business_type} in {search_city}")
 
         if not stores:
-            await msg.edit_text(_no_stores_text(lang, business_type))
+            if not await safe_edit_message(msg, _no_stores_text(lang, business_type)):
+                await safe_delete_message(msg)
+                await msg.answer(_no_stores_text(lang, business_type))
             await callback.answer()
             return
         await state.set_state(BrowseOffers.store_list)
@@ -118,7 +120,9 @@ def register_stores(
         text = offer_templates.render_business_type_store_list(lang, business_type, city, stores)
         # Compact keyboard with pagination
         keyboard = offer_keyboards.store_list_keyboard(lang, stores, page=0)
-        await msg.edit_text(text, parse_mode="HTML", reply_markup=keyboard)
+        if not await safe_edit_message(msg, text, reply_markup=keyboard):
+            await safe_delete_message(msg)
+            await msg.answer(text, parse_mode="HTML", reply_markup=keyboard)
         await callback.answer()
 
     @dp.callback_query(F.data.startswith("select_store_"))
@@ -181,6 +185,7 @@ def register_stores(
                 pass
 
         if not await safe_edit_message(msg, text, reply_markup=keyboard):
+            await safe_delete_message(msg)
             await msg.answer(text, parse_mode="HTML", reply_markup=keyboard)
         await callback.answer()
 
@@ -337,6 +342,7 @@ def register_stores(
                 pass
 
         if not await safe_edit_message(msg, text, reply_markup=keyboard):
+            await safe_delete_message(msg)
             await msg.answer(text, parse_mode="HTML", reply_markup=keyboard)
         await callback.answer()
 
@@ -392,6 +398,7 @@ def register_stores(
                 pass
 
         if not await safe_edit_message(msg, text, reply_markup=keyboard):
+            await safe_delete_message(msg)
             await msg.answer(text, parse_mode="HTML", reply_markup=keyboard)
         await callback.answer()
 
@@ -442,6 +449,7 @@ def register_stores(
             return
 
         if not await safe_edit_message(msg, text, reply_markup=keyboard):
+            await safe_delete_message(msg)
             await msg.answer(text, parse_mode="HTML", reply_markup=keyboard)
         await callback.answer()
 
@@ -731,6 +739,7 @@ def register_stores(
                 pass
 
         if not await safe_edit_message(msg, text, reply_markup=kb):
+            await safe_delete_message(msg)
             await msg.answer(text, parse_mode="HTML", reply_markup=kb)
         await callback.answer()
 
@@ -930,6 +939,7 @@ def register_stores(
             return
 
         if not await safe_edit_message(msg, text, reply_markup=keyboard):
+            await safe_delete_message(msg)
             await msg.answer(text, parse_mode="HTML", reply_markup=keyboard)
         await callback.answer()
 
@@ -968,6 +978,7 @@ def register_stores(
                 await msg.answer(text, parse_mode="HTML", reply_markup=keyboard)
             else:
                 if not await safe_edit_message(msg, text, reply_markup=keyboard):
+                    await safe_delete_message(msg)
                     await msg.answer(text, parse_mode="HTML", reply_markup=keyboard)
             await callback.answer()
             return
@@ -980,6 +991,7 @@ def register_stores(
             await msg.answer(text, parse_mode="HTML", reply_markup=keyboard)
         else:
             if not await safe_edit_message(msg, text, reply_markup=keyboard):
+                await safe_delete_message(msg)
                 await msg.answer(text, parse_mode="HTML", reply_markup=keyboard)
         await callback.answer()
 
@@ -998,6 +1010,7 @@ def register_stores(
             lang, include_back=True, back_callback="hot_entry_back"
         )
         if not await safe_edit_message(msg, text, reply_markup=keyboard):
+            await safe_delete_message(msg)
             await msg.answer(text, parse_mode="HTML", reply_markup=keyboard)
         await callback.answer()
 
@@ -1048,10 +1061,9 @@ def register_stores(
         keyboard = offer_keyboards.store_list_keyboard(lang, stores, page=page)
         await state.update_data(store_list_page=page)
 
-        try:
-            await msg.edit_text(text, parse_mode="HTML", reply_markup=keyboard)
-        except Exception:
-            pass
+        if not await safe_edit_message(msg, text, reply_markup=keyboard):
+            await safe_delete_message(msg)
+            await msg.answer(text, parse_mode="HTML", reply_markup=keyboard)
 
         await callback.answer()
 
@@ -1143,9 +1155,8 @@ def register_stores(
             )
 
             if edit_message:
-                try:
-                    await target.edit_text(text, parse_mode="HTML", reply_markup=keyboard)
-                except Exception:
+                if not await safe_edit_message(target, text, reply_markup=keyboard):
+                    await safe_delete_message(target)
                     await target.answer(text, parse_mode="HTML", reply_markup=keyboard)
             else:
                 await target.answer(text, parse_mode="HTML", reply_markup=keyboard)

@@ -185,6 +185,7 @@ def register_hot(
             lang, include_back=True, back_callback="hot_entry_back"
         )
         if not await safe_edit_message(callback.message, text, reply_markup=keyboard):
+            await safe_delete_message(callback.message)
             await callback.message.answer(text, parse_mode="HTML", reply_markup=keyboard)
         await callback.answer()
 
@@ -218,6 +219,7 @@ def register_hot(
             entry_text,
             reply_markup=offer_keyboards.hot_entry_keyboard(lang),
         ):
+            await safe_delete_message(msg)
             await msg.answer(
                 entry_text,
                 parse_mode="HTML",
@@ -481,6 +483,7 @@ def register_hot(
             await callback.answer()
             return
 
+        await safe_delete_message(msg)
         await msg.answer(text, parse_mode="HTML", reply_markup=kb)
         await callback.answer()
 
@@ -819,9 +822,8 @@ def register_hot(
             )
 
             if edit_message:
-                try:
-                    await target.edit_text(text, parse_mode="HTML", reply_markup=keyboard)
-                except Exception:
+                if not await safe_edit_message(target, text, reply_markup=keyboard):
+                    await safe_delete_message(target)
                     await target.answer(text, parse_mode="HTML", reply_markup=keyboard)
             else:
                 await target.answer(text, parse_mode="HTML", reply_markup=keyboard)
