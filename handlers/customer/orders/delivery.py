@@ -57,6 +57,10 @@ router = Router()
 db: DatabaseProtocol | None = None
 bot: Any | None = None
 ADMIN_ID = int(os.getenv("ADMIN_ID", "0"))
+# Toggle Telegram Payments (Click via Telegram Bot Payments)
+ENABLE_TELEGRAM_PAYMENTS = (
+    os.getenv("ENABLE_TELEGRAM_PAYMENTS", "0").strip().lower() in {"1", "true", "yes"}
+)
 
 
 def setup_dependencies(
@@ -706,6 +710,9 @@ async def dlv_pay_click(
         await callback.answer()
         return
 
+    # Import lazily to avoid circular imports
+    from handlers.customer import payments as telegram_payments
+
     data = await state.get_data()
     user_id = callback.from_user.id
     lang = db.get_user_language(user_id)
@@ -713,22 +720,148 @@ async def dlv_pay_click(
     logger.info(f"🖱️ User {user_id} selected Click payment")
     logger.info(f"📋 FSM data: {data}")
 
-    # TODO: Click payment not implemented yet - order is created after screenshot
-    # For now, redirect to card payment
-    logger.warning(f"⚠️ Click payment selected but not implemented, redirecting to card")
+    # If payments are disabled or provider token is missing, fallback to card flow
+    if not ENABLE_TELEGRAM_PAYMENTS or not telegram_payments.PROVIDER_TOKEN:
+        reason = (
+            "Нужен TELEGRAM_PAYMENT_PROVIDER_TOKEN и ENABLE_TELEGRAM_PAYMENTS=1"
+            if lang != "uz"
+            else "TELEGRAM_PAYMENT_PROVIDER_TOKEN va ENABLE_TELEGRAM_PAYMENTS=1 kerak"
+        )
+        logger.warning("⚠️ Telegram Payments disabled or token missing, fallback to card")
+        await _switch_to_card_payment_no_order(callback.message, state, data, lang, db, reason)
+        await callback.answer()
+        return
 
-    # Redirect to card payment
-    await _switch_to_card_payment_no_order(callback.message, state, data, lang, db)
+    # Ensure we have address and other required data
+    address = data.get("address")
+    if not address:
+        logger.error("❌ No address in state for Click payment")
+        await _switch_to_card_payment_no_order(callback.message, state, data, lang, db)
+        await callback.answer()
+        return
+
+    # Create order if not created yet
+    order_id = data.get("order_id")
+    if not order_id:
+        order_service = get_unified_order_service()
+        if not order_service and bot:
+            order_service = init_unified_order_service(db, bot)
+        if not order_service:
+            logger.warning("⚠️ UnifiedOrderService unavailable, fallback to card")
+            await _switch_to_card_payment_no_order(callback.message, state, data, lang, db)
+            await callback.answer()
+            return
+
+        try:
+            offer_id = data.get("offer_id")
+            store_id = data.get("store_id")
+            quantity = int(data.get("quantity", 1))
+            delivery_price = int(data.get("delivery_price", 0))
+
+            offer = db.get_offer(offer_id)
+            store = db.get_store(store_id)
+
+            title = get_offer_field(offer, "title", "")
+            price = int(get_offer_field(offer, "discount_price", 0))
+            store_name = get_store_field(store, "name", "")
+            store_address = get_store_field(store, "address", "")
+
+            order_item = OrderItem(
+                offer_id=int(offer_id),
+                store_id=int(store_id),
+                title=title,
+                price=price,
+                original_price=price,
+                quantity=quantity,
+                store_name=store_name,
+                store_address=store_address,
+                delivery_price=delivery_price,
+            )
+
+            order_type = data.get("order_type", "delivery")
+            result = await order_service.create_order(
+                user_id=user_id,
+                items=[order_item],
+                order_type=order_type,
+                delivery_address=address if order_type == "delivery" else None,
+                payment_method="click",
+                notify_customer=False,
+                notify_sellers=False,
+            )
+
+            if not (result.success and result.order_ids):
+                logger.error(
+                    "Failed to create order before Telegram invoice: %s", result.error_message
+                )
+                await _switch_to_card_payment_no_order(callback.message, state, data, lang, db)
+                await callback.answer()
+                return
+
+            order_id = result.order_ids[0]
+            await state.update_data(order_id=order_id, payment_method="click")
+            logger.info(f"✅ Created order #{order_id} before sending Telegram invoice")
+        except Exception as e:
+            logger.error(f"Error creating order before Telegram invoice: {e}", exc_info=True)
+            await _switch_to_card_payment_no_order(callback.message, state, data, lang, db)
+            await callback.answer()
+            return
+
+    # Send Telegram invoice
+    try:
+        items = [
+            {
+                "title": data.get("title", ""),
+                "quantity": int(data.get("quantity", 1)),
+                "price": int(data.get("price", 0)),
+            }
+        ]
+        delivery_cost = int(data.get("delivery_price", 0))
+        store_name = data.get("store_name", "")
+
+        await telegram_payments.create_order_invoice(
+            chat_id=user_id,
+            order_id=int(order_id),
+            items=items,
+            delivery_cost=delivery_cost,
+            store_name=store_name,
+        )
+        logger.info(f"✅ Sent Telegram invoice for order #{order_id}")
+    except Exception as e:
+        logger.error(f"Failed to send Telegram invoice: {e}", exc_info=True)
+        await _switch_to_card_payment_no_order(callback.message, state, data, lang, db)
+        await callback.answer()
+        return
+
+    # Remove inline keyboard to prevent duplicate taps and clear state
+    try:
+        await callback.message.edit_reply_markup(reply_markup=None)
+    except Exception:
+        pass
+    await state.clear()
+
+    # Notify user to pay the invoice
+    notify_text = (
+        "💳 Счёт отправлен. Нажмите «Оплатить» в сообщении выше."
+        if lang != "uz"
+        else "💳 Hisob yuborildi. Yuqoridagi xabarda «To'lash» tugmasini bosing."
+    )
+    try:
+        await callback.message.answer(notify_text)
+    except Exception:
+        pass
+
     await callback.answer()
 
 
-async def _switch_to_card_payment_no_order(message, state, data, lang, db):
+async def _switch_to_card_payment_no_order(message, state, data, lang, db, reason: str | None = None):
     """Switch to card payment when Click fails - no order created yet."""
     msg = (
         "⚠️ Click ishlamayapti. Karta orqali to'lang."
         if lang == "uz"
         else "⚠️ Click недоступен. Оплатите картой."
     )
+    if reason:
+        msg += f"\n{reason}"
     await message.answer(msg)
 
     await state.update_data(payment_method="card")
