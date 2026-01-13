@@ -1,4 +1,4 @@
-"""
+﻿"""
 FSM States for all bot workflows.
 
 Organized by domain:
@@ -201,11 +201,10 @@ class CourierHandover(StatesGroup):
     """
     Courier handover flow (seller → courier).
 
-    Flow: Handover → courier name → courier phone → confirm → done
+    Flow: Handover → courier phone → confirm → done
     """
 
     order_id = State()  # Order being handed over
-    courier_name = State()  # Enter courier name
     courier_phone = State()  # Enter courier phone
 
 
@@ -247,3 +246,6 @@ class BrowseOffers(StatesGroup):
     business_type = State()  # Selected business type filter
     category = State()  # Selected category filter
     filter = State()  # Active filter settings
+
+
+

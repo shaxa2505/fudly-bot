@@ -77,15 +77,23 @@ class ConnectionManager:
         }
         return await self.notify_store(store_id, message)
     
-    async def notify_order_status(self, store_id: int, order_id: int, new_status: str) -> int:
+    async def notify_order_status(
+        self,
+        store_id: int,
+        order_id: int,
+        new_status: str,
+        unified: Dict[str, Any] | None = None,
+    ) -> int:
         """Notify store about order status change."""
         message: Dict[str, Any] = {
             "type": "order_status_changed",
             "data": {
                 "order_id": order_id,
-                "status": new_status
+                "status": new_status,
             }
         }
+        if unified:
+            message["data"]["unified"] = unified
         return await self.notify_store(store_id, message)
     
     async def notify_order_cancelled(self, store_id: int, order_id: int, reason: str) -> int:

@@ -119,19 +119,26 @@
 
     <!-- Bottom Navigation -->
     <nav class="bottom-nav">
-        <button class="nav-item active" onclick="switchView('dashboard')">
+        <button class="nav-item active" data-view="dashboard" onclick="switchView('dashboard')">
             <span class="nav-icon"><i data-lucide="home"></i></span>
             <span class="nav-label">Главная</span>
         </button>
-        <button class="nav-item" onclick="switchView('products')">
+        <button class="nav-item" data-view="orders" onclick="switchView('orders')">
+            <span class="nav-icon">
+                <i data-lucide="clipboard-list"></i>
+                <span class="nav-badge" id="ordersNavBadge">0</span>
+            </span>
+            <span class="nav-label">Заказы</span>
+        </button>
+        <button class="nav-item" data-view="products" onclick="switchView('products')">
             <span class="nav-icon"><i data-lucide="package"></i></span>
             <span class="nav-label">Товары</span>
         </button>
-        <button class="nav-item" onclick="switchView('stats')">
+        <button class="nav-item" data-view="stats" onclick="switchView('stats')">
             <span class="nav-icon"><i data-lucide="bar-chart-3"></i></span>
             <span class="nav-label">Статистика</span>
         </button>
-        <button class="nav-item" onclick="switchView('settings')">
+        <button class="nav-item" data-view="settings" onclick="switchView('settings')">
             <span class="nav-icon"><i data-lucide="settings"></i></span>
             <span class="nav-label">Еще</span>
         </button>
@@ -908,16 +915,19 @@
         // ============================================
         // VIEW SWITCHING
         // ============================================
+        function setActiveNav(view) {
+            document.querySelectorAll('.nav-item').forEach((item) => {
+                item.classList.toggle('active', item.dataset.view === view);
+            });
+        }
+
         function switchView(view) {
             console.log(`📍 Switching to view: ${view}`);
             haptic('selection');
             state.currentView = view;
 
             // Update nav active state
-            document.querySelectorAll('.nav-item').forEach(item => {
-                item.classList.remove('active');
-            });
-            event?.target?.closest('.nav-item')?.classList.add('active');
+            setActiveNav(view);
 
             // Smooth transition
             const content = document.querySelector('.content');
@@ -967,6 +977,7 @@
                 state.orders = normalizeOrders(orders);
                 state.products = normalizeProducts(products);
                 syncAllProducts(state.products);
+                updateNotificationBadge();
 
                 // Connect WebSocket after store info is loaded
                 if (!websocket && store.store_id) {
@@ -1726,11 +1737,8 @@
             }
         }
 
-        async function cancelOrder(orderId) {
-            if (!confirm('Отменить заказ?')) return;
-
-            haptic('heavy');
-            await updateOrderStatus(orderId, 'cancelled');
+        function cancelOrder(orderId) {
+            openCancelModal(orderId);
         }
 
         // Open cancel order modal with reason selection
@@ -4086,13 +4094,19 @@ async function toggleProductAvailability(id) {
                 return status === 'pending' || status === 'new';
             }).length;
 
-            const badge = document.getElementById('notificationCount');
-            if (newOrdersCount > 0) {
-                badge.textContent = newOrdersCount;
-                badge.style.display = 'flex';
-            } else {
-                badge.style.display = 'none';
-            }
+            const headerBadge = document.getElementById('notificationCount');
+            const navBadge = document.getElementById('ordersNavBadge');
+            const updateBadge = (badge) => {
+                if (!badge) return;
+                if (newOrdersCount > 0) {
+                    badge.textContent = newOrdersCount;
+                    badge.style.display = 'flex';
+                } else {
+                    badge.style.display = 'none';
+                }
+            };
+            updateBadge(headerBadge);
+            updateBadge(navBadge);
         }
 
         // ============================================

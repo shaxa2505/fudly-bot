@@ -37,6 +37,7 @@ from aiogram.utils.keyboard import InlineKeyboardBuilder
 
 from app.core.notifications import Notification, NotificationType, get_notification_service
 from app.services.notification_builder import NotificationBuilder
+from app.services.notification_unified import build_unified_order_payload
 
 try:
     from logging_config import logger
@@ -1084,6 +1085,45 @@ class UnifiedOrderService:
                 currency=currency,
             )
 
+            entity_ids_raw = [x for x in (order_ids + booking_ids) if x]
+            entity_ids = [int(x) for x in entity_ids_raw]
+            entity_id = entity_ids[0] if entity_ids else None
+            entity_type = "order" if order_ids else "booking"
+            store_id = items[0].store_id if items else None
+            store_name = items[0].store_name if items else ""
+            store_address = items[0].store_address if items else ""
+            customer_payload = {"id": int(user_id)} if user_id else None
+            if customer_payload is not None:
+                customer_payload["name"] = customer_name or ""
+                customer_payload["phone"] = customer_phone or ""
+            amounts_payload = {
+                "subtotal": int(total_price or 0),
+                "delivery_fee": int(delivery_price or 0),
+                "total": int(total_price or 0) + int(delivery_price or 0),
+                "currency": currency,
+            }
+            unified_payload = build_unified_order_payload(
+                kind="order_created",
+                role="customer",
+                entity_type=entity_type,
+                entity_id=entity_id,
+                entity_ids=entity_ids,
+                is_cart=len(entity_ids) > 1,
+                order_type=order_type,
+                status=OrderStatus.PENDING,
+                payment_status=PaymentStatus.initial_for_method(payment_method),
+                pickup_code=pickup_codes[0] if len(pickup_codes) == 1 else None,
+                delivery_address=delivery_address,
+                store={
+                    "id": int(store_id) if store_id is not None else None,
+                    "name": store_name,
+                    "address": store_address,
+                },
+                customer=customer_payload,
+                items=items_for_template,
+                amounts=amounts_payload,
+            )
+
             sent_msg = None
             if customer_notifications and telegram_enabled:
                 try:
@@ -1180,6 +1220,7 @@ class UnifiedOrderService:
                                 "booking_ids": booking_ids,
                                 "status": OrderStatus.PENDING,
                                 "order_type": order_type,
+                                "unified": unified_payload,
                             },
                             priority=0,
                         )
@@ -1200,6 +1241,7 @@ class UnifiedOrderService:
                                 "booking_ids": booking_ids,
                                 "status": OrderStatus.PENDING,
                                 "order_type": order_type,
+                                "unified": unified_payload,
                             },
                         },
                     )
@@ -1492,6 +1534,34 @@ class UnifiedOrderService:
                     delivery_price=store_delivery,
                     currency=currency,
                 )
+                store_payload = {
+                    "id": int(store_id),
+                    "name": store.get("name", "") if isinstance(store, dict) else "",
+                    "address": store.get("address", "") if isinstance(store, dict) else "",
+                }
+                customer_payload = {"name": customer_name or "", "phone": customer_phone or ""}
+                amounts_payload = {
+                    "subtotal": int(store_total or 0),
+                    "delivery_fee": int(store_delivery or 0),
+                    "total": int(store_total or 0) + int(store_delivery or 0),
+                    "currency": currency,
+                }
+                unified_payload = build_unified_order_payload(
+                    kind="order_created",
+                    role="partner",
+                    entity_type="order",
+                    entity_id=order_id_ints[0] if order_id_ints else None,
+                    entity_ids=order_id_ints,
+                    is_cart=len(order_id_ints) > 1,
+                    order_type=order_type,
+                    status=OrderStatus.PENDING,
+                    pickup_code=pickup_codes[0] if len(pickup_codes) == 1 else None,
+                    delivery_address=delivery_address,
+                    store=store_payload,
+                    customer=customer_payload,
+                    items=store_orders,
+                    amounts=amounts_payload,
+                )
 
                 # Build keyboard - unified callback pattern
                 first_order_id = store_orders[0]["order_id"]
@@ -1550,6 +1620,7 @@ class UnifiedOrderService:
                                     for o in store_orders
                                 ],
                                 "delivery_address": delivery_address,
+                                "unified": unified_payload,
                             },
                             priority=0,
                         )
@@ -1579,6 +1650,7 @@ class UnifiedOrderService:
                         ],
                         "delivery_address": delivery_address,
                         "timestamp": str(datetime.now()),
+                        "unified": unified_payload,
                     }
 
                     sent = await manager.notify_new_order(store_id, order_data)
@@ -1759,6 +1831,7 @@ class UnifiedOrderService:
             # IMPORTANT: orders and bookings may still live in different tables at runtime.
             # Respect entity_type to avoid updating a wrong record on id collision.
             payment_method = None
+            payment_status = None
             delivery_address = None
             delivery_price = 0
             cart_items_json = None
@@ -1819,6 +1892,7 @@ class UnifiedOrderService:
                     current_status_raw = entity.get("order_status")
                     order_type = entity.get("order_type")
                     payment_method = entity.get("payment_method")
+                    payment_status = entity.get("payment_status")
                     delivery_address = entity.get("delivery_address")
                     delivery_price = int(entity.get("delivery_price") or 0)
                     is_cart = int(entity.get("is_cart_order") or 0) == 1
@@ -1844,6 +1918,7 @@ class UnifiedOrderService:
                     current_status_raw = getattr(entity, "order_status", None)
                     order_type = getattr(entity, "order_type", None)
                     payment_method = getattr(entity, "payment_method", None)
+                    payment_status = getattr(entity, "payment_status", None)
                     delivery_address = getattr(entity, "delivery_address", None)
                     delivery_price = int(getattr(entity, "delivery_price", 0) or 0)
                     is_cart = int(getattr(entity, "is_cart_order", 0) or 0) == 1
@@ -1860,6 +1935,9 @@ class UnifiedOrderService:
             )
             target_status = OrderStatus.normalize(str(new_status))
             normalized_payment_method = PaymentStatus.normalize_method(payment_method)
+            normalized_payment_status = PaymentStatus.normalize(
+                payment_status, payment_method=payment_method
+            )
             terminal_statuses = {
                 OrderStatus.COMPLETED,
                 OrderStatus.CANCELLED,
@@ -2002,6 +2080,23 @@ class UnifiedOrderService:
                 try:
                     from app.core.websocket import get_websocket_manager
 
+                    customer_unified_min = build_unified_order_payload(
+                        kind="order_status_changed",
+                        role="customer",
+                        entity_type=entity_type,
+                        entity_id=entity_id,
+                        entity_ids=[entity_id],
+                        is_cart=is_cart,
+                        order_type=order_type,
+                        status=target_status,
+                        payment_status=normalized_payment_status,
+                        pickup_code=pickup_code,
+                        delivery_address=delivery_address,
+                        store={"id": int(store_id)} if store_id else None,
+                        customer={"id": int(user_id)} if user_id else None,
+                        courier={"phone": courier_phone} if courier_phone else None,
+                        amounts={"delivery_fee": int(delivery_price or 0)},
+                    )
                     ws_manager = get_websocket_manager()
                     await ws_manager.send_to_user(
                         int(user_id),
@@ -2012,6 +2107,7 @@ class UnifiedOrderService:
                                 "entity_type": entity_type,
                                 "status": target_status,
                                 "order_type": order_type,
+                                "unified": customer_unified_min,
                             },
                         },
                     )
@@ -2019,11 +2115,33 @@ class UnifiedOrderService:
                     logger.warning(f"WebSocket notify failed for status change: {ws_error}")
 
             if store_id:
+                partner_unified_min = build_unified_order_payload(
+                    kind="order_status_changed",
+                    role="partner",
+                    entity_type=entity_type,
+                    entity_id=entity_id,
+                    entity_ids=[entity_id],
+                    is_cart=is_cart,
+                    order_type=order_type,
+                    status=target_status,
+                    payment_status=normalized_payment_status,
+                    pickup_code=pickup_code,
+                    delivery_address=delivery_address,
+                    store={"id": int(store_id)},
+                    customer={"id": int(user_id)} if user_id else None,
+                    courier={"phone": courier_phone} if courier_phone else None,
+                    amounts={"delivery_fee": int(delivery_price or 0)},
+                )
                 try:
                     from app.api.websocket_manager import get_connection_manager
 
                     store_ws = get_connection_manager()
-                    await store_ws.notify_order_status(int(store_id), int(entity_id), target_status)
+                    await store_ws.notify_order_status(
+                        int(store_id),
+                        int(entity_id),
+                        target_status,
+                        unified=partner_unified_min,
+                    )
                 except Exception as ws_error:
                     logger.warning(f"Partner WebSocket notify failed: {ws_error}")
 
@@ -2040,6 +2158,7 @@ class UnifiedOrderService:
                                 "order_id": entity_id,
                                 "status": target_status,
                                 "order_type": order_type,
+                                "unified": partner_unified_min,
                             },
                             priority=0,
                         )
@@ -2053,6 +2172,7 @@ class UnifiedOrderService:
                 store_address = store.get("address", "") if isinstance(store, dict) else ""
 
                 customer_lang = self.db.get_user_language(user_id)
+                currency = None
                 cart_items = None
                 if is_cart and cart_items_json:
                     try:
@@ -2136,10 +2256,11 @@ class UnifiedOrderService:
                     except Exception as group_err:
                         logger.debug(f"Failed to load grouped order ids: {group_err}")
 
+                is_grouped = False
+                aggregated_status = target_status
                 if cart_items:
                     currency = "so'm" if customer_lang == "uz" else "сум"
                     is_grouped = bool(group_order_ids and len(group_order_ids) > 1)
-                    aggregated_status = target_status
                     if is_grouped and group_statuses:
                         unique_statuses = set(group_statuses)
                         if unique_statuses == {OrderStatus.COMPLETED}:
@@ -2187,6 +2308,36 @@ class UnifiedOrderService:
                         courier_phone=courier_phone,
                     )
 
+                amounts_payload = {"delivery_fee": int(delivery_price or 0)}
+                if total_price is not None:
+                    amounts_payload["subtotal"] = int(total_price or 0)
+                    amounts_payload["total"] = int(total_price or 0) + int(delivery_price or 0)
+                if currency:
+                    amounts_payload["currency"] = currency
+
+                customer_unified_full = build_unified_order_payload(
+                    kind="order_status_changed",
+                    role="customer",
+                    entity_type=entity_type,
+                    entity_id=entity_id,
+                    entity_ids=group_order_ids or [entity_id],
+                    is_cart=is_cart or is_grouped,
+                    order_type=order_type,
+                    status=aggregated_status,
+                    payment_status=normalized_payment_status,
+                    pickup_code=pickup_code,
+                    delivery_address=delivery_address,
+                    store={
+                        "id": int(store_id) if store_id else None,
+                        "name": store_name,
+                        "address": store_address,
+                    },
+                    customer={"id": int(user_id)} if user_id else None,
+                    courier={"phone": courier_phone} if courier_phone else None,
+                    items=cart_items,
+                    amounts=amounts_payload,
+                )
+
                 if should_notify:
 
 
@@ -2216,6 +2367,7 @@ class UnifiedOrderService:
                                     "status": target_status,
                                     "order_type": order_type,
                                     "entity_type": entity_type,
+                                    "unified": customer_unified_full,
                                 },
                                 priority=0,
                             )

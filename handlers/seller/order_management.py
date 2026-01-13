@@ -1,4 +1,4 @@
-"""
+﻿"""
 Seller Order Management Handlers
 Handles order confirmation, cancellation, payment operations,
 and courier handover for delivery orders
@@ -260,34 +260,14 @@ async def start_courier_handover(callback: types.CallbackQuery, state: FSMContex
         return
 
     # Сохраняем order_id в состояние
-    await state.set_state(CourierHandover.courier_name)
+    await state.set_state(CourierHandover.courier_phone)
     await state.update_data(order_id=order_id)
 
-    prompt_ru = "📝 Введите имя курьера/таксиста:"
-    prompt_uz = "📝 Kuryer/taksi haydovchisi ismini kiriting:"
+    prompt_ru = "📝 Введите телефон курьера/таксиста:"
+    prompt_uz = "📝 Kuryer/taksi haydovchisi telefonini kiriting:"
 
     await callback.message.answer(prompt_ru if lang == "ru" else prompt_uz)
     await callback.answer()
-
-
-@router.message(CourierHandover.courier_name)
-async def process_courier_name(message: types.Message, state: FSMContext):
-    """Обработка имени курьера - запрос телефона"""
-    lang = db.get_user_language(message.from_user.id)
-
-    courier_name = message.text.strip()
-    if not courier_name or len(courier_name) < 2:
-        error_text = "❌ Введите корректное имя" if lang == "ru" else "❌ To'g'ri ism kiriting"
-        await message.answer(error_text)
-        return
-
-    await state.update_data(courier_name=courier_name)
-    await state.set_state(CourierHandover.courier_phone)
-
-    prompt_ru = "📱 Введите телефон курьера/таксиста:"
-    prompt_uz = "📱 Kuryer/taksi haydovchisi telefonini kiriting:"
-
-    await message.answer(prompt_ru if lang == "ru" else prompt_uz)
 
 
 @router.message(CourierHandover.courier_phone)
@@ -321,7 +301,7 @@ async def process_courier_phone(message: types.Message, state: FSMContext):
 
     # Используем UnifiedOrderService для начала доставки
     service = get_unified_order_service()
-    await service.start_delivery(order_id)
+    await service.start_delivery(order_id, courier_phone=courier_phone)
 
     # Уведомляем продавца об успешной передаче
     success_ru = f"✅ Заказ #{order_id} передан курьеру!\n\n🚕 Курьер: {courier_name}\n📱 Телефон: {courier_phone}"
@@ -476,3 +456,4 @@ async def rate_order(callback: types.CallbackQuery):
 
     await callback.message.edit_text(thanks_ru if lang == "ru" else thanks_uz)
     await callback.answer()
+

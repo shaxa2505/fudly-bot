@@ -52,6 +52,7 @@
     display: flex;
     align-items: center;
     justify-content: center;
+    position: relative;
 }
 
 .nav-icon svg,
@@ -84,6 +85,24 @@
 
 .nav-item:active {
     opacity: 0.6;
+}
+
+.nav-badge {
+    position: absolute;
+    top: -6px;
+    right: -8px;
+    min-width: 16px;
+    height: 16px;
+    padding: 0 4px;
+    background: var(--danger);
+    color: #fff;
+    font-size: 10px;
+    font-weight: 700;
+    border-radius: 999px;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    border: 2px solid #fff;
 }
 
 @media (min-width: 768px) {
