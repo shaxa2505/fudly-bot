@@ -175,182 +175,14 @@ def register_hot(
         search_district = normalize_city(district) if district else None
 
         await callback.answer()
-        await _send_hot_offers_list(
-            callback.message,
-            state,
-            lang,
-            city,
-            search_city,
-            search_region,
-            search_district,
-            latitude,
-            longitude,
-            offer_service,
-            logger,
-            edit_message=True,
-            show_entry_back=False,
-        )
+        data = await state.get_data()
+        page = int(data.get(\"hot_offers_page\", 0) or 0)
+        filter_mode = data.get(\"hot_filter_mode\", \"hot\")
+        category_id = data.get(\"hot_filter_value\")
+        category_label = data.get(\"hot_filter_label\")
+        show_entry_back = data.get(\"hot_entry_back\")
 
-    @dp.callback_query(F.data == "hot_entry_offers")
-    async def hot_entry_offers(callback: types.CallbackQuery, state: FSMContext) -> None:
-        """Entry point from the mini-menu: show hot offers list."""
-        if not callback.from_user or not callback.message:
-            await callback.answer()
-            return
-
-        user_id = callback.from_user.id
-        lang = db.get_user_language(user_id)
-        user = db.get_user_model(user_id)
-        if not user:
-            await callback.answer(get_text(lang, "error"), show_alert=True)
-            return
-
-        city, region, district, latitude, longitude = _extract_location(user)
-        search_city = normalize_city(city)
-        search_region = normalize_city(region) if region else None
-        search_district = normalize_city(district) if district else None
-
-        await callback.answer()
-        await _send_hot_offers_list(
-            callback.message,
-            state,
-            lang,
-            city,
-            search_city,
-            search_region,
-            search_district,
-            latitude,
-            longitude,
-            offer_service,
-            logger,
-            edit_message=True,
-            show_entry_back=True,
-        )
-
-    @dp.callback_query(F.data == "hot_entry_stores")
-    async def hot_entry_stores(callback: types.CallbackQuery, state: FSMContext) -> None:
-        """Entry point from the mini-menu: go to store categories."""
-        if not callback.from_user or not callback.message:
-            await callback.answer()
-            return
-
-        user_id = callback.from_user.id
-        lang = db.get_user_language(user_id)
-        user = db.get_user_model(user_id)
-        if not user:
-            await callback.answer(get_text(lang, "error"), show_alert=True)
-            return
-
-        city, _, _, _, _ = _extract_location(user)
-        await state.set_state(BrowseOffers.store_list)
-        text = get_text(lang, "browse_by_business_type") + f"\n\n📍 {city}"
-        keyboard = business_type_keyboard(
-            lang, include_back=True, back_callback="hot_entry_back"
-        )
-        if not await safe_edit_message(callback.message, text, reply_markup=keyboard):
-            await safe_delete_message(callback.message)
-            await callback.message.answer(text, parse_mode="HTML", reply_markup=keyboard)
-        await callback.answer()
-
-    @dp.callback_query(F.data == "hot_entry_back")
-    async def hot_entry_back(callback: types.CallbackQuery, state: FSMContext) -> None:
-        """Return to the mini-menu from offers/stores flows."""
-        if not callback.from_user:
-            await callback.answer()
-            return
-        msg = _callback_message(callback)
-        if not msg:
-            await callback.answer()
-            return
-        user_id = callback.from_user.id
-        lang = db.get_user_language(user_id)
-        user = db.get_user_model(user_id)
-        if not user:
-            await callback.answer(get_text(lang, "error"), show_alert=True)
-            return
-
-        city, _, _, _, _ = _extract_location(user)
-        entry_text = (
-            f"🏪 <b>{get_text(lang, 'hot_offers')}</b>\n\n"
-            f"📍 {city}\n"
-            f"{get_text(lang, 'hot_offers_subtitle')}"
-        )
-
-        await state.clear()
-        if not await safe_edit_message(
-            msg,
-            entry_text,
-            reply_markup=offer_keyboards.hot_entry_keyboard(lang),
-        ):
-            await safe_delete_message(msg)
-            await msg.answer(
-                entry_text,
-                parse_mode="HTML",
-                reply_markup=offer_keyboards.hot_entry_keyboard(lang),
-            )
-        await callback.answer()
-
-    @dp.callback_query(F.data == "hot_offers_categories")
-    async def hot_offers_categories(callback: types.CallbackQuery, state: FSMContext) -> None:
-        """Show product categories for filtering hot offers."""
-        if not callback.from_user:
-            await callback.answer()
-            return
-        msg = _callback_message(callback)
-        if not msg:
-            await callback.answer()
-            return
-        lang = db.get_user_language(callback.from_user.id)
-        user = db.get_user_model(callback.from_user.id)
-        if not user:
-            await callback.answer(get_text(lang, "error"), show_alert=True)
-            return
-        city, _, _, _, _ = _extract_location(user)
-
-        select_text = (
-            "Выберите категорию для просмотра актуальных предложений"
-            if lang == "ru"
-            else "Tegishli takliflarni ko'rish uchun toifani tanlang"
-        )
-        text = (
-            f"🗂 <b>{'Категории товаров' if lang == 'ru' else 'Mahsulot turlari'}</b>\n\n"
-            f"📍 {city}\n\n"
-            f"{select_text}:"
-        )
-        keyboard = offers_category_filter(
-            lang, include_back=True, back_callback="back_to_hot"
-        )
-        if not await safe_edit_message(msg, text, reply_markup=keyboard):
-            await safe_delete_message(msg)
-            await msg.answer(text, parse_mode="HTML", reply_markup=keyboard)
-        await callback.answer()
-
-    @dp.callback_query(F.data == "hot_offers_refresh")
-    async def refresh_hot_offers_handler(callback: types.CallbackQuery, state: FSMContext) -> None:
-        """Refresh hot offers list."""
-        if not callback.from_user:
-            await callback.answer()
-            return
-        msg = _callback_message(callback)
-        if not msg:
-            await callback.answer()
-            return
-        user_id = callback.from_user.id
-        lang = db.get_user_language(user_id)
-        user = db.get_user_model(user_id)
-        if not user:
-            await callback.answer(
-                "⚠️ Сессия устарела. Нажмите /start и откройте ‘🏪 Магазины и акции’ заново."
-                if lang == "ru"
-                else "⚠️ Sessiya eskirgan. /start ni bosing va ‘🏪 Do'konlar va aksiyalar’ ni qayta oching.",
-                show_alert=True,
-            )
-            return
-        city, region, district, latitude, longitude = _extract_location(user)
-        search_city = normalize_city(city)
-        search_region = normalize_city(region) if region else None
-        search_district = normalize_city(district) if district else None
-        await _send_hot_offers_list(
+        sent = await _send_hot_offers_list(
             msg,
             state,
             lang,
@@ -362,10 +194,17 @@ def register_hot(
             longitude,
             offer_service,
             logger,
-            page=0,
+            page=page,
             edit_message=True,
+            show_entry_back=show_entry_back,
+            filter_mode=filter_mode,
+            category_id=category_id,
+            category_label=category_label,
         )
-        await callback.answer("✓", show_alert=False)
+        if not sent:
+            await callback.answer(get_text(lang, \"no_offers\"), show_alert=True)
+            return
+        await callback.answer(\"🔄\", show_alert=False)
 
     @dp.callback_query(F.data.startswith("hot_page_"))
     async def hot_offers_page_handler(callback: types.CallbackQuery, state: FSMContext) -> None:
@@ -400,8 +239,13 @@ def register_hot(
         search_city = normalize_city(city)
         search_region = normalize_city(region) if region else None
         search_district = normalize_city(district) if district else None
+        data = await state.get_data()
+        filter_mode = data.get(\"hot_filter_mode\", \"hot\")
+        category_id = data.get(\"hot_filter_value\")
+        category_label = data.get(\"hot_filter_label\")
+        show_entry_back = data.get(\"hot_entry_back\")
 
-        await _send_hot_offers_list(
+        sent = await _send_hot_offers_list(
             msg,
             state,
             lang,
@@ -415,7 +259,14 @@ def register_hot(
             logger,
             page=page,
             edit_message=True,
+            show_entry_back=show_entry_back,
+            filter_mode=filter_mode,
+            category_id=category_id,
+            category_label=category_label,
         )
+        if not sent:
+            await callback.answer(get_text(lang, \"no_offers\"), show_alert=True)
+            return
         await callback.answer()
 
     @dp.callback_query(F.data.startswith("hot_offer_"))
@@ -704,7 +555,6 @@ def register_hot(
     # ------------------------------------------------------------------
     # Helper functions (kept as inner functions to use closures)
     # ------------------------------------------------------------------
-
     async def _send_hot_offers_list(
         target: types.Message,
         state: FSMContext,
@@ -720,105 +570,106 @@ def register_hot(
         page: int = 0,
         edit_message: bool = False,
         show_entry_back: bool | None = None,
-    ) -> None:
-        """Send hot offers with compact list and inline buttons."""
+        filter_mode: str = "hot",
+        category_id: str | None = None,
+        category_label: str | None = None,
+    ) -> bool:
+        """Send offers list with compact view. Returns False for empty filtered lists."""
         ITEMS_PER_PAGE = 5
         try:
             offset = page * ITEMS_PER_PAGE
-            log.info(f"[HOT_OFFERS] Fetching offers for city='{search_city}', offset={offset}")
-            result = service.list_hot_offers(
-                search_city,
-                limit=ITEMS_PER_PAGE,
-                offset=offset,
-                region=search_region,
-                district=search_district,
-                latitude=latitude,
-                longitude=longitude,
-            )
-            log.info(f"[HOT_OFFERS] Got {len(result.items)} items, total={result.total}")
-            if not result.items and page == 0:
-                log.info("[HOT_OFFERS] No items - showing empty message")
-                await target.answer(
-                    offer_templates.render_hot_offers_empty(lang), parse_mode="HTML"
-                )
-                return
-
             if show_entry_back is None:
                 state_data = await state.get_data()
                 show_entry_back = bool(state_data.get("hot_entry_back"))
             show_entry_back = bool(show_entry_back)
 
+            items: list[OfferListItem] = []
+            total_pages: int | None = None
+            keyboard_pages = 1
+            title = get_text(lang, "hot_offers_title")
+
+            if filter_mode == "category":
+                if not category_id:
+                    return False
+                raw = service.list_offers_by_category(
+                    search_city,
+                    category_id,
+                    limit=ITEMS_PER_PAGE + 1,
+                    offset=offset,
+                    region=search_region,
+                    district=search_district,
+                )
+                has_more = len(raw) > ITEMS_PER_PAGE
+                items = raw[:ITEMS_PER_PAGE]
+                if not items:
+                    return False
+                keyboard_pages = page + 1 + (1 if has_more else 0)
+                title = f"🗂 <b>{category_label or _category_label(lang, category_id)}</b>"
+                total_pages = None
+            elif filter_mode == "all":
+                result = service.list_hot_offers(
+                    search_city,
+                    limit=ITEMS_PER_PAGE,
+                    offset=offset,
+                    region=search_region,
+                    district=search_district,
+                    latitude=latitude,
+                    longitude=longitude,
+                    sort_by="new",
+                )
+                items = result.items
+                total_pages = max(1, (result.total + ITEMS_PER_PAGE - 1) // ITEMS_PER_PAGE)
+                keyboard_pages = total_pages
+                title = (
+                    "📦 <b>Все предложения</b>" if lang == "ru" else "📦 <b>Barcha takliflar</b>"
+                )
+                if not items and page == 0:
+                    await target.answer(
+                        offer_templates.render_hot_offers_empty(lang), parse_mode="HTML"
+                    )
+                    return True
+                if not items:
+                    return False
+            else:
+                result = service.list_hot_offers(
+                    search_city,
+                    limit=ITEMS_PER_PAGE,
+                    offset=offset,
+                    region=search_region,
+                    district=search_district,
+                    latitude=latitude,
+                    longitude=longitude,
+                )
+                items = result.items
+                total_pages = max(1, (result.total + ITEMS_PER_PAGE - 1) // ITEMS_PER_PAGE)
+                keyboard_pages = total_pages
+                if not items and page == 0:
+                    await target.answer(
+                        offer_templates.render_hot_offers_empty(lang), parse_mode="HTML"
+                    )
+                    return True
+                if not items:
+                    return False
+
             await state.set_state(BrowseOffers.offer_list)
             await state.update_data(
-                offer_list=[offer.id for offer in result.items],
+                offer_list=[offer.id for offer in items],
                 hot_offers_page=page,
                 hot_entry_back=show_entry_back,
+                hot_filter_mode=filter_mode,
+                hot_filter_value=category_id,
+                hot_filter_label=category_label,
             )
 
-            total_pages = (result.total + ITEMS_PER_PAGE - 1) // ITEMS_PER_PAGE
-            currency = "so'm" if lang == "uz" else "сум"
+            text = _render_offers_list_text(lang, title, city, items, page, total_pages)
 
-            # Clean professional header - proper language separation
-            header_title = "АКЦИИ ДО -70%" if lang == "ru" else "CHEGIRMALAR -70% GACHA"
-            page_label = "Стр." if lang == "ru" else "Sah."
-            text = f"🔥 <b>{header_title}</b>\n"
-            text += f"📍 {city} | {page_label} {page + 1}/{total_pages}\n"
-            text += "━" * 24 + "\n\n"
-
-            for idx, offer in enumerate(result.items, start=1):
-                # Clean title - remove test data prefix
-                title = offer.title
-                if title.startswith("Пример:"):
-                    title = title[7:].strip()
-                title = title[:22] + ".." if len(title) > 22 else title
-
-                # Safe discount calculation - handle invalid data, use round() for proper rounding
-                discount_pct = 0
-                if (
-                    offer.original_price
-                    and offer.discount_price
-                    and offer.original_price > offer.discount_price
-                ):
-                    discount_pct = min(
-                        99,
-                        max(0, round((1 - offer.discount_price / offer.original_price) * 100)),
-                    )
-
-                # Get store name if available
-                store_name = ""
-                if hasattr(offer, "store_name") and offer.store_name:
-                    store_name = offer.store_name[:15]
-                elif hasattr(offer, "store_id") and offer.store_id:
-                    store = service.get_store(offer.store_id)
-                    if store:
-                        store_name = store.name[:15] if hasattr(store, "name") else ""
-
-                # Improved format: number + title + discount badge
-                if discount_pct > 0:
-                    text += f"<b>{idx}.</b> {title} <b>-{discount_pct}%</b>\n"
-                else:
-                    text += f"<b>{idx}.</b> {title}\n"
-                # Price + store on second line
-                text += f"    💰 <b>{int(offer.discount_price):,}</b> {currency}"
-                if store_name:
-                    text += f" • 🏪 {store_name}"
-                text += "\n\n"
-
-            # Hint at bottom - clearer call to action
-            hint = (
-                "👆 Tanlang tugmani yoki raqam yozing"
-                if lang == "uz"
-                else "👆 Нажмите кнопку под списком или введите номер"
-            )
-            text += f"\n{hint}"
-
-            # Build keyboard with offer buttons
             keyboard = offer_keyboards.hot_offers_compact_keyboard(
                 lang,
-                result.items,
+                items,
                 page,
-                total_pages,
+                keyboard_pages,
                 show_entry_back=show_entry_back,
+                show_categories=True,
             )
 
             if edit_message:
@@ -827,10 +678,12 @@ def register_hot(
                     await target.answer(text, parse_mode="HTML", reply_markup=keyboard)
             else:
                 await target.answer(text, parse_mode="HTML", reply_markup=keyboard)
+            return True
 
         except Exception as exc:  # pragma: no cover
             log.error("Failed to send hot offers: %s", exc)
-            await target.answer(f"😔 {get_text(lang, 'error')}")
+            await target.answer(f"❌ {get_text(lang, 'error')}")
+            return False
 
     async def _send_offer_details(
         message: types.Message,
@@ -991,5 +844,8 @@ def register_hot(
         for offer in offers[:10]:
             await _send_offer_card(msg, offer, lang)
             await asyncio.sleep(0.1)
+
+
+
 
 
