@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
@@ -223,7 +223,6 @@
                 <div class="photo-upload-title">Загрузить фото</div>
                 <div class="photo-upload-subtitle">PNG/JPG до 5 МБ</div>
             `;
-        }
 
         // ============================================
         // PRODUCT MODAL (defined early for use in rendered HTML)
@@ -523,7 +522,6 @@
 
         function editProduct(productId) {
             openProductModal(productId);
-        }
 
         // ============================================
         // AUTH & API
@@ -739,7 +737,6 @@
                 console.error(`❌ Fetch error ${endpoint}:`, error);
                 throw error;
             }
-        }
 
         // ============================================
         // ORDER HELPERS
@@ -769,7 +766,6 @@
 
         function getOrderStatus(order) {
             return normalizeOrderStatus(order?.order_status || order?.status || '');
-        }
 
         // ============================================
         // UI HELPERS
@@ -910,7 +906,6 @@
                 `
             };
             document.querySelector('.content').innerHTML = loaders[type] || loaders.default;
-        }
 
         // ============================================
         // VIEW SWITCHING
@@ -958,7 +953,6 @@
                 // Scroll to top smoothly
                 content.scrollTo({ top: 0, behavior: 'smooth' });
             }, 150);
-        }
 
         // ============================================
         // DASHBOARD
@@ -1290,7 +1284,6 @@
                 section.classList.toggle('collapsed');
                 if (typeof lucide !== 'undefined') lucide.createIcons();
             }
-        }
 
         // ============================================
         // ORDERS
@@ -1656,7 +1649,7 @@
         }
 
 
-        async function updateOrderStatus(orderId, newStatus) {
+        async function updateOrderStatus(orderId, newStatus, courierPhone = '') {
             let order = null;
             let oldStatus = null;
 
@@ -1696,6 +1689,15 @@
                         method: 'POST',
                         body: JSON.stringify({ reason: 'other', comment: '' })
                     });
+                } else if (newStatus === 'delivering') {
+                    const phoneValue = String(courierPhone || '').trim();
+                    if (!phoneValue) {
+                        throw new Error('Введите телефон курьера');
+                    }
+                    await apiFetch(`/api/partner/orders/${orderId}/status?status=${newStatus}`, {
+                        method: 'POST',
+                        body: JSON.stringify({ courier_phone: phoneValue })
+                    });
                 } else {
                     await apiFetch(`/api/partner/orders/${orderId}/status?status=${newStatus}`, {
                         method: 'POST'
@@ -1709,6 +1711,7 @@
                 if (state.currentView === 'orders') {
                     setTimeout(() => loadOrders(), 500);
                 }
+                return true;
             } catch (error) {
                 console.error('Status update error:', error);
                 haptic('error');
@@ -1719,10 +1722,19 @@
                     order.status = oldStatus;
                 }
                 loadOrders();
+                return false;
             }
         }
 
         async function handleStatusUpdate(orderId, newStatus, button) {
+            if (newStatus === 'delivering') {
+                const order = state.orders.find(o => (o.order_id || o.id) === orderId);
+                if (order && getOrderType(order) === 'delivery') {
+                    openCourierPhoneModal(orderId);
+                    return;
+                }
+            }
+
             if (!button) return updateOrderStatus(orderId, newStatus);
 
             const originalText = button.innerHTML;
@@ -1879,27 +1891,95 @@
             }
         }
 
-        async function handleCancelOrder(orderId, button) {
-            if (!confirm('Вы уверены, что хотите отменить заказ?')) return;
+        function openCourierPhoneModal(orderId) {
+            haptic('light');
 
-            if (!button) return cancelOrder(orderId);
+            const modal = document.createElement('div');
+            modal.className = 'modal-overlay scale-in';
+            modal.innerHTML = `
+                <div class="modal-content modal-sm">
+                    <div class="modal-header">
+                        <h3>Телефон курьера</h3>
+                        <button class="btn-icon ripple" onclick="this.closest('.modal-overlay').remove()">
+                            <i data-lucide="x"></i>
+                        </button>
+                    </div>
+                    <form onsubmit="submitCourierPhone(event, ${orderId})">
+                        <div class="modal-body">
+                            <p class="modal-text">
+                                Укажите номер телефона курьера, чтобы клиент смог связаться.
+                            </p>
+                            <div class="form-group">
+                                <label class="modal-section-label">Телефон курьера *</label>
+                                <input type="tel" name="courier_phone" required
+                                       class="search-input" placeholder="+998 90 123 45 67" maxlength="25">
+                                <div class="form-hint">Минимум 9 цифр</div>
+                            </div>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-secondary ripple" onclick="this.closest('.modal-overlay').remove()">
+                                Отмена
+                            </button>
+                            <button type="submit" class="btn btn-primary ripple">
+                                Передать курьеру
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            `;
 
-            const originalText = button.innerHTML;
-            button.disabled = true;
-            button.innerHTML = '<span class="opacity-60">⏳ Отмена...</span>';
+            document.body.appendChild(modal);
+            if (typeof lucide !== 'undefined') lucide.createIcons();
 
-            try {
-                haptic('heavy');
-                await updateOrderStatus(orderId, 'cancelled');
-            } catch (error) {
-                button.disabled = false;
-                button.innerHTML = originalText;
+            const input = modal.querySelector('input[name="courier_phone"]');
+            if (input) input.focus();
+
+            modal.addEventListener('click', (e) => {
+                if (e.target === modal) modal.remove();
+            });
+        }
+
+        async function submitCourierPhone(event, orderId) {
+            event.preventDefault();
+            haptic('heavy');
+
+            const form = event.target;
+            const formData = new FormData(form);
+            const phoneRaw = String(formData.get('courier_phone') || '').trim();
+            const digits = phoneRaw.replace(/\D/g, '');
+
+            if (digits.length < 9) {
+                toast('Введите корректный номер телефона', 'error');
+                return;
             }
+
+            const submitBtn = form.querySelector('button[type="submit"]');
+            const originalText = submitBtn.innerHTML;
+            submitBtn.disabled = true;
+            submitBtn.innerHTML = '<span class="opacity-60">Отправка...</span>';
+
+            const ok = await updateOrderStatus(orderId, 'delivering', phoneRaw);
+            if (ok) {
+                form.closest('.modal-overlay')?.remove();
+            } else {
+                submitBtn.disabled = false;
+                submitBtn.innerHTML = originalText;
+            }
+        }
+
+        function handleCancelOrder(orderId) {
+            openCancelModal(orderId);
         }
 
         async function handleModalStatusUpdate(orderId, newStatus, button) {
             const modal = button.closest('.modal-overlay');
             const originalText = button.innerHTML;
+
+            if (newStatus === 'delivering') {
+                if (modal) modal.remove();
+                openCourierPhoneModal(orderId);
+                return;
+            }
 
             button.disabled = true;
             button.innerHTML = '<span class="opacity-60">⏳ Обновление...</span>';
@@ -1913,24 +1993,12 @@
             }
         }
 
-        async function handleModalCancelOrder(orderId, button) {
-            if (!confirm('Вы уверены, что хотите отменить заказ?')) return;
-
+        function handleModalCancelOrder(orderId, button) {
             const modal = button.closest('.modal-overlay');
-            const originalText = button.innerHTML;
-
-            button.disabled = true;
-            button.innerHTML = '<span class="opacity-60">⏳ Отмена...</span>';
-
-            try {
-                haptic('heavy');
-                await updateOrderStatus(orderId, 'cancelled');
-                if (modal) modal.remove();
-            } catch (error) {
-                button.disabled = false;
-                button.innerHTML = originalText;
-            }
+            if (modal) modal.remove();
+            openCancelModal(orderId);
         }
+
 
         // ============================================
         // PRODUCTS
@@ -2617,7 +2685,6 @@ async function toggleProductAvailability(id) {
                 toast('Ошибка удаления товара', 'error');
                 loadProducts(); // Restore on error
             }
-        }
 
         // ============================================
         // STATS
@@ -2904,7 +2971,6 @@ async function toggleProductAvailability(id) {
             `;
 
             if (typeof lucide !== 'undefined') lucide.createIcons();
-        }
 
         // ============================================
         // SETTINGS
@@ -3522,7 +3588,6 @@ async function toggleProductAvailability(id) {
                     loadSettings();
                 }
             }
-        }
 
         // ============================================
         // SMART UX DATA
@@ -3876,7 +3941,6 @@ async function toggleProductAvailability(id) {
             });
 
             console.log('⌨️ Keyboard navigation enabled');
-        }
 
         // ============================================
         // AUTO-REFRESH & NOTIFICATIONS
@@ -4107,7 +4171,6 @@ async function toggleProductAvailability(id) {
             };
             updateBadge(headerBadge);
             updateBadge(navBadge);
-        }
 
         // ============================================
         // INITIALIZATION
@@ -4177,3 +4240,12 @@ async function toggleProductAvailability(id) {
     <script src="improvements.js"></script>
 </body>
 </html>
+
+
+
+
+
+
+
+
+

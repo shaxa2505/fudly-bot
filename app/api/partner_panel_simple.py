@@ -1309,6 +1309,7 @@ async def confirm_order(
 @router.post("/orders/{order_id}/status")
 async def update_order_status(
     order_id: int,
+    request: Request,
     authorization: str = Header(None),
     status: str = Query(...),
 ):
@@ -1331,12 +1332,25 @@ async def update_order_status(
     if order_store_id != store["store_id"]:
         raise HTTPException(status_code=403, detail="Not your order")
 
+    courier_phone: str | None = None
+    if status == "delivering":
+        try:
+            payload = await request.json()
+        except Exception:
+            payload = {}
+        courier_phone = (payload or {}).get("courier_phone")
+        if not courier_phone:
+            raise HTTPException(status_code=400, detail="Courier phone required")
+        phone_digits = "".join(filter(str.isdigit, str(courier_phone)))
+        if len(phone_digits) < 9:
+            raise HTTPException(status_code=400, detail="Invalid courier phone")
+
     # Use unified service based on status
     if unified_service:
         if status == "ready":
             ok = await unified_service.mark_ready(order_id, "order")
         elif status == "delivering":
-            ok = await unified_service.start_delivery(order_id)
+            ok = await unified_service.start_delivery(order_id, courier_phone=courier_phone)
         elif status == "completed":
             ok = await unified_service.complete_order(order_id, "order")
         else:

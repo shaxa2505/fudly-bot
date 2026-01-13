@@ -233,7 +233,7 @@ async def reject_payment(callback: types.CallbackQuery):
 
 @router.callback_query(F.data.startswith("handover_courier_"))
 async def start_courier_handover(callback: types.CallbackQuery, state: FSMContext):
-    """Начало передачи заказа курьеру - запрос имени курьера"""
+    """Начало передачи заказа курьеру - запрос телефона"""
     lang = db.get_user_language(callback.from_user.id)
 
     try:
@@ -289,8 +289,6 @@ async def process_courier_phone(message: types.Message, state: FSMContext):
 
     data = await state.get_data()
     order_id = data.get("order_id")
-    courier_name = data.get("courier_name")
-
     await state.clear()
 
     order = db.get_order(order_id)
@@ -304,8 +302,8 @@ async def process_courier_phone(message: types.Message, state: FSMContext):
     await service.start_delivery(order_id, courier_phone=courier_phone)
 
     # Уведомляем продавца об успешной передаче
-    success_ru = f"✅ Заказ #{order_id} передан курьеру!\n\n🚕 Курьер: {courier_name}\n📱 Телефон: {courier_phone}"
-    success_uz = f"✅ Buyurtma #{order_id} kuryerga topshirildi!\n\n🚕 Kuryer: {courier_name}\n📱 Telefon: {courier_phone}"
+    success_ru = f"? Заказ #{order_id} передан курьеру!\n\n?? Телефон: {courier_phone}"
+    success_uz = f"? Buyurtma #{order_id} kuryerga topshirildi!\n\n?? Telefon: {courier_phone}"
     await message.answer(success_ru if lang == "ru" else success_uz)
 
     # Дополнительное сообщение клиенту с информацией о курьере
@@ -318,13 +316,11 @@ async def process_courier_phone(message: types.Message, state: FSMContext):
     kb.button(text=received_btn_text, callback_data=f"order_received_{order_id}")
 
     courier_info_ru = (
-        f"\n\n👤 Курьер: {courier_name}\n"
-        f"📱 Телефон: {courier_phone}\n"
+        f"\n\n📱 Телефон: {courier_phone}\n"
         f"📍 Адрес: {delivery_address}"
     )
     courier_info_uz = (
-        f"\n\n👤 Kuryer: {courier_name}\n"
-        f"📱 Telefon: {courier_phone}\n"
+        f"\n\n📱 Telefon: {courier_phone}\n"
         f"📍 Manzil: {delivery_address}"
     )
 
@@ -456,4 +452,9 @@ async def rate_order(callback: types.CallbackQuery):
 
     await callback.message.edit_text(thanks_ru if lang == "ru" else thanks_uz)
     await callback.answer()
+
+
+
+
+
 

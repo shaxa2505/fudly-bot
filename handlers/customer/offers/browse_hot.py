@@ -31,6 +31,69 @@ from .browse_helpers import (
 FetchOffersFn = Callable[[str | None, int, str | None, str | None], list[OfferListItem]]
 
 DEFAULT_CITY = "Ташкент"
+_CATEGORY_IDS = ["bakery", "dairy", "meat", "fruits", "vegetables", "drinks", "snacks", "frozen"]
+
+
+def _format_money(value: float | int) -> str:
+    return f"{int(value):,}".replace(",", " ")
+
+
+def _short_title(title: str, limit: int = 26) -> str:
+    cleaned = title or ""
+    if cleaned.startswith("Пример:"):
+        cleaned = cleaned[7:].strip()
+    return cleaned if len(cleaned) <= limit else f"{cleaned[: limit - 2]}.."
+
+
+def _short_store(name: str, limit: int = 16) -> str:
+    cleaned = name or ""
+    return cleaned if len(cleaned) <= limit else f"{cleaned[: limit - 2]}.."
+
+
+def _offer_price_line(offer: OfferDetails | OfferListItem, lang: str) -> str:
+    currency = "so'm" if lang == "uz" else "сум"
+    current = getattr(offer, "discount_price", 0) or getattr(offer, "price", 0) or 0
+    original = getattr(offer, "original_price", 0) or 0
+    if original and original > current:
+        discount_pct = round((1 - current / original) * 100)
+        discount_pct = min(99, max(1, discount_pct))
+        return f"💰 {_format_money(current)} {currency} (-{discount_pct}%)"
+    return f"💰 {_format_money(current)} {currency}"
+
+
+def _category_label(lang: str, category: str) -> str:
+    categories = get_product_categories(lang)
+    mapping = dict(zip(_CATEGORY_IDS, categories))
+    return mapping.get(category, category.replace("_", " ").title())
+
+
+def _render_offers_list_text(
+    lang: str,
+    title: str,
+    city: str,
+    offers: list[OfferListItem],
+    page: int,
+    total_pages: int | None,
+) -> str:
+    page_label = "Стр." if lang == "ru" else "Sah."
+    page_info = f"{page_label} {page + 1}"
+    if total_pages:
+        page_info += f"/{total_pages}"
+    lines = [title, f"📍 {city} | {page_info}", "-" * 24]
+
+    for idx, offer in enumerate(offers, start=1):
+        title_line = _short_title(offer.title, limit=28)
+        price_line = _offer_price_line(offer, lang)
+        store_name = _short_store(getattr(offer, "store_name", "") or "", limit=16)
+        meta = f"{price_line}"
+        if store_name:
+            meta += f" | 🏪 {store_name}"
+        lines.append(f"{idx}. <b>{title_line}</b>")
+        lines.append(f"   {meta}")
+        lines.append("")
+
+    lines.append(get_text(lang, "select_by_number"))
+    return "\n".join(lines).rstrip()
 
 
 def _extract_location(
@@ -227,34 +290,40 @@ def register_hot(
             )
         await callback.answer()
 
-    @dp.message(F.text.contains("Категории") | F.text.contains("Kategoriyalar"))
-    async def show_categories_handler(message: types.Message) -> None:
-        """Show product categories for filtering."""
-        if not message.from_user:
+    @dp.callback_query(F.data == "hot_offers_categories")
+    async def hot_offers_categories(callback: types.CallbackQuery, state: FSMContext) -> None:
+        """Show product categories for filtering hot offers."""
+        if not callback.from_user:
+            await callback.answer()
             return
-        lang = db.get_user_language(message.from_user.id)
-        user = db.get_user_model(message.from_user.id)
+        msg = _callback_message(callback)
+        if not msg:
+            await callback.answer()
+            return
+        lang = db.get_user_language(callback.from_user.id)
+        user = db.get_user_model(callback.from_user.id)
         if not user:
-            await message.answer(
-                "⚠️ Сессия устарела. Нажмите /start и откройте ‘🏪 Магазины и акции’ заново."
-                if lang == "ru"
-                else "⚠️ Sessiya eskirgan. /start ni bosing va ‘🏪 Do'konlar va aksiyalar’ ni qayta oching.",
-            )
+            await callback.answer(get_text(lang, "error"), show_alert=True)
             return
         city, _, _, _, _ = _extract_location(user)
 
         select_text = (
             "Выберите категорию для просмотра актуальных предложений"
             if lang == "ru"
-            else "Tegishli takliflarni korish uchun toifani tanlang"
+            else "Tegishli takliflarni ko'rish uchun toifani tanlang"
         )
         text = (
             f"🗂 <b>{'Категории товаров' if lang == 'ru' else 'Mahsulot turlari'}</b>\n\n"
             f"📍 {city}\n\n"
             f"{select_text}:"
         )
-
-        await message.answer(text, parse_mode="HTML", reply_markup=offers_category_filter(lang))
+        keyboard = offers_category_filter(
+            lang, include_back=True, back_callback="back_to_hot"
+        )
+        if not await safe_edit_message(msg, text, reply_markup=keyboard):
+            await safe_delete_message(msg)
+            await msg.answer(text, parse_mode="HTML", reply_markup=keyboard)
+        await callback.answer()
 
     @dp.callback_query(F.data == "hot_offers_refresh")
     async def refresh_hot_offers_handler(callback: types.CallbackQuery, state: FSMContext) -> None:

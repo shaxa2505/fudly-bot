@@ -1,4 +1,4 @@
-"""Store browsing and store-offer handlers split from browse.py."""
+﻿"""Store browsing and store-offer handlers split from browse.py."""
 from __future__ import annotations
 
 from typing import Any
@@ -13,7 +13,7 @@ from app.services.offer_service import OfferDetails, OfferListItem, OfferService
 from app.templates import offers as offer_templates
 from handlers.common import BrowseOffers
 from handlers.common.utils import safe_delete_message, safe_edit_message
-from localization import get_text
+from localization import get_product_categories, get_text
 
 from .browse_helpers import (
     callback_message as _callback_message,
@@ -28,6 +28,38 @@ from .browse_helpers import (
     range_text as _range_text,
 )
 
+_CATEGORY_IDS = ["bakery", "dairy", "meat", "fruits", "vegetables", "drinks", "snacks", "frozen"]
+
+
+def _category_label(lang: str, category: str) -> str:
+    if category == "all":
+        return "Все товары" if lang == "ru" else "Barcha mahsulotlar"
+    categories = get_product_categories(lang)
+    mapping = dict(zip(_CATEGORY_IDS, categories))
+    return mapping.get(category, category.replace("_", " ").title())
+
+
+def _format_money(value: float | int) -> str:
+    return f"{int(value):,}".replace(",", " ")
+
+
+def _short_title(title: str, limit: int = 26) -> str:
+    cleaned = title or ""
+    if cleaned.startswith("Пример:"):
+        cleaned = cleaned[7:].strip()
+    return cleaned if len(cleaned) <= limit else f"{cleaned[: limit - 2]}.."
+
+
+def _offer_price_line(offer: OfferDetails | OfferListItem, lang: str) -> str:
+    currency = "so'm" if lang == "uz" else "сум"
+    current = getattr(offer, "discount_price", 0) or getattr(offer, "price", 0) or 0
+    original = getattr(offer, "original_price", 0) or 0
+    if original and original > current:
+        discount_pct = round((1 - current / original) * 100)
+        discount_pct = min(99, max(1, discount_pct))
+        return f"💰 {_format_money(current)} {currency} (-{discount_pct}%)"
+    return f"💰 {_format_money(current)} {currency}"
+
 
 def register_stores(
     dp: Dispatcher,
@@ -36,33 +68,6 @@ def register_stores(
     logger: Any,
 ) -> None:
     """Register store and store-offer related handlers on dispatcher."""
-
-    @dp.message(F.text.in_(["🏪 Заведения", "🏪 Do'konlar"]))
-    async def show_establishments_handler(message: types.Message) -> None:
-        """Show establishment types (entry point)."""
-        if not message.from_user:
-            return
-        lang = db.get_user_language(message.from_user.id)
-
-        await message.answer(
-            get_text(lang, "choose_category"),  # Reuse existing text key for now
-            reply_markup=business_type_keyboard(
-                lang, include_back=True, back_callback="hot_entry_back"
-            ),
-        )
-
-    @dp.message(F.text.in_(["🏪 Заведения", "🏪 Muassasalar", "🏪 Места", "🏪 Joylar"]))
-    async def browse_places_handler(message: types.Message) -> None:
-        if not message.from_user:
-            return
-        lang = db.get_user_language(message.from_user.id)
-        await message.answer(
-            get_text(lang, "browse_by_business_type"),
-            parse_mode="HTML",
-            reply_markup=business_type_keyboard(
-                lang, include_back=True, back_callback="hot_entry_back"
-            ),
-        )
 
     @dp.callback_query(F.data.startswith("biztype_"))
     async def business_type_selected(callback: types.CallbackQuery, state: FSMContext) -> None:
@@ -222,11 +227,7 @@ def register_stores(
             return
 
         # Show category selection directly
-        text = (
-            f"🏪 <b>{store.name}</b>\n\n" f"📂 Выберите категорию товаров:"
-            if lang == "ru"
-            else f"🏪 <b>{store.name}</b>\n\n" f"📂 Mahsulot toifasini tanlang:"
-        )
+        text = f"🏪 <b>{store.name}</b>\n\n📂 {get_text(lang, 'select_category_in_store')}"
 
         keyboard = offers_category_filter(
             lang,
@@ -275,6 +276,7 @@ def register_stores(
             parse_mode="HTML",
             reply_markup=offers_category_filter(
                 lang,
+                store_id=store_id,
                 include_back=True,
                 back_callback=f"store_card_back_{store_id}",
             ),
@@ -429,11 +431,7 @@ def register_stores(
             return
 
         # Show category selection for store
-        text = (
-            f"🏪 <b>{store.name}</b>\n\n" f"📂 Выберите категорию товаров:"
-            if lang == "ru"
-            else f"🏪 <b>{store.name}</b>\n\n" f"📂 Mahsulot toifasini tanlang:"
-        )
+        text = f"🏪 <b>{store.name}</b>\n\n📂 {get_text(lang, 'select_category_in_store')}"
 
         keyboard = offers_category_filter(
             lang,
@@ -773,30 +771,45 @@ def register_stores(
         if not store:
             await callback.answer("Магазин не найден", show_alert=True)
             return
-        offers = offer_service.list_store_offers(store_id)
+        data = await state.get_data()
+        category = data.get("store_category", "all")
+        all_offers = offer_service.list_store_offers(store_id)
+
+        if category != "all":
+            category_map = {
+                "bakery": "bakery",
+                "dairy": "dairy",
+                "meat": "meat",
+                "fruits": "fruits",
+                "vegetables": "vegetables",
+                "drinks": "drinks",
+                "snacks": "snacks",
+                "frozen": "frozen",
+            }
+            db_category = category_map.get(category, category)
+            offers = [offer for offer in all_offers if offer.category == db_category]
+        else:
+            offers = all_offers
+
         if offset >= len(offers):
             await callback.answer(
                 "Больше товаров нет" if lang == "ru" else "Boshqa mahsulotlar yo'q",
                 show_alert=True,
             )
             return
-        page = offers[offset : offset + 20]
-        await _set_offer_state(state, offers)
-        text = offer_templates.render_store_offers_list(
+
+        items_per_page = 5
+        page = max(0, offset // items_per_page)
+        await _send_store_offers_list(
+            msg,
+            state,
             lang,
-            store.name,
-            page,
-            offset=offset,
-            total=len(offers),
+            store,
+            offers,
+            page=page,
+            edit_message=True,
+            category=category,
         )
-        has_more = offset + len(page) < len(offers)
-        keyboard = offer_keyboards.store_offers_keyboard(
-            lang,
-            store_id,
-            has_more,
-            offset + 20 if has_more else None,
-        )
-        await msg.answer(text, parse_mode="HTML", reply_markup=keyboard)
         await callback.answer()
 
     @dp.callback_query(F.data.startswith("store_reviews_"))
@@ -824,7 +837,9 @@ def register_stores(
         avg_rating, reviews = offer_service.get_store_reviews(store_id)
         text = offer_templates.render_store_reviews(lang, store.name, avg_rating, reviews)
         keyboard = offer_keyboards.store_reviews_keyboard(lang, store_id)
-        await msg.answer(text, parse_mode="HTML", reply_markup=keyboard)
+        if not await safe_edit_message(msg, text, reply_markup=keyboard):
+            await safe_delete_message(msg)
+            await msg.answer(text, parse_mode="HTML", reply_markup=keyboard)
         await callback.answer()
 
     @dp.callback_query(F.data.regexp(r"^back_to_store_\d+$"))
@@ -856,11 +871,7 @@ def register_stores(
             return
 
         # Show category selection
-        text = (
-            f"🏪 <b>{store.name}</b>\n\n" f"📂 Выберите категорию товаров:"
-            if lang == "ru"
-            else f"🏪 <b>{store.name}</b>\n\n" f"📂 Mahsulot toifasini tanlang:"
-        )
+        text = f"🏪 <b>{store.name}</b>\n\n📂 {get_text(lang, 'select_category_in_store')}"
 
         keyboard = offers_category_filter(
             lang,
@@ -1049,42 +1060,25 @@ def register_stores(
                 current_store_id=store_id,
                 store_category=category,
             )
+            total_pages = max(1, (total_offers + ITEMS_PER_PAGE - 1) // ITEMS_PER_PAGE)
+            page_label = "Стр." if lang == "ru" else "Sah."
+            category_title = _category_label(lang, category)
 
-            total_pages = (total_offers + ITEMS_PER_PAGE - 1) // ITEMS_PER_PAGE
-            currency = "so'm" if lang == "uz" else "сум"
-
-            # Category title
-            category_title = (
-                category.replace("_", " ").title()
-                if category != "all"
-                else ("Все категории" if lang == "ru" else "Barcha toifalar")
-            )
-
-            # Clean professional header
-            text = f"🏪 <b>{store.name}</b> | 📂 {category_title}\n"
-            text += f"{'Стр.' if lang == 'ru' else 'Sah.'} {page + 1}/{total_pages} ({total_offers} {'махсулот' if lang == 'uz' else 'товаров'})\n"
-            text += "─" * 28 + "\n\n"
+            lines = [
+                f"🏪 <b>{store.name}</b>",
+                f"🗂 {category_title} | {page_label} {page + 1}/{total_pages}",
+                "-" * 24,
+            ]
 
             for idx, offer in enumerate(page_offers, start=1):
-                title = offer.title[:25] + ".." if len(offer.title) > 25 else offer.title
-                discount_pct = 0
-                if offer.original_price and offer.discount_price and offer.original_price > 0:
-                    discount_pct = round((1 - offer.discount_price / offer.original_price) * 100)
+                title = _short_title(offer.title, limit=28)
+                price_line = _offer_price_line(offer, lang)
+                lines.append(f"{idx}. <b>{title}</b>")
+                lines.append(f"   {price_line}")
+                lines.append("")
 
-                # Clean format: number + title on first line
-                text += f"<b>{idx}.</b> {title}\n"
-                # Price on second line - compact
-                if offer.original_price and discount_pct > 0:
-                    text += f"    <s>{int(offer.original_price):,}</s> → <b>{int(offer.discount_price):,}</b> {currency} <i>(-{discount_pct}%)</i>\n"
-                else:
-                    price_kopeks = (
-                        getattr(offer, "discount_price", 0) or getattr(offer, "price", 0) or 0
-                    )
-                    text += f"    <b>{int(price_kopeks):,}</b> {currency}\n"
-
-            # Hint at bottom
-            hint = "👆 Tanlang" if lang == "uz" else "👆 Выберите товар"
-            text += f"\n{hint}"
+            lines.append(get_text(lang, "select_by_number"))
+            text = "\n".join(lines).rstrip()
 
             # Build keyboard with offer buttons
             keyboard = offer_keyboards.store_offers_compact_keyboard(
@@ -1115,3 +1109,4 @@ def register_stores(
         logger.info(
             f"📝 FSM state after set: state={current_state}, data_keys={list(current_data.keys())}"
         )
+

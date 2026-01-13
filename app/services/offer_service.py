@@ -365,6 +365,7 @@ class OfferService:
         city: str | None,
         category: str,
         limit: int = 20,
+        offset: int = 0,
         region: str | None = None,
         district: str | None = None,
     ) -> list[OfferListItem]:
@@ -376,6 +377,7 @@ class OfferService:
                     city=scope_city,
                     category=category,
                     limit=limit,
+                    offset=offset,
                     region=scope_region,
                     district=scope_district,
                 )
@@ -389,16 +391,18 @@ class OfferService:
         self,
         city: str | None,
         limit: int = 20,
+        offset: int = 0,
         region: str | None = None,
         district: str | None = None,
+        sort_by: str | None = "discount",
     ) -> list[OfferListItem]:
         result = self.list_hot_offers(
             city=city,
             limit=limit,
-            offset=0,
+            offset=offset,
             region=region,
             district=district,
-            sort_by="discount",
+            sort_by=sort_by,
         )
         return result.items
 
