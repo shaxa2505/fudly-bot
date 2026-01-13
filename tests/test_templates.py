@@ -322,14 +322,12 @@ class TestRenderOfferDetails:
         """Test rendering offer details in Russian."""
         result = render_offer_details(lang="ru", offer=sample_offer_details)
 
-        assert "Хлеб белый" in result
-        assert "Свежий белый хлеб" in result
-        assert "5,000" in result
-        assert "10,000" in result
-        assert "Супермаркет Тест" in result
-        assert "Доступно" in result
-        assert "10 шт" in result
-        assert "Годен до" in result
+        assert sample_offer_details.title in result
+        assert "5 000" in result
+        assert "10 000" in result
+        assert "выгода" in result
+        assert "В наличии" in result
+        assert sample_offer_details.store_name in result
 
     def test_render_offer_with_store(
         self, sample_offer_details: OfferDetails, sample_store_details: StoreDetails
@@ -339,11 +337,8 @@ class TestRenderOfferDetails:
             lang="ru", offer=sample_offer_details, store=sample_store_details
         )
 
-        # Should use store name from StoreDetails
-        assert "Тестовый магазин" in result
-        # Should show delivery info from store
+        assert sample_store_details.name in result
         assert "Доставка" in result
-
 
 # =============================================================================
 # Tests for render_store_offers_list
@@ -446,10 +441,12 @@ class TestRenderOfferCard:
         """Test rendering offer card in Russian."""
         result = render_offer_card(lang="ru", offer=sample_offer_item)
 
-        assert "Хлеб белый" in result
-        assert "5,000" in result
-        # Note: store_name and store_address are not rendered in offer_card
-        assert "В наличии" in result  # Changed from "Доступно" to "В наличии"
+        assert sample_offer_item.title in result
+        assert "5 000" in result
+        assert "10 000" in result
+        assert "выгода" in result
+        assert "В наличии" in result
+        assert sample_offer_item.store_name in result
         assert "Доставка" in result
 
     def test_render_offer_card_without_delivery(self) -> None:
@@ -466,7 +463,7 @@ class TestRenderOfferCard:
         )
         result = render_offer_card(lang="ru", offer=offer)
 
-        assert "🚚" not in result
+        assert "Только самовывоз" in result
 
 
 # =============================================================================

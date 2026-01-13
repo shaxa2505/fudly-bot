@@ -15,7 +15,7 @@ from app.keyboards import (
     search_results_compact_keyboard,
 )
 from app.services.offer_service import OfferService
-from app.templates.offers import render_offer_card
+from app.templates.offers import render_offer_card, render_offer_details
 from database_protocol import DatabaseProtocol
 from handlers.common.states import BrowseOffers, Search
 from handlers.common.utils import is_main_menu_button, is_search_button
@@ -589,10 +589,7 @@ def setup(
 
             # Get store details
             store = offer_service.get_store(offer.store_id) if offer.store_id else None
-            store_name = store.name if store else "Магазин"
-            store_address = store.address if store else ""
             delivery_enabled = store.delivery_enabled if store else False
-            delivery_price = store.delivery_price if store and delivery_enabled else 0
 
             max_quantity = offer.quantity or 0
             if max_quantity <= 0:
@@ -615,34 +612,7 @@ def setup(
                 search_page=0,
             )
 
-            # Build offer card text
-            discount_pct = 0
-            if offer.original_price and offer.original_price > offer.discount_price:
-                discount_pct = round((1 - offer.discount_price / offer.original_price) * 100)
-
-            lines = [f"🏷 <b>{offer.title}</b>"]
-            if offer.description:
-                lines.append(f"<i>{offer.description[:100]}</i>")
-            lines.append("")
-
-            if discount_pct > 0:
-                lines.append(
-                    f"<s>{offer.original_price:,.0f}</s> → <b>{offer.discount_price:,.0f} сум</b> (-{discount_pct}%)"
-                )
-            else:
-                lines.append(f"💰 <b>{offer.discount_price:,.0f} сум</b>")
-
-            lines.append(f"📦 В наличии: {max_quantity} шт")
-            if offer.expiry_date:
-                lines.append(f"📅 Годен до: {offer.expiry_date}")
-            lines.append("")
-            lines.append(f"🏪 {store_name}")
-            if store_address:
-                lines.append(f"📍 {store_address}")
-            if delivery_enabled:
-                lines.append(f"🚚 Доставка: {delivery_price:,.0f} сум")
-
-            text = "\n".join(lines)
+            text = render_offer_details(lang, offer, store)
 
             # Use keyboard with cart buttons and back to search
             from app.keyboards.offers import offer_details_search_keyboard
@@ -1044,10 +1014,7 @@ def setup(
             if msg and details:
                 # Get store details
                 store = offer_service.get_store(details.store_id) if details.store_id else None
-                store_name = store.name if store else "Магазин"
-                store_address = store.address if store else ""
                 delivery_enabled = store.delivery_enabled if store else False
-                delivery_price = store.delivery_price if store and delivery_enabled else 0
 
                 max_quantity = details.quantity or 0
                 if max_quantity <= 0:
@@ -1057,36 +1024,7 @@ def setup(
                     )
                     return
 
-                # Build offer card text
-                discount_pct = 0
-                if details.original_price and details.original_price > details.discount_price:
-                    discount_pct = round(
-                        (1 - details.discount_price / details.original_price) * 100
-                    )
-
-                lines = [f"🏷 <b>{details.title}</b>"]
-                if details.description:
-                    lines.append(f"<i>{details.description[:100]}</i>")
-                lines.append("")
-
-                if discount_pct > 0:
-                    lines.append(
-                        f"<s>{details.original_price:,.0f}</s> → <b>{details.discount_price:,.0f} сум</b> (-{discount_pct}%)"
-                    )
-                else:
-                    lines.append(f"💰 <b>{details.discount_price:,.0f} сум</b>")
-
-                lines.append(f"📦 В наличии: {max_quantity} шт")
-                if details.expiry_date:
-                    lines.append(f"📅 Годен до: {details.expiry_date}")
-                lines.append("")
-                lines.append(f"🏪 {store_name}")
-                if store_address:
-                    lines.append(f"📍 {store_address}")
-                if delivery_enabled:
-                    lines.append(f"🚚 Доставка: {delivery_price:,.0f} сум")
-
-                text = "\n".join(lines)
+                text = render_offer_details(lang, details, store)
 
                 # Use keyboard with cart buttons and back to search
                 from app.keyboards.offers import offer_details_search_keyboard

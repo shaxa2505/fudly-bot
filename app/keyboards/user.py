@@ -232,15 +232,12 @@ def offers_category_filter(
 
     # "All offers" button на всю ширину
     if store_id:
-        builder.button(
-            text=f"📋 {'Все категории' if lang == 'ru' else 'Barcha toifalar'}",
-            callback_data=f"store_cat_{store_id}_all",
-        )
+        all_label = "Все товары" if lang == "ru" else "Barcha mahsulotlar"
+        callback_data = f"store_cat_{store_id}_all"
     else:
-        builder.button(
-            text=f"📋 {'Все категории' if lang == 'ru' else 'Barcha toifalar'}",
-            callback_data="offers_all",
-        )
+        all_label = "Все категории" if lang == "ru" else "Barcha toifalar"
+        callback_data = "offers_all"
+    builder.button(text=f"📋 {all_label}", callback_data=callback_data)
 
     # Product categories for filtering with emojis
     for i, category in enumerate(categories):

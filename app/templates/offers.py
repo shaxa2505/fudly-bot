@@ -1,6 +1,7 @@
 """Text templates for offer-related handlers."""
 from __future__ import annotations
 
+import html
 from collections.abc import Iterable, Sequence
 from typing import Any
 
@@ -203,64 +204,7 @@ def render_store_card(lang: str, store: StoreDetails) -> str:
 
 
 def render_offer_details(lang: str, offer: OfferDetails, store: StoreDetails | None = None) -> str:
-    lines = []
-
-    # Title with emoji
-    lines.append(f"🎉 <b>{offer.title}</b>")
-    lines.append("")
-
-    # Description
-    if offer.description:
-        lines.append(f"📝 {offer.description}")
-        lines.append("")
-
-    # Price section with box
-    lines.append("┌────────────────────────")
-    price_line = _format_price_line(offer, lang)
-    lines.append(f"│ {price_line}")
-    lines.append("└────────────────────────")
-    lines.append("")
-
-    # Store info
-    store_name = store.name if store else offer.store_name
-    store_address = store.address if store else offer.store_address
-    store_city = store.city if store else offer.store_city
-
-    lines.append(f"🏪 <b>{store_name}</b>")
-    if store_address or store_city:
-        location = " · ".join(filter(None, [store_address, store_city]))
-        lines.append(f"📍 {location}")
-    lines.append("")
-
-    # Stock and expiry
-    stock_label = "Доступно" if lang == "ru" else "Mavjud"
-    lines.append(f"📦 {stock_label}: <b>{offer.quantity} {offer.unit}</b>")
-
-    if offer.expiry_date:
-        expiry_label = "Годен до" if lang == "ru" else "Yaroqlilik"
-        expiry_str = str(offer.expiry_date)[:10]
-        try:
-            from datetime import datetime
-
-            dt = datetime.strptime(expiry_str, "%Y-%m-%d")
-            expiry_str = dt.strftime("%d.%m.%Y")
-        except Exception:
-            pass
-        lines.append(f"⏰ {expiry_label}: {expiry_str}")
-
-    # Доставка (если доступна)
-    if store and store.delivery_enabled:
-        lines.append("")
-        currency = "сум" if lang == "ru" else "so'm"
-        delivery_label = "Доставка" if lang == "ru" else "Yetkazib berish"
-        lines.append(f"🚚 {delivery_label}: <b>{store.delivery_price:,.0f} {currency}</b>")
-        if store.min_order_amount:
-            min_label = "Мин. заказ" if lang == "ru" else "Min. buyurtma"
-            lines.append(f"   {min_label}: {store.min_order_amount:,.0f} {currency}")
-
-    return "\n".join(lines)
-
-
+    return format_product_card(offer, lang=lang, store=store)
 def render_store_offers_list(
     lang: str,
     store_name: str,
@@ -320,46 +264,172 @@ def render_store_reviews(
 
 
 def render_offer_card(lang: str, offer: OfferListItem) -> str:
-    """Render clean, minimal offer card."""
-    lines = [f"<b>{offer.title}</b>"]
+    return format_product_card(offer, lang=lang)
 
-    # Price line with discount
-    lines.append(_format_price_line(offer, lang))
+def format_product_card(
+    offer: OfferListItem,
+    lang: str = "ru",
+    store: StoreDetails | None = None,
+    max_lines: int = 10,
+) -> str:
+    labels = _product_card_labels(lang)
+    raw_title = offer.title or ""
+    if raw_title.startswith("Пример:"):
+        raw_title = raw_title[7:].strip()
+    title = _trim_title(raw_title, limit=36)
+    lines = [f"🏷 <b>{_escape(title)}</b>"]
 
-    # Category if available
-    if hasattr(offer, "category") and offer.category:
-        lines.append(f"🏷 {offer.category}")
+    current_price = getattr(offer, "discount_price", None)
+    if current_price is None:
+        current_price = getattr(offer, "price", 0) or 0
+    original_price = getattr(offer, "original_price", 0) or 0
 
-    # Stock and expiry on same area
-    unit = offer.unit or "шт"
-    if offer.quantity is not None and offer.quantity > 0:
-        stock_label = "Mavjud" if lang == "uz" else "В наличии"
-        lines.append(f"\n{stock_label}: <b>{offer.quantity} {unit}</b>")
+    if original_price and original_price > current_price:
+        discount_pct = round((1 - current_price / original_price) * 100)
+        discount_pct = min(99, max(1, discount_pct))
+        lines.append(
+            f"💰 <b>{_format_money(current_price)}</b> {labels['currency']} • -{discount_pct}%"
+        )
+        lines.append(
+            f"<s>{_format_money(original_price)}</s> • {labels['save']} "
+            f"{_format_money(original_price - current_price)} {labels['currency']}"
+        )
+    else:
+        lines.append(f"💰 <b>{_format_money(current_price)}</b> {labels['currency']}")
 
-    if offer.expiry_date:
-        expiry_label = "Yaroqlilik" if lang == "uz" else "Срок"
-        expiry_str = str(offer.expiry_date)[:10]
-        try:
-            from datetime import datetime
+    qty = getattr(offer, "quantity", None)
+    if qty is not None:
+        if qty <= 0:
+            lines.append(labels["out_of_stock"])
+        else:
+            unit = offer.unit or labels["unit"]
+            lines.append(f"📦 {labels['in_stock']}: {qty} {unit}")
 
-            dt = datetime.strptime(expiry_str, "%Y-%m-%d")
-            expiry_str = dt.strftime("%d.%m.%Y")
-        except Exception:
-            pass
-        lines.append(f"{expiry_label}: {expiry_str}")
+    optional: list[tuple[int, str]] = []
 
-    # Delivery info (compact)
-    if offer.delivery_enabled:
-        currency = "so'm" if lang == "uz" else "сум"
-        delivery_text = "Yetkazib berish" if lang == "uz" else "Доставка"
-        min_text = "Min. buyurtma" if lang == "uz" else "Мин. заказ"
-        lines.append(f"\n🚚 {delivery_text}: {offer.delivery_price:,.0f} {currency}")
-        if offer.min_order_amount:
-            lines.append(f" {min_text}: {offer.min_order_amount:,.0f} {currency}")
+    expiry_date = getattr(offer, "expiry_date", None)
+    if expiry_date:
+        date_str = _format_date(expiry_date)
+        if date_str:
+            if _days_until(expiry_date) <= 2:
+                optional.append((1, f"⚠️ {labels['expiry']}: {date_str}"))
+            else:
+                optional.append((1, f"⏰ {labels['expiry']}: {date_str}"))
+
+    store_name = None
+    store_address = None
+    delivery_enabled = None
+    delivery_price = None
+    min_order_amount = None
+    if store:
+        store_name = store.name
+        store_address = store.address
+        delivery_enabled = store.delivery_enabled
+        delivery_price = store.delivery_price
+        min_order_amount = store.min_order_amount
+    else:
+        store_name = getattr(offer, "store_name", None)
+        store_address = getattr(offer, "store_address", None)
+        delivery_enabled = getattr(offer, "delivery_enabled", None)
+        delivery_price = getattr(offer, "delivery_price", None)
+        min_order_amount = getattr(offer, "min_order_amount", None)
+
+    if store_name:
+        optional.append((1, f"🏪 {_escape(_trim_title(store_name, limit=28))}"))
+    if store_address:
+        optional.append((2, f"📍 {_escape(_trim_title(store_address, limit=32))}"))
+
+    if delivery_enabled is True:
+        if delivery_price and delivery_price > 0:
+            optional.append(
+                (3, f"🚚 {labels['delivery']}: {_format_money(delivery_price)} {labels['currency']}")
+            )
+        else:
+            optional.append((3, f"🚚 {labels['delivery_free']}"))
+        if min_order_amount and min_order_amount > 0:
+            optional.append(
+                (4, f"🧾 {labels['min_order']}: {_format_money(min_order_amount)} {labels['currency']}")
+            )
+    elif delivery_enabled is False:
+        optional.append((3, f"🚶 {labels['delivery_none']}"))
+
+    for _, line in sorted(optional, key=lambda item: item[0]):
+        if len(lines) >= max_lines:
+            break
+        lines.append(line)
 
     return "\n".join(lines)
 
 
+def formatProductCard(product: OfferListItem, lang: str = "ru") -> str:
+    return format_product_card(product, lang=lang)
+
+
+def _product_card_labels(lang: str) -> dict[str, str]:
+    if lang == "ru":
+        return {
+            "currency": "сум",
+            "save": "выгода",
+            "in_stock": "В наличии",
+            "out_of_stock": "⛔ Нет в наличии",
+            "expiry": "Срок до",
+            "delivery": "Доставка",
+            "delivery_free": "Доставка: бесплатно",
+            "delivery_none": "Только самовывоз",
+            "min_order": "Мин. заказ",
+            "unit": "шт",
+        }
+    return {
+        "currency": "so'm",
+        "save": "tejash",
+        "in_stock": "Mavjud",
+        "out_of_stock": "⛔ Mavjud emas",
+        "expiry": "Yaroqlilik",
+        "delivery": "Yetkazib berish",
+        "delivery_free": "Yetkazib berish: bepul",
+        "delivery_none": "Faqat olib ketish",
+        "min_order": "Min. buyurtma",
+        "unit": "dona",
+    }
+
+
+def _format_money(value: float) -> str:
+    return f"{int(value):,}".replace(",", " ")
+
+
+def _format_date(value: str | Any) -> str:
+    try:
+        from datetime import datetime
+
+        if isinstance(value, str):
+            expiry_str = value[:10]
+            dt = datetime.strptime(expiry_str, "%Y-%m-%d")
+        else:
+            dt = value
+        now = datetime.now()
+        if dt.year == now.year:
+            return dt.strftime("%d.%m")
+        return dt.strftime("%d.%m.%Y")
+    except Exception:
+        return str(value)[:10]
+
+
+def _days_until(value: str | Any) -> int:
+    try:
+        from datetime import datetime
+
+        if isinstance(value, str):
+            expiry_str = value[:10]
+            dt = datetime.strptime(expiry_str, "%Y-%m-%d")
+        else:
+            dt = value
+        return int((dt.date() - datetime.now().date()).days)
+    except Exception:
+        return 999
+
+
+def _escape(text: str) -> str:
+    return html.escape(text or "")
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------

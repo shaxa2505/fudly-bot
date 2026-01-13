@@ -103,7 +103,12 @@ def store_card_keyboard(
 ) -> InlineKeyboardMarkup:
     builder = InlineKeyboardBuilder()
     products = "🛍 Посмотреть товары" if lang == "ru" else "🛍 Mahsulotlarni ko'rish"
-    back = back_text or ("◀️ Назад" if lang == "ru" else "◀️ Orqaga")
+    if back_text:
+        back = back_text
+    elif back_callback == "back_to_store_list":
+        back = "◀️ К списку магазинов" if lang == "ru" else "◀️ Do'konlar ro'yxati"
+    else:
+        back = "◀️ Назад" if lang == "ru" else "◀️ Orqaga"
 
     # Показывать количество только если товары есть
     if offers_count > 0:
@@ -289,13 +294,7 @@ def store_offers_compact_keyboard(
         nav_builder.button(text="▶️", callback_data=f"store_offers_page_{store_id}_{page + 1}")
 
     # Back button
-    back = (
-        "🏪"
-        if page > 0 or page < total_pages - 1
-        else "◀️ Do'konga"
-        if lang == "uz"
-        else "◀️ К магазину"
-    )
+    back = "◀️ К магазину" if lang == "ru" else "◀️ Do'konga"
     nav_builder.button(text=back, callback_data=f"back_to_store_{store_id}")
 
     # Adjust nav: pagination buttons + back
@@ -355,7 +354,7 @@ def store_list_keyboard(
         nav_row.append(1)
 
     # Back button
-    back = "◀️ Назад" if lang == "ru" else "◀️ Orqaga"
+    back = "◀️ К категориям" if lang == "ru" else "◀️ Toifalarga"
     builder.button(text=back, callback_data="back_to_places")
 
     # Final adjust: store buttons (2 cols), then nav row, then back

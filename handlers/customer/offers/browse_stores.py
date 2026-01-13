@@ -635,7 +635,6 @@ def register_stores(
 
         # Get store info
         store = offer_service.get_store(offer.store_id) if offer.store_id else None
-        store_name = store.name if store else ("Do'kon" if lang == "uz" else "Магазин")
 
         max_quantity = offer.quantity or 0
         if max_quantity <= 0:
@@ -643,70 +642,8 @@ def register_stores(
             await callback.answer(sold_out, show_alert=True)
             return
 
-        # Localized labels
-        currency = "so'm" if lang == "uz" else "сум"
-        in_stock_label = "Mavjud" if lang == "uz" else "В наличии"
-        expiry_label = "Yaroqlilik" if lang == "uz" else "Годен до"
-        delivery_label = "Yetkazish" if lang == "uz" else "Доставка"
-
-        # Build offer card text
-        discount_pct = 0
-        if offer.original_price and offer.original_price > offer.discount_price:
-            discount_pct = min(
-                99, max(0, round((1 - offer.discount_price / offer.original_price) * 100))
-            )
-
-        # Clean title
-        title = offer.title
-        if title.startswith("Пример:"):
-            title = title[7:].strip()
-
-        lines = [f"🏷 <b>{title}</b>"]
-
-        # Only show description if different from title
-        if offer.description and offer.description.strip() != offer.title.strip():
-            desc = offer.description
-            if desc.startswith("Пример:"):
-                desc = desc[7:].strip()
-            if desc and desc != title:
-                lines.append(f"<i>{desc[:100]}</i>")
-
-        lines.append("")
-
-        if discount_pct > 0:
-            lines.append(
-                f"<s>{int(offer.original_price):,}</s> → <b>{int(offer.discount_price):,} {currency}</b> (-{discount_pct}%)"
-            )
-        else:
-            lines.append(f"💰 <b>{int(offer.discount_price):,} {currency}</b>")
-
-        # Use actual unit from offer, fallback to dona/шт
-        unit_label = offer.unit if offer.unit else ("dona" if lang == "uz" else "шт")
-        lines.append(f"📦 {in_stock_label}: {max_quantity} {unit_label}")
-        if offer.expiry_date:
-            expiry_str = str(offer.expiry_date)[:10]
-            try:
-                from datetime import datetime
-
-                dt = datetime.strptime(expiry_str, "%Y-%m-%d")
-                expiry_str = dt.strftime("%d.%m.%Y")
-            except Exception:
-                pass
-            lines.append(f"📅 {expiry_label}: {expiry_str}")
-        lines.append("")
-        lines.append(f"🏪 {store_name}")
-
-        # Get store details for delivery info
-        store_address = store.address if store else ""
         delivery_enabled = store.delivery_enabled if store else False
-        delivery_price = store.delivery_price if store and delivery_enabled else 0
-
-        if store_address:
-            lines.append(f"📍 {store_address}")
-        if delivery_enabled:
-            lines.append(f"🚚 {delivery_label}: {int(delivery_price):,} {currency}")
-
-        text = "\n".join(lines)
+        text = offer_templates.render_offer_details(lang, offer, store)
 
         # Use cart keyboard
         kb = offer_keyboards.offer_details_with_back_keyboard(

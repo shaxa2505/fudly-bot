@@ -389,78 +389,9 @@ def register_hot(
 
         # Get store details
         store = offer_service.get_store(offer.store_id) if offer.store_id else None
-        store_name = store.name if store else ("Do'kon" if lang == "uz" else "Магазин")
-        store_address = store.address if store else ""
         delivery_enabled = store.delivery_enabled if store else False
-        delivery_price = store.delivery_price if store and delivery_enabled else 0
 
-        # Localized labels
-        currency = "so'm" if lang == "uz" else "сум"
-        in_stock_label = "Mavjud" if lang == "uz" else "В наличии"
-        expiry_label = "Yaroqlilik" if lang == "uz" else "Годен до"
-        delivery_label = "Yetkazish" if lang == "uz" else "Доставка"
-        pickup_label = "Olib ketish" if lang == "uz" else "Самовывоз"
-        free_label = "bepul" if lang == "uz" else "бесплатно"
-        pickup_only = "Faqat olib ketish" if lang == "uz" else "Только самовывоз"
-
-        # Build offer card text
-        discount_pct = 0
-        if offer.original_price and offer.original_price > offer.discount_price:
-            discount_pct = min(
-                99, max(0, round((1 - offer.discount_price / offer.original_price) * 100))
-            )
-
-        # Clean title - remove "Пример:" prefix if present
-        title = offer.title
-        if title.startswith("Пример:"):
-            title = title[7:].strip()
-
-        lines = [f"🏷 <b>{title}</b>"]
-
-        # Only show description if different from title
-        if offer.description and offer.description.strip() != offer.title.strip():
-            desc = offer.description
-            if desc.startswith("Пример:"):
-                desc = desc[7:].strip()
-            if desc and desc != title:
-                lines.append(f"<i>{desc[:100]}</i>")
-
-        lines.append("")
-
-        if discount_pct > 0:
-            lines.append(
-                f"<s>{int(offer.original_price):,}</s> → <b>{int(offer.discount_price):,} {currency}</b> (-{discount_pct}%)"
-            )
-        else:
-            lines.append(f"💰 <b>{int(offer.discount_price):,} {currency}</b>")
-
-        # Use actual unit from offer, fallback to dona/шт
-        unit_label = offer.unit if offer.unit else ("dona" if lang == "uz" else "шт")
-        lines.append(f"📦 {in_stock_label}: {max_quantity} {unit_label}")
-        if offer.expiry_date:
-            expiry_str = str(offer.expiry_date)[:10]
-            try:
-                from datetime import datetime
-
-                dt = datetime.strptime(expiry_str, "%Y-%m-%d")
-                expiry_str = dt.strftime("%d.%m.%Y")
-            except Exception:
-                pass
-            lines.append(f"📅 {expiry_label}: {expiry_str}")
-        lines.append("")
-        lines.append(f"🏪 {store_name}")
-        if store_address:
-            lines.append(f"📍 {store_address}")
-
-        # Delivery/pickup options
-        lines.append("")
-        if delivery_enabled:
-            lines.append(f"🚚 {delivery_label}: {int(delivery_price):,} {currency}")
-            lines.append(f"🏪 {pickup_label}: {free_label}")
-        else:
-            lines.append(f"🏪 {pickup_only}")
-
-        text = "\n".join(lines)
+        text = offer_templates.render_offer_details(lang, offer, store)
 
         # Use keyboard with cart buttons
         kb = offer_keyboards.offer_details_with_back_keyboard(
@@ -889,70 +820,7 @@ def register_hot(
     ) -> None:
         """Edit current message to show offer details (no new message)."""
         store = offer_service.get_store(offer.store_id)
-        currency = "so'm" if lang == "uz" else "сум"
-
-        # Clean professional card format
-        lines = [f"📦 <b>{offer.title}</b>"]
-
-        if offer.description:
-            desc = (
-                offer.description[:100] + "..."
-                if len(offer.description) > 100
-                else offer.description
-            )
-            lines.append(f"<i>{desc}</i>")
-
-        lines.append("")
-        lines.append("─" * 25)
-
-        # Price with discount
-        if offer.original_price and offer.discount_price:
-            discount_pct = round((1 - offer.discount_price / offer.original_price) * 100)
-            lines.append(
-                f"<s>{int(offer.original_price):,}</s> → <b>{int(offer.discount_price):,}</b> {currency} <b>(-{discount_pct}%)</b>"
-            )
-        else:
-            lines.append(f"💰 <b>{int(offer.discount_price):,}</b> {currency}")
-
-        lines.append("─" * 25)
-        lines.append("")
-
-        # Stock info
-        stock_label = "Mavjud" if lang == "uz" else "В наличии"
-        unit = offer.unit or "шт"
-        lines.append(f"📦 {stock_label}: <b>{offer.quantity}</b> {unit}")
-
-        # Expiry date
-        if offer.expiry_date:
-            expiry_label = "Yaroqlilik" if lang == "uz" else "Срок до"
-            expiry_str = str(offer.expiry_date)[:10]
-            try:
-                from datetime import datetime
-
-                dt = datetime.strptime(expiry_str, "%Y-%m-%d")
-                expiry_str = dt.strftime("%d.%m.%Y")
-            except Exception:
-                pass
-            lines.append(f"📅 {expiry_label}: {expiry_str}")
-
-        # Store info
-        lines.append("")
-        store_name = store.name if store else offer.store_name
-        store_addr = store.address if store else offer.store_address
-        lines.append(f"🏪 {store_name}")
-        if store_addr:
-            lines.append(f"📍 {store_addr}")
-
-        # Delivery info
-        if store and store.delivery_enabled:
-            lines.append("")
-            delivery_label = "Yetkazish" if lang == "uz" else "Доставка"
-            lines.append(f"🚚 {delivery_label}: {int(store.delivery_price):,} {currency}")
-            if store.min_order_amount:
-                min_label = "Min." if lang == "uz" else "Мин."
-                lines.append(f"   {min_label}: {int(store.min_order_amount):,} {currency}")
-
-        text = "\n".join(lines)
+        text = offer_templates.render_offer_details(lang, offer, store)
 
         # Keyboard with back button
         keyboard = offer_keyboards.offer_details_with_back_keyboard(
