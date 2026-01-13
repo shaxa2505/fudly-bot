@@ -408,10 +408,49 @@ def register_hot(
         await _send_offer_details(message, details, lang, with_back=True)
 
     @dp.callback_query(F.data == "offers_all")
-    async def show_all_offers(callback: types.CallbackQuery) -> None:
-        await _show_offers_catalog(callback, offer_service.list_top_offers, logger)
+    async def show_all_offers(callback: types.CallbackQuery, state: FSMContext) -> None:
+        if not callback.from_user:
+            await callback.answer()
+            return
+        msg = _callback_message(callback)
+        if not msg:
+            await callback.answer()
+            return
+        lang = db.get_user_language(callback.from_user.id)
+        user = db.get_user_model(callback.from_user.id)
+        if not user:
+            await callback.answer(get_text(lang, "error"), show_alert=True)
+            return
+        city, region, district, latitude, longitude = _extract_location(user)
+        search_city = normalize_city(city)
+        search_region = normalize_city(region) if region else None
+        search_district = normalize_city(district) if district else None
+        data = await state.get_data()
+        show_entry_back = data.get("hot_entry_back")
 
-    @dp.callback_query(F.data.startswith("offers_cat_"))
+        sent = await _send_hot_offers_list(
+            msg,
+            state,
+            lang,
+            city,
+            search_city,
+            search_region,
+            search_district,
+            latitude,
+            longitude,
+            offer_service,
+            logger,
+            page=0,
+            edit_message=True,
+            show_entry_back=show_entry_back,
+            filter_mode="all",
+        )
+        if not sent:
+            await callback.answer(get_text(lang, "no_offers"), show_alert=True)
+            return
+        await callback.answer()
+
+        @dp.callback_query(F.data.startswith("offers_cat_"))
     async def filter_offers_by_category(callback: types.CallbackQuery, state: FSMContext) -> None:
         if not callback.from_user or not callback.data:
             await callback.answer()
@@ -425,9 +464,13 @@ def register_hot(
         if not user:
             await callback.answer(get_text(lang, "error"), show_alert=True)
             return
-        city, region, district, _, _ = _extract_location(user)
-        categories = get_product_categories(lang)  # Используем категории товаров
 
+        city, region, district, latitude, longitude = _extract_location(user)
+        search_city = normalize_city(city)
+        search_region = normalize_city(region) if region else None
+        search_district = normalize_city(district) if district else None
+
+        categories = get_product_categories(lang)
         try:
             cat_index = int(callback.data.split("_")[-1])
         except (ValueError, IndexError) as e:
@@ -436,58 +479,43 @@ def register_hot(
             return
 
         if cat_index >= len(categories):
-            await callback.answer("Ошибка", show_alert=True)
+            await callback.answer(get_text(lang, "error"), show_alert=True)
             return
-        category = categories[cat_index]
-        normalized = normalize_category(category)
 
-        # Check if we are viewing a specific store
-        state_data = await state.get_data()
-        viewing_store_id = state_data.get("viewing_store_id")
+        category_label = categories[cat_index]
+        normalized = normalize_category(category_label)
 
-        if viewing_store_id:
-            # Filter by store AND category
-            offers = offer_service.list_active_offers_by_store(viewing_store_id)
-            # Filter in memory for now as list_active_offers_by_store returns all
-            # Ideally should have list_store_offers_by_category
-            offers = [
-                o for o in offers if o.store_category == normalized or o.store_category == category
-            ]
-        else:
-            # Global category filter
-            offers = offer_service.list_offers_by_category(
-                normalize_city(city),
-                normalized,
-                limit=20,
-                region=normalize_city(region) if region else None,
-                district=normalize_city(district) if district else None,
+        data = await state.get_data()
+        show_entry_back = data.get("hot_entry_back")
+
+        sent = await _send_hot_offers_list(
+            msg,
+            state,
+            lang,
+            city,
+            search_city,
+            search_region,
+            search_district,
+            latitude,
+            longitude,
+            offer_service,
+            logger,
+            page=0,
+            edit_message=True,
+            show_entry_back=show_entry_back,
+            filter_mode="category",
+            category_id=normalized,
+            category_label=category_label,
+        )
+        if not sent:
+            no_offers_msg = (
+                f"В категории {category_label} нет предложений"
+                if lang == "ru"
+                else f"{category_label} toifasida takliflar yo'q"
             )
-
-        if not offers:
-            no_offers_msg = f"😔 {'В категории' if lang == 'ru' else 'Toifada'} {category} {'нет предложений' if lang == 'ru' else 'takliflar yoq'}"
             await callback.answer(no_offers_msg, show_alert=True)
             return
         await callback.answer()
-
-        # Улучшенный заголовок с информацией
-        select_msg = "Выберите товар для бронирования" if lang == "ru" else "Mahsulotni tanlang"
-        header = (
-            f"📂 <b>{category.upper()}</b>\n"
-            f"📍 {city}\n"
-            f"{'─' * 25}\n"
-            f"✨ {'Найдено' if lang == 'ru' else 'Topildi'}: <b>{len(offers)}</b> {'предложений' if lang == 'ru' else 'taklif'}\n\n"
-            f"👇 {select_msg}"
-        )
-        await msg.edit_text(
-            header,
-            parse_mode="HTML",
-            reply_markup=offers_category_filter(lang),
-        )
-
-        # Отправляем карточки товаров через исходное сообщение (msg)
-        for offer in offers[:10]:
-            await _send_offer_card(msg, offer, lang)
-            await asyncio.sleep(0.1)
 
     @dp.callback_query(F.data == "filter_all")
     async def show_all_offers_filter(callback: types.CallbackQuery) -> None:
@@ -844,6 +872,7 @@ def register_hot(
         for offer in offers[:10]:
             await _send_offer_card(msg, offer, lang)
             await asyncio.sleep(0.1)
+
 
 
 
