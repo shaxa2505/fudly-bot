@@ -29,6 +29,10 @@ class FavoritesMixin:
                 (user_id, store_id),
             )
 
+    def add_favorite(self, user_id: int, store_id: int) -> None:
+        """Backward-compatible alias for add_to_favorites."""
+        self.add_to_favorites(user_id, store_id)
+
     def remove_from_favorites(self, user_id: int, store_id: int):
         """Remove store from user's favorites."""
         with self.get_connection() as conn:
@@ -36,6 +40,10 @@ class FavoritesMixin:
             cursor.execute(
                 "DELETE FROM favorites WHERE user_id = %s AND store_id = %s", (user_id, store_id)
             )
+
+    def remove_favorite(self, user_id: int, store_id: int) -> None:
+        """Backward-compatible alias for remove_from_favorites."""
+        self.remove_from_favorites(user_id, store_id)
 
     def get_favorites(self, user_id: int) -> list[dict]:
         """Get user's favorite stores."""

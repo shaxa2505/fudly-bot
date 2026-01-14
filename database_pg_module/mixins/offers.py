@@ -854,7 +854,6 @@ class OfferMixin:
             cursor.execute("DELETE FROM recently_viewed WHERE offer_id = %s", (offer_id,))
             cursor.execute("DELETE FROM orders WHERE offer_id = %s", (offer_id,))
             cursor.execute("DELETE FROM bookings WHERE offer_id = %s", (offer_id,))
-            cursor.execute("DELETE FROM favorites WHERE offer_id = %s", (offer_id,))
             cursor.execute("DELETE FROM offers WHERE offer_id = %s", (offer_id,))
             logger.info(f"Offer {offer_id} and related records deleted")
 
