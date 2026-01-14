@@ -7,6 +7,7 @@ import OfferCard from '../components/OfferCard'
 import OfferCardSkeleton from '../components/OfferCardSkeleton'
 import HeroBanner from '../components/HeroBanner'
 import FlashDeals from '../components/FlashDeals'
+import RecentlyViewed from '../components/RecentlyViewed'
 import BottomNav from '../components/BottomNav'
 import PullToRefresh from '../components/PullToRefresh'
 import { usePullToRefresh } from '../hooks/usePullToRefresh'
@@ -32,6 +33,7 @@ const CATEGORY_ALIASES = {
 }
 
 const CATEGORY_IDS = new Set(CATEGORIES.map(category => category.id))
+const OFFERS_LIMIT = 20
 
 const normalizeCategoryId = (value) => {
   const raw = String(value || '').toLowerCase().trim()
@@ -45,6 +47,7 @@ const normalizeCategoryId = (value) => {
 
 function HomePage() {
   const [offers, setOffers] = useState([])
+  const [offersTotal, setOffersTotal] = useState(null)
   const [loading, setLoading] = useState(false)
   const [selectedCategory, setSelectedCategory] = useState('all')
   const [activeCategory, setActiveCategory] = useState('all')
@@ -61,11 +64,15 @@ function HomePage() {
   const [sortBy, setSortBy] = useState('default') // default, discount, price_asc, price_desc
   const [priceRange, setPriceRange] = useState('all') // all, up_20, 20_50, 50_100, 100_plus
   const [showAdvancedFilters, setShowAdvancedFilters] = useState(false)
+  const [categoryCounts, setCategoryCounts] = useState({})
+  const [categoriesLoading, setCategoriesLoading] = useState(false)
 
   // Search history state
   const [searchHistory, setSearchHistory] = useState([])
   const [showSearchHistory, setShowSearchHistory] = useState(false)
   const [searchFocused, setSearchFocused] = useState(false)
+  const [searchSuggestions, setSearchSuggestions] = useState([])
+  const [suggestionsLoading, setSuggestionsLoading] = useState(false)
   const searchInputRef = useRef(null)
   const categoriesScrollRef = useRef(null)
   const categoryTabRefs = useRef(new Map())
@@ -94,6 +101,10 @@ function HomePage() {
   const activeFiltersCount = [minDiscount, priceRange !== 'all', sortBy !== 'default']
     .filter(Boolean)
     .length
+  const offersCountValue = offersTotal ?? offers.length
+  const offersCountLabel = hasMore && offersTotal == null
+    ? `${offersCountValue}+ ta`
+    : `${offersCountValue} ta`
 
   const registerCategoryTab = useCallback((id, node) => {
     if (node) {
@@ -222,8 +233,48 @@ function HomePage() {
     }
     loadSearchHistory()
   }, [])
+
+  useEffect(() => {
+    let isActive = true
+
+    const loadCategories = async () => {
+      setCategoriesLoading(true)
+      try {
+        const params = {}
+        if (cityForApi) {
+          params.city = cityForApi
+        }
+        const data = await api.getCategories(params)
+        if (!isActive) return
+        const counts = {}
+        if (Array.isArray(data)) {
+          data.forEach((item) => {
+            if (!item?.id) return
+            counts[item.id] = Number(item.count) || 0
+          })
+        }
+        setCategoryCounts(counts)
+      } catch (error) {
+        console.error('Error loading categories:', error)
+        if (isActive) {
+          setCategoryCounts({})
+        }
+      } finally {
+        if (isActive) {
+          setCategoriesLoading(false)
+        }
+      }
+    }
+
+    loadCategories()
+    return () => {
+      isActive = false
+    }
+  }, [cityForApi])
   // Load offers - сначала по городу, если пусто - из всех городов
-  const loadOffers = useCallback(async (reset = false) => {
+  const loadOffers = useCallback(async (reset = false, options = {}) => {
+    const { searchOverride, force = false } = options
+    const searchValue = typeof searchOverride === 'string' ? searchOverride : searchQuery
     if (loadingRef.current) return
 
     loadingRef.current = true
@@ -231,8 +282,9 @@ function HomePage() {
     try {
       const currentOffset = reset ? 0 : offsetRef.current
       const params = {
-        limit: 20,
+        limit: OFFERS_LIMIT,
         offset: currentOffset,
+        include_meta: true,
       }
       if (cityForApi) {
         params.city = cityForApi
@@ -249,14 +301,13 @@ function HomePage() {
         params.district = location.district
       }
 
-      const categoryAlias = CATEGORY_ALIASES[selectedCategory]
-      if (selectedCategory && selectedCategory !== 'all' && !categoryAlias) {
+      if (selectedCategory && selectedCategory !== 'all') {
         params.category = selectedCategory
       }
 
       // Добавляем поиск только если есть запрос
-      if (searchQuery.trim()) {
-        params.search = searchQuery.trim()
+      if (searchValue.trim()) {
+        params.search = searchValue.trim()
       }
 
       // Добавляем фильтр по скидке
@@ -283,66 +334,31 @@ function HomePage() {
         params.sort_by = sortBy
       }
 
-      const data = await api.getOffers(params)
-      const dataList = Array.isArray(data?.offers) ? data.offers : (Array.isArray(data) ? data : [])
-      let nextOffers = dataList
+      const data = await api.getOffers(params, { force })
+      const items = Array.isArray(data?.items)
+        ? data.items
+        : (Array.isArray(data?.offers) ? data.offers : (Array.isArray(data) ? data : []))
+      const total = Number.isFinite(data?.total) ? data.total : null
+      const hasMoreResult = typeof data?.has_more === 'boolean'
+        ? data.has_more
+        : items.length === OFFERS_LIMIT
+      const nextOffset = Number.isFinite(data?.next_offset) ? data.next_offset : null
 
-      if (categoryAlias) {
-        nextOffers = nextOffers.filter(offer => categoryAlias.includes(String(offer.category || '').toLowerCase()))
-      }
-
-      if (minDiscount || priceRange !== 'all' || sortBy !== 'default') {
-        nextOffers = nextOffers.filter(offer => {
-          const discountPrice = Number(offer.discount_price || 0)
-          const original = Number(offer.original_price || 0)
-          const hasDiscount = original > discountPrice
-
-          if (minDiscount) {
-            if (!hasDiscount || original <= 0) return false
-            const percent = Math.round((1 - discountPrice / original) * 100)
-            if (percent < minDiscount) return false
-          }
-
-          if (priceRange !== 'all') {
-            if (priceRange === 'up_20' && discountPrice > 20000) return false
-            if (priceRange === '20_50' && (discountPrice < 20000 || discountPrice > 50000)) return false
-            if (priceRange === '50_100' && (discountPrice < 50000 || discountPrice > 100000)) return false
-            if (priceRange === '100_plus' && discountPrice < 100000) return false
-          }
-
-          return true
-        })
-
-        if (sortBy === 'discount') {
-          nextOffers = [...nextOffers].sort((a, b) => {
-            const aOriginal = Number(a.original_price || 0)
-            const bOriginal = Number(b.original_price || 0)
-            const aDiscount = Number(a.discount_price || 0)
-            const bDiscount = Number(b.discount_price || 0)
-            const aPercent = aOriginal > aDiscount ? Math.round((1 - aDiscount / aOriginal) * 100) : 0
-            const bPercent = bOriginal > bDiscount ? Math.round((1 - bDiscount / bOriginal) * 100) : 0
-            return bPercent - aPercent
-          })
-        } else if (sortBy === 'price_asc') {
-          nextOffers = [...nextOffers].sort((a, b) => Number(a.discount_price || 0) - Number(b.discount_price || 0))
-        } else if (sortBy === 'price_desc') {
-          nextOffers = [...nextOffers].sort((a, b) => Number(b.discount_price || 0) - Number(a.discount_price || 0))
+      if (reset) {
+        setOffers(items || [])
+        offsetRef.current = nextOffset ?? items.length
+        setOffset(offsetRef.current)
+        setOffersTotal(total)
+      } else {
+        setOffers(prev => [...prev, ...(items || [])])
+        offsetRef.current = nextOffset ?? offsetRef.current + items.length
+        setOffset(offsetRef.current)
+        if (total != null) {
+          setOffersTotal(total)
         }
       }
 
-      // Если город пустой и это первая загрузка - загружаем из всех городов
-
-      if (reset) {
-        setOffers(nextOffers || [])
-        offsetRef.current = 20
-        setOffset(20)
-      } else {
-        setOffers(prev => [...prev, ...(nextOffers || [])])
-        offsetRef.current = offsetRef.current + 20
-        setOffset(offsetRef.current)
-      }
-
-      setHasMore((dataList?.length || 0) === 20)
+      setHasMore(hasMoreResult)
     } catch (error) {
       console.error('Error loading offers:', error)
     } finally {
@@ -425,6 +441,39 @@ function HomePage() {
       setSearchFocused(false)
     }, 200)
   }
+
+  useEffect(() => {
+    const trimmed = searchQuery.trim()
+    if (!searchFocused || trimmed.length < 2) {
+      setSearchSuggestions([])
+      setSuggestionsLoading(false)
+      return
+    }
+
+    let isActive = true
+    const timer = setTimeout(async () => {
+      setSuggestionsLoading(true)
+      try {
+        const suggestions = await api.getSearchSuggestions(trimmed, 5)
+        if (isActive) {
+          setSearchSuggestions((suggestions || []).filter(Boolean))
+        }
+      } catch (error) {
+        if (isActive) {
+          setSearchSuggestions([])
+        }
+      } finally {
+        if (isActive) {
+          setSuggestionsLoading(false)
+        }
+      }
+    }, 250)
+
+    return () => {
+      isActive = false
+      clearTimeout(timer)
+    }
+  }, [searchQuery, searchFocused])
 
   // Автоопределение локации при первом запуске
   useEffect(() => {

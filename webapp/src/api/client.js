@@ -263,8 +263,8 @@ const api = {
   },
 
   // Offers endpoints - shorter cache for freshness
-  async getOffers(params) {
-    return cachedGet('/offers', params, 20000) // 20s cache
+  async getOffers(params = {}, options = {}) {
+    return cachedGet('/offers', params, 20000, options) // 20s cache
   },
 
   async getFlashDeals(options = {}) {
@@ -274,6 +274,20 @@ const api = {
     if (region) params.region = region
     if (district) params.district = district
     return cachedGet('/flash-deals', params, 30000) // 30s cache
+  },
+
+  async getCategories(params = {}, options = {}) {
+    return cachedGet('/categories', params, 60000, options) || []
+  },
+
+  async getSearchSuggestions(query, limit = 5) {
+    if (!query || query.length < 2) return []
+    return cachedGet('/search/suggestions', { query, limit }, 15000) || []
+  },
+
+  async reverseGeocode(lat, lon, lang = 'uz') {
+    if (lat == null || lon == null) return null
+    return cachedGet('/location/reverse', { lat, lon, lang }, 3600000)
   },
 
   async getFavorites() {

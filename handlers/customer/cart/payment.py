@@ -143,10 +143,6 @@ def register(router: Router) -> None:
 
         kb = InlineKeyboardBuilder()
         kb.button(
-            text=get_text(lang, "cart_delivery_payment_click"),
-            callback_data=f"cart_pay_click_{store_id}",
-        )
-        kb.button(
             text=get_text(lang, "cart_delivery_payment_card"),
             callback_data=f"cart_pay_card_{store_id}",
         )
@@ -158,7 +154,7 @@ def register(router: Router) -> None:
             text=get_text(lang, "cart_payment_cancel_button"),
             callback_data="cart_cancel_payment",
         )
-        kb.adjust(2, 2)
+        kb.adjust(1, 2)
 
         try:
             await callback.message.edit_text(text, parse_mode="HTML", reply_markup=kb.as_markup())
@@ -236,7 +232,7 @@ def register(router: Router) -> None:
                     store_id=int(item["store_id"]),
                     title=str(item["title"]),
                     price=int(item["price"]),
-                    original_price=int(item["price"]),
+                    original_price=int(item.get("original_price") or item["price"]),
                     quantity=int(item["quantity"]),
                     store_name=str(item.get("store_name", "")),
                     store_address="",
@@ -276,6 +272,13 @@ def register(router: Router) -> None:
         cart_storage.clear_cart(user_id)
 
         common.db.update_payment_status(order_id, "proof_submitted", photo_id)
+
+        try:
+            common.db.save_delivery_address(user_id, address)
+        except Exception as e:  # pragma: no cover - defensive logging
+            from logging_config import logger
+
+            logger.warning(f"Could not save address: {e}")
 
         await state.clear()
 

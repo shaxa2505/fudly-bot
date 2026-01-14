@@ -81,6 +81,9 @@ def offer_to_dict(offer: Any, photo_url: str | None = None) -> dict:
         "store_name": get_offer_value(offer, "store_name", "") or "",
         "store_address": get_offer_value(offer, "store_address")
         or get_offer_value(offer, "address"),
+        "delivery_enabled": bool(get_offer_value(offer, "delivery_enabled", False)),
+        "delivery_price": convert(get_offer_value(offer, "delivery_price", 0) or 0),
+        "min_order_amount": convert(get_offer_value(offer, "min_order_amount", 0) or 0),
         "photo": photo,
         "expiry_date": str(get_offer_value(offer, "expiry_date", ""))
         if get_offer_value(offer, "expiry_date")

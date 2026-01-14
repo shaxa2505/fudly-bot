@@ -51,6 +51,16 @@ def register(router: Router) -> None:
 
         user_id = callback.from_user.id
         lang = common.db.get_user_language(user_id)
+        updates, changed = common.refresh_cart_items(user_id, lang)
+        if updates:
+            warning_text = get_text(lang, "cart_updated_notice") + "\n" + "\n".join(updates)
+            await callback.message.answer(warning_text, parse_mode="HTML")
+        if changed:
+            from .view import show_cart
+
+            await show_cart(callback, state, is_callback=True)
+            await callback.answer()
+            return
 
         items = cart_storage.get_cart(user_id)
         if not items:
@@ -159,7 +169,7 @@ def register(router: Router) -> None:
         await callback.answer()
 
     @router.callback_query(F.data == "cart_confirm_pickup")
-    async def cart_confirm_pickup(callback: types.CallbackQuery) -> None:
+    async def cart_confirm_pickup(callback: types.CallbackQuery, state: FSMContext) -> None:
         """Create a pickup order from the cart and show a clear confirmation."""
 
         if not common.db or not callback.message:
@@ -168,14 +178,32 @@ def register(router: Router) -> None:
 
         user_id = callback.from_user.id
         lang = common.db.get_user_language(user_id)
+        updates, changed = common.refresh_cart_items(user_id, lang)
+        if updates:
+            warning_text = get_text(lang, "cart_updated_notice") + "\n" + "\n".join(updates)
+            await callback.message.answer(warning_text, parse_mode="HTML")
+        if changed:
+            from .view import show_cart
+
+            await show_cart(callback, state, is_callback=True)
+            await callback.answer()
+            return
+
+        data = await state.get_data()
+        if data.get("cart_confirm_in_progress"):
+            await callback.answer(get_text(lang, "cart_confirm_in_progress"), show_alert=True)
+            return
+        await state.update_data(cart_confirm_in_progress=True)
 
         items = cart_storage.get_cart(user_id)
         if not items:
+            await state.update_data(cart_confirm_in_progress=False)
             await callback.answer(get_text(lang, "cart_empty_alert"), show_alert=True)
             return
 
         order_service = get_unified_order_service()
         if not order_service:
+            await state.update_data(cart_confirm_in_progress=False)
             await callback.answer(get_text(lang, "system_error"), show_alert=True)
             return
 
@@ -187,7 +215,7 @@ def register(router: Router) -> None:
                     store_id=item.store_id,
                     title=item.title,
                     price=int(item.price),
-                    original_price=int(item.price),
+                    original_price=int(item.original_price or item.price),
                     quantity=int(item.quantity),
                     store_name=item.store_name,
                     store_address=item.store_address,
@@ -210,15 +238,18 @@ def register(router: Router) -> None:
             from logging_config import logger
 
             logger.error(f"Failed to create unified pickup order from cart: {e}")
+            await state.update_data(cart_confirm_in_progress=False)
             await callback.answer(get_text(lang, "system_error"), show_alert=True)
             return
 
         if not result.success:
             msg = result.error_message or get_text(lang, "system_error")
+            await state.update_data(cart_confirm_in_progress=False)
             await callback.answer(msg, show_alert=True)
             return
 
         cart_storage.clear_cart(user_id)
+        await state.update_data(cart_confirm_in_progress=False)
 
         user = common.db.get_user_model(user_id)
         if isinstance(user, dict):

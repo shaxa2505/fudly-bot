@@ -31,6 +31,16 @@ def register(router: Router) -> None:
 
         user_id = callback.from_user.id
         lang = common.db.get_user_language(user_id)
+        updates, changed = common.refresh_cart_items(user_id, lang)
+        if updates:
+            warning_text = get_text(lang, "cart_updated_notice") + "\n" + "\n".join(updates)
+            await callback.message.answer(warning_text, parse_mode="HTML")
+        if changed:
+            from .view import show_cart
+
+            await show_cart(callback, state, is_callback=True)
+            await callback.answer()
+            return
 
         from .storage import cart_storage
 
@@ -40,7 +50,13 @@ def register(router: Router) -> None:
             return
 
         store_id = items[0].store_id
-        delivery_price = items[0].delivery_price
+        delivery_enabled = any(item.delivery_enabled for item in items)
+        if not delivery_enabled:
+            await callback.answer(get_text(lang, "cart_delivery_unavailable"), show_alert=True)
+            return
+        delivery_price = max(
+            (item.delivery_price for item in items if item.delivery_enabled), default=0
+        )
 
         total = int(sum(item.price * item.quantity for item in items))
 
@@ -68,6 +84,7 @@ def register(router: Router) -> None:
                 "store_id": item.store_id,
                 "title": item.title,
                 "price": item.price,
+                "original_price": item.original_price,
                 "quantity": item.quantity,
                 "unit": item.unit,
                 "store_name": item.store_name,
@@ -120,13 +137,6 @@ def register(router: Router) -> None:
 
         await state.update_data(address=delivery_address)
 
-        try:
-            common.db.save_delivery_address(user_id, delivery_address)
-        except Exception as e:  # pragma: no cover - defensive logging
-            from logging_config import logger
-
-            logger.warning(f"Could not save address: {e}")
-
         await state.set_state(OrderDelivery.payment_method_select)
 
         currency = "so'm" if lang == "uz" else "сум"
@@ -156,10 +166,6 @@ def register(router: Router) -> None:
 
         kb = InlineKeyboardBuilder()
         kb.button(
-            text=get_text(lang, "cart_delivery_payment_click"),
-            callback_data=f"cart_pay_click_{store_id}",
-        )
-        kb.button(
             text=get_text(lang, "cart_delivery_payment_card"),
             callback_data=f"cart_pay_card_{store_id}",
         )
@@ -167,7 +173,7 @@ def register(router: Router) -> None:
             text=get_text(lang, "cart_delivery_back_button"),
             callback_data="cart_back_to_address",
         )
-        kb.adjust(2, 1)
+        kb.adjust(1, 1)
 
         await message.answer(text, parse_mode="HTML", reply_markup=kb.as_markup())
 
