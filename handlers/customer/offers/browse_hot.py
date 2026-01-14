@@ -750,7 +750,7 @@ def register_hot(
                 if not items:
                     return False
                 keyboard_pages = page + 1 + (1 if has_more else 0)
-                title = f"🗂 <b>{category_label or _category_label(lang, category_id)}</b>"
+                title = f"<b>{category_label or _category_label(lang, category_id)}</b>"
                 total_pages = None
             elif filter_mode == "all":
                 result = service.list_hot_offers(
@@ -767,7 +767,7 @@ def register_hot(
                 total_pages = max(1, (result.total + ITEMS_PER_PAGE - 1) // ITEMS_PER_PAGE)
                 keyboard_pages = total_pages
                 title = (
-                    "📦 <b>Все предложения</b>" if lang == "ru" else "📦 <b>Barcha takliflar</b>"
+                    "<b>Все предложения</b>" if lang == "ru" else "<b>Barcha takliflar</b>"
                 )
                 if not items and page == 0:
                     await target.answer(
@@ -827,7 +827,7 @@ def register_hot(
 
         except Exception as exc:  # pragma: no cover
             log.error("Failed to send hot offers: %s", exc)
-            await target.answer(f"❌ {get_text(lang, 'error')}")
+            await target.answer(get_text(lang, "error"))
             return False
 
     async def _send_offer_details(

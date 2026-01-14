@@ -60,11 +60,7 @@ def render_hot_offers_list(
 
 def render_hot_offers_empty(lang: str) -> str:
     header = _hot_header(lang)
-    wait_text = (
-        "Мы уведомим вас, когда появятся новые предложения!"
-        if lang == "ru"
-        else "Yangi takliflar paydo bo'lganda xabar beramiz!"
-    )
+    wait_text = ("ÐÐ¾ÐºÐ° Ð½ÐµÑ Ð¿ÑÐµÐ´Ð»Ð¾Ð¶ÐµÐ½Ð¸Ð¹. ÐÐ°Ð³Ð»ÑÐ½Ð¸ÑÐµ Ð¿Ð¾Ð·Ð¶Ðµ." if lang == "ru" else "Hozircha takliflar yo'q. Keyinroq qayting.")
     return f"{header}\n\n{wait_text}"
 
 
@@ -456,8 +452,7 @@ def _trim_title(title: str, limit: int = 30) -> str:
 
 
 def _hot_header(lang: str, total: int = 0) -> str:
-    if lang == "ru":
-        title = f"<b>ГОРЯЧЕЕ</b> ({total})" if total > 0 else "<b>ГОРЯЧЕЕ</b>"
-    else:
-        title = f"<b>ISSIQ</b> ({total})" if total > 0 else "<b>ISSIQ</b>"
-    return title
+    title = "ÐÐºÑÐ¸Ð¸" if lang == "ru" else "Aksiyalar"
+    if total > 0:
+        return f"<b>{title}</b> ({total})"
+    return f"<b>{title}</b>"

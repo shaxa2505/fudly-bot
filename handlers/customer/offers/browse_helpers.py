@@ -35,9 +35,9 @@ def no_stores_text(lang: str, business_type: str) -> str:
         "delivery": "Доставка" if lang == "ru" else "Yetkazish",
     }
     no_stores = (
-        "В этой категории пока нет магазинов с активными предложениями"
+        "Ð ÑÑÐ¾Ð¹ ÐºÐ°ÑÐµÐ³Ð¾ÑÐ¸Ð¸ Ð¿Ð¾ÐºÐ° Ð½ÐµÑ Ð¼Ð°Ð³Ð°Ð·Ð¸Ð½Ð¾Ð²."
         if lang == "ru"
-        else "Bu kategoriyada hali do'konlar yo'q"
+        else "Bu kategoriyada do'konlar yo'q."
     )
     return f"{names.get(business_type, business_type)}\n\n{no_stores}"
 
@@ -45,9 +45,9 @@ def no_stores_text(lang: str, business_type: str) -> str:
 def invalid_number_text(lang: str, subject: str) -> str:
     """Generate 'invalid number' error message."""
     base = (
-        "Пожалуйста, введите корректный номер"
+        "ÐÐµÐ²ÐµÑÐ½ÑÐ¹ Ð½Ð¾Ð¼ÐµÑ. ÐÐ²ÐµÐ´Ð¸ÑÐµ ÐµÑÐµ ÑÐ°Ð·."
         if lang == "ru"
-        else "Iltimos, to'g'ri raqam kiriting"
+        else "Noto'g'ri raqam. Qayta kiriting."
     )
     return base
 
@@ -55,8 +55,8 @@ def invalid_number_text(lang: str, subject: str) -> str:
 def range_text(lang: str, max_value: int, subject: str) -> str:
     """Generate 'number out of range' error message."""
     if lang == "ru":
-        return f"❌ Номер должен быть от 1 до {max_value}"
-    return f"❌ Raqam 1 dan {max_value} gacha bo'lishi kerak"
+        return f"ÐÐ¾Ð¼ÐµÑ Ð¾Ñ 1 Ð´Ð¾ {max_value}."
+    return f"Raqam 1 dan {max_value} gacha."
 
 
 def format_hot_offers_header(lang: str, city: str, page: int, total_pages: int, total: int) -> str:
