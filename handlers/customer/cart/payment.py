@@ -208,6 +208,7 @@ def register(router: Router) -> None:
         user_id = message.from_user.id
         lang = common.db.get_user_language(user_id)
         data = await state.get_data()
+        photo_id = message.photo[-1].file_id
 
         cart_items_stored = data.get("cart_items", [])
         store_id = data.get("store_id")
@@ -254,6 +255,7 @@ def register(router: Router) -> None:
                 order_type="delivery",
                 delivery_address=address,
                 payment_method="card",
+                payment_proof=photo_id,
                 notify_customer=False,
                 notify_sellers=False,
             )
@@ -276,8 +278,6 @@ def register(router: Router) -> None:
         from .storage import cart_storage
 
         cart_storage.clear_cart(user_id)
-
-        photo_id = message.photo[-1].file_id
 
         common.db.update_payment_status(order_id, "proof_submitted", photo_id)
 

@@ -17,6 +17,7 @@ from app.keyboards import (
 )
 from database_protocol import DatabaseProtocol
 from handlers.common.states import Registration
+from handlers.common.webapp import webapp_keyboard
 from localization import get_cities, get_text
 
 router = Router(name="registration")
@@ -304,11 +305,20 @@ async def registration_city_callback(
         name=name,
         city=city,
     )
+    webapp_markup = webapp_keyboard(lang)
 
     try:
-        await callback.message.edit_text(complete_text, parse_mode="HTML")
+        await callback.message.edit_text(
+            complete_text,
+            parse_mode="HTML",
+            reply_markup=webapp_markup,
+        )
     except Exception:
-        pass
+        await callback.message.answer(
+            complete_text,
+            parse_mode="HTML",
+            reply_markup=webapp_markup,
+        )
 
     await callback.message.answer(
         get_text(lang, "registration_choose_action"),
@@ -381,11 +391,20 @@ async def registration_district_callback(
         name=name,
         city=city_display,
     )
+    webapp_markup = webapp_keyboard(lang)
 
     try:
-        await callback.message.edit_text(complete_text, parse_mode="HTML")
+        await callback.message.edit_text(
+            complete_text,
+            parse_mode="HTML",
+            reply_markup=webapp_markup,
+        )
     except Exception:
-        pass
+        await callback.message.answer(
+            complete_text,
+            parse_mode="HTML",
+            reply_markup=webapp_markup,
+        )
 
     await callback.message.answer(
         get_text(lang, "registration_choose_action"),

@@ -986,6 +986,7 @@ async def dlv_payment_proof(
     user_id = message.from_user.id
     lang = db.get_user_language(user_id)
     data = await state.get_data()
+    photo_id = message.photo[-1].file_id
 
     logger.info(f"📸 User {user_id} uploaded payment screenshot for delivery order")
     logger.info(f"📋 FSM data keys: {list(data.keys())}")
@@ -1037,6 +1038,7 @@ async def dlv_payment_proof(
                 order_type=order_type,
                 delivery_address=address if order_type == "delivery" else None,
                 payment_method="card",
+                payment_proof=photo_id,
                 notify_customer=False,
                 notify_sellers=False,
             )
@@ -1060,8 +1062,6 @@ async def dlv_payment_proof(
     offer = db.get_offer(offer_id) if offer_id else None
     title = get_offer_field(offer, "title", "Товар")
     price = get_offer_field(offer, "discount_price", 0)
-
-    photo_id = message.photo[-1].file_id
 
     # Update payment status with photo
     db.update_payment_status(order_id, "proof_submitted", photo_id)

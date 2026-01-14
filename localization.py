@@ -102,7 +102,7 @@ TEXTS = {
         "error": "❌ Произошла ошибка",
         # Регистрация
         "registration_choose_action": "👋 Выберите действие:",
-        "registration_complete_personal": "🎉 <b>Готово!</b>\n\nДобро пожаловать, {name}!\n📍 Город: {city}\n\nТеперь вы можете:\n🔥 <b>Акции</b> — скидки до 70%\n🛒 <b>Заказы</b> — быстрое оформление\n👤 <b>Профиль</b> — история покупок",
+        "registration_complete_personal": "🎉 <b>Готово!</b>\n\nДобро пожаловать, {name}!\n📍 Город: {city}\n\nТеперь вы можете:\n🔥 <b>Акции</b> — скидки до 70%\n🛒 <b>Заказы</b> — быстрое оформление\n👤 <b>Профиль</b> — история покупок\n\nТакже можно пользоваться обычным меню бота и мини-приложением — откройте его кнопкой ниже.",
         # Предложения
         "no_offers": "😔 Пока нет доступных предложений в вашем городе",
         "no_offers_in_store": "😔 В этом магазине пока нет предложений",
@@ -704,7 +704,7 @@ Boshlash uchun /start bosing""",
         "error": "❌ Xatolik yuz berdi",
         # Ro'yxatdan o'tish
         "registration_choose_action": "👋 Amalni tanlang:",
-        "registration_complete_personal": "🎉 <b>Tayyor!</b>\n\nXush kelibsiz, {name}!\n📍 Shahar: {city}\n\nEndi siz:\n🔥 <b>Aksiyalar</b> — 70% gacha chegirmalar\n🛒 <b>Buyurtmalar</b> — tez rasmiylashtirish\n👤 <b>Profil</b> — xaridlar tarixi",
+        "registration_complete_personal": "🎉 <b>Tayyor!</b>\n\nXush kelibsiz, {name}!\n📍 Shahar: {city}\n\nEndi siz:\n🔥 <b>Aksiyalar</b> — 70% gacha chegirmalar\n🛒 <b>Buyurtmalar</b> — tez rasmiylashtirish\n👤 <b>Profil</b> — xaridlar tarixi\n\nShuningdek, botdagi odatiy menyu va mini-ilovadan foydalanishingiz mumkin — uni quyidagi tugma orqali oching.",
         # Savat
         "cart_title": "🛒 <b>Savat</b>",
         "cart_empty": "<b>Savat bo'sh</b>\n\nKatalogdan mahsulot qo'shing.",

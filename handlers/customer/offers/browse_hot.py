@@ -153,7 +153,11 @@ def register_hot(
     @dp.callback_query(F.data == "hot_offers")
     async def hot_offers_callback(callback: types.CallbackQuery, state: FSMContext) -> None:
         """Handle hot offers inline button (e.g., from cart empty state)."""
-        if not callback.from_user or not callback.message:
+        if not callback.from_user:
+            await callback.answer()
+            return
+        msg = _callback_message(callback)
+        if not msg:
             await callback.answer()
             return
 
@@ -176,11 +180,11 @@ def register_hot(
 
         await callback.answer()
         data = await state.get_data()
-        page = int(data.get(\"hot_offers_page\", 0) or 0)
-        filter_mode = data.get(\"hot_filter_mode\", \"hot\")
-        category_id = data.get(\"hot_filter_value\")
-        category_label = data.get(\"hot_filter_label\")
-        show_entry_back = data.get(\"hot_entry_back\")
+        page = int(data.get("hot_offers_page", 0) or 0)
+        filter_mode = data.get("hot_filter_mode", "hot")
+        category_id = data.get("hot_filter_value")
+        category_label = data.get("hot_filter_label")
+        show_entry_back = data.get("hot_entry_back")
 
         sent = await _send_hot_offers_list(
             msg,
@@ -202,9 +206,9 @@ def register_hot(
             category_label=category_label,
         )
         if not sent:
-            await callback.answer(get_text(lang, \"no_offers\"), show_alert=True)
+            await callback.answer(get_text(lang, "no_offers"), show_alert=True)
             return
-        await callback.answer(\"🔄\", show_alert=False)
+        await callback.answer("🔄", show_alert=False)
 
     @dp.callback_query(F.data.startswith("hot_page_"))
     async def hot_offers_page_handler(callback: types.CallbackQuery, state: FSMContext) -> None:
@@ -240,10 +244,10 @@ def register_hot(
         search_region = normalize_city(region) if region else None
         search_district = normalize_city(district) if district else None
         data = await state.get_data()
-        filter_mode = data.get(\"hot_filter_mode\", \"hot\")
-        category_id = data.get(\"hot_filter_value\")
-        category_label = data.get(\"hot_filter_label\")
-        show_entry_back = data.get(\"hot_entry_back\")
+        filter_mode = data.get("hot_filter_mode", "hot")
+        category_id = data.get("hot_filter_value")
+        category_label = data.get("hot_filter_label")
+        show_entry_back = data.get("hot_entry_back")
 
         sent = await _send_hot_offers_list(
             msg,
@@ -265,7 +269,7 @@ def register_hot(
             category_label=category_label,
         )
         if not sent:
-            await callback.answer(get_text(lang, \"no_offers\"), show_alert=True)
+            await callback.answer(get_text(lang, "no_offers"), show_alert=True)
             return
         await callback.answer()
 
@@ -450,7 +454,7 @@ def register_hot(
             return
         await callback.answer()
 
-        @dp.callback_query(F.data.startswith("offers_cat_"))
+    @dp.callback_query(F.data.startswith("offers_cat_"))
     async def filter_offers_by_category(callback: types.CallbackQuery, state: FSMContext) -> None:
         if not callback.from_user or not callback.data:
             await callback.answer()
