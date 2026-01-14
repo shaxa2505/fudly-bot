@@ -10,6 +10,8 @@ database binding helper used by the rest of the application.
 """
 from __future__ import annotations
 
-from app.api.webapp import router, set_db_instance
+from app.api.webapp import get_router, set_db_instance
+
+router = get_router()
 
 __all__ = ["router", "set_db_instance"]
