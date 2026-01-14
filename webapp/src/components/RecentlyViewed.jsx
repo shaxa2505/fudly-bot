@@ -4,7 +4,7 @@ import api from '../api/client'
 import { PLACEHOLDER_IMAGE, resolveOfferImageUrl } from '../utils/imageUtils'
 import './RecentlyViewed.css'
 
-function RecentlyViewed() {
+function RecentlyViewed({ showSeeAll = false }) {
   const navigate = useNavigate()
   const [offers, setOffers] = useState([])
   const [loading, setLoading] = useState(true)
@@ -35,15 +35,17 @@ function RecentlyViewed() {
     <div className="recently-viewed-section">
       <div className="recently-viewed-header">
         <h3 className="recently-viewed-title">So'nggi ko'rilgan</h3>
-        <button
-          className="recently-viewed-see-all"
-          onClick={() => navigate('/recently-viewed')}
-        >
-          Hammasi
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
-            <path d="M9 18l6-6-6-6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-          </svg>
-        </button>
+        {showSeeAll && (
+          <button
+            className="recently-viewed-see-all"
+            onClick={() => navigate('/recently-viewed')}
+          >
+            Hammasi
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+              <path d="M9 18l6-6-6-6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
+          </button>
+        )}
       </div>
       <div className="recently-viewed-scroll">
         {offers.map(offer => (

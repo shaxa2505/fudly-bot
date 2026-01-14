@@ -252,6 +252,11 @@
   font-weight: 500;
 }
 
+.pdp-stock-empty {
+  color: #C2410C;
+  font-weight: 600;
+}
+
 .pdp-quantity-control.quantity-control {
   --qc-height: 34px;
   --qc-pad: 4px;

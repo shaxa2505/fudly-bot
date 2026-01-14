@@ -18,6 +18,9 @@ function ProductDetailPage() {
   const [quantity, setQuantity] = useState(1)
   const [addedToCart, setAddedToCart] = useState(false)
   const [imgError, setImgError] = useState(false)
+  const stockValue = Number(offer?.quantity ?? offer?.stock ?? 0)
+  const hasStock = stockValue > 0
+  const maxQty = hasStock ? stockValue : 1
 
   // Track recently viewed
   useEffect(() => {
@@ -34,13 +37,21 @@ function ProductDetailPage() {
   const hasImage = Boolean(imageUrl) && !imgError
 
   const handleQuantityChange = (delta) => {
-    const maxQty = offer?.quantity ?? offer?.stock ?? 99
+    if (!hasStock) {
+      return
+    }
     setQuantity(prev => Math.max(1, Math.min(prev + delta, maxQty)))
     window.Telegram?.WebApp?.HapticFeedback?.impactOccurred?.('light')
   }
 
   const handleAddToCart = () => {
-    for (let i = 0; i < quantity; i++) {
+    if (!hasStock) {
+      window.Telegram?.WebApp?.HapticFeedback?.notificationOccurred?.('warning')
+      return
+    }
+
+    const finalQty = Math.min(quantity, maxQty)
+    for (let i = 0; i < finalQty; i++) {
       addToCart(offer)
     }
     setAddedToCart(true)
@@ -99,9 +110,6 @@ function ProductDetailPage() {
   const expiryInfo = getExpiryInfo()
   const hasDiscount = offer.original_price > offer.discount_price
   const isFav = isFavorite(offer.id)
-  const stockValue = Number(offer.quantity ?? offer.stock ?? 0)
-  const hasStock = stockValue > 0
-  const showPriceMeta = hasDiscount || hasStock
 
   return (
     <div className="pdp">
@@ -196,18 +204,18 @@ function ProductDetailPage() {
                 {Math.round(offer.discount_price).toLocaleString()} so'm
               </span>
             </div>
-            {showPriceMeta && (
-              <div className="pdp-price-sub">
-                {hasDiscount && (
-                  <span className="pdp-old-price">
-                    {Math.round(offer.original_price).toLocaleString()} so'm
-                  </span>
-                )}
-                {hasStock && (
-                  <span className="pdp-stock">Qoldi: {stockValue} {getUnitLabel(offer.unit)}</span>
-                )}
-          </div>
-            )}
+            <div className="pdp-price-sub">
+              {hasDiscount && (
+                <span className="pdp-old-price">
+                  {Math.round(offer.original_price).toLocaleString()} so'm
+                </span>
+              )}
+              {hasStock ? (
+                <span className="pdp-stock">Qoldi: {stockValue} {getUnitLabel(offer.unit)}</span>
+              ) : (
+                <span className="pdp-stock pdp-stock-empty">Tugagan</span>
+              )}
+            </div>
           </div>
           <QuantityControl
             value={quantity}
@@ -215,8 +223,8 @@ function ProductDetailPage() {
             className="pdp-quantity-control"
             onDecrement={() => handleQuantityChange(-1)}
             onIncrement={() => handleQuantityChange(1)}
-            disableDecrement={quantity <= 1}
-            disableIncrement={quantity >= (offer.quantity ?? offer.stock ?? 99)}
+            disableDecrement={!hasStock || quantity <= 1}
+            disableIncrement={!hasStock || quantity >= maxQty}
           />
         </div>
 
@@ -233,9 +241,9 @@ function ProductDetailPage() {
         <button
           className={`pdp-add-btn ${addedToCart ? 'success' : ''}`}
           onClick={handleAddToCart}
-          disabled={addedToCart}
+          disabled={addedToCart || !hasStock}
         >
-          {addedToCart ? "Qo'shildi!" : "Savatga qo'shish"}
+          {!hasStock ? "Tugagan" : (addedToCart ? "Qo'shildi!" : "Savatga qo'shish")}
         </button>
       </div>
     </div>

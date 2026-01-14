@@ -15,12 +15,16 @@ const OfferCard = memo(function OfferCard({ offer, cartQuantity = 0, onAddToCart
   }
 
   // Get stock limit from offer
-  const stockLimit = offer.quantity || offer.stock || 99
-  const isMaxReached = cartQuantity >= stockLimit
+  const stockLimit = Number(offer.quantity ?? offer.stock ?? 0)
+  const isOutOfStock = stockLimit <= 0
+  const isMaxReached = !isOutOfStock && cartQuantity >= stockLimit
+  const minOrderAmount = Number(offer.min_order_amount || 0)
+  const showDelivery = Boolean(offer.delivery_enabled)
+  const showStoreName = Boolean(offer.store_name)
 
   const handleAddClick = useCallback((e) => {
     e.stopPropagation()
-    if (isMaxReached) {
+    if (isOutOfStock || isMaxReached) {
       window.Telegram?.WebApp?.HapticFeedback?.notificationOccurred?.('warning')
       return
     }
@@ -33,7 +37,7 @@ const OfferCard = memo(function OfferCard({ offer, cartQuantity = 0, onAddToCart
     setTimeout(() => setIsAdding(false), 300)
 
     onAddToCart?.(offer)
-  }, [isMaxReached, offer, onAddToCart])
+  }, [isOutOfStock, isMaxReached, offer, onAddToCart])
 
   const handleRemoveClick = useCallback((e) => {
     e.stopPropagation()
@@ -58,7 +62,10 @@ const OfferCard = memo(function OfferCard({ offer, cartQuantity = 0, onAddToCart
   const fallbackUrl = PLACEHOLDER_IMAGE
 
   return (
-    <div className={`offer-card ${cartQuantity > 0 ? 'in-cart' : ''} ${isAdding ? 'adding' : ''}`} onClick={handleCardClick}>
+    <div
+      className={`offer-card ${cartQuantity > 0 ? 'in-cart' : ''} ${isAdding ? 'adding' : ''} ${isOutOfStock ? 'out-of-stock' : ''}`}
+      onClick={handleCardClick}
+    >
       {/* Image Section */}
       <div className={`card-image-container ${imageLoaded && !imageError ? 'has-image' : ''}`}>
         {/* Image skeleton while loading */}
@@ -67,6 +74,9 @@ const OfferCard = memo(function OfferCard({ offer, cartQuantity = 0, onAddToCart
         )}
         {showDiscountPercent && (
           <div className="image-discount-badge">-{discountPercent}%</div>
+        )}
+        {isOutOfStock && (
+          <div className="image-stock-badge">Tugagan</div>
         )}
 
         <img
@@ -110,8 +120,25 @@ const OfferCard = memo(function OfferCard({ offer, cartQuantity = 0, onAddToCart
             <span className="offer-title-tag"> - Muzlatilgan</span>
           )}
         </h3>
+        {(showStoreName || showDelivery) && (
+          <div className="offer-meta">
+            {showStoreName && (
+              <span className="offer-store">{offer.store_name}</span>
+            )}
+            {showDelivery && (
+              <span className="offer-badge">Yetkazib berish</span>
+            )}
+            {showDelivery && minOrderAmount > 0 && (
+              <span className="offer-badge secondary">
+                Min {Math.round(minOrderAmount).toLocaleString('ru-RU')} so'm
+              </span>
+            )}
+          </div>
+        )}
         <div className="card-control">
-          {cartQuantity > 0 ? (
+          {isOutOfStock ? (
+            <div className="card-stock-empty">Tugagan</div>
+          ) : cartQuantity > 0 ? (
             <QuantityControl
               value={cartQuantity}
               size="sm"
@@ -126,6 +153,7 @@ const OfferCard = memo(function OfferCard({ offer, cartQuantity = 0, onAddToCart
               type="button"
               className={`add-to-cart-inline ${isAdding ? 'pulse' : ''}`}
               onClick={handleAddClick}
+              disabled={isMaxReached}
               aria-label="Savatga qo'shish"
             >
               +

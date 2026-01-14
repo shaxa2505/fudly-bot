@@ -105,6 +105,10 @@ function HomePage() {
   const offersCountLabel = hasMore && offersTotal == null
     ? `${offersCountValue}+ ta`
     : `${offersCountValue} ta`
+  const trimmedSearch = searchQuery.trim()
+  const showHistoryDropdown = showSearchHistory && !trimmedSearch && searchHistory.length > 0
+  const showSuggestionsDropdown = showSearchHistory && trimmedSearch.length >= 2
+  const showSearchDropdown = showHistoryDropdown || showSuggestionsDropdown
 
   const registerCategoryTab = useCallback((id, node) => {
     if (node) {
@@ -379,14 +383,19 @@ function HomePage() {
   ])
 
   // Save search query to history when searching
-  const handleSearchSubmit = useCallback(async () => {
-    const trimmed = searchQuery.trim()
+  const handleSearchSubmit = useCallback(async (queryOverride) => {
+    const nextQuery = typeof queryOverride === 'string' ? queryOverride : searchQuery
+    const trimmed = nextQuery.trim()
+    if (typeof queryOverride === 'string') {
+      setSearchQuery(nextQuery)
+    }
     searchInputRef.current?.blur()
     setShowSearchHistory(false)
+    setSearchSuggestions([])
 
     if (!trimmed) {
       manualSearchRef.current = Date.now()
-      await loadOffers(true)
+      await loadOffers(true, { searchOverride: '' })
       return
     }
 
@@ -405,15 +414,13 @@ function HomePage() {
         }
       }
       manualSearchRef.current = Date.now()
-      await loadOffers(true)
+      await loadOffers(true, { searchOverride: trimmed })
     }
   }, [searchQuery, loadOffers])
 
   // Handle search history item click
   const handleHistoryClick = (query) => {
-    setSearchQuery(query)
-    setShowSearchHistory(false)
-    searchInputRef.current?.blur()
+    handleSearchSubmit(query)
   }
 
   // Clear search history
@@ -507,12 +514,8 @@ function HomePage() {
   // Функция для автоматического геокодирования (при старте)
   const reverseGeocodeAuto = async (lat, lon) => {
     try {
-      const response = await fetch(
-        `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lon}&accept-language=uz`,
-        { headers: { 'User-Agent': 'FudlyApp/1.0' } }
-      )
-      if (!response.ok) throw new Error('Geo lookup failed')
-      const data = await response.json()
+      const data = await api.reverseGeocode(lat, lon, 'uz')
+      if (!data) throw new Error('Geo lookup failed')
 
       const city = normalizeLocationName(
         data.address?.city || data.address?.town || data.address?.village || ''
@@ -547,7 +550,7 @@ function HomePage() {
 
   // Pull-to-refresh handler
   const handleRefresh = useCallback(async () => {
-    await loadOffers(true)
+    await loadOffers(true, { force: true })
   }, [loadOffers])
 
   // Pull-to-refresh hook
@@ -592,12 +595,8 @@ function HomePage() {
 
   const reverseGeocode = async (lat, lon) => {
     try {
-      const response = await fetch(
-        `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lon}&accept-language=uz`,
-        { headers: { 'User-Agent': 'FudlyApp/1.0' } }
-      )
-      if (!response.ok) throw new Error('Geo lookup failed')
-      const data = await response.json()
+      const data = await api.reverseGeocode(lat, lon, 'uz')
+      if (!data) throw new Error('Geo lookup failed')
 
       const city = normalizeLocationName(
         data.address?.city || data.address?.town || data.address?.village || ''
@@ -734,7 +733,10 @@ function HomePage() {
             {searchQuery && (
               <button
                 className="search-clear"
-                onClick={() => setSearchQuery('')}
+                onClick={() => {
+                  setSearchQuery('')
+                  setSearchSuggestions([])
+                }}
                 aria-label="Qidiruvni tozalash"
               >
                 x
@@ -742,27 +744,58 @@ function HomePage() {
             )}
 
             {/* Search History Dropdown */}
-            {showSearchHistory && searchHistory.length > 0 && !searchQuery && (
+            {showSearchDropdown && (
               <div className="search-history-dropdown">
-                <div className="search-history-header">
-                  <span>So'nggi qidiruvlar</span>
-                  <button className="search-history-clear" onClick={handleClearHistory}>
-                    Tozalash
-                  </button>
-                </div>
-                {searchHistory.map((query, index) => (
-                  <button
-                    key={index}
-                    className="search-history-item"
-                    onMouseDown={() => handleHistoryClick(query)}
-                  >
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
-                      <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="2"/>
-                      <path d="M12 6v6l4 2" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
-                    </svg>
-                    <span>{query}</span>
-                  </button>
-                ))}
+                {showHistoryDropdown && (
+                  <>
+                    <div className="search-history-header">
+                      <span>So'nggi qidiruvlar</span>
+                      <button className="search-history-clear" onClick={handleClearHistory}>
+                        Tozalash
+                      </button>
+                    </div>
+                    {searchHistory.map((query, index) => (
+                      <button
+                        key={index}
+                        className="search-history-item"
+                        onMouseDown={() => handleHistoryClick(query)}
+                      >
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                          <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="2"/>
+                          <path d="M12 6v6l4 2" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+                        </svg>
+                        <span>{query}</span>
+                      </button>
+                    ))}
+                  </>
+                )}
+                {showSuggestionsDropdown && (
+                  <>
+                    <div className="search-history-header">
+                      <span>Tavsiyalar</span>
+                      {suggestionsLoading && (
+                        <span className="search-suggestions-loading">Yuklanmoqda...</span>
+                      )}
+                    </div>
+                    {searchSuggestions.length === 0 && !suggestionsLoading ? (
+                      <div className="search-suggestions-empty">Topilmadi</div>
+                    ) : (
+                      searchSuggestions.map((query, index) => (
+                        <button
+                          key={`${query}-${index}`}
+                          className="search-history-item"
+                          onMouseDown={() => handleSearchSubmit(query)}
+                        >
+                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                            <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="2"/>
+                            <path d="M12 6v6l4 2" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+                          </svg>
+                          <span>{query}</span>
+                        </button>
+                      ))
+                    )}
+                  </>
+                )}
               </div>
             )}
           </div>
@@ -903,28 +936,43 @@ function HomePage() {
           role="tablist"
           aria-label="Kategoriyalar"
         >
-          {CATEGORIES.map(cat => (
-            <button
-              key={cat.id}
-              type="button"
-              ref={(node) => registerCategoryTab(cat.id, node)}
-              className={`category-tab ${activeCategory === cat.id ? 'is-active' : ''}`}
-              role="tab"
-              aria-selected={activeCategory === cat.id}
-              tabIndex={activeCategory === cat.id ? 0 : -1}
-              onClick={() => handleCategorySelect(cat.id)}
-            >
-              {cat.name}
-            </button>
-          ))}
+          {CATEGORIES.map(cat => {
+            const Icon = cat.icon
+            const count = categoryCounts[cat.id]
+            const showCount = Number.isFinite(count)
+            return (
+              <button
+                key={cat.id}
+                type="button"
+                ref={(node) => registerCategoryTab(cat.id, node)}
+                className={`category-tab ${activeCategory === cat.id ? 'is-active' : ''}`}
+                role="tab"
+                aria-selected={activeCategory === cat.id}
+                tabIndex={activeCategory === cat.id ? 0 : -1}
+                onClick={() => handleCategorySelect(cat.id)}
+              >
+                <span className="category-tab-label">
+                  <Icon size={14} strokeWidth={2} className="category-tab-icon" aria-hidden="true" />
+                  <span>{cat.name}</span>
+                </span>
+                {showCount && (
+                  <span className="category-tab-count">
+                    {categoriesLoading ? '...' : count}
+                  </span>
+                )}
+              </button>
+            )
+          })}
         </div>
       </div>
 
-      {/* Flash Deals - temporarily disabled until API deployed
-      {selectedCategory === 'all' && !searchQuery && (
+      {selectedCategory === 'all' && !trimmedSearch && (
         <FlashDeals city={cityForApi} region={location.region} district={location.district} />
       )}
-      */}
+
+      {selectedCategory === 'all' && !trimmedSearch && (
+        <RecentlyViewed />
+      )}
 
       {/* Section Title */}
       <div
@@ -934,7 +982,7 @@ function HomePage() {
         <h2 className="section-title">
           {selectedCategory === 'all' ? 'Barcha takliflar' : CATEGORIES.find(c => c.id === selectedCategory)?.name}
         </h2>
-        <span className="offers-count">{offers.length} ta</span>
+        <span className="offers-count">{offersCountLabel}</span>
       </div>
 
       {/* Offers Grid */}
