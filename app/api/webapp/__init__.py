@@ -5,6 +5,7 @@ from fastapi import APIRouter
 from . import (
     routes_cart,
     routes_favorites,
+    routes_location,
     routes_offers,
     routes_orders,
     routes_photo,
@@ -22,5 +23,6 @@ router.include_router(routes_favorites.router)
 router.include_router(routes_cart.router)
 router.include_router(routes_photo.router)
 router.include_router(routes_search_stats.router)
+router.include_router(routes_location.router)
 
 __all__ = ["router", "set_db_instance"]

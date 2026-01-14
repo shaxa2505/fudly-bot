@@ -61,8 +61,20 @@ class OfferResponse(BaseModel):
     store_id: int
     store_name: str
     store_address: str | None = None
+    delivery_enabled: bool = False
+    delivery_price: float | None = None
+    min_order_amount: float | None = None
     photo: str | None = None
     expiry_date: str | None = None
+
+
+class OfferListResponse(BaseModel):
+    items: list[OfferResponse]
+    total: int | None = None
+    offset: int
+    limit: int
+    has_more: bool
+    next_offset: int | None = None
 
 
 class StoreResponse(BaseModel):
@@ -278,6 +290,7 @@ __all__ = [
     "settings",
     "get_val",
     "OfferResponse",
+    "OfferListResponse",
     "StoreResponse",
     "CategoryResponse",
     "OrderItem",

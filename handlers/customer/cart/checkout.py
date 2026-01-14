@@ -33,11 +33,13 @@ def register(router: Router) -> None:
         cart_storage.clear_cart(user_id)
 
         text = get_text(lang, "cart_cleared")
+        kb = InlineKeyboardBuilder()
+        kb.button(text=get_text(lang, "cart_empty_cta"), callback_data="hot_offers")
 
         try:
-            await callback.message.edit_text(text, parse_mode="HTML")
+            await callback.message.edit_text(text, parse_mode="HTML", reply_markup=kb.as_markup())
         except Exception:
-            pass
+            await callback.message.answer(text, parse_mode="HTML", reply_markup=kb.as_markup())
 
         await callback.answer()
 
@@ -114,14 +116,14 @@ def register(router: Router) -> None:
             lines.append(f"• {esc(item.title)} x {item.quantity} = {subtotal:,} {currency}")
 
         lines.append("\n" + "-" * 25)
-        lines.append(f"💰 <b>{get_text(lang, 'cart_total_label')}: {total:,} {currency}</b>")
+        lines.append(f"<b>{get_text(lang, 'cart_total_label')}: {total:,} {currency}</b>")
         if delivery_enabled:
             lines.append(
-                f"🚚 {get_text(lang, 'cart_delivery_label')}: {delivery_price:,} {currency}"
+                f"{get_text(lang, 'cart_delivery_label')}: {delivery_price:,} {currency}"
             )
             grand_total = total + delivery_price
             lines.append(
-                f"🧾 <b>{get_text(lang, 'cart_grand_total_label')}: {grand_total:,} {currency}</b>"
+                f"<b>{get_text(lang, 'cart_grand_total_label')}: {grand_total:,} {currency}</b>"
             )
 
         text = "\n".join(lines)

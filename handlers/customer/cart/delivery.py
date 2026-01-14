@@ -84,11 +84,13 @@ def register(router: Router) -> None:
         await state.set_state(OrderDelivery.address)
 
         text = get_text(lang, "cart_delivery_address_prompt")
+        kb = InlineKeyboardBuilder()
+        kb.button(text=get_text(lang, "cart_delivery_back_button"), callback_data="back_to_cart")
 
         try:
-            await callback.message.edit_text(text, parse_mode="HTML")
+            await callback.message.edit_text(text, parse_mode="HTML", reply_markup=kb.as_markup())
         except Exception:
-            await callback.message.answer(text, parse_mode="HTML")
+            await callback.message.answer(text, parse_mode="HTML", reply_markup=kb.as_markup())
 
         await callback.answer()
 
@@ -140,10 +142,10 @@ def register(router: Router) -> None:
             )
 
         lines.append(
-            f"\n🚚 {get_text(lang, 'cart_delivery_label')}: {delivery_price:,} {currency}"
+            f"\n{get_text(lang, 'cart_delivery_label')}: {delivery_price:,} {currency}"
         )
         lines.append(
-            f"💰 <b>{get_text(lang, 'cart_grand_total_label')}: {total_with_delivery:,} {currency}</b>\n"
+            f"<b>{get_text(lang, 'cart_grand_total_label')}: {total_with_delivery:,} {currency}</b>\n"
         )
         lines.append(
             f"📍 {get_text(lang, 'cart_delivery_address_label')}: {esc(delivery_address)}\n"
@@ -179,11 +181,13 @@ def register(router: Router) -> None:
         lang = common.db.get_user_language(user_id)
 
         text = get_text(lang, "cart_delivery_address_prompt")
+        kb = InlineKeyboardBuilder()
+        kb.button(text=get_text(lang, "cart_delivery_back_button"), callback_data="back_to_cart")
 
         try:
-            await callback.message.edit_text(text, parse_mode="HTML")
+            await callback.message.edit_text(text, parse_mode="HTML", reply_markup=kb.as_markup())
         except Exception:
-            await callback.message.answer(text, parse_mode="HTML")
+            await callback.message.answer(text, parse_mode="HTML", reply_markup=kb.as_markup())
 
         await state.set_state(OrderDelivery.address)
         await callback.answer()

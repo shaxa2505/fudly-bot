@@ -162,7 +162,7 @@ def fix_mojibake_text(text: str | bytes | None) -> str:
     for encoding in ("cp1251", "latin1", "cp866"):
         try:
             candidate = original.encode(encoding).decode("utf-8")
-        except UnicodeDecodeError:
+        except (UnicodeDecodeError, UnicodeEncodeError):
             continue
         if candidate != original and _strip(candidate):
             return candidate

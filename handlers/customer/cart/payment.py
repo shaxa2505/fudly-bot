@@ -106,12 +106,8 @@ def register(router: Router) -> None:
             await callback.answer(get_text(lang, "cart_payment_data_missing"), show_alert=True)
             return
 
-        await callback.message.answer(get_text(lang, "cart_payment_click_unavailable"))
-
-        await state.update_data(payment_method="card")
-        await state.set_state(OrderDelivery.payment_proof)
-        await _cart_show_card_payment_details(callback.message, state, lang)
-        await callback.answer()
+        await callback.answer(get_text(lang, "cart_payment_click_unavailable"), show_alert=True)
+        return
 
     @router.callback_query(F.data == "cart_back_to_payment")
     async def cart_back_to_payment(callback: types.CallbackQuery, state: FSMContext) -> None:

@@ -10,6 +10,7 @@ from typing import Any
 
 from aiogram import Bot, Dispatcher, types
 from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
+import aiohttp
 from aiohttp import web
 
 from app.core.metrics import metrics as app_metrics
@@ -32,6 +33,8 @@ def get_offer_value(obj: Any, key: str, default: Any = None) -> Any:
 
 # Cache for photo URLs (file_id -> URL)
 _photo_url_cache: dict[str, str] = {}
+_reverse_geocode_cache: dict[str, tuple[float, dict[str, Any]]] = {}
+_REVERSE_GEOCODE_TTL = 3600
 
 
 async def get_photo_url(bot: Bot, file_id: str | None) -> str | None:
@@ -409,6 +412,62 @@ async def create_webhook_app(
             )
 
         return add_cors_headers(web.json_response(result))
+
+    async def api_reverse_geocode(request: web.Request) -> web.Response:
+        """GET /api/v1/location/reverse - Reverse geocode."""
+        def _parse_float(value: str | None) -> float | None:
+            if value is None or value == "":
+                return None
+            try:
+                return float(value)
+            except ValueError:
+                return None
+
+        lat = _parse_float(request.query.get("lat") or request.query.get("latitude"))
+        lon = _parse_float(request.query.get("lon") or request.query.get("longitude"))
+        lang = request.query.get("lang", "uz")
+
+        if lat is None or lon is None:
+            return add_cors_headers(
+                web.json_response({"detail": "Latitude and longitude are required"}, status=400)
+            )
+
+        cache_key = f"{round(lat, 5)}:{round(lon, 5)}:{str(lang).strip().lower()}"
+        cached = _reverse_geocode_cache.get(cache_key)
+        if cached:
+            cached_at, payload = cached
+            if time.time() - cached_at < _REVERSE_GEOCODE_TTL:
+                return add_cors_headers(web.json_response(payload))
+            _reverse_geocode_cache.pop(cache_key, None)
+
+        url = "https://nominatim.openstreetmap.org/reverse"
+        params = {
+            "format": "jsonv2",
+            "lat": lat,
+            "lon": lon,
+            "accept-language": lang,
+        }
+        headers = {
+            "User-Agent": "FudlyApp/1.0 (webapp reverse geocode)",
+        }
+
+        try:
+            timeout = aiohttp.ClientTimeout(total=8)
+            async with aiohttp.ClientSession(timeout=timeout) as session:
+                async with session.get(url, params=params, headers=headers) as response:
+                    if response.status != 200:
+                        return add_cors_headers(
+                            web.json_response({"detail": "Geo lookup failed"}, status=502)
+                        )
+                    payload = await response.json()
+        except Exception as exc:
+            logger.error("API reverse geocode error: %s", exc)
+            return add_cors_headers(
+                web.json_response({"detail": "Geo lookup failed"}, status=502)
+            )
+
+        _reverse_geocode_cache[cache_key] = (time.time(), payload)
+        return add_cors_headers(web.json_response(payload))
 
     async def api_offers(request: web.Request) -> web.Response:
         """GET /api/v1/offers - List offers."""
@@ -2825,11 +2884,14 @@ async def create_webhook_app(
         app.router.add_route("*", "/api/v1/offers{path:.*}", fastapi_handler)
         app.router.add_route("*", "/api/v1/stores{path:.*}", fastapi_handler)
         app.router.add_route("*", "/api/v1/photo{path:.*}", fastapi_handler)
+        app.router.add_route("*", "/api/v1/location{path:.*}", fastapi_handler)
         app.router.add_route("*", "/api/v1/health{path:.*}", fastapi_handler)
         logger.info("✅ /api/v1/orders routed to FastAPI")
     else:
         app.router.add_options("/api/v1/categories", cors_preflight)
         app.router.add_get("/api/v1/categories", api_categories)
+        app.router.add_options("/api/v1/location/reverse", cors_preflight)
+        app.router.add_get("/api/v1/location/reverse", api_reverse_geocode)
         app.router.add_options("/api/v1/offers", cors_preflight)
         app.router.add_get("/api/v1/offers", api_offers)
         app.router.add_options("/api/v1/offers/{offer_id}", cors_preflight)

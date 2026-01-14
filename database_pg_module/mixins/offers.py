@@ -118,6 +118,15 @@ class OfferMixin:
         """Return normalized variants for region/district matching."""
         return self._get_city_variants(value)
 
+    def _normalize_category_filter(self, category: Any) -> list[str] | None:
+        if not category:
+            return None
+        if isinstance(category, (list, tuple, set)):
+            values = [str(item).strip().lower() for item in category if item]
+            return values or None
+        value = str(category).strip().lower()
+        return [value] if value else None
+
     def add_offer(
         self,
         store_id: int,
@@ -431,13 +440,82 @@ class OfferMixin:
             cursor.execute(query, params)
             return cursor.fetchone()[0]
 
+    def count_offers_by_filters(
+        self,
+        city: str | None = None,
+        region: str | None = None,
+        district: str | None = None,
+        category: str | list[str] | None = None,
+        min_price: float | None = None,
+        max_price: float | None = None,
+        min_discount: float | None = None,
+    ) -> int:
+        """Count offers matching filters (active, in-stock, not expired)."""
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            query = """
+                SELECT COUNT(*)
+                FROM offers o
+                JOIN stores s ON o.store_id = s.store_id
+                WHERE o.status = 'active'
+                  AND COALESCE(o.stock_quantity, o.quantity) > 0
+                  AND (s.status = 'approved' OR s.status = 'active')
+                  AND (o.expiry_date IS NULL OR o.expiry_date >= CURRENT_DATE)
+            """
+            params: list[Any] = []
+
+            categories = self._normalize_category_filter(category)
+            if categories:
+                if len(categories) == 1:
+                    query += " AND o.category = %s"
+                    params.append(categories[0])
+                else:
+                    query += " AND o.category = ANY(%s)"
+                    params.append(categories)
+
+            if city:
+                city_variants = self._get_city_variants(city)
+                city_conditions = " OR ".join(["s.city ILIKE %s" for _ in city_variants])
+                query += f" AND ({city_conditions})"
+                params.extend([f"%{v}%" for v in city_variants])
+
+            if region:
+                region_variants = self._get_location_variants(region)
+                region_conditions = " OR ".join(["s.region ILIKE %s" for _ in region_variants])
+                query += f" AND ({region_conditions})"
+                params.extend([f"%{v}%" for v in region_variants])
+
+            if district:
+                district_variants = self._get_location_variants(district)
+                district_conditions = " OR ".join(
+                    ["s.district ILIKE %s" for _ in district_variants]
+                )
+                query += f" AND ({district_conditions})"
+                params.extend([f"%{v}%" for v in district_variants])
+
+            if min_price is not None:
+                query += " AND o.discount_price >= %s"
+                params.append(min_price)
+            if max_price is not None:
+                query += " AND o.discount_price <= %s"
+                params.append(max_price)
+            if min_discount is not None:
+                query += (
+                    " AND o.original_price > 0"
+                    " AND (1.0 - o.discount_price::numeric / o.original_price::numeric) * 100 >= %s"
+                )
+                params.append(min_discount)
+
+            cursor.execute(query, params)
+            return cursor.fetchone()[0]
+
     def get_nearby_offers(
         self,
         latitude: float,
         longitude: float,
         limit: int = 20,
         offset: int = 0,
-        category: str | None = None,
+        category: str | list[str] | None = None,
         business_type: str | None = None,
         max_distance_km: float | None = None,
         sort_by: str | None = None,
@@ -477,9 +555,14 @@ class OfferMixin:
             if max_distance_km is not None:
                 where_parts.append("t.distance_km <= %s")
                 params.append(max_distance_km)
-            if category:
-                where_parts.append("t.category = %s")
-                params.append(category)
+            categories = self._normalize_category_filter(category)
+            if categories:
+                if len(categories) == 1:
+                    where_parts.append("t.category = %s")
+                    params.append(categories[0])
+                else:
+                    where_parts.append("t.category = ANY(%s)")
+                    params.append(categories)
             if business_type:
                 where_parts.append("t.store_category = %s")
                 params.append(business_type)
@@ -533,7 +616,9 @@ class OfferMixin:
                 # Partner panel: show ALL products except deleted (inactive)
                 cursor.execute(
                     """
-                    SELECT o.*, s.name, s.address, s.city, s.category as store_category, o.category as category
+                    SELECT o.*, s.name, s.address, s.city,
+                           s.delivery_enabled, s.delivery_price, s.min_order_amount,
+                           s.category as store_category, o.category as category
                     FROM offers o
                     JOIN stores s ON o.store_id = s.store_id
                     WHERE o.store_id = %s AND o.status != 'inactive'
@@ -545,7 +630,9 @@ class OfferMixin:
                 # Customer view: only active products with stock and not expired
                 cursor.execute(
                     """
-                    SELECT o.*, s.name, s.address, s.city, s.category as store_category, o.category as category
+                    SELECT o.*, s.name, s.address, s.city,
+                           s.delivery_enabled, s.delivery_price, s.min_order_amount,
+                           s.category as store_category, o.category as category
                     FROM offers o
                     JOIN stores s ON o.store_id = s.store_id
                     WHERE o.store_id = %s AND COALESCE(o.stock_quantity, o.quantity) > 0 AND o.status = 'active'
@@ -583,7 +670,7 @@ class OfferMixin:
     def get_offers_by_city_and_category(
         self,
         city: str | None,
-        category: str,
+        category: str | list[str] | None,
         limit: int = 20,
         offset: int = 0,
         region: str | None = None,
@@ -596,18 +683,28 @@ class OfferMixin:
         """Get offers by city and category."""
         with self.get_connection() as conn:
             cursor = conn.cursor(row_factory=dict_row)
+            categories = self._normalize_category_filter(category)
+            if not categories:
+                return []
             query = """
                 SELECT o.*, s.name as store_name, s.address, s.city,
+                       s.delivery_enabled, s.delivery_price, s.min_order_amount,
                        CASE WHEN o.original_price > 0 THEN CAST((1.0 - o.discount_price::numeric / o.original_price::numeric) * 100 AS INTEGER) ELSE 0 END as discount_percent
                 FROM offers o
                 JOIN stores s ON o.store_id = s.store_id
-                WHERE o.category = %s
-                  AND o.status = 'active'
+                WHERE o.status = 'active'
                   AND COALESCE(o.stock_quantity, o.quantity) > 0
                   AND (o.expiry_date IS NULL OR o.expiry_date >= CURRENT_DATE)
                   AND (s.status = 'approved' OR s.status = 'active')
             """
-            params = [category]
+            params: list[Any] = []
+
+            if len(categories) == 1:
+                query += " AND o.category = %s"
+                params.append(categories[0])
+            else:
+                query += " AND o.category = ANY(%s)"
+                params.append(categories)
 
             if city:
                 city_variants = self._get_city_variants(city)

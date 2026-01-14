@@ -131,17 +131,6 @@ async def start_delivery_order(
     delivery_price = get_store_field(store, "delivery_price", 15000)
     min_order = get_store_field(store, "min_order_amount", 0)
 
-    # Check min order for single item
-    if min_order > 0 and price < min_order:
-        currency = "so'm" if lang == "uz" else "сум"
-        msg = (
-            f"Min. buyurtma: {min_order:,} {currency}"
-            if lang == "uz"
-            else f"Мин. заказ: {min_order:,} {currency}"
-        )
-        await callback.answer(f"❌ {msg}", show_alert=True)
-        return
-
     # Get saved address
     saved_address = None
     try:
@@ -331,18 +320,10 @@ async def dlv_change_qty(
 
     data = await state.get_data()
     max_qty = data.get("max_qty", 1)
-    min_order = data.get("min_order", 0)
     price = data.get("price", 0)
 
     if new_qty < 1 or new_qty > max_qty:
         await callback.answer("❌", show_alert=True)
-        return
-
-    # Check min order
-    if min_order > 0 and (price * new_qty) < min_order:
-        currency = "so'm" if lang == "uz" else "сум"
-        msg = f"Min: {min_order:,} {currency}"
-        await callback.answer(f"❌ {msg}", show_alert=True)
         return
 
     await state.update_data(quantity=new_qty)
@@ -386,6 +367,16 @@ async def dlv_to_address(
     lang = db.get_user_language(callback.from_user.id)
     data = await state.get_data()
     offer_id = data.get("offer_id")
+
+    min_order = int(data.get("min_order", 0) or 0)
+    price = int(data.get("price", 0) or 0)
+    quantity = int(data.get("quantity", 1) or 1)
+
+    if min_order > 0 and (price * quantity) < min_order:
+        currency = "so'm" if lang == "uz" else "???"
+        msg = f"Min: {min_order:,} {currency}"
+        await callback.answer(f"?? {msg}", show_alert=True)
+        return
 
     await state.set_state(OrderDelivery.address)
 
@@ -735,9 +726,9 @@ async def dlv_pay_click(
     # Ensure we have address and other required data
     address = data.get("address")
     if not address:
-        logger.error("❌ No address in state for Click payment")
-        await _switch_to_card_payment_no_order(callback.message, state, data, lang, db)
-        await callback.answer()
+        logger.error("? No address in state for Click payment")
+        await _return_to_address_step(callback.message, state, data, lang)
+        await callback.answer(get_text(lang, "cart_delivery_address_prompt"), show_alert=True)
         return
 
     # Create order if not created yet
@@ -869,6 +860,35 @@ async def _switch_to_card_payment_no_order(message, state, data, lang, db, reaso
     await _show_card_payment_details(message, state, lang, db)
 
 
+async def _return_to_address_step(message: types.Message, state: FSMContext, data: dict, lang: str) -> None:
+    offer_id = data.get("offer_id")
+    if not offer_id:
+        await state.clear()
+        await message.answer(get_text(lang, "system_error"), reply_markup=main_menu_customer(lang))
+        return
+
+    await state.set_state(OrderDelivery.address)
+    text = build_delivery_card_text(
+        lang,
+        data.get("title", ""),
+        data.get("price", 0),
+        data.get("quantity", 1),
+        data.get("max_qty", 1),
+        data.get("store_name", ""),
+        data.get("delivery_price", 0),
+        None,
+        "address",
+    )
+    kb = build_delivery_address_keyboard(lang, int(offer_id), data.get("saved_address"))
+
+    try:
+        if message.photo:
+            await message.edit_caption(caption=text, parse_mode="HTML", reply_markup=kb.as_markup())
+        else:
+            await message.edit_text(text, parse_mode="HTML", reply_markup=kb.as_markup())
+    except Exception:
+        pass
+
 @router.callback_query(F.data.startswith("dlv_pay_card_"))
 async def dlv_pay_card(
     callback: types.CallbackQuery, state: FSMContext, db: DatabaseProtocol
@@ -881,6 +901,13 @@ async def dlv_pay_card(
     user_id = callback.from_user.id
     lang = db.get_user_language(user_id)
     data = await state.get_data()
+    address = data.get("address")
+    if not address:
+        logger.error("? No address in state for card payment")
+        await _return_to_address_step(callback.message, state, data, lang)
+        await callback.answer(get_text(lang, "cart_delivery_address_prompt"), show_alert=True)
+        return
+
 
     logger.info(f"💳 User {user_id} selected card payment")
     logger.info(f"📋 FSM data keys: {list(data.keys())}")
@@ -990,6 +1017,12 @@ async def dlv_payment_proof(
 
     logger.info(f"📸 User {user_id} uploaded payment screenshot for delivery order")
     logger.info(f"📋 FSM data keys: {list(data.keys())}")
+
+    if data.get("payment_proof_in_progress"):
+        await message.answer(get_text(lang, "cart_payment_photo_already_received"))
+        return
+
+    await state.update_data(payment_proof_in_progress=True)
 
     # Get data from FSM
     offer_id = data.get("offer_id")
@@ -1210,9 +1243,18 @@ async def dlv_quantity_text(
         qty = int(text)
         data = await state.get_data()
         max_qty = data.get("max_qty", 1)
+        min_order = int(data.get("min_order", 0) or 0)
+        price = int(data.get("price", 0) or 0)
+
 
         if qty < 1 or qty > max_qty:
             raise ValueError()
+
+        if min_order > 0 and (price * qty) < min_order:
+            currency = "so'm" if lang == "uz" else "???"
+            msg = f"Min: {min_order:,} {currency}"
+            await message.answer(f"?? {msg}")
+            return
 
         await state.update_data(quantity=qty)
 

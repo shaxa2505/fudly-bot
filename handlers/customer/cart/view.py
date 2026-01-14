@@ -33,7 +33,7 @@ async def _build_cart_view(user_id: int) -> tuple[str, InlineKeyboardBuilder] | 
         return empty_text, kb
 
     currency = "so'm" if lang == "uz" else "сум"
-    lines: list[str] = [f"🛒 <b>{get_text(lang, 'cart_title')}</b>\n"]
+    lines: list[str] = [get_text(lang, "cart_title"), ""]
 
     total = 0
     for i, item in enumerate(items, 1):
@@ -41,13 +41,14 @@ async def _build_cart_view(user_id: int) -> tuple[str, InlineKeyboardBuilder] | 
         subtotal = price_sums * item.quantity
         total += subtotal
         lines.append(f"\n<b>{i}. {esc(item.title)}</b>")
+        unit = f" {esc(item.unit)}" if item.unit else ""
         lines.append(
-            f"   {item.quantity} x {price_sums:,} = <b>{subtotal:,}</b> {currency}"
+            f"   {item.quantity}{unit} x {price_sums:,} = <b>{subtotal:,}</b> {currency}"
         )
         lines.append(f"   🏪 {esc(item.store_name)}")
 
     lines.append("\n" + "-" * 25)
-    lines.append(f"💰 <b>{get_text(lang, 'cart_total_label')}: {total:,} {currency}</b>")
+    lines.append(f"<b>{get_text(lang, 'cart_total_label')}: {total:,} {currency}</b>")
 
     delivery_enabled = any(item.delivery_enabled for item in items)
     delivery_price = max(
@@ -56,11 +57,11 @@ async def _build_cart_view(user_id: int) -> tuple[str, InlineKeyboardBuilder] | 
 
     if delivery_enabled:
         lines.append(
-            f"\n🚚 {get_text(lang, 'cart_delivery_label')}: +{delivery_price:,} {currency}"
+            f"\n{get_text(lang, 'cart_delivery_label')}: +{delivery_price:,} {currency}"
         )
         grand_total = total + delivery_price
         lines.append(
-            f"🧾 <b>{get_text(lang, 'cart_grand_total_label')}: {grand_total:,} {currency}</b>"
+            f"<b>{get_text(lang, 'cart_grand_total_label')}: {grand_total:,} {currency}</b>"
         )
 
     text = "\n".join(lines)
@@ -68,32 +69,28 @@ async def _build_cart_view(user_id: int) -> tuple[str, InlineKeyboardBuilder] | 
     kb = InlineKeyboardBuilder()
 
     for i, item in enumerate(items, 1):
-        title_short = item.title[:25] + "..." if len(item.title) > 25 else item.title
+        title_short = item.title[:18] + "..." if len(item.title) > 18 else item.title
+        kb.button(text="➖", callback_data=f"cart_qty_dec_{item.offer_id}")
         kb.button(text=f"{i}. {title_short} ({item.quantity})", callback_data="cart_noop")
+        kb.button(text="➕", callback_data=f"cart_qty_inc_{item.offer_id}")
         kb.button(text="❌", callback_data=f"cart_remove_{item.offer_id}")
 
     kb.button(
-        text=get_text(lang, "cart_pickup_button"),
-        callback_data="cart_confirm_pickup",
+        text=get_text(lang, "cart_checkout_button"),
+        callback_data="cart_checkout",
     )
-    if delivery_enabled:
-        delivery_suffix = f" (+{delivery_price:,})" if delivery_price else ""
-        kb.button(
-            text=f"{get_text(lang, 'cart_delivery_button')}{delivery_suffix}",
-            callback_data="cart_confirm_delivery",
-        )
-
+    kb.button(
+        text=get_text(lang, "cart_empty_cta"),
+        callback_data="hot_offers",
+    )
     kb.button(
         text=get_text(lang, "cart_clear_button"),
         callback_data="cart_clear",
     )
 
     num_items = len(items)
-    adjust_pattern = [2] * num_items
-    if delivery_enabled:
-        adjust_pattern.extend([2, 1])
-    else:
-        adjust_pattern.extend([1, 1])
+    adjust_pattern = [4] * num_items
+    adjust_pattern.extend([1, 1, 1])
 
     kb.adjust(*adjust_pattern)
 

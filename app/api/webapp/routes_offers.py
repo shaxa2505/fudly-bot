@@ -8,6 +8,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from .common import (
     CATEGORIES,
     CategoryResponse,
+    OfferListResponse,
     OfferResponse,
     PRICE_STORAGE_UNIT,
     get_current_user,
@@ -19,6 +20,21 @@ from .common import (
 from app.core.utils import normalize_city
 
 router = APIRouter()
+
+CATEGORY_ALIASES: dict[str, list[str]] = {
+    "sweets": ["sweets", "snacks"],
+}
+
+
+def expand_category_filter(category: str | None) -> list[str] | None:
+    if not category:
+        return None
+    normalized = str(category).strip().lower()
+    if not normalized or normalized == "all":
+        return None
+    if normalized in CATEGORY_ALIASES:
+        return CATEGORY_ALIASES[normalized]
+    return [normalized]
 
 
 def _calc_discount_percent(original_price: float, discount_price: float) -> float:
@@ -68,6 +84,13 @@ def _to_offer_response(offer: Any, store_fallback: dict | None = None) -> OfferR
         or get_val(offer, "address")
         or (get_val(store_fallback, "address") if store_fallback else None)
     )
+    delivery_enabled = bool(
+        get_val(offer, "delivery_enabled", get_val(store_fallback, "delivery_enabled", False))
+    )
+    delivery_price = get_val(offer, "delivery_price", get_val(store_fallback, "delivery_price"))
+    min_order_amount = get_val(
+        offer, "min_order_amount", get_val(store_fallback, "min_order_amount")
+    )
 
     photo = get_val(offer, "photo") or get_val(offer, "photo_id")
 
@@ -87,6 +110,9 @@ def _to_offer_response(offer: Any, store_fallback: dict | None = None) -> OfferR
         store_id=store_id,
         store_name=store_name,
         store_address=store_address,
+        delivery_enabled=delivery_enabled,
+        delivery_price=delivery_price,
+        min_order_amount=min_order_amount,
         photo=photo,
         expiry_date=expiry_date,
     )
@@ -103,21 +129,41 @@ async def get_categories(
 
     for cat in CATEGORIES:
         count = 0
+        category_filter = expand_category_filter(cat["id"])
         if cat["id"] != "all":
             try:
-                offers = (
-                    db.get_offers_by_category(cat["id"], normalized_city)
-                    if hasattr(db, "get_offers_by_category")
-                    else []
-                )
-                count = len(offers) if offers else 0
+                if hasattr(db, "count_offers_by_filters"):
+                    count = int(
+                        db.count_offers_by_filters(
+                            city=normalized_city,
+                            category=category_filter,
+                        )
+                    )
+                elif hasattr(db, "get_offers_by_city_and_category") and category_filter:
+                    offers = db.get_offers_by_city_and_category(
+                        city=normalized_city,
+                        category=category_filter,
+                        limit=1000,
+                        offset=0,
+                    )
+                    count = len(offers) if offers else 0
+                elif hasattr(db, "get_offers_by_category") and category_filter:
+                    if isinstance(category_filter, (list, tuple)):
+                        offers = []
+                        for item in category_filter:
+                            offers.extend(db.get_offers_by_category(item, normalized_city) or [])
+                        count = len(offers)
+                    else:
+                        offers = db.get_offers_by_category(category_filter, normalized_city) or []
+                        count = len(offers)
             except Exception:  # pragma: no cover - defensive
                 count = 0
         else:
             try:
-                count = (
-                    db.count_hot_offers(normalized_city) if hasattr(db, "count_hot_offers") else 0
-                )
+                if hasattr(db, "count_offers_by_filters"):
+                    count = int(db.count_offers_by_filters(city=normalized_city))
+                elif hasattr(db, "count_hot_offers"):
+                    count = db.count_hot_offers(normalized_city) or 0
             except Exception:  # pragma: no cover - defensive
                 count = 0
 
@@ -128,7 +174,7 @@ async def get_categories(
     return result
 
 
-@router.get("/offers", response_model=list[OfferResponse])
+@router.get("/offers", response_model=list[OfferResponse] | OfferListResponse)
 async def get_offers(
     city: str | None = Query(None, description="City to filter by"),
     region: str | None = Query(None, description="Region filter"),
@@ -146,6 +192,7 @@ async def get_offers(
     sort_by: str | None = Query(None, description="Sort by: discount, price_asc, price_desc, new"),
     limit: int = Query(50, ge=1, le=100),
     offset: int = Query(0, ge=0),
+    include_meta: bool = Query(False, description="Include response metadata"),
     db=Depends(get_db),
     user: dict = Depends(get_current_user),
 ):
@@ -156,6 +203,7 @@ async def get_offers(
         normalized_city = normalized_city or None
         region = region or None
         district = district or None
+        category_filter = expand_category_filter(category)
         lat_val = lat if lat is not None else latitude
         lon_val = lon if lon is not None else longitude
         offers: list[OfferResponse] = []
@@ -211,11 +259,11 @@ async def get_offers(
             def _fetch_scoped_offers(
                 city_scope: str | None, region_scope: str | None, district_scope: str | None
             ) -> list[Any]:
-                if category and category != "all":
+                if category_filter:
                     if hasattr(db, "get_offers_by_city_and_category"):
                         return db.get_offers_by_city_and_category(
                             city=city_scope,
-                            category=category,
+                            category=category_filter,
                             limit=limit,
                             offset=offset,
                             region=region_scope,
@@ -226,7 +274,12 @@ async def get_offers(
                             min_discount=min_discount,
                         )
                     if hasattr(db, "get_offers_by_category") and city_scope:
-                        return db.get_offers_by_category(category, city_scope)
+                        if isinstance(category_filter, (list, tuple)):
+                            combined: list[Any] = []
+                            for item in category_filter:
+                                combined.extend(db.get_offers_by_category(item, city_scope) or [])
+                            return combined
+                        return db.get_offers_by_category(category_filter, city_scope)
                     return []
                 if hasattr(db, "get_hot_offers"):
                     return db.get_hot_offers(
@@ -274,7 +327,7 @@ async def get_offers(
                     longitude=lon_val,
                     limit=limit,
                     offset=offset,
-                    category=category if category and category != "all" else None,
+                    category=category_filter,
                     sort_by=sort_key,
                     min_price=storage_min_price,
                     max_price=storage_max_price,
@@ -313,6 +366,19 @@ async def get_offers(
                         store_address=get_val(offer, "store_address")
                         or get_val(offer, "address")
                         or (get_val(store_fallback, "address") if store_fallback else None),
+                        delivery_enabled=bool(
+                            get_val(
+                                offer,
+                                "delivery_enabled",
+                                get_val(store_fallback, "delivery_enabled", False),
+                            )
+                        ),
+                        delivery_price=get_val(
+                            offer, "delivery_price", get_val(store_fallback, "delivery_price")
+                        ),
+                        min_order_amount=get_val(
+                            offer, "min_order_amount", get_val(store_fallback, "min_order_amount")
+                        ),
                         photo=get_val(offer, "photo") or get_val(offer, "photo_id"),
                         expiry_date=str(get_val(offer, "expiry_date", ""))
                         if get_val(offer, "expiry_date")
@@ -343,6 +409,36 @@ async def get_offers(
 
         if apply_slice:
             offers = offers[offset : offset + limit]
+
+        if include_meta:
+            total: int | None = None
+            if not store_id and not search and hasattr(db, "count_offers_by_filters"):
+                total = int(
+                    db.count_offers_by_filters(
+                        city=normalized_city,
+                        region=region,
+                        district=district,
+                        category=category_filter,
+                        min_price=storage_min_price,
+                        max_price=storage_max_price,
+                        min_discount=min_discount,
+                    )
+                )
+            has_more = (
+                (offset + len(offers) < total)
+                if total is not None
+                else (len(offers) == limit)
+            )
+            next_offset = offset + len(offers) if has_more else None
+            total_value = total if total is not None else offset + len(offers)
+            return OfferListResponse(
+                items=offers,
+                total=total_value,
+                offset=offset,
+                limit=limit,
+                has_more=has_more,
+                next_offset=next_offset,
+            )
 
         return offers
 
@@ -386,6 +482,13 @@ async def get_offer(offer_id: int, db=Depends(get_db)):
             store_address=get_val(offer, "store_address")
             or get_val(offer, "address")
             or (get_val(store_fallback, "address") if store_fallback else None),
+            delivery_enabled=bool(
+                get_val(offer, "delivery_enabled", get_val(store_fallback, "delivery_enabled", False))
+            ),
+            delivery_price=get_val(offer, "delivery_price", get_val(store_fallback, "delivery_price")),
+            min_order_amount=get_val(
+                offer, "min_order_amount", get_val(store_fallback, "min_order_amount")
+            ),
             photo=get_val(offer, "photo") or get_val(offer, "photo_id"),
             expiry_date=str(get_val(offer, "expiry_date", ""))
             if get_val(offer, "expiry_date")

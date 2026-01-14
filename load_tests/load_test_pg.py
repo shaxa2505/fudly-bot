@@ -28,9 +28,8 @@ if not DB_URL:
     sys.exit(1)
 
 
-def worker(db_url: str, offer_id: int, amount: int):
+def worker(db: Database, offer_id: int, amount: int):
     try:
-        db = Database(database_url=db_url)
         new_qty = db.increment_offer_quantity_atomic(offer_id, amount)
         return ("ok", new_qty)
     except Exception as e:
@@ -54,12 +53,13 @@ def run_load_test(
         store_id=store_id,
         title="LoadTestOffer",
         description="Load test",
-        original_price=100.0,
-        discount_price=50.0,
+        # Prices stored as integers (kopeks) in unified schema.
+        original_price=10000,
+        discount_price=5000,
         quantity=initial_qty,
-        available_from="",
-        available_until="",
-        photo=None,
+        available_from=None,
+        available_until=None,
+        photo_id=None,
         expiry_date=None,
     )
 
@@ -76,7 +76,7 @@ def run_load_test(
     results = []
     start = time.time()
     with ThreadPoolExecutor(max_workers=concurrent_workers) as ex:
-        futures = [ex.submit(worker, database_url, offer_id, amt) for amt in ops]
+        futures = [ex.submit(worker, db, offer_id, amt) for amt in ops]
         for f in as_completed(futures):
             results.append(f.result())
 
@@ -85,9 +85,8 @@ def run_load_test(
     err_list = [r for r in results if r[0] == "err"]
 
     # Read final qty
-    db_final = Database(database_url=database_url)
     # Use raw connection to ensure numeric result
-    with db_final.get_connection() as conn:
+    with db.get_connection() as conn:
         cur = conn.cursor()
         cur.execute("SELECT quantity FROM offers WHERE offer_id = %s", (offer_id,))
         row = cur.fetchone()
