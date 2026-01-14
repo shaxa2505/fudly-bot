@@ -50,7 +50,7 @@ describe('OfferCard', () => {
 
   it('renders add to cart button when not in cart', () => {
     const { container } = renderOfferCard({ cartQuantity: 0 })
-    const addButton = container.querySelector('.add-to-cart-btn')
+    const addButton = container.querySelector('.add-to-cart-inline')
     expect(addButton).toBeInTheDocument()
   })
 

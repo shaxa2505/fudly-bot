@@ -248,6 +248,7 @@ async def get_offers(
                     min_price=storage_min_price,
                     max_price=storage_max_price,
                     min_discount=min_discount,
+                    category=category_filter,
                 )
                 if hasattr(db, "search_offers")
                 else []
@@ -430,10 +431,9 @@ async def get_offers(
                 else (len(offers) == limit)
             )
             next_offset = offset + len(offers) if has_more else None
-            total_value = total if total is not None else offset + len(offers)
             return OfferListResponse(
                 items=offers,
-                total=total_value,
+                total=total,
                 offset=offset,
                 limit=limit,
                 has_more=has_more,

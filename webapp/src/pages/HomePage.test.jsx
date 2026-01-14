@@ -9,6 +9,8 @@ const apiMocks = vi.hoisted(() => ({
   getSearchHistory: vi.fn(),
   addSearchHistory: vi.fn(),
   clearSearchHistory: vi.fn(),
+  getCategories: vi.fn(),
+  getSearchSuggestions: vi.fn(),
 }))
 
 vi.mock('../api/client', () => ({
@@ -17,6 +19,8 @@ vi.mock('../api/client', () => ({
     getSearchHistory: apiMocks.getSearchHistory,
     addSearchHistory: apiMocks.addSearchHistory,
     clearSearchHistory: apiMocks.clearSearchHistory,
+    getCategories: apiMocks.getCategories,
+    getSearchSuggestions: apiMocks.getSearchSuggestions,
   },
 }))
 
@@ -32,6 +36,14 @@ vi.mock('../components/OfferCardSkeleton', () => ({
 
 vi.mock('../components/HeroBanner', () => ({
   default: () => <div data-testid="hero-banner" />,
+}))
+
+vi.mock('../components/FlashDeals', () => ({
+  default: () => <div data-testid="flash-deals" />,
+}))
+
+vi.mock('../components/RecentlyViewed', () => ({
+  default: () => <div data-testid="recently-viewed" />,
 }))
 
 vi.mock('../components/BottomNav', () => ({
@@ -84,6 +96,10 @@ describe('HomePage', () => {
     apiMocks.addSearchHistory.mockReset()
     apiMocks.clearSearchHistory.mockReset()
     apiMocks.getSearchHistory.mockResolvedValue([])
+    apiMocks.getCategories.mockReset()
+    apiMocks.getSearchSuggestions.mockReset()
+    apiMocks.getCategories.mockResolvedValue([])
+    apiMocks.getSearchSuggestions.mockResolvedValue([])
   })
 
   afterEach(() => {
@@ -150,7 +166,6 @@ describe('HomePage', () => {
       })
       .mockResolvedValueOnce({
         offers: [
-          { id: 1, title: 'Invalid Discount', original_price: 0, discount_price: -10 },
           { id: 2, title: 'Valid Discount', original_price: 100, discount_price: 50 },
         ],
       })
@@ -168,6 +183,7 @@ describe('HomePage', () => {
       expect(apiMocks.getOffers).toHaveBeenCalledTimes(2)
     })
 
+    expect(apiMocks.getOffers.mock.calls[1][0].min_discount).toBe(20)
     await waitFor(() => {
       expect(screen.queryByText('Invalid Discount')).not.toBeInTheDocument()
     })
@@ -211,12 +227,18 @@ describe('HomePage', () => {
   })
 
   it('filters offers by price range and passes max price', async () => {
-    apiMocks.getOffers.mockResolvedValue({
-      offers: [
-        { id: 1, title: 'Cheap Offer', discount_price: 10000, original_price: 15000 },
-        { id: 2, title: 'Expensive Offer', discount_price: 30000, original_price: 35000 },
-      ],
-    })
+    apiMocks.getOffers
+      .mockResolvedValueOnce({
+        offers: [
+          { id: 1, title: 'Cheap Offer', discount_price: 10000, original_price: 15000 },
+          { id: 2, title: 'Expensive Offer', discount_price: 30000, original_price: 35000 },
+        ],
+      })
+      .mockResolvedValueOnce({
+        offers: [
+          { id: 1, title: 'Cheap Offer', discount_price: 10000, original_price: 15000 },
+        ],
+      })
 
     renderHomePage()
 
@@ -237,12 +259,19 @@ describe('HomePage', () => {
   })
 
   it('applies sort order and passes sort_by param', async () => {
-    apiMocks.getOffers.mockResolvedValue({
-      offers: [
-        { id: 1, title: 'Second', discount_price: 300, original_price: 350 },
-        { id: 2, title: 'First', discount_price: 100, original_price: 150 },
-      ],
-    })
+    apiMocks.getOffers
+      .mockResolvedValueOnce({
+        offers: [
+          { id: 1, title: 'Second', discount_price: 300, original_price: 350 },
+          { id: 2, title: 'First', discount_price: 100, original_price: 150 },
+        ],
+      })
+      .mockResolvedValueOnce({
+        offers: [
+          { id: 2, title: 'First', discount_price: 100, original_price: 150 },
+          { id: 1, title: 'Second', discount_price: 300, original_price: 350 },
+        ],
+      })
 
     renderHomePage()
 
@@ -303,13 +332,19 @@ describe('HomePage', () => {
     expect(apiMocks.getOffers.mock.calls[1][0].category).toBe('dairy')
   })
 
-  it('filters alias category in memory without category param', async () => {
-    apiMocks.getOffers.mockResolvedValue({
-      offers: [
-        { id: 1, title: 'Snack Offer', category: 'snacks' },
-        { id: 2, title: 'Drink Offer', category: 'drinks' },
-      ],
-    })
+  it('filters alias category via API', async () => {
+    apiMocks.getOffers
+      .mockResolvedValueOnce({
+        offers: [
+          { id: 1, title: 'Snack Offer', category: 'snacks' },
+          { id: 2, title: 'Drink Offer', category: 'drinks' },
+        ],
+      })
+      .mockResolvedValueOnce({
+        offers: [
+          { id: 1, title: 'Snack Offer', category: 'snacks' },
+        ],
+      })
 
     renderHomePage()
 
@@ -323,7 +358,7 @@ describe('HomePage', () => {
       expect(apiMocks.getOffers).toHaveBeenCalledTimes(2)
     })
 
-    expect(apiMocks.getOffers.mock.calls[1][0].category).toBeUndefined()
+    expect(apiMocks.getOffers.mock.calls[1][0].category).toBe('sweets')
     expect(screen.getByText('Snack Offer')).toBeInTheDocument()
     expect(screen.queryByText('Drink Offer')).not.toBeInTheDocument()
   })
@@ -442,7 +477,7 @@ describe('HomePage', () => {
     await new Promise(resolve => setTimeout(resolve, 600))
 
     expect(screen.getByPlaceholderText('Mahsulot qidirish...')).toHaveValue('')
-    expect(screen.getByRole('button', { name: 'Barchasi' }).className).toContain('active')
+    expect(screen.getByRole('button', { name: 'Barchasi' }).className).toContain('is-active')
   })
 
   it('shows filters count when multiple filters are active', async () => {

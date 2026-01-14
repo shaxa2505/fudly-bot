@@ -21,6 +21,9 @@ from handlers.common.webapp import webapp_keyboard
 from localization import get_cities, get_text
 
 router = Router(name="registration")
+REGISTRATION_COMPLETE_STICKER_ID = (
+    "CAACAgIAAxkBAAEGc3ZnW7HYzWGxKQABfLqvPQABaKyP5k0AAtAOAAI0D3FJ_vgAAczKO4CINgQ"
+)
 
 
 def _build_district_keyboard(
@@ -30,7 +33,7 @@ def _build_district_keyboard(
         return None
     builder = InlineKeyboardBuilder()
     for idx, (label, _value) in enumerate(options):
-        builder.button(text=f"\U0001F4CD {label}", callback_data=f"reg_district_{idx}")
+        builder.button(text=label, callback_data=f"reg_district_{idx}")
     builder.adjust(1)
     return builder.as_markup()
 
@@ -142,8 +145,25 @@ async def _after_phone_saved(
         reply_markup=ReplyKeyboardRemove(),
     )
     await message.answer(
-        get_text(lang, "registration_choose_action"),
+        get_text(lang, "registration_city_title"),
         reply_markup=city_inline_keyboard(lang, allow_cancel=False),
+    )
+
+
+async def _send_completion_menu(message: types.Message, lang: str) -> None:
+    menu = main_menu_customer(lang)
+    if REGISTRATION_COMPLETE_STICKER_ID:
+        try:
+            await message.answer_sticker(
+                REGISTRATION_COMPLETE_STICKER_ID,
+                reply_markup=menu,
+            )
+            return
+        except Exception:
+            pass
+    await message.answer(
+        get_text(lang, "registration_choose_action"),
+        reply_markup=menu,
     )
 
 
@@ -271,7 +291,7 @@ async def registration_city_callback(
         )
         await state.set_state(Registration.district)
         keyboard = _build_district_keyboard(district_options)
-        prompt = ("Выберите район/город в области:" if lang == "ru" else "Viloyatdagi tuman/shaharni tanlang:")
+        prompt = "Выберите район." if lang == "ru" else "Tumanni tanlang."
         if callback.message:
             try:
                 await callback.message.edit_text(prompt, reply_markup=keyboard)
@@ -320,10 +340,7 @@ async def registration_city_callback(
             reply_markup=webapp_markup,
         )
 
-    await callback.message.answer(
-        get_text(lang, "registration_choose_action"),
-        reply_markup=main_menu_customer(lang),
-    )
+    await _send_completion_menu(callback.message, lang)
     await callback.answer()
 
 
@@ -406,10 +423,7 @@ async def registration_district_callback(
             reply_markup=webapp_markup,
         )
 
-    await callback.message.answer(
-        get_text(lang, "registration_choose_action"),
-        reply_markup=main_menu_customer(lang),
-    )
+    await _send_completion_menu(callback.message, lang)
     await callback.answer()
 
 

@@ -58,6 +58,7 @@ class SearchMixin:
         min_price: float | None = None,
         max_price: float | None = None,
         min_discount: float | None = None,
+        category: str | list[str] | None = None,
     ) -> list[Any]:
         """Search offers by title or store name using advanced PostgreSQL full-text search."""
         base_sql = """
@@ -122,6 +123,22 @@ class SearchMixin:
                 " AND (1.0 - o.discount_price::numeric / o.original_price::numeric) * 100 >= %s"
             )
             params.append(min_discount)
+
+        categories: list[str] | None = None
+        if category:
+            if isinstance(category, (list, tuple, set)):
+                categories = [str(item).strip().lower() for item in category if item]
+            else:
+                categories = [str(category).strip().lower()]
+            categories = [item for item in categories if item]
+
+        if categories:
+            if len(categories) == 1:
+                base_sql += " AND o.category = %s"
+                params.append(categories[0])
+            else:
+                base_sql += " AND o.category = ANY(%s)"
+                params.append(categories)
 
         base_sql += """
             AND (o.expiry_date IS NULL OR o.expiry_date >= CURRENT_DATE)

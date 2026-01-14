@@ -486,6 +486,7 @@ class DatabaseProtocol(Protocol):
         min_price: float | None = None,
         max_price: float | None = None,
         min_discount: float | None = None,
+        category: str | list[str] | None = None,
     ) -> RowList:
         ...
 

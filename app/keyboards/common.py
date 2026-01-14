@@ -10,8 +10,8 @@ from localization import get_text
 def language_keyboard() -> InlineKeyboardMarkup:
     """Language selection keyboard."""
     builder = InlineKeyboardBuilder()
-    builder.button(text="🇷🇺 Русский", callback_data="lang_ru")
-    builder.button(text="🇺🇿 O'zbekcha", callback_data="lang_uz")
+    builder.button(text="Русский", callback_data="lang_ru")
+    builder.button(text="O'zbekcha", callback_data="lang_uz")
     builder.adjust(2)
     return builder.as_markup()
 
@@ -42,7 +42,7 @@ def city_keyboard(lang: str = "ru", allow_cancel: bool = True) -> ReplyKeyboardM
     cities = get_cities(lang)
     builder = ReplyKeyboardBuilder()
     for city in cities:
-        builder.button(text=f"\U0001F4CD {city}")
+        builder.button(text=city)
 
     if allow_cancel:
         builder.button(text=get_text(lang, "cancel"))
@@ -65,7 +65,7 @@ def city_inline_keyboard(lang: str = "ru", allow_cancel: bool = True) -> InlineK
     cities = get_cities(lang)
     builder = InlineKeyboardBuilder()
     for idx, city in enumerate(cities):
-        builder.button(text=f"\U0001F4CD {city}", callback_data=f"reg_city_{idx}")
+        builder.button(text=city, callback_data=f"reg_city_{idx}")
     if allow_cancel:
         builder.button(text=get_text(lang, "cancel"), callback_data="reg_cancel")
     builder.adjust(1)

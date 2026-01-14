@@ -18,6 +18,7 @@ const OfferCard = memo(function OfferCard({ offer, cartQuantity = 0, onAddToCart
   const stockLimit = Number(offer.quantity ?? offer.stock ?? 0)
   const isOutOfStock = stockLimit <= 0
   const isMaxReached = !isOutOfStock && cartQuantity >= stockLimit
+  const disableIncrement = isOutOfStock || isMaxReached
   const minOrderAmount = Number(offer.min_order_amount || 0)
   const showDelivery = Boolean(offer.delivery_enabled)
   const showStoreName = Boolean(offer.store_name)
@@ -136,24 +137,24 @@ const OfferCard = memo(function OfferCard({ offer, cartQuantity = 0, onAddToCart
           </div>
         )}
         <div className="card-control">
-          {isOutOfStock ? (
-            <div className="card-stock-empty">Tugagan</div>
-          ) : cartQuantity > 0 ? (
+          {cartQuantity > 0 ? (
             <QuantityControl
               value={cartQuantity}
               size="sm"
               className="card-stepper"
               onDecrement={handleRemoveClick}
               onIncrement={handleAddClick}
-              disableIncrement={isMaxReached}
+              disableIncrement={disableIncrement}
               stopPropagation
             />
+          ) : isOutOfStock ? (
+            <div className="card-stock-empty">Tugagan</div>
           ) : (
             <button
               type="button"
               className={`add-to-cart-inline ${isAdding ? 'pulse' : ''}`}
               onClick={handleAddClick}
-              disabled={isMaxReached}
+              disabled={disableIncrement}
               aria-label="Savatga qo'shish"
             >
               +

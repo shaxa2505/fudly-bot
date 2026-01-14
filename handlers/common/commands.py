@@ -650,9 +650,7 @@ async def change_city_text(
 
 def build_welcome_card(lang: str = "ru") -> str:
     """Build welcome message for new users."""
-    if lang == "uz":
-        return "Fudly ga xush kelibsiz!\n\nBoshlash uchun tilni tanlang."
-    return "Добро пожаловать в Fudly!\n\nЧтобы начать, выберите язык."
+    return get_text(lang, "welcome")
 
 
 def build_phone_card(lang: str) -> str:
@@ -668,8 +666,8 @@ def build_city_card(lang: str) -> str:
 def build_welcome_keyboard() -> types.InlineKeyboardMarkup:
     """Welcome keyboard with language buttons."""
     kb = InlineKeyboardBuilder()
-    kb.button(text="🇷🇺 Русский", callback_data="reg_lang_ru")
-    kb.button(text="🇺🇿 O'zbekcha", callback_data="reg_lang_uz")
+    kb.button(text="Русский", callback_data="reg_lang_ru")
+    kb.button(text="O'zbekcha", callback_data="reg_lang_uz")
     kb.adjust(2)
     return kb.as_markup()
 
@@ -931,8 +929,9 @@ async def cancel_action(message: types.Message, state: FSMContext, db: DatabaseP
         user_phone = user.phone if user else None
         if not user or not user_phone:
             await message.answer(
-                "❌ Регистрация обязательна для использования бота.\n\n"
-                "📱 Пожалуйста, поделитесь номером телефона.",
+                "Регистрация нужна для доступа.\nОтправьте номер."
+                if lang == "ru"
+                else "Ro'yxatdan o'tish kerak.\nTelefon raqamingizni yuboring.",
                 reply_markup=phone_request_keyboard(lang),
             )
             return

@@ -5,48 +5,24 @@ LANGUAGES = {"ru": "🇷🇺 Русский", "uz": "🇺🇿 O'zbekcha"}
 TEXTS = {
     "ru": {
         # Приветствие
-        "choose_language": "🌍 Выберите язык / Tilni tanlang",
-        "language_changed": "✅ Язык изменён на Русский",
-        "welcome": """🛍 <b>Fudly — спасаем еду от выброса!</b>
-
-Покупайте товары с истекающим сроком годности
-со скидкой <b>до 70%</b>
-
-✅ <b>Безопасно</b> — товары свежие
-✅ <b>Выгодно</b> — скидки до 70%
-✅ <b>Полезно</b> — меньше отходов
-
-🔥 Более 100 магазинов в вашем городе""",
-        "welcome_phone_step": """📱 <b>Укажите номер телефона</b>
-
-Это нужно чтобы:
-• Магазин мог связаться с вами
-• Вы получали уведомления о заказах
-
-👇 Нажмите кнопку ниже""",
-        "welcome_city_step": """📍 <b>Выберите ваш город</b>
-
-Мы покажем магазины и предложения рядом с вами
-
-👇 Выберите из списка""",
-        "registration_complete": """🎉 <b>Готово! Добро пожаловать!</b>
-
-Теперь вы можете:
-🔥 <b>Акции</b> — скидки до 70% каждый день
-🏪 <b>Заведения</b> — все магазины города
-🔍 <b>Поиск</b> — найти нужный товар
-
-💡 Совет: проверяйте "Акции" каждый день — товары обновляются!""",
-        "welcome_back": """👋 <b>Привет, {name}!</b>
-
-📍 Ваш город: {city}
-
-👇 Выберите раздел ниже, чтобы продолжить""",
-        "registration_required": """⚠️ <b>Нужна регистрация</b>
-
-Нажмите /start чтобы начать""",
+        "choose_language": "Выберите язык / Tilni tanlang.",
+        "language_changed": "Язык установлен.",
+        "welcome": """<b>Fudly</b>
+Выберите язык / Tilni tanlang.""",
+        "welcome_phone_step": """<b>Шаг 1/2: Телефон</b>
+Нужен для связи по заказу.
+Отправьте номер.""",
+        "welcome_city_step": """<b>Шаг 2/2: Город</b>
+Выберите из списка.""",
+        "registration_complete": """<b>Готово</b>
+Данные сохранены.""",
+        "welcome_back": """<b>С возвращением, {name}</b>
+Город: {city}
+Выберите раздел.""",
+        "registration_required": """<b>Нужна регистрация</b>
+Нажмите /start.""",
         # Кнопки
-        "share_phone": "📱 Поделиться номером",
+        "share_phone": "Поделиться номером",
         "cancel": "❌ Отмена",
         "hot_offers": "🏪 Магазины и акции",
         "browse_places": "Места",
@@ -94,15 +70,18 @@ TEXTS = {
         "switched_to_seller": "Переключено в режим партнёра",
         # Города
         "your_city": "Ваш город",
-        "choose_city": "<b>Выберите ваш город:</b>",
+        "choose_city": "<b>Выберите город:</b>",
         "city_changed": "Город изменён на {city}",
         "city_selected": "✅ Город выбран: {city}",
         "city_changed_confirm": "✅ Город изменён на <b>{city}</b>",
         # Общие ошибки
         "error": "❌ Произошла ошибка",
         # Регистрация
-        "registration_choose_action": "👋 Выберите действие:",
-        "registration_complete_personal": "🎉 <b>Готово!</b>\n\nДобро пожаловать, {name}!\n📍 Город: {city}\n\nТеперь вы можете:\n🔥 <b>Акции</b> — скидки до 70%\n🛒 <b>Заказы</b> — быстрое оформление\n👤 <b>Профиль</b> — история покупок\n\nТакже можно пользоваться обычным меню бота и мини-приложением — откройте его кнопкой ниже.",
+        "registration_choose_action": "Выберите раздел:",
+        "registration_complete_personal": """<b>Готово</b>
+{name}, регистрация завершена.
+Город: {city}
+Меню ниже.""",
         # Предложения
         "no_offers": "😔 Пока нет доступных предложений в вашем городе",
         "no_offers_in_store": "😔 В этом магазине пока нет предложений",
@@ -403,7 +382,7 @@ TEXTS = {
 💰 Доход: {revenue:,} сум
 📦 Активных броней: {pending}""",
         # Ошибки
-        "error_invalid_number": "❌ Пожалуйста, введите корректное число",
+        "error_invalid_number": "Неверный номер. Пример: +998 90 123 45 67.",
         "error_invalid_time": "❌ Неверный формат времени. Используйте формат ЧЧ:ММ (например: 18:00)",
         "no_stores": "❌ У вас нет одобренных магазинов!",
         "no_approved_stores": "❌ У вас нет одобренных магазинов!\n\n⏳ Дождитесь одобрения вашей заявки администратором.",
@@ -599,12 +578,12 @@ TEXTS = {
         "cart_payment_admin_total": "Итого: {total} сум",
         # Ключи регистрации
         "change_city_prompt": "📍 Выберите новый город:",
-        "phone_saved": "✅ Телефон сохранён",
-        "registration_city_title": "📍 Выберите город",
-        "registration_city_hint": "Выберите город из списка ниже",
+        "phone_saved": "Телефон сохранен.",
+        "registration_city_title": "Выберите город",
+        "registration_city_hint": "Выберите из списка.",
         "registration_continue_button": "Продолжить",
-        "registration_continue_offers": "Перейти к предложениям",
-        "registration_continue_prompt": "Хотите продолжить?",
+        "registration_continue_offers": "К предложениям",
+        "registration_continue_prompt": "Продолжить?",
         "registration_resume_cart": "Вернуться к корзине",
         # Прочие ключи
         "key": "Ключ",
@@ -613,47 +592,23 @@ TEXTS = {
         "too_many_requests": "Слишком много запросов. Попробуйте позже.",
     },
     "uz": {
-        "language_changed": "✅ Til O'zbekchaga o'zgartirildi",
-        "welcome": """🛍 <b>Fudly — oziq-ovqatni isrofdan saqlaymiz!</b>
-
-Muddati tugash arafasidagi mahsulotlarni
-<b>70% gacha</b> chegirma bilan sotib oling
-
-✅ <b>Xavfsiz</b> — mahsulotlar yangi
-✅ <b>Foydali</b> — 70% gacha chegirma
-✅ <b>Ekologik</b> — kamroq isrof
-
-🔥 Shahringizda 100 dan ortiq do'konlar""",
-        "welcome_phone_step": """📱 <b>Telefon raqamingizni kiriting</b>
-
-Bu nima uchun kerak:
-• Do'kon siz bilan bog'lanishi uchun
-• Buyurtma haqida xabar olish uchun
-
-👇 Quyidagi tugmani bosing""",
-        "welcome_city_step": """📍 <b>Shahringizni tanlang</b>
-
-Yaqin atrofdagi do'konlarni ko'rsatamiz
-
-👇 Ro'yxatdan tanlang""",
-        "registration_complete": """🎉 <b>Tayyor! Xush kelibsiz!</b>
-
-Endi siz:
-🔥 <b>Aksiyalar</b> — har kuni 70% gacha chegirmalar
-🏪 <b>Do'konlar</b> — shahardagi barcha do'konlar
-🔍 <b>Qidirish</b> — kerakli mahsulotni topish
-
-💡 Maslahat: har kuni "Aksiyalar" bo'limini tekshiring — mahsulotlar yangilanadi!""",
-        "welcome_back": """👋 <b>Salom, {name}!</b>
-
-📍 Shahringiz: {city}
-
-👇 Davom ettirish uchun pastdagi bo'limlardan birini tanlang""",
-        "registration_required": """⚠️ <b>Ro'yxatdan o'tish kerak</b>
-
-Boshlash uchun /start bosing""",
+        "language_changed": "Til o'rnatildi.",
+        "welcome": """<b>Fudly</b>
+Tilni tanlang.""",
+        "welcome_phone_step": """<b>1/2-qadam: Telefon</b>
+Buyurtma bo'yicha aloqa uchun.
+Raqamingizni yuboring.""",
+        "welcome_city_step": """<b>2/2-qadam: Shahar</b>
+Ro'yxatdan tanlang.""",
+        "registration_complete": """<b>Tayyor</b>
+Ma'lumotlar saqlandi.""",
+        "welcome_back": """<b>Yana xush kelibsiz, {name}</b>
+Shahar: {city}
+Bo'limni tanlang.""",
+        "registration_required": """<b>Ro'yxatdan o'tish kerak</b>
+/start bosing.""",
         # Tugmalar
-        "share_phone": "📱 Raqamni ulashish",
+        "share_phone": "Raqamni ulashish",
         "cancel": "❌ Bekor qilish",
         "hot_offers": "🏪 Do'konlar va aksiyalar",
         "browse_places": "🏪 Joylar",
@@ -703,15 +658,18 @@ Boshlash uchun /start bosing""",
         "switched_to_customer": "🔄 Xaridor rejimiga o'girildi",
         "switched_to_seller": "🔄 Hamkor rejimiga o'girildi",
         # Shaharlar - your_city defined earlier at line 501
-        "choose_city": "🌆 <b>Shahringizni tanlang:</b>",
+        "choose_city": "<b>Shaharni tanlang:</b>",
         "city_changed": "✅ Shahar {city}ga o'zgartirildi",
         "city_selected": "✅ Shahar tanlandi: {city}",
         "city_changed_confirm": "✅ Shahar <b>{city}</b>ga o'zgartirildi",
         # Umumiy xatolar
         "error": "❌ Xatolik yuz berdi",
         # Ro'yxatdan o'tish
-        "registration_choose_action": "👋 Amalni tanlang:",
-        "registration_complete_personal": "🎉 <b>Tayyor!</b>\n\nXush kelibsiz, {name}!\n📍 Shahar: {city}\n\nEndi siz:\n🔥 <b>Aksiyalar</b> — 70% gacha chegirmalar\n🛒 <b>Buyurtmalar</b> — tez rasmiylashtirish\n👤 <b>Profil</b> — xaridlar tarixi\n\nShuningdek, botdagi odatiy menyu va mini-ilovadan foydalanishingiz mumkin — uni quyidagi tugma orqali oching.",
+        "registration_choose_action": "Bo'limni tanlang:",
+        "registration_complete_personal": """<b>Tayyor</b>
+{name}, ro'yxatdan o'tish yakunlandi.
+Shahar: {city}
+Menyu pastda.""",
         # Savat
         "cart_title": "🛒 <b>Savat</b>",
         "cart_empty": "<b>Savat bo'sh</b>\n\nKatalogdan mahsulot qo'shing.",
@@ -1080,7 +1038,7 @@ Mijoz do'koningizni baholash uchun xabar oladi.""",
 💰 Daromad: {revenue:,} so\'m
 📦 Faol buyurtmalar: {pending}""",
         # Xatolar
-        "error_invalid_number": "❌ Iltimos, to'g'ri raqam kiriting",
+        "error_invalid_number": "Noto'g'ri raqam. Misol: +998 90 123 45 67.",
         "error_invalid_time": "❌ Noto'g'ri vaqt formati. HH:MM formatidan foydalaning (masalan: 18:00)",
         "no_stores": "❌ Sizda tasdiqlangan do'konlar yo'q!",
         "no_approved_stores": "❌ Sizda tasdiqlangan do'konlar yo'q!\n\n⏳ Administrator tomonidan arizangizni tasdiqlanishini kuting.",
@@ -1206,12 +1164,12 @@ Do'koningiz tasdiqlandi va ishlashga tayyor.
         "cart_payment_admin_total": "Jami: {total} so'm",
         # Ro'yxatdan o'tish
         "change_city_prompt": "📍 Yangi shaharni tanlang:",
-        "phone_saved": "✅ Telefon saqlandi",
-        "registration_city_title": "📍 Shaharni tanlang",
-        "registration_city_hint": "Quyidagi ro'yxatdan shaharni tanlang",
+        "phone_saved": "Telefon saqlandi.",
+        "registration_city_title": "Shaharni tanlang",
+        "registration_city_hint": "Ro'yxatdan tanlang.",
         "registration_continue_button": "Davom etish",
-        "registration_continue_offers": "Takliflarga o'tish",
-        "registration_continue_prompt": "Davom etmoqchimisiz?",
+        "registration_continue_offers": "Takliflarga",
+        "registration_continue_prompt": "Davom ettirish?",
         "registration_resume_cart": "Savatga qaytish",
         # Boshqa
         "key": "Kalit",

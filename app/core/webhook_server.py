@@ -132,6 +132,19 @@ API_CATEGORIES = [
     {"id": "other", "name": "Другое", "emoji": "📦"},
 ]
 
+CATEGORY_ALIASES = {
+    "sweets": ["sweets", "snacks"],
+}
+
+
+def expand_category_filter(category: str | None) -> list[str] | None:
+    if not category:
+        return None
+    normalized = str(category).strip().lower()
+    if not normalized or normalized == "all":
+        return None
+    return CATEGORY_ALIASES.get(normalized, [normalized])
+
 
 async def create_webhook_app(
     bot: Bot,
@@ -391,16 +404,37 @@ async def create_webhook_app(
 
         for cat in API_CATEGORIES:
             count = 0
+            category_filter = expand_category_filter(cat["id"])
             if cat["id"] != "all":
                 try:
-                    if hasattr(db, "get_offers_by_category"):
-                        offers = db.get_offers_by_category(cat["id"], city) or []
+                    if hasattr(db, "count_offers_by_filters"):
+                        count = int(
+                            db.count_offers_by_filters(city=city, category=category_filter)
+                        )
+                    elif hasattr(db, "get_offers_by_city_and_category") and category_filter:
+                        offers = db.get_offers_by_city_and_category(
+                            city=city,
+                            category=category_filter,
+                            limit=1000,
+                            offset=0,
+                        ) or []
                         count = len(offers)
+                    elif hasattr(db, "get_offers_by_category") and category_filter:
+                        if isinstance(category_filter, (list, tuple)):
+                            offers = []
+                            for item in category_filter:
+                                offers.extend(db.get_offers_by_category(item, city) or [])
+                            count = len(offers)
+                        else:
+                            offers = db.get_offers_by_category(category_filter, city) or []
+                            count = len(offers)
                 except Exception:
                     pass
             else:
                 try:
-                    if hasattr(db, "count_hot_offers"):
+                    if hasattr(db, "count_offers_by_filters"):
+                        count = int(db.count_offers_by_filters(city=city))
+                    elif hasattr(db, "count_hot_offers"):
                         count = db.count_hot_offers(city) or 0
                 except Exception:
                     pass
@@ -486,6 +520,7 @@ async def create_webhook_app(
         region = request.query.get("region") or None
         district = request.query.get("district") or None
         category = request.query.get("category", "all")
+        category_filter = expand_category_filter(category)
         store_id = request.query.get("store_id")
         search = request.query.get("search")
         limit = int(request.query.get("limit", "50"))
@@ -528,6 +563,7 @@ async def create_webhook_app(
                             min_price=min_price,
                             max_price=max_price,
                             min_discount=min_discount,
+                            category=category_filter,
                         )
                         or []
                     )
@@ -536,12 +572,12 @@ async def create_webhook_app(
                 def _fetch_scoped_offers(
                     city_scope: str | None, region_scope: str | None, district_scope: str | None
                 ) -> list[Any]:
-                    if category and category != "all":
+                    if category_filter:
                         if hasattr(db, "get_offers_by_city_and_category"):
                             return (
                                 db.get_offers_by_city_and_category(
                                     city_scope,
-                                    category,
+                                    category_filter,
                                     limit=limit,
                                     offset=offset,
                                     region=region_scope,
@@ -568,8 +604,14 @@ async def create_webhook_app(
                                 )
                                 or []
                             )
+                            if isinstance(category_filter, (list, tuple)):
+                                return [
+                                    o
+                                    for o in all_offers
+                                    if get_offer_value(o, "category") in category_filter
+                                ][:limit]
                             return [
-                                o for o in all_offers if get_offer_value(o, "category") == category
+                                o for o in all_offers if get_offer_value(o, "category") == category_filter
                             ][:limit]
                         return []
                     if hasattr(db, "get_hot_offers"):
@@ -622,7 +664,7 @@ async def create_webhook_app(
                             longitude=lon,
                             limit=limit,
                             offset=offset,
-                            category=category if category != "all" else None,
+                            category=category_filter,
                             sort_by=sort_by,
                             min_price=min_price,
                             max_price=max_price,
