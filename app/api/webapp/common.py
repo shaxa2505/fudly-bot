@@ -5,6 +5,7 @@ import hmac
 import json
 import logging
 import os
+from datetime import date, datetime
 from typing import Any
 from urllib.parse import parse_qsl, unquote
 
@@ -41,6 +42,63 @@ def get_val(obj: Any, key: str, default: Any = None) -> Any:
     if isinstance(obj, dict):
         return obj.get(key, default)
     return getattr(obj, key, default)
+
+
+def _parse_offer_expiry_date(value: Any) -> date | None:
+    if not value:
+        return None
+    if isinstance(value, date) and not isinstance(value, datetime):
+        return value
+    if isinstance(value, datetime):
+        return value.date()
+    if isinstance(value, str):
+        raw = value.strip()
+        if not raw:
+            return None
+        try:
+            return datetime.fromisoformat(raw.replace("Z", "+00:00")).date()
+        except ValueError:
+            pass
+        try:
+            return datetime.strptime(raw[:10], "%Y-%m-%d").date()
+        except ValueError:
+            pass
+        try:
+            return datetime.strptime(raw[:10], "%d.%m.%Y").date()
+        except ValueError:
+            pass
+    return None
+
+
+def _get_offer_quantity(offer: Any) -> int | None:
+    raw_qty = get_val(offer, "stock_quantity")
+    if raw_qty is None:
+        raw_qty = get_val(offer, "quantity")
+    if raw_qty is None:
+        return None
+    try:
+        return int(raw_qty)
+    except (TypeError, ValueError):
+        return None
+
+
+def is_offer_active(offer: Any) -> bool:
+    if not offer:
+        return False
+
+    status = get_val(offer, "status")
+    if status and str(status).lower() != "active":
+        return False
+
+    qty = _get_offer_quantity(offer)
+    if qty is not None and qty <= 0:
+        return False
+
+    expiry_date = _parse_offer_expiry_date(get_val(offer, "expiry_date"))
+    if expiry_date and expiry_date < date.today():
+        return False
+
+    return True
 
 
 # =============================================================================
@@ -122,7 +180,8 @@ class OrderResponse(BaseModel):
 
 
 class FavoriteRequest(BaseModel):
-    offer_id: int
+    offer_id: int | None = None
+    store_id: int | None = None
 
 
 class CartItem(BaseModel):
@@ -289,6 +348,7 @@ __all__ = [
     "logger",
     "settings",
     "get_val",
+    "is_offer_active",
     "OfferResponse",
     "OfferListResponse",
     "StoreResponse",

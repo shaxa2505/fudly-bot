@@ -158,7 +158,7 @@ def offer_details_with_back_keyboard(
     builder.button(text=order, callback_data=f"book_{offer_id}")
 
     # Back button - full width
-    back = back_text or ("◀️ Назад к списку" if lang == "ru" else "◀️ Ro'yxatga qaytish")
+    back = back_text or ("Назад к списку" if lang == "ru" else "Ro'yxatga qaytish")
     builder.button(text=back, callback_data=back_callback)
 
     builder.adjust(2, 1)  # 2 buttons top row, 1 bottom
@@ -180,9 +180,7 @@ def offer_details_search_keyboard(
     builder.button(text=order, callback_data=f"book_{offer_id}")
 
     # Back to search results
-    back = (
-        "◀️ Назад к результатам" if lang == "ru" else "◀️ Natijalarga qaytish"
-    )
+    back = "Назад к результатам" if lang == "ru" else "Natijalarga qaytish"
     builder.button(text=back, callback_data="back_to_search_results")
 
     builder.adjust(2, 1)
@@ -217,20 +215,18 @@ def offer_in_cart_keyboard(lang: str, source: str = "generic") -> InlineKeyboard
     builder = InlineKeyboardBuilder()
 
     # Open cart
-    open_cart = "🛒 Открыть корзину" if lang == "ru" else "🛒 Savatni ochish"
+    open_cart = "Открыть корзину" if lang == "ru" else "Savatni ochish"
     builder.button(text=open_cart, callback_data="view_cart")
 
     # Context-aware back
     if source == "hot":
-        back_text = "◀️ Назад к акциям" if lang == "ru" else "◀️ Aksiyalarga qaytish"
+        back_text = "Назад к акциям" if lang == "ru" else "Aksiyalarga qaytish"
         back_data = "back_to_hot"
     elif source == "search":
-        back_text = (
-            "◀️ Назад к результатам" if lang == "ru" else "◀️ Natijalarga qaytish"
-        )
+        back_text = "Назад к результатам" if lang == "ru" else "Natijalarga qaytish"
         back_data = "back_to_search_results"
     else:
-        back_text = "⬅️ Назад" if lang == "ru" else "⬅️ Orqaga"
+        back_text = "Назад" if lang == "ru" else "Orqaga"
         back_data = "back_to_menu"
 
     builder.button(text=back_text, callback_data=back_data)
@@ -246,9 +242,9 @@ def store_offers_keyboard(
 ) -> InlineKeyboardMarkup:
     builder = InlineKeyboardBuilder()
     if has_more and next_offset is not None:
-        next_text = "➡️ Показать ещё 20" if lang == "ru" else "➡️ Yana 20 ta"
+        next_text = "Показать ещё 20" if lang == "ru" else "Yana 20 ta"
         builder.button(text=next_text, callback_data=f"store_offers_next_{store_id}_{next_offset}")
-    back = "◀️ К магазину" if lang == "ru" else "◀️ Do'konga qaytish"
+    back = "К магазину" if lang == "ru" else "Do'konga qaytish"
     builder.button(text=back, callback_data=f"back_to_store_{store_id}")
     builder.adjust(1)
     return builder.as_markup()
@@ -288,12 +284,18 @@ def store_offers_compact_keyboard(
     # Pagination row - only prev/next and back
     nav_builder = InlineKeyboardBuilder()
     if page > 0:
-        nav_builder.button(text="◀️", callback_data=f"store_offers_page_{store_id}_{page - 1}")
+        nav_builder.button(
+            text="Назад" if lang == "ru" else "Oldingi",
+            callback_data=f"store_offers_page_{store_id}_{page - 1}",
+        )
     if page < total_pages - 1:
-        nav_builder.button(text="▶️", callback_data=f"store_offers_page_{store_id}_{page + 1}")
+        nav_builder.button(
+            text="Далее" if lang == "ru" else "Keyingi",
+            callback_data=f"store_offers_page_{store_id}_{page + 1}",
+        )
 
     # Back button
-    back = "◀️ К магазину" if lang == "ru" else "◀️ Do'konga"
+    back = "К магазину" if lang == "ru" else "Do'konga"
     nav_builder.button(text=back, callback_data=f"back_to_store_{store_id}")
 
     # Adjust nav: pagination buttons + back
@@ -337,7 +339,7 @@ def store_list_keyboard(
     # Pagination row
     nav_row = []
     if page > 0:
-        prev_text = "◀️"
+        prev_text = "Назад" if lang == "ru" else "Oldingi"
         builder.button(text=prev_text, callback_data=f"stores_page_{page - 1}")
         nav_row.append(1)
 
@@ -348,12 +350,12 @@ def store_list_keyboard(
         nav_row.append(1)
 
     if start_idx + per_page < total:
-        next_text = "▶️"
+        next_text = "Далее" if lang == "ru" else "Keyingi"
         builder.button(text=next_text, callback_data=f"stores_page_{page + 1}")
         nav_row.append(1)
 
     # Back button
-    back = "◀️ К категориям" if lang == "ru" else "◀️ Toifalarga"
+    back = "К категориям" if lang == "ru" else "Toifalarga"
     builder.button(text=back, callback_data="back_to_places")
 
     # Final adjust: store buttons (2 cols), then nav row, then back
@@ -367,7 +369,7 @@ def store_list_keyboard(
 
 def store_reviews_keyboard(lang: str, store_id: int) -> InlineKeyboardMarkup:
     builder = InlineKeyboardBuilder()
-    back = "◀️ К магазину" if lang == "ru" else "◀️ Do'konga qaytish"
+    back = "К магазину" if lang == "ru" else "Do'konga qaytish"
     builder.button(text=back, callback_data=f"back_to_store_{store_id}")
     builder.adjust(1)
     return builder.as_markup()
@@ -403,11 +405,15 @@ def search_results_compact_keyboard(
     # Pagination (only if needed)
     nav_buttons = []
     if page > 0:
-        nav_buttons.append(("◀️", f"search_page_{page - 1}"))
+        nav_buttons.append(
+            ("Назад" if lang == "ru" else "Oldingi", f"search_page_{page - 1}")
+        )
     if total_pages > 1:
         nav_buttons.append((f"{page + 1}/{total_pages}", "search_noop"))
     if page < total_pages - 1:
-        nav_buttons.append(("▶️", f"search_page_{page + 1}"))
+        nav_buttons.append(
+            ("Далее" if lang == "ru" else "Keyingi", f"search_page_{page + 1}")
+        )
 
     for text, cb in nav_buttons:
         builder.button(text=text, callback_data=cb)

@@ -141,10 +141,12 @@ class TestRenderHotOffersList:
             offset=0,
         )
 
-        assert "ГОРЯЧЕЕ" in result
-        assert "Ташкент" in result
+        assert "Акции" in result
+        assert "Город: Ташкент" in result
         assert "Хлеб белый" in result
         assert "Показано: 1 из 1" in result
+        assert "Цена: 5 000 сум (-50%)" in result
+        assert "Магазин: Супермаркет Тест" in result
         assert "Выберите товар" in result
 
     def test_render_with_offers_uz(self, sample_offer_item: OfferListItem) -> None:
@@ -158,9 +160,10 @@ class TestRenderHotOffersList:
             offset=0,
         )
 
-        assert "ISSIQ" in result
-        assert "Toshkent" in result
+        assert "Aksiyalar" in result
+        assert "Shahar: Toshkent" in result
         assert "Ko'rsatilgan" in result
+        assert "Narx: 5 000 so'm (-50%)" in result
 
     def test_render_with_offset(self, sample_offer_item: OfferListItem) -> None:
         """Test rendering with pagination offset."""
@@ -175,8 +178,8 @@ class TestRenderHotOffersList:
 
         assert "Показано: 6 из 10" in result
 
-    def test_category_emoji_bakery(self, sample_offer_item: OfferListItem) -> None:
-        """Test bakery category has correct emoji."""
+    def test_store_line_present(self, sample_offer_item: OfferListItem) -> None:
+        """Test that store line is present in list."""
         result = render_hot_offers_list(
             lang="ru",
             city="Ташкент",
@@ -186,10 +189,10 @@ class TestRenderHotOffersList:
             offset=0,
         )
 
-        assert "🍞" in result  # bakery emoji
+        assert "Магазин:" in result
 
     def test_high_discount_fire_emoji(self, sample_offer_high_discount: OfferListItem) -> None:
-        """Test that high discounts get fire emoji."""
+        """Test that high discounts show percent."""
         result = render_hot_offers_list(
             lang="ru",
             city="Ташкент",
@@ -199,7 +202,7 @@ class TestRenderHotOffersList:
             offset=0,
         )
 
-        assert "🔥🔥" in result  # double fire for 70%+
+        assert "-70%" in result
 
 
 class TestRenderHotOffersEmpty:
@@ -208,14 +211,14 @@ class TestRenderHotOffersEmpty:
     def test_empty_ru(self) -> None:
         """Test empty offers message in Russian."""
         result = render_hot_offers_empty(lang="ru")
-        assert "ГОРЯЧЕЕ" in result
-        assert "уведомим" in result
+        assert "Акции" in result
+        assert "Пока нет предложений" in result
 
     def test_empty_uz(self) -> None:
         """Test empty offers message in Uzbek."""
         result = render_hot_offers_empty(lang="uz")
-        assert "ISSIQ" in result
-        assert "xabar beramiz" in result
+        assert "Aksiyalar" in result
+        assert "Hozircha takliflar yo'q" in result
 
 
 # =============================================================================
@@ -235,12 +238,11 @@ class TestRenderBusinessTypeStoreList:
             stores=[sample_store_summary],
         )
 
-        assert "🛒" in result
-        assert "СУПЕРМАРКЕТЫ" in result
-        assert "Ташкент" in result
+        assert "Супермаркеты" in result
+        assert "Город: Ташкент" in result
         assert "Тестовый магазин" in result
-        assert "⭐4.5" in result  # New format: ⭐4.5 instead of 4.5/5
-        assert "🔥15" in result  # New format: 🔥15 шт instead of Предложений: 15
+        assert "Рейтинг: 4.5/5" in result
+        assert "Предложений: 15" in result
 
     def test_render_restaurant_list_uz(self, sample_store_summary: StoreSummary) -> None:
         """Test rendering restaurant list in Uzbek."""
@@ -252,9 +254,10 @@ class TestRenderBusinessTypeStoreList:
             stores=[sample_store_summary],
         )
 
-        assert "🍽" in result
-        assert "RESTORANLAR" in result
-        assert "🔥15 ta" in result  # New format: 🔥15 ta instead of Takliflar
+        assert "Restoranlar" in result
+        assert "Shahar: Toshkent" in result
+        assert "Reyting: 4.5/5" in result
+        assert "Takliflar: 15" in result
 
     def test_render_with_prompt_ru(self, sample_store_summary: StoreSummary) -> None:
         """Test that prompt is shown in Russian."""
@@ -265,7 +268,7 @@ class TestRenderBusinessTypeStoreList:
             stores=[sample_store_summary],
         )
 
-        assert "Нажмите на заведение для просмотра" in result  # New prompt text
+        assert "Выберите магазин ниже." in result
 
 
 # =============================================================================
@@ -282,32 +285,32 @@ class TestRenderStoreCard:
 
         assert "Тестовый магазин" in result
         assert "Супермаркет" in result
-        assert "Ташкент" in result
-        assert "ул. Навои 10" in result
-        assert "+998901234567" in result
-        assert "Лучший магазин" in result
-        assert "4.5/5" in result
-        assert "15" in result  # offers_count
-        assert "Доставка" in result
-        assert "Доступна" in result
+        assert "Город: Ташкент" in result
+        assert "Адрес: ул. Навои 10" in result
+        assert "Телефон: +998901234567" in result
+        assert "Описание: Лучший магазин" in result
+        assert "Рейтинг: 4.5/5 (120 отзывов)" in result
+        assert "Предложений: 15" in result
+        assert "Доставка: доступна" in result
+        assert "Стоимость: 10 000 сум" in result
+        assert "Мин. заказ: 50 000 сум" in result
 
     def test_render_store_card_uz(self, sample_store_details: StoreDetails) -> None:
         """Test rendering store card in Uzbek."""
         result = render_store_card(lang="uz", store=sample_store_details)
 
         assert "Supermarket" in result
-        assert "Shahar" in result
-        assert "Manzil" in result
-        assert "Telefon" in result
-        assert "Mavjud" in result
+        assert "Shahar:" in result
+        assert "Manzil:" in result
+        assert "Telefon:" in result
+        assert "Yetkazib berish: mavjud" in result
 
     def test_render_store_without_delivery(self, sample_store_details: StoreDetails) -> None:
         """Test store card without delivery."""
         sample_store_details.delivery_enabled = False
         result = render_store_card(lang="ru", store=sample_store_details)
 
-        # Should not have "Доставка: Доступна"
-        assert "Доставка: Доступна" not in result
+        assert "Доставка: нет" in result
 
 
 # =============================================================================
@@ -323,11 +326,10 @@ class TestRenderOfferDetails:
         result = render_offer_details(lang="ru", offer=sample_offer_details)
 
         assert sample_offer_details.title in result
-        assert "5 000" in result
-        assert "10 000" in result
-        assert "выгода" in result
+        assert "Цена: 5 000 сум" in result
+        assert "Было: 10 000 сум (-50%)" in result
         assert "В наличии" in result
-        assert sample_offer_details.store_name in result
+        assert f"Магазин: {sample_offer_details.store_name}" in result
 
     def test_render_offer_with_store(
         self, sample_offer_details: OfferDetails, sample_store_details: StoreDetails
@@ -338,7 +340,7 @@ class TestRenderOfferDetails:
         )
 
         assert sample_store_details.name in result
-        assert "Доставка" in result
+        assert "Доставка: 10 000 сум" in result
 
 # =============================================================================
 # Tests for render_store_offers_list
@@ -362,7 +364,7 @@ class TestRenderStoreOffersList:
         assert "Все товары" in result
         assert "Показано: 1 из 1" in result
         assert "Хлеб белый" in result
-        assert "Введите номер товара" in result
+        assert "Выберите товар кнопкой или введите номер" in result
 
     def test_render_store_offers_uz(self, sample_offer_item: OfferListItem) -> None:
         """Test rendering store offers list in Uzbek."""
@@ -376,7 +378,7 @@ class TestRenderStoreOffersList:
 
         assert "Barcha mahsulotlar" in result
         assert "Ko'rsatilgan: 1 dan 1" in result
-        assert "Mahsulot raqamini kiriting" in result
+        assert "Mahsulotni tugma orqali tanlang yoki raqamini kiriting" in result
 
 
 # =============================================================================
@@ -402,9 +404,9 @@ class TestRenderStoreReviews:
 
         assert "Тест магазин" in result
         assert "Отзывы" in result
-        assert "Средний рейтинг: 4.5/5" in result
+        assert "Средняя оценка: 4.5/5" in result
         assert "Отличный магазин!" in result
-        assert "⭐⭐⭐⭐⭐" in result  # 5 stars
+        assert "Оценка: 5/5" in result
 
     def test_render_reviews_empty_ru(self) -> None:
         """Test rendering empty reviews in Russian."""
@@ -442,11 +444,10 @@ class TestRenderOfferCard:
         result = render_offer_card(lang="ru", offer=sample_offer_item)
 
         assert sample_offer_item.title in result
-        assert "5 000" in result
-        assert "10 000" in result
-        assert "выгода" in result
+        assert "Цена: 5 000 сум" in result
+        assert "Было: 10 000 сум (-50%)" in result
         assert "В наличии" in result
-        assert sample_offer_item.store_name in result
+        assert f"Магазин: {sample_offer_item.store_name}" in result
         assert "Доставка" in result
 
     def test_render_offer_card_without_delivery(self) -> None:

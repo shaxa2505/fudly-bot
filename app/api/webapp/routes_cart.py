@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 
-from .common import CartItem, CartResponse, get_db, get_val, logger, normalize_price
+from .common import CartItem, CartResponse, get_db, get_val, is_offer_active, logger, normalize_price
 
 router = APIRouter()
 
@@ -28,7 +28,7 @@ async def calculate_cart(
             quantity = int(qty_str)
 
             offer = db.get_offer(offer_id) if hasattr(db, "get_offer") else None
-            if offer:
+            if offer and is_offer_active(offer):
                 price = normalize_price(get_val(offer, "discount_price", 0))
                 items.append(
                     CartItem(

@@ -14,6 +14,7 @@ from .common import (
     get_current_user,
     get_db,
     get_val,
+    is_offer_active,
     logger,
     normalize_price,
 )
@@ -453,7 +454,7 @@ async def get_offer(offer_id: int, db=Depends(get_db)):
     try:
         offer = db.get_offer(offer_id) if hasattr(db, "get_offer") else None
 
-        if not offer:
+        if not offer or not is_offer_active(offer):
             raise HTTPException(status_code=404, detail="Offer not found")
 
         store_fallback = (

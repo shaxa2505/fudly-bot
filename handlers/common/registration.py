@@ -21,9 +21,7 @@ from handlers.common.webapp import webapp_keyboard
 from localization import get_cities, get_text
 
 router = Router(name="registration")
-REGISTRATION_COMPLETE_STICKER_ID = (
-    "CAACAgIAAxkBAAEGc3ZnW7HYzWGxKQABfLqvPQABaKyP5k0AAtAOAAI0D3FJ_vgAAczKO4CINgQ"
-)
+REGISTRATION_COMPLETE_STICKER_ID = None
 
 
 def _build_district_keyboard(

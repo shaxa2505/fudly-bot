@@ -5,7 +5,7 @@ import asyncio
 import os
 import sys
 import time
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
 from typing import Any
 
 from aiogram import Bot, Dispatcher, types
@@ -30,6 +30,63 @@ def get_offer_value(obj: Any, key: str, default: Any = None) -> Any:
     if isinstance(obj, dict):
         return obj.get(key, default)
     return getattr(obj, key, default)
+
+
+def _parse_offer_expiry_date(value: Any) -> date | None:
+    if not value:
+        return None
+    if isinstance(value, date) and not isinstance(value, datetime):
+        return value
+    if isinstance(value, datetime):
+        return value.date()
+    if isinstance(value, str):
+        raw = value.strip()
+        if not raw:
+            return None
+        try:
+            return datetime.fromisoformat(raw.replace("Z", "+00:00")).date()
+        except ValueError:
+            pass
+        try:
+            return datetime.strptime(raw[:10], "%Y-%m-%d").date()
+        except ValueError:
+            pass
+        try:
+            return datetime.strptime(raw[:10], "%d.%m.%Y").date()
+        except ValueError:
+            pass
+    return None
+
+
+def _get_offer_quantity(offer: Any) -> int | None:
+    raw_qty = get_offer_value(offer, "stock_quantity")
+    if raw_qty is None:
+        raw_qty = get_offer_value(offer, "quantity")
+    if raw_qty is None:
+        return None
+    try:
+        return int(raw_qty)
+    except (TypeError, ValueError):
+        return None
+
+
+def _is_offer_active(offer: Any) -> bool:
+    if not offer:
+        return False
+
+    status = get_offer_value(offer, "status")
+    if status and str(status).lower() != "active":
+        return False
+
+    qty = _get_offer_quantity(offer)
+    if qty is not None and qty <= 0:
+        return False
+
+    expiry_date = _parse_offer_expiry_date(get_offer_value(offer, "expiry_date"))
+    if expiry_date and expiry_date < date.today():
+        return False
+
+    return True
 
 
 # Cache for photo URLs (file_id -> URL)
@@ -807,6 +864,8 @@ async def create_webhook_app(
 
             if not offer:
                 return add_cors_headers(web.json_response({"error": "Not found"}, status=404))
+            if not _is_offer_active(offer):
+                return add_cors_headers(web.json_response({"error": "Not found"}, status=404))
 
             # Convert photo_id to URL
             photo_id = get_offer_value(offer, "photo_id")
@@ -1084,7 +1143,7 @@ async def create_webhook_app(
                     continue
 
                 offer = db.get_offer(offer_id) if hasattr(db, "get_offer") else None
-                if not offer:
+                if not offer or not _is_offer_active(offer):
                     continue
 
                 price = convert(get_offer_value(offer, "discount_price", 0))
@@ -1192,6 +1251,9 @@ async def create_webhook_app(
                     if not offer:
                         failed_items.append({"offer_id": offer_id, "error": "Offer not found"})
                         continue
+                    if not _is_offer_active(offer):
+                        failed_items.append({"offer_id": offer_id, "error": "Offer not available"})
+                        continue
 
                     price = int(get_offer_value(offer, "discount_price", 0) or 0)
                     store_id = int(get_offer_value(offer, "store_id"))
@@ -1217,6 +1279,17 @@ async def create_webhook_app(
                             store_name=store_name,
                             store_address=store_address,
                             delivery_price=delivery_price,
+                        )
+                    )
+                if not order_items:
+                    return add_cors_headers(
+                        web.json_response(
+                            {
+                                "success": False,
+                                "error": "No valid items in order",
+                                "failed": failed_items,
+                            },
+                            status=400,
                         )
                     )
 
@@ -2627,7 +2700,7 @@ async def create_webhook_app(
                 for offer_id in offer_ids:
                     if hasattr(db, "get_offer"):
                         offer = db.get_offer(offer_id)
-                        if offer and isinstance(offer, dict):
+                        if offer and isinstance(offer, dict) and _is_offer_active(offer):
                             formatted_offers.append(
                                 {
                                     "id": offer.get("id") or offer.get("offer_id"),

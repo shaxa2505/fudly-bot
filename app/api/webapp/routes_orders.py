@@ -24,6 +24,7 @@ from .common import (
     get_current_user,
     get_db,
     get_val,
+    is_offer_active,
     logger,
     normalize_price,
     settings,
@@ -96,7 +97,7 @@ def _load_offers_and_store(items: list[Any], db: Any) -> tuple[dict[int, Any], i
     store_ids: set[int] = set()
     for item in items:
         offer = db.get_offer(item.offer_id) if hasattr(db, "get_offer") else None
-        if not offer:
+        if not offer or not is_offer_active(offer):
             raise HTTPException(status_code=400, detail=f"Offer not found: {item.offer_id}")
         offers_by_id[item.offer_id] = offer
         store_id = int(get_val(offer, "store_id") or 0)
