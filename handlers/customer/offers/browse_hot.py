@@ -115,6 +115,13 @@ def register_hot(
 ) -> None:
     """Register hot-offers and catalog-related handlers on dispatcher."""
 
+    def _entry_text(lang: str, city: str) -> str:
+        return (
+            f"<b>{get_text(lang, 'hot_offers')}</b>\n\n"
+            f"📍 {city}\n"
+            f"{get_text(lang, 'hot_offers_subtitle')}"
+        )
+
     @dp.message(F.text.func(is_hot_offers_button))
     async def hot_offers_handler(message: types.Message, state: FSMContext) -> None:
         logger.info(f"[HOT_OFFERS] Handler triggered, text='{message.text}'")
@@ -139,16 +146,122 @@ def register_hot(
         search_region = normalize_city(region) if region else None
         search_district = normalize_city(district) if district else None
 
-        entry_text = (
-            f"🏪 <b>{get_text(lang, 'hot_offers')}</b>\n\n"
-            f"📍 {city}\n"
-            f"{get_text(lang, 'hot_offers_subtitle')}"
-        )
+        entry_text = _entry_text(lang, city)
         await message.answer(
             entry_text,
             parse_mode="HTML",
             reply_markup=offer_keyboards.hot_entry_keyboard(lang),
         )
+
+    @dp.callback_query(F.data == "hot_entry_offers")
+    async def hot_entry_offers(callback: types.CallbackQuery, state: FSMContext) -> None:
+        if not callback.from_user:
+            await callback.answer()
+            return
+        msg = _callback_message(callback)
+        if not msg:
+            await callback.answer()
+            return
+
+        user_id = callback.from_user.id
+        lang = db.get_user_language(user_id)
+        user = db.get_user_model(user_id)
+        if not user:
+            await callback.answer(
+                "⚠️ Сессия устарела. Нажмите /start и откройте ‘🏪 Магазины и акции’ заново."
+                if lang == "ru"
+                else "⚠️ Sessiya eskirgan. /start ni bosing va '🏪 Do'konlar va aksiyalar' ni qayta oching.",
+                show_alert=True,
+            )
+            return
+
+        await state.clear()
+
+        city, region, district, latitude, longitude = _extract_location(user)
+        search_city = normalize_city(city)
+        search_region = normalize_city(region) if region else None
+        search_district = normalize_city(district) if district else None
+
+        sent = await _send_hot_offers_list(
+            msg,
+            state,
+            lang,
+            city,
+            search_city,
+            search_region,
+            search_district,
+            latitude,
+            longitude,
+            offer_service,
+            logger,
+            page=0,
+            edit_message=True,
+            show_entry_back=True,
+            filter_mode="hot",
+        )
+        if not sent:
+            await callback.answer(get_text(lang, "no_offers"), show_alert=True)
+            return
+        await callback.answer()
+
+    @dp.callback_query(F.data == "hot_entry_stores")
+    async def hot_entry_stores(callback: types.CallbackQuery, state: FSMContext) -> None:
+        if not callback.from_user:
+            await callback.answer()
+            return
+        msg = _callback_message(callback)
+        if not msg:
+            await callback.answer()
+            return
+        lang = db.get_user_language(callback.from_user.id)
+        user = db.get_user_model(callback.from_user.id)
+        if not user:
+            await callback.answer(get_text(lang, "error"), show_alert=True)
+            return
+
+        await state.clear()
+        await state.update_data(hot_entry_back=True)
+
+        text = get_text(lang, "browse_by_business_type")
+        keyboard = business_type_keyboard(lang, include_back=True, back_callback="hot_entry_back")
+        if not await safe_edit_message(msg, text, reply_markup=keyboard):
+            await safe_delete_message(msg)
+            await msg.answer(text, parse_mode="HTML", reply_markup=keyboard)
+        await callback.answer()
+
+    @dp.callback_query(F.data == "hot_entry_back")
+    async def hot_entry_back(callback: types.CallbackQuery, state: FSMContext) -> None:
+        if not callback.from_user:
+            await callback.answer()
+            return
+        msg = _callback_message(callback)
+        if not msg:
+            await callback.answer()
+            return
+
+        user_id = callback.from_user.id
+        lang = db.get_user_language(user_id)
+        user = db.get_user_model(user_id)
+        if not user:
+            await callback.answer(get_text(lang, "error"), show_alert=True)
+            return
+
+        await state.clear()
+
+        city, _, _, _, _ = _extract_location(user)
+        entry_text = _entry_text(lang, city)
+        if not await safe_edit_message(
+            msg,
+            entry_text,
+            reply_markup=offer_keyboards.hot_entry_keyboard(lang),
+        ):
+            await safe_delete_message(msg)
+            await msg.answer(
+                entry_text,
+                parse_mode="HTML",
+                reply_markup=offer_keyboards.hot_entry_keyboard(lang),
+            )
+        await callback.answer()
 
     @dp.callback_query(F.data == "hot_offers")
     async def hot_offers_callback(callback: types.CallbackQuery, state: FSMContext) -> None:
@@ -701,7 +814,6 @@ def register_hot(
                 page,
                 keyboard_pages,
                 show_entry_back=show_entry_back,
-                show_categories=True,
             )
 
             if edit_message:
