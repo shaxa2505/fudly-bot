@@ -57,8 +57,8 @@ def _offer_price_line(offer: OfferDetails | OfferListItem, lang: str) -> str:
     if original and original > current:
         discount_pct = round((1 - current / original) * 100)
         discount_pct = min(99, max(1, discount_pct))
-        return f"💰 {_format_money(current)} {currency} (-{discount_pct}%)"
-    return f"💰 {_format_money(current)} {currency}"
+        return f"{_format_money(current)} {currency} (-{discount_pct}%)"
+    return f"{_format_money(current)} {currency}"
 
 
 def _category_label(lang: str, category: str) -> str:
@@ -75,11 +75,12 @@ def _render_offers_list_text(
     page: int,
     total_pages: int | None,
 ) -> str:
+    city_label = "Город" if lang == "ru" else "Shahar"
     page_label = "Стр." if lang == "ru" else "Sah."
     page_info = f"{page_label} {page + 1}"
     if total_pages:
         page_info += f"/{total_pages}"
-    lines = [title, f"📍 {city} | {page_info}", "-" * 24]
+    lines = [title, f"{city_label}: {city} | {page_info}", "-" * 24]
 
     for idx, offer in enumerate(offers, start=1):
         title_line = _short_title(offer.title, limit=28)
@@ -87,7 +88,7 @@ def _render_offers_list_text(
         store_name = _short_store(getattr(offer, "store_name", "") or "", limit=16)
         meta = f"{price_line}"
         if store_name:
-            meta += f" | 🏪 {store_name}"
+            meta += f" | {store_name}"
         lines.append(f"{idx}. <b>{title_line}</b>")
         lines.append(f"   {meta}")
         lines.append("")
@@ -118,7 +119,7 @@ def register_hot(
     def _entry_text(lang: str, city: str) -> str:
         return (
             f"<b>{get_text(lang, 'hot_offers')}</b>\n\n"
-            f"📍 {city}\n"
+            f"{'Город' if lang == 'ru' else 'Shahar'}: {city}\n"
             f"{get_text(lang, 'hot_offers_subtitle')}"
         )
 
@@ -136,9 +137,9 @@ def register_hot(
         user = db.get_user_model(user_id)
         if not user:
             await message.answer(
-                "⚠️ Сессия устарела. Нажмите /start и откройте ‘🏪 Магазины и акции’ заново."
+                "Сессия истекла. Нажмите /start."
                 if lang == "ru"
-                else "⚠️ Sessiya eskirgan. /start ni bosing va ‘🏪 Do'konlar va aksiyalar’ ni qayta oching.",
+                else "Sessiya tugadi. /start bosing.",
             )
             return
         city, region, district, latitude, longitude = _extract_location(user)
@@ -168,9 +169,9 @@ def register_hot(
         user = db.get_user_model(user_id)
         if not user:
             await callback.answer(
-                "⚠️ Сессия устарела. Нажмите /start и откройте ‘🏪 Магазины и акции’ заново."
+                "Сессия истекла. Нажмите /start."
                 if lang == "ru"
-                else "⚠️ Sessiya eskirgan. /start ni bosing va '🏪 Do'konlar va aksiyalar' ni qayta oching.",
+                else "Sessiya tugadi. /start bosing.",
                 show_alert=True,
             )
             return
@@ -279,9 +280,9 @@ def register_hot(
         user = db.get_user_model(user_id)
         if not user:
             await callback.answer(
-                "⚠️ Сессия устарела. Нажмите /start и откройте ‘🏪 Магазины и акции’ заново."
+                "Сессия истекла. Нажмите /start."
                 if lang == "ru"
-                else "⚠️ Sessiya eskirgan. /start ni bosing va ‘🏪 Do'konlar va aksiyalar’ ni qayta oching.",
+                else "Sessiya tugadi. /start bosing.",
                 show_alert=True,
             )
             return
@@ -321,7 +322,7 @@ def register_hot(
         if not sent:
             await callback.answer(get_text(lang, "no_offers"), show_alert=True)
             return
-        await callback.answer("🔄", show_alert=False)
+        await callback.answer()
 
     @dp.callback_query(F.data.startswith("hot_page_"))
     async def hot_offers_page_handler(callback: types.CallbackQuery, state: FSMContext) -> None:
@@ -339,9 +340,9 @@ def register_hot(
         user = db.get_user_model(user_id)
         if not user:
             await callback.answer(
-                "⚠️ Сессия устарела. Нажмите /start и откройте ‘🏪 Магазины и акции’ заново."
+                "Сессия истекла. Нажмите /start."
                 if lang == "ru"
-                else "⚠️ Sessiya eskirgan. /start ni bosing va ‘🏪 Do'konlar va aksiyalar’ ni qayta oching.",
+                else "Sessiya tugadi. /start bosing.",
                 show_alert=True,
             )
             return
@@ -475,9 +476,9 @@ def register_hot(
         if not offer_list:
             # Friendly hint if session state lost or expired
             await message.answer(
-                "⚠️ Список товаров устарел. Нажмите ‘🏪 Магазины и акции’ ещё раз."
+                "Список устарел. Откройте раздел еще раз."
                 if lang == "ru"
-                else "⚠️ Mahsulotlar ro'yxati eskirgan. ‘🏪 Do'konlar va aksiyalar’ tugmasini qayta bosing.",
+                else "Ro'yxat eskirgan. Bo'limni qayta oching.",
             )
             await state.clear()
             return
@@ -972,7 +973,7 @@ def register_hot(
         search_district = normalize_city(district) if district else None
         offers: list[OfferListItem] = fetcher(search_city, 20, search_region, search_district)
         if not offers:
-            await callback.answer("😔 Нет доступных предложений", show_alert=True)
+            await callback.answer("Нет доступных предложений", show_alert=True)
             return
         await callback.answer()
         header = (

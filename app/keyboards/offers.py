@@ -14,11 +14,9 @@ from localization import get_text
 def hot_entry_keyboard(lang: str) -> InlineKeyboardMarkup:
     """Entry keyboard for the main 'Магазины и акции' button."""
     builder = InlineKeyboardBuilder()
-    deals = "🔥 Акции" if lang == "ru" else "🔥 Aksiyalar"
-    stores = "🏪 Магазины" if lang == "ru" else "🏪 Do'konlar"
-    change_city = (
-        "📍 Сменить город" if lang == "ru" else "📍 Shaharni almashtirish"
-    )
+    deals = "Акции" if lang == "ru" else "Aksiyalar"
+    stores = "Магазины" if lang == "ru" else "Do'konlar"
+    change_city = "Сменить город" if lang == "ru" else "Shaharni almashtirish"
 
     builder.button(text=deals, callback_data="hot_entry_offers")
     builder.button(text=stores, callback_data="hot_entry_stores")
@@ -38,6 +36,7 @@ def hot_offers_compact_keyboard(
     builder = InlineKeyboardBuilder()
 
     # Add buttons for each offer (max 5) - show title + price
+    currency = "so'm" if lang == "uz" else "сум"
     for idx, offer in enumerate(offers[:5], start=1):
         offer_id = offer.id if hasattr(offer, "id") else offer.get("offer_id", 0)
         price = (
@@ -53,7 +52,7 @@ def hot_offers_compact_keyboard(
         # Format: "1. Молоко 25k ➜" - shows title and short price
         price_k = f"{int(price // 1000)}k" if price >= 1000 else str(int(price))
         builder.button(
-            text=f"{idx}. {short_title} {price_k} ➜",
+            text=f"{idx}. {short_title} {price_k} {currency}",
             callback_data=f"hot_offer_{offer_id}",
         )
 
@@ -63,12 +62,12 @@ def hot_offers_compact_keyboard(
     # Pagination row - only prev/next and refresh
     nav_builder = InlineKeyboardBuilder()
     if page > 0:
-        nav_builder.button(text="◀️", callback_data=f"hot_page_{page - 1}")
+        nav_builder.button(text="Назад" if lang == "ru" else "Oldingi", callback_data=f"hot_page_{page - 1}")
     if page < total_pages - 1:
-        nav_builder.button(text="▶️", callback_data=f"hot_page_{page + 1}")
+        nav_builder.button(text="Далее" if lang == "ru" else "Keyingi", callback_data=f"hot_page_{page + 1}")
 
     # Refresh button
-    nav_builder.button(text="🔄", callback_data="hot_offers_refresh")
+    nav_builder.button(text="Обновить" if lang == "ru" else "Yangilash", callback_data="hot_offers_refresh")
 
     # Adjust nav: pagination buttons + refresh
     if page > 0 and page < total_pages - 1:
@@ -102,13 +101,13 @@ def store_card_keyboard(
     back_text: str | None = None,
 ) -> InlineKeyboardMarkup:
     builder = InlineKeyboardBuilder()
-    products = "🛍 Посмотреть товары" if lang == "ru" else "🛍 Mahsulotlarni ko'rish"
+    products = "Товары" if lang == "ru" else "Mahsulotlar"
     if back_text:
         back = back_text
     elif back_callback == "back_to_store_list":
-        back = "◀️ К списку магазинов" if lang == "ru" else "◀️ Do'konlar ro'yxati"
+        back = "К списку магазинов" if lang == "ru" else "Do'konlar ro'yxati"
     else:
-        back = "◀️ Назад" if lang == "ru" else "◀️ Orqaga"
+        back = "Назад" if lang == "ru" else "Orqaga"
 
     # Показывать количество только если товары есть
     if offers_count > 0:
@@ -128,11 +127,11 @@ def offer_details_keyboard(
     builder = InlineKeyboardBuilder()
 
     # Add to cart button (primary action)
-    cart = "🛒 В корзину" if lang == "ru" else "🛒 Savatga qo'shish"
+    cart = "В корзину" if lang == "ru" else "Savatga qo'shish"
     builder.button(text=cart, callback_data=f"add_to_cart_{offer_id}")
 
     # Quick order button (skip cart) - clearer text
-    order = "⚡ Быстрый заказ" if lang == "ru" else "⚡ Tez buyurtma"
+    order = "Быстрый заказ" if lang == "ru" else "Tez buyurtma"
     builder.button(text=order, callback_data=f"book_{offer_id}")
 
     builder.adjust(2)
@@ -151,11 +150,11 @@ def offer_details_with_back_keyboard(
     builder = InlineKeyboardBuilder()
 
     # Main action: Add to cart (most common)
-    cart = "🛒 В корзину" if lang == "ru" else "🛒 Savatga qo'shish"
+    cart = "В корзину" if lang == "ru" else "Savatga qo'shish"
     builder.button(text=cart, callback_data=f"add_to_cart_{offer_id}")
 
     # Quick order button - clearer text
-    order = "⚡ Быстрый заказ" if lang == "ru" else "⚡ Tez buyurtma"
+    order = "Быстрый заказ" if lang == "ru" else "Tez buyurtma"
     builder.button(text=order, callback_data=f"book_{offer_id}")
 
     # Back button - full width
@@ -173,11 +172,11 @@ def offer_details_search_keyboard(
     builder = InlineKeyboardBuilder()
 
     # Main action: Add to cart
-    cart = "🛒 В корзину" if lang == "ru" else "🛒 Savatga qo'shish"
+    cart = "В корзину" if lang == "ru" else "Savatga qo'shish"
     builder.button(text=cart, callback_data=f"add_to_cart_{offer_id}")
 
     # Quick order
-    order = "⚡ Быстрый заказ" if lang == "ru" else "⚡ Tez buyurtma"
+    order = "Быстрый заказ" if lang == "ru" else "Tez buyurtma"
     builder.button(text=order, callback_data=f"book_{offer_id}")
 
     # Back to search results
@@ -196,11 +195,11 @@ def offer_quick_keyboard(
     builder = InlineKeyboardBuilder()
 
     # Add to cart - main action
-    cart = "🛒 В корзину" if lang == "ru" else "🛒 Savatga qo'shish"
+    cart = "В корзину" if lang == "ru" else "Savatga qo'shish"
     builder.button(text=cart, callback_data=f"add_to_cart_{offer_id}")
 
     # Quick order - skip cart
-    order = "⚡ Быстрый заказ" if lang == "ru" else "⚡ Tez buyurtma"
+    order = "Быстрый заказ" if lang == "ru" else "Tez buyurtma"
     builder.button(text=order, callback_data=f"book_{offer_id}")
 
     builder.adjust(2)

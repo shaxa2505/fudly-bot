@@ -32,14 +32,14 @@ def no_stores_text(lang: str, business_type: str) -> str:
         "bakery": get_text(lang, "bakeries"),
         "cafe": get_text(lang, "cafes"),
         "pharmacy": get_text(lang, "pharmacies"),
-        "delivery": "🚚 Доставка" if lang == "ru" else "🚚 Yetkazish",
+        "delivery": "Доставка" if lang == "ru" else "Yetkazish",
     }
     no_stores = (
         "В этой категории пока нет магазинов с активными предложениями"
         if lang == "ru"
         else "Bu kategoriyada hali do'konlar yo'q"
     )
-    return f"😔 {names.get(business_type, business_type)}\n\n{no_stores}"
+    return f"{names.get(business_type, business_type)}\n\n{no_stores}"
 
 
 def invalid_number_text(lang: str, subject: str) -> str:
@@ -49,7 +49,7 @@ def invalid_number_text(lang: str, subject: str) -> str:
         if lang == "ru"
         else "Iltimos, to'g'ri raqam kiriting"
     )
-    return f"× {base}"
+    return base
 
 
 def range_text(lang: str, max_value: int, subject: str) -> str:

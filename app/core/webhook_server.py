@@ -5,7 +5,7 @@ import asyncio
 import os
 import sys
 import time
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Any
 
 from aiogram import Bot, Dispatcher, types
@@ -16,6 +16,7 @@ from aiohttp import web
 from app.core.metrics import metrics as app_metrics
 from app.core.notifications import get_notification_service
 from app.core.websocket import get_websocket_manager, setup_websocket_routes
+from app.core.utils import normalize_city
 from app.integrations.payment_service import get_payment_service
 from logging_config import logger
 
@@ -450,6 +451,64 @@ async def create_webhook_app(
 
         return add_cors_headers(web.json_response(result))
 
+    async def api_search_suggestions(request: web.Request) -> web.Response:
+        """GET /api/v1/search/suggestions - Search autocomplete suggestions."""
+        query = request.query.get("query", "")
+        limit_raw = request.query.get("limit", "5")
+        try:
+            limit = max(1, min(int(limit_raw), 10))
+        except (TypeError, ValueError):
+            limit = 5
+
+        if not query or len(query) < 2:
+            return add_cors_headers(web.json_response([]))
+
+        suggestions: list[str] = []
+        try:
+            if hasattr(db, "search_offers"):
+                offers = db.search_offers(query, limit=limit * 2) or []
+                titles = {
+                    get_offer_value(o, "title", "") for o in offers if get_offer_value(o, "title")
+                }
+                suggestions.extend(list(titles)[:limit])
+        except Exception as exc:
+            logger.error("API search suggestions error: %s", exc)
+            suggestions = []
+
+        return add_cors_headers(web.json_response(suggestions[:limit]))
+
+    async def api_hot_deals_stats(request: web.Request) -> web.Response:
+        """GET /api/v1/stats/hot-deals - Stats for hot deals."""
+        city = request.query.get("city")
+        normalized_city = normalize_city(city) if city else None
+        stats = {
+            "total_offers": 0,
+            "total_stores": 0,
+            "avg_discount": 0.0,
+            "max_discount": 0.0,
+            "categories_count": len(API_CATEGORIES) - 1,
+        }
+
+        try:
+            if hasattr(db, "get_hot_offers"):
+                offers = db.get_hot_offers(normalized_city, limit=1000) or []
+                stats["total_offers"] = len(offers)
+                discounts: list[float] = []
+                for offer in offers:
+                    discount = float(get_offer_value(offer, "discount_percent", 0) or 0)
+                    discounts.append(discount)
+                if discounts:
+                    stats["avg_discount"] = round(sum(discounts) / len(discounts), 1)
+                    stats["max_discount"] = round(max(discounts), 1)
+
+            if hasattr(db, "get_stores_by_city"):
+                stores = db.get_stores_by_city(normalized_city)
+                stats["total_stores"] = len(stores or [])
+        except Exception as exc:
+            logger.error("API hot deals stats error: %s", exc)
+
+        return add_cors_headers(web.json_response(stats))
+
     async def api_reverse_geocode(request: web.Request) -> web.Response:
         """GET /api/v1/location/reverse - Reverse geocode."""
         def _parse_float(value: str | None) -> float | None:
@@ -759,6 +818,88 @@ async def create_webhook_app(
             logger.error(f"API offer detail error: {e}")
             return add_cors_headers(web.json_response({"error": str(e)}, status=500))
 
+    async def api_flash_deals(request: web.Request) -> web.Response:
+        """GET /api/v1/flash-deals - High discount or expiring soon offers."""
+        city = request.query.get("city")
+        region = request.query.get("region") or None
+        district = request.query.get("district") or None
+        limit_raw = request.query.get("limit", "10")
+        try:
+            limit = int(limit_raw)
+        except (TypeError, ValueError):
+            limit = 10
+        limit = max(1, min(limit, 50))
+
+        normalized_city = normalize_city(city) if city else None
+        try:
+            raw_offers = (
+                db.get_hot_offers(
+                    normalized_city,
+                    limit=100,
+                    offset=0,
+                    region=region,
+                    district=district,
+                )
+                if hasattr(db, "get_hot_offers")
+                else []
+            )
+            if not raw_offers:
+                raw_offers = []
+
+            today = datetime.now().date()
+            max_expiry = today + timedelta(days=7)
+            filtered: list[tuple[Any, float, str | None]] = []
+
+            for offer in raw_offers:
+                try:
+                    discount = float(get_offer_value(offer, "discount_percent", 0) or 0)
+                    if not discount:
+                        original_price = float(get_offer_value(offer, "original_price", 0) or 0)
+                        discount_price = float(get_offer_value(offer, "discount_price", 0) or 0)
+                        if (
+                            original_price
+                            and original_price > 0
+                            and discount_price >= 0
+                            and original_price > discount_price
+                        ):
+                            discount = round(
+                                (1.0 - (discount_price / original_price)) * 100.0, 1
+                            )
+
+                    expiry_str = get_offer_value(offer, "expiry_date")
+                    is_expiring_soon = False
+                    if expiry_str:
+                        try:
+                            expiry = datetime.fromisoformat(str(expiry_str).split("T")[0]).date()
+                            is_expiring_soon = today <= expiry <= max_expiry
+                        except (ValueError, AttributeError):
+                            pass
+
+                    if discount >= 20 or is_expiring_soon:
+                        filtered.append((offer, discount, expiry_str))
+                except Exception as exc:
+                    logger.warning("Flash deals filter error: %s", exc)
+                    continue
+
+            filtered.sort(key=lambda item: (-item[1], str(item[2] or "9999")))
+            selected = filtered[:limit]
+
+            async def load_offer_with_photo(item: tuple[Any, float, str | None]) -> dict:
+                offer, discount, _expiry = item
+                photo_id = get_offer_value(offer, "photo_id") or get_offer_value(offer, "photo")
+                photo_url = await get_photo_url(bot, photo_id) if photo_id else None
+                offer_dict = offer_to_dict(offer, photo_url)
+                if discount and not offer_dict.get("discount_percent"):
+                    offer_dict["discount_percent"] = discount
+                return offer_dict
+
+            offers = await asyncio.gather(*[load_offer_with_photo(item) for item in selected])
+            return add_cors_headers(web.json_response(offers))
+
+        except Exception as e:
+            logger.error(f"API flash deals error: {e}")
+            return add_cors_headers(web.json_response({"error": str(e)}, status=500))
+
     async def api_stores(request: web.Request) -> web.Response:
         """GET /api/v1/stores - List stores."""
         def _parse_float(value: str | None) -> float | None:
@@ -864,6 +1005,105 @@ async def create_webhook_app(
 
         except Exception as e:
             logger.error(f"API stores error: {e}")
+            return add_cors_headers(web.json_response({"error": str(e)}, status=500))
+
+    async def api_store_detail(request: web.Request) -> web.Response:
+        """GET /api/v1/stores/{store_id} - Store details."""
+        store_id_raw = request.match_info.get("store_id")
+        try:
+            store_id = int(store_id_raw)
+        except (TypeError, ValueError):
+            return add_cors_headers(web.json_response({"error": "Invalid store_id"}, status=400))
+
+        try:
+            store = db.get_store(store_id) if hasattr(db, "get_store") else None
+            if not store:
+                return add_cors_headers(web.json_response({"error": "Store not found"}, status=404))
+
+            offers_count = int(get_offer_value(store, "offers_count", 0) or 0)
+            if offers_count == 0 and hasattr(db, "get_store_offers"):
+                try:
+                    offers_count = len(db.get_store_offers(store_id) or [])
+                except Exception:
+                    offers_count = 0
+
+            rating = float(
+                get_offer_value(store, "avg_rating", 0) or get_offer_value(store, "rating", 0) or 0
+            )
+            if rating == 0.0 and hasattr(db, "get_store_average_rating"):
+                try:
+                    rating = float(db.get_store_average_rating(store_id) or 0)
+                except Exception:
+                    rating = 0.0
+
+            photo_id = get_offer_value(store, "photo")
+            photo_url = await get_photo_url(bot, photo_id) if photo_id else None
+            store_dict = store_to_dict(store, photo_url)
+            store_dict["offers_count"] = offers_count
+            store_dict["rating"] = rating
+
+            region = get_offer_value(store, "region")
+            if region is not None:
+                store_dict["region"] = region
+            district = get_offer_value(store, "district")
+            if district is not None:
+                store_dict["district"] = district
+
+            return add_cors_headers(web.json_response(store_dict))
+
+        except Exception as e:
+            logger.error(f"API store detail error: {e}")
+            return add_cors_headers(web.json_response({"error": str(e)}, status=500))
+
+    async def api_calculate_cart(request: web.Request) -> web.Response:
+        """GET /api/v1/cart/calculate - Calculate cart totals."""
+        offer_ids = request.query.get("offer_ids", "")
+        if not offer_ids:
+            return add_cors_headers(
+                web.json_response({"error": "offer_ids required"}, status=400)
+            )
+
+        price_unit = os.getenv("PRICE_STORAGE_UNIT", "sums").lower()
+        convert = (lambda v: float(v or 0) / 100) if price_unit == "kopeks" else (
+            lambda v: float(v or 0)
+        )
+
+        items = []
+        total = 0.0
+        items_count = 0
+
+        try:
+            for item_str in offer_ids.split(","):
+                if ":" not in item_str:
+                    continue
+                offer_id_str, qty_str = item_str.split(":", 1)
+                try:
+                    offer_id = int(offer_id_str)
+                    quantity = int(qty_str)
+                except (TypeError, ValueError):
+                    continue
+
+                offer = db.get_offer(offer_id) if hasattr(db, "get_offer") else None
+                if not offer:
+                    continue
+
+                price = convert(get_offer_value(offer, "discount_price", 0))
+                items.append(
+                    {
+                        "offer_id": offer_id,
+                        "quantity": quantity,
+                        "title": get_offer_value(offer, "title", ""),
+                        "price": price,
+                        "photo": get_offer_value(offer, "photo") or get_offer_value(offer, "photo_id"),
+                    }
+                )
+                total += price * quantity
+                items_count += quantity
+
+            payload = {"items": items, "total": total, "items_count": items_count}
+            return add_cors_headers(web.json_response(payload))
+        except Exception as e:
+            logger.error(f"API cart calculate error: {e}")
             return add_cors_headers(web.json_response({"error": str(e)}, status=500))
 
     async def api_create_order(request: web.Request) -> web.Response:
@@ -2925,8 +3165,13 @@ async def create_webhook_app(
         app.router.add_route("*", "/api/v1/user/bookings{path:.*}", fastapi_handler)
         app.router.add_route("*", "/api/v1/user/profile{path:.*}", fastapi_handler)
         app.router.add_route("*", "/api/v1/user/notifications{path:.*}", fastapi_handler)
+        app.router.add_route("*", "/api/v1/cart{path:.*}", fastapi_handler)
         app.router.add_route("*", "/api/v1/categories{path:.*}", fastapi_handler)
+        app.router.add_route("*", "/api/v1/favorites{path:.*}", fastapi_handler)
+        app.router.add_route("*", "/api/v1/flash-deals{path:.*}", fastapi_handler)
         app.router.add_route("*", "/api/v1/offers{path:.*}", fastapi_handler)
+        app.router.add_route("*", "/api/v1/search{path:.*}", fastapi_handler)
+        app.router.add_route("*", "/api/v1/stats{path:.*}", fastapi_handler)
         app.router.add_route("*", "/api/v1/stores{path:.*}", fastapi_handler)
         app.router.add_route("*", "/api/v1/photo{path:.*}", fastapi_handler)
         app.router.add_route("*", "/api/v1/location{path:.*}", fastapi_handler)
@@ -2935,14 +3180,24 @@ async def create_webhook_app(
     else:
         app.router.add_options("/api/v1/categories", cors_preflight)
         app.router.add_get("/api/v1/categories", api_categories)
+        app.router.add_options("/api/v1/search/suggestions", cors_preflight)
+        app.router.add_get("/api/v1/search/suggestions", api_search_suggestions)
+        app.router.add_options("/api/v1/stats/hot-deals", cors_preflight)
+        app.router.add_get("/api/v1/stats/hot-deals", api_hot_deals_stats)
         app.router.add_options("/api/v1/location/reverse", cors_preflight)
         app.router.add_get("/api/v1/location/reverse", api_reverse_geocode)
+        app.router.add_options("/api/v1/flash-deals", cors_preflight)
+        app.router.add_get("/api/v1/flash-deals", api_flash_deals)
         app.router.add_options("/api/v1/offers", cors_preflight)
         app.router.add_get("/api/v1/offers", api_offers)
         app.router.add_options("/api/v1/offers/{offer_id}", cors_preflight)
         app.router.add_get("/api/v1/offers/{offer_id}", api_offer_detail)
         app.router.add_options("/api/v1/stores", cors_preflight)
         app.router.add_get("/api/v1/stores", api_stores)
+        app.router.add_options("/api/v1/stores/{store_id}", cors_preflight)
+        app.router.add_get("/api/v1/stores/{store_id}", api_store_detail)
+        app.router.add_options("/api/v1/cart/calculate", cors_preflight)
+        app.router.add_get("/api/v1/cart/calculate", api_calculate_cart)
         app.router.add_options("/api/v1/photo/{file_id}", cors_preflight)
         app.router.add_get("/api/v1/photo/{file_id}", api_get_photo)
         app.router.add_get("/api/v1/health", api_health)
