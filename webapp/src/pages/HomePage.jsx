@@ -82,6 +82,9 @@ function HomePage() {
   const categoryMarkersRef = useRef([])
   const activeCategoryRef = useRef(activeCategory)
   const manualSearchRef = useRef(0)
+  const latestRequestRef = useRef(0)
+  const queuedResetRef = useRef(null)
+  const loadOffersRef = useRef(null)
 
   // Use cart from context instead of local state
   const { addToCart, removeFromCart, getQuantity, cartCount } = useCart()
@@ -301,8 +304,15 @@ function HomePage() {
   const loadOffers = useCallback(async (reset = false, options = {}) => {
     const { searchOverride, force = false } = options
     const searchValue = typeof searchOverride === 'string' ? searchOverride : searchQuery
-    if (loadingRef.current) return
+    if (loadingRef.current) {
+      if (reset) {
+        queuedResetRef.current = { searchOverride, force }
+        latestRequestRef.current += 1
+      }
+      return
+    }
 
+    const requestId = ++latestRequestRef.current
     loadingRef.current = true
     setLoading(true)
     try {
@@ -310,7 +320,9 @@ function HomePage() {
       const params = {
         limit: OFFERS_LIMIT,
         offset: currentOffset,
-        include_meta: true,
+      }
+      if (reset) {
+        params.include_meta = true
       }
       if (cityForApi) {
         params.city = cityForApi
@@ -372,6 +384,10 @@ function HomePage() {
         : items.length === OFFERS_LIMIT
       const nextOffset = Number.isFinite(data?.next_offset) ? data.next_offset : null
 
+      if (requestId !== latestRequestRef.current) {
+        return
+      }
+
       if (reset) {
         setOffers(items || [])
         offsetRef.current = nextOffset ?? items.length
@@ -401,6 +417,11 @@ function HomePage() {
     } finally {
       loadingRef.current = false
       setLoading(false)
+      if (queuedResetRef.current) {
+        const nextReset = queuedResetRef.current
+        queuedResetRef.current = null
+        loadOffersRef.current?.(true, nextReset)
+      }
     }
   }, [
     selectedCategory,
@@ -414,6 +435,10 @@ function HomePage() {
     sortBy,
     priceRange,
   ])
+
+  useEffect(() => {
+    loadOffersRef.current = loadOffers
+  }, [loadOffers])
 
   // Save search query to history when searching
   const handleSearchSubmit = useCallback(async (queryOverride) => {

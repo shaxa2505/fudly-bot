@@ -79,7 +79,8 @@ def render_business_type_store_list(
     start_idx = page * per_page
     page_stores = stores[start_idx : start_idx + per_page]
 
-    lines = [f"<b>{title}</b>", f"{city_label}: {city} | {page_label} {page + 1}/{total_pages}"]
+    total_label = "Всего" if lang == "ru" else "Jami"
+    lines = [f"<b>{title}</b>", f"{city_label}: {city} | {page_label} {page + 1}/{total_pages} | {total_label} {total}"]
 
     for store in page_stores:
         store_name = store.name or ("Магазин" if lang == "ru" else "Do'kon")

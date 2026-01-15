@@ -1,6 +1,7 @@
 """Search handlers."""
 from __future__ import annotations
 
+import html
 import logging
 import re
 
@@ -220,6 +221,37 @@ SEARCH_KEYWORDS = {
 }
 
 
+def _escape(text: str) -> str:
+    return html.escape(text or "")
+
+
+def _format_money(value: float | int) -> str:
+    return f"{int(value):,}".replace(",", " ")
+
+
+def _short_title(title: str, limit: int = 26) -> str:
+    cleaned = title or ""
+    if cleaned.startswith("Пример:"):
+        cleaned = cleaned[7:].strip()
+    return cleaned if len(cleaned) <= limit else f"{cleaned[: limit - 2]}.."
+
+
+def _short_store(name: str, limit: int = 16) -> str:
+    cleaned = name or ""
+    return cleaned if len(cleaned) <= limit else f"{cleaned[: limit - 2]}.."
+
+
+def _offer_price_line(offer, lang: str) -> str:
+    currency = "so'm" if lang == "uz" else "сум"
+    current = getattr(offer, "discount_price", 0) or getattr(offer, "price", 0) or 0
+    original = getattr(offer, "original_price", 0) or 0
+    if original and original > current:
+        discount_pct = round((1 - current / original) * 100)
+        discount_pct = min(99, max(1, discount_pct))
+        return f"{_format_money(current)} {currency} (-{discount_pct}%)"
+    return f"{_format_money(current)} {currency}"
+
+
 def normalize_text(text: str) -> str:
     """Нормализация текста для поиска"""
     if not text:
@@ -334,13 +366,16 @@ def setup(
             return
 
         # Расширяем запрос синонимами
-        search_terms = expand_search_query(query, lang)
+        normalized_query = normalize_text(query)
+        base_terms = [word for word in normalized_query.split() if len(word) >= 2]
+        if not base_terms:
+            base_terms = [query]
 
         # Log search for debugging
         from logging import getLogger
 
         logger = getLogger(__name__)
-        logger.info(f"🔍 Search: query='{query}', terms={search_terms}, lang={lang}")
+        logger.info(f"🔍 Search: query='{query}', base_terms={base_terms}, lang={lang}")
 
         # Perform search
         # Use get_user instead of get_user_model if protocol doesn't support it
@@ -374,20 +409,32 @@ def setup(
                 logger.error(f"Error searching stores: {e}")
 
         # 2. Search offers (including by category)
-        # Ищем по расширенным терминам
-        for term in search_terms:
-            if len(term) < 2:  # Пропускаем короткие термины
-                continue
+        searched_terms = set()
+        search_terms = []
+        min_results_for_synonyms = 10
 
+        def search_by_term(term: str) -> None:
+            if len(term) < 2 or term in searched_terms:
+                return
+            searched_terms.add(term)
+            search_terms.append(term)
             results = offer_service.search_offers(term, city, region=region, district=district)
-            logger.info(f"🔍 Search term '{term}' found {len(results)} offers")
-
+            logger.info(f"Search term '{term}' found {len(results)} offers")
             for offer in results:
                 if offer.id not in seen_offer_ids:
                     seen_offer_ids.add(offer.id)
                     all_results.append(offer)
 
-        # Сортируем результаты по релевантности (сначала те, где запрос в начале названия)
+        for term in base_terms:
+            search_by_term(term)
+
+        if len(all_results) < min_results_for_synonyms:
+            expanded_terms = expand_search_query(query, lang)
+            for term in expanded_terms:
+                if len(all_results) >= min_results_for_synonyms:
+                    break
+                search_by_term(term)
+
         def relevance_score(offer_title: str) -> int:
             title_lower = normalize_text(offer_title)
             score = 0
@@ -424,6 +471,7 @@ def setup(
         await state.update_data(
             search_results=[o.id for o in all_results],
             search_query=query,
+            search_page=0,
         )
 
         # Show store results first - present each store as a card with a button to view its products
@@ -455,7 +503,7 @@ def setup(
                 kb = InlineKeyboardBuilder()
                 sid = store.get("store_id") or store.get("id") or store.get("storeId")
                 kb.button(
-                    text=("Смотреть товары" if lang == "ru" else "Mahsulotlarni ko'rish"),
+                    text=("🗂 Открыть каталог" if lang == "ru" else "🗂 Katalogni ochish"),
                     callback_data=f"show_store_products_{sid}",
                 )
                 kb.adjust(1)
@@ -497,27 +545,43 @@ def setup(
         edit: bool = False,
     ) -> None:
         """Send compact search results with pagination."""
-        ITEMS_PER_PAGE = 5
+        ITEMS_PER_PAGE = 10
         total_count = len(all_results)
         total_pages = max(1, (total_count + ITEMS_PER_PAGE - 1) // ITEMS_PER_PAGE)
+        page = max(0, min(page, total_pages - 1))
 
         start_idx = page * ITEMS_PER_PAGE
-        end_idx = min(start_idx + ITEMS_PER_PAGE, total_count)
-        page_offers = all_results[start_idx:end_idx]
+        page_offers = all_results[start_idx : start_idx + ITEMS_PER_PAGE]
 
-        # Simple header - buttons will show details
-        text = f"«{query}» - {total_count}" if lang == "uz" else f"«{query}» - {total_count}"
+        title_label = "Поиск" if lang == "ru" else "Qidiruv"
+        page_label = "Стр." if lang == "ru" else "Sah."
+        total_label = "Всего" if lang == "ru" else "Jami"
 
-        # Create keyboard with inline buttons
+        lines = [
+            f"{title_label}: <b>{_escape(query)}</b>",
+            f"{page_label} {page + 1}/{total_pages} | {total_label} {total_count}",
+        ]
+
+        for idx, offer in enumerate(page_offers, start=1):
+            title_line = _escape(_short_title(getattr(offer, "title", ""), limit=28))
+            price_line = _offer_price_line(offer, lang)
+            store_name = _short_store(getattr(offer, "store_name", "") or "", limit=16)
+            meta = price_line
+            if store_name:
+                meta = f"{meta} | {_escape(store_name)}"
+            lines.append(f"{idx}. <b>{title_line}</b> - {meta}")
+
+        text = "\n".join(lines).rstrip()
+
         keyboard = search_results_compact_keyboard(lang, page_offers, page, total_pages, query)
 
         if edit and isinstance(target, types.CallbackQuery) and target.message:
             try:
-                await target.message.edit_text(text, reply_markup=keyboard)
+                await target.message.edit_text(text, parse_mode="HTML", reply_markup=keyboard)
             except Exception:
-                await target.message.answer(text, reply_markup=keyboard)
+                await target.message.answer(text, parse_mode="HTML", reply_markup=keyboard)
         elif isinstance(target, types.Message):
-            await target.answer(text, reply_markup=keyboard)
+            await target.answer(text, parse_mode="HTML", reply_markup=keyboard)
         elif isinstance(target, types.CallbackQuery) and target.message:
             await target.message.answer(text, parse_mode="HTML", reply_markup=keyboard)
 
@@ -560,6 +624,7 @@ def setup(
             except Exception:
                 pass
 
+        await state.update_data(search_page=page)
         await _send_search_results_page(callback, all_results, query, lang, page=page, edit=True)
         await callback.answer()
 
@@ -603,13 +668,14 @@ def setup(
             data = await state.get_data()
             search_results = data.get("search_results", [])
             search_query = data.get("search_query", "")
+            current_page = int(data.get("search_page", 0) or 0)
 
             # Save search context for back navigation
             await state.update_data(
                 source="search",
                 search_results=search_results,
                 search_query=search_query,
-                search_page=0,
+                search_page=current_page,
             )
 
             text = render_offer_details(lang, offer, store)
@@ -744,7 +810,12 @@ def setup(
         # (including inactive / out-of-stock) so users can at least see what's offered.
         # Store offer ids in FSM so we can paginate and let user pick by inline numbers
         await state.set_state(BrowseOffers.offer_list)
-        await state.update_data(offer_list=[o.id for o in offers], current_store_id=store_id)
+        await state.update_data(
+            offer_list=[o.id for o in offers],
+            current_store_id=store_id,
+            store_offers_page=0,
+            store_category="all",
+        )
 
         # Get store name
         store = offer_service.get_store(store_id)
@@ -752,68 +823,61 @@ def setup(
 
         # Header like hot offers
         total = len(offers)
-        header = f"🏪 <b>{store_name}</b>\n"
-        shown_text = "Товаров" if lang == "ru" else "Mahsulotlar"
-        header += f"📦 {shown_text}: {total}\n"
+        per_page = 10
+        total_pages = max(1, (total + per_page - 1) // per_page)
 
         page_offset = 0
-        per_page = 10
         page_offers = offers[page_offset : page_offset + per_page]
 
-        # Build compact lines like hot offers
-        lines = [header]
-        for idx, off in enumerate(page_offers, start=1):
-            title = getattr(off, "title", "Товар")
-            short_title = title[:25] + ".." if len(title) > 25 else title
-            price = getattr(off, "discount_price", getattr(off, "price", 0))
-            qty = getattr(off, "quantity", 0)
+        page_label = "Стр." if lang == "ru" else "Sah."
+        total_label = "Всего" if lang == "ru" else "Jami"
+        list_label = "Товары" if lang == "ru" else "Mahsulotlar"
 
-            lines.append(f"{idx}. <b>{short_title}</b>")
-            currency = "сум" if lang == "ru" else "so'm"
-            qty_text = "шт" if lang == "ru" else "ta"
-            lines.append(f"   💰 {int(price):,} {currency} • 📦 {qty} {qty_text}")
-            lines.append("")
+        lines = [
+            f"🏪 <b>{_escape(store_name)}</b>",
+            f"{list_label} | {page_label} 1/{total_pages} | {total_label} {total}",
+        ]
+
+        for idx, off in enumerate(page_offers, start=1):
+            title_line = _escape(_short_title(getattr(off, "title", ""), limit=28))
+            price_line = _offer_price_line(off, lang)
+            lines.append(f"{idx}. <b>{title_line}</b> - {price_line}")
 
         if not page_offers:
-            empty = "(Нет доступных товаров)" if lang == "ru" else "(Mavjud mahsulotlar yo'q)"
+            empty = "Нет доступных товаров" if lang == "ru" else "Mavjud mahsulotlar yo'q"
             lines.append(empty)
-        else:
-            hint = "👆 Нажмите для заказа" if lang == "ru" else "👆 Buyurtma uchun tanlang"
-            lines.append(hint)
 
-        page_text = "\n".join(lines)
+        page_text = "\n".join(lines).rstrip()
 
         # Compact keyboard with offer buttons
         from aiogram.utils.keyboard import InlineKeyboardBuilder
 
         kb = InlineKeyboardBuilder()
-
-        # Offer buttons - 2 columns
-        for idx, off in enumerate(page_offers, start=1):
+        action = "🔎 Открыть" if lang == "ru" else "🔎 Ochish"
+        for off in page_offers:
             offer_id = getattr(off, "id", 0)
             title = getattr(off, "title", "Товар")
-            short = title[:10] + ".." if len(title) > 10 else title
-            price = getattr(off, "discount_price", getattr(off, "price", 0))
-            price_str = f"{int(price/1000)}k" if price >= 1000 else str(int(price))
-            kb.button(text=f"{idx}. {short} {price_str}", callback_data=f"hot_offer_{offer_id}")
+            short = _short_title(title, limit=26)
+            kb.button(text=f"{action} - {short}", callback_data=f"store_offer_{store_id}_{offer_id}")
 
-        # Adjust to 2 columns
-        kb.adjust(2)
+        kb.adjust(1)
 
         # Pagination row
-        total_pages = (total + per_page - 1) // per_page
         if total_pages > 1:
             if page_offset > 0:
                 kb.button(
-                    text="◀️",
+                    text="Назад" if lang == "ru" else "Oldingi",
                     callback_data=f"store_page_{store_id}_{max(0, page_offset - per_page)}",
                 )
             kb.button(text=f"1/{total_pages}", callback_data="store_offers_noop")
             if page_offset + per_page < total:
-                kb.button(text="▶️", callback_data=f"store_page_{store_id}_{page_offset + per_page}")
+                kb.button(
+                    text="Далее" if lang == "ru" else "Keyingi",
+                    callback_data=f"store_page_{store_id}_{page_offset + per_page}",
+                )
 
         # Back button
-        back_text = "◀️ Назад" if lang == "ru" else "◀️ Orqaga"
+        back_text = "Назад" if lang == "ru" else "Orqaga"
         kb.button(text=back_text, callback_data=f"back_to_store_{store_id}")
 
         if msg:
@@ -857,62 +921,59 @@ def setup(
         current_page = offset // per_page + 1
         total_pages = (total + per_page - 1) // per_page
 
+        await state.update_data(store_offers_page=current_page - 1, store_category="all")
+
         # Header
-        header = f"🏪 <b>{store_name}</b>\n"
-        shown_text = "Товаров" if lang == "ru" else "Mahsulotlar"
-        header += f"📦 {shown_text}: {total}\n"
+        page_label = "Стр." if lang == "ru" else "Sah."
+        total_label = "Всего" if lang == "ru" else "Jami"
+        list_label = "Товары" if lang == "ru" else "Mahsulotlar"
 
-        # Build compact lines
-        lines = [header]
+        lines = [
+            f"🏪 <b>{_escape(store_name)}</b>",
+            f"{list_label} | {page_label} {current_page}/{total_pages} | {total_label} {total}",
+        ]
+
         for idx, off in enumerate(page_offers, start=offset + 1):
-            title = getattr(off, "title", "Товар")
-            short_title = title[:25] + ".." if len(title) > 25 else title
-            price = getattr(off, "discount_price", getattr(off, "price", 0))
-            qty = getattr(off, "quantity", 0)
-
-            lines.append(f"{idx}. <b>{short_title}</b>")
-            currency = "сум" if lang == "ru" else "so'm"
-            qty_text = "шт" if lang == "ru" else "ta"
-            lines.append(f"   💰 {int(price):,} {currency} • 📦 {qty} {qty_text}")
-            lines.append("")
+            title_line = _escape(_short_title(getattr(off, "title", ""), limit=28))
+            price_line = _offer_price_line(off, lang)
+            lines.append(f"{idx}. <b>{title_line}</b> - {price_line}")
 
         if not page_offers:
-            empty = "(Нет доступных товаров)" if lang == "ru" else "(Mavjud mahsulotlar yo'q)"
+            empty = "Нет доступных товаров" if lang == "ru" else "Mavjud mahsulotlar yo'q"
             lines.append(empty)
-        else:
-            hint = "👆 Нажмите для заказа" if lang == "ru" else "👆 Buyurtma uchun tanlang"
-            lines.append(hint)
 
-        page_text = "\n".join(lines)
+        page_text = "\n".join(lines).rstrip()
 
         # Compact keyboard
         from aiogram.utils.keyboard import InlineKeyboardBuilder
 
         kb = InlineKeyboardBuilder()
+        action = "🔎 Открыть" if lang == "ru" else "🔎 Ochish"
 
-        # Offer buttons - 2 columns
-        for idx, off in enumerate(page_offers, start=offset + 1):
+        for off in page_offers:
             offer_id = getattr(off, "id", 0)
             title = getattr(off, "title", "Товар")
-            short = title[:10] + ".." if len(title) > 10 else title
-            price = getattr(off, "discount_price", getattr(off, "price", 0))
-            price_str = f"{int(price/1000)}k" if price >= 1000 else str(int(price))
-            kb.button(text=f"{idx}. {short} {price_str}", callback_data=f"hot_offer_{offer_id}")
+            short = _short_title(title, limit=26)
+            kb.button(text=f"{action} - {short}", callback_data=f"store_offer_{store_id}_{offer_id}")
 
-        kb.adjust(2)
+        kb.adjust(1)
 
         # Pagination row
         if total_pages > 1:
             if offset > 0:
                 kb.button(
-                    text="◀️", callback_data=f"store_page_{store_id}_{max(0, offset - per_page)}"
+                    text="Назад" if lang == "ru" else "Oldingi",
+                    callback_data=f"store_page_{store_id}_{max(0, offset - per_page)}",
                 )
             kb.button(text=f"{current_page}/{total_pages}", callback_data="store_offers_noop")
             if offset + per_page < total:
-                kb.button(text="▶️", callback_data=f"store_page_{store_id}_{offset + per_page}")
+                kb.button(
+                    text="Далее" if lang == "ru" else "Keyingi",
+                    callback_data=f"store_page_{store_id}_{offset + per_page}",
+                )
 
         # Back button
-        back_text = "◀️ Назад" if lang == "ru" else "◀️ Orqaga"
+        back_text = "Назад" if lang == "ru" else "Orqaga"
         kb.button(text=back_text, callback_data=f"back_to_store_{store_id}")
 
         if msg:

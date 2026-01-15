@@ -35,28 +35,18 @@ def hot_offers_compact_keyboard(
     """Compact keyboard for hot offers with item buttons and pagination."""
     builder = InlineKeyboardBuilder()
 
-    # Add buttons for each offer (max 5) - show title + price
-    currency = "so'm" if lang == "uz" else "сум"
-    for idx, offer in enumerate(offers[:5], start=1):
+    # Add one action button per offer - keep label short and clean
+    action = "✅ Применить" if lang == "ru" else "✅ Qo'llash"
+    for offer in offers:
         offer_id = offer.id if hasattr(offer, "id") else offer.get("offer_id", 0)
-        price = (
-            offer.discount_price
-            if hasattr(offer, "discount_price")
-            else offer.get("discount_price", 0)
-        )
-        title = (
-            offer.title if hasattr(offer, "title") else offer.get("title", "")
-        )
-        # Truncate title to fit in button (max ~15 chars)
-        short_title = title[:12] + ".." if len(title) > 14 else title
-        # Format: "1. Молоко 25k ➜" - shows title and short price
-        price_k = f"{int(price // 1000)}k" if price >= 1000 else str(int(price))
+        title = offer.title if hasattr(offer, "title") else offer.get("title", "")
+        short_title = title[:24] + ".." if len(title) > 26 else title
         builder.button(
-            text=f"{idx}. {short_title} {price_k} {currency}",
+            text=f"{action} - {short_title}",
             callback_data=f"hot_offer_{offer_id}",
         )
 
-    # Adjust offer buttons: 1 per row for better readability with titles
+    # Adjust offer buttons: 1 per row for better readability
     builder.adjust(1)
 
     # Pagination row - only prev/next and refresh
@@ -107,7 +97,7 @@ def store_card_keyboard(
     elif back_callback == "back_to_store_list":
         back = "К списку магазинов" if lang == "ru" else "Do'konlar ro'yxati"
     else:
-        back = "Назад" if lang == "ru" else "?? Orqaga"
+        back = "Назад" if lang == "ru" else "Orqaga"
 
     # Показывать количество только если товары есть
     if offers_count > 0:
@@ -260,26 +250,18 @@ def store_offers_compact_keyboard(
     """Compact keyboard for store offers with item buttons and pagination (like hot offers)."""
     builder = InlineKeyboardBuilder()
 
-    # Add buttons for each offer (max 5)
-    for idx, offer in enumerate(offers[:5], start=1):
+    # Add one action button per offer
+    action = "🔎 Открыть" if lang == "ru" else "🔎 Ochish"
+    for offer in offers:
         offer_id = offer.id if hasattr(offer, "id") else offer.get("offer_id", 0)
         title = offer.title if hasattr(offer, "title") else offer.get("title", "Товар")
-        short_title = title[:12] + ".." if len(title) > 12 else title
+        short_title = title[:24] + ".." if len(title) > 26 else title
         builder.button(
-            text=f"{idx}. {short_title}", callback_data=f"store_offer_{store_id}_{offer_id}"
+            text=f"{action} - {short_title}", callback_data=f"store_offer_{store_id}_{offer_id}"
         )
 
-    # Adjust offer buttons: 2 per row for 5 items = 2+2+1
-    if len(offers) == 5:
-        builder.adjust(2, 2, 1)
-    elif len(offers) == 4:
-        builder.adjust(2, 2)
-    elif len(offers) == 3:
-        builder.adjust(2, 1)
-    elif len(offers) == 2:
-        builder.adjust(2)
-    else:
-        builder.adjust(1)
+    # One button per row for cleaner scan
+    builder.adjust(1)
 
     # Pagination row - only prev/next and back
     nav_builder = InlineKeyboardBuilder()
@@ -325,16 +307,18 @@ def store_list_keyboard(
     start_idx = page * per_page
     page_stores = stores[start_idx : start_idx + per_page]
 
-    # Store buttons - compact 2 columns
+    action = "🗂 Открыть каталог" if lang == "ru" else "🗂 Katalogni ochish"
+    # Store buttons - one per row
     for idx, store in enumerate(page_stores, start_idx + 1):
         store_id = store.id if hasattr(store, "id") else store.get("store_id", idx)
         store_name = store.name if hasattr(store, "name") else store.get("name", f"Store {idx}")
-        # Very short for 2-column layout
-        short_name = store_name[:12] + ".." if len(store_name) > 12 else store_name
-        builder.button(text=f"{idx}. {short_name}", callback_data=f"select_store_{store_id}")
+        short_name = store_name[:22] + ".." if len(store_name) > 24 else store_name
+        builder.button(
+            text=f"{action} - {short_name}", callback_data=f"select_store_{store_id}"
+        )
 
-    # Adjust to 2 columns for compact view
-    builder.adjust(2)
+    # One per row for clarity
+    builder.adjust(1)
 
     # Pagination row
     nav_row = []
@@ -358,12 +342,12 @@ def store_list_keyboard(
     back = "К категориям" if lang == "ru" else "Toifalarga"
     builder.button(text=back, callback_data="back_to_places")
 
-    # Final adjust: store buttons (2 cols), then nav row, then back
-    rows = [2] * len(page_stores)  # Each pair of stores
+    # Final adjust: store buttons (1 col), then nav row, then back
+    rows = [1] * len(page_stores)
     if nav_row:
         rows.append(sum(nav_row))
-    rows.append(1)  # Back button
-
+    rows.append(1)
+    builder.adjust(*rows)
     return builder.as_markup()
 
 
@@ -385,21 +369,12 @@ def search_results_compact_keyboard(
     builder = InlineKeyboardBuilder()
 
     # Simple item buttons - one per row
-    for offer in offers[:5]:
+    action = "🔎 Открыть" if lang == "ru" else "🔎 Ochish"
+    for offer in offers:
         offer_id = offer.id if hasattr(offer, "id") else offer.get("offer_id", 0)
         title = offer.title if hasattr(offer, "title") else offer.get("title", "Товар")
-        price = (
-            offer.discount_price
-            if hasattr(offer, "discount_price")
-            else offer.get("discount_price", 0)
-        )
-        if not price:
-            price = offer.price if hasattr(offer, "price") else offer.get("price", 0)
-
-        # Single button with title and price
-        short_title = title[:25] + ".." if len(title) > 25 else title
-        price_str = f"{int(price):,}".replace(",", " ")
-        btn_text = f"{short_title} • {price_str}"
+        short_title = title[:26] + ".." if len(title) > 26 else title
+        btn_text = f"{action} - {short_title}"
         builder.button(text=btn_text, callback_data=f"search_select_{offer_id}")
 
     # Pagination (only if needed)
@@ -419,7 +394,7 @@ def search_results_compact_keyboard(
         builder.button(text=text, callback_data=cb)
 
     # Adjust: each item is 1 button, navigation row at the end
-    items_count = min(len(offers), 5)
+    items_count = len(offers)
     if nav_buttons:
         builder.adjust(*([1] * items_count), len(nav_buttons))
     else:

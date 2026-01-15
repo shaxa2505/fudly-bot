@@ -74,13 +74,18 @@ def _render_offers_list_text(
     offers: list[OfferListItem],
     page: int,
     total_pages: int | None,
+    total_count: int | None = None,
 ) -> str:
     city_label = "Город" if lang == "ru" else "Shahar"
     page_label = "Стр." if lang == "ru" else "Sah."
     page_info = f"{page_label} {page + 1}"
     if total_pages:
         page_info += f"/{total_pages}"
-    lines = [title, f"{city_label}: {city} | {page_info}"]
+    total_label = "Всего" if lang == "ru" else "Jami"
+    meta = f"{city_label}: {city} | {page_info}"
+    if total_count is not None:
+        meta = f"{meta} | {total_label} {total_count}"
+    lines = [title, meta]
 
     for idx, offer in enumerate(offers, start=1):
         title_line = _short_title(offer.title, limit=28)
@@ -718,7 +723,7 @@ def register_hot(
         category_label: str | None = None,
     ) -> bool:
         """Send offers list with compact view. Returns False for empty filtered lists."""
-        ITEMS_PER_PAGE = 5
+        ITEMS_PER_PAGE = 10
         try:
             offset = page * ITEMS_PER_PAGE
             if show_entry_back is None:
@@ -728,6 +733,7 @@ def register_hot(
 
             items: list[OfferListItem] = []
             total_pages: int | None = None
+            total_count: int | None = None
             keyboard_pages = 1
             title = get_text(lang, "hot_offers_title")
 
@@ -762,6 +768,7 @@ def register_hot(
                 )
                 items = result.items
                 total_pages = max(1, (result.total + ITEMS_PER_PAGE - 1) // ITEMS_PER_PAGE)
+                total_count = result.total
                 keyboard_pages = total_pages
                 title = (
                     "<b>Все предложения</b>" if lang == "ru" else "<b>Barcha takliflar</b>"
@@ -785,6 +792,7 @@ def register_hot(
                 )
                 items = result.items
                 total_pages = max(1, (result.total + ITEMS_PER_PAGE - 1) // ITEMS_PER_PAGE)
+                total_count = result.total
                 keyboard_pages = total_pages
                 if not items and page == 0:
                     await target.answer(
@@ -804,7 +812,7 @@ def register_hot(
                 hot_filter_label=category_label,
             )
 
-            text = _render_offers_list_text(lang, title, city, items, page, total_pages)
+            text = _render_offers_list_text(lang, title, city, items, page, total_pages, total_count)
 
             keyboard = offer_keyboards.hot_offers_compact_keyboard(
                 lang,

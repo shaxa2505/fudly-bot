@@ -1,13 +1,25 @@
-import { useState, useEffect, useMemo, useCallback } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate, useParams, useLocation } from 'react-router-dom'
 import api from '../api/client'
 import { useCart } from '../context/CartContext'
 import OfferCard from '../components/OfferCard'
 import OfferCardSkeleton from '../components/OfferCardSkeleton'
-import FilterPanel, { FILTER_CATEGORY_OPTIONS, FILTER_BRAND_OPTIONS } from '../components/FilterPanel'
 import { blurOnEnter } from '../utils/helpers'
 import { getSavedLocation, transliterateCity } from '../utils/cityUtils'
 import './CategoryProductsPage.css'
+
+const PRICE_RANGE_LABELS = {
+  up_20: '0-20k',
+  '20_50': '20-50k',
+  '50_100': '50-100k',
+  '100_plus': '100k+',
+}
+
+const SORT_LABELS = {
+  discount: 'Chegirma yuqori',
+  price_asc: 'Arzonroq',
+  price_desc: 'Qimmatroq',
+}
 
 function CategoryProductsPage() {
   const navigate = useNavigate()
@@ -22,36 +34,29 @@ function CategoryProductsPage() {
   const [offers, setOffers] = useState([])
   const [loading, setLoading] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
-  const [showFilters, setShowFilters] = useState(false)
-  const [selectedFilters, setSelectedFilters] = useState({
-    categories: [],
-    brands: []
-  })
+  const [debouncedSearch, setDebouncedSearch] = useState('')
+  const [showAdvancedFilters, setShowAdvancedFilters] = useState(false)
+  const [minDiscount, setMinDiscount] = useState(null)
+  const [priceRange, setPriceRange] = useState('all')
+  const [sortBy, setSortBy] = useState('default')
+  const hasActiveFilters = Boolean(minDiscount || priceRange !== 'all' || sortBy !== 'default')
 
-  const categoryDictionary = useMemo(
-    () => Object.fromEntries(FILTER_CATEGORY_OPTIONS.map(option => [option.id, option])),
-    []
-  )
+  const loadOffers = async (options = {}) => {
+    const { searchOverride } = options
+    const searchValue = typeof searchOverride === 'string' ? searchOverride : debouncedSearch
+    const trimmedSearch = searchValue?.trim() || ''
 
-  const brandDictionary = useMemo(
-    () => Object.fromEntries(FILTER_BRAND_OPTIONS.map(option => [option.id, option])),
-    []
-  )
-
-  useEffect(() => {
-    loadOffers()
-  }, [categoryId])
-
-  const loadOffers = async () => {
     setLoading(true)
     try {
       const savedLocation = getSavedLocation()
       const cityRaw = savedLocation?.city ? savedLocation.city.split(',')[0].trim() : ''
       const cityForApi = transliterateCity(cityRaw)
-      const params = {
-        category: categoryId,
-        search: searchQuery || undefined,
-        limit: 50,
+      const params = { limit: 50 }
+      if (categoryId) {
+        params.category = categoryId
+      }
+      if (trimmedSearch) {
+        params.search = trimmedSearch
       }
       if (cityForApi) {
         params.city = cityForApi
@@ -66,9 +71,31 @@ function CategoryProductsPage() {
         params.lat = savedLocation.coordinates.lat
         params.lon = savedLocation.coordinates.lon
       }
+      if (minDiscount) {
+        params.min_discount = minDiscount
+      }
+      if (priceRange !== 'all') {
+        if (priceRange === 'up_20') {
+          params.max_price = 20000
+        } else if (priceRange === '20_50') {
+          params.min_price = 20000
+          params.max_price = 50000
+        } else if (priceRange === '50_100') {
+          params.min_price = 50000
+          params.max_price = 100000
+        } else if (priceRange === '100_plus') {
+          params.min_price = 100000
+        }
+      }
+      if (sortBy !== 'default') {
+        params.sort_by = sortBy
+      }
 
       const data = await api.getOffers(params)
-      setOffers(data)
+      const items = Array.isArray(data?.items)
+        ? data.items
+        : (Array.isArray(data?.offers) ? data.offers : (Array.isArray(data) ? data : []))
+      setOffers(items)
     } catch (error) {
       console.error('Error loading offers:', error)
       alert('Xatolik yuz berdi')
@@ -77,90 +104,65 @@ function CategoryProductsPage() {
     }
   }
 
-  const handleSearch = () => {
+  useEffect(() => {
+    const trimmed = searchQuery.trim()
+    const timer = setTimeout(() => {
+      setDebouncedSearch(trimmed)
+    }, trimmed ? 400 : 0)
+
+    return () => clearTimeout(timer)
+  }, [searchQuery])
+
+  useEffect(() => {
     loadOffers()
+  }, [categoryId, debouncedSearch, minDiscount, priceRange, sortBy])
+
+  const handleSearch = () => {
+    setDebouncedSearch(searchQuery.trim())
   }
 
   const handleClearSearch = () => {
     setSearchQuery('')
-    setTimeout(() => loadOffers(), 0)
+    setDebouncedSearch('')
   }
 
   const handleSearchKeyDown = (event) => blurOnEnter(event, handleSearch)
 
-  const handleApplyFilters = (filters) => {
-    setSelectedFilters(filters)
-    setShowFilters(false)
-  }
-
-  const removeFilterValue = (type, value) => {
-    setSelectedFilters(prev => ({
-      ...prev,
-      [type]: prev[type].filter(item => item !== value)
-    }))
-  }
-
   const clearAllFilters = () => {
-    setSelectedFilters({ categories: [], brands: [] })
+    setMinDiscount(null)
+    setPriceRange('all')
+    setSortBy('default')
   }
 
-  const filterOffers = useCallback(
-    (items) => {
-      const { categories, brands } = selectedFilters
-      if (categories.length === 0 && brands.length === 0) {
-        return items
-      }
+  const renderFilterChips = () => {
+    if (!hasActiveFilters) return null
 
-      const categoryKeywords = categories.flatMap(id => categoryDictionary[id]?.keywords || [])
-      const brandKeywords = brands.flatMap(id => brandDictionary[id]?.keywords || [])
-
-      if (categoryKeywords.length === 0 && brandKeywords.length === 0) {
-        return items
-      }
-
-      return items.filter(offer => {
-        const haystack = `${offer.title || ''} ${offer.description || ''} ${offer.store_name || ''}`.toLowerCase()
-        const matchesCategories =
-          categoryKeywords.length === 0 || categoryKeywords.some(keyword => haystack.includes(keyword))
-        const matchesBrands =
-          brandKeywords.length === 0 || brandKeywords.some(keyword => haystack.includes(keyword))
-        return matchesCategories && matchesBrands
-      })
-    },
-    [selectedFilters, categoryDictionary, brandDictionary]
-  )
-
-  const filteredOffers = useMemo(() => filterOffers(offers), [offers, filterOffers])
-
-  const hasActiveFilters = selectedFilters.categories.length > 0 || selectedFilters.brands.length > 0
-
-  const renderFilterChips = () => (
-    <div className="active-filters-bar">
-      {selectedFilters.categories.map(id => (
-        <button
-          key={`cat-${id}`}
-          className="filter-chip"
-          onClick={() => removeFilterValue('categories', id)}
-        >
-          <span>{categoryDictionary[id]?.name || id}</span>
-          <span aria-hidden className="chip-close">x</span>
+    return (
+      <div className="active-filters-bar">
+        {minDiscount && (
+          <button className="filter-chip" onClick={() => setMinDiscount(null)}>
+            <span>{minDiscount}%+</span>
+            <span aria-hidden className="chip-close">x</span>
+          </button>
+        )}
+        {priceRange !== 'all' && (
+          <button className="filter-chip" onClick={() => setPriceRange('all')}>
+            <span>{PRICE_RANGE_LABELS[priceRange] || priceRange}</span>
+            <span aria-hidden className="chip-close">x</span>
+          </button>
+        )}
+        {sortBy !== 'default' && (
+          <button className="filter-chip" onClick={() => setSortBy('default')}>
+            <span>{SORT_LABELS[sortBy] || sortBy}</span>
+            <span aria-hidden className="chip-close">x</span>
+          </button>
+        )}
+        <button className="clear-filters-btn" onClick={clearAllFilters}>
+          Tozalash
         </button>
-      ))}
-      {selectedFilters.brands.map(id => (
-        <button
-          key={`brand-${id}`}
-          className="filter-chip"
-          onClick={() => removeFilterValue('brands', id)}
-        >
-          <span>{brandDictionary[id]?.name || id}</span>
-          <span aria-hidden className="chip-close">x</span>
-        </button>
-      ))}
-      <button className="clear-filters-btn" onClick={clearAllFilters}>
-        Tozalash
-      </button>
-    </div>
-  )
+      </div>
+    )
+  }
 
   return (
     <div className="category-products-page">
@@ -168,7 +170,10 @@ function CategoryProductsPage() {
       <header className="category-header">
         <div className="topbar-card category-header-inner">
           <h1 className="category-title">{categoryName || 'Mahsulotlar'}</h1>
-          <button className="filter-btn" onClick={() => setShowFilters(true)}>
+          <button
+            className="filter-btn"
+            onClick={() => setShowAdvancedFilters(prev => !prev)}
+          >
             <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
               <line x1="4" y1="6" x2="20" y2="6" stroke="#181725" strokeWidth="2" strokeLinecap="round"/>
               <line x1="4" y1="12" x2="20" y2="12" stroke="#181725" strokeWidth="2" strokeLinecap="round"/>
@@ -207,7 +212,7 @@ function CategoryProductsPage() {
               </button>
             )}
           </div>
-          <button className="filter-icon-btn" onClick={() => setShowFilters(true)}>
+          <button className="filter-icon-btn" onClick={() => setShowAdvancedFilters(prev => !prev)}>
             <span className="filter-icon" aria-hidden="true">
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
                 <line x1="4" y1="6" x2="20" y2="6" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
@@ -224,7 +229,96 @@ function CategoryProductsPage() {
         </div>
       </div>
 
-      {hasActiveFilters && renderFilterChips()}
+      {showAdvancedFilters && (
+        <div className="filters-section">
+          <div className="filters-advanced">
+            <div className="filter-group">
+              <span className="filter-group-label">Chegirma</span>
+              <div className="filter-group-row">
+                <button
+                  className={`filter-pill discount ${minDiscount === 20 ? 'active' : ''}`}
+                  onClick={() => setMinDiscount(minDiscount === 20 ? null : 20)}
+                >
+                  <span className="filter-pill-icon">%</span>
+                  <span className="filter-pill-text">20%+</span>
+                </button>
+                <button
+                  className={`filter-pill discount ${minDiscount === 30 ? 'active' : ''}`}
+                  onClick={() => setMinDiscount(minDiscount === 30 ? null : 30)}
+                >
+                  <span className="filter-pill-icon">%</span>
+                  <span className="filter-pill-text">30%+</span>
+                </button>
+                <button
+                  className={`filter-pill discount ${minDiscount === 50 ? 'active' : ''}`}
+                  onClick={() => setMinDiscount(minDiscount === 50 ? null : 50)}
+                >
+                  <span className="filter-pill-icon">%</span>
+                  <span className="filter-pill-text">50%+</span>
+                </button>
+              </div>
+            </div>
+
+            <div className="filter-group">
+              <span className="filter-group-label">Narx</span>
+              <div className="filter-group-row">
+                <button
+                  className={`filter-pill ${priceRange === 'up_20' ? 'active' : ''}`}
+                  onClick={() => setPriceRange(priceRange === 'up_20' ? 'all' : 'up_20')}
+                >
+                  <span className="filter-pill-icon">sum</span>
+                  <span className="filter-pill-text">0-20k</span>
+                </button>
+                <button
+                  className={`filter-pill ${priceRange === '20_50' ? 'active' : ''}`}
+                  onClick={() => setPriceRange(priceRange === '20_50' ? 'all' : '20_50')}
+                >
+                  <span className="filter-pill-icon">sum</span>
+                  <span className="filter-pill-text">20-50k</span>
+                </button>
+                <button
+                  className={`filter-pill ${priceRange === '50_100' ? 'active' : ''}`}
+                  onClick={() => setPriceRange(priceRange === '50_100' ? 'all' : '50_100')}
+                >
+                  <span className="filter-pill-icon">sum</span>
+                  <span className="filter-pill-text">50-100k</span>
+                </button>
+                <button
+                  className={`filter-pill ${priceRange === '100_plus' ? 'active' : ''}`}
+                  onClick={() => setPriceRange(priceRange === '100_plus' ? 'all' : '100_plus')}
+                >
+                  <span className="filter-pill-icon">sum</span>
+                  <span className="filter-pill-text">100k+</span>
+                </button>
+              </div>
+            </div>
+
+            <div className="filter-group">
+              <span className="filter-group-label">Tartib</span>
+              <select
+                className="sort-select"
+                value={sortBy}
+                onChange={(e) => setSortBy(e.target.value)}
+              >
+                <option value="default">Standart</option>
+                <option value="discount">Chegirma yuqori</option>
+                <option value="price_asc">Arzonroq</option>
+                <option value="price_desc">Qimmatroq</option>
+              </select>
+            </div>
+
+            {hasActiveFilters && (
+              <div className="category-filters-reset">
+                <button className="clear-filters-btn" onClick={clearAllFilters}>
+                  Filtrlarni tozalash
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {renderFilterChips()}
 
       {/* Products Grid */}
       <div className="products-grid">
@@ -232,7 +326,7 @@ function CategoryProductsPage() {
           Array.from({ length: 6 }).map((_, i) => (
             <OfferCardSkeleton key={i} />
           ))
-        ) : filteredOffers.length === 0 ? (
+        ) : offers.length === 0 ? (
           <div className="category-empty">
             <div className="empty-state">
               <div className="empty-state-icon" aria-hidden="true">
@@ -255,7 +349,7 @@ function CategoryProductsPage() {
             </div>
           </div>
         ) : (
-          filteredOffers.map(offer => (
+          offers.map(offer => (
             <OfferCard
               key={offer.id}
               offer={offer}
@@ -266,15 +360,6 @@ function CategoryProductsPage() {
           ))
         )}
       </div>
-
-      {/* Filter Panel */}
-      {showFilters && (
-        <FilterPanel
-          onClose={() => setShowFilters(false)}
-          onApply={handleApplyFilters}
-          selectedFilters={selectedFilters}
-        />
-      )}
     </div>
   )
 }

@@ -241,8 +241,9 @@ class TestRenderBusinessTypeStoreList:
         assert "Супермаркеты" in result
         assert "Город: Ташкент" in result
         assert "Тестовый магазин" in result
-        assert "Рейтинг: 4.5/5" in result
-        assert "Предложений: 15" in result
+        assert "Стр. 1/1" in result
+        assert "Всего 1" in result
+        assert "ул. Навои 10" in result
 
     def test_render_restaurant_list_uz(self, sample_store_summary: StoreSummary) -> None:
         """Test rendering restaurant list in Uzbek."""
@@ -256,8 +257,9 @@ class TestRenderBusinessTypeStoreList:
 
         assert "Restoranlar" in result
         assert "Shahar: Toshkent" in result
-        assert "Reyting: 4.5/5" in result
-        assert "Takliflar: 15" in result
+        assert "Sah. 1/1" in result
+        assert "Jami 1" in result
+        assert "ул. Навои 10" in result
 
     def test_render_with_prompt_ru(self, sample_store_summary: StoreSummary) -> None:
         """Test that prompt is shown in Russian."""
@@ -268,8 +270,7 @@ class TestRenderBusinessTypeStoreList:
             stores=[sample_store_summary],
         )
 
-        assert "Выберите магазин ниже." in result
-
+        assert "- <b>Тестовый магазин</b>" in result
 
 # =============================================================================
 # Tests for render_store_card

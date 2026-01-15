@@ -6,6 +6,7 @@ from typing import Any
 from aiogram import Dispatcher, F, types
 from aiogram.fsm.context import FSMContext
 
+from app.core.constants import STORES_PER_PAGE
 from app.core.utils import normalize_city
 from app.keyboards import business_type_keyboard, offers_category_filter
 from app.keyboards import offers as offer_keyboards
@@ -122,7 +123,7 @@ def register_stores(
             current_business_type=business_type,
             store_list_page=0,
         )
-        text = offer_templates.render_business_type_store_list(lang, business_type, city, stores)
+        text = offer_templates.render_business_type_store_list(lang, business_type, city, stores, page=0, per_page=STORES_PER_PAGE)
         # Compact keyboard with pagination
         keyboard = offer_keyboards.store_list_keyboard(lang, stores, page=0)
         if not await safe_edit_message(msg, text, reply_markup=keyboard):
@@ -798,7 +799,7 @@ def register_stores(
             )
             return
 
-        items_per_page = 5
+        items_per_page = 10
         page = max(0, offset // items_per_page)
         await _send_store_offers_list(
             msg,
@@ -931,7 +932,7 @@ def register_stores(
             await callback.answer()
             return
 
-        text = offer_templates.render_business_type_store_list(lang, business_type, city, stores)
+        text = offer_templates.render_business_type_store_list(lang, business_type, city, stores, page=page, per_page=STORES_PER_PAGE)
         keyboard = offer_keyboards.store_list_keyboard(lang, stores, page=page)
 
         if getattr(msg, "photo", None):
@@ -1005,7 +1006,7 @@ def register_stores(
             return
 
         # Render with new page
-        text = offer_templates.render_business_type_store_list(lang, business_type, city, stores)
+        text = offer_templates.render_business_type_store_list(lang, business_type, city, stores, page=page, per_page=STORES_PER_PAGE)
         keyboard = offer_keyboards.store_list_keyboard(lang, stores, page=page)
         await state.update_data(store_list_page=page)
 
@@ -1035,7 +1036,7 @@ def register_stores(
         category: str = "all",
     ) -> None:
         """Send store offers with compact list and inline buttons (like hot offers)."""
-        ITEMS_PER_PAGE = 5
+        ITEMS_PER_PAGE = 10
         try:
             store_id = store.id
             total_offers = len(offers)
@@ -1064,9 +1065,10 @@ def register_stores(
             page_label = "Стр." if lang == "ru" else "Sah."
             category_title = _category_label(lang, category)
 
+            total_label = "Всего" if lang == "ru" else "Jami"
             lines = [
                 f"🏪 <b>{store.name}</b>",
-                f"{category_title} | {page_label} {page + 1}/{total_pages}",
+                f"{category_title} | {page_label} {page + 1}/{total_pages} | {total_label} {total_offers}",
             ]
 
             for idx, offer in enumerate(page_offers, start=1):
