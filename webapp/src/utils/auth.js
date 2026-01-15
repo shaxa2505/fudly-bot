@@ -134,7 +134,28 @@ export const getUserLanguage = () => {
  * Logout user (clear localStorage)
  */
 export const logout = () => {
+  const user = getCurrentUser()
+  const userId = user?.user_id || user?.id
   localStorage.removeItem('fudly_user')
+  localStorage.removeItem('fudly_init_data')
+  localStorage.removeItem('fudly_last_user_id')
+  if (userId) {
+    localStorage.removeItem(`fudly_init_data_${userId}`)
+  }
+
+  try {
+    const storage = window.sessionStorage
+    storage.removeItem('fudly_init_data')
+    storage.removeItem('fudly_init_data_ts')
+    storage.removeItem('fudly_last_user_id')
+    if (userId) {
+      storage.removeItem(`fudly_init_data_${userId}`)
+      storage.removeItem(`fudly_init_data_ts_${userId}`)
+    }
+  } catch {
+    // ignore storage errors
+  }
+
   window.Telegram?.WebApp?.close()
 }
 

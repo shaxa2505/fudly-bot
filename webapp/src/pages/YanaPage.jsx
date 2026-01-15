@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
-import api, { API_BASE_URL } from '../api/client'
+import api, { API_BASE_URL, getTelegramInitData } from '../api/client'
 import { useCart } from '../context/CartContext'
 import { useToast } from '../context/ToastContext'
 import BottomNav from '../components/BottomNav'
@@ -70,14 +70,7 @@ function YanaPage({ user }) {
     if (userId) {
       params.set('user_id', userId)
     }
-    const tgWebApp = window.Telegram?.WebApp
-    let initData = tgWebApp?.initData
-    if (!initData && userId) {
-      initData = localStorage.getItem(`fudly_init_data_${userId}`)
-    }
-    if (!initData && !tgWebApp) {
-      initData = localStorage.getItem('fudly_init_data')
-    }
+    const initData = getTelegramInitData()
     if (initData) {
       params.set('init_data', initData)
     }

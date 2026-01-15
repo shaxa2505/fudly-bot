@@ -232,7 +232,8 @@ test.beforeEach(async ({ page }) => {
 
   await page.addInitScript((savedLocation) => {
     localStorage.setItem('fudly_location', JSON.stringify(savedLocation))
-    localStorage.setItem('fudly_init_data', 'test_init_data')
+    sessionStorage.setItem('fudly_init_data', 'test_init_data')
+    sessionStorage.setItem('fudly_init_data_ts', String(Date.now()))
 
     const noop = () => {}
     const backCallbacks = new Set()

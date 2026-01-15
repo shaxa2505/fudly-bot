@@ -2,7 +2,7 @@ import { useState, useEffect, lazy, Suspense } from 'react'
 import { BrowserRouter, Routes, Route, useNavigate, useLocation } from 'react-router-dom'
 import { FavoritesProvider } from './context/FavoritesContext'
 import { ToastProvider } from './context/ToastContext'
-import api from './api/client'
+import api, { saveTelegramInitData } from './api/client'
 import HomePage from './pages/HomePage'
 import PageLoader, { LoadingScreen } from './components/PageLoader'
 import './App.css'
@@ -136,11 +136,9 @@ function AppContent() {
       // Get user from Telegram
       const tgUser = tg.initDataUnsafe?.user
       if (tg.initData) {
-        localStorage.setItem('fudly_init_data', tg.initData)
+        saveTelegramInitData(tg.initData)
         if (tgUser?.id) {
-          const userKey = `fudly_init_data_${tgUser.id}`
-          localStorage.setItem(userKey, tg.initData)
-          localStorage.setItem('fudly_last_user_id', String(tgUser.id))
+          saveTelegramInitData(tg.initData, tgUser.id)
         }
       }
       if (tgUser) {

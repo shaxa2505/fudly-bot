@@ -19,27 +19,83 @@ const RETRY_CONFIG = {
   },
 }
 
-// Helper function to delay
-const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms))
+const INITDATA_KEY = 'fudly_init_data'
+const INITDATA_TS_KEY = 'fudly_init_data_ts'
+const INITDATA_TTL_MS = 24 * 60 * 60 * 1000
 
-const getTelegramInitData = () => {
+const getSessionStorage = () => {
+  try {
+    return window.sessionStorage
+  } catch {
+    return null
+  }
+}
+
+const readStoredInitData = (userId = null) => {
+  const storage = getSessionStorage()
+  if (!storage) return null
+  const suffix = userId ? `_${userId}` : ''
+  const initData = storage.getItem(`${INITDATA_KEY}${suffix}`)
+  if (!initData) return null
+  const tsRaw = storage.getItem(`${INITDATA_TS_KEY}${suffix}`)
+  const ts = tsRaw ? Number(tsRaw) : 0
+  if (!ts || Date.now() - ts > INITDATA_TTL_MS) {
+    storage.removeItem(`${INITDATA_KEY}${suffix}`)
+    storage.removeItem(`${INITDATA_TS_KEY}${suffix}`)
+    return null
+  }
+  return initData
+}
+
+export const saveTelegramInitData = (initData, userId = null) => {
+  const storage = getSessionStorage()
+  if (!storage || !initData) return
+  const suffix = userId ? `_${userId}` : ''
+  storage.setItem(`${INITDATA_KEY}${suffix}`, initData)
+  storage.setItem(`${INITDATA_TS_KEY}${suffix}`, String(Date.now()))
+  if (userId) {
+    storage.setItem('fudly_last_user_id', String(userId))
+  }
+}
+
+export const clearTelegramInitData = (userId = null) => {
+  const storage = getSessionStorage()
+  if (!storage) return
+  const suffix = userId ? `_${userId}` : ''
+  storage.removeItem(`${INITDATA_KEY}${suffix}`)
+  storage.removeItem(`${INITDATA_TS_KEY}${suffix}`)
+  if (!userId) {
+    storage.removeItem('fudly_last_user_id')
+  }
+}
+
+export const getTelegramInitData = () => {
   const tgWebApp = window.Telegram?.WebApp
   const tgInitData = tgWebApp?.initData
   if (tgInitData) {
     return tgInitData
   }
 
-  const tgUserId = tgWebApp?.initDataUnsafe?.user?.id
-  if (tgUserId) {
-    return localStorage.getItem(`fudly_init_data_${tgUserId}`)
-  }
-
-  if (tgWebApp) {
+  if (!tgWebApp) {
     return null
   }
 
-  return localStorage.getItem('fudly_init_data')
+  const tgUserId = tgWebApp?.initDataUnsafe?.user?.id
+  if (tgUserId) {
+    return readStoredInitData(tgUserId)
+  }
+
+  const storage = getSessionStorage()
+  const lastUserId = storage?.getItem('fudly_last_user_id')
+  if (lastUserId) {
+    return readStoredInitData(lastUserId)
+  }
+
+  return readStoredInitData()
 }
+
+// Helper function to delay
+const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms))
 
 // Create axios instance
 const client = axios.create({
