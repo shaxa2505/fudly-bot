@@ -83,7 +83,7 @@ def build_cart_add_card_keyboard(
 ) -> InlineKeyboardBuilder:
     kb = InlineKeyboardBuilder()
 
-    minus_btn = "-"
+    minus_btn = "−"
     plus_btn = "+"
 
     kb.button(
@@ -106,7 +106,7 @@ def build_cart_add_card_keyboard(
         callback_data=f"cart_add_cancel_{offer_id}",
     )
 
-    kb.adjust(3, 1, 1)
+    kb.adjust(3, 2)
 
     return kb
 

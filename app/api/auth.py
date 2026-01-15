@@ -6,6 +6,8 @@ import hashlib
 import hmac
 import json
 import logging
+import os
+import time
 from typing import Any
 from urllib.parse import parse_qsl
 
@@ -125,12 +127,36 @@ def validate_telegram_webapp_data(init_data: str, bot_token: str) -> dict[str, A
         return None
 
 
+def _validate_auth_date(parsed_data: dict[str, Any]) -> None:
+    auth_date = parsed_data.get("auth_date")
+    if not auth_date:
+        raise HTTPException(status_code=401, detail="Invalid authentication data")
+    try:
+        auth_timestamp = int(auth_date)
+    except (TypeError, ValueError):
+        raise HTTPException(status_code=401, detail="Invalid authentication data")
+    current_timestamp = int(time.time())
+    if auth_timestamp > current_timestamp:
+        raise HTTPException(status_code=401, detail="Invalid authentication data")
+
+    max_auth_age_raw = os.getenv("WEBAPP_AUTH_MAX_AGE_SECONDS", "86400")
+    try:
+        max_auth_age = int(max_auth_age_raw)
+    except ValueError:
+        max_auth_age = 86400
+    if max_auth_age < 0:
+        max_auth_age = 0
+    if max_auth_age and (current_timestamp - auth_timestamp) > max_auth_age:
+        raise HTTPException(status_code=401, detail="Authentication expired")
+
+
 def _require_valid_init_data(init_data: str | None) -> dict[str, Any]:
     if not init_data:
         raise HTTPException(status_code=401, detail="Authentication required")
     validated_data = validate_telegram_webapp_data(init_data, settings.telegram_bot_token)
     if not validated_data or "user" not in validated_data:
         raise HTTPException(status_code=401, detail="Invalid authentication data")
+    _validate_auth_date(validated_data)
     return validated_data
 
 
@@ -187,6 +213,7 @@ async def validate_auth(request: AuthRequest, db=Depends(get_db)) -> UserProfile
 
     if not validated_data or "user" not in validated_data:
         raise HTTPException(status_code=401, detail="Invalid authentication data")
+    _validate_auth_date(validated_data)
 
     telegram_user = validated_data["user"]
     user_id = telegram_user["id"]
