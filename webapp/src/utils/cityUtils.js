@@ -164,7 +164,7 @@ export const getSavedLocation = () => {
     const geoSaved = localStorage.getItem('fudly_user_location')
     if (geoSaved) {
       const geo = JSON.parse(geoSaved)
-      const isFresh = geo.timestamp && Date.now() - geo.timestamp < 3600000
+      const isFresh = geo.timestamp && Date.now() - geo.timestamp < 86400000 // 24h freshness for coordinates
       if (
         isFresh &&
         (!location.coordinates ||

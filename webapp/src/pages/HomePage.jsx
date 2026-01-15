@@ -60,6 +60,7 @@ function HomePage() {
   const [showAddressModal, setShowAddressModal] = useState(false)
   const [manualCity, setManualCity] = useState(location.city)
   const [manualAddress, setManualAddress] = useState(location.address)
+  const [geoStatus, setGeoStatus] = useState(() => localStorage.getItem(GEO_STATUS_KEY) || '')
 
   // Quick filters state
   const [minDiscount, setMinDiscount] = useState(null) // null, 20, 30, 50
@@ -117,6 +118,7 @@ function HomePage() {
     localStorage.setItem(GEO_ATTEMPT_KEY, String(Date.now()))
     if (status) {
       localStorage.setItem(GEO_STATUS_KEY, status)
+      setGeoStatus(status)
     }
   }
   const shouldSkipGeo = () => {
@@ -1008,6 +1010,18 @@ function HomePage() {
         <div className="location-warning">
           Manzil aniqlanmagan. Siz hozir barcha shaharlar bo‘yicha mahsulotlarni ko‘ryapsiz.
           Manzilni kiriting yoki geolokatsiyani yoqing, shunda yaqin atrofdagi takliflar ko‘rsatiladi.
+        </div>
+      )}
+
+      {geoStatus === 'denied' && isLocationUnset && (
+        <div className="location-warning">
+          Geolokatsiyaga ruxsat berilmadi. Manzilni qo‘lda kiriting yoki brauzer sozlamalaridan ruxsat bering.
+          <button
+            className="location-warning-btn"
+            onClick={() => setShowAddressModal(true)}
+          >
+            Manzilni o‘zgartirish
+          </button>
         </div>
       )}
 
