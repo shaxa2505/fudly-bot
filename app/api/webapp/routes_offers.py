@@ -522,6 +522,10 @@ async def get_flash_deals(
             else []
         )
 
+        # Fallback: if filters by region/district return nothing, retry by city only
+        if not raw_offers and normalized_city and (region or district) and hasattr(db, "get_hot_offers"):
+            raw_offers = db.get_hot_offers(normalized_city, limit=100, offset=0)
+
         if not raw_offers:
             raw_offers = []
 

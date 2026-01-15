@@ -713,6 +713,17 @@
   background: var(--color-primary);
 }
 
+.location-warning {
+  margin: var(--spacing-sm) var(--page-padding-x) 0;
+  padding: 12px;
+  border-radius: 12px;
+  border: 1px solid #ffe7ba;
+  background: #fff7e6;
+  color: #b36b00;
+  font-size: 13px;
+  line-height: 1.4;
+}
+
 .filters-advanced {
   margin-top: 0;
   padding: 12px;

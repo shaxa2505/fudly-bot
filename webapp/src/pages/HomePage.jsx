@@ -6,7 +6,6 @@ import { transliterateCity, getSavedLocation, saveLocation, DEFAULT_LOCATION, no
 import OfferCard from '../components/OfferCard'
 import OfferCardSkeleton from '../components/OfferCardSkeleton'
 import HeroBanner from '../components/HeroBanner'
-import FlashDeals from '../components/FlashDeals'
 import RecentlyViewed from '../components/RecentlyViewed'
 import BottomNav from '../components/BottomNav'
 import PullToRefresh from '../components/PullToRefresh'
@@ -217,6 +216,7 @@ function HomePage() {
     : ''
   const cityForApi = cityRaw ? transliterateCity(cityRaw) : ''
   const cityLabel = cityRaw || 'Shahar tanlang'
+  const isLocationUnset = !cityRaw && !location.coordinates
 
   useEffect(() => {
     saveLocation(location)
@@ -966,8 +966,11 @@ function HomePage() {
         </div>
       </div>
 
-      {selectedCategory === 'all' && !trimmedSearch && (
-        <FlashDeals city={cityForApi} region={location.region} district={location.district} />
+      {isLocationUnset && (
+        <div className="location-warning">
+          Manzil aniqlanmagan. Siz hozir barcha shaharlar bo‘yicha mahsulotlarni ko‘ryapsiz.
+          Manzilni kiriting yoki geolokatsiyani yoqing, shunda yaqin atrofdagi takliflar ko‘rsatiladi.
+        </div>
       )}
 
       {selectedCategory === 'all' && !trimmedSearch && (
