@@ -8,7 +8,7 @@
   "variable": [
     {
       "key": "base_url",
-      "value": "https://your-merchant-host.example.com"
+      "value": "https://fudly-bot-production.up.railway.app"
     },
     {
       "key": "basic_user",
@@ -46,11 +46,13 @@
           }
         ],
         "url": {
-          "raw": "{{base_url}}/check",
+          "raw": "{{base_url}}/api/merchant/check",
           "host": [
             "{{base_url}}"
           ],
           "path": [
+            "api",
+            "merchant",
             "check"
           ]
         },
@@ -72,11 +74,13 @@
           }
         ],
         "url": {
-          "raw": "{{base_url}}/create",
+          "raw": "{{base_url}}/api/merchant/create",
           "host": [
             "{{base_url}}"
           ],
           "path": [
+            "api",
+            "merchant",
             "create"
           ]
         },
@@ -98,11 +102,13 @@
           }
         ],
         "url": {
-          "raw": "{{base_url}}/confirm",
+          "raw": "{{base_url}}/api/merchant/confirm",
           "host": [
             "{{base_url}}"
           ],
           "path": [
+            "api",
+            "merchant",
             "confirm"
           ]
         },
@@ -124,11 +130,13 @@
           }
         ],
         "url": {
-          "raw": "{{base_url}}/reverse",
+          "raw": "{{base_url}}/api/merchant/reverse",
           "host": [
             "{{base_url}}"
           ],
           "path": [
+            "api",
+            "merchant",
             "reverse"
           ]
         },
@@ -150,11 +158,13 @@
           }
         ],
         "url": {
-          "raw": "{{base_url}}/status",
+          "raw": "{{base_url}}/api/merchant/status",
           "host": [
             "{{base_url}}"
           ],
           "path": [
+            "api",
+            "merchant",
             "status"
           ]
         },

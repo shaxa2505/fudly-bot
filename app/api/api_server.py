@@ -30,6 +30,7 @@ from app.api.partner_panel_simple import router as partner_panel_router
 from app.api.partner_panel_simple import set_partner_db
 from app.api.webapp_api import router as webapp_router
 from app.api.webapp_api import set_db_instance
+from app.api.merchant_webhooks import router as merchant_webhooks_router
 
 logger = logging.getLogger(__name__)
 
@@ -198,6 +199,7 @@ def create_api_app(db: Any = None, offer_service: Any = None, bot_token: str = N
     app.include_router(webapp_router)
     app.include_router(orders_router)
     app.include_router(partner_panel_router, prefix="/api/partner")
+    app.include_router(merchant_webhooks_router)
 
     @app.get("/")
     async def root():
