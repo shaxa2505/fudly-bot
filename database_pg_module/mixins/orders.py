@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import random
 import string
+import json
 from typing import Any
 
 from psycopg.rows import dict_row
@@ -357,6 +358,54 @@ class OrderMixin:
                 """,
                     (status, order_id),
                 )
+
+    # ===================== Uzum transactions =====================
+
+    def create_uzum_transaction(
+        self, trans_id: str, order_id: int, service_id: int, amount: int, status: str, payload: dict
+    ) -> None:
+        """Persist Uzum transaction."""
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                """
+                INSERT INTO uzum_transactions (trans_id, order_id, service_id, amount, status, payload)
+                VALUES (%s, %s, %s, %s, %s, %s)
+                ON CONFLICT (trans_id) DO NOTHING
+                """,
+                (trans_id, order_id, service_id, amount, status, json.dumps(payload)),
+            )
+
+    def update_uzum_transaction_status(self, trans_id: str, status: str, payload: dict = None) -> None:
+        """Update status (and payload) for Uzum transaction."""
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            if payload is not None:
+                cursor.execute(
+                    """
+                    UPDATE uzum_transactions
+                    SET status = %s, payload = %s, updated_at = CURRENT_TIMESTAMP
+                    WHERE trans_id = %s
+                    """,
+                    (status, json.dumps(payload), trans_id),
+                )
+            else:
+                cursor.execute(
+                    """
+                    UPDATE uzum_transactions
+                    SET status = %s, updated_at = CURRENT_TIMESTAMP
+                    WHERE trans_id = %s
+                    """,
+                    (status, trans_id),
+                )
+
+    def get_uzum_transaction(self, trans_id: str) -> dict | None:
+        """Fetch Uzum transaction by trans_id."""
+        with self.get_connection() as conn:
+            cursor = conn.cursor(row_factory=dict_row)
+            cursor.execute("SELECT * FROM uzum_transactions WHERE trans_id = %s", (trans_id,))
+            row = cursor.fetchone()
+            return dict(row) if row else None
 
     def update_order_status(self, order_id: int, order_status: str) -> bool:
         """Update order status.

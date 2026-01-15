@@ -30,7 +30,7 @@ from app.api.partner_panel_simple import router as partner_panel_router
 from app.api.partner_panel_simple import set_partner_db
 from app.api.webapp_api import router as webapp_router
 from app.api.webapp_api import set_db_instance
-from app.api.merchant_webhooks import router as merchant_webhooks_router
+from app.api.merchant_webhooks import router as merchant_webhooks_router, set_merchant_db
 
 logger = logging.getLogger(__name__)
 
@@ -62,6 +62,7 @@ def create_api_app(db: Any = None, offer_service: Any = None, bot_token: str = N
         set_auth_db(_app_db)
         set_orders_db(_app_db, bot_token)
         set_partner_db(_app_db, bot_token)
+        set_merchant_db(_app_db)
         logger.info("✅ Database connected to API (immediate init)")
 
     @asynccontextmanager
@@ -73,6 +74,7 @@ def create_api_app(db: Any = None, offer_service: Any = None, bot_token: str = N
             set_auth_db(_app_db)
             set_orders_db(_app_db, bot_token)
             set_partner_db(_app_db, bot_token)
+            set_merchant_db(_app_db)
             logger.info("✅ Database connected to API (lifespan)")
         yield
         # Shutdown

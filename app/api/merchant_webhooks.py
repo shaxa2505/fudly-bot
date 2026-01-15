@@ -17,6 +17,7 @@ from fastapi.security import HTTPBasic, HTTPBasicCredentials
 
 router = APIRouter(prefix="/api/merchant", tags=["merchant"])
 security = HTTPBasic()
+_db: Any = None
 
 
 def _now_ms() -> int:
@@ -50,12 +51,53 @@ def _get(data: dict, key: str, default: Any = None) -> Any:
     return data.get(key, default) if isinstance(data, dict) else default
 
 
+def _require_db():
+    if _db is None:
+        raise HTTPException(status_code=500, detail="Database not configured")
+    return _db
+
+
+def set_merchant_db(db: Any) -> None:
+    """Called from api_server to inject DB."""
+    global _db
+    _db = db
+
+
+def _extract_order_id(params: dict) -> int | None:
+    """Expect params.account (string/int) to carry order_id."""
+    if not isinstance(params, dict):
+        return None
+    account = params.get("account") or params.get("order_id")
+    if account is None:
+        return None
+    try:
+        return int(account)
+    except (TypeError, ValueError):
+        return None
+
+
+def _fetch_transaction(db, trans_id: str):
+    try:
+        return db.get_uzum_transaction(trans_id)
+    except Exception:
+        return None
+
+
 @router.post("/check")
-async def check(payload: dict, _: str = Depends(_require_auth)) -> dict:
+async def check(payload: dict, _: str = Depends(_require_auth), db=Depends(_require_db)) -> dict:
     """Webhook: validate if payment is possible."""
     service_id = _get(payload, "serviceId")
     timestamp = _get(payload, "timestamp", _now_ms())
     params = _get(payload, "params", {})
+    order_id = _extract_order_id(params)
+
+    if not (service_id and order_id):
+        raise HTTPException(status_code=400, detail="Missing serviceId or account (order_id)")
+
+    order = db.get_order(order_id)
+    if not order:
+        raise HTTPException(status_code=400, detail="Order not found")
+
     return {
         "serviceId": service_id,
         "timestamp": timestamp,
@@ -65,12 +107,38 @@ async def check(payload: dict, _: str = Depends(_require_auth)) -> dict:
 
 
 @router.post("/create")
-async def create(payload: dict, _: str = Depends(_require_auth)) -> dict:
+async def create(payload: dict, _: str = Depends(_require_auth), db=Depends(_require_db)) -> dict:
     """Webhook: create a payment transaction."""
     service_id = _get(payload, "serviceId")
     trans_id = _get(payload, "transId") or str(uuid.uuid4())
     params = _get(payload, "params", {})
     amount = _get(payload, "amount")
+    order_id = _extract_order_id(params)
+
+    if not (service_id and trans_id and order_id and amount):
+        raise HTTPException(status_code=400, detail="Missing required fields")
+
+    order = db.get_order(order_id)
+    if not order:
+        raise HTTPException(status_code=400, detail="Order not found")
+
+    # Prevent duplicate transId
+    existing = _fetch_transaction(db, trans_id)
+    if existing:
+        raise HTTPException(status_code=400, detail="Transaction already exists")
+
+    try:
+        db.create_uzum_transaction(
+            trans_id=trans_id,
+            order_id=order_id,
+            service_id=service_id,
+            amount=int(amount),
+            status="CREATED",
+            payload=payload,
+        )
+    except Exception:
+        raise HTTPException(status_code=500, detail="Failed to persist transaction")
+
     return {
         "serviceId": service_id,
         "transId": trans_id,
@@ -82,54 +150,94 @@ async def create(payload: dict, _: str = Depends(_require_auth)) -> dict:
 
 
 @router.post("/confirm")
-async def confirm(payload: dict, _: str = Depends(_require_auth)) -> dict:
+async def confirm(payload: dict, _: str = Depends(_require_auth), db=Depends(_require_db)) -> dict:
     """Webhook: confirm a successful payment."""
     service_id = _get(payload, "serviceId")
-    trans_id = _get(payload, "transId") or str(uuid.uuid4())
+    trans_id = _get(payload, "transId")
     amount = _get(payload, "amount")
-    params = _get(payload, "data", {})
+
+    if not (service_id and trans_id and amount):
+        raise HTTPException(status_code=400, detail="Missing required fields")
+
+    tx = _fetch_transaction(db, trans_id)
+    if not tx:
+        raise HTTPException(status_code=400, detail="Transaction not found")
+
+    if str(tx.get("service_id")) != str(service_id):
+        raise HTTPException(status_code=400, detail="ServiceId mismatch")
+
+    if int(tx.get("amount") or 0) != int(amount):
+        raise HTTPException(status_code=400, detail="Amount mismatch")
+
+    order_id = tx.get("order_id")
+    try:
+        db.update_uzum_transaction_status(trans_id, "CONFIRMED", payload)
+        if hasattr(db, "update_payment_status") and order_id:
+            db.update_payment_status(order_id, "confirmed")
+    except Exception:
+        raise HTTPException(status_code=500, detail="Failed to update transaction")
+
     return {
         "serviceId": service_id,
         "transId": trans_id,
         "status": "CONFIRMED",
         "confirmTime": _now_ms(),
-        "data": params,
+        "data": _get(payload, "data", {}),
         "amount": amount,
     }
 
 
 @router.post("/reverse")
-async def reverse(payload: dict, _: str = Depends(_require_auth)) -> dict:
+async def reverse(payload: dict, _: str = Depends(_require_auth), db=Depends(_require_db)) -> dict:
     """Webhook: reverse a payment."""
     service_id = _get(payload, "serviceId")
-    trans_id = _get(payload, "transId") or str(uuid.uuid4())
-    amount = _get(payload, "amount")
-    params = _get(payload, "data", {})
+    trans_id = _get(payload, "transId")
+
+    if not (service_id and trans_id):
+        raise HTTPException(status_code=400, detail="Missing required fields")
+
+    tx = _fetch_transaction(db, trans_id)
+    if not tx:
+        raise HTTPException(status_code=400, detail="Transaction not found")
+
+    order_id = tx.get("order_id")
+    try:
+        db.update_uzum_transaction_status(trans_id, "REVERSED", payload)
+        if hasattr(db, "update_payment_status") and order_id:
+            db.update_payment_status(order_id, "rejected")
+    except Exception:
+        raise HTTPException(status_code=500, detail="Failed to update transaction")
+
     return {
         "serviceId": service_id,
         "transId": trans_id,
         "status": "REVERSED",
         "reverseTime": _now_ms(),
-        "data": params,
-        "amount": amount,
+        "data": _get(payload, "data", {}),
+        "amount": _get(payload, "amount"),
     }
 
 
 @router.post("/status")
-async def status_check(payload: dict, _: str = Depends(_require_auth)) -> dict:
+async def status_check(payload: dict, _: str = Depends(_require_auth), db=Depends(_require_db)) -> dict:
     """Webhook: check transaction status."""
     service_id = _get(payload, "serviceId")
-    trans_id = _get(payload, "transId") or str(uuid.uuid4())
-    amount = _get(payload, "amount")
-    params = _get(payload, "data", {})
-    # For stub purposes return CONFIRMED; adjust to real status lookup if needed.
+    trans_id = _get(payload, "transId")
+
+    if not (service_id and trans_id):
+        raise HTTPException(status_code=400, detail="Missing required fields")
+
+    tx = _fetch_transaction(db, trans_id)
+    if not tx:
+        raise HTTPException(status_code=404, detail="Transaction not found")
+
     return {
         "serviceId": service_id,
         "transId": trans_id,
-        "status": "CONFIRMED",
+        "status": tx.get("status", "CREATED"),
         "transTime": _now_ms(),
-        "confirmTime": _now_ms(),
-        "reverseTime": None,
-        "data": params,
-        "amount": amount,
+        "confirmTime": None if tx.get("status") != "CONFIRMED" else _now_ms(),
+        "reverseTime": None if tx.get("status") != "REVERSED" else _now_ms(),
+        "data": tx.get("payload") or {},
+        "amount": tx.get("amount"),
     }

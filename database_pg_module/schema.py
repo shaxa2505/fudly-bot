@@ -330,6 +330,24 @@ class SchemaMixin:
             """
             )
 
+            # Uzum Bank merchant transactions
+            cursor.execute(
+                """
+                CREATE TABLE IF NOT EXISTS uzum_transactions (
+                    id SERIAL PRIMARY KEY,
+                    trans_id UUID UNIQUE NOT NULL,
+                    order_id INTEGER NOT NULL,
+                    service_id BIGINT,
+                    amount BIGINT NOT NULL,
+                    status TEXT NOT NULL,
+                    payload JSONB,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    FOREIGN KEY (order_id) REFERENCES orders(order_id)
+                )
+                """
+            )
+
             # Store admins table (multiple admins per store)
             cursor.execute(
                 """
