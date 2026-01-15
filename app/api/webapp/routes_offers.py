@@ -184,6 +184,9 @@ async def get_offers(
     lon: float | None = Query(None, description="Longitude for nearby fallback"),
     latitude: float | None = Query(None, description="Latitude (alias)"),
     longitude: float | None = Query(None, description="Longitude (alias)"),
+    max_distance_km: float | None = Query(
+        None, ge=0, le=100, description="Max distance in km for nearby offers fallback"
+    ),
     category: str = Query("all", description="Category filter"),
     store_id: int | None = Query(None, description="Store ID filter"),
     search: str | None = Query(None, description="Search query"),
@@ -218,6 +221,7 @@ async def get_offers(
         apply_filters = True
         apply_sort = True
         apply_slice = True
+        max_distance = max_distance_km if max_distance_km is not None else 10.0
         if store_id:
             raw_offers = (
                 db.get_store_offers(
@@ -270,6 +274,7 @@ async def get_offers(
                     min_price=storage_min_price,
                     max_price=storage_max_price,
                     min_discount=min_discount,
+                    max_distance_km=max_distance,
                 )
                 if raw_offers:
                     apply_filters = False
@@ -353,6 +358,7 @@ async def get_offers(
                     min_price=storage_min_price,
                     max_price=storage_max_price,
                     min_discount=min_discount,
+                    max_distance_km=max_distance,
                 )
 
             apply_filters = False

@@ -257,7 +257,7 @@ class NotificationTemplates:
         "Build admin caption for payment proof review."
         if lang == "uz":
             lines = [
-                "<b>To'lovni tasdiqlash</b>",
+                "<b>💳 To'lovni tasdiqlash</b>",
                 "",
                 f"Buyurtma: #{order_id} | {store_name}",
                 f"Mahsulotlar:\\n{items_text}",
@@ -268,7 +268,7 @@ class NotificationTemplates:
             ]
         else:
             lines = [
-                "<b>Проверка оплаты</b>",
+                "<b>💳 Проверка оплаты</b>",
                 "",
                 f"Заказ: #{order_id} | {store_name}",
                 f"Товары:\\n{items_text}",
@@ -308,7 +308,7 @@ class NotificationTemplates:
                 _esc(customer_name) if customer_name and customer_name.strip() else "Mijoz"
             )
             lines = [
-                "<b>Yangi buyurtma</b>",
+                "<b>🧾 Yangi buyurtma</b>",
                 f"Buyurtma: #{', #'.join(order_ids)}",
                 f"Tur: {order_type_text}",
             ]
@@ -353,7 +353,7 @@ class NotificationTemplates:
                 else "Клиент"
             )
             lines = [
-                "<b>Новый заказ</b>",
+                "<b>🧾 Новый заказ</b>",
                 f"Заказ: #{', #'.join(order_ids)}",
                 f"Тип: {order_type_text}",
             ]

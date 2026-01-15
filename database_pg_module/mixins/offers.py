@@ -114,9 +114,25 @@ class OfferMixin:
 
         return list(variants)
 
+    def _normalize_location_label(self, value: str) -> str:
+        """Normalize region/district labels similar to city normalization."""
+        value_clean = " ".join(value.strip().split())
+        value_clean = value_clean.split(",")[0]
+        value_clean = re.sub(r"\s*\([^)]*\)", "", value_clean)
+        value_clean = _CITY_SUFFIX_RE.sub("", value_clean).strip(" ,")
+        return value_clean.lower()
+
     def _get_location_variants(self, value: str) -> list[str]:
         """Return normalized variants for region/district matching."""
-        return self._get_city_variants(value)
+        base = self._normalize_location_label(value)
+        variants = {base}
+        # reuse city transliteration map for cross-script/latin mix
+        for key, vals in CITY_TRANSLITERATION.items():
+            vals_lower = [v.lower() for v in vals]
+            if base == key or base in vals_lower:
+                variants.add(key)
+                variants.update(vals_lower)
+        return list(variants)
 
     def _normalize_category_filter(self, category: Any) -> list[str] | None:
         if not category:

@@ -336,6 +336,8 @@ function HomePage() {
       // Добавляем сортировку
       if (sortBy !== 'default') {
         params.sort_by = sortBy
+      } else {
+        params.sort_by = 'urgent'
       }
 
       const data = await api.getOffers(params, { force })
