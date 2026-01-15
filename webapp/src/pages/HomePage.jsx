@@ -33,6 +33,9 @@ const CATEGORY_ALIASES = {
 
 const CATEGORY_IDS = new Set(CATEGORIES.map(category => category.id))
 const OFFERS_LIMIT = 20
+const GEO_ATTEMPT_KEY = 'fudly_geo_attempt_ts'
+const GEO_STATUS_KEY = 'fudly_geo_status'
+const GEO_COOLDOWN_MS = 24 * 60 * 60 * 1000 // 24h to avoid repeated prompts
 
 const normalizeCategoryId = (value) => {
   const raw = String(value || '').toLowerCase().trim()
@@ -105,6 +108,22 @@ function HomePage() {
     ? `${offersCountValue}+ ta`
     : `${offersCountValue} ta`
   const [hasNearbyFallback, setHasNearbyFallback] = useState(false)
+  const getGeoAttemptTs = () => {
+    const stored = localStorage.getItem(GEO_ATTEMPT_KEY)
+    const ts = stored ? Number(stored) : 0
+    return Number.isFinite(ts) ? ts : 0
+  }
+  const setGeoAttempt = (status = '') => {
+    localStorage.setItem(GEO_ATTEMPT_KEY, String(Date.now()))
+    if (status) {
+      localStorage.setItem(GEO_STATUS_KEY, status)
+    }
+  }
+  const shouldSkipGeo = () => {
+    const ts = getGeoAttemptTs()
+    if (!ts) return false
+    return Date.now() - ts < GEO_COOLDOWN_MS
+  }
   const trimmedSearch = searchQuery.trim()
   const showHistoryDropdown = showSearchHistory && !trimmedSearch && searchHistory.length > 0
   const showSuggestionsDropdown = showSearchHistory && trimmedSearch.length >= 2
@@ -499,21 +518,26 @@ function HomePage() {
     if (autoLocationAttempted.current) return
     autoLocationAttempted.current = true
 
-    // Если уже есть сохранённый адрес - не запрашиваем
+    if (shouldSkipGeo()) return
     if (location.address || location.coordinates) return
 
-    // Пытаемся определить автоматически
     if (navigator.geolocation) {
       setIsLocating(true)
+      setGeoAttempt('start')
       navigator.geolocation.getCurrentPosition(
         (position) => {
           const { latitude, longitude } = position.coords
           reverseGeocodeAuto(latitude, longitude)
+          setGeoAttempt('ok')
         },
         (error) => {
           console.log('Auto-geolocation denied or failed:', error.message)
+          if (error.code === error.PERMISSION_DENIED) {
+            setGeoAttempt('denied')
+          } else {
+            setGeoAttempt('fail')
+          }
           setIsLocating(false)
-          // Если отклонил - показываем модалку ручного ввода
           if (error.code === error.PERMISSION_DENIED) {
             setShowAddressModal(true)
           }
@@ -647,6 +671,7 @@ function HomePage() {
       return
     }
     setIsLocating(true)
+    setGeoAttempt('start')
     setLocationError('')
     navigator.geolocation.getCurrentPosition(
       (position) => {
@@ -662,6 +687,7 @@ function HomePage() {
         } else {
           setLocationError('Geolokatsiyani olish imkonsiz')
         }
+        setGeoAttempt(error.code === error.PERMISSION_DENIED ? 'denied' : 'fail')
         setIsLocating(false)
       },
       { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
