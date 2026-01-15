@@ -332,7 +332,7 @@ class NotificationTemplates:
                 item_qty = item.get("quantity") or 1
                 subtotal = item_price * item_qty
                 lines.append(
-                    f"- {_esc(item_title)} x {item_qty} = {int(subtotal):,} {currency}"
+                    f"- {_esc(item_title)} × {item_qty} = {int(subtotal):,} {currency}"
                 )
 
             lines.append("")
@@ -383,7 +383,7 @@ class NotificationTemplates:
                 item_qty = item.get("quantity") or 1
                 subtotal = item_price * item_qty
                 lines.append(
-                    f"- {_esc(item_title)} x {item_qty} = {int(subtotal):,} {currency}"
+                    f"- {_esc(item_title)} × {item_qty} = {int(subtotal):,} {currency}"
                 )
 
             lines.append("")
@@ -429,16 +429,15 @@ class NotificationTemplates:
 
         if lang == "uz":
             header = (
-                "<b>Buyurtma to'lov tekshiruvida</b>"
+                "<b>🧾 Buyurtma to'lov tekshiruvida</b>"
                 if awaiting_payment and payment_method == "card"
-                else "<b>Buyurtma yaratildi</b>"
+                else "<b>🧾 Buyurtma yaratildi</b>"
             )
 
             lines = [
                 header,
-                f"Buyurtma: #{', #'.join(order_ids)}",
+                f"Buyurtma: #{', #'.join(order_ids)} — {order_type_text}",
                 f"Do'kon: {_esc(store_name)}",
-                f"Tur: {order_type_text}",
             ]
 
             if order_type == "pickup":
@@ -455,7 +454,7 @@ class NotificationTemplates:
             for item in items:
                 subtotal = item["price"] * item["quantity"]
                 lines.append(
-                    f"- {_esc(item['title'])} x {item['quantity']} = {int(subtotal):,} {currency}"
+                    f"- {_esc(item['title'])} × {item['quantity']} = {int(subtotal):,} {currency}"
                 )
 
             lines.append("")
@@ -475,57 +474,48 @@ class NotificationTemplates:
 
         else:
             header = (
-                "<b>Заказ на проверке оплаты</b>"
+                "<b>🧾 Заказ на проверке оплаты</b>"
                 if awaiting_payment and payment_method == "card"
-                else "<b>Заказ создан</b>"
+                else "<b>🧾 Заказ создан</b>"
             )
 
             lines = [
                 header,
-                f"Заказ: #{', #'.join(order_ids)}",
+                f"Заказ: #{', #'.join(order_ids)} — {order_type_text}",
                 f"Магазин: {_esc(store_name)}",
-                f"Тип: {order_type_text}",
             ]
 
             if order_type == "pickup":
                 if store_address:
                     lines.append(f"Адрес: {_esc(store_address)}")
                 if pickup_codes:
-                    lines.append(
-                        f"Код выдачи: <b>{', '.join(pickup_codes)}</b>"
-                    )
+                    lines.append(f"Код выдачи: <b>{', '.join(pickup_codes)}</b>")
             else:
                 if delivery_address:
                     lines.append(f"Адрес: {_esc(delivery_address)}")
 
             lines.append("")
-            lines.append("Состав:")
+            lines.append("Товары:")
             for item in items:
                 subtotal = item["price"] * item["quantity"]
                 lines.append(
-                    f"- {_esc(item['title'])} x {item['quantity']} = {int(subtotal):,} {currency}"
+                    f"- {_esc(item['title'])} × {item['quantity']} = {int(subtotal):,} {currency}"
                 )
 
             lines.append("")
             if is_delivery:
-                lines.append(
-                    f"Доставка: {int(delivery_price):,} {currency}"
-                )
+                lines.append(f"Доставка: {int(delivery_price):,} {currency}")
             lines.append(f"<b>Итого: {grand_total:,} {currency}</b>")
 
             payment_text = NotificationTemplates._payment_label(lang, payment_method)
             lines.append(payment_text)
 
             lines.append("")
-            lines.append(
-                "Ожидайте подтверждения магазина (5-10 мин)"
-            )
+            lines.append("Ожидайте подтверждения магазина (5-10 мин)")
 
             if order_type == "pickup" and pickup_codes:
                 lines.append("")
-                lines.append(
-                    "Код выдачи покажите продавцу"
-                )
+                lines.append("Код выдачи покажите продавцу")
 
         return "\n".join(lines)
 

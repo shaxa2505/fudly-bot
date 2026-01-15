@@ -6,7 +6,6 @@ import { transliterateCity, getSavedLocation, saveLocation, DEFAULT_LOCATION, no
 import OfferCard from '../components/OfferCard'
 import OfferCardSkeleton from '../components/OfferCardSkeleton'
 import HeroBanner from '../components/HeroBanner'
-import RecentlyViewed from '../components/RecentlyViewed'
 import BottomNav from '../components/BottomNav'
 import PullToRefresh from '../components/PullToRefresh'
 import { usePullToRefresh } from '../hooks/usePullToRefresh'
@@ -60,7 +59,6 @@ function HomePage() {
   const [showAddressModal, setShowAddressModal] = useState(false)
   const [manualCity, setManualCity] = useState(location.city)
   const [manualAddress, setManualAddress] = useState(location.address)
-  const [geoStatus, setGeoStatus] = useState(() => localStorage.getItem(GEO_STATUS_KEY) || '')
 
   // Quick filters state
   const [minDiscount, setMinDiscount] = useState(null) // null, 20, 30, 50
@@ -118,7 +116,6 @@ function HomePage() {
     localStorage.setItem(GEO_ATTEMPT_KEY, String(Date.now()))
     if (status) {
       localStorage.setItem(GEO_STATUS_KEY, status)
-      setGeoStatus(status)
     }
   }
   const shouldSkipGeo = () => {
@@ -1013,18 +1010,6 @@ function HomePage() {
         </div>
       )}
 
-      {geoStatus === 'denied' && isLocationUnset && (
-        <div className="location-warning">
-          Geolokatsiyaga ruxsat berilmadi. Manzilni qo‘lda kiriting yoki brauzer sozlamalaridan ruxsat bering.
-          <button
-            className="location-warning-btn"
-            onClick={() => setShowAddressModal(true)}
-          >
-            Manzilni o‘zgartirish
-          </button>
-        </div>
-      )}
-
       {hasNearbyFallback && (
         <div className="location-warning">
           Yaqin atrofda takliflar topilmadi. Siz kengaytirilган hududdagi mahsulotlarni ko‘ryapsiz.
@@ -1035,10 +1020,6 @@ function HomePage() {
             Manzilni o‘zgartirish
           </button>
         </div>
-      )}
-
-      {selectedCategory === 'all' && !trimmedSearch && (
-        <RecentlyViewed />
       )}
 
       {/* Section Title */}
