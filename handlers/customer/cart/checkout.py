@@ -118,19 +118,23 @@ def register(router: Router) -> None:
         currency = "so'm" if lang == "uz" else "сум"
         total = int(sum(item.price * item.quantity for item in items))
 
-        lines: list[str] = [f"🧾 <b>{get_text(lang, 'cart_order_title')}</b>\n"]
-        lines.append(f"🏪 {esc(items[0].store_name)}\n")
+        store_label = "Магазин" if lang == "ru" else "Do'kon"
+
+        lines: list[str] = [
+            f"<b>{get_text(lang, 'cart_order_title')}</b>",
+            f"{store_label}: {esc(items[0].store_name)}",
+            "",
+        ]
 
         for item in items:
             subtotal = int(item.price * item.quantity)
-            lines.append(f"• {esc(item.title)} x {item.quantity} = {subtotal:,} {currency}")
+            lines.append(f"- {esc(item.title)} x {item.quantity} = {subtotal:,} {currency}")
 
-        lines.append("\n" + "-" * 25)
+        lines.append("")
+        lines.append("-" * 25)
         lines.append(f"<b>{get_text(lang, 'cart_total_label')}: {total:,} {currency}</b>")
         if delivery_enabled:
-            lines.append(
-                f"{get_text(lang, 'cart_delivery_label')}: {delivery_price:,} {currency}"
-            )
+            lines.append(f"{get_text(lang, 'cart_delivery_label')}: {delivery_price:,} {currency}")
             grand_total = total + delivery_price
             lines.append(
                 f"<b>{get_text(lang, 'cart_grand_total_label')}: {grand_total:,} {currency}</b>"

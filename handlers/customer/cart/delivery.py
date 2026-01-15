@@ -143,24 +143,22 @@ def register(router: Router) -> None:
         total = sum(item["price"] * item["quantity"] for item in cart_items_stored)
         total_with_delivery = total + delivery_price
 
-        lines: list[str] = []
-        lines.append(f"<b>{get_text(lang, 'cart_delivery_products_title')}:</b>")
+        lines: list[str] = [f"<b>{get_text(lang, 'cart_delivery_products_title')}:</b>"]
         for item in cart_items_stored:
-            subtotal = item["price"] * item["quantity"]
-            lines.append(
-                f"• {esc(item['title'])} x {item['quantity']} = {subtotal:,} {currency}"
-            )
+            subtotal = item['price'] * item['quantity']
+            lines.append(f"- {esc(item['title'])} x {item['quantity']} = {subtotal:,} {currency}")
 
+        lines.append("")
+        lines.append(f"{get_text(lang, 'cart_delivery_label')}: {delivery_price:,} {currency}")
         lines.append(
-            f"\n{get_text(lang, 'cart_delivery_label')}: {delivery_price:,} {currency}"
+            f"<b>{get_text(lang, 'cart_grand_total_label')}: {total_with_delivery:,} {currency}</b>"
         )
+        lines.append("")
         lines.append(
-            f"<b>{get_text(lang, 'cart_grand_total_label')}: {total_with_delivery:,} {currency}</b>\n"
+            f"{get_text(lang, 'cart_delivery_address_label')}: {esc(delivery_address)}"
         )
-        lines.append(
-            f"📍 {get_text(lang, 'cart_delivery_address_label')}: {esc(delivery_address)}\n"
-        )
-        lines.append(get_text(lang, "cart_delivery_payment_prompt"))
+        lines.append("")
+        lines.append(get_text(lang, 'cart_delivery_payment_prompt'))
 
         text = "\n".join(lines)
 

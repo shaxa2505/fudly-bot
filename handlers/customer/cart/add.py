@@ -11,6 +11,7 @@ from .common import esc
 from .storage import cart_storage
 
 
+
 def build_cart_add_card_text(
     lang: str,
     title: str,
@@ -25,64 +26,71 @@ def build_cart_add_card_text(
     unit: str = "шт",
 ) -> str:
     currency = "so'm" if lang == "uz" else "сум"
-    text_parts: list[str] = []
+    safe_title = esc(title)
+    safe_description = esc(description)
+    safe_store = esc(store_name)
+    safe_address = esc(store_address)
+    safe_unit = esc(unit)
 
-    text_parts.append(f"🛒 <b>{title}</b>")
+    text_parts: list[str] = [f"<b>{safe_title}</b>"]
+
     if description:
-        text_parts.append(f"<i>{description}</i>")
+        text_parts.append(f"<i>{safe_description}</i>")
 
     text_parts.append("")
 
     if original_price and original_price > price:
         discount_pct = int(((original_price - price) / original_price) * 100)
         text_parts.append(
-            f"<s>{original_price:,.0f}</s> → <b>{price:,.0f} {currency}</b> <code>(-{discount_pct}%)</code>"
+            f"{get_text(lang, 'cart_add_price_label')}: <s>{original_price:,.0f}</s> -> "
+            f"<b>{price:,.0f} {currency}</b> <code>(-{discount_pct}%)</code>"
         )
     else:
         text_parts.append(
-            f"💵 {get_text(lang, 'cart_add_price_label')}: <b>{price:,.0f} {currency}</b>"
+            f"{get_text(lang, 'cart_add_price_label')}: <b>{price:,.0f} {currency}</b>"
         )
 
     text_parts.append(
-        f"🔢 {get_text(lang, 'cart_add_quantity_label')}: <b>{quantity} {unit}</b>"
+        f"{get_text(lang, 'cart_add_quantity_label')}: <b>{quantity} {safe_unit}</b>"
     )
 
-    stock_label = get_text(lang, "cart_add_stock_label")
-    text_parts.append(f"📦 {stock_label}: {max_qty} {unit}")
+    stock_label = get_text(lang, 'cart_add_stock_label')
+    text_parts.append(f"{stock_label}: {max_qty} {safe_unit}")
 
     if expiry_date:
-        expiry_label = get_text(lang, "cart_add_expiry_label")
-        text_parts.append(f"⏰ {expiry_label}: {expiry_date}")
+        expiry_label = get_text(lang, 'cart_add_expiry_label')
+        text_parts.append(f"{expiry_label}: {esc(expiry_date)}")
 
     text_parts.append("")
 
-    text_parts.append(f"🏪 <b>{store_name}</b>")
+    store_label = "Магазин" if lang == "ru" else "Do'kon"
+    text_parts.append(f"{store_label}: <b>{safe_store}</b>")
     if store_address:
-        text_parts.append(f"📍 {store_address}")
+        address_label = get_text(lang, 'cart_delivery_address_label')
+        text_parts.append(f"{address_label}: {safe_address}")
 
     text_parts.append("")
 
     total = price * quantity
     text_parts.append(
-        f"💰 <b>{get_text(lang, 'cart_add_total_label')}: {total:,.0f} {currency}</b>"
+        f"<b>{get_text(lang, 'cart_add_total_label')}: {total:,.0f} {currency}</b>"
     )
 
     return "\n".join(text_parts)
-
 
 def build_cart_add_card_keyboard(
     lang: str, offer_id: int, quantity: int, max_qty: int
 ) -> InlineKeyboardBuilder:
     kb = InlineKeyboardBuilder()
 
-    minus_btn = "➖" if quantity > 1 else "⛔"
-    plus_btn = "➕" if quantity < max_qty else "⛔"
+    minus_btn = "-"
+    plus_btn = "+"
 
     kb.button(
         text=minus_btn,
         callback_data=f"cart_qty_{offer_id}_{quantity - 1}" if quantity > 1 else "cart_noop",
     )
-    kb.button(text=f"🔢 {quantity}", callback_data="cart_noop")
+    kb.button(text=str(quantity), callback_data="cart_noop")
     kb.button(
         text=plus_btn,
         callback_data=f"cart_qty_{offer_id}_{quantity + 1}" if quantity < max_qty else "cart_noop",
@@ -90,18 +98,17 @@ def build_cart_add_card_keyboard(
     kb.adjust(3)
 
     kb.button(
-        text=get_text(lang, "cart_add_confirm_button"),
+        text=get_text(lang, 'cart_add_confirm_button'),
         callback_data=f"cart_add_confirm_{offer_id}",
     )
     kb.button(
-        text=get_text(lang, "cart_add_cancel_button"),
+        text=get_text(lang, 'cart_add_cancel_button'),
         callback_data=f"cart_add_cancel_{offer_id}",
     )
 
     kb.adjust(3, 1, 1)
 
     return kb
-
 
 def register(router: Router) -> None:
     """Register add-to-cart and related handlers on the given router."""
@@ -437,9 +444,7 @@ def register(router: Router) -> None:
         currency = "so'm" if lang == "uz" else "сум"
         stock_label = get_text(lang, "store_offers_stock_label")
 
-        text_lines: list[str] = []
-        text_lines.append(f"🏪 <b>{esc(store_name)}</b>\n")
-        text_lines.append(f"{get_text(lang, 'store_offers_list_title')}\n")
+        text_lines: list[str] = [f"<b>{esc(store_name)}</b>", "", get_text(lang, "store_offers_list_title")]
 
         ITEMS_PER_PAGE = 5
         page = 0
@@ -471,7 +476,7 @@ def register(router: Router) -> None:
             title = get_offer_field(offer, "title", get_text(lang, "offer_not_found"))
 
             kb.button(
-                text=f"🔹 {title[:30]}{'...' if len(title) > 30 else ''}",
+                text=f"{title[:30]}{'...' if len(title) > 30 else ''}",
                 callback_data=f"view_offer_{offer_id}",
             )
 
@@ -484,7 +489,7 @@ def register(router: Router) -> None:
             nav_buttons = []
             if page > 0:
                 nav_buttons.append((get_text(lang, "back"), f"store_page_{store_id}_{page - 1}"))
-            nav_buttons.append((f"📄 {page + 1}/{total_pages}", "noop"))
+            nav_buttons.append((f"{page + 1}/{total_pages}", "noop"))
             if page < total_pages - 1:
                 nav_buttons.append((get_text(lang, "next_page"), f"store_page_{store_id}_{page + 1}"))
 
@@ -495,7 +500,7 @@ def register(router: Router) -> None:
         cart_count = cart_storage.get_cart_count(user_id)
         if cart_count > 0:
             kb.button(
-                text=f"🛒 {get_text(lang, 'my_cart')} ({cart_count})",
+                text=f"{get_text(lang, 'my_cart')} ({cart_count})",
                 callback_data="view_cart",
             )
             kb.adjust(1)

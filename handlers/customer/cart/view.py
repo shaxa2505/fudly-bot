@@ -33,6 +33,8 @@ async def _build_cart_view(user_id: int) -> tuple[str, InlineKeyboardBuilder] | 
         return empty_text, kb
 
     currency = "so'm" if lang == "uz" else "сум"
+    store_label = "Магазин" if lang == "ru" else "Do'kon"
+    remove_label = "Удалить" if lang == "ru" else "O'chirish"
     lines: list[str] = [get_text(lang, "cart_title"), ""]
 
     total = 0
@@ -45,7 +47,7 @@ async def _build_cart_view(user_id: int) -> tuple[str, InlineKeyboardBuilder] | 
         lines.append(
             f"   {item.quantity}{unit} x {price_sums:,} = <b>{subtotal:,}</b> {currency}"
         )
-        lines.append(f"   🏪 {esc(item.store_name)}")
+        lines.append(f"   {store_label}: {esc(item.store_name)}")
 
     lines.append("\n" + "-" * 25)
     lines.append(f"<b>{get_text(lang, 'cart_total_label')}: {total:,} {currency}</b>")
@@ -70,10 +72,10 @@ async def _build_cart_view(user_id: int) -> tuple[str, InlineKeyboardBuilder] | 
 
     for i, item in enumerate(items, 1):
         title_short = item.title[:18] + "..." if len(item.title) > 18 else item.title
-        kb.button(text="➖", callback_data=f"cart_qty_dec_{item.offer_id}")
+        kb.button(text="-", callback_data=f"cart_qty_dec_{item.offer_id}")
         kb.button(text=f"{i}. {title_short} ({item.quantity})", callback_data="cart_noop")
-        kb.button(text="➕", callback_data=f"cart_qty_inc_{item.offer_id}")
-        kb.button(text="❌", callback_data=f"cart_remove_{item.offer_id}")
+        kb.button(text="+", callback_data=f"cart_qty_inc_{item.offer_id}")
+        kb.button(text=remove_label, callback_data=f"cart_remove_{item.offer_id}")
 
     kb.button(
         text=get_text(lang, "cart_checkout_button"),
@@ -170,9 +172,9 @@ def register(router: Router) -> None:
 
         if item.quantity >= item.max_quantity:
             await callback.answer(
-                f"⚠ Максимум: {item.max_quantity}"
+                f"Максимум: {item.max_quantity}"
                 if lang == "ru"
-                else f"⚠ Maksimal: {item.max_quantity}",
+                else f"Maksimal: {item.max_quantity}",
                 show_alert=True,
             )
             return

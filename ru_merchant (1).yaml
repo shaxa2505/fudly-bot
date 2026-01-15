@@ -1,0 +1,1161 @@
+openapi: 3.1.0
+info:
+  title: Merchant API
+  version: 1.0.0
+  x-logo:
+    url: https://uzumbank.uz/_nuxt/img/uzumbank-logo-light.f4c13a0.svg
+    href: /
+  description: >
+    **Merchant API** позволяет партнерам принимать платежи через мобильное
+    приложение Uzum Bank. Когда клиент оплачивает услугу, мы отправляем на ваш
+    сервер [вебхуки](#tag/Vebhuki) — это HTTP POST-запросы с данными о платеже.
+
+
+    Чтобы интегрироваться, реализуйте на своей стороне обработчики вебхуков и
+    формируйте ответы по этой спецификации.
+
+
+    #### ⚙️ Основные возможности
+
+    - Проверка возможности проведения платежа
+
+    - Создание (инициация) платежной транзакции
+
+    - Подтверждение транзакции
+
+    - Отмена транзакции
+
+    - Проверка статуса транзакции
+
+
+    #### 🚀 **Быстрый старт**
+
+    - [Процесс приёма платежа](#section/Process-priyoma-platezha)
+
+    - [Авторизация](#section/Avtorizaciya) 
+
+    - [Формат запросов](#section/Format-zaprosov)
+
+    - [Вебхуки](#tag/Vebhuki)
+
+
+    ---
+
+
+    # Процесс приёма платежа
+
+
+    Процесс приёма платежа через мобильное приложение Uzum Bank состоит из трёх
+    этапов:
+
+
+    1. Проверка возможности проведения платежа
+
+    2. Создание транзакции
+
+    3. Подтверждение транзакции
+
+
+    ## Проверка возможности проведения платежа
+
+
+    После выбора услуги и указания необходимых данных, например, номера лицевого
+    счёта, пользователь переходит к этапу проверки возможности проведения
+    платежа. На этом этапе Uzum Bank вызывает вебхук [check](#operation/check)
+    на стороне партнёра для подтверждения возможности проведения платежа. Данные
+    необходимые для совершения платежа передаются в объекте `params`.
+
+
+    <a href='/img/merchant-api/ru-merchant-verify-transfer.png'
+    target='_blank'><img style="display: block; margin: 0 auto; max-width:70%;
+    height: auto;"
+    src='/img/merchant-api/ru-merchant-verify-transfer.png'/></a>.
+
+
+    ## Создание транзакции
+
+
+    Если по результатам проверки возможность проведения платежа подтверждена,
+    Uzum Bank вызывает вебхук [create](#operation/create) для создания
+    транзакции.
+
+
+    <a href='/img/merchant-api/ru-merchant-create-transaction.png'
+    target='_blank'><img style="display: block; margin: 0 auto; max-width:70%;
+    height:auto;"
+    src='/img/merchant-api/ru-merchant-create-transaction.png'/></a>.
+
+
+    ## Подтверждение транзакции
+
+
+    После успешного создания транзакции Uzum Bank списывает средства с
+    платёжного инструмента пользователя и зачисляет их на ваш расчётный счёт.
+    Затем Uzum Bank вызывает вебхук [confirm](#operation/confirm) для
+    подтверждения транзакции. Вам необходимо обработать этот запрос,
+    предоставить услугу пользователю и сформировать ответ.
+
+
+    <a href='/img/merchant-api/ru-merchant-confirm-transaction.png'
+    target='_blank'><img style="display: block; margin: 0 auto; max-width:70%;
+    height:auto;"
+    src='/img/merchant-api/ru-merchant-confirm-transaction.png'/></a>.
+
+
+    Если при обработке запроса возникла ошибка сервера на стороне партнёра или
+    произошёл тайм-аут, Uzum Bank вызывает вебхук [status](#operation/status)
+    для проверки статуса транзакции. Этот вызов повторяется (не более 10
+    попыток) до получения статуса `CONFIRMED` или `FAILED`.
+
+
+    ---
+
+
+    # Статусная модель
+
+
+    Транзакция может находиться в одном из трёх статусов.
+
+
+    <a href='/img/merchant-api/merchant-state-model.png' target='_blank'><img
+    style="display: block; margin: 0 auto; max-width:40%; height:auto;"
+    src='/img/merchant-api/merchant-state-model.png'/></a>.
+
+
+    Если вы не получили запрос с подтверждением транзакции в течение 30 минут с
+    момента её создания, транзакция считается неуспешной. В этом случае
+    переведите транзакцию на своей стороне в статус `FAILED`.
+
+
+    ---
+
+
+    # Формат запросов
+
+
+    Uzum Bank использует протокол HTTPS для доставки вебхуков партнёру. Запросы
+    отправляются методом `POST` в формате `application/json`, и ответы также
+    ожидаются в формате `application/json`.
+
+
+    ---
+
+
+    # Авторизация
+
+
+    Авторизация осуществляется через HTTP заголовок <a
+    href="https://developer.mozilla.org/ru/docs/Web/HTTP/Headers/Authorization"
+    target="_blank">Authorization</a>, который необходимо включать в каждый
+    запрос. Для формирования заголовка используется схема «Basic» и данные
+    пользователя, закодированные в формате <a
+    href="https://developer.mozilla.org/ru/docs/Glossary/Base64"
+    target="_blank">base64</a>: `Authorization: Basic <данные пользователя>`.
+
+
+    Для формирования заголовка:
+
+
+    1. Сформируйте строку из логина и пароля, разделённых двоеточием, например:
+    "myLogin:myPassword";
+
+    1. Закодируйте строку в base64, пример результата YWxhZGRpbjpvcGVuc2VzYW1l;
+
+    1. Вставьте результат в заголовок; Убедитесь, что между словом "Basic" и
+    закодированными учетными данными есть пробел.
+
+
+    Таким образом, заголовок будет иметь вид:
+
+
+    | Header      | Value                        |
+
+    |--------------------|------------------------------|
+
+    | Authorization | Basic YWxhZGRpbjpvcGVuc2VzYW1l    |
+
+
+    ---
+tags:
+  - name: Вебхуки
+    description: >
+      Запросы, которые Uzum Bank отправляет партнеру в процессе проведения
+      платежа согласно протоколу Merchant API.
+security:
+  - BasicAuth: []
+webhooks:
+  /check:
+    post:
+      summary: Проверка возможности проведения платежа
+      description: >
+        Вебхук `/check` используется для проверки возможности проведения платежа
+        и получения дополнительной информации о платеже или пользователе.
+      tags:
+        - Вебхуки
+      operationId: check
+      requestBody:
+        $ref: '#/components/requestBodies/CheckRequest'
+      responses:
+        '200':
+          $ref: '#/components/responses/CheckResponseSuccess'
+        '400':
+          $ref: '#/components/responses/CheckResponseError'
+  /create:
+    post:
+      summary: Создание транзакции платежа
+      description: >
+        Вебхук `/create` используется для создания транзакции платежа в системе
+        партнера.
+      tags:
+        - Вебхуки
+      operationId: create
+      requestBody:
+        $ref: '#/components/requestBodies/CreateRequest'
+      responses:
+        '200':
+          $ref: '#/components/responses/CreateResponseSuccess'
+        '400':
+          $ref: '#/components/responses/CreateResponseError'
+  /confirm:
+    post:
+      summary: Подтверждение транзакции платежа
+      description: >
+        Вебхук `/confirm` используется для подтверждения транзакции платежа
+        после успешной оплаты сервиса.
+      tags:
+        - Вебхуки
+      operationId: confirm
+      requestBody:
+        $ref: '#/components/requestBodies/ConfirmRequest'
+      responses:
+        '200':
+          $ref: '#/components/responses/ConfirmResponseSuccess'
+        '400':
+          $ref: '#/components/responses/ConfirmResponseError'
+  /reverse:
+    post:
+      summary: Отмена транзакции платежа
+      description: >
+        Вебхук `/reverse` используется для отмены транзакции платежа в системе
+        партнера.
+      tags:
+        - Вебхуки
+      operationId: reverse
+      requestBody:
+        $ref: '#/components/requestBodies/ReverseRequest'
+      responses:
+        '200':
+          $ref: '#/components/responses/ReverseResponseSuccess'
+        '400':
+          $ref: '#/components/responses/ReverseResponseError'
+  /status:
+    post:
+      summary: Проверка статуса транзакции платежа
+      description: >
+        Вебхук `/status` используется для проверки статуса транзакции платежа в
+        системе партнера.
+      tags:
+        - Вебхуки
+      operationId: status
+      requestBody:
+        $ref: '#/components/requestBodies/StatusRequest'
+      responses:
+        '200':
+          $ref: '#/components/responses/StatusResponseSuccess'
+        '400':
+          $ref: '#/components/responses/StatusResponseError'
+components:
+  securitySchemes:
+    BasicAuth:
+      type: http
+      scheme: basic
+  requestBodies:
+    CheckRequest:
+      description: |
+        JSON объект с параметрами запроса.
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/CheckRequest'
+    CreateRequest:
+      description: |
+        JSON объект с параметрами запроса.
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/CreateRequest'
+    ConfirmRequest:
+      description: |
+        JSON объект с параметрами запроса.
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ConfirmRequest'
+    ReverseRequest:
+      description: |
+        JSON объект с параметрами запроса.
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ReverseRequest'
+    StatusRequest:
+      description: |
+        JSON объект с параметрами запроса.
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/StatusRequest'
+  responses:
+    CheckResponseSuccess:
+      description: |
+        Успешный ответ.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Check'
+    CheckResponseError:
+      description: |
+        Ответ с ошибкой / Xato javob
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/CheckError'
+    CreateResponseSuccess:
+      description: |
+        Успешный ответ.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Create'
+    CreateResponseError:
+      description: |
+        Ответ с ошибкой / Xato javob
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/CreateError'
+    ConfirmResponseSuccess:
+      description: |
+        Успешный ответ.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Confirm'
+    ConfirmResponseError:
+      description: |
+        Ответ с ошибкой / Xato javob
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ConfirmError'
+    ReverseResponseSuccess:
+      description: |
+        Успешный ответ.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Reverse'
+    ReverseResponseError:
+      description: |
+        Ответ с ошибкой / Xato javob
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ReverseError'
+    StatusResponseSuccess:
+      description: |
+        Успешный ответ.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Status'
+    StatusResponseError:
+      description: |
+        Ответ с ошибкой / Xato javob
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/StatusError'
+  schemas:
+    CheckRequest:
+      type: object
+      properties:
+        serviceId:
+          description: |
+            Идентификатор сервиса за который производится оплата.
+          type: integer
+          format: int64
+          example: 101202
+        timestamp:
+          description: |
+            Время отправки запроса (unix timestamp в миллисекундах).
+          type: integer
+          format: int64
+          example: 1698361456728
+        params:
+          description: >
+            Объект с дополнительными свойствами платежа, например, номер
+            лицевого счёта `account`.
+          type: object
+          example:
+            account: 123456789
+      required:
+        - serviceId
+        - timestamp
+        - params
+    Check:
+      type: object
+      properties:
+        serviceId:
+          description: |
+            Идентификатор сервиса за который производится оплата.
+          type: integer
+          format: int64
+          example: 101202
+        timestamp:
+          description: >
+            Время проверки возможности проведения платежа (unix timestamp в
+            миллисекундах).
+          type: integer
+          format: int64
+          example: 1698361457021
+        status:
+          description: |
+            Статус проверки платежа.
+          type: string
+          enum:
+            - OK
+          example: OK
+        data:
+          description: >
+            Данные о пользователе и платеже (может быть пустым объектом). 
+
+            Объект `data` состоит из пар ключ-значение. Название ключа является
+            произвольным, например: `account` или `fio`.
+
+            Значением является объект с единственным свойством `value` (тип
+            `string`).
+          type: object
+          example:
+            account:
+              value: '123456789'
+            fio:
+              value: Иванов Иван Иванович
+      required:
+        - serviceId
+        - timestamp
+        - status
+    CheckError:
+      type: object
+      properties:
+        serviceId:
+          description: |
+            Идентификатор сервиса за который производится оплата.
+          type: integer
+          format: int64
+          example: 101202
+        timestamp:
+          description: >
+            Время проверки возможности проведения платежа (unix timestamp в
+            миллисекундах).
+          type: integer
+          format: int64
+          example: 1698361457021
+        status:
+          description: |
+            Статус проверки платежа.
+          type: string
+          enum:
+            - FAILED
+          example: FAILED
+        errorCode:
+          description: >
+            Код ошибки проверки возможности проведения платежа.
+
+
+            Код ошибки | Описание ошибки | Комментарии
+
+            -|-|-
+
+            10001 | Доступ запрещен | Ошибка авторизации 
+
+            10002 | Ошибка парсинга JSON объекта с параметрами запроса
+
+            10003 | Недопустимая операция | Неверный HTTP метод
+
+            10005 | Отсутствуют обязательные параметры в запросе 
+
+            10006 | Неверный `serviceId` 
+
+            10007 | Дополнительный атрибут платежа не найден | Например: номер
+            лицевого счета, телефона или заказа / Masalan: shaxsiy hisob raqami,
+            telefon yoki buyurtma raqami
+
+            10008 | Платеж уже оплачен | Для указанных дополнительных атрибутов 
+
+            10009 | Платеж отменен| Для указанных дополнительных атрибутов 
+
+            99999 | Ошибка проверки данных | Сервис недоступен, повторите
+            попытку позже 
+          type: string
+          example: '10007'
+      required:
+        - errorCode
+    CreateRequest:
+      type: object
+      properties:
+        serviceId:
+          description: |
+            Идентификатор сервиса за который производится оплата.
+          type: integer
+          format: int64
+          example: 101202
+        timestamp:
+          description: |
+            Время отправки запроса (unix timestamp в миллисекундах).
+          type: integer
+          format: int64
+          example: 1698361456728
+        transId:
+          description: |
+            Идентификатор транзакции платежа, созданной в Uzum Bank.
+          type: string
+          format: uuid
+          example: 5c398d7e-76b6-11ee-96da-f3a095c6289d
+        params:
+          description: >
+            Объект с дополнительными свойствами платежа, например, номер
+            лицевого счёта `account`.
+          type: object
+          example:
+            account: 123456789
+        amount:
+          description: |
+            Сумма платежа в тийинах.
+          type: integer
+          format: int64
+          example: 2500000
+      required:
+        - serviceId
+        - timestamp
+        - transId
+        - params
+        - amount
+    Create:
+      type: object
+      properties:
+        serviceId:
+          description: |
+            Идентификатор сервиса за который производится оплата.
+          type: integer
+          format: int64
+          example: 101202
+        transId:
+          description: |
+            Идентификатор транзакции платежа, созданной в Uzum Bank.
+          type: string
+          format: uuid
+          example: 5c398d7e-76b6-11ee-96da-f3a095c6289d
+        status:
+          description: |
+            Статус транзакции платежа.
+
+            To'lov tranzaksiya holati.
+          type: string
+          enum:
+            - CREATED
+          example: CREATED
+        transTime:
+          description: |
+            Время создания транзакции платежа (unix timestamp в миллисекундах).
+          type: integer
+          format: int64
+          example: 1698361458054
+        data:
+          description: >
+            Данные о пользователе и транзакции платежа (может быть пустым
+            объектом). 
+
+            Объект `data` состоит из пар ключ-значение. Название ключа является
+            произвольным, например: `account` или `fio`.
+
+            Значением является объект с единственным свойством `value` (тип
+            `string`).
+          type: object
+          example:
+            account:
+              value: '123456789'
+            fio:
+              value: Иванов Иван Иванович
+        amount:
+          description: |
+            Сумма платежа в тийинах.
+          type: integer
+          format: int64
+          example: 2500000
+      required:
+        - serviceId
+        - transId
+        - status
+        - transTime
+        - amount
+    CreateError:
+      type: object
+      properties:
+        serviceId:
+          description: |
+            Идентификатор сервиса за который производится оплата.
+          type: integer
+          format: int64
+          example: 101202
+        transId:
+          description: |
+            Идентификатор транзакции платежа, созданной в Uzum Bank.
+          type: string
+          format: uuid
+          example: 5c398d7e-76b6-11ee-96da-f3a095c6289d
+        status:
+          description: |
+            Статус транзакции платежа.
+          type: string
+          enum:
+            - FAILED
+          example: FAILED
+        transTime:
+          description: |
+            Время создания транзакции платежа (unix timestamp в миллисекундах).
+          type: integer
+          format: int64
+          example: 1698361458054
+        errorCode:
+          description: >
+            Код ошибки создания транзакции платежа.
+
+
+            Код ошибки | Описание ошибки | Комментарии
+
+            -|-|-
+
+            10001 | Доступ запрещен  | Ошибка авторизации
+
+            10002 | Ошибка парсинга JSON объекта с параметрами запроса
+
+            10003 | Недопустимая операция | Неверный HTTP метод 
+
+            10005 | Отсутствуют обязательные параметры в запросе 
+
+            10006 | Неверный `serviceId` 
+
+            10007 | Дополнительный атрибут платежа не найден | Например: номер
+            лицевого счета, телефона или заказа 
+
+            10008 | Платеж уже оплачен | Для указанных дополнительных атрибутов
+
+            10009 | Платеж отменен | Для указанных дополнительных атрибутов
+
+            10010 | Транзакция с указанным идентификатором `transId` уже
+            создана 
+
+            10011 | Неверная сумма 
+
+            10012 | Сумма оплаты ниже минимальной
+
+            10013 | Сумма оплаты превышает максимальную 
+
+            99999 | Ошибка проверки данных | Сервис недоступен, повторите
+            попытку позже
+          type: string
+          example: '10013'
+      required:
+        - errorCode
+    ConfirmRequest:
+      type: object
+      properties:
+        serviceId:
+          description: |
+            Идентификатор сервиса за который производится оплата.
+          type: integer
+          format: int64
+          example: 101202
+        timestamp:
+          description: |
+            Время отправки запроса (unix timestamp в миллисекундах).
+          type: integer
+          format: int64
+          example: 1698361456728
+        transId:
+          description: |
+            Идентификатор транзакции платежа, созданной в Uzum Bank.
+          type: string
+          format: uuid
+          example: 5c398d7e-76b6-11ee-96da-f3a095c6289d
+        paymentSource:
+          description: >
+            Признак источника оплат: UZCARD, HUMO, VISA, MASTERCARD,
+            VISA_DOMESTIC, MASTERCARD_DOMESTIC, INSTALLMENT, CASHBACK, ACCOUNT,
+            WALLET, VISAUZS, UZUM_DEBIT_VISA.
+          type: string
+          format: enum
+          example: INSTALLMENT
+        tariff:
+          description: >
+            `tariff` доступен, если символ источника платежа — `INSTALLMENT` в
+            противном случае — `null`:  "003" или "15-0-4" или `null`
+          type: string
+          format: string
+          example: '003'
+        processingReferenceNumber:
+          description: >
+            Справочный номер процессинга. Данное поле отправляется только при
+            оплате картами: Uzcard, Humo, Visa Uzum Bank, Visa Kapital Bank. В
+            противном случае значение этого поля будет `null`.
+          type: string
+          format: string
+          example: '000'
+        phone:
+          description: |
+            Номер телефона клиента.
+          type: string
+          format: string
+          example: '998901234567'
+        cardType:
+          description: >
+            Тип банковской карты клиента (1 - корпоративная карта, 2 - карта
+            физического лица).
+          type: integer
+          format: int32
+          example: 2
+      required:
+        - serviceId
+        - timestamp
+        - transId
+        - paymentSource
+        - phone
+    Confirm:
+      type: object
+      properties:
+        serviceId:
+          description: |
+            Идентификатор сервиса за который производится оплата.
+          type: integer
+          format: int64
+          example: 101202
+        transId:
+          description: |
+            Идентификатор транзакции платежа, созданной в Uzum Bank.
+          type: string
+          format: uuid
+          example: 5c398d7e-76b6-11ee-96da-f3a095c6289d
+        status:
+          description: |
+            Статус транзакции платежа.
+          type: string
+          enum:
+            - CONFIRMED
+          example: CONFIRMED
+        confirmTime:
+          description: >
+            Время подтверждения транзакции платежа (unix timestamp в
+            миллисекундах).
+          type: integer
+          format: int64
+          example: 1698361458054
+        data:
+          description: >
+            Данные о пользователе и транзакции платежа (может быть пустым
+            объектом).
+
+            Объект `data` состоит из пар ключ-значение. Название ключа является
+            произвольным, например: `account` или `fio`.
+
+            Значением является объект с единственным свойством `value` (тип
+            `string`).
+          type: object
+          example:
+            account:
+              value: '123456789'
+            fio:
+              value: Иванов Иван Иванович
+        amount:
+          description: |
+            Сумма платежа в тийинах.
+          type: integer
+          format: int64
+          example: 2500000
+      required:
+        - serviceId
+        - transId
+        - status
+        - confirmTime
+        - amount
+    ConfirmError:
+      type: object
+      properties:
+        serviceId:
+          description: |
+            Идентификатор сервиса за который производится оплата.
+          type: integer
+          format: int64
+          example: 101202
+        transId:
+          description: |
+            Идентификатор транзакции платежа, созданной в Uzum Bank.
+          type: string
+          format: uuid
+          example: 5c398d7e-76b6-11ee-96da-f3a095c6289d
+        status:
+          description: |
+            Статус транзакции платежа.
+          type: string
+          enum:
+            - FAILED
+          example: FAILED
+        confirmTime:
+          description: >
+            Время подтверждения транзакции платежа (unix timestamp в
+            миллисекундах).
+                 
+          type: integer
+          format: int64
+          example: 1698361458054
+        errorCode:
+          description: >
+            Код ошибки подтверждения транзакции платежа.
+
+
+
+            Код ошибки  | Описание ошибки | Комментарии  
+
+            -|-|-
+
+            10001 | Доступ запрещен | Ошибка авторизации 
+
+            10002 | Ошибка парсинга JSON объекта с параметрами запроса 
+
+            10003 | Недопустимая операция | Неверный HTTP метод 
+
+            10005 | Отсутствуют обязательные параметры в запросе 
+
+            10014 | Транзакция не найдена 
+
+            10015 | Транзакция отменена
+
+            10016 | Транзакция с идентификатором `transId` уже подтверждена
+
+            99999 | Ошибка проверки данных | Сервис недоступен, повторите
+            попытку позже 
+          type: string
+          example: '10014'
+      required:
+        - errorCode
+    ReverseRequest:
+      type: object
+      properties:
+        serviceId:
+          description: |
+            Идентификатор сервиса за который производится оплата.
+          type: integer
+          format: int64
+          example: 101202
+        timestamp:
+          description: |
+            Время отправки запроса (unix timestamp в миллисекундах).
+          type: integer
+          format: int64
+          example: 1698361456728
+        transId:
+          description: |
+            Идентификатор транзакции платежа, созданной в Uzum Bank.
+          type: string
+          format: uuid
+          example: 5c398d7e-76b6-11ee-96da-f3a095c6289d
+      required:
+        - serviceId
+        - timestamp
+        - transId
+    Reverse:
+      type: object
+      properties:
+        serviceId:
+          description: |
+            Идентификатор сервиса за который производится оплата.
+          type: integer
+          format: int64
+          example: 101202
+        transId:
+          description: |
+            Идентификатор транзакции платежа, созданной в Uzum Bank.
+          type: string
+          format: uuid
+          example: 5c398d7e-76b6-11ee-96da-f3a095c6289d
+        status:
+          description: |
+            Статус транзакции платежа.
+          type: string
+          enum:
+            - REVERSED
+          example: REVERSED
+        reverseTime:
+          description: |
+            Время отмены транзакции платежа (unix timestamp в миллисекундах).
+          type: integer
+          format: int64
+          example: 1698361458054
+        data:
+          description: >
+            Данные о пользователе и транзакции платежа (может быть пустым
+            объектом).
+
+            Объект `data` состоит из пар ключ-значение. Название ключа является
+            произвольным, например: `account` или `fio`.
+          type: object
+          example:
+            account:
+              value: '123456789'
+            fio:
+              value: Иванов Иван Иванович
+        amount:
+          description: |
+            Сумма платежа в тийинах.
+          type: integer
+          format: int64
+          example: 2500000
+      required:
+        - serviceId
+        - transId
+        - status
+        - confirmTime
+        - amount
+    ReverseError:
+      type: object
+      properties:
+        serviceId:
+          description: |
+            Идентификатор сервиса за который производится оплата.
+          type: integer
+          format: int64
+          example: 101202
+        transId:
+          description: |
+            Идентификатор транзакции платежа, созданной в Uzum Bank.
+          type: string
+          format: uuid
+          example: 5c398d7e-76b6-11ee-96da-f3a095c6289d
+        status:
+          description: |
+            Статус транзакции платежа.
+          type: string
+          enum:
+            - FAILED
+          example: FAILED
+        reverseTime:
+          description: |
+            Время отмены транзакции платежа (unix timestamp в миллисекундах).
+                        
+          type: integer
+          format: int64
+          example: 1698361458054
+        errorCode:
+          description: >
+            Код ошибки подтверждения транзакции платежа.
+
+
+            Код ошибки | Описание ошибки | Комментарии 
+
+            -|-|-
+
+            10001 | Доступ запрещен | Ошибка авторизации
+
+            10002 | Ошибка парсинга JSON объекта с параметрами запроса 
+
+            10003 | Недопустимая операция | Неверный HTTP метод 
+
+            10005 | Отсутствуют обязательные параметры в запросе
+
+            10014 | Транзакция не найдена
+
+            10017 | Невозможно отменить транзакцию
+
+            10018 | Транзакция с идентификатором `transId` уже отменена 
+
+            99999 | Ошибка проверки данных | Сервис недоступен, повторите
+            попытку позже 
+          type: string
+          example: '10017'
+      required:
+        - errorCode
+    StatusRequest:
+      type: object
+      properties:
+        serviceId:
+          description: |
+            Идентификатор сервиса за который производится оплата.
+          type: integer
+          format: int64
+          example: 101202
+        timestamp:
+          description: |
+            Время отправки запроса (unix timestamp в миллисекундах).
+          type: integer
+          format: int64
+          example: 1698361456728
+        transId:
+          description: |
+            Идентификатор транзакции платежа, созданной в Uzum Bank.
+          type: string
+          format: uuid
+          example: 5c398d7e-76b6-11ee-96da-f3a095c6289d
+      required:
+        - serviceId
+        - timestamp
+        - transId
+    Status:
+      type: object
+      properties:
+        serviceId:
+          description: |
+            Идентификатор сервиса за который производится оплата.
+          type: integer
+          format: int64
+          example: 101202
+        transId:
+          description: |
+            Идентификатор транзакции платежа, созданной в Uzum Bank.
+          type: string
+          format: uuid
+          example: 5c398d7e-76b6-11ee-96da-f3a095c6289d
+        status:
+          description: |
+            Статус транзакции платежа.
+          type: string
+          enum:
+            - CREATED
+            - CONFIRMED
+            - REVERSED
+          example: CONFIRMED
+        transTime:
+          description: |
+            Время создания транзакции платежа (unix timestamp в миллисекундах).
+          type: integer
+          format: int64
+          example: 1698361458054
+        confirmTime:
+          description: >
+            Время подтверждения транзакции платежа (unix timestamp в
+            миллисекундах).
+          oneOf:
+            - type: integer
+              format: int64
+            - type: 'null'
+          example: 1698361458054
+        reverseTime:
+          description: |
+            Время отмены транзакции платежа (unix timestamp в миллисекундах).
+          oneOf:
+            - type: integer
+              format: int64
+            - type: 'null'
+          example: null
+        data:
+          description: >
+            Данные о пользователе и транзакции платежа (может быть пустым
+            объектом).
+
+            Объект `data` состоит из пар ключ-значение. Название ключа является
+            произвольным, например: `account` или `fio`.
+
+            Значением является объект с единственным свойством `value` (тип
+            `string`).
+          type: object
+          example:
+            account:
+              value: '123456789'
+            fio:
+              value: Иванов Иван Иванович
+        amount:
+          description: |
+            Сумма платежа в тийинах.
+          type: integer
+          format: int64
+          example: 2500000
+      required:
+        - serviceId
+        - transId
+        - status
+        - transTime
+    StatusError:
+      type: object
+      properties:
+        serviceId:
+          description: |
+            Идентификатор сервиса за который производится оплата.
+          type: integer
+          format: int64
+          example: 101202
+        transId:
+          description: |
+            Идентификатор транзакции платежа, созданной в Uzum Bank.
+          type: string
+          format: uuid
+          example: 5c398d7e-76b6-11ee-96da-f3a095c6289d
+        status:
+          description: |
+            Статус транзакции платежа.
+          type: string
+          enum:
+            - FAILED
+          example: FAILED
+        transTime:
+          description: |
+            Время создания транзакции платежа (unix timestamp в миллисекундах).
+          type: integer
+          format: int64
+          example: 1698361458054
+        confirmTime:
+          description: >
+            Время подтверждения транзакции платежа (unix timestamp в
+            миллисекундах).
+          oneOf:
+            - type: integer
+              format: int64
+            - type: 'null'
+          example: 1698361458054
+        reverseTime:
+          description: |
+            Время отмены транзакции платежа (unix timestamp в миллисекундах).
+          oneOf:
+            - type: integer
+              format: int64
+            - type: 'null'
+          example: null
+        errorCode:
+          description: >
+            Код ошибки получения статуса транзакции платежа.
+
+
+
+            Код ошибки  | Описание ошибки  | Комментарии / 
+
+            -|-|-
+
+            10001 | Доступ запрещен  | Ошибка авторизации
+
+            10002 | Ошибка парсинга JSON объекта с параметрами запроса
+
+            10003 | Недопустимая операция | Неверный HTTP метод 
+
+            10005 | Отсутствуют обязательные параметры в запросе 
+
+            10014 | Транзакция не найдена 
+
+            99999 | Ошибка проверки данных| Сервис недоступен, повторите попытку
+            позже 
+          type: string
+          example: '10014'
+      required:
+        - errorCode

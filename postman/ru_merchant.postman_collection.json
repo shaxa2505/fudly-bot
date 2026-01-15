@@ -1,0 +1,169 @@
+{
+  "info": {
+    "name": "Uzum Merchant API Webhooks",
+    "_postman_id": "497610e1-8058-4597-bddc-6160e2dacde7",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "description": "??????? Uzum Bank Merchant API: /check, /create, /confirm, /reverse, /status. Basic Auth."
+  },
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "https://your-merchant-host.example.com"
+    },
+    {
+      "key": "basic_user",
+      "value": "fudly_merchant"
+    },
+    {
+      "key": "basic_password",
+      "value": "Fudly#Uzum_2024!pQ7s"
+    }
+  ],
+  "auth": {
+    "type": "basic",
+    "basic": [
+      {
+        "key": "username",
+        "type": "string",
+        "value": "{{basic_user}}"
+      },
+      {
+        "key": "password",
+        "type": "string",
+        "value": "{{basic_password}}"
+      }
+    ]
+  },
+  "item": [
+    {
+      "name": "check",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "{{base_url}}/check",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "check"
+          ]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"serviceId\": 101202,\n  \"timestamp\": 1698361456728,\n  \"params\": {\n    \"account\": \"123456789\"\n  }\n}"
+        },
+        "description": "???????? ??????????? ?????????? ???????"
+      }
+    },
+    {
+      "name": "create",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "{{base_url}}/create",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "create"
+          ]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"serviceId\": 101202,\n  \"timestamp\": 1698361456728,\n  \"transId\": \"5c398d7e-76b6-11ee-96da-f3a095c6289d\",\n  \"params\": {\n    \"account\": \"123456789\"\n  },\n  \"amount\": 2500000\n}"
+        },
+        "description": "???????? ?????????? ???????"
+      }
+    },
+    {
+      "name": "confirm",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "{{base_url}}/confirm",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "confirm"
+          ]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"serviceId\": 101202,\n  \"timestamp\": 1698361456728,\n  \"transId\": \"5c398d7e-76b6-11ee-96da-f3a095c6289d\",\n  \"paymentSource\": \"INSTALLMENT\",\n  \"tariff\": \"003\",\n  \"processingReferenceNumber\": \"000\",\n  \"phone\": \"998901234567\",\n  \"cardType\": 2\n}"
+        },
+        "description": "????????????? ???????? ??????????"
+      }
+    },
+    {
+      "name": "reverse",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "{{base_url}}/reverse",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "reverse"
+          ]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"serviceId\": 101202,\n  \"timestamp\": 1698361456728,\n  \"transId\": \"5c398d7e-76b6-11ee-96da-f3a095c6289d\"\n}"
+        },
+        "description": "?????? ??????????"
+      }
+    },
+    {
+      "name": "status",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "{{base_url}}/status",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "status"
+          ]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"serviceId\": 101202,\n  \"timestamp\": 1698361456728,\n  \"transId\": \"5c398d7e-76b6-11ee-96da-f3a095c6289d\"\n}"
+        },
+        "description": "???????? ??????? ??????????"
+      }
+    }
+  ]
+}

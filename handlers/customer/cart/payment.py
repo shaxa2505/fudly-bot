@@ -136,7 +136,7 @@ def register(router: Router) -> None:
 
         safe_address = esc(address)
         text = (
-            f"💳 <b>{get_text(lang, 'cart_payment_select_title')}</b>\n\n"
+            f"<b>{get_text(lang, 'cart_payment_select_title')}</b>\n\n"
             f"{get_text(lang, 'cart_payment_amount_label')}: <b>{total_with_delivery:,} {currency}</b>\n"
             f"{get_text(lang, 'cart_delivery_address_label')}: {safe_address}"
         )
@@ -310,7 +310,7 @@ def register(router: Router) -> None:
             kb.adjust(2)
 
             items_text = "\n".join(
-                [f"• {esc(item['title'])} x {item['quantity']}" for item in cart_items_stored]
+                [f"- {esc(item['title'])} x {item['quantity']}" for item in cart_items_stored]
             )
             safe_address = esc(address)
             admin_caption = NotificationTemplates.admin_payment_review(
