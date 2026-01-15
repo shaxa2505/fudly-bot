@@ -5,24 +5,23 @@ LANGUAGES = {"ru": "Русский", "uz": "O'zbekcha"}
 TEXTS = {
     "ru": {
         # Приветствие
-        "choose_language": "Выберите язык / Tilni tanlang.",
-        "language_changed": "Язык установлен.",
+        "choose_language": "🌐 Выберите язык / Tilni tanlang.",
+        "language_changed": "Язык обновлён.",
         "welcome": """<b>Fudly</b>
-Выберите язык / Tilni tanlang.""",
-        "welcome_phone_step": """<b>Шаг 1/2: Телефон</b>
-Нужен для связи по заказу.
-Отправьте номер.""",
-        "welcome_city_step": """<b>Шаг 2/2: Город</b>
+🌐 Выберите язык / Tilni tanlang.""",
+        "welcome_phone_step": """<b>📱 Шаг 1/2: телефон</b>
+Отправьте номер, чтобы подтвердить заказ.""",
+        "welcome_city_step": """<b>📍 Шаг 2/2: город</b>
 Выберите из списка.""",
-        "registration_complete": """<b>Готово</b>
+        "registration_complete": """<b>✅ Готово</b>
 Данные сохранены.""",
-        "welcome_back": """<b>С возвращением, {name}</b>
+        "welcome_back": """<b>👋 С возвращением, {name}</b>
 Город: {city}
 Выберите раздел.""",
         "registration_required": """<b>Нужна регистрация</b>
 Нажмите /start.""",
         # Кнопки
-        "share_phone": "Поделиться номером",
+        "share_phone": "📱 Отправить номер",
         "cancel": "Отмена",
         "hot_offers": "Магазины и акции",
         "browse_places": "Места",
@@ -578,13 +577,13 @@ TEXTS = {
         "cart_payment_admin_total": "Итого: {total} сум",
         # Ключи регистрации
         "change_city_prompt": "📍 Выберите новый город:",
-        "phone_saved": "Телефон сохранен.",
-        "registration_city_title": "Выберите город",
+        "phone_saved": "✅ Телефон сохранён.",
+        "registration_city_title": "📍 Выберите город",
         "registration_city_hint": "Выберите из списка.",
-        "registration_continue_button": "Продолжить",
+        "registration_continue_button": "➡️ Продолжить",
         "registration_continue_offers": "К предложениям",
         "registration_continue_prompt": "Продолжить?",
-        "registration_resume_cart": "Вернуться к корзине",
+        "registration_resume_cart": "🛒 Вернуться к корзине",
         # Прочие ключи
         "key": "Ключ",
         "open_chat_to_view": "Откройте чат для просмотра",
@@ -592,23 +591,23 @@ TEXTS = {
         "too_many_requests": "Слишком много запросов. Попробуйте позже.",
     },
     "uz": {
+        "choose_language": "🌐 Tilni tanlang.",
         "language_changed": "Til o'rnatildi.",
         "welcome": """<b>Fudly</b>
-Tilni tanlang.""",
-        "welcome_phone_step": """<b>1/2-qadam: Telefon</b>
-Buyurtma bo'yicha aloqa uchun.
-Raqamingizni yuboring.""",
-        "welcome_city_step": """<b>2/2-qadam: Shahar</b>
+🌐 Tilni tanlang.""",
+        "welcome_phone_step": """<b>📱 1/2-qadam: telefon</b>
+Buyurtma bo'yicha aloqa uchun raqamingizni yuboring.""",
+        "welcome_city_step": """<b>📍 2/2-qadam: shahar</b>
 Ro'yxatdan tanlang.""",
-        "registration_complete": """<b>Tayyor</b>
+        "registration_complete": """<b>✅ Tayyor</b>
 Ma'lumotlar saqlandi.""",
-        "welcome_back": """<b>Yana xush kelibsiz, {name}</b>
+        "welcome_back": """<b>👋 Yana xush kelibsiz, {name}</b>
 Shahar: {city}
 Bo'limni tanlang.""",
         "registration_required": """<b>Ro'yxatdan o'tish kerak</b>
 /start bosing.""",
         # Tugmalar
-        "share_phone": "Raqamni ulashish",
+        "share_phone": "📱 Raqamni yuborish",
         "cancel": "Bekor qilish",
         "hot_offers": "Do'konlar va aksiyalar",
         "browse_places": "🏪 Joylar",
@@ -666,7 +665,7 @@ Bo'limni tanlang.""",
         "error": "Xatolik yuz berdi",
         # Ro'yxatdan o'tish
         "registration_choose_action": "Bo'limni tanlang:",
-        "registration_complete_personal": """<b>Tayyor</b>
+        "registration_complete_personal": """<b>✅ Tayyor</b>
 {name}, ro'yxatdan o'tish yakunlandi.
 Shahar: {city}
 Menyu pastda.""",
@@ -1164,13 +1163,13 @@ Do'koningiz tasdiqlandi va ishlashga tayyor.
         "cart_payment_admin_total": "Jami: {total} so'm",
         # Ro'yxatdan o'tish
         "change_city_prompt": "📍 Yangi shaharni tanlang:",
-        "phone_saved": "Telefon saqlandi.",
-        "registration_city_title": "Shaharni tanlang",
+        "phone_saved": "✅ Telefon saqlandi.",
+        "registration_city_title": "📍 Shaharni tanlang",
         "registration_city_hint": "Ro'yxatdan tanlang.",
-        "registration_continue_button": "Davom etish",
+        "registration_continue_button": "➡️ Davom etish",
         "registration_continue_offers": "Takliflarga",
         "registration_continue_prompt": "Davom ettirish?",
-        "registration_resume_cart": "Savatga qaytish",
+        "registration_resume_cart": "🛒 Savatga qaytish",
         # Boshqa
         "key": "Kalit",
         "open_chat_to_view": "Ko'rish uchun chatni oching",

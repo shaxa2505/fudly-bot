@@ -190,7 +190,7 @@ async def get_offers(
     min_price: float | None = Query(None, description="Minimum price filter"),
     max_price: float | None = Query(None, description="Maximum price filter"),
     min_discount: float | None = Query(None, description="Minimum discount percent"),
-    sort_by: str | None = Query(None, description="Sort by: discount, price_asc, price_desc, new"),
+    sort_by: str | None = Query(None, description="Sort by: urgent, discount, price_asc, price_desc, new"),
     limit: int = Query(50, ge=1, le=100),
     offset: int = Query(0, ge=0),
     include_meta: bool = Query(False, description="Include response metadata"),
@@ -202,8 +202,8 @@ async def get_offers(
         _ = user  # explicitly mark dependency as used
         normalized_city = normalize_city(city) if city else None
         normalized_city = normalized_city or None
-        region = region or None
-        district = district or None
+        region = normalize_city(region) if region else None
+        district = normalize_city(district) if district else None
         category_filter = expand_category_filter(category)
         lat_val = lat if lat is not None else latitude
         lon_val = lon if lon is not None else longitude
@@ -214,7 +214,7 @@ async def get_offers(
         storage_max_price = _to_storage_price(max_price)
 
         raw_offers: list[Any] = []
-        sort_key = sort_by or "discount"
+        sort_key = sort_by or "urgent"
         apply_filters = True
         apply_sort = True
         apply_slice = True
@@ -258,6 +258,24 @@ async def get_offers(
             apply_sort = bool(sort_by)
             apply_slice = False
         else:
+            # Prefer nearby offers when coordinates are available (TGTG proximity-first)
+            if lat_val is not None and lon_val is not None and hasattr(db, "get_nearby_offers"):
+                raw_offers = db.get_nearby_offers(
+                    latitude=lat_val,
+                    longitude=lon_val,
+                    limit=limit,
+                    offset=offset,
+                    category=category_filter,
+                    sort_by=sort_key,
+                    min_price=storage_min_price,
+                    max_price=storage_max_price,
+                    min_discount=min_discount,
+                )
+                if raw_offers:
+                    apply_filters = False
+                    apply_sort = False
+                    apply_slice = False
+
             def _fetch_scoped_offers(
                 city_scope: str | None, region_scope: str | None, district_scope: str | None
             ) -> list[Any]:
@@ -314,7 +332,8 @@ async def get_offers(
                 if scope in seen:
                     continue
                 seen.add(scope)
-                raw_offers = _fetch_scoped_offers(*scope)
+                if not raw_offers:
+                    raw_offers = _fetch_scoped_offers(*scope)
                 if raw_offers:
                     break
 
@@ -400,7 +419,18 @@ async def get_offers(
                 offers = [o for o in offers if o.discount_percent >= min_discount]
 
         if apply_sort:
-            if sort_by == "discount":
+            if sort_by == "urgent":
+                offers.sort(
+                    key=lambda x: (
+                        # 1) истекает раньше — выше
+                        x.expiry_date or "9999-12-31",
+                        # 2) меньший остаток — выше
+                        x.quantity or 0,
+                        # 3) большая скидка — выше
+                        -(x.discount_percent or 0),
+                    )
+                )
+            elif sort_by == "discount":
                 offers.sort(key=lambda x: x.discount_percent, reverse=True)
             elif sort_by == "price_asc":
                 offers.sort(key=lambda x: x.discount_price)
@@ -514,6 +544,8 @@ async def get_flash_deals(
     """Get flash deals - high discount items expiring soon."""
     try:
         normalized_city = normalize_city(city) if city else None
+        region = normalize_city(region) if region else None
+        district = normalize_city(district) if district else None
         raw_offers = (
             db.get_hot_offers(
                 normalized_city, limit=100, offset=0, region=region, district=district
