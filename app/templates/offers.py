@@ -257,23 +257,21 @@ def format_product_card(
     if raw_title.startswith("Пример:"):
         raw_title = raw_title[7:].strip()
     title = _trim_title(raw_title, limit=36)
-    lines = [f"<b>{_escape(title)}</b>"]
+    lines = [f"🧾 <b>{_escape(title)}</b>"]
 
     current_price = getattr(offer, "discount_price", None)
     if current_price is None:
         current_price = getattr(offer, "price", 0) or 0
     original_price = getattr(offer, "original_price", 0) or 0
 
-    lines.append(
-        f"{labels['price']}: {_format_money(current_price)} {labels['currency']}"
-    )
+    price_parts = [f"{labels['price']}: {_format_money(current_price)} {labels['currency']}"]
     if original_price and original_price > current_price:
         discount_pct = round((1 - current_price / original_price) * 100)
         discount_pct = min(99, max(1, discount_pct))
-        lines.append(
-            f"{labels['was']}: {_format_money(original_price)} {labels['currency']} "
-            f"(-{discount_pct}%)"
+        price_parts.append(
+            f"{labels['was']}: {_format_money(original_price)} {labels['currency']} (-{discount_pct}%)"
         )
+    lines.append(" | ".join(price_parts))
 
     qty = getattr(offer, "quantity", None)
     if qty is not None:
@@ -346,34 +344,34 @@ def _product_card_labels(lang: str) -> dict[str, str]:
     if lang == "ru":
         return {
             "currency": "сум",
-            "price": "Цена",
+            "price": "💰 Цена",
             "was": "Было",
-            "in_stock": "В наличии",
+            "in_stock": "📦 Остаток",
             "out_of_stock": "Нет в наличии",
-            "expiry": "Срок до",
-            "store": "Магазин",
-            "address": "Адрес",
-            "delivery": "Доставка",
-            "delivery_free": "Доставка: бесплатно",
+            "expiry": "⏳ Срок",
+            "store": "🏪 Магазин",
+            "address": "📍 Адрес",
+            "delivery": "🚚 Доставка",
+            "delivery_free": "🚚 Доставка: бесплатно",
             "delivery_none": "Только самовывоз",
-            "min_order": "Мин. заказ",
+            "min_order": "🔖 Мин. заказ",
             "unit": "шт",
         }
     return {
         "currency": "so'm",
-        "price": "Narx",
+        "price": "💰 Narx",
         "was": "Avval",
-        "in_stock": "Mavjud",
+        "in_stock": "📦 Mavjud",
         "out_of_stock": "Mavjud emas",
-        "expiry": "Yaroqlilik",
-        "store": "Do'kon",
-        "address": "Manzil",
-        "delivery": "Yetkazib berish",
-        "delivery_free": "Yetkazib berish: bepul",
+        "expiry": "⏳ Yaroqlilik",
+        "store": "🏪 Do'kon",
+        "address": "📍 Manzil",
+        "delivery": "🚚 Yetkazib berish",
+        "delivery_free": "🚚 Yetkazib berish: bepul",
         "delivery_none": "Faqat olib ketish",
-        "min_order": "Min. buyurtma",
+        "min_order": "🔖 Min. buyurtma",
         "unit": "dona",
-    }
+        }
 
 
 def _format_money(value: float) -> str:

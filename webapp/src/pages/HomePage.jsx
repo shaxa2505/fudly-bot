@@ -59,6 +59,8 @@ function HomePage() {
   const [showAddressModal, setShowAddressModal] = useState(false)
   const [manualCity, setManualCity] = useState(location.city)
   const [manualAddress, setManualAddress] = useState(location.address)
+  const [manualError, setManualError] = useState('')
+  const [geoStatusLabel, setGeoStatusLabel] = useState(() => localStorage.getItem(GEO_STATUS_KEY) || '')
 
   // Quick filters state
   const [minDiscount, setMinDiscount] = useState(null) // null, 20, 30, 50
@@ -116,6 +118,7 @@ function HomePage() {
     localStorage.setItem(GEO_ATTEMPT_KEY, String(Date.now()))
     if (status) {
       localStorage.setItem(GEO_STATUS_KEY, status)
+      setGeoStatusLabel(status)
     }
   }
   const shouldSkipGeo = () => {
@@ -696,12 +699,18 @@ function HomePage() {
   const openAddressModal = () => {
     setManualCity(location.city)
     setManualAddress(location.address)
+    setManualError('')
     setShowAddressModal(true)
   }
 
   const handleSaveManualAddress = () => {
     const trimmedCity = normalizeLocationName(manualCity.trim())
     const trimmedAddress = manualAddress.trim()
+    if (!trimmedCity) {
+      setManualError('Shahar yoki hududni kiriting')
+      return
+    }
+    setManualError('')
     setLocation(prev => {
       const keepRegion = prev.city?.startsWith(trimmedCity)
       return {
@@ -714,6 +723,17 @@ function HomePage() {
     })
     setShowAddressModal(false)
     setLocationError('')
+  }
+
+  const handleResetLocation = () => {
+    setLocation(DEFAULT_LOCATION)
+    setManualCity('')
+    setManualAddress('')
+    setManualError('')
+    setLocationError('')
+    localStorage.removeItem(GEO_ATTEMPT_KEY)
+    localStorage.removeItem(GEO_STATUS_KEY)
+    autoLocationAttempted.current = false
   }
 
   // Cart functions now come from useCart() hook
@@ -1122,6 +1142,11 @@ function HomePage() {
             {locationError && (
               <div className="address-error">{locationError}</div>
             )}
+            {geoStatusLabel && (
+              <div className="address-helper">
+                Oxirgi avto-aniqlash: {geoStatusLabel}
+              </div>
+            )}
 
             <div className="address-divider">
               <span>yoki</span>
@@ -1137,6 +1162,7 @@ function HomePage() {
                 className="address-input"
                 placeholder="Masalan, Toshkent, O'zbekiston"
               />
+              <span className="address-helper">Shahar yoki tuman nomi kerak</span>
             </label>
             <label className="address-label">
               Aniq manzil
@@ -1147,13 +1173,18 @@ function HomePage() {
                 className="address-textarea"
                 placeholder="Ko'cha, uy, blok, mo'ljal"
               />
+              <span className="address-helper">Ixtiyoriy, agar yetkazib berish kerak bo‘lsa</span>
             </label>
+            {manualError && <div className="address-error">{manualError}</div>}
             <div className="address-modal-actions">
               <button className="address-btn secondary" onClick={() => setShowAddressModal(false)}>
                 Bekor qilish
               </button>
               <button className="address-btn" onClick={handleSaveManualAddress}>
                 Saqlash
+              </button>
+              <button className="address-btn ghost" onClick={handleResetLocation}>
+                Joylashuvni tozalash
               </button>
             </div>
           </div>

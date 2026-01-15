@@ -751,6 +751,10 @@ class NotificationTemplates:
 
         return "\n".join(lines)
 
+
+class UnifiedOrderService:
+    """Unified service for handling orders and bookings."""
+
     def __init__(self, db: Any, bot: Bot):
         self.db = db
         self.bot = bot

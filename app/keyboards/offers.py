@@ -107,7 +107,7 @@ def store_card_keyboard(
     elif back_callback == "back_to_store_list":
         back = "К списку магазинов" if lang == "ru" else "Do'konlar ro'yxati"
     else:
-        back = "Назад" if lang == "ru" else "Orqaga"
+        back = "Назад" if lang == "ru" else "?? Orqaga"
 
     # Показывать количество только если товары есть
     if offers_count > 0:
@@ -127,11 +127,11 @@ def offer_details_keyboard(
     builder = InlineKeyboardBuilder()
 
     # Add to cart button (primary action)
-    cart = "В корзину" if lang == "ru" else "Savatga qo'shish"
+    cart = "🛒 В корзину" if lang == "ru" else "🛒 Savatga qo'shish"
     builder.button(text=cart, callback_data=f"add_to_cart_{offer_id}")
 
     # Quick order button (skip cart) - clearer text
-    order = "Быстрый заказ" if lang == "ru" else "Tez buyurtma"
+    order = "⚡ Быстрый заказ" if lang == "ru" else "⚡ Tez buyurtma"
     builder.button(text=order, callback_data=f"book_{offer_id}")
 
     builder.adjust(2)
@@ -150,11 +150,11 @@ def offer_details_with_back_keyboard(
     builder = InlineKeyboardBuilder()
 
     # Main action: Add to cart (most common)
-    cart = "В корзину" if lang == "ru" else "Savatga qo'shish"
+    cart = "🛒 В корзину" if lang == "ru" else "🛒 Savatga qo'shish"
     builder.button(text=cart, callback_data=f"add_to_cart_{offer_id}")
 
     # Quick order button - clearer text
-    order = "Быстрый заказ" if lang == "ru" else "Tez buyurtma"
+    order = "⚡ Быстрый заказ" if lang == "ru" else "⚡ Tez buyurtma"
     builder.button(text=order, callback_data=f"book_{offer_id}")
 
     # Back button - full width
@@ -172,11 +172,11 @@ def offer_details_search_keyboard(
     builder = InlineKeyboardBuilder()
 
     # Main action: Add to cart
-    cart = "В корзину" if lang == "ru" else "Savatga qo'shish"
+    cart = "🛒 В корзину" if lang == "ru" else "🛒 Savatga qo'shish"
     builder.button(text=cart, callback_data=f"add_to_cart_{offer_id}")
 
     # Quick order
-    order = "Быстрый заказ" if lang == "ru" else "Tez buyurtma"
+    order = "⚡ Быстрый заказ" if lang == "ru" else "⚡ Tez buyurtma"
     builder.button(text=order, callback_data=f"book_{offer_id}")
 
     # Back to search results
@@ -193,11 +193,11 @@ def offer_quick_keyboard(
     builder = InlineKeyboardBuilder()
 
     # Add to cart - main action
-    cart = "В корзину" if lang == "ru" else "Savatga qo'shish"
+    cart = "🛒 В корзину" if lang == "ru" else "🛒 Savatga qo'shish"
     builder.button(text=cart, callback_data=f"add_to_cart_{offer_id}")
 
     # Quick order - skip cart
-    order = "Быстрый заказ" if lang == "ru" else "Tez buyurtma"
+    order = "⚡ Быстрый заказ" if lang == "ru" else "⚡ Tez buyurtma"
     builder.button(text=order, callback_data=f"book_{offer_id}")
 
     builder.adjust(2)
@@ -215,18 +215,18 @@ def offer_in_cart_keyboard(lang: str, source: str = "generic") -> InlineKeyboard
     builder = InlineKeyboardBuilder()
 
     # Open cart
-    open_cart = "Открыть корзину" if lang == "ru" else "Savatni ochish"
+    open_cart = "🛒 Открыть корзину" if lang == "ru" else "🛒 Savatni ochish"
     builder.button(text=open_cart, callback_data="view_cart")
 
     # Context-aware back
     if source == "hot":
-        back_text = "Назад к акциям" if lang == "ru" else "Aksiyalarga qaytish"
+        back_text = "⬅️ Назад к акциям" if lang == "ru" else "⬅️ Aksiyalarga qaytish"
         back_data = "back_to_hot"
     elif source == "search":
-        back_text = "Назад к результатам" if lang == "ru" else "Natijalarga qaytish"
+        back_text = "⬅️ Назад к результатам" if lang == "ru" else "⬅️ Natijalarga qaytish"
         back_data = "back_to_search_results"
     else:
-        back_text = "Назад" if lang == "ru" else "Orqaga"
+        back_text = "⬅️ Назад" if lang == "ru" else "⬅️ Orqaga"
         back_data = "back_to_menu"
 
     builder.button(text=back_text, callback_data=back_data)
