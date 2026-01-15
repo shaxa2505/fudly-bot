@@ -222,6 +222,7 @@ async def get_offers(
         apply_sort = True
         apply_slice = True
         max_distance = max_distance_km if max_distance_km is not None else 10.0
+        extended_distance = max_distance if max_distance_km is not None else 25.0
         if store_id:
             raw_offers = (
                 db.get_store_offers(
@@ -276,6 +277,19 @@ async def get_offers(
                     min_discount=min_discount,
                     max_distance_km=max_distance,
                 )
+                if not raw_offers and extended_distance and extended_distance > max_distance:
+                    raw_offers = db.get_nearby_offers(
+                        latitude=lat_val,
+                        longitude=lon_val,
+                        limit=limit,
+                        offset=offset,
+                        category=category_filter,
+                        sort_by=sort_key,
+                        min_price=storage_min_price,
+                        max_price=storage_max_price,
+                        min_discount=min_discount,
+                        max_distance_km=extended_distance,
+                    )
                 if raw_offers:
                     apply_filters = False
                     apply_sort = False

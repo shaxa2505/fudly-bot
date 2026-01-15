@@ -722,6 +722,29 @@
   color: #b36b00;
   font-size: 13px;
   line-height: 1.4;
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.location-warning + .location-warning {
+  margin-top: var(--spacing-xs);
+}
+
+.location-warning-btn {
+  border: none;
+  background: #ffd591;
+  color: #7a4100;
+  padding: 6px 10px;
+  border-radius: 10px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.location-warning-btn:active {
+  transform: translateY(1px);
 }
 
 .filters-advanced {

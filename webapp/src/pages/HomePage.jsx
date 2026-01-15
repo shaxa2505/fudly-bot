@@ -104,6 +104,7 @@ function HomePage() {
   const offersCountLabel = hasMore && offersTotal == null
     ? `${offersCountValue}+ ta`
     : `${offersCountValue} ta`
+  const [hasNearbyFallback, setHasNearbyFallback] = useState(false)
   const trimmedSearch = searchQuery.trim()
   const showHistoryDropdown = showSearchHistory && !trimmedSearch && searchHistory.length > 0
   const showSuggestionsDropdown = showSearchHistory && trimmedSearch.length >= 2
@@ -365,6 +366,15 @@ function HomePage() {
       }
 
       setHasMore(hasMoreResult)
+      // If we had coordinates but got empty list, assume we fell back to broader scope
+      if (
+        (location.coordinates?.lat != null && location.coordinates?.lon != null) &&
+        items.length === 0
+      ) {
+        setHasNearbyFallback(true)
+      } else {
+        setHasNearbyFallback(false)
+      }
     } catch (error) {
       console.error('Error loading offers:', error)
     } finally {
@@ -972,6 +982,18 @@ function HomePage() {
         <div className="location-warning">
           Manzil aniqlanmagan. Siz hozir barcha shaharlar bo‘yicha mahsulotlarni ko‘ryapsiz.
           Manzilni kiriting yoki geolokatsiyani yoqing, shunda yaqin atrofdagi takliflar ko‘rsatiladi.
+        </div>
+      )}
+
+      {hasNearbyFallback && (
+        <div className="location-warning">
+          Yaqin atrofda takliflar topilmadi. Siz kengaytirilган hududdagi mahsulotlarni ko‘ryapsiz.
+          <button
+            className="location-warning-btn"
+            onClick={() => setShowAddressModal(true)}
+          >
+            Manzilni o‘zgartirish
+          </button>
         </div>
       )}
 

@@ -584,73 +584,76 @@ class NotificationTemplates:
 
         normalized_type = "delivery" if order_type == "taxi" else order_type
         is_delivery = NotificationTemplates._is_delivery(normalized_type)
-        order_type_text = NotificationTemplates._order_type_label(lang, normalized_type)
+        type_label = NotificationTemplates._order_type_label(lang, normalized_type)
 
         status_labels = {
             "uz": {
-                OrderStatus.PENDING: "⏳ Tasdiq kutilmoqda",
-                OrderStatus.PREPARING: "👩‍🍳 Tayyorlanmoqda",
-                OrderStatus.READY: "✅ Tayyor",
-                OrderStatus.DELIVERING: "🚚 Yo'lda",
-                OrderStatus.COMPLETED: "✅ Yetkazildi",
-                OrderStatus.REJECTED: "❌ Rad etildi",
-                OrderStatus.CANCELLED: "❌ Bekor qilindi",
+                OrderStatus.PENDING: "Tasdiq kutilmoqda",
+                OrderStatus.PREPARING: "Tayyorlanmoqda",
+                OrderStatus.READY: "Tayyor",
+                OrderStatus.DELIVERING: "Yo'lda",
+                OrderStatus.COMPLETED: "Yetkazildi" if is_delivery else "Berildi",
+                OrderStatus.REJECTED: "Rad etildi",
+                OrderStatus.CANCELLED: "Bekor qilindi",
             },
             "ru": {
-                OrderStatus.PENDING: "⏳ Ожидаем подтверждение",
-                OrderStatus.PREPARING: "👩‍🍳 Готовится",
-                OrderStatus.READY: "✅ Готово",
-                OrderStatus.DELIVERING: "🚚 В пути",
-                OrderStatus.COMPLETED: "✅ Доставлено",
-                OrderStatus.REJECTED: "❌ Отклонено",
-                OrderStatus.CANCELLED: "❌ Отменено",
+                OrderStatus.PENDING: "Ожидает подтверждения",
+                OrderStatus.PREPARING: "Готовится",
+                OrderStatus.READY: "Готово",
+                OrderStatus.DELIVERING: "В пути",
+                OrderStatus.COMPLETED: "Доставлено" if is_delivery else "Выдано",
+                OrderStatus.REJECTED: "Отклонено",
+                OrderStatus.CANCELLED: "Отменено",
             },
         }
         status_text = status_labels.get(lang, status_labels["ru"]).get(status, status)
 
         unique_ids = sorted({int(x) for x in (order_ids or []) if x})
         is_group = len(unique_ids) > 1
+
+        title_label = "Buyurtma" if lang == "uz" else "Заказ"
         if is_group:
             header_label = "Savat" if lang == "uz" else "Корзина"
-            header = f"🧺 <b>{header_label}</b>"
+            header = f"🧾 {header_label} - {type_label}"
         else:
-            header_label = "Buyurtma" if lang == "uz" else "Заказ"
-            if is_cart:
-                header_label = "Buyurtma" if lang == "uz" else "Корзина"
-            header = f"🧺 <b>{header_label} #{order_id}</b>"
+            header = f"🧾 {title_label} #{order_id} - {type_label}"
 
+        status_label = "Holat" if lang == "uz" else "Статус"
         lines: list[str] = [
             header,
-            f"{order_type_text}",
-            f"Статус: {status_text}" if lang != "uz" else f"Holat: {status_text}",
+            f"{status_label}: {status_text}",
         ]
 
         if is_group:
             max_show = 5
             shown = unique_ids[:max_show]
-            suffix = ""
-            if len(unique_ids) > max_show:
-                suffix = f" +{len(unique_ids) - max_show}"
+            suffix = f" +{len(unique_ids) - max_show}" if len(unique_ids) > max_show else ""
             ids_text = ", ".join([f"#{oid}" for oid in shown]) + suffix
             label = "Buyurtmalar" if lang == "uz" else "Заказы"
-            lines.append(f"🧾 {label}: {ids_text}")
+            lines.append(f"{label}: {ids_text}")
 
         if store_name:
-            lines.append(f"🏪 {_esc(store_name)}")
+            store_label = "Do'kon" if lang == "uz" else "Магазин"
+            lines.append(f"{store_label}: {_esc(store_name)}")
 
         if is_delivery:
             if delivery_address:
-                lines.append(f"📍 {_esc(delivery_address)}")
+                addr_label = "Manzil" if lang == "uz" else "Адрес"
+                lines.append(f"{addr_label}: {_esc(delivery_address)}")
+            if courier_phone and status == OrderStatus.DELIVERING:
+                courier_label = "Kuryer" if lang == "uz" else "Курьер"
+                lines.append(f"{courier_label}: {_esc(courier_phone)}")
         else:
             if store_address:
-                lines.append(f"📍 {_esc(store_address)}")
+                addr_label = "Manzil" if lang == "uz" else "Адрес"
+                lines.append(f"{addr_label}: {_esc(store_address)}")
             if pickup_code:
-                lines.append(
-                    f"🔑 {'Kod' if lang == 'uz' else 'Код'}: <b>{_esc(pickup_code)}</b>"
-                )
+                code_label = "Kod" if lang == "uz" else "Код"
+                lines.append(f"{code_label}: <b>{_esc(pickup_code)}</b>")
 
         lines.append("")
-        lines.append("🧾 Mahsulotlar:" if lang == "uz" else "🧾 Товары:")
+        items_label = "Mahsulotlar" if lang == "uz" else "Товары"
+        lines.append(f"{items_label}:")
 
         total = 0
         for item in items:
@@ -659,25 +662,22 @@ class NotificationTemplates:
             price = int(item.get("price", 0))
             subtotal = price * qty
             total += subtotal
-            lines.append(f"• {title} × {qty} = {subtotal:,} {currency}")
+            lines.append(f"- {title} × {qty} = {subtotal:,} {currency}")
 
         if is_delivery and delivery_price:
             total += int(delivery_price)
-            lines.append(f"🚚 {'Yetkazish' if lang == 'uz' else 'Доставка'}: {int(delivery_price):,} {currency}")
+            delivery_label = "Yetkazish" if lang == "uz" else "Доставка"
+            lines.append(f"{delivery_label}: {int(delivery_price):,} {currency}")
 
-        lines.append(f"💰 {'Jami' if lang == 'uz' else 'Итого'}: <b>{int(total):,} {currency}</b>")
-
-        if courier_phone and status == OrderStatus.DELIVERING:
-            lines.append(f"📞 {'Kuryer' if lang == 'uz' else 'Курьер'}: {_esc(courier_phone)}")
+        total_label = "Jami" if lang == "uz" else "Итого"
+        lines.append(f"{total_label}: <b>{int(total):,} {currency}</b>")
 
         if reject_reason and status in (OrderStatus.REJECTED, OrderStatus.CANCELLED):
-            lines.append(
-                f"📝 {'Sabab' if lang == 'uz' else 'Причина'}: {_esc(reject_reason)}"
-            )
+            reason_label = "Sabab" if lang == "uz" else "Причина"
+            lines.append(f"{reason_label}: {_esc(reject_reason)}")
 
         return "\n".join(lines)
 
-    @staticmethod
     def seller_status_update(
         lang: str,
         order_id: int | str,
@@ -689,131 +689,77 @@ class NotificationTemplates:
         delivery_address: str | None = None,
         total: int = 0,
         delivery_price: int = 0,
-        currency: str = "сум",
+        currency: str = "UZS",
     ) -> str:
-        """Build seller notification with dynamic status indicator.
-
-        This creates ONE message that gets edited as status changes.
-        Status indicator at top shows current state.
-        """
+        """Build seller notification with a clean status layout."""
 
         def _esc(val: Any) -> str:
             return html.escape(str(val)) if val else ""
 
-        # Status indicators - different for pickup vs delivery
-        if order_type in ("delivery", "taxi"):
-            status_indicators = {
-                "uz": {
-                    OrderStatus.PENDING: "⏳ KUTILMOQDA",
-                    OrderStatus.PREPARING: "👨‍🍳 TAYYORLANMOQDA",
-                    OrderStatus.READY: "📦 KURYERGA TAYYOR",
-                    OrderStatus.DELIVERING: "🚚 KURYERDA",
-                    OrderStatus.COMPLETED: "✅ YETKAZILDI",
-                    OrderStatus.REJECTED: "❌ RAD ETILDI",
-                    OrderStatus.CANCELLED: "❌ BEKOR QILINDI",
-                },
-                "ru": {
-                    OrderStatus.PENDING: "⏳ ОЖИДАЕТ",
-                    OrderStatus.PREPARING: "👨‍🍳 ГОТОВИТСЯ",
-                    OrderStatus.READY: "📦 ГОТОВ К ПЕРЕДАЧЕ",
-                    OrderStatus.DELIVERING: "🚚 У КУРЬЕРА",
-                    OrderStatus.COMPLETED: "✅ ДОСТАВЛЕНО",
-                    OrderStatus.REJECTED: "❌ ОТКЛОНЁН",
-                    OrderStatus.CANCELLED: "❌ ОТМЕНЁН",
-                },
-            }
-        else:
-            # Pickup status indicators
-            status_indicators = {
-                "uz": {
-                    OrderStatus.PENDING: "⏳ KUTILMOQDA",
-                    OrderStatus.PREPARING: "👨‍🍳 TAYYORLANMOQDA",
-                    OrderStatus.READY: "✅ TAYYOR",
-                    OrderStatus.DELIVERING: "🚚 YETKAZILMOQDA",
-                    OrderStatus.COMPLETED: "✅ TOPSHIRILDI",
-                    OrderStatus.REJECTED: "❌ RAD ETILDI",
-                    OrderStatus.CANCELLED: "❌ BEKOR QILINDI",
-                },
-                "ru": {
-                    OrderStatus.PENDING: "⏳ ОЖИДАЕТ",
-                    OrderStatus.PREPARING: "👨‍🍳 ГОТОВИТСЯ",
-                    OrderStatus.READY: "✅ ГОТОВО",
-                    OrderStatus.DELIVERING: "🚚 В ДОСТАВКЕ",
-                    OrderStatus.COMPLETED: "✅ ВЫДАНО",
-                    OrderStatus.REJECTED: "❌ ОТКЛОНЁН",
-                    OrderStatus.CANCELLED: "❌ ОТМЕНЁН",
-                },
-            }
-
-        indicators = status_indicators.get(lang, status_indicators["ru"])
-        status_text = indicators.get(status, status)
-
-        # Order type text
         is_delivery = NotificationTemplates._is_delivery(order_type)
-        order_type_text = NotificationTemplates._order_type_label(lang, order_type)
+        type_label = NotificationTemplates._order_type_label(lang, order_type)
 
-        # Build message
-        if lang == "uz":
-            header_line = f"📦 Buyurtma #{order_id} │ {order_type_text}"
-        else:
-            header_line = f"📦 Заказ #{order_id} │ {order_type_text}"
+        status_labels = {
+            "uz": {
+                OrderStatus.PENDING: "Tasdiq kutilmoqda",
+                OrderStatus.PREPARING: "Tayyorlanmoqda",
+                OrderStatus.READY: "Tayyor",
+                OrderStatus.DELIVERING: "Yo'lda",
+                OrderStatus.COMPLETED: "Topshirildi" if is_delivery else "Berildi",
+                OrderStatus.REJECTED: "Rad etildi",
+                OrderStatus.CANCELLED: "Bekor qilindi",
+            },
+            "ru": {
+                OrderStatus.PENDING: "Ожидает подтверждения",
+                OrderStatus.PREPARING: "Готовится",
+                OrderStatus.READY: "Готово",
+                OrderStatus.DELIVERING: "В пути",
+                OrderStatus.COMPLETED: "Доставлено" if is_delivery else "Выдано",
+                OrderStatus.REJECTED: "Отклонено",
+                OrderStatus.CANCELLED: "Отменено",
+            },
+        }
+        status_text = status_labels.get(lang, status_labels["ru"]).get(status, status)
 
-        lines = [
-            f"<b>{status_text}</b>",
-            "━━━━━━━━━━━━━━━━━━",
-            "",
-            header_line,
-            "",
+        title_label = "Buyurtma" if lang == "uz" else "Заказ"
+        header = f"🧾 {title_label} #{order_id} - {type_label}"
+
+        status_label = "Holat" if lang == "uz" else "Статус"
+        lines: list[str] = [
+            header,
+            f"{status_label}: {status_text}",
         ]
 
-        # Customer info
-        if customer_name or customer_phone:
-            lines.append(f"👤 {_esc(customer_name or '-')}")
-            if customer_phone:
-                lines.append(f"📱 <code>{_esc(customer_phone)}</code>")
+        if customer_name:
+            client_label = "Mijoz" if lang == "uz" else "Клиент"
+            lines.append(f"{client_label}: {_esc(customer_name)}")
+        if customer_phone:
+            phone_label = "Telefon" if lang == "uz" else "Телефон"
+            lines.append(f"{phone_label}: <code>{_esc(customer_phone)}</code>")
 
-        # Delivery address (only for delivery)
         if is_delivery and delivery_address:
-            lines.append(f"📍 {_esc(delivery_address)}")
+            addr_label = "Manzil" if lang == "uz" else "Адрес"
+            lines.append(f"{addr_label}: {_esc(delivery_address)}")
 
-        # Items
         if items:
             lines.append("")
-            if lang == "uz":
-                lines.append("<b>Mahsulotlar:</b>")
-            else:
-                lines.append("<b>Товары:</b>")
+            items_label = "Mahsulotlar" if lang == "uz" else "Товары"
+            lines.append(f"{items_label}:")
             for item in items:
-                qty = item.get("quantity", 1)
-                title = item.get("title", "?")
-                lines.append(f"• {_esc(title)} × {qty}")
+                title = _esc(item.get("title", ""))
+                qty = int(item.get("quantity", 1))
+                price = int(item.get("price", 0))
+                subtotal = price * qty
+                lines.append(f"- {title} × {qty} = {subtotal:,} {currency}")
 
-        # Total
-        lines.append("")
-        lines.append("━━━━━━━━━━━━━━━━━━")
-        grand_total = int(total + delivery_price)
-        if lang == "uz":
-            lines.append(f"💰 <b>JAMI: {grand_total:,} {currency}</b>")
-        else:
-            lines.append(f"💰 <b>ИТОГО: {grand_total:,} {currency}</b>")
+        if is_delivery and delivery_price:
+            delivery_label = "Yetkazish" if lang == "uz" else "Доставка"
+            lines.append(f"{delivery_label}: {int(delivery_price):,} {currency}")
+
+        total_label = "Jami" if lang == "uz" else "Итого"
+        lines.append(f"{total_label}: <b>{int(total):,} {currency}</b>")
 
         return "\n".join(lines)
-
-
-# =============================================================================
-# UNIFIED ORDER SERVICE
-# =============================================================================
-
-
-class UnifiedOrderService:
-    """
-    Unified service for all order operations.
-
-    Handles both bookings (pickup) and orders (delivery) with:
-    - Consistent status management
-    - Automatic customer notifications on status changes
-    - Unified seller notifications
-    """
 
     def __init__(self, db: Any, bot: Bot):
         self.db = db
