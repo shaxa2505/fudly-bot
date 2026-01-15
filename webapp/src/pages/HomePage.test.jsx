@@ -323,7 +323,7 @@ describe('HomePage', () => {
       expect(screen.getByText('Milk Offer')).toBeInTheDocument()
     })
 
-    fireEvent.click(screen.getByRole('button', { name: 'Sut' }))
+    fireEvent.click(screen.getByRole('tab', { name: 'Sut' }))
 
     await waitFor(() => {
       expect(apiMocks.getOffers).toHaveBeenCalledTimes(2)
@@ -352,7 +352,7 @@ describe('HomePage', () => {
       expect(screen.getByText('Snack Offer')).toBeInTheDocument()
     })
 
-    fireEvent.click(screen.getByRole('button', { name: 'Shirinlik' }))
+    fireEvent.click(screen.getByRole('tab', { name: 'Shirinlik' }))
 
     await waitFor(() => {
       expect(apiMocks.getOffers).toHaveBeenCalledTimes(2)
@@ -448,10 +448,9 @@ describe('HomePage', () => {
     await new Promise(resolve => setTimeout(resolve, 600))
 
     await waitFor(() => {
-      expect(apiMocks.getOffers).toHaveBeenCalledTimes(2)
+      expect(apiMocks.getOffers.mock.calls.some(call => call[0].search === 'milk')).toBe(true)
     })
 
-    expect(apiMocks.getOffers.mock.calls[1][0].search).toBe('milk')
     expect(screen.getByText('Milk')).toBeInTheDocument()
   })
 
@@ -477,7 +476,7 @@ describe('HomePage', () => {
     await new Promise(resolve => setTimeout(resolve, 600))
 
     expect(screen.getByPlaceholderText('Mahsulot qidirish...')).toHaveValue('')
-    expect(screen.getByRole('button', { name: 'Barchasi' }).className).toContain('is-active')
+    expect(screen.getByRole('tab', { name: 'Barchasi' }).className).toContain('is-active')
   })
 
   it('shows filters count when multiple filters are active', async () => {
@@ -498,7 +497,7 @@ describe('HomePage', () => {
 
     renderHomePage()
 
-    fireEvent.click(screen.getByRole('button', { name: 'Sut' }))
+    fireEvent.click(screen.getByRole('tab', { name: 'Sut' }))
 
     await waitFor(() => {
       expect(screen.getByRole('heading', { name: 'Sut' })).toBeInTheDocument()

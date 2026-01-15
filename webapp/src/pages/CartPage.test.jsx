@@ -7,6 +7,7 @@ const apiMocks = vi.hoisted(() => ({
   getPaymentProviders: vi.fn(),
   getStore: vi.fn(),
   getPhotoUrl: vi.fn(),
+  getProfile: vi.fn(),
   createOrder: vi.fn(),
   getPaymentCard: vi.fn(),
   createPaymentLink: vi.fn(),
@@ -18,6 +19,7 @@ vi.mock('../api/client', () => ({
     getPaymentProviders: apiMocks.getPaymentProviders,
     getStore: apiMocks.getStore,
     getPhotoUrl: apiMocks.getPhotoUrl,
+    getProfile: apiMocks.getProfile,
     createOrder: apiMocks.createOrder,
     getPaymentCard: apiMocks.getPaymentCard,
     createPaymentLink: apiMocks.createPaymentLink,
@@ -38,6 +40,7 @@ describe('CartPage', () => {
     apiMocks.getPaymentProviders.mockResolvedValue([])
     apiMocks.getStore.mockResolvedValue({ delivery_enabled: false })
     apiMocks.getPhotoUrl.mockReturnValue('')
+    apiMocks.getProfile.mockReset()
   })
 
   it('renders empty cart state', () => {
@@ -63,6 +66,8 @@ describe('CartPage', () => {
         },
       })
     )
+    localStorage.setItem('fudly_user', JSON.stringify({ phone: '+998901234567' }))
+    localStorage.setItem('fudly_phone', '+998901234567')
 
     renderWithProviders(<CartPage />)
 

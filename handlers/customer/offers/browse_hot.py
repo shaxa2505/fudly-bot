@@ -80,20 +80,17 @@ def _render_offers_list_text(
     page_info = f"{page_label} {page + 1}"
     if total_pages:
         page_info += f"/{total_pages}"
-    lines = [title, f"{city_label}: {city} | {page_info}", "-" * 24]
+    lines = [title, f"{city_label}: {city} | {page_info}"]
 
     for idx, offer in enumerate(offers, start=1):
         title_line = _short_title(offer.title, limit=28)
         price_line = _offer_price_line(offer, lang)
         store_name = _short_store(getattr(offer, "store_name", "") or "", limit=16)
-        meta = f"{price_line}"
+        meta = price_line
         if store_name:
-            meta += f" | {store_name}"
-        lines.append(f"{idx}. <b>{title_line}</b>")
-        lines.append(f"   {meta}")
-        lines.append("")
+            meta = f"{meta} | {store_name}"
+        lines.append(f"{idx}. <b>{title_line}</b> - {meta}")
 
-    lines.append(get_text(lang, "select_by_number"))
     return "\n".join(lines).rstrip()
 
 

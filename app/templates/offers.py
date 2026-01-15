@@ -56,6 +56,8 @@ def render_business_type_store_list(
     business_type: str,
     city: str,
     stores: Sequence[StoreSummary],
+    page: int = 0,
+    per_page: int = 10,
 ) -> str:
     """Render store list in unified compact style like hot offers."""
     type_names = {
@@ -68,40 +70,26 @@ def render_business_type_store_list(
     }
     title = type_names.get(business_type, business_type.replace("_", " ").title())
     city_label = "Город" if lang == "ru" else "Shahar"
-    total_text = "Найдено" if lang == "ru" else "Topildi"
-    stores_word = "магазинов" if lang == "ru" else "ta do'kon"
-    address_label = "Адрес" if lang == "ru" else "Manzil"
-    rating_label = "Рейтинг" if lang == "ru" else "Reyting"
-    offers_label = "Предложений" if lang == "ru" else "Takliflar"
+    page_label = "Стр." if lang == "ru" else "Sah."
 
-    # Header
-    lines = [f"<b>{title}</b>", f"{city_label}: {city}"]
+    total = len(stores)
+    per_page = max(1, int(per_page))
+    total_pages = max(1, (total + per_page - 1) // per_page)
+    page = max(0, min(int(page), total_pages - 1))
+    start_idx = page * per_page
+    page_stores = stores[start_idx : start_idx + per_page]
 
-    # Count info
-    lines.append(f"{total_text}: {len(stores)} {stores_word}")
-    lines.append("")
+    lines = [f"<b>{title}</b>", f"{city_label}: {city} | {page_label} {page + 1}/{total_pages}"]
 
-    # Compact store list (like hot offers)
-    for idx, store in enumerate(stores, 1):
-        # Store name
+    for store in page_stores:
         store_name = store.name or ("Магазин" if lang == "ru" else "Do'kon")
         name = store_name[:30] + "..." if len(store_name) > 30 else store_name
-
-        # Rating and offers count
-        rating_str = f"{store.rating:.1f}/5" if store.rating else "—"
-        offers_count = store.offers_count if store.offers_count is not None else 0
-
-        # Build line
-        lines.append(f"{idx}. <b>{_escape(name)}</b>")
+        line = f"- <b>{_escape(name)}</b>"
         if store.address:
             short_addr = store.address[:30] + "..." if len(store.address) > 30 else store.address
-            lines.append(f"   {address_label}: {_escape(short_addr)}")
-        lines.append(f"   {rating_label}: {rating_str} | {offers_label}: {offers_count}")
-        lines.append("")
+            line += f" - {_escape(short_addr)}"
+        lines.append(line)
 
-    # Selection prompt
-    prompt = "Выберите магазин ниже." if lang == "ru" else "Quyidan do'konni tanlang."
-    lines.append(prompt)
     return "\n".join(lines)
 
 

@@ -1066,18 +1066,14 @@ def register_stores(
 
             lines = [
                 f"🏪 <b>{store.name}</b>",
-                f"🗂 {category_title} | {page_label} {page + 1}/{total_pages}",
-                "-" * 24,
+                f"{category_title} | {page_label} {page + 1}/{total_pages}",
             ]
 
             for idx, offer in enumerate(page_offers, start=1):
                 title = _short_title(offer.title, limit=28)
                 price_line = _offer_price_line(offer, lang)
-                lines.append(f"{idx}. <b>{title}</b>")
-                lines.append(f"   {price_line}")
-                lines.append("")
+                lines.append(f"{idx}. <b>{title}</b> - {price_line}")
 
-            lines.append(get_text(lang, "select_by_number"))
             text = "\n".join(lines).rstrip()
 
             # Build keyboard with offer buttons

@@ -49,7 +49,7 @@ describe('ProductDetailPage', () => {
     expect(screen.getByText('Test Offer')).toBeInTheDocument()
     expect(screen.getByText('Demo Store')).toBeInTheDocument()
     expect(screen.getByText(/Qoldi: 5/)).toBeInTheDocument()
-    expect(screen.getByText(/so'm/)).toBeInTheDocument()
+    expect(screen.getAllByText(/so'm/).length).toBeGreaterThan(0)
 
     await waitFor(() => {
       expect(apiMocks.addRecentlyViewed).toHaveBeenCalledWith(7)
