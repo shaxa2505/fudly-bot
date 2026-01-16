@@ -69,13 +69,13 @@ def settings_keyboard(
             )
             # Show switch to customer mode
             builder.button(
-                text="🛒 Режим покупателя" if lang == "ru" else "🛒 Xaridor rejimi",
+                text="↔️ Режим: покупатель" if lang == "ru" else "↔️ Rejim: xaridor",
                 callback_data="switch_to_customer",
             )
         else:
             # Currently in customer mode - show switch to seller
             builder.button(
-                text="🏪 Режим партнера" if lang == "ru" else "🏪 Hamkor rejimi",
+                text="↔️ Режим: партнер" if lang == "ru" else "↔️ Rejim: hamkor",
                 callback_data="switch_to_seller",
             )
     else:
@@ -101,13 +101,13 @@ def settings_keyboard(
 
     # Change language
     builder.button(
-        text="🌐 Изменить язык" if lang == "ru" else "🌐 Tilni o'zgartirish",
+        text="🌐 Язык" if lang == "ru" else "🌐 Til",
         callback_data="change_language",
     )
 
     # Delete account
     builder.button(
-        text="❌ Удалить аккаунт" if lang == "ru" else "❌ Akkauntni o'chirish",
+        text="🗑 Удалить аккаунт" if lang == "ru" else "🗑 Akkauntni o'chirish",
         callback_data="delete_account",
     )
 

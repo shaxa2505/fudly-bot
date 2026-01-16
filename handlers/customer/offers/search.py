@@ -367,9 +367,17 @@ def setup(
 
         # Расширяем запрос синонимами
         normalized_query = normalize_text(query)
-        base_terms = [word for word in normalized_query.split() if len(word) >= 2]
-        if not base_terms:
-            base_terms = [query]
+        base_terms = [query]
+        base_terms.extend([word for word in normalized_query.split() if len(word) >= 2])
+        deduped_terms = []
+        seen_terms = set()
+        for term in base_terms:
+            term = term.strip()
+            if len(term) < 2 or term in seen_terms:
+                continue
+            seen_terms.add(term)
+            deduped_terms.append(term)
+        base_terms = deduped_terms
 
         # Log search for debugging
         from logging import getLogger
@@ -395,7 +403,6 @@ def setup(
 
         # Search both offers and stores
         all_results = []
-        seen_offer_ids = set()
         store_results = []
 
         # 1. Search stores first
@@ -409,31 +416,53 @@ def setup(
                 logger.error(f"Error searching stores: {e}")
 
         # 2. Search offers (including by category)
-        searched_terms = set()
-        search_terms = []
         min_results_for_synonyms = 10
 
-        def search_by_term(term: str) -> None:
-            if len(term) < 2 or term in searched_terms:
-                return
-            searched_terms.add(term)
-            search_terms.append(term)
-            results = offer_service.search_offers(term, city, region=region, district=district)
-            logger.info(f"Search term '{term}' found {len(results)} offers")
-            for offer in results:
-                if offer.id not in seen_offer_ids:
-                    seen_offer_ids.add(offer.id)
-                    all_results.append(offer)
+        def run_offer_search(
+            scope_city: str | None,
+            scope_region: str | None,
+            scope_district: str | None,
+        ) -> tuple[list, list]:
+            all_results = []
+            seen_offer_ids = set()
+            searched_terms = set()
+            search_terms = []
 
-        for term in base_terms:
-            search_by_term(term)
+            def search_by_term(term: str) -> None:
+                term = term.strip()
+                if len(term) < 2 or term in searched_terms:
+                    return
+                searched_terms.add(term)
+                search_terms.append(term)
+                results = offer_service.search_offers(
+                    term,
+                    scope_city,
+                    region=scope_region,
+                    district=scope_district,
+                )
+                logger.info(f"Search term '{term}' found {len(results)} offers")
+                for offer in results:
+                    if offer.id not in seen_offer_ids:
+                        seen_offer_ids.add(offer.id)
+                        all_results.append(offer)
 
-        if len(all_results) < min_results_for_synonyms:
-            expanded_terms = expand_search_query(query, lang)
-            for term in expanded_terms:
-                if len(all_results) >= min_results_for_synonyms:
-                    break
+            for term in base_terms:
                 search_by_term(term)
+
+            if len(all_results) < min_results_for_synonyms:
+                expanded_terms = expand_search_query(query, lang)
+                for term in expanded_terms:
+                    if len(all_results) >= min_results_for_synonyms:
+                        break
+                    search_by_term(term)
+
+            return all_results, search_terms
+
+        all_results, search_terms = run_offer_search(city, region, district)
+
+        if not all_results and (city or region or district):
+            logger.info("Search: no results in scoped search, retrying without location")
+            all_results, search_terms = run_offer_search(None, None, None)
 
         def relevance_score(offer_title: str) -> int:
             title_lower = normalize_text(offer_title)

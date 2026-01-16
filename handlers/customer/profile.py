@@ -84,13 +84,16 @@ async def profile(message: types.Message, state: FSMContext) -> None:
         await message.answer(get_text(lang, "choose_language"), reply_markup=language_keyboard())
         return
     lang_text = "Русский" if lang == "ru" else "Ozbekcha"
-    city_display = normalize_city(user.city) if user.city else "N/A"
+    city_display = normalize_city(user.city) if user.city else "-"
 
-    text = f"👤 <b>{get_text(lang, 'your_profile')}</b>\n\n"
-    text += f"📝 {get_text(lang, 'name')}: <b>{user.first_name or 'N/A'}</b>\n"
-    text += f"📱 {get_text(lang, 'phone')}: <code>{user.phone or 'N/A'}</code>\n"
-    text += f"?? {get_text(lang, 'city')}: <b>{city_display}</b>\n"
-    text += f"🌍 {get_text(lang, 'language')}: {lang_text}\n"
+    empty_value = "-"
+    lines = [
+        f"<b>{get_text(lang, 'your_profile')}</b>",
+        f"{get_text(lang, 'name')}: <b>{user.first_name or empty_value}</b>",
+        f"{get_text(lang, 'phone')}: <code>{user.phone or empty_value}</code>",
+        f"{get_text(lang, 'city')}: <b>{city_display}</b>",
+        f"{get_text(lang, 'language')}: {lang_text}",
+    ]
 
     # Determine user role - check both DB role and if has approved store
     # This handles case where role wasn't updated but store was approved
@@ -114,6 +117,14 @@ async def profile(message: types.Message, state: FSMContext) -> None:
         current_mode = get_user_view_mode(message.from_user.id, db)
     else:
         current_mode = "customer"
+
+    if effective_role == "seller":
+        mode_label = "Режим" if lang == "ru" else "Rejim"
+        if current_mode == "seller":
+            mode_value = "Партнер" if lang == "ru" else "Hamkor"
+        else:
+            mode_value = "Покупатель" if lang == "ru" else "Xaridor"
+        lines.append(f"{mode_label}: {mode_value}")
 
     # Customer statistics - show when in customer mode
     if current_mode == "customer":
@@ -144,13 +155,15 @@ async def profile(message: types.Message, state: FSMContext) -> None:
         total_completed = completed_bookings + completed_orders
 
         if total_active > 0 or total_completed > 0:
-            text += (
-                f"\n📊 <b>{'Статистика покупок' if lang == 'ru' else 'Xaridlar statistikasi'}</b>\n"
-            )
-            text += f"🟢 {'Активных' if lang == 'ru' else 'Faol'}: {total_active} "
-            text += f"({'из них доставок' if lang == 'ru' else 'shulardan yetkazish'}: {active_orders})\n"
-            text += f"✅ {'Завершено' if lang == 'ru' else 'Yakunlangan'}: {total_completed} "
-            text += f"({'из них доставок' if lang == 'ru' else 'shulardan yetkazish'}: {completed_orders})\n"
+            stats_title = "Статистика" if lang == "ru" else "Statistika"
+            active_label = "Активные" if lang == "ru" else "Faol"
+            done_label = "Завершенные" if lang == "ru" else "Yakunlangan"
+            lines.append("")
+            lines.append(f"<b>{stats_title}</b>")
+            if total_active > 0:
+                lines.append(f"{active_label}: {total_active}")
+            if total_completed > 0:
+                lines.append(f"{done_label}: {total_completed}")
 
     # Seller statistics - show when in seller mode
     elif current_mode == "seller" or user.role == "seller":
@@ -199,14 +212,23 @@ async def profile(message: types.Message, state: FSMContext) -> None:
                     except Exception:
                         pass
 
-            if total_bookings > 0 or total_orders > 0:
-                text += f"\n📊 <b>{'Статистика продаж' if lang == 'ru' else 'Sotish statistikasi'}</b>\n"
-                text += f"✅ {'Завершенных бронирований' if lang == 'ru' else 'Yakunlangan bronlar'}: {total_bookings}\n"
+            if total_bookings > 0 or total_orders > 0 or total_revenue > 0:
+                stats_title = "Статистика" if lang == "ru" else "Statistika"
+                bookings_label = "Брони" if lang == "ru" else "Bronlar"
+                orders_label = "Заказы" if lang == "ru" else "Buyurtmalar"
+                revenue_label = "Выручка" if lang == "ru" else "Daromad"
+                currency = "сум" if lang == "ru" else "so'm"
+                lines.append("")
+                lines.append(f"<b>{stats_title}</b>")
+                if total_bookings > 0:
+                    lines.append(f"{bookings_label}: {total_bookings}")
                 if total_orders > 0:
-                    text += f"🚚 {'Завершенных доставок' if lang == 'ru' else 'Yakunlangan yetkazishlar'}: {total_orders}\n"
+                    lines.append(f"{orders_label}: {total_orders}")
                 if total_revenue > 0:
-                    text += f"💰 {'Выручка' if lang == 'ru' else 'Daromad'}: {total_revenue:,} {'сум' if lang == 'ru' else 'sum'}\n"
+                    revenue_value = f"{total_revenue:,}".replace(",", " ")
+                    lines.append(f"{revenue_label}: {revenue_value} {currency}")
 
+    text = "\n".join(lines)
     await message.answer(
         text,
         parse_mode="HTML",
