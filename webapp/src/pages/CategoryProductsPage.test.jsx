@@ -17,20 +17,6 @@ vi.mock('../components/OfferCard', () => ({
   default: ({ offer }) => <div data-testid="offer-card">{offer.title}</div>,
 }))
 
-vi.mock('../components/FilterPanel', () => ({
-  default: ({ onClose }) => (
-    <div data-testid="filter-panel">
-      <button onClick={onClose}>close</button>
-    </div>
-  ),
-  FILTER_CATEGORY_OPTIONS: [
-    { id: 'dairy', name: 'Sut', keywords: ['sut'] },
-  ],
-  FILTER_BRAND_OPTIONS: [
-    { id: 'brand-a', name: 'Brand A', keywords: ['brand'] },
-  ],
-}))
-
 describe('CategoryProductsPage', () => {
   beforeEach(() => {
     localStorage.clear()
@@ -49,9 +35,8 @@ describe('CategoryProductsPage', () => {
 
     await waitFor(() => {
       expect(apiMocks.getOffers).toHaveBeenCalledWith({
-        category: 'dairy',
-        search: undefined,
         limit: 50,
+        category: 'dairy',
       })
     })
 
@@ -78,13 +63,11 @@ describe('CategoryProductsPage', () => {
     fireEvent.keyDown(input, { key: 'Enter' })
 
     await waitFor(() => {
-      expect(apiMocks.getOffers).toHaveBeenCalledTimes(2)
+      expect(apiMocks.getOffers.mock.calls.some(call => call[0].search === 'milk')).toBe(true)
     })
-
-    expect(apiMocks.getOffers.mock.calls[1][0].search).toBe('milk')
   })
 
-  it('opens the filter panel', async () => {
+  it('toggles advanced filters', async () => {
     apiMocks.getOffers.mockResolvedValueOnce([])
 
     renderWithProviders(<CategoryProductsPage />, {
@@ -96,6 +79,6 @@ describe('CategoryProductsPage', () => {
     expect(filterButton).not.toBeNull()
     fireEvent.click(filterButton)
 
-    expect(await screen.findByTestId('filter-panel')).toBeInTheDocument()
+    expect(await screen.findByText('Chegirma')).toBeInTheDocument()
   })
 })

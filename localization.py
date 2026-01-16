@@ -402,10 +402,10 @@ TEXTS = {
         "store_approved_admin": "✅ Магазин одобрен!",
         "store_rejected_admin": "✅ Магазин отклонён!",
         # Избранное
-        "no_favorites": "😔 У вас пока нет избранных магазинов\n\nДобавьте магазины в избранное, чтобы быстро находить их!",
-        "already_in_favorites": "❤️ Уже в избранном!",
-        "added_to_favorites": "✅ Добавлено в избранное!",
-        "removed_from_favorites": "💔 Удалено из избранного",
+        "no_favorites": "У вас пока нет избранных магазинов.\n\nДобавьте магазины в избранное, чтобы быстро находить их.",
+        "already_in_favorites": "Уже в избранном.",
+        "added_to_favorites": "Добавлено в избранное.",
+        "removed_from_favorites": "Удалено из избранного.",
         # Аналитика
         "not_seller": "❌ Эта функция доступна только партнёрам",
         "select_store_for_analytics": "📊 Выберите магазин для просмотра аналитики:",
@@ -578,7 +578,7 @@ TEXTS = {
         "cart_payment_admin_items": "Товары:\n{items}",
         "cart_payment_admin_total": "Итого: {total} сум",
         # Ключи регистрации
-        "change_city_prompt": "📍 Выберите новый город:",
+        "change_city_prompt": "Выберите новый город:",
         "phone_saved": "✅ Телефон сохранён.",
         "registration_city_title": "📍 Выберите город",
         "registration_city_hint": "Выберите из списка.",
@@ -1059,10 +1059,10 @@ Mijoz do'koningizni baholash uchun xabar oladi.""",
         "store_approved_admin": "✅ Do'kon tasdiqlandi!",
         "store_rejected_admin": "✅ Do'kon rad etildi!",
         # Sevimlilar
-        "no_favorites": "😔 Sizda hali sevimli do'konlar yo'q\n\nDo'konlarni sevimlilarga qo'shing, tez topish uchun!",
-        "already_in_favorites": "❤️ Allaqachon sevimlilarda!",
-        "added_to_favorites": "✅ Sevimlilarga qo'shildi!",
-        "removed_from_favorites": "💔 Sevimlilardan o'chirildi",
+        "no_favorites": "Sizda hali sevimli do'konlar yo'q.\n\nDo'konlarni sevimlilarga qo'shing, tez topish uchun.",
+        "already_in_favorites": "Allaqachon sevimlilarda.",
+        "added_to_favorites": "Sevimlilarga qo'shildi.",
+        "removed_from_favorites": "Sevimlilardan o'chirildi.",
         # Analitika - no_stores defined earlier at line 802
         "not_seller": "❌ Bu funksiya faqat hamkorlar uchun",
         "select_store_for_analytics": "📊 Analitika uchun do'konni tanlang:",
@@ -1165,7 +1165,7 @@ Do'koningiz tasdiqlandi va ishlashga tayyor.
         "cart_payment_admin_items": "Mahsulotlar:\n{items}",
         "cart_payment_admin_total": "Jami: {total} so'm",
         # Ro'yxatdan o'tish
-        "change_city_prompt": "📍 Yangi shaharni tanlang:",
+        "change_city_prompt": "Yangi shaharni tanlang:",
         "phone_saved": "✅ Telefon saqlandi.",
         "registration_city_title": "📍 Shaharni tanlang",
         "registration_city_hint": "Ro'yxatdan tanlang.",

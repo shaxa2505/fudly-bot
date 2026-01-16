@@ -22,6 +22,23 @@ bot: Any | None = None
 router = Router()
 
 
+def _t(lang: str, ru: str, uz: str) -> str:
+    return ru if lang == "ru" else uz
+
+
+def _lang_code(user: types.User | None) -> str:
+    code = (user.language_code or "ru") if user else "ru"
+    return "uz" if code.startswith("uz") else "ru"
+
+
+def _service_unavailable(lang: str) -> str:
+    return _t(
+        lang,
+        "Сервис временно недоступен. Попробуйте позже.",
+        "Xizmat vaqtincha mavjud emas. Keyinroq urinib ko'ring.",
+    )
+
+
 def setup_dependencies(
     database: DatabaseProtocol, bot_instance: Any, view_mode_dict: dict[int, str] | None = None
 ) -> None:
@@ -43,20 +60,18 @@ def get_appropriate_menu(user_id: int, lang: str) -> Any:
 async def show_my_city(message: types.Message, state: FSMContext) -> None:
     """Show current city and offer change."""
     if not db:
-        lang_code = (message.from_user.language_code or "ru") if message.from_user else "ru"
-        if lang_code.startswith("uz"):
-            text = "❌ Xizmat vaqtincha mavjud emas. Keyinroq urinib ko'ring."
-        else:
-            text = "❌ Сервис временно недоступен. Попробуйте позже."
-        await message.answer(text)
+        await message.answer(_service_unavailable(_lang_code(message.from_user)))
         return
 
     user_id = message.from_user.id
     lang = db.get_user_language(user_id)
     user = db.get_user_model(user_id)
-    current_city = user.city if user else "Не выбран"
+    current_city = user.city if user else _t(lang, "Не выбран", "Tanlanmagan")
 
-    text = f"🌆 {get_text(lang, 'your_city') if 'your_city' in dir() else 'Ваш город'}: {current_city}\n\n{get_text(lang, 'change_city_prompt') if 'change_city_prompt' in dir() else 'Хотите изменить город?'}"
+    text = (
+        f"{get_text(lang, 'your_city')}: {current_city}\n\n"
+        f"{get_text(lang, 'change_city_prompt')}"
+    )
 
     await message.answer(text, reply_markup=city_keyboard(lang))
     await state.set_state(ChangeCity.city)
@@ -67,12 +82,7 @@ async def show_my_city(message: types.Message, state: FSMContext) -> None:
 async def change_city_process(message: types.Message, state: FSMContext) -> None:
     """Process city change."""
     if not db:
-        lang_code = (message.from_user.language_code or "ru") if message.from_user else "ru"
-        if lang_code.startswith("uz"):
-            text = "❌ Xizmat vaqtincha mavjud emas. Keyinroq urinib ko'ring."
-        else:
-            text = "❌ Сервис временно недоступен. Попробуйте позже."
-        await message.answer(text)
+        await message.answer(_service_unavailable(_lang_code(message.from_user)))
         return
 
     # Check if user pressed main menu button - clear state and let other handlers process
@@ -101,7 +111,7 @@ async def change_city_process(message: types.Message, state: FSMContext) -> None
 async def show_favorites(message: types.Message) -> None:
     """Show favorite stores."""
     if not db:
-        await message.answer("System error")
+        await message.answer(_service_unavailable(_lang_code(message.from_user)))
         return
 
     lang = db.get_user_language(message.from_user.id)
@@ -113,7 +123,8 @@ async def show_favorites(message: types.Message) -> None:
         await message.answer(get_text(lang, "no_favorites"))
         return
 
-    await message.answer(f"❤️ <b>Ваши избранные магазины ({len(favorites)})</b>", parse_mode="HTML")
+    heading = _t(lang, "Ваши избранные магазины", "Sevimli do'konlar")
+    await message.answer(f"<b>{heading}</b> ({len(favorites)})", parse_mode="HTML")
 
     for store in favorites:
         # Support both dict (PostgreSQL) and tuple (SQLite) formats
@@ -134,15 +145,28 @@ async def show_favorites(message: types.Message) -> None:
         avg_rating = db.get_store_average_rating(store_id)
         ratings = db.get_store_ratings(store_id)
 
-        text = f"""🏪 <b>{store_name}</b>
-🏷 {category}
-📍 {address}
-📝 {description}
-⭐ Рейтинг: {avg_rating:.1f}/5 ({len(ratings)} отзывов)"""
+        reviews_label = _t(lang, "отзывов", "ta sharh")
+        text_lines = [f"<b>{store_name}</b>"]
+        if category:
+            text_lines.append(f"{_t(lang, 'Категория', 'Kategoriya')}: {category}")
+        if address:
+            text_lines.append(f"{_t(lang, 'Адрес', 'Manzil')}: {address}")
+        if description:
+            text_lines.append(f"{_t(lang, 'Описание', 'Taʼrif')}: {description}")
+        text_lines.append(
+            f"{_t(lang, 'Рейтинг', 'Reyting')}: {avg_rating:.1f}/5 ({len(ratings)} {reviews_label})"
+        )
+        text = "\n".join(text_lines)
 
         keyboard = InlineKeyboardBuilder()
-        keyboard.button(text="🛍 Товары магазина", callback_data=f"store_offers_{store_id}")
-        keyboard.button(text="💔 Удалить из избранного", callback_data=f"unfavorite_{store_id}")
+        keyboard.button(
+            text=_t(lang, "Товары магазина", "Do'kon mahsulotlari"),
+            callback_data=f"store_offers_{store_id}",
+        )
+        keyboard.button(
+            text=_t(lang, "Удалить из избранного", "Sevimlilardan o'chirish"),
+            callback_data=f"unfavorite_{store_id}",
+        )
         keyboard.adjust(1)
 
         await message.answer(text, parse_mode="HTML", reply_markup=keyboard.as_markup())
@@ -152,7 +176,7 @@ async def show_favorites(message: types.Message) -> None:
 async def toggle_favorite(callback: types.CallbackQuery) -> None:
     """Add store to favorites."""
     if not db:
-        await callback.answer("System error")
+        await callback.answer(_service_unavailable(_lang_code(callback.from_user)))
         return
 
     user_id = callback.from_user.id
@@ -176,7 +200,7 @@ async def toggle_favorite(callback: types.CallbackQuery) -> None:
 async def remove_favorite(callback: types.CallbackQuery) -> None:
     """Remove store from favorites."""
     if not db:
-        await callback.answer("System error")
+        await callback.answer(_service_unavailable(_lang_code(callback.from_user)))
         return
 
     user_id = callback.from_user.id

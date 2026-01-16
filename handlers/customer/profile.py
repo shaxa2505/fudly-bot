@@ -62,6 +62,15 @@ def get_appropriate_menu(user_id: int, lang: str) -> Any:
     return _get_appropriate_menu(user_id, lang, db)
 
 
+def _lang_code(user: types.User | None) -> str:
+    code = (user.language_code or "ru") if user else "ru"
+    return "uz" if code.startswith("uz") else "ru"
+
+
+def _service_unavailable(lang: str) -> str:
+    return "Xizmat vaqtincha mavjud emas. Keyinroq urinib ko'ring." if lang == "uz" else "Сервис временно недоступен. Попробуйте позже."
+
+
 @router.message(F.text.func(is_profile_button))
 async def profile(message: types.Message, state: FSMContext) -> None:
     """Display user profile with statistics."""
@@ -69,12 +78,7 @@ async def profile(message: types.Message, state: FSMContext) -> None:
     await state.clear()
 
     if not db:
-        lang_code = (message.from_user.language_code or "ru") if message.from_user else "ru"
-        if lang_code.startswith("uz"):
-            text = "❌ Xizmat vaqtincha mavjud emas. Keyinroq urinib ko'ring."
-        else:
-            text = "❌ Сервис временно недоступен. Попробуйте позже."
-        await message.answer(text)
+        await message.answer(_service_unavailable(_lang_code(message.from_user)))
         return
 
     lang = db.get_user_language(message.from_user.id)
@@ -245,12 +249,7 @@ async def profile(message: types.Message, state: FSMContext) -> None:
 async def profile_change_city(callback: types.CallbackQuery, state: FSMContext) -> None:
     """Start city change from profile."""
     if not db:
-        lang_code = (callback.from_user.language_code or "ru") if callback.from_user else "ru"
-        if lang_code.startswith("uz"):
-            text = "❌ Xizmat vaqtincha mavjud emas. Keyinroq urinib ko'ring."
-        else:
-            text = "❌ Сервис временно недоступен. Попробуйте позже."
-        await callback.answer(text)
+        await callback.answer(_service_unavailable(_lang_code(callback.from_user)))
         return
 
     lang = db.get_user_language(callback.from_user.id)
@@ -274,12 +273,7 @@ async def profile_change_city(callback: types.CallbackQuery, state: FSMContext) 
 async def profile_change_city_cb(callback: types.CallbackQuery, state: FSMContext) -> None:
     """Handle inline city selection from profile change flow."""
     if not db or not callback.message:
-        lang_code = (callback.from_user.language_code or "ru") if callback.from_user else "ru"
-        if lang_code.startswith("uz"):
-            text_msg = "⚠️ Xizmat vaqtincha mavjud emas. Keyinroq urinib ko'ring."
-        else:
-            text_msg = "⚠️ Сервис временно недоступен. Попробуйте позже."
-        await callback.answer(text_msg, show_alert=True)
+        await callback.answer(_service_unavailable(_lang_code(callback.from_user)), show_alert=True)
         return
 
     assert callback.from_user is not None
@@ -350,23 +344,13 @@ async def profile_change_city_cb(callback: types.CallbackQuery, state: FSMContex
 async def switch_to_customer_cb(callback: types.CallbackQuery) -> None:
     """Switch to customer mode from profile."""
     if not db:
-        logger.error("❌ switch_to_customer_cb: db is None")
-        lang_code = (callback.from_user.language_code or "ru") if callback.from_user else "ru"
-        if lang_code.startswith("uz"):
-            text = "❌ Xizmat vaqtincha mavjud emas. Keyinroq urinib ko'ring."
-        else:
-            text = "❌ Сервис временно недоступен. Попробуйте позже."
-        await callback.answer(text, show_alert=True)
+        logger.error("switch_to_customer_cb: db is None")
+        await callback.answer(_service_unavailable(_lang_code(callback.from_user)), show_alert=True)
         return
 
     if not callback.message:
-        logger.error("❌ switch_to_customer_cb: callback.message is None")
-        lang_code = (callback.from_user.language_code or "ru") if callback.from_user else "ru"
-        if lang_code.startswith("uz"):
-            text = "❌ Xizmat vaqtincha mavjud emas. Keyinroq urinib ko'ring."
-        else:
-            text = "❌ Сервис временно недоступен. Попробуйте позже."
-        await callback.answer(text, show_alert=True)
+        logger.error("switch_to_customer_cb: callback.message is None")
+        await callback.answer(_service_unavailable(_lang_code(callback.from_user)), show_alert=True)
         return
 
     try:
@@ -416,13 +400,13 @@ async def switch_to_customer_cb(callback: types.CallbackQuery) -> None:
 async def switch_to_seller_cb(callback: types.CallbackQuery) -> None:
     """Switch to seller mode from profile."""
     if not db:
-        logger.error("❌ switch_to_seller_cb: db is None")
-        await callback.answer("System error", show_alert=True)
+        logger.error("switch_to_seller_cb: db is None")
+        await callback.answer(_service_unavailable(_lang_code(callback.from_user)), show_alert=True)
         return
 
     if not callback.message:
-        logger.error("❌ switch_to_seller_cb: callback.message is None")
-        await callback.answer("System error", show_alert=True)
+        logger.error("switch_to_seller_cb: callback.message is None")
+        await callback.answer(_service_unavailable(_lang_code(callback.from_user)), show_alert=True)
         return
 
     try:
@@ -516,7 +500,7 @@ async def switch_to_seller_cb(callback: types.CallbackQuery) -> None:
 async def change_language(callback: types.CallbackQuery) -> None:
     """Start language change."""
     if not db:
-        await callback.answer("System error")
+        await callback.answer(_service_unavailable(_lang_code(callback.from_user)))
         return
 
     lang = db.get_user_language(callback.from_user.id)
@@ -530,7 +514,7 @@ async def change_language(callback: types.CallbackQuery) -> None:
 async def toggle_notifications_callback(callback: types.CallbackQuery) -> None:
     """Toggle user notifications."""
     if not db:
-        await callback.answer("System error")
+        await callback.answer(_service_unavailable(_lang_code(callback.from_user)))
         return
 
     lang = db.get_user_language(callback.from_user.id)
@@ -568,7 +552,7 @@ async def toggle_notifications_callback(callback: types.CallbackQuery) -> None:
 async def delete_account_prompt(callback: types.CallbackQuery) -> None:
     """Prompt for account deletion confirmation."""
     if not db:
-        await callback.answer("System error")
+        await callback.answer(_service_unavailable(_lang_code(callback.from_user)))
         return
 
     lang = db.get_user_language(callback.from_user.id)
@@ -598,7 +582,7 @@ async def delete_account_prompt(callback: types.CallbackQuery) -> None:
 async def confirm_delete_yes(callback: types.CallbackQuery, state: FSMContext) -> None:
     """Confirm account deletion."""
     if not db:
-        await callback.answer("System error")
+        await callback.answer(_service_unavailable(_lang_code(callback.from_user)))
         return
 
     # Get language BEFORE deleting user
@@ -653,7 +637,7 @@ async def confirm_delete_yes(callback: types.CallbackQuery, state: FSMContext) -
 async def confirm_delete_no(callback: types.CallbackQuery) -> None:
     """Cancel account deletion."""
     if not db:
-        await callback.answer("System error")
+        await callback.answer(_service_unavailable(_lang_code(callback.from_user)))
         return
 
     lang = db.get_user_language(callback.from_user.id)
@@ -694,7 +678,7 @@ async def confirm_delete_no(callback: types.CallbackQuery) -> None:
 async def switch_to_customer(message: types.Message) -> None:
     """Switch to customer mode."""
     if not db:
-        await message.answer("System error")
+        await message.answer(_service_unavailable(_lang_code(message.from_user)))
         return
 
     lang = db.get_user_language(message.from_user.id)
@@ -703,4 +687,3 @@ async def switch_to_customer(message: types.Message) -> None:
     await message.answer(
         get_text(lang, "switched_to_customer"), reply_markup=main_menu_customer(lang)
     )
-

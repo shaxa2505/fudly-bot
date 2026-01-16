@@ -336,9 +336,13 @@ const api = {
     return cachedGet('/categories', params, 60000, options) || []
   },
 
-  async getSearchSuggestions(query, limit = 5) {
+  async getSearchSuggestions(query, limit = 5, options = {}) {
     if (!query || query.length < 2) return []
-    return cachedGet('/search/suggestions', { query, limit }, 15000) || []
+    const params = { query, limit }
+    if (options?.city) {
+      params.city = options.city
+    }
+    return cachedGet('/search/suggestions', params, 15000) || []
   },
 
   async reverseGeocode(lat, lon, lang = 'uz') {

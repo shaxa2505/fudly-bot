@@ -79,6 +79,23 @@ def get_appropriate_menu(user_id: int, lang: str) -> Any:
     return _get_appropriate_menu(user_id, lang, db)
 
 
+def _t(lang: str, ru: str, uz: str) -> str:
+    return ru if lang == "ru" else uz
+
+
+def _service_unavailable(lang: str) -> str:
+    return _t(
+        lang,
+        "Сервис временно недоступен. Попробуйте позже.",
+        "Xizmat vaqtincha mavjud emas. Keyinroq urinib ko'ring.",
+    )
+
+
+def _lang_code(user: types.User | None) -> str:
+    code = (user.language_code or "ru") if user else "ru"
+    return "uz" if code.startswith("uz") else "ru"
+
+
 # =============================================================================
 # CUSTOMER HANDLERS
 # =============================================================================
@@ -99,7 +116,7 @@ async def start_delivery_order(
     try:
         offer_id = int(callback.data.split("_")[2])
     except (ValueError, IndexError):
-        await callback.answer("❌", show_alert=True)
+        await callback.answer(get_text(lang, "error"), show_alert=True)
         return
 
     offer = db.get_offer(offer_id)
@@ -115,13 +132,13 @@ async def start_delivery_order(
     store_id = get_offer_field(offer, "store_id")
     store = db.get_store(store_id)
     if not store:
-        await callback.answer("❌", show_alert=True)
+        await callback.answer(get_text(lang, "error"), show_alert=True)
         return
 
     # Check delivery enabled
     if not get_store_field(store, "delivery_enabled", 0):
         msg = "Yetkazib berish mavjud emas" if lang == "uz" else "Доставка недоступна"
-        await callback.answer(f"❌ {msg}", show_alert=True)
+        await callback.answer(msg, show_alert=True)
         return
 
     # Get details
@@ -219,7 +236,7 @@ async def dlv_cancel_order(
                 await order_service.cancel_order(order_id, "order")
             else:
                 logger.warning("UnifiedOrderService unavailable for cancel_order")
-            logger.info(f"❌ User {user_id} cancelled order #{order_id}")
+            logger.info(f"User {user_id} cancelled order #{order_id}")
         except Exception as e:
             logger.error(f"Failed to cancel order #{order_id}: {e}")
 
@@ -229,7 +246,7 @@ async def dlv_cancel_order(
     except Exception:
         pass
 
-    msg = "❌ Bekor qilindi" if lang == "uz" else "❌ Отменено"
+    msg = "Bekor qilindi." if lang == "uz" else "Отменено."
     await callback.message.answer(msg, reply_markup=main_menu_customer(lang))
     await callback.answer()
 
@@ -279,7 +296,7 @@ async def dlv_cancel(
 
     if not result.items:
         # No offers - show main menu
-        msg = "❌ Bekor qilindi" if lang == "uz" else "❌ Отменено"
+        msg = "Bekor qilindi." if lang == "uz" else "Отменено."
         await callback.message.answer(msg, reply_markup=main_menu_customer(lang))
         await callback.answer()
         return
@@ -289,7 +306,7 @@ async def dlv_cancel(
     from app.templates.offers import render_hot_offers_list
 
     total_pages = (result.total + OFFERS_PER_PAGE - 1) // OFFERS_PER_PAGE
-    select_hint = "👆 Выберите товар" if lang == "ru" else "👆 Mahsulotni tanlang"
+    select_hint = "Выберите товар" if lang == "ru" else "Mahsulotni tanlang"
     text = render_hot_offers_list(
         lang, city, result.items, result.total, select_hint, offset=last_page * OFFERS_PER_PAGE
     )
@@ -315,7 +332,7 @@ async def dlv_change_qty(
         offer_id = int(parts[2])
         new_qty = int(parts[3])
     except (ValueError, IndexError):
-        await callback.answer("❌", show_alert=True)
+        await callback.answer(get_text(lang, "error"), show_alert=True)
         return
 
     data = await state.get_data()
@@ -323,7 +340,7 @@ async def dlv_change_qty(
     price = data.get("price", 0)
 
     if new_qty < 1 or new_qty > max_qty:
-        await callback.answer("❌", show_alert=True)
+        await callback.answer(get_text(lang, "error"), show_alert=True)
         return
 
     await state.update_data(quantity=new_qty)
@@ -373,9 +390,13 @@ async def dlv_to_address(
     quantity = int(data.get("quantity", 1) or 1)
 
     if min_order > 0 and (price * quantity) < min_order:
-        currency = "so'm" if lang == "uz" else "???"
-        msg = f"Min: {min_order:,} {currency}"
-        await callback.answer(f"?? {msg}", show_alert=True)
+        currency = "so'm" if lang == "uz" else "сум"
+        msg = _t(
+            lang,
+            f"Минимальная сумма доставки: {min_order:,} {currency}",
+            f"Minimal summa: {min_order:,} {currency}",
+        )
+        await callback.answer(msg, show_alert=True)
         return
 
     await state.set_state(OrderDelivery.address)
@@ -465,14 +486,14 @@ async def dlv_use_saved_address(
     saved_address = data.get("saved_address")
 
     if not saved_address:
-        await callback.answer("❌", show_alert=True)
+        await callback.answer(get_text(lang, "error"), show_alert=True)
         return
 
     await state.update_data(address=saved_address)
 
     # DON'T CREATE ORDER YET - wait for payment screenshot
     # Order will be created in dlv_payment_proof after screenshot is received
-    logger.info(f"✅ User {user_id} selected saved address, waiting for payment screenshot")
+    logger.info(f"User {user_id} selected saved address, waiting for payment screenshot")
 
     await state.set_state(OrderDelivery.payment_method_select)
 
@@ -535,9 +556,9 @@ async def dlv_new_address(
 
     # Show input hint
     if lang == "uz":
-        hint = "\n\n✏️ <b>Manzilni yozing:</b>\n<i>Misol: Chilanzar, 5-mavze, 10-uy</i>"
+        hint = "\n\n<b>Manzilni yozing:</b>\n<i>Misol: Chilanzar, 5-mavze, 10-uy</i>"
     else:
-        hint = "\n\n✏️ <b>Введите адрес:</b>\n<i>Пример: Чиланзар, 5-массив, дом 10</i>"
+        hint = "\n\n<b>Введите адрес:</b>\n<i>Пример: Чиланзар, 5-массив, дом 10</i>"
 
     text += hint
 
@@ -548,8 +569,8 @@ async def dlv_new_address(
     except (ValueError, IndexError):
         offer_id = 0
 
-    back_text = "⬅️ Orqaga" if lang == "uz" else "⬅️ Назад"
-    cancel_text = "❌ Bekor qilish" if lang == "uz" else "❌ Отмена"
+    back_text = "Orqaga" if lang == "uz" else "Назад"
+    cancel_text = "Bekor qilish" if lang == "uz" else "Отмена"
     if offer_id:
         kb.button(text=back_text, callback_data=f"dlv_back_address_{offer_id}")
     kb.button(text=cancel_text, callback_data="dlv_cancel")
@@ -581,12 +602,7 @@ async def dlv_address_input(message: types.Message, state: FSMContext) -> None:
     # Use module-level db to avoid DI issues
     global db
     if not db:
-        lang_code = (message.from_user.language_code or "ru") if message.from_user else "ru"
-        if lang_code.startswith("uz"):
-            text = "❌ Xizmat vaqtincha mavjud emas. Keyinroq urinib ko'ring."
-        else:
-            text = "❌ Сервис временно недоступен. Попробуйте позже."
-        await message.answer(text)
+        await message.answer(_service_unavailable(_lang_code(message.from_user)))
         return
 
     lang = db.get_user_language(message.from_user.id)
@@ -598,21 +614,21 @@ async def dlv_address_input(message: types.Message, state: FSMContext) -> None:
         return
 
     # Check cancel
-    if any(c in text.lower() for c in ["отмена", "bekor", "❌"]) or text.startswith("/"):
+    if any(c in text.lower() for c in ["отмена", "bekor"]) or text.startswith("/"):
         await state.clear()
-        msg = "❌ Bekor qilindi" if lang == "uz" else "❌ Отменено"
+        msg = "Bekor qilindi." if lang == "uz" else "Отменено."
         await message.answer(msg, reply_markup=main_menu_customer(lang))
         return
 
     # Validate address length
     if len(text) < 10:
-        msg = "❌ Manzil juda qisqa" if lang == "uz" else "❌ Адрес слишком короткий"
+        msg = "Manzil juda qisqa." if lang == "uz" else "Адрес слишком короткий."
         await message.answer(msg)
         return
 
     # Save address
     await state.update_data(address=text, awaiting_address_input=False)
-    logger.info(f"✅ User {message.from_user.id} entered delivery address: {text[:30]}...")
+    logger.info(f"User {message.from_user.id} entered delivery address: {text[:30]}...")
 
     # Save as last address for user
     try:
@@ -629,10 +645,10 @@ async def dlv_address_input(message: types.Message, state: FSMContext) -> None:
 
     # DON'T CREATE ORDER YET - wait for payment screenshot
     # Order will be created in dlv_payment_proof after screenshot is received
-    logger.info(f"✅ User {user_id} saved address, waiting for payment screenshot")
+    logger.info(f"User {user_id} saved address, waiting for payment screenshot")
 
     await state.set_state(OrderDelivery.payment_method_select)
-    logger.info(f"🔄 User {message.from_user.id} moved to payment method selection state")
+    logger.info(f"User {message.from_user.id} moved to payment method selection state")
 
     # Send card with payment step
     card_text = build_delivery_card_text(
@@ -708,8 +724,8 @@ async def dlv_pay_click(
     user_id = callback.from_user.id
     lang = db.get_user_language(user_id)
 
-    logger.info(f"🖱️ User {user_id} selected Click payment")
-    logger.info(f"📋 FSM data: {data}")
+    logger.info(f"User {user_id} selected Click payment")
+    logger.info(f"FSM data: {data}")
 
     # If payments are disabled or provider token is missing, fallback to card flow
     if not ENABLE_TELEGRAM_PAYMENTS or not telegram_payments.PROVIDER_TOKEN:
@@ -718,7 +734,7 @@ async def dlv_pay_click(
             if lang != "uz"
             else "TELEGRAM_PAYMENT_PROVIDER_TOKEN va ENABLE_TELEGRAM_PAYMENTS=1 kerak"
         )
-        logger.warning("⚠️ Telegram Payments disabled or token missing, fallback to card")
+        logger.warning("Telegram Payments disabled or token missing, fallback to card")
         await _switch_to_card_payment_no_order(callback.message, state, data, lang, db, reason)
         await callback.answer()
         return
@@ -738,7 +754,7 @@ async def dlv_pay_click(
         if not order_service and bot:
             order_service = init_unified_order_service(db, bot)
         if not order_service:
-            logger.warning("⚠️ UnifiedOrderService unavailable, fallback to card")
+            logger.warning("UnifiedOrderService unavailable, fallback to card")
             await _switch_to_card_payment_no_order(callback.message, state, data, lang, db)
             await callback.answer()
             return
@@ -790,7 +806,7 @@ async def dlv_pay_click(
 
             order_id = result.order_ids[0]
             await state.update_data(order_id=order_id, payment_method="click")
-            logger.info(f"✅ Created order #{order_id} before sending Telegram invoice")
+            logger.info(f"Created order #{order_id} before sending Telegram invoice")
         except Exception as e:
             logger.error(f"Error creating order before Telegram invoice: {e}", exc_info=True)
             await _switch_to_card_payment_no_order(callback.message, state, data, lang, db)
@@ -816,7 +832,7 @@ async def dlv_pay_click(
             delivery_cost=delivery_cost,
             store_name=store_name,
         )
-        logger.info(f"✅ Sent Telegram invoice for order #{order_id}")
+        logger.info(f"Sent Telegram invoice for order #{order_id}")
     except Exception as e:
         logger.error(f"Failed to send Telegram invoice: {e}", exc_info=True)
         await _switch_to_card_payment_no_order(callback.message, state, data, lang, db)
@@ -832,9 +848,9 @@ async def dlv_pay_click(
 
     # Notify user to pay the invoice
     notify_text = (
-        "💳 Счёт отправлен. Нажмите «Оплатить» в сообщении выше."
+        "Счёт отправлен. Нажмите «Оплатить» в сообщении выше."
         if lang != "uz"
-        else "💳 Hisob yuborildi. Yuqoridagi xabarda «To'lash» tugmasini bosing."
+        else "Hisob yuborildi. Yuqoridagi xabarda «To'lash» tugmasini bosing."
     )
     try:
         await callback.message.answer(notify_text)
@@ -847,9 +863,9 @@ async def dlv_pay_click(
 async def _switch_to_card_payment_no_order(message, state, data, lang, db, reason: str | None = None):
     """Switch to card payment when Click fails - no order created yet."""
     msg = (
-        "⚠️ Click ishlamayapti. Karta orqali to'lang."
+        "Click ishlamayapti. Karta orqali to'lang."
         if lang == "uz"
-        else "⚠️ Click недоступен. Оплатите картой."
+        else "Click недоступен. Оплатите картой."
     )
     if reason:
         msg += f"\n{reason}"
@@ -909,15 +925,15 @@ async def dlv_pay_card(
         return
 
 
-    logger.info(f"💳 User {user_id} selected card payment")
-    logger.info(f"📋 FSM data keys: {list(data.keys())}")
+    logger.info(f"User {user_id} selected card payment")
+    logger.info(f"FSM data keys: {list(data.keys())}")
 
     # Order will be created when screenshot is uploaded
     # Save payment method and show card details
     await state.update_data(payment_method="card")
     await state.set_state(OrderDelivery.payment_proof)
 
-    logger.info(f"🔄 User {user_id} state set to payment_proof (order will be created after screenshot)")
+    logger.info(f"User {user_id} state set to payment_proof (order will be created after screenshot)")
 
     await callback.message.delete()
     await _show_card_payment_details(callback.message, state, lang, db, order_id=None)
@@ -935,7 +951,7 @@ async def _show_card_payment_details(
     data = await state.get_data()
     store_id = data.get("store_id")
     oid = order_id or data.get("order_id")
-    logger.info(f"💳 Showing card payment details for order #{oid} (store_id={store_id})")
+    logger.info(f"Showing card payment details for order #{oid} (store_id={store_id})")
 
     # Get payment card
     payment_card = None
@@ -978,24 +994,24 @@ async def _show_card_payment_details(
     # Compact payment message
     if lang == "uz":
         text = (
-            f"💳 <b>Kartaga o'tkazing:</b>\n\n"
-            f"💰 Summa: <b>{total:,} {currency}</b>\n"
-            f"💳 Karta: <code>{card_number}</code>\n"
-            f"👤 {card_holder}\n\n"
-            f"📸 <i>Chek skrinshotini yuboring</i>"
+            f"<b>Kartaga o'tkazing</b>\n\n"
+            f"Summa: <b>{total:,} {currency}</b>\n"
+            f"Karta: <code>{card_number}</code>\n"
+            f"Qabul qiluvchi: {card_holder}\n\n"
+            f"<i>Chek skrinshotini yuboring</i>"
         )
     else:
         text = (
-            f"💳 <b>Переведите на карту:</b>\n\n"
-            f"💰 Сумма: <b>{total:,} {currency}</b>\n"
-            f"💳 Карта: <code>{card_number}</code>\n"
-            f"👤 {card_holder}\n\n"
-            f"📸 <i>Отправьте скриншот чека</i>"
+            f"<b>Переведите на карту</b>\n\n"
+            f"Сумма: <b>{total:,} {currency}</b>\n"
+            f"Карта: <code>{card_number}</code>\n"
+            f"Получатель: {card_holder}\n\n"
+            f"<i>Отправьте скриншот чека</i>"
         )
 
     # Cancel button with order_id
     kb = InlineKeyboardBuilder()
-    cancel_text = "❌ Bekor qilish" if lang == "uz" else "❌ Отмена"
+    cancel_text = "Bekor qilish" if lang == "uz" else "Отмена"
     oid = order_id or data.get("order_id", 0)
     kb.button(text=cancel_text, callback_data=f"dlv_cancel_{oid}")
 
@@ -1015,8 +1031,8 @@ async def dlv_payment_proof(
     data = await state.get_data()
     photo_id = message.photo[-1].file_id
 
-    logger.info(f"📸 User {user_id} uploaded payment screenshot for delivery order")
-    logger.info(f"📋 FSM data keys: {list(data.keys())}")
+    logger.info(f"User {user_id} uploaded payment screenshot for delivery order")
+    logger.info(f"FSM data keys: {list(data.keys())}")
 
     if data.get("payment_proof_in_progress"):
         await message.answer(get_text(lang, "cart_payment_photo_already_received"))
@@ -1032,8 +1048,8 @@ async def dlv_payment_proof(
     delivery_price = data.get("delivery_price", 0)
 
     if not offer_id or not store_id or not address:
-        logger.error(f"❌ User {user_id} has incomplete data in FSM: {data}")
-        msg = "❌ Ma'lumotlar yo'qoldi" if lang == "uz" else "❌ Данные потеряны"
+        logger.error(f"User {user_id} has incomplete data in FSM: {data}")
+        msg = "Ma'lumotlar yo'qoldi." if lang == "uz" else "Данные потеряны."
         await message.answer(msg, reply_markup=get_appropriate_menu(user_id, lang))
         await state.clear()
         return
@@ -1077,7 +1093,7 @@ async def dlv_payment_proof(
             )
             if result.success and result.order_ids:
                 order_id = result.order_ids[0]
-                logger.info(f"✅ Created order #{order_id} after screenshot via unified service")
+                logger.info(f"Created order #{order_id} after screenshot via unified service")
             else:
                 logger.error(f"Failed to create order via UnifiedOrderService: {result.error_message}")
                 order_id = None
@@ -1086,7 +1102,7 @@ async def dlv_payment_proof(
             order_id = None
 
     if not order_id:
-        msg = "❌ Xatolik" if lang == "uz" else "❌ Ошибка создания заказа"
+        msg = "Xatolik." if lang == "uz" else "Ошибка создания заказа."
         await message.answer(msg, reply_markup=main_menu_customer(lang))
         await state.clear()
         return
@@ -1099,7 +1115,7 @@ async def dlv_payment_proof(
     # Update payment status with photo
     db.update_payment_status(order_id, "proof_submitted", photo_id)
 
-    logger.info(f"✅ Attached screenshot to order #{order_id}")
+    logger.info(f"Attached screenshot to order #{order_id}")
 
     await state.clear()
 
@@ -1142,9 +1158,9 @@ async def dlv_payment_proof(
     )
 
     if lang == "uz":
-        customer_msg += "\n\n⏳ To'lov tasdiqlanishi kutilmoqda..."
+        customer_msg += "\n\nTo'lov tasdiqlanishi kutilmoqda..."
     else:
-        customer_msg += "\n\n⏳ Ожидаем подтверждения оплаты..."
+        customer_msg += "\n\nОжидаем подтверждения оплаты..."
 
     # Confirm to customer - single unified message
     sent_msg = await message.answer(customer_msg, parse_mode="HTML")
@@ -1162,8 +1178,8 @@ async def dlv_payment_proof(
     # Notify ADMIN
     if ADMIN_ID > 0:
         kb = InlineKeyboardBuilder()
-        kb.button(text="✅ Tasdiqlash", callback_data=f"admin_confirm_payment_{order_id}")
-        kb.button(text="❌ Rad etish", callback_data=f"admin_reject_payment_{order_id}")
+        kb.button(text="Tasdiqlash", callback_data=f"admin_confirm_payment_{order_id}")
+        kb.button(text="Rad etish", callback_data=f"admin_reject_payment_{order_id}")
         kb.adjust(2)
 
         items_text = f"• {esc(title)} × {quantity}"
@@ -1206,14 +1222,14 @@ async def dlv_payment_proof_invalid(
         await state.clear()
         return
 
-    if any(c in text.lower() for c in ["отмена", "bekor", "❌"]) or text.startswith("/"):
+    if any(c in text.lower() for c in ["отмена", "bekor"]) or text.startswith("/"):
         await state.clear()
-        msg = "❌ Bekor qilindi" if lang == "uz" else "❌ Отменено"
+        msg = "Bekor qilindi." if lang == "uz" else "Отменено."
         await message.answer(msg, reply_markup=main_menu_customer(lang))
         return
 
-    msg = "📸 Chek rasmini yuboring" if lang == "uz" else "📸 Отправьте фото чека"
-    await message.answer(f"❌ {msg}")
+    msg = "Chek rasmini yuboring." if lang == "uz" else "Отправьте фото чека."
+    await message.answer(msg)
 
 
 # Legacy quantity handler for manual input
@@ -1232,9 +1248,9 @@ async def dlv_quantity_text(
         await state.clear()
         return
 
-    if any(c in text.lower() for c in ["отмена", "bekor", "❌"]) or text.startswith("/"):
+    if any(c in text.lower() for c in ["отмена", "bekor"]) or text.startswith("/"):
         await state.clear()
-        msg = "❌ Bekor qilindi" if lang == "uz" else "❌ Отменено"
+        msg = "Bekor qilindi." if lang == "uz" else "Отменено."
         await message.answer(msg, reply_markup=main_menu_customer(lang))
         return
 
@@ -1251,9 +1267,13 @@ async def dlv_quantity_text(
             raise ValueError()
 
         if min_order > 0 and (price * qty) < min_order:
-            currency = "so'm" if lang == "uz" else "???"
-            msg = f"Min: {min_order:,} {currency}"
-            await message.answer(f"?? {msg}")
+            currency = "so'm" if lang == "uz" else "сум"
+            msg = _t(
+                lang,
+                f"Минимальная сумма доставки: {min_order:,} {currency}",
+                f"Minimal summa: {min_order:,} {currency}",
+            )
+            await message.answer(msg)
             return
 
         await state.update_data(quantity=qty)
@@ -1279,5 +1299,5 @@ async def dlv_quantity_text(
         await message.answer(card_text, parse_mode="HTML", reply_markup=kb.as_markup())
 
     except ValueError:
-        msg = "❌ Raqam kiriting" if lang == "uz" else "❌ Введите число"
+        msg = "Raqam kiriting." if lang == "uz" else "Введите число."
         await message.answer(msg)

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { useNavigate, useParams, useLocation } from 'react-router-dom'
+import { useParams, useLocation } from 'react-router-dom'
 import api from '../api/client'
 import { useCart } from '../context/CartContext'
 import OfferCard from '../components/OfferCard'
@@ -22,7 +22,6 @@ const SORT_LABELS = {
 }
 
 function CategoryProductsPage() {
-  const navigate = useNavigate()
   const params = useParams()
   const location = useLocation()
   const { addToCart, removeFromCart, getQuantity } = useCart()

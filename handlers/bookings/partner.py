@@ -445,11 +445,15 @@ async def partner_confirm_batch_bookings(callback: types.CallbackQuery) -> None:
                 )
             )
 
+            store_label = _t(customer_lang, "Магазин", "Do'kon")
+            address_label = _t(customer_lang, "Адрес", "Manzil")
+            code_label = _t(customer_lang, "Код", "Kod")
+
             for info in bookings_info:
-                lines.append(f"{_t(customer_lang, 'Магазин', \"Do'kon\")}: {_esc(info['store_name'])}")
+                lines.append(f"{store_label}: {_esc(info['store_name'])}")
                 if info["store_address"]:
-                    lines.append(f"{_t(customer_lang, 'Адрес', 'Manzil')}: {_esc(info['store_address'])}")
-                lines.append(f"{_t(customer_lang, 'Код', 'Kod')}: <code>{info['code']}</code>\n")
+                    lines.append(f"{address_label}: {_esc(info['store_address'])}")
+                lines.append(f"{code_label}: <code>{info['code']}</code>\n")
 
             lines.append(
                 _t(customer_lang, "Покажите код продавцу.", "Kodni sotuvchiga ko'rsating.")
@@ -554,10 +558,11 @@ async def partner_reject_batch_bookings(callback: types.CallbackQuery) -> None:
         try:
             customer_lang = db.get_user_language(customer_id)
 
-            if customer_lang == "uz":
-                customer_msg = f"❌ Afsuski, {', '.join(store_names)} bronlaringiz rad etildi."
-            else:
-                customer_msg = f"❌ К сожалению, ваши брони в {', '.join(store_names)} отклонены."
+            customer_msg = _t(
+                customer_lang,
+                f"К сожалению, ваши брони в {', '.join(store_names)} отклонены.",
+                f"Afsuski, {', '.join(store_names)} bronlaringiz rad etildi.",
+            )
 
             await bot.send_message(customer_id, customer_msg, parse_mode="HTML")
 
@@ -571,8 +576,8 @@ async def partner_reject_batch_bookings(callback: types.CallbackQuery) -> None:
         pass
 
     reject_text = (
-        f"❌ {rejected_count} ta bron rad etildi"
+        f"{rejected_count} ta bron rad etildi"
         if lang == "uz"
-        else f"❌ Отклонено броней: {rejected_count}"
+        else f"Отклонено броней: {rejected_count}"
     )
     await callback.answer(reject_text)

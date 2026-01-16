@@ -803,9 +803,9 @@ def setup(
         if not db:
             lang_code = (callback.from_user.language_code or "ru") if callback.from_user else "ru"
             if lang_code.startswith("uz"):
-                text = "❌ Xizmat vaqtincha mavjud emas. Keyinroq urinib ko'ring."
+                text = "Xizmat vaqtincha mavjud emas. Keyinroq urinib ko'ring."
             else:
-                text = "❌ Сервис временно недоступен. Попробуйте позже."
+                text = "Сервис временно недоступен. Попробуйте позже."
             await callback.answer(text, show_alert=True)
             return
         assert callback.from_user is not None

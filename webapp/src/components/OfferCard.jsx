@@ -22,6 +22,7 @@ const OfferCard = memo(function OfferCard({ offer, cartQuantity = 0, onAddToCart
   const minOrderAmount = Number(offer.min_order_amount || 0)
   const showDelivery = Boolean(offer.delivery_enabled)
   const showStoreName = Boolean(offer.store_name)
+  const addLabel = "Savatga"
 
   const handleAddClick = useCallback((e) => {
     e.stopPropagation()
@@ -124,15 +125,19 @@ const OfferCard = memo(function OfferCard({ offer, cartQuantity = 0, onAddToCart
         {(showStoreName || showDelivery) && (
           <div className="offer-meta">
             {showStoreName && (
-              <span className="offer-store">{offer.store_name}</span>
+              <div className="offer-store">{offer.store_name}</div>
             )}
-            {showDelivery && (
-              <span className="offer-badge">Yetkazib berish</span>
-            )}
-            {showDelivery && minOrderAmount > 0 && (
-              <span className="offer-badge secondary">
-                Min {Math.round(minOrderAmount).toLocaleString('ru-RU')} so'm
-              </span>
+            {(showDelivery || minOrderAmount > 0) && (
+              <div className="offer-tags">
+                {showDelivery && (
+                  <span className="offer-badge">Yetkazib berish</span>
+                )}
+                {showDelivery && minOrderAmount > 0 && (
+                  <span className="offer-badge secondary">
+                    Min {Math.round(minOrderAmount).toLocaleString('ru-RU')} so'm
+                  </span>
+                )}
+              </div>
             )}
           </div>
         )}
@@ -157,7 +162,8 @@ const OfferCard = memo(function OfferCard({ offer, cartQuantity = 0, onAddToCart
               disabled={disableIncrement}
               aria-label="Savatga qo'shish"
             >
-              +
+              <span className="add-icon">+</span>
+              <span className="add-label">{addLabel}</span>
             </button>
           )}
         </div>

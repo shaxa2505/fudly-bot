@@ -37,10 +37,11 @@ function YanaPage({ user }) {
   const lang = getUserLanguage()
 
   const cachedUser = getCurrentUser()
+  const telegramUser = window.Telegram?.WebApp?.initDataUnsafe?.user
   const resolvedPhone = (
     user?.phone ||
     cachedUser?.phone ||
-    window.Telegram?.WebApp?.initDataUnsafe?.user?.phone_number ||
+    telegramUser?.phone_number ||
     localStorage.getItem('fudly_phone') ||
     ''
   )
@@ -58,6 +59,23 @@ function YanaPage({ user }) {
   const [notificationsList, setNotificationsList] = useState([])
   const [notificationsLoading, setNotificationsLoading] = useState(true)
   const notificationsRef = useRef([])
+  const [showClearCartModal, setShowClearCartModal] = useState(false)
+  const profileName = (
+    user?.full_name ||
+    user?.name ||
+    [user?.first_name, user?.last_name].filter(Boolean).join(' ') ||
+    [telegramUser?.first_name, telegramUser?.last_name].filter(Boolean).join(' ') ||
+    telegramUser?.username ||
+    'Foydalanuvchi'
+  ).trim()
+  const profileHandle = user?.username || telegramUser?.username || ''
+  const avatarUrl = resolveImageUrl(
+    user?.photo_url,
+    user?.photo,
+    user?.avatar,
+    telegramUser?.photo_url
+  )
+  const profileInitial = profileName ? profileName.slice(0, 1).toUpperCase() : 'F'
 
   // Get cart count from context
   const { cartCount, clearCart } = useCart()
@@ -299,6 +317,20 @@ function YanaPage({ user }) {
     window.open(link, '_blank', 'noopener,noreferrer')
   }
 
+  const handleClearCart = () => {
+    setShowClearCartModal(true)
+  }
+
+  const handleConfirmClearCart = () => {
+    clearCart()
+    setShowClearCartModal(false)
+    window.Telegram?.WebApp?.showAlert?.('Savat tozalandi')
+  }
+
+  const handleDismissClearCart = () => {
+    setShowClearCartModal(false)
+  }
+
   const getStatusInfo = (status) => {
     const statusMap = {
       pending: { text: 'Kutilmoqda', color: '#FF9500', bg: '#FFF4E5' },
@@ -429,6 +461,34 @@ function YanaPage({ user }) {
           ))}
         </div>
       </div>
+
+      <section className="profile-hero" aria-label="Profil">
+        <div className="profile-hero-card">
+          <div className={`profile-avatar ${avatarUrl ? 'has-photo' : ''}`}>
+            {avatarUrl ? (
+              <img src={avatarUrl} alt={profileName} />
+            ) : (
+              <span>{profileInitial}</span>
+            )}
+          </div>
+          <div className="profile-info">
+            <div className="profile-name-row">
+              <h2 className="profile-name">{profileName}</h2>
+              {resolvedPhone && <span className="profile-badge">Tasdiqlangan</span>}
+            </div>
+            {profileHandle && <div className="profile-handle">@{profileHandle}</div>}
+            <div className="profile-meta">
+              {resolvedPhone && <span className="profile-chip">{resolvedPhone}</span>}
+              {resolvedCity && <span className="profile-chip muted">{resolvedCity}</span>}
+            </div>
+          </div>
+        </div>
+        <div className="profile-actions">
+          <button type="button" className="profile-action" onClick={handleChangePhone}>
+            Telegram orqali o'zgartirish
+          </button>
+        </div>
+      </section>
 
       {/* Orders Section */}
       {activeSection === 'orders' && (
@@ -611,15 +671,18 @@ function YanaPage({ user }) {
               <p>Yangi xabarlar shu yerda paydo bo'ladi.</p>
             </div>
           ) : (
-            <div className="notifications-list">
-              {notificationsList.map((item) => (
-                <div key={item.id} className="notification-card">
-                  <div className="notification-header">
-                    <span className="notification-title">{item.title}</span>
-                    <span className="notification-date">{formatDate(item.created_at)}</span>
-                  </div>
-                  <p className="notification-message">{item.message}</p>
+          <div className="notifications-list">
+            {notificationsList.map((item) => (
+              <div
+                key={item.id}
+                className={`notification-card notification-${item.type || 'system'}`}
+              >
+                <div className="notification-header">
+                  <span className="notification-title">{item.title}</span>
+                  <span className="notification-date">{formatDate(item.created_at)}</span>
                 </div>
+                <p className="notification-message">{item.message}</p>
+              </div>
               ))}
             </div>
           )}
@@ -640,14 +703,10 @@ function YanaPage({ user }) {
                 placeholder="+998 90 123 45 67"
                 value={resolvedPhone}
                 readOnly
-                disabled
               />
               <div className="setting-note">
                 Telefon raqam bot orqali o'zgartiriladi.
               </div>
-              <button type="button" className="change-btn" onClick={handleChangePhone}>
-                Telegram orqali o'zgartirish
-              </button>
             </label>
 
             <label className="setting-item">
@@ -657,38 +716,17 @@ function YanaPage({ user }) {
                 className="setting-input"
                 value={resolvedCity}
                 readOnly
-                disabled
                 placeholder="Joylashuvni aniqlang"
               />
             </label>
           </div>
 
-          <div className="settings-group">
-            <h3 className="group-title"> Bildirishnomalar</h3>
-
-            <div className="setting-item toggle-item">
-              <span className="setting-label">Yangi takliflar</span>
-              <button
-                className={`toggle ${notifications ? 'on' : ''}`}
-                onClick={handleToggleNotifications}
-              >
-                <span className="toggle-knob"></span>
-              </button>
-            </div>
-          </div>
-
-          <div className="settings-group">
-            <h3 className="group-title"> Ma'lumotlarni tozalash</h3>
-
-            <button
-              className="danger-btn"
-              onClick={() => {
-                if (confirm('Savatni tozalashni xohlaysizmi?')) {
-                  clearCart()
-                  window.Telegram?.WebApp?.showAlert?.('Savat tozalandi')
-                }
-              }}
-            >
+          <div className="settings-group danger-zone">
+            <h3 className="group-title danger-title">Xavfli amallar</h3>
+            <p className="danger-note">
+              Savatdagi barcha mahsulotlar o'chiriladi. Bu amalni qaytarib bo'lmaydi.
+            </p>
+            <button className="danger-btn" onClick={handleClearCart}>
                Savatni tozalash
             </button>
           </div>
@@ -747,6 +785,41 @@ function YanaPage({ user }) {
           </div>
 
           <p className="copyright">(c) 2024 Fudly. Barcha huquqlar himoyalangan.</p>
+        </div>
+      )}
+
+      {showClearCartModal && (
+        <div className="confirm-modal-overlay" onClick={handleDismissClearCart}>
+          <div
+            className="confirm-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="clear-cart-title"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="confirm-modal-header">
+              <h3 id="clear-cart-title">Savatni tozalash</h3>
+            </div>
+            <p className="confirm-modal-text">
+              Savatdagi barcha mahsulotlar o'chiriladi. Davom etasizmi?
+            </p>
+            <div className="confirm-modal-actions">
+              <button
+                type="button"
+                className="confirm-modal-btn secondary"
+                onClick={handleDismissClearCart}
+              >
+                Bekor qilish
+              </button>
+              <button
+                type="button"
+                className="confirm-modal-btn danger"
+                onClick={handleConfirmClearCart}
+              >
+                Tozalash
+              </button>
+            </div>
+          </div>
         </div>
       )}
 

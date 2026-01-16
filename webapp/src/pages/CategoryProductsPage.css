@@ -168,6 +168,124 @@
   box-shadow: 0 0 0 2px #FFFFFF;
 }
 
+.filters-section {
+  margin: 0 var(--page-padding-x) var(--spacing-sm);
+}
+
+.filters-advanced {
+  padding: 12px;
+  background: #FFFFFF;
+  border: 1px solid rgba(15, 118, 110, 0.08);
+  border-radius: 14px;
+  box-shadow: 0 4px 10px rgba(16, 24, 40, 0.04);
+  display: grid;
+  gap: 12px;
+}
+
+.filter-group {
+  display: grid;
+  gap: 8px;
+}
+
+.filter-group-label {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--color-text-tertiary);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.filter-group-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.sort-select {
+  width: 100%;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid var(--color-border);
+  background: var(--color-bg-primary);
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--color-text-primary);
+}
+
+.filter-pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 8px 14px;
+  background: #F4F4F5;
+  border: 1px solid #E5E7EB;
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #111827;
+  cursor: pointer;
+  transition: transform 0.15s ease, box-shadow 0.2s ease, border-color 0.2s ease, background 0.2s ease;
+  white-space: nowrap;
+  flex-shrink: 0;
+  min-height: 36px;
+  box-shadow: 0 8px 16px rgba(16, 24, 40, 0.08);
+}
+
+.filter-pill-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: #FFFFFF;
+  color: var(--pill-color, var(--color-primary));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.9);
+}
+
+.filter-pill-text {
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.1;
+}
+
+.filter-pill:active {
+  transform: scale(0.98);
+}
+
+.filter-pill.active {
+  background: var(--pill-color, var(--color-primary));
+  color: #FFFFFF;
+  border-color: transparent;
+  box-shadow: 0 12px 20px rgba(16, 24, 40, 0.18);
+}
+
+.filter-pill.active .filter-pill-icon {
+  background: rgba(255, 255, 255, 0.22);
+  color: #FFFFFF;
+}
+
+.filter-pill.discount.active {
+  background: var(--color-accent);
+  color: #FFFFFF;
+  border-color: transparent;
+  box-shadow: 0 12px 20px rgba(249, 115, 22, 0.24);
+}
+
+.filter-pill.discount.active .filter-pill-text {
+  color: #FFFFFF;
+}
+
+.filter-pill.discount.active .filter-pill-icon {
+  color: #FFFFFF;
+}
+
+.category-filters-reset {
+  display: flex;
+  justify-content: flex-end;
+}
+
 .active-filters-bar {
   display: flex;
   flex-wrap: wrap;

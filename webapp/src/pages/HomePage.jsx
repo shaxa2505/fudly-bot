@@ -519,7 +519,9 @@ function HomePage() {
     const timer = setTimeout(async () => {
       setSuggestionsLoading(true)
       try {
-        const suggestions = await api.getSearchSuggestions(trimmed, 5)
+        const suggestions = await api.getSearchSuggestions(trimmed, 5, {
+          city: cityForApi || undefined,
+        })
         if (isActive) {
           setSearchSuggestions((suggestions || []).filter(Boolean))
         }
