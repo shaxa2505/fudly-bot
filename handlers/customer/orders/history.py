@@ -37,6 +37,10 @@ def setup_dependencies(database: Any, bot_instance: Any, cart_storage_instance: 
     cart_storage = cart_storage_instance
 
 
+def _t(lang: str, ru: str, uz: str) -> str:
+    return ru if lang == "ru" else uz
+
+
 @router.callback_query(F.data.startswith("repeat_order_"))
 async def repeat_order(callback: types.CallbackQuery, state: FSMContext) -> None:
     """Repeat previous order - add items to cart."""
@@ -50,7 +54,7 @@ async def repeat_order(callback: types.CallbackQuery, state: FSMContext) -> None
     try:
         order_id = int(callback.data.split("_")[-1])
     except (ValueError, IndexError):
-        await callback.answer("❌ Ошибка" if lang == "ru" else "❌ Xatolik", show_alert=True)
+        await callback.answer(_t(lang, "Ошибка", "Xatolik"), show_alert=True)
         return
 
     # Get order details
@@ -81,12 +85,12 @@ async def repeat_order(callback: types.CallbackQuery, state: FSMContext) -> None
             order = cursor.fetchone()
     except Exception as e:
         logger.error(f"Failed to get order {order_id}: {e}")
-        await callback.answer("❌ Ошибка" if lang == "ru" else "❌ Xatolik", show_alert=True)
+        await callback.answer(_t(lang, "Ошибка", "Xatolik"), show_alert=True)
         return
 
     if not order:
         await callback.answer(
-            "❌ Заказ не найден" if lang == "ru" else "❌ Buyurtma topilmadi", show_alert=True
+            _t(lang, "Заказ не найден", "Buyurtma topilmadi"), show_alert=True
         )
         return
 
@@ -175,15 +179,15 @@ async def repeat_order(callback: types.CallbackQuery, state: FSMContext) -> None
 
     if added_count > 0:
         cart_count = cart_storage.get_cart_count(user_id)
-        text = (
-            f"✅ Добавлено в корзину: {added_count} товар(ов)\n\n🛒 В корзине: {cart_count}"
-            if lang == "ru"
-            else f"✅ Savatga qo'shildi: {added_count} ta mahsulot\n\n🛒 Savatda: {cart_count}"
+        text = _t(
+            lang,
+            f"Добавлено в корзину: {added_count}\nВ корзине: {cart_count}",
+            f"Savatga qo'shildi: {added_count} ta\nSavatda: {cart_count}",
         )
 
         kb = InlineKeyboardBuilder()
         kb.button(
-            text="🛒 Перейти в корзину" if lang == "ru" else "🛒 Savatga o'tish",
+            text="Перейти в корзину" if lang == "ru" else "Savatga o'tish",
             callback_data="view_cart",
         )
 
@@ -193,9 +197,11 @@ async def repeat_order(callback: types.CallbackQuery, state: FSMContext) -> None
             await callback.message.answer(text, parse_mode="HTML", reply_markup=kb.as_markup())
     else:
         await callback.answer(
-            "⚠️ Товары из этого заказа больше не доступны"
-            if lang == "ru"
-            else "⚠️ Bu buyurtmadagi mahsulotlar endi mavjud emas",
+            _t(
+                lang,
+                "Товары из этого заказа больше недоступны",
+                "Bu buyurtmadagi mahsulotlar endi mavjud emas",
+            ),
             show_alert=True,
         )
 

@@ -53,6 +53,19 @@ def setup_dependencies(database: Any, bot_instance: Any):
     logger.info(f"Partner module initialized, default bot_username: {bot_username}")
 
 
+def _t(lang: str, ru: str, uz: str) -> str:
+    return ru if lang == "ru" else uz
+
+
+def _lang_code(user: types.User | None) -> str:
+    code = (user.language_code or "ru") if user else "ru"
+    return "uz" if code.startswith("uz") else "ru"
+
+
+def _service_unavailable(lang: str) -> str:
+    return _t(lang, "Сервис временно недоступен. Попробуйте позже.", "Xizmat vaqtincha mavjud emas. Keyinroq urinib ko'ring.")
+
+
 # ===================== PARTNER CONFIRM/REJECT =====================
 # NOTE: Handlers for partner_confirm_ and partner_reject_ patterns
 # have been moved to handlers/common/unified_order_handlers.py
@@ -69,7 +82,8 @@ def setup_dependencies(database: Any, bot_instance: Any):
 async def partner_cancel_booking(callback: types.CallbackQuery) -> None:
     """Partner cancels an already confirmed booking."""
     if not db or not bot:
-        await callback.answer("System error", show_alert=True)
+        lang_code = _lang_code(callback.from_user)
+        await callback.answer(_service_unavailable(lang_code), show_alert=True)
         return
 
     partner_id = callback.from_user.id
@@ -126,10 +140,11 @@ async def partner_cancel_booking(callback: types.CallbackQuery) -> None:
     if customer_id:
         customer_lang = db.get_user_language(customer_id)
 
-        if customer_lang == "uz":
-            customer_msg = "❌ Afsuski, broningiz sotuvchi tomonidan bekor qilindi."
-        else:
-            customer_msg = "❌ К сожалению, продавец отменил вашу бронь."
+        customer_msg = _t(
+            customer_lang,
+            "К сожалению, продавец отменил вашу бронь.",
+            "Afsuski, broningiz sotuvchi tomonidan bekor qilindi.",
+        )
 
         try:
             await bot.send_message(customer_id, customer_msg)
@@ -138,10 +153,7 @@ async def partner_cancel_booking(callback: types.CallbackQuery) -> None:
 
     await safe_edit_reply_markup(callback.message)
 
-    if lang == "uz":
-        text = f"❌ Bron #{booking_id} bekor qilindi."
-    else:
-        text = f"❌ Бронь #{booking_id} отменена."
+    text = _t(lang, f"Бронь #{booking_id} отменена.", f"Bron #{booking_id} bekor qilindi.")
 
     await safe_answer_or_send(callback.message, partner_id, text, bot=bot)
     await callback.answer()
@@ -154,7 +166,8 @@ async def partner_cancel_booking(callback: types.CallbackQuery) -> None:
 async def rate_booking(callback: types.CallbackQuery, state: FSMContext) -> None:
     """Customer rates - save immediately, show optional review inline."""
     if not db:
-        await callback.answer("System error", show_alert=True)
+        lang_code = _lang_code(callback.from_user)
+        await callback.answer(_service_unavailable(lang_code), show_alert=True)
         return
 
     user_id = callback.from_user.id
@@ -192,33 +205,34 @@ async def rate_booking(callback: types.CallbackQuery, state: FSMContext) -> None
         logger.error(f"Failed to save rating: {e}")
 
     # Update the SAME message with thanks + optional review prompt
-    stars = "⭐" * rating
     kb = InlineKeyboardBuilder()
     kb.button(
-        text="📝 Sharh qoldirish" if lang == "uz" else "📝 Оставить отзыв",
+        text=_t(lang, "Оставить отзыв", "Sharh qoldirish"),
         callback_data=f"add_review_{booking_id}",
     )
     kb.adjust(1)
 
-    thanks = "Rahmat!" if lang == "uz" else "Спасибо!"
+    thanks = _t(lang, "Спасибо!", "Rahmat!")
+    rating_word = "звезду" if rating == 1 else "звезды" if rating < 5 else "звёзд"
     try:
         await callback.message.edit_text(
-            f"⭐ {thanks} Siz {rating} ball berdingiz."
+            f"{thanks} Siz {rating} ball berdingiz."
             if lang == "uz"
-            else f"⭐ {thanks} Вы поставили {rating} {'звезду' if rating == 1 else 'звезды' if rating < 5 else 'звёзд'}.",
+            else f"{thanks} Вы поставили {rating} {rating_word}.",
             reply_markup=kb.as_markup(),
         )
     except Exception:
         pass
 
-    await callback.answer(f"{stars} {thanks}")
+    await callback.answer(thanks)
 
 
 @router.callback_query(F.data.regexp(r"^add_review_\d+$"))
 async def add_review_prompt(callback: types.CallbackQuery, state: FSMContext) -> None:
     """User wants to add optional text review."""
     if not db:
-        await callback.answer("Error", show_alert=True)
+        lang_code = _lang_code(callback.from_user)
+        await callback.answer(_service_unavailable(lang_code), show_alert=True)
         return
 
     user_id = callback.from_user.id
@@ -227,7 +241,7 @@ async def add_review_prompt(callback: types.CallbackQuery, state: FSMContext) ->
     try:
         booking_id = int(callback.data.split("_")[-1])
     except (ValueError, IndexError):
-        await callback.answer("Error", show_alert=True)
+        await callback.answer(get_text(lang, "error"), show_alert=True)
         return
 
     await state.update_data(booking_id=booking_id)
@@ -235,7 +249,7 @@ async def add_review_prompt(callback: types.CallbackQuery, state: FSMContext) ->
 
     prompt = "Sharh yozing:" if lang == "uz" else "Напишите отзыв:"
     try:
-        await callback.message.edit_text(f"📝 {prompt}")
+        await callback.message.edit_text(prompt)
     except Exception:
         pass
     await callback.answer()
@@ -245,7 +259,8 @@ async def add_review_prompt(callback: types.CallbackQuery, state: FSMContext) ->
 async def process_review_text(message: types.Message, state: FSMContext) -> None:
     """Process the text review from customer."""
     if not db or not bot:
-        await message.answer("System error")
+        lang_code = _lang_code(message.from_user)
+        await message.answer(_service_unavailable(lang_code))
         return
 
     user_id = message.from_user.id
@@ -267,17 +282,18 @@ async def process_review_text(message: types.Message, state: FSMContext) -> None
 
     await state.clear()
 
-    thanks = "Rahmat! Sharh saqlandi." if lang == "uz" else "Спасибо! Отзыв сохранён."
+    thanks = _t(lang, "Спасибо! Отзыв сохранён.", "Rahmat! Sharh saqlandi.")
     from app.keyboards import main_menu_customer
 
-    await message.answer(f"✅ {thanks}", reply_markup=main_menu_customer(lang))
+    await message.answer(thanks, reply_markup=main_menu_customer(lang))
 
 
 @router.callback_query(F.data.regexp(r"^skip_review_\d+$"))
 async def skip_review(callback: types.CallbackQuery, state: FSMContext) -> None:
     """Skip text review and save rating only."""
     if not db or not bot:
-        await callback.answer("System error", show_alert=True)
+        lang_code = _lang_code(callback.from_user)
+        await callback.answer(_service_unavailable(lang_code), show_alert=True)
         return
 
     user_id = callback.from_user.id
@@ -315,13 +331,15 @@ async def skip_review(callback: types.CallbackQuery, state: FSMContext) -> None:
     await state.clear()
     await safe_edit_reply_markup(callback.message)
 
-    if lang == "uz":
-        text = f"⭐ Rahmat! Siz {rating} ball berdingiz."
-    else:
-        text = f"⭐ Спасибо! Вы поставили {rating} {'звезду' if rating == 1 else 'звезды' if rating < 5 else 'звёзд'}."
+    rating_word = "звезду" if rating == 1 else "звезды" if rating < 5 else "звёзд"
+    text = (
+        f"Rahmat! Siz {rating} ball berdingiz."
+        if lang == "uz"
+        else f"Спасибо! Вы поставили {rating} {rating_word}."
+    )
 
     await safe_answer_or_send(callback.message, user_id, text, bot=bot)
-    await callback.answer(get_text(lang, "rating_saved") or "Оценка сохранена")
+    await callback.answer(_t(lang, "Спасибо за оценку!", "Baholaganingiz uchun rahmat!"))
 
 
 # ===================== BATCH CONFIRM/REJECT (for cart orders) =====================
@@ -331,7 +349,8 @@ async def skip_review(callback: types.CallbackQuery, state: FSMContext) -> None:
 async def partner_confirm_batch_bookings(callback: types.CallbackQuery) -> None:
     """Partner confirms multiple bookings at once (from cart)."""
     if not db or not bot:
-        await callback.answer("System error", show_alert=True)
+        lang_code = _lang_code(callback.from_user)
+        await callback.answer(_service_unavailable(lang_code), show_alert=True)
         return
 
     partner_id = callback.from_user.id
@@ -356,7 +375,7 @@ async def partner_confirm_batch_bookings(callback: types.CallbackQuery) -> None:
     if not order_service and bot:
         order_service = init_unified_order_service(db, bot)
     if not order_service:
-        await callback.answer("System error", show_alert=True)
+        await callback.answer(_service_unavailable(lang), show_alert=True)
         return
 
     for booking_id in booking_ids:
@@ -418,21 +437,23 @@ async def partner_confirm_batch_bookings(callback: types.CallbackQuery) -> None:
             customer_lang = db.get_user_language(customer_id)
 
             lines = []
-            if customer_lang == "uz":
-                lines.append("✅ <b>Barcha bronlaringiz tasdiqlandi!</b>\n")
-            else:
-                lines.append("✅ <b>Все ваши брони подтверждены!</b>\n")
+            lines.append(
+                _t(
+                    customer_lang,
+                    "<b>Все ваши брони подтверждены</b>\n",
+                    "<b>Barcha bronlaringiz tasdiqlandi</b>\n",
+                )
+            )
 
             for info in bookings_info:
-                lines.append(f"🏪 {_esc(info['store_name'])}")
+                lines.append(f"{_t(customer_lang, 'Магазин', \"Do'kon\")}: {_esc(info['store_name'])}")
                 if info["store_address"]:
-                    lines.append(f"📍 {_esc(info['store_address'])}")
-                lines.append(f"🎫 Kod: <code>{info['code']}</code>\n")
+                    lines.append(f"{_t(customer_lang, 'Адрес', 'Manzil')}: {_esc(info['store_address'])}")
+                lines.append(f"{_t(customer_lang, 'Код', 'Kod')}: <code>{info['code']}</code>\n")
 
-            if customer_lang == "uz":
-                lines.append("⚠️ Kodni sotuvchiga ko'rsating.")
-            else:
-                lines.append("⚠️ Покажите код продавцу.")
+            lines.append(
+                _t(customer_lang, "Покажите код продавцу.", "Kodni sotuvchiga ko'rsating.")
+            )
 
             customer_msg = "\n".join(lines)
             await bot.send_message(customer_id, customer_msg, parse_mode="HTML")
@@ -447,9 +468,9 @@ async def partner_confirm_batch_bookings(callback: types.CallbackQuery) -> None:
         pass
 
     success_text = (
-        f"✅ {confirmed_count} ta bron tasdiqlandi"
+        f"{confirmed_count} ta bron tasdiqlandi"
         if lang == "uz"
-        else f"✅ Подтверждено броней: {confirmed_count}"
+        else f"Подтверждено броней: {confirmed_count}"
     )
     await callback.answer(success_text)
 

@@ -76,7 +76,7 @@ TEXTS = {
         "city_selected": "✅ Город выбран: {city}",
         "city_changed_confirm": "✅ Город изменён на <b>{city}</b>",
         # Общие ошибки
-        "error": "Произошла ошибка",
+        "error": "Ошибка",
         # Регистрация
         "registration_choose_action": "Выберите раздел:",
         "registration_complete_personal": """<b>Готово</b>
@@ -213,18 +213,18 @@ TEXTS = {
 ✓ Оплата при получении
 
 <i>Нажмите "Подтвердить" ниже</i> 👇""",
-        "booking_success": """🎉 <b>Бронирование успешно!</b>
+        "booking_success": """<b>Бронирование успешно</b>
 
-🏪 {store_name}
-🍽 {offer_name}
-💰 К оплате: {price} сум
+{store_name}
+{offer_name}
+К оплате: {price} сум
 
-📍 Адрес: {city}, {address}
-🕐 Забрать до: {time}
+Адрес: {city}, {address}
+Забрать до: {time}
 
-🎫 Код бронирования: <code>{code}</code>
+Код бронирования: <code>{code}</code>
 
-⚠️ Покажите этот код при получении заказа!""",
+Покажите этот код при получении заказа.""",
         "my_bookings_empty": "У вас пока нет заказов.\n\nПопробуйте раздел 🔥 Акции!",
         "no_active_bookings": "Нет активных бронирований",
         "no_completed_bookings": "Нет завершённых бронирований",
@@ -233,11 +233,11 @@ TEXTS = {
         "cancel_booking": "Отменить заказ",
         "booking_cancelled": "Заказ отменён",
         "insufficient_stock": "× К сожалению, выбранное количество уже недоступно. Обновите список предложений.",
-        "error_qty_gt_zero": "× Количество должно быть больше 0",
-        "error_price_gt_zero": "× Цена должна быть больше 0",
-        "error_price_too_high": "× Слишком большая цена",
-        "error_discount_less_than_original": "× Цена со скидкой должна быть меньше обычной цены",
-        "warn_discount_low": "⚠️ Внимание: скидка меньше 10%. Рекомендуем делать скидку от 30% для привлечения клиентов.",
+        "error_qty_gt_zero": "Количество должно быть больше 0.",
+        "error_price_gt_zero": "Цена должна быть больше 0.",
+        "error_price_too_high": "Слишком большая цена.",
+        "error_discount_less_than_original": "Цена со скидкой должна быть меньше обычной цены.",
+        "warn_discount_low": "Внимание: скидка меньше 10%. Рекомендуем делать скидку от 30% для привлечения клиентов.",
         "booking_how_many": "Сколько вы хотите забронировать? (1-{max_qty})",
         # Партнёр
         "become_partner_text": """🏪 <b>Стать партнёром Fudly</b>
@@ -359,9 +359,9 @@ TEXTS = {
 
 Все предложения доступны для покупателей!""",
         # Подтверждение выдачи
-        "confirm_delivery_prompt": "✅ <b>Подтверждение выдачи заказа</b>\n\nВведите 8-значный код бронирования:",
-        "booking_not_found": "❌ Бронирование с таким кодом не найдено",
-        "order_confirmed": """✅ <b>Заказ подтверждён!</b>
+        "confirm_delivery_prompt": "<b>Подтверждение выдачи</b>\n\nВведите 8-значный код бронирования:",
+        "booking_not_found": "Бронирование с таким кодом не найдено.",
+        "order_confirmed": """<b>Заказ подтверждён</b>
 
 Бронирование #{booking_id} завершено
 Клиент: {customer_name}
@@ -370,7 +370,7 @@ TEXTS = {
 Клиент получит уведомление с просьбой оценить ваш магазин.""",
         # Рейтинг
         "rate_store": "⭐ <b>Оцените магазин</b>\n\n🏪 {store_name}\n\nКак вам понравилось?",
-        "rating_saved": "✅ <b>Спасибо за оценку!</b>\n\nВаш отзыв поможет другим покупателям!",
+        "rating_saved": "<b>Спасибо за оценку!</b>\n\nВаш отзыв поможет другим покупателям!",
         "already_rated": "Вы уже оценили этот заказ",
         # Статистика
         "store_stats": """🏪 <b>{name}</b>
@@ -384,10 +384,10 @@ TEXTS = {
 📦 Активных броней: {pending}""",
         # Ошибки
         "error_invalid_number": "Неверный номер. Пример: +998 90 123 45 67.",
-        "error_invalid_time": "❌ Неверный формат времени. Используйте формат ЧЧ:ММ (например: 18:00)",
+        "error_invalid_time": "Неверный формат времени. Используйте формат ЧЧ:ММ (например: 18:00).",
         "no_stores": "❌ У вас нет одобренных магазинов!",
         "no_approved_stores": "❌ У вас нет одобренных магазинов!\n\n⏳ Дождитесь одобрения вашей заявки администратором.",
-        "operation_cancelled": "❌ Операция отменена",
+        "operation_cancelled": "Операция отменена.",
         "no_admin_access": "❌ У вас нет доступа к админ панели",
         "send_photo": '📸 Отправьте фото блюда (или напишите "пропустить")',
         "invalid_range": "❌ От 1 до 100",
@@ -434,8 +434,8 @@ TEXTS = {
         "yes_delete": "✅ Да, удалить",
         "no_cancel": "❌ Нет, отменить",
         "store_deleted": "✅ Магазин успешно удалён",
-        "error_general": "❌ Произошла ошибка. Попробуйте позже.",
-        "system_error": "⚠️ Системная ошибка. Попробуйте позже или напишите в поддержку.",
+        "error_general": "Ошибка. Попробуйте позже.",
+        "system_error": "Системная ошибка. Попробуйте позже или напишите в поддержку.",
         # Улучшенные пустые состояния
         # Навигация
         "go_back": "◀️ Назад",
@@ -445,11 +445,11 @@ TEXTS = {
         "qty_custom": "✏️ Другое",
         "qty_enter_custom": "Введите количество (от 1 до {max}):",
         # Улучшенные ошибки с подсказками
-        "error_qty_invalid": """❌ <b>Неверное количество</b>
+        "error_qty_invalid": """<b>Неверное количество</b>
 
 Доступно: {available} шт
 Попробуйте: 1, 2 или {max}""",
-        "error_qty_exceeded": """❌ <b>Слишком много</b>
+        "error_qty_exceeded": """<b>Слишком много</b>
 
 Максимум: {max} шт
 Введите число от 1 до {max}""",
@@ -665,7 +665,7 @@ Bo'limni tanlang.""",
         "city_selected": "✅ Shahar tanlandi: {city}",
         "city_changed_confirm": "✅ Shahar <b>{city}</b>ga o'zgartirildi",
         # Umumiy xatolar
-        "error": "Xatolik yuz berdi",
+        "error": "Xatolik",
         # Ro'yxatdan o'tish
         "registration_choose_action": "Bo'limni tanlang:",
         "registration_complete_personal": """<b>✅ Tayyor</b>
@@ -839,18 +839,18 @@ Tahrirlash yoki o'chirish mumkin
 • Buyurtmalarni tez tasdiqlang
 • Olib ketish vaqtini aniq ko'rsating""",
         # Buyurtma
-        "booking_success": """✅ <b>Buyurtma muvaffaqiyatli!</b>
+        "booking_success": """<b>Buyurtma muvaffaqiyatli</b>
 
-🏪 {store_name}
-🍽 {offer_name}
-💰 To'lash kerak: {price} so'm
+{store_name}
+{offer_name}
+To'lov: {price} so'm
 
-📍 Manzil: {city}, {address}
-🕐 Olish vaqti: {time}
+Manzil: {city}, {address}
+Olish vaqti: {time}
 
-🎫 Buyurtma kodi: <code>{code}</code>
+Buyurtma kodi: <code>{code}</code>
 
-⚠️ Buyurtmani olishda bu kodni ko'rsating!""",
+Buyurtmani olishda shu kodni ko'rsating.""",
         "my_bookings_empty": "📋 Sizda hali buyurtmalar yo'q.\n\nTakliflar ro'yxatidan tanlang! 🍽",
         "no_active_bookings": "Faol buyurtmalar yo'q",
         "no_completed_bookings": "Yakunlangan buyurtmalar yo'q",
@@ -859,11 +859,11 @@ Tahrirlash yoki o'chirish mumkin
         "cancel_booking": "❌ Buyurtmani bekor qilish",
         "booking_cancelled": "✅ Buyurtma bekor qilindi",
         "insufficient_stock": "❌ Afsuski, tanlangan miqdor endi mavjud emas. Takliflar ro‘yxatini yangilang.",
-        "error_qty_gt_zero": "❌ Miqdor 0 dan katta bo‘lishi kerak",
-        "error_price_gt_zero": "❌ Narx 0 dan katta bo‘lishi kerak",
-        "error_price_too_high": "❌ Juda katta narx",
-        "error_discount_less_than_original": "❌ Chegirma narxi oddiy narxdan kichik bo‘lishi kerak",
-        "warn_discount_low": "⚠️ Diqqat: chegirma 10% dan kichik. Mijozlarni jalb qilish uchun 30% va undan yuqori tavsiya etamiz.",
+        "error_qty_gt_zero": "Miqdor 0 dan katta bo'lishi kerak.",
+        "error_price_gt_zero": "Narx 0 dan katta bo'lishi kerak.",
+        "error_price_too_high": "Juda katta narx.",
+        "error_discount_less_than_original": "Chegirma narxi oddiy narxdan kichik bo'lishi kerak.",
+        "warn_discount_low": "Diqqat: chegirma 10% dan kichik. Mijozlarni jalb qilish uchun 30% va undan yuqori tavsiya etamiz.",
         "booking_how_many": "Nechta buyurtma qilmoqchisiz? (1-{max_qty})",
         "booking_step_quantity": """┏━━━━━━━━━━━━━━━━━━━━━┓
 ┃   BUYURTMA BERISH     ┃
@@ -1016,9 +1016,9 @@ Sonini kiriting (1 dan 100 gacha):""",
 
 Barcha takliflar xaridorlar uchun mavjud!""",
         # Berishni tasdiqlash
-        "confirm_delivery_prompt": "✅ <b>Buyurtma berishni tasdiqlash</b>\n\n8 xonali buyurtma kodini kiriting:",
-        "booking_not_found": "❌ Bunday kodli buyurtma topilmadi",
-        "order_confirmed": """✅ <b>Buyurtma tasdiqlandi!</b>
+        "confirm_delivery_prompt": "<b>Buyurtmani tasdiqlash</b>\n\n8 xonali buyurtma kodini kiriting:",
+        "booking_not_found": "Bunday kodli buyurtma topilmadi.",
+        "order_confirmed": """<b>Buyurtma tasdiqlandi</b>
 
 Buyurtma #{booking_id} tugallandi
 Mijoz: {customer_name}
@@ -1027,7 +1027,7 @@ Summa: {price} so\'m
 Mijoz do'koningizni baholash uchun xabar oladi.""",
         # Baho
         "rate_store": "⭐ <b>Do'konni baholang</b>\n\n🏪 {store_name}\n\nSizga qanday yoqdi?",
-        "rating_saved": "✅ <b>Baholaganingiz uchun rahmat!</b>\n\nSizning fikringiz boshqa xaridorlarga yordam beradi!",
+        "rating_saved": "<b>Baholaganingiz uchun rahmat!</b>\n\nSizning fikringiz boshqa xaridorlarga yordam beradi!",
         "already_rated": "Siz bu buyurtmani allaqachon baholagansiz",
         # Statistika
         "store_stats": """🏪 <b>{name}</b>
@@ -1041,10 +1041,10 @@ Mijoz do'koningizni baholash uchun xabar oladi.""",
 📦 Faol buyurtmalar: {pending}""",
         # Xatolar
         "error_invalid_number": "Noto'g'ri raqam. Misol: +998 90 123 45 67.",
-        "error_invalid_time": "❌ Noto'g'ri vaqt formati. HH:MM formatidan foydalaning (masalan: 18:00)",
+        "error_invalid_time": "Noto'g'ri vaqt formati. HH:MM formatidan foydalaning (masalan: 18:00).",
         "no_stores": "❌ Sizda tasdiqlangan do'konlar yo'q!",
         "no_approved_stores": "❌ Sizda tasdiqlangan do'konlar yo'q!\n\n⏳ Administrator tomonidan arizangizni tasdiqlanishini kuting.",
-        "operation_cancelled": "❌ Operatsiya bekor qilindi",
+        "operation_cancelled": "Operatsiya bekor qilindi.",
         "no_admin_access": "❌ Sizda admin paneliga kirish huquqi yo'q",
         "send_photo": '📸 Taom rasmini yuboring (yoki "otkazib yuborish" deb yozing)',
         "invalid_range": "❌ 1 dan 100 gacha",
@@ -1091,8 +1091,8 @@ Bu harakatni qaytarib bo\'lmaydi!""",
         "yes_delete": "✅ Ha, o'chirish",
         "no_cancel": "❌ Yo'q, bekor qilish",
         "store_deleted": "✅ Do'kon muvaffaqiyatli o'chirildi",
-        "error_general": "❌ Xatolik yuz berdi. Keyinroq urinib ko'ring.",
-        "system_error": "⚠️ Tizim xatosi. Keyinroq urinib ko'ring yoki qo'llab-quvvatlash xizmatiga yozing.",
+        "error_general": "Xatolik yuz berdi. Keyinroq urinib ko'ring.",
+        "system_error": "Tizim xatosi. Keyinroq urinib ko'ring yoki qo'llab-quvvatlash xizmatiga yozing.",
         # Yaxshilangan bo'sh holatlar
         "cart_empty": "<b>Savat bo'sh</b>\nAksiya yoki qidiruvdan mahsulot qo'shing.",
         "cart_empty_cta": "Takliflarga",
@@ -1102,11 +1102,11 @@ Bu harakatni qaytarib bo\'lmaydi!""",
         "qty_custom": "✏️ Boshqa",
         "qty_enter_custom": "Miqdorni kiriting (1 dan {max} gacha):",
         # Yaxshilangan xatolar
-        "error_qty_invalid": """❌ <b>Noto'g'ri miqdor</b>
+        "error_qty_invalid": """<b>Noto'g'ri miqdor</b>
 
 Mavjud: {available} dona
 Urinib ko'ring: 1, 2 yoki {max}""",
-        "error_qty_exceeded": """❌ <b>Juda ko'p</b>
+        "error_qty_exceeded": """<b>Juda ko'p</b>
 
 Maksimum: {max} dona
 1 dan {max} gacha son kiriting""",
