@@ -52,22 +52,22 @@ def _t(lang: str, ru: str, uz: str) -> str:
 # =============================================================================
 
 ORDER_STATUSES = {
-    "pending": {"emoji": "🟡", "ru": "Ожидает подтверждения", "uz": "Tasdiqlanishi kutilmoqda"},
-    "preparing": {"emoji": "👨‍🍳", "ru": "Готовится", "uz": "Tayyorlanmoqda"},
-    "ready": {"emoji": "📦", "ru": "Готов", "uz": "Tayyor"},
-    "delivering": {"emoji": "🚚", "ru": "Курьер в пути", "uz": "Kuryer yo'lda"},
-    "completed": {"emoji": "✅", "ru": "Завершён", "uz": "Yakunlangan"},
-    "rejected": {"emoji": "❌", "ru": "Отклонён", "uz": "Rad etilgan"},
-    "cancelled": {"emoji": "❌", "ru": "Отменён", "uz": "Bekor qilingan"},
+    "pending": {"emoji": "•", "ru": "Ожидает подтверждения", "uz": "Tasdiqlanishi kutilmoqda"},
+    "preparing": {"emoji": "•", "ru": "Готовится", "uz": "Tayyorlanmoqda"},
+    "ready": {"emoji": "•", "ru": "Готов", "uz": "Tayyor"},
+    "delivering": {"emoji": "•", "ru": "Курьер в пути", "uz": "Kuryer yo'lda"},
+    "completed": {"emoji": "•", "ru": "Завершён", "uz": "Yakunlangan"},
+    "rejected": {"emoji": "•", "ru": "Отклонён", "uz": "Rad etilgan"},
+    "cancelled": {"emoji": "•", "ru": "Отменён", "uz": "Bekor qilingan"},
 }
 
 BOOKING_STATUSES = {
-    "pending": {"emoji": "🟡", "ru": "Ожидает", "uz": "Kutilmoqda"},
-    "preparing": {"emoji": "👨‍🍳", "ru": "Готовится", "uz": "Tayyorlanmoqda"},
-    "ready": {"emoji": "📦", "ru": "Готов", "uz": "Tayyor"},
-    "completed": {"emoji": "✅", "ru": "Завершён", "uz": "Yakunlangan"},
-    "rejected": {"emoji": "❌", "ru": "Отклонён", "uz": "Rad etilgan"},
-    "cancelled": {"emoji": "❌", "ru": "Отменён", "uz": "Bekor qilingan"},
+    "pending": {"emoji": "•", "ru": "Ожидает", "uz": "Kutilmoqda"},
+    "preparing": {"emoji": "•", "ru": "Готовится", "uz": "Tayyorlanmoqda"},
+    "ready": {"emoji": "•", "ru": "Готов", "uz": "Tayyor"},
+    "completed": {"emoji": "•", "ru": "Завершён", "uz": "Yakunlangan"},
+    "rejected": {"emoji": "•", "ru": "Отклонён", "uz": "Rad etilgan"},
+    "cancelled": {"emoji": "•", "ru": "Отменён", "uz": "Bekor qilingan"},
 }
 
 
@@ -88,7 +88,7 @@ def _get_status_info(status: str, is_delivery: bool, lang: str) -> tuple[str, st
     """Get status emoji and text."""
     statuses = ORDER_STATUSES if is_delivery else BOOKING_STATUSES
     status_norm = _normalize_status(status)
-    info = statuses.get(status_norm, {"emoji": "❓", "ru": status_norm, "uz": status_norm})
+    info = statuses.get(status_norm, {"emoji": "•", "ru": status_norm, "uz": status_norm})
     return info["emoji"], info.get(lang, info["ru"])
 
 
@@ -117,9 +117,9 @@ async def my_orders_handler(message: types.Message) -> None:
     if not db:
         lang_code = (message.from_user.language_code or "ru") if message.from_user else "ru"
         if lang_code.startswith("uz"):
-            text = "❌ Xizmat vaqtincha mavjud emas. Keyinroq urinib ko'ring."
+            text = "Xizmat vaqtincha mavjud emas. Keyinroq urinib ko'ring."
         else:
-            text = "❌ Сервис временно недоступен. Попробуйте позже."
+            text = "Сервис временно недоступен. Попробуйте позже."
         await message.answer(text)
         return
 
@@ -190,7 +190,7 @@ async def my_orders_handler(message: types.Message) -> None:
     # АКТИВНЫЕ ЗАКАЗЫ
     # ═══════════════════════════════════════════════════════════════════
     if active_bookings or active_pickup_orders or active_delivery_orders:
-        title = _t(lang, "🔥 Активные заказы и бронирования", "🔥 Faol buyurtmalar va bronlar")
+        title = _t(lang, "Активные заказы и бронирования", "Faol buyurtmalar va bronlar")
         text_lines.append(f"<b>{title}</b> ({active_total})\n")
         status_label = _t(lang, "Статус", "Holat")
         type_pickup = _t(lang, "Самовывоз", "Olib ketish")
@@ -211,17 +211,17 @@ async def my_orders_handler(message: types.Message) -> None:
 
             emoji, status_text = _get_status_info(status, False, lang)
 
-            text_lines.append(f"{emoji} <b>#{booking_id}</b> • {store_name}")
-            text_lines.append(f"   🏪 {type_pickup} • {_format_price(total, lang)}")
+            text_lines.append(f"<b>#{booking_id}</b> • {store_name}")
+            text_lines.append(f"   {type_pickup} • {_format_price(total, lang)}")
             if pickup_code:
-                text_lines.append(f"   🎫 {code_label}: <code>{pickup_code}</code>")
-            text_lines.append(f"   📌 {status_label}: {status_text}")
+                text_lines.append(f"   {code_label}: <code>{pickup_code}</code>")
+            text_lines.append(f"   {status_label}: {status_text}")
             text_lines.append("")
 
             # Кнопка детализации
             store_name_str = str(store_name) if store_name else "Магазин"
             kb.button(
-                text=f"👁 #{booking_id} {store_name_str[:15]}",
+                text=f"{_t(lang, 'Детали', 'Batafsil')} #{booking_id}",
                 callback_data=f"myorder_detail_b_{booking_id}",
             )
 
@@ -244,16 +244,16 @@ async def my_orders_handler(message: types.Message) -> None:
 
             emoji, status_text = _get_status_info(status, False, lang)
 
-            text_lines.append(f"{emoji} <b>#{order_id}</b> • {store_name}")
-            text_lines.append(f"   🏪 {type_pickup} • {_format_price(total, lang)}")
+            text_lines.append(f"<b>#{order_id}</b> • {store_name}")
+            text_lines.append(f"   {type_pickup} • {_format_price(total, lang)}")
             if pickup_code:
-                text_lines.append(f"   🎫 {code_label}: <code>{pickup_code}</code>")
-            text_lines.append(f"   📌 {status_label}: {status_text}")
+                text_lines.append(f"   {code_label}: <code>{pickup_code}</code>")
+            text_lines.append(f"   {status_label}: {status_text}")
             text_lines.append("")
 
             store_name_str = str(store_name) if store_name else "Магазин"
             kb.button(
-                text=f"👁 #{order_id} {store_name_str[:15]}",
+                text=f"{_t(lang, 'Детали', 'Batafsil')} #{order_id}",
                 callback_data=f"myorder_detail_o_{order_id}",
             )
 
@@ -276,46 +276,47 @@ async def my_orders_handler(message: types.Message) -> None:
 
             emoji, status_text = _get_status_info(status, True, lang)
 
-            text_lines.append(f"{emoji} <b>#{order_id}</b> • {store_name}")
-            text_lines.append(f"   🚚 {type_delivery} • {_format_price(total, lang)}")
+            text_lines.append(f"<b>#{order_id}</b> • {store_name}")
+            text_lines.append(f"   {type_delivery} • {_format_price(total, lang)}")
             if address:
                 short_addr = address[:30] + "..." if len(address) > 30 else address
-                text_lines.append(f"   📍 {address_label}: {short_addr}")
-            text_lines.append(f"   📌 {status_label}: {status_text}")
+                text_lines.append(f"   {address_label}: {short_addr}")
+            text_lines.append(f"   {status_label}: {status_text}")
             text_lines.append("")
 
             # Кнопка детализации
             store_name_str = str(store_name) if store_name else "Магазин"
             kb.button(
-                text=f"👁 #{order_id} {store_name_str[:15]}",
+                text=f"{_t(lang, 'Детали', 'Batafsil')} #{order_id}",
                 callback_data=f"myorder_detail_o_{order_id}",
             )
 
         kb.adjust(1)  # По одной кнопке в ряд
     else:
         # Нет активных
-        no_active = _t(lang, "✅ Все заказы и бронирования выполнены!", "✅ Barcha buyurtmalar va bronlar bajarildi!")
+        no_active = _t(lang, "Активных заказов нет.", "Faol buyurtmalar yo'q.")
         text_lines.append(f"<b>{no_active}</b>\n")
 
     # ═══════════════════════════════════════════════════════════════════
     # SUMMARY + ИСТОРИЯ
     # ═══════════════════════════════════════════════════════════════════
-    text_lines.append("━━━━━━━━━━━━━━━━━━━━")
+    text_lines.append("")
+    text_lines.append(f"<b>{_t(lang, 'История', 'Tarix')}</b>")
 
-    completed_label = _t(lang, "Завершённых", "Yakunlangan")
-    cancelled_label = _t(lang, "Отменённых", "Bekor qilingan")
-    text_lines.append(f"✅ {completed_label}: <b>{total_completed}</b>")
-    text_lines.append(f"❌ {cancelled_label}: <b>{total_cancelled}</b>")
+    completed_label = _t(lang, "Завершено", "Yakunlangan")
+    cancelled_label = _t(lang, "Отменено", "Bekor qilingan")
+    text_lines.append(f"{completed_label}: <b>{total_completed}</b>")
+    text_lines.append(f"{cancelled_label}: <b>{total_cancelled}</b>")
 
     # Кнопки фильтров истории
     kb.button(
-        text=f"✅ {_t(lang, 'История заказов', 'Buyurtmalar tarixi')} ({total_completed})",
+        text=f"{_t(lang, 'Завершённые', 'Yakunlangan')} ({total_completed})",
         callback_data="myorders_history_completed",
     )
 
     if total_cancelled > 0:
         kb.button(
-            text=f"❌ {_t(lang, 'Отменённые', 'Bekor qilingan')} ({total_cancelled})",
+            text=f"{_t(lang, 'Отменённые', 'Bekor qilingan')} ({total_cancelled})",
             callback_data="myorders_history_cancelled",
         )
 
@@ -326,7 +327,7 @@ async def my_orders_handler(message: types.Message) -> None:
 
 async def _show_empty_orders(message: types.Message, lang: str) -> None:
     """Показать пустой экран заказов."""
-    title = _t(lang, "📋 Заказы и бронирования", "📋 Buyurtmalar va bronlar")
+    title = _t(lang, "Заказы и бронирования", "Buyurtmalar va bronlar")
     empty_text = _t(
         lang,
         "У вас пока нет заказов и бронирований",
@@ -334,17 +335,17 @@ async def _show_empty_orders(message: types.Message, lang: str) -> None:
     )
     hint = _t(
         lang,
-        "Попробуйте раздел Акции — там товары со скидками до 70%",
-        "Aksiyalar bo'limini sinab ko'ring — u yerda 70% gacha chegirmalar",
+        "Откройте «Акции и магазины» — там товары со скидками до 70%",
+        "“Aksiyalar va do'konlar” bo'limini sinab ko'ring — u yerda 70% gacha chegirmalar",
     )
 
     kb = InlineKeyboardBuilder()
     kb.button(
-        text=f"🔥 {_t(lang, 'Смотреть акции', 'Aksiyalarni ko''rish')}", callback_data="hot_offers"
+        text=_t(lang, "Открыть раздел", "Bo'limni ochish"), callback_data="hot_offers"
     )
 
     await message.answer(
-        f"<b>{title}</b>\n\n{empty_text}\n\n💡 {hint}",
+        f"<b>{title}</b>\n\n{empty_text}\n\n{hint}",
         parse_mode="HTML",
         reply_markup=kb.as_markup(),
     )
@@ -371,14 +372,14 @@ async def order_detail_handler(callback: types.CallbackQuery) -> None:
     # Parse: myorder_detail_b_123 или myorder_detail_o_123
     parts = callback.data.split("_")
     if len(parts) < 4:
-        await callback.answer("❌ Error")
+        await callback.answer(_t(lang, "Ошибка", "Xatolik"))
         return
 
     order_type = parts[2]  # 'b' = booking, 'o' = order
     try:
         order_id = int(parts[3])
     except ValueError:
-        await callback.answer("❌ Error")
+        await callback.answer(_t(lang, "Ошибка", "Xatolik"))
         return
 
     if order_type == "b":
@@ -422,11 +423,11 @@ async def _show_booking_detail(callback: types.CallbackQuery, booking_id: int, l
             booking = cursor.fetchone()
     except Exception as e:
         logger.error(f"Failed to get booking {booking_id}: {e}")
-        await callback.message.answer(_t(lang, "❌ Ошибка загрузки", "❌ Yuklab bo'lmadi"))
+        await callback.message.answer(_t(lang, "Ошибка загрузки", "Yuklab bo'lmadi"))
         return
 
     if not booking:
-        await callback.message.answer(_t(lang, "❌ Заказ не найден", "❌ Buyurtma topilmadi"))
+        await callback.message.answer(_t(lang, "Заказ не найден", "Buyurtma topilmadi"))
         return
 
     # Парсим данные
@@ -453,22 +454,23 @@ async def _show_booking_detail(callback: types.CallbackQuery, booking_id: int, l
 
     status = _normalize_status(data.get("status", "pending"))
     status_label = _t(lang, "Статус", "Holat")
+    address_label = _t(lang, "Адрес", "Manzil")
     emoji, status_text = _get_status_info(status, False, lang)
 
     # Формируем текст
     lines = []
-    lines.append(f"<b>🏪 {_t(lang, 'Самовывоз', 'Olib ketish')} #{data['booking_id']}</b>")
-    lines.append(f"{emoji} {status_label}: <b>{status_text}</b>")
+    lines.append(f"<b>{_t(lang, 'Самовывоз', 'Olib ketish')} #{data['booking_id']}</b>")
+    lines.append(f"{status_label}: <b>{status_text}</b>")
     lines.append("")
 
     # Магазин
-    lines.append(f"📍 <b>{data.get('store_name', 'Магазин')}</b>")
+    lines.append(f"<b>{data.get('store_name', 'Магазин')}</b>")
     if data.get("store_address"):
-        lines.append(f"   {data['store_address']}")
+        lines.append(f"{address_label}: {data['store_address']}")
     lines.append("")
 
     # Товары
-    lines.append(f"<b>📦 {_t(lang, 'Товары', 'Mahsulotlar')}:</b>")
+    lines.append(f"<b>{_t(lang, 'Товары', 'Mahsulotlar')}:</b>")
 
     # Bookings всегда одиночный товар (не корзина)
     title = data.get("offer_title", "Товар") or "Товар"
@@ -478,12 +480,12 @@ async def _show_booking_detail(callback: types.CallbackQuery, booking_id: int, l
     lines.append(f"   • {title} × {qty} = {_format_price(price * qty, lang)}")
 
     lines.append("")
-    lines.append(f"💰 <b>{_t(lang, 'Итого', 'Jami')}:</b> {_format_price(total, lang)}")
+    lines.append(f"<b>{_t(lang, 'Итого', 'Jami')}:</b> {_format_price(total, lang)}")
 
     # Код получения
     if data.get("booking_code") and status in ("preparing", "ready"):
         lines.append("")
-        lines.append(f"🎫 <b>{_t(lang, 'Код получения', 'Olish kodi')}:</b>")
+        lines.append(f"<b>{_t(lang, 'Код получения', 'Olish kodi')}:</b>")
         lines.append(f"<code>{data['booking_code']}</code>")
         lines.append(
             f"<i>{_t(lang, 'Покажите код при получении', 'Olishda kodni ko''rsating')}</i>"
@@ -495,28 +497,28 @@ async def _show_booking_detail(callback: types.CallbackQuery, booking_id: int, l
     if status in ("preparing", "ready"):
         # Активный заказ
         kb.button(
-            text=f"✅ {_t(lang, 'Получил заказ', 'Buyurtmani oldim')}",
+            text=_t(lang, "Получил заказ", "Buyurtmani oldim"),
             callback_data=f"myorder_received_b_{booking_id}",
         )
 
         # Показываем телефон магазина в тексте вместо кнопки (Telegram не поддерживает tel: URL)
         if data.get("store_phone"):
             lines.append("")
-            lines.append(f"📞 <b>{_t(lang, 'Телефон магазина', 'Do''kon telefoni')}:</b>")
+            lines.append(f"<b>{_t(lang, 'Телефон магазина', 'Do''kon telefoni')}:</b>")
             lines.append(f"<code>{data['store_phone']}</code>")
 
         kb.button(
-            text=f"❗ {_t(lang, 'Проблема', 'Muammo')}",
+            text=_t(lang, "Проблема", "Muammo"),
             callback_data=f"myorder_problem_b_{booking_id}",
         )
 
     elif status == "pending":
         kb.button(
-            text=f"❌ {_t(lang, 'Отменить', 'Bekor qilish')}",
+            text=_t(lang, "Отменить", "Bekor qilish"),
             callback_data=f"cancel_booking_{booking_id}",
         )
 
-    kb.button(text=f"⬅️ {_t(lang, 'Назад', 'Orqaga')}", callback_data="myorders_back")
+    kb.button(text=_t(lang, "Назад", "Orqaga"), callback_data="myorders_back")
 
     kb.adjust(1)
 
@@ -564,11 +566,11 @@ async def _show_order_detail(callback: types.CallbackQuery, order_id: int, lang:
             order = cursor.fetchone()
     except Exception as e:
         logger.error(f"Failed to get order {order_id}: {e}")
-        await callback.message.answer(_t(lang, "❌ Ошибка загрузки", "❌ Yuklab bo'lmadi"))
+        await callback.message.answer(_t(lang, "Ошибка загрузки", "Yuklab bo'lmadi"))
         return
 
     if not order:
-        await callback.message.answer(_t(lang, "❌ Заказ не найден", "❌ Buyurtma topilmadi"))
+        await callback.message.answer(_t(lang, "Заказ не найден", "Buyurtma topilmadi"))
         return
 
     # Парсим данные (SQL возвращает tuple, нужен dict)
@@ -608,30 +610,30 @@ async def _show_order_detail(callback: types.CallbackQuery, order_id: int, lang:
     # Формируем текст
     lines = []
     if is_delivery:
-        lines.append(f"<b>🚚 {_t(lang, 'Доставка', 'Yetkazish')} #{data['order_id']}</b>")
+        lines.append(f"<b>{_t(lang, 'Доставка', 'Yetkazish')} #{data['order_id']}</b>")
     else:
-        lines.append(f"<b>🏪 {_t(lang, 'Самовывоз', 'Olib ketish')} #{data['order_id']}</b>")
-    lines.append(f"{emoji} {status_label}: <b>{status_text}</b>")
+        lines.append(f"<b>{_t(lang, 'Самовывоз', 'Olib ketish')} #{data['order_id']}</b>")
+    lines.append(f"{status_label}: <b>{status_text}</b>")
     lines.append("")
 
     if is_delivery:
         # Адрес доставки
         if data.get("delivery_address"):
-            lines.append(f"📍 <b>{_t(lang, 'Адрес доставки', 'Yetkazish manzili')}:</b>")
-            lines.append(f"   {data['delivery_address']}")
+            lines.append(f"<b>{_t(lang, 'Адрес доставки', 'Yetkazish manzili')}:</b>")
+            lines.append(f"{data['delivery_address']}")
             lines.append("")
     else:
         pickup_code = data.get("pickup_code")
         if pickup_code:
-            lines.append(f"🎫 <b>{_t(lang, 'Код', 'Kod')}:</b> <code>{pickup_code}</code>")
+            lines.append(f"<b>{_t(lang, 'Код', 'Kod')}:</b> <code>{pickup_code}</code>")
             lines.append("")
 
     # Магазин
-    lines.append(f"🏪 <b>{data.get('store_name', 'Магазин')}</b>")
+    lines.append(f"<b>{data.get('store_name', 'Магазин')}</b>")
     lines.append("")
 
     # Товары
-    lines.append(f"<b>📦 {_t(lang, 'Товары', 'Mahsulotlar')}:</b>")
+    lines.append(f"<b>{_t(lang, 'Товары', 'Mahsulotlar')}:</b>")
 
     is_cart = data.get("is_cart_order")
     cart_items_json = data.get("cart_items")
@@ -661,7 +663,7 @@ async def _show_order_detail(callback: types.CallbackQuery, order_id: int, lang:
 
     # Итоги
     lines.append("")
-    lines.append(f"💰 {_t(lang, 'Товары', 'Mahsulotlar')}: {_format_price(subtotal, lang)}")
+    lines.append(f"{_t(lang, 'Товары', 'Mahsulotlar')}: {_format_price(subtotal, lang)}")
 
     total_price = data.get("total_price") or 0
     delivery_fee = 0
@@ -671,34 +673,34 @@ async def _show_order_detail(callback: types.CallbackQuery, order_id: int, lang:
         except Exception:
             delivery_fee = 0
         if delivery_fee > 0:
-            lines.append(f"🚚 {_t(lang, 'Доставка', 'Yetkazish')}: {_format_price(delivery_fee, lang)}")
+            lines.append(f"{_t(lang, 'Доставка', 'Yetkazish')}: {_format_price(delivery_fee, lang)}")
 
     total = total_price or (subtotal + delivery_fee)
-    lines.append(f"<b>💵 {_t(lang, 'Итого', 'Jami')}: {_format_price(total, lang)}</b>")
+    lines.append(f"<b>{_t(lang, 'Итого', 'Jami')}: {_format_price(total, lang)}</b>")
 
     # Курьер
     if status == "delivering" and data.get("courier_phone"):
         lines.append("")
-        lines.append(f"🏍 <b>{_t(lang, 'Курьер', 'Kuryer')}:</b>")
-        lines.append(f"   📱 {data['courier_phone']}")
+        lines.append(f"<b>{_t(lang, 'Курьер', 'Kuryer')}:</b>")
+        lines.append(f"{data['courier_phone']}")
 
     # Кнопки действий
     kb = InlineKeyboardBuilder()
 
     if is_delivery and status == "delivering":
         kb.button(
-            text=f"✅ {_t(lang, 'Получил заказ', 'Buyurtmani oldim')}",
+            text=_t(lang, "Получил заказ", "Buyurtmani oldim"),
             callback_data=f"myorder_received_o_{order_id}",
         )
 
         # Показываем телефон магазина для связи при доставке
         if data.get("store_phone"):
             lines.append("")
-            lines.append(f"📞 <b>{_t(lang, 'Телефон магазина', 'Do''kon telefoni')}:</b>")
+            lines.append(f"<b>{_t(lang, 'Телефон магазина', 'Do''kon telefoni')}:</b>")
             lines.append(f"<code>{data['store_phone']}</code>")
 
         kb.button(
-            text=f"❗ {_t(lang, 'Проблема с заказом', 'Buyurtma muammosi')}",
+            text=_t(lang, "Проблема с заказом", "Buyurtma muammosi"),
             callback_data=f"myorder_problem_o_{order_id}",
         )
 
@@ -706,21 +708,21 @@ async def _show_order_detail(callback: types.CallbackQuery, order_id: int, lang:
         # Показываем телефон магазина в тексте
         if data.get("store_phone"):
             lines.append("")
-            lines.append(f"📞 <b>{_t(lang, 'Телефон магазина', 'Do''kon telefoni')}:</b>")
+            lines.append(f"<b>{_t(lang, 'Телефон магазина', 'Do''kon telefoni')}:</b>")
             lines.append(f"<code>{data['store_phone']}</code>")
 
         if status == "pending":
             kb.button(
-                text=f"❌ {_t(lang, 'Отменить', 'Bekor qilish')}",
+                text=_t(lang, "Отменить", "Bekor qilish"),
                 callback_data=f"myorder_cancel_o_{order_id}",
             )
         elif not is_delivery and status == "ready":
             kb.button(
-                text=f"✅ {_t(lang, 'Получил заказ', 'Buyurtmani oldim')}",
+                text=_t(lang, "Получил заказ", "Buyurtmani oldim"),
                 callback_data=f"myorder_received_o_{order_id}",
             )
 
-    kb.button(text=f"⬅️ {_t(lang, 'Назад', 'Orqaga')}", callback_data="myorders_back")
+    kb.button(text=_t(lang, "Назад", "Orqaga"), callback_data="myorders_back")
 
     kb.adjust(1)
 
@@ -747,14 +749,14 @@ async def order_received_handler(callback: types.CallbackQuery) -> None:
 
     parts = callback.data.split("_")
     if len(parts) < 4:
-        await callback.answer("❌ Error")
+        await callback.answer(_t(lang, "Ошибка", "Xatolik"))
         return
 
     order_type = parts[2]  # 'b' or 'o'
     try:
         order_id = int(parts[3])
     except ValueError:
-        await callback.answer("❌ Error")
+        await callback.answer(_t(lang, "Ошибка", "Xatolik"))
         return
 
     try:
@@ -765,27 +767,27 @@ async def order_received_handler(callback: types.CallbackQuery) -> None:
             entity = db.get_order(order_id) if hasattr(db, "get_order") else None
 
         if not entity:
-            await callback.answer(_t(lang, "❌ Заказ не найден", "❌ Buyurtma topilmadi"), show_alert=True)
+            await callback.answer(_t(lang, "Заказ не найден", "Buyurtma topilmadi"), show_alert=True)
             return
 
         entity_user_id = entity.get("user_id") if hasattr(entity, "get") else _get_field(entity, 2)
         if entity_user_id != user_id:
-            await callback.answer(_t(lang, "❌ Доступ запрещен", "❌ Ruxsat yo'q"), show_alert=True)
+            await callback.answer(_t(lang, "Доступ запрещен", "Ruxsat yo'q"), show_alert=True)
             return
 
         service = get_unified_order_service()
         if not service:
-            await callback.answer(_t(lang, "❌ Ошибка", "❌ Xatolik"), show_alert=True)
+            await callback.answer(_t(lang, "Ошибка", "Xatolik"), show_alert=True)
             return
 
         entity_type = "booking" if order_type == "b" else "order"
         success = await service.complete_order(order_id, entity_type)
         if not success:
-            await callback.answer(_t(lang, "❌ Ошибка", "❌ Xatolik"), show_alert=True)
+            await callback.answer(_t(lang, "Ошибка", "Xatolik"), show_alert=True)
             return
 
         await callback.answer(
-            _t(lang, "✅ Спасибо! Заказ завершён", "✅ Rahmat! Buyurtma yakunlandi"),
+            _t(lang, "Спасибо! Заказ завершён.", "Rahmat! Buyurtma yakunlandi."),
             show_alert=True,
         )
 
@@ -795,7 +797,7 @@ async def order_received_handler(callback: types.CallbackQuery) -> None:
         kb.button(text="⭐⭐⭐⭐", callback_data=f"myorder_rate_{order_type}_{order_id}_4")
         kb.button(text="⭐⭐⭐", callback_data=f"myorder_rate_{order_type}_{order_id}_3")
         kb.button(
-            text=f"⬅️ {_t(lang, 'Пропустить', 'O''tkazib yuborish')}", callback_data="myorders_back"
+            text=_t(lang, "Пропустить", "O'tkazib yuborish"), callback_data="myorders_back"
         )
         kb.adjust(1)
 
@@ -808,7 +810,7 @@ async def order_received_handler(callback: types.CallbackQuery) -> None:
 
     except Exception as e:
         logger.error(f"Failed to complete order {order_id}: {e}")
-        await callback.answer(_t(lang, "❌ Ошибка", "❌ Xatolik"), show_alert=True)
+        await callback.answer(_t(lang, "Ошибка", "Xatolik"), show_alert=True)
 
 
 @router.callback_query(F.data.startswith("myorder_rate_"))
@@ -842,7 +844,7 @@ async def order_rate_handler(callback: types.CallbackQuery) -> None:
     except Exception as e:
         logger.warning(f"Failed to save rating: {e}")
 
-    await callback.answer(_t(lang, "✅ Спасибо за оценку!", "✅ Baholaganingiz uchun rahmat!"))
+    await callback.answer(_t(lang, "Спасибо за оценку!", "Baholaganingiz uchun rahmat!"))
 
     # Возвращаемся к списку заказов
     await callback.message.delete()
@@ -874,17 +876,17 @@ async def order_problem_handler(callback: types.CallbackQuery) -> None:
     kb = InlineKeyboardBuilder()
 
     problems = [
-        ("late", _t(lang, "⏰ Долгая доставка", "⏰ Uzoq yetkazish")),
-        ("wrong", _t(lang, "❌ Неправильный заказ", "❌ Noto'g'ri buyurtma")),
-        ("quality", _t(lang, "👎 Качество товара", "👎 Mahsulot sifati")),
-        ("other", _t(lang, "💬 Другое", "💬 Boshqa")),
+        ("late", _t(lang, "Долгая доставка", "Uzoq yetkazish")),
+        ("wrong", _t(lang, "Неправильный заказ", "Noto'g'ri buyurtma")),
+        ("quality", _t(lang, "Качество товара", "Mahsulot sifati")),
+        ("other", _t(lang, "Другое", "Boshqa")),
     ]
 
     for code, text in problems:
         kb.button(text=text, callback_data=f"myorder_report_{order_type}_{order_id}_{code}")
 
     kb.button(
-        text=f"⬅️ {_t(lang, 'Назад', 'Orqaga')}",
+        text=_t(lang, "Назад", "Orqaga"),
         callback_data=f"myorder_detail_{order_type}_{order_id}",
     )
     kb.adjust(1)
@@ -933,7 +935,7 @@ async def order_report_handler(callback: types.CallbackQuery) -> None:
             try:
                 await bot.send_message(
                     admin_id,
-                    f"⚠️ <b>Жалоба на заказ #{order_id}</b>\n\n"
+                    f"<b>Жалоба на заказ #{order_id}</b>\n\n"
                     f"Пользователь: {user_id}\n"
                     f"Тип: {'Доставка' if order_type == 'o' else 'Самовывоз'}\n"
                     f"Проблема: {problem_code}",
@@ -947,8 +949,8 @@ async def order_report_handler(callback: types.CallbackQuery) -> None:
     await callback.answer(
         _t(
             lang,
-            "✅ Жалоба отправлена. Мы свяжемся с вами!",
-            "✅ Shikoyat yuborildi. Siz bilan bog'lanamiz!",
+            "Жалоба отправлена. Мы свяжемся с вами!",
+            "Shikoyat yuborildi. Siz bilan bog'lanamiz!",
         ),
         show_alert=True,
     )
@@ -973,14 +975,14 @@ async def order_cancel_handler(callback: types.CallbackQuery) -> None:
     try:
         order_id = int(callback.data.split("_")[-1])
     except ValueError:
-        await callback.answer("❌ Error")
+        await callback.answer(_t(lang, "Ошибка", "Xatolik"))
         return
 
     # Проверяем статус - можно отменить только pending
     try:
         order = db.get_order(order_id)
         if not order:
-            await callback.answer(_t(lang, "❌ Заказ не найден", "❌ Buyurtma topilmadi"))
+            await callback.answer(_t(lang, "Заказ не найден", "Buyurtma topilmadi"))
             return
 
         if hasattr(order, "get"):
@@ -992,8 +994,8 @@ async def order_cancel_handler(callback: types.CallbackQuery) -> None:
             await callback.answer(
                 _t(
                     lang,
-                    "⚠️ Заказ уже обрабатывается, отменить нельзя",
-                    "⚠️ Buyurtma qayta ishlanmoqda, bekor qilib bo'lmaydi",
+                    "Заказ уже обрабатывается, отменить нельзя",
+                    "Buyurtma qayta ishlanmoqda, bekor qilib bo'lmaydi",
                 ),
                 show_alert=True,
             )
@@ -1001,17 +1003,15 @@ async def order_cancel_handler(callback: types.CallbackQuery) -> None:
 
         service = get_unified_order_service()
         if not service:
-            await callback.answer(_t(lang, "❌ Ошибка", "❌ Xatolik"), show_alert=True)
+            await callback.answer(_t(lang, "Ошибка", "Xatolik"), show_alert=True)
             return
 
         success = await service.cancel_order(order_id, "order")
         if not success:
-            await callback.answer(_t(lang, "❌ Ошибка", "❌ Xatolik"), show_alert=True)
+            await callback.answer(_t(lang, "Ошибка", "Xatolik"), show_alert=True)
             return
 
-        await callback.answer(
-            _t(lang, "✅ Заказ отменён", "✅ Buyurtma bekor qilindi"), show_alert=True
-        )
+        await callback.answer(_t(lang, "Заказ отменён", "Buyurtma bekor qilindi"), show_alert=True)
 
         # Удаляем сообщение и возвращаемся
         try:
@@ -1021,7 +1021,7 @@ async def order_cancel_handler(callback: types.CallbackQuery) -> None:
 
     except Exception as e:
         logger.error(f"Failed to cancel order {order_id}: {e}")
-        await callback.answer(_t(lang, "❌ Ошибка", "❌ Xatolik"), show_alert=True)
+        await callback.answer(_t(lang, "Ошибка", "Xatolik"), show_alert=True)
 
 
 # =============================================================================
@@ -1069,7 +1069,7 @@ async def orders_history_handler(callback: types.CallbackQuery) -> None:
         ]
 
     if not filtered_bookings and not filtered_orders:
-        await callback.answer(_t(lang, "📭 Нет заказов", "📭 Buyurtmalar yo'q"))
+        await callback.answer(_t(lang, "Нет заказов", "Buyurtmalar yo'q"))
         return
 
     lines = []
@@ -1078,7 +1078,7 @@ async def orders_history_handler(callback: types.CallbackQuery) -> None:
         if status_filter == "completed"
         else _t(lang, "Отменённые заказы", "Bekor qilingan buyurtmalar")
     )
-    lines.append(f"<b>📋 {title}</b>\n")
+    lines.append(f"<b>{title}</b>\n")
 
     kb = InlineKeyboardBuilder()
 
@@ -1091,12 +1091,14 @@ async def orders_history_handler(callback: types.CallbackQuery) -> None:
         discount_price = _get_field(b, "discount_price") or 0
         total = quantity * discount_price
 
-        emoji = "✅" if status_filter == "completed" else "❌"
-        lines.append(f"{emoji} <b>#{booking_id}</b> • {store_name}")
-        lines.append(f"   🏪 {_t(lang, 'Самовывоз', 'Olib ketish')} • {_format_price(total, lang)}")
+        lines.append(f"<b>#{booking_id}</b> • {store_name}")
+        lines.append(f"   {_t(lang, 'Самовывоз', 'Olib ketish')} • {_format_price(total, lang)}")
         lines.append("")
 
-        kb.button(text=f"🔄 #{booking_id}", callback_data=f"repeat_order_b_{booking_id}")
+        kb.button(
+            text=f"{_t(lang, 'Повторить', 'Qayta')} #{booking_id}",
+            callback_data=f"repeat_order_b_{booking_id}",
+        )
 
     # Orders (pickup + delivery in orders table)
     for o in filtered_orders[:10]:
@@ -1113,22 +1115,24 @@ async def orders_history_handler(callback: types.CallbackQuery) -> None:
         total = _get_field(o, "total_price", 5) or 0
         order_type = _get_field(o, "order_type") or ("delivery" if _get_field(o, "delivery_address") else "pickup")
 
-        emoji = "✅" if status_filter == "completed" else "❌"
-        lines.append(f"{emoji} <b>#{order_id}</b> • {store_name}")
+        lines.append(f"<b>#{order_id}</b> • {store_name}")
         if order_type == "delivery":
             lines.append(
-                f"   🚚 {_t(lang, 'Доставка', 'Yetkazish')} • {_format_price(total, lang)}"
+                f"   {_t(lang, 'Доставка', 'Yetkazish')} • {_format_price(total, lang)}"
             )
         else:
             lines.append(
-                f"   🏪 {_t(lang, 'Самовывоз', 'Olib ketish')} • {_format_price(total, lang)}"
+                f"   {_t(lang, 'Самовывоз', 'Olib ketish')} • {_format_price(total, lang)}"
             )
         lines.append("")
 
-        kb.button(text=f"🔄 #{order_id}", callback_data=f"repeat_order_o_{order_id}")
+        kb.button(
+            text=f"{_t(lang, 'Повторить', 'Qayta')} #{order_id}",
+            callback_data=f"repeat_order_o_{order_id}",
+        )
 
-    kb.button(text=f"⬅️ {_t(lang, 'Назад', 'Orqaga')}", callback_data="myorders_back")
-    kb.adjust(5, 1)  # 5 repeat buttons per row, then back
+    kb.button(text=_t(lang, "Назад", "Orqaga"), callback_data="myorders_back")
+    kb.adjust(1)
 
     try:
         await callback.message.edit_text(_fmt(lines), parse_mode="HTML", reply_markup=kb.as_markup())
@@ -1159,7 +1163,7 @@ async def myorders_back_handler(callback: types.CallbackQuery) -> None:
     # Используем callback.message как base
     fake_message = callback.message
     fake_message.text = (
-        "📋 Заказы и бронирования" if lang == "ru" else "📋 Buyurtmalar va bronlar"
+        "Заказы и бронирования" if lang == "ru" else "Buyurtmalar va bronlar"
     )
 
     await my_orders_handler(fake_message)

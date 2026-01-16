@@ -228,7 +228,7 @@ def register_stores(
             return
 
         # Show category selection directly
-        text = f"🏪 <b>{store.name}</b>\n\n📂 {get_text(lang, 'select_category_in_store')}"
+        text = f"<b>{store.name}</b>\n{get_text(lang, 'select_category_in_store')}"
 
         keyboard = offers_category_filter(
             lang,
@@ -432,7 +432,7 @@ def register_stores(
             return
 
         # Show category selection for store
-        text = f"🏪 <b>{store.name}</b>\n\n📂 {get_text(lang, 'select_category_in_store')}"
+        text = f"<b>{store.name}</b>\n{get_text(lang, 'select_category_in_store')}"
 
         keyboard = offers_category_filter(
             lang,
@@ -872,7 +872,7 @@ def register_stores(
             return
 
         # Show category selection
-        text = f"🏪 <b>{store.name}</b>\n\n📂 {get_text(lang, 'select_category_in_store')}"
+        text = f"<b>{store.name}</b>\n{get_text(lang, 'select_category_in_store')}"
 
         keyboard = offers_category_filter(
             lang,
@@ -1067,7 +1067,7 @@ def register_stores(
 
             total_label = "Всего" if lang == "ru" else "Jami"
             lines = [
-                f"🏪 <b>{store.name}</b>",
+                f"<b>{store.name}</b>",
                 f"{category_title} | {page_label} {page + 1}/{total_pages} | {total_label} {total_offers}",
             ]
 

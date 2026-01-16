@@ -291,6 +291,13 @@ def expand_search_query(query: str, lang: str) -> list[str]:
     return list(expanded_terms)
 
 
+def _is_cancel_text(text: str | None) -> bool:
+    if not text:
+        return False
+    normalized = text.strip().lower()
+    return normalized in {"отмена", "bekor", "bekor qilish"}
+
+
 def setup(
     dp: Router,
     db: DatabaseProtocol,
@@ -299,9 +306,7 @@ def setup(
     """Register search handlers."""
 
     # Cancel handler - must be registered BEFORE Search.query handler
-    @dp.message(
-        Search.query, F.text.contains("Bekor") | F.text.contains("Отмена") | F.text.contains("❌")
-    )
+    @dp.message(Search.query, F.text.func(_is_cancel_text))
     async def cancel_search(message: types.Message, state: FSMContext):
         """Cancel search - handle cancel button immediately."""
         assert message.from_user is not None
@@ -322,7 +327,7 @@ def setup(
 
         await state.set_state(Search.query)
         # Simple search prompt
-        prompt = "🔍 Nimani qidiryapsiz?" if lang == "uz" else "🔍 Что ищете?"
+        prompt = get_text(lang, "enter_search_query")
         await message.answer(prompt, reply_markup=search_cancel_keyboard(lang))
 
     @dp.message(Search.query)
@@ -351,7 +356,7 @@ def setup(
             return  # Let command handlers process this
 
         # Double-check cancel (fallback)
-        if "bekor" in raw_text.lower() or "отмена" in raw_text.lower() or "❌" in raw_text:
+        if _is_cancel_text(raw_text):
             await state.clear()
             await message.answer(
                 get_text(lang, "operation_cancelled"), reply_markup=menu_customer(lang)
@@ -360,9 +365,7 @@ def setup(
 
         query = raw_text.strip()
         if len(query) < 2:
-            await message.answer(
-                "Введите минимум 2 символа" if lang == "ru" else "Kamida 2 ta belgi kiriting"
-            )
+            await message.answer(get_text(lang, "search_query_too_short"))
             return
 
         # Расширяем запрос синонимами
@@ -487,13 +490,7 @@ def setup(
         total_results = len(all_results) + len(store_results)
 
         if total_results == 0:
-            # Короткое сообщение
-            no_results_msg = (
-                "😔 Ничего не найдено\n\nПопробуйте другой запрос"
-                if lang == "ru"
-                else "😔 Hech narsa topilmadi\n\nBoshqa so'z bilan qidirib ko'ring"
-            )
-            await message.answer(no_results_msg, reply_markup=menu_customer(lang))
+            await message.answer(get_text(lang, "no_results"), reply_markup=menu_customer(lang))
             return
 
         # Save search results to FSM for pagination
@@ -634,12 +631,7 @@ def setup(
         query = data.get("search_query", "")
 
         if not offer_ids:
-            await callback.answer(
-                "Результаты поиска устарели. Повторите поиск."
-                if lang == "ru"
-                else "Qidiruv natijalari eskirgan. Qayta qidiring.",
-                show_alert=True,
-            )
+            await callback.answer(get_text(lang, "search_results_expired"), show_alert=True)
             return
 
         # Fetch offer objects

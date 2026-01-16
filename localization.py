@@ -5,17 +5,17 @@ LANGUAGES = {"ru": "Русский", "uz": "O'zbekcha"}
 TEXTS = {
     "ru": {
         # Приветствие
-        "choose_language": "🌐 Выберите язык / Tilni tanlang.",
+        "choose_language": "Выберите язык / Tilni tanlang.",
         "language_changed": "Язык обновлён.",
         "welcome": """<b>Fudly</b>
-🌐 Выберите язык / Tilni tanlang.""",
-        "welcome_phone_step": """<b>📱 Шаг 1/2: телефон</b>
+Выберите язык.""",
+        "welcome_phone_step": """<b>Шаг 1/2: телефон</b>
 Отправьте номер, чтобы подтвердить заказ.""",
-        "welcome_city_step": """<b>📍 Шаг 2/2: город</b>
+        "welcome_city_step": """<b>Шаг 2/2: город</b>
 Выберите из списка.""",
-        "registration_complete": """<b>✅ Готово</b>
+        "registration_complete": """<b>Готово</b>
 Данные сохранены.""",
-        "welcome_back": """<b>👋 С возвращением, {name}</b>
+        "welcome_back": """<b>С возвращением, {name}</b>
 Город: {city}
 Выберите раздел.""",
         "registration_required": """<b>Нужна регистрация</b>
@@ -23,25 +23,27 @@ TEXTS = {
         # Кнопки
         "share_phone": "📱 Отправить номер",
         "cancel": "Отмена",
-        "hot_offers": "🛍 Магазины и акции",
+        "hot_offers": "Акции и магазины",
         "browse_places": "Места",
-        "my_cart": "🛒 Корзина",
-        "my_orders": "📦 Заказы",
-        "available_offers": "Доступные предложения",
+        "my_cart": "Корзина",
+        "my_orders": "Заказы",
+        "available_offers": "Предложения",
         "my_bookings": "Мои бронирования",
         "stores": "Все магазины",
-        "favorites": "❤️ Избранное",
+        "favorites": "Избранное",
         "my_city": "🌆 Мой город",
-        "profile": "👤 Профиль",
+        "profile": "Профиль",
         "become_partner": "🏪 Стать партнером",
         "establishments": "🏪 Заведения",
-        "search": "🔎 Поиск",
-        "help": "❓ Как это работает",
-        "enter_search_query": "Что ищете?",
+        "search": "Поиск",
+        "help": "Как это работает",
+        "enter_search_query": "Введите название товара или магазина.",
+        "search_query_too_short": "Введите минимум 2 символа.",
+        "search_results_expired": "Результаты устарели. Повторите поиск.",
         "search_results": "Результаты",
-        "no_results": "Ничего не найдено",
+        "no_results": "Ничего не найдено. Попробуйте другой запрос.",
         "action_cancelled": "Отменено",
-        "select_category_in_store": "Выберите категорию в этом заведении:",
+        "select_category_in_store": "Выберите категорию:",
         # Партнёр - новые короткие названия
         "add_item": "➕ Добавить",
         "my_items": "📦 Мои товары",
@@ -87,7 +89,7 @@ TEXTS = {
         "offers_in_city": "<b>Предложения в городе {city}</b>\nВсего: {count}",
         "offers_found": "<b>Найдено предложений</b>\nВсего: {count}",
         "hot_offers_title": "<b>Акции</b>",
-        "hot_offers_subtitle": "Акции - товары со скидкой, Магазины - список заведений.",
+        "hot_offers_subtitle": "Выберите раздел ниже.",
         "select_by_number": "Выберите товар кнопкой или введите номер.",
         "browse_by_business_type": "<b>Выберите тип магазина</b>",
         "supermarkets": "Супермаркеты",
@@ -484,8 +486,8 @@ TEXTS = {
         "invalid_city": "Пожалуйста, выберите город из списка.",
         "rate_limit_exceeded": "Слишком много запросов. Попробуйте позже.",
         # Корзина
-        "cart_title": "<b>🛒 Корзина</b>",
-        "cart_empty": "<b>🛒 Корзина пуста</b>\nДобавьте товары из акций или поиска.",
+        "cart_title": "<b>Корзина</b>",
+        "cart_empty": "<b>Корзина пустая</b>\nДобавьте товары из акций или поиска.",
         "cart_empty_alert": "Корзина пуста",
         "cart_empty_cta": "К предложениям",
         "cart_cleared": "Корзина очищена",
@@ -494,8 +496,8 @@ TEXTS = {
         "cart_grand_total_label": "💳 К оплате",
         "cart_pickup_button": "🏬 Самовывоз",
         "cart_delivery_button": "🚚 Доставка",
-        "cart_checkout_button": "🧾 Оформить заказ",
-        "cart_clear_button": "🗑 Очистить",
+        "cart_checkout_button": "Оформить заказ",
+        "cart_clear_button": "Очистить",
         "cart_back_button": "Назад",
         "cart_confirm_button": "✅ Подтвердить",
         "cart_order_created_title": "<b>Заказ создан</b>",
@@ -591,44 +593,45 @@ TEXTS = {
         "too_many_requests": "Слишком много запросов. Попробуйте позже.",
     },
     "uz": {
-        "choose_language": "🌐 Tilni tanlang.",
-        "language_changed": "Til o'rnatildi.",
+        "choose_language": "Tilni tanlang.",
+        "language_changed": "Til yangilandi.",
         "welcome": """<b>Fudly</b>
-🌐 Tilni tanlang.""",
-        "welcome_phone_step": """<b>📱 1/2-qadam: telefon</b>
-Buyurtma bo'yicha aloqa uchun raqamingizni yuboring.""",
-        "welcome_city_step": """<b>📍 2/2-qadam: shahar</b>
+Tilni tanlang.""",
+        "welcome_phone_step": """<b>1/2-qadam: telefon</b>
+Buyurtmani tasdiqlash uchun raqam yuboring.""",
+        "welcome_city_step": """<b>2/2-qadam: shahar</b>
 Ro'yxatdan tanlang.""",
-        "registration_complete": """<b>✅ Tayyor</b>
+        "registration_complete": """<b>Tayyor</b>
 Ma'lumotlar saqlandi.""",
-        "welcome_back": """<b>👋 Yana xush kelibsiz, {name}</b>
+        "welcome_back": """<b>Yana xush kelibsiz, {name}</b>
 Shahar: {city}
 Bo'limni tanlang.""",
         "registration_required": """<b>Ro'yxatdan o'tish kerak</b>
 /start bosing.""",
-        # Tugmalar
         "share_phone": "📱 Raqamni yuborish",
         "cancel": "Bekor qilish",
-        "hot_offers": "🛍 Do'konlar va aksiyalar",
-        "browse_places": "🏪 Joylar",
-        "my_cart": "🛒 Savat",
-        "my_orders": "📦 Buyurtmalar",
-        "available_offers": "🍽 Mavjud takliflar",
+        "hot_offers": "Aksiyalar va do'konlar",
+        "browse_places": "Joylar",
+        "my_cart": "Savat",
+        "my_orders": "Buyurtmalar",
+        "available_offers": "Takliflar",
         "my_bookings": "📋 Mening buyurtmalarim",
         "stores": "🏪 Barcha do'konlar",
-        "favorites": "❤️ Sevimlilar",
+        "favorites": "Sevimlilar",
         "my_city": "Mening shahrim",
         "your_city": "Sizning shahringiz",
-        "profile": "👤 Profil",
+        "profile": "Profil",
         "become_partner": "🏪 Hamkor bo'lish",
         "establishments": "🏪 Do'konlar",
-        "search": "🔎 Qidirish",
-        "help": "❓ Qanday ishlaydi",
-        "enter_search_query": "Nimani qidiryapsiz?",
-        "search_results": "<b>Qidiruv natijalari</b>",
-        "no_results": "Hech narsa topilmadi.\nBoshqa so'rov bilan sinab ko'ring yoki Aksiyalar bo'limiga qarang.",
+        "search": "Qidirish",
+        "help": "Qanday ishlaydi",
+        "enter_search_query": "Mahsulot yoki do'kon nomini kiriting.",
+        "search_query_too_short": "Kamida 2 ta belgi kiriting.",
+        "search_results_expired": "Natijalar eskirdi. Qayta qidiring.",
+        "search_results": "Natijalar",
+        "no_results": "Hech narsa topilmadi. Boshqa so'rov bilan urinib ko'ring.",
         "action_cancelled": "Amal bekor qilindi",
-        "select_category_in_store": "Ushbu muassasada toifani tanlang:",
+        "select_category_in_store": "Toifani tanlang:",
         # Hamkor - yangi qisqa nomlar
         "add_item": "➕ Qo'shish",
         "my_items": "📦 Mening mahsulotlarim",
@@ -670,8 +673,8 @@ Bo'limni tanlang.""",
 Shahar: {city}
 Menyu pastda.""",
         # Savat
-        "cart_title": "<b>🛒 Savat</b>",
-        "cart_empty": "<b>🛒 Savat bo'sh</b>\nAksiyalar yoki qidiruvdan mahsulot qo'shing.",
+        "cart_title": "<b>Savat</b>",
+        "cart_empty": "<b>Savat bo'sh</b>\nAksiya yoki qidiruvdan mahsulot qo'shing.",
         "cart_empty_alert": "Savat bo'sh",
         "cart_empty_cta": "Takliflarga",
         "cart_cleared": "Savat tozalandi",
@@ -680,8 +683,8 @@ Menyu pastda.""",
         "cart_grand_total_label": "💳 To'lash kerak",
         "cart_pickup_button": "🏬 Olib ketish",
         "cart_delivery_button": "🚚 Yetkazib berish",
-        "cart_checkout_button": "🧾 Buyurtma berish",
-        "cart_clear_button": "🗑 Tozalash",
+        "cart_checkout_button": "Buyurtma berish",
+        "cart_clear_button": "Tozalash",
         "cart_back_button": "Orqaga",
         "cart_confirm_button": "✅ Tasdiqlash",
         "cart_order_created_title": "<b>Buyurtma yaratildi</b>",
@@ -745,7 +748,7 @@ Menyu pastda.""",
         "offers_in_city": "<b>{city} shahridagi takliflar</b>\nJami: {count}",
         "offers_found": "<b>Takliflar topildi</b>\nJami: {count}",
         "hot_offers_title": "<b>Aksiyalar</b>",
-        "hot_offers_subtitle": "Aksiyalar - chegirmali mahsulotlar, Do'konlar - ro'yxat.",
+        "hot_offers_subtitle": "Quyidan bo'limni tanlang.",
         "select_by_number": "Mahsulotni tugma orqali tanlang yoki raqamini kiriting.",
         "browse_by_business_type": "<b>Do'kon turini tanlang</b>",
         "supermarkets": "Supermarketlar",
@@ -1091,7 +1094,7 @@ Bu harakatni qaytarib bo\'lmaydi!""",
         "error_general": "❌ Xatolik yuz berdi. Keyinroq urinib ko'ring.",
         "system_error": "⚠️ Tizim xatosi. Keyinroq urinib ko'ring yoki qo'llab-quvvatlash xizmatiga yozing.",
         # Yaxshilangan bo'sh holatlar
-        "cart_empty": "<b>🛒 Savat bo'sh</b>\nAksiyalar yoki qidiruvdan mahsulot qo'shing.",
+        "cart_empty": "<b>Savat bo'sh</b>\nAksiya yoki qidiruvdan mahsulot qo'shing.",
         "cart_empty_cta": "Takliflarga",
         "continue_shopping": "🔙 Xaridni davom ettirish",
         # Miqdor tugmalari

@@ -57,7 +57,7 @@ class TestUserKeyboards:
         assert isinstance(keyboard, InlineKeyboardMarkup)
         # Should have switch to customer button
         buttons = [btn.text for row in keyboard.inline_keyboard for btn in row]
-        assert any("покупателя" in btn.lower() or "xaridor" in btn.lower() for btn in buttons)
+        assert any("покупатель" in btn.lower() or "xaridor" in btn.lower() for btn in buttons)
 
     def test_settings_keyboard_seller_customer_mode(self) -> None:
         """Test settings keyboard for seller in customer mode."""
@@ -70,7 +70,7 @@ class TestUserKeyboards:
         assert isinstance(keyboard, InlineKeyboardMarkup)
         # Should have switch to seller button
         buttons = [btn.text for row in keyboard.inline_keyboard for btn in row]
-        assert any("hamkor" in btn.lower() or "партнера" in btn.lower() for btn in buttons)
+        assert any("hamkor" in btn.lower() or "партнер" in btn.lower() for btn in buttons)
 
 
 class TestMainMenuSeller:
