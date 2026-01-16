@@ -11,7 +11,7 @@ from aiogram import F, Router, types
 from aiogram.fsm.context import FSMContext
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
-from app.services.unified_order_service import PaymentStatus, get_unified_order_service
+from app.services.unified_order_service import OrderStatus, PaymentStatus, get_unified_order_service
 from localization import get_text
 from logging_config import logger
 
@@ -208,7 +208,10 @@ def _get_all_orders(db, user_id: int) -> tuple[list, list]:
 
         # Split by order_type for display compatibility
         for order in visible_orders:
-            order_type = order.get("order_type") if isinstance(order, dict) else None
+            order_type = _get_field(order, "order_type")
+            if not order_type:
+                delivery_address = _get_field(order, "delivery_address")
+                order_type = "delivery" if delivery_address else "pickup"
             if order_type == "pickup":
                 pickup_orders.append(order)
             else:
@@ -374,7 +377,7 @@ async def seller_view_booking(callback: types.CallbackQuery) -> None:
 
 @router.callback_query(F.data.startswith("seller_view_o_"))
 async def seller_view_order(callback: types.CallbackQuery) -> None:
-    """View delivery order details with action buttons."""
+    """View order details with action buttons."""
     db = get_db()
     lang = db.get_user_language(callback.from_user.id)
 
@@ -389,9 +392,17 @@ async def seller_view_order(callback: types.CallbackQuery) -> None:
         await callback.answer("❌ Topilmadi" if lang == "uz" else "❌ Не найдено", show_alert=True)
         return
 
-    status = _get_field(order, "order_status") or _get_field(order, "status") or "pending"
+    status_raw = (
+        _get_field(order, "order_status") or _get_field(order, "status") or OrderStatus.PENDING
+    )
+    status = OrderStatus.normalize(str(status_raw).strip().lower())
     quantity = _get_field(order, "quantity") or 1
     delivery_address = _get_field(order, "delivery_address") or ""
+    pickup_code = _get_field(order, "pickup_code") or ""
+    order_type = _get_field(order, "order_type")
+    if not order_type:
+        order_type = "delivery" if delivery_address else "pickup"
+    is_delivery = order_type in ("delivery", "taxi")
     total_price = _get_field(order, "total_price") or 0
     delivery_price = _get_field(order, "delivery_price") or 0
     user_id = _get_field(order, "user_id")
@@ -407,31 +418,41 @@ async def seller_view_order(callback: types.CallbackQuery) -> None:
     currency = "so'm" if lang == "uz" else "сум"
 
     status_emoji = {
-        "pending": "⏳",
-        "preparing": "👨‍🍳",
-        "ready": "📦",
-        "delivering": "🚚",
-        "completed": "🎉",
-        "cancelled": "❌",
+        OrderStatus.PENDING: "⏳",
+        OrderStatus.PREPARING: "👨‍🍳",
+        OrderStatus.READY: "📦",
+        OrderStatus.DELIVERING: "🚚",
+        OrderStatus.COMPLETED: "🎉",
+        OrderStatus.REJECTED: "❌",
+        OrderStatus.CANCELLED: "❌",
     }.get(status, "📦")
     status_text = {
-        "pending": "Kutilmoqda" if lang == "uz" else "Ожидает",
-        "preparing": "Tayyorlanmoqda" if lang == "uz" else "Готовится",
-        "ready": "Tayyor" if lang == "uz" else "Готов",
-        "delivering": "Yo'lda" if lang == "uz" else "В пути",
-        "completed": "Yetkazildi" if lang == "uz" else "Доставлен",
-        "cancelled": "Bekor qilindi" if lang == "uz" else "Отменён",
+        OrderStatus.PENDING: "Kutilmoqda" if lang == "uz" else "Ожидает",
+        OrderStatus.PREPARING: "Tayyorlanmoqda" if lang == "uz" else "Готовится",
+        OrderStatus.READY: "Tayyor" if lang == "uz" else "Готов",
+        OrderStatus.DELIVERING: "Yo'lda" if lang == "uz" else "В пути",
+        OrderStatus.COMPLETED: (
+            "Yetkazildi" if lang == "uz" else "Доставлено"
+        )
+        if is_delivery
+        else ("Berildi" if lang == "uz" else "Выдано"),
+        OrderStatus.REJECTED: "Rad etildi" if lang == "uz" else "Отклонён",
+        OrderStatus.CANCELLED: "Bekor qilindi" if lang == "uz" else "Отменён",
     }.get(status, status)
 
+    type_label = "YETKAZISH" if is_delivery else "OLIB KETISH"
+    type_label_ru = "ДОСТАВКА" if is_delivery else "САМОВЫВОЗ"
+    type_emoji = "🚚" if is_delivery else "🏪"
+
     lines = [
-        f"🚚 <b>{'YETKAZISH' if lang == 'uz' else 'ДОСТАВКА'} #{order_id}</b>",
+        f"{type_emoji} <b>{type_label if lang == 'uz' else type_label_ru} #{order_id}</b>",
         f"{status_emoji} <b>{status_text}</b>",
         "",
         f"📦 {title} × {quantity}",
         f"💰 {'Jami' if lang == 'uz' else 'Итого'}: <b>{total_price:,} {currency}</b>",
     ]
 
-    if delivery_price:
+    if is_delivery and delivery_price:
         lines.append(
             f"🚚 {'Yetkazish' if lang == 'uz' else 'Доставка'}: {delivery_price:,} {currency}"
         )
@@ -441,15 +462,19 @@ async def seller_view_order(callback: types.CallbackQuery) -> None:
             "",
             f"👤 {customer_name}",
             f"📱 <code>{customer_phone}</code>",
-            f"📍 {delivery_address or '—'}",
         ]
     )
+    if is_delivery:
+        lines.append(f"📍 {delivery_address or '—'}")
+    elif pickup_code:
+        code_label = "Kod" if lang == "uz" else "Код"
+        lines.append(f"🔐 {code_label}: <b>{pickup_code}</b>")
 
     text = "\n".join(lines)
 
     kb = InlineKeyboardBuilder()
 
-    if status == "pending":
+    if status == OrderStatus.PENDING:
         kb.button(
             text="✅ Qabul qilish" if lang == "uz" else "✅ Принять",
             callback_data=f"order_confirm_{order_id}",
@@ -458,20 +483,33 @@ async def seller_view_order(callback: types.CallbackQuery) -> None:
             text="❌ Rad etish" if lang == "uz" else "❌ Отклонить",
             callback_data=f"order_reject_{order_id}",
         )
-    elif status == "preparing":
-        kb.button(
-            text="📦 Tayyor" if lang == "uz" else "📦 Готов",
-            callback_data=f"order_ready_{order_id}",
-        )
+    elif status == OrderStatus.PREPARING:
+        if is_delivery:
+            kb.button(
+                text="📦 Tayyor" if lang == "uz" else "📦 Готов",
+                callback_data=f"order_ready_{order_id}",
+            )
+        else:
+            kb.button(
+                text="✅ Topshirildi" if lang == "uz" else "✅ Выдано",
+                callback_data=f"order_complete_{order_id}",
+            )
         kb.button(
             text="❌ Bekor" if lang == "uz" else "❌ Отменить",
             callback_data=f"order_cancel_seller_{order_id}",
         )
-    elif status == "ready":
-        kb.button(
-            text="🚚 Yo'lga chiqdi" if lang == "uz" else "🚚 В пути",
-            callback_data=f"order_delivering_{order_id}",
-        )
+    elif status == OrderStatus.READY:
+        if is_delivery:
+            kb.button(
+                text="🚚 Yo'lga chiqdi" if lang == "uz" else "🚚 В пути",
+                callback_data=f"order_delivering_{order_id}",
+            )
+        else:
+            kb.button(
+                text="✅ Topshirildi" if lang == "uz" else "✅ Выдано",
+                callback_data=f"order_complete_{order_id}",
+            )
+
 
     kb.button(
         text="📞 Aloqa" if lang == "uz" else "📞 Связаться",

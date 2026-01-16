@@ -556,7 +556,6 @@ def setup(
 
             # If user likely searched store name, do not flood with all offers — stop here
             if is_store_query:
-                await state.clear()
                 return
 
         # Show offer results as compact list with inline buttons

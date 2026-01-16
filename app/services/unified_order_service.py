@@ -731,6 +731,7 @@ class NotificationTemplates:
             addr_label = "Manzil" if lang == "uz" else "Адрес"
             lines.append(f"{addr_label}: {_esc(delivery_address)}")
 
+        items_total = 0
         if items:
             lines.append("")
             items_label = "Mahsulotlar" if lang == "uz" else "Товары"
@@ -740,14 +741,21 @@ class NotificationTemplates:
                 qty = int(item.get("quantity", 1))
                 price = int(item.get("price", 0))
                 subtotal = price * qty
+                items_total += subtotal
                 lines.append(f"- {title} × {qty} = {subtotal:,} {currency}")
 
-        if is_delivery and delivery_price:
+        base_total = int(total or 0)
+        if items_total > 0:
+            base_total = items_total
+
+        delivery_amount = int(delivery_price or 0)
+        if is_delivery and delivery_amount:
             delivery_label = "Yetkazish" if lang == "uz" else "Доставка"
-            lines.append(f"{delivery_label}: {int(delivery_price):,} {currency}")
+            lines.append(f"{delivery_label}: {delivery_amount:,} {currency}")
 
         total_label = "Jami" if lang == "uz" else "Итого"
-        lines.append(f"{total_label}: <b>{int(total):,} {currency}</b>")
+        grand_total = base_total + (delivery_amount if is_delivery else 0)
+        lines.append(f"{total_label}: <b>{grand_total:,} {currency}</b>")
 
         return "\n".join(lines)
 
