@@ -58,8 +58,8 @@ def _offer_price_line(offer: OfferDetails | OfferListItem, lang: str) -> str:
     if original and original > current:
         discount_pct = round((1 - current / original) * 100)
         discount_pct = min(99, max(1, discount_pct))
-        return f"💰 {_format_money(current)} {currency} (-{discount_pct}%)"
-    return f"💰 {_format_money(current)} {currency}"
+        return f"{_format_money(current)} {currency} (-{discount_pct}%)"
+    return f"{_format_money(current)} {currency}"
 
 
 def register_stores(

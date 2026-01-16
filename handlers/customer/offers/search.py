@@ -511,20 +511,20 @@ def setup(
 
             # Send up to 5 stores as separate cards each with an inline "Смотреть товары" button
             for store in store_results[:5]:
-                store_name = store.get("name", "Магазин")
-                address = store.get("address", "Адрес не указан")
-                category = store.get("category", "Продукты")
+                store_name = store.get("name") or store.get("store_name") or "Магазин"
+                address = store.get("address")
+                category = store.get("category")
 
-                stores_card = f"🏪 <b>{store_name}</b>\n" f"📍 {address}\n" f"📂 {category}\n"
+                name_line = _escape(_short_store(store_name, limit=32))
+                meta_line = ""
+                if address:
+                    meta_line = _escape(_short_title(address, limit=38))
+                elif category:
+                    meta_line = _escape(_short_title(category, limit=28))
 
-                if store.get("delivery_enabled") == 1:
-                    delivery_price = store.get("delivery_price", 0)
-                    min_order = store.get("min_order_amount", 0)
-                    stores_card += (
-                        f"🚚 Доставка: {delivery_price:,} сум (мин. {min_order:,} сум)\n"
-                        if lang == "ru"
-                        else f"🚚 Yetkazib berish: {delivery_price:,} so'm (min. {min_order:,} so'm)\n"
-                    )
+                stores_card = f"<b>{name_line}</b>"
+                if meta_line:
+                    stores_card = f"{stores_card}\n{meta_line}"
 
                 kb = InlineKeyboardBuilder()
                 sid = store.get("store_id") or store.get("id") or store.get("storeId")
@@ -854,7 +854,7 @@ def setup(
         list_label = "Товары" if lang == "ru" else "Mahsulotlar"
 
         lines = [
-            f"🏪 <b>{_escape(store_name)}</b>",
+            f"<b>{_escape(store_name)}</b>",
             f"{list_label} | {page_label} 1/{total_pages} | {total_label} {total}",
         ]
 
@@ -949,7 +949,7 @@ def setup(
         list_label = "Товары" if lang == "ru" else "Mahsulotlar"
 
         lines = [
-            f"🏪 <b>{_escape(store_name)}</b>",
+            f"<b>{_escape(store_name)}</b>",
             f"{list_label} | {page_label} {current_page}/{total_pages} | {total_label} {total}",
         ]
 

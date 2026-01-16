@@ -89,6 +89,8 @@ __all__ = [
 # Main menu button texts (Russian and Uzbek)
 MAIN_MENU_BUTTONS = {
     # Customer menu
+    "🛍 Акции и магазины",
+    "🛍 Aksiyalar va do'konlar",
     "🏪 Горячее",
     "🏪 Issiq takliflar",
     "🏪 Заведения",
@@ -97,6 +99,8 @@ MAIN_MENU_BUTTONS = {
     "🔍 Qidirish",
     "🛒 Корзина",
     "🛒 Savat",
+    "🧾 Заказы",
+    "🧾 Buyurtmalar",
     "💙 Избранное",
     "💙 Sevimlilar",
     "👤 Профиль",
@@ -113,6 +117,8 @@ MAIN_MENU_BUTTONS = {
     # Common
     "❌ Отмена",
     "❌ Bekor qilish",
+    "Отмена",
+    "Bekor qilish",
 }
 
 LEGACY_MAIN_MENU_BUTTONS = {
@@ -121,6 +127,8 @@ LEGACY_MAIN_MENU_BUTTONS = {
     "🏪 Issiq takliflar",
     "🏪 Заведения",
     "🏪 Do'konlar",
+    "🛍 Акции и магазины",
+    "🛍 Aksiyalar va do'konlar",
     # Search legacy
     "🔍 Поиск",
     "🔍 Qidirish",
@@ -130,6 +138,8 @@ LEGACY_MAIN_MENU_BUTTONS = {
     # Orders
     "📋 Мои заказы",
     "📋 Mening buyurtmalarim",
+    "🧾 Заказы",
+    "🧾 Buyurtmalar",
     # Profile
     "👤 Профиль",
     "👤 Profil",
@@ -185,6 +195,8 @@ def is_hot_offers_button(text: str | None) -> bool:
     if not stripped:
         return False
     return stripped in _menu_labels()["hot_offers"] or stripped in {
+        "🛍 Акции и магазины",
+        "🛍 Aksiyalar va do'konlar",
         "🏪 Горячее",
         "🏪 Issiq takliflar",
         "🏪 Акции до -70%",
@@ -206,6 +218,8 @@ def is_my_orders_button(text: str | None) -> bool:
     if not stripped:
         return False
     return stripped in _menu_labels()["my_orders"] or stripped in {
+        "🧾 Заказы",
+        "🧾 Buyurtmalar",
         "📋 Мои заказы",
         "📋 Mening buyurtmalarim",
         "📋 Заказы и бронирования",

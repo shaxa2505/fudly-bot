@@ -16,7 +16,7 @@ from database_pg_module.crypto import (
     is_dev_environment,
     is_fernet_token,
 )
-from database_pg_module.mixins.offers import CITY_TRANSLITERATION, _CITY_SUFFIX_RE
+from database_pg_module.mixins.offers import CITY_TRANSLITERATION, _CITY_SUFFIX_RE, canonicalize_geo_slug
 
 try:
     from logging_config import logger
@@ -67,18 +67,24 @@ class StoreMixin:
         """Add new store."""
         with self.get_connection() as conn:
             cursor = conn.cursor()
+            city_slug = canonicalize_geo_slug(city)
+            region_slug = canonicalize_geo_slug(region) if region else None
+            district_slug = canonicalize_geo_slug(district) if district else None
             cursor.execute(
                 """
-                INSERT INTO stores (owner_id, name, city, region, district, address, description, category, phone, business_type, photo)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                INSERT INTO stores (owner_id, name, city, city_slug, region, region_slug, district, district_slug, address, description, category, phone, business_type, photo)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                 RETURNING store_id
             """,
                 (
                     owner_id,
                     name,
                     city,
+                    city_slug,
                     region,
+                    region_slug,
                     district,
+                    district_slug,
                     address,
                     description,
                     category,
@@ -186,10 +192,12 @@ class StoreMixin:
             """
             params: list[str] = []
             if city:
-                city_variants = self._get_city_variants(city)
-                city_conditions = " OR ".join(["s.city ILIKE %s" for _ in city_variants])
-                query += f" AND ({city_conditions})"
-                params.extend([f"%{v}%" for v in city_variants])
+                condition, condition_params = self._build_location_filter(
+                    city, "city", "s", self._get_city_variants
+                )
+                if condition:
+                    query += f" AND {condition}"
+                    params.extend(condition_params)
 
             query += " GROUP BY s.store_id ORDER BY avg_rating DESC, s.created_at DESC"
             cursor.execute(query, params)
@@ -222,22 +230,26 @@ class StoreMixin:
             params: list[str] = []
 
             if city:
-                city_variants = self._get_city_variants(city)
-                city_conditions = " OR ".join(["s.city ILIKE %s" for _ in city_variants])
-                query += f" AND ({city_conditions})"
-                params.extend([f"%{v}%" for v in city_variants])
-            if region:
-                region_variants = self._get_city_variants(region)
-                region_conditions = " OR ".join(["s.region ILIKE %s" for _ in region_variants])
-                query += f" AND ({region_conditions})"
-                params.extend([f"%{v}%" for v in region_variants])
-            if district:
-                district_variants = self._get_city_variants(district)
-                district_conditions = " OR ".join(
-                    ["s.district ILIKE %s" for _ in district_variants]
+                condition, condition_params = self._build_location_filter(
+                    city, "city", "s", self._get_city_variants
                 )
-                query += f" AND ({district_conditions})"
-                params.extend([f"%{v}%" for v in district_variants])
+                if condition:
+                    query += f" AND {condition}"
+                    params.extend(condition_params)
+            if region:
+                condition, condition_params = self._build_location_filter(
+                    region, "region", "s", self._get_city_variants
+                )
+                if condition:
+                    query += f" AND {condition}"
+                    params.extend(condition_params)
+            if district:
+                condition, condition_params = self._build_location_filter(
+                    district, "district", "s", self._get_city_variants
+                )
+                if condition:
+                    query += f" AND {condition}"
+                    params.extend(condition_params)
             if business_type:
                 query += " AND s.business_type = %s"
                 params.append(business_type)
@@ -310,9 +322,14 @@ class StoreMixin:
         with self.get_connection() as conn:
             cursor = conn.cursor(row_factory=dict_row)
             if city:
-                cursor.execute(
-                    "SELECT * FROM stores WHERE status = %s AND city = %s", ("approved", city)
+                condition, condition_params = self._build_location_filter(
+                    city, "city", "", self._get_city_variants
                 )
+                if not condition:
+                    return []
+                query = f"SELECT * FROM stores WHERE status = %s AND {condition}"
+                params = ["approved"] + list(condition_params)
+                cursor.execute(query, params)
             else:
                 cursor.execute("SELECT * FROM stores WHERE status = %s", ("approved",))
             return [dict(row) for row in cursor.fetchall()]
@@ -350,10 +367,12 @@ class StoreMixin:
             """
             params: list[str] = [business_type]
             if city:
-                city_variants = self._get_city_variants(city)
-                city_conditions = " OR ".join(["s.city ILIKE %s" for _ in city_variants])
-                query += f" AND ({city_conditions})"
-                params.extend([f"%{v}%" for v in city_variants])
+                condition, condition_params = self._build_location_filter(
+                    city, "city", "s", self._get_city_variants
+                )
+                if condition:
+                    query += f" AND {condition}"
+                    params.extend(condition_params)
 
             query += " GROUP BY s.store_id ORDER BY avg_rating DESC, s.created_at DESC"
             cursor.execute(query, params)
@@ -370,10 +389,12 @@ class StoreMixin:
             """
             params: list[str] = [category]
             if city:
-                city_variants = self._get_city_variants(city)
-                city_conditions = " OR ".join(["city ILIKE %s" for _ in city_variants])
-                query += f" AND ({city_conditions})"
-                params.extend([f"%{v}%" for v in city_variants])
+                condition, condition_params = self._build_location_filter(
+                    city, "city", "", self._get_city_variants
+                )
+                if condition:
+                    query += f" AND {condition}"
+                    params.extend(condition_params)
 
             query += " ORDER BY created_at DESC"
             cursor.execute(query, params)
@@ -383,15 +404,18 @@ class StoreMixin:
         """Get store counts grouped by category."""
         with self.get_connection() as conn:
             cursor = conn.cursor()
-            city_variants = self._get_city_variants(city)
-            city_conditions = " OR ".join(["city ILIKE %s" for _ in city_variants])
+            condition, condition_params = self._build_location_filter(
+                city, "city", "", self._get_city_variants
+            )
+            if not condition:
+                return {}
             query = f"""
                 SELECT category, COUNT(*) as count
                 FROM stores
-                WHERE ({city_conditions}) AND (status = 'active' OR status = 'approved')
+                WHERE {condition} AND (status = 'active' OR status = 'approved')
                 GROUP BY category
             """
-            params = [f"%{v}%" for v in city_variants]
+            params = list(condition_params)
             cursor.execute(query, params)
             return dict(cursor.fetchall())
 
@@ -399,9 +423,12 @@ class StoreMixin:
         """Get top rated stores in city."""
         with self.get_connection() as conn:
             cursor = conn.cursor(row_factory=dict_row)
-            city_variants = self._get_city_variants(city)
-            city_conditions = " OR ".join(["s.city ILIKE %s" for _ in city_variants])
-            params = [f"%{v}%" for v in city_variants]
+            condition, condition_params = self._build_location_filter(
+                city, "city", "s", self._get_city_variants
+            )
+            if not condition:
+                return []
+            params = list(condition_params)
             params.append(limit)
             cursor.execute(
                 f"""
@@ -410,7 +437,7 @@ class StoreMixin:
                        COUNT(r.rating_id) as ratings_count
                 FROM stores s
                 LEFT JOIN ratings r ON s.store_id = r.store_id
-                WHERE ({city_conditions}) AND s.status = 'active'
+                WHERE {condition} AND s.status = 'active'
                 GROUP BY s.store_id
                 ORDER BY avg_rating DESC, ratings_count DESC
                 LIMIT %s
@@ -540,9 +567,13 @@ class StoreMixin:
         if region is not None:
             fields.append("region = %s")
             params.append(region)
+            fields.append("region_slug = %s")
+            params.append(canonicalize_geo_slug(region))
         if district is not None:
             fields.append("district = %s")
             params.append(district)
+            fields.append("district_slug = %s")
+            params.append(canonicalize_geo_slug(district))
         params.append(store_id)
 
         with self.get_connection() as conn:

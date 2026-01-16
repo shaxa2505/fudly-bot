@@ -14,20 +14,20 @@ def main_menu_customer(lang: str = "ru", cart_count: int = 0) -> ReplyKeyboardMa
         lang: Interface language
         cart_count: Number of items in cart (shown on button)
     """
-    hot_offers_text = get_text(lang, "hot_offers")
+    hot_offers_text = f"🛍 {get_text(lang, 'hot_offers')}"
     builder = ReplyKeyboardBuilder()
 
     # Row 1: Main actions - offers and search
     builder.button(text=hot_offers_text)
-    builder.button(text=get_text(lang, "search"))
+    builder.button(text=f"🔍 {get_text(lang, 'search')}")
 
     # Row 2: Cart with counter + My Orders + Profile
-    cart_text = get_text(lang, "my_cart")
+    cart_text = f"🛒 {get_text(lang, 'my_cart')}"
     if cart_count > 0:
         cart_text = f"{cart_text} ({cart_count})"
     builder.button(text=cart_text)
-    builder.button(text=get_text(lang, "my_orders"))
-    builder.button(text=get_text(lang, "profile"))
+    builder.button(text=f"🧾 {get_text(lang, 'my_orders')}")
+    builder.button(text=f"👤 {get_text(lang, 'profile')}")
 
     # Layout: 2 columns first row, 3 buttons second row
     builder.adjust(2, 3)
@@ -37,7 +37,7 @@ def main_menu_customer(lang: str = "ru", cart_count: int = 0) -> ReplyKeyboardMa
 def search_cancel_keyboard(lang: str = "ru") -> ReplyKeyboardMarkup:
     """Keyboard for cancelling search."""
     builder = ReplyKeyboardBuilder()
-    # get_text already returns "❌ Отмена" / "❌ Bekor qilish", no need to add emoji
+    # get_text returns localized "Отмена" / "Bekor qilish"
     builder.button(text=get_text(lang, "cancel"))
     builder.adjust(1)
     return builder.as_markup(resize_keyboard=True)

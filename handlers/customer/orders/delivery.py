@@ -306,9 +306,8 @@ async def dlv_cancel(
     from app.templates.offers import render_hot_offers_list
 
     total_pages = (result.total + OFFERS_PER_PAGE - 1) // OFFERS_PER_PAGE
-    select_hint = "Выберите товар" if lang == "ru" else "Mahsulotni tanlang"
     text = render_hot_offers_list(
-        lang, city, result.items, result.total, select_hint, offset=last_page * OFFERS_PER_PAGE
+        lang, city, result.items, result.total, "", offset=last_page * OFFERS_PER_PAGE
     )
     kb = hot_offers_compact_keyboard(lang, result.items, last_page, total_pages)
 

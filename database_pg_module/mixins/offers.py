@@ -87,6 +87,45 @@ _CITY_SUFFIX_RE = re.compile(
 )
 
 
+def _normalize_geo_slug(value: str | None) -> str | None:
+    if not value:
+        return None
+    value_clean = " ".join(value.strip().split())
+    value_clean = value_clean.split(",")[0]
+    value_clean = re.sub(r"\s*\([^)]*\)", "", value_clean)
+    value_clean = _CITY_SUFFIX_RE.sub("", value_clean).strip(" ,")
+    value_clean = re.sub(r"[^\w\s]", " ", value_clean, flags=re.UNICODE)
+    value_clean = " ".join(value_clean.split())
+    return value_clean.lower() if value_clean else None
+
+
+def _build_geo_slug_map() -> dict[str, str]:
+    mapping: dict[str, str] = {}
+    for key, variants in CITY_TRANSLITERATION.items():
+        canonical = _normalize_geo_slug(key)
+        if not canonical:
+            continue
+        mapping.setdefault(canonical, canonical)
+        for variant in variants:
+            normalized = _normalize_geo_slug(variant)
+            if normalized:
+                mapping.setdefault(normalized, canonical)
+        normalized_key = _normalize_geo_slug(key)
+        if normalized_key:
+            mapping.setdefault(normalized_key, canonical)
+    return mapping
+
+
+_GEO_SLUG_MAP = _build_geo_slug_map()
+
+
+def canonicalize_geo_slug(value: str | None) -> str | None:
+    base = _normalize_geo_slug(value)
+    if not base:
+        return None
+    return _GEO_SLUG_MAP.get(base, base)
+
+
 class OfferMixin:
     """Mixin for offer-related database operations."""
 
@@ -113,6 +152,65 @@ class OfferMixin:
                 variants.update(values)
 
         return list(variants)
+
+    def _get_store_slug_columns(self) -> set[str]:
+        cache = getattr(self, "_store_slug_columns_cache", None)
+        if cache is not None:
+            return cache
+
+        columns: set[str] = set()
+        try:
+            with self.get_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute(
+                    """
+                    SELECT column_name
+                    FROM information_schema.columns
+                    WHERE table_name = 'stores'
+                      AND column_name IN ('city_slug', 'region_slug', 'district_slug')
+                    """
+                )
+                columns = {row[0] for row in cursor.fetchall()}
+        except Exception as exc:
+            logger.warning("Location slug column check failed: %s", exc)
+            columns = set()
+
+        self._store_slug_columns_cache = columns
+        return columns
+
+    def _build_location_filter(
+        self,
+        value: str,
+        column: str,
+        alias: str,
+        variants_fn,
+    ) -> tuple[str, list[Any]]:
+        prefix = f"{alias}." if alias else ""
+        slug_value = canonicalize_geo_slug(value)
+        slug_column = f"{column}_slug"
+        columns = self._get_store_slug_columns()
+
+        if slug_value and slug_column in columns:
+            condition = f"{prefix}{slug_column} = %s"
+            params: list[Any] = [slug_value]
+            variants = variants_fn(value)
+            if variants:
+                ilike_conditions = " OR ".join(
+                    [f"{prefix}{column} ILIKE %s" for _ in variants]
+                )
+                condition = (
+                    f"({condition} OR ({prefix}{slug_column} IS NULL AND ({ilike_conditions})))"
+                )
+                params.extend([f"%{v}%" for v in variants])
+            return condition, params
+
+        variants = variants_fn(value)
+        if not variants:
+            return "", []
+        ilike_conditions = " OR ".join(
+            [f"{prefix}{column} ILIKE %s" for _ in variants]
+        )
+        return f"({ilike_conditions})", [f"%{v}%" for v in variants]
 
     def _normalize_location_label(self, value: str) -> str:
         """Normalize region/district labels similar to city normalization."""
@@ -278,7 +376,6 @@ class OfferMixin:
                     order_by = "o.discount_price DESC, o.created_at DESC"
                 elif sort_key == "new":
                     order_by = "o.offer_id DESC"
-
             query += f" ORDER BY {order_by}"
 
             if limit is not None:
@@ -303,10 +400,12 @@ class OfferMixin:
             ]
             params = []
             if city:
-                city_variants = self._get_city_variants(city)
-                city_conditions = " OR ".join(["s.city ILIKE %s" for _ in city_variants])
-                base.append(f"AND ({city_conditions})")
-                params.extend([f"%{v}%" for v in city_variants])
+                condition, condition_params = self._build_location_filter(
+                    city, "city", "s", self._get_city_variants
+                )
+                if condition:
+                    base.append(f"AND {condition}")
+                    params.extend(condition_params)
             if store_id:
                 base.append("AND o.store_id = %s")
                 params.append(store_id)
@@ -346,25 +445,28 @@ class OfferMixin:
 
             params = []
             if city:
-                # Поддержка транслитерации: ищем и латиницу и кириллицу
-                city_variants = self._get_city_variants(city)
-                city_conditions = " OR ".join(["s.city ILIKE %s" for _ in city_variants])
-                query += f" AND ({city_conditions})"
-                params.extend([f"%{v}%" for v in city_variants])
+                condition, condition_params = self._build_location_filter(
+                    city, "city", "s", self._get_city_variants
+                )
+                if condition:
+                    query += f" AND {condition}"
+                    params.extend(condition_params)
 
             if region:
-                region_variants = self._get_location_variants(region)
-                region_conditions = " OR ".join(["s.region ILIKE %s" for _ in region_variants])
-                query += f" AND ({region_conditions})"
-                params.extend([f"%{v}%" for v in region_variants])
+                condition, condition_params = self._build_location_filter(
+                    region, "region", "s", self._get_location_variants
+                )
+                if condition:
+                    query += f" AND {condition}"
+                    params.extend(condition_params)
 
             if district:
-                district_variants = self._get_location_variants(district)
-                district_conditions = " OR ".join(
-                    ["s.district ILIKE %s" for _ in district_variants]
+                condition, condition_params = self._build_location_filter(
+                    district, "district", "s", self._get_location_variants
                 )
-                query += f" AND ({district_conditions})"
-                params.extend([f"%{v}%" for v in district_variants])
+                if condition:
+                    query += f" AND {condition}"
+                    params.extend(condition_params)
 
             if business_type:
                 query += " AND s.category = %s"
@@ -398,7 +500,6 @@ class OfferMixin:
                     order_by = (
                         "discount_percent DESC, COALESCE(o.expiry_date, '9999-12-31') ASC, o.created_at DESC"
                     )
-
             query += f"""
                 ORDER BY {order_by}
                 LIMIT %s OFFSET %s
@@ -430,24 +531,28 @@ class OfferMixin:
             params = []
 
             if city:
-                city_variants = self._get_city_variants(city)
-                city_conditions = " OR ".join(["s.city ILIKE %s" for _ in city_variants])
-                query += f" AND ({city_conditions})"
-                params.extend([f"%{v}%" for v in city_variants])
+                condition, condition_params = self._build_location_filter(
+                    city, "city", "s", self._get_city_variants
+                )
+                if condition:
+                    query += f" AND {condition}"
+                    params.extend(condition_params)
 
             if region:
-                region_variants = self._get_location_variants(region)
-                region_conditions = " OR ".join(["s.region ILIKE %s" for _ in region_variants])
-                query += f" AND ({region_conditions})"
-                params.extend([f"%{v}%" for v in region_variants])
+                condition, condition_params = self._build_location_filter(
+                    region, "region", "s", self._get_location_variants
+                )
+                if condition:
+                    query += f" AND {condition}"
+                    params.extend(condition_params)
 
             if district:
-                district_variants = self._get_location_variants(district)
-                district_conditions = " OR ".join(
-                    ["s.district ILIKE %s" for _ in district_variants]
+                condition, condition_params = self._build_location_filter(
+                    district, "district", "s", self._get_location_variants
                 )
-                query += f" AND ({district_conditions})"
-                params.extend([f"%{v}%" for v in district_variants])
+                if condition:
+                    query += f" AND {condition}"
+                    params.extend(condition_params)
 
             if business_type:
                 query += " AND s.business_type = %s"
@@ -490,24 +595,28 @@ class OfferMixin:
                     params.append(categories)
 
             if city:
-                city_variants = self._get_city_variants(city)
-                city_conditions = " OR ".join(["s.city ILIKE %s" for _ in city_variants])
-                query += f" AND ({city_conditions})"
-                params.extend([f"%{v}%" for v in city_variants])
+                condition, condition_params = self._build_location_filter(
+                    city, "city", "s", self._get_city_variants
+                )
+                if condition:
+                    query += f" AND {condition}"
+                    params.extend(condition_params)
 
             if region:
-                region_variants = self._get_location_variants(region)
-                region_conditions = " OR ".join(["s.region ILIKE %s" for _ in region_variants])
-                query += f" AND ({region_conditions})"
-                params.extend([f"%{v}%" for v in region_variants])
+                condition, condition_params = self._build_location_filter(
+                    region, "region", "s", self._get_location_variants
+                )
+                if condition:
+                    query += f" AND {condition}"
+                    params.extend(condition_params)
 
             if district:
-                district_variants = self._get_location_variants(district)
-                district_conditions = " OR ".join(
-                    ["s.district ILIKE %s" for _ in district_variants]
+                condition, condition_params = self._build_location_filter(
+                    district, "district", "s", self._get_location_variants
                 )
-                query += f" AND ({district_conditions})"
-                params.extend([f"%{v}%" for v in district_variants])
+                if condition:
+                    query += f" AND {condition}"
+                    params.extend(condition_params)
 
             if min_price is not None:
                 query += " AND o.discount_price >= %s"
@@ -609,7 +718,6 @@ class OfferMixin:
                     order_by = "t.distance_km ASC, t.offer_id DESC"
                 elif sort_key == "discount":
                     order_by = "t.distance_km ASC, t.discount_percent DESC, t.created_at DESC"
-
             query += f" ORDER BY {order_by} LIMIT %s OFFSET %s"
             params.extend([limit, offset])
 
@@ -663,9 +771,12 @@ class OfferMixin:
         """Get top offers in city (by discount)."""
         with self.get_connection() as conn:
             cursor = conn.cursor(row_factory=dict_row)
-            city_variants = self._get_city_variants(city)
-            city_conditions = " OR ".join(["s.city ILIKE %s" for _ in city_variants])
-            params = [f"%{v}%" for v in city_variants]
+            condition, condition_params = self._build_location_filter(
+                city, "city", "s", self._get_city_variants
+            )
+            if not condition:
+                return []
+            params = list(condition_params)
             params.append(limit)
             cursor.execute(
                 f"""
@@ -673,7 +784,7 @@ class OfferMixin:
                        CAST((o.original_price - o.discount_price) * 100.0 / o.original_price AS INTEGER) as discount_percent
                 FROM offers o
                 JOIN stores s ON o.store_id = s.store_id
-                WHERE ({city_conditions}) AND s.status = 'active'
+                WHERE {condition} AND s.status = 'active'
                       AND o.status = 'active' AND COALESCE(o.stock_quantity, o.quantity) > 0
                       AND (o.expiry_date IS NULL OR o.expiry_date >= CURRENT_DATE)
                 ORDER BY discount_percent DESC, o.created_at DESC
@@ -723,24 +834,28 @@ class OfferMixin:
                 params.append(categories)
 
             if city:
-                city_variants = self._get_city_variants(city)
-                city_conditions = " OR ".join(["s.city ILIKE %s" for _ in city_variants])
-                query += f" AND ({city_conditions})"
-                params.extend([f"%{v}%" for v in city_variants])
+                condition, condition_params = self._build_location_filter(
+                    city, "city", "s", self._get_city_variants
+                )
+                if condition:
+                    query += f" AND {condition}"
+                    params.extend(condition_params)
 
             if region:
-                region_variants = self._get_location_variants(region)
-                region_conditions = " OR ".join(["s.region ILIKE %s" for _ in region_variants])
-                query += f" AND ({region_conditions})"
-                params.extend([f"%{v}%" for v in region_variants])
+                condition, condition_params = self._build_location_filter(
+                    region, "region", "s", self._get_location_variants
+                )
+                if condition:
+                    query += f" AND {condition}"
+                    params.extend(condition_params)
 
             if district:
-                district_variants = self._get_location_variants(district)
-                district_conditions = " OR ".join(
-                    ["s.district ILIKE %s" for _ in district_variants]
+                condition, condition_params = self._build_location_filter(
+                    district, "district", "s", self._get_location_variants
                 )
-                query += f" AND ({district_conditions})"
-                params.extend([f"%{v}%" for v in district_variants])
+                if condition:
+                    query += f" AND {condition}"
+                    params.extend(condition_params)
 
             if min_price is not None:
                 query += " AND o.discount_price >= %s"
@@ -766,7 +881,6 @@ class OfferMixin:
                     order_by = "o.discount_price DESC, o.created_at DESC"
                 elif sort_key == "new":
                     order_by = "o.offer_id DESC"
-
             query += f"""
                 ORDER BY {order_by}
                 LIMIT %s OFFSET %s

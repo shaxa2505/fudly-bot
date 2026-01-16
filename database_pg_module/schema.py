@@ -59,8 +59,11 @@ class SchemaMixin:
                     owner_id BIGINT,
                     name TEXT NOT NULL,
                     city TEXT NOT NULL,
+                    city_slug TEXT,
                     region TEXT,
+                    region_slug TEXT,
                     district TEXT,
+                    district_slug TEXT,
                     address TEXT,
                     description TEXT,
                     category TEXT DEFAULT 'Ресторан',
@@ -134,6 +137,9 @@ class SchemaMixin:
                 try:
                     cursor.execute("ALTER TABLE stores ADD COLUMN IF NOT EXISTS region TEXT")
                     cursor.execute("ALTER TABLE stores ADD COLUMN IF NOT EXISTS district TEXT")
+                    cursor.execute("ALTER TABLE stores ADD COLUMN IF NOT EXISTS city_slug TEXT")
+                    cursor.execute("ALTER TABLE stores ADD COLUMN IF NOT EXISTS region_slug TEXT")
+                    cursor.execute("ALTER TABLE stores ADD COLUMN IF NOT EXISTS district_slug TEXT")
                 except Exception as e:
                     logger.warning(f"Migration for stores region/district columns: {e}")
 
@@ -550,6 +556,10 @@ class SchemaMixin:
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_stores_city_status ON stores(city, status)")
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_stores_region ON stores(region)")
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_stores_district ON stores(district)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_stores_city_slug ON stores(city_slug)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_stores_region_slug ON stores(region_slug)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_stores_district_slug ON stores(district_slug)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_stores_city_slug_status ON stores(city_slug, status)")
 
         # Offer indexes - critical for browsing/search performance
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_offers_store ON offers(store_id)")

@@ -99,7 +99,7 @@ def build_cart_add_card_keyboard(
 
     # Add to cart button
     kb.button(
-        text="Добавить в корзину" if lang == "ru" else "Savatga qo'shish",
+        text="➕ В корзину" if lang == "ru" else "➕ Savatga",
         callback_data=f"cart_add_confirm_{offer_id}",
     )
 
@@ -123,7 +123,7 @@ def build_cart_view_keyboard(
     if items_count > 0:
         # Checkout button
         kb.button(
-            text="Оформить заказ" if lang == "ru" else "Buyurtma berish",
+            text="✅ Оформить заказ" if lang == "ru" else "✅ Buyurtma berish",
             callback_data="cart_checkout",
         )
 
@@ -160,13 +160,13 @@ def build_checkout_method_keyboard(
 
     if has_pickup:
         kb.button(
-            text="Самовывоз" if lang == "ru" else "O'zim olaman",
+            text="🏪 Самовывоз" if lang == "ru" else "🏪 O'zim olaman",
             callback_data="cart_confirm_pickup",
         )
 
     if has_delivery:
         kb.button(
-            text="Доставка" if lang == "ru" else "Yetkazib berish",
+            text="🚚 Доставка" if lang == "ru" else "🚚 Yetkazib berish",
             callback_data="cart_confirm_delivery",
         )
 
@@ -187,11 +187,11 @@ def build_payment_method_keyboard(
     kb = InlineKeyboardBuilder()
 
     # Click payment
-    kb.button(text="Click", callback_data="cart_pay_click")
+    kb.button(text="💳 Click", callback_data="cart_pay_click")
 
     # Card transfer
     kb.button(
-        text="Перевод на карту" if lang == "ru" else "Kartaga o'tkazma",
+        text="💳 Перевод на карту" if lang == "ru" else "💳 Kartaga o'tkazma",
         callback_data="cart_pay_card",
     )
 

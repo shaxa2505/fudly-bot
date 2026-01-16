@@ -18,35 +18,30 @@ def render_hot_offers_list(
 ) -> str:
     header = _hot_header(lang, total_count)
     city_label = "Город" if lang == "ru" else "Shahar"
-    lines = [header, f"{city_label}: {city}"]
-    shown = offset + len(offers)
     shown_text = "Ko'rsatilgan" if lang == "uz" else "Показано"
     of_text = "dan" if lang == "uz" else "из"
-    lines.append(f"{shown_text}: {shown} {of_text} {total_count}")
+    shown = offset + len(offers)
+    lines = [header, f"{city_label}: {city} | {shown_text}: {shown} {of_text} {total_count}"]
     lines.append("")
-    store_label = "Магазин" if lang == "ru" else "Do'kon"
-
     for idx, offer in enumerate(offers, offset + 1):
         name = _escape(_trim_title(offer.title))
         price_line = _format_price_line(offer, lang)
-
-        lines.append(f"{idx}. <b>{name}</b>")
-        lines.append(f"   {price_line}")
+        meta_parts = [price_line]
         store_name = getattr(offer, "store_name", "") or ""
         if store_name:
-            lines.append(f"   {store_label}: {_escape(_trim_title(store_name, limit=28))}")
-        lines.append("")
+            meta_parts.append(_escape(_trim_title(store_name, limit=28)))
+        meta = " | ".join(meta_parts)
+        lines.append(f"{idx}. <b>{name}</b> - {meta}")
 
-    lines.append(select_hint)
-    return "\n".join(lines)
+    return "\n".join(lines).rstrip()
 
 
 def render_hot_offers_empty(lang: str) -> str:
     header = _hot_header(lang)
     wait_text = (
-        "Пока нет предложений. Смените город или загляните позже."
+        "Пока нет предложений."
         if lang == "ru"
-        else "Hozircha takliflar yo'q. Shaharni almashtiring yoki keyinroq qayting."
+        else "Hozircha takliflar yo'q."
     )
     return f"{header}\n\n{wait_text}"
 
@@ -80,18 +75,22 @@ def render_business_type_store_list(
     page_stores = stores[start_idx : start_idx + per_page]
 
     total_label = "Всего" if lang == "ru" else "Jami"
-    lines = [f"<b>{title}</b>", f"{city_label}: {city} | {page_label} {page + 1}/{total_pages} | {total_label} {total}"]
+    lines = [
+        f"<b>{title}</b>",
+        f"{city_label}: {city} | {page_label} {page + 1}/{total_pages} | {total_label} {total}",
+        "",
+    ]
 
-    for store in page_stores:
+    for idx, store in enumerate(page_stores, start_idx + 1):
         store_name = store.name or ("Магазин" if lang == "ru" else "Do'kon")
         name = store_name[:30] + "..." if len(store_name) > 30 else store_name
-        line = f"- <b>{_escape(name)}</b>"
+        line = f"{idx}. <b>{_escape(name)}</b>"
         if store.address:
             short_addr = store.address[:30] + "..." if len(store.address) > 30 else store.address
             line += f" - {_escape(short_addr)}"
         lines.append(line)
 
-    return "\n".join(lines)
+    return "\n".join(lines).rstrip()
 
 
 def render_store_card(lang: str, store: StoreDetails) -> str:
@@ -187,17 +186,9 @@ def render_store_offers_list(
 
     for idx, offer in enumerate(offers, offset + 1):
         price_line = _format_price_line(offer, lang)
-        lines.append(f"{idx}. <b>{_escape(_trim_title(offer.title))}</b>")
-        lines.append(f"   {price_line}")
-        lines.append("")
+        lines.append(f"{idx}. <b>{_escape(_trim_title(offer.title))}</b> - {price_line}")
 
-    prompt = (
-        "Выберите товар кнопкой или введите номер."
-        if lang == "ru"
-        else "Mahsulotni tugma orqali tanlang yoki raqamini kiriting."
-    )
-    lines.append(prompt)
-    return "\n".join(lines)
+    return "\n".join(lines).rstrip()
 
 
 def render_store_reviews(
@@ -407,7 +398,6 @@ def _escape(text: str) -> str:
 
 def _format_price_line(offer: OfferListItem, lang: str) -> str:
     currency = "сум" if lang == "ru" else "so'm"
-    price_label = "Цена" if lang == "ru" else "Narx"
     current_price = getattr(offer, "discount_price", None)
     if current_price is None:
         current_price = getattr(offer, "price", 0) or 0
@@ -416,10 +406,8 @@ def _format_price_line(offer: OfferListItem, lang: str) -> str:
     if original_price and original_price > current_price:
         discount_pct = round((1 - current_price / original_price) * 100)
         discount_pct = min(99, max(1, discount_pct))
-        return (
-            f"{price_label}: {_format_money(current_price)} {currency} (-{discount_pct}%)"
-        )
-    return f"{price_label}: {_format_money(current_price)} {currency}"
+        return f"{_format_money(current_price)} {currency} (-{discount_pct}%)"
+    return f"{_format_money(current_price)} {currency}"
 
 
 def _trim_title(title: str, limit: int = 30) -> str:

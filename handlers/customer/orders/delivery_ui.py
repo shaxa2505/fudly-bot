@@ -33,7 +33,7 @@ def build_delivery_card_text(
     total = subtotal + delivery_price
 
     lines = [
-        f"<b>{'Yetkazib berish' if lang == 'uz' else 'Доставка'}</b>",
+        f"🚚 <b>{'Yetkazib berish' if lang == 'uz' else 'Доставка'}</b>",
         "",
         f"<b>{_esc(title)}</b>",
         _esc(store_name),
@@ -96,7 +96,7 @@ def build_delivery_qty_keyboard(
     )
 
     # Row 2: Continue
-    next_text = "Davom etish" if lang == "uz" else "Продолжить"
+    next_text = "📍 Davom etish" if lang == "uz" else "📍 Продолжить"
     kb.button(text=next_text, callback_data=f"dlv_to_address_{offer_id}")
 
     # Row 3: Cancel
@@ -121,7 +121,7 @@ def build_delivery_address_keyboard(
         kb.button(text=short_addr, callback_data=f"dlv_use_saved_{offer_id}")
 
     # Manual input button
-    manual_text = "Yangi manzil" if lang == "uz" else "Новый адрес"
+    manual_text = "✏️ Yangi manzil" if lang == "uz" else "✏️ Новый адрес"
     kb.button(text=manual_text, callback_data=f"dlv_new_address_{offer_id}")
 
     # Back and Cancel
@@ -146,8 +146,8 @@ def build_delivery_payment_keyboard(
     kb = InlineKeyboardBuilder()
 
     # Payment options
-    click_text = "Click"
-    card_text = "Kartaga o'tkazma" if lang == "uz" else "Перевод на карту"
+    click_text = "💳 Click"
+    card_text = "💳 Kartaga o'tkazma" if lang == "uz" else "💳 Перевод на карту"
 
     kb.button(text=click_text, callback_data=f"dlv_pay_click_{offer_id}")
     kb.button(text=card_text, callback_data=f"dlv_pay_card_{offer_id}")

@@ -145,9 +145,8 @@ class TestRenderHotOffersList:
         assert "Город: Ташкент" in result
         assert "Хлеб белый" in result
         assert "Показано: 1 из 1" in result
-        assert "Цена: 5 000 сум (-50%)" in result
-        assert "Магазин: Супермаркет Тест" in result
-        assert "Выберите товар" in result
+        assert "5 000 сум (-50%)" in result
+        assert "Супермаркет Тест" in result
 
     def test_render_with_offers_uz(self, sample_offer_item: OfferListItem) -> None:
         """Test rendering hot offers list in Uzbek."""
@@ -163,7 +162,7 @@ class TestRenderHotOffersList:
         assert "Aksiyalar" in result
         assert "Shahar: Toshkent" in result
         assert "Ko'rsatilgan" in result
-        assert "Narx: 5 000 so'm (-50%)" in result
+        assert "5 000 so'm (-50%)" in result
 
     def test_render_with_offset(self, sample_offer_item: OfferListItem) -> None:
         """Test rendering with pagination offset."""
@@ -189,7 +188,7 @@ class TestRenderHotOffersList:
             offset=0,
         )
 
-        assert "Магазин:" in result
+        assert "Супермаркет Тест" in result
 
     def test_high_discount_fire_emoji(self, sample_offer_high_discount: OfferListItem) -> None:
         """Test that high discounts show percent."""
@@ -270,7 +269,7 @@ class TestRenderBusinessTypeStoreList:
             stores=[sample_store_summary],
         )
 
-        assert "- <b>Тестовый магазин</b>" in result
+        assert "1. <b>Тестовый магазин</b>" in result
 
 # =============================================================================
 # Tests for render_store_card
@@ -365,7 +364,7 @@ class TestRenderStoreOffersList:
         assert "Все товары" in result
         assert "Показано: 1 из 1" in result
         assert "Хлеб белый" in result
-        assert "Выберите товар кнопкой или введите номер" in result
+        assert "5 000 сум (-50%)" in result
 
     def test_render_store_offers_uz(self, sample_offer_item: OfferListItem) -> None:
         """Test rendering store offers list in Uzbek."""
@@ -379,7 +378,7 @@ class TestRenderStoreOffersList:
 
         assert "Barcha mahsulotlar" in result
         assert "Ko'rsatilgan: 1 dan 1" in result
-        assert "Mahsulotni tugma orqali tanlang yoki raqamini kiriting" in result
+        assert "5 000 so'm (-50%)" in result
 
 
 # =============================================================================

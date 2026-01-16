@@ -20,6 +20,7 @@ import requests
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from database import Database
+from database_pg_module.mixins.offers import canonicalize_geo_slug
 
 NOMINATIM_SEARCH_URL = "https://nominatim.openstreetmap.org/search"
 NOMINATIM_REVERSE_URL = "https://nominatim.openstreetmap.org/reverse"
@@ -245,9 +246,13 @@ def update_store(
     if region is not None:
         updates.append("region = %s")
         params.append(region)
+        updates.append("region_slug = %s")
+        params.append(canonicalize_geo_slug(region))
     if district is not None:
         updates.append("district = %s")
         params.append(district)
+        updates.append("district_slug = %s")
+        params.append(canonicalize_geo_slug(district))
     if not updates:
         return
     params.append(store_id)

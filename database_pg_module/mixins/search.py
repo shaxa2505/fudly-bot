@@ -94,6 +94,38 @@ class SearchMixin:
 
         return list(variants)
 
+    def _collect_location_filters(
+        self,
+        city: str | None,
+        region: str | None,
+        district: str | None,
+        alias: str = "s",
+    ) -> tuple[list[str], list[Any]]:
+        conditions: list[str] = []
+        params: list[Any] = []
+        if city:
+            condition, condition_params = self._build_location_filter(
+                city, "city", alias, self._get_city_variants_search
+            )
+            if condition:
+                conditions.append(condition)
+                params.extend(condition_params)
+        if region:
+            condition, condition_params = self._build_location_filter(
+                region, "region", alias, self._get_city_variants_search
+            )
+            if condition:
+                conditions.append(condition)
+                params.extend(condition_params)
+        if district:
+            condition, condition_params = self._build_location_filter(
+                district, "district", alias, self._get_city_variants_search
+            )
+            if condition:
+                conditions.append(condition)
+                params.extend(condition_params)
+        return conditions, params
+
     def search_offers(
         self,
         query: str,
@@ -118,25 +150,11 @@ class SearchMixin:
             ]
             params: list[Any] = []
 
-            if city:
-                city_variants = self._get_city_variants_search(city)
-                city_conditions = " OR ".join(["s.city ILIKE %s" for _ in city_variants])
-                where_parts.append(f"({city_conditions})")
-                params.extend([f"%{v}%" for v in city_variants])
-
-            if region:
-                region_variants = self._get_city_variants_search(region)
-                region_conditions = " OR ".join(["s.region ILIKE %s" for _ in region_variants])
-                where_parts.append(f"({region_conditions})")
-                params.extend([f"%{v}%" for v in region_variants])
-
-            if district:
-                district_variants = self._get_city_variants_search(district)
-                district_conditions = " OR ".join(
-                    ["s.district ILIKE %s" for _ in district_variants]
-                )
-                where_parts.append(f"({district_conditions})")
-                params.extend([f"%{v}%" for v in district_variants])
+            location_conditions, location_params = self._collect_location_filters(
+                city, region, district, alias="s"
+            )
+            where_parts.extend(location_conditions)
+            params.extend(location_params)
 
             if min_price is not None:
                 where_parts.append("o.discount_price >= %s")
@@ -224,25 +242,12 @@ class SearchMixin:
         params = [query, query, query, query, query]
 
         # Добавляем фильтр по городу с транслитерацией
-        if city:
-            city_variants = self._get_city_variants_search(city)
-            city_conditions = " OR ".join(["s.city ILIKE %s" for _ in city_variants])
-            base_sql += f" AND ({city_conditions})"
-            params.extend([f"%{v}%" for v in city_variants])
-
-        if region:
-            region_variants = self._get_city_variants_search(region)
-            region_conditions = " OR ".join(["s.region ILIKE %s" for _ in region_variants])
-            base_sql += f" AND ({region_conditions})"
-            params.extend([f"%{v}%" for v in region_variants])
-
-        if district:
-            district_variants = self._get_city_variants_search(district)
-            district_conditions = " OR ".join(
-                ["s.district ILIKE %s" for _ in district_variants]
-            )
-            base_sql += f" AND ({district_conditions})"
-            params.extend([f"%{v}%" for v in district_variants])
+        location_conditions, location_params = self._collect_location_filters(
+            city, region, district, alias="s"
+        )
+        if location_conditions:
+            base_sql += " AND " + " AND ".join(location_conditions)
+            params.extend(location_params)
 
         if min_price is not None:
             base_sql += " AND o.discount_price >= %s"
@@ -319,25 +324,11 @@ class SearchMixin:
             ]
             where_params: list[Any] = []
 
-            if city:
-                city_variants = self._get_city_variants_search(city)
-                city_conditions = " OR ".join(["s.city ILIKE %s" for _ in city_variants])
-                where_parts.append(f"({city_conditions})")
-                where_params.extend([f"%{v}%" for v in city_variants])
-
-            if region:
-                region_variants = self._get_city_variants_search(region)
-                region_conditions = " OR ".join(["s.region ILIKE %s" for _ in region_variants])
-                where_parts.append(f"({region_conditions})")
-                where_params.extend([f"%{v}%" for v in region_variants])
-
-            if district:
-                district_variants = self._get_city_variants_search(district)
-                district_conditions = " OR ".join(
-                    ["s.district ILIKE %s" for _ in district_variants]
-                )
-                where_parts.append(f"({district_conditions})")
-                where_params.extend([f"%{v}%" for v in district_variants])
+            location_conditions, location_params = self._collect_location_filters(
+                city, region, district, alias="s"
+            )
+            where_parts.extend(location_conditions)
+            where_params.extend(location_params)
 
             where_parts.append("o.search_vector @@ to_tsquery('russian', %s)")
             where_clause = " AND ".join(where_parts)
@@ -372,25 +363,11 @@ class SearchMixin:
         ]
         params: list[Any] = [pattern]
 
-        if city:
-            city_variants = self._get_city_variants_search(city)
-            city_conditions = " OR ".join(["s.city ILIKE %s" for _ in city_variants])
-            where_parts.append(f"({city_conditions})")
-            params.extend([f"%{v}%" for v in city_variants])
-
-        if region:
-            region_variants = self._get_city_variants_search(region)
-            region_conditions = " OR ".join(["s.region ILIKE %s" for _ in region_variants])
-            where_parts.append(f"({region_conditions})")
-            params.extend([f"%{v}%" for v in region_variants])
-
-        if district:
-            district_variants = self._get_city_variants_search(district)
-            district_conditions = " OR ".join(
-                ["s.district ILIKE %s" for _ in district_variants]
-            )
-            where_parts.append(f"({district_conditions})")
-            params.extend([f"%{v}%" for v in district_variants])
+        location_conditions, location_params = self._collect_location_filters(
+            city, region, district, alias="s"
+        )
+        where_parts.extend(location_conditions)
+        params.extend(location_params)
 
         where_clause = " AND ".join(where_parts)
         sql = f"""
@@ -430,25 +407,11 @@ class SearchMixin:
             where_parts = ["(status = 'approved' OR status = 'active')"]
             where_params: list[Any] = []
 
-            if city:
-                city_variants = self._get_city_variants_search(city)
-                city_conditions = " OR ".join(["city ILIKE %s" for _ in city_variants])
-                where_parts.append(f"({city_conditions})")
-                where_params.extend([f"%{v}%" for v in city_variants])
-
-            if region:
-                region_variants = self._get_city_variants_search(region)
-                region_conditions = " OR ".join(["region ILIKE %s" for _ in region_variants])
-                where_parts.append(f"({region_conditions})")
-                where_params.extend([f"%{v}%" for v in region_variants])
-
-            if district:
-                district_variants = self._get_city_variants_search(district)
-                district_conditions = " OR ".join(
-                    ["district ILIKE %s" for _ in district_variants]
-                )
-                where_parts.append(f"({district_conditions})")
-                where_params.extend([f"%{v}%" for v in district_variants])
+            location_conditions, location_params = self._collect_location_filters(
+                city, region, district, alias=""
+            )
+            where_parts.extend(location_conditions)
+            where_params.extend(location_params)
 
             where_parts.append("search_vector @@ to_tsquery('russian', %s)")
             where_clause = " AND ".join(where_parts)
@@ -479,25 +442,11 @@ class SearchMixin:
         ]
         params: list[Any] = [pattern]
 
-        if city:
-            city_variants = self._get_city_variants_search(city)
-            city_conditions = " OR ".join(["city ILIKE %s" for _ in city_variants])
-            where_parts.append(f"({city_conditions})")
-            params.extend([f"%{v}%" for v in city_variants])
-
-        if region:
-            region_variants = self._get_city_variants_search(region)
-            region_conditions = " OR ".join(["region ILIKE %s" for _ in region_variants])
-            where_parts.append(f"({region_conditions})")
-            params.extend([f"%{v}%" for v in region_variants])
-
-        if district:
-            district_variants = self._get_city_variants_search(district)
-            district_conditions = " OR ".join(
-                ["district ILIKE %s" for _ in district_variants]
-            )
-            where_parts.append(f"({district_conditions})")
-            params.extend([f"%{v}%" for v in district_variants])
+        location_conditions, location_params = self._collect_location_filters(
+            city, region, district, alias=""
+        )
+        where_parts.extend(location_conditions)
+        params.extend(location_params)
 
         where_clause = " AND ".join(where_parts)
         sql = f"""
@@ -552,11 +501,11 @@ class SearchMixin:
             where_parts = ["(status = 'approved' OR status = 'active')"]
             params: list[Any] = []
 
-            if city:
-                city_variants = self._get_city_variants_search(city)
-                city_conditions = " OR ".join(["city ILIKE %s" for _ in city_variants])
-                where_parts.append(f"({city_conditions})")
-                params.extend([f"%{v}%" for v in city_variants])
+            location_conditions, location_params = self._collect_location_filters(
+                city, None, None, alias=""
+            )
+            where_parts.extend(location_conditions)
+            params.extend(location_params)
 
             where_parts.append("search_vector @@ to_tsquery('russian', %s)")
             params.append(tsquery)
@@ -599,11 +548,12 @@ class SearchMixin:
         params = [query, query, query, query, query, query]
 
         # Добавляем фильтр по городу с транслитерацией
-        if city:
-            city_variants = self._get_city_variants_search(city)
-            city_conditions = " OR ".join(["city ILIKE %s" for _ in city_variants])
-            base_sql += f" AND ({city_conditions})"
-            params.extend([f"%{v}%" for v in city_variants])
+        location_conditions, location_params = self._collect_location_filters(
+            city, None, None, alias=""
+        )
+        if location_conditions:
+            base_sql += " AND " + " AND ".join(location_conditions)
+            params.extend(location_params)
 
         base_sql += """
             AND (

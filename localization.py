@@ -9,16 +9,16 @@ TEXTS = {
         "language_changed": "Язык обновлён.",
         "welcome": """<b>Fudly</b>
 Выберите язык.""",
-        "welcome_phone_step": """<b>Шаг 1/2: телефон</b>
+        "welcome_phone_step": """<b>📞 Шаг 1/2: телефон</b>
 Отправьте номер, чтобы подтвердить заказ.""",
-        "welcome_city_step": """<b>Шаг 2/2: город</b>
+        "welcome_city_step": """<b>📍 Шаг 2/2: город</b>
 Выберите из списка.""",
-        "registration_complete": """<b>Готово</b>
+        "registration_complete": """<b>✅ Готово</b>
 Данные сохранены.""",
         "welcome_back": """<b>С возвращением, {name}</b>
 Город: {city}
 Выберите раздел.""",
-        "registration_required": """<b>Нужна регистрация</b>
+        "registration_required": """<b>⚠️ Нужна регистрация</b>
 Нажмите /start.""",
         # Кнопки
         "share_phone": "📱 Отправить номер",
@@ -79,7 +79,7 @@ TEXTS = {
         "error": "Ошибка",
         # Регистрация
         "registration_choose_action": "Выберите раздел:",
-        "registration_complete_personal": """<b>Готово</b>
+        "registration_complete_personal": """<b>✅ Готово</b>
 {name}, регистрация завершена.
 Город: {city}
 Меню ниже.""",
@@ -213,7 +213,7 @@ TEXTS = {
 ✓ Оплата при получении
 
 <i>Нажмите "Подтвердить" ниже</i> 👇""",
-        "booking_success": """<b>Бронирование успешно</b>
+        "booking_success": """<b>✅ Бронирование успешно</b>
 
 {store_name}
 {offer_name}
@@ -237,7 +237,7 @@ TEXTS = {
         "error_price_gt_zero": "Цена должна быть больше 0.",
         "error_price_too_high": "Слишком большая цена.",
         "error_discount_less_than_original": "Цена со скидкой должна быть меньше обычной цены.",
-        "warn_discount_low": "Внимание: скидка меньше 10%. Рекомендуем делать скидку от 30% для привлечения клиентов.",
+        "warn_discount_low": "⚠️ Внимание: скидка меньше 10%. Рекомендуем делать скидку от 30% для привлечения клиентов.",
         "booking_how_many": "Сколько вы хотите забронировать? (1-{max_qty})",
         # Партнёр
         "become_partner_text": """🏪 <b>Стать партнёром Fudly</b>
@@ -359,9 +359,9 @@ TEXTS = {
 
 Все предложения доступны для покупателей!""",
         # Подтверждение выдачи
-        "confirm_delivery_prompt": "<b>Подтверждение выдачи</b>\n\nВведите 8-значный код бронирования:",
+        "confirm_delivery_prompt": "<b>✅ Подтверждение выдачи</b>\n\nВведите 8-значный код бронирования:",
         "booking_not_found": "Бронирование с таким кодом не найдено.",
-        "order_confirmed": """<b>Заказ подтверждён</b>
+        "order_confirmed": """<b>✅ Заказ подтверждён</b>
 
 Бронирование #{booking_id} завершено
 Клиент: {customer_name}
@@ -370,7 +370,7 @@ TEXTS = {
 Клиент получит уведомление с просьбой оценить ваш магазин.""",
         # Рейтинг
         "rate_store": "⭐ <b>Оцените магазин</b>\n\n🏪 {store_name}\n\nКак вам понравилось?",
-        "rating_saved": "<b>Спасибо за оценку!</b>\n\nВаш отзыв поможет другим покупателям!",
+        "rating_saved": "<b>⭐ Спасибо за оценку!</b>\n\nВаш отзыв поможет другим покупателям!",
         "already_rated": "Вы уже оценили этот заказ",
         # Статистика
         "store_stats": """🏪 <b>{name}</b>
@@ -597,16 +597,16 @@ TEXTS = {
         "language_changed": "Til yangilandi.",
         "welcome": """<b>Fudly</b>
 Tilni tanlang.""",
-        "welcome_phone_step": """<b>1/2-qadam: telefon</b>
+        "welcome_phone_step": """<b>📞 1/2-qadam: telefon</b>
 Buyurtmani tasdiqlash uchun raqam yuboring.""",
-        "welcome_city_step": """<b>2/2-qadam: shahar</b>
+        "welcome_city_step": """<b>📍 2/2-qadam: shahar</b>
 Ro'yxatdan tanlang.""",
-        "registration_complete": """<b>Tayyor</b>
+        "registration_complete": """<b>✅ Tayyor</b>
 Ma'lumotlar saqlandi.""",
         "welcome_back": """<b>Yana xush kelibsiz, {name}</b>
 Shahar: {city}
 Bo'limni tanlang.""",
-        "registration_required": """<b>Ro'yxatdan o'tish kerak</b>
+        "registration_required": """<b>⚠️ Ro'yxatdan o'tish kerak</b>
 /start bosing.""",
         "share_phone": "📱 Raqamni yuborish",
         "cancel": "Bekor qilish",
@@ -839,7 +839,7 @@ Tahrirlash yoki o'chirish mumkin
 • Buyurtmalarni tez tasdiqlang
 • Olib ketish vaqtini aniq ko'rsating""",
         # Buyurtma
-        "booking_success": """<b>Buyurtma muvaffaqiyatli</b>
+        "booking_success": """<b>✅ Buyurtma muvaffaqiyatli</b>
 
 {store_name}
 {offer_name}
@@ -863,7 +863,7 @@ Buyurtmani olishda shu kodni ko'rsating.""",
         "error_price_gt_zero": "Narx 0 dan katta bo'lishi kerak.",
         "error_price_too_high": "Juda katta narx.",
         "error_discount_less_than_original": "Chegirma narxi oddiy narxdan kichik bo'lishi kerak.",
-        "warn_discount_low": "Diqqat: chegirma 10% dan kichik. Mijozlarni jalb qilish uchun 30% va undan yuqori tavsiya etamiz.",
+        "warn_discount_low": "⚠️ Diqqat: chegirma 10% dan kichik. Mijozlarni jalb qilish uchun 30% va undan yuqori tavsiya etamiz.",
         "booking_how_many": "Nechta buyurtma qilmoqchisiz? (1-{max_qty})",
         "booking_step_quantity": """┏━━━━━━━━━━━━━━━━━━━━━┓
 ┃   BUYURTMA BERISH     ┃
@@ -1016,9 +1016,9 @@ Sonini kiriting (1 dan 100 gacha):""",
 
 Barcha takliflar xaridorlar uchun mavjud!""",
         # Berishni tasdiqlash
-        "confirm_delivery_prompt": "<b>Buyurtmani tasdiqlash</b>\n\n8 xonali buyurtma kodini kiriting:",
+        "confirm_delivery_prompt": "<b>✅ Buyurtmani tasdiqlash</b>\n\n8 xonali buyurtma kodini kiriting:",
         "booking_not_found": "Bunday kodli buyurtma topilmadi.",
-        "order_confirmed": """<b>Buyurtma tasdiqlandi</b>
+        "order_confirmed": """<b>✅ Buyurtma tasdiqlandi</b>
 
 Buyurtma #{booking_id} tugallandi
 Mijoz: {customer_name}
@@ -1027,7 +1027,7 @@ Summa: {price} so\'m
 Mijoz do'koningizni baholash uchun xabar oladi.""",
         # Baho
         "rate_store": "⭐ <b>Do'konni baholang</b>\n\n🏪 {store_name}\n\nSizga qanday yoqdi?",
-        "rating_saved": "<b>Baholaganingiz uchun rahmat!</b>\n\nSizning fikringiz boshqa xaridorlarga yordam beradi!",
+        "rating_saved": "<b>⭐ Baholaganingiz uchun rahmat!</b>\n\nSizning fikringiz boshqa xaridorlarga yordam beradi!",
         "already_rated": "Siz bu buyurtmani allaqachon baholagansiz",
         # Statistika
         "store_stats": """🏪 <b>{name}</b>

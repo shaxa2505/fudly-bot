@@ -29,6 +29,7 @@ from slowapi import Limiter
 from slowapi.util import get_remote_address
 
 from app.core.utils import normalize_city
+from database_pg_module.mixins.offers import canonicalize_geo_slug
 from app.api.websocket_manager import get_connection_manager
 from app.services.stats import PartnerTotals, Period, get_partner_stats
 from aiogram import Bot
@@ -1542,6 +1543,11 @@ async def update_store(settings: dict, authorization: str = Header(None)):
     delivery_price_value = max(0, int(delivery_price))
     min_order_value = max(0, int(min_order_amount))
 
+    region_value = settings.get("region", store.get("region"))
+    district_value = settings.get("district", store.get("district"))
+    region_slug = canonicalize_geo_slug(region_value) if region_value else None
+    district_slug = canonicalize_geo_slug(district_value) if district_value else None
+
     # Update existing store via SQL
     with db.get_connection() as conn:
         cursor = conn.cursor()
@@ -1551,7 +1557,9 @@ async def update_store(settings: dict, authorization: str = Header(None)):
             SET name = %s,
                 address = %s,
                 region = %s,
+                region_slug = %s,
                 district = %s,
+                district_slug = %s,
                 phone = %s,
                 description = %s,
                 delivery_enabled = %s,
@@ -1562,8 +1570,10 @@ async def update_store(settings: dict, authorization: str = Header(None)):
             (
                 settings.get("name", store.get("name")),
                 settings.get("address", store.get("address")),
-                settings.get("region", store.get("region")),
-                settings.get("district", store.get("district")),
+                region_value,
+                region_slug,
+                district_value,
+                district_slug,
                 settings.get("phone", store.get("phone")),
                 settings.get("description", store.get("description")),
                 int(delivery_enabled),
