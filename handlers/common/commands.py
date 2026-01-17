@@ -701,7 +701,9 @@ async def cmd_start(message: types.Message, state: FSMContext, db: DatabaseProto
                 if not user:
                     try:
                         db.add_user(
-                            user_id, message.from_user.username, message.from_user.first_name
+                            user_id=user_id,
+                            username=message.from_user.username,
+                            first_name=message.from_user.first_name,
                         )
                         logger.info(f"👤 Created new user {user_id} from pickup deep-link /start")
                     except Exception as e:  # pragma: no cover - defensive logging
@@ -750,7 +752,11 @@ async def cmd_start(message: types.Message, state: FSMContext, db: DatabaseProto
     # NEW USER - create immediately and show welcome card with language selection
     if not user:
         # Create user right away to avoid duplicate welcome on second /start
-        db.add_user(user_id, message.from_user.username, message.from_user.first_name)
+        db.add_user(
+            user_id=user_id,
+            username=message.from_user.username,
+            first_name=message.from_user.first_name,
+        )
         logger.info(f"👤 Created new user {user_id} from regular /start")
         await message.answer(
             build_welcome_card("ru"), parse_mode="HTML", reply_markup=build_welcome_keyboard()
@@ -826,7 +832,9 @@ async def registration_choose_language(
     user = db.get_user_model(callback.from_user.id)
     if not user:
         db.add_user(
-            callback.from_user.id, callback.from_user.username, callback.from_user.first_name
+            user_id=callback.from_user.id,
+            username=callback.from_user.username,
+            first_name=callback.from_user.first_name,
         )
 
     db.update_user_language(callback.from_user.id, lang)
@@ -859,7 +867,9 @@ async def choose_language(callback: types.CallbackQuery, state: FSMContext, db: 
     if not user:
         # Redirect to new registration flow - request phone first
         db.add_user(
-            callback.from_user.id, callback.from_user.username, callback.from_user.first_name
+            user_id=callback.from_user.id,
+            username=callback.from_user.username,
+            first_name=callback.from_user.first_name,
         )
         db.update_user_language(callback.from_user.id, lang)
 

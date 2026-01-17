@@ -140,7 +140,7 @@
         </button>
         <button class="nav-item" data-view="settings" onclick="switchView('settings')">
             <span class="nav-icon"><i data-lucide="settings"></i></span>
-            <span class="nav-label">Еще</span>
+            <span class="nav-label">Настройки</span>
         </button>
     </nav>
 
@@ -219,7 +219,9 @@
 
         function getPhotoUploadPlaceholder() {
             return `
-                <div class="photo-upload-icon">📷</div>
+                <div class="photo-upload-icon">
+                    <i data-lucide="image"></i>
+                </div>
                 <div class="photo-upload-title">Загрузить фото</div>
                 <div class="photo-upload-subtitle">PNG/JPG до 5 МБ</div>
             `;
@@ -269,7 +271,9 @@
                         <div class="modal-body">
                             <div class="form-section">
                                 <div class="form-section-header">
-                                    <div class="form-section-icon">📷</div>
+                                    <div class="form-section-icon">
+                                        <i data-lucide="image" class="icon-18"></i>
+                                    </div>
                                     <div>
                                         <h4 class="form-section-title">Фото товара</h4>
                                         <p class="form-section-subtitle">Опционально, но повышает продажи</p>
@@ -288,14 +292,18 @@
                                     ` : getPhotoUploadPlaceholder()}
                                 </div>
                                 <div class="smart-hint info">
-                                    <div class="smart-hint-icon">💡</div>
+                                    <div class="smart-hint-icon">
+                                        <i data-lucide="lightbulb" class="icon-18"></i>
+                                    </div>
                                     <div class="smart-hint-text">Фото повышает доверие и продажи, но можно добавить позже.</div>
                                 </div>
                             </div>
 
                             <div class="form-section">
                                 <div class="form-section-header">
-                                   <div class="form-section-icon">📌</div>
+                                   <div class="form-section-icon">
+                                        <i data-lucide="file-text" class="icon-18"></i>
+                                   </div>
                                     <div>
                                         <h4 class="form-section-title">Информация о товаре</h4>
                                         <p class="form-section-subtitle">Название, категория, описание</p>
@@ -316,15 +324,15 @@
                                         <select name="category" id="productCategory" required class="search-input" onchange="validateField(this)">
 
                                             <option value="">Выберите категорию</option>
-                                            <option value="bakery" ${product?.category === 'bakery' ? 'selected' : ''}>🥐 Выпечка</option>
-                                            <option value="dairy" ${product?.category === 'dairy' ? 'selected' : ''}>🥛 Молочные продукты</option>
-                                            <option value="meat" ${product?.category === 'meat' ? 'selected' : ''}>🥩 Мясо и рыба</option>
-                                            <option value="fruits" ${product?.category === 'fruits' ? 'selected' : ''}>🍎 Фрукты</option>
-                                            <option value="vegetables" ${product?.category === 'vegetables' ? 'selected' : ''}>🥕 Овощи</option>
-                                            <option value="drinks" ${product?.category === 'drinks' ? 'selected' : ''}>🥤 Напитки</option>
-                                            <option value="sweets" ${product?.category === 'sweets' ? 'selected' : ''}>🍰 Сладости</option>
-                                            <option value="frozen" ${product?.category === 'frozen' ? 'selected' : ''}>❄️ Заморозка</option>
-                                            <option value="other" ${!product?.category || product?.category === 'other' ? 'selected' : ''}>📦 Другое</option>
+                                            <option value="bakery" ${product?.category === 'bakery' ? 'selected' : ''}>Выпечка</option>
+                                            <option value="dairy" ${product?.category === 'dairy' ? 'selected' : ''}>Молочные продукты</option>
+                                            <option value="meat" ${product?.category === 'meat' ? 'selected' : ''}>Мясо и рыба</option>
+                                            <option value="fruits" ${product?.category === 'fruits' ? 'selected' : ''}>Фрукты</option>
+                                            <option value="vegetables" ${product?.category === 'vegetables' ? 'selected' : ''}>Овощи</option>
+                                            <option value="drinks" ${product?.category === 'drinks' ? 'selected' : ''}>Напитки</option>
+                                            <option value="sweets" ${product?.category === 'sweets' ? 'selected' : ''}>Сладости</option>
+                                            <option value="frozen" ${product?.category === 'frozen' ? 'selected' : ''}>Заморозка</option>
+                                            <option value="other" ${!product?.category || product?.category === 'other' ? 'selected' : ''}>Другое</option>
                                         </select>
                                     </div>
                                 </div>
@@ -339,7 +347,9 @@
 
                             <div class="form-section">
                                 <div class="form-section-header">
-                                   <div class="form-section-icon">📌</div>
+                                   <div class="form-section-icon">
+                                        <i data-lucide="tag" class="icon-18"></i>
+                                   </div>
                                     <div>
                                         <h4 class="form-section-title">Цена и скидка</h4>
                                         <p class="form-section-subtitle">Цена и скидка по желанию</p>
@@ -372,7 +382,9 @@
                                 </div>
 
                                 <div class="smart-hint info">
-                                    <div class="smart-hint-icon">💡</div>
+                                    <div class="smart-hint-icon">
+                                        <i data-lucide="lightbulb" class="icon-18"></i>
+                                    </div>
                                     <div class="smart-hint-text">Можно указать только цену для клиента — скидка будет 0%.</div>
                                 </div>
 
@@ -394,7 +406,9 @@
 
                             <div class="form-section">
                                 <div class="form-section-header">
-                                   <div class="form-section-icon">📌</div>
+                                   <div class="form-section-icon">
+                                        <i data-lucide="package" class="icon-18"></i>
+                                   </div>
                                     <div>
                                         <h4 class="form-section-title">Наличие и срок</h4>
                                         <p class="form-section-subtitle">Остаток и срок годности</p>
@@ -454,7 +468,9 @@
                                     </label>
                                 </div>
                                 <div class="smart-hint warning">
-                                    <div class="smart-hint-icon">⚠️</div>
+                                    <div class="smart-hint-icon">
+                                        <i data-lucide="alert-triangle" class="icon-18"></i>
+                                    </div>
                                     <div class="smart-hint-text">Если количество = 0, товар не будет показан клиентам.</div>
                                 </div>
                             </div>
@@ -1053,7 +1069,7 @@
                                 <h2 class="hero-title">${greeting}!</h2>
                                 <div class="hero-store">
                                     <span class="hero-store-name">${state.store?.name || '\u0412\u0430\u0448 \u043c\u0430\u0433\u0430\u0437\u0438\u043d'}</span>
-                                    <span class="hero-store-tag">Partner Panel</span>
+                                    <span class="hero-store-tag">Панель партнёра</span>
                                 </div>
                             </div>
                             <div class="hero-controls">
@@ -1346,7 +1362,10 @@
                 <div class=\"container orders-shell ops\">
                     <div class=\"orders-header ops-header\">
                         <div>
-                            <h2 class=\"orders-title\">\u0417\u0430\u043a\u0430\u0437\u044b</h2>
+                            <h2 class=\"orders-title with-icon\">
+                                <i data-lucide=\"clipboard-list\" class=\"icon-18\"></i>
+                                \u0417\u0430\u043a\u0430\u0437\u044b
+                            </h2>
                             <p class=\"orders-subtitle\">\u0411\u044b\u0441\u0442\u0440\u043e\u0435 \u0443\u043f\u0440\u0430\u0432\u043b\u0435\u043d\u0438\u0435 \u0441\u0442\u0430\u0442\u0443\u0441\u0430\u043c\u0438</p>
                         </div>
                         <button class=\"btn btn-sm btn-outline\" onclick=\"loadOrders()\">\u041e\u0431\u043d\u043e\u0432\u0438\u0442\u044c</button>
@@ -1759,7 +1778,7 @@
 
             const originalText = button.innerHTML;
             button.disabled = true;
-            button.innerHTML = '<span class="opacity-60">⏳ Обновление...</span>';
+            button.innerHTML = '<span class="opacity-60">Обновление...</span>';
 
             try {
                 await updateOrderStatus(orderId, newStatus);
@@ -1798,23 +1817,23 @@
                                 <div class="d-flex flex-column gap-sm">
                                     <label class="cancel-reason-option">
                                         <input type="radio" name="cancel_reason" value="out_of_stock" required>
-                                        <span>🔴 Товар закончился</span>
+                                        <span>Товар закончился</span>
                                     </label>
                                     <label class="cancel-reason-option">
                                         <input type="radio" name="cancel_reason" value="cant_fulfill">
-                                        <span>⏱️ Не успеваем выполнить</span>
+                                        <span>Не успеваем выполнить</span>
                                     </label>
                                     <label class="cancel-reason-option">
                                         <input type="radio" name="cancel_reason" value="customer_request">
-                                        <span>📞 По просьбе клиента</span>
+                                        <span>По просьбе клиента</span>
                                     </label>
                                     <label class="cancel-reason-option">
                                         <input type="radio" name="cancel_reason" value="technical_issue">
-                                        <span>⚙️ Технические неполадки</span>
+                                        <span>Технические неполадки</span>
                                     </label>
                                     <label class="cancel-reason-option">
                                         <input type="radio" name="cancel_reason" value="other">
-                                        <span>❓ Другая причина</span>
+                                        <span>Другая причина</span>
                                     </label>
                                 </div>
                             </div>
@@ -1872,7 +1891,7 @@
             const submitBtn = event.target.querySelector('button[type="submit"]');
             const originalText = submitBtn.innerHTML;
             submitBtn.disabled = true;
-            submitBtn.innerHTML = '<span class="opacity-60">⏳ Отмена...</span>';
+            submitBtn.innerHTML = '<span class="opacity-60">Отмена...</span>';
 
             try {
                 // Call API with cancel reason
@@ -2002,7 +2021,7 @@
             }
 
             button.disabled = true;
-            button.innerHTML = '<span class="opacity-60">⏳ Обновление...</span>';
+            button.innerHTML = '<span class="opacity-60">Обновление...</span>';
 
             try {
                 await updateOrderStatus(orderId, newStatus);
@@ -2094,6 +2113,7 @@ function getCategoryLabel(category) {
         vegetables: '\u041e\u0432\u043e\u0449\u0438',
         drinks: '\u041d\u0430\u043f\u0438\u0442\u043a\u0438',
         snacks: '\u0421\u043d\u0435\u043a\u0438',
+        sweets: '\u0421\u043b\u0430\u0434\u043e\u0441\u0442\u0438',
         frozen: '\u0417\u0430\u043c\u043e\u0440\u043e\u0436\u0435\u043d\u043d\u044b\u0435',
         other: '\u0414\u0440\u0443\u0433\u043e\u0435'
     };
@@ -2136,7 +2156,10 @@ function renderProducts() {
                 <div class="products-hero">
                     <div class="products-hero-main">
                         <div class="products-title-row">
-                            <h2 class="section-title">\u0422\u043e\u0432\u0430\u0440\u044b</h2>
+                            <h2 class="section-title with-icon">
+                                <i data-lucide="package" class="icon-18"></i>
+                                \u0422\u043e\u0432\u0430\u0440\u044b
+                            </h2>
                             <span class="products-count">${totalCount}</span>
                         </div>
                         <p class="section-subtitle">\u041f\u0440\u043e\u0432\u0435\u0440\u044f\u0439\u0442\u0435 \u0430\u0441\u0441\u043e\u0440\u0442\u0438\u043c\u0435\u043d\u0442, \u043e\u0441\u0442\u0430\u0442\u043a\u0438 \u0438 \u0441\u043a\u0438\u0434\u043a\u0438.</p>
@@ -2184,6 +2207,7 @@ function renderProducts() {
                                 <option value="vegetables">\u041e\u0432\u043e\u0449\u0438</option>
                                 <option value="drinks">\u041d\u0430\u043f\u0438\u0442\u043a\u0438</option>
                                 <option value="snacks">\u0421\u043d\u0435\u043a\u0438</option>
+                                <option value="sweets">\u0421\u043b\u0430\u0434\u043e\u0441\u0442\u0438</option>
                                 <option value="frozen">\u0417\u0430\u043c\u043e\u0440\u043e\u0436\u0435\u043d\u043d\u044b\u0435</option>
                                 <option value="other">\u0414\u0440\u0443\u0433\u043e\u0435</option>
                             </select>
@@ -2433,6 +2457,7 @@ function handlePhotoUpload(input, event) {
             if (!uploadArea) return;
             uploadArea.classList.remove('has-photo');
             uploadArea.innerHTML = getPhotoUploadPlaceholder();
+            if (typeof lucide !== 'undefined') lucide.createIcons();
             const photoIdInput =
                 modal?.querySelector('input[name="photo_id"]') ||
                 document.querySelector('input[name="photo_id"]');
@@ -3027,10 +3052,19 @@ async function toggleProductAvailability(id) {
                 const coordsLabel = (Number.isFinite(latValue) && Number.isFinite(lonValue))
                     ? `${latValue.toFixed(5)}, ${lonValue.toFixed(5)}`
                     : 'Не установлена';
+                updateHeaderStatus(state.store?.is_open);
 
                 document.querySelector('.content').innerHTML = `
                     <div class="container fade-in">
-                        <h2 class="section-title">Настройки</h2>
+                        <div class="section-header">
+                            <div>
+                                <h2 class="section-title with-icon">
+                                    <i data-lucide="settings" class="icon-18"></i>
+                                    Настройки
+                                </h2>
+                                <p class="section-subtitle">Профиль, доставка и график</p>
+                            </div>
+                        </div>
 
                         <div class="dashboard-card mb-lg">
                             <h3 class="card-title">
@@ -3070,7 +3104,7 @@ async function toggleProductAvailability(id) {
                             <div class="list-item">
                                 <div class="list-content">
                                     <div class="list-info">
-                                        <div class="list-title">Viloyat</div>
+                                        <div class="list-title">Область</div>
                                         <div class="list-subtitle">${state.store?.region || '-'}</div>
                                     </div>
                                 </div>
@@ -3079,7 +3113,7 @@ async function toggleProductAvailability(id) {
                             <div class="list-item">
                                 <div class="list-content">
                                     <div class="list-info">
-                                        <div class="list-title">Tuman</div>
+                                        <div class="list-title">Район</div>
                                         <div class="list-subtitle">${state.store?.district || '-'}</div>
                                     </div>
                                 </div>
@@ -3098,7 +3132,11 @@ async function toggleProductAvailability(id) {
                                 <div class="list-content">
                                     <div class="list-info">
                                         <div class="list-title">Статус</div>
-                                        <div class="list-subtitle">${state.store?.is_open ? '🟢 Открыто' : '🔴 Закрыто'}</div>
+                                        <div class="list-subtitle">
+                                            <span class="meta-chip ${state.store?.is_open ? 'status-open' : 'status-closed'}">
+                                                ${state.store?.is_open ? 'Открыто' : 'Закрыто'}
+                                            </span>
+                                        </div>
                                     </div>
                                 </div>
                                 <button class="btn btn-sm ${state.store?.is_open ? 'btn-danger' : 'btn-success'} ripple" onclick="toggleStoreStatus()">
@@ -3589,6 +3627,7 @@ async function toggleProductAvailability(id) {
 
                 // Optimistic UI update
                 state.store.is_open = newStatus;
+                updateHeaderStatus(newStatus);
                 if (state.currentView === 'dashboard') {
                     renderDashboard();
                 }
@@ -3615,6 +3654,7 @@ async function toggleProductAvailability(id) {
                 toast('Ошибка изменения статуса', 'error');
                 try {
                     state.store = await apiFetch('/api/partner/store');
+                    updateHeaderStatus(state.store?.is_open);
                     document.getElementById('storeName').textContent = state.store?.name || 'Загрузка...';
                 } catch (_) {}
 
@@ -3637,6 +3677,7 @@ async function toggleProductAvailability(id) {
             'vegetables': { unit: 'кг', quantity: 10, expiry_days: 7 },
             'drinks': { unit: 'л', quantity: 24, expiry_days: 90 },
             'snacks': { unit: 'шт', quantity: 20, expiry_days: 30 },
+            'sweets': { unit: 'шт', quantity: 15, expiry_days: 30 },
             'frozen': { unit: 'кг', quantity: 5, expiry_days: 180 },
             'other': { unit: 'шт', quantity: 10, expiry_days: 30 }
         };
@@ -3649,6 +3690,7 @@ async function toggleProductAvailability(id) {
             'vegetables': ['Картофель', 'Морковь', 'Лук', 'Помидоры', 'Огурцы', 'Капуста'],
             'drinks': ['Вода питьевая', 'Сок апельсиновый', 'Coca-Cola', 'Чай черный', 'Кофе'],
             'snacks': ['Чипсы', 'Сухарики', 'Орехи', 'Шоколад', 'Конфеты'],
+            'sweets': ['Пирожное', 'Печенье', 'Зефир', 'Мармелад', 'Торт'],
             'frozen': ['Пельмени', 'Мороженое', 'Рыба замороженная', 'Овощи замороженные'],
             'other': ['Хлопок', 'Бумажные полотенца', 'Мыло', 'Шампунь']
         };

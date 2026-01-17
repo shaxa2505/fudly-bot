@@ -3,6 +3,7 @@ from __future__ import annotations
 
 from .bookings import BookingMixin
 from .favorites import FavoritesMixin
+from .locations import LocationReferenceMixin
 from .notifications import NotificationMixin
 from .offers import OfferMixin
 from .orders import OrderMixin
@@ -16,6 +17,7 @@ from .users import UserMixin
 __all__ = [
     "BookingMixin",
     "FavoritesMixin",
+    "LocationReferenceMixin",
     "NotificationMixin",
     "OfferMixin",
     "OrderMixin",

@@ -24,20 +24,20 @@
   left: 0;
   right: 0;
   bottom: 0;
-  height: 48%;
-  padding: 10px 56px 12px 10px;
+  height: 33%;
+  padding: 12px;
   display: flex;
   flex-direction: column;
   justify-content: flex-end;
   gap: 6px;
-  background: linear-gradient(180deg, rgba(0, 0, 0, 0) 0%, rgba(0, 0, 0, 0.65) 60%, rgba(0, 0, 0, 0.85) 100%);
+  background: linear-gradient(180deg, rgba(0, 0, 0, 0) 0%, rgba(0, 0, 0, 0.35) 55%, rgba(0, 0, 0, 0.75) 100%);
   z-index: 2;
 }
 
 .skeleton-action {
   position: absolute;
-  right: 10px;
-  bottom: 10px;
+  right: 12px;
+  bottom: 12px;
   width: 42px;
   height: 42px;
   border-radius: 999px;
@@ -62,11 +62,11 @@
 }
 
 .skeleton-title-short {
-  width: 78%;
+  width: 70%;
 }
 
 .skeleton-store {
-  width: 50%;
+  width: 62%;
 }
 
 /* Shimmer animation */

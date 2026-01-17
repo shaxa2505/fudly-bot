@@ -28,19 +28,36 @@ class UserMixin:
         language: str = "ru",
         region: str | None = None,
         district: str | None = None,
+        region_id: int | None = None,
+        district_id: int | None = None,
         latitude: float | None = None,
         longitude: float | None = None,
     ) -> None:
         """Add or update user."""
+        resolved = None
+        resolver = getattr(self, "resolve_geo_location", None)
+        if resolver:
+            try:
+                resolved = resolver(region=region, district=district, city=city)
+            except Exception as exc:
+                logger.warning("Geo resolve failed in add_user: %s", exc)
+        if resolved:
+            if region is not None and resolved.get("region_name_ru"):
+                region = resolved["region_name_ru"]
+            if district is not None and resolved.get("district_name_ru"):
+                district = resolved["district_name_ru"]
+            region_id = region_id or resolved.get("region_id")
+            district_id = district_id or resolved.get("district_id")
+
         with self.get_connection() as conn:
             cursor = conn.cursor()
             cursor.execute(
                 """
                 INSERT INTO users (
                     user_id, username, first_name, phone, city, language,
-                    region, district, latitude, longitude
+                    region, district, latitude, longitude, region_id, district_id
                 )
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                 ON CONFLICT (user_id) DO UPDATE SET
                     username = EXCLUDED.username,
                     first_name = EXCLUDED.first_name,
@@ -50,9 +67,24 @@ class UserMixin:
                     region = COALESCE(EXCLUDED.region, users.region),
                     district = COALESCE(EXCLUDED.district, users.district),
                     latitude = COALESCE(EXCLUDED.latitude, users.latitude),
-                    longitude = COALESCE(EXCLUDED.longitude, users.longitude)
+                    longitude = COALESCE(EXCLUDED.longitude, users.longitude),
+                    region_id = COALESCE(EXCLUDED.region_id, users.region_id),
+                    district_id = COALESCE(EXCLUDED.district_id, users.district_id)
             """,
-                (user_id, username, first_name, phone, city, language, region, district, latitude, longitude),
+                (
+                    user_id,
+                    username,
+                    first_name,
+                    phone,
+                    city,
+                    language,
+                    region,
+                    district,
+                    latitude,
+                    longitude,
+                    region_id,
+                    district_id,
+                ),
             )
             logger.info(f"User {user_id} added/updated")
 
@@ -82,15 +114,36 @@ class UserMixin:
         city: str | None = None,
         region: str | None = None,
         district: str | None = None,
+        region_id: int | None = None,
+        district_id: int | None = None,
         latitude: float | None = None,
         longitude: float | None = None,
         clear_city: bool = False,
         clear_region: bool = False,
         clear_district: bool = False,
+        clear_region_id: bool = False,
+        clear_district_id: bool = False,
         clear_latitude: bool = False,
         clear_longitude: bool = False,
     ) -> None:
         """Update user location fields (any subset)."""
+        resolved = None
+        resolver = getattr(self, "resolve_geo_location", None)
+        if resolver and (region is not None or district is not None or city is not None):
+            try:
+                resolved = resolver(region=region, district=district, city=city)
+            except Exception as exc:
+                logger.warning("Geo resolve failed in update_user_location: %s", exc)
+        if resolved:
+            if region is not None and resolved.get("region_name_ru"):
+                region = resolved["region_name_ru"]
+            if district is not None and resolved.get("district_name_ru"):
+                district = resolved["district_name_ru"]
+            if region is None and district is not None and resolved.get("region_name_ru"):
+                region = resolved["region_name_ru"]
+            region_id = region_id or resolved.get("region_id")
+            district_id = district_id or resolved.get("district_id")
+
         fields: list[str] = []
         params: list[Any] = []
         if city is not None:
@@ -108,6 +161,16 @@ class UserMixin:
             params.append(district)
         elif clear_district:
             fields.append("district = NULL")
+        if region_id is not None:
+            fields.append("region_id = %s")
+            params.append(region_id)
+        elif clear_region or clear_region_id:
+            fields.append("region_id = NULL")
+        if district_id is not None:
+            fields.append("district_id = %s")
+            params.append(district_id)
+        elif clear_district or clear_district_id:
+            fields.append("district_id = NULL")
         if latitude is not None:
             fields.append("latitude = %s")
             params.append(latitude)

@@ -1415,7 +1415,7 @@ async def process_admin_contact(message: types.Message, state: FSMContext) -> No
     user = db.get_user(new_admin_id)
     if not user:
         # Create user
-        db.add_user(new_admin_id, new_admin_name or "User")
+        db.add_user(user_id=new_admin_id, first_name=new_admin_name or "User")
 
     # Add admin
     try:

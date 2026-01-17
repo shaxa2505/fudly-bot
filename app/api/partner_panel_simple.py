@@ -1547,6 +1547,26 @@ async def update_store(settings: dict, authorization: str = Header(None)):
 
     region_value = settings.get("region", store.get("region"))
     district_value = settings.get("district", store.get("district"))
+    region_id_value = store.get("region_id")
+    district_id_value = store.get("district_id")
+
+    resolver = getattr(db, "resolve_geo_location", None)
+    if resolver and (region_value is not None or district_value is not None):
+        try:
+            resolved = resolver(region=region_value, district=district_value)
+        except Exception as exc:
+            logger.warning("Geo resolve failed in partner settings: %s", exc)
+            resolved = None
+        if resolved:
+            if region_value is not None and resolved.get("region_name_ru"):
+                region_value = resolved["region_name_ru"]
+            if district_value is not None and resolved.get("district_name_ru"):
+                district_value = resolved["district_name_ru"]
+            if region_value is None and district_value is not None and resolved.get("region_name_ru"):
+                region_value = resolved["region_name_ru"]
+            region_id_value = resolved.get("region_id") or region_id_value
+            district_id_value = resolved.get("district_id") or district_id_value
+
     region_slug = canonicalize_geo_slug(region_value) if region_value else None
     district_slug = canonicalize_geo_slug(district_value) if district_value else None
 
@@ -1562,6 +1582,8 @@ async def update_store(settings: dict, authorization: str = Header(None)):
                 region_slug = %s,
                 district = %s,
                 district_slug = %s,
+                region_id = %s,
+                district_id = %s,
                 phone = %s,
                 description = %s,
                 delivery_enabled = %s,
@@ -1576,6 +1598,8 @@ async def update_store(settings: dict, authorization: str = Header(None)):
                 region_slug,
                 district_value,
                 district_slug,
+                region_id_value,
+                district_id_value,
                 settings.get("phone", store.get("phone")),
                 settings.get("description", store.get("description")),
                 int(delivery_enabled),

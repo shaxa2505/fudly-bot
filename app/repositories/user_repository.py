@@ -67,7 +67,15 @@ class UserRepository(BaseRepository):
             DatabaseException: If database operation fails
         """
         try:
-            self.db.add_user(user_id, language, first_name, phone, city)
+            kwargs = {
+                "user_id": user_id,
+                "first_name": first_name,
+                "phone": phone,
+                "language": language,
+            }
+            if city is not None:
+                kwargs["city"] = city
+            self.db.add_user(**kwargs)
         except Exception as e:
             self._handle_db_error("add_user", e)
 

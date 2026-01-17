@@ -57,6 +57,8 @@ class StoreMixin:
         city: str,
         region: str | None = None,
         district: str | None = None,
+        region_id: int | None = None,
+        district_id: int | None = None,
         address: str | None = None,
         description: str | None = None,
         category: str = "Ресторан",
@@ -65,6 +67,23 @@ class StoreMixin:
         photo: str | None = None,
     ) -> int:
         """Add new store."""
+        resolved = None
+        resolver = getattr(self, "resolve_geo_location", None)
+        if resolver and (region is not None or district is not None or city is not None):
+            try:
+                resolved = resolver(region=region, district=district, city=city)
+            except Exception as exc:
+                logger.warning("Geo resolve failed in add_store: %s", exc)
+        if resolved:
+            if region is not None and resolved.get("region_name_ru"):
+                region = resolved["region_name_ru"]
+            if district is not None and resolved.get("district_name_ru"):
+                district = resolved["district_name_ru"]
+            if region is None and district is not None and resolved.get("region_name_ru"):
+                region = resolved["region_name_ru"]
+            region_id = region_id or resolved.get("region_id")
+            district_id = district_id or resolved.get("district_id")
+
         with self.get_connection() as conn:
             cursor = conn.cursor()
             city_slug = canonicalize_geo_slug(city)
@@ -72,8 +91,11 @@ class StoreMixin:
             district_slug = canonicalize_geo_slug(district) if district else None
             cursor.execute(
                 """
-                INSERT INTO stores (owner_id, name, city, city_slug, region, region_slug, district, district_slug, address, description, category, phone, business_type, photo)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                INSERT INTO stores (
+                    owner_id, name, city, city_slug, region, region_slug, district, district_slug,
+                    address, description, category, phone, business_type, photo, region_id, district_id
+                )
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                 RETURNING store_id
             """,
                 (
@@ -91,6 +113,8 @@ class StoreMixin:
                     phone,
                     business_type,
                     photo,
+                    region_id,
+                    district_id,
                 ),
             )
             store_id = cursor.fetchone()[0]
@@ -560,8 +584,27 @@ class StoreMixin:
         longitude: float,
         region: str | None = None,
         district: str | None = None,
+        region_id: int | None = None,
+        district_id: int | None = None,
     ) -> bool:
         """Update store geolocation coordinates (optionally region/district)."""
+        resolved = None
+        resolver = getattr(self, "resolve_geo_location", None)
+        if resolver and (region is not None or district is not None):
+            try:
+                resolved = resolver(region=region, district=district)
+            except Exception as exc:
+                logger.warning("Geo resolve failed in update_store_location: %s", exc)
+        if resolved:
+            if region is not None and resolved.get("region_name_ru"):
+                region = resolved["region_name_ru"]
+            if district is not None and resolved.get("district_name_ru"):
+                district = resolved["district_name_ru"]
+            if region is None and district is not None and resolved.get("region_name_ru"):
+                region = resolved["region_name_ru"]
+            region_id = region_id or resolved.get("region_id")
+            district_id = district_id or resolved.get("district_id")
+
         fields = ["latitude = %s", "longitude = %s"]
         params: list[Any] = [latitude, longitude]
         if region is not None:
@@ -574,6 +617,12 @@ class StoreMixin:
             params.append(district)
             fields.append("district_slug = %s")
             params.append(canonicalize_geo_slug(district))
+        if region_id is not None:
+            fields.append("region_id = %s")
+            params.append(region_id)
+        if district_id is not None:
+            fields.append("district_id = %s")
+            params.append(district_id)
         params.append(store_id)
 
         with self.get_connection() as conn:

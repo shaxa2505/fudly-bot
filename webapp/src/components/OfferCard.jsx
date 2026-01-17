@@ -21,6 +21,7 @@ const OfferCard = memo(function OfferCard({ offer, cartQuantity = 0, onAddToCart
   const isMaxReached = !isOutOfStock && cartQuantity >= stockLimit
   const showStoreName = Boolean(offer.store_name || offer.store)
   const storeName = offer.store_name || offer.store || ''
+  const metaText = stockLimit > 0 ? `Осталось: ${stockLimit}` : 'Забрать сегодня'
 
   const handleAddClick = useCallback((e) => {
     e.stopPropagation()
@@ -95,9 +96,12 @@ const OfferCard = memo(function OfferCard({ offer, cartQuantity = 0, onAddToCart
               </span>
             )}
           </div>
-          {showStoreName && (
-            <div className="offer-store">{storeName}</div>
-          )}
+          <div className={`offer-meta ${showStoreName ? 'has-store' : ''}`}>
+            {showStoreName && (
+              <span className="offer-store">{storeName}</span>
+            )}
+            <span className="offer-meta-text">{metaText}</span>
+          </div>
         </div>
         {isOutOfStock && (
           <div className="offer-stock-overlay">Нет в наличии</div>

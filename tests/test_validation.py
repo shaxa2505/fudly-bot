@@ -33,7 +33,7 @@ class TestOfferValidation:
     def test_store(self, db):
         """Create a test store for offer creation"""
         seller_id = 123456
-        db.add_user(seller_id, "test_seller")
+        db.add_user(user_id=seller_id, username="test_seller")
         db.update_user_role(seller_id, "seller")
 
         store_id = db.add_store(
@@ -119,7 +119,7 @@ class TestBookingValidation:
     def sample_offer(self, db):
         """Create offer for booking tests"""
         seller_id = 111111
-        db.add_user(seller_id, "seller")
+        db.add_user(user_id=seller_id, username="seller")
         db.update_user_role(seller_id, "seller")
 
         store_id = db.add_store(
@@ -147,7 +147,7 @@ class TestBookingValidation:
     def test_booking_quantity_must_be_positive(self, db, sample_offer):
         """Test that booking quantity must be at least 1"""
         user_id = 222222
-        db.add_user(user_id, "buyer")
+        db.add_user(user_id=user_id, username="buyer")
 
         # Try to book 0 items (invalid)
         ok, booking_id, code = db.create_booking_atomic(sample_offer, user_id, quantity=0)
@@ -159,7 +159,7 @@ class TestBookingValidation:
     def test_booking_respects_available_quantity(self, db, sample_offer):
         """Test that booking cannot exceed available quantity"""
         user_id = 333333
-        db.add_user(user_id, "greedy_buyer")
+        db.add_user(user_id=user_id, username="greedy_buyer")
 
         # Try to book 100 items when only 10 available
         ok, booking_id, code = db.create_booking_atomic(sample_offer, user_id, quantity=100)
@@ -175,7 +175,7 @@ class TestBookingValidation:
     def test_booking_code_format(self, db, sample_offer):
         """Test that booking code has correct format"""
         user_id = 444444
-        db.add_user(user_id, "buyer")
+        db.add_user(user_id=user_id, username="buyer")
 
         ok, booking_id, code = db.create_booking_atomic(sample_offer, user_id, quantity=1)
 
@@ -205,7 +205,7 @@ class TestStoreValidation:
     def test_store_requires_valid_owner(self, db):
         """Test that store must have a valid seller owner"""
         seller_id = 555555
-        db.add_user(seller_id, "valid_seller")
+        db.add_user(user_id=seller_id, username="valid_seller")
         db.update_user_role(seller_id, "seller")
 
         store_id = db.add_store(
@@ -224,7 +224,7 @@ class TestStoreValidation:
     def test_store_phone_format(self, db):
         """Test that store phone number has valid format"""
         seller_id = 666666
-        db.add_user(seller_id, "seller")
+        db.add_user(user_id=seller_id, username="seller")
         db.update_user_role(seller_id, "seller")
 
         # Valid Uzbekistan phone format
@@ -273,7 +273,7 @@ class TestRatingValidation:
     def completed_booking(self, db):
         """Create a completed booking for rating"""
         seller_id = 777777
-        db.add_user(seller_id, "seller")
+        db.add_user(user_id=seller_id, username="seller")
         db.update_user_role(seller_id, "seller")
 
         store_id = db.add_store(
@@ -297,7 +297,7 @@ class TestRatingValidation:
         )
 
         buyer_id = 888888
-        db.add_user(buyer_id, "buyer")
+        db.add_user(user_id=buyer_id, username="buyer")
 
         ok, booking_id, code = db.create_booking_atomic(offer_id, buyer_id, quantity=1)
         db.update_booking_status(booking_id, "confirmed")
@@ -366,7 +366,7 @@ class TestBusinessRules:
     def test_seller_cannot_book_own_offer(self, db):
         """Test that seller should not book their own offer"""
         seller_id = 999999
-        db.add_user(seller_id, "seller")
+        db.add_user(user_id=seller_id, username="seller")
         db.update_user_role(seller_id, "seller")
 
         store_id = db.add_store(
@@ -399,7 +399,7 @@ class TestBusinessRules:
     def test_store_status_workflow(self, db):
         """Test store approval workflow states"""
         seller_id = 123123
-        db.add_user(seller_id, "seller")
+        db.add_user(user_id=seller_id, username="seller")
         db.update_user_role(seller_id, "seller")
 
         store_id = db.add_store(

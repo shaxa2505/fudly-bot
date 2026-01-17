@@ -73,6 +73,7 @@ class StoreRepository(BaseRepository):
         category: str | None = None,
         phone: str | None = None,
         business_type: str = "individual",
+        photo: str | None = None,
     ) -> int:
         """Add new store.
 
@@ -94,7 +95,15 @@ class StoreRepository(BaseRepository):
         """
         try:
             return self.db.add_store(
-                owner_id, name, city, address, description, category, phone, business_type
+                owner_id=owner_id,
+                name=name,
+                city=city,
+                address=address,
+                description=description,
+                category=category,
+                phone=phone,
+                business_type=business_type,
+                photo=photo,
             )
         except Exception as e:
             self._handle_db_error("add_store", e)

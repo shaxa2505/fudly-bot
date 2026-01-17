@@ -29,6 +29,42 @@ class Base(DeclarativeBase):
     pass
 
 
+class GeoRegion(Base):
+    """Geo region model."""
+
+    __tablename__ = "geo_regions"
+
+    region_id = Column(Integer, primary_key=True, autoincrement=True)
+    name_ru = Column(Text, nullable=False)
+    name_uz = Column(Text, nullable=False)
+    slug_ru = Column(Text, nullable=False, unique=True)
+    slug_uz = Column(Text, nullable=False, unique=True)
+    is_city = Column(Integer, default=0)
+
+    districts = relationship("GeoDistrict", back_populates="region")
+
+
+class GeoDistrict(Base):
+    """Geo district model."""
+
+    __tablename__ = "geo_districts"
+
+    district_id = Column(Integer, primary_key=True, autoincrement=True)
+    region_id = Column(Integer, ForeignKey("geo_regions.region_id"), nullable=False)
+    name_ru = Column(Text, nullable=False)
+    name_uz = Column(Text, nullable=False)
+    slug_ru = Column(Text, nullable=False)
+    slug_uz = Column(Text, nullable=False)
+
+    region = relationship("GeoRegion", back_populates="districts")
+
+    __table_args__ = (
+        UniqueConstraint("region_id", "slug_ru"),
+        UniqueConstraint("region_id", "slug_uz"),
+        Index("ix_geo_districts_region_id", "region_id"),
+    )
+
+
 class User(Base):
     """User model."""
 
@@ -44,6 +80,8 @@ class User(Base):
     is_admin = Column(Integer, default=0)
     notifications_enabled = Column(Integer, default=1)
     created_at = Column(DateTime, default=datetime.utcnow)
+    region_id = Column(Integer, ForeignKey("geo_regions.region_id"), nullable=True)
+    district_id = Column(Integer, ForeignKey("geo_districts.district_id"), nullable=True)
 
     # Relationships
     stores = relationship("Store", back_populates="owner")
@@ -58,6 +96,8 @@ class User(Base):
         Index("ix_users_city", "city"),
         Index("ix_users_role", "role"),
         Index("ix_users_phone", "phone"),
+        Index("ix_users_region_id", "region_id"),
+        Index("ix_users_district_id", "district_id"),
     )
 
 
@@ -86,6 +126,8 @@ class Store(Base):
     delivery_enabled = Column(Integer, default=1)
     delivery_price = Column(Integer, default=15000)
     min_order_amount = Column(Integer, default=30000)
+    region_id = Column(Integer, ForeignKey("geo_regions.region_id"), nullable=True)
+    district_id = Column(Integer, ForeignKey("geo_districts.district_id"), nullable=True)
 
     # Relationships
     owner = relationship("User", back_populates="stores")
@@ -101,6 +143,8 @@ class Store(Base):
         Index("ix_stores_city", "city"),
         Index("ix_stores_status", "status"),
         Index("ix_stores_owner", "owner_id"),
+        Index("ix_stores_region_id", "region_id"),
+        Index("ix_stores_district_id", "district_id"),
     )
 
 

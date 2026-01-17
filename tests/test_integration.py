@@ -45,7 +45,7 @@ class TestUserFlow:
         # Step 1: User registration
         user_id = 123456789
         username = "hungry_buyer"
-        db.add_user(user_id, username)
+        db.add_user(user_id=user_id, username=username)
 
         user = db.get_user(user_id)
         assert user is not None
@@ -63,7 +63,7 @@ class TestUserFlow:
 
         # Step 3: Create seller and offer for browsing
         seller_id = 987654321
-        db.add_user(seller_id, "test_seller")
+        db.add_user(user_id=seller_id, username="test_seller")
         db.update_user_role(seller_id, "seller")
 
         store_id = db.add_store(
@@ -141,7 +141,7 @@ class TestUserFlow:
         """
         # Step 1: Seller registration
         seller_id = 555555555
-        db.add_user(seller_id, "bakery_owner")
+        db.add_user(user_id=seller_id, username="bakery_owner")
         db.update_user_role(seller_id, "seller")
 
         seller = db.get_user(seller_id)
@@ -163,7 +163,7 @@ class TestUserFlow:
 
         # Step 3: Admin approves store
         admin_id = 111111111
-        db.add_user(admin_id, "admin_user")
+        db.add_user(user_id=admin_id, username="admin_user")
         db.update_user_role(admin_id, "admin")
 
         db.update_store_status(store_id, "approved")
@@ -188,7 +188,7 @@ class TestUserFlow:
 
         # Step 5: Customer books offer
         customer_id = 999999999
-        db.add_user(customer_id, "bread_lover")
+        db.add_user(user_id=customer_id, username="bread_lover")
 
         ok, booking_id, code = db.create_booking_atomic(offer_id, customer_id, quantity=2)
         assert ok is True
@@ -210,10 +210,10 @@ class TestUserFlow:
         3. User removes from favorites
         """
         user_id = 777777777
-        db.add_user(user_id, "foodie")
+        db.add_user(user_id=user_id, username="foodie")
 
         seller_id = 888888888
-        db.add_user(seller_id, "restaurant_owner")
+        db.add_user(user_id=seller_id, username="restaurant_owner")
         db.update_user_role(seller_id, "seller")
 
         store_id = db.add_store(
@@ -273,14 +273,14 @@ class TestAdminFlow:
         """
         # Create admin
         admin_id = 100000000
-        db.add_user(admin_id, "super_admin")
+        db.add_user(user_id=admin_id, username="super_admin")
         db.update_user_role(admin_id, "admin")
 
         # Create multiple sellers with stores
         sellers_and_stores = []
         for i in range(5):
             seller_id = 200000000 + i
-            db.add_user(seller_id, f"seller_{i}")
+            db.add_user(user_id=seller_id, username=f"seller_{i}")
             db.update_user_role(seller_id, "seller")
 
             store_id = db.add_store(
@@ -335,7 +335,7 @@ class TestErrorHandling:
     def test_booking_nonexistent_offer_fails(self, db):
         """Test that booking a non-existent offer fails gracefully"""
         user_id = 123456
-        db.add_user(user_id, "test_user")
+        db.add_user(user_id=user_id, username="test_user")
 
         fake_offer_id = 999999
         ok, booking_id, code = db.create_booking_atomic(fake_offer_id, user_id, quantity=1)
@@ -357,10 +357,10 @@ class TestErrorHandling:
     def test_duplicate_favorite_ignored(self, db):
         """Test that adding same favorite twice doesn't create duplicates"""
         user_id = 111111
-        db.add_user(user_id, "user")
+        db.add_user(user_id=user_id, username="user")
 
         seller_id = 222222
-        db.add_user(seller_id, "seller")
+        db.add_user(user_id=seller_id, username="seller")
         db.update_user_role(seller_id, "seller")
 
         store_id = db.add_store(

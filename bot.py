@@ -155,7 +155,7 @@ def _setup_admin() -> None:
         try:
             user = db.get_user(ADMIN_ID)
             if not user:
-                db.add_user(ADMIN_ID, "admin", "Admin")
+                db.add_user(user_id=ADMIN_ID, username="admin", first_name="Admin")
             db.set_admin(ADMIN_ID)
             logger.info(f"✅ Admin configured: {ADMIN_ID}")
         except Exception as e:

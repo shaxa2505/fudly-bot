@@ -295,7 +295,15 @@ class CachedStoreRepository(CachedRepositoryMixin, StoreRepository):
         photo: str | None = None,
     ) -> int:
         """Add store with cache invalidation."""
-        store_id = super().add_store(user_id, name, description, city, address, phone, photo)
+        store_id = super().add_store(
+            owner_id=user_id,
+            name=name,
+            city=city or "",
+            address=address,
+            description=description,
+            phone=phone,
+            photo=photo,
+        )
 
         tags = [CacheTags.STORES]
         if city:

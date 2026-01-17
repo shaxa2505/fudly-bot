@@ -35,7 +35,7 @@ class TestDatabaseSQLite:
         # Register test user
         user_id = 123456789
         username = "testuser"
-        db.add_user(user_id, username)
+        db.add_user(user_id=user_id, username=username)
 
         # Retrieve user
         user = db.get_user(user_id)
@@ -56,7 +56,7 @@ class TestDatabaseSQLite:
         """Test that get_user_stores returns list of dicts"""
         # Register user
         user_id = 111111111
-        db.add_user(user_id, "storeowner")
+        db.add_user(user_id=user_id, username="storeowner")
 
         # Update role to store_owner
         db.update_user_role(user_id, "store_owner")
@@ -79,7 +79,7 @@ class TestDatabaseSQLite:
         """Test that get_stores_by_city returns list of dicts"""
         # Register user and add store
         user_id = 222222222
-        db.add_user(user_id, "cityowner")
+        db.add_user(user_id=user_id, username="cityowner")
         db.update_user_role(user_id, "store_owner")
 
         city = "Moscow"
@@ -105,7 +105,7 @@ class TestDatabaseSQLite:
         """Test that get_approved_stores returns list of dicts"""
         # Register user and add approved store
         user_id = 333333333
-        db.add_user(user_id, "approvedowner")
+        db.add_user(user_id=user_id, username="approvedowner")
         db.update_user_role(user_id, "store_owner")
 
         db.add_store(user_id, "Approved Store", "City", "Address", "Desc")
@@ -129,7 +129,7 @@ class TestDatabaseSQLite:
         """Test that get_store returns dict format"""
         # Register user and add store
         user_id = 444444444
-        db.add_user(user_id, "singlestore")
+        db.add_user(user_id=user_id, username="singlestore")
         db.update_user_role(user_id, "store_owner")
 
         store_name = "Single Store"
@@ -162,7 +162,7 @@ class TestDatabaseSQLite:
         username = "flowtest"
 
         # Register
-        db.add_user(user_id, username)
+        db.add_user(user_id=user_id, username=username)
 
         # Retrieve and verify
         user = db.get_user(user_id)
@@ -173,7 +173,7 @@ class TestDatabaseSQLite:
     def test_update_user_role(self, db):
         """Test role update functionality"""
         user_id = 666666666
-        db.add_user(user_id, "roletest")
+        db.add_user(user_id=user_id, username="roletest")
 
         # Update role
         db.update_user_role(user_id, "store_owner")

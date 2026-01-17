@@ -46,7 +46,40 @@ class SchemaMixin:
                     region TEXT,
                     district TEXT,
                     latitude REAL,
-                    longitude REAL
+                    longitude REAL,
+                    region_id INTEGER,
+                    district_id INTEGER
+                )
+            """
+            )
+
+            # Geo reference tables
+            cursor.execute(
+                """
+                CREATE TABLE IF NOT EXISTS geo_regions (
+                    region_id SERIAL PRIMARY KEY,
+                    name_ru TEXT NOT NULL,
+                    name_uz TEXT NOT NULL,
+                    slug_ru TEXT NOT NULL,
+                    slug_uz TEXT NOT NULL,
+                    is_city INTEGER DEFAULT 0,
+                    UNIQUE (slug_ru),
+                    UNIQUE (slug_uz)
+                )
+            """
+            )
+            cursor.execute(
+                """
+                CREATE TABLE IF NOT EXISTS geo_districts (
+                    district_id SERIAL PRIMARY KEY,
+                    region_id INTEGER NOT NULL,
+                    name_ru TEXT NOT NULL,
+                    name_uz TEXT NOT NULL,
+                    slug_ru TEXT NOT NULL,
+                    slug_uz TEXT NOT NULL,
+                    FOREIGN KEY (region_id) REFERENCES geo_regions(region_id) ON DELETE CASCADE,
+                    UNIQUE (region_id, slug_ru),
+                    UNIQUE (region_id, slug_uz)
                 )
             """
             )
@@ -75,6 +108,8 @@ class SchemaMixin:
                     delivery_enabled INTEGER DEFAULT 1,
                     delivery_price INTEGER DEFAULT 15000,
                     min_order_amount INTEGER DEFAULT 30000,
+                    region_id INTEGER,
+                    district_id INTEGER,
                     FOREIGN KEY (owner_id) REFERENCES users(user_id)
                 )
             """
@@ -142,6 +177,215 @@ class SchemaMixin:
                     cursor.execute("ALTER TABLE stores ADD COLUMN IF NOT EXISTS district_slug TEXT")
                 except Exception as e:
                     logger.warning(f"Migration for stores region/district columns: {e}")
+            # Migration: Add geo reference ids to users/stores tables
+            if run_runtime_migrations:
+                try:
+                    cursor.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS region_id INTEGER")
+                    cursor.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS district_id INTEGER")
+                    cursor.execute("ALTER TABLE stores ADD COLUMN IF NOT EXISTS region_id INTEGER")
+                    cursor.execute("ALTER TABLE stores ADD COLUMN IF NOT EXISTS district_id INTEGER")
+                except Exception as e:
+                    logger.warning(f"Migration for geo reference ids: {e}")
+            # Migration: Add geo reference foreign keys
+            if run_runtime_migrations:
+                try:
+                    cursor.execute(
+                        """
+                        ALTER TABLE users
+                        ADD CONSTRAINT fk_users_region_id
+                        FOREIGN KEY (region_id) REFERENCES geo_regions(region_id)
+                        """
+                    )
+                except Exception as e:
+                    logger.warning(f"Migration for fk_users_region_id: {e}")
+                try:
+                    cursor.execute(
+                        """
+                        ALTER TABLE users
+                        ADD CONSTRAINT fk_users_district_id
+                        FOREIGN KEY (district_id) REFERENCES geo_districts(district_id)
+                        """
+                    )
+                except Exception as e:
+                    logger.warning(f"Migration for fk_users_district_id: {e}")
+                try:
+                    cursor.execute(
+                        """
+                        ALTER TABLE stores
+                        ADD CONSTRAINT fk_stores_region_id
+                        FOREIGN KEY (region_id) REFERENCES geo_regions(region_id)
+                        """
+                    )
+                except Exception as e:
+                    logger.warning(f"Migration for fk_stores_region_id: {e}")
+                try:
+                    cursor.execute(
+                        """
+                        ALTER TABLE stores
+                        ADD CONSTRAINT fk_stores_district_id
+                        FOREIGN KEY (district_id) REFERENCES geo_districts(district_id)
+                        """
+                    )
+                except Exception as e:
+                    logger.warning(f"Migration for fk_stores_district_id: {e}")
+            # Seed geo reference tables if empty
+            if run_runtime_migrations:
+                try:
+                    cursor.execute("SELECT COUNT(*) FROM geo_regions")
+                    geo_regions_count = cursor.fetchone()[0] or 0
+                    if geo_regions_count == 0:
+                        from database_pg_module.mixins.offers import canonicalize_geo_slug
+
+                        regions = [
+                            {
+                                "ru": "Ташкент",
+                                "uz": "Toshkent",
+                                "is_city": 1,
+                                "districts": [
+                                    {"ru": "Бектемир", "uz": "Bektemir"},
+                                    {"ru": "Мирабад", "uz": "Mirobod"},
+                                    {"ru": "Мирзо-Улугбек", "uz": "Mirzo Ulug'bek"},
+                                    {"ru": "Сергелий", "uz": "Sergeli"},
+                                    {"ru": "Шайхантахур", "uz": "Shayxontohur"},
+                                    {"ru": "Учтепа", "uz": "Uchtepa"},
+                                    {"ru": "Яшнабад", "uz": "Yashnobod"},
+                                    {"ru": "Янгихаёт", "uz": "Yangihayot"},
+                                    {"ru": "Юнусабад", "uz": "Yunusobod"},
+                                    {"ru": "Яккасарай", "uz": "Yakkasaroy"},
+                                    {"ru": "Алмазар", "uz": "Olmazor"},
+                                    {"ru": "Чиланзар", "uz": "Chilonzor"},
+                                ],
+                            },
+                            {
+                                "ru": "Ташкентская область",
+                                "uz": "Toshkent viloyati",
+                                "is_city": 0,
+                                "districts": [],
+                                "slug_uz": "toshkent_viloyati",
+                            },
+                            {
+                                "ru": "Андижан",
+                                "uz": "Andijon",
+                                "is_city": 0,
+                                "districts": [],
+                            },
+                            {
+                                "ru": "Бухара",
+                                "uz": "Buxoro",
+                                "is_city": 0,
+                                "districts": [],
+                            },
+                            {
+                                "ru": "Фергана",
+                                "uz": "Farg'ona",
+                                "is_city": 0,
+                                "districts": [],
+                            },
+                            {
+                                "ru": "Джизак",
+                                "uz": "Jizzax",
+                                "is_city": 0,
+                                "districts": [],
+                            },
+                            {
+                                "ru": "Наманган",
+                                "uz": "Namangan",
+                                "is_city": 0,
+                                "districts": [],
+                            },
+                            {
+                                "ru": "Навои",
+                                "uz": "Navoiy",
+                                "is_city": 0,
+                                "districts": [],
+                            },
+                            {
+                                "ru": "Кашкадарья",
+                                "uz": "Qashqadaryo",
+                                "is_city": 0,
+                                "districts": [],
+                            },
+                            {
+                                "ru": "Самарканд",
+                                "uz": "Samarqand",
+                                "is_city": 0,
+                                "districts": [
+                                    {"ru": "Самарканд", "uz": "Samarqand"},
+                                    {"ru": "Каттакурган", "uz": "Kattaqo'rg'on"},
+                                    {"ru": "Акдарья", "uz": "Oqdaryo"},
+                                    {"ru": "Булунгур", "uz": "Bulung'ur"},
+                                    {"ru": "Джамбай", "uz": "Jomboy"},
+                                    {"ru": "Иштыхан", "uz": "Ishtixon"},
+                                    {"ru": "Кошрабад", "uz": "Qo'shrabot"},
+                                    {"ru": "Нарпай", "uz": "Narpay"},
+                                    {"ru": "Нурабад", "uz": "Nurobod"},
+                                    {"ru": "Пайарык", "uz": "Payariq"},
+                                    {"ru": "Пастдаргом", "uz": "Pastdarg'om"},
+                                    {"ru": "Пахтачи", "uz": "Paxtachi"},
+                                    {"ru": "Тайлак", "uz": "Toyloq"},
+                                    {"ru": "Ургут", "uz": "Urgut"},
+                                ],
+                            },
+                            {
+                                "ru": "Сырдарья",
+                                "uz": "Sirdaryo",
+                                "is_city": 0,
+                                "districts": [],
+                            },
+                            {
+                                "ru": "Сурхандарья",
+                                "uz": "Surxondaryo",
+                                "is_city": 0,
+                                "districts": [],
+                            },
+                            {
+                                "ru": "Хорезм",
+                                "uz": "Xorazm",
+                                "is_city": 0,
+                                "districts": [],
+                            },
+                            {
+                                "ru": "Каракалпакстан",
+                                "uz": "Qoraqalpog'iston",
+                                "is_city": 0,
+                                "districts": [],
+                            },
+                        ]
+
+                        for region in regions:
+                            slug_uz = region.get("slug_uz") or canonicalize_geo_slug(region["uz"])
+                            slug_ru = canonicalize_geo_slug(region["ru"])
+                            cursor.execute(
+                                """
+                                INSERT INTO geo_regions (name_ru, name_uz, slug_ru, slug_uz, is_city)
+                                VALUES (%s, %s, %s, %s, %s)
+                                RETURNING region_id
+                                """,
+                                (
+                                    region["ru"],
+                                    region["uz"],
+                                    slug_ru,
+                                    slug_uz,
+                                    int(region.get("is_city", 0)),
+                                ),
+                            )
+                            region_id = cursor.fetchone()[0]
+                            for district in region.get("districts", []):
+                                cursor.execute(
+                                    """
+                                    INSERT INTO geo_districts (region_id, name_ru, name_uz, slug_ru, slug_uz)
+                                    VALUES (%s, %s, %s, %s, %s)
+                                    """,
+                                    (
+                                        region_id,
+                                        district["ru"],
+                                        district["uz"],
+                                        canonicalize_geo_slug(district["ru"]),
+                                        canonicalize_geo_slug(district["uz"]),
+                                    ),
+                                )
+                except Exception as e:
+                    logger.warning(f"Geo reference seed failed: {e}")
 
             # Orders table
             cursor.execute(
@@ -556,10 +800,17 @@ class SchemaMixin:
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_stores_city_status ON stores(city, status)")
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_stores_region ON stores(region)")
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_stores_district ON stores(district)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_stores_region_id ON stores(region_id)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_stores_district_id ON stores(district_id)")
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_stores_city_slug ON stores(city_slug)")
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_stores_region_slug ON stores(region_slug)")
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_stores_district_slug ON stores(district_slug)")
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_stores_city_slug_status ON stores(city_slug, status)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_users_region_id ON users(region_id)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_users_district_id ON users(district_id)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_geo_regions_slug_ru ON geo_regions(slug_ru)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_geo_regions_slug_uz ON geo_regions(slug_uz)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_geo_districts_region_id ON geo_districts(region_id)")
 
         # Offer indexes - critical for browsing/search performance
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_offers_store ON offers(store_id)")

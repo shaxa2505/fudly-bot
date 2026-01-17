@@ -93,6 +93,11 @@
     animation: pulse 2s ease infinite;
 }
 
+.status-dot.closed {
+    background: var(--danger);
+    animation: none;
+}
+
 @keyframes pulse {
     0%, 100% { opacity: 1; }
     50% { opacity: 0.5; }

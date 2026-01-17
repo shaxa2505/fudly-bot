@@ -53,13 +53,13 @@ def temp_db():
 async def test_book_offer_quantity_flow(temp_db: Database, monkeypatch: pytest.MonkeyPatch):
     # Seed DB: user with language and phone, seller, store, offer
     user_id = 111001
-    temp_db.add_user(user_id, "buyer", first_name="Buyer")
+    temp_db.add_user(user_id=user_id, username="buyer", first_name="Buyer")
     temp_db.update_user_language(user_id, "ru")
     temp_db.update_user_phone(user_id, "+998901234567")
     temp_db.update_user_city(user_id, "Ташкент")
 
     seller_id = 222002
-    temp_db.add_user(seller_id, "seller", first_name="Seller")
+    temp_db.add_user(user_id=seller_id, username="seller", first_name="Seller")
     temp_db.update_user_language(seller_id, "ru")
     temp_db.update_user_role(seller_id, "seller")
 
@@ -268,13 +268,13 @@ async def test_cancel_booking_via_callback(temp_db: Database, monkeypatch: pytes
     """Test booking cancellation via direct DB call (avoids Router attachment issues)."""
     # Seed DB: user, store, offer, booking
     user_id = 313001
-    temp_db.add_user(user_id, "buyer", first_name="Buyer")
+    temp_db.add_user(user_id=user_id, username="buyer", first_name="Buyer")
     temp_db.update_user_language(user_id, "ru")
     temp_db.update_user_phone(user_id, "+998901234567")
     temp_db.update_user_city(user_id, "Ташкент")
 
     seller_id = 323002
-    temp_db.add_user(seller_id, "seller", first_name="Seller")
+    temp_db.add_user(user_id=seller_id, username="seller", first_name="Seller")
     temp_db.update_user_role(seller_id, "seller")
     store_id = temp_db.add_store(seller_id, "S1", "Ташкент")
     offer_id = temp_db.add_offer(store_id, "O1", "", 10000.0, 5000.0, 1, "10:00", "22:00")

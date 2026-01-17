@@ -604,6 +604,18 @@ input.success {
     color: var(--text);
 }
 
+.orders-title.with-icon {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.orders-title.with-icon i,
+.orders-title.with-icon svg {
+    width: 18px;
+    height: 18px;
+}
+
 .orders-subtitle {
     margin: 6px 0 0;
     font-size: var(--text-sm);
@@ -748,6 +760,18 @@ input.success {
 }
 
 .meta-chip.payment.payment-bad {
+    background: rgba(239, 68, 68, 0.12);
+    color: #B91C1C;
+    border: 1px solid rgba(239, 68, 68, 0.25);
+}
+
+.meta-chip.status-open {
+    background: rgba(24, 162, 75, 0.12);
+    color: var(--primary-dark);
+    border: 1px solid rgba(24, 162, 75, 0.25);
+}
+
+.meta-chip.status-closed {
     background: rgba(239, 68, 68, 0.12);
     color: #B91C1C;
     border: 1px solid rgba(239, 68, 68, 0.25);

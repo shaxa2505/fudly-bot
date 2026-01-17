@@ -38,7 +38,7 @@ async def test_booking_expiry_and_reminder(db_instance, monkeypatch):
 
     # Create a user and store and offer
     user_id = 11111
-    db.add_user(user_id, "tester", "Tester")
+    db.add_user(user_id=user_id, username="tester", first_name="Tester")
     store_id = db.add_store(user_id, "Test Store", "Test City")
     offer_id = db.add_offer(store_id, "Test Item", "Desc", 100, 50, 5, "", "", None, None)
 

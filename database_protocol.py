@@ -45,6 +45,8 @@ class DatabaseProtocol(Protocol):
         language: str = "ru",
         region: str | None = None,
         district: str | None = None,
+        region_id: int | None = None,
+        district_id: int | None = None,
         latitude: float | None = None,
         longitude: float | None = None,
     ) -> None:
@@ -72,11 +74,15 @@ class DatabaseProtocol(Protocol):
         city: str | None = None,
         region: str | None = None,
         district: str | None = None,
+        region_id: int | None = None,
+        district_id: int | None = None,
         latitude: float | None = None,
         longitude: float | None = None,
         clear_city: bool = False,
         clear_region: bool = False,
         clear_district: bool = False,
+        clear_region_id: bool = False,
+        clear_district_id: bool = False,
         clear_latitude: bool = False,
         clear_longitude: bool = False,
     ) -> None:
@@ -113,11 +119,16 @@ class DatabaseProtocol(Protocol):
         owner_id: int,
         name: str,
         city: str,
+        region: str | None = None,
+        district: str | None = None,
+        region_id: int | None = None,
+        district_id: int | None = None,
         address: str | None = None,
         description: str | None = None,
         category: str = "Р РµСЃС‚РѕСЂР°РЅ",
         phone: str | None = None,
         business_type: str = "supermarket",
+        photo: str | None = None,
     ) -> int:
         ...
 
@@ -182,8 +193,35 @@ class DatabaseProtocol(Protocol):
         """Update store photo."""
         ...
 
-    def update_store_location(self, store_id: int, latitude: float, longitude: float) -> bool:
+    def update_store_location(
+        self,
+        store_id: int,
+        latitude: float,
+        longitude: float,
+        region: str | None = None,
+        district: str | None = None,
+        region_id: int | None = None,
+        district_id: int | None = None,
+    ) -> bool:
         """Update store geolocation coordinates."""
+        ...
+
+    # ========== GEO REFERENCE METHODS ==========
+    def resolve_geo_region(self, value: Any) -> dict[str, Any] | None:
+        ...
+
+    def resolve_geo_district(self, value: Any, region_id: int | None = None) -> dict[str, Any] | None:
+        ...
+
+    def resolve_geo_location(
+        self, *, region: Any | None = None, district: Any | None = None, city: Any | None = None
+    ) -> dict[str, Any]:
+        ...
+
+    def get_geo_regions(self, *, lang: str = "ru", include_cities: bool = True) -> list[dict[str, Any]]:
+        ...
+
+    def get_geo_districts(self, region_id: int, *, lang: str = "ru") -> list[dict[str, Any]]:
         ...
 
     # ========== STORE ADMINS ==========

@@ -7,6 +7,7 @@ from .core import DatabaseCore
 from .mixins import (
     BookingMixin,
     FavoritesMixin,
+    LocationReferenceMixin,
     NotificationMixin,
     OfferMixin,
     OrderMixin,
@@ -30,6 +31,7 @@ except ImportError:
 class Database(
     DatabaseCore,
     SchemaMixin,
+    LocationReferenceMixin,
     UserMixin,
     StoreMixin,
     OfferMixin,

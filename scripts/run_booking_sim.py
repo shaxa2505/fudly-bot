@@ -15,13 +15,13 @@ async def main():
     # prepare db
     db = Database(":memory:")
     user_id = 111001
-    db.add_user(user_id, "buyer", first_name="Buyer")
+    db.add_user(user_id=user_id, username="buyer", first_name="Buyer")
     db.update_user_language(user_id, "ru")
     db.update_user_phone(user_id, "+998901234567")
     db.update_user_city(user_id, "Ташкент")
 
     seller_id = 222002
-    db.add_user(seller_id, "seller", first_name="Seller")
+    db.add_user(user_id=seller_id, username="seller", first_name="Seller")
     db.update_user_language(seller_id, "ru")
     db.update_user_role(seller_id, "seller")
 

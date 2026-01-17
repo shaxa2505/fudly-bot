@@ -63,6 +63,7 @@ _REGIONS: list[dict[str, object]] = [
         "ru": "Ташкентская область",
         "uz": "Toshkent viloyati",
         "is_city": 0,
+        "slug_uz": "toshkent_viloyati",
         "districts": [],
     },
     {
@@ -231,6 +232,7 @@ def upgrade() -> None:
     for region in _REGIONS:
         region_ru = str(region["ru"])
         region_uz = str(region["uz"])
+        slug_uz = region.get("slug_uz") or _normalize_slug(region_uz)
         region_row = conn.execute(
             sa.text(
                 """
@@ -243,7 +245,7 @@ def upgrade() -> None:
                 "name_ru": region_ru,
                 "name_uz": region_uz,
                 "slug_ru": _normalize_slug(region_ru),
-                "slug_uz": _normalize_slug(region_uz),
+                "slug_uz": slug_uz,
                 "is_city": int(region.get("is_city", 0)),
             },
         ).fetchone()

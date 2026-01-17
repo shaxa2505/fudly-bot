@@ -58,10 +58,10 @@ async def test_admin_approve_and_reject_store(temp_db: Database, monkeypatch: py
     admin_id = 700001
     owner_id = 700002
 
-    temp_db.add_user(admin_id, "admin")
+    temp_db.add_user(user_id=admin_id, username="admin")
     temp_db.update_user_role(admin_id, "admin")
 
-    temp_db.add_user(owner_id, "owner", first_name="Owner")
+    temp_db.add_user(user_id=owner_id, username="owner", first_name="Owner")
     temp_db.update_user_language(owner_id, "ru")
     store_id = temp_db.add_store(owner_id, "Moderated Store", "Ташкент")
 

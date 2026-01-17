@@ -49,7 +49,11 @@ async def cmd_setadmin(message: types.Message, db: DatabaseProtocol):
     try:
         user = db.get_user(user_id)
         if not user:
-            db.add_user(user_id, message.from_user.username, message.from_user.first_name)
+            db.add_user(
+                user_id=user_id,
+                username=message.from_user.username,
+                first_name=message.from_user.first_name,
+            )
         db.set_admin(user_id)
         await message.answer(
             f"✅ Вы теперь администратор!\n\n"

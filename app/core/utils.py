@@ -42,6 +42,26 @@ CITY_UZ_TO_RU = {
     "kattakurgan": "Каттакурган",
     "kattaqurgan": "Каттакурган",
     "каттакурган": "Каттакурган",
+    "qashqadaryo": "Кашкадарья",
+    "sirdaryo": "Сырдарья",
+    "surxondaryo": "Сурхандарья",
+    "xorazm": "Хорезм",
+    "qoraqalpogiston": "Каракалпакстан",
+    "qoraqalpog'iston": "Каракалпакстан",
+    "кашкадарьинская": "Кашкадарья",
+    "сурхандарьинская": "Сурхандарья",
+    "сырдарьинская": "Сырдарья",
+    "хорезмская": "Хорезм",
+    "каракалпакская": "Каракалпакстан",
+    "каракалпакстан": "Каракалпакстан",
+    "самаркандская": "Самарканд",
+    "бухарская": "Бухара",
+    "ферганская": "Фергана",
+    "андижанская": "Андижан",
+    "наманганская": "Наманган",
+    "навоийская": "Навои",
+    "джизакская": "Джизак",
+    "ташкентская": "Ташкент",
 }
 
 _CITY_MOJIBAKE_FIXES = {
@@ -116,10 +136,21 @@ def get_user_field(user: Any, field_name: str, default: Any = None) -> Any:
     idx = field_map.get(field_name)
     if idx is not None and isinstance(user, (tuple, list)) and len(user) > idx:
         return user[idx]
-    if field_name in {"region", "district", "latitude", "longitude"}:
-        if isinstance(user, (tuple, list)) and len(user) >= 15:
-            tail_map = {"region": -4, "district": -3, "latitude": -2, "longitude": -1}
-            return user[tail_map[field_name]]
+    if field_name in {"region", "district", "latitude", "longitude", "region_id", "district_id"}:
+        if isinstance(user, (tuple, list)):
+            if len(user) >= 17:
+                tail_map = {
+                    "region": -6,
+                    "district": -5,
+                    "latitude": -4,
+                    "longitude": -3,
+                    "region_id": -2,
+                    "district_id": -1,
+                }
+                return user[tail_map[field_name]]
+            if len(user) >= 15:
+                tail_map = {"region": -4, "district": -3, "latitude": -2, "longitude": -1}
+                return user[tail_map[field_name]]
     return default
 
 

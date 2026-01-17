@@ -20,6 +20,8 @@ class User(BaseModel):
     district: str | None = Field(None, description="User's district")
     latitude: float | None = Field(None, description="User latitude")
     longitude: float | None = Field(None, description="User longitude")
+    region_id: int | None = Field(None, description="User region id")
+    district_id: int | None = Field(None, description="User district id")
     language: Language = Field(Language.RUSSIAN, description="Interface language")
     role: UserRole = Field(UserRole.CUSTOMER, description="User role")
     notifications_enabled: bool = Field(True, description="Push notifications enabled")
@@ -76,6 +78,8 @@ class User(BaseModel):
             "district": self.district,
             "latitude": self.latitude,
             "longitude": self.longitude,
+            "region_id": self.region_id,
+            "district_id": self.district_id,
             "language": self.language.value
             if isinstance(self.language, Language)
             else self.language,
@@ -98,10 +102,24 @@ class User(BaseModel):
             return cls(**row)
 
         # Tuple format: (user_id, username, first_name, phone, city, language, role, notifications_enabled, created_at, ...)
-        region = row[-4] if len(row) >= 15 else None
-        district = row[-3] if len(row) >= 15 else None
-        latitude = row[-2] if len(row) >= 15 else None
-        longitude = row[-1] if len(row) >= 15 else None
+        region = None
+        district = None
+        latitude = None
+        longitude = None
+        region_id = None
+        district_id = None
+        if len(row) >= 17:
+            region = row[-6]
+            district = row[-5]
+            latitude = row[-4]
+            longitude = row[-3]
+            region_id = row[-2]
+            district_id = row[-1]
+        elif len(row) >= 15:
+            region = row[-4]
+            district = row[-3]
+            latitude = row[-2]
+            longitude = row[-1]
         return cls(
             user_id=row[0],
             username=row[1] if len(row) > 1 else None,
@@ -112,6 +130,8 @@ class User(BaseModel):
             district=district,
             latitude=latitude,
             longitude=longitude,
+            region_id=region_id,
+            district_id=district_id,
             language=row[5] if len(row) > 5 else Language.RUSSIAN,
             role=row[6] if len(row) > 6 else UserRole.CUSTOMER,
             notifications_enabled=bool(row[7]) if len(row) > 7 else True,

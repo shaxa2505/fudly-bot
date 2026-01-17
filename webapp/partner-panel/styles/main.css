@@ -331,6 +331,18 @@
     line-height: var(--line-tight);
 }
 
+.section-title.with-icon {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.section-title.with-icon i,
+.section-title.with-icon svg {
+    width: 18px;
+    height: 18px;
+}
+
 .section-subtitle {
     font-size: var(--text-sm);
     color: var(--text-secondary);

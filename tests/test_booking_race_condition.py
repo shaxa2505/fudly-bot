@@ -51,7 +51,7 @@ class TestBookingRaceCondition:
         """Create a sample offer with limited quantity"""
         # Create test seller
         seller_id = 111111
-        db.add_user(seller_id, "test_seller")
+        db.add_user(user_id=seller_id, username="test_seller")
         db.update_user_role(seller_id, "seller")
 
         # Create test store
@@ -81,7 +81,7 @@ class TestBookingRaceCondition:
     def test_single_booking_succeeds(self, db, sample_offer):
         """Test that a single booking works correctly"""
         user_id = 222222
-        db.add_user(user_id, "test_buyer")
+        db.add_user(user_id=user_id, username="test_buyer")
 
         ok, booking_id, code = db.create_booking_atomic(sample_offer, user_id, quantity=1)
 
@@ -109,7 +109,7 @@ class TestBookingRaceCondition:
 
         def book_item(user_id: int):
             """Each thread tries to book 1 item"""
-            db.add_user(user_id, f"concurrent_user_{user_id}")
+            db.add_user(user_id=user_id, username=f"concurrent_user_{user_id}")
             ok, booking_id, code = db.create_booking_atomic(sample_offer, user_id, quantity=1)
 
             with results_lock:
@@ -166,7 +166,7 @@ class TestBookingRaceCondition:
 
         def book_items(user_id: int):
             """Each thread tries to book 2 items"""
-            db.add_user(user_id, f"bulk_user_{user_id}")
+            db.add_user(user_id=user_id, username=f"bulk_user_{user_id}")
             ok, booking_id, code = db.create_booking_atomic(
                 sample_offer, user_id, quantity=quantity_per_booking
             )
@@ -219,7 +219,7 @@ class TestBookingRaceCondition:
                 pass
 
         user_id = 555555
-        db.add_user(user_id, "test_user")
+        db.add_user(user_id=user_id, username="test_user")
 
         ok, booking_id, code = db.create_booking_atomic(sample_offer, user_id, quantity=1)
 
@@ -230,7 +230,7 @@ class TestBookingRaceCondition:
     def test_booking_more_than_available_fails(self, db, sample_offer):
         """Test that booking more items than available fails"""
         user_id = 666666
-        db.add_user(user_id, "greedy_user")
+        db.add_user(user_id=user_id, username="greedy_user")
 
         # Try to book 10 items when only 5 available
         ok, booking_id, code = db.create_booking_atomic(sample_offer, user_id, quantity=10)
@@ -250,7 +250,7 @@ class TestBookingRaceCondition:
 
         for i in range(5):  # Book all 5 items
             user_id = 700000 + i
-            db.add_user(user_id, f"user_{i}")
+            db.add_user(user_id=user_id, username=f"user_{i}")
 
             ok, booking_id, code = db.create_booking_atomic(sample_offer, user_id, quantity=1)
 
