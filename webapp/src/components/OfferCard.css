@@ -4,10 +4,7 @@
 
 .offer-card {
   --offer-bg: var(--color-bg-card, #ffffff);
-  --offer-text: var(--tg-theme-text-color, var(--color-text-primary));
-  --offer-muted: var(--tg-theme-hint-color, var(--color-text-secondary));
   --offer-text-on-image: rgba(255, 255, 255, 0.96);
-  --offer-muted-on-image: rgba(255, 255, 255, 0.72);
   --offer-shadow: 0 8px 20px rgba(16, 24, 40, 0.08);
   --offer-action-bg: var(--tg-theme-button-color, var(--color-primary));
   --offer-action-text: var(--tg-theme-button-text-color, #ffffff);
@@ -30,10 +27,7 @@
 @media (prefers-color-scheme: dark) {
   .offer-card {
     --offer-bg: #1c1f25;
-    --offer-text: #f5f7fa;
-    --offer-muted: #a0a8b3;
     --offer-text-on-image: rgba(255, 255, 255, 0.95);
-    --offer-muted-on-image: rgba(255, 255, 255, 0.7);
     --offer-action-border: rgba(255, 255, 255, 0.2);
     --offer-action-glass: rgba(17, 19, 24, 0.86);
     --offer-overlay: rgba(0, 0, 0, 0.55);
@@ -67,14 +61,14 @@
   position: relative;
   width: 100%;
   padding-top: 100%;
-  background: var(--color-bg-secondary, #f5f2ef);
+  background: var(--offer-bg);
   overflow: hidden;
 }
 
 .offer-image-skeleton {
   position: absolute;
   inset: 0;
-  background: linear-gradient(135deg, var(--color-bg-secondary) 0%, var(--color-bg-tertiary) 100%);
+  background: var(--offer-bg);
   z-index: 1;
 }
 
@@ -125,16 +119,15 @@
   display: flex;
   flex-direction: column;
   justify-content: flex-end;
-  gap: 3px;
+  gap: 4px;
   background: linear-gradient(180deg, rgba(0, 0, 0, 0) 0%, rgba(0, 0, 0, 0.35) 55%, rgba(0, 0, 0, 0.75) 100%);
   color: var(--offer-text-on-image);
   z-index: 3;
-  overflow: visible;
 }
 
 .offer-title,
-.offer-price-row,
-.offer-meta {
+.offer-price-group,
+.offer-store {
   max-width: calc(100% - 52px);
 }
 
@@ -181,7 +174,7 @@
 
 .offer-add-btn:disabled {
   background: var(--offer-action-glass);
-  color: var(--offer-muted);
+  color: rgba(255, 255, 255, 0.6);
   box-shadow: none;
   border: 1px solid var(--offer-action-border);
 }
@@ -200,33 +193,35 @@
   display: grid;
   grid-auto-flow: column;
   align-items: center;
-  gap: 4px;
-  padding: 0 6px;
+  gap: 6px;
+  padding: 0 8px;
   border-radius: 999px;
-  background: rgba(10, 10, 10, 0.55);
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.25);
+  background: rgba(10, 10, 10, 0.5);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  box-shadow: 0 6px 14px rgba(0, 0, 0, 0.22);
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
   height: 42px;
   min-width: 120px;
   max-width: 140px;
+  overflow: hidden;
   animation: counterPop 0.14s ease-out;
   transform-origin: bottom right;
 }
 
 .offer-counter-btn {
-  width: 28px;
-  height: 28px;
-  border-radius: 999px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 9999px;
+  display: grid;
+  place-items: center;
   font-size: 16px;
   font-weight: 600;
+  line-height: 1;
   color: var(--offer-text-on-image);
-  background: rgba(255, 255, 255, 0.12);
-  border: 1px solid rgba(255, 255, 255, 0.18);
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  box-shadow: none;
 }
 
 .offer-counter-btn:active {
@@ -259,11 +254,27 @@
   text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
 }
 
-.offer-price-row {
+.offer-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.offer-price-group {
   display: flex;
   align-items: baseline;
   gap: 6px;
   flex-wrap: wrap;
+  row-gap: 2px;
+}
+
+.offer-price-row {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 
 .offer-price {
@@ -290,34 +301,18 @@
   font-variant-numeric: tabular-nums;
   opacity: 0.55;
   text-shadow: 0 1px 2px rgba(0, 0, 0, 0.25);
-}
-
-.offer-meta {
-  display: block;
-  font-size: 12px;
-  line-height: 1.2;
-  color: var(--offer-text-on-image);
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
   white-space: nowrap;
-  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.25);
-}
-
-.offer-meta.has-store .offer-meta-text::before {
-  content: '\2022';
-  margin: 0 6px;
-  opacity: 0.6;
 }
 
 .offer-store {
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  opacity: 0.7;
-}
-
-.offer-meta-text {
-  opacity: 0.75;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 15px;
+  color: rgba(255, 255, 255, 0.75);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.25);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 @keyframes counterPop {

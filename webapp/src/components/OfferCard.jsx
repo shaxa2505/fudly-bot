@@ -21,7 +21,6 @@ const OfferCard = memo(function OfferCard({ offer, cartQuantity = 0, onAddToCart
   const isMaxReached = !isOutOfStock && cartQuantity >= stockLimit
   const showStoreName = Boolean(offer.store_name || offer.store)
   const storeName = offer.store_name || offer.store || ''
-  const metaText = stockLimit > 0 ? `Осталось: ${stockLimit}` : 'Забрать сегодня'
 
   const handleAddClick = useCallback((e) => {
     e.stopPropagation()
@@ -85,22 +84,21 @@ const OfferCard = memo(function OfferCard({ offer, cartQuantity = 0, onAddToCart
           <h3 className="offer-title" title={offer.title}>
             {offer.title}
           </h3>
-          <div className="offer-price-row">
-            <span className="offer-price">
-              {Math.round(priceValue).toLocaleString('ru-RU')}
-              <span className="offer-currency"> so'm</span>
-            </span>
-            {hasOldPrice && (
-              <span className="offer-old-price">
-                {Math.round(originalPrice).toLocaleString('ru-RU')} so'm
+          <div className="offer-meta">
+            <div className="offer-price-group">
+              <span className="offer-price-row">
+                <span className="offer-price">{Math.round(priceValue).toLocaleString('ru-RU')}</span>
+                <span className="offer-currency">so'm</span>
               </span>
-            )}
-          </div>
-          <div className={`offer-meta ${showStoreName ? 'has-store' : ''}`}>
+              {hasOldPrice && (
+                <span className="offer-old-price">
+                  {Math.round(originalPrice).toLocaleString('ru-RU')} so'm
+                </span>
+              )}
+            </div>
             {showStoreName && (
               <span className="offer-store">{storeName}</span>
             )}
-            <span className="offer-meta-text">{metaText}</span>
           </div>
         </div>
         {isOutOfStock && (
