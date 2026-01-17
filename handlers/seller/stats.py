@@ -5,6 +5,7 @@ from zoneinfo import ZoneInfo
 from decimal import Decimal
 
 from app.services.stats import get_partner_stats, Period
+from localization import get_text
 
 router = Router()
 
@@ -33,20 +34,29 @@ def _render_partner_stats_card(stats) -> str:
     t = stats.totals
     avg_ticket = t.avg_ticket if t.avg_ticket is not None else Decimal(0)
     return (
-        "📊 СТАТИСТИКА СЕГОДНЯ\n"
-        f"💰 Выручка: {_format_money(t.revenue)} сум\n"
-        f"📦 Товаров продано: {t.items_sold} шт\n"
-        f"🧾 Заказов: {t.orders}\n"
-        f"📇 Активных товаров: {t.active_products}\n"
-        f"🔹 Средний чек: {_format_money(avg_ticket)} сум\n"
-        f"↩️ Возвраты: {_format_money(t.refunds_amount)} сум / {t.refunds_count}\n"
+        "Статистика за сегодня\n"
+        f"Выручка: {_format_money(t.revenue)} сум\n"
+        f"Товаров продано: {t.items_sold} шт\n"
+        f"Заказов: {t.orders}\n"
+        f"Активных товаров: {t.active_products}\n"
+        f"Средний чек: {_format_money(avg_ticket)} сум\n"
+        f"Возвраты: {_format_money(t.refunds_amount)} сум / {t.refunds_count}\n"
         f"\nОбновлено: {stats.period.end.strftime('%H:%M')}"
     )
 
 
-@router.message(F.text == "📊 Сегодня")
+@router.message(
+    F.text.in_(
+        {
+            get_text("ru", "today_stats"),
+            get_text("uz", "today_stats"),
+            "📊 Сегодня",
+            "📊 Bugun",
+        }
+    )
+)
 async def partner_stats_today(message: types.Message):
-    """Handle partner stats button: '📊 Сегодня'."""
+    """Handle partner stats button."""
     if not message.from_user or not db:
         return
     user_id = message.from_user.id

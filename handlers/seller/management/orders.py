@@ -39,14 +39,15 @@ def _format_order_line(item: Any, is_booking: bool, lang: str, idx: int) -> str:
         title = _get_field(item, "title") or "Товар"
         quantity = _get_field(item, "quantity") or 1
 
-        status_emoji = {
-            "pending": "⏳",
-            "confirmed": "✅",
-            "preparing": "👨‍🍳",
-            "completed": "🎉",
-            "cancelled": "❌",
-        }.get(status, "📦")
-        return f"{idx}. {status_emoji} 🏪 #{booking_id} • {title[:20]} ×{quantity}"
+        status_label = {
+            "pending": "Новый" if lang == "ru" else "Yangi",
+            "confirmed": "Подтверждён" if lang == "ru" else "Tasdiqlangan",
+            "preparing": "Готовится" if lang == "ru" else "Tayyorlanmoqda",
+            "completed": "Завершён" if lang == "ru" else "Yakunlangan",
+            "cancelled": "Отменён" if lang == "ru" else "Bekor qilingan",
+        }.get(status, status)
+        pickup_label = "Самовывоз" if lang == "ru" else "Olib ketish"
+        return f"{idx}. {pickup_label} #{booking_id} • {title[:20]} ×{quantity} • {status_label}"
     else:
         order_id = _get_field(item, "order_id") or (
             item[0] if isinstance(item, (list, tuple)) else 0
@@ -57,15 +58,16 @@ def _format_order_line(item: Any, is_booking: bool, lang: str, idx: int) -> str:
         title = _get_field(item, "offer_title") or _get_field(item, "title") or "Товар"
         quantity = _get_field(item, "quantity") or 1
 
-        status_emoji = {
-            "pending": "⏳",
-            "preparing": "👨‍🍳",
-            "ready": "📦",
-            "delivering": "🚚",
-            "completed": "🎉",
-            "cancelled": "❌",
-        }.get(status, "📦")
-        return f"{idx}. {status_emoji} 🚚 #{order_id} • {title[:20]} ×{quantity}"
+        status_label = {
+            "pending": "Новый" if lang == "ru" else "Yangi",
+            "preparing": "Готовится" if lang == "ru" else "Tayyorlanmoqda",
+            "ready": "Готов" if lang == "ru" else "Tayyor",
+            "delivering": "В доставке" if lang == "ru" else "Yetkazilmoqda",
+            "completed": "Завершён" if lang == "ru" else "Yakunlangan",
+            "cancelled": "Отменён" if lang == "ru" else "Bekor qilingan",
+        }.get(status, status)
+        delivery_label = "Доставка" if lang == "ru" else "Yetkazish"
+        return f"{idx}. {delivery_label} #{order_id} • {title[:20]} ×{quantity} • {status_label}"
 
 
 def _build_list_text(
@@ -75,21 +77,21 @@ def _build_list_text(
     lines = []
 
     if filter_type == "pending":
-        header = "⏳ YANGI BUYURTMALAR" if lang == "uz" else "⏳ НОВЫЕ ЗАКАЗЫ"
+        header = "YANGI BUYURTMALAR" if lang == "uz" else "НОВЫЕ ЗАКАЗЫ"
     elif filter_type == "active":
-        header = "✅ FAOL BUYURTMALAR" if lang == "uz" else "✅ АКТИВНЫЕ ЗАКАЗЫ"
+        header = "FAOL BUYURTMALAR" if lang == "uz" else "АКТИВНЫЕ ЗАКАЗЫ"
     elif filter_type == "completed":
-        header = "🎉 BAJARILGAN" if lang == "uz" else "🎉 ВЫПОЛНЕННЫЕ"
+        header = "BAJARILGAN" if lang == "uz" else "ВЫПОЛНЕННЫЕ"
     else:
-        header = "🎫 BUYURTMALAR" if lang == "uz" else "🎫 ЗАКАЗЫ"
+        header = "BUYURTMALAR" if lang == "uz" else "ЗАКАЗЫ"
 
     lines.append(f"<b>{header}</b>")
     lines.append("")
 
     pickup_label = "Olib ketish" if lang == "uz" else "Самовывоз"
     delivery_label = "Yetkazish" if lang == "uz" else "Доставка"
-    lines.append(f"🏪 {pickup_label}: <b>{len(pickup_orders)}</b>")
-    lines.append(f"🚚 {delivery_label}: <b>{len(delivery_orders)}</b>")
+    lines.append(f"{pickup_label}: <b>{len(pickup_orders)}</b>")
+    lines.append(f"{delivery_label}: <b>{len(delivery_orders)}</b>")
     lines.append("─" * 25)
 
     idx = 1
@@ -106,7 +108,7 @@ def _build_list_text(
         lines.append(f"\n<i>{empty}</i>")
     else:
         hint = "Tanlang:" if lang == "uz" else "Выберите:"
-        lines.append(f"\n<i>👆 {hint}</i>")
+        lines.append(f"\n<i>{hint}</i>")
 
     return "\n".join(lines)
 
@@ -123,9 +125,9 @@ def _build_keyboard(
             order[0] if isinstance(order, (list, tuple)) else 0
         )
         status = _get_field(order, "order_status") or "pending"
-        emoji = {"pending": "⏳", "preparing": "✅", "ready": "👨‍🍳"}.get(status, "📦")
         # Use "o_" prefix for all orders (unified table)
-        kb.button(text=f"{emoji} 🏪#{order_id}", callback_data=f"seller_view_o_{order_id}")
+        pickup_label = "Самовывоз" if lang == "ru" else "Olib ketish"
+        kb.button(text=f"{pickup_label} #{order_id}", callback_data=f"seller_view_o_{order_id}")
 
     # Delivery orders buttons
     for order in delivery_orders[:5]:
@@ -133,15 +135,15 @@ def _build_keyboard(
             order[0] if isinstance(order, (list, tuple)) else 0
         )
         status = _get_field(order, "order_status") or "pending"
-        emoji = {"pending": "⏳", "preparing": "👨‍🍳", "delivering": "🚚"}.get(status, "📦")
-        kb.button(text=f"{emoji} 🚚#{order_id}", callback_data=f"seller_view_o_{order_id}")
+        delivery_label = "Доставка" if lang == "ru" else "Yetkazish"
+        kb.button(text=f"{delivery_label} #{order_id}", callback_data=f"seller_view_o_{order_id}")
 
     kb.adjust(2)
 
     filter_row = []
-    new_label = "⏳ Yangi" if lang == "uz" else "⏳ Новые"
-    active_label = "✅ Faol" if lang == "uz" else "✅ Активные"
-    done_label = "🎉 Tayyor" if lang == "uz" else "🎉 Готовые"
+    new_label = "Yangi" if lang == "uz" else "Новые"
+    active_label = "Faol" if lang == "uz" else "Активные"
+    done_label = "Tayyor" if lang == "uz" else "Готовые"
 
     if filter_type != "pending":
         filter_row.append(("seller_filter_pending", new_label))
@@ -155,7 +157,7 @@ def _build_keyboard(
 
     kb.adjust(2, 3)
 
-    refresh = "🔄 Yangilash" if lang == "uz" else "🔄 Обновить"
+    refresh = "Yangilash" if lang == "uz" else "Обновить"
     kb.button(text=refresh, callback_data="seller_orders_refresh")
     kb.adjust(2, 3, 1)
 
@@ -225,7 +227,12 @@ def _get_all_orders(db, user_id: int) -> tuple[list, list]:
 # =============================================================================
 
 
-@router.message(F.text.contains("🎫 Заказы продавца") | F.text.contains("Buyurtmalar (sotuvchi)"))
+@router.message(
+    F.text.contains("Заказы продавца")
+    | F.text.contains("Buyurtmalar (sotuvchi)")
+    | F.text.contains(get_text("ru", "orders"))
+    | F.text.contains(get_text("uz", "orders"))
+)
 async def seller_orders_main(message: types.Message, state: FSMContext) -> Any:
     """Main seller orders view - single message."""
     db = get_db()

@@ -276,7 +276,7 @@ async def test_cancel_booking_via_callback(temp_db: Database, monkeypatch: pytes
     seller_id = 323002
     temp_db.add_user(user_id=seller_id, username="seller", first_name="Seller")
     temp_db.update_user_role(seller_id, "seller")
-    store_id = temp_db.add_store(seller_id, "S1", "Ташкент")
+    store_id = temp_db.add_store(owner_id=seller_id, name="S1", city="Ташкент")
     offer_id = temp_db.add_offer(store_id, "O1", "", 10000.0, 5000.0, 1, "10:00", "22:00")
 
     ok, booking_id, code = temp_db.create_booking_atomic(offer_id, user_id, 1)

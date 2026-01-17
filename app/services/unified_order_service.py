@@ -796,6 +796,60 @@ class UnifiedOrderService:
         except Exception:
             return True
 
+    def _get_offer_photo(self, offer_id: int | None) -> str | None:
+        if not offer_id or not hasattr(self.db, "get_offer"):
+            return None
+        try:
+            offer = self.db.get_offer(int(offer_id))
+        except Exception:
+            return None
+        if isinstance(offer, dict):
+            return offer.get("photo") or offer.get("photo_id")
+        return getattr(offer, "photo", None) or getattr(offer, "photo_id", None)
+
+    @staticmethod
+    def _extract_photo_from_items(items: list[Any] | None) -> str | None:
+        if not items:
+            return None
+        for item in items:
+            if isinstance(item, dict):
+                photo = (
+                    item.get("photo")
+                    or item.get("photo_id")
+                    or item.get("offer_photo")
+                    or item.get("offer_photo_id")
+                )
+            else:
+                photo = getattr(item, "photo", None) or getattr(item, "photo_id", None)
+            if photo:
+                return str(photo)
+        return None
+
+    def _resolve_photo_from_items(
+        self,
+        items: list[Any] | None,
+        offer_id: int | None = None,
+    ) -> str | None:
+        photo = self._extract_photo_from_items(items)
+        if photo:
+            return photo
+        if items:
+            for item in items:
+                item_offer_id = None
+                if isinstance(item, dict):
+                    item_offer_id = item.get("offer_id")
+                else:
+                    item_offer_id = getattr(item, "offer_id", None)
+                if item_offer_id:
+                    try:
+                        offer_id_int = int(item_offer_id)
+                    except (TypeError, ValueError):
+                        offer_id_int = None
+                    photo = self._get_offer_photo(offer_id_int) if offer_id_int else None
+                    if photo:
+                        return photo
+        return self._get_offer_photo(offer_id)
+
     # =========================================================================
     # ORDER CREATION
     # =========================================================================
@@ -1033,6 +1087,9 @@ class UnifiedOrderService:
                 currency=currency,
             )
 
+            primary_offer_id = items[0].offer_id if items else None
+            customer_photo = self._resolve_photo_from_items(items, primary_offer_id)
+
             entity_ids_raw = [x for x in (order_ids + booking_ids) if x]
             entity_ids = [int(x) for x in entity_ids_raw]
             entity_id = entity_ids[0] if entity_ids else None
@@ -1075,9 +1132,22 @@ class UnifiedOrderService:
             sent_msg = None
             if customer_notifications and telegram_enabled:
                 try:
-                    sent_msg = await self.bot.send_message(
-                        user_id, customer_msg, parse_mode="HTML"
-                    )
+                    if customer_photo:
+                        try:
+                            sent_msg = await self.bot.send_photo(
+                                user_id,
+                                photo=customer_photo,
+                                caption=customer_msg,
+                                parse_mode="HTML",
+                            )
+                        except Exception as photo_err:
+                            logger.warning(
+                                f"Failed to send customer photo for {user_id}: {photo_err}"
+                            )
+                    if not sent_msg:
+                        sent_msg = await self.bot.send_message(
+                            user_id, customer_msg, parse_mode="HTML"
+                        )
                 except Exception as e:
                     logger.error(f"Failed to notify customer {user_id}: {e}")
 
@@ -1482,6 +1552,10 @@ class UnifiedOrderService:
                     delivery_price=store_delivery,
                     currency=currency,
                 )
+                primary_offer_id = (
+                    store_orders[0].get("offer_id") if store_orders else None
+                )
+                seller_photo = self._resolve_photo_from_items(store_orders, primary_offer_id)
                 store_payload = {
                     "id": int(store_id),
                     "name": store.get("name", "") if isinstance(store, dict) else "",
@@ -1526,9 +1600,26 @@ class UnifiedOrderService:
 
                 sent_msg = None
                 if telegram_enabled:
-                    sent_msg = await self.bot.send_message(
-                        owner_id, seller_text, parse_mode="HTML", reply_markup=kb.as_markup()
-                    )
+                    if seller_photo:
+                        try:
+                            sent_msg = await self.bot.send_photo(
+                                owner_id,
+                                photo=seller_photo,
+                                caption=seller_text,
+                                parse_mode="HTML",
+                                reply_markup=kb.as_markup(),
+                            )
+                        except Exception as photo_err:
+                            logger.warning(
+                                f"Failed to send seller photo to {owner_id}: {photo_err}"
+                            )
+                    if not sent_msg:
+                        sent_msg = await self.bot.send_message(
+                            owner_id,
+                            seller_text,
+                            parse_mode="HTML",
+                            reply_markup=kb.as_markup(),
+                        )
                     logger.info(
                         f"Sent order notification to seller {owner_id} for orders {order_ids}"
                     )
@@ -1701,6 +1792,13 @@ class UnifiedOrderService:
                 offer = self.db.get_offer(int(offer_id)) if hasattr(self.db, "get_offer") else None
                 title = offer.get("title", "") if isinstance(offer, dict) else ""
                 price = offer.get("discount_price", 0) if isinstance(offer, dict) else 0
+                offer_photo = None
+                if isinstance(offer, dict):
+                    offer_photo = offer.get("photo") or offer.get("photo_id")
+                else:
+                    offer_photo = getattr(offer, "photo", None) if offer else None
+                    if not offer_photo:
+                        offer_photo = getattr(offer, "photo_id", None) if offer else None
                 items.append(
                     {
                         "order_id": order_id,
@@ -1713,6 +1811,7 @@ class UnifiedOrderService:
                         "title": title,
                         "store_name": store_name,
                         "store_address": store_address,
+                        "photo": offer_photo,
                         "delivery_price": int(order.get("delivery_price", 0))
                         if isinstance(order, dict)
                         else int(getattr(order, "delivery_price", 0) or 0),
@@ -2163,6 +2262,8 @@ class UnifiedOrderService:
                         }
                     ]
 
+                customer_photo = self._resolve_photo_from_items(cart_items, offer_id)
+
                 group_order_ids = None
                 group_statuses: list[str] | None = None
                 orders_for_group = None
@@ -2411,9 +2512,23 @@ class UnifiedOrderService:
                     ):
                         # Send new message only if edit failed or no existing message
                         try:
-                            message_sent = await self.bot.send_message(
-                                user_id, msg, parse_mode="HTML", reply_markup=reply_markup
-                            )
+                            if customer_photo:
+                                try:
+                                    message_sent = await self.bot.send_photo(
+                                        user_id,
+                                        photo=customer_photo,
+                                        caption=msg,
+                                        parse_mode="HTML",
+                                        reply_markup=reply_markup,
+                                    )
+                                except Exception as photo_err:
+                                    logger.warning(
+                                        f"Failed to send status photo to customer {user_id}: {photo_err}"
+                                    )
+                            if not message_sent:
+                                message_sent = await self.bot.send_message(
+                                    user_id, msg, parse_mode="HTML", reply_markup=reply_markup
+                                )
                             logger.info(f"Sent NEW message for {entity_type}#{entity_id}")
                             # Save message_id for future edits - ALWAYS save to maintain live update chain
                             if message_sent:
@@ -2499,8 +2614,16 @@ class UnifiedOrderService:
                                         qty = int(item.get("quantity", 1))
                                         price = int(item.get("price", 0))
                                         title = item.get("title", "")
+                                        item_offer_id = item.get("offer_id")
+                                        item_photo = item.get("photo") or item.get("photo_id")
                                         items.append(
-                                            {"title": title, "quantity": qty, "price": price}
+                                            {
+                                                "title": title,
+                                                "quantity": qty,
+                                                "price": price,
+                                                "offer_id": item_offer_id,
+                                                "photo": item_photo,
+                                            }
                                         )
                                         total += price * qty
                                 except Exception:
@@ -2526,11 +2649,22 @@ class UnifiedOrderService:
                                     price = (
                                         offer.get("discount_price", 0) if isinstance(offer, dict) else 0
                                     )
+                                    offer_photo = None
+                                    if isinstance(offer, dict):
+                                        offer_photo = offer.get("photo") or offer.get("photo_id")
+                                    else:
+                                        offer_photo = getattr(offer, "photo", None) if offer else None
+                                        if not offer_photo:
+                                            offer_photo = (
+                                                getattr(offer, "photo_id", None) if offer else None
+                                            )
                                     items.append(
                                         {
                                             "title": title,
                                             "quantity": int(quantity or 1),
                                             "price": int(price or 0),
+                                            "offer_id": int(offer_id),
+                                            "photo": offer_photo,
                                         }
                                     )
                                     total = int(price or 0) * int(quantity or 1)
@@ -2562,6 +2696,7 @@ class UnifiedOrderService:
                                 delivery_price=delivery_price,
                                 currency=currency,
                             )
+                            seller_photo = self._resolve_photo_from_items(items, offer_id)
 
                             kb = InlineKeyboardBuilder()
                             if resolved_order_type in ("delivery", "taxi"):
@@ -2642,12 +2777,27 @@ class UnifiedOrderService:
                                         )
                             elif self.force_telegram_sync:
                                 try:
-                                    sent_msg = await self.bot.send_message(
-                                        owner_id,
-                                        seller_text,
-                                        parse_mode="HTML",
-                                        reply_markup=reply_markup,
-                                    )
+                                    sent_msg = None
+                                    if seller_photo:
+                                        try:
+                                            sent_msg = await self.bot.send_photo(
+                                                owner_id,
+                                                photo=seller_photo,
+                                                caption=seller_text,
+                                                parse_mode="HTML",
+                                                reply_markup=reply_markup,
+                                            )
+                                        except Exception as photo_err:
+                                            logger.warning(
+                                                f"Failed to send status photo to seller {owner_id}: {photo_err}"
+                                            )
+                                    if not sent_msg:
+                                        sent_msg = await self.bot.send_message(
+                                            owner_id,
+                                            seller_text,
+                                            parse_mode="HTML",
+                                            reply_markup=reply_markup,
+                                        )
                                     if sent_msg and hasattr(self.db, "set_order_seller_message_id"):
                                         self.db.set_order_seller_message_id(
                                             entity_id, sent_msg.message_id

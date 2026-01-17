@@ -63,7 +63,11 @@ async def test_admin_approve_and_reject_store(temp_db: Database, monkeypatch: py
 
     temp_db.add_user(user_id=owner_id, username="owner", first_name="Owner")
     temp_db.update_user_language(owner_id, "ru")
-    store_id = temp_db.add_store(owner_id, "Moderated Store", "Ташкент")
+    store_id = temp_db.add_store(
+        owner_id=owner_id,
+        name="Moderated Store",
+        city="Ташкент",
+    )
 
     storage = MemoryStorage()
     dp = Dispatcher(storage=storage)

@@ -44,14 +44,14 @@ TEXTS = {
         "no_results": "Ничего не найдено. Попробуйте другой запрос.",
         "action_cancelled": "Отменено",
         "select_category_in_store": "Выберите категорию:",
-        # Партнёр - новые короткие названия
+        # Партнёр - меню
         "add_item": "➕ Добавить",
-        "my_items": "📦 Мои товары",
-        "orders": "🎫 Заказы продавца",
-        "today_stats": "📊 Сегодня",
-        "bulk_import": "📥 Массовый импорт",
-        "store_settings": "⚙️ Настройки",
-        "back_to_customer": "🛒 Режим покупателя",
+        "my_items": "📦 Товары",
+        "orders": "🧾 Заказы партнёра",
+        "today_stats": "📊 Статистика",
+        "bulk_import": "📥 Импорт",
+        "store_settings": "⚙️ Настройки магазина",
+        "back_to_customer": "🛒 Режим: покупатель",
         # Старые ключи (для совместимости)
         "add_offer": "➕ Добавить",
         "my_offers": "📋 Мои товары",
@@ -68,7 +68,7 @@ TEXTS = {
         "role_seller": "Партнёр",
         "role_customer": "Покупатель",
         "switched_to_customer": "Режим: покупатель",
-        "switched_to_seller": "Режим: партнер",
+        "switched_to_seller": "Режим: партнёр",
         # Города
         "your_city": "Ваш город",
         "choose_city": "<b>Выберите город:</b>",
@@ -144,41 +144,32 @@ TEXTS = {
 • Проверяйте раздел "Акции" каждый день
 • Забирайте товар в указанное время
 • Оценивайте магазины после покупки""",
-        "help_partner": """❓ <b>Как работать партнёром?</b>
+        "help_partner": """<b>Партнёрский кабинет: как работать</b>
 
-<b>➕ Добавление товаров:</b>
-1️⃣ Нажмите "Добавить товар"
-2️⃣ Укажите название, фото, цены
-3️⃣ Категория определится автоматически
-4️⃣ Товар сразу появится у покупателей
+<b>Добавление товаров</b>
+1) Нажмите «Добавить»
+2) Укажите название, цену и срок
+3) Добавьте фото по желанию
+4) Товар сразу появится у покупателей
 
-<b>📦 Ваши товары</b>
-Просмотр всех ваших товаров
-Можно редактировать или удалить
+<b>Товары</b>
+Просмотр, редактирование и удаление позиций.
 
-<b>🎫 Заказы продавца:</b>
-⏳ <b>Новые</b> - покупатель забронировал товар
-→ Подтвердите заказ (кнопка ✅)
+<b>Заказы</b>
+Новые - подтвердите.
+Готовится - подготовьте товар.
+Готово - выдайте по коду.
+Завершённые и отменённые - в истории.
 
-✅ <b>Подтверждённые</b> - покупатель придёт забрать
-→ Попросите 8-значный код
-→ Выдайте товар и завершите заказ
+<b>Статистика</b>
+Продажи, товары и средний чек.
 
-🎉 <b>Завершённые</b> - товар выдан, деньги получены
-
-❌ <b>Отменённые</b> - заказ не состоялся
-
-<b>📊 Статистика:</b>
-• Сколько товаров продано
-• Какие товары популярны
-• Средний чек
-
-<b>💡 Советы для роста продаж:</b>
-• Делайте скидки 30-70%
-• Загружайте качественные фото
-• Обновляйте товары каждый день
+<b>Советы</b>
+• Скидки 30-70%
+• Качественные фото
+• Обновляйте ассортимент
 • Быстро подтверждайте заказы
-• Указывайте точное время забора""",
+• Указывайте точное время выдачи""",
         # Бронирование
         "booking_step_quantity": """┏━━━━━━━━━━━━━━━━━━━━━┓
 ┃   БРОНИРОВАНИЕ        ┃
@@ -434,16 +425,16 @@ TEXTS = {
         "buy_now": "⚡ Купить сейчас",
         "added_to_cart": "✅ Добавлено в корзину!",
         # Партнёрский онбординг
-        "partner_welcome": """🎉 <b>Добро пожаловать, партнёр!</b>
+        "partner_welcome": """<b>Добро пожаловать, партнёр!</b>
 
 Ваш магазин одобрен и готов к работе.
 
-<b>Начните прямо сейчас:</b>
-1️⃣ Добавьте первый товар
-2️⃣ Установите скидку 30-70%
-3️⃣ Получайте заказы!
+<b>С чего начать:</b>
+1) Добавьте первый товар
+2) Установите скидку 30-70%
+3) Принимайте заказы
 
-💡 Совет: товары с фото продаются в 3 раза лучше""",
+Совет: товары с фото продаются лучше""",
         "partner_add_first": "➕ Добавить первый товар",
         # Хардкод-тексты которые нужно было перевести
         "offer_not_found": "Товар не найден",
@@ -610,12 +601,12 @@ Bo'limni tanlang.""",
         "select_category_in_store": "Toifani tanlang:",
         # Hamkor - yangi qisqa nomlar
         "add_item": "➕ Qo'shish",
-        "my_items": "📦 Mening mahsulotlarim",
-        "orders": "🎫 Buyurtmalar (sotuvchi)",
-        "today_stats": "📊 Bugun",
-        "bulk_import": "📦 Ommaviy import",
-        "store_settings": "⚙️ Sozlamalar",
-        "back_to_customer": "🔙 Xaridor rejimi",
+        "my_items": "📦 Mahsulotlar",
+        "orders": "🧾 Hamkor buyurtmalari",
+        "today_stats": "📊 Statistika",
+        "bulk_import": "📥 Import",
+        "store_settings": "⚙️ Do'kon sozlamalari",
+        "back_to_customer": "🛒 Rejim: xaridor",
         # Eski kalitlar (muvofiqligi uchun)
         "add_offer": "➕ Qo'shish",
         "my_offers": "📦 Mening mahsulotlarim",
@@ -779,41 +770,32 @@ Misol: yogurt, non, sut
 • Har kuni "Aksiyalar" bo'limini tekshiring
 • Mahsulotni ko'rsatilgan vaqtda oling
 • Xariddan keyin do'konni baholang""",
-        "help_partner": """❓ <b>Hamkor sifatida qanday ishlash?</b>
+        "help_partner": """<b>Hamkor kabineti: qisqa qo'llanma</b>
 
-<b>➕ Mahsulot qo'shish:</b>
-1️⃣ "Mahsulot qo'shish" tugmasini bosing
-2️⃣ Nomi, rasm, narxlarni kiriting
-3️⃣ Kategoriya avtomatik aniqlanadi
-4️⃣ Mahsulot darhol xaridorlarda ko'rinadi
+<b>Mahsulot qo'shish</b>
+1) «Qo'shish» tugmasini bosing
+2) Nomi, narxi va muddatini kiriting
+3) Xohlasangiz rasm qo'shing
+4) Mahsulot darhol ko'rinadi
 
-<b>📦 Mening mahsulotlarim</b>
-Barcha mahsulotlaringizni ko'ring
-Tahrirlash yoki o'chirish mumkin
+<b>Mahsulotlar</b>
+Ro'yxat, tahrirlash va o'chirish.
 
-<b>🎫 Sotuvchi buyurtmalari:</b>
-⏳ <b>Yangi</b> - xaridor mahsulotni bron qildi
-→ Buyurtmani tasdiqlang (✅ tugma)
+<b>Buyurtmalar</b>
+Yangi - tasdiqlang.
+Tayyorlanmoqda - mahsulotni tayyorlang.
+Tayyor - kod bo'yicha bering.
+Yakunlangan va bekor qilingan - tarixda.
 
-✅ <b>Tasdiqlangan</b> - xaridor kelib oladi
-→ 8 raqamli kodni so'rang
-→ Mahsulotni bering va buyurtmani yakunlang
+<b>Statistika</b>
+Savdo, mahsulotlar va o'rtacha чек.
 
-🎉 <b>Bajarilgan</b> - mahsulot berildi, pul olindi
-
-❌ <b>Bekor qilindi</b> - buyurtma amalga oshmadi
-
-<b>📊 Statistika:</b>
-• Qancha mahsulot sotildi
-• Qaysi mahsulotlar mashhur
-• O'rtacha chek
-
-<b>💡 Sotishni oshirish uchun:</b>
-• 30-70% chegirma bering
-• Sifatli rasm yuklang
-• Har kuni mahsulotlarni yangilang
+<b>Maslahatlar</b>
+• 30-70% chegirma
+• Sifatli rasmlar
+• Assortimentni yangilang
 • Buyurtmalarni tez tasdiqlang
-• Olib ketish vaqtini aniq ko'rsating""",
+• Berish vaqtini aniq yozing""",
         # Buyurtma
         "booking_success": """<b>✅ Buyurtma muvaffaqiyatli</b>
 
@@ -1067,16 +1049,16 @@ Maksimum: {max} dona
         "buy_now": "⚡ Hozir sotib olish",
         "added_to_cart": "✅ Savatga qo'shildi!",
         # Hamkor onbordingi
-        "partner_welcome": """🎉 <b>Xush kelibsiz, hamkor!</b>
+        "partner_welcome": """<b>Xush kelibsiz, hamkor!</b>
 
 Do'koningiz tasdiqlandi va ishlashga tayyor.
 
-<b>Hoziroq boshlang:</b>
-1️⃣ Birinchi mahsulotni qo'shing
-2️⃣ 30-70% chegirma qo'ying
-3️⃣ Buyurtmalar oling!
+<b>Nimadan boshlash kerak:</b>
+1) Birinchi mahsulotni qo'shing
+2) 30-70% chegirma qo'ying
+3) Buyurtmalarni qabul qiling
 
-💡 Maslahat: rasmli mahsulotlar 3 baravar yaxshi sotiladi""",
+Maslahat: rasmli mahsulotlar yaxshiroq sotiladi""",
         "partner_add_first": "➕ Birinchi mahsulotni qo'shish",
         # Qo'shimcha tarjimalar (xardkod-tekstlar)
         "offer_not_found": "Mahsulot topilmadi",

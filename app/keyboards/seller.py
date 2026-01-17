@@ -73,8 +73,8 @@ def offer_manage_keyboard(offer_id: int, lang: str = "ru") -> InlineKeyboardMark
 def store_keyboard(store_id: int) -> InlineKeyboardMarkup:
     """Store management keyboard."""
     builder = InlineKeyboardBuilder()
-    builder.button(text="📊 Статистика", callback_data=f"store_stats_{store_id}")
-    builder.button(text="📋 Предложения", callback_data=f"store_offers_{store_id}")
+    builder.button(text="Статистика", callback_data=f"store_stats_{store_id}")
+    builder.button(text="Товары", callback_data=f"store_offers_{store_id}")
     builder.adjust(2)
     return builder.as_markup()
 
@@ -82,7 +82,7 @@ def store_keyboard(store_id: int) -> InlineKeyboardMarkup:
 def moderation_keyboard(store_id: int) -> InlineKeyboardMarkup:
     """Store moderation keyboard."""
     builder = InlineKeyboardBuilder()
-    builder.button(text="✅ Одобрить", callback_data=f"approve_store_{store_id}")
-    builder.button(text="❌ Отклонить", callback_data=f"reject_store_{store_id}")
+    builder.button(text="Одобрить", callback_data=f"approve_store_{store_id}")
+    builder.button(text="Отклонить", callback_data=f"reject_store_{store_id}")
     builder.adjust(2)
     return builder.as_markup()

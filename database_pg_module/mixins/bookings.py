@@ -568,11 +568,11 @@ class BookingMixin:
             cursor = conn.cursor()
             cursor.execute(
                 """
-                INSERT INTO bookings (user_id, offer_id, store_id, quantity)
-                VALUES (%s, %s, %s, %s)
+                INSERT INTO bookings (user_id, offer_id, store_id, quantity, expiry_time)
+                VALUES (%s, %s, %s, %s, now() + (%s * INTERVAL '1 hour'))
                 RETURNING booking_id
             """,
-                (user_id, offer_id, store_id, quantity),
+                (user_id, offer_id, store_id, quantity, BOOKING_DURATION_HOURS),
             )
             return cursor.fetchone()[0]
 
@@ -692,12 +692,20 @@ class BookingMixin:
                 """
                 INSERT INTO bookings (
                     user_id, store_id, booking_code, pickup_time, status,
-                    cart_items, is_cart_booking, quantity
+                    cart_items, is_cart_booking, quantity, expiry_time
                 )
-                VALUES (%s, %s, %s, %s, 'pending', %s, 1, %s)
+                VALUES (%s, %s, %s, %s, 'pending', %s, 1, %s, now() + (%s * INTERVAL '1 hour'))
                 RETURNING booking_id
                 """,
-                (user_id, store_id, booking_code, pickup_time, cart_items_json, len(cart_items)),
+                (
+                    user_id,
+                    store_id,
+                    booking_code,
+                    pickup_time,
+                    cart_items_json,
+                    len(cart_items),
+                    BOOKING_DURATION_HOURS,
+                ),
             )
             booking_id = cursor.fetchone()[0]
 

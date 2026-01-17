@@ -38,14 +38,17 @@ class MockDatabase:
     def add_user(
         self,
         user_id: int,
-        language: str = "ru",
+        username: str | None = None,
         first_name: str | None = None,
         phone: str | None = None,
         city: str | None = None,
+        language: str = "ru",
+        **_kwargs: Any,
     ) -> None:
         """Add user."""
         self.users[user_id] = {
             "id": user_id,
+            "username": username,
             "language": language,
             "first_name": first_name,
             "phone": phone,
@@ -61,11 +64,17 @@ class MockDatabase:
         owner_id: int,
         name: str,
         city: str,
+        region: str | None = None,
+        district: str | None = None,
+        region_id: int | None = None,
+        district_id: int | None = None,
         address: str | None = None,
         description: str | None = None,
         category: str | None = None,
         phone: str | None = None,
         business_type: str = "individual",
+        photo: str | None = None,
+        **_kwargs: Any,
     ) -> int:
         """Add store."""
         store_id = len(self.stores) + 1
@@ -74,11 +83,16 @@ class MockDatabase:
             "owner_id": owner_id,
             "name": name,
             "city": city,
+            "region": region,
+            "district": district,
+            "region_id": region_id,
+            "district_id": district_id,
             "address": address,
             "description": description,
             "category": category,
             "phone": phone,
             "business_type": business_type,
+            "photo": photo,
         }
         return store_id
 

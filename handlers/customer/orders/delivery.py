@@ -769,6 +769,7 @@ async def dlv_pay_click(
 
             title = get_offer_field(offer, "title", "")
             price = int(get_offer_field(offer, "discount_price", 0))
+            offer_photo = get_offer_field(offer, "photo") or get_offer_field(offer, "photo_id")
             store_name = get_store_field(store, "name", "")
             store_address = get_store_field(store, "address", "")
 
@@ -781,6 +782,7 @@ async def dlv_pay_click(
                 quantity=quantity,
                 store_name=store_name,
                 store_address=store_address,
+                photo=offer_photo,
                 delivery_price=delivery_price,
             )
 
@@ -1064,6 +1066,7 @@ async def dlv_payment_proof(
 
             title = get_offer_field(offer, "title", "")
             price = get_offer_field(offer, "discount_price", 0)
+            offer_photo = get_offer_field(offer, "photo") or get_offer_field(offer, "photo_id")
             store_name = get_store_field(store, "name", "")
             store_address = get_store_field(store, "address", "")
 
@@ -1076,6 +1079,7 @@ async def dlv_payment_proof(
                 quantity=int(quantity),
                 store_name=store_name,
                 store_address=store_address,
+                photo=offer_photo,
                 delivery_price=int(delivery_price),
             )
 
@@ -1110,6 +1114,7 @@ async def dlv_payment_proof(
     offer = db.get_offer(offer_id) if offer_id else None
     title = get_offer_field(offer, "title", "Товар")
     price = get_offer_field(offer, "discount_price", 0)
+    offer_photo = get_offer_field(offer, "photo") or get_offer_field(offer, "photo_id")
 
     # Update payment status with photo
     db.update_payment_status(order_id, "proof_submitted", photo_id)
@@ -1162,7 +1167,18 @@ async def dlv_payment_proof(
         customer_msg += "\n\nОжидаем подтверждения оплаты..."
 
     # Confirm to customer - single unified message
-    sent_msg = await message.answer(customer_msg, parse_mode="HTML")
+    sent_msg = None
+    if offer_photo:
+        try:
+            sent_msg = await message.answer_photo(
+                photo=offer_photo,
+                caption=customer_msg,
+                parse_mode="HTML",
+            )
+        except Exception:
+            sent_msg = None
+    if not sent_msg:
+        sent_msg = await message.answer(customer_msg, parse_mode="HTML")
 
     # Save message_id for live status updates
     if sent_msg and order_id and hasattr(db, "set_order_customer_message_id"):

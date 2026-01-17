@@ -35,7 +35,12 @@ def main():
     # create store
     owner_id = 888888
     db.add_user(owner_id, username="owner", first_name="Owner")
-    store_id = db.add_store(owner_id, "Smoke Store", "Tashkent", "Test address")
+    store_id = db.add_store(
+        owner_id=owner_id,
+        name="Smoke Store",
+        city="Tashkent",
+        address="Test address",
+    )
 
     # create offer with quantity 5
     offer_id = db.add_offer(

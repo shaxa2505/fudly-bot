@@ -46,6 +46,8 @@ class UserMixin:
                 region = resolved["region_name_ru"]
             if district is not None and resolved.get("district_name_ru"):
                 district = resolved["district_name_ru"]
+            if region is None and district is not None and resolved.get("region_name_ru"):
+                region = resolved["region_name_ru"]
             region_id = region_id or resolved.get("region_id")
             district_id = district_id or resolved.get("district_id")
 
@@ -127,22 +129,46 @@ class UserMixin:
         clear_longitude: bool = False,
     ) -> None:
         """Update user location fields (any subset)."""
+        allow_region_name = not clear_region
+        allow_district_name = not clear_district
+        allow_region_id = not (clear_region or clear_region_id)
+        allow_district_id = not (clear_district or clear_district_id)
+
+        if not allow_region_name:
+            region = None
+        if not allow_district_name:
+            district = None
+        if not allow_region_id:
+            region_id = None
+        if not allow_district_id:
+            district_id = None
+
         resolved = None
         resolver = getattr(self, "resolve_geo_location", None)
-        if resolver and (region is not None or district is not None or city is not None):
+        if resolver and (allow_region_name or allow_district_name or allow_region_id or allow_district_id) and (
+            region is not None or district is not None or city is not None
+        ):
             try:
-                resolved = resolver(region=region, district=district, city=city)
+                resolved = resolver(
+                    region=region if (allow_region_name or allow_region_id) else None,
+                    district=district if (allow_district_name or allow_district_id) else None,
+                    city=city,
+                )
             except Exception as exc:
                 logger.warning("Geo resolve failed in update_user_location: %s", exc)
         if resolved:
-            if region is not None and resolved.get("region_name_ru"):
-                region = resolved["region_name_ru"]
-            if district is not None and resolved.get("district_name_ru"):
-                district = resolved["district_name_ru"]
-            if region is None and district is not None and resolved.get("region_name_ru"):
-                region = resolved["region_name_ru"]
-            region_id = region_id or resolved.get("region_id")
-            district_id = district_id or resolved.get("district_id")
+            if allow_region_name:
+                if region is not None and resolved.get("region_name_ru"):
+                    region = resolved["region_name_ru"]
+                if region is None and district is not None and resolved.get("region_name_ru"):
+                    region = resolved["region_name_ru"]
+            if allow_district_name:
+                if district is not None and resolved.get("district_name_ru"):
+                    district = resolved["district_name_ru"]
+            if allow_region_id:
+                region_id = region_id or resolved.get("region_id")
+            if allow_district_id:
+                district_id = district_id or resolved.get("district_id")
 
         fields: list[str] = []
         params: list[Any] = []

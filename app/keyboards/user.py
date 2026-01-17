@@ -64,18 +64,18 @@ def settings_keyboard(
         if current_mode == "seller":
             # Currently in seller mode - show store settings button
             builder.button(
-                text="⚙️ Настройки магазина" if lang == "ru" else "⚙️ Do'kon sozlamalari",
+                text=get_text(lang, "store_settings"),
                 callback_data="my_store_settings",
             )
             # Show switch to customer mode
             builder.button(
-                text="↔️ Режим: покупатель" if lang == "ru" else "↔️ Rejim: xaridor",
+                text=get_text(lang, "back_to_customer"),
                 callback_data="switch_to_customer",
             )
         else:
             # Currently in customer mode - show switch to seller
             builder.button(
-                text="↔️ Режим: партнер" if lang == "ru" else "↔️ Rejim: hamkor",
+                text=get_text(lang, "switched_to_seller"),
                 callback_data="switch_to_seller",
             )
     else:

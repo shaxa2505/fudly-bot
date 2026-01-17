@@ -62,7 +62,13 @@ class TestDatabaseSQLite:
         db.update_user_role(user_id, "store_owner")
 
         # Add store
-        db.add_store(user_id, "Test Store", "Test City", "Test Street 1", "Test Description")
+        db.add_store(
+            owner_id=user_id,
+            name="Test Store",
+            city="Test City",
+            address="Test Street 1",
+            description="Test Description",
+        )
 
         # Get stores
         stores = db.get_user_stores(user_id)
@@ -83,7 +89,13 @@ class TestDatabaseSQLite:
         db.update_user_role(user_id, "store_owner")
 
         city = "Moscow"
-        db.add_store(user_id, "Moscow Store", city, "Arbat 1", "Description")
+        db.add_store(
+            owner_id=user_id,
+            name="Moscow Store",
+            city=city,
+            address="Arbat 1",
+            description="Description",
+        )
 
         # Approve store
         stores = db.get_user_stores(user_id)
@@ -108,7 +120,13 @@ class TestDatabaseSQLite:
         db.add_user(user_id=user_id, username="approvedowner")
         db.update_user_role(user_id, "store_owner")
 
-        db.add_store(user_id, "Approved Store", "City", "Address", "Desc")
+        db.add_store(
+            owner_id=user_id,
+            name="Approved Store",
+            city="City",
+            address="Address",
+            description="Desc",
+        )
         stores = db.get_user_stores(user_id)
         if stores:
             store_id = stores[0]["store_id"]
@@ -133,7 +151,13 @@ class TestDatabaseSQLite:
         db.update_user_role(user_id, "store_owner")
 
         store_name = "Single Store"
-        db.add_store(user_id, store_name, "City", "Address", "Desc")
+        db.add_store(
+            owner_id=user_id,
+            name=store_name,
+            city="City",
+            address="Address",
+            description="Desc",
+        )
 
         # Get store by user stores
         stores = db.get_user_stores(user_id)

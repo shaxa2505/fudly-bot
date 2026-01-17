@@ -111,7 +111,18 @@ async def show_store_analytics(callback: types.CallbackQuery) -> None:
     await callback.answer()
 
 
-@router.message(F.text.contains("Сегодня") | F.text.contains("Bugun"))
+@router.message(
+    F.text.in_(
+        {
+            get_text("ru", "today_stats"),
+            get_text("uz", "today_stats"),
+            "Сегодня",
+            "Bugun",
+            "📊 Сегодня",
+            "📊 Bugun",
+        }
+    )
+)
 async def partner_today_stats(message: types.Message, state: FSMContext) -> None:
     """Компактная статистика партнёра за сегодня"""
     # Clear any active FSM state
@@ -180,27 +191,32 @@ async def partner_today_stats(message: types.Message, state: FSMContext) -> None
         cursor.execute(query3, (*store_ids, today))
 
         top_item = cursor.fetchone()
-        top_item_text = f"\n🏆 ТОП товар: {top_item[0]} ({top_item[1]} заказов)" if top_item else ""
+        if top_item:
+            top_item_label = "Top mahsulot" if lang == "uz" else "Топ товар"
+            orders_label = "buyurtma" if lang == "uz" else "заказов"
+            top_item_text = f"\n{top_item_label}: {top_item[0]} ({top_item[1]} {orders_label})"
+        else:
+            top_item_text = ""
 
     # Localized compact summary (RU / UZ)
     if lang == "uz":
         currency = "so'm"
         text = (
-            "📊 <b>BUGUNGI STATISTIKA</b>\n\n"
-            f"💰 Tushum: {revenue:,} {currency}\n"
-            f"📦 Sotilgan mahsulotlar: {items_sold} ta\n"
-            f"🛒 Buyurtmalar: {orders_count}\n"
-            f"📋 Faol takliflar: {active_offers}{top_item_text}\n\n"
+            "<b>Bugungi statistika</b>\n\n"
+            f"Tushum: {revenue:,} {currency}\n"
+            f"Sotilgan mahsulotlar: {items_sold} ta\n"
+            f"Buyurtmalar: {orders_count}\n"
+            f"Faol mahsulotlar: {active_offers}{top_item_text}\n\n"
             f"Yangilandi: {datetime.now().strftime('%H:%M')}"
         )
     else:
         currency = "сум"
         text = (
-            "📊 <b>СТАТИСТИКА СЕГОДНЯ</b>\n\n"
-            f"💰 Выручка: {revenue:,} {currency}\n"
-            f"📦 Товаров продано: {items_sold} шт\n"
-            f"🛒 Заказов: {orders_count}\n"
-            f"📋 Активных товаров: {active_offers}{top_item_text}\n\n"
+            "<b>Статистика за сегодня</b>\n\n"
+            f"Выручка: {revenue:,} {currency}\n"
+            f"Товаров продано: {items_sold} шт\n"
+            f"Заказов: {orders_count}\n"
+            f"Активных товаров: {active_offers}{top_item_text}\n\n"
             f"Обновлено: {datetime.now().strftime('%H:%M')}"
         )
 

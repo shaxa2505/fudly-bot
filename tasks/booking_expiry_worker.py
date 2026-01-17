@@ -1,5 +1,6 @@
 import asyncio
 import logging
+import os
 from typing import Any
 
 from app.keyboards import main_menu_customer
@@ -14,6 +15,24 @@ async def start_booking_expiry_worker(db: Any, bot: Any) -> None:
     - Cancels expired bookings and returns reserved quantity to offers
     """
     check_interval = getattr(db, "BOOKING_EXPIRY_CHECK_MINUTES", 30)
+    pending_expiry_minutes = int(os.environ.get("PICKUP_PENDING_EXPIRY_MINUTES", "60"))
+    ready_expiry_hours = int(os.environ.get("PICKUP_READY_EXPIRY_HOURS", "2"))
+
+    order_service = None
+    order_status_cancelled = "cancelled"
+    try:
+        from app.services.unified_order_service import (
+            OrderStatus,
+            get_unified_order_service,
+            init_unified_order_service,
+        )
+
+        order_service = get_unified_order_service()
+        if not order_service and bot:
+            order_service = init_unified_order_service(db, bot)
+        order_status_cancelled = OrderStatus.CANCELLED
+    except Exception as e:
+        logger.error(f"Failed to init UnifiedOrderService for order auto-cancel: {e}")
 
     while True:
         try:
@@ -276,6 +295,153 @@ async def start_booking_expiry_worker(db: Any, bot: Any) -> None:
                             logger.error(f"Error processing expired booking row: {e}")
             except Exception as e:
                 logger.error(f"Expired booking query failed: {e}")
+
+            # 3) Expired pickup orders (pending too long)
+            if order_service and pending_expiry_minutes > 0:
+                try:
+                    with db.get_connection() as conn:
+                        cursor = conn.cursor()
+                        pending_statuses = [
+                            "pending",
+                            "awaiting_payment",
+                            "awaiting_admin_confirmation",
+                            "paid",
+                            "new",
+                        ]
+                        try:
+                            cursor.execute(
+                                """
+                                SELECT order_id, user_id
+                                FROM orders
+                                WHERE order_status = ANY(%s)
+                                  AND (order_type = 'pickup' OR (order_type IS NULL AND COALESCE(delivery_address, '') = ''))
+                                  AND created_at <= now() - (%s * INTERVAL '1 minute')
+                            """,
+                                (pending_statuses, pending_expiry_minutes),
+                            )
+                        except Exception as e:
+                            if "order_type" in str(e):
+                                cursor.execute(
+                                    """
+                                    SELECT order_id, user_id
+                                    FROM orders
+                                    WHERE order_status = ANY(%s)
+                                      AND COALESCE(delivery_address, '') = ''
+                                      AND created_at <= now() - (%s * INTERVAL '1 minute')
+                                """,
+                                    (pending_statuses, pending_expiry_minutes),
+                                )
+                            else:
+                                raise
+
+                        rows = cursor.fetchall()
+                        for row in rows:
+                            try:
+                                if hasattr(row, "get"):
+                                    order_id = row.get("order_id")
+                                else:
+                                    order_id = row[0]
+
+                                if not order_id:
+                                    continue
+
+                                ok = await order_service.update_status(
+                                    entity_id=int(order_id),
+                                    entity_type="order",
+                                    new_status=order_status_cancelled,
+                                    notify_customer=True,
+                                )
+                                if ok:
+                                    logger.info(
+                                        f"Auto-cancelled stale pickup order {order_id} (pending)"
+                                    )
+                            except Exception as e:
+                                logger.error(f"Error processing stale pickup order row: {e}")
+                except Exception as e:
+                    logger.error(f"Pending pickup order query failed: {e}")
+
+            # 4) Expired pickup orders (ready too long)
+            if order_service and ready_expiry_hours > 0:
+                try:
+                    with db.get_connection() as conn:
+                        cursor = conn.cursor()
+                        try:
+                            cursor.execute(
+                                """
+                                SELECT order_id, user_id
+                                FROM orders
+                                WHERE order_status = 'ready'
+                                  AND (order_type = 'pickup' OR (order_type IS NULL AND COALESCE(delivery_address, '') = ''))
+                                  AND COALESCE(updated_at, created_at) <= now() - (%s * INTERVAL '1 hour')
+                            """,
+                                (ready_expiry_hours,),
+                            )
+                        except Exception as e:
+                            if "order_type" in str(e):
+                                try:
+                                    cursor.execute(
+                                        """
+                                        SELECT order_id, user_id
+                                        FROM orders
+                                        WHERE order_status = 'ready'
+                                          AND COALESCE(delivery_address, '') = ''
+                                          AND COALESCE(updated_at, created_at) <= now() - (%s * INTERVAL '1 hour')
+                                    """,
+                                        (ready_expiry_hours,),
+                                    )
+                                except Exception as e2:
+                                    if "updated_at" in str(e2):
+                                        cursor.execute(
+                                            """
+                                            SELECT order_id, user_id
+                                            FROM orders
+                                            WHERE order_status = 'ready'
+                                              AND COALESCE(delivery_address, '') = ''
+                                              AND created_at <= now() - (%s * INTERVAL '1 hour')
+                                        """,
+                                            (ready_expiry_hours,),
+                                        )
+                                    else:
+                                        raise
+                            elif "updated_at" in str(e):
+                                cursor.execute(
+                                    """
+                                    SELECT order_id, user_id
+                                    FROM orders
+                                    WHERE order_status = 'ready'
+                                      AND (order_type = 'pickup' OR (order_type IS NULL AND COALESCE(delivery_address, '') = ''))
+                                      AND created_at <= now() - (%s * INTERVAL '1 hour')
+                                """,
+                                    (ready_expiry_hours,),
+                                )
+                            else:
+                                raise
+
+                        rows = cursor.fetchall()
+                        for row in rows:
+                            try:
+                                if hasattr(row, "get"):
+                                    order_id = row.get("order_id")
+                                else:
+                                    order_id = row[0]
+
+                                if not order_id:
+                                    continue
+
+                                ok = await order_service.update_status(
+                                    entity_id=int(order_id),
+                                    entity_type="order",
+                                    new_status=order_status_cancelled,
+                                    notify_customer=True,
+                                )
+                                if ok:
+                                    logger.info(
+                                        f"Auto-cancelled pickup order {order_id} (ready timeout)"
+                                    )
+                            except Exception as e:
+                                logger.error(f"Error processing ready pickup order row: {e}")
+                except Exception as e:
+                    logger.error(f"Ready pickup order query failed: {e}")
 
         except Exception as e:
             logger.error(f"Booking expiry worker failed: {e}")

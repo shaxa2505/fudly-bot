@@ -18,7 +18,12 @@ from .utils import get_db, get_offer_field, get_store_field, update_offer_messag
 router = Router()
 
 
-@router.message(F.text.contains("Мои товары") | F.text.contains("Mening mahsulotlarim"))
+@router.message(
+    F.text.contains("Мои товары")
+    | F.text.contains("Mening mahsulotlarim")
+    | F.text.contains(get_text("ru", "my_items"))
+    | F.text.contains(get_text("uz", "my_items"))
+)
 async def my_offers(message: types.Message, state: FSMContext) -> None:
     """Display seller's offers with management buttons."""
     # Clear any active FSM state
@@ -38,7 +43,7 @@ async def my_offers(message: types.Message, state: FSMContext) -> None:
     for store in stores:
         store_id = get_store_field(store, "store_id")
         store_name = get_store_field(store, "name", "Магазин")
-        offers = db.get_store_offers(store_id)
+        offers = db.get_offers_by_store(store_id, include_all=True)
         logger.info(f"Store {store_id} ({store_name}), offers count: {len(offers)}")
         all_offers.extend(offers)
 
@@ -46,13 +51,13 @@ async def my_offers(message: types.Message, state: FSMContext) -> None:
 
     if not all_offers:
         await message.answer(
-            "📦 <b>" + ("Ваши товары" if lang == "ru" else "Sizning mahsulotlaringiz") + "</b>\n\n"
-            "❌ " + get_text(lang, "no_offers_yet") + "\n\n"
-            "💡 "
+            "<b>" + ("Ваши товары" if lang == "ru" else "Mahsulotlaringiz") + "</b>\n\n"
+            + get_text(lang, "no_offers_yet")
+            + "\n\n"
             + (
-                "Нажмите ➕ Добавить чтобы создать первый товар"
+                "Нажмите «Добавить», чтобы создать первый товар."
                 if lang == "ru"
-                else "➕ Qo'shish tugmasini bosing"
+                else "Birinchi mahsulotni yaratish uchun «Qo'shish» tugmasini bosing."
             ),
             parse_mode="HTML",
         )
@@ -64,22 +69,20 @@ async def my_offers(message: types.Message, state: FSMContext) -> None:
 
     # Filter menu
     filter_kb = InlineKeyboardBuilder()
-    filter_kb.button(text=f"✅ Активные ({active_count})", callback_data="filter_offers_active_0")
+    filter_kb.button(text=f"Активные ({active_count})", callback_data="filter_offers_active_0")
     filter_kb.button(
-        text=f"❌ Неактивные ({inactive_count})", callback_data="filter_offers_inactive_0"
+        text=f"Неактивные ({inactive_count})", callback_data="filter_offers_inactive_0"
     )
-    filter_kb.button(text=f"📋 Все ({len(all_offers)})", callback_data="filter_offers_all_0")
-    filter_kb.button(text="🔍 Поиск", callback_data="search_my_offers")
+    filter_kb.button(text=f"Все ({len(all_offers)})", callback_data="filter_offers_all_0")
+    filter_kb.button(text="Поиск", callback_data="search_my_offers")
     filter_kb.adjust(2, 1, 1)
 
     await message.answer(
-        "┌─────────────────────────┐\n"
-        f"│  📦 <b>{'ВАШИ ТОВАРЫ' if lang == 'ru' else 'MAHSULOTLARINGIZ'}</b>  │\n"
-        "└─────────────────────────┘\n\n"
-        f"✅ Активных: <b>{active_count}</b>\n"
-        f"❌ Неактивных: <b>{inactive_count}</b>\n"
-        f"📊 Всего: <b>{len(all_offers)}</b>\n\n"
-        f"{'Выберите категорию для просмотра:' if lang == 'ru' else 'Kategoriyani tanlang:'}",
+        f"<b>{'Ваши товары' if lang == 'ru' else 'Mahsulotlaringiz'}</b>\n\n"
+        f"Активных: <b>{active_count}</b>\n"
+        f"Неактивных: <b>{inactive_count}</b>\n"
+        f"Всего: <b>{len(all_offers)}</b>\n\n"
+        f"{'Выберите фильтр:' if lang == 'ru' else 'Filtrni tanlang:'}",
         parse_mode="HTML",
         reply_markup=filter_kb.as_markup(),
     )
@@ -106,19 +109,19 @@ async def filter_offers(callback: types.CallbackQuery) -> None:
     all_offers = []
     for store in stores:
         store_id = get_store_field(store, "store_id")
-        offers = db.get_store_offers(store_id)
+        offers = db.get_offers_by_store(store_id, include_all=True)
         all_offers.extend(offers)
 
     # Apply filter
     if filter_type == "active":
         filtered = [o for o in all_offers if get_offer_field(o, "status") == "active"]
-        title = "✅ Активные" if lang == "ru" else "✅ Faol"
+        title = "Активные" if lang == "ru" else "Faol"
     elif filter_type == "inactive":
         filtered = [o for o in all_offers if get_offer_field(o, "status") != "active"]
-        title = "❌ Неактивные" if lang == "ru" else "❌ Nofaol"
+        title = "Неактивные" if lang == "ru" else "Nofaol"
     else:
         filtered = all_offers
-        title = "📋 Все" if lang == "ru" else "📋 Hammasi"
+        title = "Все" if lang == "ru" else "Hammasi"
 
     if not filtered:
         await callback.answer(
@@ -199,7 +202,7 @@ async def back_to_offers_menu(callback: types.CallbackQuery) -> None:
     all_offers = []
     for store in stores:
         store_id = get_store_field(store, "store_id")
-        offers = db.get_store_offers(store_id)
+        offers = db.get_offers_by_store(store_id, include_all=True)
         all_offers.extend(offers)
 
     active_count = sum(1 for o in all_offers if get_offer_field(o, "status") == "active")
@@ -274,7 +277,7 @@ async def search_my_offers_process(message: types.Message, state: FSMContext) ->
     all_offers = []
     for store in stores:
         store_id = get_store_field(store, "store_id")
-        offers = db.get_store_offers(store_id)
+        offers = db.get_offers_by_store(store_id, include_all=True)
         all_offers.extend(offers)
 
     # Search

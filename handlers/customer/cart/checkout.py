@@ -223,6 +223,7 @@ def register(router: Router) -> None:
                     quantity=int(item.quantity),
                     store_name=item.store_name,
                     store_address=item.store_address,
+                    photo=item.photo,
                     delivery_price=0,
                 )
             )
@@ -288,7 +289,26 @@ def register(router: Router) -> None:
             text += "\n\n" + get_text(lang, "cart_order_created_menu_hint")
 
             try:
-                await callback.message.answer(text, parse_mode="HTML")
+                order_photo = next((item.photo for item in order_items if item.photo), None)
+                if not order_photo and order_items and common.db:
+                    try:
+                        offer = common.db.get_offer(int(order_items[0].offer_id))
+                        if isinstance(offer, dict):
+                            order_photo = offer.get("photo") or offer.get("photo_id")
+                        else:
+                            order_photo = getattr(offer, "photo", None) if offer else None
+                            if not order_photo:
+                                order_photo = getattr(offer, "photo_id", None) if offer else None
+                    except Exception:
+                        order_photo = None
+                if order_photo:
+                    await callback.message.answer_photo(
+                        photo=order_photo,
+                        caption=text,
+                        parse_mode="HTML",
+                    )
+                else:
+                    await callback.message.answer(text, parse_mode="HTML")
             except Exception:
                 pass
 
