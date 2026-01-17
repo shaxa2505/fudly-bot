@@ -151,7 +151,7 @@ def create_api_app(db: Any = None, offer_service: Any = None, bot_token: str = N
         allow_origin_regex=r"https://fudly-webapp.*\.vercel\.app",
         allow_credentials=True,
         # ✅ SECURITY: Restrict methods to only what's needed
-        allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+        allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
         # ✅ SECURITY: Restrict headers
         allow_headers=[
             "Content-Type",
@@ -171,10 +171,10 @@ def create_api_app(db: Any = None, offer_service: Any = None, bot_token: str = N
         # Content Security Policy
         response.headers["Content-Security-Policy"] = (
             "default-src 'self'; "
-            "script-src 'self' 'unsafe-inline' https://telegram.org https://web.telegram.org; "
-            "style-src 'self' 'unsafe-inline'; "
+            "script-src 'self' 'unsafe-inline' https://telegram.org https://web.telegram.org https://cdn.jsdelivr.net https://unpkg.com; "
+            "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://unpkg.com; "
             "img-src 'self' data: https:; "
-            "font-src 'self' data:; "
+            "font-src 'self' data: https://fonts.gstatic.com; "
             "connect-src 'self' https://api.telegram.org; "
             "frame-ancestors 'self' https://web.telegram.org"
         )

@@ -251,7 +251,7 @@ function endPriceEdit(priceEl, price) {
 async function updateProductPrice(productId, newPrice) {
     try {
         const formData = new FormData();
-        formData.append('price', newPrice.toString());
+        formData.append('discount_price', newPrice.toString());
         const endpoint = `/api/partner/products/${productId}`;
         if (typeof apiFetch === 'function') {
             await apiFetch(endpoint, { method: 'PATCH', body: formData });
@@ -272,6 +272,7 @@ async function updateProductPrice(productId, newPrice) {
         const product = getAllProducts().find(p => p.id == productId);
         if (product) {
             product.price = newPrice;
+            product.discount_price = newPrice;
         }
 
         toast('✓ Цена обновлена', 'success');

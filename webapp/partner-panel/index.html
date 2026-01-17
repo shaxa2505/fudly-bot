@@ -183,7 +183,7 @@
             if (raw.startsWith('api/') || raw.startsWith('photo/')) {
                 return new URL(`/${raw}`, API_BASE).toString();
             }
-            return `${API_BASE}/photo/${encodeURIComponent(raw)}`;
+            return `${API_BASE}/api/partner/photo/${encodeURIComponent(raw)}`;
         }
 
         function extractPhotoId(value) {
@@ -2943,17 +2943,16 @@ async function toggleProductAvailability(id) {
                                     </div>
                                     <div class="status-stat-label">Готовы</div>
                                 </div>
+                                <div class="stat-value status-stat-value ready">${stats.ordersByStatus.ready}</div>
+                            </div>
                             <div class="status-stat-card delivering ripple">
                                 <div class="status-stat-header">
                                     <div class="status-stat-icon delivering">
-                                        <span>??</span>
+                                        <span>🚚</span>
                                     </div>
-                                    <div class="status-stat-label">? ????</div>
+                                    <div class="status-stat-label">В доставке</div>
                                 </div>
                                 <div class="stat-value status-stat-value delivering">${stats.ordersByStatus.delivering}</div>
-                            </div>
-
-                                <div class="stat-value status-stat-value ready">${stats.ordersByStatus.ready}</div>
                             </div>
                             <div class="status-stat-card completed ripple">
                                 <div class="status-stat-header">
@@ -3542,7 +3541,7 @@ async function toggleProductAvailability(id) {
 
                 haptic('success');
                 toast('Профиль обновлен', 'success');
-                document.querySelector('.modal-overlay').remove();
+                document.querySelector('.modal-overlay')?.remove();
                 loadSettings();
             } catch (error) {
                 haptic('error');

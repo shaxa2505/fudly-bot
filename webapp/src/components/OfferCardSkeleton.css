@@ -4,10 +4,9 @@
 
 .offer-card-skeleton {
   background: var(--color-bg-card, #ffffff);
-  border: 1px solid rgba(15, 23, 42, 0.08);
-  border-radius: 16px;
+  border-radius: 18px;
   overflow: hidden;
-  box-shadow: 0 10px 24px rgba(16, 24, 40, 0.08);
+  box-shadow: 0 8px 20px rgba(16, 24, 40, 0.08);
   display: flex;
   flex-direction: column;
 }
@@ -20,21 +19,31 @@
   overflow: hidden;
 }
 
-.skeleton-action {
+.skeleton-overlay {
   position: absolute;
-  right: 8px;
-  bottom: 8px;
-  width: 36px;
-  height: 36px;
-  border-radius: 999px;
-  background: var(--color-bg-skeleton);
-}
-
-.skeleton-body {
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 48%;
+  padding: 10px 56px 12px 10px;
   display: flex;
   flex-direction: column;
+  justify-content: flex-end;
   gap: 6px;
-  padding: 8px 10px 12px;
+  background: linear-gradient(180deg, rgba(0, 0, 0, 0) 0%, rgba(0, 0, 0, 0.65) 60%, rgba(0, 0, 0, 0.85) 100%);
+  z-index: 2;
+}
+
+.skeleton-action {
+  position: absolute;
+  right: 10px;
+  bottom: 10px;
+  width: 42px;
+  height: 42px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  background: var(--color-bg-skeleton);
+  z-index: 3;
 }
 
 .skeleton-line {
@@ -53,7 +62,7 @@
 }
 
 .skeleton-title-short {
-  width: 80%;
+  width: 78%;
 }
 
 .skeleton-store {

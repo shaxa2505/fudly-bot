@@ -576,7 +576,7 @@ async def list_products(authorization: str = Header(None), status: Optional[str]
         # Build photo URL if photo_id exists
         photo_url = None
         if o.get("photo_id"):
-            photo_url = f"{API_BASE_URL}/api/v1/photo/{o['photo_id']}"
+            photo_url = f"{API_BASE_URL}/api/partner/photo/{o['photo_id']}"
 
         product = {
             "id": o["offer_id"],  # Frontend expects 'id'
@@ -1152,7 +1152,9 @@ async def list_orders(authorization: str = Header(None), status: Optional[str] =
             # Offer info from JOIN
             offer_title = order.get("offer_title", "Unknown")
             offer_photo_id = order.get("offer_photo_id")
-            offer_photo_url = f"{API_BASE_URL}/photo/{offer_photo_id}" if offer_photo_id else None
+            offer_photo_url = (
+                f"{API_BASE_URL}/api/partner/photo/{offer_photo_id}" if offer_photo_id else None
+            )
 
             # Build items list (cart orders or single item)
             items = []
@@ -1240,7 +1242,7 @@ async def list_orders(authorization: str = Header(None), status: Optional[str] =
                 "payment_method": payment_method,
                 "payment_proof_photo_id": payment_proof_photo_id,
                 "payment_proof_url": (
-                    f"{API_BASE_URL}/photo/{payment_proof_photo_id}"
+                    f"{API_BASE_URL}/api/partner/photo/{payment_proof_photo_id}"
                     if payment_proof_photo_id
                     else None
                 ),

@@ -80,6 +80,25 @@ const OfferCard = memo(function OfferCard({ offer, cartQuantity = 0, onAddToCart
             }
           }}
         />
+        <div className="offer-info">
+          <h3 className="offer-title" title={offer.title}>
+            {offer.title}
+          </h3>
+          <div className="offer-price-row">
+            <span className="offer-price">
+              {Math.round(priceValue).toLocaleString('ru-RU')}
+              <span className="offer-currency"> so'm</span>
+            </span>
+            {hasOldPrice && (
+              <span className="offer-old-price">
+                {Math.round(originalPrice).toLocaleString('ru-RU')} so'm
+              </span>
+            )}
+          </div>
+          {showStoreName && (
+            <div className="offer-store">{storeName}</div>
+          )}
+        </div>
         {isOutOfStock && (
           <div className="offer-stock-overlay">Нет в наличии</div>
         )}
@@ -118,26 +137,6 @@ const OfferCard = memo(function OfferCard({ offer, cartQuantity = 0, onAddToCart
             </button>
           )}
         </div>
-      </div>
-
-      <div className="offer-body">
-        <h3 className="offer-title" title={offer.title}>
-          {offer.title}
-        </h3>
-        <div className="offer-price-row">
-          <span className="offer-price">
-            {Math.round(priceValue).toLocaleString('ru-RU')}
-            <span className="offer-currency"> so'm</span>
-          </span>
-          {hasOldPrice && (
-            <span className="offer-old-price">
-              {Math.round(originalPrice).toLocaleString('ru-RU')} so'm
-            </span>
-          )}
-        </div>
-        {showStoreName && (
-          <div className="offer-store">{storeName}</div>
-        )}
       </div>
     </div>
   )
