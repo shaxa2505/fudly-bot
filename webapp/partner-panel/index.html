@@ -90,14 +90,14 @@
                 <div class="store-avatar">
                     <i data-lucide="store"></i>
                 </div>
-                <div class="store-details">
-                    <h1 id="storeName">Загрузка...</h1>
-                    <div class="store-status">
-                        <div class="status-dot"></div>
-                        <span>Открыто</span>
-                    </div>
+            <div class="store-details">
+                <h1 id="storeName">Загрузка...</h1>
+                <div class="store-status">
+                    <div class="status-dot" id="storeStatusDot"></div>
+                    <span id="storeStatusText">Открыто</span>
                 </div>
             </div>
+        </div>
             <div class="header-actions">
                 <button class="icon-btn" onclick="refreshAll()" aria-label="Обновить данные">
                     <i data-lucide="refresh-cw"></i>
@@ -855,6 +855,15 @@
             }, duration);
         }
 
+        function updateHeaderStatus(isOpen) {
+            const statusText = document.getElementById('storeStatusText');
+            const statusDot = document.getElementById('storeStatusDot');
+            if (!statusText || !statusDot) return;
+            const open = Boolean(isOpen);
+            statusText.textContent = open ? 'Открыто' : 'Закрыто';
+            statusDot.classList.toggle('closed', !open);
+        }
+
         function showLoading(type = 'default') {
             const loaders = {
                 default: `<div class="loading fade-in"><div class="spinner"></div></div>`,
@@ -1001,6 +1010,7 @@
             if (state.store?.name) {
                 document.getElementById('storeName').textContent = state.store.name;
             }
+            updateHeaderStatus(state.store?.is_open);
 
             const activeOrders = state.orders.filter(o =>
                 !['completed', 'cancelled', 'rejected'].includes(getOrderStatus(o))
@@ -1268,7 +1278,10 @@
                         <div class="order-status status-${status}">${getStatusText(status, orderType)}</div>
                     </div>
                     <div class="order-meta">
-                        <span class="order-type">${orderType === 'pickup' ? '?? ?????????' : '?? ????????'}</span>
+                        <span class="order-type">
+                            <i data-lucide="${orderType === 'pickup' ? 'shopping-bag' : 'truck'}" class="icon-16"></i>
+                            ${orderType === 'pickup' ? 'Самовывоз' : 'Доставка'}
+                        </span>
                     </div>
                     <div class="order-footer">
                         <div class="order-time">${formatTime(order.created_at)}</div>
@@ -1276,8 +1289,8 @@
                     </div>
                     ${status === 'new' || status === 'pending' ? `
                         <div class="order-actions" onclick="event.stopPropagation()">
-                            <button class="btn btn-sm btn-success ripple" onclick="updateOrderStatus(${orderId}, 'preparing')">???????</button>
-                            <button class="btn btn-sm btn-danger ripple" onclick="openCancelModal(${orderId})">????????</button>
+                            <button class="btn btn-sm btn-success ripple" onclick="updateOrderStatus(${orderId}, 'preparing')">Принять</button>
+                            <button class="btn btn-sm btn-danger ripple" onclick="openCancelModal(${orderId})">Отменить</button>
                         </div>
                     ` : ''}
                 </div>
@@ -2475,11 +2488,11 @@ function handlePhotoUpload(input, event) {
 
             if (originalValue > 0) {
                 preview.classList.remove('hidden');
-                priceOriginal.textContent = `${originalValue.toLocaleString()} ???`;
+                priceOriginal.textContent = formatPrice(originalValue);
                 const finalValue = discounted || originalValue;
-                priceFinal.textContent = `${finalValue.toLocaleString()} ???`;
+                priceFinal.textContent = formatPrice(finalValue);
                 const savings = Math.max(0, originalValue - finalValue);
-                priceSavings.textContent = `${savings.toLocaleString()} ??? (${percent}%)`;
+                priceSavings.textContent = `${formatPrice(savings)} (${percent}%)`;
             } else {
                 preview.classList.add('hidden');
             }
@@ -2708,7 +2721,9 @@ async function toggleProductAvailability(id) {
                 document.querySelector('.content').innerHTML = `
                     <div class="container">
                         <div class="error-state">
-                            <div class="error-icon">🚨</div>
+                            <div class="error-icon">
+                                <i data-lucide="alert-triangle" class="icon-48"></i>
+                            </div>
                             <p class="error-title">Ошибка загрузки</p>
                             <p class="error-text">Не удалось загрузить статистику</p>
                             <button class="btn btn-primary error-action ripple" onclick="loadStats()">
@@ -2717,6 +2732,7 @@ async function toggleProductAvailability(id) {
                         </div>
                     </div>
                 `;
+                if (typeof lucide !== 'undefined') lucide.createIcons();
             }
         }
 
@@ -2817,7 +2833,15 @@ async function toggleProductAvailability(id) {
 
             document.querySelector('.content').innerHTML = `
                 <div class="container fade-in">
-                    <h2 class="section-title">📊 Статистика</h2>
+                    <div class="section-header">
+                        <div>
+                            <h2 class="section-title with-icon">
+                                <i data-lucide="bar-chart-3" class="icon-18"></i>
+                                Статистика
+                            </h2>
+                            <p class="section-subtitle">Сводка за 7 дней</p>
+                        </div>
+                    </div>
 
                     <!-- Key Metrics -->
                     <div class="stats-grid mb-xl">
@@ -2896,7 +2920,8 @@ async function toggleProductAvailability(id) {
                                                     ${product.name}
                                                 </div>
                                                 <div class="stat-list-meta">
-                                                    <span>📦 ${product.orders} ${product.orders === 1 ? 'заказ' : product.orders < 5 ? 'заказа' : 'заказов'}</span>
+                                                    <i data-lucide="package" class="icon-16"></i>
+                                                    <span>${product.orders} ${product.orders === 1 ? 'заказ' : product.orders < 5 ? 'заказа' : 'заказов'}</span>
                                                 </div>
                                             </div>
                                             <div class="text-right">
@@ -2921,7 +2946,7 @@ async function toggleProductAvailability(id) {
                             <div class="status-stat-card new ripple">
                                 <div class="status-stat-header">
                                     <div class="status-stat-icon new">
-                                        <span>🆕</span>
+                                        <i data-lucide="sparkles" class="icon-18"></i>
                                     </div>
                                     <div class="status-stat-label">Новые</div>
                                 </div>
@@ -2930,7 +2955,7 @@ async function toggleProductAvailability(id) {
                             <div class="status-stat-card preparing ripple">
                                 <div class="status-stat-header">
                                     <div class="status-stat-icon preparing">
-                                        <span>👨‍🍳</span>
+                                        <i data-lucide="chef-hat" class="icon-18"></i>
                                     </div>
                                     <div class="status-stat-label">В работе</div>
                                 </div>
@@ -2939,7 +2964,7 @@ async function toggleProductAvailability(id) {
                             <div class="status-stat-card ready ripple">
                                 <div class="status-stat-header">
                                     <div class="status-stat-icon ready">
-                                        <span>✅</span>
+                                        <i data-lucide="check-circle" class="icon-18"></i>
                                     </div>
                                     <div class="status-stat-label">Готовы</div>
                                 </div>
@@ -2948,7 +2973,7 @@ async function toggleProductAvailability(id) {
                             <div class="status-stat-card delivering ripple">
                                 <div class="status-stat-header">
                                     <div class="status-stat-icon delivering">
-                                        <span>🚚</span>
+                                        <i data-lucide="truck" class="icon-18"></i>
                                     </div>
                                     <div class="status-stat-label">В доставке</div>
                                 </div>
@@ -2957,7 +2982,7 @@ async function toggleProductAvailability(id) {
                             <div class="status-stat-card completed ripple">
                                 <div class="status-stat-header">
                                     <div class="status-stat-icon completed">
-                                        <span>🎉</span>
+                                        <i data-lucide="check" class="icon-18"></i>
                                     </div>
                                     <div class="status-stat-label">Завершены</div>
                                 </div>
@@ -2966,7 +2991,7 @@ async function toggleProductAvailability(id) {
                             <div class="status-stat-card cancelled ripple">
                                 <div class="status-stat-header">
                                     <div class="status-stat-icon cancelled">
-                                        <span>❌</span>
+                                        <i data-lucide="x-circle" class="icon-18"></i>
                                     </div>
                                     <div class="status-stat-label">Отменены</div>
                                 </div>
@@ -3153,7 +3178,9 @@ async function toggleProductAvailability(id) {
                 document.querySelector('.content').innerHTML = `
                     <div class="container">
                         <div class="error-state">
-                            <div class="error-icon">🚨</div>
+                            <div class="error-icon">
+                                <i data-lucide="alert-triangle" class="icon-48"></i>
+                            </div>
                             <p class="error-title">Ошибка загрузки настроек</p>
                             <p class="error-text">${error.message || 'Не удалось загрузить настройки'}</p>
                             <div class="error-details">
@@ -3167,6 +3194,7 @@ async function toggleProductAvailability(id) {
                         </div>
                     </div>
                 `;
+                if (typeof lucide !== 'undefined') lucide.createIcons();
             }
         }
 
@@ -4101,7 +4129,7 @@ async function toggleProductAvailability(id) {
             } catch (e) {}
 
             // Show toast notification
-            toast(`🔔 Новый заказ #${orderData.order_ids[0]}`, 'info', {
+            toast(`Новый заказ #${orderData.order_ids[0]}`, 'info', {
                 description: `${orderData.customer_name} • ${formatPrice(orderData.total)}`
             });
 
