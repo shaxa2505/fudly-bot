@@ -87,47 +87,40 @@ def build_order_card_text(
     unit: str = "",
 ) -> str:
     """Build order card in same style as product card."""
-    currency = "so'm" if lang == "uz" else "сум"
-    unit = unit or ("dona" if lang == "uz" else "шт")
+    currency = "so'm" if lang == "uz" else "???"
+    unit = unit or ("dona" if lang == "uz" else "??")
 
-    # Calculate totals
     subtotal = price * quantity
     delivery_cost = delivery_price if delivery_method == "delivery" else 0
     total = subtotal + delivery_cost
 
-    # Header - same as product card
-    lines = [f"📦 <b>{_esc(title)}</b>"]
+    lines = [f"?? <b>{_esc(title)}</b>"]
 
     if description:
         desc = description[:80] + "..." if len(description) > 80 else description
         lines.append(f"<i>{_esc(desc)}</i>")
 
     lines.append("")
-    lines.append("─" * 25)
 
-    # Price with discount - same style as product card
-    # Use prices directly from database
     price_sums = int(price)
     original_price_sums = int(original_price) if original_price else 0
+    price_label = "Narx" if lang == "uz" else "????"
+    was_label = "Avval" if lang == "uz" else "????"
 
     if original_price and original_price > price:
         discount_pct = round((1 - price / original_price) * 100)
         lines.append(
-            f"<s>{original_price_sums:,}</s> → <b>{price_sums:,}</b> {currency} (-{discount_pct}%)"
+            f"{price_label}: <b>{price_sums:,}</b> {currency} (-{discount_pct}%)"
         )
+        lines.append(f"{was_label}: {original_price_sums:,} {currency}")
     else:
-        lines.append(f"💰 <b>{price_sums:,}</b> {currency}")
+        lines.append(f"{price_label}: <b>{price_sums:,}</b> {currency}")
 
-    lines.append("─" * 25)
-    lines.append("")
+    qty_label = "Miqdor" if lang == "uz" else "??????????"
+    lines.append(f"{qty_label}: <b>{quantity}</b> {unit}")
 
-    # Quantity selection
-    qty_label = "Miqdor" if lang == "uz" else "Количество"
-    lines.append(f"📦 {qty_label}: <b>{quantity}</b> {unit}")
-
-    # Expiry date if available
     if expiry_date:
-        expiry_label = "Yaroqlilik" if lang == "uz" else "Срок до"
+        expiry_label = "Yaroqlilik" if lang == "uz" else "???? ??"
         expiry_str = str(expiry_date)[:10]
         try:
             from datetime import datetime
@@ -136,45 +129,36 @@ def build_order_card_text(
             expiry_str = dt.strftime("%d.%m.%Y")
         except ValueError:
             logger.debug("Could not parse expiry date: %s", expiry_str)
-        lines.append(f"📅 {expiry_label}: {expiry_str}")
+        lines.append(f"{expiry_label}: {expiry_str}")
 
-    # Store info - same style
     lines.append("")
-    lines.append(f"🏪 {_esc(store_name)}")
+    store_label = "Do'kon" if lang == "uz" else "???????"
+    address_label = "Manzil" if lang == "uz" else "?????"
+    lines.append(f"{store_label}: {_esc(store_name)}")
     if store_address:
-        lines.append(f"📍 {_esc(store_address)}")
+        lines.append(f"{address_label}: {_esc(store_address)}")
 
-    # Delivery section - cleaner style with better hint
     if delivery_enabled:
-        lines.append("")
-        # Show delivery price
-        delivery_label = "Yetkazish" if lang == "uz" else "Доставка"
+        delivery_label = "Yetkazib berish" if lang == "uz" else "????????"
+        pickup_label = "Olib ketish" if lang == "uz" else "?????????"
         delivery_price_sums = int(delivery_price)
-        lines.append(f"🚚 {delivery_label}: {delivery_price_sums:,} {currency}")
-
-        # Pickup option
-        pickup_label = "Olib ketish" if lang == "uz" else "Самовывоз"
-        lines.append(
-            f"🏪 {pickup_label}: bepul" if lang == "uz" else f"🏪 {pickup_label}: бесплатно"
-        )
-
-        # Show selection hint if not selected - clearer text
+        pickup_value = "bepul" if lang == "uz" else "?????????"
+        lines.append(f"{delivery_label}: {delivery_price_sums:,} {currency}")
+        lines.append(f"{pickup_label}: {pickup_value}")
         if not delivery_method:
             hint = (
-                "👇 Yetkazish yoki olib ketish tanlang"
+                "Pastdan olish usulini tanlang."
                 if lang == "uz"
-                else "👇 Выберите доставку или самовывоз"
+                else "???????? ?????? ????????? ????."
             )
-            lines.append(f"\n<i>{hint}</i>")
+            lines.append(f"<i>{hint}</i>")
 
-    # Totals section
     lines.append("")
-    lines.append("─" * 25)
-    total_label = "JAMI" if lang == "uz" else "ИТОГО"
-    lines.append(f"💵 <b>{total_label}: {total:,} {currency}</b>")
+    total_label = "Jami" if lang == "uz" else "?????"
+    lines.append(f"<b>{total_label}: {total:,} {currency}</b>")
     if delivery_method == "delivery" and delivery_cost > 0:
-        incl_delivery = "yetkazish bilan" if lang == "uz" else "с доставкой"
-        lines.append(f"   <i>({incl_delivery})</i>")
+        incl_delivery = "yetkazish bilan" if lang == "uz" else "? ?????????"
+        lines.append(f"<i>({incl_delivery})</i>")
 
     return "\n".join(lines)
 
@@ -191,70 +175,61 @@ def build_order_card_keyboard(
     """Build order card keyboard with quick quantity buttons and delivery options."""
     kb = InlineKeyboardBuilder()
 
-    # Row 1: Quick quantity buttons [1] [2] [3] [5] or [−][qty][+] for large max
     if max_qty <= 10:
-        # Show quick buttons for small quantities
         quick_qtys = [q for q in [1, 2, 3, 5, 10] if q <= max_qty]
-        for q in quick_qtys[:4]:  # Max 4 quick buttons
+        for q in quick_qtys[:4]:
             is_selected = quantity == q
-            text = f"✓ {q}" if is_selected else str(q)
+            text = f"? {q}" if is_selected else str(q)
             kb.button(text=text, callback_data=f"pbook_qty_{offer_id}_{q}")
     else:
-        # Show [−][qty][+] for large quantities
         minus_enabled = quantity > 1
         plus_enabled = quantity < max_qty
 
-        # Use simple ASCII/basic Unicode that works everywhere
-        minus_text = "−" if minus_enabled else "▫"
-        plus_text = "+" if plus_enabled else "▫"
+        minus_text = "-" if minus_enabled else "?"
+        plus_text = "+" if plus_enabled else "?"
 
+        unit_label = "dona" if lang == "uz" else "??"
         kb.button(
             text=minus_text,
             callback_data=f"pbook_qty_{offer_id}_{quantity - 1}" if minus_enabled else "pbook_noop",
         )
-        kb.button(text=f"{quantity} шт", callback_data="pbook_noop")
+        kb.button(text=f"{quantity} {unit_label}", callback_data="pbook_noop")
         kb.button(
             text=plus_text,
             callback_data=f"pbook_qty_{offer_id}_{quantity + 1}" if plus_enabled else "pbook_noop",
         )
 
-    # Row 2-3: Delivery options (if enabled)
     if delivery_enabled:
-        pickup_text = "🏪 Olib ketish" if lang == "uz" else "🏪 Самовывоз"
-        delivery_text = "🚚 Yetkazish" if lang == "uz" else "🚚 Доставка"
+        pickup_text = "Olib ketish" if lang == "uz" else "?????????"
+        delivery_text = "Yetkazib berish" if lang == "uz" else "????????"
 
-        # Add checkmarks for selected option
         if delivery_method == "pickup":
-            pickup_text = "✅ " + pickup_text
+            pickup_text = "? " + pickup_text
         elif delivery_method == "delivery":
-            delivery_text = "✅ " + delivery_text
+            delivery_text = "? " + delivery_text
 
         kb.button(text=pickup_text, callback_data=f"pbook_method_{offer_id}_pickup")
         kb.button(text=delivery_text, callback_data=f"pbook_method_{offer_id}_delivery")
 
-    # Row 4: Confirm and Back
     if delivery_method or not delivery_enabled:
-        confirm_text = "✅ Tasdiqlash" if lang == "uz" else "✅ Подтвердить"
+        confirm_text = "? Tasdiqlash" if lang == "uz" else "? ???????????"
         kb.button(text=confirm_text, callback_data=f"pbook_confirm_{offer_id}")
 
-    back_text = "◀️ Orqaga" if lang == "uz" else "◀️ Назад"
+    back_text = "Orqaga" if lang == "uz" else "?????"
     kb.button(text=back_text, callback_data=f"pbook_cancel_{offer_id}_{store_id}")
 
-    # Layout - calculate based on what we have
     qty_button_count = (
         min(4, len([q for q in [1, 2, 3, 5, 10] if q <= max_qty])) if max_qty <= 10 else 3
     )
     if delivery_enabled:
         if delivery_method:
-            kb.adjust(qty_button_count, 2, 2)  # qty buttons, [pickup][delivery], [confirm][back]
+            kb.adjust(qty_button_count, 2, 2)
         else:
-            kb.adjust(qty_button_count, 2, 1)  # qty buttons, [pickup][delivery], [back]
+            kb.adjust(qty_button_count, 2, 1)
     else:
-        kb.adjust(qty_button_count, 2)  # qty buttons, [confirm][back]
+        kb.adjust(qty_button_count, 2)
 
     return kb
-
-
 @router.callback_query(F.data.regexp(r"^book_\d+$"))
 async def book_offer_start(callback: types.CallbackQuery, state: FSMContext) -> None:
     """Premium UX: Update current card with order controls (no new message)."""
@@ -818,9 +793,9 @@ async def pbook_confirm(callback: types.CallbackQuery, state: FSMContext) -> Non
         if min_order > 0 and order_total < min_order:
             currency = "so'm" if lang == "uz" else "сум"
             msg = (
-                f"❌ Min. buyurtma: {min_order:,} {currency}"
+                f"⚠️ Min. buyurtma: {min_order:,} {currency}"
                 if lang == "uz"
-                else f"❌ Мин. заказ: {min_order:,} {currency}"
+                else f"⚠️ Мин. заказ: {min_order:,} {currency}"
             )
             await callback.answer(msg, show_alert=True)
             return
@@ -829,13 +804,13 @@ async def pbook_confirm(callback: types.CallbackQuery, state: FSMContext) -> Non
     currency = "so'm" if lang == "uz" else "сум"
     total = offer_price * quantity
     processing_text = (
-        f"⏳ <b>Bron yuborilmoqda...</b>\n\n"
-        f"🛒 {_esc(offer_title)} × {quantity}\n"
-        f"💵 {total:,} {currency}"
+        f"⏳ <b>Bron yuborilmoqda...</b>\n"
+        f"{_esc(offer_title)} × {quantity}\n"
+        f"Jami: {total:,} {currency}"
         if lang == "uz"
-        else f"⏳ <b>Оформляем бронь...</b>\n\n"
-        f"🛒 {_esc(offer_title)} × {quantity}\n"
-        f"💵 {total:,} {currency}"
+        else f"⏳ <b>Оформляем бронь...</b>\n"
+        f"{_esc(offer_title)} × {quantity}\n"
+        f"Итого: {total:,} {currency}"
     )
 
     try:

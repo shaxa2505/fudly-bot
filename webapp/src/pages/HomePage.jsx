@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import { Flame, Milk, Cookie, Snowflake, Coffee as Beverage, Croissant, Beef, Apple, Salad, Package, Search, SlidersHorizontal } from 'lucide-react'
 import api from '../api/client'
 import { useCart } from '../context/CartContext'
-import { transliterateCity, getSavedLocation, saveLocation, DEFAULT_LOCATION, normalizeLocationName } from '../utils/cityUtils'
+import { transliterateCity, getSavedLocation, saveLocation, DEFAULT_LOCATION, normalizeLocationName, buildLocationFromReverseGeocode } from '../utils/cityUtils'
 import OfferCard from '../components/OfferCard'
 import OfferCardSkeleton from '../components/OfferCardSkeleton'
 import HeroBanner from '../components/HeroBanner'
@@ -246,6 +246,29 @@ function HomePage() {
   useEffect(() => {
     saveLocation(location)
   }, [location])
+
+  useEffect(() => {
+    const handleLocationUpdate = (event) => {
+      const next = event?.detail
+      if (!next) return
+      setLocation(prev => {
+        const prevCoords = prev.coordinates || {}
+        const nextCoords = next.coordinates || {}
+        const same =
+          (prev.city || '') === (next.city || '') &&
+          (prev.address || '') === (next.address || '') &&
+          (prev.region || '') === (next.region || '') &&
+          (prev.district || '') === (next.district || '') &&
+          prevCoords.lat === nextCoords.lat &&
+          prevCoords.lon === nextCoords.lon
+        if (same) return prev
+        return { ...prev, ...next }
+      })
+    }
+
+    window.addEventListener('fudly:location', handleLocationUpdate)
+    return () => window.removeEventListener('fudly:location', handleLocationUpdate)
+  }, [])
 
   // Load search history on mount
   useEffect(() => {
@@ -549,6 +572,7 @@ function HomePage() {
 
     if (shouldSkipGeo()) return
     if (location.address || location.coordinates) return
+    if (location.source === 'manual') return
 
     if (navigator.geolocation) {
       setIsLocating(true)
@@ -581,28 +605,7 @@ function HomePage() {
     try {
       const data = await api.reverseGeocode(lat, lon, 'uz')
       if (!data) throw new Error('Geo lookup failed')
-
-      const city = normalizeLocationName(
-        data.address?.city || data.address?.town || data.address?.village || ''
-      )
-      const state = normalizeLocationName(data.address?.state || data.address?.region || '')
-      const district = normalizeLocationName(
-        data.address?.county || data.address?.city_district || data.address?.suburb || ''
-      )
-      const primaryCity = city || state || ''
-      const normalizedCity = primaryCity
-        ? (primaryCity.includes("O'zbekiston")
-          ? primaryCity
-          : `${primaryCity}, O'zbekiston`)
-        : ''
-
-      setLocation({
-        city: normalizedCity,
-        address: data.display_name || '',
-        coordinates: { lat, lon },
-        region: state,
-        district, // Сохраняем область
-      })
+      setLocation(buildLocationFromReverseGeocode(data, lat, lon))
       setLocationError('')
     } catch (error) {
       console.error('Reverse geocode error', error)
@@ -662,28 +665,7 @@ function HomePage() {
     try {
       const data = await api.reverseGeocode(lat, lon, 'uz')
       if (!data) throw new Error('Geo lookup failed')
-
-      const city = normalizeLocationName(
-        data.address?.city || data.address?.town || data.address?.village || ''
-      )
-      const state = normalizeLocationName(data.address?.state || data.address?.region || '')
-      const district = normalizeLocationName(
-        data.address?.county || data.address?.city_district || data.address?.suburb || ''
-      )
-      const primaryCity = city || state || ''
-      const normalizedCity = primaryCity
-        ? (primaryCity.includes("O'zbekiston")
-          ? primaryCity
-          : `${primaryCity}, O'zbekiston`)
-        : ''
-
-      setLocation({
-        city: normalizedCity,
-        address: data.display_name || '',
-        coordinates: { lat, lon },
-        region: state,
-        district,
-      })
+      setLocation(buildLocationFromReverseGeocode(data, lat, lon))
       setLocationError('')
       setShowAddressModal(false) // Закрываем модалку после успешного определения
     } catch (error) {
@@ -746,6 +728,7 @@ function HomePage() {
         coordinates: trimmedAddress ? prev.coordinates : null,
         region: keepRegion ? prev.region : '',
         district: keepRegion ? prev.district : '',
+        source: 'manual',
       }
     })
     setShowAddressModal(false)

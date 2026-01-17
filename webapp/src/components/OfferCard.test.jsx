@@ -2,6 +2,7 @@ import { describe, it, expect, vi } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import { FavoritesProvider } from '../context/FavoritesContext'
+import { ToastProvider } from '../context/ToastContext'
 import OfferCard from './OfferCard'
 
 const mockOffer = {
@@ -19,15 +20,17 @@ const mockOffer = {
 const renderOfferCard = (props = {}) => {
   return render(
     <MemoryRouter>
-      <FavoritesProvider>
-        <OfferCard
-          offer={mockOffer}
-          cartQuantity={0}
-          onAddToCart={vi.fn()}
-          onRemoveFromCart={vi.fn()}
-          {...props}
-        />
-      </FavoritesProvider>
+      <ToastProvider>
+        <FavoritesProvider>
+          <OfferCard
+            offer={mockOffer}
+            cartQuantity={0}
+            onAddToCart={vi.fn()}
+            onRemoveFromCart={vi.fn()}
+            {...props}
+          />
+        </FavoritesProvider>
+      </ToastProvider>
     </MemoryRouter>
   )
 }
@@ -43,20 +46,15 @@ describe('OfferCard', () => {
     expect(screen.getByText(/10.*000/)).toBeInTheDocument()
   })
 
-  it('renders discount badge', () => {
-    renderOfferCard()
-    expect(screen.getByText('-33%')).toBeInTheDocument()
-  })
-
   it('renders add to cart button when not in cart', () => {
     const { container } = renderOfferCard({ cartQuantity: 0 })
-    const addButton = container.querySelector('.add-to-cart-inline')
+    const addButton = container.querySelector('.offer-add-btn')
     expect(addButton).toBeInTheDocument()
   })
 
   it('renders quantity controls when in cart', () => {
     const { container } = renderOfferCard({ cartQuantity: 2 })
-    const qtyControl = container.querySelector('.quantity-control')
+    const qtyControl = container.querySelector('.offer-counter')
     expect(qtyControl).toBeInTheDocument()
     expect(screen.getByText(/2/)).toBeInTheDocument()
   })
@@ -64,5 +62,11 @@ describe('OfferCard', () => {
   it('applies in-cart class when cartQuantity > 0', () => {
     const { container } = renderOfferCard({ cartQuantity: 1 })
     expect(container.querySelector('.offer-card.in-cart')).toBeInTheDocument()
+  })
+
+  it('shows out of stock overlay when quantity is zero', () => {
+    const { container } = renderOfferCard({ offer: { ...mockOffer, quantity: 0 } })
+    expect(screen.getByText('Нет в наличии')).toBeInTheDocument()
+    expect(container.querySelector('.offer-card.out-of-stock')).toBeInTheDocument()
   })
 })

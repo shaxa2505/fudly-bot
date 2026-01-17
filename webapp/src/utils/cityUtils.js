@@ -100,6 +100,31 @@ export const normalizeLocationName = (value) => {
   return cleaned.trim()
 }
 
+export const buildLocationFromReverseGeocode = (data, lat, lon) => {
+  const city = normalizeLocationName(
+    data?.address?.city || data?.address?.town || data?.address?.village || ''
+  )
+  const state = normalizeLocationName(data?.address?.state || data?.address?.region || '')
+  const district = normalizeLocationName(
+    data?.address?.county || data?.address?.city_district || data?.address?.suburb || ''
+  )
+  const primaryCity = city || state || ''
+  const normalizedCity = primaryCity
+    ? (primaryCity.includes("O'zbekiston")
+      ? primaryCity
+      : `${primaryCity}, O'zbekiston`)
+    : ''
+
+  return {
+    city: normalizedCity,
+    address: data?.display_name || '',
+    coordinates: lat != null && lon != null ? { lat, lon } : null,
+    region: state,
+    district,
+    source: 'geo',
+  }
+}
+
 
 /**
  * Transliterate city name from Latin to Cyrillic for API calls
@@ -193,6 +218,9 @@ export const getSavedLocation = () => {
 export const saveLocation = (location) => {
   try {
     localStorage.setItem('fudly_location', JSON.stringify(location))
+    if (typeof window !== 'undefined' && window.dispatchEvent) {
+      window.dispatchEvent(new CustomEvent('fudly:location', { detail: location }))
+    }
   } catch (e) {
     console.error('Failed to save location:', e)
   }

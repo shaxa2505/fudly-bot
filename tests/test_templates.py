@@ -326,8 +326,8 @@ class TestRenderOfferDetails:
         result = render_offer_details(lang="ru", offer=sample_offer_details)
 
         assert sample_offer_details.title in result
-        assert "Цена: 5 000 сум" in result
-        assert "Было: 10 000 сум (-50%)" in result
+        assert "Цена: 5 000 сум (-50%)" in result
+        assert "Было: 10 000 сум" in result
         assert "В наличии" in result
         assert f"Магазин: {sample_offer_details.store_name}" in result
 
@@ -444,8 +444,8 @@ class TestRenderOfferCard:
         result = render_offer_card(lang="ru", offer=sample_offer_item)
 
         assert sample_offer_item.title in result
-        assert "Цена: 5 000 сум" in result
-        assert "Было: 10 000 сум (-50%)" in result
+        assert "Цена: 5 000 сум (-50%)" in result
+        assert "Было: 10 000 сум" in result
         assert "В наличии" in result
         assert f"Магазин: {sample_offer_item.store_name}" in result
         assert "Доставка" in result

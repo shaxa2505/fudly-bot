@@ -3,6 +3,7 @@ import { BrowserRouter, Routes, Route, useNavigate, useLocation } from 'react-ro
 import { FavoritesProvider } from './context/FavoritesContext'
 import { ToastProvider } from './context/ToastContext'
 import api, { saveTelegramInitData } from './api/client'
+import { getSavedLocation, saveLocation, buildLocationFromReverseGeocode } from './utils/cityUtils'
 import HomePage from './pages/HomePage'
 import PageLoader, { LoadingScreen } from './components/PageLoader'
 import './App.css'
@@ -18,6 +19,9 @@ const CategoryProductsPage = lazy(() => import('./pages/CategoryProductsPage'))
 const FavoritesPage = lazy(() => import('./pages/FavoritesPage'))
 
 // LoadingScreen and PageLoader are now imported from components/PageLoader
+const GEO_ATTEMPT_KEY = 'fudly_geo_attempt_ts'
+const GEO_STATUS_KEY = 'fudly_geo_status'
+const GEO_COOLDOWN_MS = 24 * 60 * 60 * 1000
 
 // Main app content with routing
 function AppContent() {
@@ -107,6 +111,53 @@ function AppContent() {
   }, [])
 
   useEffect(() => {
+    const stored = getSavedLocation()
+    if (stored.address || stored.coordinates) return
+    if (stored.source === 'manual') return
+
+    const storedAttempt = localStorage.getItem(GEO_ATTEMPT_KEY)
+    const attemptTs = storedAttempt ? Number(storedAttempt) : 0
+    if (attemptTs && Date.now() - attemptTs < GEO_COOLDOWN_MS) {
+      return
+    }
+
+    if (!navigator.geolocation) {
+      return
+    }
+
+    const markAttempt = (status = '') => {
+      localStorage.setItem(GEO_ATTEMPT_KEY, String(Date.now()))
+      if (status) {
+        localStorage.setItem(GEO_STATUS_KEY, status)
+      }
+    }
+
+    markAttempt('start')
+    navigator.geolocation.getCurrentPosition(
+      async (position) => {
+        const { latitude, longitude } = position.coords
+        try {
+          const data = await api.reverseGeocode(latitude, longitude, 'uz')
+          if (data) {
+            const resolved = buildLocationFromReverseGeocode(data, latitude, longitude)
+            saveLocation(resolved)
+            markAttempt('ok')
+          } else {
+            markAttempt('fail')
+          }
+        } catch (error) {
+          console.error('Reverse geocode error:', error)
+          markAttempt('fail')
+        }
+      },
+      (error) => {
+        markAttempt(error.code === error.PERMISSION_DENIED ? 'denied' : 'fail')
+      },
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 300000 }
+    )
+  }, [])
+
+  useEffect(() => {
     initializeApp()
   }, [])
 
@@ -168,7 +219,32 @@ function AppContent() {
             setUser(fullUser)
             localStorage.setItem('fudly_user', JSON.stringify(fullUser))
             if (profile.phone) localStorage.setItem('fudly_phone', profile.phone)
-            if (profile.city) localStorage.setItem('fudly_location', JSON.stringify({ city: profile.city }))
+            if (profile.city) {
+              try {
+                const savedRaw = localStorage.getItem('fudly_location')
+                if (!savedRaw) {
+                  localStorage.setItem(
+                    'fudly_location',
+                    JSON.stringify({ city: profile.city, source: 'profile' })
+                  )
+                } else {
+                  const saved = JSON.parse(savedRaw)
+                  const hasCity = saved?.city && String(saved.city).trim()
+                  const hasCoords = saved?.coordinates?.lat != null && saved?.coordinates?.lon != null
+                  if (!hasCity && !hasCoords) {
+                    localStorage.setItem(
+                      'fudly_location',
+                      JSON.stringify({ ...saved, city: profile.city, source: saved?.source || 'profile' })
+                    )
+                  }
+                }
+              } catch {
+                localStorage.setItem(
+                  'fudly_location',
+                  JSON.stringify({ city: profile.city, source: 'profile' })
+                )
+              }
+            }
           }
         }).catch(() => {
           // User not registered - that's ok

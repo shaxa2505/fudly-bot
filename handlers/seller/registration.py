@@ -1,6 +1,7 @@
 """Partner registration handlers."""
 from __future__ import annotations
 
+import re
 from typing import Any
 
 from aiogram import F, Router, types
@@ -84,6 +85,10 @@ def normalize_business_type(cat_text: str) -> str:
         "Boshqa": "Другое",
     }
     return cat_map.get(cat_text, cat_text)
+
+
+def _strip_leading_marker(text: str) -> str:
+    return re.sub(r"^[^\\w]+\\s*", "", (text or "")).strip()
 
 
 def location_request_keyboard(lang: str) -> types.ReplyKeyboardMarkup:
@@ -194,7 +199,7 @@ async def register_store_city(message: types.Message, state: FSMContext) -> None
     lang = db.get_user_language(message.from_user.id)
     cities = get_cities(lang)
     raw_text = message.text or ""
-    city_text = raw_text.replace("📍 ", "").strip()
+    city_text = _strip_leading_marker(raw_text)
 
     if city_text in cities:
         # CRITICAL: Normalize city to Russian for DB consistency
@@ -280,7 +285,7 @@ async def register_store_category(message: types.Message, state: FSMContext) -> 
     lang = db.get_user_language(message.from_user.id)
     categories = get_categories(lang)
     raw_text = message.text or ""
-    cat_text = raw_text.replace("🏷 ", "").replace("▫️ ", "").strip()
+    cat_text = _strip_leading_marker(raw_text)
 
     if cat_text in categories:
         # CRITICAL: Normalize business type to Russian for DB consistency
@@ -368,9 +373,11 @@ async def register_store_address(message: types.Message, state: FSMContext) -> N
     )
     await state.update_data(address=message.text)
     location_text = (
-        "📍 Отправьте геолокацию магазина (кнопка ниже). Это обязательно для корректной выдачи."
+        "<b>Шаг 5/7: геолокация</b>\n"
+        "Отправьте геолокацию магазина кнопкой ниже. Это обязательно."
         if lang == "ru"
-        else "📍 Do'kon joylashuvini yuboring (pastdagi tugma). Bu majburiy."
+        else "<b>5/7-qadam: joylashuv</b>\n"
+        "Do'kon geolokatsiyasini pastdagi tugma orqali yuboring. Bu majburiy."
     )
     await message.answer(location_text, reply_markup=location_request_keyboard(lang))
     await state.set_state(RegisterStore.location)
@@ -422,9 +429,9 @@ async def register_store_location_invalid(message: types.Message, state: FSMCont
     assert message.from_user is not None
     lang = db.get_user_language(message.from_user.id)
     text = (
-        "📍 Пожалуйста, отправьте геолокацию магазина кнопкой ниже."
+        "Отправьте геолокацию магазина кнопкой ниже."
         if lang == "ru"
-        else "📍 Iltimos, do'kon geolokatsiyasini pastdagi tugma orqali yuboring."
+        else "Do'kon geolokatsiyasini pastdagi tugma orqali yuboring."
     )
     await message.answer(text, reply_markup=location_request_keyboard(lang))
 
@@ -442,15 +449,13 @@ async def register_store_description(message: types.Message, state: FSMContext) 
 
     # Ask for store photo (required)
     photo_prompt = (
-        "📸 <b>Шаг 7/7: Фото магазина</b>\n\n"
-        "Отправьте фото вашего магазина или витрины.\n"
-        "Это поможет покупателям узнать ваш магазин!\n\n"
-        "⚠️ Фото обязательно для подачи заявки"
+        "📸 <b>Шаг 7/7: фото</b>\n"
+        "Отправьте фото магазина или витрины.\n"
+        "Фото обязательно."
         if lang == "ru"
-        else "📸 <b>7/7-qadam: Do'kon fotosurati</b>\n\n"
-        "Do'koningiz yoki vitrina fotosuratini yuboring.\n"
-        "Bu xaridorlarga do'koningizni tanishga yordam beradi!\n\n"
-        "⚠️ Fotosurat ariza uchun majburiy"
+        else "📸 <b>7/7-qadam: foto</b>\n"
+        "Do'kon yoki vitrina fotosuratini yuboring.\n"
+        "Foto majburiy."
     )
 
     await message.answer(photo_prompt, parse_mode="HTML", reply_markup=cancel_keyboard(lang))
@@ -515,9 +520,9 @@ async def register_store_photo_text(message: types.Message, state: FSMContext) -
 
     # Any other text - require photo
     await message.answer(
-        "❌ Пожалуйста, отправьте фото магазина.\n\n" "📸 Фото обязательно для подачи заявки."
+        "Пожалуйста, отправьте фото магазина. Это обязательный шаг."
         if lang == "ru"
-        else "❌ Iltimos, do'kon fotosuratini yuboring.\n\n" "📸 Fotosurat ariza uchun majburiy."
+        else "Iltimos, do'kon fotosuratini yuboring. Bu majburiy qadam."
     )
 
 
@@ -532,9 +537,9 @@ async def register_store_photo_invalid(message: types.Message, state: FSMContext
 
     # Show error - photo is required
     await message.answer(
-        "❌ Отправьте фото магазина (изображение).\n\n" "📸 Это обязательный шаг."
+        "Отправьте фото магазина (изображение). Это обязательный шаг."
         if lang == "ru"
-        else "❌ Do'kon fotosuratini yuboring (rasm).\n\n" "📸 Bu majburiy qadam."
+        else "Do'kon fotosuratini yuboring (rasm). Bu majburiy qadam."
     )
 
 
@@ -615,13 +620,13 @@ async def create_store_from_data(message: types.Message, state: FSMContext) -> N
     if latitude is None or longitude is None:
         if lang == "ru":
             await message.answer(
-                "📍 Не удалось определить координаты магазина автоматически. "
-                "Пожалуйста, установите геолокацию в настройках магазина."
+                "Не удалось определить координаты магазина автоматически. "
+                "Установите геолокацию в настройках магазина."
             )
         else:
             await message.answer(
-                "📍 Do'kon koordinatalarini avtomatik aniqlab bo'lmadi. "
-                "Iltimos, do'kon sozlamalarida geolokatsiyani o'rnating."
+                "Do'kon koordinatalarini avtomatik aniqlab bo'lmadi. "
+                "Do'kon sozlamalarida geolokatsiyani o'rnating."
             )
 
     # Notify ALL admins about new application
@@ -629,16 +634,16 @@ async def create_store_from_data(message: types.Message, state: FSMContext) -> N
     for admin in admins:
         try:
             admin_text = (
-                f"🔔 <b>Новая заявка на партнерство!</b>\n\n"
+                f"<b>Новая заявка на партнёрство</b>\n\n"
                 f"От: {message.from_user.full_name} (@{message.from_user.username or 'нет'})\n"
                 f"ID: <code>{message.from_user.id}</code>\n\n"
-                f"🏪 Название: {data['name']}\n"
-                f"📍 Город: {data['city']}\n"
-                f"🏠 Адрес: {data['address']}\n"
-                f"🏷 Категория: {data['category']}\n"
-                f"📝 Описание: {data['description']}\n"
-                f"📱 Телефон: {owner_phone or '—'}\n\n"
-                f"Перейдите в админ панель для модерации."
+                f"Название: {data['name']}\n"
+                f"Город: {data['city']}\n"
+                f"Адрес: {data['address']}\n"
+                f"Категория: {data['category']}\n"
+                f"Описание: {data['description']}\n"
+                f"Телефон: {owner_phone or '—'}\n\n"
+                f"Откройте админ-панель для модерации."
             )
 
             # Send with photo if available
@@ -711,7 +716,7 @@ async def become_partner_cb(callback: types.CallbackQuery, state: FSMContext) ->
             pending_stores = [s for s in stores if s[6] == "pending"]
             if pending_stores:
                 await callback.answer(
-                    "⏳ Ваш магазин на модерации. Ожидайте одобрения администратором.",
+                    "Ваш магазин на модерации. Ожидайте одобрения администратора.",
                     show_alert=True,
                 )
                 return

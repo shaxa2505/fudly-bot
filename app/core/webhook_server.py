@@ -890,18 +890,27 @@ async def create_webhook_app(
         limit = max(1, min(limit, 50))
 
         normalized_city = normalize_city(city) if city else None
+        normalized_region = normalize_city(region) if region else None
+        normalized_district = normalize_city(district) if district else None
         try:
             raw_offers = (
                 db.get_hot_offers(
                     normalized_city,
                     limit=100,
                     offset=0,
-                    region=region,
-                    district=district,
+                    region=normalized_region,
+                    district=normalized_district,
                 )
                 if hasattr(db, "get_hot_offers")
                 else []
             )
+            if (
+                not raw_offers
+                and normalized_city
+                and (normalized_region or normalized_district)
+                and hasattr(db, "get_hot_offers")
+            ):
+                raw_offers = db.get_hot_offers(normalized_city, limit=100, offset=0)
             if not raw_offers:
                 raw_offers = []
 

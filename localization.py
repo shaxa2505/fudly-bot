@@ -240,79 +240,55 @@ TEXTS = {
         "warn_discount_low": "⚠️ Внимание: скидка меньше 10%. Рекомендуем делать скидку от 30% для привлечения клиентов.",
         "booking_how_many": "Сколько вы хотите забронировать? (1-{max_qty})",
         # Партнёр
-        "become_partner_text": """🏪 <b>Стать партнёром Fudly</b>
+        "become_partner_text": """<b>🏪 Стать партнёром Fudly</b>
 
-💰 Предлагайте товары со скидкой и находите новых клиентов
-🌱 Снижайте потери и заботьтесь об экологии
+Продавайте товары со скидкой и находите новых клиентов.
 
-┏━━━━━━━━━━━━━━━━━━━━━━━━┏
-┃ Шаг 1/5: Город 🏙     ┃
-┗━━━━━━━━━━━━━━━━━━━━━━━━┗
-
-Выберите город, где находится ваше заведение:""",
-        "store_name": '''┏━━━━━━━━━━━━━━━━━━━━━━━━┏
-┃ Шаг 3/5: Название 🏪 ┃
-┗━━━━━━━━━━━━━━━━━━━━━━━━┗
-
-Введите название вашего заведения:
-
-💡 Пример: "Пекарня Хлеб и Соль"''',
-        "store_category": """┏━━━━━━━━━━━━━━━━━━━━━━━━┏
-┃ Шаг 2/5: Категория 🏷 ┃
-┗━━━━━━━━━━━━━━━━━━━━━━━━┗
-
-Выберите тип вашего заведения:""",
-        "store_address": '''┏━━━━━━━━━━━━━━━━━━━━━━━━┏
-┃ Шаг 4/5: Адрес 📍   ┃
-┗━━━━━━━━━━━━━━━━━━━━━━━━┗
-
-Введите адрес заведения:
-
-💡 Пример: "ул. Амира Темура, 12"''',
-        "store_description": '''┏━━━━━━━━━━━━━━━━━━━━━━━━┏
-┃ Шаг 5/5: Описание 📝 ┃
-┗━━━━━━━━━━━━━━━━━━━━━━━━┗
-
-Опишите ваше заведение и ассортимент:
-
-💡 Пример: "Свежая выпечка ежедневно. Хлеб, булочки, торты"''',
+<b>Шаг 1/7: город</b>
+Выберите город вашего магазина:""",
+        "store_name": """<b>Шаг 3/7: название</b>
+Введите название магазина.
+Пример: Пекарня Хлеб и Соль""",
+        "store_category": """<b>Шаг 2/7: категория</b>
+Выберите тип магазина:""",
+        "store_address": """<b>Шаг 4/7: адрес</b>
+Введите адрес магазина.
+Пример: ул. Амира Темура, 12""",
+        "store_description": """<b>Шаг 6/7: описание</b>
+Коротко опишите ассортимент.
+Пример: Свежая выпечка ежедневно. Хлеб, булочки, торты""",
         "store_phone": "Введите контактный телефон:",
-        "store_registered": """✅ <b>Заявка отправлена!</b>
+        "store_registered": """<b>✅ Заявка отправлена</b>
 
-🏪 {name}
-📍 {city}, {address}
-🏷 {category}
-📝 {description}
-📞 {phone}
+{name}
+{city}, {address}
+{category}
+{description}
+{phone}
 
-⏳ Ожидайте одобрения администратором.
-Вы получите уведомление о решении!""",
-        "store_pending": """✅ <b>Заявка отправлена на модерацию!</b>
+Ожидайте одобрения администратора.
+Мы сообщим о решении.""",
+        "store_pending": """<b>✅ Заявка отправлена на модерацию</b>
 
-🏪 {name}
-📍 {city}, {address}
-🏷 {category}
-📝 {description}
-📞 {phone}
+{name}
+{city}, {address}
+{category}
+{description}
+{phone}
 
-⏳ Ожидайте одобрения администратором.
-Обычно это занимает не более 24 часов.""",
-        "store_approved": """🎉 <b>Поздравляем! Ваш магазин одобрен!</b>
+Обычно ответ в течение 24 часов.""",
+        "store_approved": """<b>✅ Ваш магазин одобрен</b>
 
-Теперь вы официальный партнёр Fudly!
+Теперь вы партнёр Fudly.
+Что дальше:
+1) Добавьте первый товар.
+2) Установите скидку 30-70%.
+3) Загрузите фото.
 
-<b>🚀 С чего начать:</b>
-1️⃣ Добавьте первый товар (кнопка «➕ Добавить»)
-2️⃣ Установите скидку 30-70% — это привлекает покупателей
-3️⃣ Загрузите фото — товары с фото продаются в 3 раза лучше!
+Удачных продаж!""",
+        "store_rejected": """<b>❌ Заявка отклонена</b>
 
-<b>💡 Совет:</b> Начните с 3-5 товаров и смотрите что лучше продаётся.
-
-Желаем успешных продаж! 🎉""",
-        "store_rejected": """❌ <b>Заявка отклонена</b>
-
-К сожалению, ваша заявка не была одобрена.
-
+К сожалению, заявка не была одобрена.
 Вы можете подать новую заявку с исправленными данными.""",
         # Создание предложения
         "choose_product_category": "🏷 Выберите категорию продукта:",
@@ -899,79 +875,55 @@ Buyurtmani olishda shu kodni ko'rsating.""",
 
 <i>Quyidagi "Tasdiqlash" tugmasini bosing</i> 👇""",
         # Hamkor
-        "become_partner_text": """🏪 <b>Fudly hamkori bo'ling</b>
+        "become_partner_text": """<b>🏪 Fudly hamkori bo'ling</b>
 
-💰 Chegirmali mahsulotlar taklif qiling va yangi mijozlar toping
-🌱 Yo'qotishlarni kamaytiring va ekologiyaga g'amxo'rlik qiling
+Chegirmali mahsulotlar taklif qiling va yangi mijozlar toping.
 
-┏━━━━━━━━━━━━━━━━━━━━━━━━┏
-┃ Qadam 1/5: Shahar 🏙    ┃
-┗━━━━━━━━━━━━━━━━━━━━━━━━┗
-
-Muassasangiz joylashgan shaharni tanlang:""",
-        "store_name": '''┏━━━━━━━━━━━━━━━━━━━━━━━━┏
-┃ Qadam 3/5: Nomi 🏪    ┃
-┗━━━━━━━━━━━━━━━━━━━━━━━━┗
-
-Muassasangiz nomini kiriting:
-
-💡 Misol: "Non va Tuz nonvoyxonasi"''',
-        "store_category": """┏━━━━━━━━━━━━━━━━━━━━━━━━┏
-┃ Qadam 2/5: Kategoriya 🏷 ┃
-┗━━━━━━━━━━━━━━━━━━━━━━━━┗
-
-Muassasangiz turini tanlang:""",
-        "store_address": '''┏━━━━━━━━━━━━━━━━━━━━━━━━┏
-┃ Qadam 4/5: Manzil 📍  ┃
-┗━━━━━━━━━━━━━━━━━━━━━━━━┗
-
-Muassasa manzilini kiriting:
-
-💡 Misol: "Amir Temur ko'chasi, 12"''',
-        "store_description": '''┏━━━━━━━━━━━━━━━━━━━━━━━━┏
-┃ Qadam 5/5: Ta'rif 📝  ┃
-┗━━━━━━━━━━━━━━━━━━━━━━━━┗
-
-Muassasangiz va assortimentini ta'riflang:
-
-💡 Misol: "Har kuni yangi pishirilgan non. Non, bulochka, tortlar"''',
+<b>1/7-qadam: shahar</b>
+Do'koningiz joylashgan shaharni tanlang:""",
+        "store_name": """<b>3/7-qadam: nomi</b>
+Do'kon nomini kiriting.
+Misol: Non va Tuz nonvoyxonasi""",
+        "store_category": """<b>2/7-qadam: kategoriya</b>
+Do'kon turini tanlang:""",
+        "store_address": """<b>4/7-qadam: manzil</b>
+Do'kon manzilini kiriting.
+Misol: Amir Temur ko'chasi, 12""",
+        "store_description": """<b>6/7-qadam: tavsif</b>
+Assortimentni qisqacha yozing.
+Misol: Har kuni yangi pishirilgan non. Non, bulochka, tortlar""",
         "store_phone": "Aloqa telefonini kiriting:",
-        "store_registered": """✅ <b>Ariza yuborildi!</b>
+        "store_registered": """<b>✅ Ariza yuborildi</b>
 
-🏪 {name}
-📍 {city}, {address}
-🏷 {category}
-📝 {description}
-📞 {phone}
+{name}
+{city}, {address}
+{category}
+{description}
+{phone}
 
-⏳ Administrator tomonidan tasdiqlanishini kuting.
-Qaror haqida xabar olasiz!""",
-        "store_pending": """✅ <b>Ariza moderatsiyaga yuborildi!</b>
+Administrator tasdiqlashini kuting.
+Qaror haqida xabar beramiz.""",
+        "store_pending": """<b>✅ Ariza moderatsiyaga yuborildi</b>
 
-🏪 {name}
-📍 {city}, {address}
-🏷 {category}
-📝 {description}
-📞 {phone}
+{name}
+{city}, {address}
+{category}
+{description}
+{phone}
 
-⏳ Administrator tomonidan tasdiqlanishini kuting.
-Odatda bu 24 soatdan ortiq vaqt olmaydi.""",
-        "store_approved": """🎉 <b>Tabriklaymiz! Do'koningiz tasdiqlandi!</b>
+Odatda javob 24 soat ichida.""",
+        "store_approved": """<b>✅ Do'koningiz tasdiqlandi</b>
 
-Endi siz Fudly ning rasmiy hamkorisiz!
+Endi siz Fudly hamkorisiz.
+Keyingi qadamlar:
+1) Birinchi mahsulotni qo'shing.
+2) 30-70% chegirma qo'ying.
+3) Rasm yuklang.
 
-<b>🚀 Nimadan boshlash kerak:</b>
-1️⃣ Birinchi mahsulotni qo'shing («➕ Qo'shish» tugmasi)
-2️⃣ 30-70% chegirma qo'ying — bu xaridorlarni jalb qiladi
-3️⃣ Rasm yuklang — rasmli tovarlar 3 baravar yaxshi sotiladi!
+Omad tilaymiz!""",
+        "store_rejected": """<b>❌ Ariza rad etildi</b>
 
-<b>💡 Maslahat:</b> 3-5 ta tovar bilan boshlang va qaysi biri yaxshi sotilishini kuzating.
-
-Muvaffaqiyatli savdo tilaymiz! 🎉""",
-        "store_rejected": """❌ <b>Ariza rad etildi</b>
-
-Afsuski, arizangiz tasdiqlanmadi.
-
+Afsuski, ariza tasdiqlanmadi.
 Tuzatilgan ma'lumotlar bilan yangi ariza topshirishingiz mumkin.""",
         # Taklif yaratish - choose_store defined earlier at line 562
         "offer_title": "Taklif nomini kiriting:",

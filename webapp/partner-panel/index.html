@@ -223,6 +223,7 @@
                 <div class="photo-upload-title">Загрузить фото</div>
                 <div class="photo-upload-subtitle">PNG/JPG до 5 МБ</div>
             `;
+        }
 
         // ============================================
         // PRODUCT MODAL (defined early for use in rendered HTML)
@@ -522,6 +523,7 @@
 
         function editProduct(productId) {
             openProductModal(productId);
+        }
 
         // ============================================
         // AUTH & API
@@ -737,6 +739,7 @@
                 console.error(`❌ Fetch error ${endpoint}:`, error);
                 throw error;
             }
+        }
 
         // ============================================
         // ORDER HELPERS
@@ -766,6 +769,7 @@
 
         function getOrderStatus(order) {
             return normalizeOrderStatus(order?.order_status || order?.status || '');
+        }
 
         // ============================================
         // UI HELPERS
@@ -906,6 +910,7 @@
                 `
             };
             document.querySelector('.content').innerHTML = loaders[type] || loaders.default;
+        }
 
         // ============================================
         // VIEW SWITCHING
@@ -953,6 +958,7 @@
                 // Scroll to top smoothly
                 content.scrollTo({ top: 0, behavior: 'smooth' });
             }, 150);
+        }
 
         // ============================================
         // DASHBOARD
@@ -1284,6 +1290,7 @@
                 section.classList.toggle('collapsed');
                 if (typeof lucide !== 'undefined') lucide.createIcons();
             }
+        }
 
         // ============================================
         // ORDERS
@@ -2685,6 +2692,7 @@ async function toggleProductAvailability(id) {
                 toast('Ошибка удаления товара', 'error');
                 loadProducts(); // Restore on error
             }
+        }
 
         // ============================================
         // STATS
@@ -2971,6 +2979,7 @@ async function toggleProductAvailability(id) {
             `;
 
             if (typeof lucide !== 'undefined') lucide.createIcons();
+        }
 
         // ============================================
         // SETTINGS
@@ -3588,6 +3597,7 @@ async function toggleProductAvailability(id) {
                     loadSettings();
                 }
             }
+        }
 
         // ============================================
         // SMART UX DATA
@@ -3941,6 +3951,7 @@ async function toggleProductAvailability(id) {
             });
 
             console.log('⌨️ Keyboard navigation enabled');
+        }
 
         // ============================================
         // AUTO-REFRESH & NOTIFICATIONS
@@ -4171,6 +4182,7 @@ async function toggleProductAvailability(id) {
             };
             updateBadge(headerBadge);
             updateBadge(navBadge);
+        }
 
         // ============================================
         // INITIALIZATION

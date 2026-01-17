@@ -79,8 +79,8 @@ def category_keyboard(lang: str = "ru") -> ReplyKeyboardMarkup:
     categories = get_categories(lang)
     builder = ReplyKeyboardBuilder()
     for cat in categories:
-        builder.button(text=f"▫️ {cat}")
-    builder.button(text=f"❌ {get_text(lang, 'cancel')}")
+        builder.button(text=cat)
+    builder.button(text=get_text(lang, "cancel"))
     builder.adjust(2, 2, 2, 1)
     return builder.as_markup(resize_keyboard=True)
 
@@ -109,7 +109,7 @@ def category_inline_keyboard(lang: str = "ru") -> InlineKeyboardMarkup:
     builder = InlineKeyboardBuilder()
     for cat in categories:
         cat_id = category_ids.get(cat, cat.lower())
-        builder.button(text=f"▫️ {cat}", callback_data=f"reg_cat_{cat_id}")
+        builder.button(text=cat, callback_data=f"reg_cat_{cat_id}")
     builder.button(text=get_text(lang, "cancel"), callback_data="reg_cancel")
     builder.adjust(2)
     return builder.as_markup()

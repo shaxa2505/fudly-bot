@@ -1,11 +1,12 @@
 import { memo, useState, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { useToast } from '../context/ToastContext'
 import { PLACEHOLDER_IMAGE, resolveOfferImageUrl } from '../utils/imageUtils'
-import QuantityControl from './QuantityControl'
 import './OfferCard.css'
 
 const OfferCard = memo(function OfferCard({ offer, cartQuantity = 0, onAddToCart, onRemoveFromCart }) {
   const navigate = useNavigate()
+  const { toast } = useToast()
   const [imageLoaded, setImageLoaded] = useState(false)
   const [imageError, setImageError] = useState(false)
   const [isAdding, setIsAdding] = useState(false)
@@ -18,11 +19,8 @@ const OfferCard = memo(function OfferCard({ offer, cartQuantity = 0, onAddToCart
   const stockLimit = Number(offer.quantity ?? offer.stock ?? 0)
   const isOutOfStock = stockLimit <= 0
   const isMaxReached = !isOutOfStock && cartQuantity >= stockLimit
-  const disableIncrement = isOutOfStock || isMaxReached
-  const minOrderAmount = Number(offer.min_order_amount || 0)
-  const showDelivery = Boolean(offer.delivery_enabled)
-  const showStoreName = Boolean(offer.store_name)
-  const addLabel = "Savatga"
+  const showStoreName = Boolean(offer.store_name || offer.store)
+  const storeName = offer.store_name || offer.store || ''
 
   const handleAddClick = useCallback((e) => {
     e.stopPropagation()
@@ -34,12 +32,13 @@ const OfferCard = memo(function OfferCard({ offer, cartQuantity = 0, onAddToCart
     // Haptic feedback
     window.Telegram?.WebApp?.HapticFeedback?.impactOccurred?.('light')
 
-    // Add animation
-    setIsAdding(true)
-    setTimeout(() => setIsAdding(false), 300)
-
     onAddToCart?.(offer)
-  }, [isOutOfStock, isMaxReached, offer, onAddToCart])
+    if (cartQuantity === 0) {
+      setIsAdding(true)
+      setTimeout(() => setIsAdding(false), 300)
+      toast?.success('Добавлено', 1800)
+    }
+  }, [cartQuantity, isOutOfStock, isMaxReached, offer, onAddToCart, toast])
 
   const handleRemoveClick = useCallback((e) => {
     e.stopPropagation()
@@ -49,15 +48,8 @@ const OfferCard = memo(function OfferCard({ offer, cartQuantity = 0, onAddToCart
 
   const originalPrice = Number(offer.original_price) || 0
   const discountPrice = Number(offer.discount_price) || 0
-  const priceValue = discountPrice || originalPrice
-  const hasDiscount = originalPrice > discountPrice && discountPrice > 0
-  const computedPercent = hasDiscount && originalPrice > 0
-    ? Math.round((1 - discountPrice / originalPrice) * 100)
-    : 0
-  const rawDiscountPercent = Number(offer.discount_percent) || 0
-  const discountPercent = rawDiscountPercent || computedPercent
-  const showDiscountPercent = discountPercent > 0 && (hasDiscount || rawDiscountPercent > 0)
-  const isFrozen = Boolean(offer.is_frozen) || String(offer.category || '').toLowerCase() === 'frozen'
+  const priceValue = discountPrice > 0 ? discountPrice : originalPrice
+  const hasOldPrice = originalPrice > priceValue && priceValue > 0
 
   // Get photo URL (handles Telegram file_id conversion)
   const photoUrl = resolveOfferImageUrl(offer)
@@ -65,26 +57,17 @@ const OfferCard = memo(function OfferCard({ offer, cartQuantity = 0, onAddToCart
 
   return (
     <div
-      className={`offer-card ${cartQuantity > 0 ? 'in-cart' : ''} ${isAdding ? 'adding' : ''} ${isOutOfStock ? 'out-of-stock' : ''}`}
+      className={`offer-card ${cartQuantity > 0 ? 'in-cart' : ''} ${isOutOfStock ? 'out-of-stock' : ''}`}
       onClick={handleCardClick}
     >
-      {/* Image Section */}
-      <div className={`card-image-container ${imageLoaded && !imageError ? 'has-image' : ''}`}>
-        {/* Image skeleton while loading */}
+      <div className="offer-media">
         {!imageLoaded && !imageError && (
-          <div className="image-skeleton shimmer" />
+          <div className="offer-image-skeleton shimmer" />
         )}
-        {showDiscountPercent && (
-          <div className="image-discount-badge">-{discountPercent}%</div>
-        )}
-        {isOutOfStock && (
-          <div className="image-stock-badge">Tugagan</div>
-        )}
-
         <img
           src={photoUrl || fallbackUrl}
           alt={offer.title}
-          className={`card-image ${imageLoaded ? 'loaded' : ''}`}
+          className={`offer-image ${imageLoaded ? 'loaded' : ''}`}
           loading="lazy"
           decoding="async"
           onLoad={() => setImageLoaded(true)}
@@ -97,76 +80,64 @@ const OfferCard = memo(function OfferCard({ offer, cartQuantity = 0, onAddToCart
             }
           }}
         />
-      </div>
-
-      {/* Content Section */}
-      <div className="card-content">
-        <div className="price-row">
-          <div className="price-stack">
-            <div className="price-line">
-              <div className={`price-main ${hasDiscount ? 'discounted' : ''}`}>
-                {Math.round(priceValue).toLocaleString('ru-RU')}
-                <span className="currency"> so'm</span>
-              </div>
-            </div>
-            {hasDiscount && (
-              <div className="price-original">
-                {Math.round(originalPrice).toLocaleString('ru-RU')} so'm
-              </div>
-            )}
-          </div>
-        </div>
-        <h3 className="offer-title">
-          {offer.title}
-          {isFrozen && (
-            <span className="offer-title-tag"> - Muzlatilgan</span>
-          )}
-        </h3>
-        {(showStoreName || showDelivery) && (
-          <div className="offer-meta">
-            {showStoreName && (
-              <div className="offer-store">{offer.store_name}</div>
-            )}
-            {(showDelivery || minOrderAmount > 0) && (
-              <div className="offer-tags">
-                {showDelivery && (
-                  <span className="offer-badge">Yetkazib berish</span>
-                )}
-                {showDelivery && minOrderAmount > 0 && (
-                  <span className="offer-badge secondary">
-                    Min {Math.round(minOrderAmount).toLocaleString('ru-RU')} so'm
-                  </span>
-                )}
-              </div>
-            )}
-          </div>
+        {isOutOfStock && (
+          <div className="offer-stock-overlay">Нет в наличии</div>
         )}
-        <div className="card-control">
+        <div className="offer-action">
           {cartQuantity > 0 ? (
-            <QuantityControl
-              value={cartQuantity}
-              size="sm"
-              className="card-stepper"
-              onDecrement={handleRemoveClick}
-              onIncrement={handleAddClick}
-              disableIncrement={disableIncrement}
-              stopPropagation
-            />
-          ) : isOutOfStock ? (
-            <div className="card-stock-empty">Tugagan</div>
+            <div className="offer-counter" role="group" aria-label="Количество в корзине">
+              <button
+                type="button"
+                className="offer-counter-btn"
+                onClick={handleRemoveClick}
+                aria-label="Уменьшить количество"
+                disabled={cartQuantity <= 0}
+              >
+                -
+              </button>
+              <span className="offer-counter-value">{cartQuantity}</span>
+              <button
+                type="button"
+                className="offer-counter-btn"
+                onClick={handleAddClick}
+                aria-label="Увеличить количество"
+                disabled={isOutOfStock || isMaxReached}
+              >
+                +
+              </button>
+            </div>
           ) : (
             <button
               type="button"
-              className={`add-to-cart-inline ${isAdding ? 'pulse' : ''}`}
+              className={`offer-add-btn ${isAdding ? 'pulse' : ''}`}
               onClick={handleAddClick}
-              disabled={disableIncrement}
-              aria-label="Savatga qo'shish"
+              disabled={isOutOfStock}
+              aria-label="Добавить в корзину"
             >
-              <span className="add-icon">+</span>
-              <span className="add-label">{addLabel}</span>
+              +
             </button>
           )}
         </div>
+      </div>
+
+      <div className="offer-body">
+        <h3 className="offer-title" title={offer.title}>
+          {offer.title}
+        </h3>
+        <div className="offer-price-row">
+          <span className="offer-price">
+            {Math.round(priceValue).toLocaleString('ru-RU')}
+            <span className="offer-currency"> so'm</span>
+          </span>
+          {hasOldPrice && (
+            <span className="offer-old-price">
+              {Math.round(originalPrice).toLocaleString('ru-RU')} so'm
+            </span>
+          )}
+        </div>
+        {showStoreName && (
+          <div className="offer-store">{storeName}</div>
+        )}
       </div>
     </div>
   )

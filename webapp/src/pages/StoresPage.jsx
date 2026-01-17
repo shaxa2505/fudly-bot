@@ -3,8 +3,8 @@ import { useNavigate } from 'react-router-dom'
 import { Store, ShoppingCart, Coffee as CafeIcon, Utensils, Croissant, Salad, Star } from 'lucide-react'
 import api from '../api/client'
 import { useCart } from '../context/CartContext'
-import { getSavedLocation, getLatinCity, getCyrillicCity } from '../utils/cityUtils'
-import { getCurrentLocation, addDistanceToStores, saveLocation, getSavedLocation as getGeoLocation } from '../utils/geolocation'
+import { getSavedLocation, getLatinCity, getCyrillicCity, saveLocation, buildLocationFromReverseGeocode } from '../utils/cityUtils'
+import { getCurrentLocation, addDistanceToStores } from '../utils/geolocation'
 import { blurOnEnter } from '../utils/helpers'
 import { resolveOfferImageUrl, resolveStoreImageUrl } from '../utils/imageUtils'
 import { getScrollContainer, getScrollTop } from '../utils/scrollContainer'
@@ -36,11 +36,16 @@ function StoresPage() {
   const [loadingOffers, setLoadingOffers] = useState(false)
   const [activeTab, setActiveTab] = useState('offers') // 'offers' or 'reviews'
   const [viewMode, setViewMode] = useState('list') // 'list' or 'map'
-  const [userLocation, setUserLocation] = useState(null)
+  const [location, setLocation] = useState(getSavedLocation)
+  const [userLocation, setUserLocation] = useState(() => {
+    const saved = getSavedLocation()
+    const coords = saved?.coordinates
+    if (coords?.lat == null || coords?.lon == null) return null
+    return { latitude: coords.lat, longitude: coords.lon }
+  })
   const [locationLoading, setLocationLoading] = useState(false)
   const searchInputRef = useRef(null)
 
-  const location = getSavedLocation()
   const cityLatin = getLatinCity(location)
   const cityRaw = getCyrillicCity(location.city)
   const regionRaw = location.region || ''
@@ -48,12 +53,40 @@ function StoresPage() {
 
   useEffect(() => {
     loadStores()
-    // Try to get saved location
-    const savedGeo = getGeoLocation()
-    if (savedGeo && !userLocation) {
-      setUserLocation(savedGeo)
-    }
   }, [selectedType, cityRaw, regionRaw, districtRaw, userLocation])
+
+  useEffect(() => {
+    if (userLocation) return
+    if (location.coordinates?.lat == null || location.coordinates?.lon == null) return
+    setUserLocation({ latitude: location.coordinates.lat, longitude: location.coordinates.lon })
+  }, [location.coordinates?.lat, location.coordinates?.lon, userLocation])
+
+  useEffect(() => {
+    const handleLocationUpdate = (event) => {
+      const next = event?.detail
+      if (!next) return
+      setLocation(prev => {
+        const prevCoords = prev.coordinates || {}
+        const nextCoords = next.coordinates || {}
+        const same =
+          (prev.city || '') === (next.city || '') &&
+          (prev.address || '') === (next.address || '') &&
+          (prev.region || '') === (next.region || '') &&
+          (prev.district || '') === (next.district || '') &&
+          prevCoords.lat === nextCoords.lat &&
+          prevCoords.lon === nextCoords.lon
+        if (same) return prev
+        return { ...prev, ...next }
+      })
+
+      if (next.coordinates?.lat != null && next.coordinates?.lon != null) {
+        setUserLocation({ latitude: next.coordinates.lat, longitude: next.coordinates.lon })
+      }
+    }
+
+    window.addEventListener('fudly:location', handleLocationUpdate)
+    return () => window.removeEventListener('fudly:location', handleLocationUpdate)
+  }, [])
 
   // Hide topbar on scroll-down (Lavka-like): keep search pinned, show topbar on scroll-up.
   useEffect(() => {
@@ -165,9 +198,34 @@ function StoresPage() {
   const requestLocation = async () => {
     setLocationLoading(true)
     try {
-      const location = await getCurrentLocation()
-      setUserLocation(location)
-      saveLocation(location)
+      const coords = await getCurrentLocation()
+      setUserLocation(coords)
+
+      let nextLocation = {
+        ...location,
+        coordinates: { lat: coords.latitude, lon: coords.longitude },
+      }
+
+      try {
+        const data = await api.reverseGeocode(coords.latitude, coords.longitude, 'uz')
+        if (data) {
+          const resolved = buildLocationFromReverseGeocode(data, coords.latitude, coords.longitude)
+          nextLocation = {
+            ...nextLocation,
+            ...resolved,
+            city: resolved.city || nextLocation.city,
+            region: resolved.region || nextLocation.region,
+            district: resolved.district || nextLocation.district,
+            address: resolved.address || nextLocation.address,
+            coordinates: resolved.coordinates || nextLocation.coordinates,
+          }
+        }
+      } catch (err) {
+        console.error('Reverse geocode error:', err)
+      }
+
+      setLocation(nextLocation)
+      saveLocation(nextLocation)
     } catch (error) {
       console.error('Location error:', error)
       if (window.Telegram?.WebApp) {

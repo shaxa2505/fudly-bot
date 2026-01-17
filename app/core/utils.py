@@ -283,6 +283,8 @@ def normalize_city(city: str) -> str:
     """Convert Uzbek/English city names to the Russian form used in DB."""
     if not city:
         return city
+    if not isinstance(city, str):
+        city = str(city)
     city_clean = " ".join(city.strip().split())
     city_clean = city_clean.split(",")[0]
     city_clean = re.sub(r"\s*\([^)]*\)", "", city_clean)
