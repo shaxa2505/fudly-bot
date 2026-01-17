@@ -131,14 +131,14 @@ def product_categories_keyboard(lang: str = "ru") -> InlineKeyboardMarkup:
 
     # Use same 8 categories as in the customer view
     categories = {
-        "bakery": "🥖 Выпечка" if lang == "ru" else "🥖 Pishiriq",
-        "dairy": "🥛 Молочные" if lang == "ru" else "🥛 Sut mahsulotlari",
-        "meat": "🥩 Мясные" if lang == "ru" else "🥩 Go'sht mahsulotlari",
-        "fruits": "🍎 Фрукты" if lang == "ru" else "🍎 Mevalar",
-        "vegetables": "🥬 Овощи" if lang == "ru" else "🥬 Sabzavotlar",
-        "drinks": "🥤 Напитки" if lang == "ru" else "🥤 Ichimliklar",
-        "snacks": "🍿 Снеки" if lang == "ru" else "🍿 Gaz. ovqatlar",
-        "frozen": "🧊 Замороженное" if lang == "ru" else "🧊 Muzlatilgan",
+        "bakery": "Выпечка" if lang == "ru" else "Pishiriq",
+        "dairy": "Молочные" if lang == "ru" else "Sut mahsulotlari",
+        "meat": "Мясные" if lang == "ru" else "Go'sht mahsulotlari",
+        "fruits": "Фрукты" if lang == "ru" else "Mevalar",
+        "vegetables": "Овощи" if lang == "ru" else "Sabzavotlar",
+        "drinks": "Напитки" if lang == "ru" else "Ichimliklar",
+        "snacks": "Снеки" if lang == "ru" else "Gaz. ovqatlar",
+        "frozen": "Замороженное" if lang == "ru" else "Muzlatilgan",
     }
 
     for cat_id, cat_name in categories.items():
@@ -155,8 +155,8 @@ def discount_keyboard(lang: str = "ru") -> InlineKeyboardMarkup:
     discounts = [10, 20, 30, 40, 50, 60, 70]
     for d in discounts:
         builder.button(text=f"{d}%", callback_data=f"discount_{d}")
-    builder.button(text="✏️ Своя" if lang == "ru" else "✏️ Boshqa", callback_data="discount_custom")
-    builder.button(text="❌ Отмена" if lang == "ru" else "❌ Bekor", callback_data="create_cancel")
+    builder.button(text="Другая" if lang == "ru" else "Boshqa", callback_data="discount_custom")
+    builder.button(text=get_text(lang, "cancel"), callback_data="create_cancel")
     builder.adjust(4, 3, 2)
     return builder.as_markup()
 
@@ -177,8 +177,8 @@ def quantity_keyboard(lang: str = "ru", unit: str = "шт") -> InlineKeyboardMar
         for q in quantities:
             builder.button(text=str(q), callback_data=f"quantity_{q}")
 
-    builder.button(text="✏️ Своё" if lang == "ru" else "✏️ Boshqa", callback_data="quantity_custom")
-    builder.button(text="◀️ Назад" if lang == "ru" else "◀️ Orqaga", callback_data="create_back_unit")
+    builder.button(text="Другое" if lang == "ru" else "Boshqa", callback_data="quantity_custom")
+    builder.button(text=get_text(lang, "back"), callback_data="create_back_unit")
     builder.adjust(3, 3, 2)
     return builder.as_markup()
 
@@ -187,15 +187,13 @@ def unit_type_keyboard(lang: str = "ru") -> InlineKeyboardMarkup:
     """Unit type selection keyboard (pieces or kg)."""
     builder = InlineKeyboardBuilder()
     builder.button(
-        text="📦 Штуки (шт)" if lang == "ru" else "📦 Dona (dona)", callback_data="unit_type_шт"
+        text="Штуки (шт)" if lang == "ru" else "Dona (dona)", callback_data="unit_type_шт"
     )
     builder.button(
-        text="⚖️ Килограммы (кг)" if lang == "ru" else "⚖️ Kilogramm (kg)",
+        text="Килограммы (кг)" if lang == "ru" else "Kilogramm (kg)",
         callback_data="unit_type_кг",
     )
-    builder.button(
-        text="◀️ Назад" if lang == "ru" else "◀️ Orqaga", callback_data="create_back_discount"
-    )
+    builder.button(text=get_text(lang, "back"), callback_data="create_back_discount")
     builder.adjust(1)
     return builder.as_markup()
 
@@ -220,12 +218,8 @@ def expiry_keyboard(lang: str = "ru") -> InlineKeyboardMarkup:
         date = (today + timedelta(days=days)).strftime("%d.%m")
         builder.button(text=f"{label} ({date})", callback_data=f"expiry_{days}")
 
-    builder.button(
-        text="✏️ Своя дата" if lang == "ru" else "✏️ Boshqa sana", callback_data="expiry_custom"
-    )
-    builder.button(
-        text="◀️ Назад" if lang == "ru" else "◀️ Orqaga", callback_data="create_back_quantity"
-    )
+    builder.button(text="Другая дата" if lang == "ru" else "Boshqa sana", callback_data="expiry_custom")
+    builder.button(text=get_text(lang, "back"), callback_data="create_back_quantity")
     builder.adjust(2, 2, 2, 2)
     return builder.as_markup()
 
@@ -233,11 +227,7 @@ def expiry_keyboard(lang: str = "ru") -> InlineKeyboardMarkup:
 def photo_keyboard(lang: str = "ru") -> InlineKeyboardMarkup:
     """Photo upload or skip keyboard."""
     builder = InlineKeyboardBuilder()
-    builder.button(
-        text="➡️ Без фото" if lang == "ru" else "➡️ Rasmsiz", callback_data="create_skip_photo"
-    )
-    builder.button(
-        text="◀️ Назад" if lang == "ru" else "◀️ Orqaga", callback_data="create_back_expiry"
-    )
+    builder.button(text="Без фото" if lang == "ru" else "Rasmsiz", callback_data="create_skip_photo")
+    builder.button(text=get_text(lang, "back"), callback_data="create_back_expiry")
     builder.adjust(1)
     return builder.as_markup()

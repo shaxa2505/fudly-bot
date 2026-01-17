@@ -160,6 +160,7 @@ class SchemaMixin:
                     )
                 except Exception as e:
                     logger.warning(f"Migration for offers table: {e}")
+                    conn.rollback()
 
             # Migration: Add photo column to stores table if it doesn't exist
             if run_runtime_migrations:
@@ -167,6 +168,7 @@ class SchemaMixin:
                     cursor.execute("ALTER TABLE stores ADD COLUMN IF NOT EXISTS photo TEXT")
                 except Exception as e:
                     logger.warning(f"Migration for stores photo column: {e}")
+                    conn.rollback()
             # Migration: Add region/district columns to stores table if they don't exist
             if run_runtime_migrations:
                 try:
@@ -177,6 +179,7 @@ class SchemaMixin:
                     cursor.execute("ALTER TABLE stores ADD COLUMN IF NOT EXISTS district_slug TEXT")
                 except Exception as e:
                     logger.warning(f"Migration for stores region/district columns: {e}")
+                    conn.rollback()
             # Migration: Add geo reference ids to users/stores tables
             if run_runtime_migrations:
                 try:
@@ -186,6 +189,7 @@ class SchemaMixin:
                     cursor.execute("ALTER TABLE stores ADD COLUMN IF NOT EXISTS district_id INTEGER")
                 except Exception as e:
                     logger.warning(f"Migration for geo reference ids: {e}")
+                    conn.rollback()
             # Migration: Add geo reference foreign keys
             if run_runtime_migrations:
                 try:
@@ -198,6 +202,7 @@ class SchemaMixin:
                     )
                 except Exception as e:
                     logger.warning(f"Migration for fk_users_region_id: {e}")
+                    conn.rollback()
                 try:
                     cursor.execute(
                         """
@@ -208,6 +213,7 @@ class SchemaMixin:
                     )
                 except Exception as e:
                     logger.warning(f"Migration for fk_users_district_id: {e}")
+                    conn.rollback()
                 try:
                     cursor.execute(
                         """
@@ -218,6 +224,7 @@ class SchemaMixin:
                     )
                 except Exception as e:
                     logger.warning(f"Migration for fk_stores_region_id: {e}")
+                    conn.rollback()
                 try:
                     cursor.execute(
                         """
@@ -228,6 +235,7 @@ class SchemaMixin:
                     )
                 except Exception as e:
                     logger.warning(f"Migration for fk_stores_district_id: {e}")
+                    conn.rollback()
             # Seed geo reference tables if empty
             if run_runtime_migrations:
                 try:
@@ -386,6 +394,7 @@ class SchemaMixin:
                                 )
                 except Exception as e:
                     logger.warning(f"Geo reference seed failed: {e}")
+                    conn.rollback()
 
             # Orders table
             cursor.execute(

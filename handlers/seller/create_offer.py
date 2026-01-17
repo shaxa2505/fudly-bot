@@ -40,26 +40,26 @@ def setup_dependencies(database: DatabaseProtocol, bot_instance: Any) -> None:
 # Category names for display
 CATEGORY_NAMES = {
     "ru": {
-        "bakery": "🥖 Выпечка",
-        "dairy": "🥛 Молочные",
-        "meat": "🥩 Мясные",
-        "fruits": "🍎 Фрукты",
-        "vegetables": "🥬 Овощи",
-        "drinks": "🥤 Напитки",
-        "snacks": "🍿 Снеки",
-        "frozen": "🧊 Замороженное",
-        "other": "📦 Другое",
+        "bakery": "Выпечка",
+        "dairy": "Молочные",
+        "meat": "Мясные",
+        "fruits": "Фрукты",
+        "vegetables": "Овощи",
+        "drinks": "Напитки",
+        "snacks": "Снеки",
+        "frozen": "Замороженное",
+        "other": "Другое",
     },
     "uz": {
-        "bakery": "🥖 Pishiriq",
-        "dairy": "🥛 Sut mahsulotlari",
-        "meat": "🥩 Go'sht",
-        "fruits": "🍎 Mevalar",
-        "vegetables": "🥬 Sabzavotlar",
-        "drinks": "🥤 Ichimliklar",
-        "snacks": "🍿 Gaz. ovqatlar",
-        "frozen": "🧊 Muzlatilgan",
-        "other": "📦 Boshqa",
+        "bakery": "Pishiriq",
+        "dairy": "Sut mahsulotlari",
+        "meat": "Go'sht",
+        "fruits": "Mevalar",
+        "vegetables": "Sabzavotlar",
+        "drinks": "Ichimliklar",
+        "snacks": "Gaz. ovqatlar",
+        "frozen": "Muzlatilgan",
+        "other": "Boshqa",
     },
 }
 
@@ -102,13 +102,13 @@ def build_progress_text(data: dict, lang: str, current_step: int) -> str:
                 display_value = str(value)[:20]
             else:
                 display_value = "—"
-            lines.append(f"✅ {name}: <b>{display_value}</b>")
+            lines.append(f"[x] {name}: <b>{display_value}</b>")
         elif i == current_step:
             # Current step
-            lines.append(f"👉 <b>{name}</b>")
+            lines.append(f"[>] <b>{name}</b>")
         else:
             # Future step
-            lines.append(f"⬜ {name}")
+            lines.append(f"[ ] {name}")
 
     return "\n".join(lines)
 
@@ -145,14 +145,14 @@ async def add_offer_start(message: types.Message, state: FSMContext) -> None:
     await state.update_data(store_id=store_id, store_name=store_name)
 
     header = (
-        f"🏪 <b>{store_name}</b>\n\n"
-        f"➕ <b>{'ДОБАВИТЬ ТОВАР' if lang == 'ru' else 'MAHSULOT QO`SHISH'}</b>\n\n"
+        f"<b>{store_name}</b>\n\n"
+        f"<b>{'Добавить товар' if lang == 'ru' else 'Mahsulot qo`shish'}</b>\n\n"
     )
 
     step_text = (
-        "📂 <b>Шаг 1/8:</b> Выберите категорию"
+        "<b>Шаг 1/8:</b> Выберите категорию"
         if lang == "ru"
-        else "📂 <b>1/8-qadam:</b> Kategoriyani tanlang"
+        else "<b>1/8-qadam:</b> Kategoriyani tanlang"
     )
 
     await message.answer(
