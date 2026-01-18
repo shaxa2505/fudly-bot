@@ -1,15 +1,33 @@
-import { memo, useState, useCallback } from 'react'
+import { memo, useState, useCallback, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useToast } from '../context/ToastContext'
 import { PLACEHOLDER_IMAGE, resolveOfferImageUrl } from '../utils/imageUtils'
 import './OfferCard.css'
 
-const OfferCard = memo(function OfferCard({ offer, cartQuantity = 0, onAddToCart, onRemoveFromCart }) {
+const LOADED_IMAGE_CACHE = new Set()
+
+const OfferCard = memo(function OfferCard({
+  offer,
+  cartQuantity = 0,
+  onAddToCart,
+  onRemoveFromCart,
+  imagePriority = false,
+}) {
   const navigate = useNavigate()
   const { toast } = useToast()
-  const [imageLoaded, setImageLoaded] = useState(false)
-  const [imageError, setImageError] = useState(false)
   const [isAdding, setIsAdding] = useState(false)
+
+  // Get photo URL (handles Telegram file_id conversion)
+  const photoUrl = resolveOfferImageUrl(offer)
+  const fallbackUrl = PLACEHOLDER_IMAGE
+  const resolvedUrl = photoUrl || fallbackUrl
+  const [imageLoaded, setImageLoaded] = useState(() => LOADED_IMAGE_CACHE.has(resolvedUrl))
+  const [imageError, setImageError] = useState(false)
+
+  useEffect(() => {
+    setImageError(false)
+    setImageLoaded(LOADED_IMAGE_CACHE.has(resolvedUrl))
+  }, [resolvedUrl])
 
   const handleCardClick = () => {
     navigate('/product', { state: { offer } })
@@ -51,10 +69,6 @@ const OfferCard = memo(function OfferCard({ offer, cartQuantity = 0, onAddToCart
   const priceValue = discountPrice > 0 ? discountPrice : originalPrice
   const hasOldPrice = originalPrice > priceValue && priceValue > 0
 
-  // Get photo URL (handles Telegram file_id conversion)
-  const photoUrl = resolveOfferImageUrl(offer)
-  const fallbackUrl = PLACEHOLDER_IMAGE
-
   return (
     <div
       className={`offer-card ${cartQuantity > 0 ? 'in-cart' : ''} ${isOutOfStock ? 'out-of-stock' : ''}`}
@@ -65,17 +79,22 @@ const OfferCard = memo(function OfferCard({ offer, cartQuantity = 0, onAddToCart
           <div className="offer-image-skeleton shimmer" />
         )}
         <img
-          src={photoUrl || fallbackUrl}
+          src={resolvedUrl}
           alt={offer.title}
           className={`offer-image ${imageLoaded ? 'loaded' : ''}`}
-          loading="lazy"
+          loading={imagePriority ? 'eager' : 'lazy'}
+          fetchPriority={imagePriority ? 'high' : 'auto'}
           decoding="async"
-          onLoad={() => setImageLoaded(true)}
+          onLoad={() => {
+            LOADED_IMAGE_CACHE.add(resolvedUrl)
+            setImageLoaded(true)
+          }}
           onError={(e) => {
             if (!e.target.dataset.fallback) {
               e.target.dataset.fallback = 'true'
               e.target.src = fallbackUrl
               setImageError(true)
+              LOADED_IMAGE_CACHE.add(fallbackUrl)
               setImageLoaded(true)
             }
           }}

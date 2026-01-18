@@ -9,7 +9,7 @@ import HeroBanner from '../components/HeroBanner'
 import BottomNav from '../components/BottomNav'
 import PullToRefresh from '../components/PullToRefresh'
 import { usePullToRefresh } from '../hooks/usePullToRefresh'
-import { getScrollContainer } from '../utils/scrollContainer'
+import { getScrollContainer, getScrollTop } from '../utils/scrollContainer'
 import { blurOnEnter } from '../utils/helpers'
 import './HomePage.css'
 
@@ -35,6 +35,7 @@ const OFFERS_LIMIT = 20
 const GEO_ATTEMPT_KEY = 'fudly_geo_attempt_ts'
 const GEO_STATUS_KEY = 'fudly_geo_status'
 const GEO_COOLDOWN_MS = 24 * 60 * 60 * 1000 // 24h to avoid repeated prompts
+let homePageCache = null
 
 const normalizeCategoryId = (value) => {
   const raw = String(value || '').toLowerCase().trim()
@@ -44,6 +45,35 @@ const normalizeCategoryId = (value) => {
     .find(([, aliases]) => aliases.includes(raw))
   if (aliasEntry) return aliasEntry[0]
   return 'other'
+}
+
+const buildLocationCacheKey = (locationValue) => {
+  if (!locationValue) return ''
+  const coords = locationValue.coordinates || {}
+  const parts = [
+    locationValue.city || '',
+    locationValue.region || '',
+    locationValue.district || '',
+    locationValue.address || '',
+    coords.lat ?? '',
+    coords.lon ?? '',
+  ]
+  return parts.map(part => String(part).trim().toLowerCase()).join('|')
+}
+
+const applyScrollTop = (target, value) => {
+  const container = target || getScrollContainer()
+  if (!container) return
+  const nextValue = Math.max(0, Number(value) || 0)
+  if (
+    container === document.body ||
+    container === document.documentElement ||
+    container === document.scrollingElement
+  ) {
+    window.scrollTo(0, nextValue)
+  } else {
+    container.scrollTop = nextValue
+  }
 }
 
 function HomePage() {
@@ -85,6 +115,10 @@ function HomePage() {
   const latestRequestRef = useRef(0)
   const queuedResetRef = useRef(null)
   const loadOffersRef = useRef(null)
+  const restoringRef = useRef(false)
+  const pendingScrollRef = useRef(null)
+  const cacheSnapshotRef = useRef(null)
+  const restoreHandledRef = useRef(false)
 
   // Use cart from context instead of local state
   const { addToCart, removeFromCart, getQuantity, cartCount } = useCart()
@@ -133,6 +167,34 @@ function HomePage() {
   const showHistoryDropdown = showSearchHistory && !trimmedSearch && searchHistory.length > 0
   const showSuggestionsDropdown = showSearchHistory && trimmedSearch.length >= 2
   const showSearchDropdown = showHistoryDropdown || showSuggestionsDropdown
+  const locationCacheKey = buildLocationCacheKey(location)
+
+  useEffect(() => {
+    if (restoreHandledRef.current) return
+    if (!homePageCache || homePageCache.key !== locationCacheKey) return
+    const cached = homePageCache.data || {}
+    const cachedOffers = Array.isArray(cached.offers) ? cached.offers : []
+    if (cached.isLoading && cachedOffers.length === 0) return
+    restoreHandledRef.current = true
+    restoringRef.current = true
+    setOffers(cachedOffers)
+    setOffersTotal(cached.offersTotal ?? null)
+    setHasMore(typeof cached.hasMore === 'boolean' ? cached.hasMore : true)
+    const nextOffset = Number.isFinite(cached.offset) ? cached.offset : 0
+    setOffset(nextOffset)
+    offsetRef.current = nextOffset
+    setSelectedCategory(cached.selectedCategory || 'all')
+    setActiveCategory(cached.activeCategory || cached.selectedCategory || 'all')
+    setSearchQuery(cached.searchQuery || '')
+    setMinDiscount(cached.minDiscount ?? null)
+    setPriceRange(cached.priceRange || 'all')
+    setSortBy(cached.sortBy || 'default')
+    setHasNearbyFallback(Boolean(cached.hasNearbyFallback))
+    setCategoryCounts(cached.categoryCounts || {})
+    setLoading(false)
+    loadingRef.current = false
+    pendingScrollRef.current = Number.isFinite(cached.scrollTop) ? cached.scrollTop : 0
+  }, [locationCacheKey])
 
   const registerCategoryTab = useCallback((id, node) => {
     if (node) {
@@ -164,6 +226,24 @@ function HomePage() {
       document.querySelectorAll('.home-page [data-category-id]')
     )
   }, [offers, selectedCategory])
+
+  useEffect(() => {
+    if (pendingScrollRef.current == null) return
+    const targetScroll = pendingScrollRef.current
+    pendingScrollRef.current = null
+    const container = getScrollContainer()
+    if (!container) {
+      restoringRef.current = false
+      return
+    }
+    requestAnimationFrame(() => {
+      applyScrollTop(container, targetScroll)
+      requestAnimationFrame(() => {
+        container.dispatchEvent(new Event('scroll'))
+        restoringRef.current = false
+      })
+    })
+  }, [offers.length])
 
   // Sync active tab with scroll position when showing all categories.
   useEffect(() => {
@@ -463,6 +543,54 @@ function HomePage() {
     loadOffersRef.current = loadOffers
   }, [loadOffers])
 
+  useEffect(() => {
+    cacheSnapshotRef.current = {
+      offers,
+      offersTotal,
+      hasMore,
+      offset: Number.isFinite(offset) ? offset : offsetRef.current,
+      selectedCategory,
+      activeCategory,
+      searchQuery,
+      minDiscount,
+      priceRange,
+      sortBy,
+      hasNearbyFallback,
+      categoryCounts,
+      isLoading: loading,
+    }
+  }, [
+    offers,
+    offersTotal,
+    hasMore,
+    loading,
+    offset,
+    selectedCategory,
+    activeCategory,
+    searchQuery,
+    minDiscount,
+    priceRange,
+    sortBy,
+    hasNearbyFallback,
+    categoryCounts,
+  ])
+
+  useEffect(() => {
+    return () => {
+      const snapshot = cacheSnapshotRef.current
+      if (!snapshot) return
+      const scrollContainer = getScrollContainer()
+      const scrollTop = getScrollTop(scrollContainer)
+      homePageCache = {
+        key: locationCacheKey,
+        data: {
+          ...snapshot,
+          scrollTop,
+        },
+      }
+    }
+  }, [locationCacheKey])
+
   // Save search query to history when searching
   const handleSearchSubmit = useCallback(async (queryOverride) => {
     const nextQuery = typeof queryOverride === 'string' ? queryOverride : searchQuery
@@ -626,6 +754,7 @@ function HomePage() {
 
   // Initial load and search with debounce
   useEffect(() => {
+    if (restoringRef.current) return
     const recentlyManual = Date.now() - manualSearchRef.current < 300
     if (recentlyManual) return
 
@@ -1106,6 +1235,7 @@ function HomePage() {
                   cartQuantity={getQuantity(offer.id || offer.offer_id)}
                   onAddToCart={addToCart}
                   onRemoveFromCart={removeFromCart}
+                  imagePriority={index < 4}
                 />
               </div>
             )

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useParams, useLocation } from 'react-router-dom'
 import api from '../api/client'
 import { useCart } from '../context/CartContext'
@@ -6,6 +6,7 @@ import OfferCard from '../components/OfferCard'
 import OfferCardSkeleton from '../components/OfferCardSkeleton'
 import { blurOnEnter } from '../utils/helpers'
 import { getSavedLocation, transliterateCity } from '../utils/cityUtils'
+import { getScrollContainer, getScrollTop } from '../utils/scrollContainer'
 import './CategoryProductsPage.css'
 
 const PRICE_RANGE_LABELS = {
@@ -19,6 +20,37 @@ const SORT_LABELS = {
   discount: 'Chegirma yuqori',
   price_asc: 'Arzonroq',
   price_desc: 'Qimmatroq',
+}
+
+const categoryPageCache = new Map()
+
+const buildLocationCacheKey = (locationValue) => {
+  if (!locationValue) return ''
+  const coords = locationValue.coordinates || {}
+  const parts = [
+    locationValue.city || '',
+    locationValue.region || '',
+    locationValue.district || '',
+    locationValue.address || '',
+    coords.lat ?? '',
+    coords.lon ?? '',
+  ]
+  return parts.map(part => String(part).trim().toLowerCase()).join('|')
+}
+
+const applyScrollTop = (target, value) => {
+  const container = target || getScrollContainer()
+  if (!container) return
+  const nextValue = Math.max(0, Number(value) || 0)
+  if (
+    container === document.body ||
+    container === document.documentElement ||
+    container === document.scrollingElement
+  ) {
+    window.scrollTo(0, nextValue)
+  } else {
+    container.scrollTop = nextValue
+  }
 }
 
 function CategoryProductsPage() {
@@ -39,6 +71,48 @@ function CategoryProductsPage() {
   const [priceRange, setPriceRange] = useState('all')
   const [sortBy, setSortBy] = useState('default')
   const hasActiveFilters = Boolean(minDiscount || priceRange !== 'all' || sortBy !== 'default')
+  const restoringRef = useRef(false)
+  const pendingScrollRef = useRef(null)
+  const cacheSnapshotRef = useRef(null)
+  const restoredKeyRef = useRef(null)
+  const savedLocation = getSavedLocation()
+  const locationCacheKey = buildLocationCacheKey(savedLocation)
+  const cacheKey = `${categoryId || 'all'}|${locationCacheKey}`
+
+  useEffect(() => {
+    if (restoredKeyRef.current === cacheKey) return
+    restoredKeyRef.current = cacheKey
+    const cached = categoryPageCache.get(cacheKey)
+    if (!cached) return
+    const cachedOffers = Array.isArray(cached.offers) ? cached.offers : []
+    if (cached.isLoading && cachedOffers.length === 0) return
+    restoringRef.current = true
+    setOffers(cachedOffers)
+    setSearchQuery(cached.searchQuery || '')
+    setDebouncedSearch(cached.debouncedSearch || cached.searchQuery || '')
+    setMinDiscount(cached.minDiscount ?? null)
+    setPriceRange(cached.priceRange || 'all')
+    setSortBy(cached.sortBy || 'default')
+    setLoading(false)
+    pendingScrollRef.current = Number.isFinite(cached.scrollTop) ? cached.scrollTop : 0
+  }, [cacheKey])
+
+  useEffect(() => {
+    if (pendingScrollRef.current == null) return
+    const targetScroll = pendingScrollRef.current
+    pendingScrollRef.current = null
+    const container = getScrollContainer()
+    if (!container) {
+      restoringRef.current = false
+      return
+    }
+    requestAnimationFrame(() => {
+      applyScrollTop(container, targetScroll)
+      requestAnimationFrame(() => {
+        restoringRef.current = false
+      })
+    })
+  }, [offers.length])
 
   const loadOffers = async (options = {}) => {
     const { searchOverride } = options
@@ -47,7 +121,6 @@ function CategoryProductsPage() {
 
     setLoading(true)
     try {
-      const savedLocation = getSavedLocation()
       const cityRaw = savedLocation?.city ? savedLocation.city.split(',')[0].trim() : ''
       const cityForApi = transliterateCity(cityRaw)
       const params = { limit: 50 }
@@ -104,6 +177,31 @@ function CategoryProductsPage() {
   }
 
   useEffect(() => {
+    cacheSnapshotRef.current = {
+      offers,
+      searchQuery,
+      debouncedSearch,
+      minDiscount,
+      priceRange,
+      sortBy,
+      isLoading: loading,
+    }
+  }, [offers, searchQuery, debouncedSearch, minDiscount, priceRange, sortBy, loading])
+
+  useEffect(() => {
+    return () => {
+      const snapshot = cacheSnapshotRef.current
+      if (!snapshot) return
+      const scrollContainer = getScrollContainer()
+      const scrollTop = getScrollTop(scrollContainer)
+      categoryPageCache.set(cacheKey, {
+        ...snapshot,
+        scrollTop,
+      })
+    }
+  }, [cacheKey])
+
+  useEffect(() => {
     const trimmed = searchQuery.trim()
     const timer = setTimeout(() => {
       setDebouncedSearch(trimmed)
@@ -113,6 +211,7 @@ function CategoryProductsPage() {
   }, [searchQuery])
 
   useEffect(() => {
+    if (restoringRef.current) return
     loadOffers()
   }, [categoryId, debouncedSearch, minDiscount, priceRange, sortBy])
 
@@ -348,13 +447,14 @@ function CategoryProductsPage() {
             </div>
           </div>
         ) : (
-          offers.map(offer => (
+          offers.map((offer, index) => (
             <OfferCard
               key={offer.id}
               offer={offer}
               cartQuantity={getQuantity(offer.id)}
               onAddToCart={addToCart}
               onRemoveFromCart={removeFromCart}
+              imagePriority={index < 4}
             />
           ))
         )}
