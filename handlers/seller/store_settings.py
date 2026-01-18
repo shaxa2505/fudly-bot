@@ -1251,8 +1251,9 @@ def store_admins_keyboard(
     for admin in admins:
         user_id = admin.get("user_id")
         name = admin.get("first_name") or admin.get("username") or f"ID:{user_id}"
+        remove_text = "Удалить" if lang == "ru" else "O'chirish"
         builder.button(
-            text=f"{'Удалить' if lang == 'ru' else \"O'chirish\"} {name}",
+            text=f"{remove_text} {name}",
             callback_data=f"remove_admin_{store_id}_{user_id}",
         )
 
