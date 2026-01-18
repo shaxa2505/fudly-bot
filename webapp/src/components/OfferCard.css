@@ -198,9 +198,9 @@
 .offer-counter {
   display: inline-flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 0;
-  padding: 0 6px;
+  justify-content: center;
+  gap: 6px;
+  padding: 0 10px;
   border-radius: 999px;
   background: rgba(10, 10, 10, 0.5);
   border: 1px solid rgba(255, 255, 255, 0.18);
@@ -243,7 +243,7 @@
 }
 
 .offer-counter-value {
-  flex: 1 0 auto;
+  flex: 0 0 auto;
   min-width: 16px;
   text-align: center;
   font-size: 12px;
