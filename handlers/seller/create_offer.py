@@ -101,7 +101,7 @@ def build_progress_text(data: dict, lang: str, current_step: int) -> str:
             elif value:
                 display_value = str(value)[:20]
             else:
-                display_value = "—"
+                display_value = "-"
             lines.append(f"[x] {name}: <b>{display_value}</b>")
         elif i == current_step:
             # Current step
@@ -178,14 +178,14 @@ async def category_selected(callback: types.CallbackQuery, state: FSMContext) ->
 
     # Build cancel keyboard
     builder = InlineKeyboardBuilder()
-    builder.button(text="❌ Отмена" if lang == "ru" else "❌ Bekor", callback_data="create_cancel")
+    builder.button(text=get_text(lang, "cancel"), callback_data="create_cancel")
 
     progress = build_progress_text({**data, "category": category}, lang, 2)
 
     text = (
-        f"🏪 <b>{data.get('store_name', 'Магазин')}</b>\n\n"
+        f"<b>{data.get('store_name', 'Магазин')}</b>\n\n"
         f"{progress}\n\n"
-        f"📝 <b>{'Введите название товара:' if lang == 'ru' else 'Mahsulot nomini kiriting:'}</b>\n\n"
+        f"<b>{'Введите название товара:' if lang == 'ru' else 'Mahsulot nomini kiriting:'}</b>\n\n"
         f"{'Пример: Чай Ахмад Английский 100г' if lang == 'ru' else 'Misol: Ahmad English Tea 100g'}"
     )
 
@@ -214,18 +214,15 @@ async def title_entered(message: types.Message, state: FSMContext) -> None:
 
     if len(title) < 2:
         await message.answer(
-            "❌ " + ("Название слишком короткое" if lang == "ru" else "Nom juda qisqa")
+            "Название слишком короткое" if lang == "ru" else "Nom juda qisqa"
         )
         return
 
     if len(title) > 100:
         await message.answer(
-            "❌ "
-            + (
-                "Название слишком длинное (макс 100 символов)"
-                if lang == "ru"
-                else "Nom juda uzun (maks 100 belgi)"
-            )
+            "Название слишком длинное (макс 100 символов)"
+            if lang == "ru"
+            else "Nom juda uzun (maks 100 belgi)"
         )
         return
 
@@ -234,18 +231,16 @@ async def title_entered(message: types.Message, state: FSMContext) -> None:
 
     # Build back/cancel keyboard
     builder = InlineKeyboardBuilder()
-    builder.button(
-        text="◀️ Назад" if lang == "ru" else "◀️ Orqaga", callback_data="create_back_category"
-    )
-    builder.button(text="❌ Отмена" if lang == "ru" else "❌ Bekor", callback_data="create_cancel")
+    builder.button(text=get_text(lang, "back"), callback_data="create_back_category")
+    builder.button(text=get_text(lang, "cancel"), callback_data="create_cancel")
     builder.adjust(2)
 
     progress = build_progress_text(data, lang, 3)
 
     text = (
-        f"🏪 <b>{data.get('store_name', 'Магазин')}</b>\n\n"
+        f"<b>{data.get('store_name', 'Магазин')}</b>\n\n"
         f"{progress}\n\n"
-        f"💰 <b>{'Введите цену (до скидки):' if lang == 'ru' else 'Narxni kiriting (chegirmadan oldin):'}</b>\n\n"
+        f"<b>{'Введите цену (до скидки):' if lang == 'ru' else 'Narxni kiriting (chegirmadan oldin):'}</b>\n\n"
         f"{'Пример: 50000' if lang == 'ru' else 'Misol: 50000'}"
     )
 
@@ -278,8 +273,7 @@ async def price_entered(message: types.Message, state: FSMContext) -> None:
             raise ValueError("Price must be positive")
     except ValueError:
         await message.answer(
-            "❌ "
-            + ("Введите число. Пример: 50000" if lang == "ru" else "Raqam kiriting. Misol: 50000")
+            "Введите число. Пример: 50000" if lang == "ru" else "Raqam kiriting. Misol: 50000"
         )
         return
 
@@ -289,9 +283,9 @@ async def price_entered(message: types.Message, state: FSMContext) -> None:
     progress = build_progress_text(data, lang, 4)
 
     text = (
-        f"🏪 <b>{data.get('store_name', 'Магазин')}</b>\n\n"
+        f"<b>{data.get('store_name', 'Магазин')}</b>\n\n"
         f"{progress}\n\n"
-        f"🏷️ <b>{'Выберите скидку:' if lang == 'ru' else 'Chegirmani tanlang:'}</b>"
+        f"<b>{'Выберите скидку:' if lang == 'ru' else 'Chegirmani tanlang:'}</b>"
     )
 
     await message.answer(text, parse_mode="HTML", reply_markup=discount_keyboard(lang))
@@ -311,12 +305,10 @@ async def discount_selected(callback: types.CallbackQuery, state: FSMContext) ->
     if discount_data == "custom":
         # Ask for custom discount
         builder = InlineKeyboardBuilder()
-        builder.button(
-            text="◀️ Назад" if lang == "ru" else "◀️ Orqaga", callback_data="create_back_price"
-        )
+        builder.button(text=get_text(lang, "back"), callback_data="create_back_price")
 
         await callback.message.edit_text(
-            "🏷️ <b>"
+            "<b>"
             + ("Введите скидку (%):" if lang == "ru" else "Chegirmani kiriting (%):")
             + "</b>\n\n"
             + ("Пример: 35" if lang == "ru" else "Misol: 35"),
@@ -351,8 +343,7 @@ async def discount_entered(message: types.Message, state: FSMContext) -> None:
             raise ValueError("Invalid discount")
     except ValueError:
         await message.answer(
-            "❌ "
-            + ("Введите число от 0 до 99" if lang == "ru" else "0 dan 99 gacha raqam kiriting")
+            "Введите число от 0 до 99" if lang == "ru" else "0 dan 99 gacha raqam kiriting"
         )
         return
 
@@ -373,10 +364,10 @@ async def _process_discount(
     progress = build_progress_text(data, lang, 5)
 
     text = (
-        f"🏪 <b>{data.get('store_name', 'Магазин')}</b>\n\n"
+        f"<b>{data.get('store_name', 'Магазин')}</b>\n\n"
         f"{progress}\n\n"
-        f"💰 Цена со скидкой: <b>{int(discount_price):,} сум</b>\n\n"
-        f"📦 <b>{'Выберите единицу измерения:' if lang == 'ru' else 'O`lchov birligini tanlang:'}</b>"
+        f"Цена со скидкой: <b>{int(discount_price):,} сум</b>\n\n"
+        f"<b>{'Выберите единицу измерения:' if lang == 'ru' else 'O`lchov birligini tanlang:'}</b>"
     )
 
     await target.answer(text, parse_mode="HTML", reply_markup=unit_type_keyboard(lang))
@@ -402,9 +393,9 @@ async def unit_type_selected(callback: types.CallbackQuery, state: FSMContext) -
     progress = build_progress_text(data, lang, 6)
 
     text = (
-        f"🏪 <b>{data.get('store_name', 'Магазин')}</b>\n\n"
+        f"<b>{data.get('store_name', 'Магазин')}</b>\n\n"
         f"{progress}\n\n"
-        f"📊 <b>{'Выберите количество:' if lang == 'ru' else 'Miqdorni tanlang:'}</b>"
+        f"<b>{'Выберите количество:' if lang == 'ru' else 'Miqdorni tanlang:'}</b>"
     )
 
     await callback.message.edit_text(
@@ -432,15 +423,13 @@ async def quantity_selected(callback: types.CallbackQuery, state: FSMContext) ->
     if qty_data == "custom":
         # Ask for custom quantity
         builder = InlineKeyboardBuilder()
-        builder.button(
-            text="◀️ Назад" if lang == "ru" else "◀️ Orqaga", callback_data="create_back_unit"
-        )
+        builder.button(text=get_text(lang, "back"), callback_data="create_back_unit")
 
         example = "Пример: 2.5" if unit == "кг" else "Пример: 25"
         example_uz = "Misol: 2.5" if unit == "кг" else "Misol: 25"
 
         await callback.message.edit_text(
-            "📊 <b>"
+            "<b>"
             + ("Введите количество:" if lang == "ru" else "Miqdorni kiriting:")
             + "</b>\n\n"
             + (example if lang == "ru" else example_uz),
@@ -479,17 +468,14 @@ async def quantity_entered(message: types.Message, state: FSMContext) -> None:
         # For pieces, ensure integer
         if unit == "шт" and quantity != int(quantity):
             await message.answer(
-                "❌ "
-                + (
-                    "Для штук введите целое число"
-                    if lang == "ru"
-                    else "Dona uchun butun son kiriting"
-                )
+                "Для штук введите целое число"
+                if lang == "ru"
+                else "Dona uchun butun son kiriting"
             )
             return
     except ValueError:
         await message.answer(
-            "❌ " + ("Введите положительное число" if lang == "ru" else "Musbat raqam kiriting")
+            "Введите положительное число" if lang == "ru" else "Musbat raqam kiriting"
         )
         return
 
@@ -506,9 +492,9 @@ async def _process_quantity(
     progress = build_progress_text(data, lang, 7)
 
     text = (
-        f"🏪 <b>{data.get('store_name', 'Магазин')}</b>\n\n"
+        f"<b>{data.get('store_name', 'Магазин')}</b>\n\n"
         f"{progress}\n\n"
-        f"📅 <b>{'Выберите срок годности:' if lang == 'ru' else 'Yaroqlilik muddatini tanlang:'}</b>"
+        f"<b>{'Выберите срок годности:' if lang == 'ru' else 'Yaroqlilik muddatini tanlang:'}</b>"
     )
 
     await target.answer(text, parse_mode="HTML", reply_markup=expiry_keyboard(lang))
@@ -531,12 +517,10 @@ async def expiry_selected(callback: types.CallbackQuery, state: FSMContext) -> N
     if expiry_data == "custom":
         # Ask for custom date
         builder = InlineKeyboardBuilder()
-        builder.button(
-            text="◀️ Назад" if lang == "ru" else "◀️ Orqaga", callback_data="create_back_quantity"
-        )
+        builder.button(text=get_text(lang, "back"), callback_data="create_back_quantity")
 
         await callback.message.edit_text(
-            "📅 <b>"
+            "<b>"
             + ("Введите дату (ДД.ММ):" if lang == "ru" else "Sanani kiriting (KK.OO):")
             + "</b>\n\n"
             + ("Пример: 25.12" if lang == "ru" else "Misol: 25.12"),
@@ -582,12 +566,9 @@ async def expiry_entered(message: types.Message, state: FSMContext) -> None:
         expiry_date = date_obj.strftime("%Y-%m-%d")
     except ValueError:
         await message.answer(
-            "❌ "
-            + (
-                "Формат: ДД.ММ (например 25.12)"
-                if lang == "ru"
-                else "Format: KK.OO (masalan 25.12)"
-            )
+            "Формат: ДД.ММ (например 25.12)"
+            if lang == "ru"
+            else "Format: KK.OO (masalan 25.12)"
         )
         return
 
@@ -604,9 +585,9 @@ async def _process_expiry(
     progress = build_progress_text(data, lang, 8)
 
     text = (
-        f"🏪 <b>{data.get('store_name', 'Магазин')}</b>\n\n"
+        f"<b>{data.get('store_name', 'Магазин')}</b>\n\n"
         f"{progress}\n\n"
-        f"📸 <b>{'Отправьте фото товара или пропустите:' if lang == 'ru' else 'Mahsulot rasmini yuboring yoki o`tkazib yuboring:'}</b>"
+        f"<b>{'Отправьте фото товара или пропустите:' if lang == 'ru' else 'Mahsulot rasmini yuboring yoki o`tkazib yuboring:'}</b>"
     )
 
     await target.answer(text, parse_mode="HTML", reply_markup=photo_keyboard(lang))
@@ -690,25 +671,25 @@ async def _finalize_offer(target: types.Message, state: FSMContext, lang: str) -
         discount_percent = data.get("discount_percent", 0)
 
         success_text = (
-            f"✅ <b>{'ТОВАР СОЗДАН!' if lang == 'ru' else 'MAHSULOT YARATILDI!'}</b>\n\n"
-            f"📦 {data['title']}\n"
-            f"💰 {int(data['original_price']):,} ➜ {int(data['discount_price']):,} сум (-{discount_percent}%)\n"
-            f"📊 {qty_display}\n"
-            f"📅 До: {data['expiry_date']}\n\n"
+            f"<b>{'Товар создан' if lang == 'ru' else 'Mahsulot yaratildi'}</b>\n\n"
+            f"{data['title']}\n"
+            f"{'Цена' if lang == 'ru' else 'Narx'}: {int(data['original_price']):,} -> {int(data['discount_price']):,} сум (-{discount_percent}%)\n"
+            f"{'Количество' if lang == 'ru' else 'Miqdor'}: {qty_display}\n"
+            f"{'Срок годности' if lang == 'ru' else 'Yaroqlilik muddati'}: {data['expiry_date']}\n\n"
         )
 
         # Add quick action buttons
         builder = InlineKeyboardBuilder()
         builder.button(
-            text="➕ Ещё товар" if lang == "ru" else "➕ Yana mahsulot",
+            text="Еще товар" if lang == "ru" else "Yana mahsulot",
             callback_data="create_another",
         )
         builder.button(
-            text="🔄 Копировать" if lang == "ru" else "🔄 Nusxalash",
+            text="Копировать" if lang == "ru" else "Nusxalash",
             callback_data=f"copy_offer_{offer_id}",
         )
         builder.button(
-            text="📦 Мои товары" if lang == "ru" else "📦 Mahsulotlarim",
+            text="Мои товары" if lang == "ru" else "Mahsulotlarim",
             callback_data="go_my_offers",
         )
         builder.adjust(2, 1)
@@ -718,12 +699,9 @@ async def _finalize_offer(target: types.Message, state: FSMContext, lang: str) -
     except Exception as e:
         logger.error(f"Error creating offer: {e}")
         await target.answer(
-            "❌ "
-            + (
-                "Ошибка при сохранении. Попробуйте снова."
-                if lang == "ru"
-                else "Saqlashda xatolik. Qayta urinib ko'ring."
-            )
+            "Ошибка при сохранении. Попробуйте снова."
+            if lang == "ru"
+            else "Saqlashda xatolik. Qayta urinib ko'ring."
         )
     finally:
         await state.clear()
@@ -743,13 +721,13 @@ async def back_to_category(callback: types.CallbackQuery, state: FSMContext) -> 
     data = await state.get_data()
 
     header = (
-        f"🏪 <b>{data.get('store_name', 'Магазин')}</b>\n\n"
-        f"➕ <b>{'ДОБАВИТЬ ТОВАР' if lang == 'ru' else 'MAHSULOT QO`SHISH'}</b>\n\n"
+        f"<b>{data.get('store_name', 'Магазин')}</b>\n\n"
+        f"<b>{'Добавить товар' if lang == 'ru' else 'Mahsulot qo`shish'}</b>\n\n"
     )
     step_text = (
-        "📂 <b>Шаг 1/8:</b> Выберите категорию"
+        "<b>Шаг 1/8:</b> Выберите категорию"
         if lang == "ru"
-        else "📂 <b>1/8-qadam:</b> Kategoriyani tanlang"
+        else "<b>1/8-qadam:</b> Kategoriyani tanlang"
     )
 
     await callback.message.edit_text(
@@ -772,18 +750,16 @@ async def back_to_price(callback: types.CallbackQuery, state: FSMContext) -> Non
     data = await state.get_data()
 
     builder = InlineKeyboardBuilder()
-    builder.button(
-        text="◀️ Назад" if lang == "ru" else "◀️ Orqaga", callback_data="create_back_category"
-    )
-    builder.button(text="❌ Отмена" if lang == "ru" else "❌ Bekor", callback_data="create_cancel")
+    builder.button(text=get_text(lang, "back"), callback_data="create_back_category")
+    builder.button(text=get_text(lang, "cancel"), callback_data="create_cancel")
     builder.adjust(2)
 
     progress = build_progress_text(data, lang, 3)
 
     text = (
-        f"🏪 <b>{data.get('store_name', 'Магазин')}</b>\n\n"
+        f"<b>{data.get('store_name', 'Магазин')}</b>\n\n"
         f"{progress}\n\n"
-        f"💰 <b>{'Введите цену (до скидки):' if lang == 'ru' else 'Narxni kiriting (chegirmadan oldin):'}</b>"
+        f"<b>{'Введите цену (до скидки):' if lang == 'ru' else 'Narxni kiriting (chegirmadan oldin):'}</b>"
     )
 
     await callback.message.edit_text(text, parse_mode="HTML", reply_markup=builder.as_markup())
@@ -804,9 +780,9 @@ async def back_to_discount(callback: types.CallbackQuery, state: FSMContext) -> 
     progress = build_progress_text(data, lang, 4)
 
     text = (
-        f"🏪 <b>{data.get('store_name', 'Магазин')}</b>\n\n"
+        f"<b>{data.get('store_name', 'Магазин')}</b>\n\n"
         f"{progress}\n\n"
-        f"🏷️ <b>{'Выберите скидку:' if lang == 'ru' else 'Chegirmani tanlang:'}</b>"
+        f"<b>{'Выберите скидку:' if lang == 'ru' else 'Chegirmani tanlang:'}</b>"
     )
 
     await callback.message.edit_text(text, parse_mode="HTML", reply_markup=discount_keyboard(lang))
@@ -828,9 +804,9 @@ async def back_to_quantity(callback: types.CallbackQuery, state: FSMContext) -> 
     progress = build_progress_text(data, lang, 6)
 
     text = (
-        f"🏪 <b>{data.get('store_name', 'Магазин')}</b>\n\n"
+        f"<b>{data.get('store_name', 'Магазин')}</b>\n\n"
         f"{progress}\n\n"
-        f"📊 <b>{'Выберите количество:' if lang == 'ru' else 'Miqdorni tanlang:'}</b>"
+        f"<b>{'Выберите количество:' if lang == 'ru' else 'Miqdorni tanlang:'}</b>"
     )
 
     await callback.message.edit_text(
@@ -853,9 +829,9 @@ async def back_to_unit(callback: types.CallbackQuery, state: FSMContext) -> None
     progress = build_progress_text(data, lang, 5)
 
     text = (
-        f"🏪 <b>{data.get('store_name', 'Магазин')}</b>\n\n"
+        f"<b>{data.get('store_name', 'Магазин')}</b>\n\n"
         f"{progress}\n\n"
-        f"📦 <b>{'Выберите единицу измерения:' if lang == 'ru' else 'O`lchov birligini tanlang:'}</b>"
+        f"<b>{'Выберите единицу измерения:' if lang == 'ru' else 'O`lchov birligini tanlang:'}</b>"
     )
 
     await callback.message.edit_text(text, parse_mode="HTML", reply_markup=unit_type_keyboard(lang))
@@ -876,9 +852,9 @@ async def back_to_expiry(callback: types.CallbackQuery, state: FSMContext) -> No
     progress = build_progress_text(data, lang, 7)
 
     text = (
-        f"🏪 <b>{data.get('store_name', 'Магазин')}</b>\n\n"
+        f"<b>{data.get('store_name', 'Магазин')}</b>\n\n"
         f"{progress}\n\n"
-        f"📅 <b>{'Выберите срок годности:' if lang == 'ru' else 'Yaroqlilik muddatini tanlang:'}</b>"
+        f"<b>{'Выберите срок годности:' if lang == 'ru' else 'Yaroqlilik muddatini tanlang:'}</b>"
     )
 
     await callback.message.edit_text(text, parse_mode="HTML", reply_markup=expiry_keyboard(lang))
@@ -898,8 +874,7 @@ async def cancel_creation(callback: types.CallbackQuery, state: FSMContext) -> N
 
     if callback.message:
         await callback.message.edit_text(
-            "❌ "
-            + ("Создание товара отменено" if lang == "ru" else "Mahsulot yaratish bekor qilindi"),
+            "Создание товара отменено" if lang == "ru" else "Mahsulot yaratish bekor qilindi",
             parse_mode="HTML",
         )
     await callback.answer()
@@ -930,13 +905,13 @@ async def create_another(callback: types.CallbackQuery, state: FSMContext) -> No
     await state.update_data(store_id=store_id, store_name=store_name)
 
     header = (
-        f"🏪 <b>{store_name}</b>\n\n"
-        f"➕ <b>{'ДОБАВИТЬ ТОВАР' if lang == 'ru' else 'MAHSULOT QO`SHISH'}</b>\n\n"
+        f"<b>{store_name}</b>\n\n"
+        f"<b>{'Добавить товар' if lang == 'ru' else 'Mahsulot qo`shish'}</b>\n\n"
     )
     step_text = (
-        "📂 <b>Шаг 1/8:</b> Выберите категорию"
+        "<b>Шаг 1/8:</b> Выберите категорию"
         if lang == "ru"
-        else "📂 <b>1/8-qadam:</b> Kategoriyani tanlang"
+        else "<b>1/8-qadam:</b> Kategoriyani tanlang"
     )
 
     await callback.message.edit_text(
@@ -1024,18 +999,18 @@ async def copy_offer_start(callback: types.CallbackQuery, state: FSMContext) -> 
     # Ask to confirm or edit title
     builder = InlineKeyboardBuilder()
     builder.button(
-        text="✅ Сохранить как есть" if lang == "ru" else "✅ Shunday saqlash",
+        text="Сохранить как есть" if lang == "ru" else "Shunday saqlash",
         callback_data="copy_save_as_is",
     )
     builder.button(
-        text="✏️ Изменить название" if lang == "ru" else "✏️ Nomni o'zgartirish",
+        text="Изменить название" if lang == "ru" else "Nomni o'zgartirish",
         callback_data="copy_edit_title",
     )
-    builder.button(text="❌ Отмена" if lang == "ru" else "❌ Bekor", callback_data="create_cancel")
+    builder.button(text=get_text(lang, "cancel"), callback_data="create_cancel")
     builder.adjust(1)
 
     text = (
-        f"🔄 <b>{'КОПИРОВАНИЕ ТОВАРА' if lang == 'ru' else 'MAHSULOTNI NUSXALASH'}</b>\n\n"
+        f"<b>{'Копирование товара' if lang == 'ru' else 'Mahsulotni nusxalash'}</b>\n\n"
         f"{progress}\n\n"
         f"{'Сохранить копию или изменить название?' if lang == 'ru' else 'Nusxani saqlash yoki nomini o`zgartirish?'}"
     )
@@ -1067,12 +1042,12 @@ async def copy_edit_title(callback: types.CallbackQuery, state: FSMContext) -> N
     data = await state.get_data()
 
     builder = InlineKeyboardBuilder()
-    builder.button(text="❌ Отмена" if lang == "ru" else "❌ Bekor", callback_data="create_cancel")
+    builder.button(text=get_text(lang, "cancel"), callback_data="create_cancel")
 
     text = (
-        f"🔄 <b>{'КОПИРОВАНИЕ ТОВАРА' if lang == 'ru' else 'MAHSULOTNI NUSXALASH'}</b>\n\n"
+        f"<b>{'Копирование товара' if lang == 'ru' else 'Mahsulotni nusxalash'}</b>\n\n"
         f"{'Текущее название:' if lang == 'ru' else 'Joriy nom:'} <b>{data.get('title', '')}</b>\n\n"
-        f"📝 <b>{'Введите новое название:' if lang == 'ru' else 'Yangi nomni kiriting:'}</b>"
+        f"<b>{'Введите новое название:' if lang == 'ru' else 'Yangi nomni kiriting:'}</b>"
     )
 
     await callback.message.edit_text(text, parse_mode="HTML", reply_markup=builder.as_markup())
@@ -1089,5 +1064,6 @@ async def go_my_offers(callback: types.CallbackQuery, state: FSMContext) -> None
         return
 
     # Send message to trigger my_offers handler
-    await callback.message.answer("📦 Мои товары")
+    lang = db.get_user_language(callback.from_user.id) if db else "ru"
+    await callback.message.answer(get_text(lang, "my_items"))
     await callback.answer()

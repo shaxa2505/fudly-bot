@@ -14,27 +14,111 @@ function ProductDetailPage() {
   const { addToCart } = useCart()
   const { isFavorite, toggleFavorite } = useFavorites()
 
-  const offer = location.state?.offer
+  const initialOffer = location.state?.offer || null
+  const [offer, setOffer] = useState(initialOffer)
+  const [store, setStore] = useState(null)
+  const [isLoadingOffer, setIsLoadingOffer] = useState(!initialOffer)
   const [quantity, setQuantity] = useState(1)
   const [addedToCart, setAddedToCart] = useState(false)
   const [imgError, setImgError] = useState(false)
+  const searchParams = new URLSearchParams(location.search)
+  const queryOfferIdRaw = searchParams.get('offer_id') || searchParams.get('id')
+  const queryOfferId = queryOfferIdRaw ? Number(queryOfferIdRaw) : null
+  const resolvedOfferId = offer?.id ?? offer?.offer_id ?? queryOfferId
+  const offerId = Number.isFinite(Number(resolvedOfferId)) ? Number(resolvedOfferId) : null
   const stockValue = Number(offer?.quantity ?? offer?.stock ?? 0)
   const hasStock = stockValue > 0
   const maxQty = hasStock ? stockValue : 1
 
+  useEffect(() => {
+    setOffer(initialOffer)
+  }, [initialOffer])
+
+  useEffect(() => {
+    if (!offerId) {
+      setIsLoadingOffer(false)
+      return
+    }
+    let cancelled = false
+    if (!offer) {
+      setIsLoadingOffer(true)
+    }
+    api.getOffer(offerId)
+      .then((data) => {
+        if (cancelled || !data) return
+        setOffer(prev => ({ ...(prev || {}), ...data }))
+      })
+      .catch(() => {})
+      .finally(() => {
+        if (!cancelled) setIsLoadingOffer(false)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [offerId])
+
+  useEffect(() => {
+    if (!offer?.store_id) {
+      setStore(null)
+      return
+    }
+    let cancelled = false
+    api.getStore(offer.store_id)
+      .then((data) => {
+        if (cancelled) return
+        setStore(data || null)
+      })
+      .catch(() => {})
+    return () => {
+      cancelled = true
+    }
+  }, [offer?.store_id])
+
   // Track recently viewed
   useEffect(() => {
-    if (offer?.id) {
+    const viewedId = offer?.id ?? offer?.offer_id ?? offerId
+    if (viewedId) {
       const userId = window.Telegram?.WebApp?.initDataUnsafe?.user?.id
       if (userId) {
-        api.addRecentlyViewed(offer.id).catch(() => {})
+        api.addRecentlyViewed(viewedId).catch(() => {})
       }
     }
-  }, [offer?.id])
+  }, [offer?.id, offer?.offer_id, offerId])
+
+  useEffect(() => {
+    if (!hasStock) {
+      setQuantity(1)
+      return
+    }
+    setQuantity(prev => Math.min(prev, maxQty))
+  }, [hasStock, maxQty])
 
   // Get image URL - support multiple field names and convert file_id
   const imageUrl = resolveOfferImageUrl(offer) || ''
   const hasImage = Boolean(imageUrl) && !imgError
+  const unitLabel = offer?.unit ? getUnitLabel(offer.unit) : ''
+  const originalPrice = Number(offer?.original_price ?? 0)
+  const discountPrice = Number(offer?.discount_price ?? offer?.price ?? 0)
+  const unitPrice = discountPrice || originalPrice || 0
+  const hasDiscount = originalPrice > 0 && unitPrice > 0 && originalPrice > unitPrice
+  const fallbackDiscountPercent = hasDiscount
+    ? Math.round((1 - unitPrice / originalPrice) * 100)
+    : 0
+  const discountPercent = Number(offer?.discount_percent ?? 0) || fallbackDiscountPercent
+  const savingsPerUnit = hasDiscount ? Math.max(0, originalPrice - unitPrice) : 0
+  const totalPrice = Math.max(0, unitPrice * quantity)
+  const totalSavings = savingsPerUnit * quantity
+  const storeName = offer?.store_name || store?.name || ''
+  const storeAddress = offer?.store_address || store?.address || ''
+  const storeRating = Number(store?.rating ?? 0)
+  const storeOffersCount = Number(store?.offers_count ?? 0)
+  const deliveryEnabled = offer?.delivery_enabled ?? store?.delivery_enabled ?? false
+  const deliveryPrice = Number(offer?.delivery_price ?? store?.delivery_price ?? 0)
+  const minOrderAmount = Number(offer?.min_order_amount ?? store?.min_order_amount ?? 0)
+  const lowStock = hasStock && stockValue <= 3
+  const midStock = hasStock && stockValue > 3 && stockValue <= 10
+  const stockMeterValue = !hasStock ? 0 : lowStock ? 24 : midStock ? 56 : 92
+  const formatPrice = (value) => Math.round(value || 0).toLocaleString('ru-RU')
 
   const handleQuantityChange = (delta) => {
     if (!hasStock) {
@@ -45,7 +129,7 @@ function ProductDetailPage() {
   }
 
   const handleAddToCart = () => {
-    if (!hasStock) {
+    if (!hasStock || !offer) {
       window.Telegram?.WebApp?.HapticFeedback?.notificationOccurred?.('warning')
       return
     }
@@ -76,7 +160,10 @@ function ProductDetailPage() {
   }
 
   const handleShare = () => {
-    const text = `${offer.title}\nNarx: ${Math.round(offer.discount_price).toLocaleString()} so'm\nDo'kon: ${offer.store_name || ''}`
+    if (!offer) return
+    const sharePrice = formatPrice(unitPrice)
+    const shareStore = storeName || ''
+    const text = `${offer.title}\nNarx: ${sharePrice} so'm\nDo'kon: ${shareStore}`
     if (navigator.share) {
       navigator.share({ title: offer.title, text }).catch(() => {})
     }
@@ -96,7 +183,7 @@ function ProductDetailPage() {
     } catch { return null }
   }
 
-  if (!offer) {
+  if (!offer && !isLoadingOffer) {
     return (
       <div className="pdp">
         <div className="pdp-error">
@@ -107,9 +194,20 @@ function ProductDetailPage() {
     )
   }
 
+  if (!offer) {
+    return (
+      <div className="pdp">
+        <div className="pdp-loading">
+          <div className="pdp-loading-badge" />
+          <div className="pdp-loading-line" />
+          <div className="pdp-loading-line short" />
+        </div>
+      </div>
+    )
+  }
+
   const expiryInfo = getExpiryInfo()
-  const hasDiscount = offer.original_price > offer.discount_price
-  const isFav = isFavorite(offer.id)
+  const isFav = isFavorite(offer.id || offer.offer_id)
 
   return (
     <div className="pdp">
@@ -177,55 +275,117 @@ function ProductDetailPage() {
               </svg>
             </div>
           )}
-        </div>
-        <div className="pdp-hero-info">
-          <h1 className="pdp-title">{offer.title}</h1>
-          {offer.store_name && (
-            <p className="pdp-store">
-              <span className="pdp-store-label">Do'kon:</span>
-              <span className="pdp-store-name">{offer.store_name}</span>
-              {offer.store_address && <span className="pdp-store-addr">{offer.store_address}</span>}
-            </p>
-          )}
-          {expiryInfo && (
-            <p className={`pdp-expiry ${expiryInfo.urgent ? 'is-urgent' : ''}`}>
-              Muddat: {expiryInfo.text}
-            </p>
-          )}
+          <div className="pdp-hero-badges">
+            {hasDiscount && discountPercent > 0 && (
+              <span className="pdp-badge pdp-badge-discount">-{discountPercent}%</span>
+            )}
+            {expiryInfo && (
+              <span className={`pdp-badge pdp-badge-expiry ${expiryInfo.urgent ? 'is-urgent' : ''}`}>
+                {expiryInfo.text}
+              </span>
+            )}
+            {lowStock && (
+              <span className="pdp-badge pdp-badge-stock">Kam qoldi</span>
+            )}
+          </div>
         </div>
       </section>
 
       {/* Content */}
       <section className="pdp-body">
-        <div className="pdp-price-row">
-          <div className="pdp-price-block">
-            <div className="pdp-price-main">
-              <span className="pdp-current-price">
-                {Math.round(offer.discount_price).toLocaleString()} so'm
+        <div className="pdp-title-block">
+          <div className="pdp-meta-row">
+            {unitLabel && <span className="pdp-meta-chip">Birlik: {unitLabel}</span>}
+            {offer.category && offer.category !== 'other' && (
+              <span className="pdp-meta-chip">{offer.category}</span>
+            )}
+            {expiryInfo && (
+              <span className={`pdp-meta-chip ${expiryInfo.urgent ? 'is-urgent' : ''}`}>
+                Yaroqlilik: {expiryInfo.text}
               </span>
-            </div>
-            <div className="pdp-price-sub">
-              {hasDiscount && (
-                <span className="pdp-old-price">
-                  {Math.round(offer.original_price).toLocaleString()} so'm
-                </span>
-              )}
-              {hasStock ? (
-                <span className="pdp-stock">Qoldi: {stockValue} {getUnitLabel(offer.unit)}</span>
-              ) : (
-                <span className="pdp-stock pdp-stock-empty">Tugagan</span>
-              )}
-            </div>
+            )}
           </div>
-          <QuantityControl
-            value={quantity}
-            size="sm"
-            className="pdp-quantity-control"
-            onDecrement={() => handleQuantityChange(-1)}
-            onIncrement={() => handleQuantityChange(1)}
-            disableDecrement={!hasStock || quantity <= 1}
-            disableIncrement={!hasStock || quantity >= maxQty}
-          />
+          <h1 className="pdp-title">{offer.title}</h1>
+          {storeName && (
+            <p className="pdp-store">
+              <span className="pdp-store-label">Do'kon:</span>
+              <span className="pdp-store-name">{storeName}</span>
+              {storeAddress && <span className="pdp-store-addr">{storeAddress}</span>}
+            </p>
+          )}
+        </div>
+
+        <div className="pdp-price-card">
+          <div className="pdp-price-main">
+            <span className="pdp-current-price">{formatPrice(unitPrice)} so'm</span>
+            {hasDiscount && discountPercent > 0 && (
+              <span className="pdp-price-badge">-{discountPercent}%</span>
+            )}
+          </div>
+          <div className="pdp-price-sub">
+            {hasDiscount && (
+              <span className="pdp-old-price">{formatPrice(originalPrice)} so'm</span>
+            )}
+            {hasDiscount && savingsPerUnit > 0 && (
+              <span className="pdp-savings">Tejaysiz {formatPrice(savingsPerUnit)} so'm</span>
+            )}
+          </div>
+          <div className="pdp-stock-row">
+            {hasStock ? (
+              <span className={`pdp-stock ${lowStock ? 'is-low' : ''}`}>
+                Qoldi: {stockValue} {unitLabel}
+              </span>
+            ) : (
+              <span className="pdp-stock pdp-stock-empty">Tugagan</span>
+            )}
+            {hasDiscount && totalSavings > 0 && (
+              <span className="pdp-total-savings">Jami tejaysiz {formatPrice(totalSavings)} so'm</span>
+            )}
+          </div>
+          <div className="pdp-stock-meter">
+            <span
+              className={`pdp-stock-meter-fill ${lowStock ? 'is-low' : midStock ? 'is-mid' : ''}`}
+              style={{ width: `${stockMeterValue}%` }}
+            />
+          </div>
+        </div>
+
+        {(storeName || storeAddress) && (
+          <div className="pdp-card pdp-store-card">
+            <div className="pdp-card-header">
+              <h3 className="pdp-card-title">Do'kon</h3>
+              {storeRating > 0 && (
+                <span className="pdp-rating">Reyting: {storeRating.toFixed(1)}</span>
+              )}
+            </div>
+            {storeName && <div className="pdp-store-title">{storeName}</div>}
+            {storeAddress && <div className="pdp-store-location">{storeAddress}</div>}
+            {storeOffersCount > 0 && (
+              <div className="pdp-store-meta">{storeOffersCount} ta mahsulot</div>
+            )}
+          </div>
+        )}
+
+        <div className="pdp-card pdp-delivery-card">
+          <div className="pdp-card-header">
+            <h3 className="pdp-card-title">Yetkazib berish</h3>
+          </div>
+          <div className="pdp-card-row">
+            <span>Holat</span>
+            <span>{deliveryEnabled ? "Mavjud" : "Faqat olib ketish"}</span>
+          </div>
+          {deliveryEnabled && deliveryPrice > 0 && (
+            <div className="pdp-card-row">
+              <span>Narxi</span>
+              <span>{formatPrice(deliveryPrice)} so'm</span>
+            </div>
+          )}
+          {minOrderAmount > 0 && (
+            <div className="pdp-card-row">
+              <span>Minimal buyurtma</span>
+              <span>{formatPrice(minOrderAmount)} so'm</span>
+            </div>
+          )}
         </div>
 
         {offer.description && offer.description.toLowerCase() !== offer.title?.toLowerCase() && (
@@ -238,13 +398,29 @@ function ProductDetailPage() {
 
       {/* Fixed Bottom Button */}
       <div className="pdp-bottom">
-        <button
-          className={`pdp-add-btn ${addedToCart ? 'success' : ''}`}
-          onClick={handleAddToCart}
-          disabled={addedToCart || !hasStock}
-        >
-          {!hasStock ? "Tugagan" : (addedToCart ? "Qo'shildi!" : "Savatga qo'shish")}
-        </button>
+        <div className="pdp-bottom-inner">
+          <QuantityControl
+            value={quantity}
+            size="md"
+            className="pdp-bottom-qty"
+            onDecrement={() => handleQuantityChange(-1)}
+            onIncrement={() => handleQuantityChange(1)}
+            disableDecrement={!hasStock || quantity <= 1}
+            disableIncrement={!hasStock || quantity >= maxQty}
+          />
+          <button
+            className={`pdp-add-btn ${addedToCart ? 'success' : ''}`}
+            onClick={handleAddToCart}
+            disabled={addedToCart || !hasStock}
+          >
+            <span className="pdp-add-text">
+              {!hasStock ? "Tugagan" : (addedToCart ? "Qo'shildi!" : "Savatga qo'shish")}
+            </span>
+            {hasStock && (
+              <span className="pdp-add-total">{formatPrice(totalPrice)} so'm</span>
+            )}
+          </button>
+        </div>
       </div>
     </div>
   )

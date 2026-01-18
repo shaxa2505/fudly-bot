@@ -148,11 +148,18 @@ async def filter_offers(callback: types.CallbackQuery) -> None:
         qty = get_offer_field(offer, "quantity", 0)
         status = get_offer_field(offer, "status", "active")
 
-        status_icon = "✅" if status == "active" else "❌"
-        qty_icon = "🟢" if qty > 0 else "🔴"
+        status_label = "Активен" if lang == "ru" else "Faol"
+        if status != "active":
+            status_label = "Неактивен" if lang == "ru" else "Nofaol"
+        qty_unit = "шт" if lang == "ru" else "dona"
+        price_label = "Цена" if lang == "ru" else "Narx"
+        qty_label = "Остаток" if lang == "ru" else "Miqdor"
 
-        text += f"{i}. {status_icon} <b>{offer_title}</b>\n"
-        text += f"   💰 {price:,} | {qty_icon} {qty} шт\n"
+        text += f"{i}. <b>{offer_title}</b>\n"
+        if filter_type == "all":
+            text += f"   {status_label} | {price_label}: {price:,} | {qty_label}: {qty} {qty_unit}\n"
+        else:
+            text += f"   {price_label}: {price:,} | {qty_label}: {qty} {qty_unit}\n"
 
     # Navigation buttons
     nav_kb = InlineKeyboardBuilder()
@@ -160,25 +167,27 @@ async def filter_offers(callback: types.CallbackQuery) -> None:
     # Add item buttons for quick access
     for offer in page_offers:
         offer_id = get_offer_field(offer, "offer_id")
-        offer_title = get_offer_field(offer, "title", "Товар")[:15]
-        nav_kb.button(text=f"📦 {offer_title}", callback_data=f"view_offer_{offer_id}")
+        offer_title = get_offer_field(offer, "title", "Товар")[:18]
+        nav_kb.button(text=offer_title, callback_data=f"view_offer_{offer_id}")
 
     nav_kb.adjust(2)  # 2 buttons per row for items
 
     # Pagination row
     pagination_buttons = []
     if page > 0:
-        pagination_buttons.append(("◀️", f"filter_offers_{filter_type}_{page - 1}"))
+        prev_text = "Предыдущая" if lang == "ru" else "Oldingi"
+        pagination_buttons.append((prev_text, f"filter_offers_{filter_type}_{page - 1}"))
     pagination_buttons.append((f"{page + 1}/{total_pages}", "noop"))
     if page < total_pages - 1:
-        pagination_buttons.append(("▶️", f"filter_offers_{filter_type}_{page + 1}"))
+        next_text = "Следующая" if lang == "ru" else "Keyingi"
+        pagination_buttons.append((next_text, f"filter_offers_{filter_type}_{page + 1}"))
 
     for btn_text, btn_data in pagination_buttons:
         nav_kb.button(text=btn_text, callback_data=btn_data)
 
     # Back button
     nav_kb.button(
-        text="🔙 Назад" if lang == "ru" else "🔙 Orqaga", callback_data="back_to_offers_menu"
+        text="К фильтрам" if lang == "ru" else "Filtrlarga", callback_data="back_to_offers_menu"
     )
 
     # Adjust: items (2 per row), then pagination (3), then back (1)
@@ -209,23 +218,21 @@ async def back_to_offers_menu(callback: types.CallbackQuery) -> None:
     inactive_count = len(all_offers) - active_count
 
     filter_kb = InlineKeyboardBuilder()
-    filter_kb.button(text=f"✅ Активные ({active_count})", callback_data="filter_offers_active_0")
+    filter_kb.button(text=f"Активные ({active_count})", callback_data="filter_offers_active_0")
     filter_kb.button(
-        text=f"❌ Неактивные ({inactive_count})", callback_data="filter_offers_inactive_0"
+        text=f"Неактивные ({inactive_count})", callback_data="filter_offers_inactive_0"
     )
-    filter_kb.button(text=f"📋 Все ({len(all_offers)})", callback_data="filter_offers_all_0")
-    filter_kb.button(text="🔍 Поиск", callback_data="search_my_offers")
+    filter_kb.button(text=f"Все ({len(all_offers)})", callback_data="filter_offers_all_0")
+    filter_kb.button(text="Поиск" if lang == "ru" else "Qidirish", callback_data="search_my_offers")
     filter_kb.adjust(2, 1, 1)
 
     await callback.answer()
     await callback.message.edit_text(
-        "┌─────────────────────────┐\n"
-        f"│  📦 <b>{'ВАШИ ТОВАРЫ' if lang == 'ru' else 'MAHSULOTLARINGIZ'}</b>  │\n"
-        "└─────────────────────────┘\n\n"
-        f"✅ Активных: <b>{active_count}</b>\n"
-        f"❌ Неактивных: <b>{inactive_count}</b>\n"
-        f"📊 Всего: <b>{len(all_offers)}</b>\n\n"
-        f"{'Выберите категорию для просмотра:' if lang == 'ru' else 'Kategoriyani tanlang:'}",
+        f"<b>{'Ваши товары' if lang == 'ru' else 'Mahsulotlaringiz'}</b>\n\n"
+        f"{'Активных' if lang == 'ru' else 'Faol'}: <b>{active_count}</b>\n"
+        f"{'Неактивных' if lang == 'ru' else 'Nofaol'}: <b>{inactive_count}</b>\n"
+        f"{'Всего' if lang == 'ru' else 'Jami'}: <b>{len(all_offers)}</b>\n\n"
+        f"{'Выберите фильтр:' if lang == 'ru' else 'Filtrni tanlang:'}",
         parse_mode="HTML",
         reply_markup=filter_kb.as_markup(),
     )
@@ -246,7 +253,7 @@ async def search_my_offers_start(callback: types.CallbackQuery, state: FSMContex
     await state.set_state(EditOffer.search_query)
     await callback.answer()
     await callback.message.answer(
-        f"🔍 {'Введите название товара для поиска:' if lang == 'ru' else 'Qidiruv uchun mahsulot nomini kiriting:'}",
+        f"{'Введите название товара для поиска:' if lang == 'ru' else 'Qidiruv uchun mahsulot nomini kiriting:'}",
         parse_mode="HTML",
     )
 
@@ -262,13 +269,13 @@ async def search_my_offers_process(message: types.Message, state: FSMContext) ->
     if "отмена" in query or "bekor" in query or query.startswith("/"):
         await state.clear()
         await message.answer(
-            "❌ " + ("Поиск отменён" if lang == "ru" else "Qidiruv bekor qilindi"),
+            "Поиск отменен" if lang == "ru" else "Qidiruv bekor qilindi",
             reply_markup=main_menu_seller(lang),
         )
         return
 
     if len(query) < 2:
-        await message.answer("❌ " + ("Минимум 2 символа" if lang == "ru" else "Kamida 2 ta belgi"))
+        await message.answer("Минимум 2 символа" if lang == "ru" else "Kamida 2 ta belgi")
         return
 
     await state.clear()
@@ -289,13 +296,13 @@ async def search_my_offers_process(message: types.Message, state: FSMContext) ->
 
     if not results:
         await message.answer(
-            f"🔍 {'Ничего не найдено по запросу' if lang == 'ru' else 'Topilmadi'}: <b>{query}</b>",
+            f"{'Ничего не найдено по запросу' if lang == 'ru' else 'Topilmadi'}: <b>{query}</b>",
             parse_mode="HTML",
         )
         return
 
     # Show results
-    text = f"🔍 {'Результаты поиска' if lang == 'ru' else 'Qidiruv natijalari'}: <b>{query}</b>\n"
+    text = f"{'Результаты поиска' if lang == 'ru' else 'Qidiruv natijalari'}: <b>{query}</b>\n"
     text += f"{'Найдено' if lang == 'ru' else 'Topildi'}: {len(results)}\n\n"
 
     nav_kb = InlineKeyboardBuilder()
@@ -307,15 +314,23 @@ async def search_my_offers_process(message: types.Message, state: FSMContext) ->
         qty = get_offer_field(offer, "quantity", 0)
         status = get_offer_field(offer, "status", "active")
 
-        status_icon = "✅" if status == "active" else "❌"
+        status_label = "Активен" if status == "active" else "Неактивен"
+        if lang != "ru":
+            status_label = "Faol" if status == "active" else "Nofaol"
+        qty_unit = "шт" if lang == "ru" else "dona"
+        price_label = "Цена" if lang == "ru" else "Narx"
+        qty_label = "Остаток" if lang == "ru" else "Miqdor"
 
-        text += f"{status_icon} <b>{offer_title}</b>\n"
-        text += f"   💰 {price:,} | 📦 {qty} шт\n"
+        text += f"<b>{offer_title}</b>\n"
+        text += f"   {status_label} | {price_label}: {price:,} | {qty_label}: {qty} {qty_unit}\n"
 
-        nav_kb.button(text=f"📝 {offer_title[:15]}", callback_data=f"edit_offer_{offer_id}")
+        nav_kb.button(
+            text=("Открыть " if lang == "ru" else "Ochish ") + offer_title[:15],
+            callback_data=f"edit_offer_{offer_id}",
+        )
 
     nav_kb.button(
-        text="🔙 Назад" if lang == "ru" else "🔙 Orqaga", callback_data="back_to_offers_menu"
+        text="К фильтрам" if lang == "ru" else "Filtrlarga", callback_data="back_to_offers_menu"
     )
     nav_kb.adjust(2, 1)
 
@@ -354,7 +369,9 @@ async def quantity_add(callback: types.CallbackQuery) -> None:
         return
 
     await update_offer_message(callback, offer_id, lang)
-    await callback.answer(f"✅ +1 (теперь {new_quantity})")
+    await callback.answer(
+        f"{'Количество увеличено на 1' if lang == 'ru' else 'Miqdor 1 taga oshirildi'} ({new_quantity})"
+    )
 
 
 @router.callback_query(F.data.startswith("qty_sub_"))
@@ -391,9 +408,16 @@ async def quantity_subtract(callback: types.CallbackQuery) -> None:
     await update_offer_message(callback, offer_id, lang)
 
     if new_quantity == 0:
-        await callback.answer("⚠️ Количество 0 - товар снят с продажи", show_alert=True)
+        await callback.answer(
+            "Количество стало 0 - товар снят с продажи"
+            if lang == "ru"
+            else "Miqdor 0 bo'ldi - mahsulot savdodan olindi",
+            show_alert=True,
+        )
     else:
-        await callback.answer(f"✅ -1 (теперь {new_quantity})")
+        await callback.answer(
+            f"{'Количество уменьшено на 1' if lang == 'ru' else 'Miqdor 1 taga kamaytirildi'} ({new_quantity})"
+        )
 
 
 @router.callback_query(F.data.startswith("extend_offer_"))
@@ -440,11 +464,13 @@ async def extend_offer(callback: types.CallbackQuery) -> None:
         text=f"Неделя {(today + timedelta(days=7)).strftime('%d.%m')}",
         callback_data=f"setexp_{offer_id}_7",
     )
-    builder.button(text="❌ Отмена", callback_data="cancel_extend")
+    builder.button(text=get_text(lang, "cancel"), callback_data="cancel_extend")
     builder.adjust(2, 2, 1, 1)
 
     await callback.message.edit_reply_markup(reply_markup=builder.as_markup())
-    await callback.answer("📅 Выберите новый срок годности")
+    await callback.answer(
+        "Выберите новый срок годности" if lang == "ru" else "Yangi muddatni tanlang"
+    )
 
 
 @router.callback_query(F.data.startswith("setexp_"))
@@ -472,13 +498,15 @@ async def set_expiry(callback: types.CallbackQuery) -> None:
     db.update_offer_expiry(offer_id, new_expiry)
 
     await update_offer_message(callback, offer_id, lang)
-    await callback.answer(f"✅ Срок продлён до {new_expiry}")
+    await callback.answer(
+        f"{'Срок продлён до' if lang == 'ru' else 'Muddat uzaytirildi'} {new_expiry}"
+    )
 
 
 @router.callback_query(F.data == "cancel_extend")
 async def cancel_extend(callback: types.CallbackQuery) -> None:
     """Cancel expiry extension."""
-    await callback.answer("❌ Отменено")
+    await callback.answer("Отменено" if lang == "ru" else "Bekor qilindi")
     await callback.message.edit_reply_markup(reply_markup=None)
 
 
@@ -508,7 +536,9 @@ async def deactivate_offer(callback: types.CallbackQuery) -> None:
 
     db.deactivate_offer(offer_id)
     await update_offer_message(callback, offer_id, lang)
-    await callback.answer("✅ Товар снят с продажи")
+    await callback.answer(
+        "Товар снят с продажи" if lang == "ru" else "Mahsulot savdodan olindi"
+    )
 
 
 @router.callback_query(F.data.startswith("activate_offer_"))
@@ -537,7 +567,9 @@ async def activate_offer(callback: types.CallbackQuery) -> None:
 
     db.activate_offer(offer_id)
     await update_offer_message(callback, offer_id, lang)
-    await callback.answer("✅ Товар активирован")
+    await callback.answer(
+        "Товар активирован" if lang == "ru" else "Mahsulot faollashtirildi"
+    )
 
 
 @router.callback_query(F.data.startswith("delete_offer_"))
@@ -567,14 +599,17 @@ async def delete_offer(callback: types.CallbackQuery) -> None:
     try:
         db.delete_offer(offer_id)
         await callback.message.delete()
-        await callback.answer("🗑 Товар удалён")
+        await callback.answer("Товар удалён" if lang == "ru" else "Mahsulot o'chirildi")
     except Exception as e:
         error_msg = str(e).lower()
         if "foreign key" in error_msg or "constraint" in error_msg or "bookings" in error_msg:
             # There are active bookings for this offer
             logger.warning(f"Cannot delete offer {offer_id}: has active bookings - {e}")
             await callback.answer(
-                "❌ Невозможно удалить товар: есть активные бронирования", show_alert=True
+                "Невозможно удалить товар: есть активные бронирования"
+                if lang == "ru"
+                else "Mahsulotni o'chirib bo'lmaydi: faol bronlar mavjud",
+                show_alert=True,
             )
         else:
             logger.error(f"Error deleting offer {offer_id}: {e}")
@@ -607,30 +642,30 @@ async def edit_offer(callback: types.CallbackQuery) -> None:
 
     kb = InlineKeyboardBuilder()
     kb.button(
-        text="💰 Изменить цену" if lang == "ru" else "💰 Narxni o'zgartirish",
+        text="Изменить цену" if lang == "ru" else "Narxni o'zgartirish",
         callback_data=f"edit_price_{offer_id}",
     )
     kb.button(
-        text="📦 Изменить количество" if lang == "ru" else "📦 Sonini o'zgartirish",
+        text="Изменить количество" if lang == "ru" else "Sonini o'zgartirish",
         callback_data=f"edit_quantity_{offer_id}",
     )
     kb.button(
-        text="🕐 Изменить время" if lang == "ru" else "🕐 Vaqtni o'zgartirish",
+        text="Изменить время" if lang == "ru" else "Vaqtni o'zgartirish",
         callback_data=f"edit_time_{offer_id}",
     )
     kb.button(
-        text="📝 Изменить описание" if lang == "ru" else "📝 Tavsifni o'zgartirish",
+        text="Изменить описание" if lang == "ru" else "Tavsifni o'zgartirish",
         callback_data=f"edit_description_{offer_id}",
     )
     kb.button(
-        text="📷 Изменить фото" if lang == "ru" else "📷 Rasmni o'zgartirish",
+        text="Изменить фото" if lang == "ru" else "Rasmni o'zgartirish",
         callback_data=f"edit_photo_{offer_id}",
     )
     kb.button(
-        text="🔄 Копировать" if lang == "ru" else "🔄 Nusxalash",
+        text="Копировать" if lang == "ru" else "Nusxalash",
         callback_data=f"copy_offer_{offer_id}",
     )
-    kb.button(text="🔙 Назад" if lang == "ru" else "🔙 Orqaga", callback_data="back_to_offers_menu")
+    kb.button(text=get_text(lang, "back"), callback_data="back_to_offers_menu")
     kb.adjust(1)
 
     try:
@@ -704,8 +739,8 @@ async def edit_time_start(callback: types.CallbackQuery, state: FSMContext) -> N
     available_until = get_offer_field(offer, "available_until", "")
 
     await callback.message.answer(
-        f"🕐 <b>Изменение времени забора</b>\n\n"
-        f"Текущее время: {available_from} - {available_until}\n\n"
+        f"<b>{'Изменение времени забора' if lang == 'ru' else 'Olib ketish vaqtini o`zgartirish'}</b>\n\n"
+        f"{'Текущее время' if lang == 'ru' else 'Joriy vaqt'}: {available_from} - {available_until}\n\n"
         f"{'Введите новое время начала (например: 18:00):' if lang == 'ru' else 'Yangi boshlanish vaqtini kiriting (masalan: 18:00):'}",
         parse_mode="HTML",
     )
@@ -721,9 +756,9 @@ async def edit_time_from(message: types.Message, state: FSMContext) -> None:
     time_pattern = r"^([0-1]?[0-9]|2[0-3]):([0-5][0-9])$"
     if not re.match(time_pattern, message.text.strip()):
         error_msg = (
-            "❌ Неверный формат! Введите время в формате ЧЧ:ММ (например: 18:00)"
+            "Неверный формат! Введите время в формате ЧЧ:ММ (например: 18:00)"
             if lang == "ru"
-            else "❌ Noto'g'ri format! ЧЧ:ММ formatida vaqt kiriting (masalan: 18:00)"
+            else "Noto'g'ri format! ЧЧ:ММ formatida vaqt kiriting (masalan: 18:00)"
         )
         await message.answer(error_msg)
         return
@@ -745,9 +780,9 @@ async def edit_time_until(message: types.Message, state: FSMContext) -> None:
     time_pattern = r"^([0-1]?[0-9]|2[0-3]):([0-5][0-9])$"
     if not re.match(time_pattern, message.text.strip()):
         error_msg = (
-            "❌ Неверный формат! Введите время в формате ЧЧ:ММ (например: 21:00)"
+            "Неверный формат! Введите время в формате ЧЧ:ММ (например: 21:00)"
             if lang == "ru"
-            else "❌ Noto'g'ri format! ЧЧ:ММ formatida vaqt kiriting (masalan: 21:00)"
+            else "Noto'g'ri format! ЧЧ:ММ formatida vaqt kiriting (masalan: 21:00)"
         )
         await message.answer(error_msg)
         return
@@ -765,8 +800,8 @@ async def edit_time_until(message: types.Message, state: FSMContext) -> None:
         )
 
     await message.answer(
-        f"✅ {'Время забора обновлено!' if lang == 'ru' else 'Olib ketish vaqti yangilandi!'}\n\n"
-        f"🕐 {available_from} - {available_until}",
+        f"{'Время забора обновлено' if lang == 'ru' else 'Olib ketish vaqti yangilandi'}\n\n"
+        f"{available_from} - {available_until}",
         reply_markup=main_menu_seller(lang),
     )
     await state.clear()
@@ -800,17 +835,14 @@ async def edit_photo_start(callback: types.CallbackQuery, state: FSMContext) -> 
 
     kb = InlineKeyboardBuilder()
     kb.button(
-        text="🗑 Удалить фото" if lang == "ru" else "🗑 Rasmni o'chirish",
+        text="Удалить фото" if lang == "ru" else "Rasmni o'chirish",
         callback_data=f"remove_photo_{offer_id}",
     )
-    kb.button(
-        text="❌ Отмена" if lang == "ru" else "❌ Bekor qilish",
-        callback_data="back_to_offers_menu",
-    )
+    kb.button(text=get_text(lang, "back"), callback_data="back_to_offers_menu")
     kb.adjust(1)
 
     await callback.message.answer(
-        f"📷 {'Отправьте новое фото товара:' if lang == 'ru' else 'Mahsulotning yangi rasmini yuboring:'}",
+        f"{'Отправьте новое фото товара:' if lang == 'ru' else 'Mahsulotning yangi rasmini yuboring:'}",
         reply_markup=kb.as_markup(),
     )
     await callback.answer()
@@ -845,7 +877,7 @@ async def remove_photo(callback: types.CallbackQuery, state: FSMContext) -> None
 
     await state.clear()
     await callback.message.edit_text(
-        f"✅ {'Фото удалено!' if lang == 'ru' else 'Rasm o`chirildi!'}",
+        f"{'Фото удалено' if lang == 'ru' else 'Rasm o`chirildi'}",
     )
     await callback.answer()
 
@@ -860,7 +892,7 @@ async def edit_photo_receive(message: types.Message, state: FSMContext) -> None:
     offer_id = data.get("offer_id")
 
     if not offer_id:
-        await message.answer("❌ Error: offer not found")
+        await message.answer("Error: offer not found")
         await state.clear()
         return
 
@@ -871,7 +903,7 @@ async def edit_photo_receive(message: types.Message, state: FSMContext) -> None:
         cursor.execute("UPDATE offers SET photo_id = %s WHERE offer_id = %s", (photo_id, offer_id))
 
     await message.answer(
-        f"✅ {'Фото обновлено!' if lang == 'ru' else 'Rasm yangilandi!'}",
+        f"{'Фото обновлено' if lang == 'ru' else 'Rasm yangilandi'}",
         reply_markup=main_menu_seller(lang),
     )
     await state.clear()

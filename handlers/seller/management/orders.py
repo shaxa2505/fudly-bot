@@ -296,7 +296,7 @@ async def seller_orders_refresh(callback: types.CallbackQuery) -> None:
     except Exception:
         pass
 
-    await callback.answer("🔄")
+    await callback.answer()
 
 
 # =============================================================================
@@ -391,12 +391,14 @@ async def seller_view_order(callback: types.CallbackQuery) -> None:
     try:
         order_id = int(callback.data.split("_")[-1])
     except ValueError:
-        await callback.answer("❌", show_alert=True)
+        await callback.answer("Ошибка", show_alert=True)
         return
 
     order = db.get_order(order_id)
     if not order:
-        await callback.answer("❌ Topilmadi" if lang == "uz" else "❌ Не найдено", show_alert=True)
+        await callback.answer(
+            "Topilmadi" if lang == "uz" else "Не найдено", show_alert=True
+        )
         return
 
     status_raw = (
@@ -424,15 +426,6 @@ async def seller_view_order(callback: types.CallbackQuery) -> None:
 
     currency = "so'm" if lang == "uz" else "сум"
 
-    status_emoji = {
-        OrderStatus.PENDING: "⏳",
-        OrderStatus.PREPARING: "👨‍🍳",
-        OrderStatus.READY: "📦",
-        OrderStatus.DELIVERING: "🚚",
-        OrderStatus.COMPLETED: "🎉",
-        OrderStatus.REJECTED: "❌",
-        OrderStatus.CANCELLED: "❌",
-    }.get(status, "📦")
     status_text = {
         OrderStatus.PENDING: "Kutilmoqda" if lang == "uz" else "Ожидает",
         OrderStatus.PREPARING: "Tayyorlanmoqda" if lang == "uz" else "Готовится",
@@ -449,33 +442,32 @@ async def seller_view_order(callback: types.CallbackQuery) -> None:
 
     type_label = "YETKAZISH" if is_delivery else "OLIB KETISH"
     type_label_ru = "ДОСТАВКА" if is_delivery else "САМОВЫВОЗ"
-    type_emoji = "🚚" if is_delivery else "🏪"
 
     lines = [
-        f"{type_emoji} <b>{type_label if lang == 'uz' else type_label_ru} #{order_id}</b>",
-        f"{status_emoji} <b>{status_text}</b>",
+        f"<b>{type_label if lang == 'uz' else type_label_ru} #{order_id}</b>",
+        f"{'Holat' if lang == 'uz' else 'Статус'}: <b>{status_text}</b>",
         "",
-        f"📦 {title} × {quantity}",
-        f"💰 {'Jami' if lang == 'uz' else 'Итого'}: <b>{total_price:,} {currency}</b>",
+        f"{title} x {quantity}",
+        f"{'Jami' if lang == 'uz' else 'Итого'}: <b>{total_price:,} {currency}</b>",
     ]
 
     if is_delivery and delivery_price:
         lines.append(
-            f"🚚 {'Yetkazish' if lang == 'uz' else 'Доставка'}: {delivery_price:,} {currency}"
+            f"{'Yetkazish' if lang == 'uz' else 'Доставка'}: {delivery_price:,} {currency}"
         )
 
     lines.extend(
         [
             "",
-            f"👤 {customer_name}",
-            f"📱 <code>{customer_phone}</code>",
+            f"{'Mijoz' if lang == 'uz' else 'Клиент'}: {customer_name}",
+            f"{'Telefon' if lang == 'uz' else 'Телефон'}: <code>{customer_phone}</code>",
         ]
     )
     if is_delivery:
-        lines.append(f"📍 {delivery_address or '—'}")
+        lines.append(f"{'Manzil' if lang == 'uz' else 'Адрес'}: {delivery_address or '—'}")
     elif pickup_code:
         code_label = "Kod" if lang == "uz" else "Код"
-        lines.append(f"🔐 {code_label}: <b>{pickup_code}</b>")
+        lines.append(f"{code_label}: <b>{pickup_code}</b>")
 
     text = "\n".join(lines)
 
@@ -483,46 +475,46 @@ async def seller_view_order(callback: types.CallbackQuery) -> None:
 
     if status == OrderStatus.PENDING:
         kb.button(
-            text="✅ Qabul qilish" if lang == "uz" else "✅ Принять",
+            text="Qabul qilish" if lang == "uz" else "Принять",
             callback_data=f"order_confirm_{order_id}",
         )
         kb.button(
-            text="❌ Rad etish" if lang == "uz" else "❌ Отклонить",
+            text="Rad etish" if lang == "uz" else "Отклонить",
             callback_data=f"order_reject_{order_id}",
         )
     elif status == OrderStatus.PREPARING:
         if is_delivery:
             kb.button(
-                text="📦 Tayyor" if lang == "uz" else "📦 Готов",
+                text="Tayyor" if lang == "uz" else "Готов",
                 callback_data=f"order_ready_{order_id}",
             )
         else:
             kb.button(
-                text="✅ Topshirildi" if lang == "uz" else "✅ Выдано",
+                text="Topshirildi" if lang == "uz" else "Выдано",
                 callback_data=f"order_complete_{order_id}",
             )
         kb.button(
-            text="❌ Bekor" if lang == "uz" else "❌ Отменить",
+            text="Bekor" if lang == "uz" else "Отменить",
             callback_data=f"order_cancel_seller_{order_id}",
         )
     elif status == OrderStatus.READY:
         if is_delivery:
             kb.button(
-                text="🚚 Yo'lga chiqdi" if lang == "uz" else "🚚 В пути",
+                text="Yo'lga chiqdi" if lang == "uz" else "В пути",
                 callback_data=f"order_delivering_{order_id}",
             )
         else:
             kb.button(
-                text="✅ Topshirildi" if lang == "uz" else "✅ Выдано",
+                text="Topshirildi" if lang == "uz" else "Выдано",
                 callback_data=f"order_complete_{order_id}",
             )
 
 
     kb.button(
-        text="📞 Aloqa" if lang == "uz" else "📞 Связаться",
+        text="Aloqa" if lang == "uz" else "Связаться",
         callback_data=f"contact_customer_o_{order_id}",
     )
-    kb.button(text="⬅️ Orqaga" if lang == "uz" else "⬅️ Назад", callback_data="seller_orders_refresh")
+    kb.button(text="Orqaga" if lang == "uz" else "Назад", callback_data="seller_orders_refresh")
     kb.adjust(2, 1, 1)
 
     try:
@@ -554,7 +546,7 @@ async def contact_customer(callback: types.CallbackQuery) -> None:
         entity = db.get_order(entity_id)
 
     if not entity:
-        await callback.answer("❌", show_alert=True)
+        await callback.answer("Ошибка", show_alert=True)
         return
 
     user_id = _get_field(entity, "user_id")
@@ -562,24 +554,24 @@ async def contact_customer(callback: types.CallbackQuery) -> None:
 
     if not customer:
         await callback.answer(
-            "❌ Kontakt topilmadi" if lang == "uz" else "❌ Контакт не найден", show_alert=True
+            "Kontakt topilmadi" if lang == "uz" else "Контакт не найден", show_alert=True
         )
         return
 
     phone = customer.phone or "—"
     name = customer.first_name or "Клиент"
 
-    text = f"📞 <b>{'Mijoz kontakti' if lang == 'uz' else 'Контакт клиента'}</b>\n\n"
-    text += f"👤 {name}\n"
-    text += f"📱 <code>{phone}</code>"
+    text = f"<b>{'Mijoz kontakti' if lang == 'uz' else 'Контакт клиента'}</b>\n\n"
+    text += f"{name}\n"
+    text += f"<code>{phone}</code>"
 
     kb = InlineKeyboardBuilder()
     if customer.username:
-        kb.button(text="✉️ Telegram", url=f"https://t.me/{customer.username}")
+        kb.button(text="Telegram", url=f"https://t.me/{customer.username}")
     elif user_id:
-        kb.button(text="✉️ Telegram", url=f"tg://user?id={user_id}")
+        kb.button(text="Telegram", url=f"tg://user?id={user_id}")
 
-    kb.button(text="⬅️ Orqaga" if lang == "uz" else "⬅️ Назад", callback_data="seller_orders_refresh")
+    kb.button(text="Orqaga" if lang == "uz" else "Назад", callback_data="seller_orders_refresh")
     kb.adjust(1)
 
     await callback.message.answer(text, parse_mode="HTML", reply_markup=kb.as_markup())
@@ -603,7 +595,7 @@ async def cancel_order_seller_handler(callback: types.CallbackQuery) -> None:
     try:
         order_id = int(callback.data.split("_")[-1])
     except ValueError:
-        await callback.answer("❌", show_alert=True)
+        await callback.answer("Ошибка", show_alert=True)
         return
 
     service = get_unified_order_service()
@@ -614,13 +606,13 @@ async def cancel_order_seller_handler(callback: types.CallbackQuery) -> None:
 
     try:
         await service.cancel_order(order_id, "order")
-        await callback.answer("❌ Bekor qilindi" if lang == "uz" else "❌ Отменено")
+        await callback.answer("Bekor qilindi" if lang == "uz" else "Отменено")
 
         await seller_orders_refresh(callback)
     except Exception as e:
         logger.error(f"cancel_order error: {e}")
         await callback.answer(
-            f"❌ Xatolik: {e}" if lang == "uz" else f"❌ Ошибка: {e}", show_alert=True
+            f"Xatolik: {e}" if lang == "uz" else f"Ошибка: {e}", show_alert=True
         )
 
 

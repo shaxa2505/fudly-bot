@@ -63,6 +63,7 @@
   padding-top: 100%;
   background: var(--offer-bg);
   overflow: hidden;
+  border-radius: inherit;
 }
 
 .offer-image-skeleton {
@@ -70,6 +71,7 @@
   inset: 0;
   background: var(--offer-bg);
   z-index: 1;
+  border-radius: inherit;
 }
 
 .offer-image-skeleton.shimmer::after {
@@ -102,6 +104,7 @@
   transition: opacity 0.3s ease, transform 0.3s ease;
   opacity: 0;
   z-index: 2;
+  border-radius: inherit;
 }
 
 .offer-image.loaded {

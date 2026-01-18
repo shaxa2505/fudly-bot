@@ -458,6 +458,15 @@ async def create_webhook_app(
         city = request.query.get("city", "")
         city = city.strip() if isinstance(city, str) else city
         city = city or None
+        region = request.query.get("region", "")
+        region = region.strip() if isinstance(region, str) else region
+        region = region or None
+        district = request.query.get("district", "")
+        district = district.strip() if isinstance(district, str) else district
+        district = district or None
+        normalized_city = normalize_city(city) if city else None
+        normalized_region = normalize_city(region) if region else None
+        normalized_district = normalize_city(district) if district else None
         result = []
 
         for cat in API_CATEGORIES:
@@ -467,12 +476,19 @@ async def create_webhook_app(
                 try:
                     if hasattr(db, "count_offers_by_filters"):
                         count = int(
-                            db.count_offers_by_filters(city=city, category=category_filter)
+                            db.count_offers_by_filters(
+                                city=normalized_city,
+                                region=normalized_region,
+                                district=normalized_district,
+                                category=category_filter,
+                            )
                         )
                     elif hasattr(db, "get_offers_by_city_and_category") and category_filter:
                         offers = db.get_offers_by_city_and_category(
-                            city=city,
+                            city=normalized_city,
                             category=category_filter,
+                            region=normalized_region,
+                            district=normalized_district,
                             limit=1000,
                             offset=0,
                         ) or []
@@ -491,9 +507,19 @@ async def create_webhook_app(
             else:
                 try:
                     if hasattr(db, "count_offers_by_filters"):
-                        count = int(db.count_offers_by_filters(city=city))
+                        count = int(
+                            db.count_offers_by_filters(
+                                city=normalized_city,
+                                region=normalized_region,
+                                district=normalized_district,
+                            )
+                        )
                     elif hasattr(db, "count_hot_offers"):
-                        count = db.count_hot_offers(city) or 0
+                        count = db.count_hot_offers(
+                            normalized_city,
+                            region=normalized_region,
+                            district=normalized_district,
+                        ) or 0
                 except Exception:
                     pass
 

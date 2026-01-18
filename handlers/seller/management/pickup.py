@@ -23,10 +23,10 @@ async def seller_check_pickup_code(message: types.Message) -> None:
     try:
         stores = db.get_user_accessible_stores(message.from_user.id) or []
         if not stores:
-            await message.answer("⚠️ This command is for sellers only")
+            await message.answer("This command is for sellers only")
             return
     except Exception:
-        await message.answer("⚠️ System error")
+        await message.answer("System error")
         return
 
     parts = message.text.split(None, 1)
@@ -52,11 +52,11 @@ async def seller_check_pickup_code(message: types.Message) -> None:
             entity = db.get_booking_by_code(code)
     except Exception as e:
         logger.error(f"Error fetching by code: {e}")
-        await message.answer("⚠️ Error checking code")
+        await message.answer("Error checking code")
         return
 
     if not entity:
-        await message.answer("❌ Booking/order not found or already used")
+        await message.answer("Booking/order not found or already used")
         return
 
     # Validate that seller owns the store for this booking
@@ -73,7 +73,7 @@ async def seller_check_pickup_code(message: types.Message) -> None:
             break
 
     if not owner_ok:
-        await message.answer("❌ You don't have permission to complete this booking")
+        await message.answer("You don't have permission to complete this booking")
         return
 
     try:
@@ -87,15 +87,15 @@ async def seller_check_pickup_code(message: types.Message) -> None:
             )
         )
         if entity_id is None:
-            await message.answer("❌ Invalid record")
+            await message.answer("Invalid record")
             return
 
         unified = get_unified_order_service() or init_unified_order_service(db, message.bot)
         await unified.complete_order(int(entity_id), entity_type)  # type: ignore[arg-type]
 
         await message.answer(
-            f"✅ {'Order' if entity_type == 'order' else 'Booking'} {entity_id} marked as completed"
+            f"{'Order' if entity_type == 'order' else 'Booking'} {entity_id} marked as completed"
         )
     except Exception as e:
         logger.error(f"Error completing booking by code: {e}")
-        await message.answer("❌ Failed to complete booking")
+        await message.answer("Failed to complete booking")

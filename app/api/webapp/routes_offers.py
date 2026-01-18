@@ -122,11 +122,15 @@ def _to_offer_response(offer: Any, store_fallback: dict | None = None) -> OfferR
 @router.get("/categories", response_model=list[CategoryResponse])
 async def get_categories(
     city: str | None = Query(None, description="City to filter by"),
+    region: str | None = Query(None, description="Region filter"),
+    district: str | None = Query(None, description="District filter"),
     db=Depends(get_db),
 ):
     """Get list of product categories with counts."""
     result: list[CategoryResponse] = []
-    normalized_city = normalize_city(city)
+    normalized_city = normalize_city(city) if city else None
+    normalized_region = normalize_city(region) if region else None
+    normalized_district = normalize_city(district) if district else None
 
     for cat in CATEGORIES:
         count = 0
@@ -137,6 +141,8 @@ async def get_categories(
                     count = int(
                         db.count_offers_by_filters(
                             city=normalized_city,
+                            region=normalized_region,
+                            district=normalized_district,
                             category=category_filter,
                         )
                     )
@@ -144,6 +150,8 @@ async def get_categories(
                     offers = db.get_offers_by_city_and_category(
                         city=normalized_city,
                         category=category_filter,
+                        region=normalized_region,
+                        district=normalized_district,
                         limit=1000,
                         offset=0,
                     )
@@ -162,9 +170,19 @@ async def get_categories(
         else:
             try:
                 if hasattr(db, "count_offers_by_filters"):
-                    count = int(db.count_offers_by_filters(city=normalized_city))
+                    count = int(
+                        db.count_offers_by_filters(
+                            city=normalized_city,
+                            region=normalized_region,
+                            district=normalized_district,
+                        )
+                    )
                 elif hasattr(db, "count_hot_offers"):
-                    count = db.count_hot_offers(normalized_city) or 0
+                    count = db.count_hot_offers(
+                        normalized_city,
+                        region=normalized_region,
+                        district=normalized_district,
+                    ) or 0
             except Exception:  # pragma: no cover - defensive
                 count = 0
 

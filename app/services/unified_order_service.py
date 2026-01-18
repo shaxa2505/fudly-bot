@@ -26,6 +26,7 @@ NOTIFICATION STRATEGY (Optimized v2):
 from __future__ import annotations
 
 import html
+import io
 import os
 import re
 from dataclasses import dataclass
@@ -33,7 +34,9 @@ from datetime import datetime
 from typing import Any, Literal
 
 from aiogram import Bot
+from aiogram.types import BufferedInputFile
 from aiogram.utils.keyboard import InlineKeyboardBuilder
+from PIL import Image
 
 from app.core.notifications import Notification, NotificationType, get_notification_service
 from app.services.notification_builder import NotificationBuilder
@@ -850,6 +853,112 @@ class UnifiedOrderService:
                         return photo
         return self._get_offer_photo(offer_id)
 
+    def _collect_photos_from_items(
+        self,
+        items: list[Any] | None,
+        limit: int = 4,
+    ) -> list[str]:
+        if not items or limit <= 0:
+            return []
+
+        photos: list[str] = []
+        seen: set[str] = set()
+
+        def _add(photo: Any) -> None:
+            if not photo:
+                return
+            photo_str = str(photo)
+            if photo_str in seen:
+                return
+            seen.add(photo_str)
+            photos.append(photo_str)
+
+        for item in items:
+            if isinstance(item, dict):
+                _add(
+                    item.get("photo")
+                    or item.get("photo_id")
+                    or item.get("offer_photo")
+                    or item.get("offer_photo_id")
+                )
+            else:
+                _add(getattr(item, "photo", None) or getattr(item, "photo_id", None))
+            if len(photos) >= limit:
+                return photos
+
+        for item in items:
+            if len(photos) >= limit:
+                break
+            if isinstance(item, dict):
+                item_offer_id = item.get("offer_id")
+            else:
+                item_offer_id = getattr(item, "offer_id", None)
+            if item_offer_id is None:
+                continue
+            try:
+                offer_id_int = int(item_offer_id)
+            except (TypeError, ValueError):
+                continue
+            _add(self._get_offer_photo(offer_id_int))
+        return photos
+
+    async def _build_collage_photo(
+        self,
+        photo_ids: list[str],
+        tile_size: int = 512,
+    ) -> BufferedInputFile | None:
+        if len(photo_ids) < 2 or tile_size <= 0:
+            return None
+
+        selected = [pid for pid in photo_ids if pid][:4]
+        images: list[Image.Image] = []
+
+        for photo_id in selected:
+            try:
+                file = await self.bot.get_file(photo_id)
+                file_content = await self.bot.download_file(file.file_path)
+                data = file_content.read()
+            except Exception as download_error:
+                logger.warning(f"Failed to download collage photo: {download_error}")
+                continue
+
+            try:
+                img = Image.open(io.BytesIO(data))
+                img = img.convert("RGB")
+                width, height = img.size
+                if width <= 0 or height <= 0:
+                    continue
+                min_side = min(width, height)
+                left = (width - min_side) // 2
+                top = (height - min_side) // 2
+                img = img.crop((left, top, left + min_side, top + min_side))
+                img = img.resize((tile_size, tile_size), Image.LANCZOS)
+                images.append(img)
+            except Exception as image_error:
+                logger.warning(f"Failed to process collage photo: {image_error}")
+
+        if len(images) < 2:
+            return None
+
+        if len(images) == 2:
+            canvas = Image.new("RGB", (tile_size * 2, tile_size), "white")
+            positions = [(0, 0), (tile_size, 0)]
+        else:
+            canvas = Image.new("RGB", (tile_size * 2, tile_size * 2), "white")
+            positions = [
+                (0, 0),
+                (tile_size, 0),
+                (0, tile_size),
+                (tile_size, tile_size),
+            ]
+
+        for img, pos in zip(images, positions):
+            canvas.paste(img, pos)
+
+        buf = io.BytesIO()
+        canvas.save(buf, format="JPEG", quality=85, optimize=True)
+        return BufferedInputFile(buf.getvalue(), filename="order_collage.jpg")
+
     # =========================================================================
     # ORDER CREATION
     # =========================================================================
@@ -1088,7 +1197,14 @@ class UnifiedOrderService:
             )
 
             primary_offer_id = items[0].offer_id if items else None
-            customer_photo = self._resolve_photo_from_items(items, primary_offer_id)
+            photo_ids = self._collect_photos_from_items(items)
+            customer_photo = None
+            if len(photo_ids) > 1:
+                customer_photo = await self._build_collage_photo(photo_ids)
+            if not customer_photo and photo_ids:
+                customer_photo = photo_ids[0]
+            if not customer_photo and primary_offer_id:
+                customer_photo = self._get_offer_photo(primary_offer_id)
 
             entity_ids_raw = [x for x in (order_ids + booking_ids) if x]
             entity_ids = [int(x) for x in entity_ids_raw]
@@ -1552,10 +1668,18 @@ class UnifiedOrderService:
                     delivery_price=store_delivery,
                     currency=currency,
                 )
-                primary_offer_id = (
-                    store_orders[0].get("offer_id") if store_orders else None
-                )
-                seller_photo = self._resolve_photo_from_items(store_orders, primary_offer_id)
+                primary_offer_id = store_orders[0].get("offer_id") if store_orders else None
+                photo_ids = self._collect_photos_from_items(store_orders)
+                seller_photo = None
+                if len(photo_ids) > 1:
+                    seller_photo = await self._build_collage_photo(photo_ids)
+                if not seller_photo and photo_ids:
+                    seller_photo = photo_ids[0]
+                if not seller_photo and primary_offer_id:
+                    try:
+                        seller_photo = self._get_offer_photo(int(primary_offer_id))
+                    except (TypeError, ValueError):
+                        seller_photo = None
                 store_payload = {
                     "id": int(store_id),
                     "name": store.get("name", "") if isinstance(store, dict) else "",
@@ -2262,7 +2386,17 @@ class UnifiedOrderService:
                         }
                     ]
 
-                customer_photo = self._resolve_photo_from_items(cart_items, offer_id)
+                photo_ids = self._collect_photos_from_items(cart_items)
+                customer_photo = None
+                if len(photo_ids) > 1:
+                    customer_photo = await self._build_collage_photo(photo_ids)
+                if not customer_photo and photo_ids:
+                    customer_photo = photo_ids[0]
+                if not customer_photo and offer_id:
+                    try:
+                        customer_photo = self._get_offer_photo(int(offer_id))
+                    except (TypeError, ValueError):
+                        customer_photo = None
 
                 group_order_ids = None
                 group_statuses: list[str] | None = None
@@ -2696,7 +2830,17 @@ class UnifiedOrderService:
                                 delivery_price=delivery_price,
                                 currency=currency,
                             )
-                            seller_photo = self._resolve_photo_from_items(items, offer_id)
+                            photo_ids = self._collect_photos_from_items(items)
+                            seller_photo = None
+                            if len(photo_ids) > 1:
+                                seller_photo = await self._build_collage_photo(photo_ids)
+                            if not seller_photo and photo_ids:
+                                seller_photo = photo_ids[0]
+                            if not seller_photo and offer_id:
+                                try:
+                                    seller_photo = self._get_offer_photo(int(offer_id))
+                                except (TypeError, ValueError):
+                                    seller_photo = None
 
                             kb = InlineKeyboardBuilder()
                             if resolved_order_type in ("delivery", "taxi"):

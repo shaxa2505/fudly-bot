@@ -306,6 +306,13 @@ const api = {
     return cachedGet(`/stores/${storeId}`, {}, 60000)
   },
 
+  async getOffer(offerId, options = {}) {
+    if (!offerId) return null
+    const normalizedOptions =
+      typeof options === 'boolean' ? { force: options } : (options || {})
+    return cachedGet(`/offers/${offerId}`, {}, 20000, normalizedOptions)
+  },
+
   async getStoreOffers(storeId) {
     return cachedGet('/offers', { store_id: storeId }, 30000) || []
   },

@@ -64,31 +64,31 @@ def store_settings_keyboard(
     builder = InlineKeyboardBuilder()
 
     if has_photo:
-        photo_text = "📸 Изменить фото" if lang == "ru" else "📸 Rasmni o'zgartirish"
-        remove_photo_text = "🗑 Удалить фото" if lang == "ru" else "🗑 Rasmni o'chirish"
+        photo_text = "Изменить фото" if lang == "ru" else "Rasmni o'zgartirish"
+        remove_photo_text = "Удалить фото" if lang == "ru" else "Rasmni o'chirish"
         builder.button(text=photo_text, callback_data=f"store_change_photo_{store_id}")
         builder.button(text=remove_photo_text, callback_data=f"store_remove_photo_{store_id}")
     else:
-        photo_text = "📸 Добавить фото" if lang == "ru" else "📸 Rasm qo'shish"
+        photo_text = "Добавить фото" if lang == "ru" else "Rasm qo'shish"
         builder.button(text=photo_text, callback_data=f"store_change_photo_{store_id}")
 
     # Geolocation
     if has_location:
-        location_text = "📍 Изменить локацию" if lang == "ru" else "📍 Joylashuvni o'zgartirish"
+        location_text = "Изменить локацию" if lang == "ru" else "Joylashuvni o'zgartirish"
     else:
-        location_text = "📍 Добавить локацию" if lang == "ru" else "📍 Joylashuv qo'shish"
+        location_text = "Добавить локацию" if lang == "ru" else "Joylashuv qo'shish"
     builder.button(text=location_text, callback_data=f"store_location_setup_{store_id}")
 
     # Payment integrations (only for owner)
     if is_owner:
-        payment_text = "💳 Онлайн оплата" if lang == "ru" else "💳 Onlayn to'lov"
+        payment_text = "Онлайн оплата" if lang == "ru" else "Onlayn to'lov"
         builder.button(text=payment_text, callback_data=f"store_payment_settings_{store_id}")
 
         # Store admins management (only for owner)
-        admins_text = "👥 Сотрудники" if lang == "ru" else "👥 Xodimlar"
+        admins_text = "Сотрудники" if lang == "ru" else "Xodimlar"
         builder.button(text=admins_text, callback_data=f"store_admins_{store_id}")
 
-    back_text = "◀️ Назад" if lang == "ru" else "◀️ Orqaga"
+    back_text = "Назад" if lang == "ru" else "Orqaga"
     builder.button(text=back_text, callback_data="store_settings_back")
 
     builder.adjust(1)
@@ -126,20 +126,20 @@ async def show_store_settings(callback: types.CallbackQuery) -> None:
 
     role_text = "" if is_owner else (" (сотрудник)" if lang == "ru" else " (xodim)")
 
-    geo_set = "✅ O'rnatilgan" if has_location else "❌ O'rnatilmagan"
+    geo_set = "O'rnatilgan" if has_location else "O'rnatilmagan"
     if lang == "ru":
         text = (
-            f"⚙️ <b>Настройки магазина{role_text}</b>\n\n"
-            f"🏪 <b>{store_name}</b>\n\n"
-            f"📸 Фото: {'✅ Загружено' if has_photo else '❌ Не загружено'}\n"
-            f"📍 Геолокация: {'✅ Установлена' if has_location else '❌ Не установлена'}"
+            f"<b>Настройки магазина{role_text}</b>\n\n"
+            f"<b>{store_name}</b>\n\n"
+            f"Фото: {'Загружено' if has_photo else 'Не загружено'}\n"
+            f"Геолокация: {'Установлена' if has_location else 'Не установлена'}"
         )
     else:
         text = (
-            f"⚙️ <b>Do'kon sozlamalari{role_text}</b>\n\n"
-            f"🏪 <b>{store_name}</b>\n\n"
-            f"📸 Rasm: {'✅ Yuklangan' if has_photo else '❌ Yuklanmagan'}\n"
-            f"📍 Geolokatsiya: {geo_set}"
+            f"<b>Do'kon sozlamalari{role_text}</b>\n\n"
+            f"<b>{store_name}</b>\n\n"
+            f"Rasm: {'Yuklangan' if has_photo else 'Yuklanmagan'}\n"
+            f"Geolokatsiya: {geo_set}"
         )
 
     # Show current photo if exists
@@ -202,23 +202,21 @@ async def request_store_photo(callback: types.CallbackQuery, state: FSMContext) 
 
     # Verify store ownership
     if not verify_store_owner(callback.from_user.id, store_id):
-        await callback.answer("❌", show_alert=True)
+        await callback.answer("Нет доступа" if lang == "ru" else "Ruxsat yo'q", show_alert=True)
         return
 
     await state.update_data(store_id=store_id)
     await state.set_state(StoreSettingsStates.waiting_photo)
 
     cancel_kb = InlineKeyboardBuilder()
-    cancel_kb.button(
-        text="❌ Отмена" if lang == "ru" else "❌ Bekor qilish", callback_data="store_photo_cancel"
-    )
+    cancel_kb.button(text="Отмена" if lang == "ru" else "Bekor qilish", callback_data="store_photo_cancel")
 
     text = (
-        "📸 <b>Загрузка фото магазина</b>\n\n"
+        "<b>Загрузка фото магазина</b>\n\n"
         "Отправьте фото вашего магазина или витрины.\n"
         "Это поможет покупателям узнать ваш магазин!"
         if lang == "ru"
-        else "📸 <b>Do'kon fotosuratini yuklash</b>\n\n"
+        else "<b>Do'kon fotosuratini yuklash</b>\n\n"
         "Do'koningiz yoki vitrina fotosuratini yuboring.\n"
         "Bu xaridorlarga do'koningizni tanishga yordam beradi!"
     )
@@ -261,16 +259,15 @@ async def handle_store_photo(message: types.Message, state: FSMContext) -> None:
         await state.clear()
 
         success_text = (
-            "✅ <b>Фото магазина обновлено!</b>\n\n" "Теперь покупатели смогут видеть ваш магазин."
+            "<b>Фото магазина обновлено</b>\n\nТеперь покупатели смогут видеть ваш магазин."
             if lang == "ru"
-            else "✅ <b>Do'kon rasmi yangilandi!</b>\n\n"
-            "Endi xaridorlar do'koningizni ko'rishlari mumkin."
+            else "<b>Do'kon rasmi yangilandi</b>\n\nEndi xaridorlar do'koningizni ko'rishlari mumkin."
         )
 
         # Show updated photo with back button
         back_kb = InlineKeyboardBuilder()
         back_kb.button(
-            text="⚙️ Настройки магазина" if lang == "ru" else "⚙️ Do'kon sozlamalari",
+            text="Настройки магазина" if lang == "ru" else "Do'kon sozlamalari",
             callback_data="my_store_settings",
         )
 
@@ -286,7 +283,7 @@ async def handle_store_photo(message: types.Message, state: FSMContext) -> None:
     except Exception as e:
         logger.error(f"Failed to update store photo: {e}")
         await message.answer(
-            "❌ Ошибка при загрузке фото" if lang == "ru" else "❌ Rasm yuklashda xatolik"
+            "Ошибка при загрузке фото" if lang == "ru" else "Rasm yuklashda xatolik"
         )
 
 
@@ -314,15 +311,15 @@ async def cancel_photo_upload(callback: types.CallbackQuery, state: FSMContext) 
         has_location = bool(store.get("latitude") and store.get("longitude"))
 
         text = (
-            f"⚙️ <b>Настройки магазина</b>\n\n"
-            f"🏪 <b>{store_name}</b>\n\n"
-            f"📸 Фото: {'✅ Загружено' if has_photo else '❌ Не загружено'}\n"
-            f"📍 Геолокация: {'✅ Установлена' if has_location else '❌ Не установлена'}"
+            f"<b>Настройки магазина</b>\n\n"
+            f"<b>{store_name}</b>\n\n"
+            f"Фото: {'Загружено' if has_photo else 'Не загружено'}\n"
+            f"Геолокация: {'Установлена' if has_location else 'Не установлена'}"
             if lang == "ru"
-            else f"⚙️ <b>Do'kon sozlamalari</b>\n\n"
-            f"🏪 <b>{store_name}</b>\n\n"
-            f"📸 Rasm: {'✅ Yuklangan' if has_photo else '❌ Yuklanmagan'}\n"
-            f"📍 Geolokatsiya: {'✅ Ornatilgan' if has_location else '❌ Ornatilmagan'}"
+            else f"<b>Do'kon sozlamalari</b>\n\n"
+            f"<b>{store_name}</b>\n\n"
+            f"Rasm: {'Yuklangan' if has_photo else 'Yuklanmagan'}\n"
+            f"Geolokatsiya: {'Ornatilgan' if has_location else 'Ornatilmagan'}"
         )
 
         try:
@@ -351,7 +348,7 @@ async def remove_store_photo(callback: types.CallbackQuery) -> None:
 
     # Verify store ownership
     if not verify_store_owner(callback.from_user.id, store_id):
-        await callback.answer("❌", show_alert=True)
+        await callback.answer("Нет доступа" if lang == "ru" else "Ruxsat yo'q", show_alert=True)
         return
 
     try:
@@ -367,17 +364,17 @@ async def remove_store_photo(callback: types.CallbackQuery) -> None:
             has_location = bool(store.get("latitude") and store.get("longitude"))
 
             text = (
-                f"⚙️ <b>Настройки магазина</b>\n\n"
-                f"🏪 <b>{store_name}</b>\n\n"
-                f"📸 Фото: ❌ Не загружено\n"
-                f"📍 Геолокация: {'✅ Установлена' if has_location else '❌ Не установлена'}\n\n"
-                f"✅ Фото удалено"
+                f"<b>Настройки магазина</b>\n\n"
+                f"<b>{store_name}</b>\n\n"
+                f"Фото: Не загружено\n"
+                f"Геолокация: {'Установлена' if has_location else 'Не установлена'}\n\n"
+                f"Фото удалено"
                 if lang == "ru"
-                else f"⚙️ <b>Do'kon sozlamalari</b>\n\n"
-                f"🏪 <b>{store_name}</b>\n\n"
-                f"📸 Rasm: ❌ Yuklanmagan\n"
-                f"📍 Geolokatsiya: {'✅ Ornatilgan' if has_location else '❌ Ornatilmagan'}\n\n"
-                f"✅ Rasm o'chirildi"
+                else f"<b>Do'kon sozlamalari</b>\n\n"
+                f"<b>{store_name}</b>\n\n"
+                f"Rasm: Yuklanmagan\n"
+                f"Geolokatsiya: {'Ornatilgan' if has_location else 'Ornatilmagan'}\n\n"
+                f"Rasm o'chirildi"
             )
 
             try:
@@ -392,12 +389,12 @@ async def remove_store_photo(callback: types.CallbackQuery) -> None:
                 reply_markup=store_settings_keyboard(store_id, lang, False, has_location),
             )
 
-        await callback.answer("✅ Фото удалено" if lang == "ru" else "✅ Rasm o'chirildi")
+        await callback.answer("Фото удалено" if lang == "ru" else "Rasm o'chirildi")
         logger.info(f"Store {store_id} photo removed by user {callback.from_user.id}")
 
     except Exception as e:
         logger.error(f"Failed to remove store photo: {e}")
-        await callback.answer("❌ Ошибка" if lang == "ru" else "❌ Xatolik", show_alert=True)
+        await callback.answer("Ошибка" if lang == "ru" else "Xatolik", show_alert=True)
 
 
 @router.callback_query(F.data == "store_settings_back")
@@ -421,7 +418,7 @@ async def back_from_settings(callback: types.CallbackQuery) -> None:
     webapp_url = get_partner_panel_url()
     await bot.send_message(
         callback.from_user.id,
-        "🏠 Главное меню" if lang == "ru" else "🏠 Asosiy menyu",
+        "Главное меню" if lang == "ru" else "Asosiy menyu",
         reply_markup=main_menu_seller(lang, webapp_url=webapp_url, user_id=callback.from_user.id),
     )
 
@@ -446,7 +443,7 @@ async def setup_store_location(callback: types.CallbackQuery, state: FSMContext)
 
     # Verify store ownership
     if not verify_store_owner(callback.from_user.id, store_id):
-        await callback.answer("❌", show_alert=True)
+        await callback.answer("Нет доступа" if lang == "ru" else "Ruxsat yo'q", show_alert=True)
         return
 
     # Save store_id to state
@@ -454,22 +451,22 @@ async def setup_store_location(callback: types.CallbackQuery, state: FSMContext)
     await state.set_state(StoreSettingsStates.waiting_location)
 
     text = (
-        "📍 <b>Установка геолокации магазина</b>\n\n"
+        "<b>Установка геолокации магазина</b>\n\n"
         "Отправьте геолокацию вашего магазина.\n\n"
         "Вы можете:\n"
-        "• Отправить свою текущую геолокацию (кнопка 📎 → Геолокация)\n"
-        "• Выбрать точку на карте"
+        "- Отправить текущую геолокацию (через меню вложений)\n"
+        "- Выбрать точку на карте"
         if lang == "ru"
-        else "📍 <b>Do'kon geolokatsiyasini o'rnatish</b>\n\n"
+        else "<b>Do'kon geolokatsiyasini o'rnatish</b>\n\n"
         "Do'koningiz joylashuvini yuboring.\n\n"
         "Siz:\n"
-        "• Hozirgi joylashuvingizni yuborishingiz mumkin (📎 → Joylashuv)\n"
-        "• Xaritadan nuqta tanlashingiz mumkin"
+        "- Hozirgi joylashuvingizni yuborishingiz mumkin (ilova menyusi orqali)\n"
+        "- Xaritadan nuqta tanlashingiz mumkin"
     )
 
     cancel_kb = InlineKeyboardBuilder()
     cancel_kb.button(
-        text="❌ Отмена" if lang == "ru" else "❌ Bekor qilish",
+        text="Отмена" if lang == "ru" else "Bekor qilish",
         callback_data="store_location_cancel",
     )
 
@@ -522,19 +519,19 @@ async def handle_store_location(message: types.Message, state: FSMContext) -> No
         await state.clear()
 
         success_text = (
-            f"✅ <b>Геолокация магазина установлена!</b>\n\n"
-            f"📍 Координаты: {latitude:.6f}, {longitude:.6f}\n\n"
+            f"<b>Геолокация магазина установлена</b>\n\n"
+            f"Координаты: {latitude:.6f}, {longitude:.6f}\n\n"
             f"Теперь ваш магазин будет отображаться на карте."
             if lang == "ru"
-            else f"✅ <b>Do'kon geolokatsiyasi o'rnatildi!</b>\n\n"
-            f"📍 Koordinatalar: {latitude:.6f}, {longitude:.6f}\n\n"
+            else f"<b>Do'kon geolokatsiyasi o'rnatildi</b>\n\n"
+            f"Koordinatalar: {latitude:.6f}, {longitude:.6f}\n\n"
             f"Endi do'koningiz xaritada ko'rinadi."
         )
 
         # Show back button
         back_kb = InlineKeyboardBuilder()
         back_kb.button(
-            text="⚙️ Настройки магазина" if lang == "ru" else "⚙️ Do'kon sozlamalari",
+            text="Настройки магазина" if lang == "ru" else "Do'kon sozlamalari",
             callback_data="my_store_settings",
         )
 
@@ -547,9 +544,9 @@ async def handle_store_location(message: types.Message, state: FSMContext) -> No
     except Exception as e:
         logger.error(f"Failed to update store location: {e}")
         await message.answer(
-            "❌ Ошибка при сохранении геолокации"
+            "Ошибка при сохранении геолокации"
             if lang == "ru"
-            else "❌ Geolokatsiyani saqlashda xatolik"
+            else "Geolokatsiyani saqlashda xatolik"
         )
 
 
@@ -577,15 +574,15 @@ async def cancel_location_setup(callback: types.CallbackQuery, state: FSMContext
         has_location = bool(store.get("latitude") and store.get("longitude"))
 
         text = (
-            f"⚙️ <b>Настройки магазина</b>\n\n"
-            f"🏪 <b>{store_name}</b>\n\n"
-            f"📸 Фото: {'✅ Загружено' if has_photo else '❌ Не загружено'}\n"
-            f"📍 Геолокация: {'✅ Установлена' if has_location else '❌ Не установлена'}"
+            f"<b>Настройки магазина</b>\n\n"
+            f"<b>{store_name}</b>\n\n"
+            f"Фото: {'Загружено' if has_photo else 'Не загружено'}\n"
+            f"Геолокация: {'Установлена' if has_location else 'Не установлена'}"
             if lang == "ru"
-            else f"⚙️ <b>Do'kon sozlamalari</b>\n\n"
-            f"🏪 <b>{store_name}</b>\n\n"
-            f"📸 Rasm: {'✅ Yuklangan' if has_photo else '❌ Yuklanmagan'}\n"
-            f"📍 Geolokatsiya: {'✅ Ornatilgan' if has_location else '❌ Ornatilmagan'}"
+            else f"<b>Do'kon sozlamalari</b>\n\n"
+            f"<b>{store_name}</b>\n\n"
+            f"Rasm: {'Yuklangan' if has_photo else 'Yuklanmagan'}\n"
+            f"Geolokatsiya: {'Ornatilgan' if has_location else 'Ornatilmagan'}"
         )
 
         try:
@@ -615,20 +612,20 @@ def payment_settings_keyboard(
     payme_configured = any(i.get("provider") == "payme" for i in integrations)
 
     if click_configured:
-        click_text = "✅ Click (настроен)" if lang == "ru" else "✅ Click (sozlangan)"
+        click_text = "Click (настроен)" if lang == "ru" else "Click (sozlangan)"
         builder.button(text=click_text, callback_data=f"store_click_view_{store_id}")
     else:
-        click_text = "➕ Подключить Click" if lang == "ru" else "➕ Click ulash"
+        click_text = "Подключить Click" if lang == "ru" else "Click ulash"
         builder.button(text=click_text, callback_data=f"store_click_setup_{store_id}")
 
     if payme_configured:
-        payme_text = "✅ Payme (настроен)" if lang == "ru" else "✅ Payme (sozlangan)"
+        payme_text = "Payme (настроен)" if lang == "ru" else "Payme (sozlangan)"
         builder.button(text=payme_text, callback_data=f"store_payme_view_{store_id}")
     else:
-        payme_text = "➕ Подключить Payme" if lang == "ru" else "➕ Payme ulash"
+        payme_text = "Подключить Payme" if lang == "ru" else "Payme ulash"
         builder.button(text=payme_text, callback_data=f"store_payme_setup_{store_id}")
 
-    back_text = "◀️ Назад" if lang == "ru" else "◀️ Orqaga"
+    back_text = "Назад" if lang == "ru" else "Orqaga"
     builder.button(text=back_text, callback_data="my_store_settings")
 
     builder.adjust(1)
@@ -649,7 +646,7 @@ async def show_payment_settings(callback: types.CallbackQuery) -> None:
 
     # Verify store ownership
     if not verify_store_owner(callback.from_user.id, store_id):
-        await callback.answer("❌", show_alert=True)
+        await callback.answer("Нет доступа" if lang == "ru" else "Ruxsat yo'q", show_alert=True)
         return
 
     # Get current integrations
@@ -659,18 +656,18 @@ async def show_payment_settings(callback: types.CallbackQuery) -> None:
         integrations = []
 
     text = (
-        "💳 <b>Настройки онлайн оплаты</b>\n\n"
+        "<b>Настройки онлайн оплаты</b>\n\n"
         "Подключите Click или Payme чтобы покупатели могли "
-        "оплачивать заказы онлайн. Деньги поступят напрямую на ваш счёт!\n\n"
-        "📌 <b>Как подключить:</b>\n"
+        "оплачивать заказы онлайн. Деньги поступят напрямую на ваш счёт.\n\n"
+        "<b>Как подключить:</b>\n"
         "1. Зарегистрируйтесь как мерчант в Click/Payme\n"
         "2. Получите API ключи в личном кабинете\n"
         "3. Введите их здесь"
         if lang == "ru"
-        else "💳 <b>Onlayn to'lov sozlamalari</b>\n\n"
+        else "<b>Onlayn to'lov sozlamalari</b>\n\n"
         "Click yoki Payme-ni ulang, shunda xaridorlar buyurtmalarni "
-        "onlayn to'lashi mumkin. Pul to'g'ridan-to'g'ri hisobingizga tushadi!\n\n"
-        "📌 <b>Qanday ulash mumkin:</b>\n"
+        "onlayn to'lashi mumkin. Pul to'g'ridan-to'g'ri hisobingizga tushadi.\n\n"
+        "<b>Qanday ulash mumkin:</b>\n"
         "1. Click/Payme-da merchant sifatida ro'yxatdan o'ting\n"
         "2. Shaxsiy kabinetdan API kalitlarini oling\n"
         "3. Ularni shu yerga kiriting"
@@ -702,7 +699,7 @@ async def setup_click_start(callback: types.CallbackQuery, state: FSMContext) ->
 
     # Verify store ownership
     if not verify_store_owner(callback.from_user.id, store_id):
-        await callback.answer("❌", show_alert=True)
+        await callback.answer("Нет доступа" if lang == "ru" else "Ruxsat yo'q", show_alert=True)
         return
 
     await state.update_data(store_id=store_id, provider="click")
@@ -710,17 +707,17 @@ async def setup_click_start(callback: types.CallbackQuery, state: FSMContext) ->
 
     cancel_kb = InlineKeyboardBuilder()
     cancel_kb.button(
-        text="❌ Отмена" if lang == "ru" else "❌ Bekor qilish",
+        text="Отмена" if lang == "ru" else "Bekor qilish",
         callback_data=f"store_payment_settings_{store_id}",
     )
 
     text = (
-        "🔗 <b>Подключение Click</b>\n\n"
+        "<b>Подключение Click</b>\n\n"
         "Шаг 1/3: Введите ваш <b>Merchant ID</b>\n\n"
         "Его можно найти в личном кабинете Click Merchant:\n"
         "merchant.click.uz → Настройки → API"
         if lang == "ru"
-        else "🔗 <b>Click ulash</b>\n\n"
+        else "<b>Click ulash</b>\n\n"
         "1-qadam: <b>Merchant ID</b>-ni kiriting\n\n"
         "Uni Click Merchant shaxsiy kabinetida topish mumkin:\n"
         "merchant.click.uz → Sozlamalar → API"
@@ -750,9 +747,9 @@ async def handle_click_merchant_id(message: types.Message, state: FSMContext) ->
 
     if not merchant_id or len(merchant_id) < 3:
         await message.answer(
-            "❌ Введите корректный Merchant ID"
+            "Введите корректный Merchant ID"
             if lang == "ru"
-            else "❌ To'g'ri Merchant ID kiriting"
+            else "To'g'ri Merchant ID kiriting"
         )
         return
 
@@ -764,14 +761,14 @@ async def handle_click_merchant_id(message: types.Message, state: FSMContext) ->
 
     cancel_kb = InlineKeyboardBuilder()
     cancel_kb.button(
-        text="❌ Отмена" if lang == "ru" else "❌ Bekor qilish",
+        text="Отмена" if lang == "ru" else "Bekor qilish",
         callback_data=f"store_payment_settings_{store_id}",
     )
 
     text = (
-        "✅ Merchant ID сохранён\n\n" "Шаг 2/3: Введите ваш <b>Service ID</b>"
+        "Merchant ID сохранён\n\nШаг 2/3: Введите ваш <b>Service ID</b>"
         if lang == "ru"
-        else "✅ Merchant ID saqlandi\n\n" "2-qadam: <b>Service ID</b>-ni kiriting"
+        else "Merchant ID saqlandi\n\n2-qadam: <b>Service ID</b>-ni kiriting"
     )
 
     await message.answer(text, parse_mode="HTML", reply_markup=cancel_kb.as_markup())
@@ -791,7 +788,9 @@ async def handle_click_service_id(message: types.Message, state: FSMContext) -> 
 
     if not service_id or len(service_id) < 3:
         await message.answer(
-            "❌ Введите корректный Service ID" if lang == "ru" else "❌ To'g'ri Service ID kiriting"
+            "Введите корректный Service ID"
+            if lang == "ru"
+            else "To'g'ri Service ID kiriting"
         )
         return
 
@@ -803,18 +802,18 @@ async def handle_click_service_id(message: types.Message, state: FSMContext) -> 
 
     cancel_kb = InlineKeyboardBuilder()
     cancel_kb.button(
-        text="❌ Отмена" if lang == "ru" else "❌ Bekor qilish",
+        text="Отмена" if lang == "ru" else "Bekor qilish",
         callback_data=f"store_payment_settings_{store_id}",
     )
 
     text = (
-        "✅ Service ID сохранён\n\n"
+        "Service ID сохранён\n\n"
         "Шаг 3/3: Введите ваш <b>Secret Key</b>\n\n"
-        "⚠️ Храните ключ в секрете!"
+        "Храните ключ в секрете."
         if lang == "ru"
-        else "✅ Service ID saqlandi\n\n"
+        else "Service ID saqlandi\n\n"
         "3-qadam: <b>Secret Key</b>-ni kiriting\n\n"
-        "⚠️ Kalitni sir saqlang!"
+        "Kalitni sir saqlang."
     )
 
     await message.answer(text, parse_mode="HTML", reply_markup=cancel_kb.as_markup())
@@ -834,7 +833,9 @@ async def handle_click_secret_key(message: types.Message, state: FSMContext) -> 
 
     if not secret_key or len(secret_key) < 5:
         await message.answer(
-            "❌ Введите корректный Secret Key" if lang == "ru" else "❌ To'g'ri Secret Key kiriting"
+            "Введите корректный Secret Key"
+            if lang == "ru"
+            else "To'g'ri Secret Key kiriting"
         )
         return
 
@@ -862,11 +863,11 @@ async def handle_click_secret_key(message: types.Message, state: FSMContext) -> 
             pass
 
         text = (
-            "✅ <b>Click успешно подключён!</b>\n\n"
+            "<b>Click подключён</b>\n\n"
             "Теперь покупатели могут оплачивать заказы через Click, "
             "и деньги будут поступать на ваш счёт."
             if lang == "ru"
-            else "✅ <b>Click muvaffaqiyatli ulandi!</b>\n\n"
+            else "<b>Click ulandi</b>\n\n"
             "Endi xaridorlar Click orqali to'lashi mumkin, "
             "pul sizning hisobingizga tushadi."
         )
@@ -882,7 +883,7 @@ async def handle_click_secret_key(message: types.Message, state: FSMContext) -> 
 
     except Exception as e:
         logger.error(f"Failed to save Click integration: {e}")
-        await message.answer("❌ Ошибка сохранения" if lang == "ru" else "❌ Saqlashda xatolik")
+        await message.answer("Ошибка сохранения" if lang == "ru" else "Saqlashda xatolik")
 
 
 @router.callback_query(F.data.startswith("store_payme_setup_"))
@@ -899,7 +900,7 @@ async def setup_payme_start(callback: types.CallbackQuery, state: FSMContext) ->
 
     # Verify store ownership
     if not verify_store_owner(callback.from_user.id, store_id):
-        await callback.answer("❌", show_alert=True)
+        await callback.answer("Нет доступа" if lang == "ru" else "Ruxsat yo'q", show_alert=True)
         return
 
     await state.update_data(store_id=store_id, provider="payme")
@@ -907,17 +908,17 @@ async def setup_payme_start(callback: types.CallbackQuery, state: FSMContext) ->
 
     cancel_kb = InlineKeyboardBuilder()
     cancel_kb.button(
-        text="❌ Отмена" if lang == "ru" else "❌ Bekor qilish",
+        text="Отмена" if lang == "ru" else "Bekor qilish",
         callback_data=f"store_payment_settings_{store_id}",
     )
 
     text = (
-        "🔗 <b>Подключение Payme</b>\n\n"
+        "<b>Подключение Payme</b>\n\n"
         "Шаг 1/2: Введите ваш <b>Merchant ID</b>\n\n"
         "Его можно найти в кабинете Payme Merchant:\n"
         "merchant.payme.uz → Настройки"
         if lang == "ru"
-        else "🔗 <b>Payme ulash</b>\n\n"
+        else "<b>Payme ulash</b>\n\n"
         "1-qadam: <b>Merchant ID</b>-ni kiriting\n\n"
         "Uni Payme Merchant kabinetida topish mumkin:\n"
         "merchant.payme.uz → Sozlamalar"
@@ -947,9 +948,9 @@ async def handle_payme_merchant_id(message: types.Message, state: FSMContext) ->
 
     if not merchant_id or len(merchant_id) < 3:
         await message.answer(
-            "❌ Введите корректный Merchant ID"
+            "Введите корректный Merchant ID"
             if lang == "ru"
-            else "❌ To'g'ri Merchant ID kiriting"
+            else "To'g'ri Merchant ID kiriting"
         )
         return
 
@@ -961,18 +962,18 @@ async def handle_payme_merchant_id(message: types.Message, state: FSMContext) ->
 
     cancel_kb = InlineKeyboardBuilder()
     cancel_kb.button(
-        text="❌ Отмена" if lang == "ru" else "❌ Bekor qilish",
+        text="Отмена" if lang == "ru" else "Bekor qilish",
         callback_data=f"store_payment_settings_{store_id}",
     )
 
     text = (
-        "✅ Merchant ID сохранён\n\n"
+        "Merchant ID сохранён\n\n"
         "Шаг 2/2: Введите ваш <b>Secret Key</b>\n\n"
-        "⚠️ Храните ключ в секрете!"
+        "Храните ключ в секрете."
         if lang == "ru"
-        else "✅ Merchant ID saqlandi\n\n"
+        else "Merchant ID saqlandi\n\n"
         "2-qadam: <b>Secret Key</b>-ni kiriting\n\n"
-        "⚠️ Kalitni sir saqlang!"
+        "Kalitni sir saqlang."
     )
 
     await message.answer(text, parse_mode="HTML", reply_markup=cancel_kb.as_markup())
@@ -992,7 +993,9 @@ async def handle_payme_secret_key(message: types.Message, state: FSMContext) -> 
 
     if not secret_key or len(secret_key) < 5:
         await message.answer(
-            "❌ Введите корректный Secret Key" if lang == "ru" else "❌ To'g'ri Secret Key kiriting"
+            "Введите корректный Secret Key"
+            if lang == "ru"
+            else "To'g'ri Secret Key kiriting"
         )
         return
 
@@ -1018,18 +1021,18 @@ async def handle_payme_secret_key(message: types.Message, state: FSMContext) -> 
             pass
 
         text = (
-            "✅ <b>Payme успешно подключён!</b>\n\n"
+            "<b>Payme подключён</b>\n\n"
             "Теперь покупатели могут оплачивать заказы через Payme, "
             "и деньги будут поступать на ваш счёт."
             if lang == "ru"
-            else "✅ <b>Payme muvaffaqiyatli ulandi!</b>\n\n"
+            else "<b>Payme ulandi</b>\n\n"
             "Endi xaridorlar Payme orqali to'lashi mumkin, "
             "pul sizning hisobingizga tushadi."
         )
 
         back_kb = InlineKeyboardBuilder()
         back_kb.button(
-            text="◀️ Назад" if lang == "ru" else "◀️ Orqaga",
+            text="Назад" if lang == "ru" else "Orqaga",
             callback_data=f"store_payment_settings_{store_id}",
         )
 
@@ -1038,7 +1041,7 @@ async def handle_payme_secret_key(message: types.Message, state: FSMContext) -> 
 
     except Exception as e:
         logger.error(f"Failed to save Payme integration: {e}")
-        await message.answer("❌ Ошибка сохранения" if lang == "ru" else "❌ Saqlashda xatolik")
+        await message.answer("Ошибка сохранения" if lang == "ru" else "Saqlashda xatolik")
 
 
 @router.callback_query(F.data.startswith("store_click_view_"))
@@ -1055,7 +1058,7 @@ async def view_click_integration(callback: types.CallbackQuery) -> None:
 
     # Verify store ownership
     if not verify_store_owner(callback.from_user.id, store_id):
-        await callback.answer("❌", show_alert=True)
+        await callback.answer("Нет доступа" if lang == "ru" else "Ruxsat yo'q", show_alert=True)
         return
 
     try:
@@ -1070,12 +1073,12 @@ async def view_click_integration(callback: types.CallbackQuery) -> None:
         )
 
         text = (
-            f"✅ <b>Click подключён</b>\n\n"
+            f"<b>Click подключён</b>\n\n"
             f"Merchant ID: <code>{masked_merchant}</code>\n"
             f"Service ID: настроен\n\n"
             f"Покупатели могут оплачивать через Click."
             if lang == "ru"
-            else f"✅ <b>Click ulangan</b>\n\n"
+            else f"<b>Click ulangan</b>\n\n"
             f"Merchant ID: <code>{masked_merchant}</code>\n"
             f"Service ID: sozlangan\n\n"
             f"Xaridorlar Click orqali to'lashi mumkin."
@@ -1083,11 +1086,11 @@ async def view_click_integration(callback: types.CallbackQuery) -> None:
 
         builder = InlineKeyboardBuilder()
         builder.button(
-            text="🗑 Отключить" if lang == "ru" else "🗑 O'chirish",
+            text="Отключить" if lang == "ru" else "O'chirish",
             callback_data=f"store_click_disable_{store_id}",
         )
         builder.button(
-            text="◀️ Назад" if lang == "ru" else "◀️ Orqaga",
+            text="Назад" if lang == "ru" else "Orqaga",
             callback_data=f"store_payment_settings_{store_id}",
         )
         builder.adjust(1)
@@ -1113,7 +1116,7 @@ async def view_payme_integration(callback: types.CallbackQuery) -> None:
 
     # Verify store ownership
     if not verify_store_owner(callback.from_user.id, store_id):
-        await callback.answer("❌", show_alert=True)
+        await callback.answer("Нет доступа" if lang == "ru" else "Ruxsat yo'q", show_alert=True)
         return
 
     try:
@@ -1128,22 +1131,22 @@ async def view_payme_integration(callback: types.CallbackQuery) -> None:
         )
 
         text = (
-            f"✅ <b>Payme подключён</b>\n\n"
+            f"<b>Payme подключён</b>\n\n"
             f"Merchant ID: <code>{masked_merchant}</code>\n\n"
             f"Покупатели могут оплачивать через Payme."
             if lang == "ru"
-            else f"✅ <b>Payme ulangan</b>\n\n"
+            else f"<b>Payme ulangan</b>\n\n"
             f"Merchant ID: <code>{masked_merchant}</code>\n\n"
             f"Xaridorlar Payme orqali to'lashi mumkin."
         )
 
         builder = InlineKeyboardBuilder()
         builder.button(
-            text="🗑 Отключить" if lang == "ru" else "🗑 O'chirish",
+            text="Отключить" if lang == "ru" else "O'chirish",
             callback_data=f"store_payme_disable_{store_id}",
         )
         builder.button(
-            text="◀️ Назад" if lang == "ru" else "◀️ Orqaga",
+            text="Назад" if lang == "ru" else "Orqaga",
             callback_data=f"store_payment_settings_{store_id}",
         )
         builder.adjust(1)
@@ -1169,19 +1172,19 @@ async def disable_click_integration(callback: types.CallbackQuery) -> None:
 
     # Verify store ownership
     if not verify_store_owner(callback.from_user.id, store_id):
-        await callback.answer("❌", show_alert=True)
+        await callback.answer("Нет доступа" if lang == "ru" else "Ruxsat yo'q", show_alert=True)
         return
 
     try:
         db.disable_store_payment_integration(store_id, "click")
-        await callback.answer("✅ Click отключён" if lang == "ru" else "✅ Click o'chirildi")
+        await callback.answer("Click отключён" if lang == "ru" else "Click o'chirildi")
 
         # Return to payment settings
         integrations = db.get_store_payment_integrations(store_id)
         text = (
-            "💳 <b>Настройки онлайн оплаты</b>\n\n" "Click был отключён."
+            "<b>Настройки онлайн оплаты</b>\n\nClick был отключён."
             if lang == "ru"
-            else "💳 <b>Onlayn to'lov sozlamalari</b>\n\n" "Click o'chirildi."
+            else "<b>Onlayn to'lov sozlamalari</b>\n\nClick o'chirildi."
         )
 
         await callback.message.edit_text(
@@ -1209,19 +1212,19 @@ async def disable_payme_integration(callback: types.CallbackQuery) -> None:
 
     # Verify store ownership
     if not verify_store_owner(callback.from_user.id, store_id):
-        await callback.answer("❌", show_alert=True)
+        await callback.answer("Нет доступа" if lang == "ru" else "Ruxsat yo'q", show_alert=True)
         return
 
     try:
         db.disable_store_payment_integration(store_id, "payme")
-        await callback.answer("✅ Payme отключён" if lang == "ru" else "✅ Payme o'chirildi")
+        await callback.answer("Payme отключён" if lang == "ru" else "Payme o'chirildi")
 
         # Return to payment settings
         integrations = db.get_store_payment_integrations(store_id)
         text = (
-            "💳 <b>Настройки онлайн оплаты</b>\n\n" "Payme был отключён."
+            "<b>Настройки онлайн оплаты</b>\n\nPayme был отключён."
             if lang == "ru"
-            else "💳 <b>Onlayn to'lov sozlamalari</b>\n\n" "Payme o'chirildi."
+            else "<b>Onlayn to'lov sozlamalari</b>\n\nPayme o'chirildi."
         )
 
         await callback.message.edit_text(
@@ -1249,16 +1252,16 @@ def store_admins_keyboard(
         user_id = admin.get("user_id")
         name = admin.get("first_name") or admin.get("username") or f"ID:{user_id}"
         builder.button(
-            text=f"❌ {name}",
+            text=f"{'Удалить' if lang == 'ru' else 'O\\'chirish'} {name}",
             callback_data=f"remove_admin_{store_id}_{user_id}",
         )
 
     # Add admin button
-    add_text = "➕ Добавить сотрудника" if lang == "ru" else "➕ Xodim qo'shish"
+    add_text = "Добавить сотрудника" if lang == "ru" else "Xodim qo'shish"
     builder.button(text=add_text, callback_data=f"add_admin_{store_id}")
 
     # Back button
-    back_text = "◀️ Назад" if lang == "ru" else "◀️ Orqaga"
+    back_text = "Назад" if lang == "ru" else "Orqaga"
     builder.button(text=back_text, callback_data="my_store_settings")
 
     builder.adjust(1)
@@ -1266,7 +1269,7 @@ def store_admins_keyboard(
 
 
 @router.callback_query(F.data.startswith("store_admins_"))
-async def show_store_admins(callback: types.CallbackQuery) -> None:
+async def show_store_admins(callback: types.CallbackQuery, state: FSMContext) -> None:
     """Show store admins management."""
     if not db:
         await callback.answer("System error", show_alert=True)
@@ -1275,6 +1278,8 @@ async def show_store_admins(callback: types.CallbackQuery) -> None:
     assert callback.from_user is not None
     assert callback.data is not None
     lang = db.get_user_language(callback.from_user.id)
+
+    await state.clear()
 
     store_id = int(callback.data.replace("store_admins_", ""))
 
@@ -1297,14 +1302,14 @@ async def show_store_admins(callback: types.CallbackQuery) -> None:
             if admins
             else "Добавьте сотрудников чтобы они могли управлять магазином."
         )
-        text = f"👥 <b>Сотрудники магазина</b>\n\nВсего сотрудников: <b>{admin_count}</b>\n\n{hint}"
+        text = f"<b>Сотрудники магазина</b>\n\nВсего сотрудников: <b>{admin_count}</b>\n\n{hint}"
     else:
         hint = (
             "Xodimni oʻchirish uchun ustiga bosing."
             if admins
             else "Xodimlar qoʻshing, ular doʻkonni boshqarishlari mumkin."
         )
-        text = f"👥 <b>Doʻkon xodimlari</b>\n\nJami xodimlar: <b>{admin_count}</b>\n\n{hint}"
+        text = f"<b>Doʻkon xodimlari</b>\n\nJami xodimlar: <b>{admin_count}</b>\n\n{hint}"
 
     try:
         await callback.message.edit_text(
@@ -1337,25 +1342,25 @@ async def start_add_admin(callback: types.CallbackQuery, state: FSMContext) -> N
 
     # Verify store ownership
     if not verify_store_owner(callback.from_user.id, store_id):
-        await callback.answer("❌", show_alert=True)
+        await callback.answer("Нет доступа" if lang == "ru" else "Ruxsat yo'q", show_alert=True)
         return
 
     await state.update_data(store_id=store_id)
     await state.set_state(StoreSettingsStates.waiting_admin_contact)
 
     text = (
-        "👤 <b>Добавление сотрудника</b>\n\n"
+        "<b>Добавление сотрудника</b>\n\n"
         "Перешлите любое сообщение от пользователя, которого хотите добавить.\n\n"
         "Или отправьте его контакт."
         if lang == "ru"
-        else "👤 <b>Xodim qo'shish</b>\n\n"
+        else "<b>Xodim qo'shish</b>\n\n"
         "Qo'shmoqchi bo'lgan foydalanuvchidan biror xabarni yo'naltiring.\n\n"
         "Yoki uning kontaktini yuboring."
     )
 
     cancel_kb = InlineKeyboardBuilder()
     cancel_kb.button(
-        text="❌ Отмена" if lang == "ru" else "❌ Bekor qilish",
+        text="Отмена" if lang == "ru" else "Bekor qilish",
         callback_data=f"store_admins_{store_id}",
     )
 
@@ -1369,7 +1374,10 @@ async def start_add_admin(callback: types.CallbackQuery, state: FSMContext) -> N
     await callback.answer()
 
 
-@router.message(StoreSettingsStates.waiting_admin_contact)
+@router.message(
+    StoreSettingsStates.waiting_admin_contact,
+    F.forward_from | F.contact | ~F.text.startswith("/"),
+)
 async def process_admin_contact(message: types.Message, state: FSMContext) -> None:
     """Process forwarded message or contact to add admin."""
     if not db:
@@ -1402,10 +1410,10 @@ async def process_admin_contact(message: types.Message, state: FSMContext) -> No
 
     if not new_admin_id:
         error_text = (
-            "❌ Не удалось определить пользователя.\n\n"
+            "Не удалось определить пользователя.\n\n"
             "Перешлите сообщение от пользователя или отправьте его контакт."
             if lang == "ru"
-            else "❌ Foydalanuvchini aniqlab bo'lmadi.\n\n"
+            else "Foydalanuvchini aniqlab bo'lmadi.\n\n"
             "Foydalanuvchidan xabar yo'naltiring yoki kontaktini yuboring."
         )
         await message.answer(error_text)
@@ -1425,12 +1433,12 @@ async def process_admin_contact(message: types.Message, state: FSMContext) -> No
                 await state.clear()
 
                 success_text = (
-                    f"✅ <b>Сотрудник добавлен!</b>\n\n"
-                    f"👤 {new_admin_name or new_admin_id}\n\n"
+                    f"<b>Сотрудник добавлен</b>\n\n"
+                    f"{new_admin_name or new_admin_id}\n\n"
                     f"Теперь этот пользователь может управлять магазином."
                     if lang == "ru"
-                    else f"✅ <b>Xodim qo'shildi!</b>\n\n"
-                    f"👤 {new_admin_name or new_admin_id}\n\n"
+                    else f"<b>Xodim qo'shildi</b>\n\n"
+                    f"{new_admin_name or new_admin_id}\n\n"
                     f"Endi bu foydalanuvchi do'konni boshqarishi mumkin."
                 )
 
@@ -1441,12 +1449,12 @@ async def process_admin_contact(message: types.Message, state: FSMContext) -> No
                     store_name = store.get("name", "Магазин") if store else "Магазин"
 
                     notify_text = (
-                        f"🎉 <b>Вы добавлены как сотрудник!</b>\n\n"
-                        f"🏪 Магазин: <b>{store_name}</b>\n\n"
+                        f"<b>Вы добавлены как сотрудник</b>\n\n"
+                        f"Магазин: <b>{store_name}</b>\n\n"
                         f"Теперь вы можете управлять товарами и заказами этого магазина."
                         if lang == "ru"
-                        else f"🎉 <b>Siz xodim sifatida qo'shildingiz!</b>\n\n"
-                        f"🏪 Do'kon: <b>{store_name}</b>\n\n"
+                        else f"<b>Siz xodim sifatida qo'shildingiz</b>\n\n"
+                        f"Do'kon: <b>{store_name}</b>\n\n"
                         f"Endi siz bu do'konning mahsulotlari va buyurtmalarini boshqarishingiz mumkin."
                     )
                     await bot.send_message(new_admin_id, notify_text, parse_mode="HTML")
@@ -1455,7 +1463,7 @@ async def process_admin_contact(message: types.Message, state: FSMContext) -> No
 
                 back_kb = InlineKeyboardBuilder()
                 back_kb.button(
-                    text="👥 К сотрудникам" if lang == "ru" else "👥 Xodimlarga",
+                    text="К сотрудникам" if lang == "ru" else "Xodimlarga",
                     callback_data=f"store_admins_{store_id}",
                 )
 
@@ -1467,16 +1475,16 @@ async def process_admin_contact(message: types.Message, state: FSMContext) -> No
                 )
             else:
                 await message.answer(
-                    "❌ Не удалось добавить сотрудника"
+                    "Не удалось добавить сотрудника"
                     if lang == "ru"
-                    else "❌ Xodim qo'shib bo'lmadi"
+                    else "Xodim qo'shib bo'lmadi"
                 )
         else:
             await message.answer("Feature not available")
 
     except Exception as e:
         logger.error(f"Error adding admin: {e}")
-        await message.answer("❌ Ошибка" if lang == "ru" else "❌ Xatolik")
+        await message.answer("Ошибка" if lang == "ru" else "Xatolik")
 
 
 @router.callback_query(F.data.startswith("remove_admin_"))
@@ -1509,7 +1517,9 @@ async def remove_admin(callback: types.CallbackQuery) -> None:
         if hasattr(db, "remove_store_admin"):
             db.remove_store_admin(store_id, admin_user_id)
 
-            await callback.answer("✅ Сотрудник удалён" if lang == "ru" else "✅ Xodim o'chirildi")
+            await callback.answer(
+                "Сотрудник удалён" if lang == "ru" else "Xodim o'chirildi"
+            )
 
             # Refresh admins list
             admins = db.get_store_admins(store_id) if hasattr(db, "get_store_admins") else []
@@ -1517,11 +1527,11 @@ async def remove_admin(callback: types.CallbackQuery) -> None:
             admin_count = len(admins)
             if lang == "ru":
                 hint = "Нажмите на сотрудника чтобы удалить." if admins else "Добавьте сотрудников."
-                text = f"👥 <b>Сотрудники магазина</b>\n\nВсего сотрудников: <b>{admin_count}</b>\n\n{hint}"
+                text = f"<b>Сотрудники магазина</b>\n\nВсего сотрудников: <b>{admin_count}</b>\n\n{hint}"
             else:
                 hint = "Xodimni oʻchirish uchun ustiga bosing." if admins else "Xodimlar qoʻshing."
                 text = (
-                    f"👥 <b>Doʻkon xodimlari</b>\n\nJami xodimlar: <b>{admin_count}</b>\n\n{hint}"
+                    f"<b>Doʻkon xodimlari</b>\n\nJami xodimlar: <b>{admin_count}</b>\n\n{hint}"
                 )
 
             await callback.message.edit_text(
@@ -1536,4 +1546,4 @@ async def remove_admin(callback: types.CallbackQuery) -> None:
 
     except Exception as e:
         logger.error(f"Error removing admin: {e}")
-        await callback.answer("❌ Ошибка" if lang == "ru" else "❌ Xatolik", show_alert=True)
+        await callback.answer("Ошибка" if lang == "ru" else "Xatolik", show_alert=True)

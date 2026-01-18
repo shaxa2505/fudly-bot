@@ -734,17 +734,23 @@
 .yana-page .toggle {
   width: 46px;
   height: 28px;
-  border: none;
+  border: 1px solid rgba(15, 118, 110, 0.14);
   border-radius: 999px;
-  background: var(--color-border);
+  background: rgba(15, 118, 110, 0.12);
   padding: 2px;
   cursor: pointer;
-  transition: background var(--transition-fast);
+  transition: background var(--transition-fast), border-color var(--transition-fast), box-shadow var(--transition-fast);
   position: relative;
+  appearance: none;
+  -webkit-appearance: none;
+  box-shadow: inset 0 1px 2px rgba(16, 24, 40, 0.12);
+  -webkit-tap-highlight-color: transparent;
 }
 
 .yana-page .toggle.on {
-  background: var(--color-primary);
+  background: var(--color-primary-gradient);
+  border-color: rgba(15, 118, 110, 0.35);
+  box-shadow: inset 0 1px 2px rgba(255, 255, 255, 0.25);
 }
 
 .yana-page .toggle-knob {
@@ -755,12 +761,13 @@
   height: 24px;
   background: #FFFFFF;
   border-radius: 50%;
-  box-shadow: var(--shadow-xs);
-  transition: transform var(--transition-fast);
+  box-shadow: 0 3px 8px rgba(16, 24, 40, 0.18);
+  transition: transform var(--transition-fast), box-shadow var(--transition-fast);
 }
 
 .yana-page .toggle.on .toggle-knob {
   transform: translateX(18px);
+  box-shadow: 0 4px 10px rgba(16, 24, 40, 0.22);
 }
 
 .yana-page .toggle:focus-visible {

@@ -52,7 +52,7 @@ async def confirm_order(callback: types.CallbackQuery):
     order = db.get_order(order_id)
     if not order:
         await callback.answer(
-            "❌ " + ("Заказ не найден" if lang == "ru" else "Buyurtma topilmadi"), show_alert=True
+            "Заказ не найден" if lang == "ru" else "Buyurtma topilmadi", show_alert=True
         )
         return
 
@@ -62,7 +62,7 @@ async def confirm_order(callback: types.CallbackQuery):
     owner_id = get_store_field(store, "owner_id") if store else None
 
     if callback.from_user.id != owner_id:
-        await callback.answer("❌", show_alert=True)
+        await callback.answer("Ошибка", show_alert=True)
         return
 
     # Используем UnifiedOrderService для обновления статуса
@@ -72,7 +72,7 @@ async def confirm_order(callback: types.CallbackQuery):
     # Уведомляем продавца
     await callback.message.edit_text(
         callback.message.text
-        + f"\n\n✅ {'Заказ подтверждён!' if lang == 'ru' else 'Buyurtma tasdiqlandi!'}"
+        + f"\n\n{'Заказ подтверждён' if lang == 'ru' else 'Buyurtma tasdiqlandi'}"
     )
 
     await callback.answer()
@@ -93,7 +93,7 @@ async def cancel_order(callback: types.CallbackQuery):
     order = db.get_order(order_id)
     if not order:
         await callback.answer(
-            "❌ " + ("Заказ не найден" if lang == "ru" else "Buyurtma topilmadi"), show_alert=True
+            "Заказ не найден" if lang == "ru" else "Buyurtma topilmadi", show_alert=True
         )
         return
 
@@ -103,7 +103,7 @@ async def cancel_order(callback: types.CallbackQuery):
     owner_id = get_store_field(store, "owner_id") if store else None
 
     if callback.from_user.id != owner_id:
-        await callback.answer("❌", show_alert=True)
+        await callback.answer("Ошибка", show_alert=True)
         return
 
     # Используем UnifiedOrderService для отмены заказа
@@ -113,7 +113,7 @@ async def cancel_order(callback: types.CallbackQuery):
     # Уведомляем продавца
     await callback.message.edit_text(
         callback.message.text
-        + f"\n\n❌ {'Заказ отменён' if lang == 'ru' else 'Buyurtma bekor qilindi'}"
+        + f"\n\n{'Заказ отменён' if lang == 'ru' else 'Buyurtma bekor qilindi'}"
     )
 
     await callback.answer()
@@ -134,7 +134,7 @@ async def confirm_payment(callback: types.CallbackQuery):
     order = db.get_order(order_id)
     if not order:
         await callback.answer(
-            "❌ " + ("Заказ не найден" if lang == "ru" else "Buyurtma topilmadi"), show_alert=True
+            "Заказ не найден" if lang == "ru" else "Buyurtma topilmadi", show_alert=True
         )
         return
 
@@ -144,7 +144,7 @@ async def confirm_payment(callback: types.CallbackQuery):
     owner_id = get_store_field(store, "owner_id") if store else None
 
     if callback.from_user.id != owner_id:
-        await callback.answer("❌", show_alert=True)
+        await callback.answer("Ошибка", show_alert=True)
         return
 
     # Используем UnifiedOrderService для подтверждения заказа
@@ -153,7 +153,7 @@ async def confirm_payment(callback: types.CallbackQuery):
 
     # Создаём кнопку "Передать курьеру"
     kb = InlineKeyboardBuilder()
-    handover_text = "🚕 Передать курьеру" if lang == "ru" else "🚕 Kuryerga topshirish"
+    handover_text = "Передать курьеру" if lang == "ru" else "Kuryerga topshirish"
     kb.button(text=handover_text, callback_data=f"handover_courier_{order_id}")
 
     # Уведомляем продавца с кнопкой
@@ -167,13 +167,13 @@ async def confirm_payment(callback: types.CallbackQuery):
     try:
         await callback.message.edit_caption(
             caption=callback.message.caption
-            + f"\n\n✅ {payment_confirmed_text}\n\n📝 {next_step_text}",
+            + f"\n\n{payment_confirmed_text}\n\n{next_step_text}",
             reply_markup=kb.as_markup(),
         )
     except Exception:
         # Если нет caption (текстовое сообщение)
         await callback.message.edit_text(
-            callback.message.text + f"\n\n✅ {payment_confirmed_text}\n\n📝 {next_step_text}",
+            callback.message.text + f"\n\n{payment_confirmed_text}\n\n{next_step_text}",
             reply_markup=kb.as_markup(),
         )
 
@@ -195,7 +195,7 @@ async def reject_payment(callback: types.CallbackQuery):
     order = db.get_order(order_id)
     if not order:
         await callback.answer(
-            "❌ " + ("Заказ не найден" if lang == "ru" else "Buyurtma topilmadi"), show_alert=True
+            "Заказ не найден" if lang == "ru" else "Buyurtma topilmadi", show_alert=True
         )
         return
 
@@ -205,7 +205,7 @@ async def reject_payment(callback: types.CallbackQuery):
     owner_id = get_store_field(store, "owner_id") if store else None
 
     if callback.from_user.id != owner_id:
-        await callback.answer("❌", show_alert=True)
+        await callback.answer("Ошибка", show_alert=True)
         return
 
     # Используем UnifiedOrderService для отклонения (отмены)
@@ -222,7 +222,7 @@ async def reject_payment(callback: types.CallbackQuery):
         else "To'lov rad etildi, buyurtma bekor qilindi"
     )
     await callback.message.edit_caption(
-        caption=callback.message.caption + f"\n\n❌ {payment_rejected_text}"
+        caption=callback.message.caption + f"\n\n{payment_rejected_text}"
     )
 
     await callback.answer()
@@ -246,7 +246,7 @@ async def start_courier_handover(callback: types.CallbackQuery, state: FSMContex
     order = db.get_order(order_id)
     if not order:
         await callback.answer(
-            "❌ " + ("Заказ не найден" if lang == "ru" else "Buyurtma topilmadi"), show_alert=True
+            "Заказ не найден" if lang == "ru" else "Buyurtma topilmadi", show_alert=True
         )
         return
 
@@ -256,15 +256,15 @@ async def start_courier_handover(callback: types.CallbackQuery, state: FSMContex
     owner_id = get_store_field(store, "owner_id") if store else None
 
     if callback.from_user.id != owner_id:
-        await callback.answer("❌", show_alert=True)
+        await callback.answer("Ошибка", show_alert=True)
         return
 
     # Сохраняем order_id в состояние
     await state.set_state(CourierHandover.courier_phone)
     await state.update_data(order_id=order_id)
 
-    prompt_ru = "📝 Введите телефон курьера/таксиста:"
-    prompt_uz = "📝 Kuryer/taksi haydovchisi telefonini kiriting:"
+    prompt_ru = "Введите телефон курьера/таксиста:"
+    prompt_uz = "Kuryer/taksi haydovchisi telefonini kiriting:"
 
     await callback.message.answer(prompt_ru if lang == "ru" else prompt_uz)
     await callback.answer()
@@ -280,9 +280,9 @@ async def process_courier_phone(message: types.Message, state: FSMContext):
     phone_digits = "".join(filter(str.isdigit, courier_phone))
     if len(phone_digits) < 9:
         error_text = (
-            "❌ Введите корректный номер телефона"
+            "Введите корректный номер телефона"
             if lang == "ru"
-            else "❌ To'g'ri telefon raqamini kiriting"
+            else "To'g'ri telefon raqamini kiriting"
         )
         await message.answer(error_text)
         return
@@ -293,7 +293,7 @@ async def process_courier_phone(message: types.Message, state: FSMContext):
 
     order = db.get_order(order_id)
     if not order:
-        error_text = "❌ Заказ не найден" if lang == "ru" else "❌ Buyurtma topilmadi"
+        error_text = "Заказ не найден" if lang == "ru" else "Buyurtma topilmadi"
         await message.answer(error_text)
         return
 
@@ -302,8 +302,8 @@ async def process_courier_phone(message: types.Message, state: FSMContext):
     await service.start_delivery(order_id, courier_phone=courier_phone)
 
     # Уведомляем продавца об успешной передаче
-    success_ru = f"? Заказ #{order_id} передан курьеру!\n\n?? Телефон: {courier_phone}"
-    success_uz = f"? Buyurtma #{order_id} kuryerga topshirildi!\n\n?? Telefon: {courier_phone}"
+    success_ru = f"Заказ #{order_id} передан курьеру.\n\nТелефон: {courier_phone}"
+    success_uz = f"Buyurtma #{order_id} kuryerga topshirildi.\n\nTelefon: {courier_phone}"
     await message.answer(success_ru if lang == "ru" else success_uz)
 
     # Дополнительное сообщение клиенту с информацией о курьере
@@ -312,16 +312,16 @@ async def process_courier_phone(message: types.Message, state: FSMContext):
     delivery_address = get_order_field(order, "delivery_address", 6)
 
     kb = InlineKeyboardBuilder()
-    received_btn_text = "✅ Получил заказ" if customer_lang == "ru" else "✅ Buyurtmani oldim"
+    received_btn_text = "Получил заказ" if customer_lang == "ru" else "Buyurtmani oldim"
     kb.button(text=received_btn_text, callback_data=f"order_received_{order_id}")
 
     courier_info_ru = (
-        f"\n\n📱 Телефон: {courier_phone}\n"
-        f"📍 Адрес: {delivery_address}"
+        f"\n\nТелефон: {courier_phone}\n"
+        f"Адрес: {delivery_address}"
     )
     courier_info_uz = (
-        f"\n\n📱 Telefon: {courier_phone}\n"
-        f"📍 Manzil: {delivery_address}"
+        f"\n\nTelefon: {courier_phone}\n"
+        f"Manzil: {delivery_address}"
     )
 
     try:
@@ -352,14 +352,14 @@ async def order_received_by_customer(callback: types.CallbackQuery):
     order = db.get_order(order_id)
     if not order:
         await callback.answer(
-            "❌ " + ("Заказ не найден" if lang == "ru" else "Buyurtma topilmadi"), show_alert=True
+            "Заказ не найден" if lang == "ru" else "Buyurtma topilmadi", show_alert=True
         )
         return
 
     # Проверяем, что это заказ текущего пользователя
     if get_order_field(order, "user_id", 1) != callback.from_user.id:
         await callback.answer(
-            "❌ " + ("Это не ваш заказ" if lang == "ru" else "Bu sizning buyurtmangiz emas"),
+            "Это не ваш заказ" if lang == "ru" else "Bu sizning buyurtmangiz emas",
             show_alert=True,
         )
         return
@@ -369,8 +369,8 @@ async def order_received_by_customer(callback: types.CallbackQuery):
     await service.complete_order(order_id)
 
     # Обновляем сообщение клиенту
-    completed_text_ru = "✅ Заказ успешно доставлен!\n\nСпасибо за покупку! 🎉"
-    completed_text_uz = "✅ Buyurtma muvaffaqiyatli yetkazildi!\n\nXaridingiz uchun rahmat! 🎉"
+    completed_text_ru = "Заказ успешно доставлен!\n\nСпасибо за покупку!"
+    completed_text_uz = "Buyurtma muvaffaqiyatli yetkazildi!\n\nXaridingiz uchun rahmat!"
 
     try:
         await callback.message.edit_text(
@@ -385,17 +385,17 @@ async def order_received_by_customer(callback: types.CallbackQuery):
     # Предлагаем оценить заказ
     kb = InlineKeyboardBuilder()
     for i in range(1, 6):
-        kb.button(text="⭐" * i, callback_data=f"rate_order_{order_id}_{i}")
+        kb.button(text=str(i), callback_data=f"rate_order_{order_id}_{i}")
     kb.adjust(5)
 
-    rate_prompt_ru = "Как вам понравился заказ? Оцените от 1 до 5 звёзд:"
-    rate_prompt_uz = "Buyurtma qanday bo'ldi? 1 dan 5 gacha yulduz bilan baholang:"
+    rate_prompt_ru = "Как вам понравился заказ? Оцените от 1 до 5:"
+    rate_prompt_uz = "Buyurtma qanday bo'ldi? 1 dan 5 gacha baholang:"
 
     await callback.message.answer(
         rate_prompt_ru if lang == "ru" else rate_prompt_uz, reply_markup=kb.as_markup()
     )
 
-    await callback.answer("✅")
+    await callback.answer()
 
 
 @router.callback_query(F.data.startswith("rate_order_"))
@@ -415,14 +415,14 @@ async def rate_order(callback: types.CallbackQuery):
     order = db.get_order(order_id)
     if not order:
         await callback.answer(
-            "❌ " + ("Заказ не найден" if lang == "ru" else "Buyurtma topilmadi"), show_alert=True
+            "Заказ не найден" if lang == "ru" else "Buyurtma topilmadi", show_alert=True
         )
         return
 
     # Verify order belongs to this customer
     order_user_id = get_order_field(order, "user_id", 1)
     if callback.from_user.id != order_user_id:
-        await callback.answer("❌", show_alert=True)
+        await callback.answer("Ошибка", show_alert=True)
         return
 
     # Check if already rated
@@ -443,12 +443,12 @@ async def rate_order(callback: types.CallbackQuery):
     if store_id and hasattr(db, "add_order_rating"):
         rating_id = db.add_order_rating(order_id, user_id, store_id, rating)
         if rating_id:
-            logger.info(f"✅ Order {order_id} rated {rating} stars by user {user_id}")
+            logger.info(f"Order {order_id} rated {rating} by user {user_id}")
         else:
             logger.warning(f"Failed to save rating for order {order_id}")
 
-    thanks_ru = f"Спасибо за оценку! {'⭐' * rating}\n\nБудем рады видеть вас снова! 😊"
-    thanks_uz = f"Baholaganingiz uchun rahmat! {'⭐' * rating}\n\nSizni yana kutamiz! 😊"
+    thanks_ru = f"Спасибо за оценку! {rating}\n\nБудем рады видеть вас снова!"
+    thanks_uz = f"Baholaganingiz uchun rahmat! {rating}\n\nSizni yana kutamiz!"
 
     await callback.message.edit_text(thanks_ru if lang == "ru" else thanks_uz)
     await callback.answer()

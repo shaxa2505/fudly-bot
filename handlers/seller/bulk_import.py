@@ -32,7 +32,18 @@ class BulkImport(StatesGroup):
 
 @router.message(
     F.text.in_(
-        ["📦 Массовый импорт", "📦 Ommaviy import", "📥 Массовый импорт", "📥 Ommaviy import"]
+        [
+            "📦 Массовый импорт",
+            "📦 Ommaviy import",
+            "📥 Массовый импорт",
+            "📥 Ommaviy import",
+            "📥 Импорт",
+            "📥 Import",
+            "Массовый импорт",
+            "Ommaviy import",
+            "Импорт",
+            "Import",
+        ]
     )
 )
 async def start_bulk_import(message: types.Message, state: FSMContext):
@@ -42,7 +53,7 @@ async def start_bulk_import(message: types.Message, state: FSMContext):
     await state.clear()
 
     if not db:
-        await message.answer("❌ System error")
+        await message.answer("System error")
         return
 
     user_id = message.from_user.id
@@ -52,9 +63,9 @@ async def start_bulk_import(message: types.Message, state: FSMContext):
     store = db.get_store_by_owner(user_id)
     if not store:
         await message.answer(
-            "❌ У вас нет магазина. Сначала зарегистрируйтесь как партнер."
+            "У вас нет магазина. Сначала зарегистрируйтесь как партнер."
             if lang == "ru"
-            else "❌ Sizda do'kon yo'q. Avval hamkor sifatida ro'yxatdan o'ting."
+            else "Sizda do'kon yo'q. Avval hamkor sifatida ro'yxatdan o'ting."
         )
         return
 
@@ -62,87 +73,54 @@ async def start_bulk_import(message: types.Message, state: FSMContext):
     store_status = store.get("status") if isinstance(store, dict) else store[8]
     if store_status != "active":
         await message.answer(
-            "❌ Ваш магазин еще не одобрен администратором"
+            "Ваш магазин еще не одобрен администратором"
             if lang == "ru"
-            else "❌ Do'koningiz hali administrator tomonidan tasdiqlanmagan"
+            else "Do'koningiz hali administrator tomonidan tasdiqlanmagan"
         )
         return
 
     # Keyboard with import options
     kb = InlineKeyboardBuilder()
     kb.button(
-        text="📸 Альбом фото (до 10)" if lang == "ru" else "📸 Rasm albomi (10 tagacha)",
+        text="Альбом фото (до 10)" if lang == "ru" else "Rasm albomi (10 tagacha)",
         callback_data="import_method_photos",
     )
     kb.button(
-        text="📄 CSV + ZIP (100+)" if lang == "ru" else "📄 CSV + ZIP (100+)",
+        text="CSV + ZIP (100+)" if lang == "ru" else "CSV + ZIP (100+)",
         callback_data="import_method_csv",
     )
     kb.button(
-        text="⚡ Авто-скидки по сроку" if lang == "ru" else "⚡ Muddatli avtoskidka",
+        text="Авто-скидки по сроку" if lang == "ru" else "Muddatli avtoskidka",
         callback_data="import_products",
     )
     kb.button(
-        text="🔗 Интеграция с 1С" if lang == "ru" else "🔗 1C integratsiyasi",
+        text="Интеграция с 1С" if lang == "ru" else "1C integratsiyasi",
         callback_data="setup_1c_integration",
     )
     kb.button(
-        text="⚙️ Настройки скидок" if lang == "ru" else "⚙️ Chegirma sozlamalari",
+        text="Настройки скидок" if lang == "ru" else "Chegirma sozlamalari",
         callback_data="auto_discount_settings",
     )
     kb.adjust(1)
 
-    instructions = """📦 <b>Массовый импорт товаров</b>
-
-Выберите способ импорта:
-
-┏━━━━━━━━━━━━━━━━━━━━━━━━┓
-┃ <b>📸 Альбом фото</b>
-┃ ✅ Быстрый ввод
-┃ ✅ До 10 товаров за раз
-┃ ⏱ ~2 минуты на 10 товаров
-┗━━━━━━━━━━━━━━━━━━━━━━━━┛
-
-┏━━━━━━━━━━━━━━━━━━━━━━━━┓
-┃ <b>📄 CSV + ZIP</b>
-┃ ✅ Любое количество
-┃ ✅ Удобно для 100+ товаров
-┃ ✅ Скачайте пример файла
-┃ ⏱ ~5 минут на 100 товаров
-┗━━━━━━━━━━━━━━━━━━━━━━━━┛
-
-┏━━━━━━━━━━━━━━━━━━━━━━━━┓
-┃ <b>⚡ Авто-скидки по сроку</b>
-┃ ✅ Импорт из Excel/CSV
-┃ ✅ Автоматический расчёт скидок
-┃ ✅ По дате срока годности
-┗━━━━━━━━━━━━━━━━━━━━━━━━┛
-
-💡 <i>Новичкам рекомендуем Альбом фото</i>"""
+    instructions = (
+        "<b>Массовый импорт товаров</b>\n\n"
+        "Выберите способ:\n"
+        "1) Альбом фото - до 10 товаров за раз.\n"
+        "2) CSV + ZIP - удобно для 100+ товаров.\n"
+        "3) Авто-скидки по сроку - импорт из Excel/CSV.\n\n"
+        "Совет: если только начинаете, используйте Альбом фото."
+    )
 
     if lang != "ru":
-        instructions = """📦 <b>Ommaviy import</b>
-
-Import usulini tanlang:
-
-┏━━━━━━━━━━━━━━━━━━━━━━━━┓
-┃ <b>📸 Rasm albomi</b>
-┃ ✅ Tez kiritish
-┃ ✅ 10 tagacha mahsulot
-┗━━━━━━━━━━━━━━━━━━━━━━━━┛
-
-┏━━━━━━━━━━━━━━━━━━━━━━━━┓
-┃ <b>📄 CSV + ZIP</b>
-┃ ✅ Istalgan miqdor
-┃ ✅ 100+ mahsulotlar uchun
-┗━━━━━━━━━━━━━━━━━━━━━━━━┛
-
-┏━━━━━━━━━━━━━━━━━━━━━━━━┓
-┃ <b>⚡ Muddatli avtoskidka</b>
-┃ ✅ Excel/CSV dan import
-┃ ✅ Avtomatik chegirma hisoblash
-┃ ✅ Yaroqlilik muddatiga qarab
-┗━━━━━━━━━━━━━━━━━━━━━━━━┛"""
+        instructions = (
+            "<b>Ommaviy import</b>\n\n"
+            "Import usulini tanlang:\n"
+            "1) Rasm albomi - 10 tagacha mahsulot.\n"
+            "2) CSV + ZIP - 100+ mahsulot uchun qulay.\n"
+            "3) Muddatli avtoskidka - Excel/CSV dan import.\n\n"
+            "Maslahat: yangi boshlasangiz, Rasm albomini tanlang."
+        )
 
     await message.answer(instructions, parse_mode="HTML", reply_markup=kb.as_markup())
 
@@ -155,44 +133,42 @@ async def import_via_photos(callback: types.CallbackQuery, state: FSMContext):
 
     await callback.answer()
 
-    instructions = """📸 <b>Импорт альбомом фото</b>
+    instructions = """<b>Импорт альбомом фото</b>
 
-<b>Как это работает:</b>
-1️⃣ Отправьте альбом фото (до 10 фото за раз)
-2️⃣ К каждому фото добавьте описание в формате:
+Как это работает:
+1) Отправьте альбом фото (до 10 фото за раз)
+2) К каждому фото добавьте описание в формате:
    <code>Название | Цена | Скидка | Количество | Срок</code>
 
-<b>Пример:</b>
+Пример:
 <code>Молоко 2.5% | 8000 | 6000 | 50 | 2025-11-20</code>
 <code>Хлеб белый | 3000 | 2000 | 100 | 2025-11-18</code>
 
-<b>Правила:</b>
-• Цены в сумах (без пробелов)
-• Срок годности: ГГГГ-ММ-ДД
-• Количество - целое число
-• Скидка должна быть меньше обычной цены
+Правила:
+- Цены в сумах (без пробелов)
+- Срок годности: ГГГГ-ММ-ДД
+- Количество - целое число
+- Скидка должна быть меньше обычной цены
 
-<b>Дополнительно (необязательно):</b>
+Дополнительно (необязательно):
 Можно добавить описание и единицу измерения:
 <code>Молоко | Описание | 8000 | 6000 | 50 | 2025-11-20 | л</code>
 
-💡 Отправьте сразу несколько фото альбомом!
-❌ Отмена - /cancel"""
+Отмена - /cancel"""
 
     if lang != "ru":
-        instructions = """📸 <b>Rasm albomi bilan import</b>
+        instructions = """<b>Rasm albomi bilan import</b>
 
-<b>Qanday ishlaydi:</b>
-1️⃣ Albom sifatida rasmlar yuboring (bir vaqtning o'zida 10 tagacha)
-2️⃣ Har bir rasmga tavsif qo'shing:
+Qanday ishlaydi:
+1) Albom sifatida rasmlar yuboring (bir vaqtning o'zida 10 tagacha)
+2) Har bir rasmga tavsif qo'shing:
    <code>Nomi | Narx | Chegirma | Soni | Muddat</code>
 
-<b>Misol:</b>
+Misol:
 <code>Sut 2.5% | 8000 | 6000 | 50 | 2025-11-20</code>
 <code>Oq non | 3000 | 2000 | 100 | 2025-11-18</code>
 
-💡 Bir vaqtning o'zida ko'p rasmlar yuboring!
-❌ Bekor qilish - /cancel"""
+Bekor qilish - /cancel"""
 
     await callback.message.answer(instructions, parse_mode="HTML")
     await state.set_state(BulkImport.waiting_photos)
@@ -245,7 +221,7 @@ async def process_media_group(message: types.Message, state: FSMContext, photos:
     # Get store
     store = db.get_store_by_owner(user_id)
     if not store:
-        await message.answer("❌ Магазин не найден" if lang == "ru" else "❌ Do'kon topilmadi")
+        await message.answer("Магазин не найден" if lang == "ru" else "Do'kon topilmadi")
         await state.clear()
         return
 
@@ -271,33 +247,39 @@ async def process_media_group(message: types.Message, state: FSMContext, photos:
 
     # Show results
     if errors:
-        error_text = "⚠️ <b>Ошибки:</b>\n" + "\n".join(errors[:5])
+        error_text = "<b>Ошибки:</b>\n" + "\n".join(errors[:5])
         if len(errors) > 5:
             error_text += f"\n\n...и еще {len(errors)-5} ошибок"
         await message.answer(error_text, parse_mode="HTML")
 
     if not offers:
         await message.answer(
-            "❌ Не найдено корректных товаров. Проверьте формат описаний."
+            "Не найдено корректных товаров. Проверьте формат описаний."
             if lang == "ru"
-            else "❌ To'g'ri mahsulotlar topilmadi. Tavsif formatini tekshiring."
+            else "To'g'ri mahsulotlar topilmadi. Tavsif formatini tekshiring."
         )
         await state.clear()
         return
 
     # Show preview
-    preview = f"✅ <b>Готово к импорту: {len(offers)} товаров</b>\n\n"
+    preview = f"<b>Готово к импорту: {len(offers)} товаров</b>\n\n"
 
     for i, offer in enumerate(offers[:3], 1):
         discount = int((1 - offer["discount_price"] / offer["original_price"]) * 100)
         preview += f"{i}. <b>{offer['title']}</b>\n"
-        preview += f"   💰 {int(offer['discount_price']):,} сум (скидка {discount}%)\n"
-        preview += f"   📦 {offer['quantity']} {offer.get('unit', 'шт')}\n\n"
+        preview += (
+            f"   {'Цена' if lang == 'ru' else 'Narx'}: {int(offer['discount_price']):,} сум "
+            f"({'скидка' if lang == 'ru' else 'chegirma'} {discount}%)\n"
+        )
+        preview += (
+            f"   {'Количество' if lang == 'ru' else 'Miqdor'}: {offer['quantity']} "
+            f"{offer.get('unit', 'шт')}\n\n"
+        )
 
     if len(offers) > 3:
         preview += f"...и еще {len(offers)-3} товаров\n\n"
 
-    preview += "Подтвердить импорт?" if lang == "ru" else "Importni tasdiqlaysizmi?"
+    preview += "Подтвердить импорт-" if lang == "ru" else "Importni tasdiqlaysizmi-"
 
     # Save to state
     await state.update_data(offers=offers, store_id=store_id)
@@ -305,11 +287,11 @@ async def process_media_group(message: types.Message, state: FSMContext, photos:
     # Confirmation buttons
     kb = InlineKeyboardBuilder()
     kb.button(
-        text="✅ Да, импортировать" if lang == "ru" else "✅ Ha, import qilish",
+        text="Да, импортировать" if lang == "ru" else "Ha, import qilish",
         callback_data="confirm_bulk_import",
     )
     kb.button(
-        text="❌ Отменить" if lang == "ru" else "❌ Bekor qilish",
+        text="Отменить" if lang == "ru" else "Bekor qilish",
         callback_data="cancel_bulk_import",
     )
     kb.adjust(2)
@@ -388,7 +370,7 @@ async def confirm_bulk_import(callback: types.CallbackQuery, state: FSMContext):
     """Confirm and execute bulk import"""
 
     if not db:
-        await callback.answer("❌ System error", show_alert=True)
+        await callback.answer("System error", show_alert=True)
         return
 
     lang = db.get_user_language(callback.from_user.id)
@@ -398,14 +380,14 @@ async def confirm_bulk_import(callback: types.CallbackQuery, state: FSMContext):
 
     if not offers or not store_id:
         await callback.answer(
-            "❌ Данные утеряны" if lang == "ru" else "❌ Ma'lumotlar yo'qoldi", show_alert=True
+            "Данные утеряны" if lang == "ru" else "Ma'lumotlar yo'qoldi", show_alert=True
         )
         await state.clear()
         return
 
     await callback.answer()
     await callback.message.edit_text(
-        "⏳ Импортирую товары..." if lang == "ru" else "⏳ Import qilinmoqda..."
+        "Импортирую товары..." if lang == "ru" else "Import qilinmoqda..."
     )
 
     # Import offers
@@ -444,16 +426,16 @@ async def confirm_bulk_import(callback: types.CallbackQuery, state: FSMContext):
 
     # Result
     result_text = (
-        "✅ <b>Импорт завершен!</b>\n\n" if lang == "ru" else "✅ <b>Import tugadi!</b>\n\n"
+        "<b>Импорт завершен</b>\n\n" if lang == "ru" else "<b>Import tugadi</b>\n\n"
     )
     result_text += (
-        f"✅ Успешно: {success_count}\n"
+        f"Успешно: {success_count}\n"
         if lang == "ru"
-        else f"✅ Muvaffaqiyatli: {success_count}\n"
+        else f"Muvaffaqiyatli: {success_count}\n"
     )
     if failed_count:
         result_text += (
-            f"❌ Ошибок: {failed_count}\n" if lang == "ru" else f"❌ Xatolar: {failed_count}\n"
+            f"Ошибок: {failed_count}\n" if lang == "ru" else f"Xatolar: {failed_count}\n"
         )
 
     await callback.message.answer(result_text, parse_mode="HTML")
@@ -468,7 +450,7 @@ async def cancel_bulk_import(callback: types.CallbackQuery, state: FSMContext):
 
     await callback.answer()
     await callback.message.edit_text(
-        "❌ Импорт отменен" if lang == "ru" else "❌ Import bekor qilindi"
+        "Импорт отменен" if lang == "ru" else "Import bekor qilindi"
     )
     await state.clear()
 
@@ -495,40 +477,40 @@ butter.jpg,Масло сливочное,Масло 82.5%,12000,9500,40,2025-11-
         filename="example_import.csv",
     )
 
-    instructions = """📄 <b>Импорт через CSV + ZIP</b>
+    instructions = """<b>Импорт через CSV + ZIP</b>
 
-<b>Шаг 1:</b> Скачайте пример CSV файла ⬆️
+Шаг 1: Скачайте пример CSV файла.
 
-<b>Шаг 2:</b> Заполните CSV файл вашими товарами
-• <code>photo_file</code> - имя файла фото (milk.jpg)
-• <code>title</code> - название товара
-• <code>description</code> - описание (можно пусто)
-• <code>original_price</code> - обычная цена
-• <code>discount_price</code> - цена со скидкой
-• <code>quantity</code> - количество
-• <code>expiry_date</code> - срок годности (ГГГГ-ММ-ДД)
-• <code>unit</code> - единица измерения (шт, кг, л)
+Шаг 2: Заполните CSV файл вашими товарами:
+- <code>photo_file</code> - имя файла фото (milk.jpg)
+- <code>title</code> - название товара
+- <code>description</code> - описание (можно пусто)
+- <code>original_price</code> - обычная цена
+- <code>discount_price</code> - цена со скидкой
+- <code>quantity</code> - количество
+- <code>expiry_date</code> - срок годности (ГГГГ-ММ-ДД)
+- <code>unit</code> - единица измерения (шт, кг, л)
 
-<b>Шаг 3:</b> Создайте ZIP архив с фотографиями
-📁 Имена файлов должны совпадать с CSV
-📸 Например: milk.jpg, bread.jpg, cheese.jpg
+Шаг 3: Создайте ZIP архив с фотографиями.
+Имена файлов должны совпадать с CSV.
+Пример: milk.jpg, bread.jpg, cheese.jpg
 
-<b>Шаг 4:</b> Отправьте CSV файл
+Шаг 4: Отправьте CSV файл.
 
-❌ Отмена - /cancel"""
+Отмена - /cancel"""
 
     if lang != "ru":
-        instructions = """📄 <b>CSV + ZIP orqali import</b>
+        instructions = """<b>CSV + ZIP orqali import</b>
 
-<b>1-qadam:</b> Misol CSV faylini yuklab oling ⬆️
+1-qadam: Misol CSV faylini yuklab oling.
 
-<b>2-qadam:</b> CSV faylni to'ldiring
+2-qadam: CSV faylni mahsulotlaringiz bilan to'ldiring.
 
-<b>3-qadam:</b> Rasmlar bilan ZIP arxiv yarating
+3-qadam: Rasmlar bilan ZIP arxiv yarating.
 
-<b>4-qadam:</b> CSV faylni yuboring
+4-qadam: CSV faylni yuboring.
 
-❌ Bekor qilish - /cancel"""
+Bekor qilish - /cancel"""
 
     await callback.message.answer_document(csv_file, caption=instructions, parse_mode="HTML")
 
@@ -546,7 +528,7 @@ async def receive_csv(message: types.Message, state: FSMContext):
 
     # Check if it's a CSV file
     if not message.document.file_name.endswith((".csv", ".CSV")):
-        await message.answer("❌ Отправьте CSV файл" if lang == "ru" else "❌ CSV fayl yuboring")
+        await message.answer("Отправьте CSV файл" if lang == "ru" else "CSV fayl yuboring")
         return
 
     try:
@@ -559,7 +541,7 @@ async def receive_csv(message: types.Message, state: FSMContext):
         products = list(csv_reader)
 
         if not products:
-            await message.answer("❌ CSV файл пустой" if lang == "ru" else "❌ CSV fayl bo'sh")
+            await message.answer("CSV файл пустой" if lang == "ru" else "CSV fayl bo'sh")
             return
 
         # Validate CSV structure
@@ -575,9 +557,9 @@ async def receive_csv(message: types.Message, state: FSMContext):
 
         if missing_fields:
             await message.answer(
-                f"❌ В CSV отсутствуют обязательные поля: {', '.join(missing_fields)}"
+                f"В CSV отсутствуют обязательные поля: {', '.join(missing_fields)}"
                 if lang == "ru"
-                else f"❌ CSV da majburiy maydonlar yo'q: {', '.join(missing_fields)}"
+                else f"CSV da majburiy maydonlar yo'q: {', '.join(missing_fields)}"
             )
             return
 
@@ -585,14 +567,14 @@ async def receive_csv(message: types.Message, state: FSMContext):
         await state.update_data(products=products)
 
         await message.answer(
-            f"✅ CSV загружен: <b>{len(products)} товаров</b>\n\n"
-            f"📦 <b>Теперь отправьте ZIP архив с фотографиями</b>\n"
-            f"📂 Имена файлов должны совпадать с CSV\n\n"
-            f"❌ Отмена - /cancel"
+            f"CSV загружен: <b>{len(products)} товаров</b>\n\n"
+            f"<b>Теперь отправьте ZIP архив с фотографиями</b>\n"
+            f"Имена файлов должны совпадать с CSV.\n\n"
+            f"Отмена - /cancel"
             if lang == "ru"
-            else f"✅ CSV yuklandi: <b>{len(products)} mahsulot</b>\n\n"
-            f"📦 <b>Endi rasmlar bilan ZIP arxivni yuboring</b>\n\n"
-            f"❌ Bekor qilish - /cancel",
+            else f"CSV yuklandi: <b>{len(products)} mahsulot</b>\n\n"
+            f"<b>Endi rasmlar bilan ZIP arxivni yuboring</b>\n\n"
+            f"Bekor qilish - /cancel",
             parse_mode="HTML",
         )
 
@@ -601,9 +583,9 @@ async def receive_csv(message: types.Message, state: FSMContext):
     except Exception as e:
         print(f"Error parsing CSV: {e}")
         await message.answer(
-            "❌ Ошибка при чтении CSV файла. Проверьте формат."
+            "Ошибка при чтении CSV файла. Проверьте формат."
             if lang == "ru"
-            else "❌ CSV faylni o'qishda xato. Formatni tekshiring."
+            else "CSV faylni o'qishda xato. Formatni tekshiring."
         )
 
 
@@ -619,14 +601,14 @@ async def receive_zip(message: types.Message, state: FSMContext):
 
     # Check if it's a ZIP file
     if not message.document.file_name.endswith((".zip", ".ZIP")):
-        await message.answer("❌ Отправьте ZIP архив" if lang == "ru" else "❌ ZIP arxiv yuboring")
+        await message.answer("Отправьте ZIP архив" if lang == "ru" else "ZIP arxiv yuboring")
         return
 
     try:
         # Get store
         store = db.get_store_by_owner(user_id)
         if not store:
-            await message.answer("❌ Магазин не найден" if lang == "ru" else "❌ Do'kon topilmadi")
+            await message.answer("Магазин не найден" if lang == "ru" else "Do'kon topilmadi")
             await state.clear()
             return
 
@@ -646,7 +628,7 @@ async def receive_zip(message: types.Message, state: FSMContext):
 
         if not photo_files:
             await message.answer(
-                "❌ В ZIP архиве нет фотографий" if lang == "ru" else "❌ ZIP arxivda rasmlar yo'q"
+                "В ZIP архиве нет фотографий" if lang == "ru" else "ZIP arxivda rasmlar yo'q"
             )
             return
 
@@ -656,17 +638,17 @@ async def receive_zip(message: types.Message, state: FSMContext):
 
         if not products:
             await message.answer(
-                "❌ Сначала отправьте CSV файл" if lang == "ru" else "❌ Avval CSV fayl yuboring"
+                "Сначала отправьте CSV файл" if lang == "ru" else "Avval CSV fayl yuboring"
             )
             await state.set_state(BulkImport.waiting_csv)
             return
 
         await message.answer(
-            f"⌛ <b>Обрабатываю {len(products)} товаров...</b>\n"
-            f"📷 Загрузка фото в Telegram...\n"
-            f"📦 Добавление в базу данных..."
+            f"<b>Обрабатываю {len(products)} товаров...</b>\n"
+            f"Загрузка фото в Telegram...\n"
+            f"Добавление в базу данных..."
             if lang == "ru"
-            else f"⌛ <b>{len(products)} mahsulot qayta ishlanmoqda...</b>"
+            else f"<b>{len(products)} mahsulot qayta ishlanmoqda...</b>"
         )
 
         # Process each product
@@ -742,24 +724,24 @@ async def receive_zip(message: types.Message, state: FSMContext):
                 success_count += 1
 
             except Exception as e:
-                errors.append(f"{idx}. {product.get('title', '?')}: {str(e)}")
+                errors.append(f"{idx}. {product.get('title', '-')}: {str(e)}")
                 failed_count += 1
 
         # Result
         result_text = (
-            "✅ <b>Импорт завершен!</b>\n\n" if lang == "ru" else "✅ <b>Import tugadi!</b>\n\n"
+            "<b>Импорт завершен</b>\n\n" if lang == "ru" else "<b>Import tugadi</b>\n\n"
         )
         result_text += (
-            f"✅ Успешно: <b>{success_count}</b>\n"
+            f"Успешно: <b>{success_count}</b>\n"
             if lang == "ru"
-            else f"✅ Muvaffaqiyatli: <b>{success_count}</b>\n"
+            else f"Muvaffaqiyatli: <b>{success_count}</b>\n"
         )
 
         if failed_count:
             result_text += (
-                f"❌ Ошибок: <b>{failed_count}</b>\n"
+                f"Ошибок: <b>{failed_count}</b>\n"
                 if lang == "ru"
-                else f"❌ Xatolar: <b>{failed_count}</b>\n"
+                else f"Xatolar: <b>{failed_count}</b>\n"
             )
             if errors:
                 result_text += "\n<b>Детали:</b>\n" + "\n".join(errors[:10])
@@ -771,12 +753,12 @@ async def receive_zip(message: types.Message, state: FSMContext):
 
     except zipfile.BadZipFile:
         await message.answer(
-            "❌ Поврежденный ZIP архив" if lang == "ru" else "❌ Buzilgan ZIP arxiv"
+            "Поврежденный ZIP архив" if lang == "ru" else "Buzilgan ZIP arxiv"
         )
     except Exception as e:
         print(f"Error processing ZIP: {e}")
         await message.answer(
-            "❌ Ошибка при обработке архива" if lang == "ru" else "❌ Arxivni qayta ishlashda xato"
+            "Ошибка при обработке архива" if lang == "ru" else "Arxivni qayta ishlashda xato"
         )
 
 
@@ -788,5 +770,5 @@ async def cancel_import_command(message: types.Message, state: FSMContext):
 
     lang = db.get_user_language(message.from_user.id) if db else "ru"
 
-    await message.answer("❌ Импорт отменен" if lang == "ru" else "❌ Import bekor qilindi")
+    await message.answer("Импорт отменен" if lang == "ru" else "Import bekor qilindi")
     await state.clear()

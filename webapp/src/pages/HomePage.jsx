@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { Flame, Milk, Cookie, Snowflake, Coffee as Beverage, Croissant, Beef, Apple, Salad, Package, Search, SlidersHorizontal } from 'lucide-react'
 import api from '../api/client'
 import { useCart } from '../context/CartContext'
@@ -146,6 +146,26 @@ function HomePage() {
     ? `${offersCountValue}+ ta`
     : `${offersCountValue} ta`
   const [hasNearbyFallback, setHasNearbyFallback] = useState(false)
+  const derivedCategoryCounts = useMemo(() => {
+    if (!offers.length) return {}
+    const counts = {}
+    CATEGORIES.forEach((category) => {
+      counts[category.id] = 0
+    })
+    counts.all = offersTotal ?? offers.length
+    offers.forEach((offer) => {
+      const categoryId = normalizeCategoryId(offer?.category)
+      counts[categoryId] = (counts[categoryId] || 0) + 1
+    })
+    return counts
+  }, [offers, offersTotal])
+  const effectiveCategoryCounts = useMemo(() => {
+    if (categoriesLoading || offers.length === 0) return categoryCounts
+    const values = Object.values(categoryCounts || {})
+    const hasPositive = values.some((value) => Number(value) > 0)
+    if (hasPositive) return categoryCounts
+    return derivedCategoryCounts
+  }, [categoriesLoading, categoryCounts, derivedCategoryCounts, offers.length])
   const getGeoAttemptTs = () => {
     const stored = localStorage.getItem(GEO_ATTEMPT_KEY)
     const ts = stored ? Number(stored) : 0
@@ -376,6 +396,12 @@ function HomePage() {
         if (cityForApi) {
           params.city = cityForApi
         }
+        if (location.region) {
+          params.region = location.region
+        }
+        if (location.district) {
+          params.district = location.district
+        }
         const data = await api.getCategories(params)
         if (!isActive) return
         const counts = {}
@@ -402,7 +428,7 @@ function HomePage() {
     return () => {
       isActive = false
     }
-  }, [cityForApi])
+  }, [cityForApi, location.region, location.district])
   // Load offers - сначала по городу, если пусто - из всех городов
   const loadOffers = useCallback(async (reset = false, options = {}) => {
     const { searchOverride, force = false } = options
@@ -1134,7 +1160,7 @@ function HomePage() {
         >
           {CATEGORIES.map(cat => {
             const Icon = cat.icon
-            const count = categoryCounts[cat.id]
+            const count = effectiveCategoryCounts?.[cat.id]
             const showCount = Number.isFinite(count)
             return (
               <button

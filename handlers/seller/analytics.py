@@ -27,7 +27,7 @@ def setup_dependencies(database: DatabaseProtocol, bot_instance: Any) -> None:
     bot = bot_instance
 
 
-@router.message(F.text.in_(["📊 Аналитика", "📊 Analitika"]))
+@router.message(F.text.in_(["Аналитика", "Analitika", "📊 Аналитика", "📊 Analitika"]))
 async def show_analytics(message: types.Message) -> None:
     """Show analytics menu for seller."""
     if not db:
@@ -52,7 +52,8 @@ async def show_analytics(message: types.Message) -> None:
         # Dict-compatible access
         store_id = store.get("store_id") if isinstance(store, dict) else store[0]
         store_name = store.get("name") if isinstance(store, dict) else store[2]
-        keyboard.button(text=f"📊 {store_name}", callback_data=f"analytics_{store_id}")
+        label = "Аналитика" if lang == "ru" else "Analitika"
+        keyboard.button(text=f"{label}: {store_name}", callback_data=f"analytics_{store_id}")
     keyboard.adjust(1)
 
     await message.answer(
@@ -82,29 +83,29 @@ async def show_store_analytics(callback: types.CallbackQuery) -> None:
     # Dict-compatible access
     store_name = store.get("name") if isinstance(store, dict) else store[2]
 
-    text = f"📊 <b>Аналитика магазина {store_name}</b>\n\n"
+    text = f"<b>Аналитика магазина {store_name}</b>\n\n"
 
-    text += "📈 <b>ОБЩАЯ СТАТИСТИКА</b>\n"
-    text += f"📦 Всего бронирований: {analytics['total_bookings']}\n"
-    text += f"✅ Выдано: {analytics['completed']}\n"
-    text += f"❌ Отменено: {analytics['cancelled']}\n"
-    text += f"💰 Конверсия: {analytics['conversion_rate']:.1f}%\n\n"
+    text += "<b>Общая статистика</b>\n"
+    text += f"Всего бронирований: {analytics['total_bookings']}\n"
+    text += f"Выдано: {analytics['completed']}\n"
+    text += f"Отменено: {analytics['cancelled']}\n"
+    text += f"Конверсия: {analytics['conversion_rate']:.1f}%\n\n"
 
     if analytics.get("days_of_week"):
-        text += "📅 <b>ПО ДНЯМ НЕДЕЛИ</b>\n"
+        text += "<b>По дням недели</b>\n"
         days_ru = ["Вс", "Пн", "Вт", "Ср", "Чт", "Пт", "Сб"]
         for day, count in analytics["days_of_week"].items():
             text += f"{days_ru[day]}: {count} бронирований\n"
         text += "\n"
 
     if analytics.get("popular_categories"):
-        text += "🏷 <b>ПОПУЛЯРНЫЕ КАТЕГОРИИ</b>\n"
+        text += "<b>Популярные категории</b>\n"
         for cat, count in analytics["popular_categories"][:5]:
             text += f"{cat}: {count} бронирований\n"
         text += "\n"
 
     if analytics.get("avg_rating"):
-        text += "⭐ <b>СРЕДНИЙ РЕЙТИНГ</b>\n"
+        text += "<b>Средний рейтинг</b>\n"
         text += f"{analytics['avg_rating']:.1f}/5 ({analytics['rating_count']} отзывов)\n"
 
     await callback.message.answer(text, parse_mode="HTML")
@@ -118,8 +119,6 @@ async def show_store_analytics(callback: types.CallbackQuery) -> None:
             get_text("uz", "today_stats"),
             "Сегодня",
             "Bugun",
-            "📊 Сегодня",
-            "📊 Bugun",
         }
     )
 )

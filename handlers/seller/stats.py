@@ -50,8 +50,8 @@ def _render_partner_stats_card(stats) -> str:
         {
             get_text("ru", "today_stats"),
             get_text("uz", "today_stats"),
-            "📊 Сегодня",
-            "📊 Bugun",
+            "Сегодня",
+            "Bugun",
         }
     )
 )

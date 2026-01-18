@@ -94,7 +94,7 @@ def _strip_leading_marker(text: str) -> str:
 def location_request_keyboard(lang: str) -> types.ReplyKeyboardMarkup:
     """Keyboard for requesting store geolocation."""
     location_text = (
-        "📍 Отправить геолокацию" if lang == "ru" else "📍 Joylashuvni yuborish"
+        "Отправить геолокацию" if lang == "ru" else "Joylashuvni yuborish"
     )
     cancel_text = get_text(lang, "cancel")
     return types.ReplyKeyboardMarkup(
@@ -449,11 +449,11 @@ async def register_store_description(message: types.Message, state: FSMContext) 
 
     # Ask for store photo (required)
     photo_prompt = (
-        "📸 <b>Шаг 7/7: фото</b>\n"
+        "<b>Шаг 7/7: фото</b>\n"
         "Отправьте фото магазина или витрины.\n"
         "Фото обязательно."
         if lang == "ru"
-        else "📸 <b>7/7-qadam: foto</b>\n"
+        else "<b>7/7-qadam: foto</b>\n"
         "Do'kon yoki vitrina fotosuratini yuboring.\n"
         "Foto majburiy."
     )

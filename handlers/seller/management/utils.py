@@ -209,63 +209,58 @@ async def send_offer_card(message: types.Message, offer: Any, lang: str) -> None
     discount_percent = int((1 - discount_price / original_price) * 100) if original_price > 0 else 0
 
     # Build card
-    status_emoji = "✅" if status == "active" else "❌"
-    text = f"{status_emoji} <b>{title}</b>\n\n"
+    status_label = "Активен" if status == "active" else "Неактивен"
+    if lang != "ru":
+        status_label = "Faol" if status == "active" else "Nofaol"
 
-    # Price box
-    text += "┌─────────────────┐\n"
-    text += f"│ <s>{original_price:,}</s> ➜ <b>{discount_price:,}</b> сум │\n"
-    text += f"│ 💥 Скидка <b>-{discount_percent}%</b>  │\n"
-    text += "└─────────────────┘\n\n"
+    text = f"<b>{title}</b>\n"
+    text += f"{'Статус' if lang == 'ru' else 'Holat'}: {status_label}\n\n"
+    text += f"{'Цена' if lang == 'ru' else 'Narx'}: <s>{original_price:,}</s> -> <b>{discount_price:,}</b> сум\n"
+    text += f"{'Скидка' if lang == 'ru' else 'Chegirma'}: -{discount_percent}%\n"
+    text += f"{'Остаток' if lang == 'ru' else 'Miqdor'}: <b>{quantity}</b> {unit}\n"
 
-    # Stock
-    stock_emoji = "🟢" if quantity > 10 else "🟡" if quantity > 0 else "🔴"
-    text += f"{stock_emoji} Остаток: <b>{quantity}</b> {unit}\n"
-
-    # Time
     if available_from and available_until:
-        text += f"🕐 {available_from} - {available_until}\n"
+        text += f"{'Время' if lang == 'ru' else 'Vaqt'}: {available_from} - {available_until}\n"
 
-    # Expiry
     if expiry_date:
         expiry_info = database.get_time_remaining(expiry_date)
         if expiry_info:
-            text += f"⏰ {expiry_info}\n"
+            text += f"{'Срок' if lang == 'ru' else 'Muddat'}: {expiry_info}\n"
 
     # Management buttons
     builder = InlineKeyboardBuilder()
 
     if status == "active":
-        builder.button(text="➕ +1", callback_data=f"qty_add_{offer_id}")
-        builder.button(text="➖ -1", callback_data=f"qty_sub_{offer_id}")
+        builder.button(text="+1", callback_data=f"qty_add_{offer_id}")
+        builder.button(text="-1", callback_data=f"qty_sub_{offer_id}")
         builder.button(
-            text="📝 Изменить" if lang == "ru" else "📝 Tahrirlash",
+            text="Изменить" if lang == "ru" else "Tahrirlash",
             callback_data=f"edit_offer_{offer_id}",
         )
         builder.button(
-            text="🔄 Продлить" if lang == "ru" else "🔄 Uzaytirish",
+            text="Продлить" if lang == "ru" else "Uzaytirish",
             callback_data=f"extend_offer_{offer_id}",
         )
         builder.button(
-            text="❌ Снять" if lang == "ru" else "❌ O'chirish",
+            text="Снять" if lang == "ru" else "O'chirish",
             callback_data=f"deactivate_offer_{offer_id}",
         )
         builder.button(
-            text="🔙 Назад" if lang == "ru" else "🔙 Orqaga",
+            text="Назад" if lang == "ru" else "Orqaga",
             callback_data="back_to_offers_menu",
         )
         builder.adjust(2, 2, 1, 1)
     else:
         builder.button(
-            text="✅ Активировать" if lang == "ru" else "✅ Faollashtirish",
+            text="Активировать" if lang == "ru" else "Faollashtirish",
             callback_data=f"activate_offer_{offer_id}",
         )
         builder.button(
-            text="🗑 Удалить" if lang == "ru" else "🗑 O'chirish",
+            text="Удалить" if lang == "ru" else "O'chirish",
             callback_data=f"delete_offer_{offer_id}",
         )
         builder.button(
-            text="🔙 Назад" if lang == "ru" else "🔙 Orqaga",
+            text="Назад" if lang == "ru" else "Orqaga",
             callback_data="back_to_offers_menu",
         )
         builder.adjust(2, 1)
@@ -357,7 +352,7 @@ async def send_order_card(
                 )
                 items_text = "\n".join(
                     [
-                        f"• {item.get('title', 'Товар')} × {item.get('quantity', 1)}"
+                        f"- {item.get('title', 'Товар')} x {item.get('quantity', 1)}"
                         for item in cart_items
                     ]
                 )
@@ -387,51 +382,54 @@ async def send_order_card(
                 pass
             items_text = f"{offer_title}"
             if unit_price is not None:
-                items_text += f"\n💰 Цена за ед.: <b>{int(unit_price):,}</b>"
-            items_text += f"\n🔢 {'Количество' if lang == 'ru' else 'Miqdor'}: <b>{quantity}</b>"
+                items_text += (
+                    f"\n{'Цена за ед.' if lang == 'ru' else 'Bir dona narxi'}: <b>{int(unit_price):,}</b>"
+                )
+            items_text += f"\n{'Количество' if lang == 'ru' else 'Miqdor'}: <b>{quantity}</b>"
 
-        status_emoji = {
-            "pending": "⏳",
-            "confirmed": "✅",
-            "completed": "🎉",
-            "cancelled": "❌",
-        }.get(status, "📦")
+        status_label = {
+            "pending": "Ожидает подтверждения" if lang == "ru" else "Tasdiqlash kutilmoqda",
+            "confirmed": "Подтвержден" if lang == "ru" else "Tasdiqlandi",
+            "completed": "Выдан" if lang == "ru" else "Berildi",
+            "cancelled": "Отменен" if lang == "ru" else "Bekor qilingan",
+        }.get(status, status)
 
-        text = f"{status_emoji} <b>{'САМОВЫВОЗ' if lang == 'ru' else 'OLIB KETISH'}</b>\n\n"
-        text += f"🏬 <b>{store_name}</b>\n"
+        text = f"<b>{'Самовывоз' if lang == 'ru' else 'Olib ketish'}</b>\n\n"
+        text += f"<b>{store_name}</b>\n"
         if store_address:
-            text += f"📍 {store_address}\n"
-        text += f"🛒 <b>{'Товары:' if lang == 'ru' else 'Mahsulotlar:'}</b>\n{items_text}\n"
+            text += f"{store_address}\n"
+        text += f"<b>{'Товары' if lang == 'ru' else 'Mahsulotlar'}:</b>\n{items_text}\n"
         if total_price is not None:
-            text += f"🧾 Итого: <b>{total_price:,}</b>\n"
+            text += f"{'Итого' if lang == 'ru' else 'Jami'}: <b>{total_price:,}</b>\n"
         text += "\n"
-        text += f"👤 {user_name}\n"
-        text += f"📱 <code>{phone}</code>\n"
-        text += f"🎫 {'Код' if lang == 'ru' else 'Kod'}: <code>{booking_code}</code>\n"
+        text += f"{'Клиент' if lang == 'ru' else 'Mijoz'}: {user_name}\n"
+        text += f"{'Телефон' if lang == 'ru' else 'Telefon'}: <code>{phone}</code>\n"
+        text += f"{'Код' if lang == 'ru' else 'Kod'}: <code>{booking_code}</code>\n"
         if created_at:
-            text += f"🕐 {created_at}\n"
+            text += f"{'Дата' if lang == 'ru' else 'Sana'}: {created_at}\n"
+        text += f"{'Статус' if lang == 'ru' else 'Holat'}: {status_label}\n"
 
         builder = InlineKeyboardBuilder()
-        builder.button(text="👁️ Подробнее", callback_data=f"seller_view_o_{booking_id}")
-        builder.button(text="📞 Контакт", callback_data=f"contact_customer_o_{booking_id}")
+        builder.button(text="Подробнее" if lang == "ru" else "Batafsil", callback_data=f"seller_view_o_{booking_id}")
+        builder.button(text="Контакт" if lang == "ru" else "Aloqa", callback_data=f"contact_customer_o_{booking_id}")
         if status == "pending":
             # Use order_ prefix since pickup orders live in orders.
             builder.button(
-                text="✅ Подтвердить" if lang == "ru" else "✅ Tasdiqlash",
+                text="Подтвердить" if lang == "ru" else "Tasdiqlash",
                 callback_data=f"order_confirm_{booking_id}",
             )
             builder.button(
-                text="❌ Отменить" if lang == "ru" else "❌ Bekor qilish",
+                text="Отменить" if lang == "ru" else "Bekor qilish",
                 callback_data=f"order_reject_{booking_id}",
             )
             builder.adjust(2, 2)
         elif status == "confirmed":
             builder.button(
-                text="🎉 Выдано" if lang == "ru" else "🎉 Berildi",
+                text="Выдано" if lang == "ru" else "Berildi",
                 callback_data=f"order_complete_{booking_id}",
             )
             builder.button(
-                text="❌ Отменить" if lang == "ru" else "❌ Bekor qilish",
+                text="Отменить" if lang == "ru" else "Bekor qilish",
                 callback_data=f"order_cancel_seller_{booking_id}",
             )
             builder.adjust(2, 2)
@@ -485,7 +483,7 @@ async def send_order_card(
                     else cart_items_json
                 )
                 items_text = "\n".join(
-                    [f"• {item['title']} × {item['quantity']}" for item in cart_items]
+                    [f"- {item['title']} x {item['quantity']}" for item in cart_items]
                 )
                 total_price = sum(
                     item.get("price", 0) * item.get("quantity", 1) for item in cart_items
@@ -503,32 +501,32 @@ async def send_order_card(
             offer = database.get_offer(offer_id) if offer_id else None
             offer_title = get_offer_field(offer, "title", "Товар") if offer else "Товар"
             offer_price = int(get_offer_field(offer, "discount_price", 0)) if offer else 0
-            items_text = f"• {offer_title} × {quantity}"
+            items_text = f"- {offer_title} x {quantity}"
             total_price = offer_price * int(quantity)
 
-        status_emoji = {
-            "pending": "⏳",
-            "confirmed": "✅",
-            "preparing": "👨‍🍳",
-            "delivering": "🚚",
-            "completed": "🎉",
-            "cancelled": "❌",
-        }.get(status, "📦")
-
-        payment_emoji = "✅" if payment_status == "confirmed" else "⏳"
         payment_text = "Оплачено" if payment_status == "confirmed" else "Ожидает подтверждения"
         if lang != "ru":
             payment_text = "To'langan" if payment_status == "confirmed" else "Tasdiqlash kutilmoqda"
 
-        text = f"{status_emoji} <b>{'ДОСТАВКА' if lang == 'ru' else 'YETKAZIB BERISH'}</b>\n\n"
-        text += f"📦 {'Заказ' if lang == 'ru' else 'Buyurtma'} #{order_id}\n"
-        text += f"🛒 <b>{'Товары:' if lang == 'ru' else 'Mahsulotlar:'}</b>\n{items_text}\n"
+        status_label = {
+            "pending": "Новый" if lang == "ru" else "Yangi",
+            "confirmed": "Подтвержден" if lang == "ru" else "Tasdiqlandi",
+            "preparing": "Готовится" if lang == "ru" else "Tayyorlanmoqda",
+            "delivering": "В пути" if lang == "ru" else "Yo'lda",
+            "completed": "Завершен" if lang == "ru" else "Yakunlandi",
+            "cancelled": "Отменен" if lang == "ru" else "Bekor qilingan",
+        }.get(status, status)
+
+        text = f"<b>{'Доставка' if lang == 'ru' else 'Yetkazib berish'}</b>\n\n"
+        text += f"{'Заказ' if lang == 'ru' else 'Buyurtma'} #{order_id}\n"
+        text += f"<b>{'Товары' if lang == 'ru' else 'Mahsulotlar'}:</b>\n{items_text}\n"
         if total_price > 0:
-            text += f"💰 {'Сумма' if lang == 'ru' else 'Summa'}: {total_price:,} {'сум' if lang == 'ru' else 'so`m'}\n"
-        text += f"\n👤 {user_name}\n"
-        text += f"📱 <code>{user_phone}</code>\n"
-        text += f"📍 {address}\n\n"
-        text += f"💳 {payment_emoji} {payment_text}\n"
+            text += f"{'Сумма' if lang == 'ru' else 'Summa'}: {total_price:,} {'сум' if lang == 'ru' else 'so`m'}\n"
+        text += f"\n{'Клиент' if lang == 'ru' else 'Mijoz'}: {user_name}\n"
+        text += f"{'Телефон' if lang == 'ru' else 'Telefon'}: <code>{user_phone}</code>\n"
+        text += f"{'Адрес' if lang == 'ru' else 'Manzil'}: {address}\n"
+        text += f"{'Статус' if lang == 'ru' else 'Holat'}: {status_label}\n"
+        text += f"{'Оплата' if lang == 'ru' else 'To`lov'}: {payment_text}\n"
 
         builder = InlineKeyboardBuilder()
 
@@ -536,25 +534,25 @@ async def send_order_card(
         if status == "pending" and payment_status == "pending":
             # Waiting for payment confirmation
             builder.button(
-                text="✅ Подтвердить оплату" if lang == "ru" else "✅ To'lovni tasdiqlash",
+                text="Подтвердить оплату" if lang == "ru" else "To'lovni tasdiqlash",
                 callback_data=f"confirm_payment_{order_id}",
             )
             builder.button(
-                text="❌ Отклонить" if lang == "ru" else "❌ Rad etish",
+                text="Отклонить" if lang == "ru" else "Rad etish",
                 callback_data=f"reject_payment_{order_id}",
             )
             builder.adjust(2)
         elif status == "preparing":
             # Payment confirmed, preparing order
             builder.button(
-                text="🚕 Передать курьеру" if lang == "ru" else "🚕 Kuryerga topshirish",
+                text="Передать курьеру" if lang == "ru" else "Kuryerga topshirish",
                 callback_data=f"handover_courier_{order_id}",
             )
             builder.adjust(1)
         elif status == "delivering":
             # Order is being delivered - no actions needed
             builder.button(
-                text="📍 В пути" if lang == "ru" else "📍 Yo'lda",
+                text="В пути" if lang == "ru" else "Yo'lda",
                 callback_data="noop",
             )
             builder.adjust(1)
@@ -583,62 +581,57 @@ async def update_offer_message(callback: types.CallbackQuery, offer_id: int, lan
 
     discount_percent = int((1 - discount_price / original_price) * 100) if original_price > 0 else 0
 
-    status_emoji = "✅" if status == "active" else "❌"
-    text = f"{status_emoji} <b>{title}</b>\n\n"
+    status_label = "Активен" if status == "active" else "Неактивен"
+    if lang != "ru":
+        status_label = "Faol" if status == "active" else "Nofaol"
 
-    # Price box
-    text += "┌─────────────────┐\n"
-    text += f"│ <s>{original_price:,}</s> ➜ <b>{discount_price:,}</b> сум │\n"
-    text += f"│ 💥 Скидка <b>-{discount_percent}%</b>  │\n"
-    text += "└─────────────────┘\n\n"
+    text = f"<b>{title}</b>\n"
+    text += f"{'Статус' if lang == 'ru' else 'Holat'}: {status_label}\n\n"
+    text += f"{'Цена' if lang == 'ru' else 'Narx'}: <s>{original_price:,}</s> -> <b>{discount_price:,}</b> сум\n"
+    text += f"{'Скидка' if lang == 'ru' else 'Chegirma'}: -{discount_percent}%\n"
+    text += f"{'Остаток' if lang == 'ru' else 'Miqdor'}: <b>{quantity}</b> {unit}\n"
 
-    # Stock
-    stock_emoji = "🟢" if quantity > 10 else "🟡" if quantity > 0 else "🔴"
-    text += f"{stock_emoji} Остаток: <b>{quantity}</b> {unit}\n"
-
-    # Time
     if available_from and available_until:
-        text += f"🕐 {available_from} - {available_until}\n"
+        text += f"{'Время' if lang == 'ru' else 'Vaqt'}: {available_from} - {available_until}\n"
 
-    # Expiry
     if expiry_date:
         expiry_info = database.get_time_remaining(expiry_date)
         if expiry_info:
-            text += f"⏰ {expiry_info}\n"
+            text += f"{'Срок' if lang == 'ru' else 'Muddat'}: {expiry_info}\n"
 
     builder = InlineKeyboardBuilder()
 
     if status == "active":
-        builder.button(text="➕ +1", callback_data=f"qty_add_{offer_id}")
-        builder.button(text="➖ -1", callback_data=f"qty_sub_{offer_id}")
+        builder.button(text="+1", callback_data=f"qty_add_{offer_id}")
+        builder.button(text="-1", callback_data=f"qty_sub_{offer_id}")
         builder.button(
-            text="📝 Изменить" if lang == "ru" else "📝 Tahrirlash",
+            text="Изменить" if lang == "ru" else "Tahrirlash",
             callback_data=f"edit_offer_{offer_id}",
         )
         builder.button(
-            text="🔄 Продлить" if lang == "ru" else "🔄 Uzaytirish",
+            text="Продлить" if lang == "ru" else "Uzaytirish",
             callback_data=f"extend_offer_{offer_id}",
         )
         builder.button(
-            text="❌ Снять" if lang == "ru" else "❌ O'chirish",
+            text="Снять" if lang == "ru" else "O'chirish",
             callback_data=f"deactivate_offer_{offer_id}",
         )
         builder.button(
-            text="🔙 Назад" if lang == "ru" else "🔙 Orqaga",
+            text="Назад" if lang == "ru" else "Orqaga",
             callback_data="back_to_offers_menu",
         )
         builder.adjust(2, 2, 1, 1)
     else:
         builder.button(
-            text="✅ Активировать" if lang == "ru" else "✅ Faollashtirish",
+            text="Активировать" if lang == "ru" else "Faollashtirish",
             callback_data=f"activate_offer_{offer_id}",
         )
         builder.button(
-            text="🗑 Удалить" if lang == "ru" else "🗑 O'chirish",
+            text="Удалить" if lang == "ru" else "O'chirish",
             callback_data=f"delete_offer_{offer_id}",
         )
         builder.button(
-            text="🔙 Назад" if lang == "ru" else "🔙 Orqaga",
+            text="Назад" if lang == "ru" else "Orqaga",
             callback_data="back_to_offers_menu",
         )
         builder.adjust(2, 1)

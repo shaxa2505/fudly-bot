@@ -6,12 +6,16 @@ import { renderWithProviders } from '../test/renderWithProviders'
 const apiMocks = vi.hoisted(() => ({
   getPhotoUrl: vi.fn(),
   addRecentlyViewed: vi.fn(),
+  getOffer: vi.fn(),
+  getStore: vi.fn(),
 }))
 
 vi.mock('../api/client', () => ({
   default: {
     getPhotoUrl: apiMocks.getPhotoUrl,
     addRecentlyViewed: apiMocks.addRecentlyViewed,
+    getOffer: apiMocks.getOffer,
+    getStore: apiMocks.getStore,
   },
 }))
 
@@ -20,17 +24,21 @@ describe('ProductDetailPage', () => {
     localStorage.clear()
     apiMocks.getPhotoUrl.mockReset()
     apiMocks.addRecentlyViewed.mockReset()
+    apiMocks.getOffer.mockReset()
+    apiMocks.getStore.mockReset()
   })
 
-  it('shows error state when no offer is provided', () => {
+  it('shows error state when no offer is provided', async () => {
     renderWithProviders(<ProductDetailPage />, { route: '/product' })
 
-    expect(screen.getByText('Mahsulot topilmadi')).toBeInTheDocument()
+    expect(await screen.findByText('Mahsulot topilmadi')).toBeInTheDocument()
   })
 
   it('renders offer details and tracks recently viewed', async () => {
     apiMocks.getPhotoUrl.mockReturnValue('https://example.com/photo.jpg')
     apiMocks.addRecentlyViewed.mockResolvedValue({})
+    apiMocks.getOffer.mockResolvedValue({})
+    apiMocks.getStore.mockResolvedValue(null)
 
     const offer = {
       id: 7,
