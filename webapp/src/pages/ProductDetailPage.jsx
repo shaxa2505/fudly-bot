@@ -97,6 +97,7 @@ function ProductDetailPage() {
   const imageUrl = resolveOfferImageUrl(offer) || ''
   const hasImage = Boolean(imageUrl) && !imgError
   const unitLabel = offer?.unit ? getUnitLabel(offer.unit) : ''
+  const displayUnitLabel = unitLabel || 'dona'
   const originalPrice = Number(offer?.original_price ?? 0)
   const discountPrice = Number(offer?.discount_price ?? offer?.price ?? 0)
   const unitPrice = discountPrice || originalPrice || 0
@@ -118,6 +119,10 @@ function ProductDetailPage() {
   const lowStock = hasStock && stockValue <= 3
   const midStock = hasStock && stockValue > 3 && stockValue <= 10
   const stockMeterValue = !hasStock ? 0 : lowStock ? 24 : midStock ? 56 : 92
+  const heroStockLabel = hasStock
+    ? (lowStock ? 'Kam qoldi' : `Qoldi: ${stockValue} ${displayUnitLabel}`)
+    : null
+  const showDiscountBadge = discountPercent > 0 && !hasDiscount
   const formatPrice = (value) => Math.round(value || 0).toLocaleString('ru-RU')
 
   const handleQuantityChange = (delta) => {
@@ -275,19 +280,11 @@ function ProductDetailPage() {
               </svg>
             </div>
           )}
-          <div className="pdp-hero-badges">
-            {hasDiscount && discountPercent > 0 && (
-              <span className="pdp-badge pdp-badge-discount">-{discountPercent}%</span>
-            )}
-            {expiryInfo && (
-              <span className={`pdp-badge pdp-badge-expiry ${expiryInfo.urgent ? 'is-urgent' : ''}`}>
-                {expiryInfo.text}
-              </span>
-            )}
-            {lowStock && (
-              <span className="pdp-badge pdp-badge-stock">Kam qoldi</span>
-            )}
-          </div>
+          {heroStockLabel && (
+            <div className="pdp-hero-badges">
+              <span className="pdp-badge pdp-badge-stock">{heroStockLabel}</span>
+            </div>
+          )}
         </div>
       </section>
 
@@ -307,18 +304,20 @@ function ProductDetailPage() {
           </div>
           <h1 className="pdp-title">{offer.title}</h1>
           {storeName && (
-            <p className="pdp-store">
-              <span className="pdp-store-label">Do'kon:</span>
-              <span className="pdp-store-name">{storeName}</span>
-              {storeAddress && <span className="pdp-store-addr">{storeAddress}</span>}
-            </p>
+            <div className="pdp-store">
+              <div className="pdp-store-line">
+                <span className="pdp-store-label">DO'KON:</span>
+                <span className="pdp-store-name">{storeName}</span>
+              </div>
+              {storeAddress && <div className="pdp-store-address">{storeAddress}</div>}
+            </div>
           )}
         </div>
 
         <div className="pdp-price-card">
           <div className="pdp-price-main">
             <span className="pdp-current-price">{formatPrice(unitPrice)} so'm</span>
-            {hasDiscount && discountPercent > 0 && (
+            {showDiscountBadge && (
               <span className="pdp-price-badge">-{discountPercent}%</span>
             )}
           </div>
@@ -333,7 +332,7 @@ function ProductDetailPage() {
           <div className="pdp-stock-row">
             {hasStock ? (
               <span className={`pdp-stock ${lowStock ? 'is-low' : ''}`}>
-                Qoldi: {stockValue} {unitLabel}
+                Qoldi: {stockValue} {displayUnitLabel}
               </span>
             ) : (
               <span className="pdp-stock pdp-stock-empty">Tugagan</span>
@@ -417,7 +416,10 @@ function ProductDetailPage() {
               {!hasStock ? "Tugagan" : (addedToCart ? "Qo'shildi!" : "Savatga qo'shish")}
             </span>
             {hasStock && (
-              <span className="pdp-add-total">{formatPrice(totalPrice)} so'm</span>
+              <span className="pdp-add-total">
+                <span className="pdp-add-amount">{formatPrice(totalPrice)}</span>
+                <span className="pdp-add-currency">so'm</span>
+              </span>
             )}
           </button>
         </div>

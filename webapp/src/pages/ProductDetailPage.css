@@ -168,25 +168,25 @@
   position: absolute;
   top: 12px;
   left: 12px;
-  right: 12px;
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: 6px;
 }
 
 .pdp-badge {
-  padding: 6px 10px;
+  padding: 4px 8px;
   border-radius: 999px;
-  font-size: 11px;
+  font-size: 10px;
   font-weight: 700;
-  background: rgba(255, 255, 255, 0.9);
+  background: rgba(255, 255, 255, 0.92);
   color: var(--color-text-secondary);
-  box-shadow: var(--shadow-xs);
+  box-shadow: 0 2px 8px rgba(16, 24, 40, 0.08);
 }
 
 .pdp-badge-discount {
-  background: var(--color-accent);
-  color: var(--color-text-inverse);
+  background: var(--color-bg-secondary);
+  color: var(--color-text-secondary);
+  border: 1px solid var(--color-border-light);
 }
 
 .pdp-badge-expiry {
@@ -241,20 +241,23 @@
 }
 
 .pdp-title {
-  font-size: 26px;
-  font-weight: var(--font-extrabold);
+  font-size: 24px;
+  font-weight: 700;
   line-height: var(--line-height-tight);
   margin: 0;
   letter-spacing: -0.02em;
+  text-transform: none;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
 }
 
 .pdp-store {
   display: flex;
-  flex-wrap: wrap;
-  gap: 4px 6px;
+  flex-direction: column;
+  gap: 4px;
   margin: 0;
-  font-size: 12px;
-  color: var(--color-text-tertiary);
 }
 
 .pdp-store-label {
@@ -264,26 +267,33 @@
   color: var(--color-text-muted);
 }
 
+.pdp-store-line {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  font-size: 12px;
+}
+
 .pdp-store-name {
   color: var(--color-text-secondary);
-  font-weight: 600;
+  font-weight: 700;
 }
 
-.pdp-store-addr {
+.pdp-store-address {
+  font-size: 12px;
   color: var(--color-text-tertiary);
-}
-
-.pdp-store-addr::before {
-  content: '\00B7';
-  margin: 0 6px 0 2px;
-  color: var(--color-text-muted);
+  line-height: 1.35;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
 }
 
 .pdp-price-card {
   background: var(--color-bg-card);
   border: 1px solid var(--color-border-light);
-  border-radius: 22px;
-  padding: var(--spacing-lg);
+  border-radius: 18px;
+  padding: 16px;
   box-shadow: var(--shadow-sm);
   display: flex;
   flex-direction: column;
@@ -293,7 +303,8 @@
 .pdp-price-main {
   display: flex;
   align-items: baseline;
-  gap: 10px;
+  justify-content: space-between;
+  gap: var(--spacing-sm);
 }
 
 .pdp-current-price {
@@ -301,30 +312,27 @@
   font-weight: var(--font-extrabold);
   letter-spacing: -0.02em;
   color: var(--color-text-primary);
+  white-space: nowrap;
 }
 
 .pdp-price-badge {
-  padding: 4px 8px;
+  padding: 3px 6px;
   border-radius: 999px;
-  font-size: 11px;
+  font-size: 10px;
   font-weight: 700;
-  background: var(--color-accent);
-  color: var(--color-text-inverse);
+  background: var(--color-bg-secondary);
+  color: var(--color-text-secondary);
+  border: 1px solid var(--color-border-light);
 }
 
 .pdp-price-sub {
   display: flex;
-  align-items: center;
+  align-items: baseline;
+  justify-content: space-between;
   flex-wrap: wrap;
-  gap: 6px;
+  gap: 6px 12px;
   font-size: 12px;
   color: var(--color-text-tertiary);
-}
-
-.pdp-price-sub span + span::before {
-  content: '\00B7';
-  margin: 0 6px 0 2px;
-  color: var(--color-text-muted);
 }
 
 .pdp-old-price {
@@ -336,12 +344,13 @@
 
 .pdp-savings {
   color: var(--color-success);
-  font-weight: 600;
+  font-weight: 700;
+  font-size: 13px;
 }
 
 .pdp-stock-row {
   display: flex;
-  align-items: center;
+  align-items: baseline;
   justify-content: space-between;
   flex-wrap: wrap;
   gap: 6px 12px;
@@ -355,7 +364,7 @@
 }
 
 .pdp-stock.is-low {
-  color: var(--color-accent-dark);
+  color: #B45309;
 }
 
 .pdp-stock-empty {
@@ -395,7 +404,7 @@
   background: var(--color-bg-card);
   border: 1px solid var(--color-border-light);
   border-radius: 18px;
-  padding: var(--spacing-md);
+  padding: 14px 16px;
   box-shadow: var(--shadow-xs);
   display: flex;
   flex-direction: column;
@@ -411,10 +420,10 @@
 
 .pdp-card-title {
   margin: 0;
-  font-size: 11px;
+  font-size: 10px;
   font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.1em;
   color: var(--color-text-tertiary);
 }
 
@@ -436,6 +445,11 @@
 .pdp-store-location {
   font-size: 13px;
   color: var(--color-text-tertiary);
+  line-height: 1.35;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
 }
 
 .pdp-store-meta {
@@ -488,11 +502,11 @@
   right: 0;
   bottom: 0;
   padding: var(--spacing-md) 0 max(var(--spacing-lg), var(--safe-area-bottom));
-  background: rgba(255, 255, 255, 0.96);
-  border-top: 1px solid var(--color-border-light);
-  box-shadow: 0 -8px 18px rgba(16, 24, 40, 0.06);
+  background: rgba(255, 255, 255, 0.88);
+  border-top: 1px solid rgba(228, 222, 214, 0.7);
+  box-shadow: 0 -10px 22px rgba(16, 24, 40, 0.05);
   z-index: var(--z-fixed);
-  backdrop-filter: blur(12px);
+  backdrop-filter: blur(16px);
 }
 
 .pdp-bottom-inner {
@@ -521,6 +535,12 @@
   font-size: 18px;
   font-weight: 600;
   color: var(--color-text-secondary);
+  width: var(--qc-btn-size);
+  height: var(--qc-btn-size);
+  border-radius: 50%;
+  background: var(--color-bg-card);
+  border: 1px solid var(--color-border-light);
+  box-shadow: 0 2px 8px rgba(16, 24, 40, 0.06);
 }
 
 .pdp-bottom-qty .quantity-control__btn:active:not(:disabled) {
@@ -574,9 +594,20 @@
 }
 
 .pdp-add-total {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 4px;
   font-size: 12px;
   font-weight: 700;
   opacity: 0.9;
+  white-space: nowrap;
+  line-height: 1;
+}
+
+.pdp-add-currency {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
 }
 
 @media (max-width: 360px) {
