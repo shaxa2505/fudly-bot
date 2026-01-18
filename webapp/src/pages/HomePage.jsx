@@ -532,14 +532,16 @@ function HomePage() {
       }
 
       setHasMore(hasMoreResult)
-      // If we had coordinates but got empty list, assume we fell back to broader scope
-      if (
-        (location.coordinates?.lat != null && location.coordinates?.lon != null) &&
-        items.length === 0
-      ) {
-        setHasNearbyFallback(true)
-      } else {
-        setHasNearbyFallback(false)
+      if (reset) {
+        // If we had coordinates but got empty list, assume we fell back to broader scope
+        if (
+          (location.coordinates?.lat != null && location.coordinates?.lon != null) &&
+          items.length === 0
+        ) {
+          setHasNearbyFallback(true)
+        } else {
+          setHasNearbyFallback(false)
+        }
       }
     } catch (error) {
       console.error('Error loading offers:', error)
@@ -1197,7 +1199,7 @@ function HomePage() {
 
       {hasNearbyFallback && (
         <div className="location-warning">
-          Yaqin atrofda takliflar topilmadi. Siz kengaytirilган hududdagi mahsulotlarni ko‘ryapsiz.
+          Yaqin atrofda takliflar topilmadi. Siz kengaytirilgan hududdagi mahsulotlarni ko'ryapsiz.
           <button
             className="location-warning-btn"
             onClick={() => setShowAddressModal(true)}

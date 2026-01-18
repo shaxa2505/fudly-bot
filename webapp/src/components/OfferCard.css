@@ -22,6 +22,9 @@
   cursor: pointer;
   -webkit-tap-highlight-color: transparent;
   transition: transform 0.18s ease, box-shadow 0.18s ease;
+  background-clip: padding-box;
+  -webkit-mask-image: -webkit-radial-gradient(white, black);
+  transform: translateZ(0);
 }
 
 @media (prefers-color-scheme: dark) {
@@ -36,7 +39,7 @@
 }
 
 .offer-card:active {
-  transform: scale(0.99);
+  transform: translateZ(0) scale(0.99);
 }
 
 .offer-card:focus-visible {
