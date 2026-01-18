@@ -212,7 +212,9 @@ class SearchMixin:
             with self.get_connection() as conn:
                 cursor = conn.cursor(row_factory=dict_row)
                 cursor.execute(base_sql, tuple(select_params))
-                return [dict(row) for row in cursor.fetchall()]
+                results = [dict(row) for row in cursor.fetchall()]
+                if results:
+                    return results
 
         base_sql = """
             SELECT
@@ -351,7 +353,8 @@ class SearchMixin:
                         suggestions.append(title)
                         if len(suggestions) >= limit:
                             break
-            return suggestions
+            if suggestions:
+                return suggestions
 
         pattern = f"%{cleaned}%"
         where_parts = [
@@ -433,7 +436,8 @@ class SearchMixin:
                         suggestions.append(name)
                         if len(suggestions) >= limit:
                             break
-            return suggestions
+            if suggestions:
+                return suggestions
 
         pattern = f"%{cleaned}%"
         where_parts = [

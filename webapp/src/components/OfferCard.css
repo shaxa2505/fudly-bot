@@ -199,8 +199,8 @@
   display: inline-flex;
   align-items: center;
   justify-content: space-between;
-  gap: 4px;
-  padding: 0 8px;
+  gap: 0;
+  padding: 0 6px;
   border-radius: 999px;
   background: rgba(10, 10, 10, 0.5);
   border: 1px solid rgba(255, 255, 255, 0.18);
@@ -213,11 +213,13 @@
   overflow: hidden;
   animation: counterPop 0.14s ease-out;
   transform-origin: bottom right;
+  box-sizing: border-box;
 }
 
 .offer-counter-btn {
   width: 36px;
   height: 36px;
+  flex: 0 0 36px;
   border-radius: 9999px;
   display: grid;
   place-items: center;
