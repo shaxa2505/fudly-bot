@@ -196,10 +196,10 @@
 }
 
 .offer-counter {
-  display: grid;
-  grid-auto-flow: column;
+  display: inline-flex;
   align-items: center;
-  gap: 6px;
+  justify-content: space-between;
+  gap: 4px;
   padding: 0 8px;
   border-radius: 999px;
   background: rgba(10, 10, 10, 0.5);
@@ -228,6 +228,8 @@
   background: rgba(255, 255, 255, 0.1);
   border: 1px solid rgba(255, 255, 255, 0.16);
   box-shadow: none;
+  padding: 0;
+  box-sizing: border-box;
 }
 
 .offer-counter-btn:active {
@@ -239,11 +241,13 @@
 }
 
 .offer-counter-value {
+  flex: 1 0 auto;
   min-width: 16px;
   text-align: center;
   font-size: 12px;
   font-weight: 600;
   color: var(--offer-text-on-image);
+  font-variant-numeric: tabular-nums;
 }
 
 .offer-title {
