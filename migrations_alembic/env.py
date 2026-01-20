@@ -33,6 +33,20 @@ target_metadata = Base.metadata
 
 
 # Get database URL from environment
+def _normalize_url(url: str) -> str:
+    """Normalize DB URL for Alembic/SQLAlchemy drivers."""
+    # Handle Railway's postgres:// vs postgresql://
+    if url.startswith("postgres://"):
+        url = url.replace("postgres://", "postgresql://", 1)
+    # SQLAlchemy defaults to psycopg2 for postgresql://; force psycopg3 if needed.
+    if url.startswith("postgresql://") and "+psycopg" not in url:
+        try:
+            import psycopg2  # noqa: F401
+        except Exception:
+            url = url.replace("postgresql://", "postgresql+psycopg://", 1)
+    return url
+
+
 def get_url():
     """Get database URL from environment variable."""
     url = os.environ.get("DATABASE_URL")
@@ -41,10 +55,7 @@ def get_url():
             "DATABASE_URL environment variable is not set. "
             "Please set it to your PostgreSQL connection string."
         )
-    # Handle Railway's postgres:// vs postgresql://
-    if url.startswith("postgres://"):
-        url = url.replace("postgres://", "postgresql://", 1)
-    return url
+    return _normalize_url(url)
 
 
 def run_migrations_offline() -> None:
