@@ -357,7 +357,7 @@ async def start_booking_expiry_worker(db: Any, bot: Any) -> None:
                                         f"Auto-cancelled stale pickup order {order_id} (pending)"
                                     )
                             except Exception as e:
-                            logger.error(f"Error processing stale pickup order row: {e}")
+                                logger.error(f"Error processing stale pickup order row: {e}")
                 except Exception as e:
                     logger.error(f"Pending pickup order query failed: {e}")
 
