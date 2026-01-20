@@ -349,6 +349,12 @@ const api = {
     if (options?.city) {
       params.city = options.city
     }
+    if (options?.region) {
+      params.region = options.region
+    }
+    if (options?.district) {
+      params.district = options.district
+    }
     return cachedGet('/search/suggestions', params, 15000) || []
   },
 

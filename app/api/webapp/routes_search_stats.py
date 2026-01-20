@@ -13,6 +13,8 @@ async def get_search_suggestions(
     query: str = Query(..., min_length=2, description="Search query"),
     limit: int = Query(5, ge=1, le=10),
     city: str | None = Query(None, description="City filter"),
+    region: str | None = Query(None, description="Region filter"),
+    district: str | None = Query(None, description="District filter"),
     db=Depends(get_db),
 ):
     """Get search suggestions for autocomplete."""
@@ -22,13 +24,39 @@ async def get_search_suggestions(
 
         suggestions: list[str] = []
         normalized_city = normalize_city(city) if city else None
+        normalized_region = normalize_city(region) if region else None
+        normalized_district = normalize_city(district) if district else None
 
         if hasattr(db, "get_search_suggestions"):
-            suggestions = db.get_search_suggestions(query, limit=limit, city=normalized_city) or []
+            suggestions = (
+                db.get_search_suggestions(
+                    query,
+                    limit=limit,
+                    city=normalized_city,
+                    region=normalized_region,
+                    district=normalized_district,
+                )
+                or []
+            )
         elif hasattr(db, "get_offer_suggestions"):
-            suggestions = db.get_offer_suggestions(query, limit=limit, city=normalized_city) or []
+            suggestions = (
+                db.get_offer_suggestions(
+                    query,
+                    limit=limit,
+                    city=normalized_city,
+                    region=normalized_region,
+                    district=normalized_district,
+                )
+                or []
+            )
         elif hasattr(db, "search_offers"):
-            offers = db.search_offers(query, limit=limit * 2, city=normalized_city)
+            offers = db.search_offers(
+                query,
+                limit=limit * 2,
+                city=normalized_city,
+                region=normalized_region,
+                district=normalized_district,
+            )
             if offers:
                 titles = list(
                     {

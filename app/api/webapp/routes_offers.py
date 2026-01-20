@@ -132,59 +132,79 @@ async def get_categories(
     normalized_region = normalize_city(region) if region else None
     normalized_district = normalize_city(district) if district else None
 
+    def _count_for_scope(
+        category_filter: list[str] | None,
+        city_scope: str | None,
+        region_scope: str | None,
+        district_scope: str | None,
+    ) -> int:
+        if hasattr(db, "count_offers_by_filters"):
+            return int(
+                db.count_offers_by_filters(
+                    city=city_scope,
+                    region=region_scope,
+                    district=district_scope,
+                    category=category_filter,
+                )
+            )
+        if category_filter:
+            if hasattr(db, "get_offers_by_city_and_category"):
+                offers = db.get_offers_by_city_and_category(
+                    city=city_scope,
+                    category=category_filter,
+                    region=region_scope,
+                    district=district_scope,
+                    limit=1000,
+                    offset=0,
+                )
+                return len(offers) if offers else 0
+            if hasattr(db, "get_offers_by_category"):
+                if isinstance(category_filter, (list, tuple)):
+                    offers = []
+                    for item in category_filter:
+                        offers.extend(db.get_offers_by_category(item, city_scope) or [])
+                    return len(offers)
+                offers = db.get_offers_by_category(category_filter, city_scope) or []
+                return len(offers)
+            return 0
+        if hasattr(db, "count_hot_offers"):
+            return (
+                db.count_hot_offers(
+                    city_scope,
+                    region=region_scope,
+                    district=district_scope,
+                )
+                or 0
+            )
+        return 0
+
+    scopes: list[tuple[str | None, str | None, str | None]] = []
+    if normalized_district:
+        scopes.append((None, normalized_region, normalized_district))
+    if normalized_region:
+        scopes.append((None, normalized_region, None))
+    if normalized_city:
+        scopes.append((normalized_city, None, None))
+        if not normalized_region:
+            scopes.append((None, normalized_city, None))
+    if not scopes:
+        scopes.append((None, None, None))
+
     for cat in CATEGORIES:
         count = 0
         category_filter = expand_category_filter(cat["id"])
-        if cat["id"] != "all":
-            try:
-                if hasattr(db, "count_offers_by_filters"):
-                    count = int(
-                        db.count_offers_by_filters(
-                            city=normalized_city,
-                            region=normalized_region,
-                            district=normalized_district,
-                            category=category_filter,
-                        )
-                    )
-                elif hasattr(db, "get_offers_by_city_and_category") and category_filter:
-                    offers = db.get_offers_by_city_and_category(
-                        city=normalized_city,
-                        category=category_filter,
-                        region=normalized_region,
-                        district=normalized_district,
-                        limit=1000,
-                        offset=0,
-                    )
-                    count = len(offers) if offers else 0
-                elif hasattr(db, "get_offers_by_category") and category_filter:
-                    if isinstance(category_filter, (list, tuple)):
-                        offers = []
-                        for item in category_filter:
-                            offers.extend(db.get_offers_by_category(item, normalized_city) or [])
-                        count = len(offers)
-                    else:
-                        offers = db.get_offers_by_category(category_filter, normalized_city) or []
-                        count = len(offers)
-            except Exception:  # pragma: no cover - defensive
-                count = 0
-        else:
-            try:
-                if hasattr(db, "count_offers_by_filters"):
-                    count = int(
-                        db.count_offers_by_filters(
-                            city=normalized_city,
-                            region=normalized_region,
-                            district=normalized_district,
-                        )
-                    )
-                elif hasattr(db, "count_hot_offers"):
-                    count = db.count_hot_offers(
-                        normalized_city,
-                        region=normalized_region,
-                        district=normalized_district,
-                    ) or 0
-            except Exception:  # pragma: no cover - defensive
-                count = 0
+        try:
+            for city_scope, region_scope, district_scope in scopes:
+                count = _count_for_scope(
+                    category_filter if cat["id"] != "all" else None,
+                    city_scope,
+                    region_scope,
+                    district_scope,
+                )
+                if count:
+                    break
+        except Exception:  # pragma: no cover - defensive
+            count = 0
 
         result.append(
             CategoryResponse(id=cat["id"], name=cat["name"], emoji=cat["emoji"], count=count)
@@ -261,22 +281,48 @@ async def get_offers(
             apply_sort = False
             apply_slice = False
         elif search:
-            raw_offers = (
-                db.search_offers(
-                    search,
-                    normalized_city,
-                    limit=limit,
-                    offset=offset,
-                    region=region,
-                    district=district,
-                    min_price=storage_min_price,
-                    max_price=storage_max_price,
-                    min_discount=min_discount,
-                    category=category_filter,
+            def _search_scoped(
+                city_scope: str | None, region_scope: str | None, district_scope: str | None
+            ) -> list[Any]:
+                return (
+                    db.search_offers(
+                        search,
+                        city_scope,
+                        limit=limit,
+                        offset=offset,
+                        region=region_scope,
+                        district=district_scope,
+                        min_price=storage_min_price,
+                        max_price=storage_max_price,
+                        min_discount=min_discount,
+                        category=category_filter,
+                    )
+                    if hasattr(db, "search_offers")
+                    else []
                 )
-                if hasattr(db, "search_offers")
-                else []
-            )
+
+            raw_offers = _search_scoped(normalized_city, region, district)
+            if not raw_offers and hasattr(db, "search_offers"):
+                scopes: list[tuple[str | None, str | None, str | None]] = []
+                if district:
+                    scopes.append((None, region, district))
+                if region:
+                    scopes.append((None, region, None))
+                if normalized_city:
+                    scopes.append((normalized_city, None, None))
+                    if not region:
+                        scopes.append((None, normalized_city, None))
+                scopes.append((None, None, None))
+
+                seen: set[tuple[str | None, str | None, str | None]] = set()
+                for scope in scopes:
+                    if scope in seen:
+                        continue
+                    seen.add(scope)
+                    raw_offers = _search_scoped(*scope)
+                    if raw_offers:
+                        break
+
             apply_filters = False
             apply_sort = bool(sort_by)
             apply_slice = False
@@ -494,6 +540,8 @@ async def get_offers(
                         min_discount=min_discount,
                     )
                 )
+            if total == 0 and offers:
+                total = None
             has_more = (
                 (offset + len(offers) < total)
                 if total is not None

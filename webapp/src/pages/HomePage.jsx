@@ -141,8 +141,9 @@ function HomePage() {
   const activeFiltersCount = [minDiscount, priceRange !== 'all', sortBy !== 'default']
     .filter(Boolean)
     .length
-  const offersCountValue = offersTotal ?? offers.length
-  const offersCountLabel = hasMore && offersTotal == null
+  const resolvedOffersTotal = offersTotal && offersTotal > 0 ? offersTotal : null
+  const offersCountValue = resolvedOffersTotal ?? offers.length
+  const offersCountLabel = hasMore && resolvedOffersTotal == null && offers.length > 0
     ? `${offersCountValue}+ ta`
     : `${offersCountValue} ta`
   const [hasNearbyFallback, setHasNearbyFallback] = useState(false)
@@ -152,7 +153,8 @@ function HomePage() {
     CATEGORIES.forEach((category) => {
       counts[category.id] = 0
     })
-    counts.all = offersTotal ?? offers.length
+    const totalCount = offersTotal && offersTotal > 0 ? offersTotal : offers.length
+    counts.all = totalCount
     offers.forEach((offer) => {
       const categoryId = normalizeCategoryId(offer?.category)
       counts[categoryId] = (counts[categoryId] || 0) + 1
@@ -161,9 +163,11 @@ function HomePage() {
   }, [offers, offersTotal])
   const effectiveCategoryCounts = useMemo(() => {
     if (categoriesLoading || offers.length === 0) return categoryCounts
-    const values = Object.values(categoryCounts || {})
-    const hasPositive = values.some((value) => Number(value) > 0)
-    if (hasPositive) return categoryCounts
+    const hasRelevantCounts = CATEGORIES.some(
+      (category) => Number(categoryCounts?.[category.id]) > 0
+    )
+    const hasAllCount = Number(categoryCounts?.all) > 0
+    if (hasRelevantCounts || hasAllCount) return categoryCounts
     return derivedCategoryCounts
   }, [categoriesLoading, categoryCounts, derivedCategoryCounts, offers.length])
   const getGeoAttemptTs = () => {
@@ -507,7 +511,10 @@ function HomePage() {
       const items = Array.isArray(data?.items)
         ? data.items
         : (Array.isArray(data?.offers) ? data.offers : (Array.isArray(data) ? data : []))
-      const total = Number.isFinite(data?.total) ? data.total : null
+      let total = Number.isFinite(data?.total) ? data.total : null
+      if (total === 0 && items.length > 0) {
+        total = null
+      }
       const hasMoreResult = typeof data?.has_more === 'boolean'
         ? data.has_more
         : items.length === OFFERS_LIMIT
@@ -700,6 +707,8 @@ function HomePage() {
       try {
         const suggestions = await api.getSearchSuggestions(trimmed, 5, {
           city: cityForApi || undefined,
+          region: location.region || undefined,
+          district: location.district || undefined,
         })
         if (isActive) {
           setSearchSuggestions((suggestions || []).filter(Boolean))
@@ -719,7 +728,7 @@ function HomePage() {
       isActive = false
       clearTimeout(timer)
     }
-  }, [searchQuery, searchFocused])
+  }, [searchQuery, searchFocused, cityForApi, location.region, location.district])
 
   // Автоопределение локации при первом запуске
   useEffect(() => {

@@ -9,6 +9,7 @@ from datetime import date, datetime, timedelta
 from typing import Any
 
 from aiogram import Bot, Dispatcher, types
+from aiogram.exceptions import TelegramAPIError
 from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 import aiohttp
 from aiohttp import web
@@ -93,6 +94,11 @@ def _is_offer_active(offer: Any) -> bool:
 _photo_url_cache: dict[str, str] = {}
 _reverse_geocode_cache: dict[str, tuple[float, dict[str, Any]]] = {}
 _REVERSE_GEOCODE_TTL = 3600
+_LEGACY_BOT_TOKEN = (
+    os.getenv("LEGACY_TELEGRAM_BOT_TOKEN")
+    or os.getenv("OLD_TELEGRAM_BOT_TOKEN")
+    or os.getenv("PHOTO_FALLBACK_BOT_TOKEN")
+)
 
 
 async def get_photo_url(bot: Bot, file_id: str | None) -> str | None:
@@ -104,14 +110,39 @@ async def get_photo_url(bot: Bot, file_id: str | None) -> str | None:
     if file_id in _photo_url_cache:
         return _photo_url_cache[file_id]
 
+    async def _try_get_url(token: str) -> str | None:
+        temp_bot = bot if token == bot.token else Bot(token=token)
+        try:
+            file = await temp_bot.get_file(file_id)
+            if file and file.file_path:
+                url = f"https://api.telegram.org/file/bot{token}/{file.file_path}"
+                _photo_url_cache[file_id] = url
+                if token != bot.token:
+                    logger.info("Photo resolved using legacy bot token")
+                return url
+        finally:
+            # Do not close shared bot session
+            if temp_bot is not bot:
+                await temp_bot.session.close()
+        return None
+
     try:
-        file = await bot.get_file(file_id)
-        if file and file.file_path:
-            url = f"https://api.telegram.org/file/bot{bot.token}/{file.file_path}"
-            _photo_url_cache[file_id] = url
+        url = await _try_get_url(bot.token)
+        if url:
             return url
-    except Exception:
+    except TelegramAPIError:
         pass
+    except Exception:
+        logger.debug("Primary bot failed to fetch photo_id %s", file_id, exc_info=True)
+
+    if _LEGACY_BOT_TOKEN and _LEGACY_BOT_TOKEN != bot.token:
+        try:
+            return await _try_get_url(_LEGACY_BOT_TOKEN)
+        except TelegramAPIError:
+            logger.warning("Legacy bot token could not fetch photo_id %s", file_id)
+        except Exception:
+            logger.debug("Legacy bot fallback failed for %s", file_id, exc_info=True)
+
     return None
 
 
@@ -469,59 +500,79 @@ async def create_webhook_app(
         normalized_district = normalize_city(district) if district else None
         result = []
 
+        def _count_for_scope(
+            category_filter: list[str] | None,
+            city_scope: str | None,
+            region_scope: str | None,
+            district_scope: str | None,
+        ) -> int:
+            if hasattr(db, "count_offers_by_filters"):
+                return int(
+                    db.count_offers_by_filters(
+                        city=city_scope,
+                        region=region_scope,
+                        district=district_scope,
+                        category=category_filter,
+                    )
+                )
+            if category_filter:
+                if hasattr(db, "get_offers_by_city_and_category"):
+                    offers = db.get_offers_by_city_and_category(
+                        city=city_scope,
+                        category=category_filter,
+                        region=region_scope,
+                        district=district_scope,
+                        limit=1000,
+                        offset=0,
+                    ) or []
+                    return len(offers)
+                if hasattr(db, "get_offers_by_category"):
+                    if isinstance(category_filter, (list, tuple)):
+                        offers = []
+                        for item in category_filter:
+                            offers.extend(db.get_offers_by_category(item, city_scope) or [])
+                        return len(offers)
+                    offers = db.get_offers_by_category(category_filter, city_scope) or []
+                    return len(offers)
+                return 0
+            if hasattr(db, "count_hot_offers"):
+                return (
+                    db.count_hot_offers(
+                        city_scope,
+                        region=region_scope,
+                        district=district_scope,
+                    )
+                    or 0
+                )
+            return 0
+
+        scopes: list[tuple[str | None, str | None, str | None]] = []
+        if normalized_district:
+            scopes.append((None, normalized_region, normalized_district))
+        if normalized_region:
+            scopes.append((None, normalized_region, None))
+        if normalized_city:
+            scopes.append((normalized_city, None, None))
+            if not normalized_region:
+                scopes.append((None, normalized_city, None))
+        if not scopes:
+            scopes.append((None, None, None))
+
         for cat in API_CATEGORIES:
             count = 0
             category_filter = expand_category_filter(cat["id"])
-            if cat["id"] != "all":
-                try:
-                    if hasattr(db, "count_offers_by_filters"):
-                        count = int(
-                            db.count_offers_by_filters(
-                                city=normalized_city,
-                                region=normalized_region,
-                                district=normalized_district,
-                                category=category_filter,
-                            )
-                        )
-                    elif hasattr(db, "get_offers_by_city_and_category") and category_filter:
-                        offers = db.get_offers_by_city_and_category(
-                            city=normalized_city,
-                            category=category_filter,
-                            region=normalized_region,
-                            district=normalized_district,
-                            limit=1000,
-                            offset=0,
-                        ) or []
-                        count = len(offers)
-                    elif hasattr(db, "get_offers_by_category") and category_filter:
-                        if isinstance(category_filter, (list, tuple)):
-                            offers = []
-                            for item in category_filter:
-                                offers.extend(db.get_offers_by_category(item, city) or [])
-                            count = len(offers)
-                        else:
-                            offers = db.get_offers_by_category(category_filter, city) or []
-                            count = len(offers)
-                except Exception:
-                    pass
-            else:
-                try:
-                    if hasattr(db, "count_offers_by_filters"):
-                        count = int(
-                            db.count_offers_by_filters(
-                                city=normalized_city,
-                                region=normalized_region,
-                                district=normalized_district,
-                            )
-                        )
-                    elif hasattr(db, "count_hot_offers"):
-                        count = db.count_hot_offers(
-                            normalized_city,
-                            region=normalized_region,
-                            district=normalized_district,
-                        ) or 0
-                except Exception:
-                    pass
+            try:
+                for city_scope, region_scope, district_scope in scopes:
+                    count = _count_for_scope(
+                        category_filter if cat["id"] != "all" else None,
+                        city_scope,
+                        region_scope,
+                        district_scope,
+                    )
+                    if count:
+                        break
+            except Exception:
+                pass
 
             result.append(
                 {
@@ -537,6 +588,9 @@ async def create_webhook_app(
     async def api_search_suggestions(request: web.Request) -> web.Response:
         """GET /api/v1/search/suggestions - Search autocomplete suggestions."""
         query = request.query.get("query", "")
+        city = request.query.get("city")
+        region = request.query.get("region")
+        district = request.query.get("district")
         limit_raw = request.query.get("limit", "5")
         try:
             limit = max(1, min(int(limit_raw), 10))
@@ -546,10 +600,46 @@ async def create_webhook_app(
         if not query or len(query) < 2:
             return add_cors_headers(web.json_response([]))
 
+        city = city.strip() if isinstance(city, str) else city
+        city = city or None
+        normalized_city = normalize_city(city) if city else None
+        normalized_region = normalize_city(region) if region else None
+        normalized_district = normalize_city(district) if district else None
         suggestions: list[str] = []
         try:
-            if hasattr(db, "search_offers"):
-                offers = db.search_offers(query, limit=limit * 2) or []
+            if hasattr(db, "get_search_suggestions"):
+                suggestions = (
+                    db.get_search_suggestions(
+                        query,
+                        limit=limit,
+                        city=normalized_city,
+                        region=normalized_region,
+                        district=normalized_district,
+                    )
+                    or []
+                )
+            elif hasattr(db, "get_offer_suggestions"):
+                suggestions = (
+                    db.get_offer_suggestions(
+                        query,
+                        limit=limit,
+                        city=normalized_city,
+                        region=normalized_region,
+                        district=normalized_district,
+                    )
+                    or []
+                )
+            elif hasattr(db, "search_offers"):
+                offers = (
+                    db.search_offers(
+                        query,
+                        city=normalized_city,
+                        limit=limit * 2,
+                        region=normalized_region,
+                        district=normalized_district,
+                    )
+                    or []
+                )
                 titles = {
                     get_offer_value(o, "title", "") for o in offers if get_offer_value(o, "title")
                 }
@@ -694,21 +784,48 @@ async def create_webhook_app(
                     logger.info(f"get_store_offers({store_id}) returned {len(raw_offers)} items")
             elif search:
                 if hasattr(db, "search_offers"):
-                    raw_offers = (
-                        db.search_offers(
-                            search,
-                            city,
-                            limit=limit,
-                            offset=offset,
-                            region=region,
-                            district=district,
-                            min_price=min_price,
-                            max_price=max_price,
-                            min_discount=min_discount,
-                            category=category_filter,
+                    def _search_scoped(
+                        city_scope: str | None,
+                        region_scope: str | None,
+                        district_scope: str | None,
+                    ) -> list[Any]:
+                        return (
+                            db.search_offers(
+                                search,
+                                city_scope,
+                                limit=limit,
+                                offset=offset,
+                                region=region_scope,
+                                district=district_scope,
+                                min_price=min_price,
+                                max_price=max_price,
+                                min_discount=min_discount,
+                                category=category_filter,
+                            )
+                            or []
                         )
-                        or []
-                    )
+
+                    raw_offers = _search_scoped(city, region, district)
+                    if not raw_offers:
+                        scopes: list[tuple[str | None, str | None, str | None]] = []
+                        if district:
+                            scopes.append((None, region, district))
+                        if region:
+                            scopes.append((None, region, None))
+                        if city:
+                            scopes.append((city, None, None))
+                            if not region:
+                                scopes.append((None, city, None))
+                        scopes.append((None, None, None))
+
+                        seen: set[tuple[str | None, str | None, str | None]] = set()
+                        for scope in scopes:
+                            if scope in seen:
+                                continue
+                            seen.add(scope)
+                            raw_offers = _search_scoped(*scope)
+                            if raw_offers:
+                                break
                     logger.info(f"search_offers returned {len(raw_offers)} items")
             else:
                 def _fetch_scoped_offers(
@@ -2309,21 +2426,10 @@ async def create_webhook_app(
             return add_cors_headers(web.json_response({"error": "file_id required"}, status=400))
 
         try:
-            # Check cache first
-            if file_id in _photo_url_cache:
-                # Redirect to cached URL
-                raise web.HTTPFound(location=_photo_url_cache[file_id])
-
-            # Get file info from Telegram
-            file = await bot.get_file(file_id)
-            if file and file.file_path:
-                # Construct URL and cache it
-                photo_url = f"https://api.telegram.org/file/bot{bot.token}/{file.file_path}"
-                _photo_url_cache[file_id] = photo_url
-                # Redirect to photo URL
+            photo_url = await get_photo_url(bot, file_id)
+            if photo_url:
                 raise web.HTTPFound(location=photo_url)
-            else:
-                return add_cors_headers(web.json_response({"error": "File not found"}, status=404))
+            return add_cors_headers(web.json_response({"error": "File not found"}, status=404))
         except web.HTTPFound:
             raise  # Re-raise redirect
         except Exception as e:

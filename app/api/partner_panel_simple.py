@@ -48,6 +48,11 @@ limiter = Limiter(key_func=get_remote_address)
 # Global database instance (set by api_server.py)
 _db: DatabaseProtocol | None = None
 _bot_token: str | None = None
+_legacy_bot_token: str | None = (
+    os.getenv("LEGACY_TELEGRAM_BOT_TOKEN")
+    or os.getenv("OLD_TELEGRAM_BOT_TOKEN")
+    or os.getenv("PHOTO_FALLBACK_BOT_TOKEN")
+)
 
 # Get base URL for photo links
 API_BASE_URL = os.getenv("RAILWAY_PUBLIC_DOMAIN") or os.getenv("PUBLIC_URL") or ""
@@ -1697,23 +1702,35 @@ async def get_photo_url(file_id: str):
     import aiohttp
     from fastapi.responses import RedirectResponse
 
-    if not _bot_token:
+    tokens = [_bot_token] if _bot_token else []
+    if _legacy_bot_token and _legacy_bot_token not in tokens:
+        tokens.append(_legacy_bot_token)
+
+    if not tokens:
         raise HTTPException(status_code=500, detail="Bot token not configured")
 
     try:
         async with aiohttp.ClientSession() as session:
-            async with session.get(
-                f"https://api.telegram.org/bot{_bot_token}/getFile?file_id={file_id}"
-            ) as resp:
-                result = await resp.json()
+            for token in tokens:
+                async with session.get(
+                    f"https://api.telegram.org/bot{token}/getFile?file_id={file_id}"
+                ) as resp:
+                    result = await resp.json()
 
-                if not result.get("ok"):
-                    raise HTTPException(status_code=404, detail="File not found")
+                    if not result.get("ok"):
+                        continue
 
-                file_path = result["result"]["file_path"]
-                photo_url = f"https://api.telegram.org/file/bot{_bot_token}/{file_path}"
+                    file_path = result["result"]["file_path"]
+                    photo_url = f"https://api.telegram.org/file/bot{token}/{file_path}"
 
-                # Redirect to actual photo URL
-                return RedirectResponse(url=photo_url)
+                    if _bot_token and token != _bot_token:
+                        import logging
+
+                        logging.info("Photo served via legacy bot token (partner panel)")
+
+                    # Redirect to actual photo URL
+                    return RedirectResponse(url=photo_url)
     except aiohttp.ClientError as e:
         raise HTTPException(status_code=500, detail=f"Network error: {str(e)}")
+
+    raise HTTPException(status_code=404, detail="File not found")
