@@ -5,6 +5,7 @@ import hmac
 import json
 import logging
 import os
+import time
 from datetime import date, datetime
 from typing import Any
 from urllib.parse import parse_qsl, unquote
@@ -235,6 +236,32 @@ def validate_init_data(init_data: str, bot_token: str) -> dict[str, Any] | None:
 
     https://core.telegram.org/bots/webapps#validating-data-received-via-the-mini-app
     """
+    def _auth_date_is_valid(parsed: dict[str, Any]) -> bool:
+        auth_date = parsed.get("auth_date")
+        if not auth_date:
+            logger.warning("Missing auth_date in initData")
+            return False
+        try:
+            auth_timestamp = int(auth_date)
+        except (TypeError, ValueError):
+            logger.warning("Invalid auth_date in initData")
+            return False
+        now_ts = int(time.time())
+        if auth_timestamp > now_ts:
+            logger.warning("auth_date is in the future")
+            return False
+        max_age_raw = os.getenv("WEBAPP_AUTH_MAX_AGE_SECONDS", "86400")
+        try:
+            max_age = int(max_age_raw)
+        except ValueError:
+            max_age = 86400
+        if max_age < 0:
+            max_age = 0
+        if max_age and (now_ts - auth_timestamp) > max_age:
+            logger.warning("initData expired (auth_date too old)")
+            return False
+        return True
+
     try:
         parsed = dict(parse_qsl(init_data, keep_blank_values=True))
 
@@ -254,6 +281,9 @@ def validate_init_data(init_data: str, bot_token: str) -> dict[str, Any] | None:
 
         if calculated_hash != received_hash:
             logger.warning("Invalid initData hash")
+            return None
+
+        if not _auth_date_is_valid(parsed):
             return None
 
         if "user" in parsed:

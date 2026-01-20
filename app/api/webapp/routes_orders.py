@@ -6,7 +6,8 @@ from typing import Any
 
 from aiogram import Bot
 from aiogram.utils.keyboard import InlineKeyboardBuilder
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Header
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
 from app.core.sanitize import sanitize_phone
@@ -16,6 +17,12 @@ from app.services.unified_order_service import (
     OrderStatus,
     PaymentStatus,
     get_unified_order_service,
+)
+from app.core.idempotency import (
+    build_request_hash,
+    check_or_reserve_key,
+    normalize_idempotency_key,
+    store_idempotency_response,
 )
 
 from .common import (
@@ -147,7 +154,11 @@ def _validate_min_order(
 
 @router.post("/orders", response_model=OrderResponse)
 async def create_order(
-    order: CreateOrderRequest, db=Depends(get_db), user: dict = Depends(get_current_user)
+    order: CreateOrderRequest,
+    db=Depends(get_db),
+    user: dict = Depends(get_current_user),
+    idempotency_key: str | None = Header(None, alias="Idempotency-Key"),
+    x_idempotency_key: str | None = Header(None, alias="X-Idempotency-Key"),
 ):
     """Create a new order from Mini App and notify partner."""
 
@@ -166,16 +177,40 @@ async def create_order(
                     detail=f"Invalid quantity for offer {item.offer_id}",
                 )
 
-        resolved_phone = _resolve_required_phone(db, user_id, order.phone)
-
-        offers_by_id, store_id = _load_offers_and_store(order.items, db)
-
         is_delivery = bool(order.delivery_address and order.delivery_address.strip())
         raw_payment_method = order.payment_method
         if not raw_payment_method:
             payment_method = "click" if is_delivery else "cash"
         else:
             payment_method = PaymentStatus.normalize_method(raw_payment_method)
+
+        idem_key = normalize_idempotency_key(idempotency_key or x_idempotency_key)
+        idem_hash = None
+        if idem_key:
+            items_payload = [
+                {"offer_id": int(item.offer_id), "quantity": int(item.quantity)}
+                for item in order.items
+            ]
+            items_payload.sort(key=lambda x: x["offer_id"])
+            idem_payload = {
+                "items": items_payload,
+                "delivery_address": order.delivery_address or "",
+                "phone": order.phone or "",
+                "comment": order.comment or "",
+                "payment_method": payment_method,
+                "order_type": "delivery" if is_delivery else "pickup",
+            }
+            idem_hash = build_request_hash(idem_payload)
+            idem_result = check_or_reserve_key(db, idem_key, user_id, idem_hash)
+            if idem_result.get("status") in ("cached", "conflict", "in_progress"):
+                return JSONResponse(
+                    content=idem_result.get("payload", {}),
+                    status_code=int(idem_result.get("status_code", 409)),
+                )
+
+        resolved_phone = _resolve_required_phone(db, user_id, order.phone)
+
+        offers_by_id, store_id = _load_offers_and_store(order.items, db)
 
         if is_delivery and payment_method == "cash":
             raise HTTPException(
@@ -301,11 +336,30 @@ async def create_order(
             total_items,
         )
 
-        return OrderResponse(
+        response_payload = OrderResponse(
             order_id=order_id, status="pending", total=total_amount, items_count=total_items
-        )
+        ).model_dump()
+        if idem_key and idem_hash:
+            store_idempotency_response(
+                db,
+                idem_key,
+                user_id,
+                idem_hash,
+                response_payload,
+                200,
+            )
+        return OrderResponse(**response_payload)
 
-    except HTTPException:
+    except HTTPException as exc:
+        if "idem_key" in locals() and idem_key and idem_hash:
+            store_idempotency_response(
+                db,
+                idem_key,
+                user_id,
+                idem_hash,
+                {"detail": exc.detail},
+                exc.status_code,
+            )
         raise
     except Exception as e:  # pragma: no cover - defensive
         logger.error(f"Error creating order: {e}")

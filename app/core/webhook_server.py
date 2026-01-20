@@ -18,6 +18,12 @@ from app.core.metrics import metrics as app_metrics
 from app.core.notifications import get_notification_service
 from app.core.websocket import get_websocket_manager, setup_websocket_routes
 from app.core.utils import normalize_city
+from app.core.idempotency import (
+    build_request_hash,
+    check_or_reserve_key,
+    normalize_idempotency_key,
+    store_idempotency_response,
+)
 from app.integrations.payment_service import get_payment_service
 from logging_config import logger
 
@@ -444,7 +450,9 @@ async def create_webhook_app(
             headers={
                 "Access-Control-Allow-Origin": "*",
                 "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
-                "Access-Control-Allow-Headers": "Content-Type, X-Telegram-Init-Data",
+                "Access-Control-Allow-Headers": (
+                    "Content-Type, X-Telegram-Init-Data, Idempotency-Key, X-Idempotency-Key"
+                ),
                 "Access-Control-Max-Age": "86400",
             },
         )
@@ -453,7 +461,9 @@ async def create_webhook_app(
         """Add CORS headers to response."""
         response.headers["Access-Control-Allow-Origin"] = "*"
         response.headers["Access-Control-Allow-Methods"] = "GET, POST, OPTIONS"
-        response.headers["Access-Control-Allow-Headers"] = "Content-Type, X-Telegram-Init-Data"
+        response.headers["Access-Control-Allow-Headers"] = (
+            "Content-Type, X-Telegram-Init-Data, Idempotency-Key, X-Idempotency-Key"
+        )
         return response
 
     def _get_authenticated_user_id(request: web.Request) -> int | None:
@@ -1367,16 +1377,65 @@ async def create_webhook_app(
                 payment_method = "card" if is_delivery else "cash"
             payment_method = PaymentStatus.normalize_method(payment_method)
 
-            if is_delivery and (not address or not str(address).strip()):
-                return add_cors_headers(
-                    web.json_response({"error": "Delivery address required"}, status=400)
-                )
-            if is_delivery and payment_method == "cash":
-                return add_cors_headers(
-                    web.json_response(
-                        {"error": "Cash is not allowed for delivery orders"},
-                        status=400,
+            idempotency_key = normalize_idempotency_key(
+                request.headers.get("Idempotency-Key")
+                or request.headers.get("X-Idempotency-Key")
+            )
+            idem_hash = None
+            if idempotency_key:
+                items_payload = []
+                for item in items:
+                    offer_id = item.get("offer_id") or item.get("id")
+                    if offer_id is None:
+                        continue
+                    try:
+                        offer_id_val = int(offer_id)
+                    except (TypeError, ValueError):
+                        continue
+                    try:
+                        quantity_val = int(item.get("quantity", 1))
+                    except (TypeError, ValueError):
+                        quantity_val = 0
+                    items_payload.append(
+                        {"offer_id": offer_id_val, "quantity": quantity_val}
                     )
+                items_payload.sort(key=lambda x: x["offer_id"])
+                idem_payload = {
+                    "items": items_payload,
+                    "delivery_address": address or "",
+                    "phone": phone or "",
+                    "comment": notes or "",
+                    "payment_method": payment_method,
+                    "order_type": delivery_type or ("delivery" if is_delivery else "pickup"),
+                }
+                idem_hash = build_request_hash(idem_payload)
+                idem_result = check_or_reserve_key(db, idempotency_key, user_id, idem_hash)
+                if idem_result.get("status") in ("cached", "conflict", "in_progress"):
+                    return add_cors_headers(
+                        web.json_response(
+                            idem_result.get("payload", {}),
+                            status=int(idem_result.get("status_code", 409)),
+                        )
+                    )
+
+            def _respond(payload: dict[str, Any], status_code: int) -> web.Response:
+                if idempotency_key and idem_hash:
+                    store_idempotency_response(
+                        db,
+                        idempotency_key,
+                        user_id,
+                        idem_hash,
+                        payload,
+                        status_code,
+                    )
+                return add_cors_headers(web.json_response(payload, status=status_code))
+
+            if is_delivery and (not address or not str(address).strip()):
+                return _respond({"error": "Delivery address required"}, 400)
+            if is_delivery and payment_method == "cash":
+                return _respond(
+                    {"error": "Cash is not allowed for delivery orders"},
+                    400,
                 )
 
             # Try unified order service first
@@ -1392,15 +1451,11 @@ async def create_webhook_app(
                     try:
                         quantity = int(item.get("quantity", 1))
                     except (TypeError, ValueError):
-                        return add_cors_headers(
-                            web.json_response({"error": "Invalid quantity"}, status=400)
-                        )
+                        return _respond({"error": "Invalid quantity"}, 400)
                     if quantity <= 0:
-                        return add_cors_headers(
-                            web.json_response(
-                                {"error": f"Invalid quantity for offer {offer_id}"},
-                                status=400,
-                            )
+                        return _respond(
+                            {"error": f"Invalid quantity for offer {offer_id}"},
+                            400,
                         )
 
                     if not offer_id:
@@ -1442,15 +1497,13 @@ async def create_webhook_app(
                         )
                     )
                 if not order_items:
-                    return add_cors_headers(
-                        web.json_response(
-                            {
-                                "success": False,
-                                "error": "No valid items in order",
-                                "failed": failed_items,
-                            },
-                            status=400,
-                        )
+                    return _respond(
+                        {
+                            "success": False,
+                            "error": "No valid items in order",
+                            "failed": failed_items,
+                        },
+                        400,
                     )
 
                 try:
@@ -1546,21 +1599,19 @@ async def create_webhook_app(
                         "failed": failed_items,
                         "message": result.error_message or "OK",
                     }
-                    return add_cors_headers(web.json_response(response, status=201))
+                    return _respond(response, 201)
                 elif result and not result.success:
                     detail = result.error_message or "Failed to create order"
                     status_code = (
                         409 if ("insufficient stock" in detail.lower() or "unavailable" in detail.lower()) else 400
                     )
-                    return add_cors_headers(
-                        web.json_response(
-                            {
-                                "success": False,
-                                "error": detail,
-                                "failed": getattr(result, "failed_items", []) or failed_items,
-                            },
-                            status=status_code,
-                        )
+                    return _respond(
+                        {
+                            "success": False,
+                            "error": detail,
+                            "failed": getattr(result, "failed_items", []) or failed_items,
+                        },
+                        status_code,
                     )
 
             # Fallback: create an order row directly (no new bookings for Mini App)
@@ -1590,11 +1641,9 @@ async def create_webhook_app(
                     if not order_service:
                         logger.error("UnifiedOrderService not available in webhook_server")
                         failed_items.append({"error": "Order service not available"})
-                        return add_cors_headers(
-                            web.json_response(
-                                {"success": False, "error": "Order service not available"},
-                                status=500,
-                            )
+                        return _respond(
+                            {"success": False, "error": "Order service not available"},
+                            500,
                         )
 
                     # Convert db_items to OrderItem format
@@ -1663,10 +1712,29 @@ async def create_webhook_app(
             }
 
             status_code = 201 if created_bookings else 400
-            return add_cors_headers(web.json_response(response, status=status_code))
+            return _respond(response, status_code)
 
         except Exception as e:
             logger.error(f"API create order error: {e}", exc_info=True)
+            if (
+                "idempotency_key" in locals()
+                and "idem_hash" in locals()
+                and "user_id" in locals()
+                and idempotency_key
+                and idem_hash
+                and user_id
+            ):
+                try:
+                    store_idempotency_response(
+                        db,
+                        idempotency_key,
+                        user_id,
+                        idem_hash,
+                        {"error": str(e), "success": False},
+                        500,
+                    )
+                except Exception:
+                    pass
             return add_cors_headers(
                 web.json_response({"error": str(e), "success": False}, status=500)
             )

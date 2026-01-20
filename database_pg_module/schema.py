@@ -415,6 +415,8 @@ class SchemaMixin:
                     payment_status TEXT DEFAULT 'not_required',
                     payment_proof_photo_id TEXT,
                     order_status TEXT DEFAULT 'pending',
+                    cancel_reason VARCHAR(50),
+                    cancel_comment TEXT,
                     quantity INTEGER DEFAULT 1,
                     total_price REAL,
                     pickup_code TEXT,
@@ -482,6 +484,18 @@ class SchemaMixin:
                     )
                 except Exception as e:
                     logger.warning(f"Migration for orders order_type: {e}")
+
+            # Migration: Add cancel_reason/cancel_comment for partner cancellations
+            if run_runtime_migrations:
+                try:
+                    cursor.execute(
+                        "ALTER TABLE orders ADD COLUMN IF NOT EXISTS cancel_reason VARCHAR(50)"
+                    )
+                    cursor.execute(
+                        "ALTER TABLE orders ADD COLUMN IF NOT EXISTS cancel_comment TEXT"
+                    )
+                except Exception as e:
+                    logger.warning(f"Migration for orders cancel fields: {e}")
 
             # Migration: Add rating_reminder_sent and updated_at for rating reminders
             if run_runtime_migrations:
@@ -730,10 +744,15 @@ class SchemaMixin:
             cursor.execute(
                 """
                 CREATE TABLE IF NOT EXISTS fsm_states (
-                    user_id BIGINT PRIMARY KEY,
+                    user_id BIGINT NOT NULL,
+                    chat_id BIGINT NOT NULL,
                     state TEXT,
+                    state_name TEXT,
                     data JSONB,
-                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    expires_at TIMESTAMP,
+                    PRIMARY KEY (user_id, chat_id)
                 )
             """
             )

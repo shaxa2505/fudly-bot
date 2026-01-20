@@ -8,18 +8,22 @@ from datetime import datetime
 
 from sqlalchemy import (
     BigInteger,
+    Boolean,
     CheckConstraint,
     Column,
+    Date,
     DateTime,
     Float,
     ForeignKey,
     Index,
     Integer,
+    PrimaryKeyConstraint,
     String,
     Text,
+    Time,
     UniqueConstraint,
 )
-from sqlalchemy.dialects.postgresql import JSONB
+from sqlalchemy.dialects.postgresql import JSONB, TSVECTOR, UUID
 from sqlalchemy.orm import DeclarativeBase, relationship
 
 
@@ -79,7 +83,13 @@ class User(Base):
     role = Column(String(20), default="customer")
     is_admin = Column(Integer, default=0)
     notifications_enabled = Column(Integer, default=1)
+    view_mode = Column(String(20), default="customer")
     created_at = Column(DateTime, default=datetime.utcnow)
+    last_delivery_address = Column(Text, nullable=True)
+    region = Column(String(100), nullable=True)
+    district = Column(String(100), nullable=True)
+    latitude = Column(Float, nullable=True)
+    longitude = Column(Float, nullable=True)
     region_id = Column(Integer, ForeignKey("geo_regions.region_id"), nullable=True)
     district_id = Column(Integer, ForeignKey("geo_districts.district_id"), nullable=True)
 
@@ -126,6 +136,11 @@ class Store(Base):
     delivery_enabled = Column(Integer, default=1)
     delivery_price = Column(Integer, default=15000)
     min_order_amount = Column(Integer, default=30000)
+    photo = Column(Text, nullable=True)
+    latitude = Column(Float, nullable=True)
+    longitude = Column(Float, nullable=True)
+    rating = Column(Float, nullable=True)
+    search_vector = Column(TSVECTOR, nullable=True)
     region_id = Column(Integer, ForeignKey("geo_regions.region_id"), nullable=True)
     district_id = Column(Integer, ForeignKey("geo_districts.district_id"), nullable=True)
 
@@ -157,17 +172,19 @@ class Offer(Base):
     store_id = Column(Integer, ForeignKey("stores.store_id"), nullable=True)
     title = Column(String(255), nullable=False)
     description = Column(Text, nullable=True)
-    original_price = Column(Float, nullable=True)
-    discount_price = Column(Float, nullable=True)
+    original_price = Column(Integer, nullable=True)
+    discount_price = Column(Integer, nullable=True)
     quantity = Column(Integer, default=1)
-    available_from = Column(String(50), nullable=True)
-    available_until = Column(String(50), nullable=True)
-    expiry_date = Column(String(50), nullable=True)
+    stock_quantity = Column(Integer, default=0)
+    available_from = Column(Time, nullable=True)
+    available_until = Column(Time, nullable=True)
+    expiry_date = Column(Date, nullable=True)
     photo_id = Column(String(255), nullable=True)
     status = Column(String(20), default="active")
     created_at = Column(DateTime, default=datetime.utcnow)
     unit = Column(String(20), default="шт")
     category = Column(String(50), default="other")
+    search_vector = Column(TSVECTOR, nullable=True)
 
     # Relationships
     store = relationship("Store", back_populates="offers")
@@ -193,9 +210,29 @@ class Booking(Base):
     store_id = Column(Integer, ForeignKey("stores.store_id"), nullable=True)
     quantity = Column(Integer, default=1)
     booking_code = Column(String(50), nullable=True)
-    pickup_time = Column(String(50), nullable=True)
+    pickup_time = Column(Text, nullable=True)
     status = Column(String(20), default="active")
     created_at = Column(DateTime, default=datetime.utcnow)
+    cart_items = Column(JSONB, nullable=True)
+    is_cart_booking = Column(Integer, default=0)
+    customer_message_id = Column(BigInteger, nullable=True)
+    seller_message_id = Column(BigInteger, nullable=True)
+    rating_reminder_sent = Column(Boolean, default=False)
+    updated_at = Column(DateTime, nullable=True)
+    delivery_option = Column(Integer, default=0)
+    delivery_address = Column(Text, nullable=True)
+    delivery_cost = Column(Integer, default=0)
+    expiry_time = Column(DateTime, nullable=True)
+    reminder_sent = Column(Integer, default=0)
+    payment_proof_photo_id = Column(Text, nullable=True)
+    pickup_address = Column(Text, nullable=True)
+    partner_reminder_sent = Column(Integer, default=0)
+    delivery_city = Column(Text, nullable=True)
+    delivery_region = Column(Text, nullable=True)
+    delivery_district = Column(Text, nullable=True)
+    delivery_lat = Column(Float, nullable=True)
+    delivery_lon = Column(Float, nullable=True)
+    delivery_structured = Column(JSONB, nullable=True)
 
     # Relationships
     user = relationship("User", back_populates="bookings")
@@ -222,13 +259,27 @@ class Order(Base):
     offer_id = Column(Integer, ForeignKey("offers.offer_id"), nullable=True)
     store_id = Column(Integer, ForeignKey("stores.store_id"), nullable=True)
     delivery_address = Column(Text, nullable=True)
-    payment_method = Column(String(50), default="card")
-    payment_status = Column(String(20), default="pending")
+    payment_method = Column(String(50), default="cash")
+    payment_status = Column(String(20), default="not_required")
     payment_proof_photo_id = Column(String(255), nullable=True)
     order_status = Column(String(20), default="pending")
     quantity = Column(Integer, default=1)
     total_price = Column(Float, nullable=True)
+    pickup_code = Column(String(50), nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
+    cart_items = Column(JSONB, nullable=True)
+    is_cart_order = Column(Integer, default=0)
+    customer_message_id = Column(BigInteger, nullable=True)
+    seller_message_id = Column(BigInteger, nullable=True)
+    order_type = Column(String(20), default="delivery")
+    rating_reminder_sent = Column(Boolean, default=False)
+    updated_at = Column(DateTime, nullable=True)
+    delivery_city = Column(Text, nullable=True)
+    delivery_region = Column(Text, nullable=True)
+    delivery_district = Column(Text, nullable=True)
+    delivery_lat = Column(Float, nullable=True)
+    delivery_lon = Column(Float, nullable=True)
+    delivery_structured = Column(JSONB, nullable=True)
 
     # Relationships
     user = relationship("User", back_populates="orders")
@@ -396,10 +447,16 @@ class FSMState(Base):
 
     __tablename__ = "fsm_states"
 
-    user_id = Column(BigInteger, primary_key=True)
+    user_id = Column(BigInteger, nullable=False)
+    chat_id = Column(BigInteger, nullable=False)
     state = Column(String(255), nullable=True)
+    state_name = Column(String(255), nullable=True)
     data = Column(JSONB, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow)
+    expires_at = Column(DateTime, nullable=True)
+
+    __table_args__ = (PrimaryKeyConstraint("user_id", "chat_id", name="fsm_states_pkey"),)
 
 
 class PlatformSettings(Base):
@@ -417,13 +474,92 @@ class PickupSlot(Base):
 
     __tablename__ = "pickup_slots"
 
-    slot_id = Column(Integer, primary_key=True, autoincrement=True)
-    store_id = Column(Integer, ForeignKey("stores.store_id"), nullable=True)
-    day_of_week = Column(Integer, nullable=True)  # 0=Monday, 6=Sunday
-    start_time = Column(String(10), nullable=True)
-    end_time = Column(String(10), nullable=True)
-    max_bookings = Column(Integer, default=10)
-    is_active = Column(Integer, default=1)
+    store_id = Column(Integer, ForeignKey("stores.store_id"), primary_key=True)
+    slot_ts = Column(Text, primary_key=True)
+    capacity = Column(Integer, default=5)
+    reserved = Column(Integer, default=0)
+    created_at = Column(DateTime, default=datetime.utcnow)
 
     # Indexes
-    __table_args__ = (Index("ix_pickup_slots_store", "store_id"),)
+    __table_args__ = (Index("ix_pickup_slots_store_ts", "store_id", "slot_ts"),)
+
+
+class StoreAdmin(Base):
+    """Store admins model."""
+
+    __tablename__ = "store_admins"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    store_id = Column(Integer, ForeignKey("stores.store_id"), nullable=False)
+    user_id = Column(BigInteger, ForeignKey("users.user_id"), nullable=False)
+    role = Column(String(20), default="admin")
+    added_by = Column(BigInteger, ForeignKey("users.user_id"), nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    __table_args__ = (
+        UniqueConstraint("store_id", "user_id"),
+        Index("ix_store_admins_user_store", "user_id", "store_id"),
+    )
+
+
+class StorePaymentIntegration(Base):
+    """Store payment integration model."""
+
+    __tablename__ = "store_payment_integrations"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    store_id = Column(Integer, ForeignKey("stores.store_id"), nullable=False)
+    provider = Column(String(50), nullable=False)
+    merchant_id = Column(String(255), nullable=True)
+    service_id = Column(String(255), nullable=True)
+    secret_key = Column(Text, nullable=True)
+    is_active = Column(Integer, default=1)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow)
+
+    __table_args__ = (
+        UniqueConstraint("store_id", "provider"),
+        Index("ix_store_payment_integrations_lookup", "store_id", "provider"),
+    )
+
+
+class UzumTransaction(Base):
+    """Uzum Bank transactions."""
+
+    __tablename__ = "uzum_transactions"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    trans_id = Column(UUID, nullable=False, unique=True)
+    order_id = Column(Integer, ForeignKey("orders.order_id"), nullable=False)
+    service_id = Column(BigInteger, nullable=True)
+    amount = Column(BigInteger, nullable=False)
+    status = Column(String(50), nullable=False)
+    payload = Column(JSONB, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow)
+
+
+class RecentlyViewed(Base):
+    """Recently viewed offers."""
+
+    __tablename__ = "recently_viewed"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    user_id = Column(BigInteger, ForeignKey("users.user_id"), nullable=False)
+    offer_id = Column(Integer, ForeignKey("offers.offer_id"), nullable=False)
+    viewed_at = Column(DateTime, default=datetime.utcnow)
+
+    __table_args__ = (Index("ix_recently_viewed_user", "user_id"),)
+
+
+class SearchHistory(Base):
+    """Search history."""
+
+    __tablename__ = "search_history"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    user_id = Column(BigInteger, ForeignKey("users.user_id"), nullable=False)
+    query = Column(Text, nullable=False)
+    searched_at = Column(DateTime, default=datetime.utcnow)
+
+    __table_args__ = (Index("ix_search_history_user", "user_id"),)

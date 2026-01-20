@@ -158,6 +158,8 @@ def create_api_app(db: Any = None, offer_service: Any = None, bot_token: str = N
             "Authorization",
             "X-Requested-With",
             "X-Telegram-Init-Data",
+            "Idempotency-Key",
+            "X-Idempotency-Key",
             "Sentry-Trace",
             "Baggage",
         ],

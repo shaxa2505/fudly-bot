@@ -15,9 +15,15 @@ const RETRY_CONFIG = {
   retries: 2,
   retryDelay: 500,
   retryCondition: (error) => {
+    const config = error?.config
+    if (!config || !config.__idempotent) {
+      return false
+    }
     return !error.response || (error.response.status >= 500 && error.response.status <= 599)
   },
 }
+
+const IDEMPOTENT_METHODS = new Set(['get', 'head', 'options', 'put', 'delete'])
 
 const INITDATA_KEY = 'fudly_init_data'
 const INITDATA_TS_KEY = 'fudly_init_data_ts'
@@ -97,6 +103,18 @@ export const getTelegramInitData = () => {
 // Helper function to delay
 const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms))
 
+const generateIdempotencyKey = () => {
+  if (typeof crypto !== 'undefined') {
+    if (crypto.randomUUID) return crypto.randomUUID()
+    if (crypto.getRandomValues) {
+      const bytes = new Uint8Array(16)
+      crypto.getRandomValues(bytes)
+      return Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('')
+    }
+  }
+  return `${Date.now()}-${Math.random().toString(16).slice(2, 10)}`
+}
+
 // Create axios instance
 const client = axios.create({
   baseURL: API_BASE,
@@ -109,6 +127,13 @@ client.interceptors.request.use((config) => {
   if (initData) {
     config.headers['X-Telegram-Init-Data'] = initData
   }
+  const headers = config.headers || {}
+  const hasIdempotencyKey = Boolean(headers['Idempotency-Key']) ||
+    Boolean(headers['X-Idempotency-Key']) ||
+    (typeof headers.get === 'function' &&
+      (headers.get('Idempotency-Key') || headers.get('X-Idempotency-Key')))
+  const method = (config.method || 'get').toLowerCase()
+  config.__idempotent = IDEMPOTENT_METHODS.has(method) || hasIdempotencyKey
   config.__retryCount = config.__retryCount || 0
   return config
 })
@@ -392,7 +417,12 @@ const api = {
 
   async createOrder(orderData) {
     try {
-      const { data } = await client.post('/orders', orderData)
+      const idempotencyKey = generateIdempotencyKey()
+      const { data } = await client.post('/orders', orderData, {
+        headers: {
+          'Idempotency-Key': idempotencyKey,
+        },
+      })
       return data
     } catch (error) {
       // Extract error message from response
