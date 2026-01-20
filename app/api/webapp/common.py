@@ -10,7 +10,7 @@ from typing import Any
 from urllib.parse import parse_qsl, unquote
 
 from fastapi import Header, HTTPException
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from app.core.config import load_settings
 
@@ -160,7 +160,7 @@ class CategoryResponse(BaseModel):
 
 class OrderItem(BaseModel):
     offer_id: int
-    quantity: int
+    quantity: int = Field(..., ge=1)
 
 
 class CreateOrderRequest(BaseModel):

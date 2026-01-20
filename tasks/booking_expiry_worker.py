@@ -16,6 +16,7 @@ async def start_booking_expiry_worker(db: Any, bot: Any) -> None:
     """
     check_interval = getattr(db, "BOOKING_EXPIRY_CHECK_MINUTES", 30)
     pending_expiry_minutes = int(os.environ.get("PICKUP_PENDING_EXPIRY_MINUTES", "60"))
+    delivery_pending_expiry_minutes = int(os.environ.get("DELIVERY_PENDING_EXPIRY_MINUTES", "120"))
     ready_expiry_hours = int(os.environ.get("PICKUP_READY_EXPIRY_HOURS", "2"))
 
     order_service = None
@@ -356,9 +357,71 @@ async def start_booking_expiry_worker(db: Any, bot: Any) -> None:
                                         f"Auto-cancelled stale pickup order {order_id} (pending)"
                                     )
                             except Exception as e:
-                                logger.error(f"Error processing stale pickup order row: {e}")
+                            logger.error(f"Error processing stale pickup order row: {e}")
                 except Exception as e:
                     logger.error(f"Pending pickup order query failed: {e}")
+
+            # 3.5) Expired delivery orders stuck in pending/awaiting payment
+            if order_service and delivery_pending_expiry_minutes > 0:
+                try:
+                    with db.get_connection() as conn:
+                        cursor = conn.cursor()
+                        pending_statuses = [
+                            "pending",
+                            "awaiting_payment",
+                            "awaiting_admin_confirmation",
+                            "paid",
+                            "new",
+                        ]
+                        try:
+                            cursor.execute(
+                                """
+                                SELECT order_id, user_id
+                                FROM orders
+                                WHERE order_status = ANY(%s)
+                                  AND (
+                                      order_type IN ('delivery','taxi')
+                                      OR (order_type IS NULL AND COALESCE(delivery_address, '') <> '')
+                                  )
+                                  AND created_at <= now() - (%s * INTERVAL '1 minute')
+                                """,
+                                (pending_statuses, delivery_pending_expiry_minutes),
+                            )
+                        except Exception as e:
+                            if "order_type" in str(e):
+                                cursor.execute(
+                                    """
+                                    SELECT order_id, user_id
+                                    FROM orders
+                                    WHERE order_status = ANY(%s)
+                                      AND COALESCE(delivery_address, '') <> ''
+                                      AND created_at <= now() - (%s * INTERVAL '1 minute')
+                                    """,
+                                    (pending_statuses, delivery_pending_expiry_minutes),
+                                )
+                            else:
+                                raise
+
+                        rows = cursor.fetchall()
+                        for row in rows:
+                            try:
+                                order_id = row.get("order_id") if hasattr(row, "get") else row[0]
+                                if not order_id:
+                                    continue
+                                ok = await order_service.update_status(
+                                    entity_id=int(order_id),
+                                    entity_type="order",
+                                    new_status=order_status_cancelled,
+                                    notify_customer=True,
+                                )
+                                if ok:
+                                    logger.info(
+                                        f"Auto-cancelled stale delivery order {order_id} (pending)"
+                                    )
+                            except Exception as e:
+                                logger.error(f"Error processing stale delivery order row: {e}")
+                except Exception as e:
+                    logger.error(f"Pending delivery order query failed: {e}")
 
             # 4) Expired pickup orders (ready too long)
             if order_service and ready_expiry_hours > 0:

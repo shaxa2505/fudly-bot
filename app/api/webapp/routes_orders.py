@@ -90,6 +90,14 @@ def _resolve_required_phone(db: Any, user_id: int, raw_phone: str | None) -> str
     raise HTTPException(status_code=400, detail="Phone is required")
 
 
+def _status_for_creation_error(detail: str) -> int:
+    """Map order creation error text to HTTP status code."""
+    lower = detail.lower()
+    if "insufficient stock" in lower or "unavailable" in lower:
+        return 409
+    return 400
+
+
 def _load_offers_and_store(items: list[Any], db: Any) -> tuple[dict[int, Any], int]:
     if not items:
         raise HTTPException(status_code=400, detail="No items provided")
@@ -150,6 +158,13 @@ async def create_order(
                 "create_order user mismatch: initData=%s payload=%s", user_id, order.user_id
             )
             raise HTTPException(status_code=403, detail="User mismatch")
+
+        for item in order.items:
+            if int(item.quantity) <= 0:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Invalid quantity for offer {item.offer_id}",
+                )
 
         resolved_phone = _resolve_required_phone(db, user_id, order.phone)
 
@@ -268,10 +283,9 @@ async def create_order(
                     "Unified order service returned failure for webapp order: %s",
                     result.error_message if result else "no result",
                 )
-                # No fallback - UnifiedOrderService is the only way
-                raise HTTPException(
-                    status_code=500, detail=result.error_message or "Failed to create order"
-                )
+                detail = result.error_message if result else "Failed to create order"
+                status_code = _status_for_creation_error(detail) if result else 500
+                raise HTTPException(status_code=status_code, detail=detail)
 
         # UnifiedOrderService already notifies sellers (WebSocket + optional Telegram).
 

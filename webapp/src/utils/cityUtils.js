@@ -65,6 +65,10 @@ export const CITY_TRANSLATIONS = {
   'Angren': 'Ангрен',
 }
 
+const CYRILLIC_RE = /[\u0400-\u04FF]/
+
+const hasCyrillic = (value) => CYRILLIC_RE.test(String(value || ''))
+
 const LOCATION_SUFFIXES = [
   'shahri',
   'shahar',
@@ -134,8 +138,13 @@ export const buildLocationFromReverseGeocode = (data, lat, lon) => {
 export const transliterateCity = (city) => {
   if (!city) return city
   const normalized = normalizeLocationName(city)
+  if (hasCyrillic(normalized)) return normalized
   const cityLower = normalized.toLowerCase().trim()
-  return CITY_TO_CYRILLIC[cityLower] || normalized
+  const mapped = CITY_TO_CYRILLIC[cityLower]
+  if (mapped && hasCyrillic(mapped)) {
+    return mapped
+  }
+  return normalized
 }
 
 /**
@@ -146,7 +155,10 @@ export const transliterateCity = (city) => {
 export const getCyrillicCity = (cityString) => {
   if (!cityString) return ''  // Empty = all cities
   const cityLatin = normalizeLocationName(cityString.split(',')[0]?.trim())
-  return CITY_TRANSLATIONS[cityLatin] || transliterateCity(cityLatin) || cityLatin
+  if (hasCyrillic(cityLatin)) return cityLatin
+  const mapped = CITY_TRANSLATIONS[cityLatin]
+  if (mapped && hasCyrillic(mapped)) return mapped
+  return transliterateCity(cityLatin) || cityLatin
 }
 
 /**

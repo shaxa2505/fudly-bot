@@ -10,12 +10,19 @@ from aiogram.utils.keyboard import InlineKeyboardBuilder
 
 from app.keyboards import main_menu_seller
 from handlers.common.states import EditOffer
+from handlers.common.utils import is_main_menu_button
 from localization import get_text
 from logging_config import logger
 
-from .utils import get_db, get_offer_field, get_store_field, update_offer_message
+from .utils import get_db, get_offer_field, get_store_field, send_offer_card, update_offer_message
 
 router = Router()
+
+PRICE_INPUT_HINT = "Send two numbers: original discount (e.g. 10000 7000). You can also send percent like 30%."
+
+
+def _extract_numbers(text: str) -> list[int]:
+    return [int(value) for value in re.findall(r"\d+", text or "")]
 
 
 @router.message(
@@ -676,6 +683,216 @@ async def edit_offer(callback: types.CallbackQuery) -> None:
     await callback.answer()
 
 
+@router.callback_query(F.data.startswith("edit_price_"))
+async def edit_price_start(callback: types.CallbackQuery, state: FSMContext) -> None:
+    """Start editing offer price."""
+    db = get_db()
+    lang = db.get_user_language(callback.from_user.id)
+
+    try:
+        offer_id = int(callback.data.split("_")[2])
+    except (ValueError, IndexError) as e:
+        logger.error(f"Invalid offer_id in callback data: {callback.data}, error: {e}")
+        await callback.answer(get_text(lang, "error"), show_alert=True)
+        return
+
+    offer = db.get_offer(offer_id)
+    if not offer:
+        await callback.answer(get_text(lang, "offer_not_found"), show_alert=True)
+        return
+
+    user_stores = db.get_user_accessible_stores(callback.from_user.id)
+    offer_store_id = get_offer_field(offer, "store_id")
+    if not any(get_store_field(store, "store_id") == offer_store_id for store in user_stores):
+        await callback.answer(get_text(lang, "not_your_offer"), show_alert=True)
+        return
+
+    current_original = int(get_offer_field(offer, "original_price", 0) or 0)
+    current_discount = int(get_offer_field(offer, "discount_price", 0) or 0)
+
+    await state.update_data(offer_id=offer_id, edit_field="price")
+    await state.set_state(EditOffer.value)
+
+    text = (
+        f"{get_text(lang, 'original_price')}\n"
+        f"{get_text(lang, 'discount_price')}\n"
+        f"{PRICE_INPUT_HINT}\n"
+        f"Current: {current_original} -> {current_discount}"
+    )
+    await callback.message.answer(text, parse_mode="HTML")
+    await callback.answer()
+
+
+@router.callback_query(F.data.startswith("edit_quantity_"))
+async def edit_quantity_start(callback: types.CallbackQuery, state: FSMContext) -> None:
+    """Start editing offer quantity."""
+    db = get_db()
+    lang = db.get_user_language(callback.from_user.id)
+
+    try:
+        offer_id = int(callback.data.split("_")[2])
+    except (ValueError, IndexError) as e:
+        logger.error(f"Invalid offer_id in callback data: {callback.data}, error: {e}")
+        await callback.answer(get_text(lang, "error"), show_alert=True)
+        return
+
+    offer = db.get_offer(offer_id)
+    if not offer:
+        await callback.answer(get_text(lang, "offer_not_found"), show_alert=True)
+        return
+
+    user_stores = db.get_user_accessible_stores(callback.from_user.id)
+    offer_store_id = get_offer_field(offer, "store_id")
+    if not any(get_store_field(store, "store_id") == offer_store_id for store in user_stores):
+        await callback.answer(get_text(lang, "not_your_offer"), show_alert=True)
+        return
+
+    current_qty = int(get_offer_field(offer, "quantity", 0) or 0)
+
+    await state.update_data(offer_id=offer_id, edit_field="quantity")
+    await state.set_state(EditOffer.value)
+
+    text = f"{get_text(lang, 'quantity')}\nCurrent: {current_qty}"
+    await callback.message.answer(text, parse_mode="HTML")
+    await callback.answer()
+
+
+@router.callback_query(F.data.startswith("edit_description_"))
+async def edit_description_start(callback: types.CallbackQuery, state: FSMContext) -> None:
+    """Start editing offer description."""
+    db = get_db()
+    lang = db.get_user_language(callback.from_user.id)
+
+    try:
+        offer_id = int(callback.data.split("_")[2])
+    except (ValueError, IndexError) as e:
+        logger.error(f"Invalid offer_id in callback data: {callback.data}, error: {e}")
+        await callback.answer(get_text(lang, "error"), show_alert=True)
+        return
+
+    offer = db.get_offer(offer_id)
+    if not offer:
+        await callback.answer(get_text(lang, "offer_not_found"), show_alert=True)
+        return
+
+    user_stores = db.get_user_accessible_stores(callback.from_user.id)
+    offer_store_id = get_offer_field(offer, "store_id")
+    if not any(get_store_field(store, "store_id") == offer_store_id for store in user_stores):
+        await callback.answer(get_text(lang, "not_your_offer"), show_alert=True)
+        return
+
+    await state.update_data(offer_id=offer_id, edit_field="description")
+    await state.set_state(EditOffer.value)
+
+    await callback.message.answer(get_text(lang, "offer_description"), parse_mode="HTML")
+    await callback.answer()
+
+
+@router.message(EditOffer.value)
+async def edit_offer_value(message: types.Message, state: FSMContext) -> None:
+    """Handle offer edit input."""
+    db = get_db()
+    lang = db.get_user_language(message.from_user.id)
+
+    if is_main_menu_button(message.text):
+        await state.clear()
+        return
+
+    data = await state.get_data()
+    offer_id = data.get("offer_id")
+    edit_field = data.get("edit_field")
+    if not offer_id or not edit_field:
+        await state.clear()
+        await message.answer(get_text(lang, "error_general"), reply_markup=main_menu_seller(lang))
+        return
+
+    offer = db.get_offer(offer_id)
+    if not offer:
+        await state.clear()
+        await message.answer(get_text(lang, "offer_not_found"), reply_markup=main_menu_seller(lang))
+        return
+
+    user_stores = db.get_user_accessible_stores(message.from_user.id)
+    offer_store_id = get_offer_field(offer, "store_id")
+    if not any(get_store_field(store, "store_id") == offer_store_id for store in user_stores):
+        await state.clear()
+        await message.answer(get_text(lang, "not_your_offer"), reply_markup=main_menu_seller(lang))
+        return
+
+    if edit_field == "price":
+        if "%" in (message.text or ""):
+            percent_values = _extract_numbers(message.text)
+            if len(percent_values) != 1:
+                await message.answer(PRICE_INPUT_HINT)
+                return
+            discount_percent = percent_values[0]
+            if discount_percent < 0 or discount_percent > 99:
+                await message.answer(PRICE_INPUT_HINT)
+                return
+            original_price = int(get_offer_field(offer, "original_price", 0) or 0)
+            if original_price <= 0:
+                await message.answer(get_text(lang, "error_price_gt_zero"))
+                return
+            discount_price = int(original_price * (100 - discount_percent) / 100)
+        else:
+            numbers = _extract_numbers(message.text)
+            if len(numbers) not in (1, 2):
+                await message.answer(PRICE_INPUT_HINT)
+                return
+            if len(numbers) == 1:
+                original_price = int(get_offer_field(offer, "original_price", 0) or 0)
+                discount_price = numbers[0]
+            else:
+                original_price, discount_price = numbers
+
+            if original_price <= 0 or discount_price <= 0:
+                await message.answer(get_text(lang, "error_price_gt_zero"))
+                return
+            if discount_price >= original_price:
+                await message.answer(get_text(lang, "error_discount_less_than_original"))
+                return
+
+        with db.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                "UPDATE offers SET original_price = %s, discount_price = %s WHERE offer_id = %s",
+                (original_price, discount_price, offer_id),
+            )
+    elif edit_field == "quantity":
+        numbers = _extract_numbers(message.text)
+        if len(numbers) != 1:
+            await message.answer(get_text(lang, "error_qty_gt_zero"))
+            return
+        quantity = numbers[0]
+        if quantity < 0:
+            await message.answer(get_text(lang, "error_qty_gt_zero"))
+            return
+        db.update_offer_quantity(offer_id, quantity)
+    elif edit_field == "description":
+        description = (message.text or "").strip()
+        if not description:
+            await message.answer(get_text(lang, "error_general"))
+            return
+        with db.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                "UPDATE offers SET description = %s WHERE offer_id = %s",
+                (description, offer_id),
+            )
+    else:
+        await state.clear()
+        await message.answer(get_text(lang, "error_general"), reply_markup=main_menu_seller(lang))
+        return
+
+    await state.clear()
+
+    updated_offer = db.get_offer(offer_id)
+    if updated_offer:
+        await send_offer_card(message, updated_offer, lang)
+    else:
+        await message.answer(get_text(lang, "error_general"), reply_markup=main_menu_seller(lang))
+
+
 @router.callback_query(F.data.startswith("view_offer_"))
 async def view_offer(callback: types.CallbackQuery) -> None:
     """View offer details with management buttons."""
@@ -795,7 +1012,7 @@ async def edit_time_until(message: types.Message, state: FSMContext) -> None:
     with db.get_connection() as conn:
         cursor = conn.cursor()
         cursor.execute(
-            "UPDATE offers SET available_from = ?, available_until = ? WHERE offer_id = ?",
+            "UPDATE offers SET available_from = %s, available_until = %s WHERE offer_id = %s",
             (available_from, available_until, offer_id),
         )
 

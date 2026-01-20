@@ -461,10 +461,6 @@ function CartPage({ user }) {
         order_type: orderType,
         delivery_fee: orderType === 'delivery' ? deliveryFee : 0,
         payment_method: selectedPaymentMethod,
-        payment_proof:
-          orderType === 'delivery' && selectedPaymentMethod === 'card' && paymentProofData
-            ? paymentProofData
-            : undefined,
       }
 
       localStorage.setItem('fudly_phone', resolvedPhone)
@@ -481,7 +477,7 @@ function CartPage({ user }) {
       setCreatedOrderId(orderId)
 
       let paymentProofUploaded = false
-      if (selectedPaymentMethod === 'card' && paymentProof && orderId && !paymentProofData) {
+      if (selectedPaymentMethod === 'card' && paymentProof && orderId) {
         try {
           await api.uploadPaymentProof(orderId, paymentProof)
           paymentProofUploaded = true

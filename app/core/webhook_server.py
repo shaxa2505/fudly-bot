@@ -1352,6 +1352,9 @@ async def create_webhook_app(
                 or data.get("payment_proof_photo_id")
                 or data.get("payment_screenshot")
             )
+            if isinstance(payment_proof, str) and payment_proof.strip().startswith("data:"):
+                logger.info("Ignoring data URL payment_proof in create_order payload")
+                payment_proof = None
 
             if not items:
                 return add_cors_headers(
@@ -1375,13 +1378,6 @@ async def create_webhook_app(
                         status=400,
                     )
                 )
-            if is_delivery and payment_method == "card" and not payment_proof:
-                return add_cors_headers(
-                    web.json_response(
-                        {"error": "payment_proof is required for card delivery orders"},
-                        status=400,
-                    )
-                )
 
             # Try unified order service first
             created_bookings: list[dict[str, Any]] = []
@@ -1393,7 +1389,19 @@ async def create_webhook_app(
 
                 for item in items:
                     offer_id = item.get("id") or item.get("offer_id")
-                    quantity = int(item.get("quantity", 1))
+                    try:
+                        quantity = int(item.get("quantity", 1))
+                    except (TypeError, ValueError):
+                        return add_cors_headers(
+                            web.json_response({"error": "Invalid quantity"}, status=400)
+                        )
+                    if quantity <= 0:
+                        return add_cors_headers(
+                            web.json_response(
+                                {"error": f"Invalid quantity for offer {offer_id}"},
+                                status=400,
+                            )
+                        )
 
                     if not offer_id:
                         failed_items.append({"item": item, "error": "Missing offer_id"})
@@ -1539,6 +1547,21 @@ async def create_webhook_app(
                         "message": result.error_message or "OK",
                     }
                     return add_cors_headers(web.json_response(response, status=201))
+                elif result and not result.success:
+                    detail = result.error_message or "Failed to create order"
+                    status_code = (
+                        409 if ("insufficient stock" in detail.lower() or "unavailable" in detail.lower()) else 400
+                    )
+                    return add_cors_headers(
+                        web.json_response(
+                            {
+                                "success": False,
+                                "error": detail,
+                                "failed": getattr(result, "failed_items", []) or failed_items,
+                            },
+                            status=status_code,
+                        )
+                    )
 
             # Fallback: create an order row directly (no new bookings for Mini App)
             if (

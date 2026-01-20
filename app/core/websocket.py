@@ -350,41 +350,25 @@ def _get_authenticated_user_id(init_data: str) -> int | None:
     if not init_data:
         return None
 
-    # Try to extract user_id from init_data even if validation fails
-    # Partner Panel sends: "user={"id":123,...}&auth_date=...&hash=..."
-    import urllib.parse
-
-    try:
-        params = urllib.parse.parse_qs(init_data)
-        if "user" in params:
-            import json
-
-            user_str = params["user"][0]
-            user_data = json.loads(user_str)
-            extracted_user_id = int(user_data.get("id"))
-            logger.debug(f"Extracted user_id from init_data: {extracted_user_id}")
-    except Exception as e:
-        logger.debug(f"Failed to extract user_id from init_data: {e}")
-        extracted_user_id = None
-
     # Try proper validation first
     try:
         from app.api.webapp.common import settings, validate_init_data
     except Exception as exc:  # pragma: no cover - defensive
         logger.warning(f"WebSocket auth import failed: {exc}")
-        # Return extracted user_id as fallback
-        return extracted_user_id
+        return None
 
     try:
         validated = validate_init_data(init_data, settings.bot_token)
         if validated:
             user = validated.get("user")
             if isinstance(user, dict):
-                return int(user.get("id"))
+                try:
+                    return int(user.get("id"))
+                except (TypeError, ValueError):
+                    return None
     except Exception as e:
         logger.debug(f"init_data validation failed: {e}")
-        # Return extracted user_id as fallback if validation fails
-        return extracted_user_id
+        return None
 
     return None
 

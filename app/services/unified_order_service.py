@@ -799,6 +799,63 @@ class UnifiedOrderService:
         except Exception:
             return True
 
+    # ------------------------------------------------------------------
+    # Error normalization helpers
+    # ------------------------------------------------------------------
+    @staticmethod
+    def _normalize_creation_error(error: str | None, items: list[Any]) -> str:
+        """Convert low-level DB error codes to user-friendly messages."""
+        if not error:
+            return "Failed to create order"
+
+        err = str(error)
+        if err.startswith("error:"):
+            err = err[len("error:") :]
+        lower = err.lower()
+
+        def _lookup_title(offer_id: int | None) -> str | None:
+            if offer_id is None:
+                return None
+            for item in items or []:
+                try:
+                    item_offer_id = getattr(item, "offer_id", None)
+                    if item_offer_id is None and isinstance(item, dict):
+                        item_offer_id = item.get("offer_id")
+                    if item_offer_id is None:
+                        continue
+                    if int(item_offer_id) != int(offer_id):
+                        continue
+                except Exception:
+                    continue
+                if isinstance(item, dict):
+                    return item.get("title")
+                return getattr(item, "title", None)
+            return None
+
+        if "insufficient_stock" in lower:
+            offer_id = None
+            try:
+                offer_id = int(err.split(":")[-1])
+            except Exception:
+                offer_id = None
+            title = _lookup_title(offer_id)
+            if title:
+                return f"Insufficient stock for '{title}'"
+            return "Insufficient stock for one of the items"
+
+        if "offer_unavailable" in lower:
+            offer_id = None
+            try:
+                offer_id = int(err.split(":")[-1])
+            except Exception:
+                offer_id = None
+            title = _lookup_title(offer_id)
+            if title:
+                return f"Item is no longer available: '{title}'"
+            return "Item is no longer available"
+
+        return err
+
     def _get_offer_photo(self, offer_id: int | None) -> str | None:
         if not offer_id or not hasattr(self.db, "get_offer"):
             return None
@@ -1007,6 +1064,18 @@ class UnifiedOrderService:
                 grand_total=0,
                 error_message="No items provided",
             )
+        if any(int(getattr(item, "quantity", 0) or 0) <= 0 for item in items):
+            return OrderResult(
+                success=False,
+                order_ids=[],
+                booking_ids=[],
+                pickup_codes=[],
+                total_items=0,
+                total_price=0,
+                delivery_price=0,
+                grand_total=0,
+                error_message="Invalid item quantity",
+            )
 
         is_delivery = order_type in ("delivery", "taxi")
         if is_delivery and not delivery_address:
@@ -1034,18 +1103,6 @@ class UnifiedOrderService:
                 delivery_price=0,
                 grand_total=0,
                 error_message="Cash is not allowed for delivery orders",
-            )
-        if is_delivery and payment_method == "card" and not payment_proof:
-            return OrderResult(
-                success=False,
-                order_ids=[],
-                booking_ids=[],
-                pickup_codes=[],
-                total_items=0,
-                total_price=0,
-                delivery_price=0,
-                grand_total=0,
-                error_message="Payment proof is required for card delivery orders",
             )
         # Enforce business invariant: one order must belong to ONE store
         # This protects from mixed-store carts and keeps pricing logic correct.
@@ -1102,6 +1159,8 @@ class UnifiedOrderService:
             )
 
         if not result.get("success"):
+            error_msg = result.get("error", "Failed to create orders")
+            friendly_error = self._normalize_creation_error(error_msg, items)
             return OrderResult(
                 success=False,
                 order_ids=[],
@@ -1111,7 +1170,8 @@ class UnifiedOrderService:
                 total_price=0,
                 delivery_price=0,
                 grand_total=0,
-                error_message=result.get("error", "Failed to create orders"),
+                error_message=friendly_error,
+                failed_items=result.get("failed_items"),
             )
 
         # Calculate totals
@@ -1481,7 +1541,11 @@ class UnifiedOrderService:
 
             created_orders = result.get("created_orders", [])
             if not created_orders:
-                return {"success": False, "error": "No orders created"}
+                return {
+                    "success": False,
+                    "error": "No orders created",
+                    "failed_items": result.get("failed_items"),
+                }
 
             return {
                 "success": True,
@@ -1491,6 +1555,7 @@ class UnifiedOrderService:
                     o.get("pickup_code") for o in created_orders if o.get("pickup_code")
                 ],
                 "stores_orders": result.get("stores_orders", {}),
+                "failed_items": result.get("failed_items"),
             }
         except Exception as e:
             logger.error(f"Failed to create pickup orders: {e}")
@@ -1580,7 +1645,11 @@ class UnifiedOrderService:
 
             created_orders = result.get("created_orders", [])
             if not created_orders:
-                return {"success": False, "error": "No orders created"}
+                return {
+                    "success": False,
+                    "error": "No orders created",
+                    "failed_items": result.get("failed_items"),
+                }
 
             return {
                 "success": True,
@@ -1590,6 +1659,7 @@ class UnifiedOrderService:
                     o.get("pickup_code") for o in created_orders if o.get("pickup_code")
                 ],
                 "stores_orders": result.get("stores_orders", {}),
+                "failed_items": result.get("failed_items"),
             }
         except Exception as e:
             logger.error(f"Failed to create delivery orders: {e}")
