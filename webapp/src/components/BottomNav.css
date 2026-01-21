@@ -97,8 +97,8 @@
 
 .nav-badge {
   position: absolute;
-  top: -6px;
-  right: -2px;
+  top: -4px;
+  right: 0;
   background: #10B981;
   color: var(--color-text-inverse);
   font-size: 8px;

@@ -5,7 +5,7 @@
 .offer-card {
   --offer-primary: var(--home-primary, #065F46);
   --offer-border: #F1F5F9;
-  --offer-shadow: 0 8px 16px rgba(15, 23, 42, 0.08);
+  --offer-shadow: 0 2px 6px rgba(15, 23, 42, 0.08);
   background: #FFFFFF;
   border-radius: 32px;
   border: 1px solid var(--offer-border);

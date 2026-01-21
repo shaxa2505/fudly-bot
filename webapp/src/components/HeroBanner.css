@@ -14,7 +14,7 @@
   background: #111827;
   color: #FFFFFF;
   cursor: pointer;
-  box-shadow: 0 8px 16px rgba(15, 23, 42, 0.12);
+  box-shadow: none;
   transition: transform 0.25s ease, box-shadow 0.25s ease;
   -webkit-tap-highlight-color: transparent;
   isolation: isolate;
@@ -27,7 +27,7 @@
   background-size: cover;
   background-position: var(--banner-position, center);
   background-repeat: no-repeat;
-  transform: scale(1.03);
+  transform: scale(1);
   filter: saturate(1.05) contrast(1.05);
 }
 
@@ -39,7 +39,7 @@
 
 .hero-banner:active {
   transform: scale(0.98);
-  box-shadow: 0 12px 24px rgba(16, 24, 40, 0.18);
+  box-shadow: none;
 }
 
 .hero-banner:focus-visible {
@@ -62,7 +62,7 @@
   background: var(--home-accent);
   color: #FFFFFF;
   font-size: 10px;
-  font-weight: 800;
+  font-weight: 700;
   letter-spacing: 0.2em;
   text-transform: uppercase;
   border-radius: 999px;
