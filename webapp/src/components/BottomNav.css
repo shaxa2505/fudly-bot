@@ -8,15 +8,13 @@
   bottom: 0;
   left: 0;
   right: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  display: block;
   background: rgba(255, 255, 255, 0.8);
   border-top: 1px solid #F1F5F9;
   border-radius: 0;
   z-index: var(--z-modal);
-  padding: 12px 24px calc(32px + var(--safe-area-bottom));
-  min-height: var(--bottom-nav-height);
+  padding: 12px 24px calc(12px + var(--safe-area-bottom));
+  min-height: 0;
   box-shadow: 0 -8px 16px rgba(15, 23, 42, 0.08);
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);

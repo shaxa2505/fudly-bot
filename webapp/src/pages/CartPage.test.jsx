@@ -6,7 +6,6 @@ import { renderWithProviders } from '../test/renderWithProviders'
 const apiMocks = vi.hoisted(() => ({
   getPaymentProviders: vi.fn(),
   getStore: vi.fn(),
-  getStoreOffers: vi.fn(),
   getPhotoUrl: vi.fn(),
   getProfile: vi.fn(),
   createOrder: vi.fn(),
@@ -19,7 +18,6 @@ vi.mock('../api/client', () => ({
   default: {
     getPaymentProviders: apiMocks.getPaymentProviders,
     getStore: apiMocks.getStore,
-    getStoreOffers: apiMocks.getStoreOffers,
     getPhotoUrl: apiMocks.getPhotoUrl,
     getProfile: apiMocks.getProfile,
     createOrder: apiMocks.createOrder,
@@ -38,11 +36,9 @@ describe('CartPage', () => {
     localStorage.clear()
     apiMocks.getPaymentProviders.mockReset()
     apiMocks.getStore.mockReset()
-    apiMocks.getStoreOffers.mockReset()
     apiMocks.getPhotoUrl.mockReset()
     apiMocks.getPaymentProviders.mockResolvedValue([])
     apiMocks.getStore.mockResolvedValue({ delivery_enabled: false })
-    apiMocks.getStoreOffers.mockResolvedValue([])
     apiMocks.getPhotoUrl.mockReturnValue('')
     apiMocks.getProfile.mockReset()
   })
@@ -75,7 +71,7 @@ describe('CartPage', () => {
 
     renderWithProviders(<CartPage />)
 
-    expect(await screen.findByText('Milk')).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: 'Milk' })).toBeInTheDocument()
 
     fireEvent.click(screen.getByRole('button', { name: "To'lovga o'tish" }))
 
